@@ -1,0 +1,27 @@
+{
+  "nodesets": [
+    {
+      "name": "bad.self",
+      "display_name": "Bad Self",
+      "category": "bad",
+      "description": "Bad recursive nodeset.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": ["value.in"],
+      "provides": ["value.out"],
+      "exports": ["value.out"],
+      "pipeline": {
+        "inputs": ["value.in"],
+        "nodes": [
+          {"name": "self", "type": "nodeset.bad.self", "requires": ["value.in"], "provides": ["value.out"]}
+        ]
+      }
+    }
+  ],
+  "pipeline": {
+    "inputs": ["value.in"],
+    "nodes": [
+      {"name": "self", "type": "nodeset.bad.self", "requires": ["value.in"], "provides": ["value.out"]}
+    ]
+  }
+}

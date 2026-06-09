@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 
+from .ast_rules import import_modules, module_statement_kind, name_targets
 from .node import NodeContract
 from .purity_helpers import (
     _assigns_resource_field,
@@ -30,7 +31,20 @@ from .purity_types import (
 )
 
 
-class NodePurityVisitor(ast.NodeVisitor):
+class _PurityImportVisitor(ast.NodeVisitor):
+    def visit_Import(self, node: ast.Import) -> None:
+        for module in import_modules(node):
+            self._check_import(module, node)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        module = node.module or ""
+        if _is_boundary_import(module) or any(alias.name in {"GlobalBoundary", "BoundaryRegistry"} for alias in node.names):
+            self._add("boundary_import", f"node must not import boundary APIs: {module}", node, suggested_fix_type="move_to_boundary")
+            return
+        self._check_import(module, node)
+
+
+class NodePurityVisitor(_PurityImportVisitor):
     def __init__(
         self,
         *,
@@ -74,17 +88,6 @@ class NodePurityVisitor(ast.NodeVisitor):
         self.generic_visit(node)
         self._current_function = previous
 
-    def visit_Import(self, node: ast.Import) -> None:
-        for alias in node.names:
-            self._check_import(alias.name, node)
-
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        module = node.module or ""
-        if _is_boundary_import(module) or any(alias.name in {"GlobalBoundary", "BoundaryRegistry"} for alias in node.names):
-            self._add("boundary_import", f"node must not import boundary APIs: {module}", node, suggested_fix_type="move_to_boundary")
-            return
-        self._check_import(module, node)
-
     def visit_Global(self, node: ast.Global) -> None:
         self._add("global_state", "global mutation is forbidden", node, suggested_fix_type="move_to_boundary")
 
@@ -93,7 +96,8 @@ class NodePurityVisitor(ast.NodeVisitor):
 
     def visit_Assign(self, node: ast.Assign) -> None:
         self._track_input_alias(node)
-        self._track_output_dict(node)
+        self._track_output_literal(node)
+        self._track_output_key_assignment(node)
         if _assigns_resource_field(node):
             self._add("resource_field", "node must not hold Context, boundary, session, browser, client, driver, cursor, or engine", node)
         for target in node.targets:
@@ -118,24 +122,11 @@ class NodePurityVisitor(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         name = _call_name(node.func)
-        root = name.split(".", 1)[0]
-        if name in BANNED_CALL_NAMES or name in BANNED_ATTR_CALLS or root in BANNED_CALL_NAMES:
-            self._add("banned_call", f"banned call: {name}", node, suggested_fix_type="move_to_boundary")
-        elif _matches_prefix(name, BANNED_ATTR_CALLS):
-            self._add("banned_call", f"banned call: {name}", node, suggested_fix_type="move_to_boundary")
-        if name in {"setattr", "delattr"}:
-            self._add("monkey_patch", f"monkey patching is forbidden: {name}", node, suggested_fix_type="fix_node")
-        if name.endswith(".run_pure") or root in self.known_node_class_names:
-            self._add("node_direct_call", f"node must not directly call another node: {name}", node, suggested_fix_type="move_to_nodeset")
-        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
-            if node.func.value.id in {"inputs", *self._input_aliases} and node.func.attr in MUTATING_METHODS:
-                self._add("input_mutation", f"node must not mutate inputs via {node.func.attr}", node, suggested_fix_type="fix_node")
-            if node.func.value.id == "params" and node.func.attr == "get" and node.args:
-                key_node = node.args[0]
-                if isinstance(key_node, ast.Constant) and isinstance(key_node.value, str):
-                    key = key_node.value
-                    if self.contract is not None and key not in self.contract.params_schema:
-                        self._add("undeclared_param", f"params key is not declared in CONTRACT.params_schema: {key}", node, failure_layer="contract", suggested_fix_type="fix_contract")
+        self._check_banned_call(name, node)
+        self._check_monkey_patch_call(name, node)
+        self._check_node_coupling_call(name, node)
+        self._check_input_mutation_call(node)
+        self._check_params_get_call(node)
         self.generic_visit(node)
 
     def visit_While(self, node: ast.While) -> None:
@@ -204,20 +195,60 @@ class NodePurityVisitor(ast.NodeVisitor):
                 if isinstance(target, ast.Name):
                     self._input_aliases.add(target.id)
 
-    def _track_output_dict(self, node: ast.Assign) -> None:
-        if isinstance(node.value, ast.Dict):
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    keys, dynamic = _dict_literal_keys(node.value)
-                    if not dynamic and keys is not None:
-                        self._output_dicts[target.id] = keys
+    def _track_output_literal(self, node: ast.Assign) -> None:
+        if not isinstance(node.value, ast.Dict):
+            return
+        keys, dynamic = _dict_literal_keys(node.value)
+        if dynamic or keys is None:
+            return
+        for target in name_targets(node.targets):
+            self._output_dicts[target.id] = keys
+
+    def _track_output_key_assignment(self, node: ast.Assign) -> None:
         for target in node.targets:
             if isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name) and target.value.id in self._output_dicts:
-                key = _literal_subscript_key(target)
-                if key:
-                    self._output_dicts[target.value.id].add(key)
-                else:
-                    self._add("dynamic_output_key", "output dict assignment key must be a string literal", node, suggested_fix_type="fix_contract")
+                self._record_output_key(target, node)
+
+    def _record_output_key(self, target: ast.Subscript, node: ast.Assign) -> None:
+        key = _literal_subscript_key(target)
+        if key and isinstance(target.value, ast.Name):
+            self._output_dicts[target.value.id].add(key)
+        else:
+            self._add("dynamic_output_key", "output dict assignment key must be a string literal", node, suggested_fix_type="fix_contract")
+
+    def _check_banned_call(self, name: str, node: ast.Call) -> None:
+        root = name.split(".", 1)[0]
+        if name in BANNED_CALL_NAMES or name in BANNED_ATTR_CALLS or root in BANNED_CALL_NAMES:
+            self._add("banned_call", f"banned call: {name}", node, suggested_fix_type="move_to_boundary")
+        elif _matches_prefix(name, BANNED_ATTR_CALLS):
+            self._add("banned_call", f"banned call: {name}", node, suggested_fix_type="move_to_boundary")
+
+    def _check_monkey_patch_call(self, name: str, node: ast.Call) -> None:
+        if name in {"setattr", "delattr"}:
+            self._add("monkey_patch", f"monkey patching is forbidden: {name}", node, suggested_fix_type="fix_node")
+
+    def _check_node_coupling_call(self, name: str, node: ast.Call) -> None:
+        root = name.split(".", 1)[0]
+        if name.endswith(".run_pure") or root in self.known_node_class_names:
+            self._add("node_direct_call", f"node must not directly call another node: {name}", node, suggested_fix_type="move_to_nodeset")
+
+    def _check_input_mutation_call(self, node: ast.Call) -> None:
+        if not isinstance(node.func, ast.Attribute) or not isinstance(node.func.value, ast.Name):
+            return
+        if node.func.value.id in {"inputs", *self._input_aliases} and node.func.attr in MUTATING_METHODS:
+            self._add("input_mutation", f"node must not mutate inputs via {node.func.attr}", node, suggested_fix_type="fix_node")
+
+    def _check_params_get_call(self, node: ast.Call) -> None:
+        if not isinstance(node.func, ast.Attribute) or not isinstance(node.func.value, ast.Name):
+            return
+        if node.func.value.id == "params" and node.func.attr == "get" and node.args:
+            self._check_params_key_node(node.args[0], node)
+
+    def _check_params_key_node(self, key_node: ast.AST, node: ast.Call) -> None:
+        if isinstance(key_node, ast.Constant) and isinstance(key_node.value, str):
+            key = key_node.value
+            if self.contract is not None and key not in self.contract.params_schema:
+                self._add("undeclared_param", f"params key is not declared in CONTRACT.params_schema: {key}", node, failure_layer="contract", suggested_fix_type="fix_contract")
 
     def _check_assignment_target(self, target: ast.AST, node: ast.AST) -> None:
         if _is_inputs_subscript(target):
@@ -254,7 +285,7 @@ class NodePurityVisitor(ast.NodeVisitor):
         )
 
 
-class ModulePurityVisitor(ast.NodeVisitor):
+class ModulePurityVisitor(_PurityImportVisitor):
     def __init__(
         self,
         *,
@@ -273,30 +304,18 @@ class ModulePurityVisitor(ast.NodeVisitor):
 
     def visit_Module(self, node: ast.Module) -> None:
         for stmt in node.body:
-            if isinstance(stmt, (ast.Import, ast.ImportFrom)):
-                self.visit(stmt)
-            elif isinstance(stmt, ast.ClassDef):
-                if stmt.name != self.node_class_name and _class_looks_like_node(stmt):
-                    self.known_node_class_names.add(stmt.name)
-                continue
-            elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            elif isinstance(stmt, (ast.Assign, ast.AnnAssign)):
-                if not _module_assignment_is_allowed(stmt):
-                    self._add("module_global_state", "module-level mutable state or side-effect construction is forbidden", stmt, suggested_fix_type="move_to_boundary")
-            elif not isinstance(stmt, ast.Expr) or not isinstance(stmt.value, ast.Constant) or not isinstance(stmt.value.value, str):
-                self._add("module_side_effect", "node module top level may only contain imports, definitions, immutable constants, and docstrings", stmt, suggested_fix_type="move_to_boundary")
+            self._visit_module_statement(stmt)
 
-    def visit_Import(self, node: ast.Import) -> None:
-        for alias in node.names:
-            self._check_import(alias.name, node)
-
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        module = node.module or ""
-        if _is_boundary_import(module) or any(alias.name in {"GlobalBoundary", "BoundaryRegistry"} for alias in node.names):
-            self._add("boundary_import", f"node must not import boundary APIs: {module}", node, suggested_fix_type="move_to_boundary")
-            return
-        self._check_import(module, node)
+    def _visit_module_statement(self, stmt: ast.stmt) -> None:
+        kind = module_statement_kind(stmt)
+        if kind == "import":
+            self.visit(stmt)
+        elif isinstance(stmt, ast.ClassDef):
+            self._record_module_class(stmt)
+        elif kind == "assignment":
+            self._check_module_assignment(stmt)
+        elif kind not in {"definition", "docstring"}:
+            self._add("module_side_effect", "node module top level may only contain imports, definitions, immutable constants, and docstrings", stmt, suggested_fix_type="move_to_boundary")
 
     def _check_import(self, module: str, node: ast.AST) -> None:
         root = module.split(".", 1)[0]
@@ -310,6 +329,14 @@ class ModulePurityVisitor(ast.NodeVisitor):
         allowed = set(self.policy.allowed_import_roots)
         if root in banned and root not in allowed:
             self._add("banned_import", f"banned import: {module}", node, suggested_fix_type="move_to_boundary")
+
+    def _record_module_class(self, node: ast.ClassDef) -> None:
+        if node.name != self.node_class_name and _class_looks_like_node(node):
+            self.known_node_class_names.add(node.name)
+
+    def _check_module_assignment(self, node: ast.Assign | ast.AnnAssign) -> None:
+        if not _module_assignment_is_allowed(node):
+            self._add("module_global_state", "module-level mutable state or side-effect construction is forbidden", node, suggested_fix_type="move_to_boundary")
 
     def _add(self, code: str, message: str, node: ast.AST, *, suggested_fix_type: str) -> None:
         self.violations.append(

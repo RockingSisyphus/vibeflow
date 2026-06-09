@@ -3,54 +3,20 @@ from __future__ import annotations
 import json
 import time
 from copy import deepcopy
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Mapping
 
 from .boundary import BoundaryRegistry, BoundaryRegistryError, GlobalBoundary
 from .compiler import GraphCompiler
 from .context import Context
 from .graph_config import GraphConfig, NodeSpec
-from .node import NodeContract
 from .path_utils import is_relative_to
 from .plugin import PluginRegistry
 from .summaries import summarize_mapping
 from .registry import NodeRegistry, NodeRegistryError
-
-
-@dataclass
-class PipelineRuntimeError(RuntimeError):
-    detail: str
-
-    def __str__(self) -> str:
-        return f"Pipeline runtime error: {self.detail}"
-
-
-@dataclass
-class BoundaryRuntimeError(PipelineRuntimeError):
-    pass
-
-
-@dataclass
-class RuntimeTrace:
-    exec_order: list[str] = field(default_factory=list)
-    edge_executions: dict[str, int] = field(default_factory=dict)
-    loop_iterations: dict[str, int] = field(default_factory=dict)
-    loop_stop_reasons: dict[str, str] = field(default_factory=dict)
-    loop_orders: dict[str, tuple[str, ...]] = field(default_factory=dict)
-    boundary_events: list[dict[str, object]] = field(default_factory=list)
-    events: list[dict[str, object]] = field(default_factory=list)
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "exec_order": tuple(self.exec_order),
-            "edge_executions": dict(self.edge_executions),
-            "loop_iterations": dict(self.loop_iterations),
-            "loop_stop_reasons": dict(self.loop_stop_reasons),
-            "loop_orders": {name: list(order) for name, order in self.loop_orders.items()},
-            "boundary_events": [dict(event) for event in self.boundary_events],
-            "events": [dict(event) for event in self.events],
-        }
+from .runtime_errors import BoundaryRuntimeError, PipelineRuntimeError
+from .runtime_trace import RuntimeTrace
+from .runtime_validation import assert_runtime_output_snapshot
 
 
 class PipelineRuntime:
@@ -82,58 +48,92 @@ class PipelineRuntime:
     def run(self, initial: Mapping[str, Any] | None = None) -> Context:
         context = Context(dict(initial or {}))
         try:
-            self._call_runtime_plugins("before_run", context.to_dict())
-            self._call_boundary("before_run", context, lambda boundary: boundary.before_run(self._run_config()))
-            for node_name in self.compiled.acyclic_order:
-                self._run_node(node_name, context)
-            for loop in self.graph.loops:
-                loop_nodes = self.compiled.loop_orders.get(loop.name, ())
-                self.trace.loop_iterations[loop.name] = 0
-                self.trace.loop_stop_reasons[loop.name] = ""
-                for iteration in range(loop.max_iterations):
-                    if loop.until and bool(context.get(loop.until, default=False)):
-                        self.trace.loop_stop_reasons[loop.name] = "until"
-                        break
-                    try:
-                        self._call_boundary(
-                            "before_iteration",
-                            context,
-                            lambda boundary, iteration=iteration: boundary.before_iteration(iteration, context.to_dict()),
-                            iteration=iteration,
-                        )
-                        for node_name in loop_nodes:
-                            self._run_node(node_name, context)
-                        self._call_boundary(
-                            "after_iteration",
-                            context,
-                            lambda boundary, iteration=iteration: boundary.after_iteration(
-                                iteration,
-                                self._boundary_consumed_outputs(context),
-                                context.to_dict(),
-                            ),
-                            iteration=iteration,
-                        )
-                    except BoundaryRuntimeError:
-                        self.trace.loop_stop_reasons[loop.name] = "boundary_failed"
-                        self.trace.loop_iterations[loop.name] = iteration
-                        self._write_trace(context)
-                        raise
-                    except Exception:
-                        self.trace.loop_stop_reasons[loop.name] = "node_failed"
-                        self.trace.loop_iterations[loop.name] = iteration
-                        self._write_trace(context)
-                        raise
-                    self.trace.loop_iterations[loop.name] = iteration + 1
-                if not self.trace.loop_stop_reasons[loop.name]:
-                    self.trace.loop_stop_reasons[loop.name] = "max_iterations"
-            self._call_boundary("after_run", context, lambda boundary: boundary.after_run(context.to_dict(), self._run_config()))
-            self._call_runtime_plugins("after_run", context.to_dict(), self.trace.to_dict())
+            self._run_preflight(context)
+            self._run_acyclic_nodes(context)
+            self._run_declared_loops(context)
+            self._finalize_run(context)
         except Exception:
             self.trace.loop_stop_reasons.setdefault("runtime", "boundary_failed")
             self._write_trace(context)
             raise
         self._write_trace(context)
         return context
+
+    def _run_preflight(self, context: Context) -> None:
+        self._call_runtime_plugins("before_run", context.to_dict())
+        self._call_boundary("before_run", context, lambda boundary: boundary.before_run(self._run_config()))
+
+    def _run_acyclic_nodes(self, context: Context) -> None:
+        for node_name in self.compiled.acyclic_order:
+            self._run_node(node_name, context)
+
+    def _run_declared_loops(self, context: Context) -> None:
+        for loop in self.graph.loops:
+            self._run_loop(loop, context)
+
+    def _run_loop(self, loop, context: Context) -> None:
+        loop_nodes = self.compiled.loop_orders.get(loop.name, ())
+        self.trace.loop_iterations[loop.name] = 0
+        self.trace.loop_stop_reasons[loop.name] = ""
+        for iteration in range(loop.max_iterations):
+            if self._loop_until_reached(loop, context):
+                self.trace.loop_stop_reasons[loop.name] = "until"
+                break
+            self._run_loop_iteration(loop.name, loop_nodes, iteration, context)
+        if not self.trace.loop_stop_reasons[loop.name]:
+            self.trace.loop_stop_reasons[loop.name] = "max_iterations"
+
+    def _loop_until_reached(self, loop, context: Context) -> bool:
+        return bool(loop.until and context.get(loop.until, default=False))
+
+    def _run_loop_iteration(
+        self,
+        loop_name: str,
+        loop_nodes: tuple[str, ...],
+        iteration: int,
+        context: Context,
+    ) -> None:
+        try:
+            self._before_loop_iteration(iteration, context)
+            for node_name in loop_nodes:
+                self._run_node(node_name, context)
+            self._after_loop_iteration(iteration, context)
+        except BoundaryRuntimeError:
+            self._record_loop_failure(loop_name, iteration, "boundary_failed", context)
+            raise
+        except Exception:
+            self._record_loop_failure(loop_name, iteration, "node_failed", context)
+            raise
+        self.trace.loop_iterations[loop_name] = iteration + 1
+
+    def _before_loop_iteration(self, iteration: int, context: Context) -> None:
+        self._call_boundary(
+            "before_iteration",
+            context,
+            lambda boundary, iteration=iteration: boundary.before_iteration(iteration, context.to_dict()),
+            iteration=iteration,
+        )
+
+    def _after_loop_iteration(self, iteration: int, context: Context) -> None:
+        self._call_boundary(
+            "after_iteration",
+            context,
+            lambda boundary, iteration=iteration: boundary.after_iteration(
+                iteration,
+                self._boundary_consumed_outputs(context),
+                context.to_dict(),
+            ),
+            iteration=iteration,
+        )
+
+    def _record_loop_failure(self, loop_name: str, iteration: int, reason: str, context: Context) -> None:
+        self.trace.loop_stop_reasons[loop_name] = reason
+        self.trace.loop_iterations[loop_name] = iteration
+        self._write_trace(context)
+
+    def _finalize_run(self, context: Context) -> None:
+        self._call_boundary("after_run", context, lambda boundary: boundary.after_run(context.to_dict(), self._run_config()))
+        self._call_runtime_plugins("after_run", context.to_dict(), self.trace.to_dict())
 
     def _load_boundary(self, boundary_registry: BoundaryRegistry | None) -> GlobalBoundary | None:
         if self._boundary_spec is None:
@@ -322,8 +322,7 @@ class PipelineRuntime:
                 raise PipelineRuntimeError(f"node '{node_name}' missed declared outputs: {sorted(missing)}")
             contract = getattr(node_cls, "CONTRACT", None)
             for key, value in outputs.items():
-                if not _output_allows_opaque_snapshot(contract, str(key)):
-                    _assert_json_snapshot(value, node_name=node_name, key=str(key))
+                assert_runtime_output_snapshot(value, contract=contract, node_name=node_name, key=str(key))
             for key, value in outputs.items():
                 context.set(str(key), value)
             self._mark_node_run(node_name)
@@ -424,24 +423,9 @@ class PipelineRuntime:
         self.trace.events.append(event)
 
 
-def _output_allows_opaque_snapshot(contract: object, key: str) -> bool:
-    if not isinstance(contract, NodeContract):
-        return False
-    schema = contract.output_schema.get(key)
-    return isinstance(schema, Mapping) and schema.get("snapshot") == "opaque"
-
-
-def _assert_json_snapshot(value: Any, *, node_name: str, key: str) -> None:
-    try:
-        json.dumps(value, ensure_ascii=False, allow_nan=False)
-    except (TypeError, ValueError) as exc:
-        raise PipelineRuntimeError(f"node '{node_name}' output '{key}' is not JSON snapshot serializable: {exc}") from exc
-
-
 def _edge_key(pair: tuple[str, str]) -> str:
     return f"{pair[0]}->{pair[1]}"
 
 
 def _elapsed_ms(started: float) -> float:
     return round((time.perf_counter() - started) * 1000, 3)
-

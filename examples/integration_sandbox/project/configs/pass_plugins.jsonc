@@ -1,0 +1,52 @@
+{
+  "plugins": [
+    {"module": "../plugins/policy_plugins.py", "class": "PolicyPlugin", "type": "policy"},
+    {"module": "../plugins/policy_plugins.py", "class": "FindingPlugin", "type": "policy"},
+    {"module": "../plugins/hook_plugins.py", "class": "CompilerPlugin", "type": "compiler"},
+    {"module": "../plugins/hook_plugins.py", "class": "RuntimePlugin", "type": "runtime"},
+    {"module": "../plugins/hook_plugins.py", "class": "BoundaryPlugin", "type": "boundary"}
+  ],
+  "boundary": {
+    "type": "sandbox.demo_boundary",
+    "consumes": ["effects.request"],
+    "provides": ["io.result"],
+    "config": {}
+  },
+  "nodesets": [
+    {
+      "name": "math.add_one",
+      "display_name": "Add One",
+      "category": "math",
+      "description": "Composite add-one flow for plugin hooks.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": ["value.in"],
+      "provides": ["value.out"],
+      "exports": ["value.out"],
+      "pipeline": {
+        "inputs": ["value.in"],
+        "nodes": [
+          {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 1}
+        ]
+      }
+    }
+  ],
+  "pipeline": {
+    "nodes": [
+      {"name": "request", "type": "sandbox.effect_request", "provides": ["effects.request"], "value": 1},
+      {"name": "add_result", "type": "sandbox.boundary_result_input", "requires": ["io.result"], "provides": ["value.in"], "delta": 1},
+      {"name": "add_one", "type": "nodeset.math.add_one", "requires": ["value.in"], "provides": ["value.out"]}
+    ],
+    "edges": [
+      {"from": "add_one", "to": "request", "loop": "plugin_boundary_loop", "max_executions": 2}
+    ],
+    "loops": [
+      {
+        "name": "plugin_boundary_loop",
+        "edges": [["add_one", "request"]],
+        "nodes": ["request", "add_result", "add_one"],
+        "max_iterations": 1
+      }
+    ]
+  }
+}

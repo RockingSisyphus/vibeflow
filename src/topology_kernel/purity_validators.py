@@ -246,88 +246,134 @@ def _validate_contract_examples_shape(value: object, *, source: _SourceInfo) -> 
 
 def _validate_examples(node_cls: type[PureNode], contract: NodeContract, *, source: _SourceInfo) -> list[PurityViolation]:
     if not contract.examples:
-        return [
-            _violation(
-                "missing_examples",
-                "node should provide at least one minimal example in CONTRACT.examples",
-                source=source,
-                severity="warning",
-                failure_layer="contract",
-                suggested_fix_type="fix_contract",
-            )
-        ]
+        return [_missing_examples_violation(source)]
     findings: list[PurityViolation] = []
     covers_contract = False
     for index, example in enumerate(contract.examples):
         if not isinstance(example, Mapping):
             continue
-        inputs = dict(example.get("inputs", {}))
-        params = dict(example.get("params", {}))
-        expected_outputs = dict(example.get("outputs", {}))
-        if set(contract.requires) <= set(inputs) and set(expected_outputs) == set(contract.provides):
+        inputs, params, expected_outputs = _example_payload(example)
+        if _example_covers_contract(contract, inputs, expected_outputs):
             covers_contract = True
         else:
-            findings.append(
-                _violation(
-                    "example_contract_gap",
-                    f"CONTRACT.examples[{index}] does not cover requires/provides",
-                    source=source,
-                    severity="warning",
-                    failure_layer="contract",
-                    suggested_fix_type="fix_contract",
-                    details={"example_index": index},
-                )
-            )
+            findings.append(_example_gap_violation(index, source=source))
             continue
-        try:
-            actual_outputs = node_cls().run_pure(deepcopy(inputs), deepcopy(params))
-        except Exception as exc:  # noqa: BLE001 - health report must contain checker-visible failure.
-            findings.append(
-                _violation(
-                    "example_failed",
-                    f"CONTRACT.examples[{index}] raised {type(exc).__name__}: {exc}",
-                    source=source,
-                    failure_layer="contract",
-                    suggested_fix_type="fix_node",
-                    details={"example_index": index},
-                )
-            )
-            continue
-        if actual_outputs != expected_outputs:
-            findings.append(
-                _violation(
-                    "example_failed",
-                    f"CONTRACT.examples[{index}] expected outputs do not match run_pure outputs",
-                    source=source,
-                    failure_layer="contract",
-                    suggested_fix_type="fix_node",
-                    details={"example_index": index, "expected": expected_outputs, "actual": actual_outputs},
-                )
-            )
-        try:
-            json.dumps(actual_outputs, ensure_ascii=False, allow_nan=False)
-        except (TypeError, ValueError) as exc:
-            findings.append(
-                _violation(
-                    "example_failed",
-                    f"CONTRACT.examples[{index}] output is not JSON snapshot serializable: {exc}",
-                    source=source,
-                    failure_layer="contract",
-                    suggested_fix_type="fix_contract",
-                    details={"example_index": index},
-                )
-            )
+        findings.extend(_validate_example_output(node_cls, inputs, params, expected_outputs, index, source=source))
     if not covers_contract:
-        findings.append(
+        findings.append(_no_covering_example_violation(source))
+    return findings
+
+
+def _example_payload(example: Mapping[str, object]) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
+    return (
+        dict(example.get("inputs", {})),
+        dict(example.get("params", {})),
+        dict(example.get("outputs", {})),
+    )
+
+
+def _example_covers_contract(contract: NodeContract, inputs: Mapping[str, object], outputs: Mapping[str, object]) -> bool:
+    return set(contract.requires) <= set(inputs) and set(outputs) == set(contract.provides)
+
+
+def _validate_example_output(
+    node_cls: type[PureNode],
+    inputs: Mapping[str, object],
+    params: Mapping[str, object],
+    expected_outputs: Mapping[str, object],
+    index: int,
+    *,
+    source: _SourceInfo,
+) -> list[PurityViolation]:
+    actual_outputs, failure = _run_example(node_cls, inputs, params, index, source=source)
+    if failure is not None:
+        return [failure]
+    findings = _compare_example_outputs(actual_outputs, expected_outputs, index, source=source)
+    findings.extend(_validate_example_snapshot(actual_outputs, index, source=source))
+    return findings
+
+
+def _run_example(
+    node_cls: type[PureNode],
+    inputs: Mapping[str, object],
+    params: Mapping[str, object],
+    index: int,
+    *,
+    source: _SourceInfo,
+) -> tuple[object, PurityViolation | None]:
+    try:
+        return node_cls().run_pure(deepcopy(dict(inputs)), deepcopy(dict(params))), None
+    except Exception as exc:  # noqa: BLE001 - health report must contain checker-visible failure.
+        return None, _violation(
+            "example_failed",
+            f"CONTRACT.examples[{index}] raised {type(exc).__name__}: {exc}",
+            source=source,
+            failure_layer="contract",
+            suggested_fix_type="fix_node",
+            details={"example_index": index},
+        )
+
+
+def _compare_example_outputs(actual_outputs: object, expected_outputs: Mapping[str, object], index: int, *, source: _SourceInfo) -> list[PurityViolation]:
+    if actual_outputs == expected_outputs:
+        return []
+    return [
+        _violation(
+            "example_failed",
+            f"CONTRACT.examples[{index}] expected outputs do not match run_pure outputs",
+            source=source,
+            failure_layer="contract",
+            suggested_fix_type="fix_node",
+            details={"example_index": index, "expected": dict(expected_outputs), "actual": actual_outputs},
+        )
+    ]
+
+
+def _validate_example_snapshot(actual_outputs: object, index: int, *, source: _SourceInfo) -> list[PurityViolation]:
+    try:
+        json.dumps(actual_outputs, ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        return [
             _violation(
-                "example_contract_gap",
-                "node examples exist but none covers all requires/provides",
+                "example_failed",
+                f"CONTRACT.examples[{index}] output is not JSON snapshot serializable: {exc}",
                 source=source,
-                severity="warning",
                 failure_layer="contract",
                 suggested_fix_type="fix_contract",
+                details={"example_index": index},
             )
-        )
-    return findings
+        ]
+    return []
+
+
+def _missing_examples_violation(source: _SourceInfo) -> PurityViolation:
+    return _contract_example_warning("missing_examples", "node should provide at least one minimal example in CONTRACT.examples", source=source)
+
+
+def _example_gap_violation(index: int, *, source: _SourceInfo) -> PurityViolation:
+    return _violation(
+        "example_contract_gap",
+        f"CONTRACT.examples[{index}] does not cover requires/provides",
+        source=source,
+        severity="warning",
+        failure_layer="contract",
+        suggested_fix_type="fix_contract",
+        details={"example_index": index},
+    )
+
+
+def _no_covering_example_violation(source: _SourceInfo) -> PurityViolation:
+    return _contract_example_warning("example_contract_gap", "node examples exist but none covers all requires/provides", source=source)
+
+
+def _contract_example_warning(code: str, message: str, *, source: _SourceInfo) -> PurityViolation:
+    return _violation(
+        code,
+        message,
+        source=source,
+        severity="warning",
+        failure_layer="contract",
+        suggested_fix_type="fix_contract",
+    )
 
 

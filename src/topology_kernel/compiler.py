@@ -139,45 +139,77 @@ def _derive_data_edges(
 
 
 def _merge_edges(edges: tuple[EdgeSpec, ...], *, loops: tuple[LoopSpec, ...]) -> tuple[EdgeSpec, ...]:
-    loop_edge_to_name: dict[tuple[str, str], str] = {}
-    loop_edge_to_limit: dict[tuple[str, str], int] = {}
-    loop_internal_limit: dict[tuple[str, str], int] = {}
-    for loop in loops:
-        loop_nodes = set(loop.nodes) if loop.nodes else {name for pair in loop.edges for name in pair}
-        for pair in loop.edges:
-            loop_edge_to_name[pair] = loop.name
-            loop_edge_to_limit[pair] = loop.max_iterations
-        for source in loop_nodes:
-            for target in loop_nodes:
-                if source != target:
-                    loop_internal_limit[(source, target)] = max(
-                        loop_internal_limit.get((source, target), 1),
-                        loop.max_iterations + 1,
-                    )
-
+    loop_edge_names = _loop_edge_names(loops)
+    loop_edge_limits = _loop_edge_limits(loops)
+    loop_internal_limits = _loop_internal_limits(loops)
     merged: dict[tuple[str, str], EdgeSpec] = {}
     for edge in edges:
-        pair = edge.pair
-        loop_name = edge.loop or loop_edge_to_name.get(pair, "")
-        if pair in loop_edge_to_limit and not edge.max_executions_declared:
-            limit = loop_edge_to_limit[pair]
-        elif pair in loop_internal_limit and not edge.max_executions_declared:
-            limit = loop_internal_limit[pair]
-        else:
-            limit = edge.max_executions
-        existing = merged.get(pair)
-        if existing is None:
-            merged[pair] = EdgeSpec(edge.source, edge.target, limit, loop_name, edge.max_executions_declared)
-        else:
-            merged_limit = max(existing.max_executions, limit)
-            merged[pair] = EdgeSpec(
-                edge.source,
-                edge.target,
-                merged_limit,
-                existing.loop or loop_name,
-                existing.max_executions_declared or edge.max_executions_declared,
-            )
+        _merge_edge_into(
+            merged,
+            _edge_with_loop_metadata(edge, loop_edge_names, loop_edge_limits, loop_internal_limits),
+        )
     return tuple(merged.values())
+
+
+def _loop_edge_names(loops: tuple[LoopSpec, ...]) -> dict[tuple[str, str], str]:
+    return {pair: loop.name for loop in loops for pair in loop.edges}
+
+
+def _loop_edge_limits(loops: tuple[LoopSpec, ...]) -> dict[tuple[str, str], int]:
+    return {pair: loop.max_iterations for loop in loops for pair in loop.edges}
+
+
+def _loop_internal_limits(loops: tuple[LoopSpec, ...]) -> dict[tuple[str, str], int]:
+    limits: dict[tuple[str, str], int] = {}
+    for loop in loops:
+        for pair in _loop_internal_pairs(loop):
+            limits[pair] = max(limits.get(pair, 1), loop.max_iterations + 1)
+    return limits
+
+
+def _loop_internal_pairs(loop: LoopSpec) -> tuple[tuple[str, str], ...]:
+    loop_nodes = tuple(loop.nodes) if loop.nodes else tuple({name for pair in loop.edges for name in pair})
+    return tuple((source, target) for source in loop_nodes for target in loop_nodes if source != target)
+
+
+def _edge_with_loop_metadata(
+    edge: EdgeSpec,
+    loop_edge_names: dict[tuple[str, str], str],
+    loop_edge_limits: dict[tuple[str, str], int],
+    loop_internal_limits: dict[tuple[str, str], int],
+) -> EdgeSpec:
+    pair = edge.pair
+    loop_name = edge.loop or loop_edge_names.get(pair, "")
+    limit = _effective_edge_limit(edge, loop_edge_limits, loop_internal_limits)
+    return EdgeSpec(edge.source, edge.target, limit, loop_name, edge.max_executions_declared)
+
+
+def _effective_edge_limit(
+    edge: EdgeSpec,
+    loop_edge_limits: dict[tuple[str, str], int],
+    loop_internal_limits: dict[tuple[str, str], int],
+) -> int:
+    if edge.max_executions_declared:
+        return edge.max_executions
+    if edge.pair in loop_edge_limits:
+        return loop_edge_limits[edge.pair]
+    if edge.pair in loop_internal_limits:
+        return loop_internal_limits[edge.pair]
+    return edge.max_executions
+
+
+def _merge_edge_into(merged: dict[tuple[str, str], EdgeSpec], edge: EdgeSpec) -> None:
+    existing = merged.get(edge.pair)
+    if existing is None:
+        merged[edge.pair] = edge
+        return
+    merged[edge.pair] = EdgeSpec(
+        edge.source,
+        edge.target,
+        max(existing.max_executions, edge.max_executions),
+        existing.loop or edge.loop,
+        existing.max_executions_declared or edge.max_executions_declared,
+    )
 
 
 def _validate_loop_until_keys(
@@ -197,33 +229,71 @@ def _validate_all_cycles_declared(
     edges: tuple[EdgeSpec, ...],
     loops: tuple[LoopSpec, ...],
 ) -> None:
-    loop_pairs = {pair for loop in loops for pair in loop.edges}
+    loop_pairs = _declared_loop_pairs(loops)
+    _validate_loop_declarations(loops)
+    _validate_loop_edge_metadata(edges, loop_pairs)
+    _validate_no_undeclared_cycles(names, edges, loop_pairs)
+    _validate_loop_edges_exist(loops, {edge.pair for edge in edges})
+
+
+def _declared_loop_pairs(loops: tuple[LoopSpec, ...]) -> set[tuple[str, str]]:
+    return {pair for loop in loops for pair in loop.edges}
+
+
+def _validate_loop_declarations(loops: tuple[LoopSpec, ...]) -> None:
     loop_names: set[str] = set()
     for loop in loops:
-        if loop.name in loop_names:
-            raise GraphCompileError(f"duplicate loop name: {loop.name}")
-        loop_names.add(loop.name)
-        loop_node_set = set(loop.nodes)
-        edge_nodes = {name for pair in loop.edges for name in pair}
-        if loop_node_set and not edge_nodes <= loop_node_set:
-            missing = sorted(edge_nodes - loop_node_set)
-            raise GraphCompileError(f"loop '{loop.name}' nodes must include loop edge endpoints: {missing}")
-    for edge in edges:
-        if edge.loop and edge.pair not in loop_pairs:
-            raise GraphCompileError(f"edge {edge.source}->{edge.target} declares unknown loop '{edge.loop}'")
-        if edge.loop and edge.max_executions < 1:
-            raise GraphCompileError(f"loop edge {edge.source}->{edge.target} must have max_executions >= 1")
+        _validate_unique_loop_name(loop, loop_names)
+        _validate_loop_edge_endpoints(loop)
 
+
+def _validate_unique_loop_name(loop: LoopSpec, loop_names: set[str]) -> None:
+    if loop.name in loop_names:
+        raise GraphCompileError(f"duplicate loop name: {loop.name}")
+    loop_names.add(loop.name)
+
+
+def _validate_loop_edge_endpoints(loop: LoopSpec) -> None:
+    loop_node_set = set(loop.nodes)
+    edge_nodes = {name for pair in loop.edges for name in pair}
+    if loop_node_set and not edge_nodes <= loop_node_set:
+        missing = sorted(edge_nodes - loop_node_set)
+        raise GraphCompileError(f"loop '{loop.name}' nodes must include loop edge endpoints: {missing}")
+
+
+def _validate_loop_edge_metadata(edges: tuple[EdgeSpec, ...], loop_pairs: set[tuple[str, str]]) -> None:
+    for edge in edges:
+        _validate_loop_edge_reference(edge, loop_pairs)
+        _validate_loop_edge_limit(edge)
+
+
+def _validate_loop_edge_reference(edge: EdgeSpec, loop_pairs: set[tuple[str, str]]) -> None:
+    if edge.loop and edge.pair not in loop_pairs:
+        raise GraphCompileError(f"edge {edge.source}->{edge.target} declares unknown loop '{edge.loop}'")
+
+
+def _validate_loop_edge_limit(edge: EdgeSpec) -> None:
+    if edge.loop and edge.max_executions < 1:
+        raise GraphCompileError(f"loop edge {edge.source}->{edge.target} must have max_executions >= 1")
+
+
+def _validate_no_undeclared_cycles(
+    names: set[str] | list[str] | tuple[str, ...],
+    edges: tuple[EdgeSpec, ...],
+    loop_pairs: set[tuple[str, str]],
+) -> None:
     try:
         _topological_order(names, tuple(edge for edge in edges if edge.pair not in loop_pairs))
     except GraphCompileError as exc:
         raise GraphCompileError(f"undeclared cycle detected after removing declared loop edges: {exc.detail}") from exc
 
+
+def _validate_loop_edges_exist(loops: tuple[LoopSpec, ...], edge_pairs: set[tuple[str, str]]) -> None:
     for loop in loops:
         if not loop.edges:
             raise GraphCompileError(f"loop '{loop.name}' must declare edges")
         for pair in loop.edges:
-            if pair not in {edge.pair for edge in edges}:
+            if pair not in edge_pairs:
                 raise GraphCompileError(f"loop '{loop.name}' references missing edge {pair[0]}->{pair[1]}")
 
 

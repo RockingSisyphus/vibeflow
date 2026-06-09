@@ -1,0 +1,28 @@
+{
+  "nodesets": [
+    {
+      "name": "bad.leak",
+      "display_name": "Bad Leak",
+      "category": "bad",
+      "description": "Bad nodeset leaking an internal key.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": ["value.in"],
+      "provides": ["value.out", "tmp.inner"],
+      "exports": ["value.out"],
+      "pipeline": {
+        "inputs": ["value.in"],
+        "nodes": [
+          {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 1},
+          {"name": "tmp", "type": "sandbox.add", "requires": ["value.in"], "provides": ["tmp.inner"], "delta": 2}
+        ]
+      }
+    }
+  ],
+  "pipeline": {
+    "inputs": ["value.in"],
+    "nodes": [
+      {"name": "leak", "type": "nodeset.bad.leak", "requires": ["value.in"], "provides": ["value.out", "tmp.inner"]}
+    ]
+  }
+}

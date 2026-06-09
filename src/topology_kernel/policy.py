@@ -9,7 +9,8 @@ from .config_schema import collect_policy_schema_findings
 from .config_loader import ConfigLoadError, load_config_document
 from .health_types import HealthFinding
 from .plugin import PluginRegistry, plugin_error
-from .purity import BANNED_IMPORT_ROOTS, PurityPolicy
+from .purity_types import BANNED_IMPORT_ROOTS, PurityPolicy
+from .schema_findings import schema_finding
 
 
 DEFAULT_POLICY_DATA: dict[str, Any] = {
@@ -121,7 +122,15 @@ def resolve_effective_policy(
     inline_policy = config_data.get("policy")
     if inline_policy is not None:
         if not isinstance(inline_policy, Mapping):
-            findings.append(_policy_schema_finding("CONFIG.SCHEMA.POLICY_ROOT", "policy must be an object", "policy"))
+            findings.append(
+                schema_finding(
+                    "CONFIG.SCHEMA.POLICY_ROOT",
+                    "policy must be an object",
+                    "policy",
+                    object_type="policy",
+                    suggested_fix_type="fix_policy",
+                )
+            )
         else:
             schema_findings = collect_policy_schema_findings(
                 inline_policy,
@@ -174,10 +183,12 @@ def _merge_external_policy(
     payload = document.data.get("policy", document.data)
     if not isinstance(payload, Mapping):
         findings.append(
-            _policy_schema_finding(
+            schema_finding(
                 "CONFIG.SCHEMA.POLICY_ROOT",
                 "policy file root must be a policy object or contain object field 'policy'",
                 str(path),
+                object_type="policy",
+                suggested_fix_type="fix_policy",
                 rule_source=f"project.policy:{path}",
             )
         )
@@ -295,25 +306,46 @@ def _validate_plugin_relaxations(
 
 
 def _relaxed_rule_ids(current: Mapping[str, Any], update: Mapping[str, Any]) -> set[str]:
-    relaxed: set[str] = set()
+    return {
+        *_relaxed_node_source_rule_ids(current, update),
+        *_relaxed_import_rule_ids(current, update),
+        *_relaxed_policy_rule_ids(update),
+    }
+
+
+def _relaxed_node_source_rule_ids(current: Mapping[str, Any], update: Mapping[str, Any]) -> set[str]:
     node_source = update.get("node_source")
-    if isinstance(node_source, Mapping):
-        current_source = current.get("node_source", {})
-        for field, rule_id in (("max_lines", "NODE.SOURCE.MAX_LINES"), ("max_bytes", "NODE.SOURCE.MAX_BYTES")):
-            if field in node_source and int(node_source[field]) > int(current_source.get(field, 0)):
-                relaxed.add(rule_id)
+    if not isinstance(node_source, Mapping):
+        return set()
+    current_source = current.get("node_source", {})
+    relaxed: set[str] = set()
+    for field, rule_id in (("max_lines", "NODE.SOURCE.MAX_LINES"), ("max_bytes", "NODE.SOURCE.MAX_BYTES")):
+        if field in node_source and int(node_source[field]) > int(current_source.get(field, 0)):
+            relaxed.add(rule_id)
+    return relaxed
+
+
+def _relaxed_import_rule_ids(current: Mapping[str, Any], update: Mapping[str, Any]) -> set[str]:
     imports = update.get("imports")
-    if isinstance(imports, Mapping):
-        current_imports = current.get("imports", {})
-        if set(imports.get("allowed_roots", ())) - set(current_imports.get("allowed_roots", ())):
-            relaxed.add("NODE.IMPORT.ALLOWED_ROOTS")
-        if set(current_imports.get("banned_roots", ())) - set(imports.get("banned_roots", current_imports.get("banned_roots", ()))):
-            relaxed.add("NODE.IMPORT.BANNED_ROOTS")
+    if not isinstance(imports, Mapping):
+        return set()
+    current_imports = current.get("imports", {})
+    relaxed: set[str] = set()
+    if set(imports.get("allowed_roots", ())) - set(current_imports.get("allowed_roots", ())):
+        relaxed.add("NODE.IMPORT.ALLOWED_ROOTS")
+    if set(current_imports.get("banned_roots", ())) - set(imports.get("banned_roots", current_imports.get("banned_roots", ()))):
+        relaxed.add("NODE.IMPORT.BANNED_ROOTS")
+    return relaxed
+
+
+def _relaxed_policy_rule_ids(update: Mapping[str, Any]) -> set[str]:
     rules = update.get("rules")
-    if isinstance(rules, Mapping) and (rules.get("downgrades") or rules.get("exemptions")):
-        for item in (*rules.get("downgrades", ()), *rules.get("exemptions", ())):
-            if isinstance(item, Mapping) and item.get("rule_id"):
-                relaxed.add(str(item["rule_id"]))
+    if not isinstance(rules, Mapping):
+        return set()
+    relaxed: set[str] = set()
+    for item in (*rules.get("downgrades", ()), *rules.get("exemptions", ())):
+        if isinstance(item, Mapping) and item.get("rule_id"):
+            relaxed.add(str(item["rule_id"]))
     return relaxed
 
 
@@ -336,22 +368,3 @@ def _deep_merge(
             _deep_merge(base[key], value, path=next_path, append_paths=append_paths)
         else:
             base[key] = deepcopy(value)
-
-
-def _policy_schema_finding(
-    rule_id: str,
-    message: str,
-    object_id: str,
-    *,
-    rule_source: str = "config.inline_policy",
-) -> HealthFinding:
-    return HealthFinding(
-        rule_id=rule_id,
-        severity="error",
-        object_type="policy",
-        object_id=object_id,
-        failure_layer="schema",
-        message=message,
-        suggested_fix_type="fix_policy",
-        rule_source=rule_source,
-    )

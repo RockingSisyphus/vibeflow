@@ -1,0 +1,10 @@
+{
+  "pipeline": {
+    "nodes": [
+      {"name": "left", "type": "sandbox.branch_left", "provides": ["branch.left"], "value": 4},
+      {"name": "right", "type": "sandbox.branch_right", "provides": ["branch.right"], "value": 6},
+      {"name": "sum", "type": "sandbox.sum_pair", "requires": ["branch.left", "branch.right"], "provides": ["value.in"]},
+      {"name": "add", "type": "sandbox.add_three", "requires": ["value.in"], "provides": ["value.out"]}
+    ]
+  }
+}

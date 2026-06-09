@@ -161,6 +161,27 @@ def test_code_quality_tool_reports_file_function_dependency_and_side_effect_find
     assert "QUALITY.DEPENDENCY.CHAIN_TOO_DEEP" in rule_ids
     assert report.longest_dependency_chain == ("a", "b", "c")
 
+def test_code_quality_report_groups_files_and_findings_by_scope(tmp_path) -> None:
+    src_dir = tmp_path / "src" / "demo"
+    tests_dir = tmp_path / "tests"
+    devtools_dir = tmp_path / "src" / "topology_kernel" / "devtools"
+    src_dir.mkdir(parents=True)
+    tests_dir.mkdir()
+    devtools_dir.mkdir(parents=True)
+    (src_dir / "bad.py").write_text("def side_effect():\n    return open('src.txt').read()\n", encoding="utf-8")
+    (tests_dir / "bad_test.py").write_text("def side_effect():\n    return open('test.txt').read()\n", encoding="utf-8")
+    (devtools_dir / "bad_tool.py").write_text("def side_effect():\n    return open('tool.txt').read()\n", encoding="utf-8")
+
+    payload = scan_code_quality(tmp_path).to_dict()
+    scope_summary = payload["scope_summary"]
+
+    assert scope_summary["src"]["files"] == 1
+    assert scope_summary["tests"]["files"] == 1
+    assert scope_summary["devtools"]["files"] == 1
+    assert scope_summary["src"]["warnings"] == 1
+    assert scope_summary["tests"]["warnings"] == 1
+    assert scope_summary["devtools"]["warnings"] == 1
+
 def test_code_quality_tool_detects_cycles_and_duplicate_function_fingerprints(tmp_path) -> None:
     (tmp_path / "a.py").write_text(
         "import b\n\ndef normalize_one(value):\n    result = value + 1\n    return result\n",
@@ -195,6 +216,8 @@ def test_cli_quality_check_json_and_text_outputs(tmp_path, capsys) -> None:
 
     assert json_code == 0
     assert json_payload["status"] == "CONCERNS"
+    assert json_payload["scope_summary"]["other"]["warnings"] == 1
     assert json_payload["warnings"][0]["rule_id"] == "QUALITY.SIDE_EFFECT.CALL"
     assert text_code == 0
+    assert "scopes:" in text_output
     assert "QUALITY.SIDE_EFFECT.CALL" in text_output

@@ -18,6 +18,7 @@ DEFAULT_EXCLUDED_DIRS = frozenset(
         "__pycache__",
         "build",
         "dist",
+        "integration_sandbox",
         "node_modules",
         "references",
         "venv",
@@ -208,6 +209,7 @@ class QualityReport:
                 "warnings": len(warnings),
                 "longest_dependency_chain_length": len(self.longest_dependency_chain),
             },
+            "scope_summary": _scope_summary(self.files, self.findings),
             "thresholds": self.thresholds.to_dict(),
             "files": [file.to_dict() for file in self.files],
             "dependency_graph": {key: list(value) for key, value in sorted(self.dependency_graph.items())},
@@ -218,3 +220,39 @@ class QualityReport:
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=2, sort_keys=False)
+
+
+def _scope_summary(files: tuple[FileQuality, ...], findings: tuple[QualityFinding, ...]) -> dict[str, dict[str, int]]:
+    summary = {
+        "src": {"files": 0, "errors": 0, "warnings": 0},
+        "tests": {"files": 0, "errors": 0, "warnings": 0},
+        "devtools": {"files": 0, "errors": 0, "warnings": 0},
+        "other": {"files": 0, "errors": 0, "warnings": 0},
+    }
+    for file in files:
+        summary[_scope_for_text(file.path)]["files"] += 1
+    for finding in findings:
+        scope = _scope_for_finding(finding)
+        if finding.severity == "error":
+            summary[scope]["errors"] += 1
+        elif finding.severity == "warning":
+            summary[scope]["warnings"] += 1
+    return summary
+
+
+def _scope_for_finding(finding: QualityFinding) -> str:
+    path = str(finding.source_location.get("path", ""))
+    if path:
+        return _scope_for_text(path)
+    return _scope_for_text(finding.object_id)
+
+
+def _scope_for_text(value: str) -> str:
+    normalized = value.replace("\\", "/")
+    if "src/topology_kernel/devtools/" in normalized:
+        return "devtools"
+    if normalized.startswith("tests/") or "/tests/" in normalized:
+        return "tests"
+    if normalized.startswith("src/") or "/src/" in normalized:
+        return "src"
+    return "other"

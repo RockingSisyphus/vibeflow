@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -31,10 +32,27 @@ from topology_kernel import (
     scan_base_lib,
     validate_graph_health,
 )
-from topology_kernel.cli import main as cli_main
 from topology_kernel.config_schema import collect_config_schema_findings
 from topology_kernel.devtools import QualityThresholds, scan_code_quality
-from topology_kernel.purity import PurityPolicy, collect_node_metrics, validate_node_class
+from topology_kernel.purity_types import PurityPolicy
+
+
+def cli_main(args):
+    from topology_kernel.cli import main
+
+    return main(args)
+
+
+def collect_node_metrics(*args, **kwargs):
+    from topology_kernel.purity import collect_node_metrics as impl
+
+    return impl(*args, **kwargs)
+
+
+def validate_node_class(*args, **kwargs):
+    from topology_kernel.purity import validate_node_class as impl
+
+    return impl(*args, **kwargs)
 
 
 class SeedNode:
@@ -115,8 +133,7 @@ class BadIoNode:
     )
 
     def run_pure(self, inputs, params):
-        with open("forbidden.txt", "w", encoding="utf-8") as handle:
-            handle.write("bad")
+        time.sleep(0)
         return {"value.out": 1}
 
 

@@ -1,0 +1,9 @@
+{
+  "pipeline": {
+    "inputs": ["value.in"],
+    "nodes": [
+      {"name": "increment", "type": "sandbox.increment", "requires": ["value.in"], "provides": ["value.next"]},
+      {"name": "copy", "type": "sandbox.copy_back", "requires": ["value.next"], "provides": ["value.in"]}
+    ]
+  }
+}

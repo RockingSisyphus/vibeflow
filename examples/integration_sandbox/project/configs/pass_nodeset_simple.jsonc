@@ -1,0 +1,27 @@
+{
+  "nodesets": [
+    {
+      "name": "math.add_one",
+      "display_name": "Add One",
+      "category": "math",
+      "description": "Composite add-one flow.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": ["value.in"],
+      "provides": ["value.out"],
+      "exports": ["value.out"],
+      "pipeline": {
+        "inputs": ["value.in"],
+        "nodes": [
+          {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 1}
+        ]
+      }
+    }
+  ],
+  "pipeline": {
+    "inputs": ["value.in"],
+    "nodes": [
+      {"name": "add_one", "type": "nodeset.math.add_one", "requires": ["value.in"], "provides": ["value.out"]}
+    ]
+  }
+}
