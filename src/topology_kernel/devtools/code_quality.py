@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from .code_quality_duplicates import duplicate_function_findings
+from .code_quality_format import format_quality_summary
 from .code_quality_types import (
     BRANCH_NODES,
     DEFAULT_EXCLUDED_DIRS,
@@ -54,29 +55,6 @@ def scan_code_quality(
         longest_dependency_chain=tuple(longest_chain),
         findings=tuple(findings),
     )
-
-
-def format_quality_summary(report: QualityReport, *, max_findings: int = 30) -> str:
-    payload = report.to_dict()
-    summary = payload["summary"]
-    lines = [
-        str(report.status),
-        (
-            f"root={report.root} files={summary['files']} "
-            f"errors={summary['errors']} warnings={summary['warnings']} "
-            f"longest_dependency_chain={summary['longest_dependency_chain_length']}"
-        ),
-    ]
-    for module in report.longest_dependency_chain:
-        lines.append(f"  chain: {module}")
-    for finding in report.findings[:max_findings]:
-        location = finding.source_location.get("path", "")
-        line = finding.source_location.get("line")
-        suffix = f":{line}" if line else ""
-        lines.append(f"{finding.severity.upper()} {finding.rule_id} {location}{suffix} {finding.message}")
-    if len(report.findings) > max_findings:
-        lines.append(f"... {len(report.findings) - max_findings} more findings omitted")
-    return "\n".join(lines)
 
 
 def _iter_python_files(root: Path, excluded_dirs: set[str]) -> Iterable[Path]:
@@ -238,7 +216,7 @@ class _BranchVisitor(ast.NodeVisitor):
 
 def _collect_imports(module: str, tree: ast.AST) -> set[str]:
     imports: set[str] = set()
-    for node in ast.walk(tree):
+    for node in getattr(tree, "body", ()):
         if isinstance(node, ast.Import):
             imports.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
@@ -345,10 +323,7 @@ def _fingerprint_function(node: ast.AST) -> str:
             self.generic_visit(function)
             return function
 
-        def visit_AsyncFunctionDef(self, function: ast.AsyncFunctionDef) -> ast.AST:
-            function.name = "_function"
-            self.generic_visit(function)
-            return function
+        visit_AsyncFunctionDef = visit_FunctionDef
 
         def visit_Name(self, name: ast.Name) -> ast.AST:
             return ast.copy_location(ast.Name(id="_name", ctx=name.ctx), name)

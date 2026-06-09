@@ -4,9 +4,10 @@ import ast
 import inspect
 from pathlib import Path
 
+from .ast_rules import boolop_branch_count, import_modules, module_statement_kind
 from .base_lib_types import BaseLibDependencySummary, BaseLibFinding, BaseLibModuleReport, BaseLibScanReport
-from .purity import BANNED_ATTR_CALLS, BANNED_CALL_NAMES, BANNED_IMPORT_ROOTS, PurityPolicy
 from .purity_helpers import _call_name, _module_assignment_is_allowed
+from .purity_types import BANNED_ATTR_CALLS, BANNED_CALL_NAMES, BANNED_IMPORT_ROOTS, PurityPolicy
 
 
 FORBIDDEN_PROJECT_IMPORT_PARTS = {"boundary", "boundaries", "nodes", "runtime"}
@@ -170,24 +171,21 @@ class _BaseLibAstScanner(ast.NodeVisitor):
 
     def visit_Module(self, node: ast.Module) -> None:
         for stmt in node.body:
-            if isinstance(stmt, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            kind = module_statement_kind(stmt)
+            if kind in {"import", "definition"}:
                 self.visit(stmt)
-            elif isinstance(stmt, (ast.Assign, ast.AnnAssign)):
-                if not _module_assignment_is_allowed(stmt):
-                    self._add("BASE_LIB.GLOBAL_STATE", "base_lib must not hold mutable module-level state", stmt)
-                self.visit(stmt)
-            elif isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+            elif kind == "assignment":
+                self._visit_module_assignment(stmt)
+            elif kind == "docstring":
                 continue
             else:
                 self._add("BASE_LIB.TOP_LEVEL_SIDE_EFFECT", "base_lib top level may only contain imports, definitions, immutable constants, and docstrings", stmt)
 
     def visit_Import(self, node: ast.Import) -> None:
-        for alias in node.names:
-            self._check_import(alias.name, node)
+        self._check_import_node(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        if node.module:
-            self._check_import(node.module, node)
+        self._check_import_node(node)
 
     def visit_Call(self, node: ast.Call) -> None:
         name = _call_name(node.func)
@@ -201,6 +199,18 @@ class _BaseLibAstScanner(ast.NodeVisitor):
 
     def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
         self._add("BASE_LIB.GLOBAL_STATE", "base_lib must not use nonlocal mutation", node)
+
+    def _visit_module_assignment(self, node: ast.Assign | ast.AnnAssign) -> None:
+        if not _module_assignment_is_allowed(node):
+            self._add("BASE_LIB.GLOBAL_STATE", "base_lib must not hold mutable module-level state", node)
+        self.visit(node)
+
+    def _check_import_node(self, node: ast.Import | ast.ImportFrom) -> None:
+        modules = import_modules(node)
+        if not modules:
+            return
+        for module in modules:
+            self._check_import(module, node)
 
     def _check_import(self, module: str, node: ast.AST) -> None:
         self.imports.add(module)
@@ -257,7 +267,8 @@ class _ComplexityCounter(ast.NodeVisitor):
         self._nested(node)
 
     def visit_BoolOp(self, node: ast.BoolOp) -> None:
-        self.branch_count += max(0, len(node.values) - 1)
+        branch_delta = boolop_branch_count(node)
+        self.branch_count += branch_delta
         self.generic_visit(node)
 
     def _branch(self, node: ast.AST) -> None:

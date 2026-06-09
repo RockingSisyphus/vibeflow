@@ -1,0 +1,32 @@
+{
+  "policy": {
+    "node_source": {
+      "max_lines": 500,
+      "max_bytes": 60000,
+      "warn_lines": 450,
+      "warn_bytes": 54000
+    },
+    "complexity": {
+      "max_functions": 8,
+      "max_branches": 12,
+      "max_nesting_depth": 4,
+      "max_params": 4,
+      "max_contract_keys": 8
+    },
+    "imports": {
+      "allowed_roots": ["math"],
+      "banned_roots": ["os", "sys", "subprocess", "socket", "requests", "urllib", "pathlib", "shutil", "sqlite3", "importlib"]
+    },
+    "base_lib": {
+      "allowed_paths": ["../base_lib"],
+      "allowed_modules": ["base_lib"],
+      "banned_modules": []
+    },
+    "maintainability": {
+      "warn_call_chain_length": 4,
+      "max_call_chain_length": 4,
+      "warn_dependency_chain_length": 4,
+      "max_dependency_chain_length": 6
+    }
+  }
+}

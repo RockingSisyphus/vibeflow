@@ -1,0 +1,8 @@
+runs/
+runs_tmp/
+reports/
+kernel/topology_kernel
+kernel/topology_kernel/
+kernel/topology_kernel.lnk
+__pycache__/
+*.py[cod]

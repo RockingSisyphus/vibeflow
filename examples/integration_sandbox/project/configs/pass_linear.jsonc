@@ -1,0 +1,9 @@
+{
+  "pipeline": {
+    "nodes": [
+      {"name": "seed", "type": "sandbox.constant", "provides": ["value.in"], "value": 4},
+      {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 3},
+      {"name": "multiply", "type": "sandbox.multiply", "requires": ["value.out"], "provides": ["value.final"], "factor": 2}
+    ]
+  }
+}

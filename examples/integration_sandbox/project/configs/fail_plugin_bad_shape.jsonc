@@ -1,0 +1,10 @@
+{
+  "plugins": [
+    {"module": "../plugins/failing_plugins.py", "class": "BadShapePlugin", "type": "policy"}
+  ],
+  "pipeline": {
+    "nodes": [
+      {"name": "seed", "type": "sandbox.constant", "provides": ["value.in"]}
+    ]
+  }
+}

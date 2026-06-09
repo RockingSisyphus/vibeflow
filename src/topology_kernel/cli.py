@@ -5,19 +5,6 @@ import json
 from pathlib import Path
 from typing import Sequence
 
-from .compiler import GraphCompiler, GraphCompileError
-from .config_loader import ConfigLoadError, load_config_document
-from .cli_config import inspect_config_payload, validate_config_path
-from .cli_node import inspect_node_payload
-from .cli_reports import config_load_error_report, fail_report, format_finding_text, graph_config_error_report
-from .devtools.code_quality import DEFAULT_EXCLUDED_DIRS, QualityThresholds, format_quality_summary, scan_code_quality
-from .graph_config import GraphConfigError, parse_graph_config
-from .mermaid import export_mermaid
-from .policy import default_effective_policy
-from .boundary import GLOBAL_BOUNDARY_REGISTRY
-from .registry import GLOBAL_NODE_REGISTRY
-from .runner import CheckedRunError, run_checked
-
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="topology-kernel")
@@ -90,6 +77,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _handle_validate(args: argparse.Namespace) -> int:
+    from .cli_config import validate_config_path
+    from .cli_reports import format_finding_text
+
     report = validate_config_path(Path(args.config), policy_path=Path(args.policy) if args.policy else None)
     if args.json:
         print(report.to_json())
@@ -101,6 +91,8 @@ def _handle_validate(args: argparse.Namespace) -> int:
 
 
 def _handle_inspect_node(args: argparse.Namespace) -> int:
+    from .cli_node import inspect_node_payload
+
     payload, status = inspect_node_payload(
         node_type=args.node_type,
         module_path=Path(args.module) if args.module else None,
@@ -112,12 +104,21 @@ def _handle_inspect_node(args: argparse.Namespace) -> int:
 
 
 def _handle_inspect_config(args: argparse.Namespace) -> int:
+    from .cli_config import inspect_config_payload
+
     payload, status = inspect_config_payload(Path(args.config), policy_path=Path(args.policy) if args.policy else None)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return status
 
 
 def _handle_export_mermaid(args: argparse.Namespace) -> int:
+    from .cli_reports import config_load_error_report, fail_report, graph_config_error_report
+    from .compiler import GraphCompiler, GraphCompileError
+    from .config_loader import ConfigLoadError, load_config_document
+    from .graph_config import GraphConfigError, parse_graph_config
+    from .mermaid import export_mermaid
+    from .policy import default_effective_policy
+
     try:
         document = load_config_document(Path(args.config))
         graph = parse_graph_config(document.data)
@@ -150,6 +151,10 @@ def _handle_export_mermaid(args: argparse.Namespace) -> int:
 
 
 def _handle_run(args: argparse.Namespace) -> int:
+    from .boundary import GLOBAL_BOUNDARY_REGISTRY
+    from .registry import GLOBAL_NODE_REGISTRY
+    from .runner import CheckedRunError, run_checked
+
     try:
         initial = _load_initial_input(Path(args.input)) if args.input else {}
     except (OSError, json.JSONDecodeError, ValueError) as exc:
@@ -175,6 +180,8 @@ def _handle_run(args: argparse.Namespace) -> int:
 
 
 def _handle_quality_check(args: argparse.Namespace) -> int:
+    from .devtools.code_quality import DEFAULT_EXCLUDED_DIRS, QualityThresholds, format_quality_summary, scan_code_quality
+
     root = Path(__file__).resolve().parents[2] if args.self else Path(args.path)
     thresholds = QualityThresholds(
         max_file_lines=args.max_lines,

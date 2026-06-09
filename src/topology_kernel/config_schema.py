@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from .health_types import HealthFinding
+from .schema_findings import schema_finding
 
 
 def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFinding, ...]:
@@ -173,6 +174,11 @@ def _validate_boundary(value: Any, findings: list[HealthFinding]) -> None:
     if not isinstance(value, Mapping):
         findings.append(_error("CONFIG.SCHEMA.BOUNDARY_OBJECT", "boundary must be an object", "boundary"))
         return
+    _validate_boundary_shape(value, findings)
+    _validate_boundary_key_prefixes(value, findings)
+
+
+def _validate_boundary_shape(value: Mapping[str, Any], findings: list[HealthFinding]) -> None:
     if not _non_empty_string(value.get("type")):
         findings.append(_error("CONFIG.SCHEMA.BOUNDARY_TYPE", "boundary.type must be a non-empty string", "boundary.type"))
     if "config" in value and not isinstance(value["config"], Mapping):
@@ -180,7 +186,10 @@ def _validate_boundary(value: Any, findings: list[HealthFinding]) -> None:
     for field in ("consumes", "provides", "allowed_paths"):
         if field in value:
             _validate_string_list(value[field], f"boundary.{field}", findings, "CONFIG.SCHEMA.BOUNDARY_STRING_LIST")
-    for index, key in enumerate(value.get("consumes", []) if isinstance(value.get("consumes", []), list) else []):
+
+
+def _validate_boundary_key_prefixes(value: Mapping[str, Any], findings: list[HealthFinding]) -> None:
+    for index, key in enumerate(_list_or_empty(value.get("consumes", []))):
         if isinstance(key, str) and not (key.startswith("effects.") or key.startswith("outbox.")):
             findings.append(
                 _error(
@@ -189,7 +198,7 @@ def _validate_boundary(value: Any, findings: list[HealthFinding]) -> None:
                     f"boundary.consumes[{index}]",
                 )
             )
-    for index, key in enumerate(value.get("provides", []) if isinstance(value.get("provides", []), list) else []):
+    for index, key in enumerate(_list_or_empty(value.get("provides", []))):
         if isinstance(key, str) and not key.startswith("io."):
             findings.append(
                 _error(
@@ -205,68 +214,63 @@ def _validate_policy(value: Any, prefix: str, findings: list[HealthFinding], *, 
         findings.append(_error("CONFIG.SCHEMA.POLICY_ROOT", f"{prefix} must be an object", prefix, rule_source=rule_source))
         return
     if "node_source" in value:
-        _validate_policy_section(value["node_source"], f"{prefix}.node_source", findings, rule_source=rule_source)
-        for field in ("max_lines", "max_bytes", "warn_lines", "warn_bytes"):
-            if isinstance(value["node_source"], Mapping) and field in value["node_source"]:
-                _validate_positive_int(
-                    value["node_source"][field],
-                    f"{prefix}.node_source.{field}",
-                    findings,
-                    "CONFIG.SCHEMA.POLICY_POSITIVE_INT",
-                    rule_source=rule_source,
-                )
+        _validate_node_source_policy(value["node_source"], f"{prefix}.node_source", findings, rule_source=rule_source)
     if "complexity" in value:
-        _validate_policy_section(value["complexity"], f"{prefix}.complexity", findings, rule_source=rule_source)
-        for field in ("max_functions", "max_branches", "max_nesting_depth", "max_params", "max_contract_keys"):
-            if isinstance(value["complexity"], Mapping) and field in value["complexity"] and value["complexity"][field] is not None:
-                _validate_positive_int(
-                    value["complexity"][field],
-                    f"{prefix}.complexity.{field}",
-                    findings,
-                    "CONFIG.SCHEMA.POLICY_POSITIVE_INT",
-                    rule_source=rule_source,
-                )
+        _validate_int_policy(value["complexity"], f"{prefix}.complexity", ("max_functions", "max_branches", "max_nesting_depth", "max_params", "max_contract_keys"), findings, rule_source=rule_source, allow_null=True)
     if "imports" in value:
-        _validate_policy_section(value["imports"], f"{prefix}.imports", findings, rule_source=rule_source)
-        if isinstance(value["imports"], Mapping):
-            for field in ("allowed_roots", "banned_roots"):
-                if field in value["imports"]:
-                    _validate_string_list(
-                        value["imports"][field],
-                        f"{prefix}.imports.{field}",
-                        findings,
-                        "CONFIG.SCHEMA.POLICY_STRING_LIST",
-                        rule_source=rule_source,
-                    )
+        _validate_string_list_policy(value["imports"], f"{prefix}.imports", ("allowed_roots", "banned_roots"), findings, rule_source=rule_source)
     if "base_lib" in value:
-        _validate_policy_section(value["base_lib"], f"{prefix}.base_lib", findings, rule_source=rule_source)
-        if isinstance(value["base_lib"], Mapping):
-            for field in ("allowed_paths", "allowed_modules", "banned_modules"):
-                if field in value["base_lib"]:
-                    _validate_string_list(
-                        value["base_lib"][field],
-                        f"{prefix}.base_lib.{field}",
-                        findings,
-                        "CONFIG.SCHEMA.POLICY_STRING_LIST",
-                        rule_source=rule_source,
-                    )
+        _validate_string_list_policy(value["base_lib"], f"{prefix}.base_lib", ("allowed_paths", "allowed_modules", "banned_modules"), findings, rule_source=rule_source)
     if "maintainability" in value:
-        _validate_policy_section(value["maintainability"], f"{prefix}.maintainability", findings, rule_source=rule_source)
-        for field in ("warn_call_chain_length", "max_call_chain_length", "warn_dependency_chain_length", "max_dependency_chain_length"):
-            if isinstance(value["maintainability"], Mapping) and field in value["maintainability"]:
-                _validate_positive_int(
-                    value["maintainability"][field],
-                    f"{prefix}.maintainability.{field}",
-                    findings,
-                    "CONFIG.SCHEMA.POLICY_POSITIVE_INT",
-                    rule_source=rule_source,
-                )
+        _validate_int_policy(value["maintainability"], f"{prefix}.maintainability", ("warn_call_chain_length", "max_call_chain_length", "warn_dependency_chain_length", "max_dependency_chain_length"), findings, rule_source=rule_source, allow_null=False)
     if "rules" in value:
-        _validate_policy_section(value["rules"], f"{prefix}.rules", findings, rule_source=rule_source)
-        if isinstance(value["rules"], Mapping):
-            for field in ("downgrades", "exemptions"):
-                if field in value["rules"]:
-                    _validate_rule_entries(value["rules"][field], f"{prefix}.rules.{field}", findings, rule_source=rule_source)
+        _validate_rules_policy(value["rules"], f"{prefix}.rules", findings, rule_source=rule_source)
+
+
+def _validate_node_source_policy(value: Any, prefix: str, findings: list[HealthFinding], *, rule_source: str) -> None:
+    _validate_int_policy(value, prefix, ("max_lines", "max_bytes", "warn_lines", "warn_bytes"), findings, rule_source=rule_source, allow_null=False)
+
+
+def _validate_int_policy(value: Any, prefix: str, fields: tuple[str, ...], findings: list[HealthFinding], *, rule_source: str, allow_null: bool) -> None:
+    _validate_policy_section(value, prefix, findings, rule_source=rule_source)
+    if isinstance(value, Mapping):
+        _validate_policy_int_fields(value, prefix, fields, findings, rule_source=rule_source, allow_null=allow_null)
+
+
+def _validate_policy_int_fields(value: Mapping[str, Any], prefix: str, fields: tuple[str, ...], findings: list[HealthFinding], *, rule_source: str, allow_null: bool) -> None:
+    for field in fields:
+        if field in value and not (allow_null and value[field] is None):
+            _validate_positive_int(
+                value[field],
+                f"{prefix}.{field}",
+                findings,
+                "CONFIG.SCHEMA.POLICY_POSITIVE_INT",
+                rule_source=rule_source,
+            )
+
+
+def _validate_string_list_policy(value: Any, prefix: str, fields: tuple[str, ...], findings: list[HealthFinding], *, rule_source: str) -> None:
+    _validate_policy_section(value, prefix, findings, rule_source=rule_source)
+    if not isinstance(value, Mapping):
+        return
+    for field in fields:
+        if field in value:
+            _validate_string_list(
+                value[field],
+                f"{prefix}.{field}",
+                findings,
+                "CONFIG.SCHEMA.POLICY_STRING_LIST",
+                rule_source=rule_source,
+            )
+
+
+def _validate_rules_policy(value: Any, prefix: str, findings: list[HealthFinding], *, rule_source: str) -> None:
+    _validate_policy_section(value, prefix, findings, rule_source=rule_source)
+    if not isinstance(value, Mapping):
+        return
+    for field in ("downgrades", "exemptions"):
+        if field in value:
+            _validate_rule_entries(value[field], f"{prefix}.{field}", findings, rule_source=rule_source)
 
 
 def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
@@ -348,6 +352,10 @@ def _non_empty_string(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
+def _list_or_empty(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
 def _error(
     rule_id: str,
     message: str,
@@ -355,13 +363,11 @@ def _error(
     *,
     rule_source: str = "kernel.default_policy",
 ) -> HealthFinding:
-    return HealthFinding(
+    return schema_finding(
         rule_id=rule_id,
-        severity="error",
-        object_type="config",
-        object_id=object_id,
-        failure_layer="schema",
         message=message,
+        object_id=object_id,
+        object_type="config",
         suggested_fix_type="fix_config",
         rule_source=rule_source,
     )

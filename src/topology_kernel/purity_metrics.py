@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 from typing import Any
 
+from .ast_rules import boolop_branch_count
 from .purity_helpers import _fingerprint_function
 from .purity_types import _CallChainAnalysis
 
@@ -50,7 +51,7 @@ class _ComplexityCounter(ast.NodeVisitor):
         self._with_nesting(lambda: self.generic_visit(node))
 
     def visit_BoolOp(self, node: ast.BoolOp) -> None:
-        self.branch_count += max(0, len(node.values) - 1)
+        self.branch_count += boolop_branch_count(node)
         self.generic_visit(node)
 
     def visit_IfExp(self, node: ast.IfExp) -> None:

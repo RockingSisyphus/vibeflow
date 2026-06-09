@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Mapping, Protocol
+
+from .registry_base import RegistryBase
 
 
 class GlobalBoundary(Protocol):
@@ -40,44 +42,19 @@ class BoundaryRegistryError(ValueError):
         return f"Boundary registry error: {self.detail}"
 
 
-class BoundaryRegistry:
-    def __init__(self) -> None:
-        self._registry: dict[str, type[GlobalBoundary]] = {}
-
-    def register(
-        self,
-        key: str,
-        boundary_cls: type[GlobalBoundary] | None = None,
-        *,
-        overwrite: bool = False,
-    ) -> type[GlobalBoundary] | Callable[[type[GlobalBoundary]], type[GlobalBoundary]]:
-        if boundary_cls is None:
-            def decorator(cls: type[GlobalBoundary]) -> type[GlobalBoundary]:
-                self._register(key, cls, overwrite=overwrite)
-                return cls
-            return decorator
-        self._register(key, boundary_cls, overwrite=overwrite)
-        return boundary_cls
-
-    def _register(self, key: str, boundary_cls: type[GlobalBoundary], *, overwrite: bool) -> None:
-        normalized = str(key).strip()
-        if not normalized:
-            raise BoundaryRegistryError("boundary registry key cannot be empty")
+class BoundaryRegistry(RegistryBase[type[GlobalBoundary]]):
+    def _validate_value(self, normalized: str, boundary_cls: type[GlobalBoundary]) -> None:
         _validate_boundary_class(boundary_cls)
         setattr(boundary_cls, "__topology_boundary__", True)
-        if normalized in self._registry and not overwrite:
-            raise BoundaryRegistryError(f"key already registered: {normalized}")
-        self._registry[normalized] = boundary_cls
 
-    def get(self, key: str) -> type[GlobalBoundary]:
-        normalized = str(key).strip()
-        try:
-            return self._registry[normalized]
-        except KeyError as exc:
-            raise BoundaryRegistryError(f"unknown boundary key '{normalized}'") from exc
+    def _empty_key_error(self) -> Exception:
+        return BoundaryRegistryError("boundary registry key cannot be empty")
 
-    def available(self) -> list[str]:
-        return sorted(self._registry)
+    def _duplicate_error(self, normalized: str) -> Exception:
+        return BoundaryRegistryError(f"key already registered: {normalized}")
+
+    def _unknown_error(self, normalized: str) -> Exception:
+        return BoundaryRegistryError(f"unknown boundary key '{normalized}'")
 
 
 def _validate_boundary_class(boundary_cls: type[GlobalBoundary]) -> None:

@@ -130,8 +130,7 @@ def _class_looks_like_node(node: ast.ClassDef) -> bool:
 
 
 def _is_node_module(module: str) -> bool:
-    parts = tuple(part for part in module.split(".") if part)
-    return "nodes" in parts
+    return _module_has_part(module, "nodes")
 
 
 def _is_boundary_import(module: str) -> bool:
@@ -140,8 +139,11 @@ def _is_boundary_import(module: str) -> bool:
 
 
 def _is_base_lib_module(module: str) -> bool:
-    parts = tuple(part for part in module.split(".") if part)
-    return "base_lib" in parts
+    return _module_has_part(module, "base_lib")
+
+
+def _module_has_part(module: str, expected: str) -> bool:
+    return expected in tuple(part for part in module.split(".") if part)
 
 
 def _module_matches(module: str, patterns: tuple[str, ...]) -> bool:

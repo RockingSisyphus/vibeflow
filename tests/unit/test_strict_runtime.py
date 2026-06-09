@@ -12,6 +12,11 @@ def test_checked_run_refuses_failed_health_before_runtime(tmp_path) -> None:
     assert result.health.status == "FAIL"
     assert any(error.rule_id == "NODE.TYPE.UNKNOWN" for error in result.health.errors)
     assert (result.run_dir / "health_report.json").exists()
+    assert (result.run_dir / "effective_policy.json").exists()
+    assert (result.run_dir / "boundary_trace.jsonl").exists()
+    health_payload = json.loads((result.run_dir / "health_report.json").read_text(encoding="utf-8"))
+    assert health_payload["errors"][0]["failure_layer"] == "topology"
+    assert health_payload["effective_policy"]["sources"] == ["kernel.default_policy"]
     assert (result.run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8") == ""
 
 def test_checked_run_writes_runtime_failure_trace(tmp_path) -> None:
@@ -169,32 +174,41 @@ class Plugin:
     assert "plugin.policy:tight_policy" in payload["effective_policy"]["sources"]
     assert any(error["details"].get("legacy_code") == "source_too_large" for error in payload["errors"])
 
-def test_policy_plugin_relaxation_requires_audited_downgradeable_rule(tmp_path) -> None:
-    plugin_path = tmp_path / "relax_plugin.py"
-    plugin_path.write_text(
-        """
+@pytest.mark.parametrize(
+    ("filename", "plugin_source", "run_id", "expected_rule_id"),
+    [
+        (
+            "relax_plugin.py",
+            """
 class Plugin:
     name = "relax_policy"
 
     def extend_policy(self, policy):
         return {"imports": {"allowed_roots": ["numpy"]}}
-""".strip(),
-        encoding="utf-8",
-    )
-    config_path = tmp_path / "workflow.json"
-    config_path.write_text(
-        json.dumps(
-            {
-                "plugins": [{"module": str(plugin_path), "type": "policy"}],
-                "pipeline": {"nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"]}]},
-            }
+""",
+            "plugin_relax",
+            "PLUGIN.POLICY.RELAXATION_REQUIRED",
         ),
-        encoding="utf-8",
-    )
+        (
+            "schema_plugin.py",
+            """
+class Plugin:
+    name = "schema_policy"
+
+    def extend_node_metadata_schema(self, schema):
+        raise RuntimeError("schema boom")
+""",
+            "plugin_schema",
+            "PLUGIN.EXECUTION",
+        ),
+    ],
+)
+def test_policy_plugin_errors_are_fail_closed(tmp_path, filename, plugin_source, run_id, expected_rule_id) -> None:
+    config_path = _write_policy_plugin_workflow(tmp_path, filename=filename, plugin_source=plugin_source)
     with pytest.raises(CheckedRunError) as exc_info:
-        run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="plugin_relax")
+        run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id=run_id)
     assert exc_info.value.result.health.status == "ERROR"
-    assert any(error.rule_id == "PLUGIN.POLICY.RELAXATION_REQUIRED" for error in exc_info.value.result.health.errors)
+    assert any(error.rule_id == expected_rule_id for error in exc_info.value.result.health.errors)
 
 def test_policy_plugin_allows_audited_downgradeable_relaxation(tmp_path) -> None:
     plugin_path = tmp_path / "audited_relax_plugin.py"
@@ -291,18 +305,9 @@ class Plugin:
     assert exc_info.value.result.health.status == "ERROR"
     assert any(error.rule_id == "PLUGIN.EXECUTION" for error in exc_info.value.result.health.errors)
 
-def test_plugin_schema_extension_errors_are_fail_closed(tmp_path) -> None:
-    plugin_path = tmp_path / "schema_plugin.py"
-    plugin_path.write_text(
-        """
-class Plugin:
-    name = "schema_policy"
-
-    def extend_node_metadata_schema(self, schema):
-        raise RuntimeError("schema boom")
-""".strip(),
-        encoding="utf-8",
-    )
+def _write_policy_plugin_workflow(tmp_path: Path, *, filename: str, plugin_source: str) -> Path:
+    plugin_path = tmp_path / filename
+    plugin_path.write_text(plugin_source.strip(), encoding="utf-8")
     config_path = tmp_path / "workflow.json"
     config_path.write_text(
         json.dumps(
@@ -313,10 +318,7 @@ class Plugin:
         ),
         encoding="utf-8",
     )
-    with pytest.raises(CheckedRunError) as exc_info:
-        run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="plugin_schema")
-    assert exc_info.value.result.health.status == "ERROR"
-    assert any(error.rule_id == "PLUGIN.EXECUTION" for error in exc_info.value.result.health.errors)
+    return config_path
 
 def test_policy_plugin_can_add_node_and_graph_findings(tmp_path) -> None:
     plugin_path = tmp_path / "finding_plugin.py"

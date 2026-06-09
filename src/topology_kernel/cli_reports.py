@@ -6,7 +6,6 @@ from typing import Mapping
 from .config_loader import ConfigLoadError
 from .graph_config import GraphConfigError
 from .health_types import HealthFinding, HealthReport
-from .policy import default_effective_policy
 
 
 def error_report(
@@ -64,6 +63,8 @@ def fail_report(
 
 
 def config_load_error_report(exc: ConfigLoadError, *, object_type: str, object_id: str) -> HealthReport:
+    from .policy import default_effective_policy
+
     return error_report(
         exc.rule_id,
         exc.message,

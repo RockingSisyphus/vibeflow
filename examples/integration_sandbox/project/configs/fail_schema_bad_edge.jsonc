@@ -1,0 +1,10 @@
+{
+  "pipeline": {
+    "nodes": [
+      {"name": "seed", "type": "sandbox.constant", "provides": ["value.in"]}
+    ],
+    "edges": [
+      ["seed"]
+    ]
+  }
+}

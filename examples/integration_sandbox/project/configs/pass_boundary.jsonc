@@ -1,0 +1,25 @@
+{
+  "boundary": {
+    "type": "sandbox.demo_boundary",
+    "consumes": ["effects.request"],
+    "provides": ["io.result"],
+    "config": {}
+  },
+  "pipeline": {
+    "nodes": [
+      {"name": "request", "type": "sandbox.effect_request", "provides": ["effects.request"], "value": 5},
+      {"name": "add_result", "type": "sandbox.boundary_result_add", "requires": ["io.result"], "provides": ["value.final"], "delta": 1}
+    ],
+    "edges": [
+      {"from": "add_result", "to": "request", "loop": "boundary_loop", "max_executions": 2}
+    ],
+    "loops": [
+      {
+        "name": "boundary_loop",
+        "edges": [["add_result", "request"]],
+        "nodes": ["request", "add_result"],
+        "max_iterations": 1
+      }
+    ]
+  }
+}
