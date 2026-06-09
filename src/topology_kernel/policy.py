@@ -7,7 +7,7 @@ from typing import Any, Mapping
 
 from .config_schema import collect_policy_schema_findings
 from .config_loader import ConfigLoadError, load_config_document
-from .health import HealthFinding
+from .health_types import HealthFinding
 from .plugin import PluginRegistry, plugin_error
 from .purity import BANNED_IMPORT_ROOTS, PurityPolicy
 

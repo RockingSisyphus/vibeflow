@@ -296,6 +296,15 @@ Paperflow 清理内核副本后的验证：
 135 passed
 ```
 
+当前内核自检：
+
+```text
+topology-kernel quality-check --self
+CONCERNS，0 errors，68 warnings
+```
+
+本轮已将 `cli.py`、`health.py`、`purity.py` 和巨型单元测试文件拆分为多个小文件；当前剩余问题主要是 warning 级别的函数复杂度、重复 AST 指纹、长依赖链预警和受控副作用导入提示。
+
 ## 尚未完成
 
 当前主体功能已达到初步实现版。后续主要工作是持续收紧规则、降低误报、补充真实项目迁移反馈，并把 `quality-check --self` 接入 CI 或发布前流程。

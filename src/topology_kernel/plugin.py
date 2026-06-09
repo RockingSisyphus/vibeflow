@@ -182,7 +182,7 @@ def _normalize_type(value: str) -> str:
 
 
 def _plugin_finding(rule_id: str, message: str, object_id: str, *, details: Mapping[str, object] | None = None):
-    from .health import HealthFinding
+    from .health_types import HealthFinding
 
     return HealthFinding(
         rule_id=rule_id,
