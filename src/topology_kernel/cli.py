@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from .base_lib import BaseLibFinding, node_base_lib_imports, scan_base_lib
+from .base_lib import BaseLibDependencySummary, BaseLibFinding, node_base_lib_imports, scan_base_lib, summarize_base_lib_dependency_chain
 from .compiler import GraphCompiler, GraphCompileError
 from .config_loader import ConfigLoadError, load_config_document
 from .config_schema import collect_config_schema_findings
@@ -72,7 +72,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             print(report.status)
             for finding in (*report.errors, *report.warnings):
-                print(f"{finding.severity}: {finding.rule_id}: {finding.message}")
+                print(_format_finding_text(finding))
         return 0 if report.status in {"PASS", "CONCERNS"} else 1
     if args.command == "inspect-node":
         payload, status = _inspect_node_payload(
@@ -88,9 +88,29 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return status
     if args.command == "export-mermaid":
-        document = load_config_document(Path(args.config))
-        graph = parse_graph_config(document.data)
-        compiled = GraphCompiler().compile(graph)
+        try:
+            document = load_config_document(Path(args.config))
+            graph = parse_graph_config(document.data)
+            compiled = GraphCompiler().compile(graph)
+        except ConfigLoadError as exc:
+            report = _config_load_error_report(exc, object_type="config", object_id=str(args.config))
+            print(report.to_json())
+            return 1
+        except GraphConfigError as exc:
+            report = _graph_config_error_report(exc, path=Path(args.config), effective_policy=default_effective_policy().to_dict())
+            print(report.to_json())
+            return 1
+        except GraphCompileError as exc:
+            report = _fail_report(
+                "GRAPH.COMPILE",
+                str(exc),
+                "pipeline",
+                "pipeline",
+                "topology",
+                effective_policy=default_effective_policy().to_dict(),
+            )
+            print(report.to_json())
+            return 1
         text = export_mermaid(
             graph,
             compiled=compiled,
@@ -130,6 +150,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "run_id": exc.result.run_id,
                 "run_dir": str(exc.result.run_dir),
                 "error": str(exc),
+                "health": exc.result.health.to_dict(),
             }
             print(json.dumps(payload, ensure_ascii=False, indent=2))
             return 1
@@ -300,6 +321,8 @@ def _inspect_node_payload(
             errors.append(finding)
     base_report = scan_base_lib(module_path.parent, policy=policy_result.effective_policy.to_purity_policy())
     unhealthy_base_modules = {finding.object_id for finding in base_report.findings}
+    dependency_summary = summarize_base_lib_dependency_chain(node_base_lib_imports(node_cls), base_report)
+    _append_dependency_chain_findings(errors, warnings, node_type, dependency_summary, policy_result.effective_policy.to_purity_policy())
     for base_finding in base_report.findings:
         finding = _base_lib_finding_to_health(base_finding)
         if base_finding.severity == "warning":
@@ -344,6 +367,7 @@ def _inspect_node_payload(
             "metrics": metrics.to_dict(),
         },
         "base_lib": base_report.to_dict(),
+        "base_lib_dependency_chain": dependency_summary.to_dict(),
     }
     return payload, 0 if report.status in {"PASS", "CONCERNS"} else 1
 
@@ -445,6 +469,37 @@ def _base_lib_finding_to_health(finding: BaseLibFinding) -> HealthFinding:
         message=finding.message,
         suggested_fix_type=finding.suggested_fix_type,
         details=finding.details,
+    )
+
+
+def _append_dependency_chain_findings(
+    errors: list[HealthFinding],
+    warnings: list[HealthFinding],
+    node_type: str,
+    summary: BaseLibDependencySummary,
+    policy,
+) -> None:
+    if summary.longest_chain_length > policy.max_dependency_chain_length:
+        target = errors
+        severity = "error"
+        limit = policy.max_dependency_chain_length
+    elif summary.longest_chain_length > policy.warn_dependency_chain_length:
+        target = warnings
+        severity = "warning"
+        limit = policy.warn_dependency_chain_length
+    else:
+        return
+    target.append(
+        HealthFinding(
+            rule_id="NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP",
+            severity=severity,
+            object_type="node",
+            object_id=node_type,
+            failure_layer="base_lib",
+            message=f"node base_lib dependency chain length is {summary.longest_chain_length} > {limit}",
+            suggested_fix_type="fix_base_lib",
+            details=summary.to_dict() | {"limit": limit},
+        )
     )
 
 
@@ -564,3 +619,23 @@ def _dedupe_findings(findings: tuple[HealthFinding, ...]) -> tuple[HealthFinding
         seen.add(key)
         unique.append(finding)
     return tuple(unique)
+
+
+def _format_finding_text(finding: HealthFinding) -> str:
+    location = _location_text(finding.source_location)
+    suffix = f" [{location}]" if location else ""
+    return f"{finding.severity}: {finding.rule_id}: {finding.message}{suffix}"
+
+
+def _location_text(source_location: Mapping[str, object]) -> str:
+    path = str(source_location.get("path", "")).strip()
+    line = source_location.get("line")
+    column = source_location.get("column")
+    parts: list[str] = []
+    if path:
+        parts.append(path)
+    if line:
+        parts.append(f"line {line}")
+    if column:
+        parts.append(f"column {column}")
+    return ":".join(parts)

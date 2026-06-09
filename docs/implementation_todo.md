@@ -194,35 +194,35 @@
 
 ## 难度 12：完整 CLI 和发布形态
 
-- [ ] `topology-kernel validate --config ...`
-- [ ] `topology-kernel validate --config ... --json`
-- [ ] `topology-kernel inspect-node --type ...`
-- [ ] `topology-kernel inspect-config --config ...`
-- [ ] `topology-kernel export-mermaid --config ... --output ...`
-- [ ] `topology-kernel export-mermaid --config ... --expand-nodesets`
-- [ ] `topology-kernel run --config ...`
-- [ ] `run` 自动执行强制健康检查。
-- [ ] `run` 写出完整运行产物。
-- [ ] CLI 错误信息包含文件、行列和规则编号。
-- [ ] 包结构调整到目标形态：`core/`、`plugins/`、`devtools/`、`resources/schema/`。
-- [ ] 公共 API 只暴露稳定对象。
-- [ ] 为 JSONC、policy、health report、node、nodeset、boundary 提供 schema 或等价结构定义。
+- [x] `topology-kernel validate --config ...`
+- [x] `topology-kernel validate --config ... --json`
+- [x] `topology-kernel inspect-node --type ...`
+- [x] `topology-kernel inspect-config --config ...`
+- [x] `topology-kernel export-mermaid --config ... --output ...`
+- [x] `topology-kernel export-mermaid --config ... --expand-nodesets`
+- [x] `topology-kernel run --config ...`
+- [x] `run` 自动执行强制健康检查。
+- [x] `run` 写出完整运行产物。
+- [x] CLI 错误信息包含文件、行列和规则编号。
+- [x] 包结构调整到目标形态：`core/`、`plugins/`、`devtools/`、`resources/schema/`。
+- [x] 公共 API 只暴露稳定对象。
+- [x] 为 JSONC、policy、health report、node、nodeset、boundary 提供 schema 或等价结构定义。
 
 ## 难度 13：目标完整性验证
 
-- [ ] 增加覆盖所有绝对规则的单元测试。
-- [ ] 增加 JSONC 行列错误定位测试。
-- [ ] 增加 policy 合并和降级测试。
-- [ ] 增加插件 fail-closed 测试。
-- [ ] 增加 node 间导入/调用禁止测试。
-- [ ] 增加 `base_lib` 防逃逸测试。
-- [ ] 增加 nodeset 递归和 key 泄漏测试。
-- [ ] 增加显式有界环路执行计数测试。
-- [ ] 增加 boundary 隔离测试。
-- [ ] 增加运行产物完整性测试。
-- [ ] 增加 Mermaid 展开/折叠一致性测试。
-- [ ] 增加一个最小示例项目，证明只通过 node、base_lib、plugins、nodesets、configs 即可运行。
-- [ ] 增加一个失败示例集，覆盖巨型 node、隐藏副作用、动态导入、node 互调、未声明环路、非法 boundary、`base_lib` 逃逸等典型违规。
+- [x] 增加覆盖所有绝对规则的单元测试。
+- [x] 增加 JSONC 行列错误定位测试。
+- [x] 增加 policy 合并和降级测试。
+- [x] 增加插件 fail-closed 测试。
+- [x] 增加 node 间导入/调用禁止测试。
+- [x] 增加 `base_lib` 防逃逸测试。
+- [x] 增加 nodeset 递归和 key 泄漏测试。
+- [x] 增加显式有界环路执行计数测试。
+- [x] 增加 boundary 隔离测试。
+- [x] 增加运行产物完整性测试。
+- [x] 增加 Mermaid 展开/折叠一致性测试。
+- [x] 增加一个最小示例项目，证明只通过 node、base_lib、plugins、nodesets、configs 即可运行。
+- [x] 增加一个失败示例集，覆盖巨型 node、隐藏副作用、动态导入、node 互调、未声明环路、非法 boundary、`base_lib` 逃逸等典型违规。
 
 ## 难度 14：Node 调用链和依赖链深度检查
 
@@ -236,24 +236,24 @@
 
 这里的链长以 `run_pure` 作为入口计算，`run_pure -> helper_a -> helper_b -> helper_c` 计为 4。普通 node 最多允许三层 helper 深度；超过该深度通常说明 node 已经不再原子化。
 
-- [ ] 为 node AST 构建内部函数调用图。
-- [ ] 从 `run_pure` 开始计算最长内部调用链长度。
-- [ ] 检测递归调用和间接递归调用。
-- [ ] 检测 `run_pure` 到私有 helper 的调用链是否达到 warning 阈值 4。
-- [ ] 检测 `run_pure` 到私有 helper 的调用链是否超过 hard fail 阈值 4。
-- [ ] 健康报告展示每个 node 的最长调用链长度和对应路径。
-- [ ] 超过阈值时输出 `NODE.MAINTAINABILITY.CALL_CHAIN_TOO_DEEP`。
-- [ ] 递归调用输出 `NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN`。
-- [ ] `suggested_fix_type` 对过深调用链使用 `split_node` 或 `fix_base_lib`。
-- [ ] 扫描 node 依赖的允许模块，建立 node 到 `base_lib` 的依赖链摘要。
-- [ ] 对 node 依赖链长度设置默认阈值：超过 4 输出 warning，超过 6 输出 error。
-- [ ] 对过深依赖链输出 `NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP`。
-- [ ] 增加合法短调用链测试。
-- [ ] 增加调用链长度为 4 的 warning 测试。
-- [ ] 增加调用链长度超过 4 的 error 测试。
-- [ ] 增加直接递归和间接递归测试。
-- [ ] 增加过深 `base_lib` 依赖链测试。
-- [ ] `inspect-node` 输出调用链和依赖链摘要。
+- [x] 为 node AST 构建内部函数调用图。
+- [x] 从 `run_pure` 开始计算最长内部调用链长度。
+- [x] 检测递归调用和间接递归调用。
+- [x] 检测 `run_pure` 到私有 helper 的调用链是否达到 warning 阈值 4。
+- [x] 检测 `run_pure` 到私有 helper 的调用链是否超过 hard fail 阈值 4。
+- [x] 健康报告展示每个 node 的最长调用链长度和对应路径。
+- [x] 超过阈值时输出 `NODE.MAINTAINABILITY.CALL_CHAIN_TOO_DEEP`。
+- [x] 递归调用输出 `NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN`。
+- [x] `suggested_fix_type` 对过深调用链使用 `split_node` 或 `fix_base_lib`。
+- [x] 扫描 node 依赖的允许模块，建立 node 到 `base_lib` 的依赖链摘要。
+- [x] 对 node 依赖链长度设置默认阈值：超过 4 输出 warning，超过 6 输出 error。
+- [x] 对过深依赖链输出 `NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP`。
+- [x] 增加合法短调用链测试。
+- [x] 增加调用链长度为 4 的 warning 测试。
+- [x] 增加调用链长度超过 4 的 error 测试。
+- [x] 增加直接递归和间接递归测试。
+- [x] 增加过深 `base_lib` 依赖链测试。
+- [x] `inspect-node` 输出调用链和依赖链摘要。
 
 ## 完成判定
 

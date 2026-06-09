@@ -1,0 +1,42 @@
+{
+  // 最小示例：业务只提供 node、base_lib、插件、nodeset 和 JSONC 配置。
+  "plugins": [
+    {"module": "plugins.py", "class": "Plugin", "type": "policy"}
+  ],
+  "nodesets": [
+    {
+      "name": "example.add_one",
+      "display_name": "Example Add One",
+      "category": "example",
+      "description": "Composite nodeset that adds one to value.in.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": ["value.in"],
+      "provides": ["value.out"],
+      "exports": ["value.out"],
+      "pipeline": {
+        "inputs": ["value.in"],
+        "nodes": [
+          {
+            "name": "add_one",
+            "type": "example.add",
+            "requires": ["value.in"],
+            "provides": ["value.out"],
+            "delta": 1
+          }
+        ]
+      }
+    }
+  ],
+  "pipeline": {
+    "nodes": [
+      {"name": "seed", "type": "example.seed", "provides": ["value.in"], "value": 4},
+      {
+        "name": "add_one_flow",
+        "type": "nodeset.example.add_one",
+        "requires": ["value.in"],
+        "provides": ["value.out"]
+      }
+    ]
+  }
+}

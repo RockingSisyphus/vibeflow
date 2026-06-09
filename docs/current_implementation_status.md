@@ -28,6 +28,20 @@ src/topology_kernel/
 - `health.py`
 - `mermaid.py`
 - `cli.py`
+- `config_loader.py`
+- `config_schema.py`
+- `policy.py`
+- `base_lib.py`
+- `boundary.py`
+- `plugin.py`
+- `runner.py`
+
+已增加目标发布形态的轻量目录：
+
+- `core/`：稳定核心 API 的 re-export。
+- `plugins/`：插件协议与插件注册表的 re-export。
+- `devtools/`：配置加载、schema 检查、纯度检查、Mermaid、`base_lib` 扫描等开发工具入口。
+- `resources/schema/`：配置、policy、health report、node、nodeset、boundary 的结构定义资源。
 
 ### 纯函数 node 接口
 
@@ -110,11 +124,12 @@ src/topology_kernel/
 - node 不允许直接接触 `Context`。
 - node 输出必须符合声明。
 - 图拓扑由配置组织，而不是 node 互相调用。
+- node 内部私有 helper 调用链从 `run_pure` 开始计数，默认长度 4 警告，超过 4 硬失败。
+- node 内部直接递归和间接递归会硬失败。
+- node 到 `base_lib` 的依赖链会被扫描，默认超过 4 警告，超过 6 硬失败。
 
 尚未形成完整能力：
 
-- 未输出每个 node 的规模、复杂度和职责边界报告。
-- 未对接近 500 行阈值的 node 给出警告。
 - 未提供“拆成多个 node / 抽取 `base_lib` / 提升为 nodeset”的自动化建议。
 - 未识别长期维护风险，例如契约漂移、重复逻辑、命名模糊、语义不一致。
 
@@ -196,11 +211,33 @@ src/topology_kernel/
 
 ```text
 topology-kernel validate --config ...
+topology-kernel validate --config ... --json
+topology-kernel inspect-node --type ... --module ...
+topology-kernel inspect-config --config ...
 topology-kernel run --config ...
 topology-kernel export-mermaid --config ...
+topology-kernel export-mermaid --config ... --output ...
+topology-kernel export-mermaid --config ... --expand-nodesets
 ```
 
-`run` 使用强制健康检查入口；未注册业务 node 或健康检查失败时会拒绝执行，并保留运行目录中的诊断产物。
+`run` 使用强制健康检查入口；未注册业务 node 或健康检查失败时会拒绝执行，并保留运行目录中的诊断产物。CLI 的配置错误输出包含稳定 `rule_id`，JSON 输出包含文件、行列和失败层级；文本验证输出也会显示文件、行列和规则编号。
+
+### 发布形态和结构定义
+
+已实现：
+
+- `pyproject.toml` 提供 `topology-kernel = topology_kernel.cli:main` 命令入口。
+- 顶层 `topology_kernel.STABLE_PUBLIC_API` 明确稳定公共 API 清单。
+- `topology_kernel.resources.schema_text(...)` 可读取内置 schema 资源。
+- 内置 schema 覆盖 JSONC 配置等价结构、policy、health report、node、nodeset、boundary。
+
+### 示例和失败样本
+
+已实现：
+
+- `examples/minimal_project/`：最小可运行项目，业务侧只提供 node、`base_lib`、policy 插件、nodeset 和 JSONC 配置。
+- `examples/failure_cases/cases.jsonc`：典型失败样本 manifest，覆盖巨型 node、隐藏副作用、动态导入、node 互调、未声明环路、非法 boundary 和 `base_lib` 逃逸。
+- 单元测试会运行最小示例，并物化失败样本确认内核输出稳定规则编号。
 
 ## 测试状态
 
@@ -214,6 +251,8 @@ tests/unit/test_topology_kernel_strict.py
 
 - 纯函数 node 元数据与 AST 检查。
 - 源码大小限制。
+- node 内部调用链和递归检查。
+- node 到 `base_lib` 的依赖链深度检查。
 - 数据边自动推导。
 - 运行时执行。
 - 未声明环路失败。
@@ -223,6 +262,9 @@ tests/unit/test_topology_kernel_strict.py
 - Mermaid 导出。
 - 正式运行产物和 runtime trace。
 - 插件加载、策略扩展、fail-closed 和运行钩子。
+- 最小示例项目和失败示例集。
+- Mermaid 展开/折叠一致性。
+- 运行产物完整性交叉验证。
 
 迁移到独立仓库后的验证：
 
@@ -233,22 +275,13 @@ tests/unit/test_topology_kernel_strict.py
 Paperflow 清理内核副本后的验证：
 
 ```text
-115 passed
+131 passed
 ```
 
 ## 尚未完成
 
 高优先级缺口：
 
-- 稳定 `HealthReport` / `HealthFinding` 结构。
-- 项目级 `kernel_policy.jsonc` / `governance.jsonc`。
-- JSONC 配置解析和保留原始行列的诊断。
-- node 元数据结构模式扩展机制。
-- 契约结构模式扩展机制。
-- 完整 JSON / JSONC 结构模式。
-- node 间导入或调用禁止扫描。
-- `base_lib` 纯函数、文件规模、复杂度、导入策略和依赖闭包扫描。
-- 完整 CLI 验证器。
 - 面向长期维护的健康报告，包括 node 规模、复杂度、职责边界、未消费输出、命名混乱和架构漂移。
 
 ## 当前风险

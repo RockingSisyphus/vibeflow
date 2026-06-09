@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://topology-kernel.local/schema/config.schema.json",
+  "title": "Topology Kernel Config",
+  "type": "object",
+  "properties": {
+    "pipeline": { "$ref": "#/$defs/pipeline" },
+    "nodes": { "$ref": "#/$defs/nodes" },
+    "edges": { "$ref": "#/$defs/edges" },
+    "loops": { "$ref": "#/$defs/loops" },
+    "nodesets": {
+      "type": "array",
+      "items": { "$ref": "nodeset.schema.json" }
+    },
+    "boundary": { "$ref": "boundary.schema.json" },
+    "policy": { "$ref": "policy.schema.json" },
+    "plugins": {
+      "type": "array",
+      "items": { "type": "object" }
+    }
+  },
+  "$defs": {
+    "pipeline": {
+      "type": "object",
+      "required": ["nodes"],
+      "properties": {
+        "inputs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "nodes": { "$ref": "#/$defs/nodes" },
+        "edges": { "$ref": "#/$defs/edges" },
+        "loops": { "$ref": "#/$defs/loops" }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "type": { "type": "string", "minLength": 1 },
+          "registry_key": { "type": "string", "minLength": 1 },
+          "requires": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "provides": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+        },
+        "anyOf": [
+          { "required": ["type"] },
+          { "required": ["registry_key"] }
+        ]
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": {
+              "from": { "type": "string", "minLength": 1 },
+              "to": { "type": "string", "minLength": 1 },
+              "max_executions": { "type": "integer", "minimum": 1 }
+            }
+          }
+        ]
+      }
+    },
+    "loops": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "edges"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "edges": { "$ref": "#/$defs/edges" },
+          "nodes": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "max_iterations": { "type": "integer", "minimum": 1 },
+          "max_executions": { "type": "integer", "minimum": 1 },
+          "until": { "type": "string" }
+        },
+        "anyOf": [
+          { "required": ["max_iterations"] },
+          { "required": ["max_executions"] }
+        ]
+      }
+    }
+  }
+}

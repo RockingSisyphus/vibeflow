@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://topology-kernel.local/schema/health_report.schema.json",
+  "title": "Topology Kernel HealthReport",
+  "type": "object",
+  "required": ["status", "errors", "warnings", "skipped", "info", "effective_policy"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["PASS", "CONCERNS", "FAIL", "ERROR"]
+    },
+    "errors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "skipped": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "info": {
+      "type": "object"
+    },
+    "effective_policy": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": [
+        "rule_id",
+        "severity",
+        "object_type",
+        "object_id",
+        "source_location",
+        "rule_source",
+        "failure_layer",
+        "message",
+        "suggested_fix_type",
+        "details"
+      ],
+      "properties": {
+        "rule_id": { "type": "string", "minLength": 1 },
+        "severity": { "type": "string", "enum": ["error", "warning", "info"] },
+        "object_type": { "type": "string" },
+        "object_id": { "type": "string" },
+        "source_location": { "type": "object" },
+        "rule_source": { "type": "string" },
+        "failure_layer": { "type": "string" },
+        "message": { "type": "string", "minLength": 1 },
+        "suggested_fix_type": { "type": "string" },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}

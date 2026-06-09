@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://topology-kernel.local/schema/policy.schema.json",
+  "title": "Topology Kernel Policy",
+  "type": "object",
+  "properties": {
+    "node_source": {
+      "type": "object",
+      "properties": {
+        "max_lines": { "type": "integer", "minimum": 1 },
+        "max_bytes": { "type": "integer", "minimum": 1 },
+        "warn_lines": { "type": "integer", "minimum": 1 },
+        "warn_bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "complexity": {
+      "type": "object",
+      "properties": {
+        "max_functions": { "type": ["integer", "null"], "minimum": 1 },
+        "max_branches": { "type": ["integer", "null"], "minimum": 1 },
+        "max_nesting_depth": { "type": ["integer", "null"], "minimum": 1 },
+        "max_params": { "type": ["integer", "null"], "minimum": 1 },
+        "max_contract_keys": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "imports": {
+      "type": "object",
+      "properties": {
+        "allowed_roots": { "type": "array", "items": { "type": "string" } },
+        "banned_roots": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "base_lib": {
+      "type": "object",
+      "properties": {
+        "allowed_paths": { "type": "array", "items": { "type": "string" } },
+        "allowed_modules": { "type": "array", "items": { "type": "string" } },
+        "banned_modules": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "maintainability": {
+      "type": "object",
+      "properties": {
+        "warn_call_chain_length": { "type": "integer", "minimum": 1 },
+        "max_call_chain_length": { "type": "integer", "minimum": 1 },
+        "warn_dependency_chain_length": { "type": "integer", "minimum": 1 },
+        "max_dependency_chain_length": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "rules": {
+      "type": "object",
+      "properties": {
+        "downgrades": { "type": "array", "items": { "$ref": "#/$defs/rule_override" } },
+        "exemptions": { "type": "array", "items": { "$ref": "#/$defs/rule_override" } }
+      }
+    }
+  },
+  "$defs": {
+    "rule_override": {
+      "type": "object",
+      "required": ["rule_id", "reason", "expires"],
+      "properties": {
+        "rule_id": { "type": "string", "minLength": 1 },
+        "to": { "type": "string" },
+        "scope": { "type": "object" },
+        "reason": { "type": "string", "minLength": 1 },
+        "expires": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
