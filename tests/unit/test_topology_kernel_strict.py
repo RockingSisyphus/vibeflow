@@ -33,6 +33,7 @@ from topology_kernel import (
 )
 from topology_kernel.cli import main as cli_main
 from topology_kernel.config_schema import collect_config_schema_findings
+from topology_kernel.devtools import QualityThresholds, scan_code_quality
 from topology_kernel.purity import PurityPolicy, collect_node_metrics, validate_node_class
 
 
@@ -2964,3 +2965,86 @@ def test_checked_run_artifact_integrity_cross_links_health_graph_trace(tmp_path)
     assert compiled["effective_edges"] == [{"from": "seed", "to": "add", "max_executions": 1, "loop": ""}]
     assert "seed -->|max=1| add" in graph_mmd
     assert [event["node"] for event in trace if event.get("kind") == "node"] == ["seed", "add"]
+
+
+def test_code_quality_tool_reports_file_function_dependency_and_side_effect_findings(tmp_path) -> None:
+    (tmp_path / "a.py").write_text(
+        "\n".join(
+            [
+                "import b",
+                "",
+                "def too_big(flag):",
+                "    if flag:",
+                "        if flag > 1:",
+                "            return open('x.txt').read()",
+                "    return 'ok'",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "b.py").write_text("import c\n\ndef helper():\n    return 1\n", encoding="utf-8")
+    (tmp_path / "c.py").write_text("def leaf():\n    return 1\n", encoding="utf-8")
+
+    report = scan_code_quality(
+        tmp_path,
+        thresholds=QualityThresholds(
+            max_file_lines=5,
+            warn_file_lines=4,
+            max_function_lines=3,
+            max_function_branches=1,
+            max_function_nesting=1,
+            warn_dependency_chain=2,
+            max_dependency_chain=2,
+        ),
+    )
+
+    rule_ids = {finding.rule_id for finding in report.findings}
+    assert report.status == "FAIL"
+    assert "QUALITY.FILE.MAX_LINES" in rule_ids
+    assert "QUALITY.FUNCTION.MAX_LINES" in rule_ids
+    assert "QUALITY.FUNCTION.TOO_MANY_BRANCHES" in rule_ids
+    assert "QUALITY.FUNCTION.TOO_DEEP_NESTING" in rule_ids
+    assert "QUALITY.SIDE_EFFECT.CALL" in rule_ids
+    assert "QUALITY.DEPENDENCY.CHAIN_TOO_DEEP" in rule_ids
+    assert report.longest_dependency_chain == ("a", "b", "c")
+
+
+def test_code_quality_tool_detects_cycles_and_duplicate_function_fingerprints(tmp_path) -> None:
+    (tmp_path / "a.py").write_text(
+        "import b\n\ndef normalize_one(value):\n    result = value + 1\n    return result\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "b.py").write_text(
+        "import a\n\ndef normalize_two(item):\n    result = item + 1\n    return result\n",
+        encoding="utf-8",
+    )
+
+    report = scan_code_quality(tmp_path)
+    rule_ids = {finding.rule_id for finding in report.findings}
+    assert "QUALITY.DEPENDENCY.CYCLE" in rule_ids
+    assert "QUALITY.DEPENDENCY.BIDIRECTIONAL" in rule_ids
+    assert "QUALITY.DUPLICATE.AST_FINGERPRINT" in rule_ids
+
+
+def test_code_quality_tool_reports_python_syntax_errors(tmp_path) -> None:
+    (tmp_path / "bad.py").write_text("def broken(:\n    pass\n", encoding="utf-8")
+
+    report = scan_code_quality(tmp_path)
+
+    assert report.status == "FAIL"
+    assert any(finding.rule_id == "QUALITY.SYNTAX.PYTHON" for finding in report.findings)
+
+
+def test_cli_quality_check_json_and_text_outputs(tmp_path, capsys) -> None:
+    (tmp_path / "bad.py").write_text("def side_effect():\n    return open('x.txt').read()\n", encoding="utf-8")
+
+    json_code = cli_main(["quality-check", "--path", str(tmp_path), "--json"])
+    json_payload = json.loads(capsys.readouterr().out)
+    text_code = cli_main(["quality-check", "--path", str(tmp_path)])
+    text_output = capsys.readouterr().out
+
+    assert json_code == 0
+    assert json_payload["status"] == "CONCERNS"
+    assert json_payload["warnings"][0]["rule_id"] == "QUALITY.SIDE_EFFECT.CALL"
+    assert text_code == 0
+    assert "QUALITY.SIDE_EFFECT.CALL" in text_output

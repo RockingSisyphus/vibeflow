@@ -12,6 +12,7 @@ from .base_lib import BaseLibDependencySummary, BaseLibFinding, node_base_lib_im
 from .compiler import GraphCompiler, GraphCompileError
 from .config_loader import ConfigLoadError, load_config_document
 from .config_schema import collect_config_schema_findings
+from .devtools.code_quality import DEFAULT_EXCLUDED_DIRS, QualityThresholds, format_quality_summary, scan_code_quality
 from .graph_config import GraphConfigError, parse_graph_config
 from .health import HealthFinding, HealthReport
 from .mermaid import export_mermaid
@@ -59,6 +60,20 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--input", required=False, help="optional JSON object file for initial context")
     run.add_argument("--run-root", required=False, help="directory where run artifacts are created")
     run.add_argument("--run-id", required=False, help="optional deterministic run id for tests or controlled runs")
+
+    quality = sub.add_parser("quality-check", help="run standalone Python code quality checks")
+    quality.add_argument("--path", required=False, default=".", help="project directory or Python file to inspect")
+    quality.add_argument("--self", action="store_true", help="inspect the topology-kernel repository itself")
+    quality.add_argument("--json", action="store_true", help="emit full quality report JSON")
+    quality.add_argument("--max-lines", type=int, default=500, help="maximum Python file lines before error")
+    quality.add_argument("--warn-lines", type=int, default=450, help="Python file lines before warning")
+    quality.add_argument("--max-bytes", type=int, default=60000, help="maximum Python file bytes before error")
+    quality.add_argument("--max-function-lines", type=int, default=80, help="maximum function lines before warning")
+    quality.add_argument("--max-function-branches", type=int, default=12, help="maximum function branch count before warning")
+    quality.add_argument("--max-function-nesting", type=int, default=4, help="maximum function nesting depth before warning")
+    quality.add_argument("--warn-dependency-depth", type=int, default=6, help="dependency chain length before warning")
+    quality.add_argument("--max-dependency-depth", type=int, default=10, help="dependency chain length before error")
+    quality.add_argument("--include-references", action="store_true", help="also scan references/ directories")
     return parser
 
 
@@ -154,6 +169,27 @@ def main(argv: Sequence[str] | None = None) -> int:
             }
             print(json.dumps(payload, ensure_ascii=False, indent=2))
             return 1
+    if args.command == "quality-check":
+        root = Path(__file__).resolve().parents[2] if args.self else Path(args.path)
+        thresholds = QualityThresholds(
+            max_file_lines=args.max_lines,
+            warn_file_lines=args.warn_lines,
+            max_file_bytes=args.max_bytes,
+            max_function_lines=args.max_function_lines,
+            max_function_branches=args.max_function_branches,
+            max_function_nesting=args.max_function_nesting,
+            warn_dependency_chain=args.warn_dependency_depth,
+            max_dependency_chain=args.max_dependency_depth,
+        )
+        excluded_dirs = set(DEFAULT_EXCLUDED_DIRS)
+        if args.include_references:
+            excluded_dirs.discard("references")
+        report = scan_code_quality(root, thresholds=thresholds, excluded_dirs=excluded_dirs)
+        if args.json:
+            print(report.to_json())
+        else:
+            print(format_quality_summary(report))
+        return 0 if report.status in {"PASS", "CONCERNS"} else 1
     parser.error(f"unknown command: {args.command}")
     return 2
 
