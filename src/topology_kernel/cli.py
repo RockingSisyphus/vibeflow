@@ -74,118 +74,124 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if args.command == "validate":
-        report = validate_config_path(Path(args.config), policy_path=Path(args.policy) if args.policy else None)
-        if args.json:
-            print(report.to_json())
-        else:
-            print(report.status)
-            for finding in (*report.errors, *report.warnings):
-                print(format_finding_text(finding))
-        return 0 if report.status in {"PASS", "CONCERNS"} else 1
-    if args.command == "inspect-node":
-        payload, status = inspect_node_payload(
-            node_type=args.node_type,
-            module_path=Path(args.module) if args.module else None,
-            class_name=args.class_name,
+    handlers = {
+        "validate": _handle_validate,
+        "inspect-node": _handle_inspect_node,
+        "inspect-config": _handle_inspect_config,
+        "export-mermaid": _handle_export_mermaid,
+        "run": _handle_run,
+        "quality-check": _handle_quality_check,
+    }
+    handler = handlers.get(args.command)
+    if handler is None:
+        parser.error(f"unknown command: {args.command}")
+        return 2
+    return handler(args)
+
+
+def _handle_validate(args: argparse.Namespace) -> int:
+    report = validate_config_path(Path(args.config), policy_path=Path(args.policy) if args.policy else None)
+    if args.json:
+        print(report.to_json())
+    else:
+        print(report.status)
+        for finding in (*report.errors, *report.warnings):
+            print(format_finding_text(finding))
+    return 0 if report.status in {"PASS", "CONCERNS"} else 1
+
+
+def _handle_inspect_node(args: argparse.Namespace) -> int:
+    payload, status = inspect_node_payload(
+        node_type=args.node_type,
+        module_path=Path(args.module) if args.module else None,
+        class_name=args.class_name,
+        policy_path=Path(args.policy) if args.policy else None,
+    )
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return status
+
+
+def _handle_inspect_config(args: argparse.Namespace) -> int:
+    payload, status = inspect_config_payload(Path(args.config), policy_path=Path(args.policy) if args.policy else None)
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return status
+
+
+def _handle_export_mermaid(args: argparse.Namespace) -> int:
+    try:
+        document = load_config_document(Path(args.config))
+        graph = parse_graph_config(document.data)
+        compiled = GraphCompiler().compile(graph)
+    except ConfigLoadError as exc:
+        report = config_load_error_report(exc, object_type="config", object_id=str(args.config))
+        print(report.to_json())
+        return 1
+    except GraphConfigError as exc:
+        report = graph_config_error_report(exc, path=Path(args.config), effective_policy=default_effective_policy().to_dict())
+        print(report.to_json())
+        return 1
+    except GraphCompileError as exc:
+        report = fail_report("GRAPH.COMPILE", str(exc), "pipeline", "pipeline", "topology", effective_policy=default_effective_policy().to_dict())
+        print(report.to_json())
+        return 1
+    text = export_mermaid(
+        graph,
+        compiled=compiled,
+        expand_nodesets=bool(args.expand_nodesets),
+        show_contract=not bool(args.hide_contract),
+        show_semantics=not bool(args.hide_semantics),
+        show_boundary=not bool(args.hide_boundary),
+    )
+    if args.output:
+        Path(args.output).write_text(text, encoding="utf-8")
+    else:
+        print(text, end="")
+    return 0
+
+
+def _handle_run(args: argparse.Namespace) -> int:
+    try:
+        initial = _load_initial_input(Path(args.input)) if args.input else {}
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        print(json.dumps({"status": "ERROR", "error": str(exc)}, ensure_ascii=False, indent=2))
+        return 1
+    try:
+        result = run_checked(
+            Path(args.config),
+            registry=GLOBAL_NODE_REGISTRY,
+            boundary_registry=GLOBAL_BOUNDARY_REGISTRY,
+            initial=initial,
             policy_path=Path(args.policy) if args.policy else None,
+            run_root=Path(args.run_root) if args.run_root else None,
+            run_id=args.run_id,
         )
+    except CheckedRunError as exc:
+        payload = {"status": exc.result.health.status, "run_id": exc.result.run_id, "run_dir": str(exc.result.run_dir), "error": str(exc), "health": exc.result.health.to_dict()}
         print(json.dumps(payload, ensure_ascii=False, indent=2))
-        return status
-    if args.command == "inspect-config":
-        payload, status = inspect_config_payload(Path(args.config), policy_path=Path(args.policy) if args.policy else None)
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
-        return status
-    if args.command == "export-mermaid":
-        try:
-            document = load_config_document(Path(args.config))
-            graph = parse_graph_config(document.data)
-            compiled = GraphCompiler().compile(graph)
-        except ConfigLoadError as exc:
-            report = config_load_error_report(exc, object_type="config", object_id=str(args.config))
-            print(report.to_json())
-            return 1
-        except GraphConfigError as exc:
-            report = graph_config_error_report(exc, path=Path(args.config), effective_policy=default_effective_policy().to_dict())
-            print(report.to_json())
-            return 1
-        except GraphCompileError as exc:
-            report = fail_report(
-                "GRAPH.COMPILE",
-                str(exc),
-                "pipeline",
-                "pipeline",
-                "topology",
-                effective_policy=default_effective_policy().to_dict(),
-            )
-            print(report.to_json())
-            return 1
-        text = export_mermaid(
-            graph,
-            compiled=compiled,
-            expand_nodesets=bool(args.expand_nodesets),
-            show_contract=not bool(args.hide_contract),
-            show_semantics=not bool(args.hide_semantics),
-            show_boundary=not bool(args.hide_boundary),
-        )
-        output = getattr(args, "output", None)
-        if output:
-            Path(output).write_text(text, encoding="utf-8")
-        else:
-            print(text, end="")
-        return 0
-    if args.command == "run":
-        try:
-            initial = _load_initial_input(Path(args.input)) if args.input else {}
-        except (OSError, json.JSONDecodeError, ValueError) as exc:
-            print(json.dumps({"status": "ERROR", "error": str(exc)}, ensure_ascii=False, indent=2))
-            return 1
-        try:
-            result = run_checked(
-                Path(args.config),
-                registry=GLOBAL_NODE_REGISTRY,
-                boundary_registry=GLOBAL_BOUNDARY_REGISTRY,
-                initial=initial,
-                policy_path=Path(args.policy) if args.policy else None,
-                run_root=Path(args.run_root) if args.run_root else None,
-                run_id=args.run_id,
-            )
-            payload = {"status": result.health.status, "run_id": result.run_id, "run_dir": str(result.run_dir)}
-            print(json.dumps(payload, ensure_ascii=False, indent=2))
-            return 0
-        except CheckedRunError as exc:
-            payload = {
-                "status": exc.result.health.status,
-                "run_id": exc.result.run_id,
-                "run_dir": str(exc.result.run_dir),
-                "error": str(exc),
-                "health": exc.result.health.to_dict(),
-            }
-            print(json.dumps(payload, ensure_ascii=False, indent=2))
-            return 1
-    if args.command == "quality-check":
-        root = Path(__file__).resolve().parents[2] if args.self else Path(args.path)
-        thresholds = QualityThresholds(
-            max_file_lines=args.max_lines,
-            warn_file_lines=args.warn_lines,
-            max_file_bytes=args.max_bytes,
-            max_function_lines=args.max_function_lines,
-            max_function_branches=args.max_function_branches,
-            max_function_nesting=args.max_function_nesting,
-            warn_dependency_chain=args.warn_dependency_depth,
-            max_dependency_chain=args.max_dependency_depth,
-        )
-        excluded_dirs = set(DEFAULT_EXCLUDED_DIRS)
-        if args.include_references:
-            excluded_dirs.discard("references")
-        report = scan_code_quality(root, thresholds=thresholds, excluded_dirs=excluded_dirs)
-        if args.json:
-            print(report.to_json())
-        else:
-            print(format_quality_summary(report))
-        return 0 if report.status in {"PASS", "CONCERNS"} else 1
-    parser.error(f"unknown command: {args.command}")
-    return 2
+        return 1
+    payload = {"status": result.health.status, "run_id": result.run_id, "run_dir": str(result.run_dir)}
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def _handle_quality_check(args: argparse.Namespace) -> int:
+    root = Path(__file__).resolve().parents[2] if args.self else Path(args.path)
+    thresholds = QualityThresholds(
+        max_file_lines=args.max_lines,
+        warn_file_lines=args.warn_lines,
+        max_file_bytes=args.max_bytes,
+        max_function_lines=args.max_function_lines,
+        max_function_branches=args.max_function_branches,
+        max_function_nesting=args.max_function_nesting,
+        warn_dependency_chain=args.warn_dependency_depth,
+        max_dependency_chain=args.max_dependency_depth,
+    )
+    excluded_dirs = set(DEFAULT_EXCLUDED_DIRS)
+    if args.include_references:
+        excluded_dirs.discard("references")
+    report = scan_code_quality(root, thresholds=thresholds, excluded_dirs=excluded_dirs)
+    print(report.to_json() if args.json else format_quality_summary(report))
+    return 0 if report.status in {"PASS", "CONCERNS"} else 1
 
 
 def _load_initial_input(path: Path) -> dict[str, object]:

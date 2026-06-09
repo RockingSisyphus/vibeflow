@@ -3,10 +3,12 @@ from __future__ import annotations
 import inspect
 from pathlib import Path
 
-from .base_lib import BaseLibDependencySummary, BaseLibFinding, node_base_lib_imports, scan_base_lib, summarize_base_lib_dependency_chain
-from .boundary import BoundaryRegistry, BoundaryRegistryError
+from .base_lib import node_base_lib_imports, scan_base_lib, summarize_base_lib_dependency_chain
+from .boundary import BoundaryRegistry
 from .compiler import GraphCompiler, GraphCompileError
 from .graph_config import GraphConfig
+from .health_base_lib import append_dependency_chain_findings, base_lib_finding_to_health, matching_unhealthy_base_module
+from .health_boundary import boundary_info, validate_boundary_health
 from .health_nodesets import append_nodeset_finding, validate_nodesets
 from .health_types import HealthFinding, HealthReport
 from .plugin import PluginRegistry, plugin_error
@@ -76,16 +78,16 @@ def validate_graph_health(
         if base_report is not None:
             dependency_summary = summarize_base_lib_dependency_chain(node_base_lib_imports(node_cls), base_report)
             node_metrics[spec.name]["base_lib_dependency_chain"] = dependency_summary.to_dict()
-            _append_dependency_chain_findings(errors, warnings, spec.name, dependency_summary, purity_policy or PurityPolicy())
+            append_dependency_chain_findings(errors, warnings, spec.name, dependency_summary, purity_policy or PurityPolicy())
             for finding in base_report.findings:
-                health_finding = _base_lib_finding_to_health(finding)
+                health_finding = base_lib_finding_to_health(finding)
                 if finding.severity == "warning":
                     warnings.append(health_finding)
                 else:
                     errors.append(health_finding)
             unhealthy_base_modules.update(finding.object_id for finding in base_report.findings)
             for imported in node_base_lib_imports(node_cls):
-                matched = _matching_unhealthy_base_module(imported, unhealthy_base_modules)
+                matched = matching_unhealthy_base_module(imported, unhealthy_base_modules)
                 if matched:
                     errors.append(
                         HealthFinding(
@@ -145,7 +147,7 @@ def validate_graph_health(
             metrics.to_dict(),
         )
 
-    boundary_errors = _validate_boundary_health(graph, boundary_registry=boundary_registry)
+    boundary_errors = validate_boundary_health(graph, boundary_registry=boundary_registry)
     for finding in boundary_errors:
         errors.append(finding)
         boundary_findings.append(finding.to_dict())
@@ -224,7 +226,7 @@ def validate_graph_health(
             "loop_orders": {name: list(order) for name, order in compiled.loop_orders.items()},
             "node_metrics": node_metrics,
             "nodeset_findings": nodeset_findings,
-            "boundary": _boundary_info(graph),
+            "boundary": boundary_info(graph),
             "boundary_findings": boundary_findings,
             "plugins": plugin_registry.to_dict() if plugin_registry is not None else {"plugins": []},
         },
@@ -306,88 +308,6 @@ def _validate_plugin_schema_extensions(
                 errors.append(plugin_error("PLUGIN.SCHEMA_EXTENSION.SHAPE", f"PolicyPlugin.{hook} must return an object or None", plugin_name))
 
 
-def _validate_boundary_health(
-    graph: GraphConfig,
-    *,
-    boundary_registry: BoundaryRegistry | None,
-) -> tuple[HealthFinding, ...]:
-    spec = graph.boundary
-    if spec is None:
-        return ()
-    findings: list[HealthFinding] = []
-    if boundary_registry is None:
-        findings.append(
-            _boundary_finding(
-                "BOUNDARY.TYPE.UNRESOLVED",
-                "graph declares boundary but no boundary registry was provided",
-                spec.boundary_type,
-            )
-        )
-    else:
-        try:
-            boundary_registry.get(spec.boundary_type)
-        except BoundaryRegistryError as exc:
-            findings.append(_boundary_finding("BOUNDARY.TYPE.UNKNOWN", str(exc), spec.boundary_type))
-    for key in spec.consumes:
-        if not (key.startswith("effects.") or key.startswith("outbox.")):
-            findings.append(
-                _boundary_finding(
-                    "BOUNDARY.CONTRACT.CONSUMES_KEY",
-                    f"boundary consumes key must start with effects. or outbox.: {key}",
-                    key,
-                )
-            )
-    for key in spec.provides:
-        if not key.startswith("io."):
-            findings.append(
-                _boundary_finding(
-                    "BOUNDARY.CONTRACT.PROVIDES_KEY",
-                    f"boundary provides key must start with io.: {key}",
-                    key,
-                )
-            )
-    configured_run_dir = spec.config.get("run_dir")
-    if configured_run_dir is not None and not (isinstance(configured_run_dir, str) and configured_run_dir.strip()):
-        findings.append(_boundary_finding("BOUNDARY.CONFIG.RUN_DIR", "boundary.config.run_dir must be a non-empty string", spec.boundary_type))
-    configured_allowed_paths = spec.config.get("allowed_paths")
-    if configured_allowed_paths is not None and not (
-        isinstance(configured_allowed_paths, list) and all(isinstance(path, str) and path.strip() for path in configured_allowed_paths)
-    ):
-        findings.append(
-            _boundary_finding(
-                "BOUNDARY.CONFIG.ALLOWED_PATHS",
-                "boundary.config.allowed_paths must be a list of non-empty strings",
-                spec.boundary_type,
-            )
-        )
-    return tuple(findings)
-
-
-def _boundary_info(graph: GraphConfig) -> dict[str, object]:
-    spec = graph.boundary
-    if spec is None:
-        return {}
-    return {
-        "type": spec.boundary_type,
-        "consumes": list(spec.consumes),
-        "provides": list(spec.provides),
-        "allowed_paths": list(spec.allowed_paths),
-        "run_dir": spec.config.get("run_dir", ""),
-    }
-
-
-def _boundary_finding(rule_id: str, message: str, object_id: str) -> HealthFinding:
-    return HealthFinding(
-        rule_id=rule_id,
-        severity="error",
-        object_type="boundary",
-        object_id=object_id,
-        failure_layer="boundary",
-        message=message,
-        suggested_fix_type="fix_boundary",
-    )
-
-
 def _purity_rule_id(code: str) -> str:
     return f"NODE.PURITY.{code.upper()}"
 
@@ -441,56 +361,4 @@ def _scan_base_lib_for_node(node_cls: type, *, purity_policy: PurityPolicy | Non
         return None
     scanned.add(key)
     return scan_base_lib(root, policy=policy)
-
-
-def _base_lib_finding_to_health(finding: BaseLibFinding) -> HealthFinding:
-    return HealthFinding(
-        rule_id=finding.rule_id,
-        severity=finding.severity,
-        object_type=finding.object_type,
-        object_id=finding.object_id,
-        source_location=finding.source_location,
-        failure_layer=finding.failure_layer,
-        message=finding.message,
-        suggested_fix_type=finding.suggested_fix_type,
-        details=finding.details,
-    )
-
-
-def _append_dependency_chain_findings(
-    errors: list[HealthFinding],
-    warnings: list[HealthFinding],
-    node_name: str,
-    summary: BaseLibDependencySummary,
-    policy: PurityPolicy,
-) -> None:
-    if summary.longest_chain_length > policy.max_dependency_chain_length:
-        target = errors
-        severity = "error"
-        limit = policy.max_dependency_chain_length
-    elif summary.longest_chain_length > policy.warn_dependency_chain_length:
-        target = warnings
-        severity = "warning"
-        limit = policy.warn_dependency_chain_length
-    else:
-        return
-    target.append(
-        HealthFinding(
-            rule_id="NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP",
-            severity=severity,
-            object_type="node",
-            object_id=node_name,
-            failure_layer="base_lib",
-            message=f"node base_lib dependency chain length is {summary.longest_chain_length} > {limit}",
-            suggested_fix_type="fix_base_lib",
-            details=summary.to_dict() | {"limit": limit},
-        )
-    )
-
-
-def _matching_unhealthy_base_module(imported: str, unhealthy: set[str]) -> str:
-    for module in unhealthy:
-        if imported == module or imported.startswith(f"{module}.") or module.startswith(f"{imported}."):
-            return module
-    return ""
 

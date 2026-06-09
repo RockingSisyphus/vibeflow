@@ -73,15 +73,7 @@ def strip_jsonc_comments(text: str, *, path: Path | None = None) -> str:
         next_char = text[index + 1] if index + 1 < length else ""
 
         if in_string:
-            out.append(char)
-            if escape:
-                escape = False
-            elif char == "\\":
-                escape = True
-            elif char == '"':
-                in_string = False
-            line, column = _advance_position(char, line, column)
-            index += 1
+            index, line, column, in_string, escape = _consume_string_char(text, index, line, column, out, escape)
             continue
 
         if char == '"':
@@ -92,54 +84,69 @@ def strip_jsonc_comments(text: str, *, path: Path | None = None) -> str:
             continue
 
         if char == "/" and next_char == "/":
-            out.extend((" ", " "))
-            line, column = _advance_position("/", line, column)
-            line, column = _advance_position("/", line, column)
-            index += 2
-            while index < length and text[index] not in "\r\n":
-                out.append(" ")
-                line, column = _advance_position(text[index], line, column)
-                index += 1
+            index, line, column = _consume_line_comment(text, index, line, column, out)
             continue
 
         if char == "/" and next_char == "*":
-            start_line = line
-            start_column = column
-            out.extend((" ", " "))
-            line, column = _advance_position("/", line, column)
-            line, column = _advance_position("*", line, column)
-            index += 2
-            closed = False
-            while index < length:
-                block_char = text[index]
-                block_next = text[index + 1] if index + 1 < length else ""
-                if block_char == "*" and block_next == "/":
-                    out.extend((" ", " "))
-                    line, column = _advance_position("*", line, column)
-                    line, column = _advance_position("/", line, column)
-                    index += 2
-                    closed = True
-                    break
-                out.append(block_char if block_char in "\r\n" else " ")
-                line, column = _advance_position(block_char, line, column)
-                index += 1
-            if not closed:
-                raise ConfigLoadError(
-                    rule_id="CONFIG.JSONC.UNTERMINATED_BLOCK_COMMENT",
-                    message="unterminated JSONC block comment",
-                    failure_layer="syntax",
-                    source_location={
-                        "path": str(path) if path else "",
-                        "line": start_line,
-                        "column": start_column,
-                    },
-                )
+            index, line, column = _consume_block_comment(text, index, line, column, out, path=path)
             continue
 
         out.append(char)
         line, column = _advance_position(char, line, column)
         index += 1
     return "".join(out)
+
+
+def _consume_string_char(text: str, index: int, line: int, column: int, out: list[str], escape: bool) -> tuple[int, int, int, bool, bool]:
+    char = text[index]
+    out.append(char)
+    in_string = True
+    if escape:
+        escape = False
+    elif char == "\\":
+        escape = True
+    elif char == '"':
+        in_string = False
+    line, column = _advance_position(char, line, column)
+    return index + 1, line, column, in_string, escape
+
+
+def _consume_line_comment(text: str, index: int, line: int, column: int, out: list[str]) -> tuple[int, int, int]:
+    out.extend((" ", " "))
+    line, column = _advance_position("/", line, column)
+    line, column = _advance_position("/", line, column)
+    index += 2
+    while index < len(text) and text[index] not in "\r\n":
+        out.append(" ")
+        line, column = _advance_position(text[index], line, column)
+        index += 1
+    return index, line, column
+
+
+def _consume_block_comment(text: str, index: int, line: int, column: int, out: list[str], *, path: Path | None) -> tuple[int, int, int]:
+    start_line = line
+    start_column = column
+    out.extend((" ", " "))
+    line, column = _advance_position("/", line, column)
+    line, column = _advance_position("*", line, column)
+    index += 2
+    while index < len(text):
+        block_char = text[index]
+        block_next = text[index + 1] if index + 1 < len(text) else ""
+        if block_char == "*" and block_next == "/":
+            out.extend((" ", " "))
+            line, column = _advance_position("*", line, column)
+            line, column = _advance_position("/", line, column)
+            return index + 2, line, column
+        out.append(block_char if block_char in "\r\n" else " ")
+        line, column = _advance_position(block_char, line, column)
+        index += 1
+    raise ConfigLoadError(
+        rule_id="CONFIG.JSONC.UNTERMINATED_BLOCK_COMMENT",
+        message="unterminated JSONC block comment",
+        failure_layer="syntax",
+        source_location={"path": str(path) if path else "", "line": start_line, "column": start_column},
+    )
 
 
 def _advance_position(char: str, line: int, column: int) -> tuple[int, int]:

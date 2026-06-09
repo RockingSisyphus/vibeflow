@@ -300,10 +300,10 @@ Paperflow 清理内核副本后的验证：
 
 ```text
 topology-kernel quality-check --self
-CONCERNS，0 errors，68 warnings
+CONCERNS，0 errors，28 warnings
 ```
 
-本轮已将 `cli.py`、`health.py`、`purity.py` 和巨型单元测试文件拆分为多个小文件；当前剩余问题主要是 warning 级别的函数复杂度、重复 AST 指纹、长依赖链预警和受控副作用导入提示。
+已将 `cli.py`、`health.py`、`purity.py` 和巨型单元测试文件拆分为多个小文件，并进一步收紧通用质量工具的误报、抽出重复摘要逻辑、复用 `base_lib` / purity helper、拆分 boundary 与 base_lib 健康报告工具。当前剩余问题主要是 warning 级别的函数复杂度、重复 AST 指纹、长依赖链预警和测试样本中的刻意副作用代码。
 
 ## 尚未完成
 

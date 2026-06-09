@@ -12,7 +12,9 @@ from .compiler import GraphCompiler
 from .context import Context
 from .graph_config import GraphConfig, NodeSpec
 from .node import NodeContract
+from .path_utils import is_relative_to
 from .plugin import PluginRegistry
+from .summaries import summarize_mapping
 from .registry import NodeRegistry, NodeRegistryError
 
 
@@ -238,7 +240,7 @@ class PipelineRuntime:
         resolved_roots = [root.resolve() for root in allowed_roots]
         for item in paths:
             path = Path(str(item)).resolve()
-            if not any(_is_relative_to(path, root) for root in resolved_roots):
+            if not any(is_relative_to(path, root) for root in resolved_roots):
                 raise PipelineRuntimeError(f"boundary artifact path is outside controlled paths: {path}")
 
     def _boundary_consumed_outputs(self, context: Context) -> dict[str, object]:
@@ -284,7 +286,7 @@ class PipelineRuntime:
                     "nodeset_exit",
                     node_name,
                     spec.node_type,
-                    output_summary=_summarize_mapping(outputs),
+                    output_summary=summarize_mapping(outputs),
                     elapsed_ms=_elapsed_ms(started),
                 )
                 self._call_runtime_plugins("after_nodeset", node_name, spec.node_type)
@@ -305,7 +307,7 @@ class PipelineRuntime:
             node_cls = self.registry.get(spec.node_type)
             node = node_cls()
             inputs = {key: deepcopy(context.get(key)) for key in spec.requires}
-            self._call_runtime_plugins("before_node", node_name, spec.node_type, _summarize_mapping(inputs))
+            self._call_runtime_plugins("before_node", node_name, spec.node_type, summarize_mapping(inputs))
             before = deepcopy(inputs)
             outputs = node.run_pure(inputs, spec.params)
             if inputs != before:
@@ -329,11 +331,11 @@ class PipelineRuntime:
                 "node",
                 node_name,
                 spec.node_type,
-                input_summary=_summarize_mapping(inputs),
-                output_summary=_summarize_mapping(outputs),
+                input_summary=summarize_mapping(inputs),
+                output_summary=summarize_mapping(outputs),
                 elapsed_ms=_elapsed_ms(started),
             )
-            self._call_runtime_plugins("after_node", node_name, spec.node_type, _summarize_mapping(outputs))
+            self._call_runtime_plugins("after_node", node_name, spec.node_type, summarize_mapping(outputs))
         except NodeRegistryError as exc:
             failure = PipelineRuntimeError(str(exc))
             self._record_runtime_event("node_failed", node_name, spec.node_type, failure=str(failure), elapsed_ms=_elapsed_ms(started))
@@ -343,7 +345,7 @@ class PipelineRuntime:
                 "node_failed",
                 node_name,
                 spec.node_type,
-                input_summary=_summarize_mapping(inputs),
+                input_summary=summarize_mapping(inputs),
                 failure=str(exc),
                 elapsed_ms=_elapsed_ms(started),
             )
@@ -443,30 +445,3 @@ def _edge_key(pair: tuple[str, str]) -> str:
 def _elapsed_ms(started: float) -> float:
     return round((time.perf_counter() - started) * 1000, 3)
 
-
-def _summarize_mapping(values: Mapping[str, object]) -> dict[str, object]:
-    return {str(key): _summarize_value(value) for key, value in values.items()}
-
-
-def _summarize_value(value: object) -> dict[str, object]:
-    summary: dict[str, object] = {"type": type(value).__name__}
-    if isinstance(value, Mapping):
-        summary["keys"] = sorted(str(key) for key in value.keys())
-        summary["size"] = len(value)
-    elif isinstance(value, (list, tuple, set)):
-        summary["size"] = len(value)
-    elif isinstance(value, (str, bytes)):
-        summary["size"] = len(value)
-    elif value is None or isinstance(value, (int, float, bool)):
-        summary["scalar"] = True
-    else:
-        summary["repr_type"] = type(value).__qualname__
-    return summary
-
-
-def _is_relative_to(path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root)
-        return True
-    except ValueError:
-        return False

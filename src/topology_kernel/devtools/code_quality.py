@@ -5,6 +5,7 @@ import copy
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+from .code_quality_duplicates import duplicate_function_findings
 from .code_quality_types import (
     BRANCH_NODES,
     DEFAULT_EXCLUDED_DIRS,
@@ -40,7 +41,7 @@ def scan_code_quality(
     dependency_graph = _build_dependency_graph(files, modules)
     dependency_findings, longest_chain = _dependency_findings(dependency_graph, active_thresholds)
     findings.extend(dependency_findings)
-    findings.extend(_duplicate_function_findings(files))
+    findings.extend(duplicate_function_findings(tuple(files)))
 
     has_error = any(finding.severity == "error" for finding in findings)
     status = "FAIL" if has_error else ("CONCERNS" if findings else "PASS")
@@ -93,37 +94,11 @@ def _analyze_file(root: Path, path: Path, thresholds: QualityThresholds) -> tupl
     byte_count = len(text.encode("utf-8"))
     line_count = len(text.splitlines())
     module = _module_name(root, path)
-    findings: list[QualityFinding] = []
+    rel_path = str(path.relative_to(root))
     try:
         tree = ast.parse(text, filename=str(path))
     except SyntaxError as exc:
-        rel_path = str(path.relative_to(root))
-        return (
-            FileQuality(
-                path=rel_path,
-                module=_module_name(root, path),
-                lines=line_count,
-                bytes=byte_count,
-                function_count=0,
-                class_count=0,
-                public_api_count=0,
-                branch_count=0,
-                max_nesting_depth=0,
-                imports=(),
-                functions=(),
-            ),
-            [
-                QualityFinding(
-                    rule_id="QUALITY.SYNTAX.PYTHON",
-                    severity="error",
-                    object_type="file",
-                    object_id=rel_path,
-                    source_location={"path": str(path), "line": exc.lineno or 1, "column": exc.offset or 1},
-                    message=str(exc),
-                    suggested_fix_type="fix_syntax",
-                )
-            ],
-        )
+        return _syntax_error_file_result(path, rel_path, module, line_count, byte_count, exc)
 
     functions = tuple(_collect_functions(tree))
     function_count = sum(isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) for node in ast.walk(tree))
@@ -134,31 +109,11 @@ def _analyze_file(root: Path, path: Path, thresholds: QualityThresholds) -> tupl
     )
     branches, nesting = _branch_and_nesting(tree)
     imports = tuple(sorted(_collect_imports(module, tree)))
-    rel_path = str(path.relative_to(root))
-
-    if line_count > thresholds.max_file_lines:
-        findings.append(_finding("QUALITY.FILE.MAX_LINES", "error", "file", rel_path, path, 1, f"file has {line_count} lines"))
-    elif line_count >= thresholds.warn_file_lines:
-        findings.append(_finding("QUALITY.FILE.WARN_LINES", "warning", "file", rel_path, path, 1, f"file has {line_count} lines"))
-    if byte_count > thresholds.max_file_bytes:
-        findings.append(_finding("QUALITY.FILE.MAX_BYTES", "error", "file", rel_path, path, 1, f"file has {byte_count} bytes"))
-    if function_count > thresholds.max_functions_per_file:
-        findings.append(_finding("QUALITY.FILE.TOO_MANY_FUNCTIONS", "warning", "file", rel_path, path, 1, f"file has {function_count} functions"))
-    if class_count > thresholds.max_classes_per_file:
-        findings.append(_finding("QUALITY.FILE.TOO_MANY_CLASSES", "warning", "file", rel_path, path, 1, f"file has {class_count} classes"))
-    if public_api_count > thresholds.max_public_api_per_file:
-        findings.append(_finding("QUALITY.FILE.TOO_WIDE_PUBLIC_API", "warning", "file", rel_path, path, 1, f"file exposes {public_api_count} public top-level objects"))
-
-    for function in functions:
-        object_id = f"{rel_path}:{function.qualname}"
-        if function.lines > thresholds.max_function_lines:
-            findings.append(_finding("QUALITY.FUNCTION.MAX_LINES", "warning", "function", object_id, path, function.line_start, f"function has {function.lines} lines"))
-        if function.branches > thresholds.max_function_branches:
-            findings.append(_finding("QUALITY.FUNCTION.TOO_MANY_BRANCHES", "warning", "function", object_id, path, function.line_start, f"function has {function.branches} branches"))
-        if function.max_nesting_depth > thresholds.max_function_nesting:
-            findings.append(_finding("QUALITY.FUNCTION.TOO_DEEP_NESTING", "warning", "function", object_id, path, function.line_start, f"function nesting depth is {function.max_nesting_depth}"))
-
-    findings.extend(_side_effect_findings(module, rel_path, path, tree))
+    findings = [
+        *_file_shape_findings(path, rel_path, line_count, byte_count, function_count, class_count, public_api_count, thresholds),
+        *_function_shape_findings(path, rel_path, functions, thresholds),
+        *_side_effect_findings(module, rel_path, path, tree),
+    ]
     return (
         FileQuality(
             path=rel_path,
@@ -175,6 +130,70 @@ def _analyze_file(root: Path, path: Path, thresholds: QualityThresholds) -> tupl
         ),
         findings,
     )
+
+
+def _syntax_error_file_result(path: Path, rel_path: str, module: str, line_count: int, byte_count: int, exc: SyntaxError) -> tuple[FileQuality, list[QualityFinding]]:
+    file_report = FileQuality(
+        path=rel_path,
+        module=module,
+        lines=line_count,
+        bytes=byte_count,
+        function_count=0,
+        class_count=0,
+        public_api_count=0,
+        branch_count=0,
+        max_nesting_depth=0,
+        imports=(),
+        functions=(),
+    )
+    finding = QualityFinding(
+        rule_id="QUALITY.SYNTAX.PYTHON",
+        severity="error",
+        object_type="file",
+        object_id=rel_path,
+        source_location={"path": str(path), "line": exc.lineno or 1, "column": exc.offset or 1},
+        message=str(exc),
+        suggested_fix_type="fix_syntax",
+    )
+    return file_report, [finding]
+
+
+def _file_shape_findings(
+    path: Path,
+    rel_path: str,
+    line_count: int,
+    byte_count: int,
+    function_count: int,
+    class_count: int,
+    public_api_count: int,
+    thresholds: QualityThresholds,
+) -> list[QualityFinding]:
+    checks = [
+        (line_count > thresholds.max_file_lines, "QUALITY.FILE.MAX_LINES", "error", f"file has {line_count} lines"),
+        (line_count >= thresholds.warn_file_lines, "QUALITY.FILE.WARN_LINES", "warning", f"file has {line_count} lines"),
+        (byte_count > thresholds.max_file_bytes, "QUALITY.FILE.MAX_BYTES", "error", f"file has {byte_count} bytes"),
+        (function_count > thresholds.max_functions_per_file, "QUALITY.FILE.TOO_MANY_FUNCTIONS", "warning", f"file has {function_count} functions"),
+        (class_count > thresholds.max_classes_per_file, "QUALITY.FILE.TOO_MANY_CLASSES", "warning", f"file has {class_count} classes"),
+        (public_api_count > thresholds.max_public_api_per_file, "QUALITY.FILE.TOO_WIDE_PUBLIC_API", "warning", f"file exposes {public_api_count} public top-level objects"),
+    ]
+    findings = []
+    for matched, rule_id, severity, message in checks:
+        if matched and (rule_id != "QUALITY.FILE.WARN_LINES" or line_count <= thresholds.max_file_lines):
+            findings.append(_finding(rule_id, severity, "file", rel_path, path, 1, message))
+    return findings
+
+
+def _function_shape_findings(path: Path, rel_path: str, functions: tuple[FunctionQuality, ...], thresholds: QualityThresholds) -> list[QualityFinding]:
+    findings = []
+    for function in functions:
+        object_id = f"{rel_path}:{function.qualname}"
+        if function.lines > thresholds.max_function_lines:
+            findings.append(_finding("QUALITY.FUNCTION.MAX_LINES", "warning", "function", object_id, path, function.line_start, f"function has {function.lines} lines"))
+        if function.branches > thresholds.max_function_branches:
+            findings.append(_finding("QUALITY.FUNCTION.TOO_MANY_BRANCHES", "warning", "function", object_id, path, function.line_start, f"function has {function.branches} branches"))
+        if function.max_nesting_depth > thresholds.max_function_nesting:
+            findings.append(_finding("QUALITY.FUNCTION.TOO_DEEP_NESTING", "warning", "function", object_id, path, function.line_start, f"function nesting depth is {function.max_nesting_depth}"))
+    return findings
 
 
 def _collect_functions(tree: ast.AST) -> Iterable[FunctionQuality]:
@@ -259,50 +278,56 @@ def _dependency_findings(graph: Mapping[str, Sequence[str]], thresholds: Quality
     return findings, longest
 
 
-def _duplicate_function_findings(files: Sequence[FileQuality]) -> list[QualityFinding]:
-    groups: dict[str, list[tuple[str, FunctionQuality]]] = {}
-    for file in files:
-        for function in file.functions:
-            if function.lines < 3:
-                continue
-            groups.setdefault(function.ast_fingerprint, []).append((file.path, function))
-    findings = []
-    for matches in groups.values():
-        if len(matches) < 2:
-            continue
-        targets = [f"{path}:{function.qualname}" for path, function in matches]
-        findings.append(QualityFinding("QUALITY.DUPLICATE.AST_FINGERPRINT", "warning", "function_group", ", ".join(targets), "similar function AST fingerprint detected", suggested_fix_type="extract_shared_helper", details={"functions": targets}))
-    return findings
-
-
 def _side_effect_findings(module: str, rel_path: str, path: Path, tree: ast.AST) -> list[QualityFinding]:
     findings = []
     aliases = _import_aliases(tree)
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
-            roots = [alias.name.split(".", 1)[0] for alias in getattr(node, "names", ())]
-            if isinstance(node, ast.ImportFrom) and node.module:
-                roots.append(node.module.split(".", 1)[0])
-            for root in roots:
-                if root in SIDE_EFFECT_IMPORT_ROOTS:
-                    findings.append(_finding("QUALITY.SIDE_EFFECT.IMPORT", "warning", "module", module, path, getattr(node, "lineno", 1), f"imports side-effect capable module {root}", "isolate_side_effect"))
-        elif isinstance(node, ast.Call):
-            call_name = _call_name(node.func, aliases)
-            if call_name in SIDE_EFFECT_CALLS or any(call_name == banned or call_name.startswith(f"{banned}.") for banned in SIDE_EFFECT_ATTR_CALLS):
-                findings.append(_finding("QUALITY.SIDE_EFFECT.CALL", "warning", "file", rel_path, path, getattr(node, "lineno", 1), f"calls side-effect capable API {call_name}", "isolate_side_effect"))
+            findings.extend(_side_effect_import_findings(module, path, node))
+            continue
+        if isinstance(node, ast.Call):
+            findings.extend(_side_effect_call_findings(rel_path, path, node, aliases))
     return findings
 
+def _side_effect_import_findings(module: str, path: Path, node: ast.Import | ast.ImportFrom) -> list[QualityFinding]:
+    findings = []
+    for root in _side_effect_import_roots(node):
+        if root in SIDE_EFFECT_IMPORT_ROOTS:
+            findings.append(_finding("QUALITY.SIDE_EFFECT.IMPORT", "warning", "module", module, path, getattr(node, "lineno", 1), f"imports side-effect capable module {root}", "isolate_side_effect"))
+    return findings
+
+
+def _side_effect_call_findings(rel_path: str, path: Path, node: ast.Call, aliases: Mapping[str, str]) -> list[QualityFinding]:
+    call_name = _call_name(node.func, aliases)
+    if call_name in SIDE_EFFECT_CALLS or any(call_name == banned or call_name.startswith(f"{banned}.") for banned in SIDE_EFFECT_ATTR_CALLS):
+        return [_finding("QUALITY.SIDE_EFFECT.CALL", "warning", "file", rel_path, path, getattr(node, "lineno", 1), f"calls side-effect capable API {call_name}", "isolate_side_effect")]
+    return []
+
+
+def _side_effect_import_roots(node: ast.Import | ast.ImportFrom) -> tuple[str, ...]:
+    roots = [alias.name.split(".", 1)[0] for alias in getattr(node, "names", ())]
+    if isinstance(node, ast.ImportFrom) and node.module:
+        roots.append(node.module.split(".", 1)[0])
+    return tuple(roots)
 
 def _import_aliases(tree: ast.AST) -> dict[str, str]:
     aliases = {"Path": "pathlib.Path"}
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            for alias in node.names:
-                aliases[alias.asname or alias.name.split(".", 1)[0]] = alias.name
+            aliases.update(_import_aliases_from_import(node))
         elif isinstance(node, ast.ImportFrom) and node.module:
-            for alias in node.names:
-                aliases[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+            aliases.update(_import_aliases_from_import_from(node))
     return aliases
+
+
+def _import_aliases_from_import(node: ast.Import) -> dict[str, str]:
+    return {alias.asname or alias.name.split(".", 1)[0]: alias.name for alias in node.names}
+
+
+def _import_aliases_from_import_from(node: ast.ImportFrom) -> dict[str, str]:
+    if not node.module:
+        return {}
+    return {alias.asname or alias.name: f"{node.module}.{alias.name}" for alias in node.names}
 
 
 def _call_name(func: ast.AST, aliases: Mapping[str, str]) -> str:

@@ -5,8 +5,9 @@ import inspect
 import sys
 from pathlib import Path
 
-from .base_lib import BaseLibDependencySummary, BaseLibFinding, node_base_lib_imports, scan_base_lib, summarize_base_lib_dependency_chain
+from .base_lib import node_base_lib_imports, scan_base_lib, summarize_base_lib_dependency_chain
 from .cli_reports import error_report, fail_report
+from .health_base_lib import append_dependency_chain_findings, base_lib_finding_to_health, matching_unhealthy_base_module
 from .health_types import HealthFinding, HealthReport
 from .node import NodeContract, NodeInfo, PureNode
 from .policy import resolve_effective_policy
@@ -136,7 +137,7 @@ def _inspect_node_health(node_cls: type[PureNode], node_type: str, policy_result
     base_report = scan_base_lib(Path(inspect.getsourcefile(node_cls) or ".").parent, policy=policy)
     unhealthy_base_modules = {finding.object_id for finding in base_report.findings}
     dependency_summary = summarize_base_lib_dependency_chain(node_base_lib_imports(node_cls), base_report)
-    _append_dependency_chain_findings(errors, warnings, node_type, dependency_summary, policy)
+    append_dependency_chain_findings(errors, warnings, node_type, dependency_summary, policy)
     _append_base_lib_findings(errors, warnings, base_report.findings)
     _append_indirect_base_lib_findings(errors, node_type, node_base_lib_imports(node_cls), unhealthy_base_modules)
     report = HealthReport(status="FAIL" if errors else "CONCERNS" if warnings else "PASS", errors=tuple(errors), warnings=tuple(warnings), effective_policy=policy_result.effective_policy.to_dict())
@@ -164,13 +165,13 @@ def _violation_findings(violations, node_type: str) -> tuple[list[HealthFinding]
 
 def _append_base_lib_findings(errors: list[HealthFinding], warnings: list[HealthFinding], findings: tuple[BaseLibFinding, ...]) -> None:
     for base_finding in findings:
-        finding = _base_lib_finding_to_health(base_finding)
+        finding = base_lib_finding_to_health(base_finding)
         (warnings if base_finding.severity == "warning" else errors).append(finding)
 
 
 def _append_indirect_base_lib_findings(errors: list[HealthFinding], node_type: str, imports: tuple[str, ...], unhealthy: set[str]) -> None:
     for imported in imports:
-        matched = _matching_unhealthy_base_module(imported, unhealthy)
+        matched = matching_unhealthy_base_module(imported, unhealthy)
         if matched:
             errors.append(
                 HealthFinding(
@@ -184,48 +185,6 @@ def _append_indirect_base_lib_findings(errors: list[HealthFinding], node_type: s
                     details={"imported_module": imported, "unhealthy_base_lib": matched},
                 )
             )
-
-
-def _base_lib_finding_to_health(finding: BaseLibFinding) -> HealthFinding:
-    return HealthFinding(
-        rule_id=finding.rule_id,
-        severity=finding.severity,
-        object_type=finding.object_type,
-        object_id=finding.object_id,
-        source_location=finding.source_location,
-        failure_layer=finding.failure_layer,
-        message=finding.message,
-        suggested_fix_type=finding.suggested_fix_type,
-        details=finding.details,
-    )
-
-
-def _append_dependency_chain_findings(errors: list[HealthFinding], warnings: list[HealthFinding], node_type: str, summary: BaseLibDependencySummary, policy) -> None:
-    if summary.longest_chain_length > policy.max_dependency_chain_length:
-        target, severity, limit = errors, "error", policy.max_dependency_chain_length
-    elif summary.longest_chain_length > policy.warn_dependency_chain_length:
-        target, severity, limit = warnings, "warning", policy.warn_dependency_chain_length
-    else:
-        return
-    target.append(
-        HealthFinding(
-            rule_id="NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP",
-            severity=severity,
-            object_type="node",
-            object_id=node_type,
-            failure_layer="base_lib",
-            message=f"node base_lib dependency chain length is {summary.longest_chain_length} > {limit}",
-            suggested_fix_type="fix_base_lib",
-            details=summary.to_dict() | {"limit": limit},
-        )
-    )
-
-
-def _matching_unhealthy_base_module(imported: str, unhealthy: set[str]) -> str:
-    for module in unhealthy:
-        if imported == module or imported.startswith(f"{module}.") or module.startswith(f"{imported}."):
-            return module
-    return ""
 
 
 def _module_node_class_names(node_cls: type[PureNode]) -> tuple[str, ...]:
