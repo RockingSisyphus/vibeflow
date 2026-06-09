@@ -24,6 +24,7 @@ class NodeContract:
     output_semantics: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     params_schema: Mapping[str, Any] = field(default_factory=dict)
     output_schema: Mapping[str, Any] = field(default_factory=dict)
+    examples: tuple[Mapping[str, Any], ...] = ()
 
 
 class PureNode(Protocol):

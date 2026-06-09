@@ -1,8 +1,10 @@
-# Current Implementation Status
+# 当前实现状态
 
 ## 当前定位
 
 当前仓库是 `topology-kernel` 的第一版严格内核原型。它验证了最核心的想法能运行，但还没有达到目标构想中的完整框架状态。
+
+补充定位：该内核的最终目标是服务于人机协同开发，尤其是 LLM 深度参与编码的场景。内核需要通过硬性健康检查约束 LLM 生成的程序只能由小型、纯函数、低耦合 node 和显式 JSONC 拓扑组成。目前实现只覆盖了这一目标的基础原型，还没有形成完整的 LLM 协作治理体系。
 
 ## 已完成
 
@@ -34,11 +36,11 @@ src/topology_kernel/
 - `NodeInfo`
 - `NodeContract`
 - `PureNode` protocol
-- runtime 通过 `run_pure(inputs, params) -> outputs` 调用 node
+- 运行时通过 `run_pure(inputs, params) -> outputs` 调用 node
 - node 不直接接触 `Context`
-- runtime 检查 node 是否原地修改输入
-- runtime 检查返回 output 是否全部声明
-- runtime 检查声明 output 是否全部返回
+- 运行时检查 node 是否原地修改输入
+- 运行时检查返回输出是否全部声明
+- 运行时检查声明输出是否全部返回
 
 ### 拓扑编译
 
@@ -54,29 +56,36 @@ src/topology_kernel/
 
 ### 显式有界环路
 
-已实现原型：
+已实现：
 
 - `pipeline.loops`
-- loop `name`
-- loop `edges`
-- loop `nodes`
-- loop `max_iterations`
-- loop `until`
-- 未声明 cycle 会编译失败
-- 声明 loop 后可以编译并执行
-
-当前 loop runtime 仍是简化版本：按 `loop.nodes` 顺序重复执行节点，还没有实现边级执行计数报告和更复杂的调度策略。
+- 环路 `name`
+- 环路 `edges`
+- 环路 `nodes`
+- 环路 `max_iterations`
+- 环路 `until`
+- 未声明环路会编译失败
+- 声明环路后可以编译并执行
+- 编译器输出依赖感知的 `loop_orders`
+- loop `until` key 必须可解析
+- loop 边可继承或覆盖执行上限
+- 运行时记录每条边实际执行次数
+- 运行时记录每个 loop 实际迭代次数
+- 运行时记录 loop 停止原因：`max_iterations`、`until`、`node_failed`
 
 ### nodeset
 
-已实现基础版：
+已实现：
 
 - `nodesets`
-- `nodeset.<name>` 可作为普通 node type 使用
+- `nodeset.<name>` 可作为普通 node 类型使用
 - nodeset 内部可执行子图
 - nodeset 通过 `exports` 暴露输出
-
-当前 nodeset 仍是基础实现，还没有完整递归检测、作用域隔离和展开式健康报告。
+- nodeset 元数据和契约 schema 检查
+- nodeset 递归和间接递归健康检查
+- nodeset 内部 key 作用域隔离和中间 key 泄漏检查
+- 外部 pipeline 和嵌套 nodeset 引用点的契约一致性检查
+- 健康报告中的 `info.nodeset_findings` 折叠视图，以及 errors / warnings 展开视图
 
 ### 纯函数静态检查
 
@@ -86,37 +95,100 @@ src/topology_kernel/
 - node 必须声明 `CONTRACT`
 - node 必须提供 `run_pure`
 - 禁止普通 `run(context, ...)`
-- AST 检查部分 banned imports
-- AST 检查部分 banned calls
-- source 行数限制
-- source 字节数限制
+- AST 检查部分禁止的导入
+- AST 检查部分禁止的调用
+- 源码行数限制
+- 源码字节数限制
 
-当前限制还不完整，尚未实现 node 间 import/call 依赖扫描，也没有完整 base_lib purity 扫描。
+当前限制还不完整，尚未实现 node 间导入或调用依赖扫描，也没有完整 `base_lib` 纯函数扫描。
 
-### Health Report
+### LLM 协作治理
+
+已具备的基础：
+
+- node 源码行数和字节数限制。
+- node 不允许直接接触 `Context`。
+- node 输出必须符合声明。
+- 图拓扑由配置组织，而不是 node 互相调用。
+
+尚未形成完整能力：
+
+- 未输出每个 node 的规模、复杂度和职责边界报告。
+- 未对接近 500 行阈值的 node 给出警告。
+- 未提供“拆成多个 node / 抽取 `base_lib` / 提升为 nodeset”的自动化建议。
+- 未识别长期维护风险，例如契约漂移、重复逻辑、命名模糊、语义不一致。
+
+### 全局边界
+
+已实现：
+
+- `GlobalBoundary` 协议。
+- 独立 `BoundaryRegistry`，boundary 不能注册进 node registry。
+- `before_run`、`after_run`、`before_iteration`、`after_iteration` 生命周期。
+- 配置中声明 `boundary.type`、`config`、`consumes`、`provides`、`allowed_paths`。
+- `effects.*` / `outbox.*` 请求 key 与 `io.*` 返回 key 的结构化约束。
+- boundary 返回 key 必须在 `boundary.provides` 中声明。
+- boundary 产物路径必须位于 `run_dir` 或显式 `allowed_paths`。
+- 运行时写出 `boundary_trace.jsonl`。
+- boundary 失败会进入 runtime trace 并阻断继续运行。
+
+### 健康报告
 
 已实现基础版：
 
 - 编译失败报告。
-- node type 解析。
-- purity violation 报告。
-- unconsumed output warning。
-- effective/data/explicit edge 信息。
+- node 类型解析。
+- 纯函数违规报告。
+- 未消费输出警告。
+- 有效边、数据边、显式边信息。
 
-尚未实现完整目标中的 schema、semantic、loop execution、nodeset scope、plugin policy 等健康检查。
+尚未实现完整目标中的语义和架构漂移等健康检查。
+
+### 插件系统
+
+已实现：
+
+- `PluginRegistry` 和 `PolicyPlugin` / `CompilerPlugin` / `RuntimePlugin` / `BoundaryPlugin` 协议。
+- 配置中的 `plugins` 显式加载机制。
+- 插件优先级、作用域和冲突策略。
+- `PolicyPlugin.extend_policy` 可以收紧策略，或在完整审计字段下放宽可降级规则。
+- 插件不能放宽未被默认 policy 标记为可降级的绝对规则。
+- `PolicyPlugin` 可追加 node、graph、nodeset、boundary 健康检查。
+- `PolicyPlugin` 元数据 schema、契约 schema、纯函数规则扩展方法采用 fail-closed 调用。
+- `CompilerPlugin`、`RuntimePlugin`、`BoundaryPlugin` 提供轻量钩子。
+- 插件加载失败和执行异常都会产生 `ERROR`。
+- 健康报告和 `effective_policy` 会显示插件参与结果。
+
+### 正式运行与产物
+
+已实现：
+
+- `run_checked(...)` 正式运行入口。
+- 每次正式运行生成 `run_id` 并创建独立 `run_dir`。
+- 运行前强制执行配置 schema、policy 合并和完整健康检查。
+- 健康检查 `FAIL` / `ERROR` 时拒绝执行 runtime。
+- 写出 `input_summary.json`、`effective_policy.json`、`compiled_graph.json`、`health_report.json`、`graph.mmd`、`runtime_trace.jsonl`、`boundary_trace.jsonl`。
+- trace 记录 node 执行、nodeset 进入和退出、耗时、失败原因、输入摘要和输出摘要。
+- trace 默认只保存结构摘要，不保存原始输入输出。
 
 ### Mermaid 导出
 
-已实现基础版：
+已实现：
 
 - 输出 `flowchart TD`
-- 显示 node name/type
-- 显示 effective edges
+- 显示 node 名称和类型
+- 显示有效边
 - 显示 `max_executions`
-- 显示 loop 名称
-- 支持基础 `expand_nodesets`
-
-尚未实现完整的 contract key、semantic、policy finding、boundary port 可视化。
+- 显示环路名称
+- 支持 nodeset 折叠显示
+- 支持 nodeset 展开显示
+- 显示 node / nodeset 的契约 key
+- 显示配置中的描述、分类、版本等语义信息
+- 显示 loop 名称、最大执行次数和 loop 摘要
+- 显示全局 boundary 及其 consumes / provides key
+- 显示 boundary 与 node 之间的输入输出端口连接
+- 支持从健康报告标记错误节点和警告节点
+- `run_checked(...)` 写出的 `graph.mmd` 与同次编译生成的 `compiled_graph.json` 使用同一个 `CompiledGraph`
 
 ### CLI
 
@@ -124,10 +196,11 @@ src/topology_kernel/
 
 ```text
 topology-kernel validate --config ...
+topology-kernel run --config ...
 topology-kernel export-mermaid --config ...
 ```
 
-当前 CLI 只做结构解析和编译 smoke，不是完整 validator。
+`run` 使用强制健康检查入口；未注册业务 node 或健康检查失败时会拒绝执行，并保留运行目录中的诊断产物。
 
 ## 测试状态
 
@@ -139,15 +212,17 @@ tests/unit/test_topology_kernel_strict.py
 
 覆盖：
 
-- pure node metadata 与 AST 检查。
-- source size limit。
-- data edge 自动推导。
-- runtime 执行。
-- 未声明 cycle 失败。
-- 显式 bounded loop 通过并执行。
+- 纯函数 node 元数据与 AST 检查。
+- 源码大小限制。
+- 数据边自动推导。
+- 运行时执行。
+- 未声明环路失败。
+- 显式有界环路通过并执行。
 - nodeset 可作为 node 使用。
-- health report。
+- 健康报告。
 - Mermaid 导出。
+- 正式运行产物和 runtime trace。
+- 插件加载、策略扩展、fail-closed 和运行钩子。
 
 迁移到独立仓库后的验证：
 
@@ -158,42 +233,35 @@ tests/unit/test_topology_kernel_strict.py
 Paperflow 清理内核副本后的验证：
 
 ```text
-8 passed
+115 passed
 ```
 
 ## 尚未完成
 
 高优先级缺口：
 
-- 全局出入口 `GlobalBoundary` 接口。
-- plugin policy 系统。
-- node metadata schema 扩展机制。
-- contract schema 扩展机制。
-- 完整 JSON schema。
-- node 间 import/call 禁止扫描。
-- base_lib purity 扫描。
-- nodeset 递归检测。
-- nodeset key 作用域隔离。
-- loop 边级执行次数统计。
-- loop runtime 调度策略细化。
-- Mermaid 完整展开和边界可视化。
-- 完整 CLI validator。
+- 稳定 `HealthReport` / `HealthFinding` 结构。
+- 项目级 `kernel_policy.jsonc` / `governance.jsonc`。
+- JSONC 配置解析和保留原始行列的诊断。
+- node 元数据结构模式扩展机制。
+- 契约结构模式扩展机制。
+- 完整 JSON / JSONC 结构模式。
+- node 间导入或调用禁止扫描。
+- `base_lib` 纯函数、文件规模、复杂度、导入策略和依赖闭包扫描。
+- 完整 CLI 验证器。
+- 面向长期维护的健康报告，包括 node 规模、复杂度、职责边界、未消费输出、命名混乱和架构漂移。
 
 ## 当前风险
 
 - 纯函数检查仍是工程约束，不是数学证明。
-- AST banned list 还很短。
-- runtime loop 模型仍简化。
-- nodeset scope 还不够严格。
-- plugin 目前还没有实现。
-- 全局出入口还没有实现。
+- AST 禁止列表还很短。
 
 ## 下一步建议
 
-1. 先实现完整 validator，把严格规则变成硬失败。
-2. 实现 `GlobalBoundary`，但保证它不进入 node registry。
-3. 实现 `PolicyPlugin`。
-4. 加强 AST/import/call 检查。
-5. 强化 nodeset scope 与递归检测。
-6. 完善 loop execution report。
+1. 先稳定 `HealthReport` / `HealthFinding` 结构和状态枚举。
+2. 实现最小项目级 `kernel_policy.jsonc` / `governance.jsonc`。
+3. 增加 JSONC 配置解析，并保证错误报告能定位到原始配置。
+4. 加强 AST、导入和 node 间调用检查。
+5. 强化 `base_lib` 纯函数性、文件大小、复杂度、导入策略和依赖闭包。
+6. 完善 Mermaid 展示。
 7. 再把 Paperflow 逐步迁移为该内核的使用方。
