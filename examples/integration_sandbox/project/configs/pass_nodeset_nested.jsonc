@@ -39,7 +39,16 @@
   "pipeline": {
     "inputs": ["value.in"],
     "nodes": [
-      {"name": "add_two", "type": "nodeset.math.add_two", "requires": ["value.in"], "provides": ["value.final"]}
+      {
+        "name": "add_two",
+        "type": "nodeset.math.add_two",
+        "requires": ["value.in"],
+        "provides": ["value.final"],
+        "node_configs": {
+          "first.add": {"delta": 4},
+          "second": {"delta": 6}
+        }
+      }
     ]
   }
 }

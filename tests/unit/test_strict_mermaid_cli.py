@@ -288,21 +288,21 @@ def test_graph_health_reports_node_call_chain_metrics() -> None:
 
 def test_runtime_rejects_non_json_snapshot_output() -> None:
     registry = NodeRegistry()
-    registry.register("test.set_output", SetOutputNode)
+    register_node(registry, "test.set_output", SetOutputNode)
     graph = parse_graph_config({"pipeline": {"nodes": [{"name": "set_output", "type": "test.set_output", "provides": ["value.out"]}]}})
     with pytest.raises(PipelineRuntimeError, match="not JSON snapshot serializable"):
         PipelineRuntime(graph, registry=registry).run()
 
 def test_runtime_allows_explicit_opaque_snapshot_output() -> None:
     registry = NodeRegistry()
-    registry.register("test.opaque_output", OpaqueOutputNode)
+    register_node(registry, "test.opaque_output", OpaqueOutputNode)
     graph = parse_graph_config({"pipeline": {"nodes": [{"name": "opaque", "type": "test.opaque_output", "provides": ["value.out"]}]}})
     context = PipelineRuntime(graph, registry=registry).run()
     assert context.get("value.out") == {1, 2}
 
 def test_runtime_rejects_input_mutation() -> None:
     registry = NodeRegistry()
-    registry.register("test.mutating_input", MutatingInputNode)
+    register_node(registry, "test.mutating_input", MutatingInputNode)
     graph = parse_graph_config(
         {
             "pipeline": {

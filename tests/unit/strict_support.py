@@ -55,6 +55,10 @@ def validate_node_class(*args, **kwargs):
     return impl(*args, **kwargs)
 
 
+def register_node(registry: NodeRegistry, key: str, node_cls: type, schema: dict | None = None, defaults: dict | None = None, **kwargs):
+    registry.register(key, node_cls, config_schema=schema or {}, config_defaults=defaults or {}, **kwargs)
+
+
 class SeedNode:
     NODE_INFO = NodeInfo(
         type_key="test.seed",
@@ -177,11 +181,11 @@ class EffectRequestNode:
 
 def _registry() -> NodeRegistry:
     registry = NodeRegistry()
-    registry.register("test.seed", SeedNode)
-    registry.register("test.add", AddNode)
-    registry.register("test.copy", CopyNode)
-    registry.register("test.nan_output", NanOutputNode)
-    registry.register("test.effect_request", EffectRequestNode)
+    register_node(registry, "test.seed", SeedNode, {"value": {"type": "number"}}, {"value": 1})
+    register_node(registry, "test.add", AddNode, {"delta": {"type": "number"}}, {"delta": 1})
+    register_node(registry, "test.copy", CopyNode)
+    register_node(registry, "test.nan_output", NanOutputNode)
+    register_node(registry, "test.effect_request", EffectRequestNode)
     return registry
 
 

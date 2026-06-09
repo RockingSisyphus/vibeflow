@@ -13,6 +13,7 @@ class NodeSpec:
     requires: tuple[str, ...] = ()
     provides: tuple[str, ...] = ()
     params: dict[str, Any] = field(default_factory=dict)
+    node_config_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -106,13 +107,14 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
     node_type = str(item.get("type", item.get("registry_key", ""))).strip()
     if not name or not node_type:
         raise GraphConfigError(f"pipeline.nodes[{index}] requires name and type")
-    reserved = {"name", "type", "registry_key", "requires", "provides"}
+    reserved = {"name", "type", "registry_key", "requires", "provides", "config", "node_configs"}
     return NodeSpec(
         name=name,
         node_type=node_type,
         requires=_as_tuple(item.get("requires", ()), field=f"node[{name}].requires"),
         provides=_as_tuple(item.get("provides", ()), field=f"node[{name}].provides"),
-        params={str(k): v for k, v in item.items() if k not in reserved},
+        params=_parse_node_params(item, reserved=reserved, field=f"node[{name}].config"),
+        node_config_overrides=_parse_node_config_overrides(item.get("node_configs", {}), field=f"node[{name}].node_configs"),
     )
 
 
@@ -229,3 +231,29 @@ def _as_tuple(value: Any, *, field: str) -> tuple[str, ...]:
     if isinstance(value, str) or not isinstance(value, (list, tuple)):
         raise GraphConfigError(f"{field} must be a list")
     return tuple(str(item).strip() for item in value if str(item).strip())
+
+
+def _parse_node_params(item: Mapping[str, Any], *, reserved: set[str], field: str) -> dict[str, Any]:
+    raw_config = item.get("config", {})
+    if raw_config in (None, {}):
+        raw_config = {}
+    if not isinstance(raw_config, Mapping):
+        raise GraphConfigError(f"{field} must be an object")
+    inline = {str(k): v for k, v in item.items() if k not in reserved}
+    return {**{str(k): v for k, v in raw_config.items()}, **inline}
+
+
+def _parse_node_config_overrides(value: Any, *, field: str) -> dict[str, dict[str, Any]]:
+    if value in (None, {}):
+        return {}
+    if not isinstance(value, Mapping):
+        raise GraphConfigError(f"{field} must be an object")
+    out: dict[str, dict[str, Any]] = {}
+    for key, item in value.items():
+        text_key = str(key).strip()
+        if not text_key:
+            raise GraphConfigError(f"{field} keys must be non-empty strings")
+        if not isinstance(item, Mapping):
+            raise GraphConfigError(f"{field}.{text_key} must be an object")
+        out[text_key] = {str(k): v for k, v in item.items()}
+    return out

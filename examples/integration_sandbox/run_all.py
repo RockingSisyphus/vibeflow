@@ -25,12 +25,12 @@ POLICY_PATH = PROJECT_DIR / "kernel_policy.jsonc"
 
 
 VALID_RUN_CASES = [
-    {"name": "linear", "config": "pass_linear.jsonc", "initial": {}, "expected_status": {"PASS", "CONCERNS"}},
+    {"name": "linear", "config": "pass_linear.jsonc", "initial": {}, "expected_status": {"PASS", "CONCERNS"}, "expected_outputs": {"value.final": 14}},
     {"name": "free_nodes", "config": "pass_free_nodes.jsonc", "initial": {}, "expected_status": {"PASS", "CONCERNS"}},
     {"name": "loop_max", "config": "pass_loop_max_iterations.jsonc", "initial": {"value.in": 0}, "expected_loop_stop": "max_iterations"},
     {"name": "loop_until", "config": "pass_loop_until.jsonc", "initial": {"value.in": 0}, "expected_loop_stop": "until"},
-    {"name": "nodeset_simple", "config": "pass_nodeset_simple.jsonc", "initial": {"value.in": 1}},
-    {"name": "nodeset_nested", "config": "pass_nodeset_nested.jsonc", "initial": {"value.in": 1}},
+    {"name": "nodeset_simple", "config": "pass_nodeset_simple.jsonc", "initial": {"value.in": 1}, "expected_outputs": {"value.out": 6}},
+    {"name": "nodeset_nested", "config": "pass_nodeset_nested.jsonc", "initial": {"value.in": 1}, "expected_outputs": {"value.final": 11}},
     {"name": "boundary", "config": "pass_boundary.jsonc", "initial": {"io.result": 20}},
     {"name": "plugins", "config": "pass_plugins.jsonc", "initial": {"io.result": 20}},
 ]
@@ -223,6 +223,10 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         stop_reasons = run_result.context.get("runtime.loop_stop_reasons")
         if expected_loop_stop not in set(stop_reasons.values()):
             raise AssertionError(f"loop stop reasons {stop_reasons} do not include {expected_loop_stop}")
+    for key, expected in dict(case.get("expected_outputs", {})).items():
+        actual = run_result.context.get(str(key))
+        if actual != expected:
+            raise AssertionError(f"{key} expected {expected!r}, got {actual!r}")
     return CaseResult(f"valid:{name}", "PASS", payload={"health": health.status, "run_dir": str(run_result.run_dir)})
 
 
@@ -323,7 +327,7 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
 
     cls = _load_class(PROJECT_DIR / str(case["module"]), str(case["class"]))
     registry = NodeRegistry()
-    registry.register(str(case["type"]), cls)
+    registry.register(str(case["type"]), cls, config_schema={}, config_defaults={})
     graph = GraphConfig(nodes=(NodeSpec(name="bad", node_type=str(case["type"]), provides=("bad.out",)),))
     try:
         PipelineRuntime(graph, registry=registry).run({})
@@ -341,7 +345,7 @@ def _health_invalid_node(case: dict[str, Any]) -> CaseResult:
 
     cls = _load_class(PROJECT_DIR / str(case["module"]), str(case["class"]))
     registry = NodeRegistry()
-    registry.register(str(case["type"]), cls)
+    registry.register(str(case["type"]), cls, config_schema={}, config_defaults={})
     graph = GraphConfig(nodes=(NodeSpec(name="bad", node_type=str(case["type"]), provides=("bad.out",)),))
     report = validate_graph_health(
         graph,

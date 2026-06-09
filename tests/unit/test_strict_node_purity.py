@@ -20,8 +20,8 @@ def test_architecture_smells_warn_for_mismatched_metadata_and_unstable_keys(tmp_
 
 def test_graph_health_reports_node_metrics_duplicate_logic_and_confusing_node_names() -> None:
     registry = NodeRegistry()
-    registry.register("test.duplicate_one", DuplicateOneNode)
-    registry.register("test.duplicate_two", DuplicateTwoNode)
+    register_node(registry, "test.duplicate_one", DuplicateOneNode)
+    register_node(registry, "test.duplicate_two", DuplicateTwoNode)
     graph = parse_graph_config(
         {
             "pipeline": {

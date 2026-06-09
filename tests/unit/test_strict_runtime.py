@@ -19,6 +19,78 @@ def test_checked_run_refuses_failed_health_before_runtime(tmp_path) -> None:
     assert health_payload["effective_policy"]["sources"] == ["kernel.default_policy"]
     assert (result.run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8") == ""
 
+
+def test_node_registration_requires_config_spec() -> None:
+    with pytest.raises(Exception, match="config_schema"):
+        NodeRegistry().register("test.seed", SeedNode)
+
+
+def test_node_config_defaults_and_call_overrides_are_passed_to_runtime() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
+                    {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"], "config": {"delta": 4}},
+                ]
+            }
+        }
+    )
+    context = PipelineRuntime(graph, registry=_registry()).run({})
+    assert context.get("value.in") == 1
+    assert context.get("value.out") == 5
+
+
+def test_node_config_invalid_override_fails_health_before_runtime() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "seed", "type": "test.seed", "provides": ["value.in"], "value": "bad"},
+                ]
+            }
+        }
+    )
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    assert report.status == "FAIL"
+    assert any(error.rule_id == "NODE.CONFIG.INVALID" for error in report.errors)
+
+
+def test_nodeset_call_can_override_inner_node_config_independently() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "math.add_one",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline={
+                        "inputs": ["value.in"],
+                        "nodes": [
+                            {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 1}
+                        ],
+                    },
+                )
+            ],
+            "pipeline": {
+                "inputs": ["value.in"],
+                "nodes": [
+                    {
+                        "name": "composite",
+                        "type": "nodeset.math.add_one",
+                        "requires": ["value.in"],
+                        "provides": ["value.out"],
+                        "node_configs": {"add": {"delta": 5}},
+                    }
+                ],
+            },
+        }
+    )
+    context = PipelineRuntime(graph, registry=_registry()).run({"value.in": 2})
+    assert context.get("value.out") == 7
+
+
 def test_checked_run_writes_runtime_failure_trace(tmp_path) -> None:
     config_path = tmp_path / "runtime_fail.json"
     config_path.write_text(
@@ -112,7 +184,8 @@ def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, ca
     from topology_kernel.registry import GLOBAL_NODE_REGISTRY
 
     original = dict(getattr(GLOBAL_NODE_REGISTRY, "_registry"))
-    GLOBAL_NODE_REGISTRY.register("test.seed", SeedNode, overwrite=True)
+    original_config_specs = dict(getattr(GLOBAL_NODE_REGISTRY, "_config_specs"))
+    register_node(GLOBAL_NODE_REGISTRY, "test.seed", SeedNode, {"value": {"type": "number"}}, {"value": 1}, overwrite=True)
     try:
         config_path = tmp_path / "workflow.json"
         input_path = tmp_path / "input.json"
@@ -138,6 +211,8 @@ def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, ca
     finally:
         getattr(GLOBAL_NODE_REGISTRY, "_registry").clear()
         getattr(GLOBAL_NODE_REGISTRY, "_registry").update(original)
+        getattr(GLOBAL_NODE_REGISTRY, "_config_specs").clear()
+        getattr(GLOBAL_NODE_REGISTRY, "_config_specs").update(original_config_specs)
     assert code == 0
     assert payload["status"] in {"PASS", "CONCERNS"}
     run_dir = Path(payload["run_dir"])

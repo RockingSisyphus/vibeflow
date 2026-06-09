@@ -351,7 +351,7 @@ def test_boundary_schema_and_node_registry_isolation() -> None:
     boundary_registry = BoundaryRegistry()
     boundary_registry.register("test.boundary", DemoBoundary)
     with pytest.raises(Exception, match="boundary class cannot be registered as a node"):
-        NodeRegistry().register("test.boundary", DemoBoundary)
+        NodeRegistry().register("test.boundary", DemoBoundary, config_schema={}, config_defaults={})
 
 def test_checked_run_writes_reproducible_artifacts_without_raw_inputs(tmp_path) -> None:
     config_path = tmp_path / "workflow.json"

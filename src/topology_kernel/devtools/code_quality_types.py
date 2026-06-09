@@ -21,6 +21,7 @@ DEFAULT_EXCLUDED_DIRS = frozenset(
         "integration_sandbox",
         "node_modules",
         "references",
+        "topology_kernel_distribution",
         "venv",
     }
 )

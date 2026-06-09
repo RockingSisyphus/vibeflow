@@ -1,0 +1,23 @@
+{
+  "plugins": [
+    {"module": "../plugins/policy.py", "class": "PolicyPlugin", "type": "policy"}
+  ],
+  "pipeline": {
+    "nodes": [
+      {
+        "name": "seed",
+        "type": "demo.seed",
+        "provides": ["value.in"],
+        "config": {"value": 2}
+      },
+      {
+        "name": "add",
+        "type": "demo.add",
+        "requires": ["value.in"],
+        "provides": ["value.out"],
+        "config": {"delta": 3}
+      }
+    ]
+  }
+}
+

@@ -9,6 +9,7 @@ from .graph_config import EdgeSpec, GraphConfig, LoopSpec, NodeSpec, NodesetSpec
 from .health import HealthFinding, HealthReport, validate_graph_health
 from .mermaid import export_mermaid
 from .node import NodeContract, NodeInfo, PureNode
+from .node_config import NodeConfigSpec
 from .policy import EffectivePolicy, PolicyResolveResult, default_effective_policy, resolve_effective_policy
 from .plugin import BoundaryPlugin, CompilerPlugin, PluginDescriptor, PluginRegistry, PolicyPlugin, RuntimePlugin, load_plugins_from_config
 from .purity import NodeMetrics, collect_node_metrics
@@ -45,6 +46,7 @@ __all__ = [
     "NodeContract",
     "NodeInfo",
     "NodeMetrics",
+    "NodeConfigSpec",
     "NodeRegistry",
     "NodeRegistryError",
     "NodeSpec",
