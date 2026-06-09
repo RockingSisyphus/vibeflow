@@ -218,6 +218,9 @@ topology-kernel run --config ...
 topology-kernel export-mermaid --config ...
 topology-kernel export-mermaid --config ... --output ...
 topology-kernel export-mermaid --config ... --expand-nodesets
+topology-kernel quality-check --path ...
+topology-kernel quality-check --self
+topology-kernel quality-check --path ... --json
 ```
 
 `run` 使用强制健康检查入口；未注册业务 node 或健康检查失败时会拒绝执行，并保留运行目录中的诊断产物。CLI 的配置错误输出包含稳定 `rule_id`，JSON 输出包含文件、行列和失败层级；文本验证输出也会显示文件、行列和规则编号。
@@ -230,6 +233,20 @@ topology-kernel export-mermaid --config ... --expand-nodesets
 - 顶层 `topology_kernel.STABLE_PUBLIC_API` 明确稳定公共 API 清单。
 - `topology_kernel.resources.schema_text(...)` 可读取内置 schema 资源。
 - 内置 schema 覆盖 JSONC 配置等价结构、policy、health report、node、nodeset、boundary。
+
+### 通用代码质量检查工具
+
+已实现：
+
+- `topology-kernel quality-check --path ...` 可检查普通 Python 项目，不要求使用 `topology-kernel` 架构。
+- `topology-kernel quality-check --self` 可检查内核仓库自身。
+- 检查文件行数、文件字节数、函数数量、类数量、公共 API 数量、分支数量和最大嵌套深度。
+- 检查单函数长度、分支数和嵌套深度。
+- 扫描 Python import 图，发现过长依赖链、循环依赖和双向依赖。
+- 检查相似 AST 指纹，输出重复逻辑信号。
+- 检查文件、网络、数据库、外部进程、环境变量、动态执行等隐藏副作用风险。
+- 支持 JSON 报告和人类可读摘要。
+- 默认排除 `references/` 等外部参考资料目录，避免把第三方参考仓库纳入内核自检。
 
 ### 示例和失败样本
 
@@ -265,6 +282,7 @@ tests/unit/test_topology_kernel_strict.py
 - 最小示例项目和失败示例集。
 - Mermaid 展开/折叠一致性。
 - 运行产物完整性交叉验证。
+- 通用代码质量检查工具。
 
 迁移到独立仓库后的验证：
 
@@ -275,26 +293,21 @@ tests/unit/test_topology_kernel_strict.py
 Paperflow 清理内核副本后的验证：
 
 ```text
-131 passed
+135 passed
 ```
 
 ## 尚未完成
 
-高优先级缺口：
-
-- 面向长期维护的健康报告，包括 node 规模、复杂度、职责边界、未消费输出、命名混乱和架构漂移。
+当前主体功能已达到初步实现版。后续主要工作是持续收紧规则、降低误报、补充真实项目迁移反馈，并把 `quality-check --self` 接入 CI 或发布前流程。
 
 ## 当前风险
 
 - 纯函数检查仍是工程约束，不是数学证明。
-- AST 禁止列表还很短。
+- 质量检查工具目前是轻量 AST 扫描和启发式检查，适合作为维护风险雷达，不等同于完整静态分析器。
 
 ## 下一步建议
 
-1. 先稳定 `HealthReport` / `HealthFinding` 结构和状态枚举。
-2. 实现最小项目级 `kernel_policy.jsonc` / `governance.jsonc`。
-3. 增加 JSONC 配置解析，并保证错误报告能定位到原始配置。
-4. 加强 AST、导入和 node 间调用检查。
-5. 强化 `base_lib` 纯函数性、文件大小、复杂度、导入策略和依赖闭包。
-6. 完善 Mermaid 展示。
-7. 再把 Paperflow 逐步迁移为该内核的使用方。
+1. 用 `quality-check --self` 的结果反向拆分过大的内核文件。
+2. 将 `quality-check --self` 接入 CI 或发布前流程。
+3. 用真实业务项目试迁移，收集误报和漏报。
+4. 再把 Paperflow 逐步迁移为该内核的使用方。
