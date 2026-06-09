@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from .plugin import PluginRegistry
     from .registry import NodeRegistry, NodeRegistryError
 
-
 @dataclass
 class _HealthValidationState:
     errors: list[HealthFinding] = field(default_factory=list)
@@ -46,6 +45,7 @@ def validate_graph_health(
 
     _validate_graph_nodes(graph, registry, plugin_registry, purity_policy, state)
     _append_boundary_health(graph, boundary_registry, state)
+    _append_node_config_health(graph, registry, state)
     _append_graph_contract_smells(graph, state)
     _append_duplicate_logic_findings(state)
     _append_nodeset_health(graph, registry, state)
@@ -251,6 +251,12 @@ def _append_boundary_health(
     for finding in validate_boundary_health(graph, boundary_registry=boundary_registry):
         state.errors.append(finding)
         state.boundary_findings.append(finding.to_dict())
+
+
+def _append_node_config_health(graph: GraphConfig, registry: NodeRegistry, state: _HealthValidationState) -> None:
+    from .health_node_config import validate_node_config_health
+
+    state.errors.extend(validate_node_config_health(graph, registry=registry))
 
 
 def _append_graph_contract_smells(graph: GraphConfig, state: _HealthValidationState) -> None:

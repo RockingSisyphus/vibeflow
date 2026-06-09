@@ -379,8 +379,8 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
     monkeypatch.syspath_prepend(str(project))
     module = _load_module_from_path(project / "nodes.py", "_minimal_project_nodes")
     registry = NodeRegistry()
-    registry.register("example.seed", module.SeedNode)
-    registry.register("example.add", module.AddNode)
+    register_node(registry, "example.seed", module.SeedNode, {"value": {"type": "number"}}, {"value": 1})
+    register_node(registry, "example.add", module.AddNode, {"delta": {"type": "number"}}, {"delta": 1})
 
     result = run_checked(
         project / "config.jsonc",

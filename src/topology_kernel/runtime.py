@@ -15,6 +15,7 @@ from .plugin import PluginRegistry
 from .summaries import summarize_mapping
 from .registry import NodeRegistry, NodeRegistryError
 from .runtime_errors import BoundaryRuntimeError, PipelineRuntimeError
+from .runtime_config import effective_node_params, nested_node_config_overrides, normalize_node_config_overrides
 from .runtime_trace import RuntimeTrace
 from .runtime_validation import assert_runtime_output_snapshot
 
@@ -28,6 +29,7 @@ class PipelineRuntime:
         boundary_registry: BoundaryRegistry | None = None,
         plugin_registry: PluginRegistry | None = None,
         run_dir: str | Path | None = None,
+        node_config_overrides: Mapping[str, Mapping[str, object]] | None = None,
     ) -> None:
         self.graph = graph
         self.registry = registry
@@ -44,6 +46,7 @@ class PipelineRuntime:
         self._boundary = self._load_boundary(boundary_registry)
         self._run_dir = self._resolve_run_dir(run_dir)
         self._boundary_trace_path = self._run_dir / "boundary_trace.jsonl" if self._boundary is not None else None
+        self._node_config_overrides = normalize_node_config_overrides(node_config_overrides or {})
 
     def run(self, initial: Mapping[str, Any] | None = None) -> Context:
         context = Context(dict(initial or {}))
@@ -307,9 +310,10 @@ class PipelineRuntime:
             node_cls = self.registry.get(spec.node_type)
             node = node_cls()
             inputs = {key: deepcopy(context.get(key)) for key in spec.requires}
+            params = self.registry.merge_config(spec.node_type, effective_node_params(spec, self._node_config_overrides))
             self._call_runtime_plugins("before_node", node_name, spec.node_type, summarize_mapping(inputs))
             before = deepcopy(inputs)
-            outputs = node.run_pure(inputs, spec.params)
+            outputs = node.run_pure(inputs, params)
             if inputs != before:
                 raise PipelineRuntimeError(f"node '{node_name}' mutated inputs")
             if not isinstance(outputs, Mapping):
@@ -364,7 +368,13 @@ class PipelineRuntime:
                 f"nodeset node '{spec.name}' provides must match nodeset '{nodeset.name}' provides"
             )
         initial = {key: deepcopy(context.get(key)) for key in spec.requires}
-        nested_context = PipelineRuntime(nodeset.graph, registry=self.registry, plugin_registry=self._plugin_registry).run(initial)
+        nested_overrides = nested_node_config_overrides(spec, self._node_config_overrides)
+        nested_context = PipelineRuntime(
+            nodeset.graph,
+            registry=self.registry,
+            plugin_registry=self._plugin_registry,
+            node_config_overrides=nested_overrides,
+        ).run(initial)
         for key in spec.provides:
             if key not in nodeset.exports:
                 raise PipelineRuntimeError(f"nodeset '{nodeset.name}' cannot export undeclared key '{key}'")
@@ -429,3 +439,4 @@ def _edge_key(pair: tuple[str, str]) -> str:
 
 def _elapsed_ms(started: float) -> float:
     return round((time.perf_counter() - started) * 1000, 3)
+

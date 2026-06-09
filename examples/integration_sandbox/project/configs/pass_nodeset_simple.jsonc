@@ -21,7 +21,13 @@
   "pipeline": {
     "inputs": ["value.in"],
     "nodes": [
-      {"name": "add_one", "type": "nodeset.math.add_one", "requires": ["value.in"], "provides": ["value.out"]}
+      {
+        "name": "add_one",
+        "type": "nodeset.math.add_one",
+        "requires": ["value.in"],
+        "provides": ["value.out"],
+        "node_configs": {"add": {"delta": 5}}
+      }
     ]
   }
 }

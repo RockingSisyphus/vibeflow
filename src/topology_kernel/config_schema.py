@@ -79,6 +79,10 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
     for field in ("requires", "provides"):
         if field in value:
             _validate_string_list(value[field], f"{prefix}.{field}", findings, f"CONFIG.SCHEMA.NODE_{field.upper()}_LIST")
+    if "config" in value and not isinstance(value["config"], Mapping):
+        findings.append(_error("CONFIG.SCHEMA.NODE_CONFIG_OBJECT", f"{prefix}.config must be an object", f"{prefix}.config"))
+    if "node_configs" in value:
+        _validate_node_configs(value["node_configs"], f"{prefix}.node_configs", findings)
 
 
 def _validate_edge(value: Any, prefix: str, findings: list[HealthFinding]) -> None:
@@ -296,6 +300,17 @@ def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
             _validate_positive_int(item["priority"], f"{prefix}.priority", findings, "CONFIG.SCHEMA.PLUGIN_PRIORITY")
         if item.get("conflict", "error") not in {"error", "replace"}:
             findings.append(_error("CONFIG.SCHEMA.PLUGIN_CONFLICT", f"{prefix}.conflict must be error or replace", f"{prefix}.conflict"))
+
+
+def _validate_node_configs(value: Any, prefix: str, findings: list[HealthFinding]) -> None:
+    if not isinstance(value, Mapping):
+        findings.append(_error("CONFIG.SCHEMA.NODE_CONFIGS_OBJECT", f"{prefix} must be an object", prefix))
+        return
+    for key, item in value.items():
+        if not _non_empty_string(key):
+            findings.append(_error("CONFIG.SCHEMA.NODE_CONFIGS_KEY", f"{prefix} keys must be non-empty strings", prefix))
+        if not isinstance(item, Mapping):
+            findings.append(_error("CONFIG.SCHEMA.NODE_CONFIG_OBJECT", f"{prefix}.{key} must be an object", f"{prefix}.{key}"))
 
 
 def _validate_policy_section(value: Any, prefix: str, findings: list[HealthFinding], *, rule_source: str) -> None:
