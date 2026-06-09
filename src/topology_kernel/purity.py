@@ -103,6 +103,10 @@ class PurityPolicy:
     allowed_base_lib_paths: tuple[str, ...] = ()
     allowed_base_lib_modules: tuple[str, ...] = ()
     banned_base_lib_modules: tuple[str, ...] = ()
+    warn_call_chain_length: int = 4
+    max_call_chain_length: int = 4
+    warn_dependency_chain_length: int = 4
+    max_dependency_chain_length: int = 6
 
 
 @dataclass(frozen=True)
@@ -118,6 +122,9 @@ class NodeMetrics:
     contract_key_count: int = 0
     function_names: tuple[str, ...] = ()
     run_pure_fingerprint: str = ""
+    call_chain_length: int = 0
+    call_chain_path: tuple[str, ...] = ()
+    recursive_call_chains: tuple[tuple[str, ...], ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -132,6 +139,9 @@ class NodeMetrics:
             "contract_key_count": self.contract_key_count,
             "function_names": list(self.function_names),
             "run_pure_fingerprint": self.run_pure_fingerprint,
+            "call_chain_length": self.call_chain_length,
+            "call_chain_path": list(self.call_chain_path),
+            "recursive_call_chains": [list(path) for path in self.recursive_call_chains],
         }
 
 
@@ -188,6 +198,7 @@ def validate_node_class(
         return violations
     metrics = collect_node_metrics(node_cls)
     violations.extend(_validate_complexity_metrics(metrics, policy=policy, source=source))
+    violations.extend(_validate_call_chain_metrics(metrics, policy=policy, source=source))
     if isinstance(info, NodeInfo) and isinstance(contract, NodeContract):
         violations.extend(_validate_architecture_smells(info, contract, source=source, metrics=metrics))
 
@@ -232,6 +243,7 @@ def collect_node_metrics(node_cls: type[Any]) -> NodeMetrics:
         return NodeMetrics(source_lines=len(source.class_text.splitlines()), source_bytes=len(source.class_text.encode("utf-8")))
     counter = _ComplexityCounter()
     counter.visit(tree)
+    call_chain = _analyze_internal_call_chain(tree)
     requires = getattr(contract, "requires", ()) if isinstance(contract, NodeContract) else ()
     provides = getattr(contract, "provides", ()) if isinstance(contract, NodeContract) else ()
     params_schema = getattr(contract, "params_schema", {}) if isinstance(contract, NodeContract) else {}
@@ -247,6 +259,9 @@ def collect_node_metrics(node_cls: type[Any]) -> NodeMetrics:
         contract_key_count=len(requires) + len(provides),
         function_names=tuple(counter.function_names),
         run_pure_fingerprint=counter.run_pure_fingerprint,
+        call_chain_length=call_chain.length,
+        call_chain_path=call_chain.path,
+        recursive_call_chains=call_chain.recursive_paths,
     )
 
 
@@ -266,6 +281,13 @@ class _SourceInfo:
         if column is not None:
             out["column"] = column
         return out
+
+
+@dataclass(frozen=True)
+class _CallChainAnalysis:
+    length: int = 0
+    path: tuple[str, ...] = ()
+    recursive_paths: tuple[tuple[str, ...], ...] = ()
 
 
 class NodePurityVisitor(ast.NodeVisitor):
@@ -626,6 +648,56 @@ class _ComplexityCounter(ast.NodeVisitor):
         self._nesting -= 1
 
 
+def _analyze_internal_call_chain(tree: ast.Module) -> _CallChainAnalysis:
+    class_defs = [node for node in tree.body if isinstance(node, ast.ClassDef)]
+    if not class_defs:
+        return _CallChainAnalysis()
+    class_def = class_defs[0]
+    methods = {node.name: node for node in class_def.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    if "run_pure" not in methods:
+        return _CallChainAnalysis()
+    method_names = set(methods)
+    graph: dict[str, set[str]] = {name: set() for name in method_names}
+    for name, method in methods.items():
+        collector = _InternalMethodCallCollector(method_names)
+        collector.visit(method)
+        graph[name] = collector.calls
+
+    recursive_paths: list[tuple[str, ...]] = []
+    best_path: tuple[str, ...] = ("run_pure",)
+
+    def dfs(name: str, path: tuple[str, ...]) -> None:
+        nonlocal best_path
+        if len(path) > len(best_path):
+            best_path = path
+        for target in sorted(graph.get(name, ())):
+            if target in path:
+                cycle = (*path[path.index(target):], target)
+                if cycle not in recursive_paths:
+                    recursive_paths.append(cycle)
+                continue
+            dfs(target, (*path, target))
+
+    dfs("run_pure", ("run_pure",))
+    return _CallChainAnalysis(length=len(best_path), path=best_path, recursive_paths=tuple(recursive_paths))
+
+
+class _InternalMethodCallCollector(ast.NodeVisitor):
+    def __init__(self, method_names: set[str]) -> None:
+        self.method_names = method_names
+        self.calls: set[str] = set()
+
+    def visit_Call(self, node: ast.Call) -> None:
+        target = ""
+        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and node.func.value.id == "self":
+            target = node.func.attr
+        elif isinstance(node.func, ast.Name):
+            target = node.func.id
+        if target in self.method_names:
+            self.calls.add(target)
+        self.generic_visit(node)
+
+
 def _validate_node_info(info: object, *, expected_type: str | None, source: _SourceInfo) -> list[PurityViolation]:
     if not isinstance(info, NodeInfo):
         return [_violation("missing_node_info", "node must define NODE_INFO: NodeInfo", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
@@ -737,6 +809,42 @@ def _validate_complexity_metrics(metrics: NodeMetrics, *, policy: PurityPolicy, 
                     details={detail_key: actual, "limit": limit, "metrics": metrics.to_dict()},
                 )
             )
+    return violations
+
+
+def _validate_call_chain_metrics(metrics: NodeMetrics, *, policy: PurityPolicy, source: _SourceInfo) -> list[PurityViolation]:
+    violations: list[PurityViolation] = []
+    for path in metrics.recursive_call_chains:
+        violations.append(
+            _violation(
+                "recursive_call_chain",
+                "node internal helper calls must not be recursive: " + " -> ".join(path),
+                source=source,
+                suggested_fix_type="split_node",
+                details={"path": list(path), "metrics": metrics.to_dict()},
+            )
+        )
+    if metrics.call_chain_length > policy.max_call_chain_length:
+        violations.append(
+            _violation(
+                "call_chain_too_deep",
+                f"node internal call chain length is {metrics.call_chain_length} > {policy.max_call_chain_length}",
+                source=source,
+                suggested_fix_type="split_node",
+                details={"length": metrics.call_chain_length, "limit": policy.max_call_chain_length, "path": list(metrics.call_chain_path)},
+            )
+        )
+    elif metrics.call_chain_length >= policy.warn_call_chain_length:
+        violations.append(
+            _violation(
+                "call_chain_too_deep",
+                f"node internal call chain length is {metrics.call_chain_length} >= warning threshold {policy.warn_call_chain_length}",
+                source=source,
+                severity="warning",
+                suggested_fix_type="split_node",
+                details={"length": metrics.call_chain_length, "limit": policy.warn_call_chain_length, "path": list(metrics.call_chain_path)},
+            )
+        )
     return violations
 
 
@@ -1143,11 +1251,13 @@ def _default_rule_id(code: str) -> str:
     if code.startswith("base_lib_"):
         return f"NODE.BASE_LIB.{code.upper()}"
     if code.startswith("complexity_") or code in {
+        "call_chain_too_deep",
         "confusing_key_name",
         "example_contract_gap",
         "example_failed",
         "example_shape",
         "missing_examples",
+        "recursive_call_chain",
         "responsibility_mismatch",
         "temporary_key",
         "wide_contract",

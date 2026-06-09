@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://topology-kernel.local/schema/boundary.schema.json",
+  "title": "Topology Kernel Boundary",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": { "type": "string", "minLength": 1 },
+    "config": { "type": "object" },
+    "consumes": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "provides": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "allowed_paths": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+  }
+}

@@ -15,6 +15,9 @@ topology-kernel = "topology_kernel.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+topology_kernel = ["resources/schema/*.schema.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
 
-from .base_lib import BaseLibFinding, node_base_lib_imports, scan_base_lib
+from .base_lib import BaseLibDependencySummary, BaseLibFinding, node_base_lib_imports, scan_base_lib, summarize_base_lib_dependency_chain
 from .boundary import BoundaryRegistry, BoundaryRegistryError
 from .compiler import GraphCompiler, GraphCompileError
 from .graph_config import GraphConfig
@@ -134,6 +134,9 @@ def validate_graph_health(
             fingerprints[spec.name] = metrics.run_pure_fingerprint
         base_report = _scan_base_lib_for_node(node_cls, purity_policy=purity_policy, scanned=scanned_base_roots)
         if base_report is not None:
+            dependency_summary = summarize_base_lib_dependency_chain(node_base_lib_imports(node_cls), base_report)
+            node_metrics[spec.name]["base_lib_dependency_chain"] = dependency_summary.to_dict()
+            _append_dependency_chain_findings(errors, warnings, spec.name, dependency_summary, purity_policy or PurityPolicy())
             for finding in base_report.findings:
                 health_finding = _base_lib_finding_to_health(finding)
                 if finding.severity == "warning":
@@ -511,6 +514,37 @@ def _base_lib_finding_to_health(finding: BaseLibFinding) -> HealthFinding:
         message=finding.message,
         suggested_fix_type=finding.suggested_fix_type,
         details=finding.details,
+    )
+
+
+def _append_dependency_chain_findings(
+    errors: list[HealthFinding],
+    warnings: list[HealthFinding],
+    node_name: str,
+    summary: BaseLibDependencySummary,
+    policy: PurityPolicy,
+) -> None:
+    if summary.longest_chain_length > policy.max_dependency_chain_length:
+        target = errors
+        severity = "error"
+        limit = policy.max_dependency_chain_length
+    elif summary.longest_chain_length > policy.warn_dependency_chain_length:
+        target = warnings
+        severity = "warning"
+        limit = policy.warn_dependency_chain_length
+    else:
+        return
+    target.append(
+        HealthFinding(
+            rule_id="NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP",
+            severity=severity,
+            object_type="node",
+            object_id=node_name,
+            failure_layer="base_lib",
+            message=f"node base_lib dependency chain length is {summary.longest_chain_length} > {limit}",
+            suggested_fix_type="fix_base_lib",
+            details=summary.to_dict() | {"limit": limit},
+        )
     )
 
 

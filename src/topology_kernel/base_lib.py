@@ -68,6 +68,22 @@ class BaseLibScanReport:
         }
 
 
+@dataclass(frozen=True)
+class BaseLibDependencySummary:
+    imported_modules: tuple[str, ...] = ()
+    longest_chain_length: int = 0
+    longest_chain: tuple[str, ...] = ()
+    recursive_chains: tuple[tuple[str, ...], ...] = ()
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "imported_modules": list(self.imported_modules),
+            "longest_chain_length": self.longest_chain_length,
+            "longest_chain": list(self.longest_chain),
+            "recursive_chains": [list(chain) for chain in self.recursive_chains],
+        }
+
+
 def scan_base_lib(project_root: Path, *, policy: PurityPolicy | None = None) -> BaseLibScanReport:
     policy = policy or PurityPolicy()
     roots = _discover_roots(project_root, policy=policy)
@@ -95,6 +111,44 @@ def scan_base_lib(project_root: Path, *, policy: PurityPolicy | None = None) -> 
         modules=tuple(module_reports),
         dependency_edges=tuple(dependency_edges),
         findings=tuple(findings),
+    )
+
+
+def summarize_base_lib_dependency_chain(imported_modules: tuple[str, ...], report: BaseLibScanReport) -> BaseLibDependencySummary:
+    module_reports = {module.module: module for module in report.modules}
+    edges: dict[str, set[str]] = {}
+    for source, target in report.dependency_edges:
+        edges.setdefault(source, set()).add(target)
+
+    starts = tuple(
+        dict.fromkeys(
+            resolved or imported
+            for imported in imported_modules
+            for resolved in (_resolve_base_lib_import(imported, module_reports),)
+        )
+    )
+    best_chain: tuple[str, ...] = ()
+    recursive_chains: list[tuple[str, ...]] = []
+
+    def dfs(module: str, path: tuple[str, ...]) -> None:
+        nonlocal best_chain
+        if len(path) > len(best_chain):
+            best_chain = path
+        for target in sorted(edges.get(module, ())):
+            if target in path:
+                cycle = (*path[path.index(target):], target)
+                if cycle not in recursive_chains:
+                    recursive_chains.append(cycle)
+                continue
+            dfs(target, (*path, target))
+
+    for start in starts:
+        dfs(start, ("node", start))
+    return BaseLibDependencySummary(
+        imported_modules=starts,
+        longest_chain_length=len(best_chain),
+        longest_chain=best_chain,
+        recursive_chains=tuple(recursive_chains),
     )
 
 

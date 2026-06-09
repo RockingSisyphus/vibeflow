@@ -1,0 +1,57 @@
+{
+  "node_cases": [
+    {
+      "name": "giant_node",
+      "kind": "generated_giant_node",
+      "expected_legacy_code": "source_too_large"
+    },
+    {
+      "name": "hidden_side_effect",
+      "run_body": "        open(\"x.txt\", \"w\")\n        return {\"demo.out\": 1}",
+      "expected_legacy_code": "banned_call"
+    },
+    {
+      "name": "dynamic_import",
+      "run_body": "        importlib.import_module(\"math\")\n        return {\"demo.out\": 1}",
+      "expected_legacy_code": "banned_call"
+    },
+    {
+      "name": "node_mutual_call",
+      "kind": "node_mutual_call",
+      "expected_legacy_code": "node_direct_call"
+    }
+  ],
+  "config_cases": [
+    {
+      "name": "undeclared_loop",
+      "expected_rule_id": "GRAPH.COMPILE",
+      "config": {
+        "pipeline": {
+          "nodes": [
+            {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
+            {"name": "copy", "type": "test.copy", "requires": ["value.out"], "provides": ["value.in"]}
+          ]
+        }
+      }
+    },
+    {
+      "name": "illegal_boundary",
+      "expected_rule_id": "CONFIG.SCHEMA.BOUNDARY_CONSUMES_KEY",
+      "config": {
+        "boundary": {"type": "bad.boundary", "consumes": ["value.out"], "provides": ["bad.result"]},
+        "pipeline": {
+          "nodes": [
+            {"name": "seed", "type": "test.seed", "provides": ["value.in"]}
+          ]
+        }
+      }
+    }
+  ],
+  "base_lib_cases": [
+    {
+      "name": "base_lib_escape",
+      "module_source": "from nodes.some_node import SomeNode\n\n\ndef helper():\n    return 1\n",
+      "expected_rule_id": "BASE_LIB.FORBIDDEN_PROJECT_IMPORT"
+    }
+  ]
+}

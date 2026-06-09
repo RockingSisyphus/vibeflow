@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import importlib.util
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -19,6 +21,8 @@ from topology_kernel import (
     PipelineRuntimeError,
     CheckedRunError,
     PluginRegistry,
+    STABLE_PUBLIC_API,
+    schema_text,
     export_mermaid,
     load_config_document,
     parse_graph_config,
@@ -738,6 +742,44 @@ def test_cli_run_uses_checked_run_and_refuses_without_registered_nodes(tmp_path,
     assert payload["status"] == "FAIL"
     run_dir = Path(payload["run_dir"])
     assert (run_dir / "health_report.json").exists()
+    assert payload["health"]["errors"][0]["rule_id"] == "NODE.TYPE.UNKNOWN"
+
+
+def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, capsys) -> None:
+    from topology_kernel.registry import GLOBAL_NODE_REGISTRY
+
+    original = dict(getattr(GLOBAL_NODE_REGISTRY, "_registry"))
+    GLOBAL_NODE_REGISTRY.register("test.seed", SeedNode, overwrite=True)
+    try:
+        config_path = tmp_path / "workflow.json"
+        input_path = tmp_path / "input.json"
+        config_path.write_text(
+            json.dumps({"pipeline": {"nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"], "value": 9}]}}),
+            encoding="utf-8",
+        )
+        input_path.write_text("{}", encoding="utf-8")
+        code = cli_main(
+            [
+                "run",
+                "--config",
+                str(config_path),
+                "--input",
+                str(input_path),
+                "--run-root",
+                str(tmp_path / "runs"),
+                "--run-id",
+                "cli_ok",
+            ]
+        )
+        payload = json.loads(capsys.readouterr().out)
+    finally:
+        getattr(GLOBAL_NODE_REGISTRY, "_registry").clear()
+        getattr(GLOBAL_NODE_REGISTRY, "_registry").update(original)
+    assert code == 0
+    assert payload["status"] in {"PASS", "CONCERNS"}
+    run_dir = Path(payload["run_dir"])
+    for name in ("compiled_graph.json", "health_report.json", "graph.mmd", "runtime_trace.jsonl", "output_summary.json"):
+        assert (run_dir / name).exists()
 
 
 def test_policy_plugin_tightens_effective_policy_and_health_uses_it(tmp_path) -> None:
@@ -1248,6 +1290,24 @@ def test_health_report_status_fail_for_unknown_node() -> None:
     assert report.errors[0].object_type == "node"
 
 
+def test_target_package_structure_reexports_stable_api_and_schema_resources() -> None:
+    import topology_kernel.core as core
+    import topology_kernel.devtools as devtools
+    import topology_kernel.plugins as plugins
+
+    assert core.NodeInfo is NodeInfo
+    assert core.GraphCompiler is GraphCompiler
+    assert devtools.export_mermaid is export_mermaid
+    assert plugins.PluginRegistry is PluginRegistry
+    assert "NodeInfo" in STABLE_PUBLIC_API
+    assert "schema_text" in STABLE_PUBLIC_API
+
+    for schema_name in ("config", "policy", "health_report", "node", "nodeset", "boundary"):
+        payload = json.loads(schema_text(schema_name))
+        assert payload["$schema"].startswith("https://json-schema.org/")
+        assert payload["title"].startswith("Topology Kernel")
+
+
 def test_cli_validate_json_reports_pass(tmp_path, capsys) -> None:
     config_path = tmp_path / "workflow.json"
     config_path.write_text(
@@ -1281,6 +1341,18 @@ def test_cli_validate_json_reports_bad_json_location(tmp_path, capsys) -> None:
     assert payload["errors"][0]["rule_id"] == "CONFIG.JSON"
     assert payload["errors"][0]["source_location"]["line"] == 1
     assert payload["errors"][0]["source_location"]["column"] > 1
+
+
+def test_cli_validate_text_error_includes_rule_file_line_and_column(tmp_path, capsys) -> None:
+    config_path = tmp_path / "bad.json"
+    config_path.write_text('{"pipeline": ', encoding="utf-8")
+    code = cli_main(["validate", "--config", str(config_path)])
+    output = capsys.readouterr().out
+    assert code == 1
+    assert "CONFIG.JSON" in output
+    assert str(config_path) in output
+    assert "line 1" in output
+    assert "column" in output
 
 
 def test_cli_inspect_config_outputs_effective_edges(tmp_path, capsys) -> None:
@@ -1399,6 +1471,7 @@ VALID_NODE_CONTRACT = """
 
 
 def _inspect_node_source(tmp_path, capsys, source: str, *, node_type: str = "demo.node", class_name: str = "DemoNode", extra_args=None):
+    tmp_path.mkdir(parents=True, exist_ok=True)
     module_path = tmp_path / "demo_node.py"
     module_path.write_text(source.strip(), encoding="utf-8")
     args = ["inspect-node", "--type", node_type, "--module", str(module_path), "--class", class_name]
@@ -1581,6 +1654,112 @@ def test_cli_inspect_node_uses_explicit_policy_path(tmp_path, capsys) -> None:
     )
     assert code == 1
     assert any(error["details"].get("legacy_code") == "source_too_large" for error in payload["health"]["errors"])
+
+
+def test_node_internal_call_chain_short_path_is_allowed(tmp_path, capsys) -> None:
+    source = _valid_node_source(
+        run_body="""
+        return {"demo.out": self._a()}
+
+    def _a(self):
+        return self._b()
+
+    def _b(self):
+        return 1
+""".rstrip()
+    )
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+    assert code == 0
+    assert payload["health"]["status"] == "PASS"
+    assert payload["node"]["metrics"]["call_chain_length"] == 3
+    assert payload["node"]["metrics"]["call_chain_path"] == ["run_pure", "_a", "_b"]
+
+
+def test_node_internal_call_chain_length_four_warns(tmp_path, capsys) -> None:
+    source = _valid_node_source(
+        run_body="""
+        return {"demo.out": self._a()}
+
+    def _a(self):
+        return self._b()
+
+    def _b(self):
+        return self._c()
+
+    def _c(self):
+        return 1
+""".rstrip()
+    )
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+    assert code == 0
+    assert payload["health"]["status"] == "CONCERNS"
+    warning = payload["health"]["warnings"][0]
+    assert warning["rule_id"] == "NODE.MAINTAINABILITY.CALL_CHAIN_TOO_DEEP"
+    assert warning["details"]["length"] == 4
+    assert warning["details"]["path"] == ["run_pure", "_a", "_b", "_c"]
+
+
+def test_node_internal_call_chain_over_four_fails(tmp_path, capsys) -> None:
+    source = _valid_node_source(
+        run_body="""
+        return {"demo.out": self._a()}
+
+    def _a(self):
+        return self._b()
+
+    def _b(self):
+        return self._c()
+
+    def _c(self):
+        return self._d()
+
+    def _d(self):
+        return 1
+""".rstrip()
+    )
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+    assert code == 1
+    error = payload["health"]["errors"][0]
+    assert error["rule_id"] == "NODE.MAINTAINABILITY.CALL_CHAIN_TOO_DEEP"
+    assert error["details"]["length"] == 5
+    assert error["suggested_fix_type"] == "split_node"
+
+
+def test_node_internal_call_chain_recursion_fails(tmp_path, capsys) -> None:
+    direct = _valid_node_source(
+        run_body="""
+        return {"demo.out": self._a()}
+
+    def _a(self):
+        return self._a()
+""".rstrip()
+    )
+    code, payload = _inspect_node_source(tmp_path, capsys, direct)
+    assert code == 1
+    assert any(error["rule_id"] == "NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN" for error in payload["health"]["errors"])
+
+    indirect = _valid_node_source(
+        run_body="""
+        return {"demo.out": self._a()}
+
+    def _a(self):
+        return self._b()
+
+    def _b(self):
+        return self._a()
+""".rstrip()
+    )
+    code, payload = _inspect_node_source(tmp_path, capsys, indirect)
+    assert code == 1
+    recursive = next(error for error in payload["health"]["errors"] if error["rule_id"] == "NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN")
+    assert recursive["details"]["path"] == ["_a", "_b", "_a"]
+
+
+def test_graph_health_reports_node_call_chain_metrics() -> None:
+    graph = parse_graph_config({"pipeline": {"nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"]}]}})
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    assert report.info["node_metrics"]["seed"]["call_chain_length"] == 1
+    assert report.info["node_metrics"]["seed"]["call_chain_path"] == ["run_pure"]
 
 
 class SetOutputNode:
@@ -2194,6 +2373,62 @@ def helper():
     assert "NODE.BASE_LIB.INDIRECT_VIOLATION" in rule_ids
 
 
+def _write_base_lib_chain(tmp_path: Path, modules: list[str]) -> None:
+    base_dir = tmp_path / "base_lib"
+    base_dir.mkdir()
+    (base_dir / "__init__.py").write_text("", encoding="utf-8")
+    for index, name in enumerate(modules):
+        next_name = modules[index + 1] if index + 1 < len(modules) else ""
+        body = f"import base_lib.{next_name}\n\n\ndef helper():\n    return base_lib.{next_name}.helper()\n" if next_name else "\ndef helper():\n    return 1\n"
+        (base_dir / f"{name}.py").write_text(body, encoding="utf-8")
+
+
+def _clear_base_lib_modules() -> None:
+    for name in tuple(sys.modules):
+        if name == "base_lib" or name.startswith("base_lib."):
+            sys.modules.pop(name, None)
+
+
+def test_node_base_lib_dependency_chain_warning_and_error(tmp_path, capsys, monkeypatch) -> None:
+    _clear_base_lib_modules()
+    monkeypatch.syspath_prepend(str(tmp_path))
+    _write_base_lib_chain(tmp_path, ["a", "b", "c", "d"])
+    policy_path = tmp_path / "kernel_policy.jsonc"
+    policy_path.write_text(
+        '{"base_lib": {"allowed_paths": ["base_lib"], "allowed_modules": ["base_lib.a"]}}',
+        encoding="utf-8",
+    )
+    source = _valid_node_source(
+        run_body="""
+        from base_lib.a import helper
+        return {"demo.out": helper()}
+""".rstrip()
+    )
+    code, payload = _inspect_node_source(tmp_path, capsys, source, extra_args=["--policy", str(policy_path)])
+    assert code == 0
+    assert payload["health"]["status"] == "CONCERNS"
+    warning = next(item for item in payload["health"]["warnings"] if item["rule_id"] == "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP")
+    assert warning["details"]["longest_chain_length"] == 5
+    assert warning["details"]["longest_chain"] == ["node", "base_lib.a", "base_lib.b", "base_lib.c", "base_lib.d"]
+    assert payload["base_lib_dependency_chain"]["longest_chain_length"] == 5
+
+    deeper = tmp_path / "deep"
+    deeper.mkdir()
+    _clear_base_lib_modules()
+    monkeypatch.syspath_prepend(str(deeper))
+    _write_base_lib_chain(deeper, ["a", "b", "c", "d", "e", "f"])
+    deep_policy = deeper / "kernel_policy.jsonc"
+    deep_policy.write_text(
+        '{"base_lib": {"allowed_paths": ["base_lib"], "allowed_modules": ["base_lib.a"]}}',
+        encoding="utf-8",
+    )
+    code, payload = _inspect_node_source(deeper, capsys, source, extra_args=["--policy", str(deep_policy)])
+    assert code == 1
+    error = next(item for item in payload["health"]["errors"] if item["rule_id"] == "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP")
+    assert error["details"]["longest_chain_length"] == 7
+    assert error["suggested_fix_type"] == "fix_base_lib"
+
+
 def test_jsonc_loader_strips_comments_without_changing_runtime_data(tmp_path) -> None:
     config_path = tmp_path / "workflow.jsonc"
     config_path.write_text(
@@ -2488,3 +2723,244 @@ def test_cli_export_mermaid_reads_jsonc(tmp_path, capsys) -> None:
     assert "flowchart TD" in output
     assert "seed -->|max=1| add" in output
     assert "provides: value.in" in output
+
+
+def test_cli_export_mermaid_writes_output_and_expands_nodesets(tmp_path, capsys) -> None:
+    config_path = tmp_path / "workflow.jsonc"
+    output_path = tmp_path / "graph.mmd"
+    config_path.write_text(
+        json.dumps(
+            {
+                "nodesets": [
+                    _nodeset_config(
+                        "math.add_one",
+                        requires=["value.in"],
+                        provides=["value.out"],
+                        exports=["value.out"],
+                        pipeline={
+                            "inputs": ["value.in"],
+                            "nodes": [{"name": "inner", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]}],
+                        },
+                    )
+                ],
+                "pipeline": {
+                    "inputs": ["value.in"],
+                    "nodes": [
+                        {
+                            "name": "composite",
+                            "type": "nodeset.math.add_one",
+                            "requires": ["value.in"],
+                            "provides": ["value.out"],
+                        }
+                    ],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    code = cli_main(["export-mermaid", "--config", str(config_path), "--output", str(output_path), "--expand-nodesets"])
+    assert capsys.readouterr().out == ""
+    assert code == 0
+    output = output_path.read_text(encoding="utf-8")
+    assert "flowchart TD" in output
+    assert 'subgraph composite__expanded["math.add_one"]' in output
+    assert "composite__inner" in output
+
+
+def test_cli_export_mermaid_reports_config_errors_as_health_report(tmp_path, capsys) -> None:
+    config_path = tmp_path / "bad.jsonc"
+    config_path.write_text('{\n  "pipeline": {"nodes": []},\n  "bad": [1,]\n}', encoding="utf-8")
+    code = cli_main(["export-mermaid", "--config", str(config_path)])
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 1
+    assert payload["status"] == "ERROR"
+    assert payload["errors"][0]["rule_id"] == "CONFIG.JSON"
+    assert payload["errors"][0]["source_location"]["line"] == 3
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _load_module_from_path(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_minimal_example_project_runs_only_through_declared_extension_points(tmp_path, monkeypatch) -> None:
+    project = _repo_root() / "examples" / "minimal_project"
+    _clear_base_lib_modules()
+    monkeypatch.syspath_prepend(str(project))
+    module = _load_module_from_path(project / "nodes.py", "_minimal_project_nodes")
+    registry = NodeRegistry()
+    registry.register("example.seed", module.SeedNode)
+    registry.register("example.add", module.AddNode)
+
+    result = run_checked(
+        project / "config.jsonc",
+        registry=registry,
+        run_root=tmp_path / "runs",
+        run_id="minimal_example",
+    )
+
+    assert result.context.get("value.out") == 5
+    assert result.health.status == "CONCERNS"
+    assert "plugin.policy:minimal_project_policy" in result.health.effective_policy["sources"]
+    assert result.health.effective_policy["base_lib"]["allowed_modules"] == ["base_lib.math_tools"]
+    assert (result.run_dir / "compiled_graph.json").exists()
+    assert (result.run_dir / "graph.mmd").exists()
+    assert "nodeset.example.add_one" in (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
+
+
+def _failure_case_source(case: dict[str, object]) -> str:
+    kind = str(case.get("kind", ""))
+    if kind == "generated_giant_node":
+        return _valid_node_source() + "\n" + "\n".join("    # filler line" for _ in range(510))
+    if kind == "node_mutual_call":
+        return f"""
+{VALID_NODE_IMPORT}
+class OtherNode:
+    NODE_INFO = NodeInfo(type_key="demo.other", display_name="Other", category="demo", description="Other node.", version="0.1.0")
+    CONTRACT = NodeContract(provides=("other.out",), output_semantics={{"other.out": ("other output",)}}, output_schema={{"other.out": {{"type": "number"}}}}, examples=({{"inputs": {{}}, "params": {{}}, "outputs": {{"other.out": 1}}}},))
+
+    def run_pure(self, inputs, params):
+        return {{"other.out": 1}}
+
+
+class DemoNode:
+{VALID_NODE_INFO}
+{VALID_NODE_CONTRACT}
+
+    def run_pure(self, inputs, params):
+        OtherNode().run_pure({{}}, {{}})
+        return {{"demo.out": 1}}
+"""
+    return _valid_node_source(run_body=str(case["run_body"]))
+
+
+def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) -> None:
+    manifest = load_config_document(_repo_root() / "examples" / "failure_cases" / "cases.jsonc").data
+    observed: set[str] = set()
+
+    for case in manifest["node_cases"]:
+        code, payload = _inspect_node_source(tmp_path / str(case["name"]), capsys, _failure_case_source(case))
+        assert code == 1
+        legacy_codes = {
+            finding["details"].get("legacy_code")
+            for finding in (*payload["health"]["errors"], *payload["health"]["warnings"])
+        }
+        expected = str(case["expected_legacy_code"])
+        assert expected in legacy_codes
+        observed.add(expected)
+
+    for case in manifest["config_cases"]:
+        config_path = tmp_path / f"{case['name']}.json"
+        config_path.write_text(json.dumps(case["config"]), encoding="utf-8")
+        code = cli_main(["validate", "--config", str(config_path), "--json"])
+        payload = json.loads(capsys.readouterr().out)
+        assert code == 1
+        rule_ids = {finding["rule_id"] for finding in (*payload["errors"], *payload["warnings"])}
+        expected_rule = str(case["expected_rule_id"])
+        assert expected_rule in rule_ids
+        observed.add(expected_rule)
+
+    for case in manifest["base_lib_cases"]:
+        base_dir = tmp_path / str(case["name"]) / "base_lib"
+        base_dir.mkdir(parents=True)
+        (base_dir / "bad.py").write_text(str(case["module_source"]), encoding="utf-8")
+        report = scan_base_lib(base_dir.parent, policy=PurityPolicy(max_source_lines=1000))
+        rule_ids = {finding.rule_id for finding in report.findings}
+        expected_rule = str(case["expected_rule_id"])
+        assert expected_rule in rule_ids
+        observed.add(expected_rule)
+
+    assert {
+        "source_too_large",
+        "banned_call",
+        "node_direct_call",
+        "GRAPH.COMPILE",
+        "CONFIG.SCHEMA.BOUNDARY_CONSUMES_KEY",
+        "BASE_LIB.FORBIDDEN_PROJECT_IMPORT",
+    } <= observed
+
+
+def test_policy_downgrade_schema_requires_audit_fields() -> None:
+    findings = collect_config_schema_findings(
+        {
+            "policy": {
+                "rules": {
+                    "downgrades": [
+                        {"rule_id": "GRAPH.OUTPUT.UNCONSUMED", "to": "warning", "scope": "bad"}
+                    ]
+                }
+            },
+            "pipeline": {"nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"]}]},
+        }
+    )
+    rule_ids = {finding.rule_id for finding in findings}
+    assert "CONFIG.SCHEMA.POLICY_RULE_REASON" in rule_ids
+    assert "CONFIG.SCHEMA.POLICY_RULE_SCOPE" in rule_ids
+    assert "CONFIG.SCHEMA.POLICY_RULE_EXPIRES" in rule_ids
+
+
+def test_mermaid_collapsed_and_expanded_views_share_top_level_compiled_edges() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "math.add_one",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline={
+                        "inputs": ["value.in"],
+                        "nodes": [{"name": "inner", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]}],
+                    },
+                )
+            ],
+            "pipeline": {
+                "nodes": [
+                    {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
+                    {"name": "flow", "type": "nodeset.math.add_one", "requires": ["value.in"], "provides": ["value.out"]},
+                ]
+            },
+        }
+    )
+    collapsed = export_mermaid(graph, expand_nodesets=False)
+    expanded = export_mermaid(graph, expand_nodesets=True)
+    assert "seed -->|max=1| flow" in collapsed
+    assert "seed -->|max=1| flow" in expanded
+    assert "flow__inner" not in collapsed
+    assert "flow__inner" in expanded
+
+
+def test_checked_run_artifact_integrity_cross_links_health_graph_trace(tmp_path) -> None:
+    config_path = tmp_path / "workflow.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "pipeline": {
+                    "nodes": [
+                        {"name": "seed", "type": "test.seed", "provides": ["value.in"], "value": 6},
+                        {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 2},
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="integrity")
+    compiled = json.loads((result.run_dir / "compiled_graph.json").read_text(encoding="utf-8"))
+    health = json.loads((result.run_dir / "health_report.json").read_text(encoding="utf-8"))
+    graph_mmd = (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
+    trace = [json.loads(line) for line in (result.run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
+
+    assert result.context.get("value.out") == 8
+    assert health["status"] == result.health.status
+    assert compiled["effective_edges"] == [{"from": "seed", "to": "add", "max_executions": 1, "loop": ""}]
+    assert "seed -->|max=1| add" in graph_mmd
+    assert [event["node"] for event in trace if event.get("kind") == "node"] == ["seed", "add"]

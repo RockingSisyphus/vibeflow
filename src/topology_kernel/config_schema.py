@@ -250,6 +250,17 @@ def _validate_policy(value: Any, prefix: str, findings: list[HealthFinding], *, 
                         "CONFIG.SCHEMA.POLICY_STRING_LIST",
                         rule_source=rule_source,
                     )
+    if "maintainability" in value:
+        _validate_policy_section(value["maintainability"], f"{prefix}.maintainability", findings, rule_source=rule_source)
+        for field in ("warn_call_chain_length", "max_call_chain_length", "warn_dependency_chain_length", "max_dependency_chain_length"):
+            if isinstance(value["maintainability"], Mapping) and field in value["maintainability"]:
+                _validate_positive_int(
+                    value["maintainability"][field],
+                    f"{prefix}.maintainability.{field}",
+                    findings,
+                    "CONFIG.SCHEMA.POLICY_POSITIVE_INT",
+                    rule_source=rule_source,
+                )
     if "rules" in value:
         _validate_policy_section(value["rules"], f"{prefix}.rules", findings, rule_source=rule_source)
         if isinstance(value["rules"], Mapping):
@@ -305,7 +316,7 @@ def _validate_rule_entries(value: Any, prefix: str, findings: list[HealthFinding
             findings.append(_error("CONFIG.SCHEMA.POLICY_RULE_REASON", f"{item_prefix}.reason must be a non-empty string", f"{item_prefix}.reason", rule_source=rule_source))
         if "scope" in item and not isinstance(item["scope"], Mapping):
             findings.append(_error("CONFIG.SCHEMA.POLICY_RULE_SCOPE", f"{item_prefix}.scope must be an object", f"{item_prefix}.scope", rule_source=rule_source))
-        if "expires" in item and not _non_empty_string(item["expires"]):
+        if not _non_empty_string(item.get("expires")):
             findings.append(_error("CONFIG.SCHEMA.POLICY_RULE_EXPIRES", f"{item_prefix}.expires must be a non-empty string", f"{item_prefix}.expires", rule_source=rule_source))
 
 

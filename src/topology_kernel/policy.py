@@ -35,6 +35,12 @@ DEFAULT_POLICY_DATA: dict[str, Any] = {
         "allowed_modules": [],
         "banned_modules": [],
     },
+    "maintainability": {
+        "warn_call_chain_length": 4,
+        "max_call_chain_length": 4,
+        "warn_dependency_chain_length": 4,
+        "max_dependency_chain_length": 6,
+    },
     "rules": {
         "downgrades": [],
         "exemptions": [],
@@ -63,6 +69,7 @@ class EffectivePolicy:
         complexity = self.data.get("complexity", {})
         imports = self.data.get("imports", {})
         base_lib = self.data.get("base_lib", {})
+        maintainability = self.data.get("maintainability", {})
         return PurityPolicy(
             max_source_lines=int(node_source.get("max_lines", DEFAULT_POLICY_DATA["node_source"]["max_lines"])),
             max_source_bytes=int(node_source.get("max_bytes", DEFAULT_POLICY_DATA["node_source"]["max_bytes"])),
@@ -78,6 +85,10 @@ class EffectivePolicy:
             allowed_base_lib_paths=tuple(base_lib.get("allowed_paths", ())),
             allowed_base_lib_modules=tuple(base_lib.get("allowed_modules", ())),
             banned_base_lib_modules=tuple(base_lib.get("banned_modules", ())),
+            warn_call_chain_length=int(maintainability.get("warn_call_chain_length", DEFAULT_POLICY_DATA["maintainability"]["warn_call_chain_length"])),
+            max_call_chain_length=int(maintainability.get("max_call_chain_length", DEFAULT_POLICY_DATA["maintainability"]["max_call_chain_length"])),
+            warn_dependency_chain_length=int(maintainability.get("warn_dependency_chain_length", DEFAULT_POLICY_DATA["maintainability"]["warn_dependency_chain_length"])),
+            max_dependency_chain_length=int(maintainability.get("max_dependency_chain_length", DEFAULT_POLICY_DATA["maintainability"]["max_dependency_chain_length"])),
         )
 
 
