@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from .health import HealthFinding
+from .health_types import HealthFinding
 
 
 def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFinding, ...]:

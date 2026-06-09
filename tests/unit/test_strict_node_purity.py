@@ -1,0 +1,384 @@
+from tests.unit.strict_support import *
+
+def test_architecture_smells_warn_for_mismatched_metadata_and_unstable_keys(tmp_path, capsys) -> None:
+    info = VALID_NODE_INFO.replace('description="Demo node."', 'description="Calculates invoice total."')
+    contract = """
+    CONTRACT = NodeContract(
+        provides=("Tmp Key",),
+        output_semantics={"Tmp Key": ("scratch debug value",)},
+        output_schema={"Tmp Key": {"type": "number"}},
+        examples=({"inputs": {}, "params": {}, "outputs": {"Tmp Key": 1}},),
+    )
+""".rstrip()
+    source = _valid_node_source(info=info, contract=contract, run_body='        return {"Tmp Key": 1}')
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+    assert code == 0
+    warnings = {warning["details"].get("legacy_code") for warning in payload["health"]["warnings"]}
+    assert "responsibility_mismatch" in warnings
+    assert "temporary_key" in warnings
+    assert "confusing_key_name" in warnings
+
+def test_graph_health_reports_node_metrics_duplicate_logic_and_confusing_node_names() -> None:
+    registry = NodeRegistry()
+    registry.register("test.duplicate_one", DuplicateOneNode)
+    registry.register("test.duplicate_two", DuplicateTwoNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "DuplicateOne", "type": "test.duplicate_one", "provides": ["dup.one"]},
+                    {"name": "duplicate_two", "type": "test.duplicate_two", "provides": ["dup.two"]},
+                ]
+            }
+        }
+    )
+    report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
+    payload = report.to_dict()
+    assert payload["info"]["node_metrics"]["DuplicateOne"]["function_count"] == 1
+    rule_ids = {warning["rule_id"] for warning in payload["warnings"]}
+    assert "GRAPH.SMELL.CONFUSING_NODE_NAME" in rule_ids
+    assert "GRAPH.SMELL.DUPLICATE_LOGIC" in rule_ids
+
+def test_graph_health_warns_for_overwide_nodeset() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "wide.flow",
+                    provides=["wide.out"],
+                    exports=["wide.out"],
+                    pipeline={
+                        "nodes": [
+                            {"name": f"n{index}", "type": "test.seed", "provides": [f"wide.k{index}"]}
+                            for index in range(11)
+                        ]
+                    },
+                )
+            ],
+            "pipeline": {"nodes": [{"name": "wide_flow", "type": "nodeset.wide.flow", "provides": ["wide.out"]}]},
+        }
+    )
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    assert any(warning.rule_id == "NODESET.SMELL.TOO_WIDE" for warning in report.warnings)
+    assert "wide.flow" in report.info["nodeset_findings"]
+
+def test_nodeset_schema_requires_metadata_contract_and_purity() -> None:
+    findings = collect_config_schema_findings(
+        {
+            "nodesets": [
+                {
+                    "name": "bad.flow",
+                    "purity": "impure",
+                    "pipeline": {"nodes": [{"name": "seed", "type": "test.seed"}]},
+                }
+            ],
+            "pipeline": {"nodes": [{"name": "flow", "type": "nodeset.bad.flow", "provides": ["value.out"]}]},
+        }
+    )
+    rule_ids = {finding.rule_id for finding in findings}
+    assert "CONFIG.SCHEMA.NODESET_METADATA" in rule_ids
+    assert "CONFIG.SCHEMA.NODESET_CONTRACT" in rule_ids
+    assert "CONFIG.SCHEMA.NODESET_PURITY" in rule_ids
+
+def test_nodeset_health_accepts_valid_contract_and_groups_no_findings() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "math.add_one",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline={
+                        "inputs": ["value.in"],
+                        "nodes": [
+                            {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]}
+                        ],
+                    },
+                )
+            ],
+            "pipeline": {
+                "inputs": ["value.in"],
+                "nodes": [
+                    {
+                        "name": "composite",
+                        "type": "nodeset.math.add_one",
+                        "requires": ["value.in"],
+                        "provides": ["value.out"],
+                    }
+                ],
+            },
+        }
+    )
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    assert report.errors == ()
+    assert report.info["nodeset_findings"] == {}
+
+def test_nodeset_health_rejects_direct_and_indirect_recursion() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "loop.self",
+                    provides=["loop.out"],
+                    exports=["loop.out"],
+                    pipeline={
+                        "nodes": [{"name": "self", "type": "nodeset.loop.self", "provides": ["loop.out"]}]
+                    },
+                ),
+                _nodeset_config(
+                    "loop.a",
+                    provides=["loop.out"],
+                    exports=["loop.out"],
+                    pipeline={"nodes": [{"name": "to_b", "type": "nodeset.loop.b", "provides": ["loop.out"]}]},
+                ),
+                _nodeset_config(
+                    "loop.b",
+                    provides=["loop.out"],
+                    exports=["loop.out"],
+                    pipeline={"nodes": [{"name": "to_a", "type": "nodeset.loop.a", "provides": ["loop.out"]}]},
+                ),
+            ],
+            "pipeline": {"nodes": [{"name": "use_self", "type": "nodeset.loop.self", "provides": ["loop.out"]}]},
+        }
+    )
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    recursion_errors = [error for error in report.errors if error.rule_id == "NODESET.RECURSION"]
+    assert len(recursion_errors) == 2
+    assert "loop.self" in report.info["nodeset_findings"]
+    assert "loop.a" in report.info["nodeset_findings"]
+
+def test_nodeset_health_rejects_export_and_internal_key_leak() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "bad.scope",
+                    provides=["public.out", "tmp.internal"],
+                    exports=["missing.out"],
+                    pipeline={
+                        "nodes": [
+                            {"name": "public", "type": "test.seed", "provides": ["public.out"]},
+                            {"name": "tmp", "type": "test.seed", "provides": ["tmp.internal"]},
+                        ]
+                    },
+                )
+            ],
+            "pipeline": {
+                "nodes": [
+                    {
+                        "name": "bad_scope",
+                        "type": "nodeset.bad.scope",
+                        "provides": ["public.out", "tmp.internal"],
+                    }
+                ]
+            },
+        }
+    )
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    rule_ids = {error.rule_id for error in report.errors}
+    assert "NODESET.CONTRACT.EXPORTS_NOT_PROVIDES" in rule_ids
+    assert "NODESET.EXPORT.UNKNOWN_KEY" in rule_ids
+    assert "NODESET.KEY_LEAK" in rule_ids
+    assert "NODESET.INTERNAL_KEY_LEAK" in rule_ids
+
+def test_nodeset_health_and_runtime_reject_external_contract_mismatch() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "math.add_one",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline={
+                        "inputs": ["value.in"],
+                        "nodes": [
+                            {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]}
+                        ],
+                    },
+                )
+            ],
+            "pipeline": {
+                "nodes": [
+                    {
+                        "name": "bad_composite",
+                        "type": "nodeset.math.add_one",
+                        "provides": ["wrong.out"],
+                    }
+                ]
+            },
+        }
+    )
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    assert any(error.rule_id == "NODESET.CONTRACT.EXTERNAL_MISMATCH" for error in report.errors)
+    with pytest.raises(PipelineRuntimeError, match="requires must match"):
+        PipelineRuntime(graph, registry=_registry()).run({"value": {"in": 2}})
+
+def test_nodeset_health_rejects_nested_nodeset_contract_mismatch() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "inner.flow",
+                    provides=["inner.out"],
+                    exports=["inner.out"],
+                    pipeline={"nodes": [{"name": "seed", "type": "test.seed", "provides": ["inner.out"]}]},
+                ),
+                _nodeset_config(
+                    "outer.flow",
+                    provides=["outer.out"],
+                    exports=["outer.out"],
+                    pipeline={"nodes": [{"name": "inner", "type": "nodeset.inner.flow", "provides": ["outer.out"]}]},
+                ),
+            ],
+            "pipeline": {"nodes": [{"name": "outer", "type": "nodeset.outer.flow", "provides": ["outer.out"]}]},
+        }
+    )
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    assert any(
+        error.rule_id == "NODESET.CONTRACT.EXTERNAL_MISMATCH" and error.details.get("owner") == "nodeset:outer.flow"
+        for error in report.errors
+    )
+
+def test_base_lib_scan_discovers_default_root_and_reports_metrics(tmp_path) -> None:
+    base_dir = tmp_path / "base_lib"
+    base_dir.mkdir()
+    (base_dir / "math_tools.py").write_text(
+        """
+def add_one(value):
+    return value + 1
+""".strip(),
+        encoding="utf-8",
+    )
+    report = scan_base_lib(tmp_path, policy=PurityPolicy(max_source_lines=1000))
+    payload = report.to_dict()
+    assert payload["roots"] == [str(base_dir.resolve())]
+    assert payload["modules"][0]["module"] == "base_lib.math_tools"
+    assert payload["modules"][0]["function_count"] == 1
+    assert payload["findings"] == []
+
+def test_base_lib_scan_reports_size_complexity_imports_side_effects_and_globals(tmp_path) -> None:
+    base_dir = tmp_path / "base_lib"
+    base_dir.mkdir()
+    (base_dir / "bad.py").write_text(
+        """
+import os
+
+CACHE = {}
+
+def risky(value):
+    if value:
+        if value > 1:
+            open("x.txt", "w")
+    return value
+""".strip(),
+        encoding="utf-8",
+    )
+    report = scan_base_lib(
+        tmp_path,
+        policy=PurityPolicy(
+            max_source_lines=3,
+            max_functions=0,
+            max_branches=1,
+            max_nesting_depth=1,
+        ),
+    )
+    rule_ids = {finding.rule_id for finding in report.findings}
+    assert "BASE_LIB.SOURCE.MAX_LINES" in rule_ids
+    assert "BASE_LIB.COMPLEXITY.MAX_FUNCTIONS" in rule_ids
+    assert "BASE_LIB.COMPLEXITY.MAX_BRANCHES" in rule_ids
+    assert "BASE_LIB.COMPLEXITY.MAX_NESTING_DEPTH" in rule_ids
+    assert "BASE_LIB.BANNED_IMPORT" in rule_ids
+    assert "BASE_LIB.GLOBAL_STATE" in rule_ids
+    assert "BASE_LIB.SIDE_EFFECT_CALL" in rule_ids
+
+def test_base_lib_scan_reports_forbidden_project_import_and_dependency_closure(tmp_path) -> None:
+    base_dir = tmp_path / "base_lib"
+    base_dir.mkdir()
+    (base_dir / "bad.py").write_text(
+        """
+from nodes.some_node import SomeNode
+
+def value():
+    return 1
+""".strip(),
+        encoding="utf-8",
+    )
+    (base_dir / "wrapper.py").write_text(
+        """
+import base_lib.bad
+
+def wrapped():
+    return base_lib.bad.value()
+""".strip(),
+        encoding="utf-8",
+    )
+    report = scan_base_lib(tmp_path, policy=PurityPolicy(max_source_lines=1000))
+    rule_ids = {finding.rule_id for finding in report.findings}
+    assert ("base_lib.wrapper", "base_lib.bad") in report.dependency_edges
+    assert "BASE_LIB.FORBIDDEN_PROJECT_IMPORT" in rule_ids
+    assert "BASE_LIB.DEPENDENCY_CLOSURE_VIOLATION" in rule_ids
+
+def test_node_importing_base_lib_requires_policy_declaration(tmp_path, capsys, monkeypatch) -> None:
+    monkeypatch.syspath_prepend(str(tmp_path))
+    base_dir = tmp_path / "base_lib"
+    base_dir.mkdir()
+    (base_dir / "__init__.py").write_text("", encoding="utf-8")
+    (base_dir / "good.py").write_text(
+        """
+def helper():
+    return 1
+""".strip(),
+        encoding="utf-8",
+    )
+    source = _valid_node_source(
+        run_body="""
+        from base_lib.good import helper
+        return {"demo.out": helper()}
+""".rstrip()
+    )
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+    assert code == 1
+    assert any(error["details"].get("legacy_code") == "base_lib_undeclared" for error in payload["health"]["errors"])
+
+    policy_path = tmp_path / "kernel_policy.jsonc"
+    policy_path.write_text(
+        '{"base_lib": {"allowed_paths": ["base_lib"], "allowed_modules": ["base_lib.good"]}}',
+        encoding="utf-8",
+    )
+    code, payload = _inspect_node_source(tmp_path, capsys, source, extra_args=["--policy", str(policy_path)])
+    assert code == 0
+    assert payload["health"]["status"] == "PASS"
+    assert "base_lib.good" in {module["module"] for module in payload["base_lib"]["modules"]}
+
+def test_node_importing_unhealthy_base_lib_reports_indirect_violation(tmp_path, capsys, monkeypatch) -> None:
+    monkeypatch.syspath_prepend(str(tmp_path))
+    base_dir = tmp_path / "base_lib"
+    base_dir.mkdir()
+    (base_dir / "__init__.py").write_text("", encoding="utf-8")
+    (base_dir / "bad.py").write_text(
+        """
+import os
+
+def helper():
+    return 1
+""".strip(),
+        encoding="utf-8",
+    )
+    policy_path = tmp_path / "kernel_policy.jsonc"
+    policy_path.write_text(
+        '{"base_lib": {"allowed_paths": ["base_lib"], "allowed_modules": ["base_lib.bad"]}}',
+        encoding="utf-8",
+    )
+    source = _valid_node_source(
+        run_body="""
+        from base_lib.bad import helper
+        return {"demo.out": helper()}
+""".rstrip()
+    )
+    code, payload = _inspect_node_source(tmp_path, capsys, source, extra_args=["--policy", str(policy_path)])
+    assert code == 1
+    rule_ids = {error["rule_id"] for error in payload["health"]["errors"]}
+    assert "BASE_LIB.BANNED_IMPORT" in rule_ids
+    assert "NODE.BASE_LIB.INDIRECT_VIOLATION" in rule_ids
