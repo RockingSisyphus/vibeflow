@@ -18,6 +18,7 @@ from .plugin import load_plugins_from_config
 from .policy import default_effective_policy, resolve_effective_policy
 from .registry import NodeRegistry
 from .runtime import PipelineRuntime
+from .summaries import summarize_mapping
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,7 @@ def run_checked(
     actual_run_id = run_id or _new_run_id()
     run_dir = (Path(run_root) if run_root is not None else Path("runs")) / actual_run_id
     run_dir.mkdir(parents=True, exist_ok=False)
-    _write_json(run_dir / "input_summary.json", _summarize_mapping(dict(initial or {})))
+    _write_json(run_dir / "input_summary.json", summarize_mapping(dict(initial or {})))
 
     try:
         document = load_config_document(path)
@@ -151,7 +152,7 @@ def run_checked(
     finally:
         _write_runtime_trace(run_dir / "runtime_trace.jsonl", runtime.trace.to_dict())
         _ensure_trace_files(run_dir)
-    _write_json(run_dir / "output_summary.json", _summarize_mapping(dict(context.iter_flat_items())))
+    _write_json(run_dir / "output_summary.json", summarize_mapping(dict(context.iter_flat_items())))
     return CheckedRunResult(actual_run_id, run_dir, health, context)
 
 
@@ -188,26 +189,6 @@ def _write_runtime_trace(path: Path, trace: Mapping[str, object]) -> None:
         summary = {key: value for key, value in trace.items() if key != "events"}
         summary["kind"] = "runtime_summary"
         handle.write(json.dumps(summary, ensure_ascii=False, sort_keys=True) + "\n")
-
-
-def _summarize_mapping(values: Mapping[str, object]) -> dict[str, object]:
-    return {str(key): _summarize_value(value) for key, value in values.items()}
-
-
-def _summarize_value(value: object) -> dict[str, object]:
-    summary: dict[str, object] = {"type": type(value).__name__}
-    if isinstance(value, Mapping):
-        summary["keys"] = sorted(str(key) for key in value.keys())
-        summary["size"] = len(value)
-    elif isinstance(value, (list, tuple, set)):
-        summary["size"] = len(value)
-    elif isinstance(value, (str, bytes)):
-        summary["size"] = len(value)
-    elif value is None or isinstance(value, (int, float, bool)):
-        summary["scalar"] = True
-    else:
-        summary["repr_type"] = type(value).__qualname__
-    return summary
 
 
 def _write_json(path: Path, payload: object) -> None:

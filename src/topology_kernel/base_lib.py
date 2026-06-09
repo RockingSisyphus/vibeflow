@@ -2,86 +2,14 @@ from __future__ import annotations
 
 import ast
 import inspect
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Mapping
 
+from .base_lib_types import BaseLibDependencySummary, BaseLibFinding, BaseLibModuleReport, BaseLibScanReport
 from .purity import BANNED_ATTR_CALLS, BANNED_CALL_NAMES, BANNED_IMPORT_ROOTS, PurityPolicy
+from .purity_helpers import _call_name, _module_assignment_is_allowed
 
 
 FORBIDDEN_PROJECT_IMPORT_PARTS = {"boundary", "boundaries", "nodes", "runtime"}
-IMMUTABLE_CONSTANT_TYPES = (str, int, float, bool, type(None), tuple)
-
-
-@dataclass(frozen=True)
-class BaseLibFinding:
-    rule_id: str
-    message: str
-    severity: str = "error"
-    object_type: str = "base_lib"
-    object_id: str = ""
-    source_location: Mapping[str, object] = field(default_factory=dict)
-    failure_layer: str = "base_lib"
-    suggested_fix_type: str = "fix_base_lib"
-    details: Mapping[str, object] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class BaseLibModuleReport:
-    module: str
-    path: str
-    source_lines: int
-    source_bytes: int
-    function_count: int
-    branch_count: int
-    max_nesting_depth: int
-    imports: tuple[str, ...]
-    findings: tuple[BaseLibFinding, ...]
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "module": self.module,
-            "path": self.path,
-            "source_lines": self.source_lines,
-            "source_bytes": self.source_bytes,
-            "function_count": self.function_count,
-            "branch_count": self.branch_count,
-            "max_nesting_depth": self.max_nesting_depth,
-            "imports": list(self.imports),
-            "findings": [finding.__dict__ | {"source_location": dict(finding.source_location), "details": dict(finding.details)} for finding in self.findings],
-        }
-
-
-@dataclass(frozen=True)
-class BaseLibScanReport:
-    roots: tuple[str, ...]
-    modules: tuple[BaseLibModuleReport, ...]
-    dependency_edges: tuple[tuple[str, str], ...]
-    findings: tuple[BaseLibFinding, ...]
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "roots": list(self.roots),
-            "modules": [module.to_dict() for module in self.modules],
-            "dependency_edges": [list(edge) for edge in self.dependency_edges],
-            "findings": [finding.__dict__ | {"source_location": dict(finding.source_location), "details": dict(finding.details)} for finding in self.findings],
-        }
-
-
-@dataclass(frozen=True)
-class BaseLibDependencySummary:
-    imported_modules: tuple[str, ...] = ()
-    longest_chain_length: int = 0
-    longest_chain: tuple[str, ...] = ()
-    recursive_chains: tuple[tuple[str, ...], ...] = ()
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "imported_modules": list(self.imported_modules),
-            "longest_chain_length": self.longest_chain_length,
-            "longest_chain": list(self.longest_chain),
-            "recursive_chains": [list(chain) for chain in self.recursive_chains],
-        }
 
 
 def scan_base_lib(project_root: Path, *, policy: PurityPolicy | None = None) -> BaseLibScanReport:
@@ -404,32 +332,6 @@ def _module_name(path: Path, *, root: Path) -> str:
     parts = tuple(part for part in rel.parts if part != "__init__")
     prefix = root.name if root.name else "base_lib"
     return ".".join((prefix, *parts)) if parts else prefix
-
-
-def _module_assignment_is_allowed(node: ast.Assign | ast.AnnAssign) -> bool:
-    value = node.value
-    if value is None:
-        return True
-    return _is_immutable_constant(value)
-
-
-def _is_immutable_constant(node: ast.AST) -> bool:
-    if isinstance(node, ast.Constant):
-        return isinstance(node.value, IMMUTABLE_CONSTANT_TYPES)
-    if isinstance(node, ast.Tuple):
-        return all(_is_immutable_constant(item) for item in node.elts)
-    return False
-
-
-def _call_name(node: ast.AST) -> str:
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        left = _call_name(node.value)
-        return f"{left}.{node.attr}" if left else node.attr
-    if isinstance(node, ast.Call):
-        return _call_name(node.func)
-    return ""
 
 
 def _matches_prefix(name: str, patterns: set[str]) -> bool:

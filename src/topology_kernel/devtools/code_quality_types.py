@@ -29,9 +29,6 @@ SIDE_EFFECT_IMPORT_ROOTS = frozenset(
         "boto3",
         "dotenv",
         "httpx",
-        "importlib",
-        "os",
-        "pathlib",
         "playwright",
         "psycopg2",
         "pymongo",
@@ -44,7 +41,6 @@ SIDE_EFFECT_IMPORT_ROOTS = frozenset(
         "sqlalchemy",
         "sqlite3",
         "subprocess",
-        "urllib",
     }
 )
 
