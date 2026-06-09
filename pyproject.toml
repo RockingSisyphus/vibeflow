@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "topology-kernel"
+version = "0.1.0"
+description = "Strict pure-node topology runtime with explicit bounded loops and composite nodes"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+topology-kernel = "topology_kernel.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
