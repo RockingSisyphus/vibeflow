@@ -1,0 +1,64 @@
+# Home page
+- name: Home
+  href: index.md
+
+# Getting started section
+- name: Getting Started
+  items:
+    - name: Installation
+      href: installation.md
+    - name: Quick Start
+      href: quickstart.md
+    - name: Upgrade
+      href: upgrade.md
+    - name: Install uv
+      href: install/uv.md
+    - name: Install with pipx
+      href: install/pipx.md
+    - name: One-time Usage (uvx)
+      href: install/one-time.md
+    - name: Enterprise / Air-Gapped
+      href: install/air-gapped.md
+
+# Reference
+- name: Reference
+  items:
+    - name: Overview
+      href: reference/overview.md
+    - name: Core Commands
+      href: reference/core.md
+    - name: Integrations
+      href: reference/integrations.md
+    - name: Extensions
+      href: reference/extensions.md
+    - name: Presets
+      href: reference/presets.md
+    - name: Workflows
+      href: reference/workflows.md
+
+# Concepts
+- name: Concepts
+  items:
+    - name: What is SDD?
+      href: concepts/sdd.md
+
+# Development workflows
+- name: Development
+  items:
+    - name: Local Development
+      href: local-development.md
+
+# Community
+- name: Community
+  href: community/overview.md
+  items:
+    - name: Overview
+      href: community/overview.md
+    - name: Extensions
+      href: community/extensions.md
+    - name: Presets
+      href: community/presets.md
+    - name: Walkthroughs
+      href: community/walkthroughs.md
+    - name: Friends
+      href: community/friends.md

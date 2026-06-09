@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
+from .boundary import BoundarySpec
+
 
 @dataclass(frozen=True)
 class NodeSpec:
@@ -19,6 +21,7 @@ class EdgeSpec:
     target: str
     max_executions: int = 1
     loop: str = ""
+    max_executions_declared: bool = False
 
     @property
     def pair(self) -> tuple[str, str]:
@@ -41,6 +44,7 @@ class NodesetSpec:
     category: str
     description: str
     version: str
+    purity: str
     requires: tuple[str, ...]
     provides: tuple[str, ...]
     exports: tuple[str, ...]
@@ -54,6 +58,7 @@ class GraphConfig:
     loops: tuple[LoopSpec, ...] = ()
     nodesets: dict[str, NodesetSpec] = field(default_factory=dict)
     inputs: tuple[str, ...] = ()
+    boundary: BoundarySpec | None = None
 
 
 @dataclass
@@ -90,7 +95,8 @@ def parse_graph_config(config: Mapping[str, Any]) -> GraphConfig:
         for source, target in loop.edges:
             if source not in names or target not in names:
                 raise GraphConfigError(f"loop '{loop.name}' references unknown edge node: {source}->{target}")
-    return GraphConfig(nodes=nodes, edges=edges, loops=loops, nodesets=nodesets, inputs=inputs)
+    boundary = _parse_boundary(config.get("boundary"))
+    return GraphConfig(nodes=nodes, edges=edges, loops=loops, nodesets=nodesets, inputs=inputs, boundary=boundary)
 
 
 def _parse_node(item: Any, *, index: int) -> NodeSpec:
@@ -119,7 +125,11 @@ def _parse_edge(item: Any, *, index: int) -> EdgeSpec:
     target = str(item.get("to", item.get("target", ""))).strip()
     if not source or not target:
         raise GraphConfigError(f"pipeline.edges[{index}] requires from/to")
-    max_executions = int(item.get("max_executions", item.get("max", 1)))
+    max_executions_declared = "max_executions" in item or "max" in item
+    max_value = item.get("max_executions", item.get("max", 1))
+    if isinstance(max_value, bool) or not isinstance(max_value, int):
+        raise GraphConfigError(f"pipeline.edges[{index}].max_executions must be an integer >= 1")
+    max_executions = max_value
     if max_executions < 1:
         raise GraphConfigError(f"pipeline.edges[{index}].max_executions must be >= 1")
     return EdgeSpec(
@@ -127,6 +137,7 @@ def _parse_edge(item: Any, *, index: int) -> EdgeSpec:
         target=target,
         max_executions=max_executions,
         loop=str(item.get("loop", "")).strip(),
+        max_executions_declared=max_executions_declared,
     )
 
 
@@ -145,10 +156,15 @@ def _parse_loop(item: Any, *, index: int) -> LoopSpec:
             raise GraphConfigError(f"loop '{name}'.edges[{edge_index}] must be [from, to]")
         edges.append((str(edge[0]).strip(), str(edge[1]).strip()))
     nodes = _as_tuple(item.get("nodes", ()), field=f"loop[{name}].nodes")
+    if "max_iterations" not in item and "max_executions" not in item:
+        raise GraphConfigError(f"loop '{name}' requires max_iterations or max_executions")
+    max_value = item.get("max_iterations", item.get("max_executions"))
+    if isinstance(max_value, bool) or not isinstance(max_value, int):
+        raise GraphConfigError(f"loop '{name}' max_iterations must be an integer >= 1")
     return LoopSpec(
         name=name,
         edges=tuple(edges),
-        max_iterations=int(item.get("max_iterations", item.get("max_executions", 1))),
+        max_iterations=max_value,
         nodes=nodes,
         until=str(item.get("until", "")).strip(),
     )
@@ -178,12 +194,33 @@ def _parse_nodesets(value: Any) -> dict[str, NodesetSpec]:
             category=str(item.get("category", "composite")),
             description=str(item.get("description", "")),
             version=str(item.get("version", "0.1.0")),
+            purity=str(item.get("purity", "pure")),
             requires=_as_tuple(item.get("requires", ()), field=f"nodeset[{name}].requires"),
             provides=_as_tuple(item.get("provides", ()), field=f"nodeset[{name}].provides"),
             exports=_as_tuple(item.get("exports", item.get("provides", ())), field=f"nodeset[{name}].exports"),
             graph=graph,
         )
     return out
+
+
+def _parse_boundary(value: Any) -> BoundarySpec | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise GraphConfigError("boundary must be an object")
+    boundary_type = str(value.get("type", "")).strip()
+    if not boundary_type:
+        raise GraphConfigError("boundary.type must be a non-empty string")
+    config = value.get("config", {})
+    if not isinstance(config, Mapping):
+        raise GraphConfigError("boundary.config must be an object")
+    return BoundarySpec(
+        boundary_type=boundary_type,
+        config={str(key): item for key, item in config.items()},
+        consumes=_as_tuple(value.get("consumes", ()), field="boundary.consumes"),
+        provides=_as_tuple(value.get("provides", ()), field="boundary.provides"),
+        allowed_paths=_as_tuple(value.get("allowed_paths", ()), field="boundary.allowed_paths"),
+    )
 
 
 def _as_tuple(value: Any, *, field: str) -> tuple[str, ...]:
