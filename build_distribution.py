@@ -7,6 +7,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_OUTPUT = ROOT / "topology_kernel_distribution"
+EXTRA_DOCS = (
+    ("developer_guide.md", "10_Kernel能力与项目开发指南.md"),
+    ("kernel_development_guide.md", "11_Kernel维护者工作流.md"),
+)
 
 
 def main() -> int:
@@ -24,6 +28,7 @@ def build_distribution(output: Path, *, replace: bool = True) -> None:
     _prepare_output(output, replace=replace)
     _copy_tree(ROOT / "distribution" / "kernel_development_pack" / "project_template", output)
     _copy_tree(ROOT / "distribution" / "kernel_development_pack" / "docs", output / "docs")
+    _copy_extra_docs(output / "docs")
     _copy_tree(ROOT / "src" / "topology_kernel", output / "kernel" / "topology_kernel")
     _write_root_readme(output)
     _write_project_gitignore(output)
@@ -48,6 +53,14 @@ def _copy_tree(source: Path, target: Path) -> None:
         else:
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(path.read_bytes())
+
+
+def _copy_extra_docs(target: Path) -> None:
+    for source_name, target_name in EXTRA_DOCS:
+        source = ROOT / "docs" / source_name
+        destination = target / target_name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(source.read_bytes())
 
 
 def _remove_tree(path: Path) -> None:
