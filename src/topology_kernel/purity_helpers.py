@@ -4,8 +4,11 @@ import ast
 from copy import deepcopy
 from typing import Mapping
 
+from .ast_rules import call_name as _call_name
+from .ast_rules import is_immutable_constant as _is_immutable_constant
+from .ast_rules import module_assignment_is_allowed as _module_assignment_is_allowed
 from .node import NodeInfo
-from .purity_types import IMMUTABLE_CONSTANT_TYPES, RESOURCE_FIELD_NAMES, PurityViolation, _SourceInfo, _default_rule_id
+from .purity_types import RESOURCE_FIELD_NAMES, PurityViolation, _SourceInfo, _default_rule_id
 
 
 def _validate_key_tuple(value: object, field_name: str, *, source: _SourceInfo, violations: list[PurityViolation]) -> tuple[str, ...]:
@@ -60,17 +63,6 @@ def _literal_subscript_key(node: ast.Subscript) -> str:
     return ""
 
 
-def _call_name(node: ast.AST) -> str:
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        left = _call_name(node.value)
-        return f"{left}.{node.attr}" if left else node.attr
-    if isinstance(node, ast.Call):
-        return _call_name(node.func)
-    return ""
-
-
 def _root_name(node: ast.AST) -> str:
     if isinstance(node, ast.Name):
         return node.id
@@ -99,21 +91,6 @@ def _assigns_resource_field(node: ast.AST) -> bool:
         if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
             if target.attr.lower() in RESOURCE_FIELD_NAMES:
                 return True
-    return False
-
-
-def _module_assignment_is_allowed(node: ast.Assign | ast.AnnAssign) -> bool:
-    value = node.value
-    if value is None:
-        return True
-    return _is_immutable_constant(value)
-
-
-def _is_immutable_constant(node: ast.AST) -> bool:
-    if isinstance(node, ast.Constant):
-        return isinstance(node.value, IMMUTABLE_CONSTANT_TYPES)
-    if isinstance(node, ast.Tuple):
-        return all(_is_immutable_constant(item) for item in node.elts)
     return False
 
 

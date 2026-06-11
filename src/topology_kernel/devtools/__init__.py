@@ -5,7 +5,7 @@ from ..config_loader import ConfigDocument, ConfigLoadError, load_config_documen
 from ..config_schema import collect_config_schema_findings
 from ..mermaid import compiled_graph_payload, export_mermaid
 from ..purity import NodeMetrics, collect_node_metrics, validate_node_class
-from .code_quality import QualityFinding, QualityReport, QualityThresholds, format_quality_summary, scan_code_quality
+from .code_quality import DirectoryQuality, PrefixClusterQuality, QualityFinding, QualityReport, QualityThresholds, format_quality_summary, scan_code_quality
 
 __all__ = [
     "BaseLibFinding",
@@ -15,6 +15,8 @@ __all__ = [
     "ConfigDocument",
     "ConfigLoadError",
     "NodeMetrics",
+    "DirectoryQuality",
+    "PrefixClusterQuality",
     "QualityFinding",
     "QualityReport",
     "QualityThresholds",
