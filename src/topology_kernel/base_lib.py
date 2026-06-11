@@ -4,9 +4,16 @@ import ast
 import inspect
 from pathlib import Path
 
-from .ast_rules import boolop_branch_count, import_modules, module_statement_kind
+from .ast_rules import (
+    boolop_branch_count,
+    call_name,
+    import_aliases_from_node,
+    import_modules,
+    module_assignment_is_allowed,
+    module_statement_kind,
+    path_effect_call_name,
+)
 from .base_lib_types import BaseLibDependencySummary, BaseLibFinding, BaseLibModuleReport, BaseLibScanReport
-from .purity_helpers import _call_name, _module_assignment_is_allowed
 from .purity_types import BANNED_ATTR_CALLS, BANNED_CALL_NAMES, BANNED_IMPORT_ROOTS, PurityPolicy
 
 
@@ -168,6 +175,7 @@ class _BaseLibAstScanner(ast.NodeVisitor):
         self.policy = policy
         self.imports: set[str] = set()
         self.findings: list[BaseLibFinding] = []
+        self.import_aliases: dict[str, str] = {"Path": "pathlib.Path"}
 
     def visit_Module(self, node: ast.Module) -> None:
         for stmt in node.body:
@@ -188,10 +196,14 @@ class _BaseLibAstScanner(ast.NodeVisitor):
         self._check_import_node(node)
 
     def visit_Call(self, node: ast.Call) -> None:
-        name = _call_name(node.func)
+        name = call_name(node.func)
         root = name.split(".", 1)[0]
-        if name in BANNED_CALL_NAMES or name in BANNED_ATTR_CALLS or root in BANNED_CALL_NAMES or _matches_prefix(name, BANNED_ATTR_CALLS):
+        banned = name in BANNED_CALL_NAMES or name in BANNED_ATTR_CALLS or root in BANNED_CALL_NAMES or _matches_prefix(name, BANNED_ATTR_CALLS)
+        if banned:
             self._add("BASE_LIB.SIDE_EFFECT_CALL", f"base_lib banned side-effect call: {name}", node)
+        path_effect = path_effect_call_name(node, self.import_aliases)
+        if path_effect and not banned:
+            self._add("BASE_LIB.SIDE_EFFECT_CALL", f"base_lib banned side-effect call: {path_effect}", node)
         self.generic_visit(node)
 
     def visit_Global(self, node: ast.Global) -> None:
@@ -201,11 +213,12 @@ class _BaseLibAstScanner(ast.NodeVisitor):
         self._add("BASE_LIB.GLOBAL_STATE", "base_lib must not use nonlocal mutation", node)
 
     def _visit_module_assignment(self, node: ast.Assign | ast.AnnAssign) -> None:
-        if not _module_assignment_is_allowed(node):
+        if not module_assignment_is_allowed(node):
             self._add("BASE_LIB.GLOBAL_STATE", "base_lib must not hold mutable module-level state", node)
         self.visit(node)
 
     def _check_import_node(self, node: ast.Import | ast.ImportFrom) -> None:
+        self.import_aliases.update(import_aliases_from_node(node))
         modules = import_modules(node)
         if not modules:
             return

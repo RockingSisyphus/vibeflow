@@ -135,6 +135,18 @@ class DemoNode:
             "module_side_effect",
         ),
         (_valid_node_source(run_body='        Path("x").read_text()\n        return {"demo.out": 1}'), "banned_call"),
+        (
+            _valid_node_source(
+                run_body='        path = Path("x")\n        path.write_text("bad")\n        return {"demo.out": 1}'
+            ),
+            "banned_call",
+        ),
+        (
+            _valid_node_source(
+                run_body='        path = Path("x")\n        (path / "child").open()\n        return {"demo.out": 1}'
+            ),
+            "banned_call",
+        ),
         (_valid_node_source(run_body='        compile("1", "<x>", "eval")\n        return {"demo.out": 1}'), "banned_call"),
     ],
 )

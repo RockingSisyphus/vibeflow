@@ -124,12 +124,18 @@ def test_code_quality_tool_reports_file_function_dependency_and_side_effect_find
     (tmp_path / "a.py").write_text(
         "\n".join(
             [
+                "from pathlib import Path",
+                "",
                 "import b",
                 "",
                 "def too_big(flag):",
+                "    path = Path('x.txt')",
                 "    if flag:",
                 "        if flag > 1:",
                 "            return open('x.txt').read()",
+                "    path.write_text('ok')",
+                "    Path('y.txt').read_text()",
+                "    (path / 'child').open()",
                 "    return 'ok'",
             ]
         ),
@@ -143,23 +149,56 @@ def test_code_quality_tool_reports_file_function_dependency_and_side_effect_find
         thresholds=QualityThresholds(
             max_file_lines=5,
             warn_file_lines=4,
+            max_file_branches=1,
             max_function_lines=3,
             max_function_branches=1,
             max_function_nesting=1,
             warn_dependency_chain=2,
             max_dependency_chain=2,
         ),
+        check_side_effects=True,
     )
 
     rule_ids = {finding.rule_id for finding in report.findings}
     assert report.status == "FAIL"
     assert "QUALITY.FILE.MAX_LINES" in rule_ids
+    assert "QUALITY.FILE.TOO_MANY_BRANCHES" in rule_ids
     assert "QUALITY.FUNCTION.MAX_LINES" in rule_ids
     assert "QUALITY.FUNCTION.TOO_MANY_BRANCHES" in rule_ids
     assert "QUALITY.FUNCTION.TOO_DEEP_NESTING" in rule_ids
     assert "QUALITY.SIDE_EFFECT.CALL" in rule_ids
+    side_effect_messages = [finding.message for finding in report.findings if finding.rule_id == "QUALITY.SIDE_EFFECT.CALL"]
+    assert any("open" in message for message in side_effect_messages)
+    assert any("write_text" in message for message in side_effect_messages)
+    assert any("read_text" in message for message in side_effect_messages)
     assert "QUALITY.DEPENDENCY.CHAIN_TOO_DEEP" in rule_ids
     assert report.longest_dependency_chain == ("a", "b", "c")
+
+def test_code_quality_function_qualnames_include_classes_and_nested_functions(tmp_path) -> None:
+    (tmp_path / "models.py").write_text(
+        "\n".join(
+            [
+                "class Alpha:",
+                "    def to_dict(self):",
+                "        return {'value': 1}",
+                "",
+                "class Beta:",
+                "    def to_dict(self):",
+                "        return {'value': 1}",
+                "",
+                "def outer():",
+                "    def inner():",
+                "        return 1",
+                "    return inner()",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    report = scan_code_quality(tmp_path)
+    qualnames = {function.qualname for file in report.files for function in file.functions}
+
+    assert {"Alpha.to_dict", "Beta.to_dict", "outer", "outer.inner"} <= qualnames
 
 def test_code_quality_report_groups_files_and_findings_by_scope(tmp_path) -> None:
     src_dir = tmp_path / "src" / "demo"
@@ -172,7 +211,7 @@ def test_code_quality_report_groups_files_and_findings_by_scope(tmp_path) -> Non
     (tests_dir / "bad_test.py").write_text("def side_effect():\n    return open('test.txt').read()\n", encoding="utf-8")
     (devtools_dir / "bad_tool.py").write_text("def side_effect():\n    return open('tool.txt').read()\n", encoding="utf-8")
 
-    payload = scan_code_quality(tmp_path).to_dict()
+    payload = scan_code_quality(tmp_path, check_side_effects=True).to_dict()
     scope_summary = payload["scope_summary"]
 
     assert scope_summary["src"]["files"] == 1
@@ -181,6 +220,138 @@ def test_code_quality_report_groups_files_and_findings_by_scope(tmp_path) -> Non
     assert scope_summary["src"]["warnings"] == 1
     assert scope_summary["tests"]["warnings"] == 1
     assert scope_summary["devtools"]["warnings"] == 1
+
+def test_code_quality_report_includes_directory_structure_graph(tmp_path) -> None:
+    for directory in ("left", "right", "shared", "x", "y"):
+        package = tmp_path / directory
+        package.mkdir()
+        (package / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "left" / "a.py").write_text("import right.b\nimport shared.core\n", encoding="utf-8")
+    (tmp_path / "right" / "b.py").write_text("def value():\n    return 1\n", encoding="utf-8")
+    (tmp_path / "shared" / "core.py").write_text("def value():\n    return 1\n", encoding="utf-8")
+    (tmp_path / "x" / "feature.py").write_text("import shared.core\n", encoding="utf-8")
+    (tmp_path / "y" / "feature.py").write_text("import shared.core\n", encoding="utf-8")
+
+    report = scan_code_quality(
+        tmp_path,
+        thresholds=QualityThresholds(max_directory_fanout=1, max_directory_fanin=1),
+    )
+    payload = report.to_dict()
+    directories = {item["directory"]: item for item in payload["directory_graph"]}
+    rule_ids = {finding.rule_id for finding in report.findings}
+
+    assert directories["left"]["outgoing_directories"] == ["right", "shared"]
+    assert sorted(directories["shared"]["incoming_directories"]) == ["left", "x", "y"]
+    assert payload["structure_summary"]["directory_count"] == 5
+    assert "QUALITY.STRUCTURE.DIRECTORY_FANOUT" in rule_ids
+    assert "QUALITY.STRUCTURE.DIRECTORY_FANIN" in rule_ids
+    fanin = next(finding for finding in report.findings if finding.rule_id == "QUALITY.STRUCTURE.DIRECTORY_FANIN")
+    assert fanin.details["suggested_entry_files"] == ("__init__.py", "api.py")
+
+def test_code_quality_report_identifies_prefix_clusters(tmp_path) -> None:
+    feature = tmp_path / "feature"
+    feature.mkdir()
+    (feature / "__init__.py").write_text("", encoding="utf-8")
+    (feature / "feature.py").write_text("import feature.feature_rules\n", encoding="utf-8")
+    (feature / "feature_rules.py").write_text("import feature.feature_types\n", encoding="utf-8")
+    (feature / "feature_types.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (tmp_path / "consumer.py").write_text("import feature.feature_rules\n", encoding="utf-8")
+
+    report = scan_code_quality(
+        tmp_path,
+        thresholds=QualityThresholds(max_prefix_cluster_files=2),
+    )
+    payload = report.to_dict()
+    clusters = {item["cluster_name"]: item for item in payload["prefix_clusters"]}
+    rule_ids = {finding.rule_id for finding in report.findings}
+
+    assert "feature/feature" in clusters
+    assert "feature.feature" in clusters["feature/feature"]["public_entry_candidates"]
+    assert clusters["feature/feature"]["external_incoming_modules"] == ["consumer"]
+    assert payload["structure_summary"]["prefix_cluster_count"] == 1
+    assert "QUALITY.STRUCTURE.PREFIX_CLUSTER_SHOULD_BE_PACKAGE" in rule_ids
+    package_finding = next(
+        finding
+        for finding in report.findings
+        if finding.rule_id == "QUALITY.STRUCTURE.PREFIX_CLUSTER_SHOULD_BE_PACKAGE"
+    )
+    assert package_finding.details["suggested_package_dir"] == "feature/feature"
+    assert "feature/feature/rules.py" in package_finding.details["suggested_layout"]
+    assert package_finding.details["import_update_candidates"] == ("consumer",)
+
+def test_code_quality_reports_public_entry_boundary_violations(tmp_path) -> None:
+    feature = tmp_path / "feature"
+    feature.mkdir()
+    (feature / "__init__.py").write_text("", encoding="utf-8")
+    (feature / "feature.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (feature / "feature_helpers.py").write_text("HELPER = 1\n", encoding="utf-8")
+    (feature / "feature_rules.py").write_text("RULE = 1\n", encoding="utf-8")
+    (feature / "feature_visitors.py").write_text("VISITOR = 1\n", encoding="utf-8")
+    (tmp_path / "consumer.py").write_text(
+        "\n".join(
+            [
+                "import feature.feature_helpers",
+                "import feature.feature_rules",
+                "import feature.feature_visitors",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    report = scan_code_quality(
+        tmp_path,
+        thresholds=QualityThresholds(max_public_entry_bypass_imports=2),
+    )
+    rule_ids = {finding.rule_id for finding in report.findings}
+
+    assert "QUALITY.STRUCTURE.INTERNAL_MODULE_IMPORTED_EXTERNALLY" in rule_ids
+    assert "QUALITY.STRUCTURE.PUBLIC_ENTRY_BYPASSED" in rule_ids
+
+def test_code_quality_reports_dependency_distance_violations(tmp_path) -> None:
+    for directory in (
+        "app/feature",
+        "lib/common",
+        "platform/config",
+        "platform/schema",
+    ):
+        package = tmp_path
+        for part in directory.split("/"):
+            package = package / part
+            package.mkdir(exist_ok=True)
+            (package / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "lib" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "platform" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "app" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "lib" / "common" / "feature.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (tmp_path / "lib" / "common" / "feature_helpers.py").write_text("HELPER = 1\n", encoding="utf-8")
+    (tmp_path / "platform" / "config" / "settings.py").write_text("VALUE = 2\n", encoding="utf-8")
+    (tmp_path / "platform" / "schema" / "models.py").write_text("VALUE = 3\n", encoding="utf-8")
+    (tmp_path / "app" / "feature" / "worker.py").write_text(
+        "\n".join(
+            [
+                "import lib.common.feature_helpers",
+                "import platform.config.settings",
+                "import platform.schema.models",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    report = scan_code_quality(
+        tmp_path,
+        thresholds=QualityThresholds(max_dependency_distance=1, max_scattered_dependency_directories=1),
+    )
+
+    rule_ids = {finding.rule_id for finding in report.findings}
+    assert "QUALITY.STRUCTURE.DISTANT_INTERNAL_IMPORT" in rule_ids
+    assert "QUALITY.STRUCTURE.CLUSTER_SCATTERED_DEPENDENCY" in rule_ids
+    assert report.to_dict()["structure_summary"]["dependency_distance"]["max_distance"] >= 4
+    distance_finding = next(
+        finding
+        for finding in report.findings
+        if finding.rule_id == "QUALITY.STRUCTURE.DISTANT_INTERNAL_IMPORT"
+    )
+    assert "suggestion" in distance_finding.details
 
 def test_code_quality_tool_detects_cycles_and_duplicate_function_fingerprints(tmp_path) -> None:
     (tmp_path / "a.py").write_text(
@@ -209,9 +380,9 @@ def test_code_quality_tool_reports_python_syntax_errors(tmp_path) -> None:
 def test_cli_quality_check_json_and_text_outputs(tmp_path, capsys) -> None:
     (tmp_path / "bad.py").write_text("def side_effect():\n    return open('x.txt').read()\n", encoding="utf-8")
 
-    json_code = cli_main(["quality-check", "--path", str(tmp_path), "--json"])
+    json_code = cli_main(["quality-check", "--path", str(tmp_path), "--json", "--check-side-effects"])
     json_payload = json.loads(capsys.readouterr().out)
-    text_code = cli_main(["quality-check", "--path", str(tmp_path)])
+    text_code = cli_main(["quality-check", "--path", str(tmp_path), "--check-side-effects"])
     text_output = capsys.readouterr().out
 
     assert json_code == 0

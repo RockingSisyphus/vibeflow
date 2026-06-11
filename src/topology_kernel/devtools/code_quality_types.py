@@ -90,6 +90,13 @@ class QualityThresholds:
     max_functions_per_file: int = 40
     max_classes_per_file: int = 20
     max_public_api_per_file: int = 30
+    max_file_branches: int = 150
+    max_directory_fanout: int = 25
+    max_directory_fanin: int = 25
+    max_prefix_cluster_files: int = 12
+    max_public_entry_bypass_imports: int = 3
+    max_dependency_distance: int = 3
+    max_scattered_dependency_directories: int = 6
     max_function_lines: int = 80
     max_function_branches: int = 12
     max_function_nesting: int = 4
@@ -104,6 +111,13 @@ class QualityThresholds:
             "max_functions_per_file": self.max_functions_per_file,
             "max_classes_per_file": self.max_classes_per_file,
             "max_public_api_per_file": self.max_public_api_per_file,
+            "max_file_branches": self.max_file_branches,
+            "max_directory_fanout": self.max_directory_fanout,
+            "max_directory_fanin": self.max_directory_fanin,
+            "max_prefix_cluster_files": self.max_prefix_cluster_files,
+            "max_public_entry_bypass_imports": self.max_public_entry_bypass_imports,
+            "max_dependency_distance": self.max_dependency_distance,
+            "max_scattered_dependency_directories": self.max_scattered_dependency_directories,
             "max_function_lines": self.max_function_lines,
             "max_function_branches": self.max_function_branches,
             "max_function_nesting": self.max_function_nesting,
@@ -189,6 +203,50 @@ class FileQuality:
 
 
 @dataclass(frozen=True)
+class DirectoryQuality:
+    directory: str
+    module_count: int
+    internal_import_count: int
+    external_import_count: int
+    outgoing_directories: tuple[str, ...]
+    incoming_directories: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "directory": self.directory,
+            "module_count": self.module_count,
+            "internal_import_count": self.internal_import_count,
+            "external_import_count": self.external_import_count,
+            "outgoing_directories": list(self.outgoing_directories),
+            "incoming_directories": list(self.incoming_directories),
+        }
+
+
+@dataclass(frozen=True)
+class PrefixClusterQuality:
+    cluster_name: str
+    directory: str
+    prefix: str
+    files: tuple[str, ...]
+    modules: tuple[str, ...]
+    public_entry_candidates: tuple[str, ...]
+    internal_dependency_edges: tuple[tuple[str, str], ...]
+    external_incoming_modules: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "cluster_name": self.cluster_name,
+            "directory": self.directory,
+            "prefix": self.prefix,
+            "files": list(self.files),
+            "modules": list(self.modules),
+            "public_entry_candidates": list(self.public_entry_candidates),
+            "internal_dependency_edges": [list(edge) for edge in self.internal_dependency_edges],
+            "external_incoming_modules": list(self.external_incoming_modules),
+        }
+
+
+@dataclass(frozen=True)
 class QualityReport:
     status: str
     root: str
@@ -197,6 +255,9 @@ class QualityReport:
     dependency_graph: Mapping[str, Sequence[str]]
     longest_dependency_chain: tuple[str, ...]
     findings: tuple[QualityFinding, ...]
+    directory_graph: tuple[DirectoryQuality, ...] = ()
+    prefix_clusters: tuple[PrefixClusterQuality, ...] = ()
+    structure_summary: Mapping[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, object]:
         errors = [finding.to_dict() for finding in self.findings if finding.severity == "error"]
@@ -214,6 +275,9 @@ class QualityReport:
             "thresholds": self.thresholds.to_dict(),
             "files": [file.to_dict() for file in self.files],
             "dependency_graph": {key: list(value) for key, value in sorted(self.dependency_graph.items())},
+            "directory_graph": [directory.to_dict() for directory in self.directory_graph],
+            "prefix_clusters": [cluster.to_dict() for cluster in self.prefix_clusters],
+            "structure_summary": dict(self.structure_summary),
             "longest_dependency_chain": list(self.longest_dependency_chain),
             "errors": errors,
             "warnings": warnings,

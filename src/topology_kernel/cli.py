@@ -44,11 +44,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     quality = sub.add_parser("quality-check", help="run standalone Python code quality checks")
     quality.add_argument("--path", required=False, default=".", help="project directory or Python file to inspect")
-    quality.add_argument("--self", action="store_true", help="inspect the topology-kernel repository itself")
     quality.add_argument("--json", action="store_true", help="emit full quality report JSON")
+    quality.add_argument("--check-side-effects", action="store_true", help="also warn about side-effect capable imports and calls")
     quality.add_argument("--max-lines", type=int, default=500, help="maximum Python file lines before error")
     quality.add_argument("--warn-lines", type=int, default=450, help="Python file lines before warning")
     quality.add_argument("--max-bytes", type=int, default=60000, help="maximum Python file bytes before error")
+    quality.add_argument("--max-file-branches", type=int, default=150, help="maximum Python file branch count before warning")
+    quality.add_argument("--max-directory-fanout", type=int, default=25, help="maximum directory fanout before warning")
+    quality.add_argument("--max-directory-fanin", type=int, default=25, help="maximum directory fanin before warning")
+    quality.add_argument("--max-prefix-cluster-files", type=int, default=12, help="maximum same-prefix files before package warning")
+    quality.add_argument("--max-public-entry-bypass-imports", type=int, default=3, help="maximum direct internal imports from one cluster before warning")
+    quality.add_argument("--max-dependency-distance", type=int, default=3, help="maximum module path distance before warning")
+    quality.add_argument("--max-scattered-dependency-directories", type=int, default=6, help="maximum far dependency directories before warning")
     quality.add_argument("--max-function-lines", type=int, default=80, help="maximum function lines before warning")
     quality.add_argument("--max-function-branches", type=int, default=12, help="maximum function branch count before warning")
     quality.add_argument("--max-function-nesting", type=int, default=4, help="maximum function nesting depth before warning")
@@ -182,11 +189,18 @@ def _handle_run(args: argparse.Namespace) -> int:
 def _handle_quality_check(args: argparse.Namespace) -> int:
     from .devtools.code_quality import DEFAULT_EXCLUDED_DIRS, QualityThresholds, format_quality_summary, scan_code_quality
 
-    root = Path(__file__).resolve().parents[2] if args.self else Path(args.path)
+    root = Path(args.path)
     thresholds = QualityThresholds(
         max_file_lines=args.max_lines,
         warn_file_lines=args.warn_lines,
         max_file_bytes=args.max_bytes,
+        max_file_branches=args.max_file_branches,
+        max_directory_fanout=args.max_directory_fanout,
+        max_directory_fanin=args.max_directory_fanin,
+        max_prefix_cluster_files=args.max_prefix_cluster_files,
+        max_public_entry_bypass_imports=args.max_public_entry_bypass_imports,
+        max_dependency_distance=args.max_dependency_distance,
+        max_scattered_dependency_directories=args.max_scattered_dependency_directories,
         max_function_lines=args.max_function_lines,
         max_function_branches=args.max_function_branches,
         max_function_nesting=args.max_function_nesting,
@@ -196,7 +210,12 @@ def _handle_quality_check(args: argparse.Namespace) -> int:
     excluded_dirs = set(DEFAULT_EXCLUDED_DIRS)
     if args.include_references:
         excluded_dirs.discard("references")
-    report = scan_code_quality(root, thresholds=thresholds, excluded_dirs=excluded_dirs)
+    report = scan_code_quality(
+        root,
+        thresholds=thresholds,
+        excluded_dirs=excluded_dirs,
+        check_side_effects=bool(args.check_side_effects),
+    )
     print(report.to_json() if args.json else format_quality_summary(report))
     return 0 if report.status in {"PASS", "CONCERNS"} else 1
 

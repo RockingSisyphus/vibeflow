@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 
-from .ast_rules import import_modules, module_statement_kind, name_targets
+from .ast_rules import import_aliases_from_node, import_modules, module_statement_kind, name_targets, path_effect_call_name
 from .node import NodeContract
 from .purity_helpers import (
     _assigns_resource_field,
@@ -33,15 +33,22 @@ from .purity_types import (
 
 class _PurityImportVisitor(ast.NodeVisitor):
     def visit_Import(self, node: ast.Import) -> None:
+        self._record_import_aliases(node)
         for module in import_modules(node):
             self._check_import(module, node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        self._record_import_aliases(node)
         module = node.module or ""
         if _is_boundary_import(module) or any(alias.name in {"GlobalBoundary", "BoundaryRegistry"} for alias in node.names):
             self._add("boundary_import", f"node must not import boundary APIs: {module}", node, suggested_fix_type="move_to_boundary")
             return
         self._check_import(module, node)
+
+    def _record_import_aliases(self, node: ast.Import | ast.ImportFrom) -> None:
+        aliases = getattr(self, "_import_aliases", None)
+        if isinstance(aliases, dict):
+            aliases.update(import_aliases_from_node(node))
 
 
 class NodePurityVisitor(_PurityImportVisitor):
@@ -65,6 +72,7 @@ class NodePurityVisitor(_PurityImportVisitor):
         self._input_aliases: set[str] = set()
         self._output_dicts: dict[str, set[str]] = {}
         self._current_function = ""
+        self._import_aliases: dict[str, str] = {"Path": "pathlib.Path"}
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         for stmt in node.body:
@@ -218,10 +226,16 @@ class NodePurityVisitor(_PurityImportVisitor):
 
     def _check_banned_call(self, name: str, node: ast.Call) -> None:
         root = name.split(".", 1)[0]
+        banned = False
         if name in BANNED_CALL_NAMES or name in BANNED_ATTR_CALLS or root in BANNED_CALL_NAMES:
+            banned = True
             self._add("banned_call", f"banned call: {name}", node, suggested_fix_type="move_to_boundary")
         elif _matches_prefix(name, BANNED_ATTR_CALLS):
+            banned = True
             self._add("banned_call", f"banned call: {name}", node, suggested_fix_type="move_to_boundary")
+        path_effect = path_effect_call_name(node, self._import_aliases)
+        if path_effect and not banned:
+            self._add("banned_call", f"banned call: {path_effect}", node, suggested_fix_type="move_to_boundary")
 
     def _check_monkey_patch_call(self, name: str, node: ast.Call) -> None:
         if name in {"setattr", "delattr"}:

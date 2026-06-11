@@ -264,13 +264,16 @@ def test_base_lib_scan_reports_size_complexity_imports_side_effects_and_globals(
     (base_dir / "bad.py").write_text(
         """
 import os
+from pathlib import Path
 
 CACHE = {}
 
 def risky(value):
+    path = Path("x.txt")
     if value:
         if value > 1:
-            open("x.txt", "w")
+            path.write_text("bad")
+            (path / "child").open()
     return value
 """.strip(),
         encoding="utf-8",
