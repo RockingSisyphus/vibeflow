@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import inspect
 from typing import Any, Callable, Mapping
 
 from .node_config import NodeConfigError, NodeConfigSpec, merge_node_config, normalize_node_config_spec
@@ -16,10 +17,19 @@ class NodeRegistryError(ValueError):
         return f"Node registry error: {self.detail}"
 
 
+@dataclass(frozen=True)
+class NodeRegistrationInfo:
+    key: str
+    function: str
+    path: str
+    line: int
+
+
 class NodeRegistry(RegistryBase[type[PureNode]]):
     def __init__(self) -> None:
         super().__init__()
         self._config_specs: dict[str, NodeConfigSpec] = {}
+        self._registration_info: dict[str, NodeRegistrationInfo] = {}
 
     def register(
         self,
@@ -48,6 +58,9 @@ class NodeRegistry(RegistryBase[type[PureNode]]):
         except NodeConfigError as exc:
             raise NodeRegistryError(str(exc)) from exc
 
+    def registration_info(self) -> tuple[NodeRegistrationInfo, ...]:
+        return tuple(self._registration_info[key] for key in sorted(self._registration_info))
+
     def _decorator_for_node(
         self,
         key: str,
@@ -75,6 +88,7 @@ class NodeRegistry(RegistryBase[type[PureNode]]):
             raise self._duplicate_error(normalized)
         self._registry[normalized] = value
         self._config_specs[normalized] = config_spec
+        self._registration_info[normalized] = _capture_registration_info(normalized)
 
     def _validate_value(self, normalized: str, node_cls: type[PureNode]) -> None:
         if getattr(node_cls, "__topology_boundary__", False) or _looks_boundary_class(node_cls):
@@ -95,6 +109,14 @@ GLOBAL_NODE_REGISTRY = NodeRegistry()
 
 def _looks_boundary_class(value: object) -> bool:
     return all(callable(getattr(value, method, None)) for method in ("before_run", "after_run", "before_iteration", "after_iteration"))
+
+
+def _capture_registration_info(key: str) -> NodeRegistrationInfo:
+    for frame in inspect.stack(context=0)[2:]:
+        if frame.filename.endswith(("registry.py", "registry_base.py")):
+            continue
+        return NodeRegistrationInfo(key=key, function=frame.function, path=frame.filename, line=frame.lineno)
+    return NodeRegistrationInfo(key=key, function="", path="", line=0)
 
 
 def _config_spec_or_error(

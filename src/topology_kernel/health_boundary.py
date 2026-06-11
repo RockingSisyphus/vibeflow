@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+import ast
+import inspect
+
+from .ast_rules import call_name
 from .boundary import BoundaryRegistry, BoundaryRegistryError
 from .graph_config import GraphConfig
 from .health_types import HealthFinding
+
+
+DECISION_LOGIC_TERMS = ("rank", "score", "audit", "plan", "strategy")
 
 
 def validate_boundary_health(
@@ -18,9 +25,11 @@ def validate_boundary_health(
         findings.append(_boundary_finding("BOUNDARY.TYPE.UNRESOLVED", "graph declares boundary but no boundary registry was provided", spec.boundary_type))
     else:
         try:
-            boundary_registry.get(spec.boundary_type)
+            boundary_cls = boundary_registry.get(spec.boundary_type)
         except BoundaryRegistryError as exc:
             findings.append(_boundary_finding("BOUNDARY.TYPE.UNKNOWN", str(exc), spec.boundary_type))
+        else:
+            findings.extend(_boundary_decision_logic_findings(spec.boundary_type, boundary_cls))
     findings.extend(_boundary_key_findings(tuple(spec.consumes), prefix=("effects.", "outbox."), rule_id="BOUNDARY.CONTRACT.CONSUMES_KEY"))
     findings.extend(_boundary_key_findings(tuple(spec.provides), prefix=("io.",), rule_id="BOUNDARY.CONTRACT.PROVIDES_KEY"))
     findings.extend(_boundary_config_findings(spec.boundary_type, spec.config))
@@ -64,13 +73,64 @@ def _is_string_list(value: object) -> bool:
     return isinstance(value, list) and all(isinstance(path, str) and path.strip() for path in value)
 
 
-def _boundary_finding(rule_id: str, message: str, object_id: str) -> HealthFinding:
+def _boundary_decision_logic_findings(boundary_type: str, boundary_cls: type) -> list[HealthFinding]:
+    try:
+        source = inspect.getsource(boundary_cls)
+        path = inspect.getsourcefile(boundary_cls) or ""
+        start_line = inspect.getsourcelines(boundary_cls)[1]
+        tree = ast.parse(source)
+    except (OSError, TypeError, SyntaxError):
+        return []
+    findings = []
+    for node in ast.walk(tree):
+        name = _decision_name(node)
+        if not name or not _looks_like_decision_logic(name):
+            continue
+        findings.append(
+            _boundary_finding(
+                "BOUNDARY.SMELL.DECISION_LOGIC",
+                f"boundary contains decision-like logic '{name}'; consider moving strategy into node/base_lib and passing an explicit request",
+                boundary_type,
+                severity="warning",
+                source_location={"path": path, "line": start_line + getattr(node, "lineno", 1) - 1, "column": getattr(node, "col_offset", 0) + 1},
+                details={"name": name},
+            )
+        )
+    return findings
+
+
+def _decision_name(node: ast.AST) -> str:
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return node.name
+    if isinstance(node, ast.Call):
+        return call_name(node.func)
+    return ""
+
+
+def _looks_like_decision_logic(name: str) -> bool:
+    normalized = name.casefold()
+    if "select_" in normalized and "provider" in normalized:
+        return True
+    return any(term in normalized.split(".")[-1] for term in DECISION_LOGIC_TERMS)
+
+
+def _boundary_finding(
+    rule_id: str,
+    message: str,
+    object_id: str,
+    *,
+    severity: str = "error",
+    source_location: dict[str, object] | None = None,
+    details: dict[str, object] | None = None,
+) -> HealthFinding:
     return HealthFinding(
         rule_id=rule_id,
-        severity="error",
+        severity=severity,
         object_type="boundary",
         object_id=object_id,
+        source_location=source_location or {},
         failure_layer="boundary",
         message=message,
         suggested_fix_type="fix_boundary",
+        details=details or {},
     )

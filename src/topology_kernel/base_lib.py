@@ -9,7 +9,9 @@ from .ast_rules import (
     call_name,
     import_aliases_from_node,
     import_modules,
+    is_banned_import,
     module_assignment_is_allowed,
+    module_matches,
     module_statement_kind,
     path_effect_call_name,
 )
@@ -227,16 +229,19 @@ class _BaseLibAstScanner(ast.NodeVisitor):
 
     def _check_import(self, module: str, node: ast.AST) -> None:
         self.imports.add(module)
-        root = module.split(".", 1)[0]
         if any(part in FORBIDDEN_PROJECT_IMPORT_PARTS for part in module.split(".")):
             self._add("BASE_LIB.FORBIDDEN_PROJECT_IMPORT", f"base_lib must not import node, boundary, runtime, or side-effect layer: {module}", node)
             return
-        if _module_matches(module, self.policy.banned_base_lib_modules):
+        if module_matches(module, self.policy.banned_base_lib_modules):
             self._add("BASE_LIB.BANNED_MODULE", f"base_lib module is banned by policy: {module}", node)
             return
-        banned = set(self.policy.banned_import_roots or tuple(sorted(BANNED_IMPORT_ROOTS)))
-        allowed = set(self.policy.allowed_import_roots)
-        if root in banned and root not in allowed:
+        if is_banned_import(
+            module,
+            allowed_roots=self.policy.allowed_import_roots,
+            banned_roots=self.policy.banned_import_roots or tuple(sorted(BANNED_IMPORT_ROOTS)),
+            allowed_modules=self.policy.allowed_import_modules,
+            banned_modules=self.policy.banned_import_modules,
+        ):
             self._add("BASE_LIB.BANNED_IMPORT", f"base_lib banned import: {module}", node)
 
     def _add(self, rule_id: str, message: str, node: ast.AST) -> None:
@@ -366,8 +371,6 @@ def _is_base_lib_module(module: str) -> bool:
     return "base_lib" in tuple(part for part in module.split(".") if part)
 
 
-def _module_matches(module: str, patterns: tuple[str, ...]) -> bool:
-    return any(module == pattern or module.startswith(f"{pattern}.") for pattern in patterns)
 
 
 def _finding(

@@ -1,0 +1,27 @@
+{
+  "nodesets": [
+    {
+      "name": "example.add_one",
+      "display_name": "Example Add One",
+      "category": "example",
+      "description": "Composite nodeset that adds one to value.in.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": ["value.in"],
+      "provides": ["value.out"],
+      "exports": ["value.out"],
+      "pipeline": {
+        "inputs": ["value.in"],
+        "nodes": [
+          {
+            "name": "add_one",
+            "type": "example.add",
+            "requires": ["value.in"],
+            "provides": ["value.out"],
+            "delta": 1
+          }
+        ]
+      }
+    }
+  ]
+}

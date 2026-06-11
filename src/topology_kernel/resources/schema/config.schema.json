@@ -12,6 +12,22 @@
       "type": "array",
       "items": { "$ref": "nodeset.schema.json" }
     },
+    "nodeset_imports": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "type": "string", "minLength": 1 },
+          {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "names": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+            }
+          }
+        ]
+      }
+    },
     "boundary": { "$ref": "boundary.schema.json" },
     "policy": { "$ref": "policy.schema.json" },
     "plugins": {

@@ -92,6 +92,7 @@ src/topology_kernel/
 已实现：
 
 - `nodesets`
+- `nodeset_imports`，可从独立 JSON/JSONC 文件导入全部或指定 nodeset。
 - `nodeset.<name>` 可作为普通 node 类型使用
 - nodeset 内部可执行子图
 - nodeset 通过 `exports` 暴露输出
@@ -100,6 +101,7 @@ src/topology_kernel/
 - nodeset 内部 key 作用域隔离和中间 key 泄漏检查
 - 外部 pipeline 和嵌套 nodeset 引用点的契约一致性检查
 - 健康报告中的 `info.nodeset_findings` 折叠视图，以及 errors / warnings 展开视图
+- 健康报告和 inspect-config 输出 `info.nodeset_imports`，便于审计 nodeset 来源。
 
 ### 纯函数静态检查
 
@@ -110,6 +112,7 @@ src/topology_kernel/
 - node 必须提供 `run_pure`
 - 禁止普通 `run(context, ...)`
 - AST 检查部分禁止的导入
+- import policy 支持 root 级和 module 级规则；默认允许 `urllib.parse`，继续禁止 `urllib.request`。
 - AST 检查部分禁止的调用
 - 源码行数限制
 - 源码字节数限制
@@ -127,6 +130,8 @@ src/topology_kernel/
 - node 内部私有 helper 调用链从 `run_pure` 开始计数，默认长度 4 警告，超过 4 硬失败。
 - node 内部直接递归和间接递归会硬失败。
 - node 到 `base_lib` 的依赖链会被扫描，默认超过 4 警告，超过 6 硬失败。
+- 标准 wrapper node 会被识别为 `run_pure_shape=wrapper`，避免简单适配 node 触发 duplicate AST 形状噪声。
+- registry 会记录 node 注册来源，并对 `_register_<namespace>_nodes` 中注册其他 namespace 的 key 输出 maintainability warning。
 
 尚未形成完整能力：
 
@@ -146,6 +151,7 @@ src/topology_kernel/
 - boundary 产物路径必须位于 `run_dir` 或显式 `allowed_paths`。
 - 运行时写出 `boundary_trace.jsonl`。
 - boundary 失败会进入 runtime trace 并阻断继续运行。
+- boundary 健康检查会对 provider selection、rank/score/audit/plan/strategy 等决策逻辑输出 warning，提示策略可能应前移到 node/base_lib。
 
 ### 健康报告
 
@@ -155,6 +161,9 @@ src/topology_kernel/
 - node 类型解析。
 - 纯函数违规报告。
 - 未消费输出警告。
+- duplicate logic warning 会跳过标准 wrapper node 对。
+- boundary decision-logic smell warning。
+- registry namespace mismatch warning。
 - 有效边、数据边、显式边信息。
 
 尚未实现完整目标中的语义和架构漂移等健康检查。
@@ -219,7 +228,6 @@ topology-kernel export-mermaid --config ...
 topology-kernel export-mermaid --config ... --output ...
 topology-kernel export-mermaid --config ... --expand-nodesets
 topology-kernel quality-check --path ...
-topology-kernel quality-check --self
 topology-kernel quality-check --path ... --json
 ```
 
@@ -239,7 +247,7 @@ topology-kernel quality-check --path ... --json
 已实现：
 
 - `topology-kernel quality-check --path ...` 可检查普通 Python 项目，不要求使用 `topology-kernel` 架构。
-- `topology-kernel quality-check --self` 可检查内核仓库自身。
+- 检查内核仓库自身时使用 `PYTHONPATH=src python3 -m topology_kernel quality-check --path .`。
 - 检查文件行数、文件字节数、函数数量、类数量、公共 API 数量、分支数量和最大嵌套深度。
 - 检查单函数长度、分支数和嵌套深度。
 - 扫描 Python import 图，发现过长依赖链、循环依赖和双向依赖。
@@ -299,15 +307,15 @@ Paperflow 清理内核副本后的验证：
 当前内核自检：
 
 ```text
-topology-kernel quality-check --self
-CONCERNS，0 errors，28 warnings
+PYTHONPATH=src python3 -m topology_kernel quality-check --path .
+PASS，0 errors，0 warnings
 ```
 
-已将 `cli.py`、`health.py`、`purity.py` 和巨型单元测试文件拆分为多个小文件，并进一步收紧通用质量工具的误报、抽出重复摘要逻辑、复用 `base_lib` / purity helper、拆分 boundary 与 base_lib 健康报告工具。当前剩余问题主要是 warning 级别的函数复杂度、重复 AST 指纹、长依赖链预警和测试样本中的刻意副作用代码。
+已将 `cli.py`、`health.py`、`purity.py` 和巨型单元测试文件拆分为多个小文件，并进一步收紧通用质量工具的误报、抽出重复摘要逻辑、复用 `base_lib` / purity helper、拆分 boundary 与 base_lib 健康报告工具。当前内核仓库自检通过，后续变更应继续保持 `quality-check --path .` 的 `PASS`、0 error、0 warning。
 
 ## 尚未完成
 
-当前主体功能已达到初步实现版。后续主要工作是持续收紧规则、降低误报、补充真实项目迁移反馈，并把 `quality-check --self` 接入 CI 或发布前流程。
+当前主体功能已达到初步实现版。后续主要工作是持续收紧规则、降低误报、补充真实项目迁移反馈，并把 `quality-check --path .` 接入 CI 或发布前流程。
 
 ## 当前风险
 
@@ -316,7 +324,7 @@ CONCERNS，0 errors，28 warnings
 
 ## 下一步建议
 
-1. 用 `quality-check --self` 的结果反向拆分过大的内核文件。
-2. 将 `quality-check --self` 接入 CI 或发布前流程。
+1. 用 `quality-check --path .` 的结果反向拆分过大的内核文件。
+2. 将 `quality-check --path .` 接入 CI 或发布前流程。
 3. 用真实业务项目试迁移，收集误报和漏报。
 4. 再把 Paperflow 逐步迁移为该内核的使用方。

@@ -100,6 +100,19 @@ def name_targets(targets: list[ast.expr]) -> tuple[ast.Name, ...]:
     return tuple(target for target in targets if isinstance(target, ast.Name))
 
 
+def module_matches(module: str, patterns: tuple[str, ...]) -> bool:
+    return any(module == pattern or module.startswith(f"{pattern}.") for pattern in patterns)
+
+
+def is_banned_import(module: str, *, allowed_roots: tuple[str, ...], banned_roots: tuple[str, ...], allowed_modules: tuple[str, ...], banned_modules: tuple[str, ...]) -> bool:
+    root = module.split(".", 1)[0]
+    if module_matches(module, banned_modules):
+        return True
+    if module_matches(module, allowed_modules):
+        return False
+    return root in set(banned_roots) and root not in set(allowed_roots)
+
+
 def _is_pathlike_expression(node: ast.AST, aliases: Mapping[str, str]) -> bool:
     if isinstance(node, ast.Name):
         return aliases.get(node.id, "") == "pathlib.Path" or _looks_pathlike_name(node.id)

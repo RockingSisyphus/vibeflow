@@ -15,6 +15,8 @@ def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFin
     _validate_pipeline(pipeline, "pipeline", findings)
     if "nodesets" in config:
         _validate_nodesets(config["nodesets"], findings)
+    if "nodeset_imports" in config:
+        _validate_nodeset_imports(config["nodeset_imports"], findings)
     if "boundary" in config:
         _validate_boundary(config["boundary"], findings)
     if "plugins" in config:
@@ -174,6 +176,25 @@ def _validate_nodesets(value: Any, findings: list[HealthFinding]) -> None:
                 _validate_string_list(item[field], f"{prefix}.{field}", findings, "CONFIG.SCHEMA.NODESET_CONTRACT_LIST")
 
 
+def _validate_nodeset_imports(value: Any, findings: list[HealthFinding]) -> None:
+    if not isinstance(value, list):
+        findings.append(_error("CONFIG.SCHEMA.NODESET_IMPORTS_LIST", "nodeset_imports must be a list", "nodeset_imports"))
+        return
+    for index, item in enumerate(value):
+        prefix = f"nodeset_imports[{index}]"
+        if isinstance(item, str):
+            if not item.strip():
+                findings.append(_error("CONFIG.SCHEMA.NODESET_IMPORT_PATH", f"{prefix} must be a non-empty path string", prefix))
+            continue
+        if not isinstance(item, Mapping):
+            findings.append(_error("CONFIG.SCHEMA.NODESET_IMPORT_OBJECT", f"{prefix} must be a string or object", prefix))
+            continue
+        if not _non_empty_string(item.get("path")):
+            findings.append(_error("CONFIG.SCHEMA.NODESET_IMPORT_PATH", f"{prefix}.path must be a non-empty string", f"{prefix}.path"))
+        if "names" in item:
+            _validate_string_list(item["names"], f"{prefix}.names", findings, "CONFIG.SCHEMA.NODESET_IMPORT_NAMES")
+
+
 def _validate_boundary(value: Any, findings: list[HealthFinding]) -> None:
     if not isinstance(value, Mapping):
         findings.append(_error("CONFIG.SCHEMA.BOUNDARY_OBJECT", "boundary must be an object", "boundary"))
@@ -222,7 +243,7 @@ def _validate_policy(value: Any, prefix: str, findings: list[HealthFinding], *, 
     if "complexity" in value:
         _validate_int_policy(value["complexity"], f"{prefix}.complexity", ("max_functions", "max_branches", "max_nesting_depth", "max_params", "max_contract_keys"), findings, rule_source=rule_source, allow_null=True)
     if "imports" in value:
-        _validate_string_list_policy(value["imports"], f"{prefix}.imports", ("allowed_roots", "banned_roots"), findings, rule_source=rule_source)
+        _validate_string_list_policy(value["imports"], f"{prefix}.imports", ("allowed_roots", "banned_roots", "allowed_modules", "banned_modules"), findings, rule_source=rule_source)
     if "base_lib" in value:
         _validate_string_list_policy(value["base_lib"], f"{prefix}.base_lib", ("allowed_paths", "allowed_modules", "banned_modules"), findings, rule_source=rule_source)
     if "maintainability" in value:

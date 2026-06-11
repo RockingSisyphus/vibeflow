@@ -39,6 +39,7 @@ def test_graph_health_reports_node_metrics_duplicate_logic_and_confusing_node_na
     assert "GRAPH.SMELL.CONFUSING_NODE_NAME" in rule_ids
     assert "GRAPH.SMELL.DUPLICATE_LOGIC" in rule_ids
 
+
 def test_graph_health_warns_for_overwide_nodeset() -> None:
     graph = parse_graph_config(
         {

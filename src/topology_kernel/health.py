@@ -47,6 +47,7 @@ def validate_graph_health(
     _append_boundary_health(graph, boundary_registry, state)
     _append_node_config_health(graph, registry, state)
     _append_graph_contract_smells(graph, state)
+    _append_registry_namespace_smells(registry, state)
     _append_duplicate_logic_findings(state)
     _append_nodeset_health(graph, registry, state)
     _append_graph_plugin_findings(graph, compiled, plugin_registry, state)
@@ -247,9 +248,10 @@ def _append_boundary_health(
     state: _HealthValidationState,
 ) -> None:
     from .health_boundary import validate_boundary_health
+    from .health_plugins import append_finding_by_severity
 
     for finding in validate_boundary_health(graph, boundary_registry=boundary_registry):
-        state.errors.append(finding)
+        append_finding_by_severity(finding, state.errors, state.warnings)
         state.boundary_findings.append(finding.to_dict())
 
 
@@ -278,19 +280,16 @@ def _append_graph_contract_smells(graph: GraphConfig, state: _HealthValidationSt
         )
 
 
+def _append_registry_namespace_smells(registry: NodeRegistry, state: _HealthValidationState) -> None:
+    from .health_registry import registry_namespace_findings
+
+    state.warnings.extend(registry_namespace_findings(registry))
+
+
 def _append_duplicate_logic_findings(state: _HealthValidationState) -> None:
-    for first, second in _duplicate_fingerprints(state.fingerprints):
-        state.warnings.append(
-            HealthFinding(
-                rule_id="GRAPH.SMELL.DUPLICATE_LOGIC",
-                severity="warning",
-                object_type="node",
-                object_id=f"{first},{second}",
-                failure_layer="implementation",
-                message=f"nodes appear to have duplicate run_pure logic: {first}, {second}",
-                suggested_fix_type="split_node",
-            )
-        )
+    from .health_duplicates import duplicate_logic_findings
+
+    state.warnings.extend(duplicate_logic_findings(state.fingerprints, state.node_metrics))
 
 
 def _append_nodeset_health(graph: GraphConfig, registry: NodeRegistry, state: _HealthValidationState) -> None:
@@ -414,21 +413,6 @@ def _registry_node_classes(registry: NodeRegistry) -> tuple[type, ...]:
 def _looks_node_name(value: str) -> bool:
     allowed = set("abcdefghijklmnopqrstuvwxyz0123456789_")
     return bool(value) and value == value.lower() and all(char in allowed for char in value)
-
-
-def _duplicate_fingerprints(fingerprints: dict[str, str]) -> tuple[tuple[str, str], ...]:
-    grouped: dict[str, list[str]] = {}
-    for node_name, fingerprint in fingerprints.items():
-        grouped.setdefault(fingerprint, []).append(node_name)
-    duplicates: list[tuple[str, str]] = []
-    for names in grouped.values():
-        if len(names) < 2:
-            continue
-        names = sorted(names)
-        for index, first in enumerate(names):
-            for second in names[index + 1:]:
-                duplicates.append((first, second))
-    return tuple(duplicates)
 
 
 def _scan_base_lib_for_node(node_cls: type, *, purity_policy: PurityPolicy | None, scanned: set[str]):

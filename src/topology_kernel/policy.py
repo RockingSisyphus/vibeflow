@@ -30,6 +30,8 @@ DEFAULT_POLICY_DATA: dict[str, Any] = {
     "imports": {
         "allowed_roots": [],
         "banned_roots": sorted(BANNED_IMPORT_ROOTS),
+        "allowed_modules": ["urllib.parse"],
+        "banned_modules": ["urllib.request"],
     },
     "base_lib": {
         "allowed_paths": [],
@@ -78,6 +80,8 @@ class EffectivePolicy:
             warn_source_bytes=node_source.get("warn_bytes", DEFAULT_POLICY_DATA["node_source"]["warn_bytes"]),
             allowed_import_roots=tuple(imports.get("allowed_roots", ())),
             banned_import_roots=tuple(imports.get("banned_roots", DEFAULT_POLICY_DATA["imports"]["banned_roots"])),
+            allowed_import_modules=tuple(imports.get("allowed_modules", DEFAULT_POLICY_DATA["imports"]["allowed_modules"])),
+            banned_import_modules=tuple(imports.get("banned_modules", DEFAULT_POLICY_DATA["imports"]["banned_modules"])),
             max_functions=complexity.get("max_functions"),
             max_branches=complexity.get("max_branches"),
             max_nesting_depth=complexity.get("max_nesting_depth"),
@@ -333,8 +337,12 @@ def _relaxed_import_rule_ids(current: Mapping[str, Any], update: Mapping[str, An
     relaxed: set[str] = set()
     if set(imports.get("allowed_roots", ())) - set(current_imports.get("allowed_roots", ())):
         relaxed.add("NODE.IMPORT.ALLOWED_ROOTS")
+    if set(imports.get("allowed_modules", ())) - set(current_imports.get("allowed_modules", ())):
+        relaxed.add("NODE.IMPORT.ALLOWED_MODULES")
     if set(current_imports.get("banned_roots", ())) - set(imports.get("banned_roots", current_imports.get("banned_roots", ()))):
         relaxed.add("NODE.IMPORT.BANNED_ROOTS")
+    if set(current_imports.get("banned_modules", ())) - set(imports.get("banned_modules", current_imports.get("banned_modules", ()))):
+        relaxed.add("NODE.IMPORT.BANNED_MODULES")
     return relaxed
 
 

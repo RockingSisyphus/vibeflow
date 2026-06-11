@@ -1,0 +1,20 @@
+{
+  // Same topology as config.jsonc, but nodeset definitions live in nodesets.jsonc.
+  "plugins": [
+    {"module": "plugins.py", "class": "Plugin", "type": "policy"}
+  ],
+  "nodeset_imports": [
+    {"path": "nodesets.jsonc", "names": ["example.add_one"]}
+  ],
+  "pipeline": {
+    "nodes": [
+      {"name": "seed", "type": "example.seed", "provides": ["value.in"], "value": 4},
+      {
+        "name": "add_one_flow",
+        "type": "nodeset.example.add_one",
+        "requires": ["value.in"],
+        "provides": ["value.out"]
+      }
+    ]
+  }
+}

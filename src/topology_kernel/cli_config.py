@@ -46,6 +46,7 @@ def validate_config_path(path: Path, *, policy_path: Path | None = None) -> Heal
         info={
             "nodes": len(graph.nodes),
             "nodesets": sorted(graph.nodesets),
+            "nodeset_imports": [dict(item) for item in document.nodeset_imports],
             "explicit_edges": [edge.pair for edge in compiled.explicit_edges],
             "data_edges": [edge.pair for edge in compiled.data_edges],
             "effective_edges": [edge.pair for edge in compiled.effective_edges],
@@ -84,6 +85,7 @@ def inspect_config_payload(path: Path, *, policy_path: Path | None = None) -> tu
             }
             for nodeset in graph.nodesets.values()
         ],
+        "nodeset_imports": [dict(item) for item in document.nodeset_imports],
         "boundary": boundary_payload(graph),
         "loops": [
             {"name": loop.name, "edges": [list(edge) for edge in loop.edges], "max_iterations": loop.max_iterations, "nodes": list(loop.nodes), "until": loop.until}
