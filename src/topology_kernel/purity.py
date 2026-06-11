@@ -126,6 +126,7 @@ def collect_node_metrics(node_cls: type[Any]) -> NodeMetrics:
         contract_key_count=len(requires) + len(provides),
         function_names=tuple(counter.function_names),
         run_pure_fingerprint=counter.run_pure_fingerprint,
+        run_pure_shape=counter.run_pure_shape,
         call_chain_length=call_chain.length,
         call_chain_path=call_chain.path,
         recursive_call_chains=call_chain.recursive_paths,

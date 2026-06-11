@@ -396,3 +396,12 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
     assert (result.run_dir / "compiled_graph.json").exists()
     assert (result.run_dir / "graph.mmd").exists()
     assert "nodeset.example.add_one" in (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
+
+    imported_result = run_checked(
+        project / "config_with_imports.jsonc",
+        registry=registry,
+        run_root=tmp_path / "runs",
+        run_id="minimal_example_imports",
+    )
+    assert imported_result.context.get("value.out") == 5
+    assert imported_result.health.info["nodeset_imports"][0]["names"] == ["example.add_one"]

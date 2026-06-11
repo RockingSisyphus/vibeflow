@@ -27,7 +27,9 @@
       "type": "object",
       "properties": {
         "allowed_roots": { "type": "array", "items": { "type": "string" } },
-        "banned_roots": { "type": "array", "items": { "type": "string" } }
+        "banned_roots": { "type": "array", "items": { "type": "string" } },
+        "allowed_modules": { "type": "array", "items": { "type": "string" } },
+        "banned_modules": { "type": "array", "items": { "type": "string" } }
       }
     },
     "base_lib": {

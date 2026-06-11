@@ -64,7 +64,7 @@ def run_checked(
     _write_json(run_dir / "effective_policy.json", effective_policy)
     _refuse_on_schema_findings(document.data, policy_result.findings, effective_policy, run_dir, actual_run_id)
     graph, compiled = _compile_or_refuse(document.data, plugin_registry, effective_policy, run_dir, actual_run_id)
-    health = _validate_run_health(graph, registry, boundary_registry, plugin_registry, policy_result, effective_policy)
+    health = _validate_run_health(graph, registry, boundary_registry, plugin_registry, policy_result, effective_policy, document.nodeset_imports)
     _write_preflight_artifacts(run_dir, graph, compiled, health)
     _refuse_on_health_failure(health, run_dir, actual_run_id)
     context = _execute_runtime(graph, registry, boundary_registry, plugin_registry, initial, run_dir)
@@ -173,6 +173,7 @@ def _validate_run_health(
     plugin_registry,
     policy_result,
     effective_policy: dict[str, Any],
+    nodeset_imports: tuple[Mapping[str, Any], ...],
 ) -> HealthReport:
     from .health import validate_graph_health
 
@@ -183,7 +184,9 @@ def _validate_run_health(
         plugin_registry=plugin_registry,
         purity_policy=policy_result.effective_policy.to_purity_policy(),
     )
-    return replace(health, effective_policy=effective_policy)
+    info = dict(health.info)
+    info["nodeset_imports"] = [dict(item) for item in nodeset_imports]
+    return replace(health, effective_policy=effective_policy, info=info)
 
 
 def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport) -> None:

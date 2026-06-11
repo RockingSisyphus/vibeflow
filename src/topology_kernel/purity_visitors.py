@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 
-from .ast_rules import import_aliases_from_node, import_modules, module_statement_kind, name_targets, path_effect_call_name
+from .ast_rules import import_aliases_from_node, import_modules, is_banned_import, module_statement_kind, name_targets, path_effect_call_name
 from .node import NodeContract
 from .purity_helpers import (
     _assigns_resource_field,
@@ -178,7 +178,6 @@ class NodePurityVisitor(_PurityImportVisitor):
         self.generic_visit(node)
 
     def _check_import(self, module: str, node: ast.AST) -> None:
-        root = module.split(".", 1)[0]
         if _is_boundary_import(module):
             self._add("boundary_import", f"node must not import boundary APIs: {module}", node, suggested_fix_type="move_to_boundary")
             return
@@ -192,9 +191,13 @@ class NodePurityVisitor(_PurityImportVisitor):
             if not _module_matches(module, self.policy.allowed_base_lib_modules):
                 self._add("base_lib_undeclared", f"node imports base_lib module not allowed by policy: {module}", node, suggested_fix_type="fix_base_lib")
                 return
-        banned = set(self.policy.banned_import_roots or tuple(sorted(BANNED_IMPORT_ROOTS)))
-        allowed = set(self.policy.allowed_import_roots)
-        if root in banned and root not in allowed:
+        if is_banned_import(
+            module,
+            allowed_roots=self.policy.allowed_import_roots,
+            banned_roots=self.policy.banned_import_roots or tuple(sorted(BANNED_IMPORT_ROOTS)),
+            allowed_modules=self.policy.allowed_import_modules,
+            banned_modules=self.policy.banned_import_modules,
+        ):
             self._add("banned_import", f"banned import: {module}", node, suggested_fix_type="move_to_boundary")
 
     def _track_input_alias(self, node: ast.Assign) -> None:
@@ -332,16 +335,19 @@ class ModulePurityVisitor(_PurityImportVisitor):
             self._add("module_side_effect", "node module top level may only contain imports, definitions, immutable constants, and docstrings", stmt, suggested_fix_type="move_to_boundary")
 
     def _check_import(self, module: str, node: ast.AST) -> None:
-        root = module.split(".", 1)[0]
         if _is_boundary_import(module):
             self._add("boundary_import", f"node must not import boundary APIs: {module}", node, suggested_fix_type="move_to_boundary")
             return
         if _is_node_module(module) or module in self.known_node_modules:
             self._add("node_import", f"node must not import another node module: {module}", node, suggested_fix_type="move_to_nodeset")
             return
-        banned = set(self.policy.banned_import_roots or tuple(sorted(BANNED_IMPORT_ROOTS)))
-        allowed = set(self.policy.allowed_import_roots)
-        if root in banned and root not in allowed:
+        if is_banned_import(
+            module,
+            allowed_roots=self.policy.allowed_import_roots,
+            banned_roots=self.policy.banned_import_roots or tuple(sorted(BANNED_IMPORT_ROOTS)),
+            allowed_modules=self.policy.allowed_import_modules,
+            banned_modules=self.policy.banned_import_modules,
+        ):
             self._add("banned_import", f"banned import: {module}", node, suggested_fix_type="move_to_boundary")
 
     def _record_module_class(self, node: ast.ClassDef) -> None:
@@ -363,5 +369,3 @@ class ModulePurityVisitor(_PurityImportVisitor):
                 suggested_fix_type=suggested_fix_type,
             )
         )
-
-

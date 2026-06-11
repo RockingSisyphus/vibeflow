@@ -88,6 +88,8 @@ class PurityPolicy:
     warn_source_bytes: int | None = None
     allowed_import_roots: tuple[str, ...] = ()
     banned_import_roots: tuple[str, ...] = tuple(sorted(BANNED_IMPORT_ROOTS))
+    allowed_import_modules: tuple[str, ...] = ("urllib.parse",)
+    banned_import_modules: tuple[str, ...] = ("urllib.request",)
     max_functions: int | None = None
     max_branches: int | None = None
     max_nesting_depth: int | None = None
@@ -115,6 +117,7 @@ class NodeMetrics:
     contract_key_count: int = 0
     function_names: tuple[str, ...] = ()
     run_pure_fingerprint: str = ""
+    run_pure_shape: str = ""
     call_chain_length: int = 0
     call_chain_path: tuple[str, ...] = ()
     recursive_call_chains: tuple[tuple[str, ...], ...] = ()
@@ -132,6 +135,7 @@ class NodeMetrics:
             "contract_key_count": self.contract_key_count,
             "function_names": list(self.function_names),
             "run_pure_fingerprint": self.run_pure_fingerprint,
+            "run_pure_shape": self.run_pure_shape,
             "call_chain_length": self.call_chain_length,
             "call_chain_path": list(self.call_chain_path),
             "recursive_call_chains": [list(path) for path in self.recursive_call_chains],

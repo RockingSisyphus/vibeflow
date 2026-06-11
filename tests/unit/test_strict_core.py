@@ -1,5 +1,18 @@
 from tests.unit.strict_support import *
 
+
+class ProviderPlanningBoundary(DemoBoundary):
+    def _select_http_provider(self, providers):
+        return providers[0] if providers else ""
+
+    def after_run(self, outputs, run_config):
+        self._select_http_provider(["http"])
+        return {}
+
+
+def _register_fulltext_nodes(registry: NodeRegistry) -> None:
+    registry.register("literature.rank_records", SeedNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 1})
+
 def test_pure_node_metadata_and_static_check() -> None:
     assert validate_node_class(SeedNode, policy=PurityPolicy(max_source_lines=1000)) == []
     violations = validate_node_class(BadIoNode, policy=PurityPolicy(max_source_lines=1000))
@@ -257,6 +270,34 @@ def test_boundary_health_resolves_type_and_suppresses_consumed_effect_warning() 
     )
     assert not any(warning.object_id == "effects.request" for warning in report.warnings)
     assert report.info["boundary"]["type"] == "test.boundary"
+
+def test_boundary_decision_logic_is_warning_not_error() -> None:
+    boundary_registry = BoundaryRegistry()
+    boundary_registry.register("test.provider_boundary", ProviderPlanningBoundary)
+    graph = parse_graph_config(
+        {
+            "boundary": {
+                "type": "test.provider_boundary",
+                "consumes": ["outbox.request"],
+                "provides": ["io.result"],
+            },
+            "pipeline": {"nodes": [{"name": "seed", "type": "test.seed", "provides": ["outbox.request"], "value": 1}]},
+        }
+    )
+    report = validate_graph_health(graph, registry=_registry(), boundary_registry=boundary_registry)
+    assert report.status == "CONCERNS"
+    assert not report.errors
+    assert any(warning.rule_id == "BOUNDARY.SMELL.DECISION_LOGIC" for warning in report.warnings)
+    assert any(finding["rule_id"] == "BOUNDARY.SMELL.DECISION_LOGIC" for finding in report.info["boundary_findings"])
+
+def test_registry_namespace_mismatch_is_warning() -> None:
+    registry = NodeRegistry()
+    _register_fulltext_nodes(registry)
+    graph = parse_graph_config({"pipeline": {"nodes": [{"name": "rank", "type": "literature.rank_records", "provides": ["value.in"]}]}})
+    report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
+    warnings = [warning for warning in report.warnings if warning.rule_id == "REGISTRY.SMELL.NAMESPACE_MISMATCH"]
+    assert len(warnings) == 1
+    assert warnings[0].details["expected_namespace"] == "fulltext"
 
 def test_boundary_runtime_rejects_unknown_type_undeclared_key_and_escaped_artifact(tmp_path) -> None:
     graph = parse_graph_config(

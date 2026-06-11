@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 from typing import Any
 
-from .ast_rules import boolop_branch_count
+from .ast_rules import boolop_branch_count, call_name
 from .purity_helpers import _fingerprint_function
 from .purity_types import _CallChainAnalysis
 
@@ -15,6 +15,7 @@ class _ComplexityCounter(ast.NodeVisitor):
         self.max_nesting_depth = 0
         self.function_names: list[str] = []
         self.run_pure_fingerprint = ""
+        self.run_pure_shape = ""
         self._nesting = 0
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
@@ -22,6 +23,7 @@ class _ComplexityCounter(ast.NodeVisitor):
         self.function_names.append(node.name)
         if node.name == "run_pure":
             self.run_pure_fingerprint = _fingerprint_function(node)
+            self.run_pure_shape = _classify_run_pure_shape(node)
         self.generic_visit(node)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
@@ -120,4 +122,43 @@ class _InternalMethodCallCollector(ast.NodeVisitor):
         if target in self.method_names:
             self.calls.add(target)
         self.generic_visit(node)
+
+
+def _classify_run_pure_shape(node: ast.FunctionDef) -> str:
+    if _has_control_flow(node):
+        return "logic"
+    core_calls = [name for name in _call_names(node) if not _is_wrapper_scaffolding_call(name)]
+    if len(core_calls) == 1 and _has_static_output_return(node):
+        return "wrapper"
+    if not core_calls and _has_static_output_return(node):
+        return "literal"
+    return "logic"
+
+
+def _has_control_flow(node: ast.FunctionDef) -> bool:
+    control_nodes = (ast.If, ast.For, ast.AsyncFor, ast.While, ast.Try, ast.TryStar, ast.Match, ast.IfExp, ast.comprehension)
+    return any(isinstance(child, control_nodes) for child in ast.walk(node))
+
+
+def _call_names(node: ast.FunctionDef) -> tuple[str, ...]:
+    names: list[str] = []
+    for child in ast.walk(node):
+        if isinstance(child, ast.Call):
+            names.append(call_name(child.func))
+    return tuple(names)
+
+
+def _is_wrapper_scaffolding_call(name: str) -> bool:
+    return name in {"dict", "list", "tuple", "set", "str", "int", "float", "bool", "inputs.get", "params.get"}
+
+
+def _has_static_output_return(node: ast.FunctionDef) -> bool:
+    for child in ast.walk(node):
+        if not isinstance(child, ast.Return):
+            continue
+        if isinstance(child.value, ast.Dict):
+            return all(isinstance(key, ast.Constant) and isinstance(key.value, str) for key in child.value.keys)
+        if isinstance(child.value, ast.Name):
+            return True
+    return False
 
