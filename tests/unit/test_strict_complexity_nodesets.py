@@ -349,6 +349,32 @@ def test_cli_export_ascii_reads_jsonc(tmp_path, capsys) -> None:
     assert "provides=value.in" in output
 
 
+def test_cli_export_svg_reads_jsonc(tmp_path, capsys) -> None:
+    if not is_mermaid_svg_renderer_available():
+        pytest.skip("Mermaid SVG renderer is not installed")
+    config_path = tmp_path / "workflow.jsonc"
+    output_path = tmp_path / "graph.svg"
+    config_path.write_text(
+        """
+{
+  "pipeline": {
+    "nodes": [
+      {"name": "start", "type": "test.start"},
+      {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
+      {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
+      {"name": "end", "type": "test.out_end", "requires": ["value.out"]}
+    ],
+    "edges": [["start", "seed"], ["seed", "add"], ["add", "end"]]
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    code = cli_main(["export-svg", "--config", str(config_path), "--output", str(output_path)])
+    assert code == 0
+    assert "<svg" in output_path.read_text(encoding="utf-8")
+
+
 def test_ascii_flowchart_distinguishes_standard_shapes() -> None:
     nodes = [
         ("start", "terminal"),

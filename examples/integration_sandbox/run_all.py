@@ -21,6 +21,7 @@ CONFIG_DIR = PROJECT_DIR / "configs"
 REPORT_DIR = SANDBOX_DIR / "reports"
 ASCII_DIR = REPORT_DIR / "ascii"
 MERMAID_DIR = REPORT_DIR / "mermaid"
+SVG_DIR = REPORT_DIR / "svg"
 RUN_ROOT = SANDBOX_DIR / "runs"
 POLICY_PATH = PROJECT_DIR / "kernel_policy.jsonc"
 
@@ -164,6 +165,7 @@ def _reset_outputs() -> None:
             shutil.rmtree(path)
     ASCII_DIR.mkdir(parents=True, exist_ok=True)
     MERMAID_DIR.mkdir(parents=True, exist_ok=True)
+    SVG_DIR.mkdir(parents=True, exist_ok=True)
     RUN_ROOT.mkdir(parents=True, exist_ok=True)
 
 
@@ -179,7 +181,7 @@ def _run_valid_cases() -> list[CaseResult]:
 
 
 def _run_valid_case(case: dict[str, Any]) -> CaseResult:
-    from topology_kernel import GraphCompiler, export_ascii_flowchart, export_mermaid, load_config_document, parse_graph_config, resolve_effective_policy, run_checked, validate_graph_health
+    from topology_kernel import GraphCompiler, export_ascii_flowchart, export_mermaid, is_mermaid_svg_renderer_available, load_config_document, parse_graph_config, render_mermaid_svg, resolve_effective_policy, run_checked, validate_graph_health
     from topology_kernel.config_schema import collect_config_schema_findings
     from topology_kernel.plugin import load_plugins_from_config
 
@@ -217,6 +219,9 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     (ASCII_DIR / f"{name}.expanded.txt").write_text(ascii_expanded, encoding="utf-8")
     (MERMAID_DIR / f"{name}.mmd").write_text(collapsed, encoding="utf-8")
     (MERMAID_DIR / f"{name}.expanded.mmd").write_text(expanded, encoding="utf-8")
+    if is_mermaid_svg_renderer_available():
+        render_mermaid_svg(collapsed, SVG_DIR / f"{name}.svg")
+        render_mermaid_svg(expanded, SVG_DIR / f"{name}.expanded.svg")
     run_result = run_checked(
         config_path,
         registry=node_registry,
@@ -252,6 +257,8 @@ def _assert_ascii_contains(name: str, collapsed: str, expanded: str) -> None:
 
 
 def _assert_artifacts(run_dir: Path) -> None:
+    from topology_kernel import is_mermaid_svg_renderer_available
+
     required = (
         "health_report.json",
         "compiled_graph.json",
@@ -265,6 +272,10 @@ def _assert_artifacts(run_dir: Path) -> None:
     missing = [name for name in required if not (run_dir / name).exists()]
     if missing:
         raise AssertionError(f"missing run artifacts: {missing}")
+    if is_mermaid_svg_renderer_available():
+        svg = run_dir / "graph.svg"
+        if not svg.exists() or "<svg" not in svg.read_text(encoding="utf-8"):
+            raise AssertionError("missing rendered SVG artifact")
 
 
 def _run_invalid_cases() -> list[CaseResult]:

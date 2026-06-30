@@ -8,6 +8,7 @@ from .graph_config import EdgeSpec, GraphConfig, NodeSpec, NodesetSpec, parse_gr
 from .health import HealthFinding, HealthReport, validate_graph_health
 from .ascii_flowchart import export_ascii_flowchart
 from .mermaid import export_mermaid
+from .mermaid_render import MermaidRenderError, is_mermaid_svg_renderer_available, render_mermaid_svg
 from .node import FLOW_KINDS, FLOW_KIND_DATA_STORE, FLOW_KIND_DECISION, FLOW_KIND_DOCUMENT, FLOW_KIND_IO, FLOW_KIND_PREDEFINED, FLOW_KIND_PREPARATION, FLOW_KIND_PROCESS, FLOW_KIND_TERMINAL, NodeContract, NodeInfo, PureNode
 from .node_config import NodeConfigSpec
 from .policy import EffectivePolicy, PolicyResolveResult, default_effective_policy, resolve_effective_policy
@@ -35,6 +36,7 @@ __all__ = [
     "GraphCompileError",
     "GraphCompiler",
     "GraphConfig",
+    "MermaidRenderError",
     "FLOW_KINDS",
     "FLOW_KIND_DATA_STORE",
     "FLOW_KIND_DECISION",
@@ -67,10 +69,12 @@ __all__ = [
     "default_effective_policy",
     "export_mermaid",
     "export_ascii_flowchart",
+    "is_mermaid_svg_renderer_available",
     "load_config_document",
     "load_plugins_from_config",
     "parse_graph_config",
     "resolve_effective_policy",
+    "render_mermaid_svg",
     "run_checked",
     "scan_base_lib",
     "schema_text",

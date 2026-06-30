@@ -8,9 +8,9 @@ from topology_kernel import NodeContract, NodeInfo
 class StartNode:
     NODE_INFO = NodeInfo(
         type_key="sandbox.start",
-        display_name="Start",
+        display_name="流程开始",
         category="sandbox",
-        description="Starts a sandbox flow.",
+        description="标记一个可执行流程的唯一入口；它不产生业务数据，只负责让内核从明确的 Terminal 节点开始调度后续步骤。",
         version="0.1.0",
         flow_kind="terminal",
     )
@@ -25,15 +25,15 @@ class StartNode:
 class ValueInputNode:
     NODE_INFO = NodeInfo(
         type_key="sandbox.value_input",
-        display_name="Value Input",
+        display_name="读取数值输入",
         category="sandbox",
-        description="Reads value.in input inside a flow.",
+        description="在流程内部读取由运行初始上下文提供的 value.in；该节点用于表达标准流程图中的输入动作，而不是程序开始节点。",
         version="0.1.0",
         flow_kind="io",
     )
     CONTRACT = NodeContract(
         requires=("value.in",),
-        input_semantics={"value.in": ("initial numeric value",)},
+        input_semantics={"value.in": ("由调用方注入的原始数值，后续准备节点会基于它进行初始化。",)},
         examples=({"inputs": {"value.in": 1}, "params": {}, "outputs": {}},),
     )
 
@@ -44,15 +44,15 @@ class ValueInputNode:
 class IoInputNode:
     NODE_INFO = NodeInfo(
         type_key="sandbox.io_input",
-        display_name="IO Input",
+        display_name="读取外部结果输入",
         category="sandbox",
-        description="Reads io.result input inside a flow.",
+        description="在流程中读取外部系统已经准备好的 io.result，用来验证边界被移除后 IO 节点如何承接外部数据。",
         version="0.1.0",
         flow_kind="io",
     )
     CONTRACT = NodeContract(
         requires=("io.result",),
-        input_semantics={"io.result": ("external numeric result",)},
+        input_semantics={"io.result": ("外部系统或测试初始上下文提供的数值结果。",)},
         examples=({"inputs": {"io.result": 1}, "params": {}, "outputs": {}},),
     )
 
@@ -63,9 +63,9 @@ class IoInputNode:
 class FinalValueEndNode:
     NODE_INFO = NodeInfo(
         type_key="sandbox.final_value_end",
-        display_name="Final Value End",
+        display_name="最终数值结束",
         category="sandbox",
-        description="Ends a flow after value.final is produced.",
+        description="当 value.final 已经生成后终止流程；它验证所有非计划节点都能够从开始节点抵达明确的 Terminal 结束节点。",
         version="0.1.0",
         flow_kind="terminal",
     )
@@ -82,9 +82,9 @@ class FinalValueEndNode:
 class OutValueEndNode:
     NODE_INFO = NodeInfo(
         type_key="sandbox.out_value_end",
-        display_name="Out Value End",
+        display_name="计算结果结束",
         category="sandbox",
-        description="Ends a flow after value.out is produced.",
+        description="当子流程或普通计算已经产出 value.out 后结束，用来验证 nodeset 内部也必须拥有清晰的开始和结束。",
         version="0.1.0",
         flow_kind="terminal",
     )
@@ -101,9 +101,9 @@ class OutValueEndNode:
 class NextValueEndNode:
     NODE_INFO = NodeInfo(
         type_key="sandbox.next_value_end",
-        display_name="Next Value End",
+        display_name="循环结果结束",
         category="sandbox",
-        description="Ends a flow after value.next is produced.",
+        description="用于较小循环示例的结束节点，表示循环判断完成后已经得到最终的 value.next。",
         version="0.1.0",
         flow_kind="terminal",
     )

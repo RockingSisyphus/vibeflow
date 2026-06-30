@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import tempfile
 from pathlib import Path
 from typing import Sequence
 
@@ -43,6 +44,17 @@ def build_parser() -> argparse.ArgumentParser:
     ascii_chart.add_argument("--hide-semantics", action="store_true")
     ascii_chart.set_defaults(expand_nodesets=False)
 
+    svg = sub.add_parser("export-svg", help="render topology config Mermaid flowchart to SVG")
+    svg.add_argument("--config", required=True)
+    svg.add_argument("--output", required=False)
+    svg.add_argument("--expand-nodesets", dest="expand_nodesets", action="store_true")
+    svg.add_argument("--collapse-nodesets", dest="expand_nodesets", action="store_false")
+    svg.add_argument("--hide-contract", action="store_true")
+    svg.add_argument("--hide-semantics", action="store_true")
+    svg.add_argument("--theme", default="default")
+    svg.add_argument("--background", default="transparent")
+    svg.set_defaults(expand_nodesets=False)
+
     run = sub.add_parser("run", help="run topology config after mandatory health checks")
     run.add_argument("--config", required=True)
     run.add_argument("--policy", required=False, help="explicit kernel_policy.jsonc/governance.jsonc path")
@@ -81,6 +93,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "inspect-node": _handle_inspect_node,
         "inspect-config": _handle_inspect_config,
         "export-ascii": _handle_export_ascii,
+        "export-svg": _handle_export_svg,
         "export-mermaid": _handle_export_mermaid,
         "run": _handle_run,
         "quality-check": _handle_quality_check,
@@ -135,6 +148,10 @@ def _handle_export_ascii(args: argparse.Namespace) -> int:
     return _handle_export_graph(args, export_kind="ascii")
 
 
+def _handle_export_svg(args: argparse.Namespace) -> int:
+    return _handle_export_graph(args, export_kind="svg")
+
+
 def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
     from .cli_reports import config_load_error_report, fail_report, graph_config_error_report
     from .compiler import GraphCompiler, GraphCompileError
@@ -142,6 +159,7 @@ def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
     from .graph_config import GraphConfigError, parse_graph_config
     from .ascii_flowchart import export_ascii_flowchart
     from .mermaid import export_mermaid
+    from .mermaid_render import MermaidRenderError, render_mermaid_svg
     from .policy import default_effective_policy
 
     try:
@@ -160,6 +178,21 @@ def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
         report = fail_report(exc.rule_id, str(exc), "pipeline", "pipeline", "topology", effective_policy=default_effective_policy().to_dict())
         print(report.to_json())
         return 1
+    if export_kind == "svg":
+        mermaid_text = export_mermaid(graph, compiled=compiled, expand_nodesets=bool(args.expand_nodesets), show_contract=not bool(args.hide_contract), show_semantics=not bool(args.hide_semantics))
+        try:
+            if args.output:
+                render_mermaid_svg(mermaid_text, Path(args.output), theme=str(args.theme), background=str(args.background))
+            else:
+                with tempfile.TemporaryDirectory(prefix="topology-kernel-svg-") as temp_dir:
+                    output = Path(temp_dir) / "graph.svg"
+                    render_mermaid_svg(mermaid_text, output, theme=str(args.theme), background=str(args.background))
+                    print(output.read_text(encoding="utf-8"), end="")
+        except MermaidRenderError as exc:
+            report = fail_report("MERMAID.RENDER.SVG", str(exc), "pipeline", "pipeline", "render", effective_policy=default_effective_policy().to_dict())
+            print(report.to_json())
+            return 1
+        return 0
     exporter = export_ascii_flowchart if export_kind == "ascii" else export_mermaid
     text = exporter(graph, compiled=compiled, expand_nodesets=bool(args.expand_nodesets), show_contract=not bool(args.hide_contract), show_semantics=not bool(args.hide_semantics))
     if args.output:

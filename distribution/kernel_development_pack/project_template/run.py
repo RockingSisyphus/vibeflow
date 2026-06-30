@@ -21,6 +21,7 @@ from topology_kernel import (  # noqa: E402
     load_plugins_from_config,
     parse_graph_config,
     resolve_effective_policy,
+    render_mermaid_svg,
     run_checked,
     validate_graph_health,
 )
@@ -44,6 +45,9 @@ def main() -> int:
     ascii_chart = _add_config_command(sub, "ascii")
     ascii_chart.add_argument("--output", required=False)
     ascii_chart.add_argument("--expand-nodesets", action="store_true")
+    svg = _add_config_command(sub, "svg")
+    svg.add_argument("--output", required=True)
+    svg.add_argument("--expand-nodesets", action="store_true")
     inspect_node = sub.add_parser("inspect-node")
     inspect_node.add_argument("--type", required=True, dest="node_type")
     inspect_node.add_argument("--module", required=True)
@@ -69,6 +73,7 @@ def _dispatch(args) -> int:
         "run": _run,
         "ascii": _ascii,
         "mermaid": _mermaid,
+        "svg": _svg,
         "inspect-node": _inspect_node,
         "quality": _quality,
     }
@@ -128,6 +133,15 @@ def _mermaid(args) -> int:
 
 def _ascii(args) -> int:
     return _export_graph(args, exporter=export_ascii_flowchart)
+
+
+def _svg(args) -> int:
+    graph = _load_graph(args.config)
+    registry = build_node_registry()
+    compiled = GraphCompiler().compile(graph, registry=registry)
+    text = export_mermaid(graph, compiled=compiled, registry=registry, expand_nodesets=bool(args.expand_nodesets))
+    render_mermaid_svg(text, Path(args.output))
+    return 0
 
 
 def _export_graph(args, *, exporter) -> int:

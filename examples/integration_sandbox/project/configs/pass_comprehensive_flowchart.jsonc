@@ -2,9 +2,9 @@
   "nodesets": [
     {
       "name": "comprehensive.core",
-      "display_name": "Comprehensive Core",
-      "category": "sandbox",
-      "description": "Predefined subflow used by the comprehensive flowchart case.",
+      "display_name": "综合示例核心计算子流程",
+      "category": "沙箱综合流程",
+      "description": "这是综合流程图中的预定义过程节点，用来验证 nodeset 在折叠视图和展开视图中都能保留契约、中文说明、内部开始结束节点以及显式边关系。",
       "version": "0.1.0",
       "purity": "pure",
       "requires": ["value.prepared"],
