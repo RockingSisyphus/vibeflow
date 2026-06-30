@@ -40,8 +40,8 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         "source_too_large",
         "banned_call",
         "node_direct_call",
-        "GRAPH.COMPILE",
-        "CONFIG.SCHEMA.BOUNDARY_CONSUMES_KEY",
+        "CONFIG.LOOPS.REMOVED",
+        "CONFIG.BOUNDARY.REMOVED",
         "BASE_LIB.FORBIDDEN_PROJECT_IMPORT",
     } <= observed
 
@@ -51,7 +51,7 @@ def test_policy_downgrade_schema_requires_audit_fields() -> None:
             "policy": {
                 "rules": {
                     "downgrades": [
-                        {"rule_id": "GRAPH.OUTPUT.UNCONSUMED", "to": "warning", "scope": "bad"}
+                        {"rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER", "to": "warning", "scope": "bad"}
                     ]
                 }
             },
@@ -72,24 +72,24 @@ def test_mermaid_collapsed_and_expanded_views_share_top_level_compiled_edges() -
                     requires=["value.in"],
                     provides=["value.out"],
                     exports=["value.out"],
-                    pipeline={
-                        "inputs": ["value.in"],
-                        "nodes": [{"name": "inner", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]}],
-                    },
+                    pipeline=_input_add_pipeline(add={"name": "inner"}),
                 )
             ],
             "pipeline": {
                 "nodes": [
+                    {"name": "start", "type": "test.start"},
                     {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
                     {"name": "flow", "type": "nodeset.math.add_one", "requires": ["value.in"], "provides": ["value.out"]},
-                ]
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": _edge_chain("start", "seed", "flow", "end"),
             },
         }
     )
     collapsed = export_mermaid(graph, expand_nodesets=False)
     expanded = export_mermaid(graph, expand_nodesets=True)
-    assert "seed -->|max=1| flow" in collapsed
-    assert "seed -->|max=1| flow" in expanded
+    assert "seed --> flow" in collapsed
+    assert "seed --> flow" in expanded
     assert "flow__inner" not in collapsed
     assert "flow__inner" in expanded
 
@@ -98,12 +98,7 @@ def test_checked_run_artifact_integrity_cross_links_health_graph_trace(tmp_path)
     config_path.write_text(
         json.dumps(
             {
-                "pipeline": {
-                    "nodes": [
-                        {"name": "seed", "type": "test.seed", "provides": ["value.in"], "value": 6},
-                        {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 2},
-                    ]
-                }
+                "pipeline": _seed_add_pipeline(seed={"value": 6}, add={"delta": 2})
             }
         ),
         encoding="utf-8",
@@ -116,9 +111,13 @@ def test_checked_run_artifact_integrity_cross_links_health_graph_trace(tmp_path)
 
     assert result.context.get("value.out") == 8
     assert health["status"] == result.health.status
-    assert compiled["effective_edges"] == [{"from": "seed", "to": "add", "max_executions": 1, "loop": ""}]
-    assert "seed -->|max=1| add" in graph_mmd
-    assert [event["node"] for event in trace if event.get("kind") == "node"] == ["seed", "add"]
+    assert compiled["effective_edges"] == [
+        {"from": "start", "to": "seed", "when": ""},
+        {"from": "seed", "to": "add", "when": ""},
+        {"from": "add", "to": "end", "when": ""},
+    ]
+    assert "seed --> add" in graph_mmd
+    assert [event["node"] for event in trace if event.get("kind") == "node"] == ["start", "seed", "add", "end"]
 
 def test_code_quality_tool_reports_file_function_dependency_and_side_effect_findings(tmp_path) -> None:
     (tmp_path / "a.py").write_text(

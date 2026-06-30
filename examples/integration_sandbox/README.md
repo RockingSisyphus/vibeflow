@@ -1,6 +1,6 @@
 # 集成沙盒
 
-这个目录模拟真实业务项目使用 `topology-kernel` 的方式：业务侧只编写 node、受控 `base_lib`、插件、boundary 和 JSONC 配置；内核通过 `kernel/topology_kernel` 软链接进入项目。
+这个目录模拟真实业务项目使用 `topology-kernel` 的方式：业务侧只编写 node、受控 `base_lib`、插件和 JSONC 配置；内核通过 `kernel/topology_kernel` 软链接进入项目。
 
 运行：
 
@@ -23,13 +23,13 @@ python examples\integration_sandbox\run_all.py
 
 本目录包含故意违规的 Python 文件，用于验证内核能拒绝坏代码。因此仓库级通用质量自检默认排除 `integration_sandbox`，避免把反例 fixture 当成内核自身质量问题。
 
-## Boundary lifecycle 示例
+## Flowchart 示例
 
-`project/configs/pass_boundary.jsonc` 展示了当前推荐的外部副作用拓扑：
+`project/configs/pass_decision_cycle_short.jsonc` 和 `pass_decision_cycle_long.jsonc` 展示了新版循环表达：
 
-- 纯 node `sandbox.effect_request` 输出 `effects.request`。
-- `sandbox.demo_boundary.after_iteration` 消费该请求并返回 `io.result`。
-- 下游纯 node `sandbox.boundary_result_add` 消费 `io.result`，继续产生普通拓扑输出。
-- `pipeline.loops` 显式声明 `boundary_loop`，让 plan/effect/result 反馈在有界轮次内执行。
+- 普通 `process` 节点 `sandbox.increment` 产生下一步值。
+- `decision` 节点 `sandbox.done_check` 输出 `loop.done`。
+- 配置边用 `when: "loop.done == false"` 表达回边是否激活。
+- 运行时只使用 `max_steps` 作为安全护栏，不再注册 `pipeline.loops`。
 
-这个模式覆盖 `plan node -> effects.* -> boundary.after_iteration -> io.* -> downstream node`，不需要把 boundary 伪装成 node，也不需要 named stage。
+`project/configs/pass_io_data_store.jsonc` 展示外部数据/副作用的替代建模方式：`data_store` 节点产出请求数据，`io` 节点消费外部输入结果。旧 `boundary` 配置只保留在失败用例中，验证内核会以 `CONFIG.BOUNDARY.REMOVED` 拒绝。

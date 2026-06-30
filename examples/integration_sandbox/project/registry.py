@@ -1,9 +1,19 @@
 from __future__ import annotations
 
-from topology_kernel import BoundaryRegistry, NodeRegistry
+from topology_kernel import NodeRegistry
 
-from boundaries import DemoBoundary
-from nodes.legal_boundary_nodes import BoundaryResultAddNode, BoundaryResultInputNode, EffectRequestNode
+from nodes.legal_comprehensive_nodes import (
+    AuditStoreNode,
+    CoreComputeNode,
+    ExternalBoostNode,
+    LoopBackNode,
+    PrepareValueNode,
+    ReportDocumentNode,
+    ReportEndNode,
+    ReportOutputNode,
+    RouteDecisionNode,
+)
+from nodes.legal_external_nodes import EffectRequestNode, IoResultAddNode, IoResultInputNode
 from nodes.legal_loop_nodes import CopyBackNode, DoneCheckNode, IncrementNode
 from nodes.legal_math_nodes import (
     AddNode,
@@ -12,13 +22,25 @@ from nodes.legal_math_nodes import (
     BranchLeftNode,
     BranchRightNode,
     ConstantNode,
+    FinalValueEndNode,
+    IoInputNode,
     MultiplyNode,
+    NextValueEndNode,
+    OutValueEndNode,
+    StartNode,
     SumPairNode,
+    ValueInputNode,
 )
 
 
 def build_node_registry() -> NodeRegistry:
     registry = NodeRegistry()
+    registry.register("sandbox.start", StartNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.value_input", ValueInputNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.io_input", IoInputNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.final_value_end", FinalValueEndNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.out_value_end", OutValueEndNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.next_value_end", NextValueEndNode, config_schema={}, config_defaults={})
     registry.register("sandbox.constant", ConstantNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 1})
     registry.register("sandbox.add", AddNode, config_schema={"delta": {"type": "number"}}, config_defaults={"delta": 1})
     registry.register("sandbox.add_out", AddOutNode, config_schema={"delta": {"type": "number"}}, config_defaults={"delta": 1})
@@ -31,12 +53,15 @@ def build_node_registry() -> NodeRegistry:
     registry.register("sandbox.copy_back", CopyBackNode, config_schema={}, config_defaults={})
     registry.register("sandbox.done_check", DoneCheckNode, config_schema={"target": {"type": "number"}}, config_defaults={"target": 3})
     registry.register("sandbox.effect_request", EffectRequestNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 1})
-    registry.register("sandbox.boundary_result_add", BoundaryResultAddNode, config_schema={"delta": {"type": "number"}}, config_defaults={"delta": 1})
-    registry.register("sandbox.boundary_result_input", BoundaryResultInputNode, config_schema={"delta": {"type": "number"}}, config_defaults={"delta": 1})
-    return registry
-
-
-def build_boundary_registry() -> BoundaryRegistry:
-    registry = BoundaryRegistry()
-    registry.register("sandbox.demo_boundary", DemoBoundary)
+    registry.register("sandbox.io_result_add", IoResultAddNode, config_schema={"delta": {"type": "number"}}, config_defaults={"delta": 1})
+    registry.register("sandbox.io_result_input", IoResultInputNode, config_schema={"delta": {"type": "number"}}, config_defaults={"delta": 1})
+    registry.register("sandbox.prepare_value", PrepareValueNode, config_schema={"offset": {"type": "number"}}, config_defaults={"offset": 0})
+    registry.register("sandbox.core_compute", CoreComputeNode, config_schema={"factor": {"type": "number"}}, config_defaults={"factor": 2})
+    registry.register("sandbox.route_decision", RouteDecisionNode, config_schema={"threshold": {"type": "number"}}, config_defaults={"threshold": 10})
+    registry.register("sandbox.loop_back", LoopBackNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.external_boost", ExternalBoostNode, config_schema={"bonus": {"type": "number"}}, config_defaults={"bonus": 5})
+    registry.register("sandbox.audit_store", AuditStoreNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.report_document", ReportDocumentNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.report_output", ReportOutputNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.report_end", ReportEndNode, config_schema={}, config_defaults={})
     return registry

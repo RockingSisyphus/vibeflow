@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from ..plugin import (
-    BoundaryPlugin,
     CompilerPlugin,
     PluginDescriptor,
     PluginRegistry,
@@ -11,7 +10,6 @@ from ..plugin import (
 )
 
 __all__ = [
-    "BoundaryPlugin",
     "CompilerPlugin",
     "PluginDescriptor",
     "PluginRegistry",

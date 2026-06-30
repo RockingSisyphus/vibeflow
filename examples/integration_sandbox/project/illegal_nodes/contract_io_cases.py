@@ -6,7 +6,7 @@ from topology_kernel import NodeContract, NodeInfo
 
 
 def _info(type_key):
-    return NodeInfo(type_key=type_key, display_name="Bad", category="bad", description="Bad contract I/O node.", version="0.1.0")
+    return NodeInfo(type_key=type_key, display_name="Bad", category="bad", description="Bad contract I/O node.", version="0.1.0", flow_kind="process")
 
 
 class DynamicOutputKeyNode:

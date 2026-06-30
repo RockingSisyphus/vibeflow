@@ -13,7 +13,15 @@
       "pipeline": {
         "inputs": ["value.in"],
         "nodes": [
-          {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 1}
+          {"name": "start", "type": "sandbox.start"},
+          {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
+          {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 1},
+          {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+        ],
+        "edges": [
+          {"from": "start", "to": "input"},
+          {"from": "input", "to": "add"},
+          {"from": "add", "to": "end"}
         ]
       }
     },
@@ -30,8 +38,17 @@
       "pipeline": {
         "inputs": ["value.in"],
         "nodes": [
+          {"name": "start", "type": "sandbox.start"},
+          {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
           {"name": "first", "type": "nodeset.math.add_one", "requires": ["value.in"], "provides": ["value.out"]},
-          {"name": "second", "type": "sandbox.add_out", "requires": ["value.out"], "provides": ["value.final"], "delta": 1}
+          {"name": "second", "type": "sandbox.add_out", "requires": ["value.out"], "provides": ["value.final"], "delta": 1},
+          {"name": "end", "type": "sandbox.final_value_end", "requires": ["value.final"]}
+        ],
+        "edges": [
+          {"from": "start", "to": "input"},
+          {"from": "input", "to": "first"},
+          {"from": "first", "to": "second"},
+          {"from": "second", "to": "end"}
         ]
       }
     }
@@ -39,6 +56,8 @@
   "pipeline": {
     "inputs": ["value.in"],
     "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
       {
         "name": "add_two",
         "type": "nodeset.math.add_two",
@@ -48,7 +67,13 @@
           "first.add": {"delta": 4},
           "second": {"delta": 6}
         }
-      }
+      },
+      {"name": "end", "type": "sandbox.final_value_end", "requires": ["value.final"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "input"},
+      {"from": "input", "to": "add_two"},
+      {"from": "add_two", "to": "end"}
     ]
   }
 }

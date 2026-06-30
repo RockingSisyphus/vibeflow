@@ -10,3 +10,4 @@ topology_kernel_distribution/
 *.egg-info/
 runs/
 *.log
+node_modules/

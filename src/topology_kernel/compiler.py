@@ -1,34 +1,31 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from graphlib import CycleError, TopologicalSorter
 from typing import Any
 
-from .graph_config import EdgeSpec, GraphConfig, LoopSpec, NodeSpec
+from .graph_config import EdgeSpec, GraphConfig, NodeSpec, STATUS_PLANNED
+from .node import FLOW_KIND_DECISION, FLOW_KIND_PREDEFINED
 from .plugin import PluginRegistry
 
 
 @dataclass(frozen=True)
 class CompiledGraph:
     order: tuple[str, ...]
-    acyclic_order: tuple[str, ...]
     explicit_edges: tuple[EdgeSpec, ...]
     data_edges: tuple[EdgeSpec, ...]
     effective_edges: tuple[EdgeSpec, ...]
-    loop_edges: tuple[EdgeSpec, ...]
-    loops: tuple[LoopSpec, ...]
-    loop_orders: dict[str, tuple[str, ...]]
-    edge_execution_limits: dict[tuple[str, str], int]
     providers: dict[str, str]
     consumers: dict[str, tuple[str, ...]]
+    flow_kinds: dict[str, str]
 
 
 @dataclass
 class GraphCompileError(ValueError):
     detail: str
+    rule_id: str = "GRAPH.COMPILE"
 
     def __str__(self) -> str:
-        return f"Graph compile error: {self.detail}"
+        return f"{self.rule_id}: Graph compile error: {self.detail}"
 
 
 class GraphCompiler:
@@ -45,28 +42,19 @@ class GraphCompiler:
         _validate_node_types(graph.nodes, registry=registry, nodesets=known_nodesets or set(graph.nodesets))
         providers = _collect_providers(graph.nodes)
         consumers = _collect_consumers(graph.nodes)
-        boundary_inputs = set(graph.boundary.provides) if graph.boundary else set()
-        data_edges = _derive_data_edges(graph.nodes, providers, available_inputs=set(graph.inputs) | boundary_inputs)
-        effective_edges = _merge_edges((*graph.edges, *data_edges), loops=graph.loops)
-        _validate_loop_until_keys(graph.loops, providers=providers, available_inputs=set(graph.inputs) | boundary_inputs)
-        _validate_all_cycles_declared(nodes_by_name.keys(), effective_edges, graph.loops)
-        loop_edges = tuple(edge for edge in effective_edges if edge.loop)
-        acyclic_edges = tuple(edge for edge in effective_edges if not edge.loop)
-        acyclic_order = _topological_order(nodes_by_name.keys(), acyclic_edges)
-        loop_orders = _derive_loop_orders(nodes_by_name.keys(), effective_edges, graph.loops)
-        edge_execution_limits = {edge.pair: edge.max_executions for edge in effective_edges}
+        data_edges = _derive_data_edges(graph.nodes, providers, available_inputs=set(graph.inputs))
+        effective_edges = _merge_edges(graph.edges)
+        flow_kinds = _node_flow_kinds(nodes_by_name, registry=registry)
+        _validate_routing_edge_conditions(graph.edges, flow_kinds=flow_kinds)
+        _validate_routed_cycles(nodes_by_name, graph.edges, registry=registry)
         compiled = CompiledGraph(
-            order=acyclic_order,
-            acyclic_order=acyclic_order,
+            order=tuple(node.name for node in graph.nodes),
             explicit_edges=graph.edges,
             data_edges=data_edges,
             effective_edges=effective_edges,
-            loop_edges=loop_edges,
-            loops=graph.loops,
-            loop_orders=loop_orders,
-            edge_execution_limits=edge_execution_limits,
             providers=providers,
             consumers=consumers,
+            flow_kinds=flow_kinds,
         )
         _call_compiler_plugins(plugin_registry, "after_compile", graph, compiled)
         return compiled
@@ -90,6 +78,8 @@ def _validate_node_types(nodes: tuple[NodeSpec, ...], *, registry: Any | None, n
     if registry is None:
         return
     for node in nodes:
+        if node.status == STATUS_PLANNED:
+            continue
         if node.node_type.startswith("nodeset."):
             nodeset_name = node.node_type.removeprefix("nodeset.")
             if nodeset_name not in nodesets:
@@ -104,6 +94,8 @@ def _validate_node_types(nodes: tuple[NodeSpec, ...], *, registry: Any | None, n
 def _collect_providers(nodes: tuple[NodeSpec, ...]) -> dict[str, str]:
     providers: dict[str, str] = {}
     for node in nodes:
+        if node.status == STATUS_PLANNED:
+            continue
         for key in node.provides:
             if key in providers:
                 raise GraphCompileError(f"key '{key}' provided by both '{providers[key]}' and '{node.name}'")
@@ -114,6 +106,8 @@ def _collect_providers(nodes: tuple[NodeSpec, ...]) -> dict[str, str]:
 def _collect_consumers(nodes: tuple[NodeSpec, ...]) -> dict[str, tuple[str, ...]]:
     consumers: dict[str, list[str]] = {}
     for node in nodes:
+        if node.status == STATUS_PLANNED:
+            continue
         for key in node.requires:
             consumers.setdefault(key, []).append(node.name)
     return {key: tuple(values) for key, values in consumers.items()}
@@ -132,70 +126,17 @@ def _derive_data_edges(
             if provider is None:
                 if key in available_inputs:
                     continue
-                raise GraphCompileError(f"node '{node.name}' requires missing key '{key}'")
+                continue
             if provider != node.name:
-                edges.append(EdgeSpec(source=provider, target=node.name, max_executions=1))
+                edges.append(EdgeSpec(source=provider, target=node.name))
     return tuple(edges)
 
 
-def _merge_edges(edges: tuple[EdgeSpec, ...], *, loops: tuple[LoopSpec, ...]) -> tuple[EdgeSpec, ...]:
-    loop_edge_names = _loop_edge_names(loops)
-    loop_edge_limits = _loop_edge_limits(loops)
-    loop_internal_limits = _loop_internal_limits(loops)
+def _merge_edges(edges: tuple[EdgeSpec, ...]) -> tuple[EdgeSpec, ...]:
     merged: dict[tuple[str, str], EdgeSpec] = {}
     for edge in edges:
-        _merge_edge_into(
-            merged,
-            _edge_with_loop_metadata(edge, loop_edge_names, loop_edge_limits, loop_internal_limits),
-        )
+        _merge_edge_into(merged, edge)
     return tuple(merged.values())
-
-
-def _loop_edge_names(loops: tuple[LoopSpec, ...]) -> dict[tuple[str, str], str]:
-    return {pair: loop.name for loop in loops for pair in loop.edges}
-
-
-def _loop_edge_limits(loops: tuple[LoopSpec, ...]) -> dict[tuple[str, str], int]:
-    return {pair: loop.max_iterations for loop in loops for pair in loop.edges}
-
-
-def _loop_internal_limits(loops: tuple[LoopSpec, ...]) -> dict[tuple[str, str], int]:
-    limits: dict[tuple[str, str], int] = {}
-    for loop in loops:
-        for pair in _loop_internal_pairs(loop):
-            limits[pair] = max(limits.get(pair, 1), loop.max_iterations + 1)
-    return limits
-
-
-def _loop_internal_pairs(loop: LoopSpec) -> tuple[tuple[str, str], ...]:
-    loop_nodes = tuple(loop.nodes) if loop.nodes else tuple({name for pair in loop.edges for name in pair})
-    return tuple((source, target) for source in loop_nodes for target in loop_nodes if source != target)
-
-
-def _edge_with_loop_metadata(
-    edge: EdgeSpec,
-    loop_edge_names: dict[tuple[str, str], str],
-    loop_edge_limits: dict[tuple[str, str], int],
-    loop_internal_limits: dict[tuple[str, str], int],
-) -> EdgeSpec:
-    pair = edge.pair
-    loop_name = edge.loop or loop_edge_names.get(pair, "")
-    limit = _effective_edge_limit(edge, loop_edge_limits, loop_internal_limits)
-    return EdgeSpec(edge.source, edge.target, limit, loop_name, edge.max_executions_declared)
-
-
-def _effective_edge_limit(
-    edge: EdgeSpec,
-    loop_edge_limits: dict[tuple[str, str], int],
-    loop_internal_limits: dict[tuple[str, str], int],
-) -> int:
-    if edge.max_executions_declared:
-        return edge.max_executions
-    if edge.pair in loop_edge_limits:
-        return loop_edge_limits[edge.pair]
-    if edge.pair in loop_internal_limits:
-        return loop_internal_limits[edge.pair]
-    return edge.max_executions
 
 
 def _merge_edge_into(merged: dict[tuple[str, str], EdgeSpec], edge: EdgeSpec) -> None:
@@ -203,140 +144,90 @@ def _merge_edge_into(merged: dict[tuple[str, str], EdgeSpec], edge: EdgeSpec) ->
     if existing is None:
         merged[edge.pair] = edge
         return
-    merged[edge.pair] = EdgeSpec(
-        edge.source,
-        edge.target,
-        max(existing.max_executions, edge.max_executions),
-        existing.loop or edge.loop,
-        existing.max_executions_declared or edge.max_executions_declared,
-    )
+    merged[edge.pair] = EdgeSpec(edge.source, edge.target, existing.when or edge.when)
 
 
-def _validate_loop_until_keys(
-    loops: tuple[LoopSpec, ...],
-    *,
-    providers: dict[str, str],
-    available_inputs: set[str],
-) -> None:
-    known_keys = set(providers) | available_inputs
-    for loop in loops:
-        if loop.until and loop.until not in known_keys:
-            raise GraphCompileError(f"loop '{loop.name}' until key is not resolvable: {loop.until}")
-
-
-def _validate_all_cycles_declared(
-    names: set[str] | list[str] | tuple[str, ...],
-    edges: tuple[EdgeSpec, ...],
-    loops: tuple[LoopSpec, ...],
-) -> None:
-    loop_pairs = _declared_loop_pairs(loops)
-    _validate_loop_declarations(loops)
-    _validate_loop_edge_metadata(edges, loop_pairs)
-    _validate_no_undeclared_cycles(names, edges, loop_pairs)
-    _validate_loop_edges_exist(loops, {edge.pair for edge in edges})
-
-
-def _declared_loop_pairs(loops: tuple[LoopSpec, ...]) -> set[tuple[str, str]]:
-    return {pair for loop in loops for pair in loop.edges}
-
-
-def _validate_loop_declarations(loops: tuple[LoopSpec, ...]) -> None:
-    loop_names: set[str] = set()
-    for loop in loops:
-        _validate_unique_loop_name(loop, loop_names)
-        _validate_loop_edge_endpoints(loop)
-
-
-def _validate_unique_loop_name(loop: LoopSpec, loop_names: set[str]) -> None:
-    if loop.name in loop_names:
-        raise GraphCompileError(f"duplicate loop name: {loop.name}")
-    loop_names.add(loop.name)
-
-
-def _validate_loop_edge_endpoints(loop: LoopSpec) -> None:
-    loop_node_set = set(loop.nodes)
-    edge_nodes = {name for pair in loop.edges for name in pair}
-    if loop_node_set and not edge_nodes <= loop_node_set:
-        missing = sorted(edge_nodes - loop_node_set)
-        raise GraphCompileError(f"loop '{loop.name}' nodes must include loop edge endpoints: {missing}")
-
-
-def _validate_loop_edge_metadata(edges: tuple[EdgeSpec, ...], loop_pairs: set[tuple[str, str]]) -> None:
+def _validate_routed_cycles(nodes_by_name: dict[str, NodeSpec], edges: tuple[EdgeSpec, ...], *, registry: Any | None) -> None:
+    if registry is None:
+        return
+    flow_kinds = _node_flow_kinds(nodes_by_name, registry=registry)
+    adjacency: dict[str, list[str]] = {name: [] for name in nodes_by_name}
     for edge in edges:
-        _validate_loop_edge_reference(edge, loop_pairs)
-        _validate_loop_edge_limit(edge)
+        adjacency.setdefault(edge.source, []).append(edge.target)
+    for component in _strongly_connected_components(adjacency):
+        if len(component) == 1:
+            node = component[0]
+            if node not in adjacency.get(node, ()):
+                continue
+        if not any(flow_kinds.get(node) == FLOW_KIND_DECISION for node in component):
+            raise GraphCompileError(
+                "cycle requires decision node: " + " -> ".join(sorted(component)),
+                "GRAPH.CYCLE.MISSING_ROUTER",
+            )
 
 
-def _validate_loop_edge_reference(edge: EdgeSpec, loop_pairs: set[tuple[str, str]]) -> None:
-    if edge.loop and edge.pair not in loop_pairs:
-        raise GraphCompileError(f"edge {edge.source}->{edge.target} declares unknown loop '{edge.loop}'")
-
-
-def _validate_loop_edge_limit(edge: EdgeSpec) -> None:
-    if edge.loop and edge.max_executions < 1:
-        raise GraphCompileError(f"loop edge {edge.source}->{edge.target} must have max_executions >= 1")
-
-
-def _validate_no_undeclared_cycles(
-    names: set[str] | list[str] | tuple[str, ...],
-    edges: tuple[EdgeSpec, ...],
-    loop_pairs: set[tuple[str, str]],
-) -> None:
-    try:
-        _topological_order(names, tuple(edge for edge in edges if edge.pair not in loop_pairs))
-    except GraphCompileError as exc:
-        raise GraphCompileError(f"undeclared cycle detected after removing declared loop edges: {exc.detail}") from exc
-
-
-def _validate_loop_edges_exist(loops: tuple[LoopSpec, ...], edge_pairs: set[tuple[str, str]]) -> None:
-    for loop in loops:
-        if not loop.edges:
-            raise GraphCompileError(f"loop '{loop.name}' must declare edges")
-        for pair in loop.edges:
-            if pair not in edge_pairs:
-                raise GraphCompileError(f"loop '{loop.name}' references missing edge {pair[0]}->{pair[1]}")
-
-
-def _derive_loop_orders(
-    names: set[str] | list[str] | tuple[str, ...],
-    edges: tuple[EdgeSpec, ...],
-    loops: tuple[LoopSpec, ...],
-) -> dict[str, tuple[str, ...]]:
-    all_names = {str(name) for name in names}
-    orders: dict[str, tuple[str, ...]] = {}
-    for loop in loops:
-        loop_pairs = set(loop.edges)
-        loop_nodes = tuple(loop.nodes) if loop.nodes else tuple(dict.fromkeys(name for pair in loop.edges for name in pair))
-        for node in loop_nodes:
-            if node not in all_names:
-                raise GraphCompileError(f"loop '{loop.name}' references unknown node: {node}")
-        loop_node_set = set(loop_nodes)
-        internal_acyclic_edges = tuple(
-            edge
-            for edge in edges
-            if edge.source in loop_node_set and edge.target in loop_node_set and edge.pair not in loop_pairs
-        )
-        orders[loop.name] = _topological_order(loop_nodes, internal_acyclic_edges)
-    return orders
-
-
-def _topological_order(names: set[str] | list[str] | tuple[str, ...], edges: tuple[EdgeSpec, ...]) -> tuple[str, ...]:
-    predecessors: dict[str, set[str]] = {str(name): set() for name in names}
+def _validate_routing_edge_conditions(edges: tuple[EdgeSpec, ...], *, flow_kinds: dict[str, str]) -> None:
+    if not flow_kinds:
+        return
     for edge in edges:
-        predecessors[edge.target].add(edge.source)
-    sorter = TopologicalSorter()
-    for name in sorted(predecessors):
-        sorter.add(name, *sorted(predecessors[name]))
-    try:
-        return tuple(sorter.static_order())
-    except CycleError as exc:
-        raise GraphCompileError("cycle detected: " + _format_cycle(exc)) from exc
+        if flow_kinds.get(edge.source) == FLOW_KIND_DECISION and not edge.when:
+            raise GraphCompileError(
+                f"edge {edge.source}->{edge.target} from routing node must declare when",
+                "GRAPH.DECISION.MISSING_EDGE_CONDITION",
+            )
 
 
-def _format_cycle(error: CycleError) -> str:
-    if len(error.args) >= 2 and isinstance(error.args[1], (list, tuple)):
-        cycle = [str(item) for item in error.args[1]]
-        if cycle and cycle[0] != cycle[-1]:
-            cycle.append(cycle[0])
-        return " -> ".join(cycle)
-    return "unknown"
+def _node_flow_kinds(nodes_by_name: dict[str, NodeSpec], *, registry: Any | None) -> dict[str, str]:
+    kinds: dict[str, str] = {}
+    for name, spec in nodes_by_name.items():
+        if spec.status == STATUS_PLANNED:
+            kinds[name] = spec.flow_kind
+            continue
+        if spec.node_type.startswith("nodeset."):
+            kinds[name] = FLOW_KIND_PREDEFINED
+            continue
+        if registry is None:
+            kinds[name] = ""
+            continue
+        node_cls = registry.get(spec.node_type)
+        info = getattr(node_cls, "NODE_INFO", None)
+        kinds[name] = str(getattr(info, "flow_kind", ""))
+    return kinds
+
+
+def _strongly_connected_components(adjacency: dict[str, list[str]]) -> list[tuple[str, ...]]:
+    index = 0
+    stack: list[str] = []
+    indices: dict[str, int] = {}
+    lowlinks: dict[str, int] = {}
+    on_stack: set[str] = set()
+    components: list[tuple[str, ...]] = []
+
+    def visit(node: str) -> None:
+        nonlocal index
+        indices[node] = index
+        lowlinks[node] = index
+        index += 1
+        stack.append(node)
+        on_stack.add(node)
+        for target in adjacency.get(node, ()):
+            if target not in indices:
+                visit(target)
+                lowlinks[node] = min(lowlinks[node], lowlinks[target])
+            elif target in on_stack:
+                lowlinks[node] = min(lowlinks[node], indices[target])
+        if lowlinks[node] != indices[node]:
+            return
+        component: list[str] = []
+        while True:
+            item = stack.pop()
+            on_stack.remove(item)
+            component.append(item)
+            if item == node:
+                break
+        components.append(tuple(component))
+
+    for node in sorted(adjacency):
+        if node not in indices:
+            visit(node)
+    return components

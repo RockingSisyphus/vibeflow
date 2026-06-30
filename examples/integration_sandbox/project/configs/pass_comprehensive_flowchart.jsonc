@@ -1,0 +1,56 @@
+{
+  "nodesets": [
+    {
+      "name": "comprehensive.core",
+      "display_name": "Comprehensive Core",
+      "category": "sandbox",
+      "description": "Predefined subflow used by the comprehensive flowchart case.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": ["value.prepared"],
+      "provides": ["value.out"],
+      "exports": ["value.out"],
+      "pipeline": {
+        "inputs": ["value.prepared"],
+        "nodes": [
+          {"name": "start", "type": "sandbox.start"},
+          {"name": "compute", "type": "sandbox.core_compute", "requires": ["value.prepared"], "provides": ["value.out"], "factor": 2},
+          {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+        ],
+        "edges": [
+          {"from": "start", "to": "compute"},
+          {"from": "compute", "to": "end"}
+        ]
+      }
+    }
+  ],
+  "pipeline": {
+    "inputs": ["value.in"],
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
+      {"name": "prepare", "type": "sandbox.prepare_value", "requires": ["value.in"], "provides": ["value.prepared"], "offset": 1},
+      {"name": "core", "type": "nodeset.comprehensive.core", "requires": ["value.prepared"], "provides": ["value.out"]},
+      {"name": "route", "type": "sandbox.route_decision", "requires": ["value.out"], "provides": ["flow.route"], "threshold": 10},
+      {"name": "loop_back", "type": "sandbox.loop_back", "requires": ["value.out"], "provides": ["value.in"]},
+      {"name": "external", "type": "sandbox.external_boost", "requires": ["value.out"], "provides": ["value.final"], "bonus": 5},
+      {"name": "store", "type": "sandbox.audit_store", "requires": ["value.final"], "provides": ["effects.request"]},
+      {"name": "document", "type": "sandbox.report_document", "requires": ["value.final", "effects.request"], "provides": ["document.report"]},
+      {"name": "output", "type": "sandbox.report_output", "requires": ["document.report"], "provides": ["io.output"]},
+      {"name": "end", "type": "sandbox.report_end", "requires": ["io.output"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "input"},
+      {"from": "input", "to": "prepare"},
+      {"from": "prepare", "to": "core"},
+      {"from": "core", "to": "route"},
+      {"from": "route", "to": "loop_back", "when": "flow.route == 'again'"},
+      {"from": "loop_back", "to": "prepare"},
+      {"from": "route", "to": "external", "when": "flow.route == 'external'"},
+      {"from": "external", "to": "store"},
+      {"from": "store", "to": "document"},
+      {"from": "document", "to": "output"},
+      {"from": "output", "to": "end"}
+    ]
+  }
+}

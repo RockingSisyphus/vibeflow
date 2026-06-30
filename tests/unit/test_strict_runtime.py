@@ -13,7 +13,7 @@ def test_checked_run_refuses_failed_health_before_runtime(tmp_path) -> None:
     assert any(error.rule_id == "NODE.TYPE.UNKNOWN" for error in result.health.errors)
     assert (result.run_dir / "health_report.json").exists()
     assert (result.run_dir / "effective_policy.json").exists()
-    assert (result.run_dir / "boundary_trace.jsonl").exists()
+    assert not (result.run_dir / "boundary_trace.jsonl").exists()
     health_payload = json.loads((result.run_dir / "health_report.json").read_text(encoding="utf-8"))
     assert health_payload["errors"][0]["failure_layer"] == "topology"
     assert health_payload["effective_policy"]["sources"] == ["kernel.default_policy"]
@@ -28,12 +28,7 @@ def test_node_registration_requires_config_spec() -> None:
 def test_node_config_defaults_and_call_overrides_are_passed_to_runtime() -> None:
     graph = parse_graph_config(
         {
-            "pipeline": {
-                "nodes": [
-                    {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
-                    {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"], "config": {"delta": 4}},
-                ]
-            }
+            "pipeline": _seed_add_pipeline(add={"config": {"delta": 4}})
         }
     )
     context = PipelineRuntime(graph, registry=_registry()).run({})
@@ -56,6 +51,32 @@ def test_node_config_invalid_override_fails_health_before_runtime() -> None:
     assert any(error.rule_id == "NODE.CONFIG.INVALID" for error in report.errors)
 
 
+def test_checked_run_refuses_planned_architecture(tmp_path) -> None:
+    config_path = tmp_path / "planned.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "nodesets": [{"name": "a", "status": "planned"}],
+                "pipeline": {
+                    "nodes": [
+                        {"name": "a", "type": "nodeset.a", "status": "planned", "flow_kind": "predefined"},
+                    ]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CheckedRunError) as exc_info:
+        run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="planned_run")
+
+    result = exc_info.value.result
+    assert result.health.status == "FAIL"
+    assert any(error.rule_id == "GRAPH.PLANNED.NODE_IN_RUN" for error in result.health.errors)
+    assert "planned" in (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
+    assert "PLANNED" in (result.run_dir / "graph.txt").read_text(encoding="utf-8")
+
+
 def test_nodeset_call_can_override_inner_node_config_independently() -> None:
     graph = parse_graph_config(
         {
@@ -67,24 +88,26 @@ def test_nodeset_call_can_override_inner_node_config_independently() -> None:
                     exports=["value.out"],
                     pipeline={
                         "inputs": ["value.in"],
-                        "nodes": [
-                            {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 1}
-                        ],
+                        **_input_add_pipeline(add={"delta": 1}),
                     },
                 )
             ],
             "pipeline": {
-                "inputs": ["value.in"],
-                "nodes": [
-                    {
-                        "name": "composite",
+                    "inputs": ["value.in"],
+                    "nodes": [
+                        {"name": "start", "type": "test.start"},
+                        {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
+                        {
+                            "name": "composite",
                         "type": "nodeset.math.add_one",
                         "requires": ["value.in"],
                         "provides": ["value.out"],
                         "node_configs": {"add": {"delta": 5}},
-                    }
-                ],
-            },
+                    },
+                        {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                    ],
+                    "edges": _edge_chain("start", "input", "composite", "end"),
+                },
         }
     )
     context = PipelineRuntime(graph, registry=_registry()).run({"value.in": 2})
@@ -94,7 +117,18 @@ def test_nodeset_call_can_override_inner_node_config_independently() -> None:
 def test_checked_run_writes_runtime_failure_trace(tmp_path) -> None:
     config_path = tmp_path / "runtime_fail.json"
     config_path.write_text(
-        json.dumps({"pipeline": {"nodes": [{"name": "nan", "type": "test.nan_output", "provides": ["value.out"]}]}}),
+        json.dumps(
+            {
+                "pipeline": {
+                    "nodes": [
+                        {"name": "start", "type": "test.start"},
+                        {"name": "nan", "type": "test.nan_output", "provides": ["value.out"]},
+                        {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                    ],
+                    "edges": _edge_chain("start", "nan", "end"),
+                }
+            }
+        ),
         encoding="utf-8",
     )
     with pytest.raises(PipelineRuntimeError, match="not JSON snapshot serializable"):
@@ -103,8 +137,8 @@ def test_checked_run_writes_runtime_failure_trace(tmp_path) -> None:
         json.loads(line)
         for line in (tmp_path / "runs" / "runtime_fail" / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()
     ]
-    assert trace_lines[0]["kind"] == "node_failed"
-    assert "not JSON snapshot serializable" in trace_lines[0]["failure"]
+    failed = next(line for line in trace_lines if line["kind"] == "node_failed")
+    assert "not JSON snapshot serializable" in failed["failure"]
     assert trace_lines[-1]["kind"] == "runtime_summary"
 
 def test_checked_run_trace_records_nodeset_enter_exit(tmp_path) -> None:
@@ -119,25 +153,27 @@ def test_checked_run_trace_records_nodeset_enter_exit(tmp_path) -> None:
                         provides=["value.out"],
                         exports=["value.out"],
                         pipeline={
-                            "inputs": ["value.in"],
-                            "nodes": [
-                                {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]}
-                            ],
-                        },
-                    )
-                ],
+                        "inputs": ["value.in"],
+                        **_input_add_pipeline(),
+                    },
+                )
+            ],
                 "pipeline": {
                     "inputs": ["value.in"],
                     "nodes": [
+                        {"name": "start", "type": "test.start"},
+                        {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
                         {
                             "name": "composite",
-                            "type": "nodeset.math.add_one",
-                            "requires": ["value.in"],
-                            "provides": ["value.out"],
-                        }
+                        "type": "nodeset.math.add_one",
+                        "requires": ["value.in"],
+                        "provides": ["value.out"],
+                    },
+                        {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
                     ],
+                    "edges": _edge_chain("start", "input", "composite", "end"),
                 },
-            }
+        }
         ),
         encoding="utf-8",
     )
@@ -185,12 +221,14 @@ def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, ca
 
     original = dict(getattr(GLOBAL_NODE_REGISTRY, "_registry"))
     original_config_specs = dict(getattr(GLOBAL_NODE_REGISTRY, "_config_specs"))
+    register_node(GLOBAL_NODE_REGISTRY, "test.start", StartNode, overwrite=True)
+    register_node(GLOBAL_NODE_REGISTRY, "test.in_end", InEndNode, overwrite=True)
     register_node(GLOBAL_NODE_REGISTRY, "test.seed", SeedNode, {"value": {"type": "number"}}, {"value": 1}, overwrite=True)
     try:
         config_path = tmp_path / "workflow.json"
         input_path = tmp_path / "input.json"
         config_path.write_text(
-            json.dumps({"pipeline": {"nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"], "value": 9}]}}),
+            json.dumps({"pipeline": _seed_only_pipeline(seed={"value": 9})}),
             encoding="utf-8",
         )
         input_path.write_text("{}", encoding="utf-8")
@@ -216,7 +254,7 @@ def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, ca
     assert code == 0
     assert payload["status"] in {"PASS", "CONCERNS"}
     run_dir = Path(payload["run_dir"])
-    for name in ("compiled_graph.json", "health_report.json", "graph.mmd", "runtime_trace.jsonl", "output_summary.json"):
+    for name in ("compiled_graph.json", "health_report.json", "graph.txt", "graph.mmd", "runtime_trace.jsonl", "output_summary.json"):
         assert (run_dir / name).exists()
 
 def test_policy_plugin_tightens_effective_policy_and_health_uses_it(tmp_path) -> None:
@@ -298,7 +336,7 @@ class Plugin:
                 "rules": {
                     "downgrades": [
                         {
-                            "rule_id": "GRAPH.OUTPUT.UNCONSUMED",
+                            "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
                             "to": "warning",
                             "scope": {"pipeline": "demo"},
                             "reason": "documented project preference",
@@ -309,7 +347,7 @@ class Plugin:
             },
             "relaxations": [
                 {
-                    "rule_id": "GRAPH.OUTPUT.UNCONSUMED",
+                    "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
                     "scope": {"pipeline": "demo"},
                     "reason": "documented project preference",
                     "source": "audited_relax_policy"
@@ -324,12 +362,7 @@ class Plugin:
         json.dumps(
             {
                 "plugins": [{"module": str(plugin_path), "type": "policy"}],
-                "pipeline": {
-                    "nodes": [
-                        {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
-                        {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
-                    ]
-                },
+                "pipeline": _seed_add_pipeline(),
             }
         ),
         encoding="utf-8",
@@ -388,7 +421,7 @@ def _write_policy_plugin_workflow(tmp_path: Path, *, filename: str, plugin_sourc
         json.dumps(
             {
                 "plugins": [{"module": str(plugin_path), "type": "policy"}],
-                "pipeline": {"nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"]}]},
+                "pipeline": _seed_only_pipeline(),
             }
         ),
         encoding="utf-8",
@@ -433,7 +466,7 @@ class Plugin:
         json.dumps(
             {
                 "plugins": [{"module": str(plugin_path), "type": "policy"}],
-                "pipeline": {"nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"]}]},
+                "pipeline": _seed_only_pipeline(),
             }
         ),
         encoding="utf-8",

@@ -3,7 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
-from .boundary import BoundarySpec
+from .node import FLOW_KINDS, FLOW_KIND_PREDEFINED
+
+STATUS_PLANNED = "planned"
+STATUS_IMPLEMENTED = "implemented"
+STATUSES = frozenset({STATUS_PLANNED, STATUS_IMPLEMENTED})
 
 
 @dataclass(frozen=True)
@@ -14,28 +18,19 @@ class NodeSpec:
     provides: tuple[str, ...] = ()
     params: dict[str, Any] = field(default_factory=dict)
     node_config_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
+    status: str = STATUS_IMPLEMENTED
+    flow_kind: str = ""
 
 
 @dataclass(frozen=True)
 class EdgeSpec:
     source: str
     target: str
-    max_executions: int = 1
-    loop: str = ""
-    max_executions_declared: bool = False
+    when: str = ""
 
     @property
     def pair(self) -> tuple[str, str]:
         return (self.source, self.target)
-
-
-@dataclass(frozen=True)
-class LoopSpec:
-    name: str
-    edges: tuple[tuple[str, str], ...]
-    max_iterations: int
-    nodes: tuple[str, ...] = ()
-    until: str = ""
 
 
 @dataclass(frozen=True)
@@ -50,16 +45,17 @@ class NodesetSpec:
     provides: tuple[str, ...]
     exports: tuple[str, ...]
     graph: "GraphConfig"
+    status: str = STATUS_IMPLEMENTED
+    flow_kind: str = FLOW_KIND_PREDEFINED
 
 
 @dataclass(frozen=True)
 class GraphConfig:
     nodes: tuple[NodeSpec, ...]
     edges: tuple[EdgeSpec, ...] = ()
-    loops: tuple[LoopSpec, ...] = ()
     nodesets: dict[str, NodesetSpec] = field(default_factory=dict)
     inputs: tuple[str, ...] = ()
-    boundary: BoundarySpec | None = None
+    max_steps: int = 1000
 
 
 @dataclass
@@ -74,6 +70,10 @@ def parse_graph_config(config: Mapping[str, Any]) -> GraphConfig:
     raw = config.get("pipeline", config)
     if not isinstance(raw, Mapping):
         raise GraphConfigError("pipeline config must be an object")
+    if "boundary" in config or "boundary" in raw:
+        raise GraphConfigError("boundary is removed; use terminal/io/data_store/document nodes")
+    if "loops" in raw:
+        raise GraphConfigError("pipeline.loops is removed; model cycles with decision routing")
 
     nodesets = _parse_nodesets(config.get("nodesets", raw.get("nodesets", [])))
     nodes_raw = raw.get("nodes")
@@ -84,30 +84,35 @@ def parse_graph_config(config: Mapping[str, Any]) -> GraphConfig:
     if len(names) != len(nodes):
         raise GraphConfigError("duplicate node name")
     edges = tuple(_parse_edge(item, index=index) for index, item in enumerate(raw.get("edges", [])))
-    loops = tuple(_parse_loop(item, index=index) for index, item in enumerate(raw.get("loops", [])))
     inputs = _as_tuple(raw.get("inputs", ()), field="pipeline.inputs")
+    max_steps = _parse_max_steps(raw.get("max_steps", 1000))
 
     for edge in edges:
         if edge.source not in names or edge.target not in names:
             raise GraphConfigError(f"edge references unknown node: {edge.source}->{edge.target}")
-    for loop in loops:
-        if loop.max_iterations < 1:
-            raise GraphConfigError(f"loop '{loop.name}' max_iterations must be >= 1")
-        for source, target in loop.edges:
-            if source not in names or target not in names:
-                raise GraphConfigError(f"loop '{loop.name}' references unknown edge node: {source}->{target}")
-    boundary = _parse_boundary(config.get("boundary"))
-    return GraphConfig(nodes=nodes, edges=edges, loops=loops, nodesets=nodesets, inputs=inputs, boundary=boundary)
+    return GraphConfig(nodes=nodes, edges=edges, nodesets=nodesets, inputs=inputs, max_steps=max_steps)
 
 
 def _parse_node(item: Any, *, index: int) -> NodeSpec:
     if not isinstance(item, Mapping):
         raise GraphConfigError(f"pipeline.nodes[{index}] must be an object")
     name = str(item.get("name", "")).strip()
+    status = _parse_status(item.get("status", STATUS_IMPLEMENTED), field=f"pipeline.nodes[{index}].status")
     node_type = str(item.get("type", item.get("registry_key", ""))).strip()
-    if not name or not node_type:
-        raise GraphConfigError(f"pipeline.nodes[{index}] requires name and type")
-    reserved = {"name", "type", "registry_key", "requires", "provides", "config", "node_configs"}
+    if not name:
+        raise GraphConfigError(f"pipeline.nodes[{index}] requires name")
+    if not node_type:
+        if status != STATUS_PLANNED:
+            raise GraphConfigError(f"pipeline.nodes[{index}] requires type")
+        node_type = f"planned.{name}"
+    flow_kind = str(item.get("flow_kind", "")).strip()
+    if status == STATUS_PLANNED and not flow_kind:
+        raise GraphConfigError(f"pipeline.nodes[{index}].flow_kind is required for planned nodes")
+    if flow_kind and flow_kind not in FLOW_KINDS:
+        raise GraphConfigError(f"pipeline.nodes[{index}].flow_kind must be one of {sorted(FLOW_KINDS)}")
+    if status == STATUS_IMPLEMENTED and flow_kind:
+        raise GraphConfigError(f"pipeline.nodes[{index}].flow_kind is only allowed for planned nodes")
+    reserved = {"name", "type", "registry_key", "requires", "provides", "config", "node_configs", "status", "flow_kind"}
     return NodeSpec(
         name=name,
         node_type=node_type,
@@ -115,61 +120,27 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         provides=_as_tuple(item.get("provides", ()), field=f"node[{name}].provides"),
         params=_parse_node_params(item, reserved=reserved, field=f"node[{name}].config"),
         node_config_overrides=_parse_node_config_overrides(item.get("node_configs", {}), field=f"node[{name}].node_configs"),
+        status=status,
+        flow_kind=flow_kind,
     )
 
 
 def _parse_edge(item: Any, *, index: int) -> EdgeSpec:
     if isinstance(item, (list, tuple)) and len(item) == 2:
-        return EdgeSpec(source=str(item[0]).strip(), target=str(item[1]).strip(), max_executions=1)
+        return EdgeSpec(source=str(item[0]).strip(), target=str(item[1]).strip())
     if not isinstance(item, Mapping):
         raise GraphConfigError(f"pipeline.edges[{index}] must be [from, to] or object")
     source = str(item.get("from", item.get("source", ""))).strip()
     target = str(item.get("to", item.get("target", ""))).strip()
     if not source or not target:
         raise GraphConfigError(f"pipeline.edges[{index}] requires from/to")
-    max_executions_declared = "max_executions" in item or "max" in item
-    max_value = item.get("max_executions", item.get("max", 1))
-    if isinstance(max_value, bool) or not isinstance(max_value, int):
-        raise GraphConfigError(f"pipeline.edges[{index}].max_executions must be an integer >= 1")
-    max_executions = max_value
-    if max_executions < 1:
-        raise GraphConfigError(f"pipeline.edges[{index}].max_executions must be >= 1")
-    return EdgeSpec(
-        source=source,
-        target=target,
-        max_executions=max_executions,
-        loop=str(item.get("loop", "")).strip(),
-        max_executions_declared=max_executions_declared,
-    )
-
-
-def _parse_loop(item: Any, *, index: int) -> LoopSpec:
-    if not isinstance(item, Mapping):
-        raise GraphConfigError(f"pipeline.loops[{index}] must be an object")
-    name = str(item.get("name", "")).strip()
-    if not name:
-        raise GraphConfigError(f"pipeline.loops[{index}] missing name")
-    edges_raw = item.get("edges", [])
-    if not isinstance(edges_raw, list) or not edges_raw:
-        raise GraphConfigError(f"loop '{name}' requires non-empty edges")
-    edges = []
-    for edge_index, edge in enumerate(edges_raw):
-        if not isinstance(edge, (list, tuple)) or len(edge) != 2:
-            raise GraphConfigError(f"loop '{name}'.edges[{edge_index}] must be [from, to]")
-        edges.append((str(edge[0]).strip(), str(edge[1]).strip()))
-    nodes = _as_tuple(item.get("nodes", ()), field=f"loop[{name}].nodes")
-    if "max_iterations" not in item and "max_executions" not in item:
-        raise GraphConfigError(f"loop '{name}' requires max_iterations or max_executions")
-    max_value = item.get("max_iterations", item.get("max_executions"))
-    if isinstance(max_value, bool) or not isinstance(max_value, int):
-        raise GraphConfigError(f"loop '{name}' max_iterations must be an integer >= 1")
-    return LoopSpec(
-        name=name,
-        edges=tuple(edges),
-        max_iterations=max_value,
-        nodes=nodes,
-        until=str(item.get("until", "")).strip(),
-    )
+    for field in ("max_executions", "max", "loop"):
+        if field in item:
+            raise GraphConfigError(f"pipeline.edges[{index}].{field} is removed; use when/max_steps")
+    when = str(item.get("when", "")).strip()
+    if when:
+        _validate_when_expression(when, field=f"pipeline.edges[{index}].when")
+    return EdgeSpec(source=source, target=target, when=when)
 
 
 def _parse_nodesets(value: Any) -> dict[str, NodesetSpec]:
@@ -186,10 +157,17 @@ def _parse_nodesets(value: Any) -> dict[str, NodesetSpec]:
             raise GraphConfigError(f"nodesets[{index}] missing name")
         if name in out:
             raise GraphConfigError(f"duplicate nodeset: {name}")
+        status = _parse_status(item.get("status", STATUS_IMPLEMENTED), field=f"nodesets[{index}].status")
+        flow_kind = str(item.get("flow_kind", FLOW_KIND_PREDEFINED)).strip() or FLOW_KIND_PREDEFINED
+        if flow_kind not in FLOW_KINDS:
+            raise GraphConfigError(f"nodesets[{index}].flow_kind must be one of {sorted(FLOW_KINDS)}")
         pipeline = item.get("pipeline")
-        if not isinstance(pipeline, Mapping):
+        if pipeline is None and status == STATUS_PLANNED:
+            graph = GraphConfig(nodes=())
+        elif not isinstance(pipeline, Mapping):
             raise GraphConfigError(f"nodeset '{name}' requires pipeline")
-        graph = parse_graph_config({"pipeline": pipeline, "nodesets": value[:index]})
+        else:
+            graph = parse_graph_config({"pipeline": pipeline, "nodesets": value[:index]})
         out[name] = NodesetSpec(
             name=name,
             display_name=str(item.get("display_name", name)),
@@ -201,28 +179,10 @@ def _parse_nodesets(value: Any) -> dict[str, NodesetSpec]:
             provides=_as_tuple(item.get("provides", ()), field=f"nodeset[{name}].provides"),
             exports=_as_tuple(item.get("exports", item.get("provides", ())), field=f"nodeset[{name}].exports"),
             graph=graph,
+            status=status,
+            flow_kind=flow_kind,
         )
     return out
-
-
-def _parse_boundary(value: Any) -> BoundarySpec | None:
-    if value is None:
-        return None
-    if not isinstance(value, Mapping):
-        raise GraphConfigError("boundary must be an object")
-    boundary_type = str(value.get("type", "")).strip()
-    if not boundary_type:
-        raise GraphConfigError("boundary.type must be a non-empty string")
-    config = value.get("config", {})
-    if not isinstance(config, Mapping):
-        raise GraphConfigError("boundary.config must be an object")
-    return BoundarySpec(
-        boundary_type=boundary_type,
-        config={str(key): item for key, item in config.items()},
-        consumes=_as_tuple(value.get("consumes", ()), field="boundary.consumes"),
-        provides=_as_tuple(value.get("provides", ()), field="boundary.provides"),
-        allowed_paths=_as_tuple(value.get("allowed_paths", ()), field="boundary.allowed_paths"),
-    )
 
 
 def _as_tuple(value: Any, *, field: str) -> tuple[str, ...]:
@@ -231,6 +191,33 @@ def _as_tuple(value: Any, *, field: str) -> tuple[str, ...]:
     if isinstance(value, str) or not isinstance(value, (list, tuple)):
         raise GraphConfigError(f"{field} must be a list")
     return tuple(str(item).strip() for item in value if str(item).strip())
+
+
+def _parse_max_steps(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise GraphConfigError("pipeline.max_steps must be an integer >= 1")
+    return value
+
+
+def _parse_status(value: Any, *, field: str) -> str:
+    status = str(value).strip()
+    if status not in STATUSES:
+        raise GraphConfigError(f"{field} must be 'planned' or 'implemented'")
+    return status
+
+
+def _validate_when_expression(value: str, *, field: str) -> None:
+    operators = [operator for operator in ("==", "!=") if operator in value]
+    if len(operators) != 1:
+        raise GraphConfigError(f"{field} must use == or !=")
+    left, right = (part.strip() for part in value.split(operators[0], 1))
+    if not left or not right:
+        raise GraphConfigError(f"{field} must compare a key to a literal")
+    if right in {"true", "false"}:
+        return
+    if len(right) >= 2 and right[0] == right[-1] and right[0] in {"'", '"'}:
+        return
+    raise GraphConfigError(f"{field} literal must be true, false, or quoted string")
 
 
 def _parse_node_params(item: Mapping[str, Any], *, reserved: set[str], field: str) -> dict[str, Any]:

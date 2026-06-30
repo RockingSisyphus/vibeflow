@@ -17,26 +17,32 @@
       "pipeline": {
         "inputs": ["value.in"],
         "nodes": [
+          {"name": "start", "type": "example.start"},
           {
             "name": "add_one",
             "type": "example.add",
             "requires": ["value.in"],
             "provides": ["value.out"],
             "delta": 1
-          }
-        ]
+          },
+          {"name": "end", "type": "example.end", "requires": ["value.out"]}
+        ],
+        "edges": [["start", "add_one"], ["add_one", "end"]]
       }
     }
   ],
   "pipeline": {
     "nodes": [
+      {"name": "start", "type": "example.start"},
       {"name": "seed", "type": "example.seed", "provides": ["value.in"], "value": 4},
       {
         "name": "add_one_flow",
         "type": "nodeset.example.add_one",
         "requires": ["value.in"],
         "provides": ["value.out"]
-      }
-    ]
+      },
+      {"name": "end", "type": "example.end", "requires": ["value.out"]}
+    ],
+    "edges": [["start", "seed"], ["seed", "add_one_flow"], ["add_one_flow", "end"]]
   }
 }

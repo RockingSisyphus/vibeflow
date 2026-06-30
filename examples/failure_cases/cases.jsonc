@@ -23,20 +23,21 @@
   ],
   "config_cases": [
     {
-      "name": "undeclared_loop",
-      "expected_rule_id": "GRAPH.COMPILE",
+      "name": "removed_loop_registration",
+      "expected_rule_id": "CONFIG.LOOPS.REMOVED",
       "config": {
         "pipeline": {
           "nodes": [
             {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
             {"name": "copy", "type": "test.copy", "requires": ["value.out"], "provides": ["value.in"]}
-          ]
+          ],
+          "loops": [{"name": "old", "edges": [["copy", "add"]], "max_iterations": 2}]
         }
       }
     },
     {
       "name": "illegal_boundary",
-      "expected_rule_id": "CONFIG.SCHEMA.BOUNDARY_CONSUMES_KEY",
+      "expected_rule_id": "CONFIG.BOUNDARY.REMOVED",
       "config": {
         "boundary": {"type": "bad.boundary", "consumes": ["value.out"], "provides": ["bad.result"]},
         "pipeline": {

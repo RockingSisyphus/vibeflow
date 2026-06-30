@@ -1,9 +1,17 @@
 {
   "pipeline": {
     "nodes": [
+      {"name": "start", "type": "sandbox.start"},
       {"name": "seed", "type": "sandbox.constant", "provides": ["value.in"], "value": 4},
       {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "config": {"delta": 3}},
-      {"name": "multiply", "type": "sandbox.multiply", "requires": ["value.out"], "provides": ["value.final"], "config": {"factor": 2}}
+      {"name": "multiply", "type": "sandbox.multiply", "requires": ["value.out"], "provides": ["value.final"], "config": {"factor": 2}},
+      {"name": "end", "type": "sandbox.final_value_end", "requires": ["value.final"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "seed"},
+      {"from": "seed", "to": "add"},
+      {"from": "add", "to": "multiply"},
+      {"from": "multiply", "to": "end"}
     ]
   }
 }

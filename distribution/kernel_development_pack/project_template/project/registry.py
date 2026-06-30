@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from topology_kernel import BoundaryRegistry, NodeRegistry
+from topology_kernel import NodeRegistry
 
-from boundaries import DemoBoundary
 from nodes.math_nodes import AddNode, SeedNode
 
 
@@ -21,10 +20,3 @@ def build_node_registry() -> NodeRegistry:
         config_defaults={"delta": 1},
     )
     return registry
-
-
-def build_boundary_registry() -> BoundaryRegistry:
-    registry = BoundaryRegistry()
-    registry.register("demo.boundary", DemoBoundary)
-    return registry
-

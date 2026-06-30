@@ -19,6 +19,7 @@ KERNEL_LINK = KERNEL_DIR / "topology_kernel"
 PROJECT_DIR = SANDBOX_DIR / "project"
 CONFIG_DIR = PROJECT_DIR / "configs"
 REPORT_DIR = SANDBOX_DIR / "reports"
+ASCII_DIR = REPORT_DIR / "ascii"
 MERMAID_DIR = REPORT_DIR / "mermaid"
 RUN_ROOT = SANDBOX_DIR / "runs"
 POLICY_PATH = PROJECT_DIR / "kernel_policy.jsonc"
@@ -27,12 +28,13 @@ POLICY_PATH = PROJECT_DIR / "kernel_policy.jsonc"
 VALID_RUN_CASES = [
     {"name": "linear", "config": "pass_linear.jsonc", "initial": {}, "expected_status": {"PASS", "CONCERNS"}, "expected_outputs": {"value.final": 14}},
     {"name": "free_nodes", "config": "pass_free_nodes.jsonc", "initial": {}, "expected_status": {"PASS", "CONCERNS"}},
-    {"name": "loop_max", "config": "pass_loop_max_iterations.jsonc", "initial": {"value.in": 0}, "expected_loop_stop": "max_iterations"},
-    {"name": "loop_until", "config": "pass_loop_until.jsonc", "initial": {"value.in": 0}, "expected_loop_stop": "until"},
+    {"name": "decision_cycle_short", "config": "pass_decision_cycle_short.jsonc", "initial": {"value.in": 0}},
+    {"name": "decision_cycle_long", "config": "pass_decision_cycle_long.jsonc", "initial": {"value.in": 0}},
     {"name": "nodeset_simple", "config": "pass_nodeset_simple.jsonc", "initial": {"value.in": 1}, "expected_outputs": {"value.out": 6}},
     {"name": "nodeset_nested", "config": "pass_nodeset_nested.jsonc", "initial": {"value.in": 1}, "expected_outputs": {"value.final": 11}},
-    {"name": "boundary", "config": "pass_boundary.jsonc", "initial": {"io.result": 20}},
+    {"name": "io_data_store", "config": "pass_io_data_store.jsonc", "initial": {"io.result": 20}},
     {"name": "plugins", "config": "pass_plugins.jsonc", "initial": {"io.result": 20}},
+    {"name": "comprehensive_flowchart", "config": "pass_comprehensive_flowchart.jsonc", "initial": {"value.in": 3}, "expected_outputs": {"io.output": "final=23;request=23"}},
 ]
 
 
@@ -89,10 +91,11 @@ INVALID_CASES = [
     {"kind": "base_lib_chain", "expect_length_gt": 4},
     {"kind": "config", "config": "fail_schema_bad_edge.jsonc", "expect": "CONFIG.SCHEMA.EDGE_PAIR"},
     {"kind": "run", "config": "fail_unknown_node.jsonc", "expect": "NODE.TYPE.UNKNOWN"},
-    {"kind": "config", "config": "fail_undeclared_loop.jsonc", "expect": "GRAPH.COMPILE"},
+    {"kind": "config", "config": "fail_removed_loop_registration.jsonc", "expect": "CONFIG.LOOPS.REMOVED"},
     {"kind": "run", "config": "fail_nodeset_key_leak.jsonc", "expect": "NODESET.INTERNAL_KEY_LEAK"},
     {"kind": "run", "config": "fail_nodeset_recursion.jsonc", "expect": "NODESET.RECURSION"},
-    {"kind": "config", "config": "fail_bad_boundary_keys.jsonc", "expect": "CONFIG.SCHEMA.BOUNDARY_CONSUMES_KEY"},
+    {"kind": "config", "config": "fail_removed_boundary.jsonc", "expect": "CONFIG.BOUNDARY.REMOVED"},
+    {"kind": "run", "config": "fail_planned_architecture_run.jsonc", "expect": "GRAPH.PLANNED.NODE_IN_RUN"},
     {"kind": "config", "config": "fail_plugin_load.jsonc", "expect": "PLUGIN.LOAD"},
     {"kind": "run", "config": "fail_plugin_unclosed_relaxation.jsonc", "expect": "PLUGIN.POLICY.RELAXATION_REQUIRED"},
     {"kind": "run", "config": "fail_plugin_execution.jsonc", "expect": "PLUGIN.EXECUTION"},
@@ -159,6 +162,7 @@ def _reset_outputs() -> None:
     for path in (REPORT_DIR, RUN_ROOT):
         if path.exists():
             shutil.rmtree(path)
+    ASCII_DIR.mkdir(parents=True, exist_ok=True)
     MERMAID_DIR.mkdir(parents=True, exist_ok=True)
     RUN_ROOT.mkdir(parents=True, exist_ok=True)
 
@@ -175,11 +179,11 @@ def _run_valid_cases() -> list[CaseResult]:
 
 
 def _run_valid_case(case: dict[str, Any]) -> CaseResult:
-    from topology_kernel import GraphCompiler, export_mermaid, load_config_document, parse_graph_config, resolve_effective_policy, run_checked, validate_graph_health
+    from topology_kernel import GraphCompiler, export_ascii_flowchart, export_mermaid, load_config_document, parse_graph_config, resolve_effective_policy, run_checked, validate_graph_health
     from topology_kernel.config_schema import collect_config_schema_findings
     from topology_kernel.plugin import load_plugins_from_config
 
-    from registry import build_boundary_registry, build_node_registry
+    from registry import build_node_registry
 
     name = str(case["name"])
     config_path = CONFIG_DIR / str(case["config"])
@@ -192,37 +196,36 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         raise AssertionError(f"plugin findings: {[finding.rule_id for finding in plugin_findings]}")
     policy_result = resolve_effective_policy(document.data, config_path=config_path, explicit_policy_path=POLICY_PATH, plugin_registry=plugin_registry)
     graph = parse_graph_config(document.data)
-    compiled = GraphCompiler().compile(graph, plugin_registry=plugin_registry)
+    node_registry = build_node_registry()
+    compiled = GraphCompiler().compile(graph, registry=node_registry, plugin_registry=plugin_registry)
     health = validate_graph_health(
         graph,
-        registry=build_node_registry(),
-        boundary_registry=build_boundary_registry(),
+        registry=node_registry,
         plugin_registry=plugin_registry,
         purity_policy=policy_result.effective_policy.to_purity_policy(),
     )
     allowed = set(case.get("expected_status", {"PASS", "CONCERNS"}))
     if health.status not in allowed:
         raise AssertionError(f"health status {health.status}, expected {sorted(allowed)}")
-    collapsed = export_mermaid(graph, compiled=compiled, health_report=health)
-    expanded = export_mermaid(graph, compiled=compiled, expand_nodesets=True, health_report=health)
+    collapsed = export_mermaid(graph, compiled=compiled, registry=node_registry, health_report=health)
+    expanded = export_mermaid(graph, compiled=compiled, registry=node_registry, expand_nodesets=True, health_report=health)
+    ascii_collapsed = export_ascii_flowchart(graph, compiled=compiled, registry=node_registry, health_report=health)
+    ascii_expanded = export_ascii_flowchart(graph, compiled=compiled, registry=node_registry, expand_nodesets=True, health_report=health)
     _assert_mermaid_contains(name, collapsed, expanded)
+    _assert_ascii_contains(name, ascii_collapsed, ascii_expanded)
+    (ASCII_DIR / f"{name}.txt").write_text(ascii_collapsed, encoding="utf-8")
+    (ASCII_DIR / f"{name}.expanded.txt").write_text(ascii_expanded, encoding="utf-8")
     (MERMAID_DIR / f"{name}.mmd").write_text(collapsed, encoding="utf-8")
     (MERMAID_DIR / f"{name}.expanded.mmd").write_text(expanded, encoding="utf-8")
     run_result = run_checked(
         config_path,
-        registry=build_node_registry(),
-        boundary_registry=build_boundary_registry(),
+        registry=node_registry,
         initial=case.get("initial", {}),
         policy_path=POLICY_PATH,
         run_root=RUN_ROOT,
         run_id=name,
     )
     _assert_artifacts(run_result.run_dir)
-    expected_loop_stop = case.get("expected_loop_stop")
-    if expected_loop_stop:
-        stop_reasons = run_result.context.get("runtime.loop_stop_reasons")
-        if expected_loop_stop not in set(stop_reasons.values()):
-            raise AssertionError(f"loop stop reasons {stop_reasons} do not include {expected_loop_stop}")
     for key, expected in dict(case.get("expected_outputs", {})).items():
         actual = run_result.context.get(str(key))
         if actual != expected:
@@ -237,19 +240,24 @@ def _assert_mermaid_contains(name: str, collapsed: str, expanded: str) -> None:
         raise AssertionError("expanded Mermaid missing flowchart TD")
     if "nodeset" in name and "subgraph" not in expanded:
         raise AssertionError("expanded nodeset Mermaid missing subgraph")
-    if "loop" in name and "%% loop" not in collapsed:
-        raise AssertionError("loop Mermaid missing loop comment")
-    if "boundary" in name and "__boundary__" not in collapsed:
-        raise AssertionError("boundary Mermaid missing boundary node")
+
+
+def _assert_ascii_contains(name: str, collapsed: str, expanded: str) -> None:
+    if "TOPOLOGY FLOWCHART" not in collapsed:
+        raise AssertionError("collapsed ASCII missing header")
+    if "Flow edges:" not in collapsed:
+        raise AssertionError("collapsed ASCII missing flow edges")
+    if "nodeset" in name and "nodeset " not in expanded:
+        raise AssertionError("expanded nodeset ASCII missing nodeset section")
 
 
 def _assert_artifacts(run_dir: Path) -> None:
     required = (
         "health_report.json",
         "compiled_graph.json",
+        "graph.txt",
         "graph.mmd",
         "runtime_trace.jsonl",
-        "boundary_trace.jsonl",
         "effective_policy.json",
         "input_summary.json",
         "output_summary.json",
@@ -322,13 +330,36 @@ def _inspect_invalid_node(case: dict[str, Any], kind: str) -> CaseResult:
 
 
 def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
-    from topology_kernel import GraphConfig, NodeSpec, PipelineRuntime
+    from topology_kernel import EdgeSpec, GraphConfig, NodeContract, NodeInfo, NodeSpec, PipelineRuntime
     from topology_kernel.registry import NodeRegistry
+
+    class RuntimeStartNode:
+        NODE_INFO = NodeInfo("sandbox.runtime_start", "Runtime Start", "sandbox", "runtime test start", "0.1.0", "terminal")
+        CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}, "outputs": {}},))
+
+        def run_pure(self, inputs, params):
+            return {}
+
+    class RuntimeEndNode:
+        NODE_INFO = NodeInfo("sandbox.runtime_end", "Runtime End", "sandbox", "runtime test end", "0.1.0", "terminal")
+        CONTRACT = NodeContract(requires=("bad.out",), input_semantics={"bad.out": ("bad output",)}, examples=({"inputs": {"bad.out": 1}, "params": {}, "outputs": {}},))
+
+        def run_pure(self, inputs, params):
+            return {}
 
     cls = _load_class(PROJECT_DIR / str(case["module"]), str(case["class"]))
     registry = NodeRegistry()
+    registry.register("sandbox.runtime_start", RuntimeStartNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.runtime_end", RuntimeEndNode, config_schema={}, config_defaults={})
     registry.register(str(case["type"]), cls, config_schema={}, config_defaults={})
-    graph = GraphConfig(nodes=(NodeSpec(name="bad", node_type=str(case["type"]), provides=("bad.out",)),))
+    graph = GraphConfig(
+        nodes=(
+            NodeSpec(name="start", node_type="sandbox.runtime_start"),
+            NodeSpec(name="bad", node_type=str(case["type"]), provides=("bad.out",)),
+            NodeSpec(name="end", node_type="sandbox.runtime_end", requires=("bad.out",)),
+        ),
+        edges=(EdgeSpec("start", "bad"), EdgeSpec("bad", "end")),
+    )
     try:
         PipelineRuntime(graph, registry=registry).run({})
     except Exception as exc:
@@ -388,14 +419,13 @@ def _invalid_config(case: dict[str, Any]) -> CaseResult:
 
 
 def _invalid_run(case: dict[str, Any]) -> CaseResult:
-    from registry import build_boundary_registry, build_node_registry
+    from registry import build_node_registry
     from topology_kernel import CheckedRunError, run_checked
 
     try:
         run_checked(
             CONFIG_DIR / str(case["config"]),
             registry=build_node_registry(),
-            boundary_registry=build_boundary_registry(),
             initial={"value.in": 0, "io.result": 1},
             policy_path=POLICY_PATH,
             run_root=RUN_ROOT,

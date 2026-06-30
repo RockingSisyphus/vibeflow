@@ -13,7 +13,15 @@
       "pipeline": {
         "inputs": ["value.in"],
         "nodes": [
-          {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 1}
+          {"name": "start", "type": "sandbox.start"},
+          {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
+          {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 1},
+          {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+        ],
+        "edges": [
+          {"from": "start", "to": "input"},
+          {"from": "input", "to": "add"},
+          {"from": "add", "to": "end"}
         ]
       }
     }
@@ -21,13 +29,21 @@
   "pipeline": {
     "inputs": ["value.in"],
     "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
       {
         "name": "add_one",
         "type": "nodeset.math.add_one",
         "requires": ["value.in"],
         "provides": ["value.out"],
         "node_configs": {"add": {"delta": 5}}
-      }
+      },
+      {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "input"},
+      {"from": "input", "to": "add_one"},
+      {"from": "add_one", "to": "end"}
     ]
   }
 }

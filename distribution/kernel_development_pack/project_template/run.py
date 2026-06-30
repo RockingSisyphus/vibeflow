@@ -15,6 +15,7 @@ from topology_kernel import (  # noqa: E402
     CheckedRunError,
     GraphCompiler,
     HealthReport,
+    export_ascii_flowchart,
     export_mermaid,
     load_config_document,
     load_plugins_from_config,
@@ -40,6 +41,9 @@ def main() -> int:
     mermaid = _add_config_command(sub, "mermaid")
     mermaid.add_argument("--output", required=False)
     mermaid.add_argument("--expand-nodesets", action="store_true")
+    ascii_chart = _add_config_command(sub, "ascii")
+    ascii_chart.add_argument("--output", required=False)
+    ascii_chart.add_argument("--expand-nodesets", action="store_true")
     inspect_node = sub.add_parser("inspect-node")
     inspect_node.add_argument("--type", required=True, dest="node_type")
     inspect_node.add_argument("--module", required=True)
@@ -63,6 +67,7 @@ def _dispatch(args) -> int:
         "validate": _validate,
         "inspect-config": _inspect_config,
         "run": _run,
+        "ascii": _ascii,
         "mermaid": _mermaid,
         "inspect-node": _inspect_node,
         "quality": _quality,
@@ -118,9 +123,18 @@ def _run(args) -> int:
 
 
 def _mermaid(args) -> int:
+    return _export_graph(args, exporter=export_mermaid)
+
+
+def _ascii(args) -> int:
+    return _export_graph(args, exporter=export_ascii_flowchart)
+
+
+def _export_graph(args, *, exporter) -> int:
     graph = _load_graph(args.config)
-    compiled = GraphCompiler().compile(graph, registry=build_node_registry())
-    text = export_mermaid(graph, compiled=compiled, expand_nodesets=bool(args.expand_nodesets))
+    registry = build_node_registry()
+    compiled = GraphCompiler().compile(graph, registry=registry)
+    text = exporter(graph, compiled=compiled, registry=registry, expand_nodesets=bool(args.expand_nodesets))
     if args.output:
         output = Path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)

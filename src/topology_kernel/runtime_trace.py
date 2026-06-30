@@ -7,19 +7,17 @@ from dataclasses import dataclass, field
 class RuntimeTrace:
     exec_order: list[str] = field(default_factory=list)
     edge_executions: dict[str, int] = field(default_factory=dict)
-    loop_iterations: dict[str, int] = field(default_factory=dict)
-    loop_stop_reasons: dict[str, str] = field(default_factory=dict)
-    loop_orders: dict[str, tuple[str, ...]] = field(default_factory=dict)
-    boundary_events: list[dict[str, object]] = field(default_factory=list)
+    step_count: int = 0
+    node_runs: dict[str, int] = field(default_factory=dict)
+    stop_reason: str = ""
     events: list[dict[str, object]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
         return {
             "exec_order": tuple(self.exec_order),
             "edge_executions": dict(self.edge_executions),
-            "loop_iterations": dict(self.loop_iterations),
-            "loop_stop_reasons": dict(self.loop_stop_reasons),
-            "loop_orders": {name: list(order) for name, order in self.loop_orders.items()},
-            "boundary_events": [dict(event) for event in self.boundary_events],
+            "step_count": self.step_count,
+            "node_runs": dict(self.node_runs),
+            "stop_reason": self.stop_reason,
             "events": [dict(event) for event in self.events],
         }

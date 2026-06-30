@@ -7,7 +7,7 @@ def test_cli_inspect_node_reports_unmatched_type(tmp_path, capsys) -> None:
 from topology_kernel import NodeContract, NodeInfo
 
 class DemoNode:
-    NODE_INFO = NodeInfo(type_key="demo.other", display_name="Other", category="demo", description="Other.", version="0.1.0")
+    NODE_INFO = NodeInfo(type_key="demo.other", display_name="Other", category="demo", description="Other.", version="0.1.0", flow_kind="process")
     CONTRACT = NodeContract(
         provides=("demo.out",),
         output_semantics={"demo.out": ("demo output",)},
@@ -94,13 +94,6 @@ class DemoNode:
         (
             _valid_node_source(run_body='        while True:\n            return {"demo.out": 1}'),
             "internal_loop",
-        ),
-        (
-            _valid_node_source().replace(
-                "from topology_kernel import NodeContract, NodeInfo",
-                "from topology_kernel import NodeContract, NodeInfo, GlobalBoundary",
-            ),
-            "boundary_import",
         ),
         (
             _valid_node_source(run_body='        return {"demo.out": 1}\n\n    def helper(self):\n        return 1'),
@@ -299,34 +292,60 @@ def test_graph_health_reports_node_call_chain_metrics() -> None:
     assert report.info["node_metrics"]["seed"]["call_chain_path"] == ["run_pure"]
 
 def test_runtime_rejects_non_json_snapshot_output() -> None:
-    registry = NodeRegistry()
+    registry = _registry()
     register_node(registry, "test.set_output", SetOutputNode)
-    graph = parse_graph_config({"pipeline": {"nodes": [{"name": "set_output", "type": "test.set_output", "provides": ["value.out"]}]}})
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "set_output", "type": "test.set_output", "provides": ["value.out"]},
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": _edge_chain("start", "set_output", "end"),
+            }
+        }
+    )
     with pytest.raises(PipelineRuntimeError, match="not JSON snapshot serializable"):
         PipelineRuntime(graph, registry=registry).run()
 
 def test_runtime_allows_explicit_opaque_snapshot_output() -> None:
-    registry = NodeRegistry()
+    registry = _registry()
     register_node(registry, "test.opaque_output", OpaqueOutputNode)
-    graph = parse_graph_config({"pipeline": {"nodes": [{"name": "opaque", "type": "test.opaque_output", "provides": ["value.out"]}]}})
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "opaque", "type": "test.opaque_output", "provides": ["value.out"]},
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": _edge_chain("start", "opaque", "end"),
+            }
+        }
+    )
     context = PipelineRuntime(graph, registry=registry).run()
     assert context.get("value.out") == {1, 2}
 
 def test_runtime_rejects_input_mutation() -> None:
-    registry = NodeRegistry()
+    registry = _registry()
     register_node(registry, "test.mutating_input", MutatingInputNode)
     graph = parse_graph_config(
         {
             "pipeline": {
                 "inputs": ["value.in"],
                 "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
                     {
                         "name": "mutate",
                         "type": "test.mutating_input",
                         "requires": ["value.in"],
                         "provides": ["value.out"],
-                    }
+                    },
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
                 ],
+                "edges": _edge_chain("start", "input", "mutate", "end"),
             }
         }
     )

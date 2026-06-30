@@ -3,7 +3,10 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from .health_types import HealthFinding
+from .node import FLOW_KINDS
 from .schema_findings import schema_finding
+
+STATUSES = {"planned", "implemented"}
 
 
 def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFinding, ...]:
@@ -18,7 +21,7 @@ def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFin
     if "nodeset_imports" in config:
         _validate_nodeset_imports(config["nodeset_imports"], findings)
     if "boundary" in config:
-        _validate_boundary(config["boundary"], findings)
+        findings.append(_error("CONFIG.BOUNDARY.REMOVED", "boundary is removed; use terminal/io/data_store/document nodes", "boundary"))
     if "plugins" in config:
         _validate_plugins(config["plugins"], findings)
     if "policy" in config:
@@ -56,12 +59,9 @@ def _validate_pipeline(value: Mapping[str, Any], prefix: str, findings: list[Hea
                 _validate_edge(edge, f"{prefix}.edges[{index}]", findings)
 
     if "loops" in value:
-        loops = value["loops"]
-        if not isinstance(loops, list):
-            findings.append(_error("CONFIG.SCHEMA.LOOPS_LIST", f"{prefix}.loops must be a list", f"{prefix}.loops"))
-        else:
-            for index, loop in enumerate(loops):
-                _validate_loop(loop, f"{prefix}.loops[{index}]", findings)
+        findings.append(_error("CONFIG.LOOPS.REMOVED", f"{prefix}.loops is removed; use decision routed cycles", f"{prefix}.loops"))
+    if "max_steps" in value:
+        _validate_positive_int(value["max_steps"], f"{prefix}.max_steps", findings, "CONFIG.SCHEMA.MAX_STEPS")
 
 
 def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> None:
@@ -70,7 +70,16 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
         return
     if not _non_empty_string(value.get("name")):
         findings.append(_error("CONFIG.SCHEMA.NODE_MISSING_NAME", f"{prefix}.name must be a non-empty string", f"{prefix}.name"))
-    if not (_non_empty_string(value.get("type")) or _non_empty_string(value.get("registry_key"))):
+    status = str(value.get("status", "implemented")).strip()
+    if status not in STATUSES:
+        findings.append(_error("GRAPH.PLANNED.STATUS_INVALID", f"{prefix}.status must be planned or implemented", f"{prefix}.status"))
+    if status == "planned" and not _non_empty_string(value.get("flow_kind")):
+        findings.append(_error("GRAPH.PLANNED.MISSING_FLOW_KIND", f"{prefix}.flow_kind is required for planned nodes", f"{prefix}.flow_kind"))
+    if _non_empty_string(value.get("flow_kind")) and value.get("flow_kind") not in FLOW_KINDS:
+        findings.append(_error("NODE.FLOW_KIND.INVALID", f"{prefix}.flow_kind must be one of {sorted(FLOW_KINDS)}", f"{prefix}.flow_kind"))
+    if status == "implemented" and _non_empty_string(value.get("flow_kind")):
+        findings.append(_error("GRAPH.PLANNED.IMPLEMENTED_HAS_CONFIG_FLOW_KIND", f"{prefix}.flow_kind is only allowed for planned nodes", f"{prefix}.flow_kind"))
+    if status != "planned" and not (_non_empty_string(value.get("type")) or _non_empty_string(value.get("registry_key"))):
         findings.append(
             _error(
                 "CONFIG.SCHEMA.NODE_MISSING_TYPE",
@@ -100,39 +109,13 @@ def _validate_edge(value: Any, prefix: str, findings: list[HealthFinding]) -> No
     if not (_non_empty_string(value.get("to")) or _non_empty_string(value.get("target"))):
         findings.append(_error("CONFIG.SCHEMA.EDGE_TO", f"{prefix}.to must be a non-empty string", f"{prefix}.to"))
     if "max_executions" in value:
-        _validate_positive_int(value["max_executions"], f"{prefix}.max_executions", findings, "CONFIG.SCHEMA.EDGE_MAX_EXECUTIONS")
-
-
-def _validate_loop(value: Any, prefix: str, findings: list[HealthFinding]) -> None:
-    if not isinstance(value, Mapping):
-        findings.append(_error("CONFIG.SCHEMA.LOOP_OBJECT", f"{prefix} must be an object", prefix))
-        return
-    if not _non_empty_string(value.get("name")):
-        findings.append(_error("CONFIG.SCHEMA.LOOP_MISSING_NAME", f"{prefix}.name must be a non-empty string", f"{prefix}.name"))
-    edges = value.get("edges")
-    if not isinstance(edges, list) or not edges:
-        findings.append(_error("CONFIG.SCHEMA.LOOP_EDGES", f"{prefix}.edges must be a non-empty list", f"{prefix}.edges"))
-    else:
-        for index, edge in enumerate(edges):
-            if not (isinstance(edge, list) and len(edge) == 2 and all(_non_empty_string(item) for item in edge)):
-                findings.append(
-                    _error(
-                        "CONFIG.SCHEMA.LOOP_EDGE_PAIR",
-                        f"{prefix}.edges[{index}] must be [from, to] with non-empty strings",
-                        f"{prefix}.edges[{index}]",
-                    )
-                )
-    if "max_iterations" not in value and "max_executions" not in value:
-        findings.append(
-            _error(
-                "CONFIG.SCHEMA.LOOP_MAX_ITERATIONS",
-                f"{prefix} must define max_iterations or max_executions",
-                f"{prefix}.max_iterations",
-            )
-        )
-    for field in ("max_iterations", "max_executions"):
-        if field in value:
-            _validate_positive_int(value[field], f"{prefix}.{field}", findings, "CONFIG.SCHEMA.LOOP_MAX_ITERATIONS")
+        findings.append(_error("CONFIG.LOOP_LIMITS.REMOVED", f"{prefix}.max_executions is removed; use pipeline.max_steps", f"{prefix}.max_executions"))
+    if "max" in value:
+        findings.append(_error("CONFIG.LOOP_LIMITS.REMOVED", f"{prefix}.max is removed; use pipeline.max_steps", f"{prefix}.max"))
+    if "loop" in value:
+        findings.append(_error("CONFIG.LOOPS.REMOVED", f"{prefix}.loop is removed; use edge.when", f"{prefix}.loop"))
+    if "when" in value and not isinstance(value["when"], str):
+        findings.append(_error("CONFIG.SCHEMA.EDGE_WHEN", f"{prefix}.when must be a string", f"{prefix}.when"))
 
 
 def _validate_nodesets(value: Any, findings: list[HealthFinding]) -> None:
@@ -146,8 +129,14 @@ def _validate_nodesets(value: Any, findings: list[HealthFinding]) -> None:
             continue
         if not _non_empty_string(item.get("name")):
             findings.append(_error("CONFIG.SCHEMA.NODESET_MISSING_NAME", f"{prefix}.name must be a non-empty string", f"{prefix}.name"))
+        status = str(item.get("status", "implemented")).strip()
+        if status not in STATUSES:
+            findings.append(_error("GRAPH.PLANNED.STATUS_INVALID", f"{prefix}.status must be planned or implemented", f"{prefix}.status"))
+        flow_kind = str(item.get("flow_kind", "predefined")).strip() or "predefined"
+        if flow_kind not in FLOW_KINDS:
+            findings.append(_error("NODE.FLOW_KIND.INVALID", f"{prefix}.flow_kind must be one of {sorted(FLOW_KINDS)}", f"{prefix}.flow_kind"))
         for field in ("display_name", "category", "description", "version", "purity"):
-            if not _non_empty_string(item.get(field)):
+            if status != "planned" and not _non_empty_string(item.get(field)):
                 findings.append(
                     _error(
                         "CONFIG.SCHEMA.NODESET_METADATA",
@@ -158,7 +147,7 @@ def _validate_nodesets(value: Any, findings: list[HealthFinding]) -> None:
         if item.get("purity") not in {None, "pure"}:
             findings.append(_error("CONFIG.SCHEMA.NODESET_PURITY", f"{prefix}.purity must be 'pure'", f"{prefix}.purity"))
         for required_field in ("requires", "provides", "exports"):
-            if required_field not in item:
+            if status != "planned" and required_field not in item:
                 findings.append(
                     _error(
                         "CONFIG.SCHEMA.NODESET_CONTRACT",
@@ -167,7 +156,9 @@ def _validate_nodesets(value: Any, findings: list[HealthFinding]) -> None:
                     )
                 )
         pipeline = item.get("pipeline")
-        if not isinstance(pipeline, Mapping):
+        if pipeline is None and status == "planned":
+            pass
+        elif not isinstance(pipeline, Mapping):
             findings.append(_error("CONFIG.SCHEMA.NODESET_PIPELINE", f"{prefix}.pipeline must be an object", f"{prefix}.pipeline"))
         else:
             _validate_pipeline(pipeline, f"{prefix}.pipeline", findings)
@@ -193,45 +184,6 @@ def _validate_nodeset_imports(value: Any, findings: list[HealthFinding]) -> None
             findings.append(_error("CONFIG.SCHEMA.NODESET_IMPORT_PATH", f"{prefix}.path must be a non-empty string", f"{prefix}.path"))
         if "names" in item:
             _validate_string_list(item["names"], f"{prefix}.names", findings, "CONFIG.SCHEMA.NODESET_IMPORT_NAMES")
-
-
-def _validate_boundary(value: Any, findings: list[HealthFinding]) -> None:
-    if not isinstance(value, Mapping):
-        findings.append(_error("CONFIG.SCHEMA.BOUNDARY_OBJECT", "boundary must be an object", "boundary"))
-        return
-    _validate_boundary_shape(value, findings)
-    _validate_boundary_key_prefixes(value, findings)
-
-
-def _validate_boundary_shape(value: Mapping[str, Any], findings: list[HealthFinding]) -> None:
-    if not _non_empty_string(value.get("type")):
-        findings.append(_error("CONFIG.SCHEMA.BOUNDARY_TYPE", "boundary.type must be a non-empty string", "boundary.type"))
-    if "config" in value and not isinstance(value["config"], Mapping):
-        findings.append(_error("CONFIG.SCHEMA.BOUNDARY_CONFIG", "boundary.config must be an object", "boundary.config"))
-    for field in ("consumes", "provides", "allowed_paths"):
-        if field in value:
-            _validate_string_list(value[field], f"boundary.{field}", findings, "CONFIG.SCHEMA.BOUNDARY_STRING_LIST")
-
-
-def _validate_boundary_key_prefixes(value: Mapping[str, Any], findings: list[HealthFinding]) -> None:
-    for index, key in enumerate(_list_or_empty(value.get("consumes", []))):
-        if isinstance(key, str) and not (key.startswith("effects.") or key.startswith("outbox.")):
-            findings.append(
-                _error(
-                    "CONFIG.SCHEMA.BOUNDARY_CONSUMES_KEY",
-                    "boundary.consumes keys must start with effects. or outbox.",
-                    f"boundary.consumes[{index}]",
-                )
-            )
-    for index, key in enumerate(_list_or_empty(value.get("provides", []))):
-        if isinstance(key, str) and not key.startswith("io."):
-            findings.append(
-                _error(
-                    "CONFIG.SCHEMA.BOUNDARY_PROVIDES_KEY",
-                    "boundary.provides keys must start with io.",
-                    f"boundary.provides[{index}]",
-                )
-            )
 
 
 def _validate_policy(value: Any, prefix: str, findings: list[HealthFinding], *, rule_source: str) -> None:
@@ -315,8 +267,10 @@ def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
             findings.append(_error("CONFIG.SCHEMA.PLUGIN_MODULE", f"{prefix}.module or path must be a non-empty string", f"{prefix}.module"))
         if "class" in item and not _non_empty_string(item["class"]):
             findings.append(_error("CONFIG.SCHEMA.PLUGIN_CLASS", f"{prefix}.class must be a non-empty string", f"{prefix}.class"))
-        if item.get("type", "policy") not in {"policy", "compiler", "runtime", "boundary"}:
-            findings.append(_error("CONFIG.SCHEMA.PLUGIN_TYPE", f"{prefix}.type must be policy, compiler, runtime, or boundary", f"{prefix}.type"))
+        if item.get("type", "policy") == "boundary":
+            findings.append(_error("CONFIG.BOUNDARY.REMOVED", f"{prefix}.type boundary is removed; use runtime plugins", f"{prefix}.type"))
+        elif item.get("type", "policy") not in {"policy", "compiler", "runtime"}:
+            findings.append(_error("CONFIG.SCHEMA.PLUGIN_TYPE", f"{prefix}.type must be policy, compiler, or runtime", f"{prefix}.type"))
         if "priority" in item:
             _validate_positive_int(item["priority"], f"{prefix}.priority", findings, "CONFIG.SCHEMA.PLUGIN_PRIORITY")
         if item.get("conflict", "error") not in {"error", "replace"}:
@@ -386,10 +340,6 @@ def _validate_positive_int(
 
 def _non_empty_string(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
-
-
-def _list_or_empty(value: Any) -> list[Any]:
-    return value if isinstance(value, list) else []
 
 
 def _error(

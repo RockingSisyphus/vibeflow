@@ -5,7 +5,7 @@ import json
 from copy import deepcopy
 from typing import Mapping
 
-from .node import NodeContract, NodeInfo, PureNode
+from .node import FLOW_KIND_DECISION, FLOW_KINDS, NodeContract, NodeInfo, PureNode
 from .purity_helpers import (
     _looks_structured_key,
     _looks_temporary_key,
@@ -23,9 +23,13 @@ def _validate_node_info(info: object, *, expected_type: str | None, source: _Sou
     if not isinstance(info, NodeInfo):
         return [_violation("missing_node_info", "node must define NODE_INFO: NodeInfo", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
     violations: list[PurityViolation] = []
-    for field_name in ("type_key", "display_name", "category", "description", "version", "purity"):
+    for field_name in ("type_key", "display_name", "category", "description", "version", "flow_kind", "purity"):
         if not _non_empty_string(getattr(info, field_name, None)):
             violations.append(_violation(f"node_info_{field_name}", f"NODE_INFO.{field_name} must be a non-empty string", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
+    if _non_empty_string(getattr(info, "flow_kind", None)) and info.flow_kind not in FLOW_KINDS:
+        violations.append(_violation("node_flow_kind_invalid", f"NODE_INFO.flow_kind must be one of {sorted(FLOW_KINDS)}", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
+    if not isinstance(getattr(info, "external", False), bool):
+        violations.append(_violation("node_external_invalid", "NODE_INFO.external must be a boolean", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
     if info.purity != "pure":
         violations.append(_violation("non_pure_node", "NODE_INFO.purity must be 'pure'", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
     if expected_type and info.type_key != expected_type:
@@ -47,6 +51,28 @@ def _validate_contract(contract: object, *, source: _SourceInfo) -> list[PurityV
     violations.extend(_validate_schema_mapping(contract.output_schema, provides, "CONTRACT.output_schema", source=source, require_all=bool(provides)))
     violations.extend(_validate_contract_examples_shape(contract.examples, source=source))
     return violations
+
+
+def _validate_flow_kind_contract(info: NodeInfo, contract: NodeContract, *, source: _SourceInfo) -> list[PurityViolation]:
+    if info.flow_kind != FLOW_KIND_DECISION:
+        return []
+    route_keys = tuple(key for key in contract.provides if _looks_route_key(key))
+    if route_keys:
+        return []
+    return [
+        _violation(
+            "node_decision_missing_route_output",
+            "decision nodes must provide a route/decision/branch output key",
+            source=source,
+            failure_layer="contract",
+            suggested_fix_type="fix_contract",
+        )
+    ]
+
+
+def _looks_route_key(key: str) -> bool:
+    leaf = key.rsplit(".", 1)[-1].rsplit("_", 1)[-1]
+    return leaf in {"route", "decision", "branch", "selected", "done", "should_retry"} or key.endswith("selected_branch")
 
 
 def _validate_interface(node_cls: type[PureNode], *, source: _SourceInfo) -> list[PurityViolation]:

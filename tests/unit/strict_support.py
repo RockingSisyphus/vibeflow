@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from topology_kernel import (
-    BoundaryRegistry,
     ConfigLoadError,
     GraphCompileError,
     GraphCompiler,
@@ -24,6 +23,7 @@ from topology_kernel import (
     PluginRegistry,
     STABLE_PUBLIC_API,
     schema_text,
+    export_ascii_flowchart,
     export_mermaid,
     load_config_document,
     parse_graph_config,
@@ -32,6 +32,7 @@ from topology_kernel import (
     scan_base_lib,
     validate_graph_health,
 )
+from topology_kernel.graph_config import GraphConfigError
 from topology_kernel.config_schema import collect_config_schema_findings
 from topology_kernel.devtools import QualityThresholds, scan_code_quality
 from topology_kernel.purity_types import PurityPolicy
@@ -59,6 +60,50 @@ def register_node(registry: NodeRegistry, key: str, node_cls: type, schema: dict
     registry.register(key, node_cls, config_schema=schema or {}, config_defaults=defaults or {}, **kwargs)
 
 
+class StartNode:
+    NODE_INFO = NodeInfo("test.start", "Start", "test", "Starts a test flow.", "0.1.0", "terminal")
+    CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}, "outputs": {}},))
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
+class ValueInputNode:
+    NODE_INFO = NodeInfo("test.value_input", "Value Input", "test", "Reads value.in.", "0.1.0", "io")
+    CONTRACT = NodeContract(
+        requires=("value.in",),
+        input_semantics={"value.in": ("input value",)},
+        examples=({"inputs": {"value.in": 1}, "params": {}, "outputs": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
+class OutEndNode:
+    NODE_INFO = NodeInfo("test.out_end", "Out End", "test", "Ends after value.out.", "0.1.0", "terminal")
+    CONTRACT = NodeContract(
+        requires=("value.out",),
+        input_semantics={"value.out": ("output value",)},
+        examples=({"inputs": {"value.out": 1}, "params": {}, "outputs": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
+class InEndNode:
+    NODE_INFO = NodeInfo("test.in_end", "In End", "test", "Ends after value.in.", "0.1.0", "terminal")
+    CONTRACT = NodeContract(
+        requires=("value.in",),
+        input_semantics={"value.in": ("input value",)},
+        examples=({"inputs": {"value.in": 1}, "params": {}, "outputs": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
 class SeedNode:
     NODE_INFO = NodeInfo(
         type_key="test.seed",
@@ -66,6 +111,7 @@ class SeedNode:
         category="test",
         description="Produces a seed value.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         provides=("value.in",),
@@ -86,6 +132,7 @@ class AddNode:
         category="test",
         description="Adds delta to input.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         requires=("value.in",),
@@ -108,6 +155,7 @@ class CopyNode:
         category="test",
         description="Copies a value.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         requires=("value.out",),
@@ -129,6 +177,7 @@ class BadIoNode:
         category="test",
         description="Illegally performs IO.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         provides=("value.out",),
@@ -148,6 +197,7 @@ class NanOutputNode:
         category="test",
         description="Returns a runtime-invalid JSON value.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         provides=("value.out",),
@@ -166,6 +216,7 @@ class EffectRequestNode:
         category="test",
         description="Emits a structured effect request.",
         version="0.1.0",
+        flow_kind="data_store",
     )
     CONTRACT = NodeContract(
         requires=("value.in",),
@@ -181,6 +232,10 @@ class EffectRequestNode:
 
 def _registry() -> NodeRegistry:
     registry = NodeRegistry()
+    register_node(registry, "test.start", StartNode)
+    register_node(registry, "test.value_input", ValueInputNode)
+    register_node(registry, "test.out_end", OutEndNode)
+    register_node(registry, "test.in_end", InEndNode)
     register_node(registry, "test.seed", SeedNode, {"value": {"type": "number"}}, {"value": 1})
     register_node(registry, "test.add", AddNode, {"delta": {"type": "number"}}, {"delta": 1})
     register_node(registry, "test.copy", CopyNode)
@@ -208,6 +263,51 @@ def _nodeset_config(
         "provides": provides or ["value.out"],
         "exports": exports or ["value.out"],
         "pipeline": pipeline,
+    }
+
+
+def _edge_chain(*names: str) -> list[dict[str, str]]:
+    return [{"from": source, "to": target} for source, target in zip(names, names[1:])]
+
+
+def _seed_add_pipeline(*, seed: dict | None = None, add: dict | None = None) -> dict:
+    seed_node = {"name": "seed", "type": "test.seed", "provides": ["value.in"], **(seed or {})}
+    add_node = {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"], **(add or {})}
+    return {
+        "nodes": [
+            {"name": "start", "type": "test.start"},
+            seed_node,
+            add_node,
+            {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+        ],
+        "edges": _edge_chain("start", "seed", "add", "end"),
+    }
+
+
+def _seed_only_pipeline(*, seed: dict | None = None) -> dict:
+    seed_node = {"name": "seed", "type": "test.seed", "provides": ["value.in"], **(seed or {})}
+    return {
+        "nodes": [
+            {"name": "start", "type": "test.start"},
+            seed_node,
+            {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+        ],
+        "edges": _edge_chain("start", "seed", "end"),
+    }
+
+
+def _input_add_pipeline(*, add: dict | None = None) -> dict:
+    add_node = {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"], **(add or {})}
+    add_name = str(add_node["name"])
+    return {
+        "inputs": ["value.in"],
+        "nodes": [
+            {"name": "start", "type": "test.start"},
+            {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
+            add_node,
+            {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+        ],
+        "edges": _edge_chain("start", "input", add_name, "end"),
     }
 
 
@@ -252,6 +352,7 @@ VALID_NODE_INFO = """
         category="demo",
         description="Demo node.",
         version="0.1.0",
+        flow_kind="process",
     )
 """.rstrip()
 
@@ -296,6 +397,7 @@ class SetOutputNode:
         category="test",
         description="Returns a non-json output.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         provides=("value.out",),
@@ -314,6 +416,7 @@ class OpaqueOutputNode:
         category="test",
         description="Returns an explicitly opaque output.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         provides=("value.out",),
@@ -332,6 +435,7 @@ class MutatingInputNode:
         category="test",
         description="Mutates its input.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         requires=("value.in",),
@@ -347,7 +451,7 @@ class MutatingInputNode:
 
 
 class DuplicateOneNode:
-    NODE_INFO = NodeInfo("test.duplicate_one", "Duplicate One", "test", "Duplicates output.", "0.1.0")
+    NODE_INFO = NodeInfo("test.duplicate_one", "Duplicate One", "test", "Duplicates output.", "0.1.0", "process")
     CONTRACT = NodeContract(
         provides=("dup.one",),
         output_semantics={"dup.one": ("duplicate value",)},
@@ -360,7 +464,7 @@ class DuplicateOneNode:
 
 
 class DuplicateTwoNode:
-    NODE_INFO = NodeInfo("test.duplicate_two", "Duplicate Two", "test", "Duplicates output.", "0.1.0")
+    NODE_INFO = NodeInfo("test.duplicate_two", "Duplicate Two", "test", "Duplicates output.", "0.1.0", "process")
     CONTRACT = NodeContract(
         provides=("dup.two",),
         output_semantics={"dup.two": ("duplicate value",)},
@@ -416,7 +520,7 @@ def _failure_case_source(case: dict[str, object]) -> str:
         return f"""
 {VALID_NODE_IMPORT}
 class OtherNode:
-    NODE_INFO = NodeInfo(type_key="demo.other", display_name="Other", category="demo", description="Other node.", version="0.1.0")
+    NODE_INFO = NodeInfo(type_key="demo.other", display_name="Other", category="demo", description="Other node.", version="0.1.0", flow_kind="process")
     CONTRACT = NodeContract(provides=("other.out",), output_semantics={{"other.out": ("other output",)}}, output_schema={{"other.out": {{"type": "number"}}}}, examples=({{"inputs": {{}}, "params": {{}}, "outputs": {{"other.out": 1}}}},))
 
     def run_pure(self, inputs, params):

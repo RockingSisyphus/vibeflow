@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from .node import NodeContract, NodeInfo, PureNode
-from .purity_helpers import _dedupe_violations
+from .purity_helpers import _dedupe_violations, _violation
 from .purity_metrics import _ComplexityCounter, _analyze_internal_call_chain
 from .purity_source import _parse_source, _source_info
 from .purity_types import (
@@ -20,6 +20,7 @@ from .purity_validators import (
     _validate_complexity_metrics,
     _validate_contract,
     _validate_examples,
+    _validate_flow_kind_contract,
     _validate_interface,
     _validate_node_info,
     _validate_source_size,
@@ -45,6 +46,8 @@ def validate_node_class(
     violations.extend(_validate_node_info(info, expected_type=expected_type, source=source))
     violations.extend(_validate_contract(contract, source=source))
     violations.extend(_validate_interface(node_cls, source=source))
+    if isinstance(info, NodeInfo) and isinstance(contract, NodeContract):
+        violations.extend(_validate_flow_kind_contract(info, contract, source=source))
 
     if source.class_text is None:
         violations.append(
@@ -56,6 +59,11 @@ def validate_node_class(
             )
         )
         return violations
+
+    if isinstance(info, NodeInfo) and info.external:
+        if isinstance(contract, NodeContract) and not any(violation.severity == "error" for violation in violations):
+            violations.extend(_validate_examples(node_cls, contract, source=source))
+        return _dedupe_violations(violations)
 
     violations.extend(_validate_source_size(source.class_text, policy=policy, source=source))
     class_tree = _parse_source(source.class_text, source=source)

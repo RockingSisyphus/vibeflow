@@ -48,7 +48,7 @@ DEFAULT_POLICY_DATA: dict[str, Any] = {
         "downgrades": [],
         "exemptions": [],
         "downgradeable": [
-            "GRAPH.OUTPUT.UNCONSUMED",
+            "GRAPH.DATA.UNCONSUMED_PROVIDER",
             "GRAPH.SMELL.CONFUSING_NODE_NAME",
             "GRAPH.SMELL.DUPLICATE_LOGIC",
             "NODESET.SMELL.TOO_WIDE",

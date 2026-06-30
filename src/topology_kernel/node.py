@@ -4,6 +4,29 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol
 
 
+FLOW_KIND_TERMINAL = "terminal"
+FLOW_KIND_PROCESS = "process"
+FLOW_KIND_DECISION = "decision"
+FLOW_KIND_IO = "io"
+FLOW_KIND_PREDEFINED = "predefined"
+FLOW_KIND_DATA_STORE = "data_store"
+FLOW_KIND_DOCUMENT = "document"
+FLOW_KIND_PREPARATION = "preparation"
+
+FLOW_KINDS = frozenset(
+    {
+        FLOW_KIND_TERMINAL,
+        FLOW_KIND_PROCESS,
+        FLOW_KIND_DECISION,
+        FLOW_KIND_IO,
+        FLOW_KIND_PREDEFINED,
+        FLOW_KIND_DATA_STORE,
+        FLOW_KIND_DOCUMENT,
+        FLOW_KIND_PREPARATION,
+    }
+)
+
+
 @dataclass(frozen=True)
 class NodeInfo:
     type_key: str
@@ -11,9 +34,11 @@ class NodeInfo:
     category: str
     description: str
     version: str
+    flow_kind: str
     purity: str = "pure"
     author: str | None = None
     tags: tuple[str, ...] = ()
+    external: bool = False
 
 
 @dataclass(frozen=True)

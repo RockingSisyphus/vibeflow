@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ..base_lib import BaseLibDependencySummary, BaseLibFinding, BaseLibModuleReport, BaseLibScanReport, scan_base_lib, summarize_base_lib_dependency_chain
+from ..ascii_flowchart import export_ascii_flowchart
 from ..config_loader import ConfigDocument, ConfigLoadError, load_config_document, strip_jsonc_comments
 from ..config_schema import collect_config_schema_findings
 from ..mermaid import compiled_graph_payload, export_mermaid
@@ -24,6 +25,7 @@ __all__ = [
     "collect_node_metrics",
     "compiled_graph_payload",
     "export_mermaid",
+    "export_ascii_flowchart",
     "format_quality_summary",
     "load_config_document",
     "scan_base_lib",
