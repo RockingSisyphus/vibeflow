@@ -39,6 +39,9 @@ from topology_kernel.config_schema import collect_config_schema_findings
 from topology_kernel.devtools import QualityThresholds, scan_code_quality
 from topology_kernel.purity_types import PurityPolicy
 
+from .strict_support_boundaries import *
+from .strict_support_runtime_nodes import *
+
 
 def cli_main(args):
     from topology_kernel.cli import main
@@ -313,37 +316,6 @@ def _input_add_pipeline(*, add: dict | None = None) -> dict:
     }
 
 
-class DemoBoundary:
-    calls: list[str] = []
-
-    def __init__(self):
-        self.run_dir = None
-
-    def before_run(self, run_config):
-        self.__class__.calls.append("before_run")
-        self.run_dir = Path(run_config["run_dir"])
-        return {}
-
-    def after_run(self, outputs, run_config):
-        self.__class__.calls.append("after_run")
-        return {}
-
-    def before_iteration(self, iteration, state):
-        self.__class__.calls.append(f"before_iteration:{iteration}")
-        return {}
-
-    def after_iteration(self, iteration, outputs, state):
-        self.__class__.calls.append(f"after_iteration:{iteration}")
-        value = outputs.get("effects.request", {}).get("value", 0)
-        run_dir = self.run_dir
-        return {"io.result": value + iteration + 1, "artifacts": [str(run_dir / f"artifact_{iteration}.txt")]}
-
-
-class FailingBoundary(DemoBoundary):
-    def after_iteration(self, iteration, outputs, state):
-        raise RuntimeError("boundary failed")
-
-
 VALID_NODE_IMPORT = "from topology_kernel import NodeContract, NodeInfo\n\n"
 
 
@@ -390,92 +362,6 @@ class DemoNode:
     def run_pure(self, inputs, params):
 {run_body}
 """
-
-
-class SetOutputNode:
-    NODE_INFO = NodeInfo(
-        type_key="test.set_output",
-        display_name="Set Output",
-        category="test",
-        description="Returns a non-json output.",
-        version="0.1.0",
-        flow_kind="process",
-    )
-    CONTRACT = NodeContract(
-        provides=("value.out",),
-        output_semantics={"value.out": ("output value",)},
-        output_schema={"value.out": {"type": "array"}},
-    )
-
-    def run_pure(self, inputs, params):
-        return {"value.out": {1, 2}}
-
-
-class OpaqueOutputNode:
-    NODE_INFO = NodeInfo(
-        type_key="test.opaque_output",
-        display_name="Opaque Output",
-        category="test",
-        description="Returns an explicitly opaque output.",
-        version="0.1.0",
-        flow_kind="process",
-    )
-    CONTRACT = NodeContract(
-        provides=("value.out",),
-        output_semantics={"value.out": ("output value",)},
-        output_schema={"value.out": {"snapshot": "opaque"}},
-    )
-
-    def run_pure(self, inputs, params):
-        return {"value.out": {1, 2}}
-
-
-class MutatingInputNode:
-    NODE_INFO = NodeInfo(
-        type_key="test.mutating_input",
-        display_name="Mutating Input",
-        category="test",
-        description="Mutates its input.",
-        version="0.1.0",
-        flow_kind="process",
-    )
-    CONTRACT = NodeContract(
-        requires=("value.in",),
-        provides=("value.out",),
-        input_semantics={"value.in": ("input value",)},
-        output_semantics={"value.out": ("output value",)},
-        output_schema={"value.out": {"type": "array"}},
-    )
-
-    def run_pure(self, inputs, params):
-        inputs["value.in"].append(3)
-        return {"value.out": inputs["value.in"]}
-
-
-class DuplicateOneNode:
-    NODE_INFO = NodeInfo("test.duplicate_one", "Duplicate One", "test", "Duplicates output.", "0.1.0", "process")
-    CONTRACT = NodeContract(
-        provides=("dup.one",),
-        output_semantics={"dup.one": ("duplicate value",)},
-        output_schema={"dup.one": {"type": "number"}},
-        examples=({"inputs": {}, "params": {}, "outputs": {"dup.one": 1}},),
-    )
-
-    def run_pure(self, inputs, params):
-        return {"dup.one": 1}
-
-
-class DuplicateTwoNode:
-    NODE_INFO = NodeInfo("test.duplicate_two", "Duplicate Two", "test", "Duplicates output.", "0.1.0", "process")
-    CONTRACT = NodeContract(
-        provides=("dup.two",),
-        output_semantics={"dup.two": ("duplicate value",)},
-        output_schema={"dup.two": {"type": "number"}},
-        examples=({"inputs": {}, "params": {}, "outputs": {"dup.two": 1}},),
-    )
-
-    def run_pure(self, inputs, params):
-        return {"dup.two": 1}
 
 
 def _write_base_lib_chain(tmp_path: Path, modules: list[str]) -> None:

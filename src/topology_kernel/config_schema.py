@@ -68,9 +68,15 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
     if not isinstance(value, Mapping):
         findings.append(_error("CONFIG.SCHEMA.NODE_OBJECT", f"{prefix} must be an object", prefix))
         return
+    status = str(value.get("status", "implemented")).strip()
+    _validate_node_identity(value, prefix, findings, status=status)
+    _validate_node_contract_fields(value, prefix, findings)
+    _validate_node_config_fields(value, prefix, findings)
+
+
+def _validate_node_identity(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
     if not _non_empty_string(value.get("name")):
         findings.append(_error("CONFIG.SCHEMA.NODE_MISSING_NAME", f"{prefix}.name must be a non-empty string", f"{prefix}.name"))
-    status = str(value.get("status", "implemented")).strip()
     if status not in STATUSES:
         findings.append(_error("GRAPH.PLANNED.STATUS_INVALID", f"{prefix}.status must be planned or implemented", f"{prefix}.status"))
     if status == "planned" and not _non_empty_string(value.get("flow_kind")):
@@ -87,9 +93,15 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
                 f"{prefix}.type",
             )
         )
+
+
+def _validate_node_contract_fields(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
     for field in ("requires", "provides"):
         if field in value:
             _validate_string_list(value[field], f"{prefix}.{field}", findings, f"CONFIG.SCHEMA.NODE_{field.upper()}_LIST")
+
+
+def _validate_node_config_fields(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
     if "config" in value and not isinstance(value["config"], Mapping):
         findings.append(_error("CONFIG.SCHEMA.NODE_CONFIG_OBJECT", f"{prefix}.config must be an object", f"{prefix}.config"))
     if "node_configs" in value:
@@ -98,24 +110,36 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
 
 def _validate_edge(value: Any, prefix: str, findings: list[HealthFinding]) -> None:
     if isinstance(value, list):
-        if len(value) != 2 or not all(_non_empty_string(item) for item in value):
-            findings.append(_error("CONFIG.SCHEMA.EDGE_PAIR", f"{prefix} must be [from, to] with non-empty strings", prefix))
+        _validate_edge_pair(value, prefix, findings)
         return
     if not isinstance(value, Mapping):
         findings.append(_error("CONFIG.SCHEMA.EDGE_OBJECT", f"{prefix} must be [from, to] or an object", prefix))
         return
+    _validate_edge_endpoints(value, prefix, findings)
+    _validate_removed_edge_fields(value, prefix, findings)
+    if "when" in value and not isinstance(value["when"], str):
+        findings.append(_error("CONFIG.SCHEMA.EDGE_WHEN", f"{prefix}.when must be a string", f"{prefix}.when"))
+
+
+def _validate_edge_pair(value: list[Any], prefix: str, findings: list[HealthFinding]) -> None:
+    if len(value) != 2 or not all(_non_empty_string(item) for item in value):
+        findings.append(_error("CONFIG.SCHEMA.EDGE_PAIR", f"{prefix} must be [from, to] with non-empty strings", prefix))
+
+
+def _validate_edge_endpoints(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
     if not (_non_empty_string(value.get("from")) or _non_empty_string(value.get("source"))):
         findings.append(_error("CONFIG.SCHEMA.EDGE_FROM", f"{prefix}.from must be a non-empty string", f"{prefix}.from"))
     if not (_non_empty_string(value.get("to")) or _non_empty_string(value.get("target"))):
         findings.append(_error("CONFIG.SCHEMA.EDGE_TO", f"{prefix}.to must be a non-empty string", f"{prefix}.to"))
+
+
+def _validate_removed_edge_fields(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
     if "max_executions" in value:
         findings.append(_error("CONFIG.LOOP_LIMITS.REMOVED", f"{prefix}.max_executions is removed; use pipeline.max_steps", f"{prefix}.max_executions"))
     if "max" in value:
         findings.append(_error("CONFIG.LOOP_LIMITS.REMOVED", f"{prefix}.max is removed; use pipeline.max_steps", f"{prefix}.max"))
     if "loop" in value:
         findings.append(_error("CONFIG.LOOPS.REMOVED", f"{prefix}.loop is removed; use edge.when", f"{prefix}.loop"))
-    if "when" in value and not isinstance(value["when"], str):
-        findings.append(_error("CONFIG.SCHEMA.EDGE_WHEN", f"{prefix}.when must be a string", f"{prefix}.when"))
 
 
 def _validate_nodesets(value: Any, findings: list[HealthFinding]) -> None:
@@ -127,44 +151,51 @@ def _validate_nodesets(value: Any, findings: list[HealthFinding]) -> None:
         if not isinstance(item, Mapping):
             findings.append(_error("CONFIG.SCHEMA.NODESET_OBJECT", f"{prefix} must be an object", prefix))
             continue
-        if not _non_empty_string(item.get("name")):
-            findings.append(_error("CONFIG.SCHEMA.NODESET_MISSING_NAME", f"{prefix}.name must be a non-empty string", f"{prefix}.name"))
-        status = str(item.get("status", "implemented")).strip()
-        if status not in STATUSES:
-            findings.append(_error("GRAPH.PLANNED.STATUS_INVALID", f"{prefix}.status must be planned or implemented", f"{prefix}.status"))
-        flow_kind = str(item.get("flow_kind", "predefined")).strip() or "predefined"
-        if flow_kind not in FLOW_KINDS:
-            findings.append(_error("NODE.FLOW_KIND.INVALID", f"{prefix}.flow_kind must be one of {sorted(FLOW_KINDS)}", f"{prefix}.flow_kind"))
-        for field in ("display_name", "category", "description", "version", "purity"):
-            if status != "planned" and not _non_empty_string(item.get(field)):
-                findings.append(
-                    _error(
-                        "CONFIG.SCHEMA.NODESET_METADATA",
-                        f"{prefix}.{field} must be a non-empty string",
-                        f"{prefix}.{field}",
-                    )
-                )
-        if item.get("purity") not in {None, "pure"}:
-            findings.append(_error("CONFIG.SCHEMA.NODESET_PURITY", f"{prefix}.purity must be 'pure'", f"{prefix}.purity"))
-        for required_field in ("requires", "provides", "exports"):
-            if status != "planned" and required_field not in item:
-                findings.append(
-                    _error(
-                        "CONFIG.SCHEMA.NODESET_CONTRACT",
-                        f"{prefix}.{required_field} must be declared",
-                        f"{prefix}.{required_field}",
-                    )
-                )
-        pipeline = item.get("pipeline")
-        if pipeline is None and status == "planned":
-            pass
-        elif not isinstance(pipeline, Mapping):
-            findings.append(_error("CONFIG.SCHEMA.NODESET_PIPELINE", f"{prefix}.pipeline must be an object", f"{prefix}.pipeline"))
-        else:
-            _validate_pipeline(pipeline, f"{prefix}.pipeline", findings)
-        for field in ("requires", "provides", "exports"):
-            if field in item:
-                _validate_string_list(item[field], f"{prefix}.{field}", findings, "CONFIG.SCHEMA.NODESET_CONTRACT_LIST")
+        _validate_nodeset(item, prefix, findings)
+
+
+def _validate_nodeset(item: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
+    status = str(item.get("status", "implemented")).strip()
+    _validate_nodeset_identity(item, prefix, findings, status=status)
+    _validate_nodeset_metadata(item, prefix, findings, status=status)
+    _validate_nodeset_contract(item, prefix, findings, status=status)
+    _validate_nodeset_pipeline(item, prefix, findings, status=status)
+
+
+def _validate_nodeset_identity(item: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
+    if not _non_empty_string(item.get("name")):
+        findings.append(_error("CONFIG.SCHEMA.NODESET_MISSING_NAME", f"{prefix}.name must be a non-empty string", f"{prefix}.name"))
+    if status not in STATUSES:
+        findings.append(_error("GRAPH.PLANNED.STATUS_INVALID", f"{prefix}.status must be planned or implemented", f"{prefix}.status"))
+    flow_kind = str(item.get("flow_kind", "predefined")).strip() or "predefined"
+    if flow_kind not in FLOW_KINDS:
+        findings.append(_error("NODE.FLOW_KIND.INVALID", f"{prefix}.flow_kind must be one of {sorted(FLOW_KINDS)}", f"{prefix}.flow_kind"))
+
+
+def _validate_nodeset_metadata(item: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
+    for field in ("display_name", "category", "description", "version", "purity"):
+        if status != "planned" and not _non_empty_string(item.get(field)):
+            findings.append(_error("CONFIG.SCHEMA.NODESET_METADATA", f"{prefix}.{field} must be a non-empty string", f"{prefix}.{field}"))
+    if item.get("purity") not in {None, "pure"}:
+        findings.append(_error("CONFIG.SCHEMA.NODESET_PURITY", f"{prefix}.purity must be 'pure'", f"{prefix}.purity"))
+
+
+def _validate_nodeset_contract(item: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
+    for required_field in ("requires", "provides", "exports"):
+        if status != "planned" and required_field not in item:
+            findings.append(_error("CONFIG.SCHEMA.NODESET_CONTRACT", f"{prefix}.{required_field} must be declared", f"{prefix}.{required_field}"))
+        if required_field in item:
+            _validate_string_list(item[required_field], f"{prefix}.{required_field}", findings, "CONFIG.SCHEMA.NODESET_CONTRACT_LIST")
+
+
+def _validate_nodeset_pipeline(item: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
+    pipeline = item.get("pipeline")
+    if pipeline is None and status == "planned":
+        return
+    if not isinstance(pipeline, Mapping):
+        findings.append(_error("CONFIG.SCHEMA.NODESET_PIPELINE", f"{prefix}.pipeline must be an object", f"{prefix}.pipeline"))
+        return
+    _validate_pipeline(pipeline, f"{prefix}.pipeline", findings)
 
 
 def _validate_nodeset_imports(value: Any, findings: list[HealthFinding]) -> None:

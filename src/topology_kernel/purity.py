@@ -43,26 +43,14 @@ def validate_node_class(
     info = getattr(node_cls, "NODE_INFO", None)
     contract = getattr(node_cls, "CONTRACT", None)
 
-    violations.extend(_validate_node_info(info, expected_type=expected_type, source=source))
-    violations.extend(_validate_contract(contract, source=source))
-    violations.extend(_validate_interface(node_cls, source=source))
-    if isinstance(info, NodeInfo) and isinstance(contract, NodeContract):
-        violations.extend(_validate_flow_kind_contract(info, contract, source=source))
+    _append_contract_violations(node_cls, info, contract, expected_type, source, violations)
 
     if source.class_text is None:
-        violations.append(
-            _violation(
-                "source_unavailable",
-                "node source is unavailable for static purity check",
-                source=source,
-                suggested_fix_type="fix_node",
-            )
-        )
+        violations.append(_source_unavailable_violation(source))
         return violations
 
     if isinstance(info, NodeInfo) and info.external:
-        if isinstance(contract, NodeContract) and not any(violation.severity == "error" for violation in violations):
-            violations.extend(_validate_examples(node_cls, contract, source=source))
+        _append_examples_if_clean(node_cls, contract, source, violations)
         return _dedupe_violations(violations)
 
     violations.extend(_validate_source_size(source.class_text, policy=policy, source=source))
@@ -76,6 +64,54 @@ def validate_node_class(
     if isinstance(info, NodeInfo) and isinstance(contract, NodeContract):
         violations.extend(_validate_architecture_smells(info, contract, source=source, metrics=metrics))
 
+    _append_class_visitor_violations(
+        class_tree,
+        contract,
+        policy,
+        source,
+        known_node_modules,
+        known_node_class_names,
+        violations,
+    )
+    _append_examples_if_clean(node_cls, contract, source, violations)
+
+    if scan_module:
+        _append_module_violations(node_cls, source, policy, known_node_modules, known_node_class_names, violations)
+
+    return _dedupe_violations(violations)
+
+
+def _append_contract_violations(node_cls, info, contract, expected_type, source, violations: list[PurityViolation]) -> None:
+    violations.extend(_validate_node_info(info, expected_type=expected_type, source=source))
+    violations.extend(_validate_contract(contract, source=source))
+    violations.extend(_validate_interface(node_cls, source=source))
+    if isinstance(info, NodeInfo) and isinstance(contract, NodeContract):
+        violations.extend(_validate_flow_kind_contract(info, contract, source=source))
+
+
+def _source_unavailable_violation(source) -> PurityViolation:
+    return _violation(
+        "source_unavailable",
+        "node source is unavailable for static purity check",
+        source=source,
+        suggested_fix_type="fix_node",
+    )
+
+
+def _append_examples_if_clean(node_cls, contract, source, violations: list[PurityViolation]) -> None:
+    if isinstance(contract, NodeContract) and not any(violation.severity == "error" for violation in violations):
+        violations.extend(_validate_examples(node_cls, contract, source=source))
+
+
+def _append_class_visitor_violations(
+    class_tree,
+    contract,
+    policy: PurityPolicy,
+    source,
+    known_node_modules: tuple[str, ...],
+    known_node_class_names: tuple[str, ...],
+    violations: list[PurityViolation],
+) -> None:
     visitor = NodePurityVisitor(
         policy=policy,
         source=source,
@@ -86,25 +122,31 @@ def validate_node_class(
     )
     visitor.visit(class_tree)
     violations.extend(visitor.violations)
-    if isinstance(contract, NodeContract) and not any(violation.severity == "error" for violation in violations):
-        violations.extend(_validate_examples(node_cls, contract, source=source))
 
-    if scan_module and source.module_text:
-        module_tree = _parse_source(source.module_text, source=source)
-        if isinstance(module_tree, PurityViolation):
-            violations.append(module_tree)
-        else:
-            module_visitor = ModulePurityVisitor(
-                policy=policy,
-                source=source,
-                node_class_name=node_cls.__name__,
-                known_node_modules=known_node_modules,
-                known_node_class_names=known_node_class_names,
-            )
-            module_visitor.visit(module_tree)
-            violations.extend(module_visitor.violations)
 
-    return _dedupe_violations(violations)
+def _append_module_violations(
+    node_cls: type[PureNode],
+    source,
+    policy: PurityPolicy,
+    known_node_modules: tuple[str, ...],
+    known_node_class_names: tuple[str, ...],
+    violations: list[PurityViolation],
+) -> None:
+    if not source.module_text:
+        return
+    module_tree = _parse_source(source.module_text, source=source)
+    if isinstance(module_tree, PurityViolation):
+        violations.append(module_tree)
+        return
+    module_visitor = ModulePurityVisitor(
+        policy=policy,
+        source=source,
+        node_class_name=node_cls.__name__,
+        known_node_modules=known_node_modules,
+        known_node_class_names=known_node_class_names,
+    )
+    module_visitor.visit(module_tree)
+    violations.extend(module_visitor.violations)
 
 
 

@@ -8,12 +8,11 @@
 {
   "pipeline": {
     "inputs": [],
+    "max_steps": 1000,
     "nodes": [],
-    "edges": [],
-    "loops": []
+    "edges": []
   },
   "nodesets": [],
-  "boundary": null,
   "plugins": [],
   "policy": {}
 }
@@ -33,10 +32,11 @@
 
 ```jsonc
 {
-  "name": "seed",
-  "type": "demo.seed",
-  "provides": ["value.in"],
-  "config": {"value": 2}
+  "name": "add",
+  "type": "demo.add",
+  "requires": ["value.in"],
+  "provides": ["value.out"],
+  "config": {"delta": 3}
 }
 ```
 
@@ -44,12 +44,37 @@
 
 - `name`：本次调用的 node_id，在当前 pipeline 内必须唯一。
 - `type`：注册表中的 node_type。
+- `status`：可选，`implemented` 或 `planned`，默认 `implemented`。
+- `flow_kind`：只允许 planned node 使用；implemented node 的 flow_kind 来自 registry 中的 `NODE_INFO`。
 - `requires`：本次调用需要从上下文读取的 key。
 - `provides`：本次调用写入上下文的 key。
 - `config`：本次调用覆盖注册默认值的配置。
 - `node_configs`：调用 nodeset 时，用来覆盖内部 node 配置。
 
-内核会根据 `requires` / `provides` 自动推导数据依赖边，也允许显式写 `edges`。
+## terminal start/end
+
+每个可执行 pipeline 和 nodeset 内部 pipeline 都应有 terminal start/end：
+
+```jsonc
+{
+  "pipeline": {
+    "inputs": ["value.in"],
+    "nodes": [
+      {"name": "start", "type": "demo.start"},
+      {"name": "input", "type": "demo.input", "requires": ["value.in"]},
+      {"name": "add", "type": "demo.add", "requires": ["value.in"], "provides": ["value.out"]},
+      {"name": "end", "type": "demo.end", "requires": ["value.out"]}
+    ],
+    "edges": [["start", "input"], ["input", "add"], ["add", "end"]]
+  }
+}
+```
+
+`io` 不是 start/end。推荐结构是：
+
+```text
+terminal start -> io input -> process... -> io output -> terminal end
+```
 
 ## edge
 
@@ -62,36 +87,67 @@
 对象形式：
 
 ```jsonc
-{"from": "seed", "to": "add", "max_executions": 1}
+{"from": "route", "to": "retry", "when": "flow.route == 'again'"}
 ```
 
-`max_executions` 必须是大于等于 1 的整数。
+规则：
 
-## loop
+- `pipeline.edges` 是唯一控制流来源。
+- `requires/provides` 不会自动推导控制流。
+- `when` 只支持小表达式：`key == 'value'`、`key != 'value'`、`flag == true`、`flag == false`。
+- 从 `decision` 出发的 edge 必须写 `when`。
 
-所有环路都必须显式声明，并必须有执行上限。
+## cycle
+
+旧 `pipeline.loops` 已移除。现在 cycle 直接由显式 edge 表达，但必须经过 `decision`：
 
 ```jsonc
 {
-  "name": "count_loop",
-  "nodes": ["inc", "done", "copy_back"],
-  "edges": [
-    ["copy_back", "inc"]
-  ],
-  "max_iterations": 5,
-  "until": "loop.done"
+  "pipeline": {
+    "max_steps": 1000,
+    "nodes": [
+      {"name": "start", "type": "demo.start"},
+      {"name": "work", "type": "demo.work", "requires": ["value.in"], "provides": ["value.out"]},
+      {"name": "route", "type": "demo.route", "requires": ["value.out"], "provides": ["flow.route"]},
+      {"name": "copy", "type": "demo.copy", "requires": ["value.out"], "provides": ["value.in"]},
+      {"name": "end", "type": "demo.end", "requires": ["value.out"]}
+    ],
+    "edges": [
+      ["start", "work"],
+      ["work", "route"],
+      {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
+      ["copy", "work"],
+      {"from": "route", "to": "end", "when": "flow.route == 'done'"}
+    ]
+  }
 }
 ```
 
-字段说明：
+`max_steps` 是运行时防护，不是架构语义。
 
-- `name`：loop 名称。
-- `nodes`：loop 内节点，建议显式写出。
-- `edges`：形成环路的边。
-- `max_iterations`：最大迭代次数。
-- `until`：可选，某个上下文 key 为真时停止。
+## planned node
 
-未声明的 cycle 会被拒绝。
+可用 planned node 先登记架构：
+
+```jsonc
+{
+  "name": "classify",
+  "status": "planned",
+  "flow_kind": "decision"
+}
+```
+
+planned 内容会在健康检查中给 warning，但 runtime 会拒绝执行。
+
+## 已移除字段
+
+这些字段出现时会失败：
+
+- `boundary`
+- `pipeline.loops`
+- edge `max_executions`
+- edge `loop`
+- `max_iterations`
 
 ## policy
 
@@ -105,14 +161,9 @@
       "max_bytes": 60000,
       "warn_lines": 450,
       "warn_bytes": 54000
-    },
-    "maintainability": {
-      "warn_call_chain_length": 4,
-      "max_call_chain_length": 4
     }
   }
 }
 ```
 
 通常不要放宽硬规则。确实需要临时放宽时，应写明 reason 和 expires。
-

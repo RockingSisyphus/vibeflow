@@ -1,5 +1,7 @@
 # Paperflow Kernel 反馈复核
 
+> 历史说明：本文是 flowchart 内核重构前的 Paperflow 反馈审查记录。文中的 `boundary`、显式 loop、`max_iterations` 等术语反映当时的内核模型和 Paperflow 项目状态，不代表当前 `topology-kernel` 的公开 API。当前模型以标准 `flow_kind`、显式 `pipeline.edges`、terminal start/end、decision cycle 和 `NodeInfo.external=True` 为准。
+
 本文记录对 `/home/rockingsisyphus/projects/paperflow` 的一次外部开发体验反馈复核。分析分两阶段：
 
 1. 先仅基于 paperflow 项目事实复核反馈是否成立。

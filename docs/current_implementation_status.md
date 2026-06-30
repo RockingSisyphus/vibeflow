@@ -2,217 +2,191 @@
 
 ## 当前定位
 
-当前仓库是 `topology-kernel` 的第一版严格内核原型。它验证了最核心的想法能运行，但还没有达到目标构想中的完整框架状态。
+`topology-kernel` 当前已经从“纯函数 node + 拓扑配置原型”演进为严格标准流程图内核。它面向人机协同开发，尤其是 LLM 参与长期编码和维护的场景，用机器可检查的规则限制程序结构漂移。
 
-补充定位：该内核的最终目标是服务于人机协同开发，尤其是 LLM 深度参与编码的场景。内核需要通过硬性健康检查约束 LLM 生成的程序只能由小型、纯函数、低耦合 node 和显式 JSONC 拓扑组成。目前实现只覆盖了这一目标的基础原型，还没有形成完整的 LLM 协作治理体系。
+当前核心语义：
 
-## 已完成
+- 程序架构由 JSONC `pipeline` / `nodesets` 显式声明。
+- `pipeline.edges` 是唯一控制流来源。
+- `requires` / `provides` 是数据契约，不会被推导成控制流。
+- node 必须声明标准 `flow_kind`。
+- 可执行图必须有 `terminal` start/end。
+- cycle 必须经过 `decision`。
+- 运行时使用 `max_steps` 防止无限执行。
+- 旧 `boundary`、`pipeline.loops`、edge `max_executions` 已移除，并会被配置校验拒绝。
 
-### 基础包结构
+## 已完成能力
 
-已建立独立 Python 包：
+### 包结构
+
+核心包位于：
 
 ```text
 src/topology_kernel/
 ```
 
-当前模块：
+主要模块包括：
 
-- `context.py`
-- `node.py`
-- `registry.py`
-- `graph_config.py`
-- `compiler.py`
-- `runtime.py`
-- `purity.py`
-- `health.py`
-- `mermaid.py`
-- `cli.py`
-- `config_loader.py`
-- `config_schema.py`
-- `policy.py`
-- `base_lib.py`
-- `boundary.py`
-- `plugin.py`
-- `runner.py`
+- `node.py`：`NodeInfo`、`NodeContract`、`PureNode` 和标准 `flow_kind` 常量。
+- `graph_config.py`：JSONC 拓扑解析，包含 `status: planned|implemented`、`max_steps`、显式 edge `when`。
+- `compiler.py`：编译显式 flow edge、数据契约诊断、cycle/decision 检查。
+- `runtime.py`：按显式 flow edge 调度的 step runtime。
+- `health.py`、`health_flow.py`、`health_planned.py`：健康检查入口、flow 结构检查、planned 内容检查。
+- `purity.py`、`purity_validators.py`、`purity_visitors.py`：node 纯函数、契约、源码质量检查。
+- `mermaid.py`：Mermaid flowchart 源码导出。
+- `ascii_flowchart.py` 及相关拆分模块：ASCII flowchart 导出。
+- `mermaid_render.py`：通过项目本地 Mermaid CLI 渲染 SVG。
+- `plugin.py`：policy/compiler/runtime 插件。
+- `runner.py`：强制健康检查后的正式运行入口。
+- `cli.py`：命令行入口。
 
-已增加目标发布形态的轻量目录：
+稳定 re-export：
 
-- `core/`：稳定核心 API 的 re-export。
-- `plugins/`：插件协议与插件注册表的 re-export。
-- `devtools/`：配置加载、schema 检查、纯度检查、Mermaid、`base_lib` 扫描等开发工具入口。
-- `resources/schema/`：配置、policy、health report、node、nodeset、boundary 的结构定义资源。
+- `core/`
+- `plugins/`
+- `devtools/`
+- `resources/schema/`
 
-### 纯函数 node 接口
+### 标准流程图 Node
 
-已实现：
+`NodeInfo` 当前形态：
 
-- `NodeInfo`
-- `NodeContract`
-- `PureNode` protocol
-- 运行时通过 `run_pure(inputs, params) -> outputs` 调用 node
-- node 不直接接触 `Context`
-- 运行时检查 node 是否原地修改输入
-- 运行时检查返回输出是否全部声明
-- 运行时检查声明输出是否全部返回
+```python
+NodeInfo(
+    type_key="demo.add",
+    display_name="Add",
+    category="demo",
+    description="Add a configured delta.",
+    version="0.1.0",
+    flow_kind="process",
+    external=False,
+)
+```
 
-### 拓扑编译
+`flow_kind` 必填，合法值：
+
+- `terminal`
+- `process`
+- `decision`
+- `io`
+- `predefined`
+- `data_store`
+- `document`
+- `preparation`
+
+`external=True` 表示该 node 包装第三方库或外部维护代码。它仍然要通过元数据、契约、拓扑、运行时 trace 检查，但跳过内部源码质量、复杂度、导入链等“我们不维护的代码”检查。
+
+### 显式 Flow Edge
 
 已实现：
 
 - `pipeline.nodes`
 - `pipeline.edges`
 - `pipeline.inputs`
-- `requires/provides` 自动推导 data edges
-- explicit edges 与 data edges 合并为 effective edges
-- 缺失 provider 会编译失败
-- 重复 provider 会编译失败
+- `pipeline.max_steps`
+- edge `when`，支持小型表达式，例如 `flow.route == 'again'`、`flag == true`。
+- `requires/provides` 只生成 data diagnostics，不进入 `effective_edges`。
+- 每个可执行图必须有 terminal start/end。
+- 每个已实现节点必须从 start 可达且能到达 end。
+- 每个 cycle 必须包含 `decision`。
+- decision 分支值会和 output schema enum / boolean 做静态检查。
+- decision 非回环出口必须能到达 terminal end。
 
-### 显式有界环路
+旧配置会被拒绝：
 
-已实现：
-
+- `boundary`
 - `pipeline.loops`
-- 环路 `name`
-- 环路 `edges`
-- 环路 `nodes`
-- 环路 `max_iterations`
-- 环路 `until`
-- 未声明环路会编译失败
-- 声明环路后可以编译并执行
-- 编译器输出依赖感知的 `loop_orders`
-- loop `until` key 必须可解析
-- loop 边可继承或覆盖执行上限
-- 运行时记录每条边实际执行次数
-- 运行时记录每个 loop 实际迭代次数
-- 运行时记录 loop 停止原因：`max_iterations`、`until`、`node_failed`
+- edge `max_executions`
+- edge `loop`
+- `max_iterations`
 
-### nodeset
+### Planned Architecture
+
+现有 `pipeline + nodesets` 同时承担架构契约职责，不再另加 `architecture_flow`。
+
+支持：
+
+- `status: "planned" | "implemented"`，默认 `implemented`。
+- planned node 可以没有真实 `type`，但必须声明 `flow_kind`。
+- implemented node 不允许在 config 中伪造 `flow_kind`，真实类型来自 registry 中 `NODE_INFO.flow_kind`。
+- health 对 planned 内容给 warning。
+- runtime 拒绝执行 planned 内容。
+- Mermaid / ASCII / SVG 都能显示 planned 节点。
+
+### Nodeset
 
 已实现：
 
 - `nodesets`
-- `nodeset_imports`，可从独立 JSON/JSONC 文件导入全部或指定 nodeset。
-- `nodeset.<name>` 可作为普通 node 类型使用
-- nodeset 内部可执行子图
-- nodeset 通过 `exports` 暴露输出
-- nodeset 元数据和契约 schema 检查
-- nodeset 递归和间接递归健康检查
-- nodeset 内部 key 作用域隔离和中间 key 泄漏检查
-- 外部 pipeline 和嵌套 nodeset 引用点的契约一致性检查
-- 健康报告中的 `info.nodeset_findings` 折叠视图，以及 errors / warnings 展开视图
-- 健康报告和 inspect-config 输出 `info.nodeset_imports`，便于审计 nodeset 来源。
+- `nodeset_imports`
+- `nodeset.<name>` 可作为 node 调用。
+- nodeset 内部 pipeline 同样必须有 terminal start/end 和显式 edges。
+- nodeset 通过 `exports` 暴露输出。
+- 递归引用、契约不匹配、内部 key 泄漏会被检查。
+- planned nodeset 可作为设计占位，但不能运行。
 
-### 纯函数静态检查
-
-已实现初版：
-
-- node 必须声明 `NODE_INFO`
-- node 必须声明 `CONTRACT`
-- node 必须提供 `run_pure`
-- 禁止普通 `run(context, ...)`
-- AST 检查部分禁止的导入
-- import policy 支持 root 级和 module 级规则；默认允许 `urllib.parse`，继续禁止 `urllib.request`。
-- AST 检查部分禁止的调用
-- 源码行数限制
-- 源码字节数限制
-
-当前限制还不完整，尚未实现 node 间导入或调用依赖扫描，也没有完整 `base_lib` 纯函数扫描。
-
-### LLM 协作治理
-
-已具备的基础：
-
-- node 源码行数和字节数限制。
-- node 不允许直接接触 `Context`。
-- node 输出必须符合声明。
-- 图拓扑由配置组织，而不是 node 互相调用。
-- node 内部私有 helper 调用链从 `run_pure` 开始计数，默认长度 4 警告，超过 4 硬失败。
-- node 内部直接递归和间接递归会硬失败。
-- node 到 `base_lib` 的依赖链会被扫描，默认超过 4 警告，超过 6 硬失败。
-- 标准 wrapper node 会被识别为 `run_pure_shape=wrapper`，避免简单适配 node 触发 duplicate AST 形状噪声。
-- registry 会记录 node 注册来源，并对 `_register_<namespace>_nodes` 中注册其他 namespace 的 key 输出 maintainability warning。
-
-尚未形成完整能力：
-
-- 未提供“拆成多个 node / 抽取 `base_lib` / 提升为 nodeset”的自动化建议。
-- 未识别长期维护风险，例如契约漂移、重复逻辑、命名模糊、语义不一致。
-
-### 全局边界
+### 纯函数和源码质量检查
 
 已实现：
 
-- `GlobalBoundary` 协议。
-- 独立 `BoundaryRegistry`，boundary 不能注册进 node registry。
-- `before_run`、`after_run`、`before_iteration`、`after_iteration` 生命周期。
-- 配置中声明 `boundary.type`、`config`、`consumes`、`provides`、`allowed_paths`。
-- `effects.*` / `outbox.*` 请求 key 与 `io.*` 返回 key 的结构化约束。
-- boundary 返回 key 必须在 `boundary.provides` 中声明。
-- boundary 产物路径必须位于 `run_dir` 或显式 `allowed_paths`。
-- 运行时写出 `boundary_trace.jsonl`。
-- boundary 失败会进入 runtime trace 并阻断继续运行。
-- boundary 健康检查会对 provider selection、rank/score/audit/plan/strategy 等决策逻辑输出 warning，提示策略可能应前移到 node/base_lib。
-
-### 健康报告
-
-已实现基础版：
-
-- 编译失败报告。
-- node 类型解析。
-- 纯函数违规报告。
-- 未消费输出警告。
-- duplicate logic warning 会跳过标准 wrapper node 对。
-- boundary decision-logic smell warning。
-- registry namespace mismatch warning。
-- 有效边、数据边、显式边信息。
-
-尚未实现完整目标中的语义和架构漂移等健康检查。
+- `NODE_INFO` 必填。
+- `CONTRACT` 必填。
+- `run_pure(inputs, params) -> outputs` 必填。
+- 禁止普通 `run(context, ...)`。
+- 禁止修改输入。
+- 禁止动态输出 key。
+- 禁止多返回/少返回 key。
+- 禁止 node 之间 import/call。
+- 默认禁止文件、网络、数据库、进程、环境变量等副作用能力。
+- 行数、字节数、函数数量、分支数量、嵌套深度、调用链长度检查。
+- duplicate AST fingerprint warning。
+- `base_lib` 纯函数扫描和依赖链检查。
+- `external=True` 跳过源码质量扫描，但不跳过契约/拓扑/运行时检查。
 
 ### 插件系统
 
+已实现插件类型：
+
+- `PolicyPlugin`
+- `CompilerPlugin`
+- `RuntimePlugin`
+
+插件可扩展或收紧治理规则，但不能隐式绕过绝对规则。插件异常采用 fail-closed 语义；观测类 runtime 插件异常会进入健康报告。
+
+`BoundaryPlugin` 已移除。
+
+### 正式运行和产物
+
+`run_checked(...)` 会在运行前强制执行 schema、policy、compile 和 health 检查。失败时拒绝执行 runtime。
+
+运行目录当前主要产物：
+
+```text
+runs/<run_id>/
+  input_summary.json
+  effective_policy.json
+  compiled_graph.json
+  health_report.json
+  graph.mmd
+  graph.txt
+  graph.svg
+  graph.svg.error.txt        # 仅 SVG 渲染失败时出现
+  runtime_trace.jsonl
+  output_summary.json
+```
+
+### 图形导出
+
 已实现：
 
-- `PluginRegistry` 和 `PolicyPlugin` / `CompilerPlugin` / `RuntimePlugin` / `BoundaryPlugin` 协议。
-- 配置中的 `plugins` 显式加载机制。
-- 插件优先级、作用域和冲突策略。
-- `PolicyPlugin.extend_policy` 可以收紧策略，或在完整审计字段下放宽可降级规则。
-- 插件不能放宽未被默认 policy 标记为可降级的绝对规则。
-- `PolicyPlugin` 可追加 node、graph、nodeset、boundary 健康检查。
-- `PolicyPlugin` 元数据 schema、契约 schema、纯函数规则扩展方法采用 fail-closed 调用。
-- `CompilerPlugin`、`RuntimePlugin`、`BoundaryPlugin` 提供轻量钩子。
-- 插件加载失败和执行异常都会产生 `ERROR`。
-- 健康报告和 `effective_policy` 会显示插件参与结果。
-
-### 正式运行与产物
-
-已实现：
-
-- `run_checked(...)` 正式运行入口。
-- 每次正式运行生成 `run_id` 并创建独立 `run_dir`。
-- 运行前强制执行配置 schema、policy 合并和完整健康检查。
-- 健康检查 `FAIL` / `ERROR` 时拒绝执行 runtime。
-- 写出 `input_summary.json`、`effective_policy.json`、`compiled_graph.json`、`health_report.json`、`graph.mmd`、`runtime_trace.jsonl`、`boundary_trace.jsonl`。
-- trace 记录 node 执行、nodeset 进入和退出、耗时、失败原因、输入摘要和输出摘要。
-- trace 默认只保存结构摘要，不保存原始输入输出。
-
-### Mermaid 导出
-
-已实现：
-
-- 输出 `flowchart TD`
-- 显示 node 名称和类型
-- 显示有效边
-- 显示 `max_executions`
-- 显示环路名称
-- 支持 nodeset 折叠显示
-- 支持 nodeset 展开显示
-- 显示 node / nodeset 的契约 key
-- 显示配置中的描述、分类、版本等语义信息
-- 显示 loop 名称、最大执行次数和 loop 摘要
-- 显示全局 boundary 及其 consumes / provides key
-- 显示 boundary 与 node 之间的输入输出端口连接
-- 支持从健康报告标记错误节点和警告节点
-- `run_checked(...)` 写出的 `graph.mmd` 与同次编译生成的 `compiled_graph.json` 使用同一个 `CompiledGraph`
+- `export_mermaid(...)` / CLI `export-mermaid`：输出 Mermaid flowchart 源码。
+- `export_ascii_flowchart(...)` / CLI `export-ascii`：输出无外部依赖的 ASCII flowchart。
+- `render_mermaid_svg(...)` / CLI `export-svg`：通过项目本地 Mermaid CLI 渲染 SVG。
+- nodeset 折叠/展开视图。
+- flow_kind 标准形状。
+- `when` 条件边。
+- planned/external/health finding 标记。
+- registry 元数据、中文描述、契约 key 可进入图中标签。
 
 ### CLI
 
@@ -224,107 +198,34 @@ topology-kernel validate --config ... --json
 topology-kernel inspect-node --type ... --module ...
 topology-kernel inspect-config --config ...
 topology-kernel run --config ...
-topology-kernel export-mermaid --config ...
-topology-kernel export-mermaid --config ... --output ...
-topology-kernel export-mermaid --config ... --expand-nodesets
+topology-kernel export-mermaid --config ... --output graph.mmd
+topology-kernel export-ascii --config ... --output graph.txt
+topology-kernel export-svg --config ... --output graph.svg
 topology-kernel quality-check --path ...
 topology-kernel quality-check --path ... --json
 ```
 
-`run` 使用强制健康检查入口；未注册业务 node 或健康检查失败时会拒绝执行，并保留运行目录中的诊断产物。CLI 的配置错误输出包含稳定 `rule_id`，JSON 输出包含文件、行列和失败层级；文本验证输出也会显示文件、行列和规则编号。
+### 通用质量自检
 
-### 发布形态和结构定义
+`topology-kernel quality-check --path ...` 可检查普通 Python 项目，也用于内核自检。
 
-已实现：
-
-- `pyproject.toml` 提供 `topology-kernel = topology_kernel.cli:main` 命令入口。
-- 顶层 `topology_kernel.STABLE_PUBLIC_API` 明确稳定公共 API 清单。
-- `topology_kernel.resources.schema_text(...)` 可读取内置 schema 资源。
-- 内置 schema 覆盖 JSONC 配置等价结构、policy、health report、node、nodeset、boundary。
-
-### 通用代码质量检查工具
-
-已实现：
-
-- `topology-kernel quality-check --path ...` 可检查普通 Python 项目，不要求使用 `topology-kernel` 架构。
-- 检查内核仓库自身时使用 `PYTHONPATH=src python3 -m topology_kernel quality-check --path .`。
-- 检查文件行数、文件字节数、函数数量、类数量、公共 API 数量、分支数量和最大嵌套深度。
-- 检查单函数长度、分支数和嵌套深度。
-- 扫描 Python import 图，发现过长依赖链、循环依赖和双向依赖。
-- 检查相似 AST 指纹，输出重复逻辑信号。
-- 检查文件、网络、数据库、外部进程、环境变量、动态执行等隐藏副作用风险。
-- 支持 JSON 报告和人类可读摘要。
-- 默认排除 `references/` 等外部参考资料目录，避免把第三方参考仓库纳入内核自检。
-
-### 示例和失败样本
-
-已实现：
-
-- `examples/minimal_project/`：最小可运行项目，业务侧只提供 node、`base_lib`、policy 插件、nodeset 和 JSONC 配置。
-- `examples/failure_cases/cases.jsonc`：典型失败样本 manifest，覆盖巨型 node、隐藏副作用、动态导入、node 互调、未声明环路、非法 boundary 和 `base_lib` 逃逸。
-- 单元测试会运行最小示例，并物化失败样本确认内核输出稳定规则编号。
-
-## 测试状态
-
-当前测试文件：
+当前内核默认自检已达到：
 
 ```text
-tests/unit/test_topology_kernel_strict.py
+PASS, errors=0, warnings=0
 ```
 
-覆盖：
+### 示例和沙箱
 
-- 纯函数 node 元数据与 AST 检查。
-- 源码大小限制。
-- node 内部调用链和递归检查。
-- node 到 `base_lib` 的依赖链深度检查。
-- 数据边自动推导。
-- 运行时执行。
-- 未声明环路失败。
-- 显式有界环路通过并执行。
-- nodeset 可作为 node 使用。
-- 健康报告。
-- Mermaid 导出。
-- 正式运行产物和 runtime trace。
-- 插件加载、策略扩展、fail-closed 和运行钩子。
-- 最小示例项目和失败示例集。
-- Mermaid 展开/折叠一致性。
-- 运行产物完整性交叉验证。
-- 通用代码质量检查工具。
+已维护：
 
-迁移到独立仓库后的验证：
+- `examples/minimal_project/`：最小可运行项目。
+- `examples/integration_sandbox/`：综合沙箱，覆盖 flow_kind、decision cycle、nodeset、plugins、planned 内容、ASCII/Mermaid/SVG 输出。
+- `examples/failure_cases/`：失败样本和 rule_id 覆盖。
 
-```text
-7 passed
-```
+## 当前仍可继续改进
 
-Paperflow 清理内核副本后的验证：
-
-```text
-135 passed
-```
-
-当前内核自检：
-
-```text
-PYTHONPATH=src python3 -m topology_kernel quality-check --path .
-PASS，0 errors，0 warnings
-```
-
-已将 `cli.py`、`health.py`、`purity.py` 和巨型单元测试文件拆分为多个小文件，并进一步收紧通用质量工具的误报、抽出重复摘要逻辑、复用 `base_lib` / purity helper、拆分 boundary 与 base_lib 健康报告工具。当前内核仓库自检通过，后续变更应继续保持 `quality-check --path .` 的 `PASS`、0 error、0 warning。
-
-## 尚未完成
-
-当前主体功能已达到初步实现版。后续主要工作是持续收紧规则、降低误报、补充真实项目迁移反馈，并把 `quality-check --path .` 接入 CI 或发布前流程。
-
-## 当前风险
-
-- 纯函数检查仍是工程约束，不是数学证明。
-- 质量检查工具目前是轻量 AST 扫描和启发式检查，适合作为维护风险雷达，不等同于完整静态分析器。
-
-## 下一步建议
-
-1. 用 `quality-check --path .` 的结果反向拆分过大的内核文件。
-2. 将 `quality-check --path .` 接入 CI 或发布前流程。
-3. 用真实业务项目试迁移，收集误报和漏报。
-4. 再把 Paperflow 逐步迁移为该内核的使用方。
+- 更智能的图布局和大图折叠策略。
+- 更丰富的语义一致性检查。
+- 更细的外部依赖治理策略。
+- 更完整的 side-effect 自检分层和允许清单。

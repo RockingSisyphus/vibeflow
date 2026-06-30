@@ -1,5 +1,7 @@
 # ASCII Flowchart Renderer Plan
 
+> 当前状态：本文件记录 ASCII renderer 的实现计划和取舍。后续内核已加入基于 Mermaid CLI 的 SVG 导出，人工审查标准流程图形状时优先使用 `graph.svg` / `export-svg`；ASCII 仍保留为无外部渲染器的终端 fallback 和调试产物。
+
 ## Problem
 
 The kernel currently emits Mermaid flowcharts. Recent Mermaid shape syntax fixed

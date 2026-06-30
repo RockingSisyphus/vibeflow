@@ -4,6 +4,40 @@ from base_lib.math_tools import add
 from topology_kernel import NodeContract, NodeInfo
 
 
+class StartNode:
+    NODE_INFO = NodeInfo(
+        type_key="demo.start",
+        display_name="Start",
+        category="demo",
+        description="Terminal start node for the demo workflow.",
+        version="0.1.0",
+        flow_kind="terminal",
+    )
+    CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}, "outputs": {}},))
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
+class EndNode:
+    NODE_INFO = NodeInfo(
+        type_key="demo.end",
+        display_name="End",
+        category="demo",
+        description="Terminal end node after value.out is produced.",
+        version="0.1.0",
+        flow_kind="terminal",
+    )
+    CONTRACT = NodeContract(
+        requires=("value.out",),
+        input_semantics={"value.out": ("final numeric value",)},
+        examples=({"inputs": {"value.out": 5}, "params": {}, "outputs": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
 class SeedNode:
     NODE_INFO = NodeInfo(
         type_key="demo.seed",
