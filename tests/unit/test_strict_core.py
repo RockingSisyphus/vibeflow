@@ -356,11 +356,16 @@ def test_checked_run_writes_reproducible_artifacts_without_raw_inputs(tmp_path) 
     graph_mmd = (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
     graph_txt = (result.run_dir / "graph.txt").read_text(encoding="utf-8")
     for edge in compiled["effective_edges"]:
-        assert f'{edge["from"]} --> {edge["to"]}' in graph_mmd
+        mermaid_to = "n_end" if edge["to"] == "end" else edge["to"]
+        assert f'{edge["from"]} --> {mermaid_to}' in graph_mmd
         assert f'{edge["from"]} ----> {edge["to"]}' in graph_txt
     assert "provides: value.out" in graph_mmd
     assert "TOPOLOGY FLOWCHART" in graph_txt
     assert "provides=value.out" in graph_txt
+    if is_mermaid_svg_renderer_available():
+        graph_svg = (result.run_dir / "graph.svg").read_text(encoding="utf-8")
+        assert "<svg" in graph_svg
+        assert "graph.svg.error.txt" not in {path.name for path in result.run_dir.iterdir()}
     trace_lines = [json.loads(line) for line in (result.run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
     assert [event["node"] for event in trace_lines if event["kind"] == "node"] == ["start", "seed", "add", "end"]
     assert trace_lines[-1]["kind"] == "runtime_summary"

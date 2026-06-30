@@ -212,11 +212,17 @@ def _validate_run_health(
 def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None) -> None:
     from .ascii_flowchart import export_ascii_flowchart
     from .mermaid import compiled_graph_payload, export_mermaid
+    from .mermaid_render import MermaidRenderError, render_mermaid_svg
 
     _write_json(run_dir / "health_report.json", health.to_dict())
     _write_json(run_dir / "compiled_graph.json", compiled_graph_payload(graph, compiled))
     (run_dir / "graph.txt").write_text(export_ascii_flowchart(graph, compiled=compiled, registry=registry, health_report=health), encoding="utf-8")
-    (run_dir / "graph.mmd").write_text(export_mermaid(graph, compiled=compiled, registry=registry, health_report=health), encoding="utf-8")
+    mermaid_text = export_mermaid(graph, compiled=compiled, registry=registry, health_report=health)
+    (run_dir / "graph.mmd").write_text(mermaid_text, encoding="utf-8")
+    try:
+        render_mermaid_svg(mermaid_text, run_dir / "graph.svg")
+    except MermaidRenderError as exc:
+        (run_dir / "graph.svg.error.txt").write_text(str(exc), encoding="utf-8")
 
 
 def _refuse_on_health_failure(health: HealthReport, run_dir: Path, run_id: str) -> None:

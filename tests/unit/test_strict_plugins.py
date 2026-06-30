@@ -210,7 +210,7 @@ def test_mermaid_shows_when_edges_and_health_findings() -> None:
     mermaid = export_mermaid(graph, health_report=report)
     assert "seed -->|flow.route == 'go'| consumer" in mermaid
     assert "%% finding warning POLICY.TEST node:consumer policy warning" in mermaid
-    assert ":::healthWarning" in mermaid
+    assert "class consumer healthWarning;" in mermaid
 
 def test_health_report_status_pass_when_no_findings() -> None:
     registry = _registry()
@@ -249,8 +249,11 @@ def test_target_package_structure_reexports_stable_api_and_schema_resources() ->
     assert core.GraphCompiler is GraphCompiler
     assert devtools.export_mermaid is export_mermaid
     assert devtools.export_ascii_flowchart is export_ascii_flowchart
+    assert devtools.render_mermaid_svg is render_mermaid_svg
+    assert devtools.is_mermaid_svg_renderer_available is is_mermaid_svg_renderer_available
     assert plugins.PluginRegistry is PluginRegistry
     assert "NodeInfo" in STABLE_PUBLIC_API
+    assert "render_mermaid_svg" in STABLE_PUBLIC_API
     assert "schema_text" in STABLE_PUBLIC_API
 
     for schema_name in ("config", "policy", "health_report", "node", "nodeset"):

@@ -113,11 +113,15 @@ class _MermaidRenderer:
                 flow_kind = _node_flow_kind(node, compiled) or FLOW_KIND_PROCESS
                 preferred_class = "externalDependency" if self._node_is_external(node) else ""
                 class_name = self._class_for_node(node_id, preferred_class=preferred_class, planned=node.status == STATUS_PLANNED)
-                lines.append(f"{indent}{_node_shape(node_id, self._node_label(node), flow_kind, class_name=class_name)}")
+                lines.append(f"{indent}{_node_shape(node_id, self._node_label(node), flow_kind)}")
+                if class_name:
+                    lines.append(f"{indent}class {node_id} {class_name};")
                 continue
             flow_kind = _node_flow_kind(node, compiled) or nodeset.flow_kind
             class_name = self._class_for_node(node_id, preferred_class="nodesetNode", planned=node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED)
-            lines.append(f"{indent}{_node_shape(node_id, self._nodeset_label(node, nodeset), flow_kind, class_name=class_name)}")
+            lines.append(f"{indent}{_node_shape(node_id, self._nodeset_label(node, nodeset), flow_kind)}")
+            if class_name:
+                lines.append(f"{indent}class {node_id} {class_name};")
             if not self.expand_nodesets:
                 continue
             group_id = _safe_id(f"{prefix}{node.name}__expanded")
@@ -205,7 +209,7 @@ class _MermaidRenderer:
         if node.status == STATUS_PLANNED:
             lines.append("planned")
         if self.show_semantics:
-            lines.extend(_node_semantic_lines(node))
+            lines.extend(self._node_semantic_lines(node))
         if self.show_contract:
             lines.extend((_key_line("requires", node.requires), _key_line("provides", node.provides)))
         return _join_label_lines(lines)
@@ -233,6 +237,30 @@ class _MermaidRenderer:
             )
         return _join_label_lines(lines)
 
+    def _node_semantic_lines(self, node: NodeSpec) -> tuple[str, ...]:
+        lines: list[str] = []
+        if self.registry is not None and node.status != STATUS_PLANNED and not node.node_type.startswith("nodeset."):
+            try:
+                node_cls = self.registry.get(node.node_type)
+            except Exception:
+                node_cls = None
+            info = getattr(node_cls, "NODE_INFO", None) if node_cls is not None else None
+            if info is not None:
+                lines.extend(
+                    str(value)
+                    for value in (
+                        getattr(info, "display_name", ""),
+                        f"category: {getattr(info, 'category', '')}",
+                        f"version: {getattr(info, 'version', '')}",
+                        getattr(info, "description", ""),
+                    )
+                    if str(value).strip()
+                )
+                if getattr(info, "external", False):
+                    lines.append("external: true")
+        lines.extend(_node_param_semantic_lines(node))
+        return tuple(lines)
+
 
 def _nodeset_for_node(graph: GraphConfig, node: NodeSpec) -> NodesetSpec | None:
     if not node.node_type.startswith("nodeset."):
@@ -249,7 +277,7 @@ def _nodeset_node_ids(graph: GraphConfig, node_ids: Mapping[str, str]) -> dict[s
     return result
 
 
-def _node_semantic_lines(node: NodeSpec) -> tuple[str, ...]:
+def _node_param_semantic_lines(node: NodeSpec) -> tuple[str, ...]:
     lines: list[str] = []
     for key in ("display_name", "category", "version", "description"):
         value = node.params.get(key)
@@ -258,10 +286,9 @@ def _node_semantic_lines(node: NodeSpec) -> tuple[str, ...]:
     return tuple(lines)
 
 
-def _node_shape(node_id: str, label: str, flow_kind: object, *, class_name: str = "") -> str:
+def _node_shape(node_id: str, label: str, flow_kind: object) -> str:
     escaped = _escape_label(label)
     kind = str(flow_kind)
-    suffix = f":::{class_name}" if class_name else ""
     shape = {
         FLOW_KIND_TERMINAL: "stadium",
         FLOW_KIND_PROCESS: "rect",
@@ -272,7 +299,7 @@ def _node_shape(node_id: str, label: str, flow_kind: object, *, class_name: str 
         FLOW_KIND_DOCUMENT: "doc",
         FLOW_KIND_PREPARATION: "hex",
     }.get(kind, "rect")
-    return f'{node_id}@{{ shape: {shape}, label: "{escaped}" }}{suffix}'
+    return f'{node_id}@{{ shape: {shape}, label: "{escaped}" }}'
 
 
 def _node_flow_kind(node: NodeSpec, compiled: CompiledGraph) -> str:
@@ -310,7 +337,7 @@ def _safe_id(value: str) -> str:
     cleaned = "".join(char if char.isalnum() or char == "_" else "_" for char in value)
     if not cleaned:
         return "node"
-    if cleaned[0].isdigit():
+    if cleaned[0].isdigit() or cleaned.lower() in {"end", "class", "classdef", "flowchart", "graph", "subgraph"}:
         return f"n_{cleaned}"
     return cleaned
 

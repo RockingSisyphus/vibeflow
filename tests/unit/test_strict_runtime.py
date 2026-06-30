@@ -256,6 +256,8 @@ def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, ca
     run_dir = Path(payload["run_dir"])
     for name in ("compiled_graph.json", "health_report.json", "graph.txt", "graph.mmd", "runtime_trace.jsonl", "output_summary.json"):
         assert (run_dir / name).exists()
+    if is_mermaid_svg_renderer_available():
+        assert (run_dir / "graph.svg").exists()
 
 def test_policy_plugin_tightens_effective_policy_and_health_uses_it(tmp_path) -> None:
     plugin_path = tmp_path / "tight_plugin.py"

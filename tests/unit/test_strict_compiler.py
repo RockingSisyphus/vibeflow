@@ -173,7 +173,7 @@ def test_planned_nodes_compile_without_registry_and_render_as_architecture() -> 
     assert payload["nodes"][0]["flow_kind"] == "predefined"
     assert 'a@{ shape: fr-rect, label: "a' in text
     assert "planned" in text
-    assert ":::plannedNode" in text
+    assert "class a plannedNode;" in text
 
 
 def test_implemented_node_cannot_declare_config_flow_kind() -> None:
