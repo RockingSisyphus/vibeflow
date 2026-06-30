@@ -40,7 +40,7 @@ def validate_config_path(path: Path, *, policy_path: Path | None = None) -> Heal
     try:
         compiled = GraphCompiler().compile(graph)
     except GraphCompileError as exc:
-        return fail_report("GRAPH.COMPILE", str(exc), "pipeline", "pipeline", "topology", effective_policy=effective_policy)
+        return fail_report(exc.rule_id, str(exc), "pipeline", "pipeline", "topology", effective_policy=effective_policy)
     return HealthReport(
         status="PASS",
         info={
@@ -50,7 +50,6 @@ def validate_config_path(path: Path, *, policy_path: Path | None = None) -> Heal
             "explicit_edges": [edge.pair for edge in compiled.explicit_edges],
             "data_edges": [edge.pair for edge in compiled.data_edges],
             "effective_edges": [edge.pair for edge in compiled.effective_edges],
-            "loops": [loop.name for loop in compiled.loops],
         },
         effective_policy=effective_policy,
     )
@@ -86,23 +85,7 @@ def inspect_config_payload(path: Path, *, policy_path: Path | None = None) -> tu
             for nodeset in graph.nodesets.values()
         ],
         "nodeset_imports": [dict(item) for item in document.nodeset_imports],
-        "boundary": boundary_payload(graph),
-        "loops": [
-            {"name": loop.name, "edges": [list(edge) for edge in loop.edges], "max_iterations": loop.max_iterations, "nodes": list(loop.nodes), "until": loop.until}
-            for loop in graph.loops
-        ],
-        "effective_edges": [list(edge.pair) for edge in compiled.effective_edges],
+        "max_steps": graph.max_steps,
+        "effective_edges": [{"from": edge.source, "to": edge.target, "when": edge.when} for edge in compiled.effective_edges],
     }
     return payload, 0
-
-
-def boundary_payload(graph) -> dict[str, object]:
-    if graph.boundary is None:
-        return {}
-    return {
-        "type": graph.boundary.boundary_type,
-        "consumes": list(graph.boundary.consumes),
-        "provides": list(graph.boundary.provides),
-        "allowed_paths": list(graph.boundary.allowed_paths),
-        "run_dir": graph.boundary.config.get("run_dir", ""),
-    }

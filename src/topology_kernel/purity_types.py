@@ -185,6 +185,14 @@ class _CallChainAnalysis:
 
 
 def _default_rule_id(code: str) -> str:
+    flow_rules = {
+        "node_info_flow_kind": "NODE.FLOW_KIND.MISSING",
+        "node_flow_kind_invalid": "NODE.FLOW_KIND.INVALID",
+        "node_decision_missing_route_output": "NODE.DECISION.MISSING_ROUTE_OUTPUT",
+        "node_external_invalid": "NODE.EXTERNAL.INVALID",
+    }
+    if code in flow_rules:
+        return flow_rules[code]
     if code.startswith("node_") or code in {"type_mismatch"}:
         return f"NODE.METADATA.{code.upper()}"
     if code.startswith("contract") or code in {

@@ -32,8 +32,16 @@ def build_parser() -> argparse.ArgumentParser:
     mermaid.add_argument("--collapse-nodesets", dest="expand_nodesets", action="store_false")
     mermaid.add_argument("--hide-contract", action="store_true")
     mermaid.add_argument("--hide-semantics", action="store_true")
-    mermaid.add_argument("--hide-boundary", action="store_true")
     mermaid.set_defaults(expand_nodesets=False)
+
+    ascii_chart = sub.add_parser("export-ascii", help="export topology config to ASCII flowchart")
+    ascii_chart.add_argument("--config", required=True)
+    ascii_chart.add_argument("--output", required=False)
+    ascii_chart.add_argument("--expand-nodesets", dest="expand_nodesets", action="store_true")
+    ascii_chart.add_argument("--collapse-nodesets", dest="expand_nodesets", action="store_false")
+    ascii_chart.add_argument("--hide-contract", action="store_true")
+    ascii_chart.add_argument("--hide-semantics", action="store_true")
+    ascii_chart.set_defaults(expand_nodesets=False)
 
     run = sub.add_parser("run", help="run topology config after mandatory health checks")
     run.add_argument("--config", required=True)
@@ -72,6 +80,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "validate": _handle_validate,
         "inspect-node": _handle_inspect_node,
         "inspect-config": _handle_inspect_config,
+        "export-ascii": _handle_export_ascii,
         "export-mermaid": _handle_export_mermaid,
         "run": _handle_run,
         "quality-check": _handle_quality_check,
@@ -119,10 +128,19 @@ def _handle_inspect_config(args: argparse.Namespace) -> int:
 
 
 def _handle_export_mermaid(args: argparse.Namespace) -> int:
+    return _handle_export_graph(args, export_kind="mermaid")
+
+
+def _handle_export_ascii(args: argparse.Namespace) -> int:
+    return _handle_export_graph(args, export_kind="ascii")
+
+
+def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
     from .cli_reports import config_load_error_report, fail_report, graph_config_error_report
     from .compiler import GraphCompiler, GraphCompileError
     from .config_loader import ConfigLoadError, load_config_document
     from .graph_config import GraphConfigError, parse_graph_config
+    from .ascii_flowchart import export_ascii_flowchart
     from .mermaid import export_mermaid
     from .policy import default_effective_policy
 
@@ -139,17 +157,11 @@ def _handle_export_mermaid(args: argparse.Namespace) -> int:
         print(report.to_json())
         return 1
     except GraphCompileError as exc:
-        report = fail_report("GRAPH.COMPILE", str(exc), "pipeline", "pipeline", "topology", effective_policy=default_effective_policy().to_dict())
+        report = fail_report(exc.rule_id, str(exc), "pipeline", "pipeline", "topology", effective_policy=default_effective_policy().to_dict())
         print(report.to_json())
         return 1
-    text = export_mermaid(
-        graph,
-        compiled=compiled,
-        expand_nodesets=bool(args.expand_nodesets),
-        show_contract=not bool(args.hide_contract),
-        show_semantics=not bool(args.hide_semantics),
-        show_boundary=not bool(args.hide_boundary),
-    )
+    exporter = export_ascii_flowchart if export_kind == "ascii" else export_mermaid
+    text = exporter(graph, compiled=compiled, expand_nodesets=bool(args.expand_nodesets), show_contract=not bool(args.hide_contract), show_semantics=not bool(args.hide_semantics))
     if args.output:
         Path(args.output).write_text(text, encoding="utf-8")
     else:
@@ -158,7 +170,6 @@ def _handle_export_mermaid(args: argparse.Namespace) -> int:
 
 
 def _handle_run(args: argparse.Namespace) -> int:
-    from .boundary import GLOBAL_BOUNDARY_REGISTRY
     from .registry import GLOBAL_NODE_REGISTRY
     from .runner import CheckedRunError, run_checked
 
@@ -171,7 +182,6 @@ def _handle_run(args: argparse.Namespace) -> int:
         result = run_checked(
             Path(args.config),
             registry=GLOBAL_NODE_REGISTRY,
-            boundary_registry=GLOBAL_BOUNDARY_REGISTRY,
             initial=initial,
             policy_path=Path(args.policy) if args.policy else None,
             run_root=Path(args.run_root) if args.run_root else None,

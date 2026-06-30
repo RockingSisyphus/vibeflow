@@ -5,6 +5,118 @@ from base_lib.good_math import add, multiply
 from topology_kernel import NodeContract, NodeInfo
 
 
+class StartNode:
+    NODE_INFO = NodeInfo(
+        type_key="sandbox.start",
+        display_name="Start",
+        category="sandbox",
+        description="Starts a sandbox flow.",
+        version="0.1.0",
+        flow_kind="terminal",
+    )
+    CONTRACT = NodeContract(
+        examples=({"inputs": {}, "params": {}, "outputs": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
+class ValueInputNode:
+    NODE_INFO = NodeInfo(
+        type_key="sandbox.value_input",
+        display_name="Value Input",
+        category="sandbox",
+        description="Reads value.in input inside a flow.",
+        version="0.1.0",
+        flow_kind="io",
+    )
+    CONTRACT = NodeContract(
+        requires=("value.in",),
+        input_semantics={"value.in": ("initial numeric value",)},
+        examples=({"inputs": {"value.in": 1}, "params": {}, "outputs": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
+class IoInputNode:
+    NODE_INFO = NodeInfo(
+        type_key="sandbox.io_input",
+        display_name="IO Input",
+        category="sandbox",
+        description="Reads io.result input inside a flow.",
+        version="0.1.0",
+        flow_kind="io",
+    )
+    CONTRACT = NodeContract(
+        requires=("io.result",),
+        input_semantics={"io.result": ("external numeric result",)},
+        examples=({"inputs": {"io.result": 1}, "params": {}, "outputs": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
+class FinalValueEndNode:
+    NODE_INFO = NodeInfo(
+        type_key="sandbox.final_value_end",
+        display_name="Final Value End",
+        category="sandbox",
+        description="Ends a flow after value.final is produced.",
+        version="0.1.0",
+        flow_kind="terminal",
+    )
+    CONTRACT = NodeContract(
+        requires=("value.final",),
+        input_semantics={"value.final": ("final numeric value",)},
+        examples=({"inputs": {"value.final": 1}, "params": {}, "outputs": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
+class OutValueEndNode:
+    NODE_INFO = NodeInfo(
+        type_key="sandbox.out_value_end",
+        display_name="Out Value End",
+        category="sandbox",
+        description="Ends a flow after value.out is produced.",
+        version="0.1.0",
+        flow_kind="terminal",
+    )
+    CONTRACT = NodeContract(
+        requires=("value.out",),
+        input_semantics={"value.out": ("output numeric value",)},
+        examples=({"inputs": {"value.out": 1}, "params": {}, "outputs": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
+class NextValueEndNode:
+    NODE_INFO = NodeInfo(
+        type_key="sandbox.next_value_end",
+        display_name="Next Value End",
+        category="sandbox",
+        description="Ends a flow after value.next is produced.",
+        version="0.1.0",
+        flow_kind="terminal",
+    )
+    CONTRACT = NodeContract(
+        requires=("value.next",),
+        input_semantics={"value.next": ("final loop value",)},
+        examples=({"inputs": {"value.next": 1}, "params": {}, "outputs": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
 class ConstantNode:
     NODE_INFO = NodeInfo(
         type_key="sandbox.constant",
@@ -12,6 +124,7 @@ class ConstantNode:
         category="sandbox",
         description="Produces a configured numeric value.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         provides=("value.in",),
@@ -32,6 +145,7 @@ class AddNode:
         category="sandbox",
         description="Adds a configured delta to value.in.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         requires=("value.in",),
@@ -54,6 +168,7 @@ class MultiplyNode:
         category="sandbox",
         description="Multiplies value.out by a configured factor.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         requires=("value.out",),
@@ -76,6 +191,7 @@ class BranchLeftNode:
         category="sandbox",
         description="Produces the left value for a free branch.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         provides=("branch.left",),
@@ -96,6 +212,7 @@ class BranchRightNode:
         category="sandbox",
         description="Produces the right value for a free branch.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         provides=("branch.right",),
@@ -116,6 +233,7 @@ class SumPairNode:
         category="sandbox",
         description="Sums two free branch values.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         requires=("branch.left", "branch.right"),
@@ -137,6 +255,7 @@ class AddThreeNode:
         category="sandbox",
         description="Adds three through a short legal base_lib dependency chain.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         requires=("value.in",),
@@ -158,6 +277,7 @@ class AddOutNode:
         category="sandbox",
         description="Adds a configured delta to value.out and produces value.final.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         requires=("value.out",),

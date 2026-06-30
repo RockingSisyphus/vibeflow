@@ -12,16 +12,13 @@ def test_nodeset_imports_expand_for_validate_inspect_mermaid_and_run(tmp_path, c
                         requires=["value.in"],
                         provides=["value.out"],
                         exports=["value.out"],
-                        pipeline={
-                            "inputs": ["value.in"],
-                            "nodes": [{"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]}],
-                        },
+                        pipeline=_input_add_pipeline(),
                     ),
                     _nodeset_config(
                         "math.seed",
                         provides=["value.in"],
                         exports=["value.in"],
-                        pipeline={"nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"], "value": 4}]},
+                        pipeline=_seed_only_pipeline(seed={"value": 4}),
                     ),
                 ]
             }
@@ -35,9 +32,12 @@ def test_nodeset_imports_expand_for_validate_inspect_mermaid_and_run(tmp_path, c
                 "nodeset_imports": [{"path": "nodesets.jsonc", "names": ["math.add_one"]}],
                 "pipeline": {
                     "nodes": [
+                        {"name": "start", "type": "test.start"},
                         {"name": "seed", "type": "test.seed", "provides": ["value.in"], "value": 4},
                         {"name": "flow", "type": "nodeset.math.add_one", "requires": ["value.in"], "provides": ["value.out"]},
-                    ]
+                        {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                    ],
+                    "edges": _edge_chain("start", "seed", "flow", "end"),
                 },
             }
         ),

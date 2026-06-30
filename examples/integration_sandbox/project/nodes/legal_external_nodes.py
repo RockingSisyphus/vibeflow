@@ -10,10 +10,11 @@ class EffectRequestNode:
         category="sandbox",
         description="Expresses an external effect request as data.",
         version="0.1.0",
+        flow_kind="data_store",
     )
     CONTRACT = NodeContract(
         provides=("effects.request",),
-        output_semantics={"effects.request": ("structured request for boundary",)},
+        output_semantics={"effects.request": ("structured request for an external effect",)},
         params_schema={"value": {"type": "number"}},
         output_schema={"effects.request": {"type": "object"}},
         examples=({"inputs": {}, "params": {"value": 5}, "outputs": {"effects.request": {"value": 5}}},),
@@ -23,18 +24,19 @@ class EffectRequestNode:
         return {"effects.request": {"value": params.get("value", 1)}}
 
 
-class BoundaryResultAddNode:
+class IoResultAddNode:
     NODE_INFO = NodeInfo(
-        type_key="sandbox.boundary_result_add",
-        display_name="Boundary Result Add",
+        type_key="sandbox.io_result_add",
+        display_name="IO Result Add",
         category="sandbox",
-        description="Adds a configured delta to a boundary result.",
+        description="Adds a configured delta to an external IO result.",
         version="0.1.0",
+        flow_kind="io",
     )
     CONTRACT = NodeContract(
         requires=("io.result",),
         provides=("value.final",),
-        input_semantics={"io.result": ("boundary numeric result",)},
+        input_semantics={"io.result": ("external numeric result",)},
         output_semantics={"value.final": ("final numeric value",)},
         params_schema={"delta": {"type": "number"}},
         output_schema={"value.final": {"type": "number"}},
@@ -45,18 +47,19 @@ class BoundaryResultAddNode:
         return {"value.final": inputs["io.result"] + params.get("delta", 1)}
 
 
-class BoundaryResultInputNode:
+class IoResultInputNode:
     NODE_INFO = NodeInfo(
-        type_key="sandbox.boundary_result_input",
-        display_name="Boundary Result Input",
+        type_key="sandbox.io_result_input",
+        display_name="IO Result Input",
         category="sandbox",
-        description="Converts a boundary result into value.in for a downstream nodeset.",
+        description="Converts an external IO result into value.in for a downstream nodeset.",
         version="0.1.0",
+        flow_kind="io",
     )
     CONTRACT = NodeContract(
         requires=("io.result",),
         provides=("value.in",),
-        input_semantics={"io.result": ("boundary numeric result",)},
+        input_semantics={"io.result": ("external numeric result",)},
         output_semantics={"value.in": ("numeric input for downstream flow",)},
         params_schema={"delta": {"type": "number"}},
         output_schema={"value.in": {"type": "number"}},

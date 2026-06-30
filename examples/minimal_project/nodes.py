@@ -4,6 +4,40 @@ from base_lib.math_tools import add
 from topology_kernel import NodeContract, NodeInfo
 
 
+class StartNode:
+    NODE_INFO = NodeInfo(
+        type_key="example.start",
+        display_name="Start",
+        category="example",
+        description="Starts the example workflow.",
+        version="0.1.0",
+        flow_kind="terminal",
+    )
+    CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}, "outputs": {}},))
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
+class EndNode:
+    NODE_INFO = NodeInfo(
+        type_key="example.end",
+        display_name="End",
+        category="example",
+        description="Ends after value.out is produced.",
+        version="0.1.0",
+        flow_kind="terminal",
+    )
+    CONTRACT = NodeContract(
+        requires=("value.out",),
+        input_semantics={"value.out": ("final numeric value",)},
+        examples=({"inputs": {"value.out": 2}, "params": {}, "outputs": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
 class SeedNode:
     NODE_INFO = NodeInfo(
         type_key="example.seed",
@@ -11,6 +45,7 @@ class SeedNode:
         category="example",
         description="Produces the initial value for the example workflow.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         provides=("value.in",),
@@ -31,6 +66,7 @@ class AddNode:
         category="example",
         description="Adds a configured delta using a pure base_lib helper.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         requires=("value.in",),

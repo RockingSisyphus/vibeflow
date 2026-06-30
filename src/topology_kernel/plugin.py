@@ -22,11 +22,6 @@ class RuntimePlugin(Protocol):
     priority: int
 
 
-class BoundaryPlugin(Protocol):
-    name: str
-    priority: int
-
-
 @dataclass(frozen=True)
 class PluginDescriptor:
     name: str
@@ -47,7 +42,7 @@ class PluginDescriptor:
 
 class PluginRegistry:
     def __init__(self) -> None:
-        self._plugins: dict[str, list[object]] = {"policy": [], "compiler": [], "runtime": [], "boundary": []}
+        self._plugins: dict[str, list[object]] = {"policy": [], "compiler": [], "runtime": []}
         self._descriptors: dict[int, PluginDescriptor] = {}
 
     def register(
@@ -89,12 +84,9 @@ class PluginRegistry:
     def runtime_plugins(self) -> tuple[object, ...]:
         return tuple(self._plugins["runtime"])
 
-    def boundary_plugins(self) -> tuple[object, ...]:
-        return tuple(self._plugins["boundary"])
-
     def descriptors(self) -> tuple[PluginDescriptor, ...]:
         ordered: list[PluginDescriptor] = []
-        for plugin_type in ("policy", "compiler", "runtime", "boundary"):
+        for plugin_type in ("policy", "compiler", "runtime"):
             for plugin in self._plugins[plugin_type]:
                 ordered.append(self._descriptors[id(plugin)])
         return tuple(ordered)
@@ -176,7 +168,9 @@ def _plugin_name(plugin: object) -> str:
 
 def _normalize_type(value: str) -> str:
     normalized = str(value).strip().lower()
-    if normalized not in {"policy", "compiler", "runtime", "boundary"}:
+    if normalized == "boundary":
+        raise ValueError("boundary plugins are removed; use runtime plugins")
+    if normalized not in {"policy", "compiler", "runtime"}:
         raise ValueError(f"unknown plugin type: {value}")
     return normalized
 

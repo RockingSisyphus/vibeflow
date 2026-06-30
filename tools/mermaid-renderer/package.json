@@ -1,0 +1,10 @@
+{
+  "name": "topology-kernel-mermaid-renderer",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Project-local Mermaid renderer for topology-kernel SVG artifacts",
+  "license": "MIT",
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "^11.16.0"
+  }
+}

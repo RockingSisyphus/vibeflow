@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import Any, Mapping
 from uuid import uuid4
 
 from .config_loader import ConfigLoadError, load_config_document
@@ -14,10 +14,8 @@ from .plugin import load_plugins_from_config
 from .policy import default_effective_policy, resolve_effective_policy
 from .summaries import summarize_mapping
 
-if TYPE_CHECKING:
-    from .boundary import BoundaryRegistry
-    from .graph_config import GraphConfig
-    from .registry import NodeRegistry
+from .graph_config import GraphConfig, STATUS_PLANNED
+from .registry import NodeRegistry
 
 
 @dataclass(frozen=True)
@@ -41,7 +39,7 @@ def run_checked(
     config_path: str | Path,
     *,
     registry: NodeRegistry,
-    boundary_registry: BoundaryRegistry | None = None,
+    boundary_registry: object | None = None,
     initial: Mapping[str, Any] | None = None,
     policy_path: str | Path | None = None,
     run_root: str | Path | None = None,
@@ -49,6 +47,8 @@ def run_checked(
 ) -> CheckedRunResult:
     path = Path(config_path)
     actual_run_id = run_id or _new_run_id()
+    if boundary_registry is not None:
+        raise ValueError("boundary_registry is removed; use flowchart nodes")
     run_dir = _prepare_run_dir(run_root, actual_run_id)
     _write_json(run_dir / "input_summary.json", summarize_mapping(dict(initial or {})))
 
@@ -64,10 +64,13 @@ def run_checked(
     _write_json(run_dir / "effective_policy.json", effective_policy)
     _refuse_on_schema_findings(document.data, policy_result.findings, effective_policy, run_dir, actual_run_id)
     graph, compiled = _compile_or_refuse(document.data, plugin_registry, effective_policy, run_dir, actual_run_id)
-    health = _validate_run_health(graph, registry, boundary_registry, plugin_registry, policy_result, effective_policy, document.nodeset_imports)
-    _write_preflight_artifacts(run_dir, graph, compiled, health)
+    health = _validate_run_health(graph, registry, plugin_registry, policy_result, effective_policy, document.nodeset_imports)
+    _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry)
+    if health.status not in {"FAIL", "ERROR"}:
+        compiled = _compile_with_registry_or_refuse(graph, registry, effective_policy, run_dir, actual_run_id)
+    _write_preflight_artifacts(run_dir, graph, compiled, health, registry=registry)
     _refuse_on_health_failure(health, run_dir, actual_run_id)
-    context = _execute_runtime(graph, registry, boundary_registry, plugin_registry, initial, run_dir)
+    context = _execute_runtime(graph, registry, plugin_registry, initial, run_dir)
     _write_json(run_dir / "output_summary.json", summarize_mapping(dict(context.iter_flat_items())))
     return CheckedRunResult(actual_run_id, run_dir, health, context)
 
@@ -148,12 +151,31 @@ def _compile_or_refuse(
     return graph, compiled
 
 
+def _compile_with_registry_or_refuse(
+    graph: GraphConfig,
+    registry: NodeRegistry,
+    effective_policy: dict[str, Any],
+    run_dir: Path,
+    run_id: str,
+):
+    from .compiler import GraphCompiler, GraphCompileError
+
+    try:
+        return GraphCompiler().compile(graph, registry=registry)
+    except GraphCompileError as exc:
+        health = _compile_health_report(exc, effective_policy)
+        _write_refused_artifacts(run_dir, health)
+        result = CheckedRunResult(run_id, run_dir, health)
+        raise CheckedRunError(f"run refused: health status {health.status}", result) from exc
+
+
 def _compile_health_report(exc: Exception, effective_policy: dict[str, Any]) -> HealthReport:
+    rule_id = getattr(exc, "rule_id", "GRAPH.COMPILE")
     return HealthReport(
         status="FAIL",
         errors=(
             HealthFinding(
-                rule_id="GRAPH.COMPILE",
+                rule_id=str(rule_id),
                 severity="error",
                 object_type="pipeline",
                 object_id="pipeline",
@@ -169,7 +191,6 @@ def _compile_health_report(exc: Exception, effective_policy: dict[str, Any]) -> 
 def _validate_run_health(
     graph: GraphConfig,
     registry: NodeRegistry,
-    boundary_registry: BoundaryRegistry | None,
     plugin_registry,
     policy_result,
     effective_policy: dict[str, Any],
@@ -180,7 +201,6 @@ def _validate_run_health(
     health = validate_graph_health(
         graph,
         registry=registry,
-        boundary_registry=boundary_registry,
         plugin_registry=plugin_registry,
         purity_policy=policy_result.effective_policy.to_purity_policy(),
     )
@@ -189,12 +209,14 @@ def _validate_run_health(
     return replace(health, effective_policy=effective_policy, info=info)
 
 
-def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport) -> None:
+def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None) -> None:
+    from .ascii_flowchart import export_ascii_flowchart
     from .mermaid import compiled_graph_payload, export_mermaid
 
     _write_json(run_dir / "health_report.json", health.to_dict())
     _write_json(run_dir / "compiled_graph.json", compiled_graph_payload(graph, compiled))
-    (run_dir / "graph.mmd").write_text(export_mermaid(graph, compiled=compiled, health_report=health), encoding="utf-8")
+    (run_dir / "graph.txt").write_text(export_ascii_flowchart(graph, compiled=compiled, registry=registry, health_report=health), encoding="utf-8")
+    (run_dir / "graph.mmd").write_text(export_mermaid(graph, compiled=compiled, registry=registry, health_report=health), encoding="utf-8")
 
 
 def _refuse_on_health_failure(health: HealthReport, run_dir: Path, run_id: str) -> None:
@@ -204,10 +226,42 @@ def _refuse_on_health_failure(health: HealthReport, run_dir: Path, run_id: str) 
         raise CheckedRunError(f"run refused: health status {health.status}", result)
 
 
+def _refuse_on_planned_run(graph: GraphConfig, health: HealthReport, run_dir: Path, run_id: str, *, registry: NodeRegistry) -> None:
+    from .compiler import GraphCompiler
+
+    planned = _planned_items(graph)
+    if not planned:
+        return
+    error = HealthFinding(
+        rule_id="GRAPH.PLANNED.NODE_IN_RUN",
+        severity="error",
+        object_type="pipeline",
+        object_id="pipeline",
+        failure_layer="topology",
+        message="planned nodes/nodesets cannot run: " + ", ".join(planned),
+        suggested_fix_type="implement_node",
+        details={"planned": planned},
+    )
+    failed = replace(health, status="FAIL", errors=(*health.errors, error))
+    _write_preflight_artifacts(run_dir, graph, GraphCompiler().compile(graph, registry=registry), failed, registry=registry)
+    _ensure_trace_files(run_dir)
+    result = CheckedRunResult(run_id, run_dir, failed)
+    raise CheckedRunError("run refused: planned nodes are not executable", result)
+
+
+def _planned_items(graph: GraphConfig, *, prefix: str = "") -> list[str]:
+    items = [f"{prefix}{node.name}" for node in graph.nodes if node.status == STATUS_PLANNED]
+    for name, nodeset in graph.nodesets.items():
+        full_name = f"{prefix}nodeset.{name}"
+        if nodeset.status == STATUS_PLANNED:
+            items.append(full_name)
+        items.extend(_planned_items(nodeset.graph, prefix=f"{full_name}."))
+    return items
+
+
 def _execute_runtime(
     graph: GraphConfig,
     registry: NodeRegistry,
-    boundary_registry: BoundaryRegistry | None,
     plugin_registry,
     initial: Mapping[str, Any] | None,
     run_dir: Path,
@@ -217,7 +271,6 @@ def _execute_runtime(
     runtime = PipelineRuntime(
         graph,
         registry=registry,
-        boundary_registry=boundary_registry,
         plugin_registry=plugin_registry,
         run_dir=run_dir,
     )
@@ -276,7 +329,7 @@ def _write_json(path: Path, payload: object) -> None:
 
 
 def _ensure_trace_files(run_dir: Path) -> None:
-    for name in ("runtime_trace.jsonl", "boundary_trace.jsonl"):
+    for name in ("runtime_trace.jsonl",):
         path = run_dir / name
         if not path.exists():
             path.write_text("", encoding="utf-8")

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Mapping
 
 from .compiler import GraphCompiler, GraphCompileError
-from .graph_config import GraphConfig
+from .graph_config import GraphConfig, STATUS_PLANNED
 from .health_types import HealthFinding
 from .registry import NodeRegistry, NodeRegistryError
 
@@ -13,6 +13,8 @@ def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry) -> tuple[tu
     warnings: list[HealthFinding] = []
     references = _nodeset_references(graph)
     for nodeset in graph.nodesets.values():
+        if nodeset.status == STATUS_PLANNED:
+            continue
         errors.extend(_validate_nodeset_metadata(nodeset))
         errors.extend(_validate_nodeset_contract(nodeset))
         errors.extend(_validate_nodeset_key_scope(nodeset))
@@ -66,6 +68,8 @@ def append_nodeset_finding(
 def _validate_node_types_in_scope(nodes, nodesets, *, registry: NodeRegistry, owner: str) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
     for node in nodes:
+        if node.status == STATUS_PLANNED:
+            continue
         if node.node_type.startswith("nodeset."):
             continue
         try:
@@ -89,6 +93,8 @@ def _validate_node_types_in_scope(nodes, nodesets, *, registry: NodeRegistry, ow
 def _validate_nodeset_usages(nodes, nodesets, *, owner: str) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
     for node in nodes:
+        if node.status == STATUS_PLANNED:
+            continue
         if not node.node_type.startswith("nodeset."):
             continue
         nodeset_name = node.node_type.removeprefix("nodeset.")

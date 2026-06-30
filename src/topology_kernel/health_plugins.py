@@ -26,8 +26,6 @@ def _plugins_for_types(plugin_registry: PluginRegistry, plugin_types: tuple[str,
         plugins.extend(plugin_registry.compiler_plugins())
     if "runtime" in plugin_types:
         plugins.extend(plugin_registry.runtime_plugins())
-    if "boundary" in plugin_types:
-        plugins.extend(plugin_registry.boundary_plugins())
     return tuple(plugins)
 
 

@@ -33,6 +33,7 @@ class EmptyTypeKeyNode:
         category="bad",
         description="Bad node with empty type key.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         provides=("bad.out",),
@@ -51,6 +52,7 @@ class NonPureNode:
         category="bad",
         description="Bad node with non-pure metadata.",
         version="0.1.0",
+        flow_kind="process",
         purity="impure",
     )
     CONTRACT = NodeContract(
@@ -70,6 +72,7 @@ class MissingContractNode:
         category="bad",
         description="Bad node without contract.",
         version="0.1.0",
+        flow_kind="process",
     )
 
     def run_pure(self, inputs, params):
@@ -83,6 +86,7 @@ class DuplicateKeysNode:
         category="bad",
         description="Bad node with duplicate contract keys.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         requires=("bad.in", "bad.in"),
@@ -103,6 +107,7 @@ class MissingSemanticsNode:
         category="bad",
         description="Bad node with missing semantics.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         requires=("bad.in",),

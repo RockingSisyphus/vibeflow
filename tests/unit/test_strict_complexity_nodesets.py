@@ -193,10 +193,10 @@ def test_schema_validation_rejects_invalid_pipeline_shapes() -> None:
     object_ids = {finding.object_id for finding in findings}
     assert "CONFIG.SCHEMA.NODE_MISSING_NAME" in rule_ids
     assert "CONFIG.SCHEMA.NODE_REQUIRES_LIST" in rule_ids
-    assert "CONFIG.SCHEMA.EDGE_MAX_EXECUTIONS" in rule_ids
-    assert "CONFIG.SCHEMA.LOOP_MAX_ITERATIONS" in rule_ids
+    assert "CONFIG.LOOP_LIMITS.REMOVED" in rule_ids
+    assert "CONFIG.LOOPS.REMOVED" in rule_ids
     assert "CONFIG.SCHEMA.NODESET_PIPELINE" in rule_ids
-    assert "CONFIG.SCHEMA.BOUNDARY_TYPE" in rule_ids
+    assert "CONFIG.BOUNDARY.REMOVED" in rule_ids
     assert "pipeline.nodes[0].name" in object_ids
 
 def test_schema_validation_rejects_policy_bool_as_int() -> None:
@@ -282,14 +282,7 @@ def test_cli_validate_explicit_policy_path_and_inspect_config(tmp_path, capsys) 
     policy_path = tmp_path / "policy.jsonc"
     config_path.write_text(
         json.dumps(
-            {
-                "pipeline": {
-                    "nodes": [
-                        {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
-                        {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
-                    ]
-                }
-            }
+            {"pipeline": _seed_add_pipeline()}
         ),
         encoding="utf-8",
     )
@@ -298,7 +291,11 @@ def test_cli_validate_explicit_policy_path_and_inspect_config(tmp_path, capsys) 
     payload = json.loads(capsys.readouterr().out)
     assert code == 0
     assert payload["health"]["effective_policy"]["node_source"]["max_lines"] == 111
-    assert payload["config"]["effective_edges"] == [["seed", "add"]]
+    assert payload["config"]["effective_edges"] == [
+        {"from": "start", "to": "seed", "when": ""},
+        {"from": "seed", "to": "add", "when": ""},
+        {"from": "add", "to": "end", "when": ""},
+    ]
 
 def test_cli_export_mermaid_reads_jsonc(tmp_path, capsys) -> None:
     config_path = tmp_path / "workflow.jsonc"
@@ -307,9 +304,12 @@ def test_cli_export_mermaid_reads_jsonc(tmp_path, capsys) -> None:
 {
   "pipeline": {
     "nodes": [
+      {"name": "start", "type": "test.start"},
       {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
-      {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]}
-    ]
+      {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
+      {"name": "end", "type": "test.out_end", "requires": ["value.out"]}
+    ],
+    "edges": [["start", "seed"], ["seed", "add"], ["add", "end"]]
   }
 }
 """.strip(),
@@ -319,8 +319,68 @@ def test_cli_export_mermaid_reads_jsonc(tmp_path, capsys) -> None:
     output = capsys.readouterr().out
     assert code == 0
     assert "flowchart TD" in output
-    assert "seed -->|max=1| add" in output
+    assert "seed --> add" in output
     assert "provides: value.in" in output
+
+
+def test_cli_export_ascii_reads_jsonc(tmp_path, capsys) -> None:
+    config_path = tmp_path / "workflow.jsonc"
+    config_path.write_text(
+        """
+{
+  "pipeline": {
+    "nodes": [
+      {"name": "start", "type": "test.start"},
+      {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
+      {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
+      {"name": "end", "type": "test.out_end", "requires": ["value.out"]}
+    ],
+    "edges": [["start", "seed"], ["seed", "add"], ["add", "end"]]
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    code = cli_main(["export-ascii", "--config", str(config_path)])
+    output = capsys.readouterr().out
+    assert code == 0
+    assert "TOPOLOGY FLOWCHART" in output
+    assert "seed ----> add" in output
+    assert "provides=value.in" in output
+
+
+def test_ascii_flowchart_distinguishes_standard_shapes() -> None:
+    nodes = [
+        ("start", "terminal"),
+        ("input", "io"),
+        ("prepare", "preparation"),
+        ("call", "predefined"),
+        ("route", "decision"),
+        ("work", "process"),
+        ("store", "data_store"),
+        ("doc", "document"),
+        ("end", "terminal"),
+    ]
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": name, "status": "planned", "flow_kind": flow_kind}
+                    for name, flow_kind in nodes
+                ],
+                "edges": [
+                    {"from": source, "to": target, "when": "flow.route == 'ok'"}
+                    if source == "route"
+                    else [source, target]
+                    for (source, _), (target, _) in zip(nodes, nodes[1:])
+                ],
+            }
+        }
+    )
+    text = export_ascii_flowchart(graph)
+    for marker in ("● START", "⇄ I/O", "INIT", "CALL", "DECISION", "PROCESS", "▣ STORE", "DOC", "~~~~~~~~"):
+        assert marker in text
+    assert "Node contracts:" in text
 
 def test_cli_export_mermaid_writes_output_and_expands_nodesets(tmp_path, capsys) -> None:
     config_path = tmp_path / "workflow.jsonc"
@@ -335,21 +395,24 @@ def test_cli_export_mermaid_writes_output_and_expands_nodesets(tmp_path, capsys)
                         provides=["value.out"],
                         exports=["value.out"],
                         pipeline={
-                            "inputs": ["value.in"],
-                            "nodes": [{"name": "inner", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]}],
+                            **_input_add_pipeline(add={"name": "inner"}),
                         },
                     )
                 ],
                 "pipeline": {
                     "inputs": ["value.in"],
                     "nodes": [
+                        {"name": "start", "type": "test.start"},
+                        {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
                         {
                             "name": "composite",
                             "type": "nodeset.math.add_one",
                             "requires": ["value.in"],
                             "provides": ["value.out"],
-                        }
+                        },
+                        {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
                     ],
+                    "edges": _edge_chain("start", "input", "composite", "end"),
                 },
             }
         ),
@@ -379,6 +442,8 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
     monkeypatch.syspath_prepend(str(project))
     module = _load_module_from_path(project / "nodes.py", "_minimal_project_nodes")
     registry = NodeRegistry()
+    register_node(registry, "example.start", module.StartNode)
+    register_node(registry, "example.end", module.EndNode)
     register_node(registry, "example.seed", module.SeedNode, {"value": {"type": "number"}}, {"value": 1})
     register_node(registry, "example.add", module.AddNode, {"delta": {"type": "number"}}, {"delta": 1})
 
@@ -394,6 +459,7 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
     assert "plugin.policy:minimal_project_policy" in result.health.effective_policy["sources"]
     assert result.health.effective_policy["base_lib"]["allowed_modules"] == ["base_lib.math_tools"]
     assert (result.run_dir / "compiled_graph.json").exists()
+    assert (result.run_dir / "graph.txt").exists()
     assert (result.run_dir / "graph.mmd").exists()
     assert "nodeset.example.add_one" in (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
 

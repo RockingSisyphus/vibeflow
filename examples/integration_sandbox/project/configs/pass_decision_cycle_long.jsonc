@@ -1,0 +1,21 @@
+{
+  "pipeline": {
+    "inputs": ["value.in"],
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
+      {"name": "increment", "type": "sandbox.increment", "requires": ["value.in"], "provides": ["value.next"]},
+      {"name": "done", "type": "sandbox.done_check", "requires": ["value.next"], "provides": ["loop.done"], "target": 3},
+      {"name": "copy", "type": "sandbox.copy_back", "requires": ["value.next", "loop.done"], "provides": ["value.in"]},
+      {"name": "end", "type": "sandbox.next_value_end", "requires": ["value.next"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "input"},
+      {"from": "input", "to": "increment"},
+      {"from": "increment", "to": "done"},
+      {"from": "done", "to": "copy", "when": "loop.done == false"},
+      {"from": "done", "to": "end", "when": "loop.done == true"},
+      {"from": "copy", "to": "increment"}
+    ]
+  }
+}

@@ -11,6 +11,7 @@ class NodeImportNode:
         category="bad",
         description="Bad node importing another node.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         provides=("bad.out",),
@@ -29,6 +30,7 @@ class DirectNodeCallNode:
         category="bad",
         description="Bad node directly calling another node.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         provides=("bad.out",),
@@ -48,6 +50,7 @@ class NodeInternalReadNode:
         category="bad",
         description="Bad node reading another node internals.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         provides=("bad.out",),

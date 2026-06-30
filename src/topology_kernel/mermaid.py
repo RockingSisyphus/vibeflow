@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from typing import Any, Mapping
 
 from .compiler import CompiledGraph, GraphCompiler
-from .graph_config import GraphConfig, NodeSpec, NodesetSpec
+from .graph_config import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
+from .node import FLOW_KIND_DATA_STORE, FLOW_KIND_DECISION, FLOW_KIND_DOCUMENT, FLOW_KIND_IO, FLOW_KIND_PREDEFINED, FLOW_KIND_PREPARATION, FLOW_KIND_PROCESS, FLOW_KIND_TERMINAL
+
+if TYPE_CHECKING:
+    from .registry import NodeRegistry
 
 
 def export_mermaid(
@@ -11,19 +16,19 @@ def export_mermaid(
     *,
     expand_nodesets: bool = False,
     compiled: CompiledGraph | None = None,
+    registry: NodeRegistry | None = None,
     health_report: object | None = None,
     show_contract: bool = True,
     show_semantics: bool = True,
-    show_boundary: bool = True,
     show_findings: bool = True,
 ) -> str:
-    actual_compiled = compiled or GraphCompiler().compile(graph)
+    actual_compiled = compiled or GraphCompiler().compile(graph, registry=registry)
     renderer = _MermaidRenderer(
         expand_nodesets=expand_nodesets,
+        registry=registry,
         health_report=health_report,
         show_contract=show_contract,
         show_semantics=show_semantics,
-        show_boundary=show_boundary,
         show_findings=show_findings,
     )
     return renderer.render(graph, actual_compiled)
@@ -31,24 +36,20 @@ def export_mermaid(
 
 def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph) -> dict[str, object]:
     return {
-        "nodes": [{"name": node.name, "type": node.node_type, "requires": list(node.requires), "provides": list(node.provides)} for node in graph.nodes],
+        "nodes": [
+            {
+                "name": node.name,
+                "type": node.node_type,
+                "requires": list(node.requires),
+                "provides": list(node.provides),
+                "status": node.status,
+                "flow_kind": _node_flow_kind(node, compiled),
+            }
+            for node in graph.nodes
+        ],
         "explicit_edges": [list(edge.pair) for edge in compiled.explicit_edges],
         "data_edges": [list(edge.pair) for edge in compiled.data_edges],
-        "effective_edges": [
-            {"from": edge.source, "to": edge.target, "max_executions": edge.max_executions, "loop": edge.loop}
-            for edge in compiled.effective_edges
-        ],
-        "edge_execution_limits": {f"{source}->{target}": limit for (source, target), limit in compiled.edge_execution_limits.items()},
-        "loops": [
-            {
-                "name": loop.name,
-                "edges": [list(edge) for edge in loop.edges],
-                "max_iterations": loop.max_iterations,
-                "until": loop.until,
-                "order": list(compiled.loop_orders.get(loop.name, ())),
-            }
-            for loop in graph.loops
-        ],
+        "effective_edges": [{"from": edge.source, "to": edge.target, "when": edge.when} for edge in compiled.effective_edges],
         "providers": dict(compiled.providers),
         "consumers": {key: list(values) for key, values in compiled.consumers.items()},
         "nodesets": sorted(graph.nodesets),
@@ -60,36 +61,37 @@ class _MermaidRenderer:
         self,
         *,
         expand_nodesets: bool,
+        registry: NodeRegistry | None,
         health_report: object | None,
         show_contract: bool,
         show_semantics: bool,
-        show_boundary: bool,
         show_findings: bool,
     ) -> None:
         self.expand_nodesets = expand_nodesets
+        self.registry = registry
         self.health_report = health_report
         self.show_contract = show_contract
         self.show_semantics = show_semantics
-        self.show_boundary = show_boundary
         self.show_findings = show_findings
         self.node_ids: dict[str, str] = {}
         self.nodeset_node_ids: dict[str, str] = {}
+        self.node_classes: dict[str, str] = {}
 
     def render(self, graph: GraphConfig, compiled: CompiledGraph) -> str:
         self.node_ids = {node.name: _safe_id(node.name) for node in graph.nodes}
         self.nodeset_node_ids = _nodeset_node_ids(graph, self.node_ids)
+        self.node_classes = self._finding_classes(graph, compiled) if self.show_findings else {}
         lines = [
             "flowchart TD",
             "  classDef healthError fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;",
             "  classDef healthWarning fill:#fef3c7,stroke:#d97706,color:#78350f;",
-            "  classDef boundaryNode fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;",
+            "  classDef externalDependency fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;",
+            "  classDef documentNode fill:#f0fdf4,stroke:#16a34a,color:#14532d;",
             "  classDef nodesetNode fill:#ede9fe,stroke:#7c3aed,color:#3b0764;",
+            "  classDef plannedNode fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;",
         ]
         self._render_graph_body(lines, graph, compiled, prefix="", indent="  ", visited_nodesets=())
-        if self.show_boundary:
-            self._render_boundary(lines, graph, compiled, indent="  ")
         self._render_edges(lines, compiled, prefix="", indent="  ")
-        self._render_loop_summaries(lines, compiled, indent="  ")
         if self.show_findings:
             self._render_findings(lines, graph, compiled, indent="  ")
         return "\n".join(lines) + "\n"
@@ -108,10 +110,14 @@ class _MermaidRenderer:
             node_id = _safe_id(f"{prefix}{node.name}")
             nodeset = _nodeset_for_node(graph, node)
             if nodeset is None:
-                lines.append(f'{indent}{node_id}["{_escape_label(self._node_label(node))}"]')
+                flow_kind = _node_flow_kind(node, compiled) or FLOW_KIND_PROCESS
+                preferred_class = "externalDependency" if self._node_is_external(node) else ""
+                class_name = self._class_for_node(node_id, preferred_class=preferred_class, planned=node.status == STATUS_PLANNED)
+                lines.append(f"{indent}{_node_shape(node_id, self._node_label(node), flow_kind, class_name=class_name)}")
                 continue
-            lines.append(f'{indent}{node_id}["{_escape_label(self._nodeset_label(node, nodeset))}"]')
-            lines.append(f"{indent}class {node_id} nodesetNode;")
+            flow_kind = _node_flow_kind(node, compiled) or nodeset.flow_kind
+            class_name = self._class_for_node(node_id, preferred_class="nodesetNode", planned=node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED)
+            lines.append(f"{indent}{_node_shape(node_id, self._nodeset_label(node, nodeset), flow_kind, class_name=class_name)}")
             if not self.expand_nodesets:
                 continue
             group_id = _safe_id(f"{prefix}{node.name}__expanded")
@@ -119,7 +125,7 @@ class _MermaidRenderer:
             if nodeset.name in visited_nodesets:
                 lines.append(f"{indent}  %% recursive nodeset expansion skipped: {nodeset.name}")
             else:
-                nested_compiled = GraphCompiler().compile(nodeset.graph)
+                nested_compiled = GraphCompiler().compile(nodeset.graph, registry=self.registry)
                 nested_prefix = f"{prefix}{node.name}__"
                 self._render_graph_body(
                     lines,
@@ -130,44 +136,14 @@ class _MermaidRenderer:
                     visited_nodesets=(*visited_nodesets, nodeset.name),
                 )
                 self._render_edges(lines, nested_compiled, prefix=nested_prefix, indent=f"{indent}  ")
-                self._render_loop_summaries(lines, nested_compiled, indent=f"{indent}  ")
             lines.append(f"{indent}end")
 
     def _render_edges(self, lines: list[str], compiled: CompiledGraph, *, prefix: str, indent: str) -> None:
         for edge in compiled.effective_edges:
-            label_parts = [f"max={edge.max_executions}"]
-            if edge.loop:
-                label_parts.insert(0, f"loop {edge.loop}")
             source_id = _safe_id(f"{prefix}{edge.source}")
             target_id = _safe_id(f"{prefix}{edge.target}")
-            lines.append(f"{indent}{source_id} -->|{' '.join(label_parts)}| {target_id}")
-
-    def _render_loop_summaries(self, lines: list[str], compiled: CompiledGraph, *, indent: str) -> None:
-        for loop in compiled.loops:
-            edges = ", ".join(f"{source}->{target}" for source, target in loop.edges)
-            until = f"; until={loop.until}" if loop.until else ""
-            lines.append(f"{indent}%% loop {loop.name}: max_iterations={loop.max_iterations}; edges={edges}{until}")
-
-    def _render_boundary(self, lines: list[str], graph: GraphConfig, compiled: CompiledGraph, *, indent: str) -> None:
-        boundary = graph.boundary
-        if boundary is None:
-            return
-        boundary_id = "__boundary__"
-        label = [
-            "boundary",
-            boundary.boundary_type,
-            _key_line("consumes", boundary.consumes),
-            _key_line("provides", boundary.provides),
-        ]
-        lines.append(f'{indent}{boundary_id}["{_escape_label(_join_label_lines(label))}"]')
-        lines.append(f"{indent}class {boundary_id} boundaryNode;")
-        for key in boundary.consumes:
-            source = compiled.providers.get(key)
-            if source:
-                lines.append(f"{indent}{_safe_id(source)} -.->|{_escape_label(key)}| {boundary_id}")
-        for key in boundary.provides:
-            for target in compiled.consumers.get(key, ()):
-                lines.append(f"{indent}{boundary_id} -.->|{_escape_label(key)}| {_safe_id(target)}")
+            label = f"|{_escape_label(edge.when)}|" if edge.when else ""
+            lines.append(f"{indent}{source_id} -->{label} {target_id}")
 
     def _render_findings(self, lines: list[str], graph: GraphConfig, compiled: CompiledGraph, *, indent: str) -> None:
         for finding in _health_findings(self.health_report):
@@ -179,7 +155,33 @@ class _MermaidRenderer:
             lines.append(f"{indent}%% finding {severity} {rule_id} {object_type}:{object_id} {_comment_text(message)}")
             class_name = "healthWarning" if severity == "warning" else "healthError"
             for target_id in self._finding_targets(graph, compiled, object_type=object_type, object_id=object_id):
-                lines.append(f"{indent}class {target_id} {class_name};")
+                self.node_classes.setdefault(target_id, class_name)
+
+    def _finding_classes(self, graph: GraphConfig, compiled: CompiledGraph) -> dict[str, str]:
+        classes: dict[str, str] = {}
+        for finding in _health_findings(self.health_report):
+            severity = str(finding.get("severity", "error"))
+            object_type = str(finding.get("object_type", ""))
+            object_id = str(finding.get("object_id", ""))
+            class_name = "healthWarning" if severity == "warning" else "healthError"
+            for target_id in self._finding_targets(graph, compiled, object_type=object_type, object_id=object_id):
+                if classes.get(target_id) != "healthError":
+                    classes[target_id] = class_name
+        return classes
+
+    def _class_for_node(self, node_id: str, *, preferred_class: str = "", planned: bool = False) -> str:
+        if planned:
+            return "plannedNode"
+        return self.node_classes.get(node_id) or preferred_class
+
+    def _node_is_external(self, node: NodeSpec) -> bool:
+        if self.registry is None or node.status == STATUS_PLANNED or node.node_type.startswith("nodeset."):
+            return False
+        try:
+            node_cls = self.registry.get(node.node_type)
+        except Exception:
+            return False
+        return bool(getattr(getattr(node_cls, "NODE_INFO", None), "external", False))
 
     def _finding_targets(self, graph: GraphConfig, compiled: CompiledGraph, *, object_type: str, object_id: str) -> tuple[str, ...]:
         if object_type == "node" and object_id in self.node_ids:
@@ -187,8 +189,6 @@ class _MermaidRenderer:
         if object_type == "nodeset":
             target = self.nodeset_node_ids.get(object_id)
             return (target,) if target else ()
-        if object_type == "boundary" or object_id == "boundary":
-            return ("__boundary__",) if graph.boundary is not None else ()
         if object_type == "contract_key":
             targets: list[str] = []
             provider = compiled.providers.get(object_id)
@@ -202,6 +202,8 @@ class _MermaidRenderer:
 
     def _node_label(self, node: NodeSpec) -> str:
         lines = [node.name, node.node_type]
+        if node.status == STATUS_PLANNED:
+            lines.append("planned")
         if self.show_semantics:
             lines.extend(_node_semantic_lines(node))
         if self.show_contract:
@@ -210,6 +212,8 @@ class _MermaidRenderer:
 
     def _nodeset_label(self, node: NodeSpec, nodeset: NodesetSpec) -> str:
         lines = [node.name, node.node_type]
+        if node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED:
+            lines.append("planned")
         if self.show_semantics:
             lines.extend(
                 (
@@ -252,6 +256,29 @@ def _node_semantic_lines(node: NodeSpec) -> tuple[str, ...]:
         if isinstance(value, str) and value.strip():
             lines.append(f"{key}: {value.strip()}" if key != "description" else value.strip())
     return tuple(lines)
+
+
+def _node_shape(node_id: str, label: str, flow_kind: object, *, class_name: str = "") -> str:
+    escaped = _escape_label(label)
+    kind = str(flow_kind)
+    suffix = f":::{class_name}" if class_name else ""
+    shape = {
+        FLOW_KIND_TERMINAL: "stadium",
+        FLOW_KIND_PROCESS: "rect",
+        FLOW_KIND_DECISION: "diam",
+        FLOW_KIND_IO: "lean-r",
+        FLOW_KIND_PREDEFINED: "fr-rect",
+        FLOW_KIND_DATA_STORE: "cyl",
+        FLOW_KIND_DOCUMENT: "doc",
+        FLOW_KIND_PREPARATION: "hex",
+    }.get(kind, "rect")
+    return f'{node_id}@{{ shape: {shape}, label: "{escaped}" }}{suffix}'
+
+
+def _node_flow_kind(node: NodeSpec, compiled: CompiledGraph) -> str:
+    if node.status == STATUS_PLANNED:
+        return node.flow_kind
+    return compiled.flow_kinds.get(node.name, "")
 
 
 def _key_line(label: str, values: tuple[str, ...]) -> str:

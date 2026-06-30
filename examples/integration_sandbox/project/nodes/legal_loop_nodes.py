@@ -11,6 +11,7 @@ class IncrementNode:
         category="sandbox",
         description="Increments value.in by one.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         requires=("value.in",),
@@ -32,14 +33,15 @@ class CopyBackNode:
         category="sandbox",
         description="Copies value.next back to value.in for the next loop iteration.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
-        requires=("value.next",),
+        requires=("value.next", "loop.done"),
         provides=("value.in",),
-        input_semantics={"value.next": ("next value",)},
+        input_semantics={"value.next": ("next value",), "loop.done": ("whether the loop should stop",)},
         output_semantics={"value.in": ("loop current value",)},
         output_schema={"value.in": {"type": "number"}},
-        examples=({"inputs": {"value.next": 2}, "params": {}, "outputs": {"value.in": 2}},),
+        examples=({"inputs": {"value.next": 2, "loop.done": False}, "params": {}, "outputs": {"value.in": 2}},),
     )
 
     def run_pure(self, inputs, params):
@@ -53,6 +55,7 @@ class DoneCheckNode:
         category="sandbox",
         description="Checks whether the loop reached its target.",
         version="0.1.0",
+        flow_kind="decision",
     )
     CONTRACT = NodeContract(
         requires=("value.next",),

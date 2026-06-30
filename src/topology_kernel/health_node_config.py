@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Mapping
 
-from .graph_config import GraphConfig, NodeSpec, NodesetSpec
+from .graph_config import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
 from .health_types import HealthFinding
 from .registry import NodeRegistry, NodeRegistryError
 
@@ -24,6 +24,8 @@ def _validate_graph_node_configs(
     owner: str,
 ) -> None:
     for node in graph.nodes:
+        if node.status == STATUS_PLANNED:
+            continue
         if node.node_type.startswith("nodeset."):
             continue
         _append_node_config_finding(node, registry=registry, findings=findings, owner=owner)
@@ -117,6 +119,8 @@ def _validate_direct_override(
 ) -> None:
     if target.node_type.startswith("nodeset."):
         findings.append(_node_config_finding("NODESET.CONFIG.NESTED_PATH_REQUIRED", caller_name, f"override for nested nodeset must use a dotted path: {target.name}", details={"nodeset": nodeset.name, "node": target.name}))
+        return
+    if target.status == STATUS_PLANNED:
         return
     try:
         registry.merge_config(target.node_type, {**target.params, **value})

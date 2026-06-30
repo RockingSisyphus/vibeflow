@@ -1,0 +1,18 @@
+{
+  "nodesets": [
+    {
+      "name": "a",
+      "status": "planned"
+    }
+  ],
+  "pipeline": {
+    "nodes": [
+      {
+        "name": "a",
+        "type": "nodeset.a",
+        "status": "planned",
+        "flow_kind": "predefined"
+      }
+    ]
+  }
+}

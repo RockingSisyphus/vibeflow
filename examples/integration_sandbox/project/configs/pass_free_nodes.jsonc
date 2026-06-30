@@ -1,10 +1,19 @@
 {
   "pipeline": {
     "nodes": [
+      {"name": "start", "type": "sandbox.start"},
       {"name": "left", "type": "sandbox.branch_left", "provides": ["branch.left"], "value": 4},
       {"name": "right", "type": "sandbox.branch_right", "provides": ["branch.right"], "value": 6},
       {"name": "sum", "type": "sandbox.sum_pair", "requires": ["branch.left", "branch.right"], "provides": ["value.in"]},
-      {"name": "add", "type": "sandbox.add_three", "requires": ["value.in"], "provides": ["value.out"]}
+      {"name": "add", "type": "sandbox.add_three", "requires": ["value.in"], "provides": ["value.out"]},
+      {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "left"},
+      {"from": "left", "to": "right"},
+      {"from": "right", "to": "sum"},
+      {"from": "sum", "to": "add"},
+      {"from": "add", "to": "end"}
     ]
   }
 }

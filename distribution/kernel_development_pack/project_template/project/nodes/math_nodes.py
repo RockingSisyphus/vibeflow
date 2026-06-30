@@ -11,6 +11,7 @@ class SeedNode:
         category="demo",
         description="Provide an initial numeric value.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         provides=("value.in",),
@@ -31,6 +32,7 @@ class AddNode:
         category="demo",
         description="Add a configured delta.",
         version="0.1.0",
+        flow_kind="process",
     )
     CONTRACT = NodeContract(
         requires=("value.in",),
@@ -50,4 +52,3 @@ class AddNode:
 
     def run_pure(self, inputs, params):
         return {"value.out": add(inputs["value.in"], params["delta"])}
-

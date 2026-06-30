@@ -1,9 +1,5 @@
 {
-  "boundary": {
-    "type": "sandbox.demo_boundary",
-    "consumes": ["value.out"],
-    "provides": ["bad.result"]
-  },
+  "boundary": {"type": "sandbox.demo_boundary"},
   "pipeline": {
     "nodes": [
       {"name": "seed", "type": "sandbox.constant", "provides": ["value.in"]}

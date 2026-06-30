@@ -34,14 +34,3 @@ class RuntimePlugin:
 
     def after_run(self, state, trace):
         _record({"hook": "after_run", "events": len(trace.get("events", []))})
-
-
-class BoundaryPlugin:
-    name = "sandbox_boundary_hook"
-    priority = 10
-
-    def before_boundary(self, stage, state, iteration):
-        _record({"hook": "before_boundary", "stage": stage})
-
-    def after_boundary(self, stage, result, iteration):
-        _record({"hook": "after_boundary", "stage": stage})

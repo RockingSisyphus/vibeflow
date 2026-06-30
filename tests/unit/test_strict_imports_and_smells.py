@@ -61,7 +61,7 @@ def wrap_value(value):
     return value + 1
 
 class WrapperOneNode:
-    NODE_INFO = NodeInfo("test.wrapper_one", "Wrapper One", "test", "Wrapper node.", "0.1.0")
+    NODE_INFO = NodeInfo("test.wrapper_one", "Wrapper One", "test", "Wrapper node.", "0.1.0", "process")
     CONTRACT = NodeContract(
         requires=("value.in",),
         provides=("wrap.one",),
@@ -77,7 +77,7 @@ class WrapperOneNode:
         return {"wrap.one": result}
 
 class WrapperTwoNode:
-    NODE_INFO = NodeInfo("test.wrapper_two", "Wrapper Two", "test", "Wrapper node.", "0.1.0")
+    NODE_INFO = NodeInfo("test.wrapper_two", "Wrapper Two", "test", "Wrapper node.", "0.1.0", "process")
     CONTRACT = NodeContract(
         requires=("value.in",),
         provides=("wrap.two",),

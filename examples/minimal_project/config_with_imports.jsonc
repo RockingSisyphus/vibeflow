@@ -8,13 +8,16 @@
   ],
   "pipeline": {
     "nodes": [
+      {"name": "start", "type": "example.start"},
       {"name": "seed", "type": "example.seed", "provides": ["value.in"], "value": 4},
       {
         "name": "add_one_flow",
         "type": "nodeset.example.add_one",
         "requires": ["value.in"],
         "provides": ["value.out"]
-      }
-    ]
+      },
+      {"name": "end", "type": "example.end", "requires": ["value.out"]}
+    ],
+    "edges": [["start", "seed"], ["seed", "add_one_flow"], ["add_one_flow", "end"]]
   }
 }

@@ -3,7 +3,7 @@
   "$id": "https://topology-kernel.local/schema/nodeset.schema.json",
   "title": "Topology Kernel Nodeset",
   "type": "object",
-  "required": ["name", "display_name", "category", "description", "version", "purity", "provides", "exports", "pipeline"],
+  "required": ["name"],
   "properties": {
     "name": { "type": "string", "minLength": 1 },
     "display_name": { "type": "string", "minLength": 1 },
@@ -11,9 +11,14 @@
     "description": { "type": "string", "minLength": 1 },
     "version": { "type": "string", "minLength": 1 },
     "purity": { "type": "string", "const": "pure" },
+    "status": { "enum": ["planned", "implemented"] },
+    "flow_kind": { "enum": ["terminal", "process", "decision", "io", "predefined", "data_store", "document", "preparation"] },
     "requires": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
     "provides": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
     "exports": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
     "pipeline": { "$ref": "config.schema.json#/$defs/pipeline" }
-  }
+  },
+  "if": { "properties": { "status": { "const": "planned" } }, "required": ["status"] },
+  "then": { "required": ["name"] },
+  "else": { "required": ["name", "display_name", "category", "description", "version", "purity", "provides", "exports", "pipeline"] }
 }

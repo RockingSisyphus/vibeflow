@@ -90,24 +90,23 @@ def test_nodeset_health_accepts_valid_contract_and_groups_no_findings() -> None:
                     requires=["value.in"],
                     provides=["value.out"],
                     exports=["value.out"],
-                    pipeline={
-                        "inputs": ["value.in"],
-                        "nodes": [
-                            {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]}
-                        ],
-                    },
+                    pipeline=_input_add_pipeline(),
                 )
             ],
             "pipeline": {
                 "inputs": ["value.in"],
                 "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
                     {
                         "name": "composite",
                         "type": "nodeset.math.add_one",
                         "requires": ["value.in"],
                         "provides": ["value.out"],
-                    }
+                    },
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
                 ],
+                "edges": _edge_chain("start", "input", "composite", "end"),
             },
         }
     )
@@ -192,28 +191,29 @@ def test_nodeset_health_and_runtime_reject_external_contract_mismatch() -> None:
                     requires=["value.in"],
                     provides=["value.out"],
                     exports=["value.out"],
-                    pipeline={
-                        "inputs": ["value.in"],
-                        "nodes": [
-                            {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]}
-                        ],
-                    },
+                    pipeline=_input_add_pipeline(),
                 )
             ],
             "pipeline": {
+                "inputs": ["value.in"],
                 "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
                     {
                         "name": "bad_composite",
                         "type": "nodeset.math.add_one",
+                        "requires": ["value.in"],
                         "provides": ["wrong.out"],
-                    }
-                ]
+                    },
+                    {"name": "end", "type": "test.start"},
+                ],
+                "edges": _edge_chain("start", "input", "bad_composite", "end"),
             },
         }
     )
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
     assert any(error.rule_id == "NODESET.CONTRACT.EXTERNAL_MISMATCH" for error in report.errors)
-    with pytest.raises(PipelineRuntimeError, match="requires must match"):
+    with pytest.raises(PipelineRuntimeError, match="provides must match"):
         PipelineRuntime(graph, registry=_registry()).run({"value": {"in": 2}})
 
 def test_nodeset_health_rejects_nested_nodeset_contract_mismatch() -> None:
