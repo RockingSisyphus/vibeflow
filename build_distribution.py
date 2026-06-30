@@ -28,6 +28,7 @@ def build_distribution(output: Path, *, replace: bool = True) -> None:
     _prepare_output(output, replace=replace)
     _copy_tree(ROOT / "distribution" / "kernel_development_pack" / "project_template", output)
     _copy_tree(ROOT / "distribution" / "kernel_development_pack" / "docs", output / "docs")
+    _copy_mermaid_renderer_config(output)
     _copy_extra_docs(output / "docs")
     _copy_tree(ROOT / "src" / "topology_kernel", output / "kernel" / "topology_kernel")
     _write_root_readme(output)
@@ -63,6 +64,16 @@ def _copy_extra_docs(target: Path) -> None:
         destination.write_bytes(source.read_bytes())
 
 
+def _copy_mermaid_renderer_config(output: Path) -> None:
+    source = ROOT / "tools" / "mermaid-renderer"
+    target = output / "tools" / "mermaid-renderer"
+    target.mkdir(parents=True, exist_ok=True)
+    for name in ("package.json", "package-lock.json"):
+        path = source / name
+        if path.exists():
+            (target / name).write_bytes(path.read_bytes())
+
+
 def _remove_tree(path: Path) -> None:
     for item in sorted(path.rglob("*"), key=lambda candidate: len(candidate.parts), reverse=True):
         if item.is_dir():
@@ -89,6 +100,7 @@ def _write_root_readme(output: Path) -> None:
 - `docs/`：中文开发文档。
 - `project/`：可直接运行的示例业务项目骨架。
 - `run.py`：推荐启动器，会自动加载本地内核和项目 registry。
+- `tools/mermaid-renderer/`：SVG 渲染器依赖配置；运行 `npm install` 后启用 `svg` 命令。
 
 ## 开始使用
 
@@ -96,16 +108,27 @@ def _write_root_readme(output: Path) -> None:
 python run.py validate --config project/configs/main.jsonc
 python run.py run --config project/configs/main.jsonc --run-root runs
 python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
+python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
+python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
 python run.py quality --path project
+```
+
+首次使用 `svg` 前，在分发目录执行一次：
+
+```powershell
+cd tools/mermaid-renderer
+npm install
+cd ../..
 ```
 
 业务开发原则：
 
 - 只在 `project/nodes/` 写纯函数 node。
 - 只在 `project/base_lib/` 写纯 helper。
-- 只在 `project/boundaries.py` 放真实副作用。
 - 只在 `project/plugins/` 写插件。
 - 只用 `project/configs/*.jsonc` 和 nodeset 组织程序结构。
+- 控制流必须显式写在 `pipeline.edges` 中。
+- 外部输入输出用 `io`、`data_store`、`document` 或 `external=True` node 建模。
 
 运行前内核会强制健康检查；检查失败时拒绝执行并输出原因。
 

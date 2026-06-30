@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from topology_kernel import NodeRegistry
 
-from nodes.math_nodes import AddNode, SeedNode
+from nodes.math_nodes import AddNode, EndNode, SeedNode, StartNode
 
 
 def build_node_registry() -> NodeRegistry:
     registry = NodeRegistry()
+    registry.register("demo.start", StartNode, config_schema={}, config_defaults={})
     registry.register(
         "demo.seed",
         SeedNode,
@@ -19,4 +20,5 @@ def build_node_registry() -> NodeRegistry:
         config_schema={"delta": {"type": "number"}},
         config_defaults={"delta": 1},
     )
+    registry.register("demo.end", EndNode, config_schema={}, config_defaults={})
     return registry

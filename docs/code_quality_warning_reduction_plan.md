@@ -1,5 +1,7 @@
 # 代码质量 warning 影响面重审与复杂度降低计划
 
+> 历史说明：本文是早期质量 warning 压降过程记录。文中的 `boundary`、`loop`、`max_executions`、`boundary_trace` 等函数名和概念是历史上下文，不代表当前内核设计。当前实现已移除公开 boundary/loop 注册模型，并通过标准 flowchart 节点、显式 edges、SVG/ASCII/Mermaid 图和 `quality-check --path .` 维护质量基线。
+
 本文档记录对当前 `topology-kernel quality-check --self` 剩余 warning 的二次审核结果。此次审核不再只按 warning 数量或函数复杂度排序，而是优先评估“修改这些代码会影响哪些已有行为、公开接口、测试和下游模块”。
 
 初始基线：

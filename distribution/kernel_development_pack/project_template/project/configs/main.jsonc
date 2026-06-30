@@ -5,6 +5,10 @@
   "pipeline": {
     "nodes": [
       {
+        "name": "start",
+        "type": "demo.start"
+      },
+      {
         "name": "seed",
         "type": "demo.seed",
         "provides": ["value.in"],
@@ -16,8 +20,13 @@
         "requires": ["value.in"],
         "provides": ["value.out"],
         "config": {"delta": 3}
+      },
+      {
+        "name": "end",
+        "type": "demo.end",
+        "requires": ["value.out"]
       }
-    ]
+    ],
+    "edges": [["start", "seed"], ["seed", "add"], ["add", "end"]]
   }
 }
-

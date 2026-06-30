@@ -28,7 +28,7 @@ from topology_kernel import (  # noqa: E402
 
 from topology_kernel.config_schema import collect_config_schema_findings  # noqa: E402
 
-from registry import build_boundary_registry, build_node_registry  # noqa: E402
+from registry import build_node_registry  # noqa: E402
 
 
 def main() -> int:
@@ -88,7 +88,6 @@ def _validate(args) -> int:
     report = validate_graph_health(
         graph,
         registry=build_node_registry(),
-        boundary_registry=build_boundary_registry(),
         plugin_registry=plugin_registry,
         purity_policy=effective_policy.to_purity_policy(),
     )
@@ -102,7 +101,7 @@ def _inspect_config(args) -> int:
     payload = {
         "nodes": [node.__dict__ for node in graph.nodes],
         "edges": [edge.__dict__ for edge in graph.edges],
-        "loops": [loop.__dict__ for loop in graph.loops],
+        "max_steps": graph.max_steps,
         "nodesets": sorted(graph.nodesets),
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -115,7 +114,6 @@ def _run(args) -> int:
         result = run_checked(
             args.config,
             registry=build_node_registry(),
-            boundary_registry=build_boundary_registry(),
             initial=initial,
             policy_path=args.policy,
             run_root=args.run_root,

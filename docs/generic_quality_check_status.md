@@ -52,10 +52,10 @@ PYTHONPATH=src python3 -m topology_kernel quality-check --path . --check-side-ef
 PYTHONPATH=src python3 -m topology_kernel quality-check --path .
 ```
 
-结果：`PASS`，84 files，0 errors，0 warnings。
+结果：`PASS`，99 files，0 errors，0 warnings。
 
 ```bash
-PYTHONPATH=src python3 -m pytest tests/unit/test_strict_base_config_examples.py -q
+PYTHONPATH=src python3 -m pytest -q
 ```
 
-结果：14 passed。
+结果：166 passed。

@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from typing import Any, Mapping
 
-from .compiler import CompiledGraph, GraphCompiler
+from .compiler import CompiledGraph
+from .flowchart_render_helpers import compile_for_render, node_flow_kind, node_is_external, nodeset_for_node, shorten
 from .graph_config import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
 from .node import FLOW_KIND_DATA_STORE, FLOW_KIND_DECISION, FLOW_KIND_DOCUMENT, FLOW_KIND_IO, FLOW_KIND_PREDEFINED, FLOW_KIND_PREPARATION, FLOW_KIND_PROCESS, FLOW_KIND_TERMINAL
 
@@ -22,7 +23,7 @@ def export_mermaid(
     show_semantics: bool = True,
     show_findings: bool = True,
 ) -> str:
-    actual_compiled = compiled or GraphCompiler().compile(graph, registry=registry)
+    actual_compiled = compile_for_render(graph, compiled, registry)
     renderer = _MermaidRenderer(
         expand_nodesets=expand_nodesets,
         registry=registry,
@@ -43,7 +44,7 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph) -> dict[
                 "requires": list(node.requires),
                 "provides": list(node.provides),
                 "status": node.status,
-                "flow_kind": _node_flow_kind(node, compiled),
+                "flow_kind": node_flow_kind(node, compiled),
             }
             for node in graph.nodes
         ],
@@ -108,16 +109,16 @@ class _MermaidRenderer:
     ) -> None:
         for node in graph.nodes:
             node_id = _safe_id(f"{prefix}{node.name}")
-            nodeset = _nodeset_for_node(graph, node)
+            nodeset = nodeset_for_node(graph, node)
             if nodeset is None:
-                flow_kind = _node_flow_kind(node, compiled) or FLOW_KIND_PROCESS
+                flow_kind = node_flow_kind(node, compiled) or FLOW_KIND_PROCESS
                 preferred_class = "externalDependency" if self._node_is_external(node) else ""
                 class_name = self._class_for_node(node_id, preferred_class=preferred_class, planned=node.status == STATUS_PLANNED)
                 lines.append(f"{indent}{_node_shape(node_id, self._node_label(node), flow_kind)}")
                 if class_name:
                     lines.append(f"{indent}class {node_id} {class_name};")
                 continue
-            flow_kind = _node_flow_kind(node, compiled) or nodeset.flow_kind
+            flow_kind = node_flow_kind(node, compiled) or nodeset.flow_kind
             class_name = self._class_for_node(node_id, preferred_class="nodesetNode", planned=node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED)
             lines.append(f"{indent}{_node_shape(node_id, self._nodeset_label(node, nodeset), flow_kind)}")
             if class_name:
@@ -129,7 +130,7 @@ class _MermaidRenderer:
             if nodeset.name in visited_nodesets:
                 lines.append(f"{indent}  %% recursive nodeset expansion skipped: {nodeset.name}")
             else:
-                nested_compiled = GraphCompiler().compile(nodeset.graph, registry=self.registry)
+                nested_compiled = compile_for_render(nodeset.graph, None, self.registry)
                 nested_prefix = f"{prefix}{node.name}__"
                 self._render_graph_body(
                     lines,
@@ -179,13 +180,7 @@ class _MermaidRenderer:
         return self.node_classes.get(node_id) or preferred_class
 
     def _node_is_external(self, node: NodeSpec) -> bool:
-        if self.registry is None or node.status == STATUS_PLANNED or node.node_type.startswith("nodeset."):
-            return False
-        try:
-            node_cls = self.registry.get(node.node_type)
-        except Exception:
-            return False
-        return bool(getattr(getattr(node_cls, "NODE_INFO", None), "external", False))
+        return node_is_external(node, self.registry)
 
     def _finding_targets(self, graph: GraphConfig, compiled: CompiledGraph, *, object_type: str, object_id: str) -> tuple[str, ...]:
         if object_type == "node" and object_id in self.node_ids:
@@ -262,16 +257,10 @@ class _MermaidRenderer:
         return tuple(lines)
 
 
-def _nodeset_for_node(graph: GraphConfig, node: NodeSpec) -> NodesetSpec | None:
-    if not node.node_type.startswith("nodeset."):
-        return None
-    return graph.nodesets.get(node.node_type.removeprefix("nodeset."))
-
-
 def _nodeset_node_ids(graph: GraphConfig, node_ids: Mapping[str, str]) -> dict[str, str]:
     result: dict[str, str] = {}
     for node in graph.nodes:
-        nodeset = _nodeset_for_node(graph, node)
+        nodeset = nodeset_for_node(graph, node)
         if nodeset is not None:
             result[nodeset.name] = node_ids[node.name]
     return result
@@ -302,12 +291,6 @@ def _node_shape(node_id: str, label: str, flow_kind: object) -> str:
     return f'{node_id}@{{ shape: {shape}, label: "{escaped}" }}'
 
 
-def _node_flow_kind(node: NodeSpec, compiled: CompiledGraph) -> str:
-    if node.status == STATUS_PLANNED:
-        return node.flow_kind
-    return compiled.flow_kinds.get(node.name, "")
-
-
 def _key_line(label: str, values: tuple[str, ...]) -> str:
     if not values:
         return ""
@@ -315,14 +298,7 @@ def _key_line(label: str, values: tuple[str, ...]) -> str:
 
 
 def _join_label_lines(lines: tuple[str, ...] | list[str]) -> str:
-    return "\n".join(_shorten(line) for line in lines if str(line).strip())
-
-
-def _shorten(value: object, *, limit: int = 120) -> str:
-    text = str(value).replace("\r", " ").replace("\n", " ").strip()
-    if len(text) <= limit:
-        return text
-    return text[: limit - 3].rstrip() + "..."
+    return "\n".join(shorten(line) for line in lines if str(line).strip())
 
 
 def _escape_label(value: str) -> str:
