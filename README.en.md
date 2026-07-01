@@ -31,7 +31,7 @@ AI still writes business code, but it must work through the flowchart: each node
 
 ## Showcase ✨
 
-This SVG was exported from a complete integration sandbox example.
+This SVG was exported from a complete integration sandbox example. Throughout AI development, developers can inspect the latest flowchart generated under `reports/` at any time to understand the project's current logical structure and keep track of the whole project state with minimal effort.
 
 ![VibeFlow comprehensive flowchart](docs/assets/comprehensive_flowchart.svg)
 
