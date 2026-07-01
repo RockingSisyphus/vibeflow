@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://topology-kernel.local/schema/health_report.schema.json",
-  "title": "Topology Kernel HealthReport",
+  "$id": "https://vibeflow.local/schema/health_report.schema.json",
+  "title": "VibeFlow HealthReport",
   "type": "object",
   "required": ["status", "errors", "warnings", "skipped", "info", "effective_policy"],
   "properties": {

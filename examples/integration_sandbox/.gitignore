@@ -4,5 +4,8 @@ reports/
 kernel/topology_kernel
 kernel/topology_kernel/
 kernel/topology_kernel.lnk
+kernel/vibeflow
+kernel/vibeflow/
+kernel/vibeflow.lnk
 __pycache__/
 *.py[cod]

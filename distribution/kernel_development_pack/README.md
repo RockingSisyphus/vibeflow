@@ -1,11 +1,11 @@
-# Topology Kernel 分发开发包
+# VibeFlow 分发开发包
 
 这个目录是给“使用内核开发业务程序的人或 AI”看的分发材料。它不解释内核内部实现，只说明如何把程序拆成标准流程图 node、纯 `base_lib`、可选 plugin 和 JSONC 配置，并通过内核强制健康检查后运行。
 
 推荐分发方式：
 
 1. 复制本目录的 `docs/` 到新项目。
-2. 复制仓库的 `src/topology_kernel/` 到新项目的 `kernel/topology_kernel/`。
+2. 复制仓库的 `src/vibeflow/` 到新项目的 `kernel/vibeflow/`。
 3. 复制 `project_template/` 作为新项目骨架。
 4. 在新项目里开发 `project/nodes/`、`project/base_lib/`、`project/plugins/` 和 `project/configs/*.jsonc`。
 5. 用模板里的 `run.py` 启动检查、运行和图形导出。
@@ -16,7 +16,7 @@
 my_project/
   docs/
   kernel/
-    topology_kernel/
+    vibeflow/
   project/
     nodes/
     base_lib/

@@ -4,7 +4,7 @@ def test_cli_inspect_node_reports_unmatched_type(tmp_path, capsys) -> None:
     module_path = tmp_path / "demo_node.py"
     module_path.write_text(
         """
-from topology_kernel import NodeContract, NodeInfo
+from vibeflow import NodeContract, NodeInfo
 
 class DemoNode:
     NODE_INFO = NodeInfo(type_key="demo.other", display_name="Other", category="demo", description="Other.", version="0.1.0", flow_kind="process")

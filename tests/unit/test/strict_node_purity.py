@@ -1,6 +1,6 @@
 from tests.unit.strict_support import *
 
-from topology_kernel.policy import EffectivePolicy
+from vibeflow.policy import EffectivePolicy
 
 def test_architecture_smells_warn_for_mismatched_metadata_and_unstable_keys(tmp_path, capsys) -> None:
     info = VALID_NODE_INFO.replace('description="Demo node."', 'description="Calculates invoice total."')

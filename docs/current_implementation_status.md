@@ -2,7 +2,7 @@
 
 ## 当前定位
 
-`topology-kernel` 当前已经从“纯函数 node + 拓扑配置原型”演进为严格标准流程图内核。它面向人机协同开发，尤其是 LLM 参与长期编码和维护的场景，用机器可检查的规则限制程序结构漂移。
+`vibeflow` 当前已经从“纯函数 node + 拓扑配置原型”演进为严格标准流程图内核。它面向人机协同开发，尤其是 LLM 参与长期编码和维护的场景，用机器可检查的规则限制程序结构漂移。
 
 当前核心语义：
 
@@ -22,7 +22,7 @@
 核心包位于：
 
 ```text
-src/topology_kernel/
+src/vibeflow/
 ```
 
 主要模块包括：
@@ -193,21 +193,21 @@ runs/<run_id>/
 已实现：
 
 ```text
-topology-kernel validate --config ...
-topology-kernel validate --config ... --json
-topology-kernel inspect-node --type ... --module ...
-topology-kernel inspect-config --config ...
-topology-kernel run --config ...
-topology-kernel export-mermaid --config ... --output graph.mmd
-topology-kernel export-ascii --config ... --output graph.txt
-topology-kernel export-svg --config ... --output graph.svg
-topology-kernel quality-check --path ...
-topology-kernel quality-check --path ... --json
+vibeflow validate --config ...
+vibeflow validate --config ... --json
+vibeflow inspect-node --type ... --module ...
+vibeflow inspect-config --config ...
+vibeflow run --config ...
+vibeflow export-mermaid --config ... --output graph.mmd
+vibeflow export-ascii --config ... --output graph.txt
+vibeflow export-svg --config ... --output graph.svg
+vibeflow quality-check --path ...
+vibeflow quality-check --path ... --json
 ```
 
 ### 通用质量自检
 
-`topology-kernel quality-check --path ...` 可检查普通 Python 项目，也用于内核自检。
+`vibeflow quality-check --path ...` 可检查普通 Python 项目，也用于内核自检。
 
 当前内核默认自检已达到：
 

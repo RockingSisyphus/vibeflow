@@ -2,7 +2,7 @@
 
 使用方法：
 
-1. 把仓库的 `src/topology_kernel/` 复制到本项目的 `kernel/topology_kernel/`。
+1. 把仓库的 `src/vibeflow/` 复制到本项目的 `kernel/vibeflow/`。
 2. 把本目录内容复制到新项目根目录。
 3. 在 `project/nodes/` 中开发业务 node。
 4. 在 `project/registry.py` 中注册 node。

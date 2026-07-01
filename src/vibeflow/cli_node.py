@@ -65,7 +65,7 @@ def inspect_node_payload(
 def load_node_class(module_path: Path, *, node_type: str, class_name: str | None) -> type[PureNode]:
     if not module_path.exists():
         raise OSError(f"module file does not exist: {module_path}")
-    module_name = f"_topology_kernel_inspect_{abs(hash(module_path.resolve()))}"
+    module_name = f"_vibeflow_inspect_{abs(hash(module_path.resolve()))}"
     spec = importlib.util.spec_from_file_location(module_name, module_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"cannot load module: {module_path}")

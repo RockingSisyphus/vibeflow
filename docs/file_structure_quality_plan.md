@@ -7,7 +7,7 @@
 当前唯一入口形态是：
 
 ```bash
-topology-kernel quality-check --path <project-or-file>
+vibeflow quality-check --path <project-or-file>
 ```
 
 ## 设计原则
@@ -36,7 +36,7 @@ topology-kernel quality-check --path <project-or-file>
 副作用 API 检查默认关闭，需要显式启用：
 
 ```bash
-topology-kernel quality-check --path <project-or-file> --check-side-effects
+vibeflow quality-check --path <project-or-file> --check-side-effects
 ```
 
 原因：

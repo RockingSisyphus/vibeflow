@@ -35,15 +35,15 @@
 
 实现位置：
 
-- `src/topology_kernel/ast_rules.py`
+- `src/vibeflow/ast_rules.py`
   - `import_aliases_from_node`
   - `qualified_call_name`
   - `path_effect_call_name`
-- `src/topology_kernel/purity_visitors.py`
+- `src/vibeflow/purity_visitors.py`
   - node `run_pure` 纯度检查复用 path-like 副作用识别。
-- `src/topology_kernel/base_lib.py`
+- `src/vibeflow/base_lib.py`
   - base_lib AST 扫描复用 path-like 副作用识别。
-- `src/topology_kernel/devtools/code_quality_rules.py`
+- `src/vibeflow/devtools/code_quality_rules.py`
   - `quality-check` 自身也改为复用同一套核心 AST 逻辑，避免规则分叉。
 
 ## 新增测试
@@ -64,7 +64,7 @@ PYTHONPATH=src python3 -m pytest tests/unit -q
 结果：150 passed。
 
 ```bash
-PYTHONPATH=src python3 -m topology_kernel quality-check --path .
+PYTHONPATH=src python3 -m vibeflow quality-check --path .
 ```
 
 结果：PASS，84 files，0 errors，0 warnings。
@@ -76,7 +76,7 @@ python3 -m compileall -q src tests
 结果：通过。
 
 ```bash
-git diff --check -- src/topology_kernel/ast_rules.py src/topology_kernel/base_lib.py src/topology_kernel/purity_visitors.py src/topology_kernel/devtools/code_quality_rules.py tests/unit/test_strict_mermaid_cli.py tests/unit/test_strict_node_purity.py
+git diff --check -- src/vibeflow/ast_rules.py src/vibeflow/base_lib.py src/vibeflow/purity_visitors.py src/vibeflow/devtools/code_quality_rules.py tests/unit/test_strict_mermaid_cli.py tests/unit/test_strict_node_purity.py
 ```
 
 结果：通过。
@@ -89,7 +89,7 @@ git diff --check -- src/topology_kernel/ast_rules.py src/topology_kernel/base_li
 
 ## 不建议直接迁移的能力
 
-- topology-kernel 自身的架构 contract。
+- vibeflow 自身的架构 contract。
 - 目录 fanin/fanout。
 - 前缀功能簇 package 化建议。
 - 公共入口绕过规则。

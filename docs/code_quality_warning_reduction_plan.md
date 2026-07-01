@@ -2,7 +2,7 @@
 
 > 历史说明：本文是早期质量 warning 压降过程记录。文中的 `boundary`、`loop`、`max_executions`、`boundary_trace` 等函数名和概念是历史上下文，不代表当前内核设计。当前实现已移除公开 boundary/loop 注册模型，并通过标准 flowchart 节点、显式 edges、SVG/ASCII/Mermaid 图和 `quality-check --path .` 维护质量基线。
 
-本文档记录对当前 `topology-kernel quality-check --self` 剩余 warning 的二次审核结果。此次审核不再只按 warning 数量或函数复杂度排序，而是优先评估“修改这些代码会影响哪些已有行为、公开接口、测试和下游模块”。
+本文档记录对当前 `vibeflow quality-check --self` 剩余 warning 的二次审核结果。此次审核不再只按 warning 数量或函数复杂度排序，而是优先评估“修改这些代码会影响哪些已有行为、公开接口、测试和下游模块”。
 
 初始基线：
 
@@ -63,7 +63,7 @@ scope warnings: src=0, tests=0, devtools=0, other=0
 
 - `tests/unit/strict_support.py` 中测试样本源码包含 `open()`。
 - `tests/unit/test_strict_runtime.py` 两个插件失败测试 AST 相似。
-- `src/topology_kernel/devtools/code_quality.py` 中 visitor 方法重复。
+- `src/vibeflow/devtools/code_quality.py` 中 visitor 方法重复。
 - `QUALITY.DEPENDENCY.CHAIN_WARN` 当前最长链从测试模块开始。
 
 影响判断：
@@ -76,10 +76,10 @@ scope warnings: src=0, tests=0, devtools=0, other=0
 
 涉及：
 
-- `src/topology_kernel/config_schema.py:_validate_boundary`
-- `src/topology_kernel/config_schema.py:_validate_policy`
-- `src/topology_kernel/policy.py:_relaxed_rule_ids`
-- `src/topology_kernel/config_schema.py:_error` 与 `src/topology_kernel/policy.py:_policy_schema_finding`
+- `src/vibeflow/config_schema.py:_validate_boundary`
+- `src/vibeflow/config_schema.py:_validate_policy`
+- `src/vibeflow/policy.py:_relaxed_rule_ids`
+- `src/vibeflow/config_schema.py:_error` 与 `src/vibeflow/policy.py:_policy_schema_finding`
 
 影响判断：
 
@@ -91,13 +91,13 @@ scope warnings: src=0, tests=0, devtools=0, other=0
 
 涉及：
 
-- `src/topology_kernel/base_lib.py:visit_Module`
-- `src/topology_kernel/purity_visitors.py:visit_Call`
-- `src/topology_kernel/purity_visitors.py:_track_output_dict`
-- `src/topology_kernel/purity_visitors.py:visit_Module`
-- `src/topology_kernel/base_lib.py` 与 `src/topology_kernel/purity_visitors.py` 的 import visitor 重复
-- `src/topology_kernel/base_lib.py` 与 `src/topology_kernel/purity_metrics.py` 的 BoolOp 统计重复
-- `src/topology_kernel/purity_validators.py:_validate_examples`
+- `src/vibeflow/base_lib.py:visit_Module`
+- `src/vibeflow/purity_visitors.py:visit_Call`
+- `src/vibeflow/purity_visitors.py:_track_output_dict`
+- `src/vibeflow/purity_visitors.py:visit_Module`
+- `src/vibeflow/base_lib.py` 与 `src/vibeflow/purity_visitors.py` 的 import visitor 重复
+- `src/vibeflow/base_lib.py` 与 `src/vibeflow/purity_metrics.py` 的 BoolOp 统计重复
+- `src/vibeflow/purity_validators.py:_validate_examples`
 
 影响判断：
 
@@ -109,8 +109,8 @@ scope warnings: src=0, tests=0, devtools=0, other=0
 
 涉及：
 
-- `src/topology_kernel/compiler.py:_merge_edges`
-- `src/topology_kernel/compiler.py:_validate_all_cycles_declared`
+- `src/vibeflow/compiler.py:_merge_edges`
+- `src/vibeflow/compiler.py:_validate_all_cycles_declared`
 
 影响判断：
 
@@ -122,10 +122,10 @@ scope warnings: src=0, tests=0, devtools=0, other=0
 
 涉及：
 
-- `src/topology_kernel/health.py:validate_graph_health`
-- `src/topology_kernel/health.py:_append_plugin_findings`
-- `src/topology_kernel/runner.py:run_checked`
-- `src/topology_kernel/runtime.py:run`
+- `src/vibeflow/health.py:validate_graph_health`
+- `src/vibeflow/health.py:_append_plugin_findings`
+- `src/vibeflow/runner.py:run_checked`
+- `src/vibeflow/runtime.py:run`
 
 影响判断：
 
@@ -139,8 +139,8 @@ scope warnings: src=0, tests=0, devtools=0, other=0
 
 涉及：
 
-- `src/topology_kernel/boundary.py:register/get/decorator`
-- `src/topology_kernel/registry.py:register/get/decorator`
+- `src/vibeflow/boundary.py:register/get/decorator`
+- `src/vibeflow/registry.py:register/get/decorator`
 
 影响判断：
 
@@ -403,7 +403,7 @@ python -m pytest tests\unit
 ```powershell
 python -m pytest tests\unit
 python -m compileall -q src tests
-$env:PYTHONPATH='src'; python -m topology_kernel quality-check --self
+$env:PYTHONPATH='src'; python -m vibeflow quality-check --self
 ```
 
 短期目标：

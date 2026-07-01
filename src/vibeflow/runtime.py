@@ -49,7 +49,7 @@ class PipelineRuntime:
             node.name: tuple(edge for edge in self.compiled.effective_edges if edge.source == node.name)
             for node in graph.nodes
         }
-        self._run_dir = Path(run_dir) if run_dir is not None else Path("runs") / "topology_kernel"
+        self._run_dir = Path(run_dir) if run_dir is not None else Path("runs") / "vibeflow"
         self._node_config_overrides = normalize_node_config_overrides(node_config_overrides or {})
 
     def run(self, initial: Mapping[str, Any] | None = None) -> Context:

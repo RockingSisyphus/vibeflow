@@ -1,6 +1,6 @@
 # Strict Flowchart Kernel Redesign
 
-This document records the target redesign for `topology-kernel` as a strict
+This document records the target redesign for `vibeflow` as a strict
 standard-flowchart kernel for human-AI collaborative development.
 
 ## Goal

@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_OUTPUT = ROOT / "topology_kernel_distribution"
+DEFAULT_OUTPUT = ROOT / "vibeflow_distribution"
 EXTRA_DOCS = (
     ("developer_guide.md", "10_Kernel能力与项目开发指南.md"),
 )
@@ -26,12 +26,12 @@ PROTECTED_FILES = (
     "README.md",
 )
 PROTECTED_DIRS = (
-    "kernel/topology_kernel",
+    "kernel/vibeflow",
 )
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build a copyable Topology Kernel distribution directory.")
+    parser = argparse.ArgumentParser(description="Build a copyable VibeFlow distribution directory.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="directory to rebuild")
     parser.add_argument("--keep-existing", action="store_true", help="fail instead of replacing an existing output directory")
     args = parser.parse_args()
@@ -47,7 +47,7 @@ def build_distribution(output: Path, *, replace: bool = True) -> None:
     _copy_tree(ROOT / "distribution" / "kernel_development_pack" / "docs", output / "docs")
     _copy_mermaid_renderer_config(output)
     _copy_extra_docs(output / "docs")
-    _copy_tree(ROOT / "src" / "topology_kernel", output / "kernel" / "topology_kernel")
+    _copy_tree(ROOT / "src" / "vibeflow", output / "kernel" / "vibeflow")
     _ensure_standard_project_dirs(output)
     _write_root_readme(output)
     _write_project_gitignore(output)
@@ -149,13 +149,13 @@ def _ignored(relative: Path) -> bool:
 
 def _write_root_readme(output: Path) -> None:
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    text = f"""# Topology Kernel 可复制开发包
+    text = f"""# VibeFlow 可复制开发包
 
 生成时间：{generated_at}
 
 这个目录可以整体复制到其他位置作为新项目起点。它已经包含：
 
-- `kernel/topology_kernel/`：当前仓库最新内核源码副本。
+- `kernel/vibeflow/`：当前仓库最新内核源码副本。
 - `docs/`：中文开发文档。
 - `project/`：可直接运行的示例业务项目骨架。
 - `project/nodes/`、`project/base_lib/`、`project/plugins/`、`project/configs/`：AI 和开发者放业务代码与配置的标准目录。

@@ -13,9 +13,9 @@ from typing import Any
 
 SANDBOX_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SANDBOX_DIR.parents[1]
-SRC_KERNEL = REPO_ROOT / "src" / "topology_kernel"
+SRC_KERNEL = REPO_ROOT / "src" / "vibeflow"
 KERNEL_DIR = SANDBOX_DIR / "kernel"
-KERNEL_LINK = KERNEL_DIR / "topology_kernel"
+KERNEL_LINK = KERNEL_DIR / "vibeflow"
 PROJECT_DIR = SANDBOX_DIR / "project"
 CONFIG_DIR = PROJECT_DIR / "configs"
 REPORT_DIR = SANDBOX_DIR / "reports"
@@ -181,9 +181,9 @@ def _run_valid_cases() -> list[CaseResult]:
 
 
 def _run_valid_case(case: dict[str, Any]) -> CaseResult:
-    from topology_kernel import GraphCompiler, export_ascii_flowchart, export_mermaid, is_mermaid_svg_renderer_available, load_config_document, parse_graph_config, render_mermaid_svg, resolve_effective_policy, run_checked, validate_graph_health
-    from topology_kernel.config_schema import collect_config_schema_findings
-    from topology_kernel.plugin import load_plugins_from_config
+    from vibeflow import GraphCompiler, export_ascii_flowchart, export_mermaid, is_mermaid_svg_renderer_available, load_config_document, parse_graph_config, render_mermaid_svg, resolve_effective_policy, run_checked, validate_graph_health
+    from vibeflow.config_schema import collect_config_schema_findings
+    from vibeflow.plugin import load_plugins_from_config
 
     from registry import build_node_registry
 
@@ -257,7 +257,7 @@ def _assert_ascii_contains(name: str, collapsed: str, expanded: str) -> None:
 
 
 def _assert_artifacts(run_dir: Path) -> None:
-    from topology_kernel import is_mermaid_svg_renderer_available
+    from vibeflow import is_mermaid_svg_renderer_available
 
     required = (
         "health_report.json",
@@ -305,7 +305,7 @@ def _run_invalid_case(case: dict[str, Any], base_lib_report):
         return CaseResult(f"invalid:base_lib:{case['expect']}", "PASS"), report
     if kind == "base_lib_chain":
         report = base_lib_report or _bad_base_lib_report()
-        from topology_kernel import summarize_base_lib_dependency_chain
+        from vibeflow import summarize_base_lib_dependency_chain
 
         summary = summarize_base_lib_dependency_chain(("bad_base_lib.deep_chain_a",), report)
         if summary.longest_chain_length <= int(case["expect_length_gt"]):
@@ -319,8 +319,8 @@ def _run_invalid_case(case: dict[str, Any], base_lib_report):
 
 
 def _inspect_invalid_node(case: dict[str, Any], kind: str) -> CaseResult:
-    from topology_kernel.purity import validate_node_class
-    from topology_kernel.purity_types import PurityPolicy
+    from vibeflow.purity import validate_node_class
+    from vibeflow.purity_types import PurityPolicy
 
     cls = _load_class(PROJECT_DIR / str(case["module"]), str(case["class"]))
     policy = PurityPolicy(max_source_lines=500, warn_source_lines=None, allowed_base_lib_modules=("base_lib",))
@@ -341,8 +341,8 @@ def _inspect_invalid_node(case: dict[str, Any], kind: str) -> CaseResult:
 
 
 def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
-    from topology_kernel import EdgeSpec, GraphConfig, NodeContract, NodeInfo, NodeSpec, PipelineRuntime
-    from topology_kernel.registry import NodeRegistry
+    from vibeflow import EdgeSpec, GraphConfig, NodeContract, NodeInfo, NodeSpec, PipelineRuntime
+    from vibeflow.registry import NodeRegistry
 
     class RuntimeStartNode:
         NODE_INFO = NodeInfo("sandbox.runtime_start", "Runtime Start", "sandbox", "runtime test start", "0.1.0", "terminal")
@@ -381,9 +381,9 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
 
 
 def _health_invalid_node(case: dict[str, Any]) -> CaseResult:
-    from topology_kernel import GraphConfig, NodeSpec, validate_graph_health
-    from topology_kernel.purity_types import PurityPolicy
-    from topology_kernel.registry import NodeRegistry
+    from vibeflow import GraphConfig, NodeSpec, validate_graph_health
+    from vibeflow.purity_types import PurityPolicy
+    from vibeflow.registry import NodeRegistry
 
     cls = _load_class(PROJECT_DIR / str(case["module"]), str(case["class"]))
     registry = NodeRegistry()
@@ -404,8 +404,8 @@ def _health_invalid_node(case: dict[str, Any]) -> CaseResult:
 
 
 def _bad_base_lib_report():
-    from topology_kernel import scan_base_lib
-    from topology_kernel.purity_types import PurityPolicy
+    from vibeflow import scan_base_lib
+    from vibeflow.purity_types import PurityPolicy
 
     return scan_base_lib(
         PROJECT_DIR,
@@ -420,7 +420,7 @@ def _bad_base_lib_report():
 
 
 def _invalid_config(case: dict[str, Any]) -> CaseResult:
-    from topology_kernel.cli_config import validate_config_path
+    from vibeflow.cli_config import validate_config_path
 
     report = validate_config_path(CONFIG_DIR / str(case["config"]), policy_path=POLICY_PATH)
     if report.status not in {"FAIL", "ERROR"}:
@@ -431,7 +431,7 @@ def _invalid_config(case: dict[str, Any]) -> CaseResult:
 
 def _invalid_run(case: dict[str, Any]) -> CaseResult:
     from registry import build_node_registry
-    from topology_kernel import CheckedRunError, run_checked
+    from vibeflow import CheckedRunError, run_checked
 
     try:
         run_checked(
