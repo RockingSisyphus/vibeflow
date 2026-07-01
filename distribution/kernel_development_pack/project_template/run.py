@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from dataclasses import replace
@@ -8,6 +9,109 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
+MANIFEST_PATH = ROOT / "kernel" / "MANIFEST.sha256"
+PROTECTED_PREFIXES = ("kernel/topology_kernel/",)
+PROTECTED_FILES = {"run.py", "kernel/README.md", "AGENTS.md", "README.md"}
+
+
+class KernelIntegrityError(RuntimeError):
+    def __init__(self, *, changed: list[str], missing: list[str], unexpected: list[str]) -> None:
+        super().__init__("kernel integrity check failed")
+        self.changed = changed
+        self.missing = missing
+        self.unexpected = unexpected
+
+
+def _hash_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _is_protected_relative(relative: str) -> bool:
+    return relative in PROTECTED_FILES or any(relative.startswith(prefix) for prefix in PROTECTED_PREFIXES)
+
+
+def _iter_protected_files() -> list[str]:
+    paths: list[str] = []
+    for relative in PROTECTED_FILES:
+        if (ROOT / relative).is_file():
+            paths.append(relative)
+    kernel_root = ROOT / "kernel" / "topology_kernel"
+    if kernel_root.exists():
+        for path in kernel_root.rglob("*"):
+            if path.is_file() and "__pycache__" not in path.parts and not path.name.endswith(".pyc"):
+                paths.append(path.relative_to(ROOT).as_posix())
+    return sorted(set(paths))
+
+
+def _read_manifest() -> dict[str, str]:
+    if not MANIFEST_PATH.is_file():
+        raise KernelIntegrityError(changed=[], missing=[MANIFEST_PATH.relative_to(ROOT).as_posix()], unexpected=[])
+    entries: dict[str, str] = {}
+    for line_number, raw_line in enumerate(MANIFEST_PATH.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            digest, relative = line.split("  ", 1)
+        except ValueError as exc:
+            raise KernelIntegrityError(
+                changed=[f"{MANIFEST_PATH.relative_to(ROOT).as_posix()}:{line_number}"],
+                missing=[],
+                unexpected=[],
+            ) from exc
+        entries[relative] = digest
+    return entries
+
+
+def _verify_kernel_manifest() -> None:
+    entries = _read_manifest()
+    changed: list[str] = []
+    missing: list[str] = []
+    unexpected: list[str] = []
+    for relative, expected in entries.items():
+        path = ROOT / relative
+        if not path.is_file():
+            missing.append(relative)
+        elif _hash_file(path) != expected:
+            changed.append(relative)
+    recorded = set(entries)
+    for relative in _iter_protected_files():
+        if _is_protected_relative(relative) and relative not in recorded:
+            unexpected.append(relative)
+    if changed or missing or unexpected:
+        raise KernelIntegrityError(changed=changed, missing=missing, unexpected=unexpected)
+
+
+def _format_integrity_error(exc: KernelIntegrityError) -> str:
+    lines = [
+        "KERNEL INTEGRITY CHECK FAILED",
+        "",
+        "The distributed kernel or launcher files were modified.",
+        "This may mean an AI or developer changed kernel rules to bypass validation.",
+        "",
+    ]
+    for title, items in (("Changed", exc.changed), ("Missing", exc.missing), ("Unexpected", exc.unexpected)):
+        if items:
+            lines.append(f"{title}:")
+            lines.extend(f"- {item}" for item in sorted(items))
+            lines.append("")
+    lines.append("Rebuild or restore the distribution from a trusted source.")
+    return "\n".join(lines)
+
+
+def _run_integrity_check() -> None:
+    try:
+        _verify_kernel_manifest()
+    except KernelIntegrityError as exc:
+        print(_format_integrity_error(exc), file=sys.stderr)
+        raise SystemExit(2) from exc
+
+
+_run_integrity_check()
 sys.path.insert(0, str(ROOT / "kernel"))
 sys.path.insert(0, str(ROOT / "project"))
 
@@ -34,6 +138,7 @@ from registry import build_node_registry  # noqa: E402
 def main() -> int:
     parser = argparse.ArgumentParser(prog="project-runner")
     sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("verify-kernel")
     _add_config_command(sub, "validate")
     _add_config_command(sub, "inspect-config")
     run_cmd = _add_config_command(sub, "run")
@@ -76,8 +181,14 @@ def _dispatch(args) -> int:
         "svg": _svg,
         "inspect-node": _inspect_node,
         "quality": _quality,
+        "verify-kernel": _verify_kernel,
     }
     return handlers[args.command](args)
+
+
+def _verify_kernel(args) -> int:
+    print("kernel integrity: OK")
+    return 0
 
 
 def _validate(args) -> int:
