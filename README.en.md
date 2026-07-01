@@ -4,11 +4,9 @@
 
 > Keep AI-built projects from turning into an unmaintainable pile of mud.
 
-VibeFlow forces AI to design the program flowchart first, then refine nodesets, nodes, base_lib helpers, plugins, and config step by step. It turns "think through the structure before writing code" into a project-level constraint instead of a prompt-engineering wish.
+VibeFlow forces AI to design the program flowchart first, generating a directly readable standard program flowchart from the program's **real code logic** so you can understand the real structure of each part instead of guessing from AI descriptions that may be distorted. AI then refines nodesets, nodes, base_lib helpers, plugins, and config step by step. It turns "think through the structure before writing code" into a project-level constraint instead of a prompt-engineering wish.
 
 It also forces high cohesion, low coupling, small files, small functions, explicit flow edges, and checkable contracts. AI can still move fast, but every edit must return to a visual, verifiable, runnable flowchart.
-
-It is not another chat tool, and it is not a heavier framework. Its goal is simple: keep vibe coding from turning into structural drift.
 
 ## Why VibeFlow 🧯
 
