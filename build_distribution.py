@@ -46,6 +46,7 @@ def build_distribution(output: Path, *, replace: bool = True) -> None:
     _copy_tree(ROOT / "distribution" / "kernel_development_pack" / "project_template", output)
     _copy_tree(ROOT / "distribution" / "kernel_development_pack" / "docs", output / "docs")
     _copy_mermaid_renderer_config(output)
+    _copy_third_party_notices(output)
     _copy_extra_docs(output / "docs")
     _copy_tree(ROOT / "src" / "vibeflow", output / "kernel" / "vibeflow")
     _ensure_standard_project_dirs(output)
@@ -91,6 +92,12 @@ def _copy_mermaid_renderer_config(output: Path) -> None:
         path = source / name
         if path.exists():
             (target / name).write_bytes(path.read_bytes())
+
+
+def _copy_third_party_notices(output: Path) -> None:
+    source = ROOT / "THIRD_PARTY_NOTICES.md"
+    if source.exists():
+        (output / source.name).write_bytes(source.read_bytes())
 
 
 def _write_kernel_manifest(output: Path) -> None:
@@ -161,6 +168,7 @@ def _write_root_readme(output: Path) -> None:
 - `project/nodes/`、`project/base_lib/`、`project/plugins/`、`project/configs/`：AI 和开发者放业务代码与配置的标准目录。
 - `run.py`：推荐启动器，会自动加载本地内核和项目 registry。
 - `tools/mermaid-renderer/`：SVG 渲染器依赖配置；运行 `npm install` 后启用 `svg` 命令。
+- `THIRD_PARTY_NOTICES.md`：SVG 渲染相关第三方项目致谢与许可证信息。
 
 ## 开始使用
 
