@@ -1,17 +1,17 @@
-# Paperflow Kernel 反馈复核
+# Paperflow 对 VibeFlow 的反馈复核
 
-> 历史说明：本文是 flowchart 内核重构前的 Paperflow 反馈审查记录。文中的 `boundary`、显式 loop、`max_iterations` 等术语反映当时的内核模型和 Paperflow 项目状态，不代表当前 `vibeflow` 的公开 API。当前模型以标准 `flow_kind`、显式 `pipeline.edges`、terminal start/end、decision cycle 和 `NodeInfo.external=True` 为准。
+> 历史说明：本文是 flowchart 模型重构前的 Paperflow 反馈审查记录。文中的 `boundary`、显式 loop、`max_iterations` 等术语反映当时的模型和 Paperflow 项目状态，不代表当前 VibeFlow（包名 `vibeflow`）的公开 API。当前模型以标准 `flow_kind`、显式 `pipeline.edges`、terminal start/end、decision cycle 和 `NodeInfo.external=True` 为准。
 
 本文记录对 `/home/rockingsisyphus/projects/paperflow` 的一次外部开发体验反馈复核。分析分两阶段：
 
 1. 先仅基于 paperflow 项目事实复核反馈是否成立。
-2. 再阅读当前 kernel 项目文档，按 kernel 的初心和开发理念重新评估是否应修改 kernel。
+2. 再阅读当前 VibeFlow 项目文档，按 VibeFlow 的初心和开发理念重新评估是否应修改 VibeFlow。
 
 ## 第一阶段：基于 paperflow 的初步结论
 
 ### 结论
 
-开发者反馈总体成立。kernel 在 paperflow 中已经有效约束了结构性问题，但仍放过了一些需要语义理解的职责边界问题。当前更值得改进的是 kernel 的“引导与提示能力”，而不是把所有建议都升级成硬错误。
+开发者反馈总体成立。VibeFlow 在 paperflow 中已经有效约束了结构性问题，但仍放过了一些需要语义理解的职责边界问题。当前更值得改进的是 VibeFlow 的“引导与提示能力”，而不是把所有建议都升级成硬错误。
 
 ### 已核对事实
 
@@ -26,11 +26,11 @@
 
 ### 初步判断
 
-1. **kernel 起效了。**
+1. **VibeFlow 起效了。**
 
-   paperflow 的代码确实被迫形成了 `nodes/`、`base_lib/`、`boundary`、`configs/nodesets` 的分层。副作用基本集中在 boundary，纯逻辑基本位于 node 或 base_lib。开发 memo 中也能看到 kernel 对未声明输出、重复逻辑、base_lib import、契约完整性等问题的即时反馈。
+   paperflow 的代码确实被迫形成了 `nodes/`、`base_lib/`、`boundary`、`configs/nodesets` 的分层。副作用基本集中在 boundary，纯逻辑基本位于 node 或 base_lib。开发 memo 中也能看到 VibeFlow 对未声明输出、重复逻辑、base_lib import、契约完整性等问题的即时反馈。
 
-2. **kernel 目前主要防守“结构性坏味道”。**
+2. **VibeFlow 目前主要防守“结构性坏味道”。**
 
    当前规则能检查动态输出 key、未声明契约、IO import、文件大小、重复 AST、boundary provides 等问题。但它无法判断“注册函数名称和注册 node namespace 是否一致”“一个 base_lib 文件是否聚合了过多业务领域”“boundary 中 provider selection 是否已经变成业务策略”。
 
@@ -68,13 +68,13 @@
 
 6. **评估 boundary lifecycle 的中间注入点。**
 
-   paperflow 的自然拓扑是 search plan -> boundary execution -> normalize/summary。目前 boundary 主要 before/after run，表达多段 IO DAG 时不自然。可以考虑显式 IO node 或 boundary stage hook，但这会改变 kernel 表达模型，需在阅读 kernel 文档后再定优先级。
+   paperflow 的自然拓扑是 search plan -> boundary execution -> normalize/summary。目前 boundary 主要 before/after run，表达多段 IO DAG 时不自然。可以考虑显式 IO node 或 boundary stage hook，但这会改变 VibeFlow 表达模型，需在阅读 VibeFlow 文档后再定优先级。
 
-## 第二阶段：按 kernel 初心重新审视
+## 第二阶段：按 VibeFlow 初心重新审视
 
-### 已阅读的 kernel 文档要点
+### 已阅读的 VibeFlow 文档要点
 
-- `docs/kernel_target_vision.md` 明确说明 kernel 面向人机协同和 LLM 深度参与开发，目标不是让开发更自由，而是用硬性规则限制自由度，防止巨型模块、隐式依赖、副作用污染和架构不可审计。
+- `docs/kernel_target_vision.md` 明确说明 VibeFlow 面向人机协同和 LLM 深度参与开发，目标不是让开发更自由，而是用硬性规则限制自由度，防止巨型模块、隐式依赖、副作用污染和架构不可审计。
 - 同一文档把 `node`、`nodeset`、`pipeline`、`boundary`、`base_lib`、`policy`、`plugin` 定义为一等概念，并要求治理策略可解释、可分层、可降级、有来源。
 - `docs/strict_kernel_design.md` 要求凡是违反高内聚、低耦合、纯函数、原子化、显式拓扑和边界隔离目标的情况，都应由健康检查给出硬失败或显式警告。
 - `docs/current_implementation_status.md` 说明当前实现已经覆盖纯度、契约、nodeset、boundary、运行产物、插件和质量检查，但仍未形成完整的语义和架构漂移检查。
@@ -82,23 +82,23 @@
 
 ### 复核后的总判断
 
-应该修改 kernel，但修改方向应保持“核心绝对规则少而硬，语义/结构气味多用 warning、policy 和 plugin 表达”。
+应该修改 VibeFlow，但修改方向应保持“核心绝对规则少而硬，语义/结构气味多用 warning、policy 和 plugin 表达”。
 
-paperflow 的反馈没有推翻 kernel 方向，反而证明了 kernel 的基本假设：LLM 开发确实需要机器规则防止隐式 IO、契约漂移、动态输出和无约束拓扑。但 paperflow 也暴露出下一阶段治理重点：当前硬规则足够拦住结构性失控，却还不能很好提示“职责放错位置”和“配置复用困难”。
+paperflow 的反馈没有推翻 VibeFlow 方向，反而证明了 VibeFlow 的基本假设：LLM 开发确实需要机器规则防止隐式 IO、契约漂移、动态输出和无约束拓扑。但 paperflow 也暴露出下一阶段治理重点：当前硬规则足够拦住结构性失控，却还不能很好提示“职责放错位置”和“配置复用困难”。
 
 因此不建议把所有 paperflow 反馈升级为 hard error。更合适的是：
 
-- 对明显影响可维护性的通用能力，进入 kernel 核心 warning。
+- 对明显影响可维护性的通用能力，进入 VibeFlow 核心 warning。
 - 对领域语义强、误报风险高的能力，放入 project policy/plugin。
-- 对仅 paperflow 局部组织不佳的问题，先作为 paperflow 重构，不改 kernel。
+- 对仅 paperflow 局部组织不佳的问题，先作为 paperflow 重构，不改 VibeFlow。
 
 ## 最终建议
 
-### 需要修改 kernel 核心
+### 需要修改 VibeFlow 核心
 
 1. **支持 nodeset include/import。**
 
-   这是最明确、最符合 kernel 初心的核心改动。kernel 强调“程序结构必须由配置显式组织”，而 nodeset 是复杂功能组合的一等机制。如果 runnable config 必须复制大段 nodeset 定义，配置本身会成为新的维护风险。建议增加 JSONC 级别的 nodeset 引用机制，例如：
+   这是最明确、最符合 VibeFlow 初心的核心改动。VibeFlow 强调“程序结构必须由配置显式组织”，而 nodeset 是复杂功能组合的一等机制。如果 runnable config 必须复制大段 nodeset 定义，配置本身会成为新的维护风险。建议增加 JSONC 级别的 nodeset 引用机制，例如：
 
    - `include_nodesets: ["paperflow_nodesets.jsonc"]`
    - 或 `nodeset_imports: [{"path": "...", "names": ["paperflow.catalog"]}]`
@@ -107,7 +107,7 @@ paperflow 的反馈没有推翻 kernel 方向，反而证明了 kernel 的基本
 
 2. **把纯标准库 allowlist 做到更细粒度。**
 
-   当前禁止整个 `urllib` 会让 `urllib.parse` 这种纯解析能力也不可用，paperflow 因此手写 URL parsing。按 kernel 初心，规则应防止副作用污染，而不是逼开发者重写可靠标准库。建议把 import policy 从 root 级别扩展到模块/成员级别：
+   当前禁止整个 `urllib` 会让 `urllib.parse` 这种纯解析能力也不可用，paperflow 因此手写 URL parsing。按 VibeFlow 初心，规则应防止副作用污染，而不是逼开发者重写可靠标准库。建议把 import policy 从 root 级别扩展到模块/成员级别：
 
    - 允许 `urllib.parse`
    - 继续禁止 `urllib.request`
@@ -153,13 +153,13 @@ paperflow 的反馈没有推翻 kernel 方向，反而证明了 kernel 的基本
 
 2. **base_lib 领域聚合检查。**
 
-   `artifact_tools.py` 过宽在 paperflow 中成立，但“PDF/repo/summary 是否是同一领域”不能只靠 kernel 判断。核心质量工具可以提供文件函数数、公共 API 数、prefix cluster 等信号；具体拆分建议应放 project policy/plugin 或人工审查。
+   `artifact_tools.py` 过宽在 paperflow 中成立，但“PDF/repo/summary 是否是同一领域”不能只靠 VibeFlow 判断。核心质量工具可以提供文件函数数、公共 API 数、prefix cluster 等信号；具体拆分建议应放 project policy/plugin 或人工审查。
 
 3. **注册分组严格性。**
 
    核心只做 namespace mismatch warning。是否禁止跨组注册，应由项目 policy 决定。
 
-### 不建议修改 kernel 核心的部分
+### 不建议修改 VibeFlow 核心的部分
 
 1. **不应因 paperflow 直接把 provider selection 禁止在 boundary。**
 
@@ -167,7 +167,7 @@ paperflow 的反馈没有推翻 kernel 方向，反而证明了 kernel 的基本
 
 2. **不应把所有语义职责判断做成 hard error。**
 
-   kernel 初心是机器化架构纪律，但它也有 policy 分层和可降级规则。语义职责边界天然有灰度，应先用 warning 建立反馈闭环。
+   VibeFlow 初心是机器化架构纪律，但它也有 policy 分层和可降级规则。语义职责边界天然有灰度，应先用 warning 建立反馈闭环。
 
 3. **不应为了消除 duplicate AST warning 鼓励代码形态变化。**
 
@@ -182,7 +182,7 @@ paperflow 的反馈没有推翻 kernel 方向，反而证明了 kernel 的基本
 
 ## 最终结论
 
-需要修改 kernel，且优先级如下：
+需要修改 VibeFlow，且优先级如下：
 
 1. **P0：nodeset include/import。**
 2. **P1：细粒度纯标准库 allowlist，尤其允许 `urllib.parse`、继续禁止 `urllib.request`。**
@@ -191,4 +191,4 @@ paperflow 的反馈没有推翻 kernel 方向，反而证明了 kernel 的基本
 5. **P2：registry namespace consistency warning。**
 6. **P3：boundary lifecycle 示例和必要时的 named stage 扩展。**
 
-这些改动符合 kernel 初心：继续保持 node 纯函数、拓扑显式、boundary 隔离和健康报告可审计，同时把治理从“机械形状检查”推进到“可解释的职责边界提示”。其中 P0/P1 是核心体验和可靠性问题，应进入 kernel；P2/P3 更适合先以 warning、policy/plugin 和示例演进，避免把语义判断过早硬编码。
+这些改动符合 VibeFlow 初心：继续保持 node 纯函数、拓扑显式、boundary 隔离和健康报告可审计，同时把治理从“机械形状检查”推进到“可解释的职责边界提示”。其中 P0/P1 是核心体验和可靠性问题，应进入 VibeFlow；P2/P3 更适合先以 warning、policy/plugin 和示例演进，避免把语义判断过早硬编码。

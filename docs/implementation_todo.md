@@ -1,10 +1,10 @@
-# vibeflow 当前实现清单
+# VibeFlow 当前实现清单
 
 本文件记录当前实现基线和后续仍值得推进的工作。旧 `boundary`、`pipeline.loops`、edge `max_executions` 设计已废弃，不再作为待办或完成项维护。
 
 ## 当前已完成
 
-### 标准流程图内核
+### 标准流程图核心
 
 - [x] `NodeInfo.flow_kind` 必填。
 - [x] 支持标准 flow_kind：`terminal`、`process`、`decision`、`io`、`predefined`、`data_store`、`document`、`preparation`。

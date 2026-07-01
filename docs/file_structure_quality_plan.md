@@ -2,7 +2,7 @@
 
 ## 当前目标
 
-`quality-check` 是一个通用 Python 代码质量检查工具，不再包含针对本仓库主体 `a` 的专属模式。
+`quality-check` 是一个通用 Python 代码质量检查工具，不再包含针对 VibeFlow 仓库的专属模式。
 
 当前唯一入口形态是：
 

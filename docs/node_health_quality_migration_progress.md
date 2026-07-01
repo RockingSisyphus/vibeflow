@@ -89,7 +89,7 @@ git diff --check -- src/vibeflow/ast_rules.py src/vibeflow/base_lib.py src/vibef
 
 ## 不建议直接迁移的能力
 
-- vibeflow 自身的架构 contract。
+- VibeFlow 自身的架构 contract。
 - 目录 fanin/fanout。
 - 前缀功能簇 package 化建议。
 - 公共入口绕过规则。
