@@ -65,116 +65,6 @@ def register_node(registry: NodeRegistry, key: str, node_cls: type, schema: dict
     registry.register(key, node_cls, config_schema=schema or {}, config_defaults=defaults or {}, **kwargs)
 
 
-class StartNode:
-    NODE_INFO = NodeInfo("test.start", "Start", "test", "Starts a test flow.", "0.1.0", "terminal")
-    CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}, "outputs": {}},))
-
-    def run_pure(self, inputs, params):
-        return {}
-
-
-class ValueInputNode:
-    NODE_INFO = NodeInfo("test.value_input", "Value Input", "test", "Reads value.in.", "0.1.0", "io")
-    CONTRACT = NodeContract(
-        requires=("value.in",),
-        input_semantics={"value.in": ("input value",)},
-        examples=({"inputs": {"value.in": 1}, "params": {}, "outputs": {}},),
-    )
-
-    def run_pure(self, inputs, params):
-        return {}
-
-
-class OutEndNode:
-    NODE_INFO = NodeInfo("test.out_end", "Out End", "test", "Ends after value.out.", "0.1.0", "terminal")
-    CONTRACT = NodeContract(
-        requires=("value.out",),
-        input_semantics={"value.out": ("output value",)},
-        examples=({"inputs": {"value.out": 1}, "params": {}, "outputs": {}},),
-    )
-
-    def run_pure(self, inputs, params):
-        return {}
-
-
-class InEndNode:
-    NODE_INFO = NodeInfo("test.in_end", "In End", "test", "Ends after value.in.", "0.1.0", "terminal")
-    CONTRACT = NodeContract(
-        requires=("value.in",),
-        input_semantics={"value.in": ("input value",)},
-        examples=({"inputs": {"value.in": 1}, "params": {}, "outputs": {}},),
-    )
-
-    def run_pure(self, inputs, params):
-        return {}
-
-
-class SeedNode:
-    NODE_INFO = NodeInfo(
-        type_key="test.seed",
-        display_name="Seed",
-        category="test",
-        description="Produces a seed value.",
-        version="0.1.0",
-        flow_kind="process",
-    )
-    CONTRACT = NodeContract(
-        provides=("value.in",),
-        output_semantics={"value.in": ("seed value",)},
-        params_schema={"value": {"type": "number"}},
-        output_schema={"value.in": {"type": "number"}},
-        examples=({"inputs": {}, "params": {"value": 4}, "outputs": {"value.in": 4}},),
-    )
-
-    def run_pure(self, inputs, params):
-        return {"value.in": params.get("value", 1)}
-
-
-class AddNode:
-    NODE_INFO = NodeInfo(
-        type_key="test.add",
-        display_name="Add",
-        category="test",
-        description="Adds delta to input.",
-        version="0.1.0",
-        flow_kind="process",
-    )
-    CONTRACT = NodeContract(
-        requires=("value.in",),
-        provides=("value.out",),
-        input_semantics={"value.in": ("input value",)},
-        output_semantics={"value.out": ("output value",)},
-        params_schema={"delta": {"type": "number"}},
-        output_schema={"value.out": {"type": "number"}},
-        examples=({"inputs": {"value.in": 4}, "params": {"delta": 3}, "outputs": {"value.out": 7}},),
-    )
-
-    def run_pure(self, inputs, params):
-        return {"value.out": inputs["value.in"] + params.get("delta", 1)}
-
-
-class CopyNode:
-    NODE_INFO = NodeInfo(
-        type_key="test.copy",
-        display_name="Copy",
-        category="test",
-        description="Copies a value.",
-        version="0.1.0",
-        flow_kind="process",
-    )
-    CONTRACT = NodeContract(
-        requires=("value.out",),
-        provides=("value.in",),
-        input_semantics={"value.out": ("output value",)},
-        output_semantics={"value.in": ("input value",)},
-        output_schema={"value.in": {"type": "number"}},
-        examples=({"inputs": {"value.out": 7}, "params": {}, "outputs": {"value.in": 7}},),
-    )
-
-    def run_pure(self, inputs, params):
-        return {"value.in": inputs["value.out"]}
-
-
 class BadIoNode:
     NODE_INFO = NodeInfo(
         type_key="test.bad_io",
@@ -195,57 +85,19 @@ class BadIoNode:
         return {"value.out": 1}
 
 
-class NanOutputNode:
-    NODE_INFO = NodeInfo(
-        type_key="test.nan_output",
-        display_name="NaN Output",
-        category="test",
-        description="Returns a runtime-invalid JSON value.",
-        version="0.1.0",
-        flow_kind="process",
-    )
-    CONTRACT = NodeContract(
-        provides=("value.out",),
-        output_semantics={"value.out": ("output value",)},
-        output_schema={"value.out": {"type": "number"}},
-    )
-
-    def run_pure(self, inputs, params):
-        return {"value.out": float("nan")}
-
-
-class EffectRequestNode:
-    NODE_INFO = NodeInfo(
-        type_key="test.effect_request",
-        display_name="Effect Request",
-        category="test",
-        description="Emits a structured effect request.",
-        version="0.1.0",
-        flow_kind="data_store",
-    )
-    CONTRACT = NodeContract(
-        requires=("value.in",),
-        provides=("effects.request",),
-        input_semantics={"value.in": ("input value",)},
-        output_semantics={"effects.request": ("structured effect request",)},
-        output_schema={"effects.request": {"type": "object"}},
-    )
-
-    def run_pure(self, inputs, params):
-        return {"effects.request": {"value": inputs["value.in"]}}
-
-
 def _registry() -> NodeRegistry:
+    from . import strict_support_runtime_nodes as runtime_nodes
+
     registry = NodeRegistry()
-    register_node(registry, "test.start", StartNode)
-    register_node(registry, "test.value_input", ValueInputNode)
-    register_node(registry, "test.out_end", OutEndNode)
-    register_node(registry, "test.in_end", InEndNode)
-    register_node(registry, "test.seed", SeedNode, {"value": {"type": "number"}}, {"value": 1})
-    register_node(registry, "test.add", AddNode, {"delta": {"type": "number"}}, {"delta": 1})
-    register_node(registry, "test.copy", CopyNode)
-    register_node(registry, "test.nan_output", NanOutputNode)
-    register_node(registry, "test.effect_request", EffectRequestNode)
+    register_node(registry, "test.start", runtime_nodes.StartNode)
+    register_node(registry, "test.value_input", runtime_nodes.ValueInputNode)
+    register_node(registry, "test.out_end", runtime_nodes.OutEndNode)
+    register_node(registry, "test.in_end", runtime_nodes.InEndNode)
+    register_node(registry, "test.seed", runtime_nodes.SeedNode, {"value": {"type": "number"}}, {"value": 1})
+    register_node(registry, "test.add", runtime_nodes.AddNode, {"delta": {"type": "number"}}, {"delta": 1})
+    register_node(registry, "test.copy", runtime_nodes.CopyNode)
+    register_node(registry, "test.nan_output", runtime_nodes.NanOutputNode)
+    register_node(registry, "test.effect_request", runtime_nodes.EffectRequestNode)
     return registry
 
 
@@ -421,6 +273,18 @@ class DemoNode:
 
     def run_pure(self, inputs, params):
         OtherNode().run_pure({{}}, {{}})
+        return {{"demo.out": 1}}
+"""
+    if kind == "module_top_level_side_effect":
+        return f"""
+{VALID_NODE_IMPORT}
+len([])
+
+class DemoNode:
+{VALID_NODE_INFO}
+{VALID_NODE_CONTRACT}
+
+    def run_pure(self, inputs, params):
         return {{"demo.out": 1}}
 """
     return _valid_node_source(run_body=str(case["run_body"]))

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .base_lib import BaseLibDependencySummary, BaseLibFinding, BaseLibModuleReport, BaseLibScanReport, scan_base_lib, summarize_base_lib_dependency_chain
+from .architecture_report import build_architecture_report
 from .config_loader import ConfigDocument, ConfigLoadError, load_config_document, strip_jsonc_comments
 from .compiler import CompiledGraph, GraphCompileError, GraphCompiler
 from .context import Context
@@ -30,6 +31,7 @@ __all__ = [
     "BaseLibDependencySummary",
     "BaseLibModuleReport",
     "BaseLibScanReport",
+    "build_architecture_report",
     "CompilerPlugin",
     "EdgeSpec",
     "EffectivePolicy",

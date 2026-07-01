@@ -1,8 +1,14 @@
 from tests.unit.strict_support import *
 
+import ast
+
+from topology_kernel import build_architecture_report
+from topology_kernel.ast_rules import import_aliases, import_roots, qualified_call_name
+
 def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) -> None:
     manifest = load_config_document(_repo_root() / "examples" / "failure_cases" / "cases.jsonc").data
     observed: set[str] = set()
+    from tests.unit.strict_support_runtime_nodes import RouteNode as RuntimeRouteNode
 
     for case in manifest["node_cases"]:
         code, payload = _inspect_node_source(tmp_path / str(case["name"]), capsys, _failure_case_source(case))
@@ -36,13 +42,81 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         assert expected_rule in rule_ids
         observed.add(expected_rule)
 
+    for case in manifest["health_cases"]:
+        registry = _registry()
+        register_node(registry, "test.route", RuntimeRouteNode)
+        graph = parse_graph_config(case["config"])
+        report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
+        rule_ids = {finding.rule_id for finding in (*report.errors, *report.warnings)}
+        expected_rule = str(case["expected_rule_id"])
+        assert expected_rule in rule_ids
+        if expected_rule.startswith("GRAPH.EDGE."):
+            assert expected_rule in report.info["rule_catalog"]
+        observed.add(expected_rule)
+
+    for case in manifest["policy_cases"]:
+        registry = _registry()
+        graph = parse_graph_config(case["config"])
+        policy = resolve_effective_policy(case["config"], config_path=tmp_path / f"{case['name']}.json").effective_policy
+        report = validate_graph_health(graph, registry=registry, effective_policy=policy)
+        buckets = {
+            "errors": report.errors,
+            "warnings": report.warnings,
+            "skipped": report.skipped,
+        }
+        expected_rule = str(case["expected_rule_id"])
+        expected_bucket = str(case["expected_bucket"])
+        assert any(finding.rule_id == expected_rule for finding in buckets[expected_bucket])
+        assert not any(finding.rule_id == expected_rule for finding in (*report.errors, *report.warnings))
+        observed.add(expected_rule)
+
+    for case in manifest["quality_cases"]:
+        case_dir = tmp_path / str(case["name"])
+        case_dir.mkdir()
+        for rel_path, source in case["files"].items():
+            path = case_dir / rel_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(source, encoding="utf-8")
+        args = ["quality-check", "--path", str(case_dir), "--json", *case.get("args", [])]
+        code = cli_main(args)
+        assert code in {0, 1}
+        payload = json.loads(capsys.readouterr().out)
+        rule_ids = {finding["rule_id"] for finding in (*payload["errors"], *payload["warnings"])}
+        if "expected_rule_id" in case:
+            expected_rule = str(case["expected_rule_id"])
+            assert expected_rule in rule_ids
+            assert payload["summary"]["score"] < 100
+            assert payload["top_offenders"]
+            observed.add(expected_rule)
+        if "expected_absent_rule_id" in case:
+            assert str(case["expected_absent_rule_id"]) not in rule_ids
+
+    for case in manifest["architecture_cases"]:
+        registry = _registry()
+        graph = parse_graph_config(case["config"])
+        compiled = GraphCompiler().compile(graph, registry=registry)
+        health = validate_graph_health(graph, registry=registry)
+        architecture = build_architecture_report(graph, compiled=compiled)
+        assert architecture["summary"]["nodes"] == len(graph.nodes)
+        assert architecture["nodes"]
+        assert "architecture_report" not in health.info
+        observed.add("ARCHITECTURE.REPORT.OPTIONAL")
+
     assert {
         "source_too_large",
         "banned_call",
         "node_direct_call",
+        "module_side_effect",
         "CONFIG.LOOPS.REMOVED",
         "CONFIG.BOUNDARY.REMOVED",
         "BASE_LIB.FORBIDDEN_PROJECT_IMPORT",
+        "GRAPH.CYCLE.MISSING_DECISION_EXIT",
+        "GRAPH.EDGE.DUPLICATE",
+        "GRAPH.EDGE.CONFLICTING_DUPLICATE",
+        "GRAPH.SMELL.CONFUSING_NODE_NAME",
+        "QUALITY.FUNCTION.TOO_MANY_PARAMS",
+        "QUALITY.SIDE_EFFECT.CALL",
+        "ARCHITECTURE.REPORT.OPTIONAL",
     } <= observed
 
 def test_policy_downgrade_schema_requires_audit_fields() -> None:
@@ -172,6 +246,8 @@ def test_code_quality_tool_reports_file_function_dependency_and_side_effect_find
     assert any("read_text" in message for message in side_effect_messages)
     assert "QUALITY.DEPENDENCY.CHAIN_TOO_DEEP" in rule_ids
     assert report.longest_dependency_chain == ("a", "b", "c")
+    assert report.to_dict()["summary"]["score"] < 100
+    assert report.to_dict()["top_offenders"]["files"]
 
 def test_code_quality_function_qualnames_include_classes_and_nested_functions(tmp_path) -> None:
     (tmp_path / "models.py").write_text(
@@ -199,26 +275,81 @@ def test_code_quality_function_qualnames_include_classes_and_nested_functions(tm
 
     assert {"Alpha.to_dict", "Beta.to_dict", "outer", "outer.inner"} <= qualnames
 
+
+def test_code_quality_reports_too_many_function_params(tmp_path) -> None:
+    (tmp_path / "wide.py").write_text("def too_wide(a, b, c):\n    return a + b + c\n", encoding="utf-8")
+
+    report = scan_code_quality(tmp_path, thresholds=QualityThresholds(max_function_params=2))
+    payload = report.to_dict()
+
+    assert "QUALITY.FUNCTION.TOO_MANY_PARAMS" in {finding.rule_id for finding in report.findings}
+    assert payload["top_offenders"]["functions"][0]["params"] == 3
+
+
+def test_shared_ast_rules_resolve_imports_and_calls() -> None:
+    tree = ast.parse("import pathlib as pl\nfrom subprocess import run as r\nr(['true'])\npl.Path('x').write_text('ok')\n")
+    aliases = import_aliases(tree)
+    calls = [qualified_call_name(node.func, aliases) for node in ast.walk(tree) if isinstance(node, ast.Call)]
+    roots = [root for node in ast.walk(tree) if isinstance(node, (ast.Import, ast.ImportFrom)) for root in import_roots(node)]
+
+    assert aliases["r"] == "subprocess.run"
+    assert "subprocess.run" in calls
+    assert roots == ["pathlib", "subprocess"]
+
+
+def test_optional_architecture_report_is_not_health_gate() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
+                    {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": _edge_chain("start", "seed", "add", "end"),
+            }
+        }
+    )
+    compiled = GraphCompiler().compile(graph, registry=_registry())
+    health = validate_graph_health(graph, registry=_registry())
+    report = build_architecture_report(graph, compiled=compiled)
+    add = next(node for node in report["nodes"] if node["name"] == "add")
+
+    assert "architecture_report" not in health.info
+    assert report["summary"]["nodes"] == 4
+    assert report["summary"]["data_edges"] == 2
+    assert report["entry_nodes"] == ["start"]
+    assert add["affected"] == ["end"]
+
 def test_code_quality_report_groups_files_and_findings_by_scope(tmp_path) -> None:
     src_dir = tmp_path / "src" / "demo"
     tests_dir = tmp_path / "tests"
+    distribution_dir = tmp_path / "distribution"
     devtools_dir = tmp_path / "src" / "topology_kernel" / "devtools"
     src_dir.mkdir(parents=True)
     tests_dir.mkdir()
+    distribution_dir.mkdir()
     devtools_dir.mkdir(parents=True)
     (src_dir / "bad.py").write_text("def side_effect():\n    return open('src.txt').read()\n", encoding="utf-8")
     (tests_dir / "bad_test.py").write_text("def side_effect():\n    return open('test.txt').read()\n", encoding="utf-8")
+    (distribution_dir / "bad_dist.py").write_text("def side_effect():\n    return open('dist.txt').read()\n", encoding="utf-8")
+    (tmp_path / "build_distribution.py").write_text("def side_effect():\n    return open('build.txt').read()\n", encoding="utf-8")
     (devtools_dir / "bad_tool.py").write_text("def side_effect():\n    return open('tool.txt').read()\n", encoding="utf-8")
 
     payload = scan_code_quality(tmp_path, check_side_effects=True).to_dict()
     scope_summary = payload["scope_summary"]
 
     assert scope_summary["src"]["files"] == 1
-    assert scope_summary["tests"]["files"] == 1
+    assert scope_summary["tests"]["files"] == 0
     assert scope_summary["devtools"]["files"] == 1
     assert scope_summary["src"]["warnings"] == 1
-    assert scope_summary["tests"]["warnings"] == 1
+    assert scope_summary["tests"]["warnings"] == 0
     assert scope_summary["devtools"]["warnings"] == 1
+    scanned_files = {file["path"] for file in payload["files"]}
+    assert "tests/bad_test.py" not in scanned_files
+    assert "distribution/bad_dist.py" not in scanned_files
+    assert "build_distribution.py" not in scanned_files
 
 def test_code_quality_report_includes_directory_structure_graph(tmp_path) -> None:
     for directory in ("left", "right", "shared", "x", "y"):
@@ -387,7 +518,10 @@ def test_cli_quality_check_json_and_text_outputs(tmp_path, capsys) -> None:
     assert json_code == 0
     assert json_payload["status"] == "CONCERNS"
     assert json_payload["scope_summary"]["other"]["warnings"] == 1
+    assert "score" in json_payload["summary"]
+    assert "top_offenders" in json_payload
     assert json_payload["warnings"][0]["rule_id"] == "QUALITY.SIDE_EFFECT.CALL"
     assert text_code == 0
     assert "scopes:" in text_output
+    assert "score=" in text_output
     assert "QUALITY.SIDE_EFFECT.CALL" in text_output

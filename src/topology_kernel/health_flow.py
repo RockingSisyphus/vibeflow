@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Mapping
 
+from .graph_algorithms import strongly_connected_components
 from .graph_config import STATUS_PLANNED
 from .health_types import HealthFinding
 from .node import FLOW_KIND_DECISION, FLOW_KIND_TERMINAL
+
+
+@dataclass(frozen=True)
+class _DecisionFlow:
+    registry: object
+    outgoing: dict[str, list[str]]
+    outgoing_edges: dict[str, list[object]]
+    can_reach_end: set[str]
 
 
 def append_flowchart_health(graph, compiled, state, *, registry, owner: str = "pipeline") -> None:
@@ -19,7 +29,10 @@ def append_flowchart_health(graph, compiled, state, *, registry, owner: str = "p
     _append_reachability_findings(starts, active_names, outgoing, state)
     can_reach_end = _append_end_reachability_findings(ends, active_names, incoming, state)
     if ends:
-        _append_decision_branch_health(graph, compiled, state, registry=registry, outgoing=outgoing, outgoing_edges=outgoing_edges, can_reach_end=can_reach_end)
+        decision_flow = _DecisionFlow(registry, outgoing, outgoing_edges, can_reach_end)
+        _append_decision_branch_health(graph, compiled, state, decision_flow)
+        _append_decision_cycle_exit_health(compiled, state, outgoing=outgoing, can_reach_end=can_reach_end)
+    _append_explicit_edge_duplicate_warnings(graph, state)
     _append_orphan_findings(active_names, incoming, outgoing, state)
     _append_nodeset_flow_health(graph, state, registry=registry)
 
@@ -124,25 +137,60 @@ def _append_unconsumed_provider_warnings(node, compiled, nodes_by_name, outgoing
             state.warnings.append(_data_finding("GRAPH.DATA.UNCONSUMED_PROVIDER", key, f"node '{node.name}' provides '{key}' but no downstream flow successor requires it", node=node.name))
 
 
-def _append_decision_branch_health(graph, compiled, state, *, registry, outgoing: dict[str, list[str]], outgoing_edges: dict[str, list[object]], can_reach_end: set[str]) -> None:
+def _append_decision_branch_health(graph, compiled, state, flow: _DecisionFlow) -> None:
     nodes_by_name = {node.name: node for node in graph.nodes}
     for node in graph.nodes:
         if node.status == STATUS_PLANNED or compiled.flow_kinds.get(node.name) != FLOW_KIND_DECISION:
             continue
-        _append_single_decision_health(node, nodes_by_name, state, registry=registry, outgoing=outgoing, edges=outgoing_edges.get(node.name, ()), can_reach_end=can_reach_end)
+        _append_single_decision_health(node, nodes_by_name, state, flow)
 
 
-def _append_single_decision_health(node, nodes_by_name, state, *, registry, outgoing, edges, can_reach_end) -> None:
-    schema_values = _decision_schema_values(node, registry)
+def _append_single_decision_health(node, nodes_by_name, state, flow: _DecisionFlow) -> None:
+    schema_values = _decision_schema_values(node, flow.registry)
     equality_values: set[object] = set()
-    for edge in edges:
+    for edge in flow.outgoing_edges.get(node.name, ()):
         parsed = _parse_when(getattr(edge, "when", ""))
         if parsed is not None:
             equality_values.update(_validate_branch_value(node, parsed, schema_values, state))
         target = getattr(edge, "target", "")
-        if target in nodes_by_name and not _is_loop_branch(node.name, target, outgoing) and target not in can_reach_end:
+        if target in nodes_by_name and not _is_loop_branch(node.name, target, flow.outgoing) and target not in flow.can_reach_end:
             state.errors.append(_flow_finding("GRAPH.DECISION.BRANCH_CANNOT_REACH_END", node.name, f"decision branch {node.name}->{target} cannot reach a terminal end node", object_type="node"))
     _append_missing_schema_branches(node, schema_values, equality_values, state)
+
+
+def _append_decision_cycle_exit_health(compiled, state, *, outgoing: dict[str, list[str]], can_reach_end: set[str]) -> None:
+    for component in strongly_connected_components(outgoing):
+        if len(component) == 1 and component[0] not in outgoing.get(component[0], ()):
+            continue
+        cycle = set(component)
+        decision_nodes = [node for node in component if compiled.flow_kinds.get(node) == FLOW_KIND_DECISION]
+        for decision in decision_nodes:
+            has_exit = any(target not in cycle and target in can_reach_end for target in outgoing.get(decision, ()))
+            if not has_exit:
+                state.errors.append(_flow_finding("GRAPH.CYCLE.MISSING_DECISION_EXIT", decision, f"decision cycle containing '{decision}' needs an exit edge from a decision node to a terminal end", object_type="node"))
+
+
+def _append_explicit_edge_duplicate_warnings(graph, state) -> None:
+    seen: dict[tuple[str, str], set[str]] = {}
+    for edge in graph.edges:
+        seen.setdefault(edge.pair, set()).add(edge.when)
+    for pair, conditions in sorted(seen.items()):
+        count = sum(1 for edge in graph.edges if edge.pair == pair)
+        if count <= 1:
+            continue
+        rule_id = "GRAPH.EDGE.CONFLICTING_DUPLICATE" if len(conditions) > 1 else "GRAPH.EDGE.DUPLICATE"
+        state.warnings.append(
+            HealthFinding(
+                rule_id=rule_id,
+                severity="warning",
+                object_type="edge",
+                object_id=f"{pair[0]}->{pair[1]}",
+                failure_layer="topology",
+                message=f"explicit edge {pair[0]}->{pair[1]} is declared {count} times and will be collapsed",
+                suggested_fix_type="fix_config",
+                details={"conditions": sorted(conditions)},
+            )
+        )
 
 
 def _validate_branch_value(node, parsed: tuple[str, str, object], schema_values: set[object] | None, state) -> set[object]:
@@ -224,6 +272,7 @@ def _walk(starts: set[str], adjacency: dict[str, list[str]]) -> set[str]:
             seen.add(target)
             queue.append(target)
     return seen
+
 
 
 def _flow_finding(rule_id: str, object_id: str, message: str, *, object_type: str = "pipeline") -> HealthFinding:

@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Mapping
 
 from .graph_config import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
 from .health_types import HealthFinding
 from .registry import NodeRegistry, NodeRegistryError
+
+
+@dataclass(frozen=True)
+class _OverrideContext:
+    caller_name: str
+    nodeset: NodesetSpec
+    nodes_by_name: dict[str, NodeSpec]
+    registry: NodeRegistry
+    findings: list[HealthFinding]
 
 
 def validate_node_config_health(graph: GraphConfig, *, registry: NodeRegistry) -> tuple[HealthFinding, ...]:
@@ -77,35 +87,27 @@ def _validate_override_map(
     findings: list[HealthFinding],
 ) -> None:
     nodes_by_name = {node.name: node for node in nodeset.graph.nodes}
+    context = _OverrideContext(caller_name, nodeset, nodes_by_name, registry, findings)
     for path, value in overrides.items():
-        _validate_override_path(caller_name, nodeset, str(path), dict(value), nodes_by_name, registry=registry, findings=findings)
+        _validate_override_path(str(path), dict(value), context)
 
 
-def _validate_override_path(
-    caller_name: str,
-    nodeset: NodesetSpec,
-    path: str,
-    value: dict[str, object],
-    nodes_by_name: dict[str, NodeSpec],
-    *,
-    registry: NodeRegistry,
-    findings: list[HealthFinding],
-) -> None:
+def _validate_override_path(path: str, value: dict[str, object], context: _OverrideContext) -> None:
     head, sep, tail = path.partition(".")
-    target = nodes_by_name.get(head)
+    target = context.nodes_by_name.get(head)
     if target is None:
-        findings.append(_node_config_finding("NODESET.CONFIG.UNKNOWN_NODE", caller_name, f"nodeset override references unknown node: {path}", details={"nodeset": nodeset.name, "path": path}))
+        context.findings.append(_node_config_finding("NODESET.CONFIG.UNKNOWN_NODE", context.caller_name, f"nodeset override references unknown node: {path}", details={"nodeset": context.nodeset.name, "path": path}))
         return
     if not sep:
-        _validate_direct_override(caller_name, target, value, nodeset=nodeset, registry=registry, findings=findings)
+        _validate_direct_override(context.caller_name, target, value, nodeset=context.nodeset, registry=context.registry, findings=context.findings)
         return
     if not target.node_type.startswith("nodeset."):
-        findings.append(_node_config_finding("NODESET.CONFIG.INVALID_PATH", caller_name, f"override path passes through non-nodeset node: {path}", details={"nodeset": nodeset.name, "path": path}))
+        context.findings.append(_node_config_finding("NODESET.CONFIG.INVALID_PATH", context.caller_name, f"override path passes through non-nodeset node: {path}", details={"nodeset": context.nodeset.name, "path": path}))
         return
-    child = nodeset.graph.nodesets.get(target.node_type.removeprefix("nodeset."))
+    child = context.nodeset.graph.nodesets.get(target.node_type.removeprefix("nodeset."))
     if child is None:
         return
-    _validate_override_map(caller_name, child, {tail: value}, registry=registry, findings=findings)
+    _validate_override_map(context.caller_name, child, {tail: value}, registry=context.registry, findings=context.findings)
 
 
 def _validate_direct_override(

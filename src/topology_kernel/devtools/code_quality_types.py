@@ -18,10 +18,16 @@ DEFAULT_EXCLUDED_DIRS = frozenset(
         "__pycache__",
         "build",
         "dist",
+        "distribution",
         "integration_sandbox",
+        ".ipynb_checkpoints",
+        ".nox",
         "node_modules",
         "references",
+        "site-packages",
+        "tests",
         "topology_kernel_distribution",
+        "vendor",
         "venv",
     }
 )
@@ -70,6 +76,19 @@ SIDE_EFFECT_ATTR_CALLS = frozenset(
     }
 )
 
+SIDE_EFFECT_BOUNDARY_PATHS = frozenset(
+    {
+        "src/topology_kernel/base_lib.py",
+        "src/topology_kernel/cli.py",
+        "src/topology_kernel/config_loader.py",
+        "src/topology_kernel/devtools/code_quality.py",
+        "src/topology_kernel/devtools/code_quality_types.py",
+        "src/topology_kernel/mermaid_render.py",
+        "src/topology_kernel/purity_source.py",
+        "src/topology_kernel/runner.py",
+    }
+)
+
 BRANCH_NODES = (
     ast.If,
     ast.IfExp,
@@ -100,6 +119,7 @@ class QualityThresholds:
     max_function_lines: int = 80
     max_function_branches: int = 12
     max_function_nesting: int = 4
+    max_function_params: int = 6
     warn_dependency_chain: int = 6
     max_dependency_chain: int = 10
 
@@ -121,6 +141,7 @@ class QualityThresholds:
             "max_function_lines": self.max_function_lines,
             "max_function_branches": self.max_function_branches,
             "max_function_nesting": self.max_function_nesting,
+            "max_function_params": self.max_function_params,
             "warn_dependency_chain": self.warn_dependency_chain,
             "max_dependency_chain": self.max_dependency_chain,
         }
@@ -158,6 +179,7 @@ class FunctionQuality:
     lines: int
     branches: int
     max_nesting_depth: int
+    param_count: int
     ast_fingerprint: str
 
     def to_dict(self) -> dict[str, object]:
@@ -168,6 +190,7 @@ class FunctionQuality:
             "lines": self.lines,
             "branches": self.branches,
             "max_nesting_depth": self.max_nesting_depth,
+            "param_count": self.param_count,
             "ast_fingerprint": self.ast_fingerprint,
         }
 
@@ -269,9 +292,11 @@ class QualityReport:
                 "files": len(self.files),
                 "errors": len(errors),
                 "warnings": len(warnings),
+                "score": _quality_score(errors, warnings),
                 "longest_dependency_chain_length": len(self.longest_dependency_chain),
             },
             "scope_summary": _scope_summary(self.files, self.findings),
+            "top_offenders": _top_offenders(self.files, self.findings),
             "thresholds": self.thresholds.to_dict(),
             "files": [file.to_dict() for file in self.files],
             "dependency_graph": {key: list(value) for key, value in sorted(self.dependency_graph.items())},
@@ -303,6 +328,58 @@ def _scope_summary(files: tuple[FileQuality, ...], findings: tuple[QualityFindin
         elif finding.severity == "warning":
             summary[scope]["warnings"] += 1
     return summary
+
+
+def _quality_score(errors: list[dict[str, object]], warnings: list[dict[str, object]]) -> int:
+    return max(0, 100 - len(errors) * 10 - len(warnings) * 2)
+
+
+def _top_offenders(files: tuple[FileQuality, ...], findings: tuple[QualityFinding, ...]) -> dict[str, list[dict[str, object]]]:
+    file_findings: dict[str, list[QualityFinding]] = {file.path: [] for file in files}
+    function_findings: dict[str, list[QualityFinding]] = {}
+    for finding in findings:
+        path = str(finding.source_location.get("path", "")) or finding.object_id.split(":", 1)[0]
+        rel_path = _rel_path_for_finding(path, file_findings)
+        if rel_path:
+            file_findings.setdefault(rel_path, []).append(finding)
+        if finding.object_type == "function":
+            function_findings.setdefault(finding.object_id, []).append(finding)
+    return {
+        "files": _top_files(files, file_findings),
+        "functions": _top_functions(files, function_findings),
+    }
+
+
+def _top_files(files: tuple[FileQuality, ...], file_findings: dict[str, list[QualityFinding]]) -> list[dict[str, object]]:
+    rows = []
+    for file in files:
+        findings = file_findings.get(file.path, [])
+        score = len([item for item in findings if item.severity == "error"]) * 10 + len([item for item in findings if item.severity == "warning"]) * 2 + file.lines // 100 + file.branch_count
+        if score:
+            rows.append({"path": file.path, "score": score, "lines": file.lines, "branches": file.branch_count, "findings": len(findings)})
+    return sorted(rows, key=lambda row: (-int(row["score"]), str(row["path"])))[:10]
+
+
+def _top_functions(files: tuple[FileQuality, ...], function_findings: dict[str, list[QualityFinding]]) -> list[dict[str, object]]:
+    rows = []
+    for file in files:
+        for function in file.functions:
+            object_id = f"{file.path}:{function.qualname}"
+            findings = function_findings.get(object_id, [])
+            score = len(findings) * 5 + function.lines // 20 + function.branches + function.max_nesting_depth + function.param_count
+            if score:
+                rows.append({"object_id": object_id, "score": score, "lines": function.lines, "branches": function.branches, "params": function.param_count, "findings": len(findings)})
+    return sorted(rows, key=lambda row: (-int(row["score"]), str(row["object_id"])))[:10]
+
+
+def _rel_path_for_finding(path: str, known: dict[str, list[QualityFinding]]) -> str:
+    normalized = path.replace("\\", "/")
+    if normalized in known:
+        return normalized
+    for rel_path in known:
+        if normalized.endswith(rel_path.replace("\\", "/")):
+            return rel_path
+    return normalized
 
 
 def _scope_for_finding(finding: QualityFinding) -> str:

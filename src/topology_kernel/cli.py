@@ -79,6 +79,7 @@ def build_parser() -> argparse.ArgumentParser:
     quality.add_argument("--max-function-lines", type=int, default=80, help="maximum function lines before warning")
     quality.add_argument("--max-function-branches", type=int, default=12, help="maximum function branch count before warning")
     quality.add_argument("--max-function-nesting", type=int, default=4, help="maximum function nesting depth before warning")
+    quality.add_argument("--max-function-params", type=int, default=6, help="maximum function parameter count before warning")
     quality.add_argument("--warn-dependency-depth", type=int, default=6, help="dependency chain length before warning")
     quality.add_argument("--max-dependency-depth", type=int, default=10, help="dependency chain length before error")
     quality.add_argument("--include-references", action="store_true", help="also scan references/ directories")
@@ -247,6 +248,7 @@ def _handle_quality_check(args: argparse.Namespace) -> int:
         max_function_lines=args.max_function_lines,
         max_function_branches=args.max_function_branches,
         max_function_nesting=args.max_function_nesting,
+        max_function_params=args.max_function_params,
         warn_dependency_chain=args.warn_dependency_depth,
         max_dependency_chain=args.max_dependency_depth,
     )

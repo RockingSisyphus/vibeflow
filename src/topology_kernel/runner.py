@@ -203,6 +203,7 @@ def _validate_run_health(
         registry=registry,
         plugin_registry=plugin_registry,
         purity_policy=policy_result.effective_policy.to_purity_policy(),
+        effective_policy=policy_result.effective_policy,
     )
     info = dict(health.info)
     info["nodeset_imports"] = [dict(item) for item in nodeset_imports]

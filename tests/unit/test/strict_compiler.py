@@ -102,6 +102,35 @@ def test_compiler_allows_cycle_with_decision_router() -> None:
     assert ("copy", "add") in [edge.pair for edge in compiled.effective_edges]
 
 
+def test_graph_health_reports_decision_cycle_without_exit() -> None:
+    from tests.unit.strict_support_runtime_nodes import RouteNode as RuntimeRouteNode
+
+    registry = _registry()
+    register_node(registry, "test.route", RuntimeRouteNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "inputs": ["value.in"],
+                "nodes": [
+                    {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
+                    {"name": "route", "type": "test.route", "requires": ["value.out"], "provides": ["flow.route"]},
+                    {"name": "copy", "type": "test.copy", "requires": ["value.out"], "provides": ["value.in"]},
+                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                ],
+                "edges": [
+                    {"from": "add", "to": "route"},
+                    {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
+                    {"from": "copy", "to": "add"},
+                ],
+            }
+        }
+    )
+
+    report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
+
+    assert any(error.rule_id == "GRAPH.CYCLE.MISSING_DECISION_EXIT" for error in report.errors)
+
+
 def test_compiler_rejects_unconditional_edge_from_decision() -> None:
     registry = _registry()
     register_node(registry, "test.route", RouteNode)

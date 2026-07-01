@@ -1,5 +1,7 @@
 from tests.unit.strict_support import *
 
+from topology_kernel.policy import EffectivePolicy
+
 def test_architecture_smells_warn_for_mismatched_metadata_and_unstable_keys(tmp_path, capsys) -> None:
     info = VALID_NODE_INFO.replace('description="Demo node."', 'description="Calculates invoice total."')
     contract = """
@@ -38,6 +40,71 @@ def test_graph_health_reports_node_metrics_duplicate_logic_and_confusing_node_na
     rule_ids = {warning["rule_id"] for warning in payload["warnings"]}
     assert "GRAPH.SMELL.CONFUSING_NODE_NAME" in rule_ids
     assert "GRAPH.SMELL.DUPLICATE_LOGIC" in rule_ids
+
+
+def test_graph_health_policy_can_exempt_findings() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "BadName", "type": "test.seed", "provides": ["value.in"]},
+                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                ],
+                "edges": _edge_chain("start", "BadName", "end"),
+            }
+        }
+    )
+    policy = EffectivePolicy(
+        {
+            "rules": {
+                "exemptions": [
+                    {
+                        "rule_id": "GRAPH.SMELL.CONFUSING_NODE_NAME",
+                        "scope": {"object_id": "BadName"},
+                        "reason": "legacy fixture",
+                        "expires": "2026-12-31",
+                    }
+                ]
+            }
+        },
+        ("test",),
+    )
+
+    report = validate_graph_health(
+        graph,
+        registry=_registry(),
+        purity_policy=PurityPolicy(max_source_lines=1000),
+        effective_policy=policy,
+    )
+
+    assert not any(warning.rule_id == "GRAPH.SMELL.CONFUSING_NODE_NAME" for warning in report.warnings)
+    skipped = [finding for finding in report.skipped if finding.rule_id == "GRAPH.SMELL.CONFUSING_NODE_NAME"]
+    assert skipped[0].details["policy_override"]["reason"] == "legacy fixture"
+
+
+def test_graph_health_warns_for_duplicate_explicit_edges() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
+                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                ],
+                "edges": [
+                    {"from": "start", "to": "seed"},
+                    {"from": "start", "to": "seed"},
+                    {"from": "seed", "to": "end"},
+                ],
+            }
+        }
+    )
+
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+
+    assert any(warning.rule_id == "GRAPH.EDGE.DUPLICATE" for warning in report.warnings)
+    assert "GRAPH.EDGE.DUPLICATE" in report.info["rule_catalog"]
 
 
 def test_graph_health_warns_for_overwide_nodeset() -> None:

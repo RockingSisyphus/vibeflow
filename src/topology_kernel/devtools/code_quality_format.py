@@ -13,6 +13,7 @@ def format_quality_summary(report: QualityReport, *, max_findings: int = 30) -> 
         (
             f"root={report.root} files={summary['files']} "
             f"errors={summary['errors']} warnings={summary['warnings']} "
+            f"score={summary['score']} "
             f"longest_dependency_chain={summary['longest_dependency_chain_length']}"
         ),
     ]
@@ -21,6 +22,7 @@ def format_quality_summary(report: QualityReport, *, max_findings: int = 30) -> 
         lines.append(scope_line)
     for module in report.longest_dependency_chain:
         lines.append(f"  chain: {module}")
+    lines.extend(_top_offender_lines(payload.get("top_offenders", {})))
     for finding in report.findings[:max_findings]:
         location = finding.source_location.get("path", "")
         line = finding.source_location.get("line")
@@ -29,6 +31,19 @@ def format_quality_summary(report: QualityReport, *, max_findings: int = 30) -> 
     if len(report.findings) > max_findings:
         lines.append(f"... {len(report.findings) - max_findings} more findings omitted")
     return "\n".join(lines)
+
+
+def _top_offender_lines(top_offenders: object) -> list[str]:
+    if not isinstance(top_offenders, Mapping):
+        return []
+    lines: list[str] = []
+    for file in top_offenders.get("files", [])[:5] if isinstance(top_offenders.get("files"), list) else []:
+        if isinstance(file, Mapping):
+            lines.append(f"  top-file: {file.get('path')} score={file.get('score')}")
+    for function in top_offenders.get("functions", [])[:5] if isinstance(top_offenders.get("functions"), list) else []:
+        if isinstance(function, Mapping):
+            lines.append(f"  top-function: {function.get('object_id')} score={function.get('score')}")
+    return lines
 
 
 def _scope_summary_line(scope_summary: object) -> str:

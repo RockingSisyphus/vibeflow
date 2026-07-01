@@ -19,6 +19,11 @@
       "name": "node_mutual_call",
       "kind": "node_mutual_call",
       "expected_legacy_code": "node_direct_call"
+    },
+    {
+      "name": "module_top_level_side_effect",
+      "kind": "module_top_level_side_effect",
+      "expected_legacy_code": "module_side_effect"
     }
   ],
   "config_cases": [
@@ -53,6 +58,140 @@
       "name": "base_lib_escape",
       "module_source": "from nodes.some_node import SomeNode\n\n\ndef helper():\n    return 1\n",
       "expected_rule_id": "BASE_LIB.FORBIDDEN_PROJECT_IMPORT"
+    }
+  ],
+  "health_cases": [
+    {
+      "name": "decision_cycle_without_exit",
+      "expected_rule_id": "GRAPH.CYCLE.MISSING_DECISION_EXIT",
+      "config": {
+        "pipeline": {
+          "inputs": ["value.in"],
+          "nodes": [
+            {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
+            {"name": "route", "type": "test.route", "requires": ["value.out"], "provides": ["flow.route"]},
+            {"name": "copy", "type": "test.copy", "requires": ["value.out"], "provides": ["value.in"]},
+            {"name": "end", "type": "test.in_end", "requires": ["value.in"]}
+          ],
+          "edges": [
+            {"from": "add", "to": "route"},
+            {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
+            {"from": "copy", "to": "add"}
+          ]
+        }
+      }
+    },
+    {
+      "name": "duplicate_explicit_edge",
+      "expected_rule_id": "GRAPH.EDGE.DUPLICATE",
+      "config": {
+        "pipeline": {
+          "nodes": [
+            {"name": "start", "type": "test.start"},
+            {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
+            {"name": "end", "type": "test.in_end", "requires": ["value.in"]}
+          ],
+          "edges": [
+            {"from": "start", "to": "seed"},
+            {"from": "start", "to": "seed"},
+            {"from": "seed", "to": "end"}
+          ]
+        }
+      }
+    },
+    {
+      "name": "conflicting_duplicate_explicit_edge",
+      "expected_rule_id": "GRAPH.EDGE.CONFLICTING_DUPLICATE",
+      "config": {
+        "pipeline": {
+          "nodes": [
+            {"name": "route", "type": "test.route", "provides": ["flow.route"]},
+            {"name": "copy", "type": "test.copy", "requires": ["value.in"], "provides": ["value.out"]}
+          ],
+          "edges": [
+            {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
+            {"from": "route", "to": "copy", "when": "flow.route == 'done'"}
+          ]
+        }
+      }
+    }
+  ],
+  "policy_cases": [
+    {
+      "name": "policy_exempts_confusing_node_name",
+      "expected_rule_id": "GRAPH.SMELL.CONFUSING_NODE_NAME",
+      "expected_bucket": "skipped",
+      "config": {
+        "policy": {
+          "rules": {
+            "exemptions": [
+              {
+                "rule_id": "GRAPH.SMELL.CONFUSING_NODE_NAME",
+                "scope": {"object_id": "BadName"},
+                "reason": "documented failure-case exemption",
+                "expires": "2099-01-01"
+              }
+            ]
+          }
+        },
+        "pipeline": {
+          "nodes": [
+            {"name": "start", "type": "test.start"},
+            {"name": "BadName", "type": "test.seed", "provides": ["value.in"]},
+            {"name": "end", "type": "test.in_end", "requires": ["value.in"]}
+          ],
+          "edges": [
+            {"from": "start", "to": "BadName"},
+            {"from": "BadName", "to": "end"}
+          ]
+        }
+      }
+    }
+  ],
+  "quality_cases": [
+    {
+      "name": "too_many_function_params",
+      "expected_rule_id": "QUALITY.FUNCTION.TOO_MANY_PARAMS",
+      "args": ["--max-function-params", "2"],
+      "files": {
+        "wide.py": "def too_wide(a, b, c):\n    return a + b + c\n"
+      }
+    },
+    {
+      "name": "aliased_side_effect_call",
+      "expected_rule_id": "QUALITY.SIDE_EFFECT.CALL",
+      "args": ["--check-side-effects"],
+      "files": {
+        "side_effect.py": "from subprocess import run as r\n\ndef call():\n    return r(['true'])\n"
+      }
+    },
+    {
+      "name": "skips_sensitive_file",
+      "expected_absent_rule_id": "QUALITY.SIDE_EFFECT.CALL",
+      "args": ["--check-side-effects"],
+      "files": {
+        "secrets.py": "def leak():\n    return open('secret.txt').read()\n"
+      }
+    }
+  ],
+  "architecture_cases": [
+    {
+      "name": "optional_architecture_report_not_health_gate",
+      "config": {
+        "pipeline": {
+          "nodes": [
+            {"name": "start", "type": "test.start"},
+            {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
+            {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
+            {"name": "end", "type": "test.out_end", "requires": ["value.out"]}
+          ],
+          "edges": [
+            {"from": "start", "to": "seed"},
+            {"from": "seed", "to": "add"},
+            {"from": "add", "to": "end"}
+          ]
+        }
+      }
     }
   ]
 }
