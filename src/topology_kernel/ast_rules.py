@@ -73,6 +73,18 @@ def import_aliases_from_node(node: ast.Import | ast.ImportFrom) -> dict[str, str
     return {alias.asname or alias.name: f"{node.module}.{alias.name}" for alias in node.names}
 
 
+def import_aliases(tree: ast.AST, *, defaults: Mapping[str, str] | None = None) -> dict[str, str]:
+    aliases = dict(defaults or {})
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            aliases.update(import_aliases_from_node(node))
+    return aliases
+
+
+def import_roots(node: ast.Import | ast.ImportFrom) -> tuple[str, ...]:
+    return tuple(module.split(".", 1)[0] for module in import_modules(node))
+
+
 def path_effect_call_name(node: ast.Call, aliases: Mapping[str, str]) -> str:
     if not isinstance(node.func, ast.Attribute) or node.func.attr not in PATH_EFFECT_METHODS:
         return ""

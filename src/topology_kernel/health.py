@@ -10,6 +10,7 @@ from .purity_types import PurityPolicy
 from .graph_config import STATUS_PLANNED
 from .health_flow import append_data_contract_warnings, append_flowchart_health
 from .health_planned import append_planned_findings
+from .policy import EffectivePolicy, apply_policy_to_findings
 
 if TYPE_CHECKING:
     from .compiler import CompiledGraph, GraphCompileError
@@ -35,6 +36,7 @@ def validate_graph_health(
     boundary_registry: object | None = None,
     plugin_registry: PluginRegistry | None = None,
     purity_policy: PurityPolicy | None = None,
+    effective_policy: EffectivePolicy | None = None,
 ) -> HealthReport:
     from .compiler import GraphCompiler, GraphCompileError
 
@@ -70,7 +72,7 @@ def validate_graph_health(
     _append_duplicate_logic_findings(state)
     _append_nodeset_health(graph, registry, state)
     _append_graph_plugin_findings(graph, compiled, plugin_registry, state)
-    return _build_health_report(graph, compiled, plugin_registry, state)
+    return _build_health_report(graph, compiled, plugin_registry, state, effective_policy=effective_policy)
 
 
 def _compile_error_report(exc: GraphCompileError) -> HealthReport:
@@ -237,6 +239,7 @@ def _append_node_purity_findings(
         expected_type=spec.node_type,
         known_node_class_names=known_classes,
         known_node_modules=known_modules,
+        scan_module=True,
     ):
         append_finding_by_severity(_node_violation_finding(spec.name, violation), state.errors, state.warnings)
 
@@ -327,11 +330,20 @@ def _build_health_report(
     compiled: CompiledGraph,
     plugin_registry: PluginRegistry | None,
     state: _HealthValidationState,
+    effective_policy: EffectivePolicy | None = None,
 ) -> HealthReport:
+    from .rule_catalog import rule_catalog
+
+    errors: tuple[HealthFinding, ...] = tuple(state.errors)
+    warnings: tuple[HealthFinding, ...] = tuple(state.warnings)
+    skipped: tuple[HealthFinding, ...] = ()
+    if effective_policy is not None:
+        errors, warnings, skipped = apply_policy_to_findings(errors, warnings, effective_policy)
     return HealthReport(
-        status=_health_status(state.errors, state.warnings),
-        errors=tuple(state.errors),
-        warnings=tuple(state.warnings),
+        status=_health_status(list(errors), list(warnings)),
+        errors=errors,
+        warnings=warnings,
+        skipped=skipped,
         info={
             "explicit_edges": [edge.pair for edge in compiled.explicit_edges],
             "data_edges": [edge.pair for edge in compiled.data_edges],
@@ -339,6 +351,7 @@ def _build_health_report(
             "node_metrics": state.node_metrics,
             "nodeset_findings": state.nodeset_findings,
             "plugins": plugin_registry.to_dict() if plugin_registry is not None else {"plugins": []},
+            "rule_catalog": rule_catalog(),
         },
     )
 

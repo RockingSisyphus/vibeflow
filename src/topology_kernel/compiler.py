@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from .graph_algorithms import strongly_connected_components
 from .graph_config import EdgeSpec, GraphConfig, NodeSpec, STATUS_PLANNED
 from .node import FLOW_KIND_DECISION, FLOW_KIND_PREDEFINED
 from .plugin import PluginRegistry
@@ -154,7 +155,7 @@ def _validate_routed_cycles(nodes_by_name: dict[str, NodeSpec], edges: tuple[Edg
     adjacency: dict[str, list[str]] = {name: [] for name in nodes_by_name}
     for edge in edges:
         adjacency.setdefault(edge.source, []).append(edge.target)
-    for component in _strongly_connected_components(adjacency):
+    for component in strongly_connected_components(adjacency):
         if len(component) == 1:
             node = component[0]
             if node not in adjacency.get(node, ()):
@@ -193,41 +194,3 @@ def _node_flow_kinds(nodes_by_name: dict[str, NodeSpec], *, registry: Any | None
         info = getattr(node_cls, "NODE_INFO", None)
         kinds[name] = str(getattr(info, "flow_kind", ""))
     return kinds
-
-
-def _strongly_connected_components(adjacency: dict[str, list[str]]) -> list[tuple[str, ...]]:
-    index = 0
-    stack: list[str] = []
-    indices: dict[str, int] = {}
-    lowlinks: dict[str, int] = {}
-    on_stack: set[str] = set()
-    components: list[tuple[str, ...]] = []
-
-    def visit(node: str) -> None:
-        nonlocal index
-        indices[node] = index
-        lowlinks[node] = index
-        index += 1
-        stack.append(node)
-        on_stack.add(node)
-        for target in adjacency.get(node, ()):
-            if target not in indices:
-                visit(target)
-                lowlinks[node] = min(lowlinks[node], lowlinks[target])
-            elif target in on_stack:
-                lowlinks[node] = min(lowlinks[node], indices[target])
-        if lowlinks[node] != indices[node]:
-            return
-        component: list[str] = []
-        while True:
-            item = stack.pop()
-            on_stack.remove(item)
-            component.append(item)
-            if item == node:
-                break
-        components.append(tuple(component))
-
-    for node in sorted(adjacency):
-        if node not in indices:
-            visit(node)
-    return components

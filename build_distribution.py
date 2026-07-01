@@ -9,7 +9,6 @@ ROOT = Path(__file__).resolve().parent
 DEFAULT_OUTPUT = ROOT / "topology_kernel_distribution"
 EXTRA_DOCS = (
     ("developer_guide.md", "10_Kernel能力与项目开发指南.md"),
-    ("kernel_development_guide.md", "11_Kernel维护者工作流.md"),
 )
 
 

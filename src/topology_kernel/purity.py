@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Mapping
 
 from .node import NodeContract, NodeInfo, PureNode
@@ -26,6 +27,16 @@ from .purity_validators import (
     _validate_source_size,
 )
 from .purity_visitors import ModulePurityVisitor, NodePurityVisitor
+
+
+@dataclass(frozen=True)
+class _ClassVisitorContext:
+    class_tree: object
+    contract: object
+    policy: PurityPolicy
+    source: object
+    known_node_modules: tuple[str, ...]
+    known_node_class_names: tuple[str, ...]
 
 
 def validate_node_class(
@@ -64,15 +75,8 @@ def validate_node_class(
     if isinstance(info, NodeInfo) and isinstance(contract, NodeContract):
         violations.extend(_validate_architecture_smells(info, contract, source=source, metrics=metrics))
 
-    _append_class_visitor_violations(
-        class_tree,
-        contract,
-        policy,
-        source,
-        known_node_modules,
-        known_node_class_names,
-        violations,
-    )
+    visitor_context = _ClassVisitorContext(class_tree, contract, policy, source, known_node_modules, known_node_class_names)
+    _append_class_visitor_violations(visitor_context, violations)
     _append_examples_if_clean(node_cls, contract, source, violations)
 
     if scan_module:
@@ -103,24 +107,16 @@ def _append_examples_if_clean(node_cls, contract, source, violations: list[Purit
         violations.extend(_validate_examples(node_cls, contract, source=source))
 
 
-def _append_class_visitor_violations(
-    class_tree,
-    contract,
-    policy: PurityPolicy,
-    source,
-    known_node_modules: tuple[str, ...],
-    known_node_class_names: tuple[str, ...],
-    violations: list[PurityViolation],
-) -> None:
+def _append_class_visitor_violations(context: _ClassVisitorContext, violations: list[PurityViolation]) -> None:
     visitor = NodePurityVisitor(
-        policy=policy,
-        source=source,
-        contract=contract if isinstance(contract, NodeContract) else None,
-        known_node_modules=known_node_modules,
-        known_node_class_names=known_node_class_names,
-        line_offset=source.class_start_line - 1,
+        policy=context.policy,
+        source=context.source,
+        contract=context.contract if isinstance(context.contract, NodeContract) else None,
+        known_node_modules=context.known_node_modules,
+        known_node_class_names=context.known_node_class_names,
+        line_offset=context.source.class_start_line - 1,
     )
-    visitor.visit(class_tree)
+    visitor.visit(context.class_tree)
     violations.extend(visitor.violations)
 
 

@@ -14,30 +14,15 @@ from .schema_findings import schema_finding
 
 
 DEFAULT_POLICY_DATA: dict[str, Any] = {
-    "node_source": {
-        "max_lines": 500,
-        "max_bytes": 60000,
-        "warn_lines": 450,
-        "warn_bytes": 54000,
-    },
-    "complexity": {
-        "max_functions": None,
-        "max_branches": None,
-        "max_nesting_depth": None,
-        "max_params": None,
-        "max_contract_keys": None,
-    },
+    "node_source": {"max_lines": 500, "max_bytes": 60000, "warn_lines": 450, "warn_bytes": 54000},
+    "complexity": {"max_functions": None, "max_branches": None, "max_nesting_depth": None, "max_params": None, "max_contract_keys": None},
     "imports": {
         "allowed_roots": [],
         "banned_roots": sorted(BANNED_IMPORT_ROOTS),
         "allowed_modules": ["urllib.parse"],
         "banned_modules": ["urllib.request"],
     },
-    "base_lib": {
-        "allowed_paths": [],
-        "allowed_modules": [],
-        "banned_modules": [],
-    },
+    "base_lib": {"allowed_paths": [], "allowed_modules": [], "banned_modules": []},
     "maintainability": {
         "warn_call_chain_length": 4,
         "max_call_chain_length": 4,
@@ -103,8 +88,84 @@ class PolicyResolveResult:
     findings: tuple[HealthFinding, ...] = ()
 
 
+def apply_policy_to_findings(
+    errors: tuple[HealthFinding, ...] | list[HealthFinding],
+    warnings: tuple[HealthFinding, ...] | list[HealthFinding],
+    policy: EffectivePolicy,
+) -> tuple[tuple[HealthFinding, ...], tuple[HealthFinding, ...], tuple[HealthFinding, ...]]:
+    rules = policy.data.get("rules", {})
+    exemptions = [item for item in rules.get("exemptions", ()) if isinstance(item, Mapping)] if isinstance(rules, Mapping) else []
+    downgrades = [item for item in rules.get("downgrades", ()) if isinstance(item, Mapping)] if isinstance(rules, Mapping) else []
+    next_errors: list[HealthFinding] = []
+    next_warnings: list[HealthFinding] = []
+    skipped: list[HealthFinding] = []
+    for finding in (*errors, *warnings):
+        bucket, adjusted = _policy_bucket(finding, exemptions, downgrades)
+        if bucket == "skipped":
+            skipped.append(adjusted)
+        elif bucket == "error":
+            next_errors.append(adjusted)
+        else:
+            next_warnings.append(adjusted)
+    return tuple(next_errors), tuple(next_warnings), tuple(skipped)
+
+
 def default_effective_policy() -> EffectivePolicy:
     return EffectivePolicy(deepcopy(DEFAULT_POLICY_DATA), ("kernel.default_policy",))
+
+
+def _policy_bucket(finding: HealthFinding, exemptions: list[Mapping[str, Any]], downgrades: list[Mapping[str, Any]]) -> tuple[str, HealthFinding]:
+    exemption = _matching_rule_override(finding, exemptions)
+    if exemption is not None:
+        return "skipped", _policy_adjusted_finding(finding, "skipped", exemption)
+    downgrade = _matching_rule_override(finding, downgrades)
+    if downgrade is None:
+        return finding.severity, finding
+    target = str(downgrade.get("to", "warning"))
+    if target == "skip":
+        return "skipped", _policy_adjusted_finding(finding, "skipped", downgrade)
+    if target in {"warning", "info"}:
+        return "warning", _policy_adjusted_finding(finding, "warning", downgrade)
+    return finding.severity, finding
+
+
+def _matching_rule_override(finding: HealthFinding, overrides: list[Mapping[str, Any]]) -> Mapping[str, Any] | None:
+    for item in overrides:
+        if str(item.get("rule_id", "")) == finding.rule_id and _scope_matches(finding, item.get("scope")):
+            return item
+    return None
+
+
+def _scope_matches(finding: HealthFinding, scope: object) -> bool:
+    if not isinstance(scope, Mapping) or not scope:
+        return True
+    checks = {
+        "object_id": finding.object_id,
+        "object_type": finding.object_type,
+        "node": finding.object_id,
+        "layer": finding.failure_layer,
+    }
+    return all(str(checks.get(str(key), "")) == str(value) for key, value in scope.items())
+
+
+def _policy_adjusted_finding(finding: HealthFinding, severity: str, rule: Mapping[str, Any]) -> HealthFinding:
+    details = dict(finding.details)
+    details["policy_override"] = {
+        "reason": rule.get("reason", ""),
+        "expires": rule.get("expires", ""),
+    }
+    return HealthFinding(
+        rule_id=finding.rule_id,
+        severity=severity,
+        object_type=finding.object_type,
+        object_id=finding.object_id,
+        source_location=finding.source_location,
+        rule_source=finding.rule_source,
+        failure_layer=finding.failure_layer,
+        message=finding.message,
+        suggested_fix_type=finding.suggested_fix_type,
+        details=details,
+    )
 
 
 def resolve_effective_policy(

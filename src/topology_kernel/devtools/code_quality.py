@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import copy
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -19,7 +20,20 @@ from .code_quality_types import (
     QualityFinding,
     QualityReport,
     QualityThresholds,
+    SIDE_EFFECT_BOUNDARY_PATHS,
 )
+
+
+@dataclass(frozen=True)
+class _FileShape:
+    path: Path
+    rel_path: str
+    line_count: int
+    byte_count: int
+    function_count: int
+    class_count: int
+    public_api_count: int
+    branch_count: int
 
 
 def scan_code_quality(
@@ -75,12 +89,20 @@ def scan_code_quality(
 
 def _iter_python_files(root: Path, excluded_dirs: set[str]) -> Iterable[Path]:
     if root.is_file() and root.suffix == ".py":
-        yield root
+        if not _skip_file(root):
+            yield root
         return
     for path in root.rglob("*.py"):
         if any(part in excluded_dirs for part in path.relative_to(root).parts):
             continue
+        if _skip_file(path):
+            continue
         yield path
+
+
+def _skip_file(path: Path) -> bool:
+    name = path.name.lower()
+    return name.endswith((".generated.py", "_pb2.py", "_pb2_grpc.py")) or name in {"build_distribution.py", "secrets.py", "credentials.py"}
 
 
 def _analyze_file(root: Path, path: Path, thresholds: QualityThresholds, *, check_side_effects: bool) -> tuple[FileQuality, list[QualityFinding]]:
@@ -104,10 +126,13 @@ def _analyze_file(root: Path, path: Path, thresholds: QualityThresholds, *, chec
     branches, nesting = _branch_and_nesting(tree)
     imports = tuple(sorted(_collect_imports(module, tree)))
     findings = [
-        *_file_shape_findings(path, rel_path, line_count, byte_count, function_count, class_count, public_api_count, branches, thresholds),
+        *_file_shape_findings(
+            _FileShape(path, rel_path, line_count, byte_count, function_count, class_count, public_api_count, branches),
+            thresholds,
+        ),
         *_function_shape_findings(path, rel_path, functions, thresholds),
     ]
-    if check_side_effects:
+    if check_side_effects and rel_path not in SIDE_EFFECT_BOUNDARY_PATHS:
         findings.extend(side_effect_findings(module, rel_path, path, tree))
     return (
         FileQuality(
@@ -153,30 +178,20 @@ def _syntax_error_file_result(path: Path, rel_path: str, module: str, line_count
     return file_report, [finding]
 
 
-def _file_shape_findings(
-    path: Path,
-    rel_path: str,
-    line_count: int,
-    byte_count: int,
-    function_count: int,
-    class_count: int,
-    public_api_count: int,
-    branch_count: int,
-    thresholds: QualityThresholds,
-) -> list[QualityFinding]:
+def _file_shape_findings(shape: _FileShape, thresholds: QualityThresholds) -> list[QualityFinding]:
     checks = [
-        (line_count > thresholds.max_file_lines, "QUALITY.FILE.MAX_LINES", "error", f"file has {line_count} lines"),
-        (line_count >= thresholds.warn_file_lines, "QUALITY.FILE.WARN_LINES", "warning", f"file has {line_count} lines"),
-        (byte_count > thresholds.max_file_bytes, "QUALITY.FILE.MAX_BYTES", "error", f"file has {byte_count} bytes"),
-        (function_count > thresholds.max_functions_per_file, "QUALITY.FILE.TOO_MANY_FUNCTIONS", "warning", f"file has {function_count} functions"),
-        (class_count > thresholds.max_classes_per_file, "QUALITY.FILE.TOO_MANY_CLASSES", "warning", f"file has {class_count} classes"),
-        (public_api_count > thresholds.max_public_api_per_file, "QUALITY.FILE.TOO_WIDE_PUBLIC_API", "warning", f"file exposes {public_api_count} public top-level objects"),
-        (branch_count > thresholds.max_file_branches, "QUALITY.FILE.TOO_MANY_BRANCHES", "warning", f"file has {branch_count} branches"),
+        (shape.line_count > thresholds.max_file_lines, "QUALITY.FILE.MAX_LINES", "error", f"file has {shape.line_count} lines"),
+        (shape.line_count >= thresholds.warn_file_lines, "QUALITY.FILE.WARN_LINES", "warning", f"file has {shape.line_count} lines"),
+        (shape.byte_count > thresholds.max_file_bytes, "QUALITY.FILE.MAX_BYTES", "error", f"file has {shape.byte_count} bytes"),
+        (shape.function_count > thresholds.max_functions_per_file, "QUALITY.FILE.TOO_MANY_FUNCTIONS", "warning", f"file has {shape.function_count} functions"),
+        (shape.class_count > thresholds.max_classes_per_file, "QUALITY.FILE.TOO_MANY_CLASSES", "warning", f"file has {shape.class_count} classes"),
+        (shape.public_api_count > thresholds.max_public_api_per_file, "QUALITY.FILE.TOO_WIDE_PUBLIC_API", "warning", f"file exposes {shape.public_api_count} public top-level objects"),
+        (shape.branch_count > thresholds.max_file_branches, "QUALITY.FILE.TOO_MANY_BRANCHES", "warning", f"file has {shape.branch_count} branches"),
     ]
     findings = []
     for matched, rule_id, severity, message in checks:
-        if matched and (rule_id != "QUALITY.FILE.WARN_LINES" or line_count <= thresholds.max_file_lines):
-            findings.append(_finding(rule_id, severity, "file", rel_path, path, 1, message))
+        if matched and (rule_id != "QUALITY.FILE.WARN_LINES" or shape.line_count <= thresholds.max_file_lines):
+            findings.append(_finding(rule_id, severity, ("file", shape.rel_path), shape.path, 1, message))
     return findings
 
 
@@ -185,11 +200,13 @@ def _function_shape_findings(path: Path, rel_path: str, functions: tuple[Functio
     for function in functions:
         object_id = f"{rel_path}:{function.qualname}"
         if function.lines > thresholds.max_function_lines:
-            findings.append(_finding("QUALITY.FUNCTION.MAX_LINES", "warning", "function", object_id, path, function.line_start, f"function has {function.lines} lines"))
+            findings.append(_finding("QUALITY.FUNCTION.MAX_LINES", "warning", ("function", object_id), path, function.line_start, f"function has {function.lines} lines"))
         if function.branches > thresholds.max_function_branches:
-            findings.append(_finding("QUALITY.FUNCTION.TOO_MANY_BRANCHES", "warning", "function", object_id, path, function.line_start, f"function has {function.branches} branches"))
+            findings.append(_finding("QUALITY.FUNCTION.TOO_MANY_BRANCHES", "warning", ("function", object_id), path, function.line_start, f"function has {function.branches} branches"))
         if function.max_nesting_depth > thresholds.max_function_nesting:
-            findings.append(_finding("QUALITY.FUNCTION.TOO_DEEP_NESTING", "warning", "function", object_id, path, function.line_start, f"function nesting depth is {function.max_nesting_depth}"))
+            findings.append(_finding("QUALITY.FUNCTION.TOO_DEEP_NESTING", "warning", ("function", object_id), path, function.line_start, f"function nesting depth is {function.max_nesting_depth}"))
+        if function.param_count > thresholds.max_function_params:
+            findings.append(_finding("QUALITY.FUNCTION.TOO_MANY_PARAMS", "warning", ("function", object_id), path, function.line_start, f"function has {function.param_count} parameters"))
     return findings
 
 
@@ -229,9 +246,21 @@ class _FunctionCollector(ast.NodeVisitor):
                 lines=max(1, end - start + 1),
                 branches=branches,
                 max_nesting_depth=nesting,
+                param_count=_param_count(node, is_method=bool(self.stack)),
                 ast_fingerprint=_fingerprint_function(node),
             )
         )
+
+
+def _param_count(node: ast.FunctionDef | ast.AsyncFunctionDef, *, is_method: bool) -> int:
+    args = node.args
+    positional = (*args.posonlyargs, *args.args)
+    required_positional = len(positional) - len(args.defaults)
+    required_kwonly = sum(default is None for default in args.kw_defaults)
+    count = required_positional + required_kwonly + int(args.vararg is not None) + int(args.kwarg is not None)
+    if is_method and positional and positional[0].arg in {"self", "cls"}:
+        count -= 1
+    return max(0, count)
 
 
 def _branch_and_nesting(tree: ast.AST) -> tuple[int, int]:
@@ -389,13 +418,13 @@ def _cycles(graph: Mapping[str, Sequence[str]]) -> list[list[str]]:
 def _finding(
     rule_id: str,
     severity: str,
-    object_type: str,
-    object_id: str,
+    target: tuple[str, str],
     path: Path,
     line: int,
     message: str,
     suggested_fix_type: str = "refactor",
 ) -> QualityFinding:
+    object_type, object_id = target
     return QualityFinding(
         rule_id=rule_id,
         severity=severity,
