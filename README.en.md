@@ -13,8 +13,9 @@ LLMs are great at writing code quickly. Across many rounds of edits, they are al
 - One function keeps growing until nobody wants to touch it.
 - New features bypass existing structure and add hidden dependencies.
 - Bug fixes become local patches while the root cause stays alive.
-- Side effects leak into pure logic, with file, network, database, or browser calls scattered around.
-- The code still runs, but the architecture is no longer reviewable.
+- The project architecture gradually becomes bloated and chaotic until AI itself can no longer understand it.
+
+Eventually the code may still run, but the structure is no longer reviewable, new features are hard to add, and bugs become hard to fix.
 
 VibeFlow moves these risks earlier. Before AI writes code, the project already carries executable rules for structure, contracts, flow, and artifacts.
 
