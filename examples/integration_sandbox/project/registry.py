@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from topology_kernel import NodeRegistry
+from vibeflow import NodeRegistry
 
 from nodes.legal_comprehensive_nodes import (
     AuditStoreNode,

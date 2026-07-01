@@ -8,7 +8,7 @@ from typing import Sequence
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="topology-kernel")
+    parser = argparse.ArgumentParser(prog="vibeflow")
     sub = parser.add_subparsers(dest="command", required=True)
 
     validate = sub.add_parser("validate", help="validate topology config structure and compile graph")
@@ -185,7 +185,7 @@ def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
             if args.output:
                 render_mermaid_svg(mermaid_text, Path(args.output), theme=str(args.theme), background=str(args.background))
             else:
-                with tempfile.TemporaryDirectory(prefix="topology-kernel-svg-") as temp_dir:
+                with tempfile.TemporaryDirectory(prefix="vibeflow-svg-") as temp_dir:
                     output = Path(temp_dir) / "graph.svg"
                     render_mermaid_svg(mermaid_text, output, theme=str(args.theme), background=str(args.background))
                     print(output.read_text(encoding="utf-8"), end="")

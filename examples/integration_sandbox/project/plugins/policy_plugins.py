@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from topology_kernel import HealthFinding
+from vibeflow import HealthFinding
 
 
 class PolicyPlugin:

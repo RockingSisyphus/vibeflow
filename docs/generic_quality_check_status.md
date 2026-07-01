@@ -7,7 +7,7 @@
 当前定位：
 
 - 默认检查通用代码质量、依赖图和结构启发式。
-- 不再内置 `topology_kernel` 专属架构规则。
+- 不再内置 `vibeflow` 专属架构规则。
 - 不再内置本仓库专属副作用 allowlist。
 - 副作用检查改为显式 opt-in，避免普通 Python 项目因为 CLI、测试、构建脚本读写文件而产生大量默认噪声。
 
@@ -16,20 +16,20 @@
 默认通用检查：
 
 ```bash
-PYTHONPATH=src python3 -m topology_kernel quality-check --path .
+PYTHONPATH=src python3 -m vibeflow quality-check --path .
 ```
 
 显式检查副作用 API：
 
 ```bash
-PYTHONPATH=src python3 -m topology_kernel quality-check --path . --check-side-effects
+PYTHONPATH=src python3 -m vibeflow quality-check --path . --check-side-effects
 ```
 
 ## 已移除的 a 专属能力
 
 - `quality-check --self`
 - `self_check` 参数链
-- `topology_kernel` core/devtools/CLI 分层 hardcode
+- `vibeflow` core/devtools/CLI 分层 hardcode
 - production/tests hardcode
 - 本仓库专属 side-effect allowlist
 
@@ -49,7 +49,7 @@ PYTHONPATH=src python3 -m topology_kernel quality-check --path . --check-side-ef
 ## 验证结果
 
 ```bash
-PYTHONPATH=src python3 -m topology_kernel quality-check --path .
+PYTHONPATH=src python3 -m vibeflow quality-check --path .
 ```
 
 结果：`PASS`，99 files，0 errors，0 warnings。

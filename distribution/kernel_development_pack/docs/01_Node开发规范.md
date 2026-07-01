@@ -7,7 +7,7 @@ Node 是业务逻辑的最小执行单元。它必须是纯函数对象：相同
 ```python
 from __future__ import annotations
 
-from topology_kernel import NodeContract, NodeInfo
+from vibeflow import NodeContract, NodeInfo
 from base_lib.math_tools import add
 
 

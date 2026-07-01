@@ -2,8 +2,8 @@ from tests.unit.strict_support import *
 
 import ast
 
-from topology_kernel import build_architecture_report
-from topology_kernel.ast_rules import import_aliases, import_roots, qualified_call_name
+from vibeflow import build_architecture_report
+from vibeflow.ast_rules import import_aliases, import_roots, qualified_call_name
 
 def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) -> None:
     manifest = load_config_document(_repo_root() / "examples" / "failure_cases" / "cases.jsonc").data
@@ -326,7 +326,7 @@ def test_code_quality_report_groups_files_and_findings_by_scope(tmp_path) -> Non
     src_dir = tmp_path / "src" / "demo"
     tests_dir = tmp_path / "tests"
     distribution_dir = tmp_path / "distribution"
-    devtools_dir = tmp_path / "src" / "topology_kernel" / "devtools"
+    devtools_dir = tmp_path / "src" / "vibeflow" / "devtools"
     src_dir.mkdir(parents=True)
     tests_dir.mkdir()
     distribution_dir.mkdir()

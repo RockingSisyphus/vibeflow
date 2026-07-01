@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from topology_kernel import NodeContract, NodeInfo
+from vibeflow import NodeContract, NodeInfo
 
 
 class EffectRequestNode:

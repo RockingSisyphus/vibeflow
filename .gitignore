@@ -10,6 +10,7 @@ __pycache__/
 build/
 dist/
 topology_kernel_distribution/
+vibeflow_distribution/
 *.egg-info/
 runs/
 reports/

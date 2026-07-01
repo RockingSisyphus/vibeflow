@@ -15,7 +15,7 @@
 默认通用检查：
 
 ```bash
-PYTHONPATH=src python3 -m topology_kernel quality-check --path .
+PYTHONPATH=src python3 -m vibeflow quality-check --path .
 ```
 
 结果：
@@ -30,7 +30,7 @@ warnings=0
 显式副作用检查：
 
 ```bash
-PYTHONPATH=src python3 -m topology_kernel quality-check --path . --check-side-effects
+PYTHONPATH=src python3 -m vibeflow quality-check --path . --check-side-effects
 ```
 
 结果：

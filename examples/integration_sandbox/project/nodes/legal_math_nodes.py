@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from base_lib.good_chain_a import add_three
 from base_lib.good_math import add, multiply
-from topology_kernel import NodeContract, NodeInfo
+from vibeflow import NodeContract, NodeInfo
 
 
 class StartNode:

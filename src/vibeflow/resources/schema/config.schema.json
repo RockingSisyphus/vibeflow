@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://topology-kernel.local/schema/config.schema.json",
-  "title": "Topology Kernel Config",
+  "$id": "https://vibeflow.local/schema/config.schema.json",
+  "title": "VibeFlow Config",
   "type": "object",
   "properties": {
     "pipeline": { "$ref": "#/$defs/pipeline" },

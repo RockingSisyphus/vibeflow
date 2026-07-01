@@ -1,10 +1,10 @@
-# Topology Kernel AI 开发指引
+# VibeFlow AI 开发指引
 
-本目录是一个可复制的业务项目开发包，内置 `kernel/topology_kernel/` 作为运行和校验内核。AI 默认应按本文开发业务程序。
+本目录是一个可复制的业务项目开发包，内置 `kernel/vibeflow/` 作为运行和校验内核。AI 默认应按本文开发业务程序。
 
 ## 硬性边界
 
-- 不要修改 `kernel/topology_kernel/` 下的内核源码。
+- 不要修改 `kernel/vibeflow/` 下的内核源码。
 - 不要修改 `kernel/`、`run.py` 或 `kernel/MANIFEST.sha256`；这些文件由分发包构建脚本生成和校验。
 - 如果内核报错或警告，优先修改 `project/` 下的业务代码、registry 或 JSONC 配置来满足内核要求；不要 patch 内核来绕过检查。
 - 如果完整性检查失败，不要通过修改 manifest 或 `run.py` 绕过；应从可信来源重新生成或恢复分发包。

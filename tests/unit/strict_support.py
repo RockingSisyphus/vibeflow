@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from topology_kernel import (
+from vibeflow import (
     ConfigLoadError,
     GraphCompileError,
     GraphCompiler,
@@ -34,29 +34,29 @@ from topology_kernel import (
     scan_base_lib,
     validate_graph_health,
 )
-from topology_kernel.graph_config import GraphConfigError
-from topology_kernel.config_schema import collect_config_schema_findings
-from topology_kernel.devtools import QualityThresholds, scan_code_quality
-from topology_kernel.purity_types import PurityPolicy
+from vibeflow.graph_config import GraphConfigError
+from vibeflow.config_schema import collect_config_schema_findings
+from vibeflow.devtools import QualityThresholds, scan_code_quality
+from vibeflow.purity_types import PurityPolicy
 
 from .strict_support_boundaries import *
 from .strict_support_runtime_nodes import *
 
 
 def cli_main(args):
-    from topology_kernel.cli import main
+    from vibeflow.cli import main
 
     return main(args)
 
 
 def collect_node_metrics(*args, **kwargs):
-    from topology_kernel.purity import collect_node_metrics as impl
+    from vibeflow.purity import collect_node_metrics as impl
 
     return impl(*args, **kwargs)
 
 
 def validate_node_class(*args, **kwargs):
-    from topology_kernel.purity import validate_node_class as impl
+    from vibeflow.purity import validate_node_class as impl
 
     return impl(*args, **kwargs)
 
@@ -168,7 +168,7 @@ def _input_add_pipeline(*, add: dict | None = None) -> dict:
     }
 
 
-VALID_NODE_IMPORT = "from topology_kernel import NodeContract, NodeInfo\n\n"
+VALID_NODE_IMPORT = "from vibeflow import NodeContract, NodeInfo\n\n"
 
 
 VALID_NODE_INFO = """

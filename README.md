@@ -1,4 +1,4 @@
-# topology-kernel
+# vibeflow
 
 面向标准流程图程序的严格拓扑运行时，服务于人机协同开发，尤其是 LLM 深度参与编码和维护的场景。
 
@@ -32,17 +32,17 @@
 
 ```powershell
 python -m pytest tests\unit
-$env:PYTHONPATH='src'; python -m topology_kernel --help
+$env:PYTHONPATH='src'; python -m vibeflow --help
 ```
 
 ## 常用命令
 
 ```powershell
-PYTHONPATH=src python -m topology_kernel validate --config examples/minimal_project/config.jsonc
-PYTHONPATH=src python -m topology_kernel export-mermaid --config examples/minimal_project/config.jsonc --output reports/graph.mmd
-PYTHONPATH=src python -m topology_kernel export-ascii --config examples/minimal_project/config.jsonc --output reports/graph.txt
-PYTHONPATH=src python -m topology_kernel export-svg --config examples/minimal_project/config.jsonc --output reports/graph.svg
-PYTHONPATH=src python -m topology_kernel quality-check --path .
+PYTHONPATH=src python -m vibeflow validate --config examples/minimal_project/config.jsonc
+PYTHONPATH=src python -m vibeflow export-mermaid --config examples/minimal_project/config.jsonc --output reports/graph.mmd
+PYTHONPATH=src python -m vibeflow export-ascii --config examples/minimal_project/config.jsonc --output reports/graph.txt
+PYTHONPATH=src python -m vibeflow export-svg --config examples/minimal_project/config.jsonc --output reports/graph.svg
+PYTHONPATH=src python -m vibeflow quality-check --path .
 ```
 
 `export-svg` 使用项目本地 `tools/mermaid-renderer/` 中的 Mermaid CLI。核心运行不依赖 SVG 渲染；渲染失败会被报告为图形产物问题，而不是改变拓扑语义。
@@ -75,7 +75,7 @@ cd ../..
 python build_distribution.py
 ```
 
-脚本会在项目根目录生成 `topology_kernel_distribution/`，其中包含最新内核源码副本、中文开发文档、示例项目骨架和启动器。
+脚本会在项目根目录生成 `vibeflow_distribution/`，其中包含最新内核源码副本、中文开发文档、示例项目骨架和启动器。
 
 推荐项目结构：
 
