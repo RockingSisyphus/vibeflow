@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://topology-kernel.local/schema/node.schema.json",
-  "title": "Topology Kernel Node",
+  "$id": "https://vibeflow.local/schema/node.schema.json",
+  "title": "VibeFlow Node",
   "type": "object",
   "required": ["NODE_INFO", "CONTRACT", "run_pure"],
   "properties": {

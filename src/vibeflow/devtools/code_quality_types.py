@@ -27,6 +27,7 @@ DEFAULT_EXCLUDED_DIRS = frozenset(
         "site-packages",
         "tests",
         "topology_kernel_distribution",
+        "vibeflow_distribution",
         "vendor",
         "venv",
     }
@@ -78,14 +79,14 @@ SIDE_EFFECT_ATTR_CALLS = frozenset(
 
 SIDE_EFFECT_BOUNDARY_PATHS = frozenset(
     {
-        "src/topology_kernel/base_lib.py",
-        "src/topology_kernel/cli.py",
-        "src/topology_kernel/config_loader.py",
-        "src/topology_kernel/devtools/code_quality.py",
-        "src/topology_kernel/devtools/code_quality_types.py",
-        "src/topology_kernel/mermaid_render.py",
-        "src/topology_kernel/purity_source.py",
-        "src/topology_kernel/runner.py",
+        "src/vibeflow/base_lib.py",
+        "src/vibeflow/cli.py",
+        "src/vibeflow/config_loader.py",
+        "src/vibeflow/devtools/code_quality.py",
+        "src/vibeflow/devtools/code_quality_types.py",
+        "src/vibeflow/mermaid_render.py",
+        "src/vibeflow/purity_source.py",
+        "src/vibeflow/runner.py",
     }
 )
 
@@ -391,7 +392,7 @@ def _scope_for_finding(finding: QualityFinding) -> str:
 
 def _scope_for_text(value: str) -> str:
     normalized = value.replace("\\", "/")
-    if "src/topology_kernel/devtools/" in normalized:
+    if "src/vibeflow/devtools/" in normalized:
         return "devtools"
     if normalized.startswith("tests/") or "/tests/" in normalized:
         return "tests"

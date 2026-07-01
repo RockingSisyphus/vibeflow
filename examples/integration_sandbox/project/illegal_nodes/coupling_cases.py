@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from nodes.legal_math_nodes import ConstantNode
-from topology_kernel import NodeContract, NodeInfo
+from vibeflow import NodeContract, NodeInfo
 
 
 class NodeImportNode:

@@ -181,7 +181,7 @@ def test_policy_plugin_can_add_node_and_graph_findings(tmp_path) -> None:
     plugin_path = tmp_path / "finding_plugin.py"
     plugin_path.write_text(
         """
-from topology_kernel import HealthFinding
+from vibeflow import HealthFinding
 
 class Plugin:
     name = "finding_policy"

@@ -241,9 +241,9 @@ def test_health_report_status_fail_for_unknown_node() -> None:
     assert report.errors[0].object_type == "node"
 
 def test_target_package_structure_reexports_stable_api_and_schema_resources() -> None:
-    import topology_kernel.core as core
-    import topology_kernel.devtools as devtools
-    import topology_kernel.plugins as plugins
+    import vibeflow.core as core
+    import vibeflow.devtools as devtools
+    import vibeflow.plugins as plugins
 
     assert core.NodeInfo is NodeInfo
     assert core.GraphCompiler is GraphCompiler
@@ -259,7 +259,7 @@ def test_target_package_structure_reexports_stable_api_and_schema_resources() ->
     for schema_name in ("config", "policy", "health_report", "node", "nodeset"):
         payload = json.loads(schema_text(schema_name))
         assert payload["$schema"].startswith("https://json-schema.org/")
-        assert payload["title"].startswith("Topology Kernel")
+        assert payload["title"].startswith("VibeFlow")
 
 def test_cli_validate_json_reports_pass(tmp_path, capsys) -> None:
     config_path = tmp_path / "workflow.json"
@@ -321,7 +321,7 @@ def test_cli_inspect_node_with_module_reports_metadata_and_contract(tmp_path, ca
     module_path = tmp_path / "demo_node.py"
     module_path.write_text(
         """
-from topology_kernel import NodeContract, NodeInfo
+from vibeflow import NodeContract, NodeInfo
 
 class DemoNode:
     NODE_INFO = NodeInfo(

@@ -1,10 +1,10 @@
-# topology-kernel 当前实现清单
+# VibeFlow 当前实现清单
 
 本文件记录当前实现基线和后续仍值得推进的工作。旧 `boundary`、`pipeline.loops`、edge `max_executions` 设计已废弃，不再作为待办或完成项维护。
 
 ## 当前已完成
 
-### 标准流程图内核
+### 标准流程图核心
 
 - [x] `NodeInfo.flow_kind` 必填。
 - [x] 支持标准 flow_kind：`terminal`、`process`、`decision`、`io`、`predefined`、`data_store`、`document`、`preparation`。
@@ -95,10 +95,10 @@
 当前主线应满足：
 
 ```powershell
-python -m compileall src/topology_kernel tests/unit examples/integration_sandbox/project examples/integration_sandbox/run_all.py distribution/kernel_development_pack/project_template/run.py
+python -m compileall src/vibeflow tests/unit examples/integration_sandbox/project examples/integration_sandbox/run_all.py distribution/kernel_development_pack/project_template/run.py
 pytest -q
 python examples/integration_sandbox/run_all.py
-$env:PYTHONPATH='src'; python -m topology_kernel quality-check --path .
+$env:PYTHONPATH='src'; python -m vibeflow quality-check --path .
 ```
 
 预期：测试通过，集成沙箱通过，默认质量自检 `PASS` 且 `errors=0, warnings=0`。

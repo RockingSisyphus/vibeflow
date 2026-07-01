@@ -55,7 +55,7 @@ def test_graph_health_suppresses_duplicate_logic_for_standard_wrappers(tmp_path)
     module_path = tmp_path / "wrapper_nodes.py"
     module_path.write_text(
         """
-from topology_kernel import NodeContract, NodeInfo
+from vibeflow import NodeContract, NodeInfo
 
 def wrap_value(value):
     return value + 1

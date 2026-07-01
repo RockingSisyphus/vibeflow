@@ -1,8 +1,8 @@
 {
-  "name": "topology-kernel-mermaid-renderer",
+  "name": "vibeflow-mermaid-renderer",
   "private": true,
   "version": "0.1.0",
-  "description": "Project-local Mermaid renderer for topology-kernel SVG artifacts",
+  "description": "Project-local Mermaid renderer for vibeflow SVG artifacts",
   "license": "MIT",
   "dependencies": {
     "@fortawesome/fontawesome-free": "7.3.0",

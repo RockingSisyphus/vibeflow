@@ -1,11 +1,11 @@
-# Strict Flowchart Kernel Redesign
+# VibeFlow Strict Flowchart Redesign
 
-This document records the target redesign for `topology-kernel` as a strict
-standard-flowchart kernel for human-AI collaborative development.
+This document records the target redesign for VibeFlow (`vibeflow`) as a strict
+standard-flowchart runtime for human-AI collaborative development.
 
 ## Goal
 
-The kernel must enforce an explicit architecture contract, not merely suggest
+VibeFlow must enforce an explicit architecture contract, not merely suggest
 good structure. Every node must declare its standard flowchart role, every path
 must be explainable by the registered flow, and any drift must fail strict
 checks.

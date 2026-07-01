@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 MANIFEST_PATH = ROOT / "kernel" / "MANIFEST.sha256"
-PROTECTED_PREFIXES = ("kernel/topology_kernel/",)
+PROTECTED_PREFIXES = ("kernel/vibeflow/",)
 PROTECTED_FILES = {"run.py", "kernel/README.md", "AGENTS.md", "README.md"}
 
 
@@ -39,7 +39,7 @@ def _iter_protected_files() -> list[str]:
     for relative in PROTECTED_FILES:
         if (ROOT / relative).is_file():
             paths.append(relative)
-    kernel_root = ROOT / "kernel" / "topology_kernel"
+    kernel_root = ROOT / "kernel" / "vibeflow"
     if kernel_root.exists():
         for path in kernel_root.rglob("*"):
             if path.is_file() and "__pycache__" not in path.parts and not path.name.endswith(".pyc"):
@@ -115,7 +115,7 @@ _run_integrity_check()
 sys.path.insert(0, str(ROOT / "kernel"))
 sys.path.insert(0, str(ROOT / "project"))
 
-from topology_kernel import (  # noqa: E402
+from vibeflow import (  # noqa: E402
     CheckedRunError,
     GraphCompiler,
     HealthReport,
@@ -130,7 +130,7 @@ from topology_kernel import (  # noqa: E402
     validate_graph_health,
 )
 
-from topology_kernel.config_schema import collect_config_schema_findings  # noqa: E402
+from vibeflow.config_schema import collect_config_schema_findings  # noqa: E402
 
 from registry import build_node_registry  # noqa: E402
 
@@ -268,7 +268,7 @@ def _export_graph(args, *, exporter) -> int:
 
 
 def _inspect_node(args) -> int:
-    from topology_kernel.cli import main as kernel_cli_main
+    from vibeflow.cli import main as kernel_cli_main
 
     return kernel_cli_main(
         [
@@ -285,7 +285,7 @@ def _inspect_node(args) -> int:
 
 
 def _quality(args) -> int:
-    from topology_kernel.cli import main as kernel_cli_main
+    from vibeflow.cli import main as kernel_cli_main
 
     return kernel_cli_main(["quality-check", "--path", args.path])
 

@@ -2,12 +2,12 @@
 
 ## 当前目标
 
-`quality-check` 是一个通用 Python 代码质量检查工具，不再包含针对本仓库主体 `a` 的专属模式。
+`quality-check` 是一个通用 Python 代码质量检查工具，不再包含针对 VibeFlow 仓库的专属模式。
 
 当前唯一入口形态是：
 
 ```bash
-topology-kernel quality-check --path <project-or-file>
+vibeflow quality-check --path <project-or-file>
 ```
 
 ## 设计原则
@@ -36,7 +36,7 @@ topology-kernel quality-check --path <project-or-file>
 副作用 API 检查默认关闭，需要显式启用：
 
 ```bash
-topology-kernel quality-check --path <project-or-file> --check-side-effects
+vibeflow quality-check --path <project-or-file> --check-side-effects
 ```
 
 原因：

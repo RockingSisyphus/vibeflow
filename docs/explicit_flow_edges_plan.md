@@ -1,13 +1,13 @@
-# Explicit Flow Edges Plan
+# VibeFlow Explicit Flow Edges Plan
 
-This document records the next kernel tightening step: config edges are the only
-program flow edges. The kernel must not infer control flow from
+This document records the next VibeFlow tightening step: config edges are the only
+program flow edges. VibeFlow must not infer control flow from
 `requires`/`provides`.
 
 ## Goal
 
 AI and humans must explicitly register the program flow in `pipeline.edges` and
-nodeset-local `pipeline.edges`. The kernel should validate that registered flow
+nodeset-local `pipeline.edges`. VibeFlow should validate that registered flow
 as a strict flowchart contract.
 
 `requires` and `provides` remain data contracts. They can produce warnings when
@@ -26,7 +26,7 @@ data looks disconnected, but they must not create flow edges.
 
 ### Data Contract Warnings
 
-The kernel should keep `providers` and `consumers` maps for diagnostics.
+VibeFlow should keep `providers` and `consumers` maps for diagnostics.
 
 Warn, but do not fail, when:
 

@@ -217,7 +217,7 @@ def test_cli_run_uses_checked_run_and_refuses_without_registered_nodes(tmp_path,
     assert payload["health"]["errors"][0]["rule_id"] == "NODE.TYPE.UNKNOWN"
 
 def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, capsys) -> None:
-    from topology_kernel.registry import GLOBAL_NODE_REGISTRY
+    from vibeflow.registry import GLOBAL_NODE_REGISTRY
 
     original = dict(getattr(GLOBAL_NODE_REGISTRY, "_registry"))
     original_config_specs = dict(getattr(GLOBAL_NODE_REGISTRY, "_config_specs"))

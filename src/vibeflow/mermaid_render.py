@@ -25,7 +25,7 @@ def render_mermaid_svg(
     output.parent.mkdir(parents=True, exist_ok=True)
     mmdc = _find_mmdc()
     _ensure_mermaid_cli_compat()
-    with tempfile.TemporaryDirectory(prefix="topology-kernel-mermaid-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="vibeflow-mermaid-") as temp_dir:
         temp = Path(temp_dir)
         input_path = temp / "graph.mmd"
         config_path = temp / "puppeteer.json"

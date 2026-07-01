@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from math import nan
 
-from topology_kernel import NodeContract, NodeInfo
+from vibeflow import NodeContract, NodeInfo
 
 
 def _info(type_key):

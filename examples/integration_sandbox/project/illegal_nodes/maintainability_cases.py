@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from base_lib.deep_chain_a import step_a
-from topology_kernel import NodeContract, NodeInfo
+from vibeflow import NodeContract, NodeInfo
 
 
 def _info(type_key):
