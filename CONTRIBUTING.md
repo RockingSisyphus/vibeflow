@@ -1,15 +1,15 @@
 # Contributing to VibeFlow
 
-VibeFlow is a strict flowchart runtime for AI-assisted development. Contributions should keep that boundary tight: small nodes, explicit flow edges, checkable contracts, and runnable diagrams.
+This guide is for people changing the VibeFlow framework itself. If you are using VibeFlow to build a business project, start with `docs/developer_guide.md` instead.
 
-## Ground Rules
+## Framework Ground Rules
 
 - Do not reintroduce removed public concepts such as `boundary`, `pipeline.loops`, `max_iterations`, edge `max_executions`, or edge `loop`.
-- Program control flow must come from explicit `pipeline.edges`; `requires` and `provides` are data contracts only.
-- Implemented nodes get `flow_kind` from `NODE_INFO`, not from config.
-- Planned nodes and nodesets are for architecture review only; runtime must refuse to execute planned content.
-- Nodes should stay small and pure. Real IO belongs outside pure business nodes and must be modeled through the flowchart contract.
-- Prefer warnings or policy/plugin hooks for semantic smells; reserve hard errors for rules that protect the core architecture contract.
+- Keep `pipeline.edges` as the only source of executable control flow. `requires` and `provides` are data-contract diagnostics, not scheduler edges.
+- Keep implemented `flow_kind` semantics owned by registered framework metadata, not duplicated in runnable config.
+- Keep planned architecture non-runnable. Design-time placeholders may be visualized and warned about, but must not execute.
+- Keep framework rules explainable through stable health findings: `rule_id`, severity, object identity, failure layer, details, and suggested fix type.
+- Prefer policy/plugin extension points for project-specific semantics. Put only general framework invariants in core hard errors.
 
 ## Development Setup
 
@@ -25,7 +25,7 @@ Run these before opening a pull request:
 
 ```bash
 python -m compileall -q src tests examples
-pytest -q
+python -m pytest -q
 PYTHONPATH=src python examples/integration_sandbox/run_all.py
 PYTHONPATH=src python -m vibeflow quality-check --path .
 ```
