@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install package
+        run: python -m pip install -e .
+      - name: Compile Python files
+        run: python -m compileall -q src tests examples
+      - name: Run tests
+        run: pytest -q
+      - name: Run integration sandbox
+        run: PYTHONPATH=src python examples/integration_sandbox/run_all.py
+      - name: Run quality check
+        run: PYTHONPATH=src python -m vibeflow quality-check --path .
