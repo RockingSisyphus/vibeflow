@@ -2,7 +2,7 @@
 
 ## 结论
 
-`quality-check` 现在已移除针对本仓库主体 `a` 的专属 `--self` 模式。工具只通过 `--path` 检查传入的 Python 项目或文件。
+`quality-check` 现在已移除针对 VibeFlow 仓库的专属 `--self` 模式。工具只通过 `--path` 检查传入的 Python 项目或文件。
 
 当前定位：
 
@@ -25,7 +25,7 @@ PYTHONPATH=src python3 -m vibeflow quality-check --path .
 PYTHONPATH=src python3 -m vibeflow quality-check --path . --check-side-effects
 ```
 
-## 已移除的 a 专属能力
+## 已移除的仓库专属能力
 
 - `quality-check --self`
 - `self_check` 参数链

@@ -1,8 +1,8 @@
 # 代码质量 warning 影响面重审与复杂度降低计划
 
-> 历史说明：本文是早期质量 warning 压降过程记录。文中的 `boundary`、`loop`、`max_executions`、`boundary_trace` 等函数名和概念是历史上下文，不代表当前内核设计。当前实现已移除公开 boundary/loop 注册模型，并通过标准 flowchart 节点、显式 edges、SVG/ASCII/Mermaid 图和 `quality-check --path .` 维护质量基线。
+> 历史说明：本文是早期质量 warning 压降过程记录。文中的 `boundary`、`loop`、`max_executions`、`boundary_trace` 等函数名和概念是历史上下文，不代表当前 VibeFlow 设计。当前实现已移除公开 boundary/loop 注册模型，并通过标准 flowchart 节点、显式 edges、SVG/ASCII/Mermaid 图和 `quality-check --path .` 维护质量基线。
 
-本文档记录对当前 `vibeflow quality-check --self` 剩余 warning 的二次审核结果。此次审核不再只按 warning 数量或函数复杂度排序，而是优先评估“修改这些代码会影响哪些已有行为、公开接口、测试和下游模块”。
+本文档记录对早期 `vibeflow quality-check --self` 剩余 warning 的二次审核结果；当前命令已统一为 `vibeflow quality-check --path .`。此次审核不再只按 warning 数量或函数复杂度排序，而是优先评估“修改这些代码会影响哪些已有行为、公开接口、测试和下游模块”。
 
 初始基线：
 
@@ -388,7 +388,7 @@ python -m pytest tests\unit\test_strict_runtime.py tests\unit\test_strict_plugin
 python -m pytest tests\unit
 ```
 
-实际收益：清除了运行入口、运行时调度、注册器重复和最终依赖链 warning。`quality-check --self` 当前为 `PASS`。
+实际收益：清除了运行入口、运行时调度、注册器重复和最终依赖链 warning。`quality-check --path .` 当前为 `PASS`。
 
 风险：最高。建议最后处理，并拆成 runner 与 runtime 两次独立提交。
 
@@ -403,7 +403,7 @@ python -m pytest tests\unit
 ```powershell
 python -m pytest tests\unit
 python -m compileall -q src tests
-$env:PYTHONPATH='src'; python -m vibeflow quality-check --self
+$env:PYTHONPATH='src'; python -m vibeflow quality-check --path .
 ```
 
 短期目标：
