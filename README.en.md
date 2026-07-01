@@ -30,6 +30,12 @@ terminal start -> io input -> process -> decision -> process -> io output -> ter
 
 AI still writes business code, but it must work through the flowchart: each node stays small, control flow comes only from config, and every run starts with health checks.
 
+## Showcase
+
+This SVG was exported from a complete integration sandbox example.
+
+![VibeFlow comprehensive flowchart](docs/assets/comprehensive_flowchart.svg)
+
 ## Who It Is For
 
 - Developers using OpenCode, Codex, Claude Code, or other vibe coding tools for long-running projects.
@@ -103,7 +109,7 @@ VibeFlow is designed for release-package usage.
 1. Download the latest package from GitHub Releases.
 2. Extract it into your workspace.
 3. Open or create a project in that directory with any vibe coding tool, such as OpenCode, Codex, or Claude Code.
-4. Let AI develop business nodes, base_lib helpers, plugins, and JSONC configs.
+4. Let AI follow `AGENTS.md`: design a planned flowchart first, review the structure, then implement business nodes, base_lib helpers, plugins, and JSONC configs step by step.
 
 The release package root includes `AGENTS.md`. AI tools that support project instructions can read it automatically and learn:
 
@@ -112,6 +118,7 @@ The release package root includes `AGENTS.md`. AI tools that support project ins
 - How to add nodes, nodesets, and plugins.
 - How to run validate, run, quality, and diagram commands.
 - Which health checks must pass before execution.
+- How to design planned nodesets first, export diagrams for human review, and only then implement them.
 
 You do not need to understand the full kernel source first. Treat the release package as an AI development workspace with built-in rules.
 
@@ -145,12 +152,16 @@ python run.py quality --path project
 
 ```text
 Describe requirement
-  -> AI adds or edits node/base_lib/config
-  -> VibeFlow checks structure and contracts
-  -> Export diagrams for review
-  -> Run the project
+  -> AI abstracts it into a coarse standard flowchart
+  -> Write planned nodesets into JSONC
+  -> Export Mermaid or SVG for human review
+  -> Expand nodesets after review
+  -> Implement node/base_lib/plugin/config
+  -> validate / quality / run
   -> Iterate
 ```
+
+Major architecture changes use the same loop: planned first, diagram first, review first, implementation second. Anything still undecided stays as `status: "planned"`; VibeFlow allows it for design review but will not let it pretend to be runnable.
 
 VibeFlow does not stop you from vibe coding. It makes every vibe return to a checkable structure.
 
