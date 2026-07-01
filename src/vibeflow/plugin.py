@@ -152,7 +152,7 @@ def _import_plugin_module(module_ref: str, *, base_path: Path):
     candidate = (base_path / module_ref).resolve()
     if module_ref.endswith(".py") or candidate.exists():
         path = candidate if candidate.exists() else Path(module_ref).resolve()
-        module_name = f"_topology_kernel_plugin_{abs(hash(path))}"
+        module_name = f"_vibeflow_plugin_{abs(hash(path))}"
         spec = importlib.util.spec_from_file_location(module_name, path)
         if spec is None or spec.loader is None:
             raise ImportError(f"cannot load plugin module: {path}")

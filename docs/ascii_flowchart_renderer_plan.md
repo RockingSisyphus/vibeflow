@@ -68,7 +68,7 @@ The ASCII renderer should map `flow_kind` directly:
 
 ## Minimal Renderer Design
 
-Add `src/topology_kernel/ascii_flowchart.py`.
+Add `src/vibeflow/ascii_flowchart.py`.
 
 Public function:
 
@@ -147,7 +147,7 @@ Add or update tests to cover:
 Run:
 
 ```bash
-python -m compileall src/topology_kernel tests/unit examples/integration_sandbox/project examples/integration_sandbox/run_all.py
+python -m compileall src/vibeflow tests/unit examples/integration_sandbox/project examples/integration_sandbox/run_all.py
 pytest -q
 python examples/integration_sandbox/run_all.py
 ```

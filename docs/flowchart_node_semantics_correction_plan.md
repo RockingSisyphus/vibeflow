@@ -1,6 +1,6 @@
-# Flowchart Node Semantics Correction Plan
+# VibeFlow Flowchart Node Semantics Correction Plan
 
-This document records the next correction pass for the strict flowchart kernel.
+This document records the next correction pass for VibeFlow's strict flowchart model.
 The goal is to keep standard flowchart semantics, runtime boundaries, and source
 quality policy separate.
 

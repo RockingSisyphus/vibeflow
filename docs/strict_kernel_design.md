@@ -1,19 +1,19 @@
-# 严格标准流程图内核设计
+# VibeFlow 严格标准流程图设计
 
 ## 目标
 
-`topology-kernel` 是面向人机协同开发的严格流程图运行内核。它要求业务程序由小型纯函数 node 和显式 JSONC flow edge 组成，并在运行前通过 schema、编译、健康检查和策略系统验证。
+VibeFlow（包名 `vibeflow`）是面向人机协同开发的严格流程图运行内核。它要求业务程序由小型纯函数 node 和显式 JSONC flow edge 组成，并在运行前通过 schema、编译、健康检查和策略系统验证。
 
 核心目标：
 
-- 内核与业务彻底解耦。
+- VibeFlow 与业务彻底解耦。
 - node 默认必须是纯函数。
 - node 必须完整声明元数据、契约、输入、输出和标准 `flow_kind`。
 - node 之间禁止互相导入、依赖或直接调用。
 - 控制流只由配置中的显式 `pipeline.edges` 表达。
 - 复杂功能通过 nodeset 组合，而不是写巨型 node。
 - 插件可以扩展 policy / compiler / runtime，但不能绕过绝对规则。
-- 内核能生成 Mermaid、ASCII 和 SVG 流程图，供人审查整体结构。
+- VibeFlow 能生成 Mermaid、ASCII 和 SVG 流程图，供人审查整体结构。
 
 ## 核心概念
 
@@ -235,14 +235,14 @@ runs/<run_id>/
 ## CLI
 
 ```text
-topology-kernel validate --config workflow.jsonc
-topology-kernel inspect-node --type demo.add --module nodes.py --class AddNode
-topology-kernel inspect-config --config workflow.jsonc
-topology-kernel run --config workflow.jsonc
-topology-kernel export-mermaid --config workflow.jsonc --output graph.mmd
-topology-kernel export-ascii --config workflow.jsonc --output graph.txt
-topology-kernel export-svg --config workflow.jsonc --output graph.svg
-topology-kernel quality-check --path .
+vibeflow validate --config workflow.jsonc
+vibeflow inspect-node --type demo.add --module nodes.py --class AddNode
+vibeflow inspect-config --config workflow.jsonc
+vibeflow run --config workflow.jsonc
+vibeflow export-mermaid --config workflow.jsonc --output graph.mmd
+vibeflow export-ascii --config workflow.jsonc --output graph.txt
+vibeflow export-svg --config workflow.jsonc --output graph.svg
+vibeflow quality-check --path .
 ```
 
 ## 绝对规则摘要

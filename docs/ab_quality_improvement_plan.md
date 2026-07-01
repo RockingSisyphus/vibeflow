@@ -2,7 +2,7 @@
 
 This document records the proposed deterministic improvements for the current quality systems:
 
-- A: `topology-kernel quality-check`, the generic Python code quality scanner under `src/topology_kernel/devtools/`.
+- A: `vibeflow quality-check`, the generic Python code quality scanner under `src/vibeflow/devtools/`.
 - B: kernel health governance for topology projects, nodes, plugins, config, flow, and `base_lib`.
 
 No item in this plan requires model calls. The plan intentionally avoids copying large reference subsystems.
@@ -116,13 +116,13 @@ Implementation status: items 1-11 are done. Item 11 remains optional and is not 
 
 | Change | Files |
 | --- | --- |
-| A parameter count | `src/topology_kernel/devtools/code_quality_types.py`, `src/topology_kernel/devtools/code_quality.py`, `src/topology_kernel/cli.py`, quality tests |
-| A top offenders and score | `src/topology_kernel/devtools/code_quality_types.py`, `src/topology_kernel/devtools/code_quality_format.py`, `src/topology_kernel/devtools/code_quality.py`, CLI/text/JSON tests |
-| A discovery hygiene | `src/topology_kernel/devtools/code_quality.py`, `src/topology_kernel/devtools/code_quality_types.py`, discovery tests |
-| B policy application | `src/topology_kernel/policy.py` or a tiny policy findings module, `src/topology_kernel/health.py`, policy tests |
-| B graph-health module scan | `src/topology_kernel/health.py`, node purity tests |
-| B decision-loop exit | `src/topology_kernel/health_flow.py`, graph flow tests |
-| B explicit-edge visibility | `src/topology_kernel/compiler.py` and/or `src/topology_kernel/health_flow.py`, compiler/health tests |
+| A parameter count | `src/vibeflow/devtools/code_quality_types.py`, `src/vibeflow/devtools/code_quality.py`, `src/vibeflow/cli.py`, quality tests |
+| A top offenders and score | `src/vibeflow/devtools/code_quality_types.py`, `src/vibeflow/devtools/code_quality_format.py`, `src/vibeflow/devtools/code_quality.py`, CLI/text/JSON tests |
+| A discovery hygiene | `src/vibeflow/devtools/code_quality.py`, `src/vibeflow/devtools/code_quality_types.py`, discovery tests |
+| B policy application | `src/vibeflow/policy.py` or a tiny policy findings module, `src/vibeflow/health.py`, policy tests |
+| B graph-health module scan | `src/vibeflow/health.py`, node purity tests |
+| B decision-loop exit | `src/vibeflow/health_flow.py`, graph flow tests |
+| B explicit-edge visibility | `src/vibeflow/compiler.py` and/or `src/vibeflow/health_flow.py`, compiler/health tests |
 | B rule catalog | new small catalog module plus docs/tests for touched rules |
 
 ## Guardrails

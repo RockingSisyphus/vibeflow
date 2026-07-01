@@ -4,20 +4,20 @@
 
 `quality-check` 已从“通用工具 + 本仓库专属模式”调整为真正通用的 Python 代码质量检查工具。
 
-当前不再存在针对本仓库主体 `a` 的专属检查入口或 hardcode。
+当前不再存在针对 VibeFlow 仓库的专属检查入口或 hardcode。
 
 ## 接口
 
 默认检查：
 
 ```bash
-topology-kernel quality-check --path <project-or-file>
+vibeflow quality-check --path <project-or-file>
 ```
 
 显式副作用检查：
 
 ```bash
-topology-kernel quality-check --path <project-or-file> --check-side-effects
+vibeflow quality-check --path <project-or-file> --check-side-effects
 ```
 
 ## 移除项
@@ -44,7 +44,7 @@ topology-kernel quality-check --path <project-or-file> --check-side-effects
 ## 验证结果
 
 ```bash
-PYTHONPATH=src python3 -m topology_kernel quality-check --path .
+PYTHONPATH=src python3 -m vibeflow quality-check --path .
 ```
 
 结果：`PASS`，84 files，0 errors，0 warnings。

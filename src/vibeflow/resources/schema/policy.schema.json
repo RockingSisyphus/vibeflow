@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://topology-kernel.local/schema/policy.schema.json",
-  "title": "Topology Kernel Policy",
+  "$id": "https://vibeflow.local/schema/policy.schema.json",
+  "title": "VibeFlow Policy",
   "type": "object",
   "properties": {
     "node_source": {

@@ -1,6 +1,6 @@
 # 集成沙盒
 
-这个目录模拟真实业务项目使用 `topology-kernel` 的方式：业务侧只编写 node、受控 `base_lib`、插件和 JSONC 配置；内核通过 `kernel/topology_kernel` 软链接进入项目。
+这个目录模拟真实业务项目使用 `vibeflow` 的方式：业务侧只编写 node、受控 `base_lib`、插件和 JSONC 配置；内核通过 `kernel/vibeflow` 软链接进入项目。
 
 运行：
 
@@ -8,7 +8,7 @@
 python examples\integration_sandbox\run_all.py
 ```
 
-脚本会自动创建或刷新 `kernel/topology_kernel` 软链接，批量运行合法配置、非法 node、非法 `base_lib`、非法配置和非法插件，并输出：
+脚本会自动创建或刷新 `kernel/vibeflow` 软链接，批量运行合法配置、非法 node、非法 `base_lib`、非法配置和非法插件，并输出：
 
 - `reports/summary.json`
 - `reports/summary.md`

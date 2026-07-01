@@ -153,7 +153,7 @@ def test_compiler_rejects_unconditional_edge_from_decision() -> None:
 
 
 def test_compiled_payload_uses_registry_flow_kind() -> None:
-    from topology_kernel.mermaid import compiled_graph_payload
+    from vibeflow.mermaid import compiled_graph_payload
 
     registry = _registry()
     register_node(registry, "test.route", RouteNode)
@@ -175,7 +175,7 @@ def test_compiled_payload_uses_registry_flow_kind() -> None:
 
 
 def test_planned_nodes_compile_without_registry_and_render_as_architecture() -> None:
-    from topology_kernel.mermaid import compiled_graph_payload
+    from vibeflow.mermaid import compiled_graph_payload
 
     graph = parse_graph_config(
         {

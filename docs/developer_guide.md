@@ -1,6 +1,6 @@
-# Kernel 使用者开发引导
+# VibeFlow 使用者开发引导
 
-本文面向使用 `topology-kernel` 编写业务 node、nodeset、plugin、base_lib 和 JSONC config 的开发者。
+本文面向使用 VibeFlow（包名 `vibeflow`）编写业务 node、nodeset、plugin、base_lib 和 JSONC config 的开发者。
 
 ## Node
 
@@ -47,7 +47,7 @@ NODE_INFO = NodeInfo(
 - node 不导入其他 node，不调用其他 node。
 - node 输出 key 必须是 `CONTRACT.provides` 中声明的字符串字面量。
 - node 不修改 `inputs` 或其中的可变对象。
-- 简单 wrapper node 可以只取输入、调用纯 helper/base_lib 函数、返回固定输出；内核会识别这种标准形态，避免误报 duplicate logic。
+- 简单 wrapper node 可以只取输入、调用纯 helper/base_lib 函数、返回固定输出；VibeFlow 会识别这种标准形态，避免误报 duplicate logic。
 
 ## 外部依赖 Node
 
@@ -209,9 +209,9 @@ def _register_fulltext_nodes(registry):
 推荐每次设计或修改后生成图：
 
 ```powershell
-topology-kernel export-mermaid --config workflow.jsonc --output graph.mmd
-topology-kernel export-ascii --config workflow.jsonc --output graph.txt
-topology-kernel export-svg --config workflow.jsonc --output graph.svg
+vibeflow export-mermaid --config workflow.jsonc --output graph.mmd
+vibeflow export-ascii --config workflow.jsonc --output graph.txt
+vibeflow export-svg --config workflow.jsonc --output graph.svg
 ```
 
 正式运行也会写出 `graph.mmd`、`graph.txt`、`graph.svg`。

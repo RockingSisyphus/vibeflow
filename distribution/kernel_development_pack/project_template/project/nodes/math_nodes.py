@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from base_lib.math_tools import add
-from topology_kernel import NodeContract, NodeInfo
+from vibeflow import NodeContract, NodeInfo
 
 
 class StartNode:
