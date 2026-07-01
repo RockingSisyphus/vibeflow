@@ -30,6 +30,12 @@ terminal start -> io input -> process -> decision -> process -> io output -> ter
 
 AI 仍然负责写业务代码，但它必须按流程图开发：每个节点小而清晰，控制流只来自配置，运行前必须通过健康检查。
 
+## 效果展示
+
+下面是 integration sandbox 中一个完整示例导出的 SVG 流程图。
+
+![VibeFlow comprehensive flowchart](docs/assets/comprehensive_flowchart.svg)
+
 ## 适合谁
 
 - 使用 OpenCode、Codex、Claude Code 等 vibe coding 工具长期开发项目的人。
@@ -103,7 +109,7 @@ VibeFlow 面向发布包使用。
 1. 到 GitHub Releases 下载最新发布包。
 2. 解压到你的工作目录。
 3. 用任意 vibe coding 软件在该目录创建或打开项目，例如 OpenCode、Codex、Claude Code。
-4. 开始让 AI 开发业务 node、base_lib、plugin 和 JSONC config。
+4. 让 AI 先按 `AGENTS.md` 生成 planned 流程图，确认结构后再逐步实现业务 node、base_lib、plugin 和 JSONC config。
 
 发布包根目录会带有 `AGENTS.md`。支持项目指令的 AI 工具会自动读取它，并理解：
 
@@ -112,6 +118,7 @@ VibeFlow 面向发布包使用。
 - 如何新增 node、nodeset、plugin。
 - 如何运行 validate、run、quality、diagram 命令。
 - 运行前必须满足哪些健康检查。
+- 如何先设计 planned nodeset，导出流程图给人审核，再逐层实现。
 
 你不需要先理解完整内核源码，也不需要手工配置复杂工程。把发布包当成一个带规则的 AI 开发工作目录即可。
 
@@ -145,12 +152,16 @@ python run.py quality --path project
 
 ```text
 描述需求
-  -> AI 新增或修改 node/base_lib/config
-  -> VibeFlow 校验结构和契约
-  -> 导出流程图审查
-  -> 运行项目
+  -> AI 抽象成粗粒度标准流程图
+  -> 用 planned nodeset 写入 JSONC
+  -> 导出 Mermaid 或 SVG 给人审核
+  -> 审核通过后逐层展开 nodeset
+  -> 实现 node/base_lib/plugin/config
+  -> validate / quality / run
   -> 继续迭代
 ```
+
+重大结构变更也走同一模式：先 planned、先出图、先审核，再实现。尚未确定的部分保留为 `status: "planned"`，VibeFlow 会允许它用于设计审查，但不会让它伪装成可运行程序。
 
 VibeFlow 不阻止你 vibe coding。它只是让每一轮 vibe 都必须回到可检查的结构里。
 
