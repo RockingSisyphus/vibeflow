@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -9,6 +10,23 @@ ROOT = Path(__file__).resolve().parent
 DEFAULT_OUTPUT = ROOT / "topology_kernel_distribution"
 EXTRA_DOCS = (
     ("developer_guide.md", "10_Kernel能力与项目开发指南.md"),
+)
+STANDARD_PROJECT_DIRS = (
+    "project/nodes",
+    "project/base_lib",
+    "project/plugins",
+    "project/configs",
+    "project/configs/nodesets",
+)
+MANIFEST_RELATIVE = Path("kernel/MANIFEST.sha256")
+PROTECTED_FILES = (
+    "run.py",
+    "kernel/README.md",
+    "AGENTS.md",
+    "README.md",
+)
+PROTECTED_DIRS = (
+    "kernel/topology_kernel",
 )
 
 
@@ -30,8 +48,10 @@ def build_distribution(output: Path, *, replace: bool = True) -> None:
     _copy_mermaid_renderer_config(output)
     _copy_extra_docs(output / "docs")
     _copy_tree(ROOT / "src" / "topology_kernel", output / "kernel" / "topology_kernel")
+    _ensure_standard_project_dirs(output)
     _write_root_readme(output)
     _write_project_gitignore(output)
+    _write_kernel_manifest(output)
 
 
 def _prepare_output(output: Path, *, replace: bool) -> None:
@@ -73,6 +93,46 @@ def _copy_mermaid_renderer_config(output: Path) -> None:
             (target / name).write_bytes(path.read_bytes())
 
 
+def _write_kernel_manifest(output: Path) -> None:
+    lines = []
+    for relative in _iter_manifest_files(output):
+        digest = _hash_file(output / relative)
+        lines.append(f"{digest}  {relative.as_posix()}")
+    path = output / MANIFEST_RELATIVE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _iter_manifest_files(output: Path) -> list[Path]:
+    files: list[Path] = []
+    for relative in PROTECTED_FILES:
+        path = output / relative
+        if path.is_file():
+            files.append(Path(relative))
+    for relative_dir in PROTECTED_DIRS:
+        root = output / relative_dir
+        if not root.exists():
+            continue
+        for path in root.rglob("*"):
+            relative = path.relative_to(output)
+            if path.is_file() and not _ignored(relative):
+                files.append(relative)
+    return sorted(set(files), key=lambda item: item.as_posix())
+
+
+def _hash_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _ensure_standard_project_dirs(output: Path) -> None:
+    for relative in STANDARD_PROJECT_DIRS:
+        (output / relative).mkdir(parents=True, exist_ok=True)
+
+
 def _remove_tree(path: Path) -> None:
     for item in sorted(path.rglob("*"), key=lambda candidate: len(candidate.parts), reverse=True):
         if item.is_dir():
@@ -98,6 +158,7 @@ def _write_root_readme(output: Path) -> None:
 - `kernel/topology_kernel/`：当前仓库最新内核源码副本。
 - `docs/`：中文开发文档。
 - `project/`：可直接运行的示例业务项目骨架。
+- `project/nodes/`、`project/base_lib/`、`project/plugins/`、`project/configs/`：AI 和开发者放业务代码与配置的标准目录。
 - `run.py`：推荐启动器，会自动加载本地内核和项目 registry。
 - `tools/mermaid-renderer/`：SVG 渲染器依赖配置；运行 `npm install` 后启用 `svg` 命令。
 
@@ -119,6 +180,18 @@ cd tools/mermaid-renderer
 npm install
 cd ../..
 ```
+
+## Kernel 完整性检查
+
+分发包包含 `kernel/MANIFEST.sha256`。`run.py` 会在运行前校验 kernel、启动器和 AI 指引文件是否被修改。
+
+手动检查：
+
+```powershell
+python run.py verify-kernel
+```
+
+如果检查失败，不要继续信任当前分发包；请从可信来源重新生成或恢复。
 
 业务开发原则：
 

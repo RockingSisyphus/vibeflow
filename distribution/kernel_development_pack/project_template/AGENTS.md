@@ -5,8 +5,11 @@
 ## 硬性边界
 
 - 不要修改 `kernel/topology_kernel/` 下的内核源码。
+- 不要修改 `kernel/`、`run.py` 或 `kernel/MANIFEST.sha256`；这些文件由分发包构建脚本生成和校验。
 - 如果内核报错或警告，优先修改 `project/` 下的业务代码、registry 或 JSONC 配置来满足内核要求；不要 patch 内核来绕过检查。
+- 如果完整性检查失败，不要通过修改 manifest 或 `run.py` 绕过；应从可信来源重新生成或恢复分发包。
 - 业务代码只放在 `project/nodes/`、`project/base_lib/`、`project/plugins/` 和 `project/configs/`。
+- `project/nodes/` 放业务 node；`project/base_lib/` 放可复用纯 helper；`project/plugins/` 放 policy/compiler/runtime 插件；`project/configs/` 放可运行 JSONC；`project/configs/nodesets/` 放可复用 nodeset JSONC。
 - node 默认必须是纯函数：不要读写文件、网络、数据库、浏览器、环境变量或启动外部进程。
 - 外部输入输出必须建模为 `io`、`data_store`、`document` 类型节点，或明确的 `external=True` 节点。
 - 控制流只写在 JSONC 的 `pipeline.edges` 中；不要用 Python 调用关系隐式表达流程。
@@ -43,6 +46,7 @@
 ## 常用命令
 
 - 校验配置和健康检查：`python run.py validate --config project/configs/main.jsonc`
+- 校验 kernel 完整性：`python run.py verify-kernel`
 - 运行程序：`python run.py run --config project/configs/main.jsonc --run-root runs`
 - 导出 Mermaid：`python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd`
 - 导出展开 nodeset 的 Mermaid：`python run.py mermaid --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.mmd`
