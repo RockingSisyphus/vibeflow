@@ -384,6 +384,68 @@ def test_runtime_options_rejects_unknown_execution() -> None:
         RuntimeOptions(execution="compiled")
 
 
+def test_async_result_key_joins_when_required() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "seed", "type": "test.seed", "provides": ["value.in"], "async": "result_key", "result_key": "value.in", "config": {"value": 4}},
+                    {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"], "config": {"delta": 3}},
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": _edge_chain("start", "seed", "add", "end"),
+            }
+        }
+    )
+
+    context = PipelineRuntime(graph, registry=_registry()).run({})
+
+    assert context.get("value.out") == 7
+    assert "async_result_join" in [event["kind"] for event in context.get("runtime.events")]
+
+
+def test_async_detached_failure_records_warning_and_completes() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "metrics", "type": "test.runtime_fail", "provides": ["value.out"], "async": "detached", "config": {"fail": True}},
+                    {"name": "seed", "type": "test.seed", "provides": ["value.in"], "config": {"value": 2}},
+                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                ],
+                "edges": _edge_chain("start", "metrics", "seed", "end"),
+            }
+        }
+    )
+
+    context = PipelineRuntime(graph, registry=_registry()).run({})
+
+    assert context.get("runtime.stop_reason") == "completed"
+    assert context.get("value.in") == 2
+    events = context.get("runtime.events")
+    assert any(event["kind"] == "async_detached_failed" and "boom" in event["failure"] for event in events)
+
+
+def test_async_result_key_requires_declared_output() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "seed", "type": "test.seed", "provides": ["value.in"], "async": "result_key", "result_key": "value.missing"},
+                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                ],
+                "edges": _edge_chain("start", "seed", "end"),
+            }
+        }
+    )
+
+    with pytest.raises(PipelineRuntimeError, match="result_key must be declared"):
+        PipelineRuntime(graph, registry=_registry()).run({})
+
+
 def test_runtime_options_snapshot_outputs_restores_json_snapshot_check() -> None:
     graph = parse_graph_config(
         {

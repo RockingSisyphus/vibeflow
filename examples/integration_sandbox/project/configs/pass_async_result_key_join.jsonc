@@ -1,0 +1,15 @@
+{
+  "pipeline": {
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "seed", "type": "sandbox.constant", "provides": ["value.in"], "async": "result_key", "result_key": "value.in", "value": 7},
+      {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 5},
+      {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "seed"},
+      {"from": "seed", "to": "add"},
+      {"from": "add", "to": "end"}
+    ]
+  }
+}

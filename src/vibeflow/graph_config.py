@@ -20,6 +20,8 @@ class NodeSpec:
     node_config_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
     status: str = STATUS_IMPLEMENTED
     flow_kind: str = ""
+    async_mode: str = ""
+    result_key: str = ""
 
 
 @dataclass(frozen=True)
@@ -112,7 +114,8 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         raise GraphConfigError(f"pipeline.nodes[{index}].flow_kind must be one of {sorted(FLOW_KINDS)}")
     if status == STATUS_IMPLEMENTED and flow_kind:
         raise GraphConfigError(f"pipeline.nodes[{index}].flow_kind is only allowed for planned nodes")
-    reserved = {"name", "type", "registry_key", "requires", "provides", "config", "node_configs", "status", "flow_kind"}
+    async_mode, result_key = _parse_node_async(item, index=index)
+    reserved = {"name", "type", "registry_key", "requires", "provides", "config", "node_configs", "status", "flow_kind", "async", "result_key"}
     return NodeSpec(
         name=name,
         node_type=node_type,
@@ -122,6 +125,8 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         node_config_overrides=_parse_node_config_overrides(item.get("node_configs", {}), field=f"node[{name}].node_configs"),
         status=status,
         flow_kind=flow_kind,
+        async_mode=async_mode,
+        result_key=result_key,
     )
 
 
@@ -204,6 +209,23 @@ def _parse_status(value: Any, *, field: str) -> str:
     if status not in STATUSES:
         raise GraphConfigError(f"{field} must be 'planned' or 'implemented'")
     return status
+
+
+def _parse_node_async(item: Mapping[str, Any], *, index: int) -> tuple[str, str]:
+    async_mode = _parse_async_mode(item.get("async", ""), field=f"pipeline.nodes[{index}].async")
+    result_key = str(item.get("result_key", "")).strip()
+    if async_mode == "result_key" and not result_key:
+        raise GraphConfigError(f"pipeline.nodes[{index}].result_key is required for async result_key")
+    if async_mode != "result_key" and result_key:
+        raise GraphConfigError(f"pipeline.nodes[{index}].result_key requires async='result_key'")
+    return async_mode, result_key
+
+
+def _parse_async_mode(value: Any, *, field: str) -> str:
+    mode = str(value).strip()
+    if mode in {"", "detached", "result_key"}:
+        return mode
+    raise GraphConfigError(f"{field} must be 'detached' or 'result_key'")
 
 
 def _validate_when_expression(value: str, *, field: str) -> None:
