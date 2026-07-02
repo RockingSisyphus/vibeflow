@@ -162,6 +162,25 @@ VALID_RUN_CASES = [
         "expect_training_metrics": True,
         "expected_nodeset_exports": {"train_step": ["train.model_after", "train.optimizer_after", "train.step_report", "train.metrics"]},
     },
+    {
+        "name": "block_linear_training",
+        "config": "pass_block_linear_training.jsonc",
+        "initial_factory": _training_initial,
+        "runtime_options": {"execution": "block"},
+        "expected_outputs": {"train.loss": 6.0, "train.grad": 0.6, "train.step_report": {"steps": 1, "weight": 0.7}},
+        "expected_same_as_initial": [("train.model_after", "train.model"), ("train.optimizer_after", "train.optimizer")],
+        "expected_object_attrs": [("train.model_after", "weight", 0.7), ("train.optimizer_after", "steps", 1)],
+        "expect_training_metrics": True,
+        "expected_runtime_exec_order": ["start", "training_input", "forward_loss", "backward_grad", "optimizer_step", "training_metrics", "end"],
+    },
+    {
+        "name": "block_decision_loop",
+        "config": "pass_block_decision_loop.jsonc",
+        "initial": {"value.in": 1},
+        "runtime_options": {"execution": "block"},
+        "expected_outputs": {"value.next": 3},
+        "expected_runtime_exec_order": ["start", "input", "increment", "done", "copy", "increment", "done", "end"],
+    },
 ]
 
 
@@ -398,6 +417,10 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         for key, expected in case["expected_trace_summary"].items():
             if summary.get(key) != expected:
                 raise AssertionError(f"runtime summary {key} expected {expected!r}, got {summary.get(key)!r}")
+    if "expected_runtime_exec_order" in case:
+        actual = list(run_result.context.get("runtime.exec_order"))
+        if actual != case["expected_runtime_exec_order"]:
+            raise AssertionError(f"runtime exec_order expected {case['expected_runtime_exec_order']!r}, got {actual!r}")
     if "expected_hook_delta_present" in case or "expected_hook_delta_absent" in case:
         delta_lines = hook_marker.read_text(encoding="utf-8").splitlines()[hook_count_before:] if hook_marker.exists() else []
         delta_hooks = {json.loads(line)["hook"] for line in delta_lines}
