@@ -18,7 +18,8 @@ from .plugin import CompilerPlugin, PluginDescriptor, PluginRegistry, PolicyPlug
 from .purity import NodeMetrics, collect_node_metrics
 from .registry import NodeRegistry, NodeRegistryError
 from .resources import schema_text
-from .runtime import PipelineRuntime, PipelineRuntimeError, RuntimeOptions
+from .runtime import PipelineRuntime, PipelineRuntimeError
+from .runtime_options import RuntimeOptions
 from .runner import CheckedRunError, CheckedRunResult, run_checked
 
 __all__ = [

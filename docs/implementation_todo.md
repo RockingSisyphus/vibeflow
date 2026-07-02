@@ -73,7 +73,7 @@
 - [x] `run_pure(inputs, params)` 接口检查。
 - [x] 禁止 node 间 import/call。
 - [x] 禁止常见副作用能力。
-- [x] 静态检查输入变异、输出 key 和 CONTRACT example JSON snapshot；runtime 默认检查输出 key，可选恢复输出 JSON snapshot。
+- [x] 静态检查输入变异、输出 key 和 CONTRACT example 可运行性；runtime 默认检查输出 key，不审计输出内容。
 - [x] 检查源码行数、字节数、函数数量、分支、嵌套、调用链。
 - [x] 检查 `base_lib` 纯度和依赖链。
 - [x] 支持 `PolicyPlugin`、`CompilerPlugin`、`RuntimePlugin`。

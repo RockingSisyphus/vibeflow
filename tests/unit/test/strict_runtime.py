@@ -429,24 +429,36 @@ def test_async_detached_failure_records_warning_and_completes() -> None:
 
 
 def test_async_result_key_requires_declared_output() -> None:
-    graph = parse_graph_config(
+    with pytest.raises(GraphConfigError, match="result_key must be declared"):
+        parse_graph_config(
+            {
+                "pipeline": {
+                    "nodes": [
+                        {"name": "start", "type": "test.start"},
+                        {"name": "seed", "type": "test.seed", "provides": ["value.in"], "async": "result_key", "result_key": "value.missing"},
+                        {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                    ],
+                    "edges": _edge_chain("start", "seed", "end"),
+                }
+            }
+        )
+
+
+def test_config_schema_reports_async_result_key_not_in_provides() -> None:
+    findings = collect_config_schema_findings(
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "seed", "type": "test.seed", "provides": ["value.in"], "async": "result_key", "result_key": "value.missing"},
-                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
-                ],
-                "edges": _edge_chain("start", "seed", "end"),
+                    {"name": "seed", "type": "test.seed", "provides": ["value.in"], "async": "result_key", "result_key": "value.missing"}
+                ]
             }
         }
     )
 
-    with pytest.raises(PipelineRuntimeError, match="result_key must be declared"):
-        PipelineRuntime(graph, registry=_registry()).run({})
+    assert any(finding.rule_id == "CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY" and "declared in provides" in finding.message for finding in findings)
 
 
-def test_runtime_options_snapshot_outputs_restores_json_snapshot_check() -> None:
+def test_runtime_no_longer_has_json_snapshot_output_mode() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -460,8 +472,70 @@ def test_runtime_options_snapshot_outputs_restores_json_snapshot_check() -> None
         }
     )
 
-    with pytest.raises(PipelineRuntimeError, match="not JSON snapshot serializable"):
-        PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(snapshot_outputs=True)).run({})
+    context = PipelineRuntime(graph, registry=_registry()).run({})
+    assert str(context.get("value.out")) == "nan"
+
+
+def test_async_nodeset_result_key_joins_when_required() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "math.add_one",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline={"inputs": ["value.in"], **_input_add_pipeline(add={"delta": 2})},
+                )
+            ],
+            "pipeline": {
+                "inputs": ["value.in"],
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
+                    {"name": "composite", "type": "nodeset.math.add_one", "requires": ["value.in"], "provides": ["value.out"], "async": "result_key", "result_key": "value.out"},
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": _edge_chain("start", "input", "composite", "end"),
+            },
+        }
+    )
+
+    context = PipelineRuntime(graph, registry=_registry()).run({"value.in": 5})
+
+    assert context.get("value.out") == 7
+    assert "async_result_join" in [event["kind"] for event in context.get("runtime.events")]
+
+
+def test_async_detached_timeout_records_warning_and_does_not_block() -> None:
+    class SlowNode:
+        NODE_INFO = NodeInfo("test.slow", "Slow", "test", "Slow detached task.", "0.1.0", "process")
+        CONTRACT = NodeContract(provides=("value.out",), examples=({"inputs": {}, "params": {}},))
+
+        def run_pure(self, inputs, params):
+            time.sleep(0.05)
+            return {"value.out": 1}
+
+    registry = _registry()
+    register_node(registry, "test.slow", SlowNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "slow", "type": "test.slow", "provides": ["value.out"], "async": "detached"},
+                    {"name": "seed", "type": "test.seed", "provides": ["value.in"], "config": {"value": 3}},
+                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                ],
+                "edges": _edge_chain("start", "slow", "seed", "end"),
+            }
+        }
+    )
+
+    context = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(async_flush_timeout=0)).run({})
+
+    assert context.get("value.in") == 3
+    assert any(event["kind"] == "async_detached_timeout" for event in context.get("runtime.events"))
 
 
 def test_runtime_options_node_hooks_false_skips_per_node_hooks(tmp_path) -> None:
@@ -606,6 +680,8 @@ def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, ca
                 str(tmp_path / "runs"),
                 "--run-id",
                 "cli_ok",
+                "--runtime-profile",
+                "train",
             ]
         )
         payload = json.loads(capsys.readouterr().out)
@@ -619,5 +695,7 @@ def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, ca
     run_dir = Path(payload["run_dir"])
     for name in ("compiled_graph.json", "health_report.json", "graph.txt", "graph.mmd", "runtime_trace.jsonl", "output_summary.json"):
         assert (run_dir / name).exists()
+    trace_kinds = [json.loads(line)["kind"] for line in (run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert trace_kinds == ["run_start", "run_end", "runtime_summary"]
     if is_mermaid_svg_renderer_available():
         assert (run_dir / "graph.svg").exists()
