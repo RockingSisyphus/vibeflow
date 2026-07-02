@@ -309,7 +309,7 @@ def test_runtime_allows_non_json_object_output_by_reference() -> None:
     context = PipelineRuntime(graph, registry=registry).run()
     assert context.get("value.out") == {1, 2}
 
-def test_runtime_allows_explicit_opaque_snapshot_output() -> None:
+def test_runtime_ignores_legacy_snapshot_metadata() -> None:
     registry = _registry()
     register_node(registry, "test.opaque_output", OpaqueOutputNode)
     graph = parse_graph_config(
@@ -424,20 +424,27 @@ def test_missing_examples_and_example_contract_gap_are_concerns(tmp_path, capsys
     assert any(warning["details"].get("legacy_code") == "missing_examples" for warning in payload["health"]["warnings"])
 
     gap_contract = VALID_NODE_CONTRACT.replace(
-        'examples=({"inputs": {}, "params": {}, "outputs": {"demo.out": 1}},),',
-        'examples=({"inputs": {}, "params": {}, "outputs": {}},),',
+        'provides=("demo.out",),',
+        'requires=("demo.in",),\n        provides=("demo.out",),\n        input_semantics={"demo.in": ("demo input",)},',
     )
     code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(contract=gap_contract))
     assert code == 0
     assert payload["health"]["status"] == "CONCERNS"
     assert any(warning["details"].get("legacy_code") == "example_contract_gap" for warning in payload["health"]["warnings"])
 
-def test_example_failure_is_health_error(tmp_path, capsys) -> None:
+def test_example_output_content_is_documentation_only(tmp_path, capsys) -> None:
     bad_example_contract = VALID_NODE_CONTRACT.replace(
         'examples=({"inputs": {}, "params": {}, "outputs": {"demo.out": 1}},),',
         'examples=({"inputs": {}, "params": {}, "outputs": {"demo.out": 2}},),',
     )
     code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(contract=bad_example_contract))
+    assert code == 0
+    assert payload["health"]["status"] == "PASS"
+
+
+def test_example_output_key_failure_is_health_error(tmp_path, capsys) -> None:
+    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(run_body='        return {"demo.other": 1}'))
     assert code == 1
     assert payload["health"]["status"] == "FAIL"
-    assert any(error["details"].get("legacy_code") == "example_failed" for error in payload["health"]["errors"])
+    legacy_codes = {error["details"].get("legacy_code") for error in payload["health"]["errors"]}
+    assert legacy_codes & {"undeclared_output", "example_failed"}

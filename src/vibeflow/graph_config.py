@@ -114,13 +114,15 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         raise GraphConfigError(f"pipeline.nodes[{index}].flow_kind must be one of {sorted(FLOW_KINDS)}")
     if status == STATUS_IMPLEMENTED and flow_kind:
         raise GraphConfigError(f"pipeline.nodes[{index}].flow_kind is only allowed for planned nodes")
-    async_mode, result_key = _parse_node_async(item, index=index)
+    requires = _as_tuple(item.get("requires", ()), field=f"node[{name}].requires")
+    provides = _as_tuple(item.get("provides", ()), field=f"node[{name}].provides")
+    async_mode, result_key = _parse_node_async(item, index=index, provides=provides)
     reserved = {"name", "type", "registry_key", "requires", "provides", "config", "node_configs", "status", "flow_kind", "async", "result_key"}
     return NodeSpec(
         name=name,
         node_type=node_type,
-        requires=_as_tuple(item.get("requires", ()), field=f"node[{name}].requires"),
-        provides=_as_tuple(item.get("provides", ()), field=f"node[{name}].provides"),
+        requires=requires,
+        provides=provides,
         params=_parse_node_params(item, reserved=reserved, field=f"node[{name}].config"),
         node_config_overrides=_parse_node_config_overrides(item.get("node_configs", {}), field=f"node[{name}].node_configs"),
         status=status,
@@ -211,11 +213,13 @@ def _parse_status(value: Any, *, field: str) -> str:
     return status
 
 
-def _parse_node_async(item: Mapping[str, Any], *, index: int) -> tuple[str, str]:
+def _parse_node_async(item: Mapping[str, Any], *, index: int, provides: tuple[str, ...]) -> tuple[str, str]:
     async_mode = _parse_async_mode(item.get("async", ""), field=f"pipeline.nodes[{index}].async")
     result_key = str(item.get("result_key", "")).strip()
     if async_mode == "result_key" and not result_key:
         raise GraphConfigError(f"pipeline.nodes[{index}].result_key is required for async result_key")
+    if async_mode == "result_key" and result_key not in provides:
+        raise GraphConfigError(f"pipeline.nodes[{index}].result_key must be declared in provides")
     if async_mode != "result_key" and result_key:
         raise GraphConfigError(f"pipeline.nodes[{index}].result_key requires async='result_key'")
     return async_mode, result_key

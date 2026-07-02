@@ -104,7 +104,7 @@ class TrainingMetricsNode:
         provides=("train.metrics",),
         input_semantics={"train.model_after": ("model object",), "train.loss": ("numeric loss",)},
         output_semantics={"train.metrics": ("metrics object containing non-JSON values",)},
-        output_schema={"train.metrics": {"type": "object", "snapshot": "opaque"}},
+        output_schema={"train.metrics": {"type": "object"}},
         examples=(
             {
                 "inputs": {"train.model_after": {}, "train.loss": 1},
@@ -145,23 +145,6 @@ class BatchMetricsNode:
             return {"train.metrics": {"size": 1}}
         items = batch.items if hasattr(batch, "items") and not isinstance(batch, dict) else [1]
         return {"train.metrics": {"items": set(items), "unstable": float("nan"), "batch": batch}}
-
-
-class SnapshotUnsafeMetricsNode:
-    NODE_INFO = NodeInfo("sandbox.snapshot_unsafe_metrics", "Snapshot Unsafe Metrics", "training", "Emits non-JSON metrics without opaque snapshot opt-out.", "0.1.0", "process")
-    CONTRACT = NodeContract(
-        requires=("train.batch",),
-        provides=("train.metrics",),
-        input_semantics={"train.batch": ("batch object",)},
-        output_semantics={"train.metrics": ("non-JSON metrics",)},
-        output_schema={"train.metrics": {"type": "object"}},
-        examples=({"inputs": {"train.batch": {}}, "params": {}, "outputs": {"train.metrics": {"size": 1}}},),
-    )
-
-    def run_pure(self, inputs, params):
-        batch = inputs["train.batch"]
-        items = batch.items if hasattr(batch, "items") and not isinstance(batch, dict) else [1]
-        return {"train.metrics": {"items": set(items), "unstable": float("nan")}}
 
 
 class TrainingMetricsEndNode:

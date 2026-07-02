@@ -190,6 +190,14 @@ VALID_RUN_CASES = [
         "expected_runtime_exec_order": ["start", "seed", "add", "end"],
     },
     {
+        "name": "async_nodeset_result_key_join",
+        "config": "pass_async_nodeset_result_key_join.jsonc",
+        "initial": {"value.in": 3},
+        "expected_outputs": {"value.out": 8},
+        "expected_trace_kind_counts": {"async_result": 1, "async_result_join": 1},
+        "expected_runtime_exec_order": ["start", "input", "composite", "end"],
+    },
+    {
         "name": "async_detached_metrics",
         "config": "pass_async_detached_metrics.jsonc",
         "initial_factory": _batch_initial,
@@ -260,7 +268,6 @@ INVALID_CASES = [
     {"kind": "run", "config": "fail_plugin_unclosed_relaxation.jsonc", "expect": "PLUGIN.POLICY.RELAXATION_REQUIRED"},
     {"kind": "run", "config": "fail_plugin_execution.jsonc", "expect": "PLUGIN.EXECUTION"},
     {"kind": "config", "config": "fail_plugin_bad_shape.jsonc", "expect": "PLUGIN.POLICY.SHAPE"},
-    {"kind": "runtime_options_fail", "config": "fail_runtime_snapshot_outputs.jsonc", "runtime_options": {"snapshot_outputs": True}, "initial_factory": _batch_initial, "expect": "JSON serializable"},
 ]
 
 
@@ -557,8 +564,6 @@ def _run_invalid_case(case: dict[str, Any], base_lib_report):
         return _invalid_config(case), base_lib_report
     if kind == "run":
         return _invalid_run(case), base_lib_report
-    if kind == "runtime_options_fail":
-        return _invalid_runtime_options_run(case), base_lib_report
     raise AssertionError(f"unknown invalid case kind: {kind}")
 
 
@@ -693,28 +698,6 @@ def _invalid_run(case: dict[str, Any]) -> CaseResult:
         _assert_report_has_rule([item.to_dict() for item in (*report.errors, *report.warnings)], str(case["expect"]))
         return CaseResult(f"invalid:run:{case['config']}", "PASS", payload=report.to_dict())
     raise AssertionError("run case was not rejected")
-
-
-def _invalid_runtime_options_run(case: dict[str, Any]) -> CaseResult:
-    from registry import build_node_registry
-    from vibeflow import RuntimeOptions, run_checked
-
-    initial = case["initial_factory"]() if "initial_factory" in case else {"value.in": 0, "io.result": 1}
-    try:
-        run_checked(
-            CONFIG_DIR / str(case["config"]),
-            registry=build_node_registry(),
-            initial=initial,
-            policy_path=POLICY_PATH,
-            run_root=RUN_ROOT,
-            run_id=f"expected_fail_{Path(str(case['config'])).stem}",
-            runtime_options=RuntimeOptions(**dict(case.get("runtime_options", {}))),
-        )
-    except Exception as exc:
-        if str(case["expect"]) not in str(exc):
-            raise AssertionError(f"runtime-options error did not include {case['expect']}: {exc}") from exc
-        return CaseResult(f"invalid:runtime_options_fail:{case['config']}", "PASS", str(exc))
-    raise AssertionError("runtime-options run was not rejected")
 
 
 def _load_class(path: Path, class_name: str):

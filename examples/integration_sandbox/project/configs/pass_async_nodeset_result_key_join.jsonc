@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "name": "pass.async_nodeset_result_key_join",
+    "version": "0.1.0"
+  },
+  "nodesets": [
+    {
+      "name": "math.add_five",
+      "display_name": "Add Five",
+      "category": "math",
+      "description": "Adds five inside an async-capable nodeset.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": ["value.in"],
+      "provides": ["value.out"],
+      "exports": ["value.out"],
+      "pipeline": {
+        "inputs": ["value.in"],
+        "nodes": [
+          {"name": "start", "type": "sandbox.start"},
+          {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
+          {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "config": {"delta": 5}},
+          {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+        ],
+        "edges": [
+          {"from": "start", "to": "input"},
+          {"from": "input", "to": "add"},
+          {"from": "add", "to": "end"}
+        ]
+      }
+    }
+  ],
+  "pipeline": {
+    "inputs": ["value.in"],
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
+      {"name": "composite", "type": "nodeset.math.add_five", "requires": ["value.in"], "provides": ["value.out"], "async": "result_key", "result_key": "value.out"},
+      {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "input"},
+      {"from": "input", "to": "composite"},
+      {"from": "composite", "to": "end"}
+    ]
+  }
+}

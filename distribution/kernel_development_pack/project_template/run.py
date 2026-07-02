@@ -126,6 +126,7 @@ from vibeflow import (  # noqa: E402
     parse_graph_config,
     resolve_effective_policy,
     render_mermaid_svg,
+    RuntimeOptions,
     run_checked,
     validate_graph_health,
 )
@@ -144,6 +145,7 @@ def main() -> int:
     run_cmd = _add_config_command(sub, "run")
     run_cmd.add_argument("--run-root", default="runs")
     run_cmd.add_argument("--input", required=False)
+    _add_runtime_options(run_cmd)
     mermaid = _add_config_command(sub, "mermaid")
     mermaid.add_argument("--output", required=False)
     mermaid.add_argument("--expand-nodesets", action="store_true")
@@ -169,6 +171,31 @@ def _add_config_command(sub, name: str):
     command.add_argument("--config", required=True)
     command.add_argument("--policy", required=False)
     return command
+
+
+def _add_runtime_options(command) -> None:
+    command.add_argument("--runtime-profile", choices=("debug", "train"), default=None)
+    command.add_argument("--trace", choices=("full", "boundary", "off"), default=None)
+    command.add_argument("--execution", choices=("plan", "block"), default=None)
+    command.add_argument("--node-hooks", action=argparse.BooleanOptionalAction, default=None)
+    command.add_argument("--async-flush-timeout", type=float, default=None)
+
+
+def _runtime_options_from_args(args) -> RuntimeOptions:
+    values: dict[str, object] = {}
+    if args.runtime_profile == "train":
+        values.update({"trace": "boundary", "node_hooks": False, "execution": "plan"})
+    elif args.runtime_profile == "debug":
+        values.update({"trace": "full", "node_hooks": True, "execution": "plan"})
+    if args.trace is not None:
+        values["trace"] = args.trace
+    if args.execution is not None:
+        values["execution"] = args.execution
+    if args.node_hooks is not None:
+        values["node_hooks"] = args.node_hooks
+    if args.async_flush_timeout is not None:
+        values["async_flush_timeout"] = args.async_flush_timeout
+    return RuntimeOptions(**values)
 
 
 def _dispatch(args) -> int:
@@ -228,6 +255,7 @@ def _run(args) -> int:
             initial=initial,
             policy_path=args.policy,
             run_root=args.run_root,
+            runtime_options=_runtime_options_from_args(args),
         )
     except CheckedRunError as exc:
         print(exc.result.health.to_json())

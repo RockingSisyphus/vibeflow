@@ -220,7 +220,7 @@ Runtime 数据语义：
 
 - `Context` 按引用保存任意 Python 对象，不默认 deepcopy。
 - runtime 默认只审计流程、key 合约和事件 summary，不审计 tensor/model/optimizer 等对象内容。
-- 输出值默认不要求 JSON serializable；旧式 snapshot 审计可用 `RuntimeOptions(snapshot_outputs=True)` 显式开启。
+- 输出值不要求 JSON serializable；内核不提供 runtime value snapshot 审计开关。
 - `ExecutionPlan` / `NodeFrame` 在 runtime 构造时预绑定 node 实例、参数、edge、flow kind、nodeset 子计划和 plugin 列表。
 - nodeset 子计划和轻量子 runtime 会复用；输入/导出按 key 引用传递。
 
@@ -229,9 +229,9 @@ Runtime 数据语义：
 ```python
 RuntimeOptions(
     trace="full",          # full | boundary | off
-    snapshot_outputs=False,
     node_hooks=True,
     execution="plan",      # plan | block
+    async_flush_timeout=None,
 )
 ```
 

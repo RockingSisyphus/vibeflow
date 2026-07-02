@@ -165,10 +165,10 @@ Runtime 当前已实现训练性能导向能力：
 
 - `Context` 按引用保存任意 Python 对象，node 间不要求 JSON serializable 或可 deepcopy。
 - runtime 默认只检查输出是否为 mapping、输出 key 是否与 `provides` 一致；数据内容不做默认 snapshot 审计。
-- `RuntimeOptions(trace="full"|"boundary"|"off", snapshot_outputs=False, node_hooks=True, execution="plan"|"block")` 控制 trace 粒度、可选 JSON snapshot 校验、node hook 和执行模式。
+- `RuntimeOptions(trace="full"|"boundary"|"off", node_hooks=True, execution="plan"|"block", async_flush_timeout=None)` 控制 trace 粒度、node hook、执行模式和 detached async flush 超时。
 - 默认 `execution="plan"` 使用 `ExecutionPlan` / `NodeFrame` 预绑定 node、参数、edge、nodeset 子计划和 runtime plugin 列表。
 - `execution="block"` 是显式 opt-in 的保守 block runner，支持线性链和条件 edge 覆盖的简单 decision loop，不做 Python 代码生成、自动并行或 context 自动 merge。
-- node 调用可声明 `async: "detached"` 或 `async: "result_key"`；`detached` 在主流程外运行并在 run 结束 flush，失败记录 warning 事件；`result_key` 把 future 结果写入一个显式 key，下游 `requires` 该 key 时 join。
+- node 或 nodeset 调用可声明 `async: "detached"` 或 `async: "result_key"`；`detached` 在主流程外运行并在 run 结束 flush，失败/超时记录 warning 事件；`result_key` 把 future 结果写入一个显式 key，下游 `requires` 该 key 时 join。
 
 运行目录当前主要产物：
 

@@ -61,6 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--input", required=False, help="optional JSON object file for initial context")
     run.add_argument("--run-root", required=False, help="directory where run artifacts are created")
     run.add_argument("--run-id", required=False, help="optional deterministic run id for tests or controlled runs")
+    _add_runtime_options(run)
 
     quality = sub.add_parser("quality-check", help="run standalone Python code quality checks")
     quality.add_argument("--path", required=False, default=".", help="project directory or Python file to inspect")
@@ -220,6 +221,7 @@ def _handle_run(args: argparse.Namespace) -> int:
             policy_path=Path(args.policy) if args.policy else None,
             run_root=Path(args.run_root) if args.run_root else None,
             run_id=args.run_id,
+            runtime_options=_runtime_options_from_args(args),
         )
     except CheckedRunError as exc:
         payload = {"status": exc.result.health.status, "run_id": exc.result.run_id, "run_dir": str(exc.result.run_dir), "error": str(exc), "health": exc.result.health.to_dict()}
@@ -270,3 +272,30 @@ def _load_initial_input(path: Path) -> dict[str, object]:
     if not isinstance(payload, dict):
         raise ValueError("--input JSON root must be an object")
     return {str(key): value for key, value in payload.items()}
+
+
+def _add_runtime_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--runtime-profile", choices=("debug", "train"), default=None, help="runtime option preset")
+    parser.add_argument("--trace", choices=("full", "boundary", "off"), default=None, help="runtime trace policy")
+    parser.add_argument("--execution", choices=("plan", "block"), default=None, help="runtime execution mode")
+    parser.add_argument("--node-hooks", action=argparse.BooleanOptionalAction, default=None, help="enable or disable node-level runtime plugin hooks")
+    parser.add_argument("--async-flush-timeout", type=float, default=None, help="seconds to wait for detached async tasks at run end")
+
+
+def _runtime_options_from_args(args: argparse.Namespace):
+    from .runtime_options import RuntimeOptions
+
+    values: dict[str, object] = {}
+    if args.runtime_profile == "train":
+        values.update({"trace": "boundary", "node_hooks": False, "execution": "plan"})
+    elif args.runtime_profile == "debug":
+        values.update({"trace": "full", "node_hooks": True, "execution": "plan"})
+    if args.trace is not None:
+        values["trace"] = args.trace
+    if args.execution is not None:
+        values["execution"] = args.execution
+    if args.node_hooks is not None:
+        values["node_hooks"] = args.node_hooks
+    if args.async_flush_timeout is not None:
+        values["async_flush_timeout"] = args.async_flush_timeout
+    return RuntimeOptions(**values)

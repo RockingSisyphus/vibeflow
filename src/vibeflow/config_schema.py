@@ -116,6 +116,8 @@ def _validate_node_async_fields(value: Mapping[str, Any], prefix: str, findings:
     result_key = value.get("result_key", "")
     if mode == "result_key" and not _non_empty_string(result_key):
         findings.append(_error("CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY", f"{prefix}.result_key is required when async is 'result_key'", f"{prefix}.result_key"))
+    if mode == "result_key" and _non_empty_string(result_key) and str(result_key).strip() not in _string_items(value.get("provides", [])):
+        findings.append(_error("CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY", f"{prefix}.result_key must be declared in provides", f"{prefix}.result_key"))
     if mode != "result_key" and result_key:
         findings.append(_error("CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY", f"{prefix}.result_key requires async='result_key'", f"{prefix}.result_key"))
 
@@ -367,6 +369,12 @@ def _validate_string_list(
 ) -> None:
     if not isinstance(value, list) or any(not _non_empty_string(item) for item in value):
         findings.append(_error(rule_id, f"{object_id} must be a list of non-empty strings", object_id, rule_source=rule_source))
+
+
+def _string_items(value: Any) -> set[str]:
+    if not isinstance(value, list):
+        return set()
+    return {str(item).strip() for item in value if _non_empty_string(item)}
 
 
 def _validate_positive_int(

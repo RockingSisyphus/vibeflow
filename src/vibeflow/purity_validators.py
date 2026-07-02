@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import inspect
-import json
-from copy import deepcopy
 from typing import Mapping
 
 from .node import FLOW_KIND_DECISION, FLOW_KINDS, NodeContract, NodeInfo, PureNode
@@ -264,9 +262,11 @@ def _validate_contract_examples_shape(value: object, *, source: _SourceInfo) -> 
     for index, item in enumerate(value):
         if not isinstance(item, Mapping):
             return [_violation("example_shape", f"CONTRACT.examples[{index}] must be a mapping", source=source, severity="warning", failure_layer="contract", suggested_fix_type="fix_contract")]
-        for field_name in ("inputs", "params", "outputs"):
+        for field_name in ("inputs", "params"):
             if field_name not in item or not isinstance(item[field_name], Mapping):
                 return [_violation("example_shape", f"CONTRACT.examples[{index}].{field_name} must be a mapping", source=source, severity="warning", failure_layer="contract", suggested_fix_type="fix_contract")]
+        if "outputs" in item and not isinstance(item["outputs"], Mapping):
+            return [_violation("example_shape", f"CONTRACT.examples[{index}].outputs must be a mapping when present", source=source, severity="warning", failure_layer="contract", suggested_fix_type="fix_contract")]
     return []
 
 
@@ -278,35 +278,34 @@ def _validate_examples(node_cls: type[PureNode], contract: NodeContract, *, sour
     for index, example in enumerate(contract.examples):
         if not isinstance(example, Mapping):
             continue
-        inputs, params, expected_outputs = _example_payload(example)
-        if _example_covers_contract(contract, inputs, expected_outputs):
+        inputs, params = _example_payload(example)
+        if _example_covers_contract(contract, inputs):
             covers_contract = True
         else:
             findings.append(_example_gap_violation(index, source=source))
             continue
-        findings.extend(_validate_example_output(node_cls, inputs, params, expected_outputs, index, source=source))
+        findings.extend(_validate_example_output(node_cls, contract, inputs, params, index, source=source))
     if not covers_contract:
         findings.append(_no_covering_example_violation(source))
     return findings
 
 
-def _example_payload(example: Mapping[str, object]) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
+def _example_payload(example: Mapping[str, object]) -> tuple[dict[str, object], dict[str, object]]:
     return (
         dict(example.get("inputs", {})),
         dict(example.get("params", {})),
-        dict(example.get("outputs", {})),
     )
 
 
-def _example_covers_contract(contract: NodeContract, inputs: Mapping[str, object], outputs: Mapping[str, object]) -> bool:
-    return set(contract.requires) <= set(inputs) and set(outputs) == set(contract.provides)
+def _example_covers_contract(contract: NodeContract, inputs: Mapping[str, object]) -> bool:
+    return set(contract.requires) <= set(inputs)
 
 
 def _validate_example_output(
     node_cls: type[PureNode],
+    contract: NodeContract,
     inputs: Mapping[str, object],
     params: Mapping[str, object],
-    expected_outputs: Mapping[str, object],
     index: int,
     *,
     source: _SourceInfo,
@@ -314,9 +313,7 @@ def _validate_example_output(
     actual_outputs, failure = _run_example(node_cls, inputs, params, index, source=source)
     if failure is not None:
         return [failure]
-    findings = _compare_example_outputs(actual_outputs, expected_outputs, index, source=source)
-    findings.extend(_validate_example_snapshot(actual_outputs, index, source=source))
-    return findings
+    return _validate_example_output_keys(actual_outputs, contract, index, source=source)
 
 
 def _run_example(
@@ -328,7 +325,7 @@ def _run_example(
     source: _SourceInfo,
 ) -> tuple[object, PurityViolation | None]:
     try:
-        return node_cls().run_pure(deepcopy(dict(inputs)), deepcopy(dict(params))), None
+        return node_cls().run_pure(dict(inputs), dict(params)), None
     except Exception as exc:  # noqa: BLE001 - health report must contain checker-visible failure.
         return None, _violation(
             "example_failed",
@@ -340,36 +337,19 @@ def _run_example(
         )
 
 
-def _compare_example_outputs(actual_outputs: object, expected_outputs: Mapping[str, object], index: int, *, source: _SourceInfo) -> list[PurityViolation]:
-    if actual_outputs == expected_outputs:
+def _validate_example_output_keys(actual_outputs: object, contract: NodeContract, index: int, *, source: _SourceInfo) -> list[PurityViolation]:
+    if isinstance(actual_outputs, Mapping) and set(actual_outputs) == set(contract.provides):
         return []
     return [
         _violation(
             "example_failed",
-            f"CONTRACT.examples[{index}] expected outputs do not match run_pure outputs",
+            f"CONTRACT.examples[{index}] run_pure output keys must match CONTRACT.provides",
             source=source,
             failure_layer="contract",
             suggested_fix_type="fix_node",
-            details={"example_index": index, "expected": dict(expected_outputs), "actual": actual_outputs},
+            details={"example_index": index, "expected_keys": list(contract.provides), "actual_keys": list(actual_outputs) if isinstance(actual_outputs, Mapping) else []},
         )
     ]
-
-
-def _validate_example_snapshot(actual_outputs: object, index: int, *, source: _SourceInfo) -> list[PurityViolation]:
-    try:
-        json.dumps(actual_outputs, ensure_ascii=False, allow_nan=False)
-    except (TypeError, ValueError) as exc:
-        return [
-            _violation(
-                "example_failed",
-                f"CONTRACT.examples[{index}] output is not JSON snapshot serializable: {exc}",
-                source=source,
-                failure_layer="contract",
-                suggested_fix_type="fix_contract",
-                details={"example_index": index},
-            )
-        ]
-    return []
 
 
 def _missing_examples_violation(source: _SourceInfo) -> PurityViolation:

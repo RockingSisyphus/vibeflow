@@ -176,7 +176,7 @@ Runtime 审计流程，不默认审计数据内容：
 - 默认不要求输出值 JSON serializable，也不要求可 deepcopy。
 - 默认 trace 只记录流程事件和 summary，不记录真实对象内容。
 - 输出仍必须是 mapping，且 key 必须和调用点 `provides` 完全一致。
-- 如果需要恢复旧式输出 snapshot 审计，在程序入口传 `RuntimeOptions(snapshot_outputs=True)`。
+- `CONTRACT.examples` 只证明最小输入/参数可运行并返回声明 key；`outputs` 可作为文档，但不作为内容断言。
 
 可选执行和 trace：
 
