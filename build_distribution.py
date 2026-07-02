@@ -170,6 +170,8 @@ def _write_root_readme(output: Path) -> None:
 - `tools/mermaid-renderer/`：SVG 渲染器依赖配置；运行 `npm install` 后启用 `svg` 命令。
 - `THIRD_PARTY_NOTICES.md`：SVG 渲染相关第三方项目致谢与许可证信息。
 
+Runtime 默认审计流程和 key，不保存真实对象内容；node 间可以按引用传递普通 Python 对象。需要指标、日志或诊断 side task 时，在 config 中显式使用 `async: "detached"` 或 `async: "result_key"`。
+
 ## 开始使用
 
 ```powershell
@@ -209,6 +211,7 @@ python run.py verify-kernel
 - 只用 `project/configs/*.jsonc` 和 nodeset 组织程序结构。
 - 控制流必须显式写在 `pipeline.edges` 中。
 - 外部输入输出用 `io`、`data_store`、`document` 或 `external=True` node 建模。
+- trace 和报告只记录 summary，不序列化 tensor/model/optimizer 等对象。
 
 运行前内核会强制健康检查；检查失败时拒绝执行并输出原因。
 

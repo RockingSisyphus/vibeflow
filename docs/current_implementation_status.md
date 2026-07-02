@@ -30,7 +30,9 @@ src/vibeflow/
 - `node.py`：`NodeInfo`、`NodeContract`、`PureNode` 和标准 `flow_kind` 常量。
 - `graph_config.py`：JSONC 拓扑解析，包含 `status: planned|implemented`、`max_steps`、显式 edge `when`。
 - `compiler.py`：编译显式 flow edge、数据契约诊断、cycle/decision 检查。
-- `runtime.py`：按显式 flow edge 调度的 step runtime。
+- `execution_plan.py`：预绑定 node 实例、参数、edge、nodeset 子计划和异步标记的执行计划。
+- `runtime.py`：按显式 flow edge 调度的 runtime，支持 plan/block 执行、trace policy、对象按引用传递和显式异步 side task。
+- `runtime_trace.py`、`runtime_validation.py`：运行 trace 摘要和可选输出 snapshot 校验。
 - `health.py`、`health_flow.py`、`health_planned.py`：健康检查入口、flow 结构检查、planned 内容检查。
 - `purity.py`、`purity_validators.py`、`purity_visitors.py`：node 纯函数、契约、源码质量检查。
 - `mermaid.py`：Mermaid flowchart 源码导出。
@@ -133,7 +135,7 @@ NodeInfo(
 - `CONTRACT` 必填。
 - `run_pure(inputs, params) -> outputs` 必填。
 - 禁止普通 `run(context, ...)`。
-- 禁止修改输入。
+- 静态检查禁止直接修改 `inputs`；runtime 为训练对象按引用传递，不再用 deepcopy 做内容级变异审计。
 - 禁止动态输出 key。
 - 禁止多返回/少返回 key。
 - 禁止 node 之间 import/call。
@@ -158,6 +160,15 @@ NodeInfo(
 ### 正式运行和产物
 
 `run_checked(...)` 会在运行前强制执行 schema、policy、compile 和 health 检查。失败时拒绝执行 runtime。
+
+Runtime 当前已实现训练性能导向能力：
+
+- `Context` 按引用保存任意 Python 对象，node 间不要求 JSON serializable 或可 deepcopy。
+- runtime 默认只检查输出是否为 mapping、输出 key 是否与 `provides` 一致；数据内容不做默认 snapshot 审计。
+- `RuntimeOptions(trace="full"|"boundary"|"off", snapshot_outputs=False, node_hooks=True, execution="plan"|"block")` 控制 trace 粒度、可选 JSON snapshot 校验、node hook 和执行模式。
+- 默认 `execution="plan"` 使用 `ExecutionPlan` / `NodeFrame` 预绑定 node、参数、edge、nodeset 子计划和 runtime plugin 列表。
+- `execution="block"` 是显式 opt-in 的保守 block runner，支持线性链和条件 edge 覆盖的简单 decision loop，不做 Python 代码生成、自动并行或 context 自动 merge。
+- node 调用可声明 `async: "detached"` 或 `async: "result_key"`；`detached` 在主流程外运行并在 run 结束 flush，失败记录 warning 事件；`result_key` 把 future 结果写入一个显式 key，下游 `requires` 该 key 时 join。
 
 运行目录当前主要产物：
 
@@ -220,7 +231,7 @@ PASS, errors=0, warnings=0
 已维护：
 
 - `examples/minimal_project/`：最小可运行项目。
-- `examples/integration_sandbox/`：综合沙箱，覆盖 flow_kind、decision cycle、nodeset、plugins、planned 内容、ASCII/Mermaid/SVG 输出。
+- `examples/integration_sandbox/`：综合沙箱，覆盖 flow_kind、decision cycle、nodeset、plugins、planned 内容、训练对象直通、RuntimeOptions、ExecutionPlan、block 执行、async side task、ASCII/Mermaid/SVG 输出。
 - `examples/failure_cases/`：失败样本和 rule_id 覆盖。
 
 ## 当前仍可继续改进

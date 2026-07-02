@@ -75,7 +75,7 @@ node 禁止：
 - 调用其他 node。
 - 导入其他 node 的 Python 模块。
 - 动态生成 output key。
-- 修改 `inputs` 或从 `inputs` 中取出的可变对象。
+- 直接修改 `inputs`；共享对象原地更新只应作为显式业务语义出现，并通过输出 key 暴露更新后的引用。
 
 真实外部能力应放在内核外部系统中执行，并通过 `io` / `data_store` / `document` 节点的结构化契约衔接。
 
@@ -213,8 +213,35 @@ nodeset 是可复用复合拓扑。它本身必须表现为纯函数：
 5. 编译图。
 6. 执行完整健康检查。
 7. 健康失败则拒绝运行。
-8. 运行 step runtime。
+8. 按 `RuntimeOptions` 运行 plan/block runtime。
 9. 写出报告、trace 和图形产物。
+
+Runtime 数据语义：
+
+- `Context` 按引用保存任意 Python 对象，不默认 deepcopy。
+- runtime 默认只审计流程、key 合约和事件 summary，不审计 tensor/model/optimizer 等对象内容。
+- 输出值默认不要求 JSON serializable；旧式 snapshot 审计可用 `RuntimeOptions(snapshot_outputs=True)` 显式开启。
+- `ExecutionPlan` / `NodeFrame` 在 runtime 构造时预绑定 node 实例、参数、edge、flow kind、nodeset 子计划和 plugin 列表。
+- nodeset 子计划和轻量子 runtime 会复用；输入/导出按 key 引用传递。
+
+`RuntimeOptions`：
+
+```python
+RuntimeOptions(
+    trace="full",          # full | boundary | off
+    snapshot_outputs=False,
+    node_hooks=True,
+    execution="plan",      # plan | block
+)
+```
+
+`execution="block"` 只支持线性链和条件 edge 覆盖的简单 decision loop；不做 Python 代码生成、复杂 CFG 优化、自动并行或 context 自动 merge。
+
+异步 node 是显式配置能力：
+
+- `async: "detached"`：提交 side task，主流程不等待，run 结束 flush；失败记录 `async_detached_failed`。
+- `async: "result_key"` + `result_key`：future 结果写入单个显式 key，下游 `requires` 该 key 时 join。
+- 异步不支持 nodeset，不自动合并 context。
 
 运行产物：
 
