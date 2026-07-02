@@ -1,0 +1,18 @@
+{
+  "pipeline": {
+    "inputs": ["train.batch"],
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "metrics", "type": "sandbox.batch_metrics", "requires": ["train.batch"], "provides": ["train.metrics"], "async": "detached"},
+      {"name": "seed", "type": "sandbox.constant", "provides": ["value.in"], "value": 4},
+      {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 6},
+      {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "metrics"},
+      {"from": "metrics", "to": "seed"},
+      {"from": "seed", "to": "add"},
+      {"from": "add", "to": "end"}
+    ]
+  }
+}

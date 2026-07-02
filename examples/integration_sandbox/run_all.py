@@ -181,6 +181,22 @@ VALID_RUN_CASES = [
         "expected_outputs": {"value.next": 3},
         "expected_runtime_exec_order": ["start", "input", "increment", "done", "copy", "increment", "done", "end"],
     },
+    {
+        "name": "async_result_key_join",
+        "config": "pass_async_result_key_join.jsonc",
+        "initial": {},
+        "expected_outputs": {"value.out": 12},
+        "expected_trace_kind_counts": {"async_result": 1, "async_result_join": 1},
+        "expected_runtime_exec_order": ["start", "seed", "add", "end"],
+    },
+    {
+        "name": "async_detached_metrics",
+        "config": "pass_async_detached_metrics.jsonc",
+        "initial_factory": _batch_initial,
+        "expected_outputs": {"value.out": 10},
+        "expected_trace_kind_counts": {"async_detached": 1, "async_detached_done": 1},
+        "expected_runtime_exec_order": ["start", "metrics", "seed", "add", "end"],
+    },
 ]
 
 

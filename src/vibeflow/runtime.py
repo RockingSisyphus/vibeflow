@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import operator
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -58,6 +59,9 @@ class PipelineRuntime:
         self._node_runs: dict[str, int] = {node.name: 0 for node in graph.nodes}
         self._frames = self._plan.frames
         self._nodeset_runtimes: dict[str, PipelineRuntime] = {}
+        self._executor: ThreadPoolExecutor | None = None
+        self._async_results: dict[str, tuple[NodeFrame, Future[Mapping[str, object]]]] = {}
+        self._detached: list[tuple[NodeFrame, Future[Mapping[str, object]]]] = []
         self._run_dir = Path(run_dir) if run_dir is not None else Path("runs") / "vibeflow"
         self.runtime_options = _runtime_options(runtime_options)
 
@@ -74,6 +78,9 @@ class PipelineRuntime:
         runtime._node_runs = {name: 0 for name in plan.order}
         runtime._frames = plan.frames
         runtime._nodeset_runtimes = {}
+        runtime._executor = None
+        runtime._async_results = {}
+        runtime._detached = []
         runtime._run_dir = parent._run_dir
         runtime.runtime_options = parent.runtime_options
         return runtime
@@ -88,20 +95,27 @@ class PipelineRuntime:
                 self._run_block_steps(context)
             else:
                 self._run_steps(context)
+            self._flush_async_results(context)
+            self._flush_detached()
             self.trace.stop_reason = self.trace.stop_reason or "completed"
             self._record_run_boundary("run_end")
             self._call_runtime_plugins("after_run", context.to_dict(), self.trace.to_dict())
         except Exception as exc:
+            self._flush_detached()
             self.trace.stop_reason = self.trace.stop_reason or "node_failed"
             self.trace.exception = str(exc)
             self._write_trace(context)
+            self._shutdown_executor()
             raise
         self._write_trace(context)
+        self._shutdown_executor()
         return context
 
     def _reset_run_state(self) -> None:
         self.trace = RuntimeTrace()
         self._node_runs = {name: 0 for name in self._plan.order}
+        self._async_results = {}
+        self._detached = []
 
     def _run_steps(self, context: Context) -> None:
         ready = list(self._initial_ready_nodes(context))
@@ -172,6 +186,9 @@ class PipelineRuntime:
         return tuple(ready)
 
     def _requirements_available(self, node_name: str, context: Context) -> bool:
+        for key in self._frames[node_name].requires:
+            if not context.exists(key) and key in self._async_results:
+                self._join_async_result(key, context)
         return all(context.exists(key) for key in self._frames[node_name].requires)
 
     def _is_end_terminal(self, node_name: str) -> bool:
@@ -194,6 +211,8 @@ class PipelineRuntime:
     def _run_node(self, node_name: str, context: Context) -> Mapping[str, object]:
         self.trace.current_node = node_name
         frame = self._frames[node_name]
+        if frame.async_mode:
+            return self._run_async_node(frame, context)
         if frame.is_nodeset:
             return self._run_nodeset_node(frame, context)
         return self._run_pure_node(frame, context)
@@ -222,18 +241,8 @@ class PipelineRuntime:
                 raise PipelineRuntimeError(f"node '{frame.name}' has no bound callable")
             inputs = {key: context.get(key) for key in frame.requires}
             self._call_runtime_plugins("before_node", frame.name, frame.node_type, summarize_mapping(inputs))
-            outputs = node.run_pure(inputs, frame.params)
-            if not isinstance(outputs, Mapping):
-                raise PipelineRuntimeError(f"node '{frame.name}' must return a mapping")
-            unexpected = set(outputs) - set(frame.provides)
-            if unexpected:
-                raise PipelineRuntimeError(f"node '{frame.name}' returned undeclared outputs: {sorted(unexpected)}")
-            missing = set(frame.provides) - set(outputs)
-            if missing:
-                raise PipelineRuntimeError(f"node '{frame.name}' missed declared outputs: {sorted(missing)}")
+            outputs = self._execute_pure_outputs(frame, inputs)
             for key, value in outputs.items():
-                if self.runtime_options.snapshot_outputs:
-                    assert_runtime_output_snapshot(value, contract=node.CONTRACT, node_name=frame.name, key=str(key))
                 context.set(str(key), value)
             self._mark_node_run(frame.name)
             self._record_runtime_event("node", frame.name, frame.node_type, input_summary=summarize_mapping(inputs), output_summary=summarize_mapping(outputs), elapsed_ms=_elapsed_ms(started))
@@ -246,6 +255,41 @@ class PipelineRuntime:
         except Exception as exc:
             self._record_runtime_event("node_failed", frame.name, frame.node_type, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=_elapsed_ms(started))
             raise
+
+    def _execute_pure_outputs(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
+        node = frame.node
+        if node is None:
+            raise PipelineRuntimeError(f"node '{frame.name}' has no bound callable")
+        outputs = node.run_pure(inputs, frame.params)
+        if not isinstance(outputs, Mapping):
+            raise PipelineRuntimeError(f"node '{frame.name}' must return a mapping")
+        unexpected = set(outputs) - set(frame.provides)
+        if unexpected:
+            raise PipelineRuntimeError(f"node '{frame.name}' returned undeclared outputs: {sorted(unexpected)}")
+        missing = set(frame.provides) - set(outputs)
+        if missing:
+            raise PipelineRuntimeError(f"node '{frame.name}' missed declared outputs: {sorted(missing)}")
+        if self.runtime_options.snapshot_outputs:
+            for key, value in outputs.items():
+                assert_runtime_output_snapshot(value, contract=node.CONTRACT, node_name=frame.name, key=str(key))
+        return outputs
+
+    def _run_async_node(self, frame: NodeFrame, context: Context) -> Mapping[str, object]:
+        if frame.is_nodeset:
+            raise PipelineRuntimeError(f"async nodeset '{frame.name}' is not supported")
+        if frame.async_mode == "result_key" and frame.result_key not in frame.provides:
+            raise PipelineRuntimeError(f"async node '{frame.name}' result_key must be declared in provides")
+        inputs = {key: context.get(key) for key in frame.requires}
+        self._call_runtime_plugins("before_node", frame.name, frame.node_type, summarize_mapping(inputs))
+        future = self._executor_for_async().submit(self._execute_pure_outputs, frame, inputs)
+        self._mark_node_run(frame.name)
+        if frame.async_mode == "detached":
+            self._detached.append((frame, future))
+            self._record_runtime_event("async_detached", frame.name, frame.node_type, input_summary=summarize_mapping(inputs))
+            return {}
+        self._async_results[frame.result_key] = (frame, future)
+        self._record_runtime_event("async_result", frame.name, frame.node_type, input_summary=summarize_mapping(inputs), output_summary={frame.result_key: {"type": "future"}})
+        return {}
 
     def _run_nodeset(self, frame: NodeFrame, context: Context) -> None:
         nodeset = self.graph.nodesets.get(frame.nodeset_name)
@@ -272,8 +316,43 @@ class PipelineRuntime:
             self._nodeset_runtimes[frame.name] = runtime
         return runtime
 
+    def _executor_for_async(self) -> ThreadPoolExecutor:
+        if self._executor is None:
+            self._executor = ThreadPoolExecutor(max_workers=4)
+        return self._executor
+
+    def _join_async_result(self, key: str, context: Context) -> None:
+        frame, future = self._async_results.pop(key)
+        try:
+            outputs = future.result()
+        except Exception as exc:
+            self._record_runtime_event("node_failed", frame.name, frame.node_type, failure=str(exc))
+            raise
+        context.set(key, outputs[key])
+        self._call_runtime_plugins("after_node", frame.name, frame.node_type, summarize_mapping({key: outputs[key]}))
+        self._record_runtime_event("async_result_join", frame.name, frame.node_type, output_summary=summarize_mapping({key: outputs[key]}))
+
+    def _flush_async_results(self, context: Context) -> None:
+        for key in tuple(self._async_results):
+            self._join_async_result(key, context)
+
+    def _flush_detached(self) -> None:
+        for frame, future in self._detached:
+            try:
+                outputs = future.result()
+            except Exception as exc:
+                self._record_runtime_event("async_detached_failed", frame.name, frame.node_type, failure=str(exc))
+                continue
+            self._record_runtime_event("async_detached_done", frame.name, frame.node_type, output_summary=summarize_mapping(outputs))
+        self._detached = []
+
+    def _shutdown_executor(self) -> None:
+        if self._executor is not None:
+            self._executor.shutdown(wait=True)
+            self._executor = None
+
     def _record_edge(self, edge: EdgeSpec) -> None:
-        key = _edge_key(edge.pair)
+        key = f"{edge.source}->{edge.target}"
         self.trace.edge_executions[key] = self.trace.edge_executions.get(key, 0) + 1
 
     def _mark_node_run(self, node_name: str) -> None:
@@ -334,9 +413,7 @@ class PipelineRuntime:
         self.trace.events.append(event)
 
     def _record_run_boundary(self, kind: str) -> None:
-        if self.runtime_options.trace == "boundary":
-            self._record_runtime_event(kind, "pipeline", "pipeline")
-
+        if self.runtime_options.trace == "boundary": self._record_runtime_event(kind, "pipeline", "pipeline")
 
 def _runtime_options(value: RuntimeOptions | Mapping[str, object] | None) -> RuntimeOptions:
     if value is None:
@@ -344,7 +421,6 @@ def _runtime_options(value: RuntimeOptions | Mapping[str, object] | None) -> Run
     if isinstance(value, RuntimeOptions):
         return value
     return RuntimeOptions(**dict(value))
-
 
 def _condition_matches(expression: str, values: Mapping[str, object]) -> bool:
     for token, op in (("==", operator.eq), ("!=", operator.ne)):
@@ -356,10 +432,8 @@ def _condition_matches(expression: str, values: Mapping[str, object]) -> bool:
         return bool(op(values.get(left), _literal_value(right)))
     raise PipelineRuntimeError(f"unsupported edge condition: {expression}")
 
-
 def _has_planned(graph: GraphConfig) -> bool:
     return any(node.status == STATUS_PLANNED for node in graph.nodes) or any(nodeset.status == STATUS_PLANNED or _has_planned(nodeset.graph) for nodeset in graph.nodesets.values())
-
 
 def _literal_value(value: str) -> object:
     if value in {"true", "false"}:
@@ -367,11 +441,6 @@ def _literal_value(value: str) -> object:
     if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
         return value[1:-1]
     return value
-
-
-def _edge_key(pair: tuple[str, str]) -> str:
-    return f"{pair[0]}->{pair[1]}"
-
 
 def _elapsed_ms(started: float) -> float:
     return round((time.perf_counter() - started) * 1000, 3)

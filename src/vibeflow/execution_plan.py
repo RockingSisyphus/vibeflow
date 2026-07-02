@@ -25,6 +25,8 @@ class NodeFrame:
     is_nodeset: bool
     nodeset_name: str = ""
     exports: tuple[str, ...] = ()
+    async_mode: str = ""
+    result_key: str = ""
     subplan: "ExecutionPlan | None" = None
 
 
@@ -86,6 +88,8 @@ def _frame_for(
             is_nodeset=True,
             nodeset_name=nodeset_name,
             exports=nodeset.exports,
+            async_mode=spec.async_mode,
+            result_key=spec.result_key,
             subplan=build_execution_plan(nodeset.graph, subcompiled, registry=registry, node_config_overrides=nested_overrides),
         )
     node_cls = registry.get(spec.node_type)
@@ -102,6 +106,8 @@ def _frame_for(
         flow_kind=flow_kind,
         is_terminal=flow_kind == "terminal",
         is_nodeset=False,
+        async_mode=spec.async_mode,
+        result_key=spec.result_key,
     )
 
 

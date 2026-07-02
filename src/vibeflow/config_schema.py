@@ -72,6 +72,7 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
     _validate_node_identity(value, prefix, findings, status=status)
     _validate_node_contract_fields(value, prefix, findings)
     _validate_node_config_fields(value, prefix, findings)
+    _validate_node_async_fields(value, prefix, findings)
 
 
 def _validate_node_identity(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
@@ -106,6 +107,17 @@ def _validate_node_config_fields(value: Mapping[str, Any], prefix: str, findings
         findings.append(_error("CONFIG.SCHEMA.NODE_CONFIG_OBJECT", f"{prefix}.config must be an object", f"{prefix}.config"))
     if "node_configs" in value:
         _validate_node_configs(value["node_configs"], f"{prefix}.node_configs", findings)
+
+
+def _validate_node_async_fields(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
+    mode = value.get("async", "")
+    if mode not in {"", "detached", "result_key"}:
+        findings.append(_error("CONFIG.SCHEMA.NODE_ASYNC", f"{prefix}.async must be 'detached' or 'result_key'", f"{prefix}.async"))
+    result_key = value.get("result_key", "")
+    if mode == "result_key" and not _non_empty_string(result_key):
+        findings.append(_error("CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY", f"{prefix}.result_key is required when async is 'result_key'", f"{prefix}.result_key"))
+    if mode != "result_key" and result_key:
+        findings.append(_error("CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY", f"{prefix}.result_key requires async='result_key'", f"{prefix}.result_key"))
 
 
 def _validate_edge(value: Any, prefix: str, findings: list[HealthFinding]) -> None:
