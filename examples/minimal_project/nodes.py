@@ -13,7 +13,7 @@ class StartNode:
         version="0.1.0",
         flow_kind="terminal",
     )
-    CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}, "outputs": {}},))
+    CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}},))
 
     def run_pure(self, inputs, params):
         return {}
@@ -31,7 +31,7 @@ class EndNode:
     CONTRACT = NodeContract(
         requires=("value.out",),
         input_semantics={"value.out": ("final numeric value",)},
-        examples=({"inputs": {"value.out": 2}, "params": {}, "outputs": {}},),
+        examples=({"inputs": {"value.out": 2}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -52,7 +52,7 @@ class SeedNode:
         output_semantics={"value.in": ("initial numeric value",)},
         params_schema={"value": {"type": "number"}},
         output_schema={"value.in": {"type": "number"}},
-        examples=({"inputs": {}, "params": {"value": 2}, "outputs": {"value.in": 2}},),
+        examples=({"inputs": {}, "params": {"value": 2}},),
     )
 
     def run_pure(self, inputs, params):
@@ -75,7 +75,7 @@ class AddNode:
         output_semantics={"value.out": ("output numeric value",)},
         params_schema={"delta": {"type": "number"}},
         output_schema={"value.out": {"type": "number"}},
-        examples=({"inputs": {"value.in": 2}, "params": {"delta": 3}, "outputs": {"value.out": 5}},),
+        examples=({"inputs": {"value.in": 2}, "params": {"delta": 3}},),
     )
 
     def run_pure(self, inputs, params):

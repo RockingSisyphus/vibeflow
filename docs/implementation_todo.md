@@ -55,7 +55,7 @@
 - [x] runtime 到达无 outgoing edge 的 terminal end 后停止。
 - [x] runtime 默认按引用传递任意 Python 对象，不要求输出 JSON serializable 或可 deepcopy。
 - [x] runtime 使用 `ExecutionPlan` / `NodeFrame` 预绑定 node、参数、edge 和 nodeset 子计划。
-- [x] runtime 可选 `execution="block"` 执行线性链和简单 decision loop。
+- [x] runtime 可选 `execution="block"` 执行线性链和简单 decision loop；可选 `execution="compiled"` 对线性段使用 `CompiledBlock` 低开销执行。
 - [x] runtime 支持显式 `async: "detached"` 和 `async: "result_key"` side task。
 
 ### 图形输出

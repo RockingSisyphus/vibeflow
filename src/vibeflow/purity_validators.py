@@ -265,8 +265,8 @@ def _validate_contract_examples_shape(value: object, *, source: _SourceInfo) -> 
         for field_name in ("inputs", "params"):
             if field_name not in item or not isinstance(item[field_name], Mapping):
                 return [_violation("example_shape", f"CONTRACT.examples[{index}].{field_name} must be a mapping", source=source, severity="warning", failure_layer="contract", suggested_fix_type="fix_contract")]
-        if "outputs" in item and not isinstance(item["outputs"], Mapping):
-            return [_violation("example_shape", f"CONTRACT.examples[{index}].outputs must be a mapping when present", source=source, severity="warning", failure_layer="contract", suggested_fix_type="fix_contract")]
+        if "outputs" in item:
+            return [_violation("example_outputs_removed", f"CONTRACT.examples[{index}].outputs is removed; examples only declare inputs and params", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
     return []
 
 

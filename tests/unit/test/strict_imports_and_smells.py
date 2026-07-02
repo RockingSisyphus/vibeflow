@@ -68,7 +68,7 @@ class WrapperOneNode:
         input_semantics={"value.in": ("input value",)},
         output_semantics={"wrap.one": ("wrapped value",)},
         output_schema={"wrap.one": {"type": "number"}},
-        examples=({"inputs": {"value.in": 1}, "params": {}, "outputs": {"wrap.one": 2}},),
+        examples=({"inputs": {"value.in": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -84,7 +84,7 @@ class WrapperTwoNode:
         input_semantics={"value.in": ("input value",)},
         output_semantics={"wrap.two": ("wrapped value",)},
         output_schema={"wrap.two": {"type": "number"}},
-        examples=({"inputs": {"value.in": 1}, "params": {}, "outputs": {"wrap.two": 2}},),
+        examples=({"inputs": {"value.in": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):

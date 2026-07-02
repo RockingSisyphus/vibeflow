@@ -277,8 +277,11 @@ def _load_initial_input(path: Path) -> dict[str, object]:
 def _add_runtime_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--runtime-profile", choices=("debug", "train"), default=None, help="runtime option preset")
     parser.add_argument("--trace", choices=("full", "boundary", "off"), default=None, help="runtime trace policy")
-    parser.add_argument("--execution", choices=("plan", "block"), default=None, help="runtime execution mode")
+    parser.add_argument("--execution", choices=("plan", "block", "compiled"), default=None, help="runtime execution mode")
+    parser.add_argument("--run-hooks", action=argparse.BooleanOptionalAction, default=None, help="enable or disable run-level runtime plugin hooks")
     parser.add_argument("--node-hooks", action=argparse.BooleanOptionalAction, default=None, help="enable or disable node-level runtime plugin hooks")
+    parser.add_argument("--nodeset-hooks", action=argparse.BooleanOptionalAction, default=None, help="enable or disable nodeset-level runtime plugin hooks")
+    parser.add_argument("--block-hooks", action=argparse.BooleanOptionalAction, default=None, help="enable or disable block-level runtime plugin hooks")
     parser.add_argument("--async-flush-timeout", type=float, default=None, help="seconds to wait for detached async tasks at run end")
 
 
@@ -287,15 +290,21 @@ def _runtime_options_from_args(args: argparse.Namespace):
 
     values: dict[str, object] = {}
     if args.runtime_profile == "train":
-        values.update({"trace": "boundary", "node_hooks": False, "execution": "plan"})
+        values.update({"trace": "boundary", "run_hooks": True, "node_hooks": False, "nodeset_hooks": False, "block_hooks": True, "execution": "plan"})
     elif args.runtime_profile == "debug":
-        values.update({"trace": "full", "node_hooks": True, "execution": "plan"})
+        values.update({"trace": "full", "run_hooks": True, "node_hooks": True, "nodeset_hooks": True, "block_hooks": True, "execution": "plan"})
     if args.trace is not None:
         values["trace"] = args.trace
     if args.execution is not None:
         values["execution"] = args.execution
+    if args.run_hooks is not None:
+        values["run_hooks"] = args.run_hooks
     if args.node_hooks is not None:
         values["node_hooks"] = args.node_hooks
+    if args.nodeset_hooks is not None:
+        values["nodeset_hooks"] = args.nodeset_hooks
+    if args.block_hooks is not None:
+        values["block_hooks"] = args.block_hooks
     if args.async_flush_timeout is not None:
         values["async_flush_timeout"] = args.async_flush_timeout
     return RuntimeOptions(**values)

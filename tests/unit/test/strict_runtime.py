@@ -346,6 +346,27 @@ def test_runtime_options_block_executes_linear_plan() -> None:
     assert list(context.get("runtime.exec_order")) == ["start", "seed", "add", "end"]
 
 
+def test_runtime_options_compiled_executes_linear_block() -> None:
+    graph = parse_graph_config({"pipeline": _seed_add_pipeline(add={"config": {"delta": 4}})})
+
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
+    context = runtime.run({})
+
+    assert context.get("value.out") == 5
+    assert list(context.get("runtime.exec_order")) == ["start", "seed", "add", "end"]
+    assert [event["kind"] for event in context.get("runtime.events")] == ["run_start", "block_enter", "block_exit", "run_end"]
+    assert runtime._plan.blocks
+
+
+def test_runtime_options_compiled_falls_back_when_node_hooks_enabled() -> None:
+    graph = parse_graph_config({"pipeline": _seed_add_pipeline(add={"config": {"delta": 4}})})
+
+    context = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="boundary", node_hooks=True, execution="compiled")).run({})
+
+    assert context.get("value.out") == 5
+    assert [event["kind"] for event in context.get("runtime.events")] == ["run_start", "run_end"]
+
+
 def test_runtime_options_block_executes_simple_conditional_route() -> None:
     registry = _registry()
     register_node(registry, "test.route", RouteNode)
@@ -381,7 +402,7 @@ def test_runtime_options_block_executes_simple_conditional_route() -> None:
 
 def test_runtime_options_rejects_unknown_execution() -> None:
     with pytest.raises(ValueError, match="runtime execution"):
-        RuntimeOptions(execution="compiled")
+        RuntimeOptions(execution="native")
 
 
 def test_async_result_key_joins_when_required() -> None:
@@ -577,6 +598,53 @@ class RuntimePlugin:
 
     hooks = [json.loads(line)["hook"] for line in marker_path.read_text(encoding="utf-8").splitlines()]
     assert hooks == ["before_run", "after_run"]
+
+
+def test_runtime_options_hook_granularity_controls_nodeset_and_block_hooks(tmp_path) -> None:
+    marker_path = tmp_path / "plugin_calls.jsonl"
+    plugin_path = tmp_path / "runtime_plugin.py"
+    plugin_path.write_text(
+        f"""
+import json
+from pathlib import Path
+MARKER = Path({str(marker_path)!r})
+def record(value):
+    with MARKER.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(value, sort_keys=True) + "\\n")
+class RuntimePlugin:
+    name = "runtime_hook"
+    def before_nodeset(self, name, node_type):
+        record({{"hook": "before_nodeset"}})
+    def after_nodeset(self, name, node_type):
+        record({{"hook": "after_nodeset"}})
+    def before_block(self, name, nodes):
+        record({{"hook": "before_block"}})
+    def after_block(self, name, nodes):
+        record({{"hook": "after_block"}})
+""".strip(),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "workflow.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "plugins": [{"module": str(plugin_path), "class": "RuntimePlugin", "type": "runtime"}],
+                "pipeline": _seed_add_pipeline(add={"config": {"delta": 4}}),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    run_checked(
+        config_path,
+        registry=_registry(),
+        run_root=tmp_path / "runs",
+        run_id="block_hooks",
+        runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, nodeset_hooks=False, block_hooks=True, execution="compiled"),
+    )
+
+    hooks = [json.loads(line)["hook"] for line in marker_path.read_text(encoding="utf-8").splitlines()]
+    assert hooks == ["before_block", "after_block"]
 
 def test_checked_run_trace_records_nodeset_enter_exit(tmp_path) -> None:
     config_path = tmp_path / "nodeset_workflow.json"

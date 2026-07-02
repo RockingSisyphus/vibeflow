@@ -12,7 +12,7 @@ class TrainingInputNode:
             "train.batch": ("arbitrary batch object",),
             "train.optimizer": ("arbitrary optimizer object",),
         },
-        examples=({"inputs": {"train.model": {}, "train.batch": {}, "train.optimizer": {}}, "params": {}, "outputs": {}},),
+        examples=({"inputs": {"train.model": {}, "train.batch": {}, "train.optimizer": {}}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -27,7 +27,7 @@ class ForwardLossNode:
         input_semantics={"train.model": ("model object",), "train.batch": ("batch object",)},
         output_semantics={"train.loss": ("numeric loss",)},
         output_schema={"train.loss": {"type": "number"}},
-        examples=({"inputs": {"train.model": {}, "train.batch": {}}, "params": {}, "outputs": {"train.loss": 1}},),
+        examples=({"inputs": {"train.model": {}, "train.batch": {}}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -45,7 +45,7 @@ class BackwardGradNode:
         input_semantics={"train.model": ("model object",), "train.loss": ("numeric loss",)},
         output_semantics={"train.grad": ("numeric gradient",)},
         output_schema={"train.grad": {"type": "number"}},
-        examples=({"inputs": {"train.model": {}, "train.loss": 1}, "params": {}, "outputs": {"train.grad": 0.1}},),
+        examples=({"inputs": {"train.model": {}, "train.loss": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -71,15 +71,14 @@ class OptimizerStepNode:
             "train.step_report": ("small JSON-safe training report",),
         },
         output_schema={
-            "train.model_after": {"type": "object", "snapshot": "opaque"},
-            "train.optimizer_after": {"type": "object", "snapshot": "opaque"},
+            "train.model_after": {"type": "object"},
+            "train.optimizer_after": {"type": "object"},
             "train.step_report": {"type": "object"},
         },
         examples=(
             {
                 "inputs": {"train.model": {}, "train.optimizer": {}, "train.grad": 0.1},
                 "params": {},
-                "outputs": {"train.model_after": {}, "train.optimizer_after": {}, "train.step_report": {"steps": 1}},
             },
         ),
     )
@@ -109,7 +108,6 @@ class TrainingMetricsNode:
             {
                 "inputs": {"train.model_after": {}, "train.loss": 1},
                 "params": {},
-                "outputs": {"train.metrics": {"loss": 1, "tags": ["train"]}},
             },
         ),
     )
@@ -135,8 +133,8 @@ class BatchMetricsNode:
         provides=("train.metrics",),
         input_semantics={"train.batch": ("batch object",)},
         output_semantics={"train.metrics": ("non-JSON metrics",)},
-        output_schema={"train.metrics": {"type": "object", "snapshot": "opaque"}},
-        examples=({"inputs": {"train.batch": {}}, "params": {}, "outputs": {"train.metrics": {"size": 1}}},),
+        output_schema={"train.metrics": {"type": "object"}},
+        examples=({"inputs": {"train.batch": {}}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -152,7 +150,7 @@ class TrainingMetricsEndNode:
     CONTRACT = NodeContract(
         requires=("train.metrics",),
         input_semantics={"train.metrics": ("training metrics",)},
-        examples=({"inputs": {"train.metrics": {"loss": 1}}, "params": {}, "outputs": {}},),
+        examples=({"inputs": {"train.metrics": {"loss": 1}}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):

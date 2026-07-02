@@ -129,7 +129,7 @@ def run_pure(self, inputs, params):
 - 返回动态 output key
 - 少返回或多返回 key
 
-Runtime 允许输出任意 Python 对象，并按引用传给下游；不要求输出 JSON serializable，也不要求可 deepcopy。输出仍必须是 mapping，且 key 必须和 `provides` 完全一致。`CONTRACT.examples` 只证明最小输入/参数可运行并返回声明 key；`outputs` 可作为文档，但不作为内容断言。
+Runtime 允许输出任意 Python 对象，并按引用传给下游；不要求输出 JSON serializable，也不要求可 deepcopy。输出仍必须是 mapping，且 key 必须和 `provides` 完全一致。`CONTRACT.examples` 只包含 `inputs` 和 `params`，用于证明最小输入/参数可运行并返回声明 key；不要在 examples 中写 `outputs`。
 
 ## 导入和副作用限制
 

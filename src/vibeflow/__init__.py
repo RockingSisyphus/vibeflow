@@ -5,7 +5,7 @@ from .architecture_report import build_architecture_report
 from .config_loader import ConfigDocument, ConfigLoadError, load_config_document, strip_jsonc_comments
 from .compiler import CompiledGraph, GraphCompileError, GraphCompiler
 from .context import Context
-from .execution_plan import ExecutionPlan, NodeFrame, build_execution_plan
+from .execution_plan import CompiledBlock, ExecutionPlan, NodeFrame, build_execution_plan
 from .graph_config import EdgeSpec, GraphConfig, NodeSpec, NodesetSpec, parse_graph_config
 from .health import HealthFinding, HealthReport, validate_graph_health
 from .ascii_flowchart import export_ascii_flowchart
@@ -19,11 +19,12 @@ from .purity import NodeMetrics, collect_node_metrics
 from .registry import NodeRegistry, NodeRegistryError
 from .resources import schema_text
 from .runtime import PipelineRuntime, PipelineRuntimeError
-from .runtime_options import RuntimeOptions
+from .runtime_options import HookPlan, RuntimeOptions
 from .runner import CheckedRunError, CheckedRunResult, run_checked
 
 __all__ = [
     "CompiledGraph",
+    "CompiledBlock",
     "ConfigDocument",
     "ConfigLoadError",
     "Context",
@@ -54,6 +55,7 @@ __all__ = [
     "FLOW_KIND_TERMINAL",
     "HealthFinding",
     "HealthReport",
+    "HookPlan",
     "NodeContract",
     "NodeFrame",
     "NodeInfo",
