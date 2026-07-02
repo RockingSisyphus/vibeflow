@@ -24,6 +24,7 @@ class NodeFrame:
     is_terminal: bool
     is_nodeset: bool
     nodeset_name: str = ""
+    exports: tuple[str, ...] = ()
     subplan: "ExecutionPlan | None" = None
 
 
@@ -84,6 +85,7 @@ def _frame_for(
             is_terminal=False,
             is_nodeset=True,
             nodeset_name=nodeset_name,
+            exports=nodeset.exports,
             subplan=build_execution_plan(nodeset.graph, subcompiled, registry=registry, node_config_overrides=nested_overrides),
         )
     node_cls = registry.get(spec.node_type)

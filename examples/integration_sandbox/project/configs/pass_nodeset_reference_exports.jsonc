@@ -1,0 +1,49 @@
+{
+  "nodesets": [
+    {
+      "name": "training.reference_step",
+      "display_name": "Training Reference Step",
+      "category": "training",
+      "description": "Training nodeset that exports object references back to the parent context.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": ["train.model", "train.batch", "train.optimizer"],
+      "provides": ["train.model_after", "train.optimizer_after", "train.step_report", "train.metrics"],
+      "exports": ["train.model_after", "train.optimizer_after", "train.step_report", "train.metrics"],
+      "pipeline": {
+        "inputs": ["train.model", "train.batch", "train.optimizer"],
+        "nodes": [
+          {"name": "start", "type": "sandbox.start"},
+          {"name": "training_input", "type": "sandbox.training_input", "requires": ["train.model", "train.batch", "train.optimizer"]},
+          {"name": "forward_loss", "type": "sandbox.forward_loss", "requires": ["train.model", "train.batch"], "provides": ["train.loss"]},
+          {"name": "backward_grad", "type": "sandbox.backward_grad", "requires": ["train.model", "train.loss"], "provides": ["train.grad"]},
+          {"name": "optimizer_step", "type": "sandbox.optimizer_step", "requires": ["train.model", "train.optimizer", "train.grad"], "provides": ["train.model_after", "train.optimizer_after", "train.step_report"]},
+          {"name": "training_metrics", "type": "sandbox.training_metrics", "requires": ["train.model_after", "train.loss"], "provides": ["train.metrics"]},
+          {"name": "end", "type": "sandbox.training_metrics_end", "requires": ["train.metrics"]}
+        ],
+        "edges": [
+          {"from": "start", "to": "training_input"},
+          {"from": "training_input", "to": "forward_loss"},
+          {"from": "forward_loss", "to": "backward_grad"},
+          {"from": "backward_grad", "to": "optimizer_step"},
+          {"from": "optimizer_step", "to": "training_metrics"},
+          {"from": "training_metrics", "to": "end"}
+        ]
+      }
+    }
+  ],
+  "pipeline": {
+    "inputs": ["train.model", "train.batch", "train.optimizer"],
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "training_input", "type": "sandbox.training_input", "requires": ["train.model", "train.batch", "train.optimizer"]},
+      {"name": "train_step", "type": "nodeset.training.reference_step", "requires": ["train.model", "train.batch", "train.optimizer"], "provides": ["train.model_after", "train.optimizer_after", "train.step_report", "train.metrics"]},
+      {"name": "end", "type": "sandbox.training_metrics_end", "requires": ["train.metrics"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "training_input"},
+      {"from": "training_input", "to": "train_step"},
+      {"from": "train_step", "to": "end"}
+    ]
+  }
+}
