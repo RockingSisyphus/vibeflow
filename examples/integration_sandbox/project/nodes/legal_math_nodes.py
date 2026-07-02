@@ -15,7 +15,7 @@ class StartNode:
         flow_kind="terminal",
     )
     CONTRACT = NodeContract(
-        examples=({"inputs": {}, "params": {}, "outputs": {}},),
+        examples=({"inputs": {}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -34,7 +34,7 @@ class ValueInputNode:
     CONTRACT = NodeContract(
         requires=("value.in",),
         input_semantics={"value.in": ("由调用方注入的原始数值，后续准备节点会基于它进行初始化。",)},
-        examples=({"inputs": {"value.in": 1}, "params": {}, "outputs": {}},),
+        examples=({"inputs": {"value.in": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -53,7 +53,7 @@ class IoInputNode:
     CONTRACT = NodeContract(
         requires=("io.result",),
         input_semantics={"io.result": ("外部系统或测试初始上下文提供的数值结果。",)},
-        examples=({"inputs": {"io.result": 1}, "params": {}, "outputs": {}},),
+        examples=({"inputs": {"io.result": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -72,7 +72,7 @@ class FinalValueEndNode:
     CONTRACT = NodeContract(
         requires=("value.final",),
         input_semantics={"value.final": ("final numeric value",)},
-        examples=({"inputs": {"value.final": 1}, "params": {}, "outputs": {}},),
+        examples=({"inputs": {"value.final": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -91,7 +91,7 @@ class OutValueEndNode:
     CONTRACT = NodeContract(
         requires=("value.out",),
         input_semantics={"value.out": ("output numeric value",)},
-        examples=({"inputs": {"value.out": 1}, "params": {}, "outputs": {}},),
+        examples=({"inputs": {"value.out": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -110,7 +110,7 @@ class NextValueEndNode:
     CONTRACT = NodeContract(
         requires=("value.next",),
         input_semantics={"value.next": ("final loop value",)},
-        examples=({"inputs": {"value.next": 1}, "params": {}, "outputs": {}},),
+        examples=({"inputs": {"value.next": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -131,7 +131,7 @@ class ConstantNode:
         output_semantics={"value.in": ("configured numeric value",)},
         params_schema={"value": {"type": "number"}},
         output_schema={"value.in": {"type": "number"}},
-        examples=({"inputs": {}, "params": {"value": 2}, "outputs": {"value.in": 2}},),
+        examples=({"inputs": {}, "params": {"value": 2}},),
     )
 
     def run_pure(self, inputs, params):
@@ -154,7 +154,7 @@ class AddNode:
         output_semantics={"value.out": ("output numeric value",)},
         params_schema={"delta": {"type": "number"}},
         output_schema={"value.out": {"type": "number"}},
-        examples=({"inputs": {"value.in": 2}, "params": {"delta": 3}, "outputs": {"value.out": 5}},),
+        examples=({"inputs": {"value.in": 2}, "params": {"delta": 3}},),
     )
 
     def run_pure(self, inputs, params):
@@ -177,7 +177,7 @@ class MultiplyNode:
         output_semantics={"value.final": ("final numeric value",)},
         params_schema={"factor": {"type": "number"}},
         output_schema={"value.final": {"type": "number"}},
-        examples=({"inputs": {"value.out": 5}, "params": {"factor": 2}, "outputs": {"value.final": 10}},),
+        examples=({"inputs": {"value.out": 5}, "params": {"factor": 2}},),
     )
 
     def run_pure(self, inputs, params):
@@ -198,7 +198,7 @@ class BranchLeftNode:
         output_semantics={"branch.left": ("left branch value",)},
         params_schema={"value": {"type": "number"}},
         output_schema={"branch.left": {"type": "number"}},
-        examples=({"inputs": {}, "params": {"value": 4}, "outputs": {"branch.left": 4}},),
+        examples=({"inputs": {}, "params": {"value": 4}},),
     )
 
     def run_pure(self, inputs, params):
@@ -219,7 +219,7 @@ class BranchRightNode:
         output_semantics={"branch.right": ("right branch value",)},
         params_schema={"value": {"type": "number"}},
         output_schema={"branch.right": {"type": "number"}},
-        examples=({"inputs": {}, "params": {"value": 6}, "outputs": {"branch.right": 6}},),
+        examples=({"inputs": {}, "params": {"value": 6}},),
     )
 
     def run_pure(self, inputs, params):
@@ -241,7 +241,7 @@ class SumPairNode:
         input_semantics={"branch.left": ("left value",), "branch.right": ("right value",)},
         output_semantics={"value.in": ("summed value",)},
         output_schema={"value.in": {"type": "number"}},
-        examples=({"inputs": {"branch.left": 4, "branch.right": 6}, "params": {}, "outputs": {"value.in": 10}},),
+        examples=({"inputs": {"branch.left": 4, "branch.right": 6}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -263,7 +263,7 @@ class AddThreeNode:
         input_semantics={"value.in": ("input numeric value",)},
         output_semantics={"value.out": ("output numeric value",)},
         output_schema={"value.out": {"type": "number"}},
-        examples=({"inputs": {"value.in": 2}, "params": {}, "outputs": {"value.out": 5}},),
+        examples=({"inputs": {"value.in": 2}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -286,7 +286,7 @@ class AddOutNode:
         output_semantics={"value.final": ("final numeric value",)},
         params_schema={"delta": {"type": "number"}},
         output_schema={"value.final": {"type": "number"}},
-        examples=({"inputs": {"value.out": 2}, "params": {"delta": 1}, "outputs": {"value.final": 3}},),
+        examples=({"inputs": {"value.out": 2}, "params": {"delta": 1}},),
     )
 
     def run_pure(self, inputs, params):

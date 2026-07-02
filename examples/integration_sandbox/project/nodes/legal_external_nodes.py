@@ -17,7 +17,7 @@ class EffectRequestNode:
         output_semantics={"effects.request": ("structured request for an external effect",)},
         params_schema={"value": {"type": "number"}},
         output_schema={"effects.request": {"type": "object"}},
-        examples=({"inputs": {}, "params": {"value": 5}, "outputs": {"effects.request": {"value": 5}}},),
+        examples=({"inputs": {}, "params": {"value": 5}},),
     )
 
     def run_pure(self, inputs, params):
@@ -40,7 +40,7 @@ class IoResultAddNode:
         output_semantics={"value.final": ("final numeric value",)},
         params_schema={"delta": {"type": "number"}},
         output_schema={"value.final": {"type": "number"}},
-        examples=({"inputs": {"io.result": 7}, "params": {"delta": 1}, "outputs": {"value.final": 8}},),
+        examples=({"inputs": {"io.result": 7}, "params": {"delta": 1}},),
     )
 
     def run_pure(self, inputs, params):
@@ -63,7 +63,7 @@ class IoResultInputNode:
         output_semantics={"value.in": ("numeric input for downstream flow",)},
         params_schema={"delta": {"type": "number"}},
         output_schema={"value.in": {"type": "number"}},
-        examples=({"inputs": {"io.result": 7}, "params": {"delta": 1}, "outputs": {"value.in": 8}},),
+        examples=({"inputs": {"io.result": 7}, "params": {"delta": 1}},),
     )
 
     def run_pure(self, inputs, params):

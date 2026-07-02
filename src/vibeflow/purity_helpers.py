@@ -43,8 +43,10 @@ def _validate_schema_mapping(value: object, keys: tuple[str, ...], field_name: s
     for key, schema in value.items():
         if keys and key not in keys:
             return [_violation("contract_schema_extra", f"{field_name} contains undeclared key: {key}", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
-        if not isinstance(schema, Mapping) or ("type" not in schema and schema.get("snapshot") != "opaque"):
-            return [_violation("contract_schema_shape", f"{field_name}[{key!r}] must be an object with 'type' or snapshot='opaque'", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
+        if not isinstance(schema, Mapping) or "type" not in schema:
+            return [_violation("contract_schema_shape", f"{field_name}[{key!r}] must be an object with 'type'", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
+        if "snapshot" in schema:
+            return [_violation("contract_schema_deprecated_snapshot", f"{field_name}[{key!r}].snapshot is deprecated; runtime no longer snapshots output values", source=source, severity="warning", failure_layer="contract", suggested_fix_type="fix_contract")]
     return []
 
 

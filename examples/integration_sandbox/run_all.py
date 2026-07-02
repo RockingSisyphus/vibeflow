@@ -174,6 +174,19 @@ VALID_RUN_CASES = [
         "expected_runtime_exec_order": ["start", "training_input", "forward_loss", "backward_grad", "optimizer_step", "training_metrics", "end"],
     },
     {
+        "name": "compiled_linear_training",
+        "config": "pass_block_linear_training.jsonc",
+        "initial_factory": _training_initial,
+        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
+        "expected_outputs": {"train.loss": 6.0, "train.grad": 0.6, "train.step_report": {"steps": 1, "weight": 0.7}},
+        "expected_same_as_initial": [("train.model_after", "train.model"), ("train.optimizer_after", "train.optimizer")],
+        "expected_object_attrs": [("train.model_after", "weight", 0.7), ("train.optimizer_after", "steps", 1)],
+        "expect_training_metrics": True,
+        "expected_runtime_exec_order": ["start", "training_input", "forward_loss", "backward_grad", "optimizer_step", "training_metrics", "end"],
+        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
+        "expected_blocks": [["start", "training_input", "forward_loss", "backward_grad", "optimizer_step", "training_metrics", "end"]],
+    },
+    {
         "name": "block_decision_loop",
         "config": "pass_block_decision_loop.jsonc",
         "initial": {"value.in": 1},
@@ -485,6 +498,10 @@ def _assert_execution_plan(case: dict[str, Any], plan) -> None:
         frame = plan.frame(str(node_name))
         if list(frame.exports) != list(expected_exports):
             raise AssertionError(f"nodeset {node_name} exports expected {expected_exports!r}, got {list(frame.exports)!r}")
+    if "expected_blocks" in case:
+        blocks = [list(block.nodes) for block in plan.blocks]
+        if blocks != case["expected_blocks"]:
+            raise AssertionError(f"compiled blocks expected {case['expected_blocks']!r}, got {blocks!r}")
 
 
 def _assert_mermaid_contains(name: str, collapsed: str, expanded: str) -> None:
@@ -595,14 +612,14 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
 
     class RuntimeStartNode:
         NODE_INFO = NodeInfo("sandbox.runtime_start", "Runtime Start", "sandbox", "runtime test start", "0.1.0", "terminal")
-        CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}, "outputs": {}},))
+        CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}},))
 
         def run_pure(self, inputs, params):
             return {}
 
     class RuntimeEndNode:
         NODE_INFO = NodeInfo("sandbox.runtime_end", "Runtime End", "sandbox", "runtime test end", "0.1.0", "terminal")
-        CONTRACT = NodeContract(requires=("bad.out",), input_semantics={"bad.out": ("bad output",)}, examples=({"inputs": {"bad.out": 1}, "params": {}, "outputs": {}},))
+        CONTRACT = NodeContract(requires=("bad.out",), input_semantics={"bad.out": ("bad output",)}, examples=({"inputs": {"bad.out": 1}, "params": {}},))
 
         def run_pure(self, inputs, params):
             return {}

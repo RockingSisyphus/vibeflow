@@ -229,13 +229,16 @@ Runtime 数据语义：
 ```python
 RuntimeOptions(
     trace="full",          # full | boundary | off
+    run_hooks=True,
     node_hooks=True,
-    execution="plan",      # plan | block
+    nodeset_hooks=True,
+    block_hooks=True,
+    execution="plan",      # plan | block | compiled
     async_flush_timeout=None,
 )
 ```
 
-`execution="block"` 只支持线性链和条件 edge 覆盖的简单 decision loop；不做 Python 代码生成、复杂 CFG 优化、自动并行或 context 自动 merge。
+`execution="block"` 只支持线性链和条件 edge 覆盖的简单 decision loop；`execution="compiled"` 使用预分析 `CompiledBlock` 跑线性段，其他情况回退 plan。不做任意 Python 代码生成、复杂 CFG 优化、自动并行或 context 自动 merge。
 
 异步 node 是显式配置能力：
 

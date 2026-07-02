@@ -32,7 +32,7 @@ src/vibeflow/
 - `compiler.py`：编译显式 flow edge、数据契约诊断、cycle/decision 检查。
 - `execution_plan.py`：预绑定 node 实例、参数、edge、nodeset 子计划和异步标记的执行计划。
 - `runtime.py`：按显式 flow edge 调度的 runtime，支持 plan/block 执行、trace policy、对象按引用传递和显式异步 side task。
-- `runtime_trace.py`、`runtime_validation.py`：运行 trace 摘要和可选输出 snapshot 校验。
+- `runtime_trace.py`、`runtime_options.py`：运行 trace 摘要、RuntimeOptions 和 HookPlan。
 - `health.py`、`health_flow.py`、`health_planned.py`：健康检查入口、flow 结构检查、planned 内容检查。
 - `purity.py`、`purity_validators.py`、`purity_visitors.py`：node 纯函数、契约、源码质量检查。
 - `mermaid.py`：Mermaid flowchart 源码导出。
@@ -165,9 +165,9 @@ Runtime 当前已实现训练性能导向能力：
 
 - `Context` 按引用保存任意 Python 对象，node 间不要求 JSON serializable 或可 deepcopy。
 - runtime 默认只检查输出是否为 mapping、输出 key 是否与 `provides` 一致；数据内容不做默认 snapshot 审计。
-- `RuntimeOptions(trace="full"|"boundary"|"off", node_hooks=True, execution="plan"|"block", async_flush_timeout=None)` 控制 trace 粒度、node hook、执行模式和 detached async flush 超时。
+- `RuntimeOptions(trace="full"|"boundary"|"off", run_hooks=True, node_hooks=True, nodeset_hooks=True, block_hooks=True, execution="plan"|"block"|"compiled", async_flush_timeout=None)` 控制 trace 粒度、hook 粒度、执行模式和 detached async flush 超时。
 - 默认 `execution="plan"` 使用 `ExecutionPlan` / `NodeFrame` 预绑定 node、参数、edge、nodeset 子计划和 runtime plugin 列表。
-- `execution="block"` 是显式 opt-in 的保守 block runner，支持线性链和条件 edge 覆盖的简单 decision loop，不做 Python 代码生成、自动并行或 context 自动 merge。
+- `execution="block"` 是显式 opt-in 的保守 block runner，支持线性链和条件 edge 覆盖的简单 decision loop；`execution="compiled"` 在低开销条件满足时使用 `CompiledBlock` 线性段执行，否则回退 plan。
 - node 或 nodeset 调用可声明 `async: "detached"` 或 `async: "result_key"`；`detached` 在主流程外运行并在 run 结束 flush，失败/超时记录 warning 事件；`result_key` 把 future 结果写入一个显式 key，下游 `requires` 该 key 时 join。
 
 运行目录当前主要产物：

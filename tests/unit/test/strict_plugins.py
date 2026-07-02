@@ -13,7 +13,7 @@ class SinkNode:
     CONTRACT = NodeContract(
         requires=("value.in",),
         input_semantics={"value.in": ("input value",)},
-        examples=({"inputs": {"value.in": 1}, "params": {}, "outputs": {}},),
+        examples=({"inputs": {"value.in": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -338,7 +338,7 @@ class DemoNode:
         input_semantics={"demo.in": ("demo input",)},
         output_semantics={"demo.out": ("demo output",)},
         output_schema={"demo.out": {"type": "number"}},
-        examples=({"inputs": {"demo.in": 5}, "params": {}, "outputs": {"demo.out": 5}},),
+        examples=({"inputs": {"demo.in": 5}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):

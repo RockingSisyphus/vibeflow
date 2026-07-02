@@ -12,7 +12,7 @@ class DemoNode:
         provides=("demo.out",),
         output_semantics={"demo.out": ("demo output",)},
         output_schema={"demo.out": {"type": "number"}},
-        examples=({"inputs": {}, "params": {}, "outputs": {"demo.out": 1}},),
+        examples=({"inputs": {}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -57,6 +57,7 @@ class DemoNode:
         (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('output_semantics={"demo.out": ("demo output",)},', 'output_semantics={},')), "contract_semantics_missing"),
         (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('output_schema={"demo.out": {"type": "number"}},', 'output_schema={},')), "contract_schema_missing"),
         (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('output_schema={"demo.out": {"type": "number"}},', 'output_schema={"demo.out": {}},')), "contract_schema_shape"),
+        (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('output_schema={"demo.out": {"type": "number"}},', 'output_schema={"demo.out": {"snapshot": "opaque"}},')), "contract_schema_shape"),
         (_valid_node_source(run_body='        return {"demo.out": params.get("delta", 1)}'), "undeclared_param"),
         (_valid_node_source(run_body='        return {"other.out": 1}'), "undeclared_output"),
         (_valid_node_source(run_body='        return {}'), "missing_output"),
@@ -391,8 +392,8 @@ def test_branch_and_nesting_complexity_are_enforced(tmp_path, capsys) -> None:
         return {"demo.out": 1}
 """.rstrip(),
         contract=VALID_NODE_CONTRACT.replace(
-            'examples=({"inputs": {}, "params": {}, "outputs": {"demo.out": 1}},),',
-            'params_schema={"flag": {"type": "boolean"}, "other": {"type": "boolean"}},\n        examples=({"inputs": {}, "params": {}, "outputs": {"demo.out": 1}},),',
+            'examples=({"inputs": {}, "params": {}},),',
+            'params_schema={"flag": {"type": "boolean"}, "other": {"type": "boolean"}},\n        examples=({"inputs": {}, "params": {}},),',
         ),
     )
     policy_path = tmp_path / "kernel_policy.jsonc"
@@ -411,11 +412,11 @@ def test_inspect_node_reports_metrics_for_valid_node(tmp_path, capsys) -> None:
     assert payload["health"]["status"] == "PASS"
     assert payload["node"]["metrics"]["function_count"] == 1
     assert payload["node"]["metrics"]["provides_count"] == 1
-    assert payload["node"]["contract"]["examples"][0]["outputs"] == {"demo.out": 1}
+    assert set(payload["node"]["contract"]["examples"][0]) == {"inputs", "params"}
 
 def test_missing_examples_and_example_contract_gap_are_concerns(tmp_path, capsys) -> None:
     no_examples_contract = VALID_NODE_CONTRACT.replace(
-        '        examples=({"inputs": {}, "params": {}, "outputs": {"demo.out": 1}},),\n',
+        '        examples=({"inputs": {}, "params": {}},),\n',
         "",
     )
     code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(contract=no_examples_contract))
@@ -432,14 +433,26 @@ def test_missing_examples_and_example_contract_gap_are_concerns(tmp_path, capsys
     assert payload["health"]["status"] == "CONCERNS"
     assert any(warning["details"].get("legacy_code") == "example_contract_gap" for warning in payload["health"]["warnings"])
 
-def test_example_output_content_is_documentation_only(tmp_path, capsys) -> None:
+def test_example_outputs_field_is_removed(tmp_path, capsys) -> None:
     bad_example_contract = VALID_NODE_CONTRACT.replace(
+        'examples=({"inputs": {}, "params": {}},),',
         'examples=({"inputs": {}, "params": {}, "outputs": {"demo.out": 1}},),',
-        'examples=({"inputs": {}, "params": {}, "outputs": {"demo.out": 2}},),',
     )
     code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(contract=bad_example_contract))
+    assert code == 1
+    assert payload["health"]["status"] == "FAIL"
+    assert {error["details"].get("legacy_code") for error in payload["health"]["errors"]} == {"example_outputs_removed"}
+
+
+def test_output_schema_snapshot_is_deprecated_warning(tmp_path, capsys) -> None:
+    snapshot_contract = VALID_NODE_CONTRACT.replace(
+        'output_schema={"demo.out": {"type": "number"}},',
+        'output_schema={"demo.out": {"type": "number", "snapshot": "opaque"}},',
+    )
+    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(contract=snapshot_contract))
     assert code == 0
-    assert payload["health"]["status"] == "PASS"
+    assert payload["health"]["status"] == "CONCERNS"
+    assert {warning["details"].get("legacy_code") for warning in payload["health"]["warnings"]} == {"contract_schema_deprecated_snapshot"}
 
 
 def test_example_output_key_failure_is_health_error(tmp_path, capsys) -> None:

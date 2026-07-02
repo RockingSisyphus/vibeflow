@@ -16,7 +16,7 @@ class RouteNode:
         input_semantics={"value.out": ("output value",)},
         output_semantics={"flow.route": ("branch route",)},
         output_schema={"flow.route": {"type": "string", "enum": ["again", "done"]}},
-        examples=({"inputs": {"value.out": 1}, "params": {}, "outputs": {"flow.route": "done"}},),
+        examples=({"inputs": {"value.out": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):

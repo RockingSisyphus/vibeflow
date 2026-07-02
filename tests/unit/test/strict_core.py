@@ -18,7 +18,7 @@ class TwoRouteNode:
         input_semantics={"value.in": ("input",)},
         output_semantics={"flow.route": ("route",)},
         output_schema={"flow.route": {"type": "string", "enum": ["again", "done"]}},
-        examples=({"inputs": {"value.in": 1}, "params": {}, "outputs": {"flow.route": "done"}},),
+        examples=({"inputs": {"value.in": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -56,7 +56,7 @@ def test_external_flag_keeps_contract_but_skips_source_quality() -> None:
             provides=("external.out",),
             output_semantics={"external.out": ("external output",)},
             output_schema={"external.out": {"type": "string"}},
-            examples=({"inputs": {}, "params": {}, "outputs": {"external.out": "ok"}},),
+            examples=({"inputs": {}, "params": {}},),
         )
 
         def run_pure(self, inputs, params):
@@ -79,7 +79,7 @@ def test_external_flag_does_not_require_route_output() -> None:
             provides=("external.out",),
             output_semantics={"external.out": ("external output",)},
             output_schema={"external.out": {"type": "number"}},
-            examples=({"inputs": {}, "params": {}, "outputs": {"external.out": 1}},),
+            examples=({"inputs": {}, "params": {}},),
         )
 
         def run_pure(self, inputs, params):

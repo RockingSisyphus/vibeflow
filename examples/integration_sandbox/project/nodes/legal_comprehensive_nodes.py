@@ -19,7 +19,7 @@ class PrepareValueNode:
         output_semantics={"value.prepared": ("value.prepared：已经加上初始化偏移量、可以交给核心计算子流程使用的准备态数值。",)},
         params_schema={"offset": {"type": "number", "description": "初始化阶段叠加到原始输入上的偏移量，用来模拟默认配置或预处理修正。"}},
         output_schema={"value.prepared": {"type": "number"}},
-        examples=({"inputs": {"value.in": 3}, "params": {"offset": 1}, "outputs": {"value.prepared": 4}},),
+        examples=({"inputs": {"value.in": 3}, "params": {"offset": 1}},),
     )
 
     def run_pure(self, inputs, params):
@@ -42,7 +42,7 @@ class CoreComputeNode:
         output_semantics={"value.out": ("核心计算得到的中间业务结果，后续会进入决策节点判断是否继续循环。",)},
         params_schema={"factor": {"type": "number", "description": "核心计算使用的乘数，用于放大准备态数值。"}},
         output_schema={"value.out": {"type": "number"}},
-        examples=({"inputs": {"value.prepared": 4}, "params": {"factor": 2}, "outputs": {"value.out": 8}},),
+        examples=({"inputs": {"value.prepared": 4}, "params": {"factor": 2}},),
     )
 
     def run_pure(self, inputs, params):
@@ -66,8 +66,8 @@ class RouteDecisionNode:
         params_schema={"threshold": {"type": "number", "description": "路由判断阈值；小于该值时继续循环，大于等于该值时退出循环。"}},
         output_schema={"flow.route": {"type": "string", "enum": ["again", "external"]}},
         examples=(
-            {"inputs": {"value.out": 8}, "params": {"threshold": 10}, "outputs": {"flow.route": "again"}},
-            {"inputs": {"value.out": 18}, "params": {"threshold": 10}, "outputs": {"flow.route": "external"}},
+            {"inputs": {"value.out": 8}, "params": {"threshold": 10}},
+            {"inputs": {"value.out": 18}, "params": {"threshold": 10}},
         ),
     )
 
@@ -90,7 +90,7 @@ class LoopBackNode:
         input_semantics={"value.out": ("本轮核心计算的结果，将被作为下一轮循环的原始输入。",)},
         output_semantics={"value.in": ("写回后的下一轮输入值，沿显式回环边重新进入准备节点。",)},
         output_schema={"value.in": {"type": "number"}},
-        examples=({"inputs": {"value.out": 8}, "params": {}, "outputs": {"value.in": 8}},),
+        examples=({"inputs": {"value.out": 8}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -114,7 +114,7 @@ class ExternalBoostNode:
         output_semantics={"value.final": ("外部依赖完成后处理后的最终数值，后续会被记录和输出。",)},
         params_schema={"bonus": {"type": "number", "description": "外部依赖附加的奖励值，用来模拟第三方库的业务增强。"}},
         output_schema={"value.final": {"type": "number"}},
-        examples=({"inputs": {"value.out": 8}, "params": {"bonus": 5}, "outputs": {"value.final": 13}},),
+        examples=({"inputs": {"value.out": 8}, "params": {"bonus": 5}},),
     )
 
     def run_pure(self, inputs, params):
@@ -136,7 +136,7 @@ class AuditStoreNode:
         input_semantics={"value.final": ("外部后处理后的最终业务数值，需要被记录到审计请求中。",)},
         output_semantics={"effects.request": ("effects.request：结构化审计存储请求，描述应当记录的最终数值；真实写入动作由外部系统负责。",)},
         output_schema={"effects.request": {"type": "object"}},
-        examples=({"inputs": {"value.final": 13}, "params": {}, "outputs": {"effects.request": {"final": 13}}},),
+        examples=({"inputs": {"value.final": 13}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -162,7 +162,6 @@ class ReportDocumentNode:
             {
                 "inputs": {"value.final": 13, "effects.request": {"final": 13}},
                 "params": {},
-                "outputs": {"document.report": "final=13;request=13"},
             },
         ),
     )
@@ -186,7 +185,7 @@ class ReportOutputNode:
         input_semantics={"document.report": ("已经生成的报告文档正文。",)},
         output_semantics={"io.output": ("程序最终对外暴露的输出载荷。",)},
         output_schema={"io.output": {"type": "string"}},
-        examples=({"inputs": {"document.report": "final=13;request=13"}, "params": {}, "outputs": {"io.output": "final=13;request=13"}},),
+        examples=({"inputs": {"document.report": "final=13;request=13"}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -205,7 +204,7 @@ class ReportEndNode:
     CONTRACT = NodeContract(
         requires=("io.output",),
         input_semantics={"io.output": ("综合流程最终产出的对外输出载荷。",)},
-        examples=({"inputs": {"io.output": "final=13;request=13"}, "params": {}, "outputs": {}},),
+        examples=({"inputs": {"io.output": "final=13;request=13"}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):

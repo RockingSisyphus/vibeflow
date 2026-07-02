@@ -19,7 +19,7 @@ class IncrementNode:
         input_semantics={"value.in": ("current value",)},
         output_semantics={"value.next": ("next value",)},
         output_schema={"value.next": {"type": "number"}},
-        examples=({"inputs": {"value.in": 1}, "params": {}, "outputs": {"value.next": 2}},),
+        examples=({"inputs": {"value.in": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -41,7 +41,7 @@ class CopyBackNode:
         input_semantics={"value.next": ("next value",), "loop.done": ("whether the loop should stop",)},
         output_semantics={"value.in": ("loop current value",)},
         output_schema={"value.in": {"type": "number"}},
-        examples=({"inputs": {"value.next": 2, "loop.done": False}, "params": {}, "outputs": {"value.in": 2}},),
+        examples=({"inputs": {"value.next": 2, "loop.done": False}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -64,7 +64,7 @@ class DoneCheckNode:
         output_semantics={"loop.done": ("whether the loop should stop",)},
         params_schema={"target": {"type": "number"}},
         output_schema={"loop.done": {"type": "boolean"}},
-        examples=({"inputs": {"value.next": 3}, "params": {"target": 3}, "outputs": {"loop.done": True}},),
+        examples=({"inputs": {"value.next": 3}, "params": {"target": 3}},),
     )
 
     def run_pure(self, inputs, params):

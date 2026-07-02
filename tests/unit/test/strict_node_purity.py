@@ -9,7 +9,7 @@ def test_architecture_smells_warn_for_mismatched_metadata_and_unstable_keys(tmp_
         provides=("Tmp Key",),
         output_semantics={"Tmp Key": ("scratch debug value",)},
         output_schema={"Tmp Key": {"type": "number"}},
-        examples=({"inputs": {}, "params": {}, "outputs": {"Tmp Key": 1}},),
+        examples=({"inputs": {}, "params": {}},),
     )
 """.rstrip()
     source = _valid_node_source(info=info, contract=contract, run_body='        return {"Tmp Key": 1}')

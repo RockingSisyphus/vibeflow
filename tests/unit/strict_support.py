@@ -195,7 +195,7 @@ VALID_NODE_CONTRACT = """
         provides=("demo.out",),
         output_semantics={"demo.out": ("demo output",)},
         output_schema={"demo.out": {"type": "number"}},
-        examples=({"inputs": {}, "params": {}, "outputs": {"demo.out": 1}},),
+        examples=({"inputs": {}, "params": {}},),
     )
 """.rstrip()
 
@@ -268,7 +268,7 @@ def _failure_case_source(case: dict[str, object]) -> str:
 {VALID_NODE_IMPORT}
 class OtherNode:
     NODE_INFO = NodeInfo(type_key="demo.other", display_name="Other", category="demo", description="Other node.", version="0.1.0", flow_kind="process")
-    CONTRACT = NodeContract(provides=("other.out",), output_semantics={{"other.out": ("other output",)}}, output_schema={{"other.out": {{"type": "number"}}}}, examples=({{"inputs": {{}}, "params": {{}}, "outputs": {{"other.out": 1}}}},))
+    CONTRACT = NodeContract(provides=("other.out",), output_semantics={{"other.out": ("other output",)}}, output_schema={{"other.out": {{"type": "number"}}}}, examples=({{"inputs": {{}}, "params": {{}}}},))
 
     def run_pure(self, inputs, params):
         return {{"other.out": 1}}

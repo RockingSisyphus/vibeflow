@@ -176,14 +176,14 @@ Runtime 审计流程，不默认审计数据内容：
 - 默认不要求输出值 JSON serializable，也不要求可 deepcopy。
 - 默认 trace 只记录流程事件和 summary，不记录真实对象内容。
 - 输出仍必须是 mapping，且 key 必须和调用点 `provides` 完全一致。
-- `CONTRACT.examples` 只证明最小输入/参数可运行并返回声明 key；`outputs` 可作为文档，但不作为内容断言。
+- `CONTRACT.examples` 只包含 `inputs` 和 `params`，用于证明最小输入/参数可运行并返回声明 key；不要在 examples 中写 `outputs`。
 
 可选执行和 trace：
 
 ```python
 from vibeflow import RuntimeOptions, run_checked
 
-run_checked(..., runtime_options=RuntimeOptions(trace="boundary", execution="block"))
+run_checked(..., runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
 ```
 
 - `trace="full"`：默认逐 node/nodeset 事件。
@@ -191,6 +191,7 @@ run_checked(..., runtime_options=RuntimeOptions(trace="boundary", execution="blo
 - `trace="off"`：只写 runtime summary。
 - `execution="plan"`：默认执行计划模式。
 - `execution="block"`：显式 opt-in 的保守 block 模式，仅支持线性链和简单条件 loop。
+- `execution="compiled"`：显式 opt-in 的低开销线性 `CompiledBlock` 模式；遇到不满足条件的图会回退到 plan。
 
 异步 side task 只通过 config 显式开启：
 

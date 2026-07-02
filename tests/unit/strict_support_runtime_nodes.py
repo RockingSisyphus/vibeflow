@@ -5,7 +5,7 @@ from vibeflow import NodeContract, NodeInfo
 
 class StartNode:
     NODE_INFO = NodeInfo("test.start", "Start", "test", "Starts a test flow.", "0.1.0", "terminal")
-    CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}, "outputs": {}},))
+    CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}},))
 
     def run_pure(self, inputs, params):
         return {}
@@ -16,7 +16,7 @@ class ValueInputNode:
     CONTRACT = NodeContract(
         requires=("value.in",),
         input_semantics={"value.in": ("input value",)},
-        examples=({"inputs": {"value.in": 1}, "params": {}, "outputs": {}},),
+        examples=({"inputs": {"value.in": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -28,7 +28,7 @@ class OutEndNode:
     CONTRACT = NodeContract(
         requires=("value.out",),
         input_semantics={"value.out": ("output value",)},
-        examples=({"inputs": {"value.out": 1}, "params": {}, "outputs": {}},),
+        examples=({"inputs": {"value.out": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -40,7 +40,7 @@ class InEndNode:
     CONTRACT = NodeContract(
         requires=("value.in",),
         input_semantics={"value.in": ("input value",)},
-        examples=({"inputs": {"value.in": 1}, "params": {}, "outputs": {}},),
+        examples=({"inputs": {"value.in": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -54,7 +54,7 @@ class SeedNode:
         output_semantics={"value.in": ("seed value",)},
         params_schema={"value": {"type": "number"}},
         output_schema={"value.in": {"type": "number"}},
-        examples=({"inputs": {}, "params": {"value": 4}, "outputs": {"value.in": 4}},),
+        examples=({"inputs": {}, "params": {"value": 4}},),
     )
 
     def run_pure(self, inputs, params):
@@ -70,7 +70,7 @@ class AddNode:
         output_semantics={"value.out": ("output value",)},
         params_schema={"delta": {"type": "number"}},
         output_schema={"value.out": {"type": "number"}},
-        examples=({"inputs": {"value.in": 4}, "params": {"delta": 3}, "outputs": {"value.out": 7}},),
+        examples=({"inputs": {"value.in": 4}, "params": {"delta": 3}},),
     )
 
     def run_pure(self, inputs, params):
@@ -85,7 +85,7 @@ class CopyNode:
         input_semantics={"value.out": ("output value",)},
         output_semantics={"value.in": ("input value",)},
         output_schema={"value.in": {"type": "number"}},
-        examples=({"inputs": {"value.out": 7}, "params": {}, "outputs": {"value.in": 7}},),
+        examples=({"inputs": {"value.out": 7}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -100,7 +100,7 @@ class RouteNode:
         input_semantics={"value.out": ("output value",)},
         output_semantics={"flow.route": ("branch route",)},
         output_schema={"flow.route": {"type": "string", "enum": ["again", "done"]}},
-        examples=({"inputs": {"value.out": 1}, "params": {}, "outputs": {"flow.route": "done"}},),
+        examples=({"inputs": {"value.out": 1}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -164,7 +164,7 @@ class OpaqueOutputNode:
     CONTRACT = NodeContract(
         provides=("value.out",),
         output_semantics={"value.out": ("output value",)},
-        output_schema={"value.out": {"snapshot": "opaque"}},
+        output_schema={"value.out": {"type": "object"}},
     )
 
     def run_pure(self, inputs, params):
@@ -227,7 +227,7 @@ class RuntimeFailNode:
         output_semantics={"value.out": ("runtime output",)},
         output_schema={"value.out": {"type": "number"}},
         params_schema={"fail": {"type": "boolean"}},
-        examples=({"inputs": {}, "params": {"fail": False}, "outputs": {"value.out": 1}},),
+        examples=({"inputs": {}, "params": {"fail": False}},),
     )
 
     def run_pure(self, inputs, params):
@@ -245,7 +245,7 @@ class CountingInitNode:
         output_semantics={"value.out": ("configured output")},
         params_schema={"value": {"type": "number"}},
         output_schema={"value.out": {"type": "number"}},
-        examples=({"inputs": {}, "params": {"value": 3}, "outputs": {"value.out": 3}},),
+        examples=({"inputs": {}, "params": {"value": 3}},),
     )
 
     def __init__(self) -> None:
@@ -261,7 +261,7 @@ class DuplicateOneNode:
         provides=("dup.one",),
         output_semantics={"dup.one": ("duplicate value",)},
         output_schema={"dup.one": {"type": "number"}},
-        examples=({"inputs": {}, "params": {}, "outputs": {"dup.one": 1}},),
+        examples=({"inputs": {}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -274,7 +274,7 @@ class DuplicateTwoNode:
         provides=("dup.two",),
         output_semantics={"dup.two": ("duplicate value",)},
         output_schema={"dup.two": {"type": "number"}},
-        examples=({"inputs": {}, "params": {}, "outputs": {"dup.two": 1}},),
+        examples=({"inputs": {}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
