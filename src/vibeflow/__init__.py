@@ -5,6 +5,7 @@ from .architecture_report import build_architecture_report
 from .config_loader import ConfigDocument, ConfigLoadError, load_config_document, strip_jsonc_comments
 from .compiler import CompiledGraph, GraphCompileError, GraphCompiler
 from .context import Context
+from .execution_plan import ExecutionPlan, NodeFrame, build_execution_plan
 from .graph_config import EdgeSpec, GraphConfig, NodeSpec, NodesetSpec, parse_graph_config
 from .health import HealthFinding, HealthReport, validate_graph_health
 from .ascii_flowchart import export_ascii_flowchart
@@ -32,9 +33,11 @@ __all__ = [
     "BaseLibModuleReport",
     "BaseLibScanReport",
     "build_architecture_report",
+    "build_execution_plan",
     "CompilerPlugin",
     "EdgeSpec",
     "EffectivePolicy",
+    "ExecutionPlan",
     "GraphCompileError",
     "GraphCompiler",
     "GraphConfig",
@@ -51,6 +54,7 @@ __all__ = [
     "HealthFinding",
     "HealthReport",
     "NodeContract",
+    "NodeFrame",
     "NodeInfo",
     "NodeMetrics",
     "NodeConfigSpec",

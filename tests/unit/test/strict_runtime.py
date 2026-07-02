@@ -36,6 +36,70 @@ def test_node_config_defaults_and_call_overrides_are_passed_to_runtime() -> None
     assert context.get("value.out") == 5
 
 
+def test_execution_plan_binds_node_instance_and_params_once() -> None:
+    CountingInitNode.instances = 0
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "count", "type": "test.counting_init", "provides": ["value.out"], "config": {"value": 9}},
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": _edge_chain("start", "count", "end"),
+            }
+        }
+    )
+
+    runtime = PipelineRuntime(graph, registry=_registry())
+
+    assert runtime._plan.frame("count").params["value"] == 9
+    assert CountingInitNode.instances == 1
+    assert runtime.run({}).get("value.out") == 9
+    assert runtime.run({}).get("value.out") == 9
+    assert CountingInitNode.instances == 1
+
+
+def test_execution_plan_prebuilds_nodeset_subplan_with_overrides() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "math.add_one",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline={"inputs": ["value.in"], **_input_add_pipeline(add={"delta": 1})},
+                )
+            ],
+            "pipeline": {
+                "inputs": ["value.in"],
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
+                    {
+                        "name": "composite",
+                        "type": "nodeset.math.add_one",
+                        "requires": ["value.in"],
+                        "provides": ["value.out"],
+                        "node_configs": {"add": {"delta": 6}},
+                    },
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": _edge_chain("start", "input", "composite", "end"),
+            },
+        }
+    )
+
+    runtime = PipelineRuntime(graph, registry=_registry())
+    frame = runtime._plan.frame("composite")
+
+    assert frame.is_nodeset
+    assert frame.subplan is not None
+    assert frame.subplan.frame("add").params["delta"] == 6
+    assert runtime.run({"value.in": 2}).get("value.out") == 8
+
+
 def test_node_config_invalid_override_fails_health_before_runtime() -> None:
     graph = parse_graph_config(
         {

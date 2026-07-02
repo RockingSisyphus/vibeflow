@@ -8,12 +8,11 @@ from typing import Any, Mapping
 
 from .compiler import GraphCompiler
 from .context import Context
-from .graph_config import EdgeSpec, GraphConfig, NodeSpec, STATUS_PLANNED
-from .node import FLOW_KIND_TERMINAL
+from .execution_plan import ExecutionPlan, NodeFrame, build_execution_plan
+from .graph_config import EdgeSpec, GraphConfig, STATUS_PLANNED
 from .plugin import PluginRegistry
 from .summaries import summarize_mapping
 from .registry import NodeRegistry, NodeRegistryError
-from .runtime_config import effective_node_params, nested_node_config_overrides, normalize_node_config_overrides
 from .runtime_errors import PipelineRuntimeError
 from .runtime_trace import RuntimeTrace
 from .runtime_validation import assert_runtime_output_snapshot
@@ -49,21 +48,30 @@ class PipelineRuntime:
         self.graph = graph
         self.registry = registry
         self._plugin_registry = plugin_registry
+        self._runtime_plugins = plugin_registry.runtime_plugins() if plugin_registry is not None else ()
         self.compiled = GraphCompiler().compile(graph, registry=registry, plugin_registry=plugin_registry)
-        self._specs = {node.name: node for node in graph.nodes}
+        self._plan = build_execution_plan(graph, self.compiled, registry=registry, node_config_overrides=node_config_overrides)
         self.trace = RuntimeTrace()
         self._node_runs: dict[str, int] = {node.name: 0 for node in graph.nodes}
-        self._incoming_edges = {
-            node.name: tuple(edge for edge in self.compiled.effective_edges if edge.target == node.name)
-            for node in graph.nodes
-        }
-        self._outgoing_edges = {
-            node.name: tuple(edge for edge in self.compiled.effective_edges if edge.source == node.name)
-            for node in graph.nodes
-        }
+        self._frames = self._plan.frames
         self._run_dir = Path(run_dir) if run_dir is not None else Path("runs") / "vibeflow"
-        self._node_config_overrides = normalize_node_config_overrides(node_config_overrides or {})
         self.runtime_options = _runtime_options(runtime_options)
+
+    @classmethod
+    def _from_plan(cls, parent: "PipelineRuntime", plan: ExecutionPlan) -> "PipelineRuntime":
+        runtime = cls.__new__(cls)
+        runtime.graph = plan.graph
+        runtime.registry = parent.registry
+        runtime._plugin_registry = parent._plugin_registry
+        runtime._runtime_plugins = parent._runtime_plugins
+        runtime.compiled = plan.compiled
+        runtime._plan = plan
+        runtime.trace = RuntimeTrace()
+        runtime._node_runs = {name: 0 for name in plan.order}
+        runtime._frames = plan.frames
+        runtime._run_dir = parent._run_dir
+        runtime.runtime_options = parent.runtime_options
+        return runtime
 
     def run(self, initial: Mapping[str, Any] | None = None) -> Context:
         context = Context(dict(initial or {}))
@@ -85,7 +93,7 @@ class PipelineRuntime:
     def _run_steps(self, context: Context) -> None:
         ready = list(self._initial_ready_nodes(context))
         queued = set(ready)
-        for _ in range(self.graph.max_steps):
+        for _ in range(self._plan.max_steps):
             if not ready:
                 self.trace.stop_reason = "no_ready_nodes"
                 return
@@ -104,108 +112,108 @@ class PipelineRuntime:
                     ready.append(edge.target)
                     queued.add(edge.target)
         self.trace.stop_reason = "max_steps"
-        raise PipelineRuntimeError(f"pipeline exceeded max_steps={self.graph.max_steps}")
+        raise PipelineRuntimeError(f"pipeline exceeded max_steps={self._plan.max_steps}")
 
     def _initial_ready_nodes(self, context: Context) -> tuple[str, ...]:
         ready = []
-        for node in self.graph.nodes:
-            if self._incoming_edges.get(node.name):
+        for node_name in self._plan.order:
+            frame = self._frames[node_name]
+            if frame.incoming:
                 continue
-            if not self._is_terminal_node(node.name):
+            if not frame.is_terminal:
                 continue
-            if self._requirements_available(node.name, context):
-                ready.append(node.name)
+            if self._requirements_available(node_name, context):
+                ready.append(node_name)
         return tuple(ready)
 
     def _requirements_available(self, node_name: str, context: Context) -> bool:
-        return all(context.exists(key) for key in self._specs[node_name].requires)
+        return all(context.exists(key) for key in self._frames[node_name].requires)
 
     def _is_end_terminal(self, node_name: str) -> bool:
-        spec = self._specs[node_name]
-        if self._outgoing_edges.get(node_name):
+        frame = self._frames[node_name]
+        if frame.outgoing:
             return False
-        return self._is_terminal_node(node_name)
+        return frame.is_terminal
 
     def _is_terminal_node(self, node_name: str) -> bool:
-        return self.compiled.flow_kinds.get(node_name) == FLOW_KIND_TERMINAL
+        return self._frames[node_name].is_terminal
 
     def _activated_edges(self, node_name: str, outputs: Mapping[str, object], context: Context) -> tuple[EdgeSpec, ...]:
         active = []
         values = {**context.to_dict(), **dict(outputs)}
-        for edge in self._outgoing_edges.get(node_name, ()):
+        for edge in self._frames[node_name].outgoing:
             if not edge.when or _condition_matches(edge.when, values):
                 active.append(edge)
         return tuple(active)
 
     def _run_node(self, node_name: str, context: Context) -> Mapping[str, object]:
         self.trace.current_node = node_name
-        spec = self._specs[node_name]
-        if spec.node_type.startswith("nodeset."):
-            return self._run_nodeset_node(spec, context)
-        return self._run_pure_node(spec, context)
+        frame = self._frames[node_name]
+        if frame.is_nodeset:
+            return self._run_nodeset_node(frame, context)
+        return self._run_pure_node(frame, context)
 
-    def _run_nodeset_node(self, spec: NodeSpec, context: Context) -> Mapping[str, object]:
+    def _run_nodeset_node(self, frame: NodeFrame, context: Context) -> Mapping[str, object]:
         started = time.perf_counter()
-        self._record_runtime_event("nodeset_enter", spec.name, spec.node_type)
-        self._call_runtime_plugins("before_nodeset", spec.name, spec.node_type)
+        self._record_runtime_event("nodeset_enter", frame.name, frame.node_type)
+        self._call_runtime_plugins("before_nodeset", frame.name, frame.node_type)
         try:
-            self._run_nodeset(spec, context)
-            outputs = {key: context.get(key, default=None) for key in spec.provides}
-            self._mark_node_run(spec.name)
-            self._record_runtime_event("nodeset_exit", spec.name, spec.node_type, output_summary=summarize_mapping(outputs), elapsed_ms=_elapsed_ms(started))
-            self._call_runtime_plugins("after_nodeset", spec.name, spec.node_type)
+            self._run_nodeset(frame, context)
+            outputs = {key: context.get(key, default=None) for key in frame.provides}
+            self._mark_node_run(frame.name)
+            self._record_runtime_event("nodeset_exit", frame.name, frame.node_type, output_summary=summarize_mapping(outputs), elapsed_ms=_elapsed_ms(started))
+            self._call_runtime_plugins("after_nodeset", frame.name, frame.node_type)
             return outputs
         except Exception as exc:
-            self._record_runtime_event("nodeset_failed", spec.name, spec.node_type, failure=str(exc), elapsed_ms=_elapsed_ms(started))
+            self._record_runtime_event("nodeset_failed", frame.name, frame.node_type, failure=str(exc), elapsed_ms=_elapsed_ms(started))
             raise
 
-    def _run_pure_node(self, spec: NodeSpec, context: Context) -> Mapping[str, object]:
+    def _run_pure_node(self, frame: NodeFrame, context: Context) -> Mapping[str, object]:
         started = time.perf_counter()
         inputs: dict[str, object] = {}
         try:
-            node_cls = self.registry.get(spec.node_type)
-            node = node_cls()
-            inputs = {key: context.get(key) for key in spec.requires}
-            params = self.registry.merge_config(spec.node_type, effective_node_params(spec, self._node_config_overrides))
-            self._call_runtime_plugins("before_node", spec.name, spec.node_type, summarize_mapping(inputs))
-            outputs = node.run_pure(inputs, params)
+            node = frame.node
+            if node is None:
+                raise PipelineRuntimeError(f"node '{frame.name}' has no bound callable")
+            inputs = {key: context.get(key) for key in frame.requires}
+            self._call_runtime_plugins("before_node", frame.name, frame.node_type, summarize_mapping(inputs))
+            outputs = node.run_pure(inputs, frame.params)
             if not isinstance(outputs, Mapping):
-                raise PipelineRuntimeError(f"node '{spec.name}' must return a mapping")
-            unexpected = set(outputs) - set(spec.provides)
+                raise PipelineRuntimeError(f"node '{frame.name}' must return a mapping")
+            unexpected = set(outputs) - set(frame.provides)
             if unexpected:
-                raise PipelineRuntimeError(f"node '{spec.name}' returned undeclared outputs: {sorted(unexpected)}")
-            missing = set(spec.provides) - set(outputs)
+                raise PipelineRuntimeError(f"node '{frame.name}' returned undeclared outputs: {sorted(unexpected)}")
+            missing = set(frame.provides) - set(outputs)
             if missing:
-                raise PipelineRuntimeError(f"node '{spec.name}' missed declared outputs: {sorted(missing)}")
+                raise PipelineRuntimeError(f"node '{frame.name}' missed declared outputs: {sorted(missing)}")
             for key, value in outputs.items():
                 if self.runtime_options.snapshot_outputs:
-                    assert_runtime_output_snapshot(value, contract=node.CONTRACT, node_name=spec.name, key=str(key))
+                    assert_runtime_output_snapshot(value, contract=node.CONTRACT, node_name=frame.name, key=str(key))
                 context.set(str(key), value)
-            self._mark_node_run(spec.name)
-            self._record_runtime_event("node", spec.name, spec.node_type, input_summary=summarize_mapping(inputs), output_summary=summarize_mapping(outputs), elapsed_ms=_elapsed_ms(started))
-            self._call_runtime_plugins("after_node", spec.name, spec.node_type, summarize_mapping(outputs))
+            self._mark_node_run(frame.name)
+            self._record_runtime_event("node", frame.name, frame.node_type, input_summary=summarize_mapping(inputs), output_summary=summarize_mapping(outputs), elapsed_ms=_elapsed_ms(started))
+            self._call_runtime_plugins("after_node", frame.name, frame.node_type, summarize_mapping(outputs))
             return outputs
         except NodeRegistryError as exc:
             failure = PipelineRuntimeError(str(exc))
-            self._record_runtime_event("node_failed", spec.name, spec.node_type, failure=str(failure), elapsed_ms=_elapsed_ms(started))
+            self._record_runtime_event("node_failed", frame.name, frame.node_type, failure=str(failure), elapsed_ms=_elapsed_ms(started))
             raise failure from exc
         except Exception as exc:
-            self._record_runtime_event("node_failed", spec.name, spec.node_type, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=_elapsed_ms(started))
+            self._record_runtime_event("node_failed", frame.name, frame.node_type, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=_elapsed_ms(started))
             raise
 
-    def _run_nodeset(self, spec: NodeSpec, context: Context) -> None:
-        nodeset_name = spec.node_type.removeprefix("nodeset.")
-        nodeset = self.graph.nodesets.get(nodeset_name)
+    def _run_nodeset(self, frame: NodeFrame, context: Context) -> None:
+        nodeset = self.graph.nodesets.get(frame.nodeset_name)
         if nodeset is None:
-            raise PipelineRuntimeError(f"unknown nodeset: {nodeset_name}")
-        if set(spec.requires) != set(nodeset.requires):
-            raise PipelineRuntimeError(f"nodeset node '{spec.name}' requires must match nodeset '{nodeset.name}' requires")
-        if set(spec.provides) != set(nodeset.provides):
-            raise PipelineRuntimeError(f"nodeset node '{spec.name}' provides must match nodeset '{nodeset.name}' provides")
-        initial = {key: context.get(key) for key in spec.requires}
-        nested_overrides = nested_node_config_overrides(spec, self._node_config_overrides)
-        nested_context = PipelineRuntime(nodeset.graph, registry=self.registry, plugin_registry=self._plugin_registry, node_config_overrides=nested_overrides, runtime_options=self.runtime_options).run(initial)
-        for key in spec.provides:
+            raise PipelineRuntimeError(f"unknown nodeset: {frame.nodeset_name}")
+        if set(frame.requires) != set(nodeset.requires):
+            raise PipelineRuntimeError(f"nodeset node '{frame.name}' requires must match nodeset '{nodeset.name}' requires")
+        if set(frame.provides) != set(nodeset.provides):
+            raise PipelineRuntimeError(f"nodeset node '{frame.name}' provides must match nodeset '{nodeset.name}' provides")
+        if frame.subplan is None:
+            raise PipelineRuntimeError(f"nodeset node '{frame.name}' has no execution plan")
+        nested_context = PipelineRuntime._from_plan(self, frame.subplan).run({key: context.get(key) for key in frame.requires})
+        for key in frame.provides:
             if key not in nodeset.exports:
                 raise PipelineRuntimeError(f"nodeset '{nodeset.name}' cannot export undeclared key '{key}'")
             context.set(key, nested_context.get(key))
@@ -231,11 +239,11 @@ class PipelineRuntime:
         context.set("runtime.events", payload["events"])
 
     def _call_runtime_plugins(self, hook: str, *args) -> None:
-        if self._plugin_registry is None:
+        if not self._runtime_plugins:
             return
         if not self.runtime_options.node_hooks and hook in {"before_node", "after_node"}:
             return
-        for plugin in self._plugin_registry.runtime_plugins():
+        for plugin in self._runtime_plugins:
             method = getattr(plugin, hook, None)
             if not callable(method):
                 continue

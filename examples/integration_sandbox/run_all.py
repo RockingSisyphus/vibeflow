@@ -120,6 +120,30 @@ VALID_RUN_CASES = [
         "expected_hook_delta_present": {"after_run"},
         "expected_hook_delta_absent": {"before_node", "after_node"},
     },
+    {
+        "name": "execution_plan_bound_params",
+        "config": "pass_execution_plan_bound_params.jsonc",
+        "initial": {},
+        "expected_outputs": {"value.final": 26},
+        "expected_plan_params": {"seed": {"value": 4}, "add": {"delta": 9}, "multiply": {"factor": 2}},
+    },
+    {
+        "name": "execution_plan_nodeset_subplan",
+        "config": "pass_execution_plan_nodeset_subplan.jsonc",
+        "initial": {"value.in": 2},
+        "expected_outputs": {"value.out": 10},
+        "expected_nodeset_subplan_params": {"add_one.add": {"delta": 8}},
+    },
+    {
+        "name": "execution_plan_training_nodeset",
+        "config": "pass_execution_plan_training_nodeset.jsonc",
+        "initial_factory": _training_initial,
+        "expected_outputs": {"train.step_report": {"steps": 1, "weight": 0.7}},
+        "expected_same_as_initial": [("train.model_after", "train.model"), ("train.optimizer_after", "train.optimizer")],
+        "expected_object_attrs": [("train.model_after", "weight", 0.7), ("train.optimizer_after", "steps", 1)],
+        "expect_training_metrics": True,
+        "expected_nodeset_subplan_nodes": {"training_step": ["start", "training_input", "forward_loss", "backward_grad", "optimizer_step", "training_metrics", "end"]},
+    },
 ]
 
 
@@ -264,7 +288,7 @@ def _run_valid_cases() -> list[CaseResult]:
 
 
 def _run_valid_case(case: dict[str, Any]) -> CaseResult:
-    from vibeflow import GraphCompiler, RuntimeOptions, export_ascii_flowchart, export_mermaid, is_mermaid_svg_renderer_available, load_config_document, parse_graph_config, render_mermaid_svg, resolve_effective_policy, run_checked, validate_graph_health
+    from vibeflow import GraphCompiler, RuntimeOptions, build_execution_plan, export_ascii_flowchart, export_mermaid, is_mermaid_svg_renderer_available, load_config_document, parse_graph_config, render_mermaid_svg, resolve_effective_policy, run_checked, validate_graph_health
     from vibeflow.config_schema import collect_config_schema_findings
     from vibeflow.plugin import load_plugins_from_config
 
@@ -283,6 +307,8 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     graph = parse_graph_config(document.data)
     node_registry = build_node_registry()
     compiled = GraphCompiler().compile(graph, registry=node_registry, plugin_registry=plugin_registry)
+    plan = build_execution_plan(graph, compiled, registry=node_registry)
+    _assert_execution_plan(case, plan)
     health = validate_graph_health(
         graph,
         registry=node_registry,
@@ -362,6 +388,29 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
 
 def _runtime_trace_lines(run_dir: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in (run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
+
+
+def _assert_execution_plan(case: dict[str, Any], plan) -> None:
+    for node_name, expected_params in dict(case.get("expected_plan_params", {})).items():
+        params = plan.frame(str(node_name)).params
+        for key, expected in expected_params.items():
+            if params.get(key) != expected:
+                raise AssertionError(f"plan {node_name}.{key} expected {expected!r}, got {params.get(key)!r}")
+    for path, expected_params in dict(case.get("expected_nodeset_subplan_params", {})).items():
+        node_name, child_name = str(path).split(".", 1)
+        subplan = plan.frame(node_name).subplan
+        if subplan is None:
+            raise AssertionError(f"plan node {node_name} missing subplan")
+        params = subplan.frame(child_name).params
+        for key, expected in expected_params.items():
+            if params.get(key) != expected:
+                raise AssertionError(f"subplan {path}.{key} expected {expected!r}, got {params.get(key)!r}")
+    for node_name, expected_nodes in dict(case.get("expected_nodeset_subplan_nodes", {})).items():
+        subplan = plan.frame(str(node_name)).subplan
+        if subplan is None:
+            raise AssertionError(f"plan node {node_name} missing subplan")
+        if list(subplan.order) != list(expected_nodes):
+            raise AssertionError(f"subplan {node_name} order expected {expected_nodes!r}, got {list(subplan.order)!r}")
 
 
 def _assert_mermaid_contains(name: str, collapsed: str, expanded: str) -> None:
