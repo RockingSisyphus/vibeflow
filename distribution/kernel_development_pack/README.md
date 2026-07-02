@@ -30,7 +30,7 @@ my_project/
   reports/
 ```
 
-核心原则：业务开发者只写小型纯函数 node、纯 helper、必要插件和 JSONC 拓扑配置；控制流只写在显式 `pipeline.edges` 中；运行前由内核自动健康检查，检查不过不执行。
+核心原则：业务开发者只写小型纯函数 node、纯 helper、必要插件和 JSONC 拓扑配置；控制流只写在显式 `pipeline.edges` 中；运行前由内核自动健康检查，检查不过不执行。运行时只审计流程和 key，node 间可按引用传递普通 Python 对象。
 
 常用命令：
 

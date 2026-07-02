@@ -14,11 +14,13 @@
 - 外部输入输出必须建模为 `io`、`data_store`、`document` 类型节点，或明确的 `external=True` 节点。
 - 控制流只写在 JSONC 的 `pipeline.edges` 中；不要用 Python 调用关系隐式表达流程。
 - `requires` / `provides` 只表达数据契约，不会自动生成控制流。
+- node 间可以按引用传递普通 Python 对象；不要依赖 trace 或报告保存对象内容，报告只审计流程和 key。
+- 需要后台指标、日志或诊断任务时，只能显式使用 config 的 `async: "detached"` 或 `async: "result_key"`，不要在 node 内私自启动线程。
 - 运行或交付前必须让内核健康检查通过；不要跳过 `python run.py validate ...`。
 
 ## 先读文档
 
-- 开始设计或修改业务程序前，先读 `docs/10_Kernel能力与项目开发指南.md`。
+- 开始设计或修改业务程序前，先读 `docs/00_内核目的与项目结构.md`。
 - 编写 node 前，读 `docs/01_Node开发规范.md`。
 - 注册 node 和配置默认值前，读 `docs/02_注册与配置默认值.md`。
 - 修改 pipeline/config 前，读 `docs/03_Config与Pipeline规范.md`。

@@ -50,6 +50,8 @@
 - `provides`：本次调用写入上下文的 key。
 - `config`：本次调用覆盖注册默认值的配置。
 - `node_configs`：调用 nodeset 时，用来覆盖内部 node 配置。
+- `async`：可选，`detached` 或 `result_key`；只用于显式后台 side task。
+- `result_key`：仅当 `async: "result_key"` 时必填，表示 future 结果写入的唯一 key，且必须在 `provides` 中声明。
 
 ## terminal start/end
 
@@ -138,6 +140,20 @@ terminal start -> io input -> process... -> io output -> terminal end
 ```
 
 planned 内容会在健康检查中给 warning，但 runtime 会拒绝执行。
+
+## async node
+
+异步是显式配置能力，不会自动并行普通节点：
+
+```jsonc
+{"name": "metrics", "type": "demo.metrics", "async": "detached", "requires": ["batch"], "provides": ["metrics"]}
+{"name": "load", "type": "demo.load", "async": "result_key", "result_key": "data.batch", "provides": ["data.batch"]}
+```
+
+- `detached`：主流程不等待，run 结束时 flush；失败记录 trace warning，不默认中断主流程。
+- `result_key`：下游 `requires` 该 key 时 join，结果只写入 `result_key`。
+- runtime 不自动 merge async context；共享对象的线程安全由业务对象负责。
+- async 不支持 nodeset。
 
 ## 已移除字段
 

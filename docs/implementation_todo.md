@@ -51,8 +51,12 @@
 - [x] step runtime 从 terminal start 节点开始。
 - [x] runtime 只沿显式 flow edge 调度。
 - [x] runtime 执行 edge `when` 条件。
-- [x] runtime 记录 `exec_order`、`edge_executions`、`step_count`、`node_runs`、`stop_reason`、events。
+- [x] runtime 记录 `exec_order`、`edge_executions`、`step_count`、`node_runs`、`stop_reason`、events，并可通过 `RuntimeOptions.trace` 降低 trace 粒度。
 - [x] runtime 到达无 outgoing edge 的 terminal end 后停止。
+- [x] runtime 默认按引用传递任意 Python 对象，不要求输出 JSON serializable 或可 deepcopy。
+- [x] runtime 使用 `ExecutionPlan` / `NodeFrame` 预绑定 node、参数、edge 和 nodeset 子计划。
+- [x] runtime 可选 `execution="block"` 执行线性链和简单 decision loop。
+- [x] runtime 支持显式 `async: "detached"` 和 `async: "result_key"` side task。
 
 ### 图形输出
 
@@ -69,7 +73,7 @@
 - [x] `run_pure(inputs, params)` 接口检查。
 - [x] 禁止 node 间 import/call。
 - [x] 禁止常见副作用能力。
-- [x] 检查输出 key、输入变异、JSON snapshot。
+- [x] 静态检查输入变异、输出 key 和 CONTRACT example JSON snapshot；runtime 默认检查输出 key，可选恢复输出 JSON snapshot。
 - [x] 检查源码行数、字节数、函数数量、分支、嵌套、调用链。
 - [x] 检查 `base_lib` 纯度和依赖链。
 - [x] 支持 `PolicyPlugin`、`CompilerPlugin`、`RuntimePlugin`。

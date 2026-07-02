@@ -46,7 +46,7 @@ NODE_INFO = NodeInfo(
 - node 不启动进程，不动态 import，不使用 `eval/exec`。
 - node 不导入其他 node，不调用其他 node。
 - node 输出 key 必须是 `CONTRACT.provides` 中声明的字符串字面量。
-- node 不修改 `inputs` 或其中的可变对象。
+- node 不修改 `inputs`；如果训练类场景确实需要共享对象原地更新，应让这个行为成为显式业务语义，并通过输出 key 暴露更新后的引用。
 - 简单 wrapper node 可以只取输入、调用纯 helper/base_lib 函数、返回固定输出；VibeFlow 会识别这种标准形态，避免误报 duplicate logic。
 
 ## 外部依赖 Node
@@ -167,6 +167,41 @@ def add(left: float, right: float) -> float:
 - 导入的 nodeset 和当前文件内联 nodeset 不允许重名。
 - `nodeset_imports` 只导入 nodeset，不导入 pipeline、policy 或 plugins。
 - nodeset 内部 pipeline 也必须显式写 edges。
+
+## 运行时数据和性能选项
+
+Runtime 审计流程，不默认审计数据内容：
+
+- node 间可以按引用传递 tensor、model、optimizer、batch 等任意 Python 对象。
+- 默认不要求输出值 JSON serializable，也不要求可 deepcopy。
+- 默认 trace 只记录流程事件和 summary，不记录真实对象内容。
+- 输出仍必须是 mapping，且 key 必须和调用点 `provides` 完全一致。
+- 如果需要恢复旧式输出 snapshot 审计，在程序入口传 `RuntimeOptions(snapshot_outputs=True)`。
+
+可选执行和 trace：
+
+```python
+from vibeflow import RuntimeOptions, run_checked
+
+run_checked(..., runtime_options=RuntimeOptions(trace="boundary", execution="block"))
+```
+
+- `trace="full"`：默认逐 node/nodeset 事件。
+- `trace="boundary"`：只保留 run/nodeset/failure 边界事件。
+- `trace="off"`：只写 runtime summary。
+- `execution="plan"`：默认执行计划模式。
+- `execution="block"`：显式 opt-in 的保守 block 模式，仅支持线性链和简单条件 loop。
+
+异步 side task 只通过 config 显式开启：
+
+```jsonc
+{"name": "metrics", "type": "demo.metrics", "async": "detached", "requires": ["batch"], "provides": ["metrics"]}
+{"name": "load", "type": "demo.load", "async": "result_key", "result_key": "data.batch", "provides": ["data.batch"]}
+```
+
+- `detached`：主流程不等待，run 结束时 flush；失败记录 trace warning，不自动中断主流程。
+- `result_key`：future 结果只写入 `result_key`，下游 `requires` 该 key 时 join。
+- runtime 不自动 merge async context；共享对象线程安全由业务对象负责。
 
 ## Planned Architecture
 
