@@ -19,6 +19,7 @@ from vibeflow import (
     NodeRegistry,
     PipelineRuntime,
     PipelineRuntimeError,
+    RuntimeOptions,
     CheckedRunError,
     PluginRegistry,
     STABLE_PUBLIC_API,

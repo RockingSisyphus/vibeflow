@@ -167,6 +167,89 @@ def test_checked_run_writes_runtime_failure_trace(tmp_path) -> None:
     assert "boom" in failed["failure"]
     assert trace_lines[-1]["kind"] == "runtime_summary"
 
+
+def test_runtime_options_boundary_trace_records_only_boundaries() -> None:
+    graph = parse_graph_config({"pipeline": _seed_only_pipeline()})
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="boundary"))
+
+    context = runtime.run({})
+
+    assert context.get("value.in") == 1
+    assert [event["kind"] for event in runtime.trace.events] == ["run_start", "run_end"]
+    assert runtime.trace.exec_order == ["start", "seed", "end"]
+    assert runtime.trace.current_node == "end"
+
+
+def test_runtime_options_off_keeps_summary_without_events() -> None:
+    graph = parse_graph_config({"pipeline": _seed_only_pipeline()})
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="off"))
+
+    context = runtime.run({})
+
+    assert context.get("runtime.events") == []
+    assert context.get("runtime.current_node") == "end"
+    assert context.get("runtime.stop_reason") == "completed"
+    assert context.get("runtime.exception") == ""
+
+
+def test_runtime_options_snapshot_outputs_restores_json_snapshot_check() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "set", "type": "test.nan_output", "provides": ["value.out"]},
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": _edge_chain("start", "set", "end"),
+            }
+        }
+    )
+
+    with pytest.raises(PipelineRuntimeError, match="not JSON snapshot serializable"):
+        PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(snapshot_outputs=True)).run({})
+
+
+def test_runtime_options_node_hooks_false_skips_per_node_hooks(tmp_path) -> None:
+    marker_path = tmp_path / "plugin_calls.jsonl"
+    plugin_path = tmp_path / "runtime_plugin.py"
+    plugin_path.write_text(
+        f"""
+import json
+from pathlib import Path
+MARKER = Path({str(marker_path)!r})
+def record(value):
+    with MARKER.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(value, sort_keys=True) + "\\n")
+class RuntimePlugin:
+    name = "runtime_hook"
+    def before_run(self, state):
+        record({{"hook": "before_run"}})
+    def before_node(self, name, node_type, input_summary):
+        record({{"hook": "before_node"}})
+    def after_node(self, name, node_type, output_summary):
+        record({{"hook": "after_node"}})
+    def after_run(self, state, trace):
+        record({{"hook": "after_run"}})
+""".strip(),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "workflow.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "plugins": [{"module": str(plugin_path), "class": "RuntimePlugin", "type": "runtime"}],
+                "pipeline": _seed_only_pipeline(),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="node_hooks_off", runtime_options=RuntimeOptions(node_hooks=False))
+
+    hooks = [json.loads(line)["hook"] for line in marker_path.read_text(encoding="utf-8").splitlines()]
+    assert hooks == ["before_run", "after_run"]
+
 def test_checked_run_trace_records_nodeset_enter_exit(tmp_path) -> None:
     config_path = tmp_path / "nodeset_workflow.json"
     config_path.write_text(

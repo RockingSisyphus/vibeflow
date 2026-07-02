@@ -44,6 +44,7 @@ def run_checked(
     policy_path: str | Path | None = None,
     run_root: str | Path | None = None,
     run_id: str | None = None,
+    runtime_options: object | None = None,
 ) -> CheckedRunResult:
     path = Path(config_path)
     actual_run_id = run_id or _new_run_id()
@@ -70,7 +71,7 @@ def run_checked(
         compiled = _compile_with_registry_or_refuse(graph, registry, effective_policy, run_dir, actual_run_id)
     _write_preflight_artifacts(run_dir, graph, compiled, health, registry=registry)
     _refuse_on_health_failure(health, run_dir, actual_run_id)
-    context = _execute_runtime(graph, registry, plugin_registry, initial, run_dir)
+    context = _execute_runtime(graph, registry, plugin_registry, initial, run_dir, runtime_options)
     _write_json(run_dir / "output_summary.json", summarize_mapping(dict(context.iter_flat_items())))
     return CheckedRunResult(actual_run_id, run_dir, health, context)
 
@@ -272,6 +273,7 @@ def _execute_runtime(
     plugin_registry,
     initial: Mapping[str, Any] | None,
     run_dir: Path,
+    runtime_options: object | None,
 ):
     from .runtime import PipelineRuntime
 
@@ -280,6 +282,7 @@ def _execute_runtime(
         registry=registry,
         plugin_registry=plugin_registry,
         run_dir=run_dir,
+        runtime_options=runtime_options,
     )
     try:
         context = runtime.run(initial)

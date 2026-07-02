@@ -1,0 +1,14 @@
+{
+  "pipeline": {
+    "inputs": ["train.batch"],
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "metrics", "type": "sandbox.snapshot_unsafe_metrics", "requires": ["train.batch"], "provides": ["train.metrics"]},
+      {"name": "end", "type": "sandbox.training_metrics_end", "requires": ["train.metrics"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "metrics"},
+      {"from": "metrics", "to": "end"}
+    ]
+  }
+}

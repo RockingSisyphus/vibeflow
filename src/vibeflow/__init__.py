@@ -17,7 +17,7 @@ from .plugin import CompilerPlugin, PluginDescriptor, PluginRegistry, PolicyPlug
 from .purity import NodeMetrics, collect_node_metrics
 from .registry import NodeRegistry, NodeRegistryError
 from .resources import schema_text
-from .runtime import PipelineRuntime, PipelineRuntimeError
+from .runtime import PipelineRuntime, PipelineRuntimeError, RuntimeOptions
 from .runner import CheckedRunError, CheckedRunResult, run_checked
 
 __all__ = [
@@ -62,6 +62,7 @@ __all__ = [
     "PolicyPlugin",
     "PolicyResolveResult",
     "RuntimePlugin",
+    "RuntimeOptions",
     "STABLE_PUBLIC_API",
     "NodesetSpec",
     "PipelineRuntime",

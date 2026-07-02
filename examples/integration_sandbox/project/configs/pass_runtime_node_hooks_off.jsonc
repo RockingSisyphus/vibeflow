@@ -1,0 +1,19 @@
+{
+  "plugins": [
+    {"module": "../plugins/hook_plugins.py", "class": "CompilerPlugin", "type": "compiler"},
+    {"module": "../plugins/hook_plugins.py", "class": "RuntimePlugin", "type": "runtime"}
+  ],
+  "pipeline": {
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "seed", "type": "sandbox.constant", "provides": ["value.in"], "value": 4},
+      {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 2},
+      {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "seed"},
+      {"from": "seed", "to": "add"},
+      {"from": "add", "to": "end"}
+    ]
+  }
+}
