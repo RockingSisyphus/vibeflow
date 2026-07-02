@@ -1,0 +1,49 @@
+{
+  "nodesets": [
+    {
+      "name": "loop.increment_step",
+      "display_name": "Increment Step",
+      "category": "loop",
+      "description": "Reusable increment subplan for loop execution.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": ["value.in"],
+      "provides": ["value.next"],
+      "exports": ["value.next"],
+      "pipeline": {
+        "inputs": ["value.in"],
+        "nodes": [
+          {"name": "start", "type": "sandbox.start"},
+          {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
+          {"name": "increment", "type": "sandbox.increment", "requires": ["value.in"], "provides": ["value.next"]},
+          {"name": "end", "type": "sandbox.next_value_end", "requires": ["value.next"]}
+        ],
+        "edges": [
+          {"from": "start", "to": "input"},
+          {"from": "input", "to": "increment"},
+          {"from": "increment", "to": "end"}
+        ]
+      }
+    }
+  ],
+  "pipeline": {
+    "inputs": ["value.in"],
+    "max_steps": 20,
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
+      {"name": "increment_step", "type": "nodeset.loop.increment_step", "requires": ["value.in"], "provides": ["value.next"]},
+      {"name": "done", "type": "sandbox.done_check", "requires": ["value.next"], "provides": ["loop.done"], "target": 3},
+      {"name": "copy", "type": "sandbox.copy_back", "requires": ["value.next", "loop.done"], "provides": ["value.in"]},
+      {"name": "end", "type": "sandbox.next_value_end", "requires": ["value.next"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "input"},
+      {"from": "input", "to": "increment_step"},
+      {"from": "increment_step", "to": "done"},
+      {"from": "done", "to": "end", "when": "loop.done == true"},
+      {"from": "done", "to": "copy", "when": "loop.done == false"},
+      {"from": "copy", "to": "increment_step"}
+    ]
+  }
+}

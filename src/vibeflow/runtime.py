@@ -54,6 +54,7 @@ class PipelineRuntime:
         self.trace = RuntimeTrace()
         self._node_runs: dict[str, int] = {node.name: 0 for node in graph.nodes}
         self._frames = self._plan.frames
+        self._nodeset_runtimes: dict[str, PipelineRuntime] = {}
         self._run_dir = Path(run_dir) if run_dir is not None else Path("runs") / "vibeflow"
         self.runtime_options = _runtime_options(runtime_options)
 
@@ -69,11 +70,13 @@ class PipelineRuntime:
         runtime.trace = RuntimeTrace()
         runtime._node_runs = {name: 0 for name in plan.order}
         runtime._frames = plan.frames
+        runtime._nodeset_runtimes = {}
         runtime._run_dir = parent._run_dir
         runtime.runtime_options = parent.runtime_options
         return runtime
 
     def run(self, initial: Mapping[str, Any] | None = None) -> Context:
+        self._reset_run_state()
         context = Context(dict(initial or {}))
         try:
             self._record_run_boundary("run_start")
@@ -89,6 +92,10 @@ class PipelineRuntime:
             raise
         self._write_trace(context)
         return context
+
+    def _reset_run_state(self) -> None:
+        self.trace = RuntimeTrace()
+        self._node_runs = {name: 0 for name in self._plan.order}
 
     def _run_steps(self, context: Context) -> None:
         ready = list(self._initial_ready_nodes(context))
@@ -210,13 +217,22 @@ class PipelineRuntime:
             raise PipelineRuntimeError(f"nodeset node '{frame.name}' requires must match nodeset '{nodeset.name}' requires")
         if set(frame.provides) != set(nodeset.provides):
             raise PipelineRuntimeError(f"nodeset node '{frame.name}' provides must match nodeset '{nodeset.name}' provides")
+        if set(frame.provides) - set(frame.exports):
+            raise PipelineRuntimeError(f"nodeset '{nodeset.name}' cannot export undeclared keys: {sorted(set(frame.provides) - set(frame.exports))}")
         if frame.subplan is None:
             raise PipelineRuntimeError(f"nodeset node '{frame.name}' has no execution plan")
-        nested_context = PipelineRuntime._from_plan(self, frame.subplan).run({key: context.get(key) for key in frame.requires})
+        nested_context = self._nodeset_runtime(frame).run({key: context.get(key) for key in frame.requires})
         for key in frame.provides:
-            if key not in nodeset.exports:
-                raise PipelineRuntimeError(f"nodeset '{nodeset.name}' cannot export undeclared key '{key}'")
             context.set(key, nested_context.get(key))
+
+    def _nodeset_runtime(self, frame: NodeFrame) -> "PipelineRuntime":
+        runtime = self._nodeset_runtimes.get(frame.name)
+        if runtime is None:
+            if frame.subplan is None:
+                raise PipelineRuntimeError(f"nodeset node '{frame.name}' has no execution plan")
+            runtime = PipelineRuntime._from_plan(self, frame.subplan)
+            self._nodeset_runtimes[frame.name] = runtime
+        return runtime
 
     def _record_edge(self, edge: EdgeSpec) -> None:
         key = _edge_key(edge.pair)

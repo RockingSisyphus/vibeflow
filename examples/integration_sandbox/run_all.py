@@ -144,6 +144,24 @@ VALID_RUN_CASES = [
         "expect_training_metrics": True,
         "expected_nodeset_subplan_nodes": {"training_step": ["start", "training_input", "forward_loss", "backward_grad", "optimizer_step", "training_metrics", "end"]},
     },
+    {
+        "name": "nodeset_loop_subplan_reuse",
+        "config": "pass_nodeset_loop_subplan_reuse.jsonc",
+        "initial": {"value.in": 1},
+        "expected_outputs": {"value.next": 3},
+        "expected_nodeset_exports": {"increment_step": ["value.next"]},
+        "expected_trace_kind_counts": {"nodeset_enter": 2, "nodeset_exit": 2},
+    },
+    {
+        "name": "nodeset_reference_exports",
+        "config": "pass_nodeset_reference_exports.jsonc",
+        "initial_factory": _training_initial,
+        "expected_outputs": {"train.step_report": {"steps": 1, "weight": 0.7}},
+        "expected_same_as_initial": [("train.model_after", "train.model"), ("train.optimizer_after", "train.optimizer")],
+        "expected_object_attrs": [("train.model_after", "weight", 0.7), ("train.optimizer_after", "steps", 1)],
+        "expect_training_metrics": True,
+        "expected_nodeset_exports": {"train_step": ["train.model_after", "train.optimizer_after", "train.step_report", "train.metrics"]},
+    },
 ]
 
 
@@ -369,6 +387,12 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         actual_kinds = [line["kind"] for line in _runtime_trace_lines(run_result.run_dir)]
         if actual_kinds != case["expected_trace_kinds"]:
             raise AssertionError(f"trace kinds expected {case['expected_trace_kinds']!r}, got {actual_kinds!r}")
+    if "expected_trace_kind_counts" in case:
+        actual_kinds = [line["kind"] for line in _runtime_trace_lines(run_result.run_dir)]
+        for kind, expected in case["expected_trace_kind_counts"].items():
+            actual = actual_kinds.count(kind)
+            if actual != expected:
+                raise AssertionError(f"trace kind {kind} expected {expected}, got {actual}")
     if "expected_trace_summary" in case:
         summary = _runtime_trace_lines(run_result.run_dir)[-1]
         for key, expected in case["expected_trace_summary"].items():
@@ -411,6 +435,10 @@ def _assert_execution_plan(case: dict[str, Any], plan) -> None:
             raise AssertionError(f"plan node {node_name} missing subplan")
         if list(subplan.order) != list(expected_nodes):
             raise AssertionError(f"subplan {node_name} order expected {expected_nodes!r}, got {list(subplan.order)!r}")
+    for node_name, expected_exports in dict(case.get("expected_nodeset_exports", {})).items():
+        frame = plan.frame(str(node_name))
+        if list(frame.exports) != list(expected_exports):
+            raise AssertionError(f"nodeset {node_name} exports expected {expected_exports!r}, got {list(frame.exports)!r}")
 
 
 def _assert_mermaid_contains(name: str, collapsed: str, expanded: str) -> None:

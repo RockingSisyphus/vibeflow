@@ -100,6 +100,87 @@ def test_execution_plan_prebuilds_nodeset_subplan_with_overrides() -> None:
     assert runtime.run({"value.in": 2}).get("value.out") == 8
 
 
+def test_nodeset_runner_reuses_cached_subruntime() -> None:
+    CountingInitNode.instances = 0
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "count.once",
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline={
+                        "nodes": [
+                            {"name": "start", "type": "test.start"},
+                            {"name": "count", "type": "test.counting_init", "provides": ["value.out"], "config": {"value": 5}},
+                            {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                        ],
+                        "edges": _edge_chain("start", "count", "end"),
+                    },
+                )
+            ],
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "composite", "type": "nodeset.count.once", "provides": ["value.out"]},
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": _edge_chain("start", "composite", "end"),
+            },
+        }
+    )
+
+    runtime = PipelineRuntime(graph, registry=_registry())
+    assert CountingInitNode.instances == 1
+
+    assert runtime.run({}).get("value.out") == 5
+    nested = runtime._nodeset_runtimes["composite"]
+    assert runtime.run({}).get("value.out") == 5
+    assert runtime._nodeset_runtimes["composite"] is nested
+    assert CountingInitNode.instances == 1
+
+
+def test_nodeset_inputs_and_exports_preserve_object_reference() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "identity.object",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline={
+                        "inputs": ["value.in"],
+                        "nodes": [
+                            {"name": "start", "type": "test.start"},
+                            {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
+                            {"name": "identity", "type": "test.identity_object", "requires": ["value.in"], "provides": ["value.out"]},
+                            {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                        ],
+                        "edges": _edge_chain("start", "input", "identity", "end"),
+                    },
+                )
+            ],
+            "pipeline": {
+                "inputs": ["value.in"],
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
+                    {"name": "composite", "type": "nodeset.identity.object", "requires": ["value.in"], "provides": ["value.out"]},
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": _edge_chain("start", "input", "composite", "end"),
+            },
+        }
+    )
+
+    value = NoDeepcopyObject()
+    context = PipelineRuntime(graph, registry=_registry()).run({"value.in": value})
+
+    assert context.get("value.in") is value
+    assert context.get("value.out") is value
+
+
 def test_node_config_invalid_override_fails_health_before_runtime() -> None:
     graph = parse_graph_config(
         {
