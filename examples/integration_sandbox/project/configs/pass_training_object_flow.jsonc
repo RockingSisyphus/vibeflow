@@ -1,0 +1,22 @@
+{
+  "pipeline": {
+    "inputs": ["train.model", "train.batch", "train.optimizer"],
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "input", "type": "sandbox.training_input", "requires": ["train.model", "train.batch", "train.optimizer"]},
+      {"name": "forward", "type": "sandbox.forward_loss", "requires": ["train.model", "train.batch"], "provides": ["train.loss"]},
+      {"name": "backward", "type": "sandbox.backward_grad", "requires": ["train.model", "train.loss"], "provides": ["train.grad"]},
+      {"name": "step", "type": "sandbox.optimizer_step", "requires": ["train.model", "train.optimizer", "train.grad"], "provides": ["train.model_after", "train.optimizer_after", "train.step_report"]},
+      {"name": "metrics", "type": "sandbox.training_metrics", "requires": ["train.model_after", "train.loss"], "provides": ["train.metrics"]},
+      {"name": "end", "type": "sandbox.training_metrics_end", "requires": ["train.metrics"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "input"},
+      {"from": "input", "to": "forward"},
+      {"from": "forward", "to": "backward"},
+      {"from": "backward", "to": "step"},
+      {"from": "step", "to": "metrics"},
+      {"from": "metrics", "to": "end"}
+    ]
+  }
+}

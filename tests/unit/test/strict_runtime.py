@@ -114,6 +114,32 @@ def test_nodeset_call_can_override_inner_node_config_independently() -> None:
     assert context.get("value.out") == 7
 
 
+class NoDeepcopyObject:
+    def __deepcopy__(self, memo):
+        raise AssertionError("should not deepcopy runtime objects")
+
+
+def test_runtime_passes_non_deepcopy_object_by_reference() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "inputs": ["value.in"],
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
+                    {"name": "identity", "type": "test.identity_object", "requires": ["value.in"], "provides": ["value.out"]},
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": _edge_chain("start", "input", "identity", "end"),
+            }
+        }
+    )
+    value = NoDeepcopyObject()
+    context = PipelineRuntime(graph, registry=_registry()).run({"value.in": value})
+    assert context.get("value.in") is value
+    assert context.get("value.out") is value
+
+
 def test_checked_run_writes_runtime_failure_trace(tmp_path) -> None:
     config_path = tmp_path / "runtime_fail.json"
     config_path.write_text(
@@ -122,23 +148,23 @@ def test_checked_run_writes_runtime_failure_trace(tmp_path) -> None:
                 "pipeline": {
                     "nodes": [
                         {"name": "start", "type": "test.start"},
-                        {"name": "nan", "type": "test.nan_output", "provides": ["value.out"]},
+                        {"name": "bad", "type": "test.runtime_fail", "provides": ["value.out"], "config": {"fail": True}},
                         {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
                     ],
-                    "edges": _edge_chain("start", "nan", "end"),
+                    "edges": _edge_chain("start", "bad", "end"),
                 }
             }
         ),
         encoding="utf-8",
     )
-    with pytest.raises(PipelineRuntimeError, match="not JSON snapshot serializable"):
+    with pytest.raises(RuntimeError, match="boom"):
         run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="runtime_fail")
     trace_lines = [
         json.loads(line)
         for line in (tmp_path / "runs" / "runtime_fail" / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     failed = next(line for line in trace_lines if line["kind"] == "node_failed")
-    assert "not JSON snapshot serializable" in failed["failure"]
+    assert "boom" in failed["failure"]
     assert trace_lines[-1]["kind"] == "runtime_summary"
 
 def test_checked_run_trace_records_nodeset_enter_exit(tmp_path) -> None:

@@ -31,6 +31,15 @@ from nodes.legal_math_nodes import (
     SumPairNode,
     ValueInputNode,
 )
+from nodes.legal_training_nodes import (
+    BackwardGradNode,
+    BatchMetricsNode,
+    ForwardLossNode,
+    OptimizerStepNode,
+    TrainingInputNode,
+    TrainingMetricsEndNode,
+    TrainingMetricsNode,
+)
 
 
 def build_node_registry() -> NodeRegistry:
@@ -64,4 +73,11 @@ def build_node_registry() -> NodeRegistry:
     registry.register("sandbox.report_document", ReportDocumentNode, config_schema={}, config_defaults={})
     registry.register("sandbox.report_output", ReportOutputNode, config_schema={}, config_defaults={})
     registry.register("sandbox.report_end", ReportEndNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.training_input", TrainingInputNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.forward_loss", ForwardLossNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.backward_grad", BackwardGradNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.optimizer_step", OptimizerStepNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.training_metrics", TrainingMetricsNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.batch_metrics", BatchMetricsNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.training_metrics_end", TrainingMetricsEndNode, config_schema={}, config_defaults={})
     return registry

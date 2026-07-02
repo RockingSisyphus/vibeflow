@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import operator
 import time
-from copy import deepcopy
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -16,7 +15,6 @@ from .registry import NodeRegistry, NodeRegistryError
 from .runtime_config import effective_node_params, nested_node_config_overrides, normalize_node_config_overrides
 from .runtime_errors import PipelineRuntimeError
 from .runtime_trace import RuntimeTrace
-from .runtime_validation import assert_runtime_output_snapshot
 
 
 class PipelineRuntime:
@@ -148,13 +146,10 @@ class PipelineRuntime:
         try:
             node_cls = self.registry.get(spec.node_type)
             node = node_cls()
-            inputs = {key: deepcopy(context.get(key)) for key in spec.requires}
+            inputs = {key: context.get(key) for key in spec.requires}
             params = self.registry.merge_config(spec.node_type, effective_node_params(spec, self._node_config_overrides))
             self._call_runtime_plugins("before_node", spec.name, spec.node_type, summarize_mapping(inputs))
-            before = deepcopy(inputs)
             outputs = node.run_pure(inputs, params)
-            if inputs != before:
-                raise PipelineRuntimeError(f"node '{spec.name}' mutated inputs")
             if not isinstance(outputs, Mapping):
                 raise PipelineRuntimeError(f"node '{spec.name}' must return a mapping")
             unexpected = set(outputs) - set(spec.provides)
@@ -163,9 +158,7 @@ class PipelineRuntime:
             missing = set(spec.provides) - set(outputs)
             if missing:
                 raise PipelineRuntimeError(f"node '{spec.name}' missed declared outputs: {sorted(missing)}")
-            contract = getattr(node_cls, "CONTRACT", None)
             for key, value in outputs.items():
-                assert_runtime_output_snapshot(value, contract=contract, node_name=spec.name, key=str(key))
                 context.set(str(key), value)
             self._mark_node_run(spec.name)
             self._record_runtime_event("node", spec.name, spec.node_type, input_summary=summarize_mapping(inputs), output_summary=summarize_mapping(outputs), elapsed_ms=_elapsed_ms(started))
@@ -188,7 +181,7 @@ class PipelineRuntime:
             raise PipelineRuntimeError(f"nodeset node '{spec.name}' requires must match nodeset '{nodeset.name}' requires")
         if set(spec.provides) != set(nodeset.provides):
             raise PipelineRuntimeError(f"nodeset node '{spec.name}' provides must match nodeset '{nodeset.name}' provides")
-        initial = {key: deepcopy(context.get(key)) for key in spec.requires}
+        initial = {key: context.get(key) for key in spec.requires}
         nested_overrides = nested_node_config_overrides(spec, self._node_config_overrides)
         nested_context = PipelineRuntime(nodeset.graph, registry=self.registry, plugin_registry=self._plugin_registry, node_config_overrides=nested_overrides).run(initial)
         for key in spec.provides:

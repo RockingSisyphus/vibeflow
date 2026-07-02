@@ -291,7 +291,7 @@ def test_graph_health_reports_node_call_chain_metrics() -> None:
     assert report.info["node_metrics"]["seed"]["call_chain_length"] == 1
     assert report.info["node_metrics"]["seed"]["call_chain_path"] == ["run_pure"]
 
-def test_runtime_rejects_non_json_snapshot_output() -> None:
+def test_runtime_allows_non_json_object_output_by_reference() -> None:
     registry = _registry()
     register_node(registry, "test.set_output", SetOutputNode)
     graph = parse_graph_config(
@@ -306,8 +306,8 @@ def test_runtime_rejects_non_json_snapshot_output() -> None:
             }
         }
     )
-    with pytest.raises(PipelineRuntimeError, match="not JSON snapshot serializable"):
-        PipelineRuntime(graph, registry=registry).run()
+    context = PipelineRuntime(graph, registry=registry).run()
+    assert context.get("value.out") == {1, 2}
 
 def test_runtime_allows_explicit_opaque_snapshot_output() -> None:
     registry = _registry()
@@ -327,7 +327,7 @@ def test_runtime_allows_explicit_opaque_snapshot_output() -> None:
     context = PipelineRuntime(graph, registry=registry).run()
     assert context.get("value.out") == {1, 2}
 
-def test_runtime_rejects_input_mutation() -> None:
+def test_runtime_allows_input_mutation_by_reference() -> None:
     registry = _registry()
     register_node(registry, "test.mutating_input", MutatingInputNode)
     graph = parse_graph_config(
@@ -349,8 +349,11 @@ def test_runtime_rejects_input_mutation() -> None:
             }
         }
     )
-    with pytest.raises(PipelineRuntimeError, match="mutated inputs"):
-        PipelineRuntime(graph, registry=registry).run({"value": {"in": [1, 2]}})
+    value = [1, 2]
+    context = PipelineRuntime(graph, registry=registry).run({"value.in": value})
+    assert context.get("value.in") is value
+    assert context.get("value.out") is value
+    assert value == [1, 2, 3]
 
 def test_collect_node_metrics_reports_complexity_and_contract_size() -> None:
     metrics = collect_node_metrics(AddNode)

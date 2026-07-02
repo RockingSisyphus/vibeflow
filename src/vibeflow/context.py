@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Iterator
@@ -22,12 +21,12 @@ class Context:
         self._data: dict[str, Any] = {}
         for key, value in (initial or {}).items():
             if "." in str(key):
-                self.set(str(key), deepcopy(value))
+                self.set(str(key), value)
             else:
-                self._data[str(key)] = deepcopy(value)
+                self._data[str(key)] = value
 
     def to_dict(self) -> dict[str, Any]:
-        return deepcopy(self._data)
+        return dict(self._data)
 
     def exists(self, key: str) -> bool:
         try:

@@ -26,6 +26,40 @@ RUN_ROOT = SANDBOX_DIR / "runs"
 POLICY_PATH = PROJECT_DIR / "kernel_policy.jsonc"
 
 
+class SandboxBatch:
+    def __init__(self, items: list[int]) -> None:
+        self.items = items
+
+
+class SandboxModel:
+    def __init__(self, weight: float) -> None:
+        self.weight = weight
+
+    def loss(self, batch: SandboxBatch) -> float:
+        return sum(batch.items) * self.weight
+
+    def grad(self, loss: float) -> float:
+        return loss / 10
+
+
+class SandboxOptimizer:
+    def __init__(self, lr: float) -> None:
+        self.lr = lr
+        self.steps = 0
+
+    def step(self, model: SandboxModel, grad: float) -> None:
+        model.weight -= self.lr * grad
+        self.steps += 1
+
+
+def _training_initial() -> dict[str, Any]:
+    return {"train.model": SandboxModel(1.0), "train.batch": SandboxBatch([2, 4]), "train.optimizer": SandboxOptimizer(0.5)}
+
+
+def _batch_initial() -> dict[str, Any]:
+    return {"train.batch": SandboxBatch([2, 4])}
+
+
 VALID_RUN_CASES = [
     {"name": "linear", "config": "pass_linear.jsonc", "initial": {}, "expected_status": {"PASS", "CONCERNS"}, "expected_outputs": {"value.final": 14}},
     {"name": "free_nodes", "config": "pass_free_nodes.jsonc", "initial": {}, "expected_status": {"PASS", "CONCERNS"}},
@@ -36,6 +70,30 @@ VALID_RUN_CASES = [
     {"name": "io_data_store", "config": "pass_io_data_store.jsonc", "initial": {"io.result": 20}},
     {"name": "plugins", "config": "pass_plugins.jsonc", "initial": {"io.result": 20}},
     {"name": "comprehensive_flowchart", "config": "pass_comprehensive_flowchart.jsonc", "initial": {"value.in": 3}, "expected_outputs": {"io.output": "final=23;request=23"}},
+    {
+        "name": "training_object_flow",
+        "config": "pass_training_object_flow.jsonc",
+        "initial_factory": _training_initial,
+        "expected_outputs": {"train.loss": 6.0, "train.grad": 0.6, "train.step_report": {"steps": 1, "weight": 0.7}},
+        "expected_same_as_initial": [("train.model_after", "train.model"), ("train.optimizer_after", "train.optimizer")],
+        "expected_object_attrs": [("train.model_after", "weight", 0.7), ("train.optimizer_after", "steps", 1)],
+        "expect_training_metrics": True,
+    },
+    {
+        "name": "training_nodeset_object_flow",
+        "config": "pass_training_nodeset_object_flow.jsonc",
+        "initial_factory": _training_initial,
+        "expected_outputs": {"train.step_report": {"steps": 1, "weight": 0.7}},
+        "expected_same_as_initial": [("train.model_after", "train.model"), ("train.optimizer_after", "train.optimizer")],
+        "expected_object_attrs": [("train.model_after", "weight", 0.7), ("train.optimizer_after", "steps", 1)],
+        "expect_training_metrics": True,
+    },
+    {
+        "name": "training_non_json_metrics",
+        "config": "pass_training_non_json_metrics.jsonc",
+        "initial_factory": _batch_initial,
+        "expect_batch_metrics": True,
+    },
 ]
 
 
@@ -74,8 +132,6 @@ INVALID_CASES = [
     {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "MutateInputsNode", "type": "bad.mutate_inputs", "expect": "NODE.PURITY.INPUT_MUTATION"},
     {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "MutateNestedInputNode", "type": "bad.mutate_nested", "expect": "NODE.PURITY.INPUT_MUTATION"},
     {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "UndeclaredParamNode", "type": "bad.undeclared_param", "expect": "UNDECLARED_PARAM"},
-    {"kind": "runtime_node", "module": "illegal_nodes/contract_io_cases.py", "class": "SetOutputNode", "type": "bad.set_output", "expect": "not JSON snapshot serializable"},
-    {"kind": "runtime_node", "module": "illegal_nodes/contract_io_cases.py", "class": "NaNOutputNode", "type": "bad.nan_output", "expect": "not JSON snapshot serializable"},
     {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "GlobalStateNode", "type": "bad.global_state", "expect": "MODULE_GLOBAL_STATE"},
     {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "SetAttrNode", "type": "bad.setattr", "expect": "NODE.PURITY.MONKEY_PATCH"},
     {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "MonkeyPatchNode", "type": "bad.monkey_patch", "expect": "NODE.PURITY.MONKEY_PATCH"},
@@ -222,10 +278,11 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     if is_mermaid_svg_renderer_available():
         render_mermaid_svg(collapsed, SVG_DIR / f"{name}.svg")
         render_mermaid_svg(expanded, SVG_DIR / f"{name}.expanded.svg")
+    initial = case["initial_factory"]() if "initial_factory" in case else case.get("initial", {})
     run_result = run_checked(
         config_path,
         registry=node_registry,
-        initial=case.get("initial", {}),
+        initial=initial,
         policy_path=POLICY_PATH,
         run_root=RUN_ROOT,
         run_id=name,
@@ -235,6 +292,23 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         actual = run_result.context.get(str(key))
         if actual != expected:
             raise AssertionError(f"{key} expected {expected!r}, got {actual!r}")
+    for key, initial_key in case.get("expected_same_as_initial", ()):
+        if run_result.context.get(key) is not initial[initial_key]:
+            raise AssertionError(f"{key} is not initial {initial_key}")
+    for key, attr, expected in case.get("expected_object_attrs", ()):
+        actual = getattr(run_result.context.get(key), attr)
+        if actual != expected:
+            raise AssertionError(f"{key}.{attr} expected {expected!r}, got {actual!r}")
+    if case.get("expect_training_metrics"):
+        metrics = run_result.context.get("train.metrics")
+        if metrics["model"] is not run_result.context.get("train.model_after"):
+            raise AssertionError("train.metrics.model did not preserve model reference")
+        if metrics["tags"] != {"sandbox", "train"} or metrics["unstable"] == metrics["unstable"]:
+            raise AssertionError("train.metrics did not preserve non-JSON set/NaN values")
+    if case.get("expect_batch_metrics"):
+        metrics = run_result.context.get("train.metrics")
+        if metrics["batch"] is not initial["train.batch"] or metrics["items"] != {2, 4} or metrics["unstable"] == metrics["unstable"]:
+            raise AssertionError("batch metrics did not preserve batch reference/set/NaN values")
     return CaseResult(f"valid:{name}", "PASS", payload={"health": health.status, "run_dir": str(run_result.run_dir)})
 
 
