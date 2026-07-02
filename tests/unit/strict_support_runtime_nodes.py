@@ -236,6 +236,25 @@ class RuntimeFailNode:
         return {"value.out": 1}
 
 
+class CountingInitNode:
+    instances = 0
+
+    NODE_INFO = NodeInfo("test.counting_init", "Counting Init", "test", "Counts construction for execution plan tests.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        provides=("value.out",),
+        output_semantics={"value.out": ("configured output")},
+        params_schema={"value": {"type": "number"}},
+        output_schema={"value.out": {"type": "number"}},
+        examples=({"inputs": {}, "params": {"value": 3}, "outputs": {"value.out": 3}},),
+    )
+
+    def __init__(self) -> None:
+        type(self).instances += 1
+
+    def run_pure(self, inputs, params):
+        return {"value.out": params.get("value", 3)}
+
+
 class DuplicateOneNode:
     NODE_INFO = NodeInfo("test.duplicate_one", "Duplicate One", "test", "Duplicates output.", "0.1.0", "process")
     CONTRACT = NodeContract(
@@ -265,6 +284,7 @@ class DuplicateTwoNode:
 __all__ = (
     "AddNode",
     "CopyNode",
+    "CountingInitNode",
     "DuplicateOneNode",
     "DuplicateTwoNode",
     "EffectRequestNode",

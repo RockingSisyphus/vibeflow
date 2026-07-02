@@ -10,11 +10,13 @@ import pytest
 
 from vibeflow import (
     ConfigLoadError,
+    ExecutionPlan,
     GraphCompileError,
     GraphCompiler,
     HealthFinding,
     HealthReport,
     NodeContract,
+    NodeFrame,
     NodeInfo,
     NodeRegistry,
     PipelineRuntime,
@@ -34,6 +36,7 @@ from vibeflow import (
     run_checked,
     scan_base_lib,
     validate_graph_health,
+    build_execution_plan,
 )
 from vibeflow.graph_config import GraphConfigError
 from vibeflow.config_schema import collect_config_schema_findings
@@ -100,6 +103,7 @@ def _registry() -> NodeRegistry:
     register_node(registry, "test.identity_object", runtime_nodes.IdentityObjectNode)
     register_node(registry, "test.nan_output", runtime_nodes.NanOutputNode)
     register_node(registry, "test.runtime_fail", runtime_nodes.RuntimeFailNode, {"fail": {"type": "boolean"}}, {"fail": False})
+    register_node(registry, "test.counting_init", runtime_nodes.CountingInitNode, {"value": {"type": "number"}}, {"value": 3})
     register_node(registry, "test.effect_request", runtime_nodes.EffectRequestNode)
     return registry
 

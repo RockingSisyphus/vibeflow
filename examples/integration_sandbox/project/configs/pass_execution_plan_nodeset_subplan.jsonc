@@ -1,0 +1,49 @@
+{
+  "nodesets": [
+    {
+      "name": "math.add_one",
+      "display_name": "Add One",
+      "category": "math",
+      "description": "Composite add-one flow with caller override.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": ["value.in"],
+      "provides": ["value.out"],
+      "exports": ["value.out"],
+      "pipeline": {
+        "inputs": ["value.in"],
+        "nodes": [
+          {"name": "start", "type": "sandbox.start"},
+          {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
+          {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 1},
+          {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+        ],
+        "edges": [
+          {"from": "start", "to": "input"},
+          {"from": "input", "to": "add"},
+          {"from": "add", "to": "end"}
+        ]
+      }
+    }
+  ],
+  "pipeline": {
+    "inputs": ["value.in"],
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
+      {
+        "name": "add_one",
+        "type": "nodeset.math.add_one",
+        "requires": ["value.in"],
+        "provides": ["value.out"],
+        "node_configs": {"add": {"delta": 8}}
+      },
+      {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "input"},
+      {"from": "input", "to": "add_one"},
+      {"from": "add_one", "to": "end"}
+    ]
+  }
+}
