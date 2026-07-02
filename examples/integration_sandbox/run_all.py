@@ -94,6 +94,32 @@ VALID_RUN_CASES = [
         "initial_factory": _batch_initial,
         "expect_batch_metrics": True,
     },
+    {
+        "name": "runtime_boundary_trace",
+        "config": "pass_runtime_boundary_trace.jsonc",
+        "initial": {"value.in": 1},
+        "runtime_options": {"trace": "boundary"},
+        "expected_outputs": {"value.out": 6},
+        "expected_trace_kinds": ["run_start", "nodeset_enter", "nodeset_exit", "run_end", "runtime_summary"],
+    },
+    {
+        "name": "runtime_trace_off",
+        "config": "pass_runtime_trace_off.jsonc",
+        "initial": {},
+        "runtime_options": {"trace": "off"},
+        "expected_outputs": {"value.out": 7},
+        "expected_trace_kinds": ["runtime_summary"],
+        "expected_trace_summary": {"stop_reason": "completed", "current_node": "end"},
+    },
+    {
+        "name": "runtime_node_hooks_off",
+        "config": "pass_runtime_node_hooks_off.jsonc",
+        "initial": {},
+        "runtime_options": {"node_hooks": False},
+        "expected_outputs": {"value.out": 6},
+        "expected_hook_delta_present": {"after_run"},
+        "expected_hook_delta_absent": {"before_node", "after_node"},
+    },
 ]
 
 
@@ -157,6 +183,7 @@ INVALID_CASES = [
     {"kind": "run", "config": "fail_plugin_unclosed_relaxation.jsonc", "expect": "PLUGIN.POLICY.RELAXATION_REQUIRED"},
     {"kind": "run", "config": "fail_plugin_execution.jsonc", "expect": "PLUGIN.EXECUTION"},
     {"kind": "config", "config": "fail_plugin_bad_shape.jsonc", "expect": "PLUGIN.POLICY.SHAPE"},
+    {"kind": "runtime_options_fail", "config": "fail_runtime_snapshot_outputs.jsonc", "runtime_options": {"snapshot_outputs": True}, "initial_factory": _batch_initial, "expect": "JSON serializable"},
 ]
 
 
@@ -237,7 +264,7 @@ def _run_valid_cases() -> list[CaseResult]:
 
 
 def _run_valid_case(case: dict[str, Any]) -> CaseResult:
-    from vibeflow import GraphCompiler, export_ascii_flowchart, export_mermaid, is_mermaid_svg_renderer_available, load_config_document, parse_graph_config, render_mermaid_svg, resolve_effective_policy, run_checked, validate_graph_health
+    from vibeflow import GraphCompiler, RuntimeOptions, export_ascii_flowchart, export_mermaid, is_mermaid_svg_renderer_available, load_config_document, parse_graph_config, render_mermaid_svg, resolve_effective_policy, run_checked, validate_graph_health
     from vibeflow.config_schema import collect_config_schema_findings
     from vibeflow.plugin import load_plugins_from_config
 
@@ -279,6 +306,8 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         render_mermaid_svg(collapsed, SVG_DIR / f"{name}.svg")
         render_mermaid_svg(expanded, SVG_DIR / f"{name}.expanded.svg")
     initial = case["initial_factory"]() if "initial_factory" in case else case.get("initial", {})
+    hook_marker = REPORT_DIR / "plugin_hooks.jsonl"
+    hook_count_before = len(hook_marker.read_text(encoding="utf-8").splitlines()) if hook_marker.exists() else 0
     run_result = run_checked(
         config_path,
         registry=node_registry,
@@ -286,6 +315,7 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         policy_path=POLICY_PATH,
         run_root=RUN_ROOT,
         run_id=name,
+        runtime_options=RuntimeOptions(**case["runtime_options"]) if "runtime_options" in case else None,
     )
     _assert_artifacts(run_result.run_dir)
     for key, expected in dict(case.get("expected_outputs", {})).items():
@@ -309,7 +339,29 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         metrics = run_result.context.get("train.metrics")
         if metrics["batch"] is not initial["train.batch"] or metrics["items"] != {2, 4} or metrics["unstable"] == metrics["unstable"]:
             raise AssertionError("batch metrics did not preserve batch reference/set/NaN values")
+    if "expected_trace_kinds" in case:
+        actual_kinds = [line["kind"] for line in _runtime_trace_lines(run_result.run_dir)]
+        if actual_kinds != case["expected_trace_kinds"]:
+            raise AssertionError(f"trace kinds expected {case['expected_trace_kinds']!r}, got {actual_kinds!r}")
+    if "expected_trace_summary" in case:
+        summary = _runtime_trace_lines(run_result.run_dir)[-1]
+        for key, expected in case["expected_trace_summary"].items():
+            if summary.get(key) != expected:
+                raise AssertionError(f"runtime summary {key} expected {expected!r}, got {summary.get(key)!r}")
+    if "expected_hook_delta_present" in case or "expected_hook_delta_absent" in case:
+        delta_lines = hook_marker.read_text(encoding="utf-8").splitlines()[hook_count_before:] if hook_marker.exists() else []
+        delta_hooks = {json.loads(line)["hook"] for line in delta_lines}
+        missing = set(case.get("expected_hook_delta_present", ())) - delta_hooks
+        forbidden = set(case.get("expected_hook_delta_absent", ())) & delta_hooks
+        if missing:
+            raise AssertionError(f"missing expected hook delta: {sorted(missing)}")
+        if forbidden:
+            raise AssertionError(f"unexpected hook delta: {sorted(forbidden)}")
     return CaseResult(f"valid:{name}", "PASS", payload={"health": health.status, "run_dir": str(run_result.run_dir)})
+
+
+def _runtime_trace_lines(run_dir: Path) -> list[dict[str, Any]]:
+    return [json.loads(line) for line in (run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
 
 
 def _assert_mermaid_contains(name: str, collapsed: str, expanded: str) -> None:
@@ -389,6 +441,8 @@ def _run_invalid_case(case: dict[str, Any], base_lib_report):
         return _invalid_config(case), base_lib_report
     if kind == "run":
         return _invalid_run(case), base_lib_report
+    if kind == "runtime_options_fail":
+        return _invalid_runtime_options_run(case), base_lib_report
     raise AssertionError(f"unknown invalid case kind: {kind}")
 
 
@@ -523,6 +577,28 @@ def _invalid_run(case: dict[str, Any]) -> CaseResult:
         _assert_report_has_rule([item.to_dict() for item in (*report.errors, *report.warnings)], str(case["expect"]))
         return CaseResult(f"invalid:run:{case['config']}", "PASS", payload=report.to_dict())
     raise AssertionError("run case was not rejected")
+
+
+def _invalid_runtime_options_run(case: dict[str, Any]) -> CaseResult:
+    from registry import build_node_registry
+    from vibeflow import RuntimeOptions, run_checked
+
+    initial = case["initial_factory"]() if "initial_factory" in case else {"value.in": 0, "io.result": 1}
+    try:
+        run_checked(
+            CONFIG_DIR / str(case["config"]),
+            registry=build_node_registry(),
+            initial=initial,
+            policy_path=POLICY_PATH,
+            run_root=RUN_ROOT,
+            run_id=f"expected_fail_{Path(str(case['config'])).stem}",
+            runtime_options=RuntimeOptions(**dict(case.get("runtime_options", {}))),
+        )
+    except Exception as exc:
+        if str(case["expect"]) not in str(exc):
+            raise AssertionError(f"runtime-options error did not include {case['expect']}: {exc}") from exc
+        return CaseResult(f"invalid:runtime_options_fail:{case['config']}", "PASS", str(exc))
+    raise AssertionError("runtime-options run was not rejected")
 
 
 def _load_class(path: Path, class_name: str):

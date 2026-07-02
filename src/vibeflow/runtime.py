@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import operator
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -15,6 +16,18 @@ from .registry import NodeRegistry, NodeRegistryError
 from .runtime_config import effective_node_params, nested_node_config_overrides, normalize_node_config_overrides
 from .runtime_errors import PipelineRuntimeError
 from .runtime_trace import RuntimeTrace
+from .runtime_validation import assert_runtime_output_snapshot
+
+
+@dataclass(frozen=True)
+class RuntimeOptions:
+    trace: str = "full"
+    snapshot_outputs: bool = False
+    node_hooks: bool = True
+
+    def __post_init__(self) -> None:
+        if self.trace not in {"full", "boundary", "off"}:
+            raise ValueError("runtime trace must be one of: full, boundary, off")
 
 
 class PipelineRuntime:
@@ -27,6 +40,7 @@ class PipelineRuntime:
         plugin_registry: PluginRegistry | None = None,
         run_dir: str | Path | None = None,
         node_config_overrides: Mapping[str, Mapping[str, object]] | None = None,
+        runtime_options: RuntimeOptions | Mapping[str, object] | None = None,
     ) -> None:
         if boundary_registry is not None:
             raise PipelineRuntimeError("boundary_registry is removed; use flowchart nodes")
@@ -49,16 +63,20 @@ class PipelineRuntime:
         }
         self._run_dir = Path(run_dir) if run_dir is not None else Path("runs") / "vibeflow"
         self._node_config_overrides = normalize_node_config_overrides(node_config_overrides or {})
+        self.runtime_options = _runtime_options(runtime_options)
 
     def run(self, initial: Mapping[str, Any] | None = None) -> Context:
         context = Context(dict(initial or {}))
         try:
+            self._record_run_boundary("run_start")
             self._call_runtime_plugins("before_run", context.to_dict())
             self._run_steps(context)
             self.trace.stop_reason = self.trace.stop_reason or "completed"
+            self._record_run_boundary("run_end")
             self._call_runtime_plugins("after_run", context.to_dict(), self.trace.to_dict())
-        except Exception:
+        except Exception as exc:
             self.trace.stop_reason = self.trace.stop_reason or "node_failed"
+            self.trace.exception = str(exc)
             self._write_trace(context)
             raise
         self._write_trace(context)
@@ -120,6 +138,7 @@ class PipelineRuntime:
         return tuple(active)
 
     def _run_node(self, node_name: str, context: Context) -> Mapping[str, object]:
+        self.trace.current_node = node_name
         spec = self._specs[node_name]
         if spec.node_type.startswith("nodeset."):
             return self._run_nodeset_node(spec, context)
@@ -159,6 +178,8 @@ class PipelineRuntime:
             if missing:
                 raise PipelineRuntimeError(f"node '{spec.name}' missed declared outputs: {sorted(missing)}")
             for key, value in outputs.items():
+                if self.runtime_options.snapshot_outputs:
+                    assert_runtime_output_snapshot(value, contract=node.CONTRACT, node_name=spec.name, key=str(key))
                 context.set(str(key), value)
             self._mark_node_run(spec.name)
             self._record_runtime_event("node", spec.name, spec.node_type, input_summary=summarize_mapping(inputs), output_summary=summarize_mapping(outputs), elapsed_ms=_elapsed_ms(started))
@@ -183,7 +204,7 @@ class PipelineRuntime:
             raise PipelineRuntimeError(f"nodeset node '{spec.name}' provides must match nodeset '{nodeset.name}' provides")
         initial = {key: context.get(key) for key in spec.requires}
         nested_overrides = nested_node_config_overrides(spec, self._node_config_overrides)
-        nested_context = PipelineRuntime(nodeset.graph, registry=self.registry, plugin_registry=self._plugin_registry, node_config_overrides=nested_overrides).run(initial)
+        nested_context = PipelineRuntime(nodeset.graph, registry=self.registry, plugin_registry=self._plugin_registry, node_config_overrides=nested_overrides, runtime_options=self.runtime_options).run(initial)
         for key in spec.provides:
             if key not in nodeset.exports:
                 raise PipelineRuntimeError(f"nodeset '{nodeset.name}' cannot export undeclared key '{key}'")
@@ -205,10 +226,14 @@ class PipelineRuntime:
         context.set("runtime.step_count", payload["step_count"])
         context.set("runtime.node_runs", payload["node_runs"])
         context.set("runtime.stop_reason", payload["stop_reason"])
+        context.set("runtime.current_node", payload["current_node"])
+        context.set("runtime.exception", payload["exception"])
         context.set("runtime.events", payload["events"])
 
     def _call_runtime_plugins(self, hook: str, *args) -> None:
         if self._plugin_registry is None:
+            return
+        if not self.runtime_options.node_hooks and hook in {"before_node", "after_node"}:
             return
         for plugin in self._plugin_registry.runtime_plugins():
             method = getattr(plugin, hook, None)
@@ -231,6 +256,10 @@ class PipelineRuntime:
         elapsed_ms: float | None = None,
         failure: str = "",
     ) -> None:
+        if self.runtime_options.trace == "off":
+            return
+        if self.runtime_options.trace == "boundary" and kind not in {"run_start", "run_end", "nodeset_enter", "nodeset_exit", "nodeset_failed", "node_failed"}:
+            return
         event: dict[str, object] = {"kind": kind, "node": node_name, "type": node_type}
         if input_summary is not None:
             event["input_summary"] = dict(input_summary)
@@ -241,6 +270,18 @@ class PipelineRuntime:
         if failure:
             event["failure"] = failure
         self.trace.events.append(event)
+
+    def _record_run_boundary(self, kind: str) -> None:
+        if self.runtime_options.trace == "boundary":
+            self._record_runtime_event(kind, "pipeline", "pipeline")
+
+
+def _runtime_options(value: RuntimeOptions | Mapping[str, object] | None) -> RuntimeOptions:
+    if value is None:
+        return RuntimeOptions()
+    if isinstance(value, RuntimeOptions):
+        return value
+    return RuntimeOptions(**dict(value))
 
 
 def _condition_matches(expression: str, values: Mapping[str, object]) -> bool:

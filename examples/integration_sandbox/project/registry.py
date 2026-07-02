@@ -36,6 +36,7 @@ from nodes.legal_training_nodes import (
     BatchMetricsNode,
     ForwardLossNode,
     OptimizerStepNode,
+    SnapshotUnsafeMetricsNode,
     TrainingInputNode,
     TrainingMetricsEndNode,
     TrainingMetricsNode,
@@ -79,5 +80,6 @@ def build_node_registry() -> NodeRegistry:
     registry.register("sandbox.optimizer_step", OptimizerStepNode, config_schema={}, config_defaults={})
     registry.register("sandbox.training_metrics", TrainingMetricsNode, config_schema={}, config_defaults={})
     registry.register("sandbox.batch_metrics", BatchMetricsNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.snapshot_unsafe_metrics", SnapshotUnsafeMetricsNode, config_schema={}, config_defaults={})
     registry.register("sandbox.training_metrics_end", TrainingMetricsEndNode, config_schema={}, config_defaults={})
     return registry
