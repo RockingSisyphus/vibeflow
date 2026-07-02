@@ -337,6 +337,53 @@ def test_runtime_options_off_keeps_summary_without_events() -> None:
     assert context.get("runtime.exception") == ""
 
 
+def test_runtime_options_block_executes_linear_plan() -> None:
+    graph = parse_graph_config({"pipeline": _seed_add_pipeline(add={"config": {"delta": 4}})})
+
+    context = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(execution="block")).run({})
+
+    assert context.get("value.out") == 5
+    assert list(context.get("runtime.exec_order")) == ["start", "seed", "add", "end"]
+
+
+def test_runtime_options_block_executes_simple_conditional_route() -> None:
+    registry = _registry()
+    register_node(registry, "test.route", RouteNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "inputs": ["value.in"],
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
+                    {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
+                    {"name": "route", "type": "test.route", "requires": ["value.out"], "provides": ["flow.route"]},
+                    {"name": "copy", "type": "test.copy", "requires": ["value.out"], "provides": ["value.in"]},
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": [
+                    {"from": "start", "to": "input"},
+                    {"from": "input", "to": "add"},
+                    {"from": "add", "to": "route"},
+                    {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
+                    {"from": "copy", "to": "add"},
+                    {"from": "route", "to": "end", "when": "flow.route == 'done'"},
+                ],
+            }
+        }
+    )
+
+    context = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(execution="block")).run({"value.in": 1})
+
+    assert context.get("value.out") == 2
+    assert list(context.get("runtime.exec_order")) == ["start", "input", "add", "route", "end"]
+
+
+def test_runtime_options_rejects_unknown_execution() -> None:
+    with pytest.raises(ValueError, match="runtime execution"):
+        RuntimeOptions(execution="compiled")
+
+
 def test_runtime_options_snapshot_outputs_restores_json_snapshot_check() -> None:
     graph = parse_graph_config(
         {

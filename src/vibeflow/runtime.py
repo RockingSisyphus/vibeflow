@@ -23,10 +23,13 @@ class RuntimeOptions:
     trace: str = "full"
     snapshot_outputs: bool = False
     node_hooks: bool = True
+    execution: str = "plan"
 
     def __post_init__(self) -> None:
         if self.trace not in {"full", "boundary", "off"}:
             raise ValueError("runtime trace must be one of: full, boundary, off")
+        if self.execution not in {"plan", "block"}:
+            raise ValueError("runtime execution must be one of: plan, block")
 
 
 class PipelineRuntime:
@@ -81,7 +84,10 @@ class PipelineRuntime:
         try:
             self._record_run_boundary("run_start")
             self._call_runtime_plugins("before_run", context.to_dict())
-            self._run_steps(context)
+            if self.runtime_options.execution == "block":
+                self._run_block_steps(context)
+            else:
+                self._run_steps(context)
             self.trace.stop_reason = self.trace.stop_reason or "completed"
             self._record_run_boundary("run_end")
             self._call_runtime_plugins("after_run", context.to_dict(), self.trace.to_dict())
@@ -120,6 +126,38 @@ class PipelineRuntime:
                     queued.add(edge.target)
         self.trace.stop_reason = "max_steps"
         raise PipelineRuntimeError(f"pipeline exceeded max_steps={self._plan.max_steps}")
+
+    def _run_block_steps(self, context: Context) -> None:
+        self._assert_block_eligible()
+        ready = self._initial_ready_nodes(context)
+        if len(ready) != 1:
+            raise PipelineRuntimeError("block execution requires exactly one ready start node")
+        node_name = ready[0]
+        for _ in range(self._plan.max_steps):
+            if not self._requirements_available(node_name, context):
+                self.trace.stop_reason = "no_ready_nodes"
+                return
+            outputs = self._run_node(node_name, context)
+            self.trace.step_count += 1
+            if self._is_end_terminal(node_name):
+                self.trace.stop_reason = "completed"
+                return
+            active = self._activated_edges(node_name, outputs, context)
+            if len(active) != 1:
+                raise PipelineRuntimeError(f"block execution requires exactly one active edge from '{node_name}'")
+            edge = active[0]
+            self._record_edge(edge)
+            node_name = edge.target
+        self.trace.stop_reason = "max_steps"
+        raise PipelineRuntimeError(f"pipeline exceeded max_steps={self._plan.max_steps}")
+
+    def _assert_block_eligible(self) -> None:
+        for name in self._plan.order:
+            outgoing = self._frames[name].outgoing
+            if len(outgoing) <= 1:
+                continue
+            if not all(edge.when for edge in outgoing):
+                raise PipelineRuntimeError(f"block execution only supports conditional multi-edge routes: {name}")
 
     def _initial_ready_nodes(self, context: Context) -> tuple[str, ...]:
         ready = []
