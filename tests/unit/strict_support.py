@@ -96,7 +96,9 @@ def _registry() -> NodeRegistry:
     register_node(registry, "test.seed", runtime_nodes.SeedNode, {"value": {"type": "number"}}, {"value": 1})
     register_node(registry, "test.add", runtime_nodes.AddNode, {"delta": {"type": "number"}}, {"delta": 1})
     register_node(registry, "test.copy", runtime_nodes.CopyNode)
+    register_node(registry, "test.identity_object", runtime_nodes.IdentityObjectNode)
     register_node(registry, "test.nan_output", runtime_nodes.NanOutputNode)
+    register_node(registry, "test.runtime_fail", runtime_nodes.RuntimeFailNode, {"fail": {"type": "boolean"}}, {"fail": False})
     register_node(registry, "test.effect_request", runtime_nodes.EffectRequestNode)
     return registry
 

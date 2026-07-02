@@ -193,6 +193,49 @@ class MutatingInputNode:
         return {"value.out": inputs["value.in"]}
 
 
+class IdentityObjectNode:
+    NODE_INFO = NodeInfo(
+        type_key="test.identity_object",
+        display_name="Identity Object",
+        category="test",
+        description="Passes an object through unchanged.",
+        version="0.1.0",
+        flow_kind="process",
+    )
+    CONTRACT = NodeContract(
+        requires=("value.in",),
+        provides=("value.out",),
+        input_semantics={"value.in": ("input object",)},
+        output_semantics={"value.out": ("same object",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"value.out": inputs["value.in"]}
+
+
+class RuntimeFailNode:
+    NODE_INFO = NodeInfo(
+        type_key="test.runtime_fail",
+        display_name="Runtime Fail",
+        category="test",
+        description="Fails during runtime.",
+        version="0.1.0",
+        flow_kind="process",
+    )
+    CONTRACT = NodeContract(
+        provides=("value.out",),
+        output_semantics={"value.out": ("runtime output",)},
+        output_schema={"value.out": {"type": "number"}},
+        params_schema={"fail": {"type": "boolean"}},
+        examples=({"inputs": {}, "params": {"fail": False}, "outputs": {"value.out": 1}},),
+    )
+
+    def run_pure(self, inputs, params):
+        if params.get("fail", False):
+            raise RuntimeError("boom")
+        return {"value.out": 1}
+
+
 class DuplicateOneNode:
     NODE_INFO = NodeInfo("test.duplicate_one", "Duplicate One", "test", "Duplicates output.", "0.1.0", "process")
     CONTRACT = NodeContract(
@@ -226,11 +269,13 @@ __all__ = (
     "DuplicateTwoNode",
     "EffectRequestNode",
     "InEndNode",
+    "IdentityObjectNode",
     "MutatingInputNode",
     "NanOutputNode",
     "OpaqueOutputNode",
     "OutEndNode",
     "RouteNode",
+    "RuntimeFailNode",
     "SeedNode",
     "SetOutputNode",
     "StartNode",
