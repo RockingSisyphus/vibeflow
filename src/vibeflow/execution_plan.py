@@ -1,14 +1,32 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 from .block_compiler import CompiledBlock, compile_blocks
 from .compiler import CompiledGraph
+from .data_contract import DataProvider, DataRequirement, provider_keys, requirement_types
 from .graph_config import EdgeSpec, GraphConfig, NodeSpec
 from .node import FLOW_KIND_PREDEFINED, PureNode
+from .planned_behavior import (
+    PLANNED_BEHAVIOR_PYTHON_STUB,
+    PlannedBehavior,
+    blocking_planned_behavior,
+    effective_planned_behavior,
+    hash_file,
+    resolve_stub_module_path,
+)
 from .registry import NodeRegistry
-from .runtime_config import effective_node_params, nested_node_config_overrides, normalize_node_config_overrides
+from .runtime_config import (
+    ConfigScope,
+    attach_global_config,
+    merge_config_scopes,
+    nested_node_config_overrides,
+    node_invocation_scope,
+    normalize_config_scope,
+    normalize_node_config_overrides,
+    scoped_node_params,
+)
 
 
 @dataclass(frozen=True)
@@ -16,8 +34,8 @@ class NodeFrame:
     name: str
     node_type: str
     node: PureNode | None
-    requires: tuple[str, ...]
-    provides: tuple[str, ...]
+    requires: tuple[DataRequirement, ...]
+    provides: tuple[DataProvider, ...]
     params: Mapping[str, object]
     incoming: tuple[EdgeSpec, ...]
     outgoing: tuple[EdgeSpec, ...]
@@ -25,10 +43,30 @@ class NodeFrame:
     is_terminal: bool
     is_nodeset: bool
     nodeset_name: str = ""
-    exports: tuple[str, ...] = ()
+    exports: tuple[DataProvider, ...] = ()
     async_mode: str = ""
     result_key: str = ""
     subplan: "ExecutionPlan | None" = None
+    planned_behavior: PlannedBehavior = field(default_factory=blocking_planned_behavior)
+    planned_stub_module: str = ""
+    planned_stub_path: str = ""
+    planned_stub_hash: str = ""
+
+    @property
+    def is_planned_stub(self) -> bool:
+        return self.planned_behavior.kind == PLANNED_BEHAVIOR_PYTHON_STUB
+
+    @property
+    def require_types(self) -> tuple[str, ...]:
+        return requirement_types(self.requires)
+
+    @property
+    def provide_keys(self) -> tuple[str, ...]:
+        return provider_keys(self.provides)
+
+    @property
+    def export_keys(self) -> tuple[str, ...]:
+        return provider_keys(self.exports)
 
 
 @dataclass(frozen=True)
@@ -57,11 +95,13 @@ def build_execution_plan(
     *,
     registry: NodeRegistry,
     node_config_overrides: Mapping[str, Mapping[str, Any]] | None = None,
+    global_config: Mapping[str, Any] | ConfigScope | None = None,
     runtime_options: object | None = None,
 ) -> ExecutionPlan:
     overrides = normalize_node_config_overrides(node_config_overrides or {})
+    scope = normalize_config_scope(global_config)
     frames = {
-        spec.name: _frame_for(spec, graph=graph, compiled=compiled, registry=registry, overrides=overrides, runtime_options=runtime_options)
+        spec.name: _frame_for(spec, graph=graph, compiled=compiled, registry=registry, overrides=overrides, global_scope=scope, runtime_options=runtime_options)
         for spec in graph.nodes
     }
     order = tuple(node.name for node in graph.nodes)
@@ -90,17 +130,36 @@ def _frame_for(
     compiled: CompiledGraph,
     registry: NodeRegistry,
     overrides: Mapping[str, Mapping[str, Any]],
+    global_scope: ConfigScope,
     runtime_options: object | None,
 ) -> NodeFrame:
     incoming = tuple(edge for edge in compiled.effective_edges if edge.target == spec.name)
     outgoing = tuple(edge for edge in compiled.effective_edges if edge.source == spec.name)
     is_nodeset = spec.node_type.startswith("nodeset.")
     nodeset_name = spec.node_type.removeprefix("nodeset.") if is_nodeset else ""
+    nodeset = graph.nodesets.get(nodeset_name) if is_nodeset else None
     flow_kind = compiled.flow_kinds.get(spec.name, "")
+    planned_behavior = effective_planned_behavior(spec, nodeset)
+    if planned_behavior.kind == PLANNED_BEHAVIOR_PYTHON_STUB:
+        return _planned_stub_frame(
+            spec,
+            graph=graph,
+            incoming=incoming,
+            outgoing=outgoing,
+            flow_kind=flow_kind or (nodeset.flow_kind if nodeset is not None else ""),
+            nodeset=nodeset,
+            nodeset_name=nodeset_name,
+            behavior=planned_behavior,
+            overrides=overrides,
+            global_scope=global_scope,
+        )
     if is_nodeset:
         nodeset = graph.nodesets[nodeset_name]
         nested_overrides = nested_node_config_overrides(spec, overrides)
         subcompiled = _compile_nodeset(nodeset.graph, registry=registry)
+        caller_values = {**dict(spec.params), **dict(global_scope.values), **dict(overrides.get(spec.name, {}))}
+        caller_scope = node_invocation_scope(caller_values, allow_config_override=spec.allow_config_override)
+        child_scope = merge_config_scopes(normalize_config_scope(nodeset.global_config), caller_scope)
         return NodeFrame(
             name=spec.name,
             node_type=spec.node_type,
@@ -117,17 +176,20 @@ def _frame_for(
             exports=nodeset.exports,
             async_mode=spec.async_mode,
             result_key=spec.result_key,
-            subplan=build_execution_plan(nodeset.graph, subcompiled, registry=registry, node_config_overrides=nested_overrides, runtime_options=runtime_options),
+            subplan=build_execution_plan(nodeset.graph, subcompiled, registry=registry, node_config_overrides=nested_overrides, global_config=child_scope, runtime_options=runtime_options),
         )
     node_cls = registry.get(spec.node_type)
     node = node_cls()
+    config_spec = registry.get_config_spec(spec.node_type)
+    scoped_params = scoped_node_params(spec.params, global_scope, declared_keys=set(config_spec.schema))
+    node_params = registry.merge_config(spec.node_type, {**scoped_params, **dict(overrides.get(spec.name, {}))})
     return NodeFrame(
         name=spec.name,
         node_type=spec.node_type,
         node=node,
         requires=spec.requires,
         provides=spec.provides,
-        params=registry.merge_config(spec.node_type, effective_node_params(spec, overrides)),
+        params=attach_global_config(node_params, global_scope.values),
         incoming=incoming,
         outgoing=outgoing,
         flow_kind=flow_kind,
@@ -135,6 +197,53 @@ def _frame_for(
         is_nodeset=False,
         async_mode=spec.async_mode,
         result_key=spec.result_key,
+    )
+
+
+def _planned_stub_frame(
+    spec: NodeSpec,
+    *,
+    graph: GraphConfig,
+    incoming: tuple[EdgeSpec, ...],
+    outgoing: tuple[EdgeSpec, ...],
+    flow_kind: str,
+    nodeset: object | None,
+    nodeset_name: str,
+    behavior: PlannedBehavior,
+    overrides: Mapping[str, Mapping[str, Any]],
+    global_scope: ConfigScope,
+) -> NodeFrame:
+    params = {**dict(spec.params), **dict(global_scope.values), **dict(overrides.get(spec.name, {}))}
+    stub_path = ""
+    stub_hash = ""
+    try:
+        path = resolve_stub_module_path(behavior.stub_module, graph.project_root)
+        stub_path = str(path)
+        if path.is_file():
+            stub_hash = hash_file(path)
+    except Exception:
+        stub_path = behavior.stub_module
+    exports = tuple(getattr(nodeset, "exports", ())) if nodeset is not None else ()
+    return NodeFrame(
+        name=spec.name,
+        node_type=spec.node_type,
+        node=None,
+        requires=spec.requires,
+        provides=spec.provides,
+        params=attach_global_config(params, global_scope.values),
+        incoming=incoming,
+        outgoing=outgoing,
+        flow_kind=flow_kind,
+        is_terminal=flow_kind == "terminal",
+        is_nodeset=nodeset is not None,
+        nodeset_name=nodeset_name,
+        exports=exports,
+        async_mode=spec.async_mode,
+        result_key=spec.result_key,
+        planned_behavior=behavior,
+        planned_stub_module=behavior.stub_module,
+        planned_stub_path=stub_path,
+        planned_stub_hash=stub_hash,
     )
 
 

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .base_lib import node_base_lib_imports, scan_base_lib, summarize_base_lib_dependency_chain
 from .cli_reports import error_report, fail_report
+from .data_contract import providers_to_dicts, requirements_to_dicts
 from .health_base_lib import append_dependency_chain_findings, base_lib_finding_to_health, matching_unhealthy_base_module
 from .health_types import HealthFinding, HealthReport
 from .node import NodeContract, NodeInfo, PureNode
@@ -106,8 +107,8 @@ def contract_payload(contract: object) -> dict[str, object]:
     if not isinstance(contract, NodeContract):
         return {}
     return {
-        "requires": list(contract.requires),
-        "provides": list(contract.provides),
+        "requires": requirements_to_dicts(contract.requires),
+        "provides": providers_to_dicts(contract.provides),
         "input_semantics": {key: list(value) for key, value in contract.input_semantics.items()},
         "output_semantics": {key: list(value) for key, value in contract.output_semantics.items()},
         "params_schema": dict(contract.params_schema),

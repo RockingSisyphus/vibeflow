@@ -1,0 +1,38 @@
+{
+  "pipeline": {
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {
+        "name": "left",
+        "type": "sandbox.branch_left",
+        "provides": [{"key": "branch.left", "type": "branch_result"}],
+        "value": 4
+      },
+      {
+        "name": "right",
+        "type": "sandbox.branch_right",
+        "provides": [{"key": "branch.right", "type": "branch_result"}],
+        "value": 6
+      },
+      {
+        "name": "consume_branch",
+        "type": "semantic.branch_type_consumer",
+        "requires": [{"type": "branch_result", "cardinality": "exactly_one"}],
+        "provides": [{"key": "branch.final", "type": "final_result"}]
+      },
+      {
+        "name": "end",
+        "type": "semantic.branch_final_end",
+        "requires": [{"type": "final_result", "cardinality": "exactly_one"}]
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "left"},
+      {"from": "start", "to": "right"},
+      {"from": "left", "to": "consume_branch"},
+      {"from": "right", "to": "consume_branch"},
+      {"from": "consume_branch", "to": "end"}
+    ],
+    "outputs": [{"type": "final_result", "cardinality": "exactly_one"}]
+  }
+}

@@ -8,14 +8,17 @@ from typing import Any, Mapping
 from uuid import uuid4
 
 from .config_loader import ConfigLoadError, load_config_document
+from .config_resources import ConfigResources, load_config_resources
 from .config_schema import collect_config_schema_findings
 from .health_types import HealthFinding, HealthReport
 from .plugin import load_plugins_from_config
 from .policy import default_effective_policy, resolve_effective_policy
 from .summaries import summarize_mapping
 
-from .graph_config import GraphConfig, STATUS_PLANNED
+from .graph_config import GraphConfig
+from .planned_behavior import project_root_for_config
 from .registry import NodeRegistry
+from .runtime_options import runtime_options as normalize_runtime_options
 
 
 @dataclass(frozen=True)
@@ -55,6 +58,7 @@ def run_checked(
 
     document = _load_document_or_refuse(path, run_dir, actual_run_id)
     plugin_registry = _load_plugins_or_refuse(document.data, path, run_dir, actual_run_id)
+    resources, resource_findings = load_config_resources(document.data, base_path=path.parent, plugin_registry=plugin_registry)
     policy_result = resolve_effective_policy(
         document.data,
         config_path=path,
@@ -63,15 +67,15 @@ def run_checked(
     )
     effective_policy = policy_result.effective_policy.to_dict()
     _write_json(run_dir / "effective_policy.json", effective_policy)
-    _refuse_on_schema_findings(document.data, policy_result.findings, effective_policy, run_dir, actual_run_id)
-    graph, compiled = _compile_or_refuse(document.data, plugin_registry, effective_policy, run_dir, actual_run_id)
-    health = _validate_run_health(graph, registry, plugin_registry, policy_result, effective_policy, document.nodeset_imports)
-    _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry)
+    _refuse_on_schema_findings(document.data, (*resource_findings, *policy_result.findings), effective_policy, run_dir, actual_run_id)
+    graph, compiled = _compile_or_refuse(document.data, plugin_registry, effective_policy, run_dir, actual_run_id, config_path=path)
+    health = _validate_run_health(graph, registry, plugin_registry, policy_result, effective_policy, document.nodeset_imports, resources)
+    _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources, runtime_options=runtime_options)
     if health.status not in {"FAIL", "ERROR"}:
         compiled = _compile_with_registry_or_refuse(graph, registry, effective_policy, run_dir, actual_run_id)
-    _write_preflight_artifacts(run_dir, graph, compiled, health, registry=registry)
+    _write_preflight_artifacts(run_dir, graph, compiled, health, registry=registry, resources=resources)
     _refuse_on_health_failure(health, run_dir, actual_run_id)
-    context = _execute_runtime(graph, registry, plugin_registry, initial, run_dir, runtime_options)
+    context = _execute_runtime(graph, registry, plugin_registry, initial, run_dir, runtime_options, resources)
     _write_json(run_dir / "output_summary.json", summarize_mapping(dict(context.iter_flat_items())))
     return CheckedRunResult(actual_run_id, run_dir, health, context)
 
@@ -122,7 +126,7 @@ def _refuse_on_schema_findings(
 
 
 def _schema_health_report(findings: tuple[HealthFinding, ...], effective_policy: dict[str, Any]) -> HealthReport:
-    status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin"} for finding in findings) else "FAIL"
+    status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin", "base_lib"} for finding in findings) else "FAIL"
     return HealthReport(
         status=status,
         errors=tuple(finding for finding in findings if finding.severity == "error"),
@@ -137,12 +141,14 @@ def _compile_or_refuse(
     effective_policy: dict[str, Any],
     run_dir: Path,
     run_id: str,
+    *,
+    config_path: Path,
 ):
     from .compiler import GraphCompiler
     from .graph_config import GraphConfigError, parse_graph_config
 
     try:
-        graph = parse_graph_config(config_data)
+        graph = parse_graph_config(config_data, project_root=project_root_for_config(config_path))
         compiled = GraphCompiler().compile(graph, plugin_registry=plugin_registry)
     except (GraphConfigError, Exception) as exc:
         health = _compile_health_report(exc, effective_policy)
@@ -196,6 +202,7 @@ def _validate_run_health(
     policy_result,
     effective_policy: dict[str, Any],
     nodeset_imports: tuple[Mapping[str, Any], ...],
+    resources: ConfigResources,
 ) -> HealthReport:
     from .health import validate_graph_health
 
@@ -203,23 +210,25 @@ def _validate_run_health(
         graph,
         registry=registry,
         plugin_registry=plugin_registry,
+        global_config=resources.global_config,
         purity_policy=policy_result.effective_policy.to_purity_policy(),
         effective_policy=policy_result.effective_policy,
     )
     info = dict(health.info)
     info["nodeset_imports"] = [dict(item) for item in nodeset_imports]
+    info["resources"] = resources.to_dict()
     return replace(health, effective_policy=effective_policy, info=info)
 
 
-def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None) -> None:
+def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None, resources: ConfigResources | None = None) -> None:
     from .ascii_flowchart import export_ascii_flowchart
     from .mermaid import compiled_graph_payload, export_mermaid
     from .mermaid_render import MermaidRenderError, render_mermaid_svg
 
     _write_json(run_dir / "health_report.json", health.to_dict())
-    _write_json(run_dir / "compiled_graph.json", compiled_graph_payload(graph, compiled))
+    _write_json(run_dir / "compiled_graph.json", compiled_graph_payload(graph, compiled, resources=resources))
     (run_dir / "graph.txt").write_text(export_ascii_flowchart(graph, compiled=compiled, registry=registry, health_report=health), encoding="utf-8")
-    mermaid_text = export_mermaid(graph, compiled=compiled, registry=registry, health_report=health)
+    mermaid_text = export_mermaid(graph, compiled=compiled, registry=registry, health_report=health, resources=resources)
     (run_dir / "graph.mmd").write_text(mermaid_text, encoding="utf-8")
     try:
         render_mermaid_svg(mermaid_text, run_dir / "graph.svg")
@@ -234,37 +243,45 @@ def _refuse_on_health_failure(health: HealthReport, run_dir: Path, run_id: str) 
         raise CheckedRunError(f"run refused: health status {health.status}", result)
 
 
-def _refuse_on_planned_run(graph: GraphConfig, health: HealthReport, run_dir: Path, run_id: str, *, registry: NodeRegistry) -> None:
+def _refuse_on_planned_run(
+    graph: GraphConfig,
+    health: HealthReport,
+    run_dir: Path,
+    run_id: str,
+    *,
+    registry: NodeRegistry,
+    resources: ConfigResources,
+    runtime_options: object | None,
+) -> None:
     from .compiler import GraphCompiler
+    from .runtime_helpers import planned_items
 
-    planned = _planned_items(graph)
+    options = normalize_runtime_options(runtime_options)
+    planned = planned_items(graph)
     if not planned:
         return
+    if options.allow_planned_stub and all(item.get("behavior") == "python_stub" for item in planned):
+        return
+    planned_ids = [str(item.get("id", "")) for item in planned]
+    non_stub = [str(item.get("id", "")) for item in planned if item.get("behavior") != "python_stub"]
+    reason = "planned nodes/nodesets cannot run"
+    if options.allow_planned_stub:
+        reason = "only planned python_stub nodes/nodesets can run with allow_planned_stub"
     error = HealthFinding(
         rule_id="GRAPH.PLANNED.NODE_IN_RUN",
         severity="error",
         object_type="pipeline",
         object_id="pipeline",
         failure_layer="topology",
-        message="planned nodes/nodesets cannot run: " + ", ".join(planned),
+        message=f"{reason}: " + ", ".join(non_stub or planned_ids),
         suggested_fix_type="implement_node",
-        details={"planned": planned},
+        details={"planned": [dict(item) for item in planned], "allow_planned_stub": options.allow_planned_stub},
     )
     failed = replace(health, status="FAIL", errors=(*health.errors, error))
-    _write_preflight_artifacts(run_dir, graph, GraphCompiler().compile(graph, registry=registry), failed, registry=registry)
+    _write_preflight_artifacts(run_dir, graph, GraphCompiler().compile(graph, registry=registry), failed, registry=registry, resources=resources)
     _ensure_trace_files(run_dir)
     result = CheckedRunResult(run_id, run_dir, failed)
     raise CheckedRunError("run refused: planned nodes are not executable", result)
-
-
-def _planned_items(graph: GraphConfig, *, prefix: str = "") -> list[str]:
-    items = [f"{prefix}{node.name}" for node in graph.nodes if node.status == STATUS_PLANNED]
-    for name, nodeset in graph.nodesets.items():
-        full_name = f"{prefix}nodeset.{name}"
-        if nodeset.status == STATUS_PLANNED:
-            items.append(full_name)
-        items.extend(_planned_items(nodeset.graph, prefix=f"{full_name}."))
-    return items
 
 
 def _execute_runtime(
@@ -274,6 +291,7 @@ def _execute_runtime(
     initial: Mapping[str, Any] | None,
     run_dir: Path,
     runtime_options: object | None,
+    resources: ConfigResources,
 ):
     from .runtime import PipelineRuntime
 
@@ -282,6 +300,7 @@ def _execute_runtime(
         registry=registry,
         plugin_registry=plugin_registry,
         run_dir=run_dir,
+        global_config=resources.global_config,
         runtime_options=runtime_options,
     )
     try:

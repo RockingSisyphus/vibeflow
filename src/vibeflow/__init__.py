@@ -4,7 +4,8 @@ from .base_lib import BaseLibDependencySummary, BaseLibFinding, BaseLibModuleRep
 from .architecture_report import build_architecture_report
 from .config_loader import ConfigDocument, ConfigLoadError, load_config_document, strip_jsonc_comments
 from .compiler import CompiledGraph, GraphCompileError, GraphCompiler
-from .context import Context
+from .config_resources import BaseLibInfo, BaseLibResource, ConfigResources, PluginInfo, PluginResource, load_config_resources
+from .data_contract import DataEnvelope, DataProvider, DataRequirement, RunResult
 from .execution_plan import CompiledBlock, ExecutionPlan, NodeFrame, build_execution_plan
 from .graph_config import EdgeSpec, GraphConfig, NodeSpec, NodesetSpec, parse_graph_config
 from .health import HealthFinding, HealthReport, validate_graph_health
@@ -15,6 +16,7 @@ from .node import FLOW_KINDS, FLOW_KIND_DATA_STORE, FLOW_KIND_DECISION, FLOW_KIN
 from .node_config import NodeConfigSpec
 from .policy import EffectivePolicy, PolicyResolveResult, default_effective_policy, resolve_effective_policy
 from .plugin import CompilerPlugin, PluginDescriptor, PluginRegistry, PolicyPlugin, RuntimePlugin, load_plugins_from_config
+from .planned_behavior import PlannedBehavior
 from .purity import NodeMetrics, collect_node_metrics
 from .registry import NodeRegistry, NodeRegistryError
 from .resources import schema_text
@@ -27,16 +29,21 @@ __all__ = [
     "CompiledBlock",
     "ConfigDocument",
     "ConfigLoadError",
-    "Context",
     "CheckedRunError",
     "CheckedRunResult",
     "BaseLibFinding",
     "BaseLibDependencySummary",
+    "BaseLibInfo",
     "BaseLibModuleReport",
+    "BaseLibResource",
     "BaseLibScanReport",
     "build_architecture_report",
     "build_execution_plan",
     "CompilerPlugin",
+    "ConfigResources",
+    "DataEnvelope",
+    "DataProvider",
+    "DataRequirement",
     "EdgeSpec",
     "EffectivePolicy",
     "ExecutionPlan",
@@ -65,11 +72,15 @@ __all__ = [
     "NodeRegistryError",
     "NodeSpec",
     "PluginDescriptor",
+    "PluginInfo",
     "PluginRegistry",
+    "PluginResource",
+    "PlannedBehavior",
     "PolicyPlugin",
     "PolicyResolveResult",
     "RuntimePlugin",
     "RuntimeOptions",
+    "RunResult",
     "STABLE_PUBLIC_API",
     "NodesetSpec",
     "PipelineRuntime",
@@ -81,6 +92,7 @@ __all__ = [
     "export_ascii_flowchart",
     "is_mermaid_svg_renderer_available",
     "load_config_document",
+    "load_config_resources",
     "load_plugins_from_config",
     "parse_graph_config",
     "resolve_effective_policy",

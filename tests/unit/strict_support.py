@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 
 from vibeflow import (
+    DataProvider,
+    DataRequirement,
     ConfigLoadError,
     ExecutionPlan,
     GraphCompileError,
@@ -23,7 +25,9 @@ from vibeflow import (
     PipelineRuntimeError,
     RuntimeOptions,
     CheckedRunError,
+    BaseLibInfo,
     PluginRegistry,
+    PluginInfo,
     STABLE_PUBLIC_API,
     schema_text,
     export_ascii_flowchart,
@@ -45,6 +49,22 @@ from vibeflow.purity_types import PurityPolicy
 
 from .strict_support_boundaries import *
 from .strict_support_runtime_nodes import *
+
+
+def REQ_SPEC(data_type: str, cardinality: str = "exactly_one") -> dict[str, str]:
+    return {"type": data_type, "cardinality": cardinality}
+
+
+def PROV_SPEC(key: str, data_type: str | None = None) -> dict[str, str]:
+    return {"key": key, "type": data_type or key}
+
+
+def _requirement_specs(values: list[str] | None) -> list[dict[str, str]]:
+    return [REQ_SPEC(value) for value in values or []]
+
+
+def _provider_specs(values: list[str] | None) -> list[dict[str, str]]:
+    return [PROV_SPEC(value) for value in values or []]
 
 
 def cli_main(args):
@@ -79,7 +99,7 @@ class BadIoNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        provides=("value.out",),
+        provides=(DataProvider(key="value.out", type="value.out"),),
         output_semantics={"value.out": ("output value",)},
         output_schema={"value.out": {"type": "number"}},
     )
@@ -123,9 +143,9 @@ def _nodeset_config(
         "description": f"Composite flow for {name}.",
         "version": "0.1.0",
         "purity": "pure",
-        "requires": requires or [],
-        "provides": provides or ["value.out"],
-        "exports": exports or ["value.out"],
+        "requires": _requirement_specs(requires),
+        "provides": _provider_specs(provides or ["value.out"]),
+        "exports": _provider_specs(exports or ["value.out"]),
         "pipeline": pipeline,
     }
 
@@ -135,47 +155,61 @@ def _edge_chain(*names: str) -> list[dict[str, str]]:
 
 
 def _seed_add_pipeline(*, seed: dict | None = None, add: dict | None = None) -> dict:
-    seed_node = {"name": "seed", "type": "test.seed", "provides": ["value.in"], **(seed or {})}
-    add_node = {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"], **(add or {})}
+    seed_node = {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")], **(seed or {})}
+    add_node = {"name": "add", "type": "test.add", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")], **(add or {})}
     return {
         "nodes": [
             {"name": "start", "type": "test.start"},
             seed_node,
             add_node,
-            {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+            {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
         ],
         "edges": _edge_chain("start", "seed", "add", "end"),
+        "outputs": [REQ_SPEC("value.out")],
     }
 
 
 def _seed_only_pipeline(*, seed: dict | None = None) -> dict:
-    seed_node = {"name": "seed", "type": "test.seed", "provides": ["value.in"], **(seed or {})}
+    seed_node = {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")], **(seed or {})}
     return {
         "nodes": [
             {"name": "start", "type": "test.start"},
             seed_node,
-            {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+            {"name": "end", "type": "test.in_end", "requires": [REQ_SPEC("value.in")]},
         ],
         "edges": _edge_chain("start", "seed", "end"),
+        "outputs": [REQ_SPEC("value.in")],
     }
 
 
 def _input_add_pipeline(*, add: dict | None = None) -> dict:
-    add_node = {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"], **(add or {})}
+    add_node = {"name": "add", "type": "test.add", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")], **(add or {})}
     add_name = str(add_node["name"])
     return {
-        "inputs": ["value.in"],
+        "inputs": [PROV_SPEC("value.in")],
         "nodes": [
             {"name": "start", "type": "test.start"},
-            {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
+            {"name": "input", "type": "test.value_input", "requires": [REQ_SPEC("value.in")]},
             add_node,
-            {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+            {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
         ],
         "edges": _edge_chain("start", "input", add_name, "end"),
+        "outputs": [REQ_SPEC("value.out")],
     }
 
 
-VALID_NODE_IMPORT = "from vibeflow import NodeContract, NodeInfo\n\n"
+VALID_NODE_IMPORT = """from vibeflow import DataProvider, DataRequirement, NodeContract, NodeInfo
+
+
+def REQ(data_type: str, cardinality: str = "exactly_one") -> DataRequirement:
+    return DataRequirement(type=data_type, cardinality=cardinality)
+
+
+def PROV(key: str, data_type: str | None = None) -> DataProvider:
+    return DataProvider(key=key, type=data_type or key)
+
+
+""".rstrip() + "\n\n"
 
 
 VALID_NODE_INFO = """
@@ -192,7 +226,7 @@ VALID_NODE_INFO = """
 
 VALID_NODE_CONTRACT = """
     CONTRACT = NodeContract(
-        provides=("demo.out",),
+        provides=(PROV("demo.out"),),
         output_semantics={"demo.out": ("demo output",)},
         output_schema={"demo.out": {"type": "number"}},
         examples=({"inputs": {}, "params": {}},),
@@ -268,7 +302,7 @@ def _failure_case_source(case: dict[str, object]) -> str:
 {VALID_NODE_IMPORT}
 class OtherNode:
     NODE_INFO = NodeInfo(type_key="demo.other", display_name="Other", category="demo", description="Other node.", version="0.1.0", flow_kind="process")
-    CONTRACT = NodeContract(provides=("other.out",), output_semantics={{"other.out": ("other output",)}}, output_schema={{"other.out": {{"type": "number"}}}}, examples=({{"inputs": {{}}, "params": {{}}}},))
+    CONTRACT = NodeContract(provides=(PROV("other.out"),), output_semantics={{"other.out": ("other output",)}}, output_schema={{"other.out": {{"type": "number"}}}}, examples=({{"inputs": {{}}, "params": {{}}}},))
 
     def run_pure(self, inputs, params):
         return {{"other.out": 1}}

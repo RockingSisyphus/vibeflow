@@ -1,9 +1,17 @@
 from __future__ import annotations
 
-from vibeflow import HealthFinding
+from vibeflow import HealthFinding, PluginInfo
 
 
 class PolicyPlugin:
+    PLUGIN_INFO = PluginInfo(
+        name="sandbox_policy",
+        plugin_type="policy",
+        display_name="Sandbox Policy",
+        category="policy",
+        description="Adds sandbox base_lib and maintainability policy.",
+        version="0.1.0",
+    )
     name = "sandbox_policy"
     priority = 10
 
@@ -25,6 +33,14 @@ class PolicyPlugin:
 
 
 class FindingPlugin:
+    PLUGIN_INFO = PluginInfo(
+        name="sandbox_finding",
+        plugin_type="policy",
+        display_name="Sandbox Finding",
+        category="policy",
+        description="Adds sandbox graph and node findings.",
+        version="0.1.0",
+    )
     name = "sandbox_finding"
     priority = 20
 

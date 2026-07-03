@@ -13,6 +13,7 @@ class RuntimeOptions:
     block_hooks: bool = True
     execution: str = "plan"
     async_flush_timeout: float | None = None
+    allow_planned_stub: bool = False
 
     def __post_init__(self) -> None:
         if self.trace not in {"full", "boundary", "off"}:

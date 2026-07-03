@@ -2,7 +2,7 @@
 
 使用方法：
 
-1. 把仓库的 `src/vibeflow/` 复制到本项目的 `kernel/vibeflow/`。
+1. 使用 `build_distribution.py` 生成包含 `kernel/vibeflow-kernel.zip` 的完整开发包。
 2. 把本目录内容复制到新项目根目录。
 3. 在 `project/nodes/` 中开发业务 node。
 4. 在 `project/registry.py` 中注册 node。
@@ -16,6 +16,8 @@ python run.py mermaid --config project/configs/main.jsonc --output reports/graph
 python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
 python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
 ```
+
+`svg` 默认会为 Mermaid CLI 放大渲染上限：普通图使用 `maxTextSize=200000`、`maxEdges=2000`；`--expand-nodesets` 使用 `maxTextSize=500000`、`maxEdges=5000`。超大图可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
 
 如果要使用 `svg`，确保项目根目录存在 `tools/mermaid-renderer/`，并先执行：
 

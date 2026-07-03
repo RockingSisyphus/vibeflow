@@ -1,14 +1,58 @@
 {
   "pipeline": {
-    "inputs": ["train.batch"],
+    "inputs": [
+      {
+        "key": "train.batch",
+        "type": "train.batch"
+      }
+    ],
     "nodes": [
-      {"name": "start", "type": "sandbox.start"},
-      {"name": "metrics", "type": "sandbox.batch_metrics", "requires": ["train.batch"], "provides": ["train.metrics"]},
-      {"name": "end", "type": "sandbox.training_metrics_end", "requires": ["train.metrics"]}
+      {
+        "name": "start",
+        "type": "sandbox.start"
+      },
+      {
+        "name": "metrics",
+        "type": "sandbox.batch_metrics",
+        "requires": [
+          {
+            "type": "train.batch",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "train.metrics",
+            "type": "train.metrics"
+          }
+        ]
+      },
+      {
+        "name": "end",
+        "type": "sandbox.training_metrics_end",
+        "requires": [
+          {
+            "type": "train.metrics",
+            "cardinality": "exactly_one"
+          }
+        ]
+      }
     ],
     "edges": [
-      {"from": "start", "to": "metrics"},
-      {"from": "metrics", "to": "end"}
+      {
+        "from": "start",
+        "to": "metrics"
+      },
+      {
+        "from": "metrics",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "train.metrics",
+        "cardinality": "exactly_one"
+      }
     ]
   }
 }

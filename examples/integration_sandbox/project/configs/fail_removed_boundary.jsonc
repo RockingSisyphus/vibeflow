@@ -1,8 +1,19 @@
 {
-  "boundary": {"type": "sandbox.demo_boundary"},
+  "boundary": {
+    "type": "sandbox.demo_boundary"
+  },
   "pipeline": {
     "nodes": [
-      {"name": "seed", "type": "sandbox.constant", "provides": ["value.in"]}
+      {
+        "name": "seed",
+        "type": "sandbox.constant",
+        "provides": [
+          {
+            "key": "value.in",
+            "type": "value.in"
+          }
+        ]
+      }
     ]
   }
 }

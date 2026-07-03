@@ -1,18 +1,95 @@
 {
   "pipeline": {
-    "inputs": ["train.batch"],
+    "inputs": [
+      {
+        "key": "train.batch",
+        "type": "train.batch"
+      }
+    ],
     "nodes": [
-      {"name": "start", "type": "sandbox.start"},
-      {"name": "metrics", "type": "sandbox.batch_metrics", "requires": ["train.batch"], "provides": ["train.metrics"], "async": "detached"},
-      {"name": "seed", "type": "sandbox.constant", "provides": ["value.in"], "value": 4},
-      {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 6},
-      {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+      {
+        "name": "start",
+        "type": "sandbox.start"
+      },
+      {
+        "name": "metrics",
+        "type": "sandbox.batch_metrics",
+        "requires": [
+          {
+            "type": "train.batch",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "train.metrics",
+            "type": "train.metrics"
+          }
+        ],
+        "async": "detached"
+      },
+      {
+        "name": "seed",
+        "type": "sandbox.constant",
+        "provides": [
+          {
+            "key": "value.in",
+            "type": "value.in"
+          }
+        ],
+        "value": 4
+      },
+      {
+        "name": "add",
+        "type": "sandbox.add",
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out"
+          }
+        ],
+        "delta": 6
+      },
+      {
+        "name": "end",
+        "type": "sandbox.out_value_end",
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one"
+          }
+        ]
+      }
     ],
     "edges": [
-      {"from": "start", "to": "metrics"},
-      {"from": "metrics", "to": "seed"},
-      {"from": "seed", "to": "add"},
-      {"from": "add", "to": "end"}
+      {
+        "from": "start",
+        "to": "metrics"
+      },
+      {
+        "from": "metrics",
+        "to": "seed"
+      },
+      {
+        "from": "seed",
+        "to": "add"
+      },
+      {
+        "from": "add",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one"
+      }
     ]
   }
 }

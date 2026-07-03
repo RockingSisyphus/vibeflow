@@ -1,0 +1,306 @@
+{
+  "global_config": {
+    "config": {
+      "addend": 5,
+      "multiplier": 3,
+      "subtrahend": 4,
+      "divisor": 1
+    },
+    "allow_config_override": true
+  },
+  "base_lib": {
+    "paths": [
+      "../base_lib"
+    ],
+    "modules": [
+      {
+        "module": "base_lib.good_math",
+        "status": "implemented"
+      },
+      {
+        "module": "base_lib.good_chain_a",
+        "status": "implemented"
+      },
+      {
+        "module": "base_lib.sandbox_arithmetic",
+        "status": "implemented"
+      },
+      {
+        "module": "base_lib.future_arithmetic",
+        "status": "planned",
+        "description": "planned arithmetic helpers for later sandbox cases"
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "module": "plugins.value_plugin",
+      "class": "ValueShiftPlugin",
+      "type": "runtime",
+      "status": "implemented",
+      "config": {
+        "shift": 9
+      }
+    },
+    {
+      "name": "future_value_plugin",
+      "type": "runtime",
+      "status": "planned",
+      "description": "planned runtime value hook"
+    }
+  ],
+  "nodesets": [
+    {
+      "name": "math.configured_finalize",
+      "display_name": "Configured Finalize",
+      "category": "math",
+      "description": "Scales a resource arithmetic value and finalizes it with nodeset call config.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": [
+        {
+          "type": "calc.resource",
+          "cardinality": "exactly_one"
+        }
+      ],
+      "provides": [
+        {
+          "key": "calc.final",
+          "type": "calc.final"
+        }
+      ],
+      "exports": [
+        {
+          "key": "calc.final",
+          "type": "calc.final"
+        }
+      ],
+      "global_config": {
+        "config": {
+          "factor": 2,
+          "offset": 1
+        },
+        "allow_config_override": false
+      },
+      "pipeline": {
+        "inputs": [
+          {
+            "key": "calc.resource",
+            "type": "calc.resource"
+          }
+        ],
+        "nodes": [
+          {
+            "name": "start",
+            "type": "sandbox.start"
+          },
+          {
+            "name": "scale",
+            "type": "sandbox.resource_scale",
+            "requires": [
+              {
+                "type": "calc.resource",
+                "cardinality": "exactly_one"
+              }
+            ],
+            "provides": [
+              {
+                "key": "calc.scaled",
+                "type": "calc.scaled"
+              }
+            ],
+            "factor": 100
+          },
+          {
+            "name": "use_scaled",
+            "type": "semantic.use_scaled",
+            "requires": [
+              {
+                "type": "calc.scaled",
+                "cardinality": "exactly_one"
+              }
+            ],
+            "provides": [
+              {
+                "key": "calc.branch",
+                "type": "calc.branch"
+              }
+            ]
+          },
+          {
+            "name": "finalize",
+            "type": "semantic.finalize",
+            "requires": [
+              {
+                "type": "calc.branch",
+                "cardinality": "exactly_one"
+              }
+            ],
+            "provides": [
+              {
+                "key": "calc.final",
+                "type": "calc.final"
+              }
+            ],
+            "offset": -100
+          },
+          {
+            "name": "end",
+            "type": "semantic.final_end",
+            "requires": [
+              {
+                "type": "calc.final",
+                "cardinality": "exactly_one"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "start",
+            "to": "scale"
+          },
+          {
+            "from": "scale",
+            "to": "use_scaled"
+          },
+          {
+            "from": "use_scaled",
+            "to": "finalize"
+          },
+          {
+            "from": "finalize",
+            "to": "end"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "calc.final",
+            "cardinality": "exactly_one"
+          }
+        ]
+      }
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "calc.a",
+        "type": "calc.a"
+      },
+      {
+        "key": "calc.b",
+        "type": "calc.b"
+      }
+    ],
+    "nodes": [
+      {
+        "name": "start",
+        "type": "sandbox.start"
+      },
+      {
+        "name": "add_pair",
+        "type": "semantic.add_pair",
+        "requires": [
+          {
+            "type": "calc.a",
+            "cardinality": "exactly_one"
+          },
+          {
+            "type": "calc.b",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.sum",
+            "type": "calc.sum"
+          }
+        ]
+      },
+      {
+        "name": "resource_calc",
+        "type": "sandbox.resource_arithmetic",
+        "requires": [
+          {
+            "type": "calc.sum",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.resource",
+            "type": "calc.resource"
+          }
+        ],
+        "addend": 999,
+        "multiplier": 999,
+        "subtrahend": 999,
+        "divisor": 999
+      },
+      {
+        "name": "configured_finalize",
+        "type": "nodeset.math.configured_finalize",
+        "requires": [
+          {
+            "type": "calc.resource",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.final",
+            "type": "calc.final"
+          }
+        ],
+        "config": {
+          "factor": 4,
+          "offset": 3
+        },
+        "allow_config_override": false
+      },
+      {
+        "name": "end",
+        "type": "semantic.final_end",
+        "requires": [
+          {
+            "type": "calc.final",
+            "cardinality": "exactly_one"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "add_pair"
+      },
+      {
+        "from": "add_pair",
+        "to": "resource_calc"
+      },
+      {
+        "from": "resource_calc",
+        "to": "configured_finalize"
+      },
+      {
+        "from": "configured_finalize",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "calc.final",
+        "cardinality": "exactly_one"
+      },
+      {
+        "type": "calc.resource",
+        "cardinality": "optional_one"
+      },
+      {
+        "type": "calc.sum",
+        "cardinality": "optional_one"
+      }
+    ]
+  }
+}

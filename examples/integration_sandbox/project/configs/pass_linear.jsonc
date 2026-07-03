@@ -1,17 +1,93 @@
 {
   "pipeline": {
     "nodes": [
-      {"name": "start", "type": "sandbox.start"},
-      {"name": "seed", "type": "sandbox.constant", "provides": ["value.in"], "value": 4},
-      {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "config": {"delta": 3}},
-      {"name": "multiply", "type": "sandbox.multiply", "requires": ["value.out"], "provides": ["value.final"], "config": {"factor": 2}},
-      {"name": "end", "type": "sandbox.final_value_end", "requires": ["value.final"]}
+      {
+        "name": "start",
+        "type": "sandbox.start"
+      },
+      {
+        "name": "seed",
+        "type": "sandbox.constant",
+        "provides": [
+          {
+            "key": "value.in",
+            "type": "value.in"
+          }
+        ],
+        "value": 4
+      },
+      {
+        "name": "add",
+        "type": "sandbox.add",
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out"
+          }
+        ],
+        "config": {
+          "delta": 3
+        }
+      },
+      {
+        "name": "multiply",
+        "type": "sandbox.multiply",
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.final",
+            "type": "value.final"
+          }
+        ],
+        "config": {
+          "factor": 2
+        }
+      },
+      {
+        "name": "end",
+        "type": "sandbox.final_value_end",
+        "requires": [
+          {
+            "type": "value.final",
+            "cardinality": "exactly_one"
+          }
+        ]
+      }
     ],
     "edges": [
-      {"from": "start", "to": "seed"},
-      {"from": "seed", "to": "add"},
-      {"from": "add", "to": "multiply"},
-      {"from": "multiply", "to": "end"}
+      {
+        "from": "start",
+        "to": "seed"
+      },
+      {
+        "from": "seed",
+        "to": "add"
+      },
+      {
+        "from": "add",
+        "to": "multiply"
+      },
+      {
+        "from": "multiply",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.final",
+        "cardinality": "exactly_one"
+      }
     ]
   }
 }

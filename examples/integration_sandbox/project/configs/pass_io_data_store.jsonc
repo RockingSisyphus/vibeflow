@@ -1,18 +1,98 @@
 {
   "pipeline": {
-    "inputs": ["io.result"],
+    "inputs": [
+      {
+        "key": "io.result",
+        "type": "io.result"
+      }
+    ],
     "nodes": [
-      {"name": "start", "type": "sandbox.start"},
-      {"name": "input", "type": "sandbox.io_input", "requires": ["io.result"]},
-      {"name": "request", "type": "sandbox.effect_request", "provides": ["effects.request"], "value": 5},
-      {"name": "add_result", "type": "sandbox.io_result_add", "requires": ["io.result"], "provides": ["value.final"], "delta": 1},
-      {"name": "end", "type": "sandbox.final_value_end", "requires": ["value.final"]}
+      {
+        "name": "start",
+        "type": "sandbox.start"
+      },
+      {
+        "name": "input",
+        "type": "sandbox.io_input",
+        "requires": [
+          {
+            "type": "io.result",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "io.result.input",
+            "type": "io.result"
+          }
+        ]
+      },
+      {
+        "name": "request",
+        "type": "sandbox.effect_request",
+        "provides": [
+          {
+            "key": "effects.request",
+            "type": "effects.request"
+          }
+        ],
+        "value": 5
+      },
+      {
+        "name": "add_result",
+        "type": "sandbox.io_result_add",
+        "requires": [
+          {
+            "type": "io.result",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.final",
+            "type": "value.final"
+          }
+        ],
+        "delta": 1
+      },
+      {
+        "name": "end",
+        "type": "sandbox.final_value_end",
+        "requires": [
+          {
+            "type": "value.final",
+            "cardinality": "exactly_one"
+          }
+        ]
+      }
     ],
     "edges": [
-      {"from": "start", "to": "input"},
-      {"from": "input", "to": "request"},
-      {"from": "request", "to": "add_result"},
-      {"from": "add_result", "to": "end"}
+      {
+        "from": "start",
+        "to": "input"
+      },
+      {
+        "from": "input",
+        "to": "request"
+      },
+      {
+        "from": "add_result",
+        "to": "end"
+      },
+      {
+        "from": "input",
+        "to": "add_result"
+      },
+      {
+        "from": "request",
+        "to": "add_result"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.final",
+        "cardinality": "exactly_one"
+      }
     ]
   }
 }

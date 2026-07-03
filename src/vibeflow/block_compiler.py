@@ -4,7 +4,6 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Mapping
 
-from .context import Context
 from .graph_config import EdgeSpec
 from .node import FLOW_KIND_DECISION
 from .runtime_errors import PipelineRuntimeError
@@ -29,7 +28,7 @@ class CompiledBlock:
     exits: tuple[str, ...]
     nodes: tuple[str, ...]
     edge_routes: Mapping[str, tuple[EdgeSpec, ...]]
-    callable: Callable[["PipelineRuntime", Context], CompiledBlockResult]
+    callable: Callable[["PipelineRuntime", object], CompiledBlockResult]
     source: str
     supports_full_trace: bool = False
     supports_node_hooks: bool = False
@@ -46,6 +45,9 @@ class _Instrumentation:
 
 
 def compile_blocks(plan: "ExecutionPlan", runtime_options: object | None = None) -> tuple[CompiledBlock, ...]:
+    # Inbox-mode runtime resolves inputs and delivers payloads through shared runtime
+    # helpers. Old generated blocks used Context.get/set and are intentionally disabled.
+    return ()
     instrumentation = _instrumentation(runtime_options)
     blocks: list[CompiledBlock] = []
     visited: set[str] = set()
@@ -73,7 +75,7 @@ def _instrumentation(runtime_options: object | None) -> _Instrumentation:
     )
 
 
-def select_active_edges(edges: tuple[EdgeSpec, ...], outputs: Mapping[str, object], context: Context) -> tuple[EdgeSpec, ...]:
+def select_active_edges(edges: tuple[EdgeSpec, ...], outputs: Mapping[str, object], context: object) -> tuple[EdgeSpec, ...]:
     values = context.to_dict()
     values.update(dict(outputs))
     return tuple(edge for edge in edges if not edge.when or condition_matches(edge.when, values))
@@ -335,7 +337,7 @@ def _cfg_block_failure_lines() -> list[str]:
 
 
 def _frame_compilable(frame: "NodeFrame") -> bool:
-    return not frame.async_mode and not frame.is_nodeset
+    return not frame.async_mode and not frame.is_nodeset and not frame.is_planned_stub
 
 
 def _outgoing_compilable(frame: "NodeFrame") -> bool:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from base_lib.deep_chain_a import step_a
-from vibeflow import NodeContract, NodeInfo
+from vibeflow import DataProvider, NodeContract, NodeInfo
 
 
 def _info(type_key):
@@ -10,7 +10,7 @@ def _info(type_key):
 
 def _contract():
     return NodeContract(
-        provides=("bad.out",),
+        provides=(DataProvider("bad.out", "bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
         output_schema={"bad.out": {"type": "number"}},
     )

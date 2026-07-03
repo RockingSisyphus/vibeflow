@@ -5,7 +5,10 @@ def test_policy_plugin_tightens_effective_policy_and_health_uses_it(tmp_path) ->
     plugin_path = tmp_path / "tight_plugin.py"
     plugin_path.write_text(
         """
+from vibeflow import PluginInfo
+
 class Plugin:
+    PLUGIN_INFO = PluginInfo("tight_policy", "policy", "Tight Policy", "test", "Tightens node source limits.", "0.1.0")
     name = "tight_policy"
     priority = 1
 
@@ -38,7 +41,10 @@ class Plugin:
         (
             "relax_plugin.py",
             """
+from vibeflow import PluginInfo
+
 class Plugin:
+    PLUGIN_INFO = PluginInfo("relax_policy", "policy", "Relax Policy", "test", "Relaxes import policy.", "0.1.0")
     name = "relax_policy"
 
     def extend_policy(self, policy):
@@ -50,7 +56,10 @@ class Plugin:
         (
             "schema_plugin.py",
             """
+from vibeflow import PluginInfo
+
 class Plugin:
+    PLUGIN_INFO = PluginInfo("schema_policy", "policy", "Schema Policy", "test", "Extends node metadata schema.", "0.1.0")
     name = "schema_policy"
 
     def extend_node_metadata_schema(self, schema):
@@ -73,7 +82,10 @@ def test_policy_plugin_allows_audited_downgradeable_relaxation(tmp_path) -> None
     plugin_path = tmp_path / "audited_relax_plugin.py"
     plugin_path.write_text(
         """
+from vibeflow import PluginInfo
+
 class Plugin:
+    PLUGIN_INFO = PluginInfo("audited_relax_policy", "policy", "Audited Relax Policy", "test", "Declares audited policy relaxation.", "0.1.0")
     name = "audited_relax_policy"
 
     def extend_policy(self, policy):
@@ -138,7 +150,10 @@ def test_plugin_load_and_execution_fail_closed(tmp_path, capsys) -> None:
     plugin_path = tmp_path / "raise_plugin.py"
     plugin_path.write_text(
         """
+from vibeflow import PluginInfo
+
 class Plugin:
+    PLUGIN_INFO = PluginInfo("raise_policy", "policy", "Raise Policy", "test", "Raises during policy extension.", "0.1.0")
     name = "raise_policy"
 
     def extend_policy(self, policy):
@@ -181,9 +196,10 @@ def test_policy_plugin_can_add_node_and_graph_findings(tmp_path) -> None:
     plugin_path = tmp_path / "finding_plugin.py"
     plugin_path.write_text(
         """
-from vibeflow import HealthFinding
+from vibeflow import HealthFinding, PluginInfo
 
 class Plugin:
+    PLUGIN_INFO = PluginInfo("finding_policy", "policy", "Finding Policy", "test", "Adds node and graph findings.", "0.1.0")
     name = "finding_policy"
 
     def validate_node(self, spec, node_cls, metrics):

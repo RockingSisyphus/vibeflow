@@ -1,19 +1,110 @@
 {
   "pipeline": {
     "nodes": [
-      {"name": "start", "type": "sandbox.start"},
-      {"name": "left", "type": "sandbox.branch_left", "provides": ["branch.left"], "value": 4},
-      {"name": "right", "type": "sandbox.branch_right", "provides": ["branch.right"], "value": 6},
-      {"name": "sum", "type": "sandbox.sum_pair", "requires": ["branch.left", "branch.right"], "provides": ["value.in"]},
-      {"name": "add", "type": "sandbox.add_three", "requires": ["value.in"], "provides": ["value.out"]},
-      {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+      {
+        "name": "start",
+        "type": "sandbox.start"
+      },
+      {
+        "name": "left",
+        "type": "sandbox.branch_left",
+        "provides": [
+          {
+            "key": "branch.left",
+            "type": "branch.left"
+          }
+        ],
+        "value": 4
+      },
+      {
+        "name": "right",
+        "type": "sandbox.branch_right",
+        "provides": [
+          {
+            "key": "branch.right",
+            "type": "branch.right"
+          }
+        ],
+        "value": 6
+      },
+      {
+        "name": "sum",
+        "type": "sandbox.sum_pair",
+        "requires": [
+          {
+            "type": "branch.left",
+            "cardinality": "exactly_one"
+          },
+          {
+            "type": "branch.right",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.in",
+            "type": "value.in"
+          }
+        ]
+      },
+      {
+        "name": "add",
+        "type": "sandbox.add_three",
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out"
+          }
+        ]
+      },
+      {
+        "name": "end",
+        "type": "sandbox.out_value_end",
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one"
+          }
+        ]
+      }
     ],
     "edges": [
-      {"from": "start", "to": "left"},
-      {"from": "left", "to": "right"},
-      {"from": "right", "to": "sum"},
-      {"from": "sum", "to": "add"},
-      {"from": "add", "to": "end"}
+      {
+        "from": "start",
+        "to": "left"
+      },
+      {
+        "from": "left",
+        "to": "right"
+      },
+      {
+        "from": "right",
+        "to": "sum"
+      },
+      {
+        "from": "sum",
+        "to": "add"
+      },
+      {
+        "from": "add",
+        "to": "end"
+      },
+      {
+        "from": "left",
+        "to": "sum"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one"
+      }
     ]
   }
 }

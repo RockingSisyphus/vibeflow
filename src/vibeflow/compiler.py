@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from .data_contract import provider_keys
 from .graph_algorithms import strongly_connected_components
 from .graph_config import EdgeSpec, GraphConfig, NodeSpec, STATUS_PLANNED
 from .node import FLOW_KIND_DECISION, FLOW_KIND_PREDEFINED
@@ -41,9 +42,10 @@ class GraphCompiler:
         _call_compiler_plugins(plugin_registry, "before_compile", graph)
         nodes_by_name = {node.name: node for node in graph.nodes}
         _validate_node_types(graph.nodes, registry=registry, nodesets=known_nodesets or set(graph.nodesets))
-        providers = _collect_providers(graph.nodes)
+        providers = _collect_providers(graph.nodes, input_keys=set(provider_keys(graph.inputs)))
         consumers = _collect_consumers(graph.nodes)
-        data_edges = _derive_data_edges(graph.nodes, providers, available_inputs=set(graph.inputs))
+        provider_types = {provider.key: provider.type for node in graph.nodes for provider in node.provides}
+        data_edges = _derive_data_edges(graph.nodes, providers, provider_types, available_inputs=set(provider_keys(graph.inputs)))
         effective_edges = _merge_edges(graph.edges)
         flow_kinds = _node_flow_kinds(nodes_by_name, registry=registry)
         _validate_routing_edge_conditions(graph.edges, flow_kinds=flow_kinds)
@@ -92,12 +94,16 @@ def _validate_node_types(nodes: tuple[NodeSpec, ...], *, registry: Any | None, n
             raise GraphCompileError(f"node '{node.name}' has unknown type '{node.node_type}'") from exc
 
 
-def _collect_providers(nodes: tuple[NodeSpec, ...]) -> dict[str, str]:
+def _collect_providers(nodes: tuple[NodeSpec, ...], *, input_keys: set[str] | None = None) -> dict[str, str]:
+    input_keys = input_keys or set()
     providers: dict[str, str] = {}
     for node in nodes:
         if node.status == STATUS_PLANNED:
             continue
-        for key in node.provides:
+        for provider_spec in node.provides:
+            key = provider_spec.key
+            if key in input_keys:
+                raise GraphCompileError(f"key '{key}' is declared by pipeline.inputs and provided by node '{node.name}'")
             if key in providers:
                 raise GraphCompileError(f"key '{key}' provided by both '{providers[key]}' and '{node.name}'")
             providers[key] = node.name
@@ -109,27 +115,24 @@ def _collect_consumers(nodes: tuple[NodeSpec, ...]) -> dict[str, tuple[str, ...]
     for node in nodes:
         if node.status == STATUS_PLANNED:
             continue
-        for key in node.requires:
-            consumers.setdefault(key, []).append(node.name)
+        for requirement in node.requires:
+            consumers.setdefault(requirement.type, []).append(node.name)
     return {key: tuple(values) for key, values in consumers.items()}
 
 
 def _derive_data_edges(
     nodes: tuple[NodeSpec, ...],
     providers: dict[str, str],
+    provider_types: dict[str, str],
     *,
     available_inputs: set[str],
 ) -> tuple[EdgeSpec, ...]:
     edges: list[EdgeSpec] = []
     for node in nodes:
-        for key in node.requires:
-            provider = providers.get(key)
-            if provider is None:
-                if key in available_inputs:
-                    continue
-                continue
-            if provider != node.name:
-                edges.append(EdgeSpec(source=provider, target=node.name))
+        for requirement in node.requires:
+            for provider_key, provider in providers.items():
+                if provider_types.get(provider_key) == requirement.type and provider_key not in available_inputs and provider != node.name:
+                    edges.append(EdgeSpec(source=provider, target=node.name))
     return tuple(edges)
 
 

@@ -4,9 +4,12 @@ from typing import TYPE_CHECKING
 from typing import Any, Mapping
 
 from .compiler import CompiledGraph
+from .data_contract import providers_to_dicts, requirements_to_dicts
 from .flowchart_render_helpers import compile_for_render, node_flow_kind, node_is_external, nodeset_for_node, shorten
 from .graph_config import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
 from .node import FLOW_KIND_DATA_STORE, FLOW_KIND_DECISION, FLOW_KIND_DOCUMENT, FLOW_KIND_IO, FLOW_KIND_PREDEFINED, FLOW_KIND_PREPARATION, FLOW_KIND_PROCESS, FLOW_KIND_TERMINAL
+from .planned_behavior import effective_planned_behavior, planned_behavior_label
+from .runtime_helpers import has_planned, planned_items
 
 if TYPE_CHECKING:
     from .registry import NodeRegistry
@@ -19,6 +22,7 @@ def export_mermaid(
     compiled: CompiledGraph | None = None,
     registry: NodeRegistry | None = None,
     health_report: object | None = None,
+    resources: object | None = None,
     show_contract: bool = True,
     show_semantics: bool = True,
     show_findings: bool = True,
@@ -28,6 +32,7 @@ def export_mermaid(
         expand_nodesets=expand_nodesets,
         registry=registry,
         health_report=health_report,
+        resources=resources,
         show_contract=show_contract,
         show_semantics=show_semantics,
         show_findings=show_findings,
@@ -35,15 +40,16 @@ def export_mermaid(
     return renderer.render(graph, actual_compiled)
 
 
-def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph) -> dict[str, object]:
-    return {
+def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resources: object | None = None) -> dict[str, object]:
+    payload: dict[str, object] = {
         "nodes": [
             {
                 "name": node.name,
                 "type": node.node_type,
-                "requires": list(node.requires),
-                "provides": list(node.provides),
+                "requires": requirements_to_dicts(node.requires),
+                "provides": providers_to_dicts(node.provides),
                 "status": node.status,
+                "planned_behavior": node.planned_behavior.to_dict(),
                 "flow_kind": node_flow_kind(node, compiled),
             }
             for node in graph.nodes
@@ -54,7 +60,13 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph) -> dict[
         "providers": dict(compiled.providers),
         "consumers": {key: list(values) for key, values in compiled.consumers.items()},
         "nodesets": sorted(graph.nodesets),
+        "planned": [dict(item) for item in planned_items(graph)],
+        "production_ready": not has_planned(graph),
     }
+    resource_payload = _resources_payload(resources)
+    if resource_payload:
+        payload["resources"] = resource_payload
+    return payload
 
 
 class _MermaidRenderer:
@@ -64,6 +76,7 @@ class _MermaidRenderer:
         expand_nodesets: bool,
         registry: NodeRegistry | None,
         health_report: object | None,
+        resources: object | None,
         show_contract: bool,
         show_semantics: bool,
         show_findings: bool,
@@ -71,6 +84,7 @@ class _MermaidRenderer:
         self.expand_nodesets = expand_nodesets
         self.registry = registry
         self.health_report = health_report
+        self.resources = resources
         self.show_contract = show_contract
         self.show_semantics = show_semantics
         self.show_findings = show_findings
@@ -90,9 +104,13 @@ class _MermaidRenderer:
             "  classDef documentNode fill:#f0fdf4,stroke:#16a34a,color:#14532d;",
             "  classDef nodesetNode fill:#ede9fe,stroke:#7c3aed,color:#3b0764;",
             "  classDef plannedNode fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;",
+            "  classDef baseLibResource fill:#ecfdf5,stroke:#059669,color:#064e3b;",
+            "  classDef pluginResource fill:#eff6ff,stroke:#2563eb,color:#1e3a8a;",
+            "  classDef plannedResource fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;",
         ]
         self._render_graph_body(lines, graph, compiled, prefix="", indent="  ", visited_nodesets=())
         self._render_edges(lines, compiled, prefix="", indent="  ")
+        self._render_resources(lines, indent="  ")
         if self.show_findings:
             self._render_findings(lines, graph, compiled, indent="  ")
         return "\n".join(lines) + "\n"
@@ -150,6 +168,62 @@ class _MermaidRenderer:
             label = f"|{_escape_label(edge.when)}|" if edge.when else ""
             lines.append(f"{indent}{source_id} -->{label} {target_id}")
 
+    def _render_resources(self, lines: list[str], *, indent: str) -> None:
+        payload = _resources_payload(self.resources)
+        if not payload:
+            return
+        base_lib = payload.get("base_lib", {})
+        if isinstance(base_lib, Mapping):
+            modules = _mapping_items(base_lib.get("modules", ()))
+            self._render_resource_group(
+                lines,
+                root_id="resource_base_lib",
+                root_label="base_lib",
+                root_class="baseLibResource",
+                child_class="baseLibResource",
+                child_shape="fr-rect",
+                resources=modules,
+                label_kind="base_lib",
+                indent=indent,
+            )
+        plugins = _mapping_items(payload.get("plugins", ()))
+        self._render_resource_group(
+            lines,
+            root_id="resource_plugins",
+            root_label="plugins",
+            root_class="pluginResource",
+            child_class="pluginResource",
+            child_shape="hex",
+            resources=plugins,
+            label_kind="plugin",
+            indent=indent,
+        )
+
+    def _render_resource_group(
+        self,
+        lines: list[str],
+        *,
+        root_id: str,
+        root_label: str,
+        root_class: str,
+        child_class: str,
+        child_shape: str,
+        resources: tuple[Mapping[str, object], ...],
+        label_kind: str,
+        indent: str,
+    ) -> None:
+        if not resources:
+            return
+        lines.append(f'{indent}{root_id}@{{ shape: hex, label: "{_escape_label(root_label)}" }}')
+        lines.append(f"{indent}class {root_id} {root_class};")
+        for index, resource in enumerate(resources):
+            resource_id = f"{root_id}_{index}"
+            label = _resource_label(resource, kind=label_kind, show_semantics=self.show_semantics)
+            lines.append(f'{indent}{resource_id}@{{ shape: {child_shape}, label: "{_escape_label(label)}" }}')
+            lines.append(f"{indent}{root_id} -.-> {resource_id}")
+            status = str(resource.get("status", "implemented"))
+            lines.append(f"{indent}class {resource_id} {'plannedResource' if status == STATUS_PLANNED else child_class};")
+
     def _render_findings(self, lines: list[str], graph: GraphConfig, compiled: CompiledGraph, *, indent: str) -> None:
         for finding in _health_findings(self.health_report):
             severity = str(finding.get("severity", "error"))
@@ -202,7 +276,9 @@ class _MermaidRenderer:
     def _node_label(self, node: NodeSpec) -> str:
         lines = [node.name, node.node_type]
         if node.status == STATUS_PLANNED:
-            lines.append("planned")
+            lines.append(planned_behavior_label(node.planned_behavior))
+            if node.planned_behavior.stub_module:
+                lines.append(f"stub: {node.planned_behavior.stub_module}")
         if self.show_semantics:
             lines.extend(self._node_semantic_lines(node))
         if self.show_contract:
@@ -212,7 +288,10 @@ class _MermaidRenderer:
     def _nodeset_label(self, node: NodeSpec, nodeset: NodesetSpec) -> str:
         lines = [node.name, node.node_type]
         if node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED:
-            lines.append("planned")
+            behavior = effective_planned_behavior(node, nodeset)
+            lines.append(planned_behavior_label(behavior))
+            if behavior.stub_module:
+                lines.append(f"stub: {behavior.stub_module}")
         if self.show_semantics:
             lines.extend(
                 (
@@ -291,10 +370,71 @@ def _node_shape(node_id: str, label: str, flow_kind: object) -> str:
     return f'{node_id}@{{ shape: {shape}, label: "{escaped}" }}'
 
 
-def _key_line(label: str, values: tuple[str, ...]) -> str:
+def _resources_payload(resources: object | None) -> Mapping[str, object]:
+    if resources is None:
+        return {}
+    if hasattr(resources, "to_dict") and callable(getattr(resources, "to_dict")):
+        payload = resources.to_dict()
+    else:
+        payload = resources
+    return payload if isinstance(payload, Mapping) else {}
+
+
+def _mapping_items(value: object) -> tuple[Mapping[str, object], ...]:
+    if not isinstance(value, list):
+        return ()
+    return tuple(item for item in value if isinstance(item, Mapping))
+
+
+def _resource_label(resource: Mapping[str, object], *, kind: str, show_semantics: bool) -> str:
+    info = resource.get("info", {})
+    info_map = info if isinstance(info, Mapping) else {}
+    module = str(resource.get("module", "")).strip()
+    name = str(resource.get("name", "")).strip()
+    display_name = str(info_map.get("display_name", "")).strip() or name or module
+    lines = [display_name]
+    status = str(resource.get("status", "implemented")).strip() or "implemented"
+    if status == STATUS_PLANNED:
+        lines.append("planned")
+    if kind == "base_lib":
+        lines.append(f"module: {module}")
+    else:
+        plugin_type = str(resource.get("type", info_map.get("type", ""))).strip()
+        if plugin_type:
+            lines.append(f"type: {plugin_type}")
+        if module:
+            lines.append(f"module: {module}")
+    if show_semantics:
+        category = str(info_map.get("category", "")).strip()
+        version = str(info_map.get("version", "")).strip()
+        description = str(resource.get("description", "")).strip() or str(info_map.get("description", "")).strip()
+        config_keys = resource.get("config_keys", ())
+        if category:
+            lines.append(f"category: {category}")
+        if version:
+            lines.append(f"version: {version}")
+        if description:
+            lines.append(description)
+        if kind == "plugin" and isinstance(config_keys, list) and config_keys:
+            lines.append("config: " + ", ".join(str(key) for key in config_keys))
+    return _join_label_lines(lines)
+
+
+def _key_line(label: str, values: tuple[object, ...]) -> str:
     if not values:
         return ""
-    return f"{label}: {', '.join(values)}"
+    return f"{label}: {', '.join(_contract_item_text(item) for item in values)}"
+
+
+def _contract_item_text(item: object) -> str:
+    key = getattr(item, "key", "")
+    data_type = getattr(item, "type", "")
+    cardinality = getattr(item, "cardinality", "")
+    if key and data_type:
+        return f"{key} -> {data_type}"
+    if data_type and cardinality:
+        return f"{data_type} ({cardinality})"
+    return str(item)
 
 
 def _join_label_lines(lines: tuple[str, ...] | list[str]) -> str:

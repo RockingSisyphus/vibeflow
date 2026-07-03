@@ -1,10 +1,9 @@
 # kernel 目录
 
-把仓库中的 `src/vibeflow/` 复制到这里：
+这里放分发构建脚本生成的内核单文件归档：
 
 ```text
-kernel/vibeflow/
+kernel/vibeflow-kernel.zip
 ```
 
-复制后 `run.py` 会通过 `sys.path` 使用这个本地内核。
-
+`run.py` 会通过 `sys.path` 直接从这个归档导入本地内核。业务开发时不需要解包或阅读归档内容。

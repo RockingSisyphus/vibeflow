@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from .data_contract import DataProvider, DataRequirement
 from .node import NodeContract, NodeInfo, PureNode
 from .purity_helpers import _dedupe_violations, _violation
 from .purity_metrics import _ComplexityCounter, _analyze_internal_call_chain
@@ -72,7 +73,7 @@ def validate_node_class(
     metrics = collect_node_metrics(node_cls)
     violations.extend(_validate_complexity_metrics(metrics, policy=policy, source=source))
     violations.extend(_validate_call_chain_metrics(metrics, policy=policy, source=source))
-    if isinstance(info, NodeInfo) and isinstance(contract, NodeContract):
+    if isinstance(info, NodeInfo) and isinstance(contract, NodeContract) and _contract_items_valid(contract):
         violations.extend(_validate_architecture_smells(info, contract, source=source, metrics=metrics))
 
     visitor_context = _ClassVisitorContext(class_tree, contract, policy, source, known_node_modules, known_node_class_names)
@@ -89,7 +90,7 @@ def _append_contract_violations(node_cls, info, contract, expected_type, source,
     violations.extend(_validate_node_info(info, expected_type=expected_type, source=source))
     violations.extend(_validate_contract(contract, source=source))
     violations.extend(_validate_interface(node_cls, source=source))
-    if isinstance(info, NodeInfo) and isinstance(contract, NodeContract):
+    if isinstance(info, NodeInfo) and isinstance(contract, NodeContract) and _contract_items_valid(contract):
         violations.extend(_validate_flow_kind_contract(info, contract, source=source))
 
 
@@ -108,16 +109,21 @@ def _append_examples_if_clean(node_cls, contract, source, violations: list[Purit
 
 
 def _append_class_visitor_violations(context: _ClassVisitorContext, violations: list[PurityViolation]) -> None:
+    contract = context.contract if isinstance(context.contract, NodeContract) and _contract_items_valid(context.contract) else None
     visitor = NodePurityVisitor(
         policy=context.policy,
         source=context.source,
-        contract=context.contract if isinstance(context.contract, NodeContract) else None,
+        contract=contract,
         known_node_modules=context.known_node_modules,
         known_node_class_names=context.known_node_class_names,
         line_offset=context.source.class_start_line - 1,
     )
     visitor.visit(context.class_tree)
     violations.extend(visitor.violations)
+
+
+def _contract_items_valid(contract: NodeContract) -> bool:
+    return all(isinstance(item, DataRequirement) for item in contract.requires) and all(isinstance(item, DataProvider) for item in contract.provides)
 
 
 def _append_module_violations(

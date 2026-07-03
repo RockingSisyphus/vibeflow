@@ -215,6 +215,9 @@ class _BaseLibAstScanner(ast.NodeVisitor):
         self._add("BASE_LIB.GLOBAL_STATE", "base_lib must not use nonlocal mutation", node)
 
     def _visit_module_assignment(self, node: ast.Assign | ast.AnnAssign) -> None:
+        if _is_base_lib_info_assignment(node):
+            self.visit(node)
+            return
         if not module_assignment_is_allowed(node):
             self._add("BASE_LIB.GLOBAL_STATE", "base_lib must not hold mutable module-level state", node)
         self.visit(node)
@@ -354,6 +357,14 @@ def _resolve_base_lib_import(module: str, reports: dict[str, BaseLibModuleReport
         if module == candidate or candidate.endswith(f".{module}") or module.endswith(f".{candidate}"):
             return candidate
     return ""
+
+
+def _is_base_lib_info_assignment(node: ast.Assign | ast.AnnAssign) -> bool:
+    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+    if not any(isinstance(target, ast.Name) and target.id == "BASE_LIB_INFO" for target in targets):
+        return False
+    value = node.value
+    return isinstance(value, (ast.Call, ast.Dict))
 
 
 def _module_name(path: Path, *, root: Path) -> str:

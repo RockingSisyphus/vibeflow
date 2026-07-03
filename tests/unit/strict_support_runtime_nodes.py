@@ -1,6 +1,22 @@
 from __future__ import annotations
 
-from vibeflow import NodeContract, NodeInfo
+from vibeflow import DataProvider, DataRequirement, NodeContract, NodeInfo
+
+
+def REQ(data_type: str, cardinality: str = "exactly_one") -> DataRequirement:
+    return DataRequirement(type=data_type, cardinality=cardinality)
+
+
+def PROV(key: str, data_type: str | None = None) -> DataProvider:
+    return DataProvider(key=key, type=data_type or key)
+
+
+def ENV(key: str, data_type: str, value):
+    return {"key": key, "type": data_type, "value": value, "source_node": "example"}
+
+
+def V(inputs, data_type: str):
+    return inputs[data_type]["value"]
 
 
 class StartNode:
@@ -14,9 +30,9 @@ class StartNode:
 class ValueInputNode:
     NODE_INFO = NodeInfo("test.value_input", "Value Input", "test", "Reads value.in.", "0.1.0", "io")
     CONTRACT = NodeContract(
-        requires=("value.in",),
+        requires=(REQ("value.in"),),
         input_semantics={"value.in": ("input value",)},
-        examples=({"inputs": {"value.in": 1}, "params": {}},),
+        examples=({"inputs": {"value.in": ENV("value.in", "value.in", 1)}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -26,9 +42,9 @@ class ValueInputNode:
 class OutEndNode:
     NODE_INFO = NodeInfo("test.out_end", "Out End", "test", "Ends after value.out.", "0.1.0", "terminal")
     CONTRACT = NodeContract(
-        requires=("value.out",),
+        requires=(REQ("value.out"),),
         input_semantics={"value.out": ("output value",)},
-        examples=({"inputs": {"value.out": 1}, "params": {}},),
+        examples=({"inputs": {"value.out": ENV("value.out", "value.out", 1)}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -38,9 +54,9 @@ class OutEndNode:
 class InEndNode:
     NODE_INFO = NodeInfo("test.in_end", "In End", "test", "Ends after value.in.", "0.1.0", "terminal")
     CONTRACT = NodeContract(
-        requires=("value.in",),
+        requires=(REQ("value.in"),),
         input_semantics={"value.in": ("input value",)},
-        examples=({"inputs": {"value.in": 1}, "params": {}},),
+        examples=({"inputs": {"value.in": ENV("value.in", "value.in", 1)}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -50,7 +66,7 @@ class InEndNode:
 class SeedNode:
     NODE_INFO = NodeInfo("test.seed", "Seed", "test", "Produces a seed value.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        provides=("value.in",),
+        provides=(PROV("value.in"),),
         output_semantics={"value.in": ("seed value",)},
         params_schema={"value": {"type": "number"}},
         output_schema={"value.in": {"type": "number"}},
@@ -64,43 +80,43 @@ class SeedNode:
 class AddNode:
     NODE_INFO = NodeInfo("test.add", "Add", "test", "Adds delta to input.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        requires=("value.in",),
-        provides=("value.out",),
+        requires=(REQ("value.in"),),
+        provides=(PROV("value.out"),),
         input_semantics={"value.in": ("input value",)},
         output_semantics={"value.out": ("output value",)},
         params_schema={"delta": {"type": "number"}},
         output_schema={"value.out": {"type": "number"}},
-        examples=({"inputs": {"value.in": 4}, "params": {"delta": 3}},),
+        examples=({"inputs": {"value.in": ENV("value.in", "value.in", 4)}, "params": {"delta": 3}},),
     )
 
     def run_pure(self, inputs, params):
-        return {"value.out": inputs["value.in"] + params.get("delta", 1)}
+        return {"value.out": V(inputs, "value.in") + params.get("delta", 1)}
 
 
 class CopyNode:
     NODE_INFO = NodeInfo("test.copy", "Copy", "test", "Copies a value.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        requires=("value.out",),
-        provides=("value.in",),
+        requires=(REQ("value.out"),),
+        provides=(PROV("value.in"),),
         input_semantics={"value.out": ("output value",)},
         output_semantics={"value.in": ("input value",)},
         output_schema={"value.in": {"type": "number"}},
-        examples=({"inputs": {"value.out": 7}, "params": {}},),
+        examples=({"inputs": {"value.out": ENV("value.out", "value.out", 7)}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
-        return {"value.in": inputs["value.out"]}
+        return {"value.in": V(inputs, "value.out")}
 
 
 class RouteNode:
     NODE_INFO = NodeInfo("test.route", "Route", "test", "Routes the next step.", "0.1.0", "decision")
     CONTRACT = NodeContract(
-        requires=("value.out",),
-        provides=("flow.route",),
+        requires=(REQ("value.out"),),
+        provides=(PROV("flow.route"),),
         input_semantics={"value.out": ("output value",)},
         output_semantics={"flow.route": ("branch route",)},
         output_schema={"flow.route": {"type": "string", "enum": ["again", "done"]}},
-        examples=({"inputs": {"value.out": 1}, "params": {}},),
+        examples=({"inputs": {"value.out": ENV("value.out", "value.out", 1)}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
@@ -110,7 +126,7 @@ class RouteNode:
 class NanOutputNode:
     NODE_INFO = NodeInfo("test.nan_output", "NaN Output", "test", "Returns a runtime-invalid JSON value.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        provides=("value.out",),
+        provides=(PROV("value.out"),),
         output_semantics={"value.out": ("output value",)},
         output_schema={"value.out": {"type": "number"}},
     )
@@ -122,15 +138,15 @@ class NanOutputNode:
 class EffectRequestNode:
     NODE_INFO = NodeInfo("test.effect_request", "Effect Request", "test", "Emits a structured effect request.", "0.1.0", "data_store")
     CONTRACT = NodeContract(
-        requires=("value.in",),
-        provides=("effects.request",),
+        requires=(REQ("value.in"),),
+        provides=(PROV("effects.request"),),
         input_semantics={"value.in": ("input value",)},
         output_semantics={"effects.request": ("structured effect request",)},
         output_schema={"effects.request": {"type": "object"}},
     )
 
     def run_pure(self, inputs, params):
-        return {"effects.request": {"value": inputs["value.in"]}}
+        return {"effects.request": {"value": V(inputs, "value.in")}}
 
 
 class SetOutputNode:
@@ -143,7 +159,7 @@ class SetOutputNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        provides=("value.out",),
+        provides=(PROV("value.out"),),
         output_semantics={"value.out": ("output value",)},
         output_schema={"value.out": {"type": "array"}},
     )
@@ -162,7 +178,7 @@ class OpaqueOutputNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        provides=("value.out",),
+        provides=(PROV("value.out"),),
         output_semantics={"value.out": ("output value",)},
         output_schema={"value.out": {"type": "object"}},
     )
@@ -181,16 +197,16 @@ class MutatingInputNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        requires=("value.in",),
-        provides=("value.out",),
+        requires=(REQ("value.in"),),
+        provides=(PROV("value.out"),),
         input_semantics={"value.in": ("input value",)},
         output_semantics={"value.out": ("output value",)},
         output_schema={"value.out": {"type": "array"}},
     )
 
     def run_pure(self, inputs, params):
-        inputs["value.in"].append(3)
-        return {"value.out": inputs["value.in"]}
+        V(inputs, "value.in").append(3)
+        return {"value.out": V(inputs, "value.in")}
 
 
 class IdentityObjectNode:
@@ -203,14 +219,14 @@ class IdentityObjectNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        requires=("value.in",),
-        provides=("value.out",),
+        requires=(REQ("value.in"),),
+        provides=(PROV("value.out"),),
         input_semantics={"value.in": ("input object",)},
         output_semantics={"value.out": ("same object",)},
     )
 
     def run_pure(self, inputs, params):
-        return {"value.out": inputs["value.in"]}
+        return {"value.out": V(inputs, "value.in")}
 
 
 class RuntimeFailNode:
@@ -223,7 +239,7 @@ class RuntimeFailNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        provides=("value.out",),
+        provides=(PROV("value.out"),),
         output_semantics={"value.out": ("runtime output",)},
         output_schema={"value.out": {"type": "number"}},
         params_schema={"fail": {"type": "boolean"}},
@@ -241,7 +257,7 @@ class CountingInitNode:
 
     NODE_INFO = NodeInfo("test.counting_init", "Counting Init", "test", "Counts construction for execution plan tests.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        provides=("value.out",),
+        provides=(PROV("value.out"),),
         output_semantics={"value.out": ("configured output")},
         params_schema={"value": {"type": "number"}},
         output_schema={"value.out": {"type": "number"}},
@@ -258,7 +274,7 @@ class CountingInitNode:
 class DuplicateOneNode:
     NODE_INFO = NodeInfo("test.duplicate_one", "Duplicate One", "test", "Duplicates output.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        provides=("dup.one",),
+        provides=(PROV("dup.one"),),
         output_semantics={"dup.one": ("duplicate value",)},
         output_schema={"dup.one": {"type": "number"}},
         examples=({"inputs": {}, "params": {}},),
@@ -271,7 +287,7 @@ class DuplicateOneNode:
 class DuplicateTwoNode:
     NODE_INFO = NodeInfo("test.duplicate_two", "Duplicate Two", "test", "Duplicates output.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        provides=("dup.two",),
+        provides=(PROV("dup.two"),),
         output_semantics={"dup.two": ("duplicate value",)},
         output_schema={"dup.two": {"type": "number"}},
         examples=({"inputs": {}, "params": {}},),

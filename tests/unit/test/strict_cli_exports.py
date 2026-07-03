@@ -39,6 +39,55 @@ def test_cli_export_text_formats_read_jsonc(tmp_path, capsys, command, expected)
         assert item in output
 
 
+def test_cli_export_mermaid_includes_declared_resources(tmp_path, capsys) -> None:
+    base_dir = tmp_path / "base_lib"
+    base_dir.mkdir()
+    (base_dir / "__init__.py").write_text("", encoding="utf-8")
+    (base_dir / "math_tools.py").write_text(
+        """
+from vibeflow import BaseLibInfo
+
+BASE_LIB_INFO = BaseLibInfo("base_lib.math_tools", "Math Tools", "math", "Pure arithmetic helpers.", "0.1.0")
+""".strip(),
+        encoding="utf-8",
+    )
+    plugin_path = tmp_path / "policy_plugin.py"
+    plugin_path.write_text(
+        """
+from vibeflow import PluginInfo
+
+PLUGIN_INFO = PluginInfo("policy", "policy", "Policy", "policy", "Policy extension.", "0.1.0")
+
+class Plugin:
+    name = "policy"
+""".strip(),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "workflow.jsonc"
+    config_path.write_text(
+        json.dumps(
+            {
+                "base_lib": {"paths": ["base_lib"], "modules": ["base_lib.math_tools"]},
+                "plugins": [
+                    {"module": str(plugin_path), "type": "policy"},
+                    {"name": "future_policy", "type": "policy", "status": "planned", "description": "planned policy"},
+                ],
+                "pipeline": _seed_only_pipeline(),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    code = cli_main(["export-mermaid", "--config", str(config_path)])
+    output = capsys.readouterr().out
+
+    assert code == 0
+    assert "resource_base_lib" in output
+    assert "Math Tools" in output
+    assert "resource_plugins" in output
+    assert "future_policy" in output
+
+
 def test_cli_export_svg_reads_jsonc(tmp_path, capsys) -> None:
     if not is_mermaid_svg_renderer_available():
         pytest.skip("Mermaid SVG renderer is not installed")

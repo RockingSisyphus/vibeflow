@@ -1,11 +1,19 @@
 from __future__ import annotations
 
-from vibeflow import NodeContract, NodeInfo
+from vibeflow import DataProvider, DataRequirement, NodeContract, NodeInfo
+
+
+def _provider(key: str) -> DataProvider:
+    return DataProvider(key, key)
+
+
+def _requirement(data_type: str) -> DataRequirement:
+    return DataRequirement(data_type, "exactly_one")
 
 
 class MissingInfoNode:
     CONTRACT = NodeContract(
-        provides=("bad.out",),
+        provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
         output_schema={"bad.out": {"type": "number"}},
     )
@@ -17,7 +25,7 @@ class MissingInfoNode:
 class InfoWrongTypeNode:
     NODE_INFO = {"type_key": "bad.info_type"}
     CONTRACT = NodeContract(
-        provides=("bad.out",),
+        provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
         output_schema={"bad.out": {"type": "number"}},
     )
@@ -36,7 +44,7 @@ class EmptyTypeKeyNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        provides=("bad.out",),
+        provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
         output_schema={"bad.out": {"type": "number"}},
     )
@@ -56,7 +64,7 @@ class NonPureNode:
         purity="impure",
     )
     CONTRACT = NodeContract(
-        provides=("bad.out",),
+        provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
         output_schema={"bad.out": {"type": "number"}},
     )
@@ -89,8 +97,8 @@ class DuplicateKeysNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        requires=("bad.in", "bad.in"),
-        provides=("bad.out",),
+        requires=(_requirement("bad.in"), _requirement("bad.in")),
+        provides=(_provider("bad.out"),),
         input_semantics={"bad.in": ("bad input",)},
         output_semantics={"bad.out": ("bad output",)},
         output_schema={"bad.out": {"type": "number"}},
@@ -110,8 +118,8 @@ class MissingSemanticsNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        requires=("bad.in",),
-        provides=("bad.out",),
+        requires=(_requirement("bad.in"),),
+        provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
         output_schema={"bad.out": {"type": "number"}},
     )

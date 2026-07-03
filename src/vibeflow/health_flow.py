@@ -3,10 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from .data_contract import CARDINALITY_EXACTLY_ONE, CARDINALITY_OPTIONAL_ONE, provider_keys
 from .graph_algorithms import strongly_connected_components
 from .graph_config import STATUS_PLANNED
 from .health_types import HealthFinding
 from .node import FLOW_KIND_DECISION, FLOW_KIND_TERMINAL
+from .planned_behavior import PLANNED_BEHAVIOR_PYTHON_STUB, PLANNED_BEHAVIOR_TRANSPARENT, effective_planned_behavior
 
 
 @dataclass(frozen=True)
@@ -18,7 +20,7 @@ class _DecisionFlow:
 
 
 def append_flowchart_health(graph, compiled, state, *, registry, owner: str = "pipeline") -> None:
-    active_nodes = [node for node in graph.nodes if node.status != STATUS_PLANNED]
+    active_nodes = [node for node in graph.nodes if _node_participates_in_flow(graph, node)]
     if not active_nodes:
         return
     active_names = {node.name for node in active_nodes}
@@ -48,6 +50,13 @@ def _flow_maps(compiled, active_names: set[str]) -> tuple[dict[str, list[str]], 
         outgoing_edges[edge.source].append(edge)
         incoming[edge.target].append(edge.source)
     return incoming, outgoing, outgoing_edges
+
+
+def _node_participates_in_flow(graph, node) -> bool:
+    if node.status != STATUS_PLANNED:
+        return True
+    nodeset = graph.nodesets.get(node.node_type.removeprefix("nodeset.")) if node.node_type.startswith("nodeset.") else None
+    return effective_planned_behavior(node, nodeset).kind in {PLANNED_BEHAVIOR_TRANSPARENT, PLANNED_BEHAVIOR_PYTHON_STUB}
 
 
 def _append_boundary_findings(starts: set[str], ends: set[str], state, *, owner: str) -> None:
@@ -115,26 +124,126 @@ def _append_nodeset_flow_health(graph, state, *, registry) -> None:
 
 
 def _append_missing_provider_warnings(node, graph, nodes_by_name, incoming, state) -> None:
-    upstream_names = _walk(set(incoming.get(node.name, ())), incoming)
-    upstream = [nodes_by_name[name] for name in upstream_names if name in nodes_by_name]
-    for key in node.requires:
-        if key in graph.inputs:
+    direct = [nodes_by_name[name] for name in incoming.get(node.name, ()) if name in nodes_by_name]
+    input_types = {item.type for item in graph.inputs} if _is_initial_input_node(node, graph, incoming, nodes_by_name) else set()
+    for requirement in node.requires:
+        matches = [provider for parent in direct for provider in parent.provides if provider.type == requirement.type]
+        if requirement.type in input_types:
+            matches.append(None)
+        if not matches:
+            state.errors.append(
+                _data_finding(
+                    "GRAPH.DATA.MISSING_DIRECT_PROVIDER",
+                    requirement.type,
+                    f"node '{node.name}' requires type '{requirement.type}' but no direct incoming flow predecessor or entry input provides it",
+                    node=node.name,
+                    severity="error",
+                )
+            )
             continue
-        if not any(key in parent.provides for parent in upstream):
-            state.warnings.append(_data_finding("GRAPH.DATA.MISSING_UPSTREAM_PROVIDER", key, f"node '{node.name}' requires '{key}' but no upstream flow predecessor provides it", node=node.name))
+        if requirement.cardinality in {CARDINALITY_EXACTLY_ONE, CARDINALITY_OPTIONAL_ONE} and len(matches) > 1:
+            matched_sources = [_source_name(item, direct) for item in matches]
+            if _sources_are_mutually_exclusive(matched_sources, graph):
+                continue
+            finding = _data_finding(
+                "GRAPH.DATA.TYPE_CARDINALITY_AMBIGUOUS",
+                requirement.type,
+                f"node '{node.name}' requires type '{requirement.type}' with {requirement.cardinality} but {len(matches)} direct sources may provide it",
+                node=node.name,
+                details={"matched_sources": matched_sources},
+            )
+            if _sources_are_cyclic_alternatives(node.name, matched_sources, graph):
+                state.warnings.append(finding)
+            elif _direct_sources_are_unconditional(node.name, incoming.get(node.name, ()), graph):
+                state.errors.append(_replace_severity(finding, "error"))
+            else:
+                state.warnings.append(finding)
 
 
 def _append_unconsumed_provider_warnings(node, compiled, nodes_by_name, outgoing, condition_keys_by_source, state) -> None:
-    downstream_names = _walk(set(outgoing.get(node.name, ())), outgoing)
-    downstream = [nodes_by_name[name] for name in downstream_names if name in nodes_by_name]
+    downstream = [nodes_by_name[name] for name in outgoing.get(node.name, ()) if name in nodes_by_name]
     is_end = compiled.flow_kinds.get(node.name) == FLOW_KIND_TERMINAL and not outgoing.get(node.name)
     if is_end:
         return
-    for key in node.provides:
-        if key in condition_keys_by_source.get(node.name, set()):
+    for provider in node.provides:
+        if provider.key in condition_keys_by_source.get(node.name, set()):
             continue
-        if not any(key in child.requires for child in downstream):
-            state.warnings.append(_data_finding("GRAPH.DATA.UNCONSUMED_PROVIDER", key, f"node '{node.name}' provides '{key}' but no downstream flow successor requires it", node=node.name))
+        if not any(provider.type == requirement.type for child in downstream for requirement in child.requires):
+            state.warnings.append(_data_finding("GRAPH.DATA.UNCONSUMED_PROVIDER", provider.key, f"node '{node.name}' provides key '{provider.key}' type '{provider.type}' but no direct downstream flow successor requires that type", node=node.name))
+
+
+def _is_initial_input_node(node, graph, incoming, nodes_by_name) -> bool:
+    if not node.requires:
+        return False
+    parents = [nodes_by_name[name] for name in incoming.get(node.name, ()) if name in nodes_by_name]
+    if not parents:
+        return True
+    return any(not parent.requires and not parent.provides for parent in parents)
+
+
+def _direct_sources_are_unconditional(node_name: str, sources: list[str], graph) -> bool:
+    relevant = [edge for edge in graph.edges if edge.target == node_name and edge.source in sources]
+    return bool(relevant) and all(not edge.when for edge in relevant)
+
+
+def _sources_are_mutually_exclusive(sources: list[str], graph) -> bool:
+    source_set = set(sources)
+    if len(source_set) != len(sources) or len(source_set) <= 1 or "pipeline.input" in source_set:
+        return False
+    by_decision: dict[tuple[str, str], dict[str, set[object]]] = {}
+    for source in source_set:
+        for edge in graph.edges:
+            if edge.target != source or not edge.when:
+                continue
+            parsed = _parse_when(edge.when)
+            if parsed is None:
+                continue
+            key, operator, value = parsed
+            if operator != "==":
+                continue
+            by_decision.setdefault((edge.source, key), {}).setdefault(source, set()).add(value)
+    for by_source in by_decision.values():
+        if set(by_source) != source_set:
+            continue
+        values = {value for source_values in by_source.values() for value in source_values}
+        if len(values) >= len(source_set):
+            return True
+    return False
+
+
+def _sources_are_cyclic_alternatives(node_name: str, sources: list[str], graph) -> bool:
+    source_set = {source for source in sources if source != "pipeline.input"}
+    if not source_set:
+        return False
+    outgoing: dict[str, list[str]] = {}
+    for edge in graph.edges:
+        outgoing.setdefault(edge.source, []).append(edge.target)
+    reachable_from_node = _walk({node_name}, outgoing)
+    return any(source in reachable_from_node and node_name in _walk({source}, outgoing) for source in source_set)
+
+
+def _source_name(provider, direct) -> str:
+    if provider is None:
+        return "pipeline.input"
+    for node in direct:
+        if provider in node.provides:
+            return node.name
+    return str(getattr(provider, "key", provider))
+
+
+def _replace_severity(finding: HealthFinding, severity: str) -> HealthFinding:
+    return HealthFinding(
+        rule_id=finding.rule_id,
+        severity=severity,
+        object_type=finding.object_type,
+        object_id=finding.object_id,
+        source_location=finding.source_location,
+        rule_source=finding.rule_source,
+        failure_layer=finding.failure_layer,
+        message=finding.message,
+        suggested_fix_type=finding.suggested_fix_type,
+        details=finding.details,
+    )
 
 
 def _append_decision_branch_health(graph, compiled, state, flow: _DecisionFlow) -> None:
@@ -226,8 +335,8 @@ def _decision_schema_values(node: Any, registry) -> set[object] | None:
     if not isinstance(schema, Mapping):
         return None
     values: set[object] = set()
-    for key in node.provides:
-        spec = schema.get(key)
+    for provider in node.provides:
+        spec = schema.get(provider.key)
         if not isinstance(spec, Mapping):
             continue
         enum = spec.get("enum")
@@ -279,5 +388,8 @@ def _flow_finding(rule_id: str, object_id: str, message: str, *, object_type: st
     return HealthFinding(rule_id=rule_id, severity="error", object_type=object_type, object_id=object_id, failure_layer="topology", message=message, suggested_fix_type="fix_config")
 
 
-def _data_finding(rule_id: str, key: str, message: str, *, node: str) -> HealthFinding:
-    return HealthFinding(rule_id=rule_id, severity="warning", object_type="contract_key", object_id=key, failure_layer="topology", message=message, suggested_fix_type="fix_config", details={"node": node})
+def _data_finding(rule_id: str, key: str, message: str, *, node: str, severity: str = "warning", details: Mapping[str, object] | None = None) -> HealthFinding:
+    payload = {"node": node}
+    if details:
+        payload.update(details)
+    return HealthFinding(rule_id=rule_id, severity=severity, object_type="contract_key", object_id=key, failure_layer="topology", message=message, suggested_fix_type="fix_config", details=payload)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 from typing import Mapping
 
+from .data_contract import CARDINALITIES, DataProvider, DataRequirement, provider_keys, requirement_types
 from .node import FLOW_KIND_DECISION, FLOW_KINDS, NodeContract, NodeInfo, PureNode
 from .purity_helpers import (
     _looks_structured_key,
@@ -39,22 +40,48 @@ def _validate_contract(contract: object, *, source: _SourceInfo) -> list[PurityV
     if not isinstance(contract, NodeContract):
         return [_violation("missing_contract", "node must define CONTRACT: NodeContract", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
     violations: list[PurityViolation] = []
-    requires = _validate_key_tuple(contract.requires, "CONTRACT.requires", source=source, violations=violations)
-    provides = _validate_key_tuple(contract.provides, "CONTRACT.provides", source=source, violations=violations)
-    if set(requires) & set(provides):
-        violations.append(_violation("contract_overlap", "CONTRACT.requires and CONTRACT.provides must not overlap", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    violations.extend(_validate_semantics(contract.input_semantics, requires, "CONTRACT.input_semantics", required=bool(requires), source=source))
-    violations.extend(_validate_semantics(contract.output_semantics, provides, "CONTRACT.output_semantics", required=bool(provides), source=source))
+    requires = _validate_contract_requirements(contract.requires, "CONTRACT.requires", source=source, violations=violations)
+    provides = _validate_contract_providers(contract.provides, "CONTRACT.provides", source=source, violations=violations)
+    require_types = requirement_types(requires)
+    provide_keys = provider_keys(provides)
+    if set(require_types) & set(provide_keys):
+        violations.append(_violation("contract_overlap", "CONTRACT.requires types and CONTRACT.provides keys must not overlap", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
+    violations.extend(_validate_semantics(contract.input_semantics, require_types, "CONTRACT.input_semantics", required=bool(requires), source=source))
+    violations.extend(_validate_semantics(contract.output_semantics, provide_keys, "CONTRACT.output_semantics", required=bool(provides), source=source))
     violations.extend(_validate_schema_mapping(contract.params_schema, (), "CONTRACT.params_schema", source=source, require_all=False))
-    violations.extend(_validate_schema_mapping(contract.output_schema, provides, "CONTRACT.output_schema", source=source, require_all=bool(provides)))
+    violations.extend(_validate_schema_mapping(contract.output_schema, provide_keys, "CONTRACT.output_schema", source=source, require_all=bool(provides)))
     violations.extend(_validate_contract_examples_shape(contract.examples, source=source))
     return violations
+
+
+def _validate_contract_requirements(value: object, field_name: str, *, source: _SourceInfo, violations: list[PurityViolation]) -> tuple[DataRequirement, ...]:
+    if not isinstance(value, (list, tuple)) or any(not isinstance(item, DataRequirement) for item in value):
+        violations.append(_violation("contract_requirement_list", f"{field_name} must be a tuple/list of DataRequirement objects", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
+        return ()
+    types = tuple(item.type for item in value)
+    if any(not item.type.strip() or item.cardinality not in CARDINALITIES for item in value):
+        violations.append(_violation("contract_requirement_shape", f"{field_name} items must declare non-empty type and valid cardinality", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
+    if len(set(types)) != len(types):
+        violations.append(_violation("contract_duplicate_requirement_type", f"{field_name} must not contain duplicate types", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
+    return tuple(value)
+
+
+def _validate_contract_providers(value: object, field_name: str, *, source: _SourceInfo, violations: list[PurityViolation]) -> tuple[DataProvider, ...]:
+    if not isinstance(value, (list, tuple)) or any(not isinstance(item, DataProvider) for item in value):
+        violations.append(_violation("contract_provider_list", f"{field_name} must be a tuple/list of DataProvider objects", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
+        return ()
+    keys = tuple(item.key for item in value)
+    if any(not item.key.strip() or not item.type.strip() for item in value):
+        violations.append(_violation("contract_provider_shape", f"{field_name} items must declare non-empty key and type", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
+    if len(set(keys)) != len(keys):
+        violations.append(_violation("contract_duplicate_key", f"{field_name} must not contain duplicate keys", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
+    return tuple(value)
 
 
 def _validate_flow_kind_contract(info: NodeInfo, contract: NodeContract, *, source: _SourceInfo) -> list[PurityViolation]:
     if info.flow_kind != FLOW_KIND_DECISION:
         return []
-    route_keys = tuple(key for key in contract.provides if _looks_route_key(key))
+    route_keys = tuple(provider.key for provider in contract.provides if _looks_route_key(provider.key))
     if route_keys:
         return []
     return [
@@ -202,7 +229,9 @@ def _validate_architecture_smells(
 ) -> list[PurityViolation]:
     warnings: list[PurityViolation] = []
     metadata_tokens = _tokens(" ".join((info.type_key, info.display_name, info.category, info.description)))
-    contract_tokens = _tokens(" ".join((*contract.requires, *contract.provides)))
+    require_types = requirement_types(contract.requires)
+    provide_keys = provider_keys(contract.provides)
+    contract_tokens = _tokens(" ".join((*require_types, *provide_keys)))
     semantic_tokens = _tokens(" ".join(part for values in (*contract.input_semantics.values(), *contract.output_semantics.values()) for part in values))
     if contract_tokens and not (contract_tokens & (metadata_tokens | semantic_tokens)):
         warnings.append(
@@ -216,7 +245,7 @@ def _validate_architecture_smells(
                 details={"metadata_tokens": sorted(metadata_tokens), "contract_tokens": sorted(contract_tokens)},
             )
         )
-    for key in (*contract.requires, *contract.provides):
+    for key in (*require_types, *provide_keys):
         if _looks_temporary_key(key):
             warnings.append(
                 _violation(
@@ -298,7 +327,7 @@ def _example_payload(example: Mapping[str, object]) -> tuple[dict[str, object], 
 
 
 def _example_covers_contract(contract: NodeContract, inputs: Mapping[str, object]) -> bool:
-    return set(contract.requires) <= set(inputs)
+    return set(requirement_types(contract.requires)) <= set(inputs)
 
 
 def _validate_example_output(
@@ -338,7 +367,8 @@ def _run_example(
 
 
 def _validate_example_output_keys(actual_outputs: object, contract: NodeContract, index: int, *, source: _SourceInfo) -> list[PurityViolation]:
-    if isinstance(actual_outputs, Mapping) and set(actual_outputs) == set(contract.provides):
+    expected = set(provider_keys(contract.provides))
+    if isinstance(actual_outputs, Mapping) and set(actual_outputs) == expected:
         return []
     return [
         _violation(
@@ -347,7 +377,7 @@ def _validate_example_output_keys(actual_outputs: object, contract: NodeContract
             source=source,
             failure_layer="contract",
             suggested_fix_type="fix_node",
-            details={"example_index": index, "expected_keys": list(contract.provides), "actual_keys": list(actual_outputs) if isinstance(actual_outputs, Mapping) else []},
+            details={"example_index": index, "expected_keys": sorted(expected), "actual_keys": list(actual_outputs) if isinstance(actual_outputs, Mapping) else []},
         )
     ]
 

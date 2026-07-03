@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 
 from .ast_rules import import_aliases_from_node, import_modules, is_banned_import, module_statement_kind, name_targets, path_effect_call_name
+from .data_contract import provider_keys
 from .node import NodeContract
 from .purity_helpers import (
     _assigns_resource_field,
@@ -161,7 +162,7 @@ class NodePurityVisitor(_PurityImportVisitor):
         if dynamic:
             self._add("dynamic_output_key", "run_pure output keys must be string literals declared in CONTRACT.provides", node, suggested_fix_type="fix_contract")
         elif keys is not None:
-            provides = set(self.contract.provides)
+            provides = set(provider_keys(self.contract.provides))
             extra = keys - provides
             missing = provides - keys
             if extra:
@@ -173,7 +174,7 @@ class NodePurityVisitor(_PurityImportVisitor):
     def visit_Subscript(self, node: ast.Subscript) -> None:
         if isinstance(node.value, ast.Name) and node.value.id == "params":
             key = _literal_subscript_key(node)
-            if key and self.contract is not None and key not in self.contract.params_schema:
+            if key and key != "_global" and self.contract is not None and key not in self.contract.params_schema:
                 self._add("undeclared_param", f"params key is not declared in CONTRACT.params_schema: {key}", node, failure_layer="contract", suggested_fix_type="fix_contract")
         self.generic_visit(node)
 
@@ -264,7 +265,7 @@ class NodePurityVisitor(_PurityImportVisitor):
     def _check_params_key_node(self, key_node: ast.AST, node: ast.Call) -> None:
         if isinstance(key_node, ast.Constant) and isinstance(key_node.value, str):
             key = key_node.value
-            if self.contract is not None and key not in self.contract.params_schema:
+            if key != "_global" and self.contract is not None and key not in self.contract.params_schema:
                 self._add("undeclared_param", f"params key is not declared in CONTRACT.params_schema: {key}", node, failure_layer="contract", suggested_fix_type="fix_contract")
 
     def _check_assignment_target(self, target: ast.AST, node: ast.AST) -> None:

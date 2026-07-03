@@ -169,9 +169,17 @@ Rules:
 - Planned pipeline nodes must declare config `flow_kind`.
 - Implemented pipeline nodes must not declare config `flow_kind`; their kind comes
   from registered `NodeInfo.flow_kind`.
-- Planned nodes and nodesets are valid for design/health visualization but cannot
-  run.
-- An implemented nodeset cannot contain planned children.
+- Planned nodes and nodesets default to `planned_behavior: "blocking"`.
+- `planned_behavior: "transparent"` keeps the planned warning but participates in
+  flow connectivity checks.
+- `planned_behavior: {"kind": "python_stub", "stub_module": "project/stubs/x.py"}`
+  is development-test-only, participates in flow checks, and only runs when the
+  runtime explicitly enables planned stubs.
+- Blocking and transparent planned content cannot run. Python stub planned
+  content can run only with an explicit development flag. Any config containing
+  planned content is not production ready.
+- An implemented nodeset cannot contain blocking planned children; transparent
+  or python_stub planned children remain warnings.
 - Mermaid must render planned nodes/nodesets with flowchart shapes and a distinct
   planned marker.
 - Conditional routes and cycles still follow the same `when` and routing-node
@@ -271,7 +279,7 @@ The following conditions must fail strict runs:
 - allow planned nodes/nodesets to declare design-time `flow_kind`
 - reject config `flow_kind` on implemented nodes
 - warn on planned design content during health checks
-- refuse planned content at runtime
+- refuse planned content at runtime by default
 - render planned content in Mermaid
 
 The shortest correct path is to land Phase 1 first, then remove old semantics,

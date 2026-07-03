@@ -88,7 +88,7 @@ class PurityPolicy:
     warn_source_bytes: int | None = None
     allowed_import_roots: tuple[str, ...] = ()
     banned_import_roots: tuple[str, ...] = tuple(sorted(BANNED_IMPORT_ROOTS))
-    allowed_import_modules: tuple[str, ...] = ("urllib.parse",)
+    allowed_import_modules: tuple[str, ...] = ("urllib.parse", "vibeflow")
     banned_import_modules: tuple[str, ...] = ("urllib.request",)
     max_functions: int | None = None
     max_branches: int | None = None

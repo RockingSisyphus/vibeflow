@@ -713,13 +713,16 @@ def test_async_result_key_not_joined_when_unconsumed() -> None:
     )
 
     started = time.perf_counter()
-    context = PipelineRuntime(graph, registry=registry).run({})
+    context = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="boundary")).run({})
     elapsed = time.perf_counter() - started
 
     assert elapsed < 0.15
     assert context.get("value.in") == 2
     assert not context.exists("value.async")
-    assert "async_result" in [event["kind"] for event in context.get("runtime.events")]
+    abandoned = [event for event in context.get("runtime.events") if event["kind"] == "async_result_abandoned"]
+    assert len(abandoned) == 1
+    assert abandoned[0]["node"] == "slow"
+    assert abandoned[0]["output_summary"]["value.async"]["status"] == "abandoned"
     assert "async_result_join" not in [event["kind"] for event in context.get("runtime.events")]
 
 
@@ -863,11 +866,13 @@ def test_runtime_options_node_hooks_false_skips_per_node_hooks(tmp_path) -> None
         f"""
 import json
 from pathlib import Path
+from vibeflow import PluginInfo
 MARKER = Path({str(marker_path)!r})
 def record(value):
     with MARKER.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(value, sort_keys=True) + "\\n")
 class RuntimePlugin:
+    PLUGIN_INFO = PluginInfo("runtime_hook", "runtime", "Runtime Hook", "test", "Records runtime hook calls.", "0.1.0")
     name = "runtime_hook"
     def before_run(self, state):
         record({{"hook": "before_run"}})
@@ -904,11 +909,13 @@ def test_runtime_options_hook_granularity_controls_nodeset_and_block_hooks(tmp_p
         f"""
 import json
 from pathlib import Path
+from vibeflow import PluginInfo
 MARKER = Path({str(marker_path)!r})
 def record(value):
     with MARKER.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(value, sort_keys=True) + "\\n")
 class RuntimePlugin:
+    PLUGIN_INFO = PluginInfo("runtime_hook", "runtime", "Runtime Hook", "test", "Records runtime hook calls.", "0.1.0")
     name = "runtime_hook"
     def before_nodeset(self, name, node_type):
         record({{"hook": "before_nodeset"}})
