@@ -33,6 +33,7 @@ from nodes.legal_math_nodes import (
 )
 from nodes.legal_semantic_nodes import (
     SemanticAddPairNode,
+    SemanticAsyncValueEndNode,
     SemanticCompareGtNode,
     SemanticCopyNextNode,
     SemanticFinalEndNode,
@@ -46,6 +47,7 @@ from nodes.legal_semantic_nodes import (
     SemanticRightAdjustNode,
     SemanticScaleNode,
     SemanticScaledEndNode,
+    SemanticSlowAsyncValueNode,
     SemanticUseScaledNode,
 )
 from nodes.legal_training_nodes import (
@@ -107,6 +109,8 @@ def build_node_registry() -> NodeRegistry:
     registry.register("semantic.increment_until", SemanticIncrementUntilNode, config_schema={"step": {"type": "number"}}, config_defaults={"step": 1})
     registry.register("semantic.loop_done", SemanticLoopDoneNode, config_schema={"target": {"type": "number"}}, config_defaults={"target": 0})
     registry.register("semantic.copy_next", SemanticCopyNextNode, config_schema={}, config_defaults={})
+    registry.register("semantic.slow_async_value", SemanticSlowAsyncValueNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 42})
+    registry.register("semantic.async_value_end", SemanticAsyncValueEndNode, config_schema={}, config_defaults={})
     registry.register("semantic.scaled_end", SemanticScaledEndNode, config_schema={}, config_defaults={})
     registry.register("semantic.final_end", SemanticFinalEndNode, config_schema={}, config_defaults={})
     registry.register("semantic.left_branch_end", SemanticLeftBranchEndNode, config_schema={}, config_defaults={})

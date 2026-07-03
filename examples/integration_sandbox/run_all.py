@@ -61,8 +61,10 @@ def _batch_initial() -> dict[str, Any]:
     return {"train.batch": SandboxBatch([2, 4])}
 
 
-COMPILED_SOURCE_REQUIRED = ("_execute_pure_outputs", "select_active_edges", "_record_edge")
+COMPILED_SOURCE_FULL_REQUIRED = ("_execute_pure_outputs", "select_active_edges", "_record_edge")
+COMPILED_SOURCE_FAST_REQUIRED = ("_execute_pure_outputs", "select_active_edges")
 COMPILED_SOURCE_FORBIDDEN = ("_run_node(",)
+COMPILED_SOURCE_FAST_FORBIDDEN = ("_run_node(", "_record_edge(edge)", "summarize_mapping(inputs)", "summarize_mapping(outputs)", "'node',")
 
 
 VALID_RUN_CASES = [
@@ -151,7 +153,6 @@ VALID_RUN_CASES = [
         "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
         "expected_trace_summary": {
             "current_node": "end",
-            "edge_executions": {"start->seed": 1, "seed->add": 1, "add->end": 1},
             "exec_order": ["start", "seed", "add", "end"],
             "node_runs": {"start": 1, "seed": 1, "add": 1, "end": 1},
             "step_count": 4,
@@ -184,6 +185,24 @@ VALID_RUN_CASES = [
         "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
         "expected_trace_summary": {
             "current_node": "end",
+            "exec_order": ["start", "add_pair", "scale", "use_scaled", "finalize", "end"],
+            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "use_scaled": 1, "finalize": 1, "end": 1},
+            "step_count": 6,
+            "stop_reason": "completed",
+        },
+        "expected_blocks": [["start", "add_pair", "scale", "use_scaled", "finalize", "end"]],
+        "expected_block_source_contains": COMPILED_SOURCE_FAST_REQUIRED,
+        "expected_block_source_absent": COMPILED_SOURCE_FAST_FORBIDDEN,
+    },
+    {
+        "name": "compiled_full_semantic_linear_arithmetic",
+        "config": "pass_semantic_linear_arithmetic.jsonc",
+        "initial": {"calc.a": 2, "calc.b": 5},
+        "runtime_options": {"trace": "full", "node_hooks": False, "execution": "compiled"},
+        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "calc.branch": 21, "calc.final": 17},
+        "expected_trace_kind_counts": {"block_enter": 1, "node": 6, "block_exit": 1},
+        "expected_trace_summary": {
+            "current_node": "end",
             "edge_executions": {"start->add_pair": 1, "add_pair->scale": 1, "scale->use_scaled": 1, "use_scaled->finalize": 1, "finalize->end": 1},
             "exec_order": ["start", "add_pair", "scale", "use_scaled", "finalize", "end"],
             "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "use_scaled": 1, "finalize": 1, "end": 1},
@@ -191,7 +210,7 @@ VALID_RUN_CASES = [
             "stop_reason": "completed",
         },
         "expected_blocks": [["start", "add_pair", "scale", "use_scaled", "finalize", "end"]],
-        "expected_block_source_contains": COMPILED_SOURCE_REQUIRED,
+        "expected_block_source_contains": COMPILED_SOURCE_FULL_REQUIRED,
         "expected_block_source_absent": COMPILED_SOURCE_FORBIDDEN,
     },
     {
@@ -234,6 +253,24 @@ VALID_RUN_CASES = [
         "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
         "expected_trace_summary": {
             "current_node": "left_end",
+            "exec_order": ["start", "add_pair", "scale", "compare", "left_adjust", "left_end"],
+            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "left_adjust": 1, "left_end": 1},
+            "step_count": 6,
+            "stop_reason": "completed",
+        },
+        "expected_blocks": [["start", "add_pair", "scale", "compare", "left_adjust", "right_adjust", "left_end", "right_end"]],
+        "expected_block_source_contains": COMPILED_SOURCE_FAST_REQUIRED,
+        "expected_block_source_absent": COMPILED_SOURCE_FAST_FORBIDDEN,
+    },
+    {
+        "name": "compiled_full_semantic_decision_branch_left",
+        "config": "pass_semantic_decision_branch.jsonc",
+        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 9, "calc.d": 4},
+        "runtime_options": {"trace": "full", "node_hooks": False, "execution": "compiled"},
+        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "left", "calc.left_branch": 31},
+        "expected_trace_kind_counts": {"block_enter": 1, "node": 6, "block_exit": 1},
+        "expected_trace_summary": {
+            "current_node": "left_end",
             "edge_executions": {"start->add_pair": 1, "add_pair->scale": 1, "scale->compare": 1, "compare->left_adjust": 1, "left_adjust->left_end": 1},
             "exec_order": ["start", "add_pair", "scale", "compare", "left_adjust", "left_end"],
             "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "left_adjust": 1, "left_end": 1},
@@ -241,7 +278,7 @@ VALID_RUN_CASES = [
             "stop_reason": "completed",
         },
         "expected_blocks": [["start", "add_pair", "scale", "compare", "left_adjust", "right_adjust", "left_end", "right_end"]],
-        "expected_block_source_contains": COMPILED_SOURCE_REQUIRED,
+        "expected_block_source_contains": COMPILED_SOURCE_FULL_REQUIRED,
         "expected_block_source_absent": COMPILED_SOURCE_FORBIDDEN,
     },
     {
@@ -254,15 +291,14 @@ VALID_RUN_CASES = [
         "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
         "expected_trace_summary": {
             "current_node": "right_end",
-            "edge_executions": {"start->add_pair": 1, "add_pair->scale": 1, "scale->compare": 1, "compare->right_adjust": 1, "right_adjust->right_end": 1},
             "exec_order": ["start", "add_pair", "scale", "compare", "right_adjust", "right_end"],
             "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "right_adjust": 1, "right_end": 1},
             "step_count": 6,
             "stop_reason": "completed",
         },
         "expected_blocks": [["start", "add_pair", "scale", "compare", "left_adjust", "right_adjust", "left_end", "right_end"]],
-        "expected_block_source_contains": COMPILED_SOURCE_REQUIRED,
-        "expected_block_source_absent": COMPILED_SOURCE_FORBIDDEN,
+        "expected_block_source_contains": COMPILED_SOURCE_FAST_REQUIRED,
+        "expected_block_source_absent": COMPILED_SOURCE_FAST_FORBIDDEN,
     },
     {
         "name": "semantic_decision_loop",
@@ -289,6 +325,24 @@ VALID_RUN_CASES = [
         "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
         "expected_trace_summary": {
             "current_node": "end",
+            "exec_order": ["start", "increment", "done", "copy", "increment", "done", "copy", "increment", "done", "end"],
+            "node_runs": {"start": 1, "increment": 3, "done": 3, "copy": 2, "end": 1},
+            "step_count": 10,
+            "stop_reason": "completed",
+        },
+        "expected_blocks": [["start", "increment", "done", "copy", "end"]],
+        "expected_block_source_contains": COMPILED_SOURCE_FAST_REQUIRED,
+        "expected_block_source_absent": COMPILED_SOURCE_FAST_FORBIDDEN,
+    },
+    {
+        "name": "compiled_full_semantic_decision_loop",
+        "config": "pass_semantic_decision_loop.jsonc",
+        "initial": {"loop.current": 1},
+        "runtime_options": {"trace": "full", "node_hooks": False, "execution": "compiled"},
+        "expected_outputs": {"loop.next": 7, "loop.done": True},
+        "expected_trace_kind_counts": {"block_enter": 1, "node": 10, "block_exit": 1},
+        "expected_trace_summary": {
+            "current_node": "end",
             "edge_executions": {"start->increment": 1, "increment->done": 3, "done->copy": 2, "copy->increment": 2, "done->end": 1},
             "exec_order": ["start", "increment", "done", "copy", "increment", "done", "copy", "increment", "done", "end"],
             "node_runs": {"start": 1, "increment": 3, "done": 3, "copy": 2, "end": 1},
@@ -296,7 +350,7 @@ VALID_RUN_CASES = [
             "stop_reason": "completed",
         },
         "expected_blocks": [["start", "increment", "done", "copy", "end"]],
-        "expected_block_source_contains": COMPILED_SOURCE_REQUIRED,
+        "expected_block_source_contains": COMPILED_SOURCE_FULL_REQUIRED,
         "expected_block_source_absent": COMPILED_SOURCE_FORBIDDEN,
     },
     {
@@ -327,7 +381,7 @@ VALID_RUN_CASES = [
         "expected_trace_kind_counts": {"nodeset_enter": 1, "nodeset_exit": 1, "block_enter": 1, "block_exit": 1},
         "expected_trace_summary": {
             "current_node": "end",
-            "edge_executions": {"start->arithmetic": 1, "arithmetic->use_scaled": 1, "use_scaled->finalize": 1, "finalize->end": 1},
+            "edge_executions": {"start->arithmetic": 1, "arithmetic->use_scaled": 1},
             "exec_order": ["start", "arithmetic", "use_scaled", "finalize", "end"],
             "node_runs": {"start": 1, "arithmetic": 1, "use_scaled": 1, "finalize": 1, "end": 1},
             "step_count": 5,
@@ -337,8 +391,8 @@ VALID_RUN_CASES = [
         "expected_nodeset_subplan_params": {"arithmetic.scale": {"factor": 2}},
         "expected_nodeset_subplan_nodes": {"arithmetic": ["start", "add_pair", "scale", "end"]},
         "expected_nodeset_exports": {"arithmetic": ["calc.scaled"]},
-        "expected_block_source_contains": COMPILED_SOURCE_REQUIRED,
-        "expected_block_source_absent": COMPILED_SOURCE_FORBIDDEN,
+        "expected_block_source_contains": COMPILED_SOURCE_FAST_REQUIRED,
+        "expected_block_source_absent": COMPILED_SOURCE_FAST_FORBIDDEN,
     },
     {
         "name": "execution_plan_bound_params",
@@ -406,14 +460,6 @@ VALID_RUN_CASES = [
         "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
         "expected_trace_summary": {
             "current_node": "end",
-            "edge_executions": {
-                "start->training_input": 1,
-                "training_input->forward_loss": 1,
-                "forward_loss->backward_grad": 1,
-                "backward_grad->optimizer_step": 1,
-                "optimizer_step->training_metrics": 1,
-                "training_metrics->end": 1,
-            },
             "node_runs": {
                 "start": 1,
                 "training_input": 1,
@@ -446,14 +492,6 @@ VALID_RUN_CASES = [
         "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
         "expected_trace_summary": {
             "current_node": "end",
-            "edge_executions": {
-                "start->input": 1,
-                "input->increment": 1,
-                "increment->done": 2,
-                "done->copy": 1,
-                "copy->increment": 1,
-                "done->end": 1,
-            },
             "exec_order": ["start", "input", "increment", "done", "copy", "increment", "done", "end"],
             "node_runs": {"start": 1, "input": 1, "increment": 2, "done": 2, "copy": 1, "end": 1},
             "step_count": 8,
@@ -471,14 +509,6 @@ VALID_RUN_CASES = [
         "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
         "expected_trace_summary": {
             "current_node": "end",
-            "edge_executions": {
-                "start->input": 1,
-                "input->prepare": 1,
-                "prepare->compute": 1,
-                "compute->route": 1,
-                "route->external": 1,
-                "external->end": 1,
-            },
             "exec_order": ["start", "input", "prepare", "compute", "route", "external", "end"],
             "node_runs": {"start": 1, "input": 1, "prepare": 1, "compute": 1, "route": 1, "external": 1, "end": 1},
             "step_count": 7,
@@ -495,6 +525,32 @@ VALID_RUN_CASES = [
         "expected_runtime_exec_order": ["start", "seed", "add", "end"],
     },
     {
+        "name": "semantic_async_result_key_unconsumed",
+        "config": "pass_semantic_async_result_unconsumed.jsonc",
+        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 9, "calc.d": 4},
+        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "left", "calc.branch": 21, "calc.final": 17},
+        "expected_absent_outputs": ["async.value"],
+        "expected_trace_kind_counts": {"async_result": 1},
+        "expected_trace_kind_absent": ["async_result_join"],
+        "expected_runtime_exec_order": ["start", "slow_async", "add_pair", "scale", "compare", "use_scaled", "finalize", "end"],
+        "expected_trace_summary": {
+            "current_node": "end",
+            "edge_executions": {
+                "start->slow_async": 1,
+                "slow_async->add_pair": 1,
+                "add_pair->scale": 1,
+                "scale->compare": 1,
+                "compare->use_scaled": 1,
+                "use_scaled->finalize": 1,
+                "finalize->end": 1,
+            },
+            "exec_order": ["start", "slow_async", "add_pair", "scale", "compare", "use_scaled", "finalize", "end"],
+            "node_runs": {"start": 1, "slow_async": 1, "add_pair": 1, "scale": 1, "compare": 1, "use_scaled": 1, "finalize": 1, "end": 1},
+            "step_count": 8,
+            "stop_reason": "completed",
+        },
+    },
+    {
         "name": "compiled_fallback_mixed_graph",
         "config": "pass_async_result_key_join.jsonc",
         "initial": {},
@@ -504,7 +560,7 @@ VALID_RUN_CASES = [
         "expected_runtime_exec_order": ["start", "seed", "add", "end"],
         "expected_trace_summary": {
             "current_node": "end",
-            "edge_executions": {"start->seed": 1, "seed->add": 1, "add->end": 1},
+            "edge_executions": {"start->seed": 1, "seed->add": 1},
             "exec_order": ["start", "seed", "add", "end"],
             "node_runs": {"start": 1, "seed": 1, "add": 1, "end": 1},
             "step_count": 4,
@@ -691,7 +747,8 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     graph = parse_graph_config(document.data)
     node_registry = build_node_registry()
     compiled = GraphCompiler().compile(graph, registry=node_registry, plugin_registry=plugin_registry)
-    plan = build_execution_plan(graph, compiled, registry=node_registry)
+    runtime_options = RuntimeOptions(**case["runtime_options"]) if "runtime_options" in case else None
+    plan = build_execution_plan(graph, compiled, registry=node_registry, runtime_options=runtime_options)
     _assert_execution_plan(case, plan)
     block_source_paths = _write_compiled_block_sources(name, plan)
     _assert_compiled_block_sources(case, plan, block_source_paths)
@@ -727,13 +784,16 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         policy_path=POLICY_PATH,
         run_root=RUN_ROOT,
         run_id=name,
-        runtime_options=RuntimeOptions(**case["runtime_options"]) if "runtime_options" in case else None,
+        runtime_options=runtime_options,
     )
     _assert_artifacts(run_result.run_dir)
     for key, expected in dict(case.get("expected_outputs", {})).items():
         actual = run_result.context.get(str(key))
         if actual != expected:
             raise AssertionError(f"{key} expected {expected!r}, got {actual!r}")
+    for key in case.get("expected_absent_outputs", ()):
+        if run_result.context.exists(str(key)):
+            raise AssertionError(f"{key} should be absent, got {run_result.context.get(str(key))!r}")
     for key, initial_key in case.get("expected_same_as_initial", ()):
         if run_result.context.get(key) is not initial[initial_key]:
             raise AssertionError(f"{key} is not initial {initial_key}")
@@ -761,6 +821,11 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
             actual = actual_kinds.count(kind)
             if actual != expected:
                 raise AssertionError(f"trace kind {kind} expected {expected}, got {actual}")
+    if "expected_trace_kind_absent" in case:
+        actual_kinds = [line["kind"] for line in _runtime_trace_lines(run_result.run_dir)]
+        unexpected = set(case["expected_trace_kind_absent"]) & set(actual_kinds)
+        if unexpected:
+            raise AssertionError(f"unexpected trace kinds present: {sorted(unexpected)}")
     if "expected_trace_summary" in case:
         summary = _runtime_trace_lines(run_result.run_dir)[-1]
         for key, expected in case["expected_trace_summary"].items():

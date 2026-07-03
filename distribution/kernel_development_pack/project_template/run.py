@@ -187,7 +187,17 @@ def _add_runtime_options(command) -> None:
 def _runtime_options_from_args(args) -> RuntimeOptions:
     values: dict[str, object] = {}
     if args.runtime_profile == "train":
-        values.update({"trace": "boundary", "run_hooks": True, "node_hooks": False, "nodeset_hooks": False, "block_hooks": True, "execution": "compiled"})
+        values.update(
+            {
+                "trace": "boundary",
+                "run_hooks": True,
+                "node_hooks": False,
+                "nodeset_hooks": False,
+                "block_hooks": True,
+                "execution": "compiled",
+                "async_flush_timeout": 30.0,
+            }
+        )
     elif args.runtime_profile == "debug":
         values.update({"trace": "full", "run_hooks": True, "node_hooks": True, "nodeset_hooks": True, "block_hooks": True, "execution": "plan"})
     if args.trace is not None:

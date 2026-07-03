@@ -353,6 +353,10 @@ def test_runtime_options_compiled_executes_linear_block(monkeypatch) -> None:
     block = runtime._plan.blocks[0]
     assert callable(block.callable)
     assert "def compiled_block(runtime, context):" in block.source
+    assert "_record_edge(edge)" not in block.source
+    assert "'node'," not in block.source
+    assert "summarize_mapping(inputs)" not in block.source
+    assert "summarize_mapping(outputs)" not in block.source
     assert runtime._plan.compiled_blocks == runtime._plan.blocks
     assert runtime._plan.compiled_block_by_entry == runtime._plan.block_by_entry
     assert runtime._plan.compiled_node_to_block == {node: block for node in block.nodes}
@@ -365,7 +369,7 @@ def test_runtime_options_compiled_executes_linear_block(monkeypatch) -> None:
 
     assert context.get("value.out") == 5
     assert list(context.get("runtime.exec_order")) == ["start", "seed", "add", "end"]
-    assert context.get("runtime.edge_executions") == {"start->seed": 1, "seed->add": 1, "add->end": 1}
+    assert context.get("runtime.edge_executions") == {}
     assert [event["kind"] for event in context.get("runtime.events")] == ["run_start", "block_enter", "block_exit", "run_end"]
     assert runtime._plan.blocks
 
@@ -416,12 +420,16 @@ def test_runtime_options_compiled_full_trace_records_node_events(monkeypatch) ->
         raise AssertionError(f"compiled block should not call _run_node for {node_name}")
 
     monkeypatch.setattr(PipelineRuntime, "_run_node", fail_if_interpreted)
-    context = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="full", node_hooks=False, execution="compiled")).run({})
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="full", node_hooks=False, execution="compiled"))
+    assert "_record_edge(edge)" in runtime._plan.blocks[0].source
+    assert "summarize_mapping(inputs)" in runtime._plan.blocks[0].source
+    context = runtime.run({})
 
     assert context.get("value.out") == 5
     event_kinds = [event["kind"] for event in context.get("runtime.events")]
     assert event_kinds == ["block_enter", "node", "node", "node", "node", "block_exit"]
     assert [event["node"] for event in context.get("runtime.events") if event["kind"] == "node"] == ["start", "seed", "add", "end"]
+    assert context.get("runtime.edge_executions") == {"start->seed": 1, "seed->add": 1, "add->end": 1}
 
 
 def test_runtime_options_compiled_failure_records_node_and_block_failed() -> None:
@@ -443,9 +451,8 @@ def test_runtime_options_compiled_failure_records_node_and_block_failed() -> Non
         runtime.run({})
 
     assert runtime.trace.current_node == "bad"
-    assert [event["kind"] for event in runtime.trace.events] == ["run_start", "block_enter", "node_failed", "block_failed"]
+    assert [event["kind"] for event in runtime.trace.events] == ["run_start", "block_enter", "block_failed"]
     assert "boom" in runtime.trace.events[2]["failure"]
-    assert "boom" in runtime.trace.events[3]["failure"]
 
 
 def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
@@ -485,12 +492,7 @@ def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
 
     assert context.get("value.out") == 2
     assert list(context.get("runtime.exec_order")) == ["start", "input", "add", "route", "end"]
-    assert context.get("runtime.edge_executions") == {
-        "start->input": 1,
-        "input->add": 1,
-        "add->route": 1,
-        "route->end": 1,
-    }
+    assert context.get("runtime.edge_executions") == {}
 
 
 def test_runtime_options_compiled_executes_decision_loop(monkeypatch) -> None:
@@ -519,14 +521,7 @@ def test_runtime_options_compiled_executes_decision_loop(monkeypatch) -> None:
 
     assert context.get("value.out") == 3
     assert list(context.get("runtime.exec_order")) == ["start", "input", "add", "done", "copy", "add", "done", "end"]
-    assert context.get("runtime.edge_executions") == {
-        "start->input": 1,
-        "input->add": 1,
-        "add->done": 2,
-        "done->copy": 1,
-        "copy->add": 1,
-        "done->end": 1,
-    }
+    assert context.get("runtime.edge_executions") == {}
 
 
 def test_runtime_options_compiled_decision_loop_respects_max_steps() -> None:
@@ -684,6 +679,48 @@ def test_async_result_key_joins_when_required() -> None:
 
     assert context.get("value.out") == 7
     assert "async_result_join" in [event["kind"] for event in context.get("runtime.events")]
+
+
+def test_async_result_key_not_joined_when_unconsumed() -> None:
+    class SlowResultNode:
+        NODE_INFO = NodeInfo("test.slow_result", "Slow Result", "test", "Slow result-key async task.", "0.1.0", "process")
+        CONTRACT = NodeContract(provides=("value.async",), examples=({"inputs": {}, "params": {}},))
+
+        def run_pure(self, inputs, params):
+            time.sleep(0.2)
+            return {"value.async": 99}
+
+    registry = _registry()
+    register_node(registry, "test.slow_result", SlowResultNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {
+                        "name": "slow",
+                        "type": "test.slow_result",
+                        "provides": ["value.async"],
+                        "async": "result_key",
+                        "result_key": "value.async",
+                    },
+                    {"name": "seed", "type": "test.seed", "provides": ["value.in"], "config": {"value": 2}},
+                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                ],
+                "edges": _edge_chain("start", "slow", "seed", "end"),
+            }
+        }
+    )
+
+    started = time.perf_counter()
+    context = PipelineRuntime(graph, registry=registry).run({})
+    elapsed = time.perf_counter() - started
+
+    assert elapsed < 0.15
+    assert context.get("value.in") == 2
+    assert not context.exists("value.async")
+    assert "async_result" in [event["kind"] for event in context.get("runtime.events")]
+    assert "async_result_join" not in [event["kind"] for event in context.get("runtime.events")]
 
 
 def test_async_detached_failure_records_warning_and_completes() -> None:
@@ -956,6 +993,21 @@ def test_checked_run_trace_records_nodeset_enter_exit(tmp_path) -> None:
     ]
     assert "nodeset_enter" in trace_kinds
     assert "nodeset_exit" in trace_kinds
+
+
+def test_cli_train_profile_sets_async_flush_timeout_and_allows_override() -> None:
+    import argparse
+    from vibeflow.cli import _add_runtime_options, _runtime_options_from_args
+
+    parser = argparse.ArgumentParser()
+    _add_runtime_options(parser)
+
+    train_options = _runtime_options_from_args(parser.parse_args(["--runtime-profile", "train"]))
+    override_options = _runtime_options_from_args(parser.parse_args(["--runtime-profile", "train", "--async-flush-timeout", "1.5"]))
+
+    assert train_options.async_flush_timeout == 30.0
+    assert override_options.async_flush_timeout == 1.5
+
 
 def test_cli_run_uses_checked_run_and_refuses_without_registered_nodes(tmp_path, capsys) -> None:
     config_path = tmp_path / "workflow.json"

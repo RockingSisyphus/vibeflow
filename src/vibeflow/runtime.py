@@ -57,6 +57,7 @@ class PipelineRuntime:
         self._async_results: dict[str, tuple[NodeFrame, Future[Mapping[str, object]]]] = {}
         self._detached: list[tuple[NodeFrame, Future[Mapping[str, object]]]] = []
         self._detached_timeout = False
+        self._abandoned_async_results = False
         self._run_dir = Path(run_dir) if run_dir is not None else Path("runs") / "vibeflow"
 
     @classmethod
@@ -77,6 +78,7 @@ class PipelineRuntime:
         runtime._async_results = {}
         runtime._detached = []
         runtime._detached_timeout = False
+        runtime._abandoned_async_results = False
         runtime._run_dir = parent._run_dir
         runtime.runtime_options = parent.runtime_options
         return runtime
@@ -93,12 +95,13 @@ class PipelineRuntime:
                 self._run_block_steps(context)
             else:
                 self._run_steps(context)
-            self._flush_async_results(context)
+            self._abandon_async_results()
             self._flush_detached()
             self.trace.stop_reason = self.trace.stop_reason or "completed"
             self._record_run_boundary("run_end")
             self._call_runtime_plugins("after_run", context.to_dict(), self.trace.to_dict())
         except Exception as exc:
+            self._abandon_async_results()
             self._flush_detached()
             self.trace.stop_reason = self.trace.stop_reason or "node_failed"
             self.trace.exception = str(exc)
@@ -116,6 +119,7 @@ class PipelineRuntime:
         self._async_results = {}
         self._detached = []
         self._detached_timeout = False
+        self._abandoned_async_results = False
 
     def _run_steps(self, context: Context) -> None:
         ready = list(self._initial_ready_nodes(context))
@@ -340,9 +344,13 @@ class PipelineRuntime:
         self._call_runtime_plugins("after_node", frame.name, frame.node_type, summarize_mapping({key: outputs[key]}))
         self._record_runtime_event("async_result_join", frame.name, frame.node_type, output_summary=summarize_mapping({key: outputs[key]}))
 
-    def _flush_async_results(self, context: Context) -> None:
-        for key in tuple(self._async_results):
-            self._join_async_result(key, context)
+    def _abandon_async_results(self) -> None:
+        if not self._async_results:
+            return
+        self._abandoned_async_results = True
+        for _key, (_frame, future) in tuple(self._async_results.items()):
+            future.cancel()
+        self._async_results = {}
 
     def _flush_detached(self) -> None:
         timeout = self.runtime_options.async_flush_timeout
@@ -361,7 +369,8 @@ class PipelineRuntime:
 
     def _shutdown_executor(self) -> None:
         if self._executor is not None:
-            self._executor.shutdown(wait=not self._detached_timeout, cancel_futures=self._detached_timeout)
+            nonblocking = self._detached_timeout or self._abandoned_async_results
+            self._executor.shutdown(wait=not nonblocking, cancel_futures=nonblocking)
             self._executor = None
 
     def _record_edge(self, edge: EdgeSpec) -> None:

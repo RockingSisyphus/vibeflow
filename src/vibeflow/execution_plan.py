@@ -61,7 +61,7 @@ def build_execution_plan(
 ) -> ExecutionPlan:
     overrides = normalize_node_config_overrides(node_config_overrides or {})
     frames = {
-        spec.name: _frame_for(spec, graph=graph, compiled=compiled, registry=registry, overrides=overrides)
+        spec.name: _frame_for(spec, graph=graph, compiled=compiled, registry=registry, overrides=overrides, runtime_options=runtime_options)
         for spec in graph.nodes
     }
     order = tuple(node.name for node in graph.nodes)
@@ -90,6 +90,7 @@ def _frame_for(
     compiled: CompiledGraph,
     registry: NodeRegistry,
     overrides: Mapping[str, Mapping[str, Any]],
+    runtime_options: object | None,
 ) -> NodeFrame:
     incoming = tuple(edge for edge in compiled.effective_edges if edge.target == spec.name)
     outgoing = tuple(edge for edge in compiled.effective_edges if edge.source == spec.name)
@@ -116,7 +117,7 @@ def _frame_for(
             exports=nodeset.exports,
             async_mode=spec.async_mode,
             result_key=spec.result_key,
-            subplan=build_execution_plan(nodeset.graph, subcompiled, registry=registry, node_config_overrides=nested_overrides),
+            subplan=build_execution_plan(nodeset.graph, subcompiled, registry=registry, node_config_overrides=nested_overrides, runtime_options=runtime_options),
         )
     node_cls = registry.get(spec.node_type)
     node = node_cls()

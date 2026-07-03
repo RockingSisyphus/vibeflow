@@ -1,0 +1,33 @@
+{
+  "pipeline": {
+    "inputs": ["calc.a", "calc.b", "calc.c", "calc.d"],
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {
+        "name": "slow_async",
+        "type": "semantic.slow_async_value",
+        "provides": ["async.value"],
+        "async": "result_key",
+        "result_key": "async.value",
+        "config": {"value": 99}
+      },
+      {"name": "add_pair", "type": "semantic.add_pair", "requires": ["calc.a", "calc.b"], "provides": ["calc.sum"]},
+      {"name": "scale", "type": "semantic.scale", "requires": ["calc.sum"], "provides": ["calc.scaled"], "config": {"factor": 3}},
+      {"name": "compare", "type": "semantic.compare_gt", "requires": ["calc.c", "calc.d"], "provides": ["route.branch"]},
+      {"name": "use_scaled", "type": "semantic.use_scaled", "requires": ["calc.scaled"], "provides": ["calc.branch"]},
+      {"name": "finalize", "type": "semantic.finalize", "requires": ["calc.branch"], "provides": ["calc.final"], "config": {"offset": -4}},
+      {"name": "end", "type": "semantic.final_end", "requires": ["calc.final"]},
+      {"name": "async_end", "type": "semantic.async_value_end", "requires": ["async.value"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "slow_async"},
+      {"from": "slow_async", "to": "add_pair"},
+      {"from": "add_pair", "to": "scale"},
+      {"from": "scale", "to": "compare"},
+      {"from": "compare", "to": "use_scaled", "when": "route.branch == 'left'"},
+      {"from": "compare", "to": "async_end", "when": "route.branch == 'right'"},
+      {"from": "use_scaled", "to": "finalize"},
+      {"from": "finalize", "to": "end"}
+    ]
+  }
+}
