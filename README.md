@@ -179,6 +179,10 @@ VibeFlow 会在运行前检查：
 - `docs/kernel_development_guide.md`：VibeFlow 自身维护指南。
 - `distribution/kernel_development_pack/`：发布包模板。
 
+## 许可证 📄
+
+VibeFlow 使用 GNU Affero General Public License v3.0（AGPLv3）授权。详见 `LICENSE`。
+
 ## 项目状态 🚧
 
 VibeFlow 仍在快速演进中。当前重点是把 AI 协同开发中的结构纪律、流程图表达、运行前检查、训练/批处理运行性能和发布包体验打磨稳定。
