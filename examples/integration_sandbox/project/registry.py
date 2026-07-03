@@ -31,6 +31,23 @@ from nodes.legal_math_nodes import (
     SumPairNode,
     ValueInputNode,
 )
+from nodes.legal_semantic_nodes import (
+    SemanticAddPairNode,
+    SemanticCompareGtNode,
+    SemanticCopyNextNode,
+    SemanticFinalEndNode,
+    SemanticFinalizeNode,
+    SemanticIncrementUntilNode,
+    SemanticLeftBranchEndNode,
+    SemanticLeftAdjustNode,
+    SemanticLoopDoneNode,
+    SemanticLoopEndNode,
+    SemanticRightBranchEndNode,
+    SemanticRightAdjustNode,
+    SemanticScaleNode,
+    SemanticScaledEndNode,
+    SemanticUseScaledNode,
+)
 from nodes.legal_training_nodes import (
     BackwardGradNode,
     BatchMetricsNode,
@@ -80,4 +97,19 @@ def build_node_registry() -> NodeRegistry:
     registry.register("sandbox.training_metrics", TrainingMetricsNode, config_schema={}, config_defaults={})
     registry.register("sandbox.batch_metrics", BatchMetricsNode, config_schema={}, config_defaults={})
     registry.register("sandbox.training_metrics_end", TrainingMetricsEndNode, config_schema={}, config_defaults={})
+    registry.register("semantic.add_pair", SemanticAddPairNode, config_schema={}, config_defaults={})
+    registry.register("semantic.scale", SemanticScaleNode, config_schema={"factor": {"type": "number"}}, config_defaults={"factor": 1})
+    registry.register("semantic.use_scaled", SemanticUseScaledNode, config_schema={}, config_defaults={})
+    registry.register("semantic.compare_gt", SemanticCompareGtNode, config_schema={}, config_defaults={})
+    registry.register("semantic.left_adjust", SemanticLeftAdjustNode, config_schema={"bonus": {"type": "number"}}, config_defaults={"bonus": 0})
+    registry.register("semantic.right_adjust", SemanticRightAdjustNode, config_schema={"penalty": {"type": "number"}}, config_defaults={"penalty": 0})
+    registry.register("semantic.finalize", SemanticFinalizeNode, config_schema={"offset": {"type": "number"}}, config_defaults={"offset": 0})
+    registry.register("semantic.increment_until", SemanticIncrementUntilNode, config_schema={"step": {"type": "number"}}, config_defaults={"step": 1})
+    registry.register("semantic.loop_done", SemanticLoopDoneNode, config_schema={"target": {"type": "number"}}, config_defaults={"target": 0})
+    registry.register("semantic.copy_next", SemanticCopyNextNode, config_schema={}, config_defaults={})
+    registry.register("semantic.scaled_end", SemanticScaledEndNode, config_schema={}, config_defaults={})
+    registry.register("semantic.final_end", SemanticFinalEndNode, config_schema={}, config_defaults={})
+    registry.register("semantic.left_branch_end", SemanticLeftBranchEndNode, config_schema={}, config_defaults={})
+    registry.register("semantic.right_branch_end", SemanticRightBranchEndNode, config_schema={}, config_defaults={})
+    registry.register("semantic.loop_end", SemanticLoopEndNode, config_schema={}, config_defaults={})
     return registry

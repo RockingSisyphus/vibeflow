@@ -42,7 +42,13 @@ class PipelineRuntime:
         self._runtime_plugins = plugin_registry.runtime_plugins() if plugin_registry is not None else ()
         self._hook_plan = runtime_hook_plan(self._runtime_plugins, self.runtime_options)
         self.compiled = GraphCompiler().compile(graph, registry=registry, plugin_registry=plugin_registry)
-        self._plan = build_execution_plan(graph, self.compiled, registry=registry, node_config_overrides=node_config_overrides)
+        self._plan = build_execution_plan(
+            graph,
+            self.compiled,
+            registry=registry,
+            node_config_overrides=node_config_overrides,
+            runtime_options=self.runtime_options,
+        )
         self.trace = RuntimeTrace()
         self._node_runs: dict[str, int] = {node.name: 0 for node in graph.nodes}
         self._frames = self._plan.frames

@@ -346,25 +346,285 @@ def test_runtime_options_block_executes_linear_plan() -> None:
     assert list(context.get("runtime.exec_order")) == ["start", "seed", "add", "end"]
 
 
-def test_runtime_options_compiled_executes_linear_block() -> None:
+def test_runtime_options_compiled_executes_linear_block(monkeypatch) -> None:
     graph = parse_graph_config({"pipeline": _seed_add_pipeline(add={"config": {"delta": 4}})})
 
     runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
+    block = runtime._plan.blocks[0]
+    assert callable(block.callable)
+    assert "def compiled_block(runtime, context):" in block.source
+    assert runtime._plan.compiled_blocks == runtime._plan.blocks
+    assert runtime._plan.compiled_block_by_entry == runtime._plan.block_by_entry
+    assert runtime._plan.compiled_node_to_block == {node: block for node in block.nodes}
+
+    def fail_if_interpreted(self, node_name, context):
+        raise AssertionError(f"compiled block should not call _run_node for {node_name}")
+
+    monkeypatch.setattr(PipelineRuntime, "_run_node", fail_if_interpreted)
     context = runtime.run({})
 
     assert context.get("value.out") == 5
     assert list(context.get("runtime.exec_order")) == ["start", "seed", "add", "end"]
+    assert context.get("runtime.edge_executions") == {"start->seed": 1, "seed->add": 1, "add->end": 1}
     assert [event["kind"] for event in context.get("runtime.events")] == ["run_start", "block_enter", "block_exit", "run_end"]
     assert runtime._plan.blocks
 
 
-def test_runtime_options_compiled_falls_back_when_node_hooks_enabled() -> None:
+def test_runtime_options_compiled_runs_generated_block_when_node_hooks_enabled(monkeypatch) -> None:
     graph = parse_graph_config({"pipeline": _seed_add_pipeline(add={"config": {"delta": 4}})})
 
-    context = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="boundary", node_hooks=True, execution="compiled")).run({})
+    calls = []
+
+    def before_node(self, name, node_type, input_summary):
+        calls.append(("before", name))
+
+    def after_node(self, name, node_type, output_summary):
+        calls.append(("after", name))
+
+    def fail_if_interpreted(self, node_name, context):
+        raise AssertionError(f"compiled block should not call _run_node for {node_name}")
+
+    monkeypatch.setattr(PipelineRuntime, "_run_node", fail_if_interpreted)
+    plugin = type("NodeHookPlugin", (), {"name": "node_hook", "before_node": before_node, "after_node": after_node})()
+    plugin_registry = PluginRegistry()
+    plugin_registry.register(plugin, plugin_type="runtime")
+    context = PipelineRuntime(
+        graph,
+        registry=_registry(),
+        plugin_registry=plugin_registry,
+        runtime_options=RuntimeOptions(trace="boundary", node_hooks=True, execution="compiled"),
+    ).run({})
 
     assert context.get("value.out") == 5
-    assert [event["kind"] for event in context.get("runtime.events")] == ["run_start", "run_end"]
+    assert [event["kind"] for event in context.get("runtime.events")] == ["run_start", "block_enter", "block_exit", "run_end"]
+    assert calls == [
+        ("before", "start"),
+        ("after", "start"),
+        ("before", "seed"),
+        ("after", "seed"),
+        ("before", "add"),
+        ("after", "add"),
+        ("before", "end"),
+        ("after", "end"),
+    ]
+
+
+def test_runtime_options_compiled_full_trace_records_node_events(monkeypatch) -> None:
+    graph = parse_graph_config({"pipeline": _seed_add_pipeline(add={"config": {"delta": 4}})})
+
+    def fail_if_interpreted(self, node_name, context):
+        raise AssertionError(f"compiled block should not call _run_node for {node_name}")
+
+    monkeypatch.setattr(PipelineRuntime, "_run_node", fail_if_interpreted)
+    context = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="full", node_hooks=False, execution="compiled")).run({})
+
+    assert context.get("value.out") == 5
+    event_kinds = [event["kind"] for event in context.get("runtime.events")]
+    assert event_kinds == ["block_enter", "node", "node", "node", "node", "block_exit"]
+    assert [event["node"] for event in context.get("runtime.events") if event["kind"] == "node"] == ["start", "seed", "add", "end"]
+
+
+def test_runtime_options_compiled_failure_records_node_and_block_failed() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "bad", "type": "test.runtime_fail", "provides": ["value.out"], "config": {"fail": True}},
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": _edge_chain("start", "bad", "end"),
+            }
+        }
+    )
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
+
+    with pytest.raises(RuntimeError, match="boom"):
+        runtime.run({})
+
+    assert runtime.trace.current_node == "bad"
+    assert [event["kind"] for event in runtime.trace.events] == ["run_start", "block_enter", "node_failed", "block_failed"]
+    assert "boom" in runtime.trace.events[2]["failure"]
+    assert "boom" in runtime.trace.events[3]["failure"]
+
+
+def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
+    registry = _registry()
+    register_node(registry, "test.route", RouteNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "inputs": ["value.in"],
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
+                    {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
+                    {"name": "route", "type": "test.route", "requires": ["value.out"], "provides": ["flow.route"]},
+                    {"name": "copy", "type": "test.copy", "requires": ["value.out"], "provides": ["value.in"]},
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": [
+                    {"from": "start", "to": "input"},
+                    {"from": "input", "to": "add"},
+                    {"from": "add", "to": "route"},
+                    {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
+                    {"from": "copy", "to": "add"},
+                    {"from": "route", "to": "end", "when": "flow.route == 'done'"},
+                ],
+            }
+        }
+    )
+    runtime = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
+    assert [list(block.nodes) for block in runtime._plan.blocks] == [["start", "input", "add", "route", "copy", "end"]]
+
+    def fail_if_interpreted(self, node_name, context):
+        raise AssertionError(f"compiled CFG block should not call _run_node for {node_name}")
+
+    monkeypatch.setattr(PipelineRuntime, "_run_node", fail_if_interpreted)
+    context = runtime.run({"value.in": 1})
+
+    assert context.get("value.out") == 2
+    assert list(context.get("runtime.exec_order")) == ["start", "input", "add", "route", "end"]
+    assert context.get("runtime.edge_executions") == {
+        "start->input": 1,
+        "input->add": 1,
+        "add->route": 1,
+        "route->end": 1,
+    }
+
+
+def test_runtime_options_compiled_executes_decision_loop(monkeypatch) -> None:
+    class DoneCheckNode:
+        NODE_INFO = NodeInfo("test.done_check", "Done Check", "test", "Checks loop completion.", "0.1.0", "decision")
+        CONTRACT = NodeContract(
+            requires=("value.out",),
+            provides=("loop.done",),
+            output_schema={"loop.done": {"type": "boolean"}},
+            params_schema={"target": {"type": "number"}},
+        )
+
+        def run_pure(self, inputs, params):
+            return {"loop.done": inputs["value.out"] >= params.get("target", 3)}
+
+    registry = _registry()
+    register_node(registry, "test.done_check", DoneCheckNode, {"target": {"type": "number"}}, {"target": 3})
+    graph = _decision_loop_graph(target=3)
+    runtime = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
+
+    def fail_if_interpreted(self, node_name, context):
+        raise AssertionError(f"compiled CFG loop should not call _run_node for {node_name}")
+
+    monkeypatch.setattr(PipelineRuntime, "_run_node", fail_if_interpreted)
+    context = runtime.run({"value.in": 1})
+
+    assert context.get("value.out") == 3
+    assert list(context.get("runtime.exec_order")) == ["start", "input", "add", "done", "copy", "add", "done", "end"]
+    assert context.get("runtime.edge_executions") == {
+        "start->input": 1,
+        "input->add": 1,
+        "add->done": 2,
+        "done->copy": 1,
+        "copy->add": 1,
+        "done->end": 1,
+    }
+
+
+def test_runtime_options_compiled_decision_loop_respects_max_steps() -> None:
+    class NeverDoneNode:
+        NODE_INFO = NodeInfo("test.never_done", "Never Done", "test", "Never exits loop.", "0.1.0", "decision")
+        CONTRACT = NodeContract(requires=("value.out",), provides=("loop.done",), output_schema={"loop.done": {"type": "boolean"}})
+
+        def run_pure(self, inputs, params):
+            return {"loop.done": False}
+
+    registry = _registry()
+    register_node(registry, "test.done_check", NeverDoneNode, {"target": {"type": "number"}}, {"target": 3})
+    graph = _decision_loop_graph(target=3, max_steps=6)
+    runtime = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
+
+    with pytest.raises(PipelineRuntimeError, match="max_steps=6"):
+        runtime.run({"value.in": 1})
+
+    assert runtime.trace.stop_reason == "max_steps"
+    assert runtime.trace.step_count == 6
+
+
+def test_runtime_options_compiled_falls_back_around_async_barrier() -> None:
+    class OutToNextNode:
+        NODE_INFO = NodeInfo("test.out_to_next", "Out To Next", "test", "Copies value.out to value.next.", "0.1.0", "process")
+        CONTRACT = NodeContract(requires=("value.out",), provides=("value.next",))
+
+        def run_pure(self, inputs, params):
+            return {"value.next": inputs["value.out"]}
+
+    class NextEndNode:
+        NODE_INFO = NodeInfo("test.next_end", "Next End", "test", "Ends after value.next.", "0.1.0", "terminal")
+        CONTRACT = NodeContract(requires=("value.next",))
+
+        def run_pure(self, inputs, params):
+            return {}
+
+    registry = _registry()
+    register_node(registry, "test.out_to_next", OutToNextNode)
+    register_node(registry, "test.next_end", NextEndNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "seed", "type": "test.seed", "provides": ["value.in"], "config": {"value": 4}},
+                    {"name": "async_add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"], "async": "result_key", "result_key": "value.out", "config": {"delta": 3}},
+                    {"name": "out_to_next", "type": "test.out_to_next", "requires": ["value.out"], "provides": ["value.next"]},
+                    {"name": "end", "type": "test.next_end", "requires": ["value.next"]},
+                ],
+                "edges": _edge_chain("start", "seed", "async_add", "out_to_next", "end"),
+            }
+        }
+    )
+    runtime = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
+    assert [list(block.nodes) for block in runtime._plan.blocks] == [["start", "seed"], ["out_to_next", "end"]]
+    interpreted_nodes = []
+    original_run_node = PipelineRuntime._run_node
+
+    def spy_run_node(self, node_name, context):
+        interpreted_nodes.append(node_name)
+        return original_run_node(self, node_name, context)
+
+    PipelineRuntime._run_node = spy_run_node
+    try:
+        context = runtime.run({})
+    finally:
+        PipelineRuntime._run_node = original_run_node
+
+    assert interpreted_nodes == ["async_add"]
+    assert context.get("value.next") == 7
+
+
+def _decision_loop_graph(*, target: int, max_steps: int = 20):
+    return parse_graph_config(
+        {
+            "pipeline": {
+                "inputs": ["value.in"],
+                "max_steps": max_steps,
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
+                    {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
+                    {"name": "done", "type": "test.done_check", "requires": ["value.out"], "provides": ["loop.done"], "config": {"target": target}},
+                    {"name": "copy", "type": "test.copy", "requires": ["value.out"], "provides": ["value.in"]},
+                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ],
+                "edges": [
+                    {"from": "start", "to": "input"},
+                    {"from": "input", "to": "add"},
+                    {"from": "add", "to": "done"},
+                    {"from": "done", "to": "end", "when": "loop.done == true"},
+                    {"from": "done", "to": "copy", "when": "loop.done == false"},
+                    {"from": "copy", "to": "add"},
+                ],
+            }
+        }
+    )
 
 
 def test_runtime_options_block_executes_simple_conditional_route() -> None:
@@ -753,6 +1013,24 @@ def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, ca
             ]
         )
         payload = json.loads(capsys.readouterr().out)
+        plan_code = cli_main(
+            [
+                "run",
+                "--config",
+                str(config_path),
+                "--input",
+                str(input_path),
+                "--run-root",
+                str(tmp_path / "runs"),
+                "--run-id",
+                "cli_plan_override",
+                "--runtime-profile",
+                "train",
+                "--execution",
+                "plan",
+            ]
+        )
+        plan_payload = json.loads(capsys.readouterr().out)
     finally:
         getattr(GLOBAL_NODE_REGISTRY, "_registry").clear()
         getattr(GLOBAL_NODE_REGISTRY, "_registry").update(original)
@@ -764,6 +1042,11 @@ def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, ca
     for name in ("compiled_graph.json", "health_report.json", "graph.txt", "graph.mmd", "runtime_trace.jsonl", "output_summary.json"):
         assert (run_dir / name).exists()
     trace_kinds = [json.loads(line)["kind"] for line in (run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
-    assert trace_kinds == ["run_start", "run_end", "runtime_summary"]
+    assert trace_kinds == ["run_start", "block_enter", "block_exit", "run_end", "runtime_summary"]
+    assert plan_code == 0
+    assert plan_payload["status"] in {"PASS", "CONCERNS"}
+    plan_run_dir = Path(plan_payload["run_dir"])
+    plan_trace_kinds = [json.loads(line)["kind"] for line in (plan_run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert plan_trace_kinds == ["run_start", "run_end", "runtime_summary"]
     if is_mermaid_svg_renderer_available():
         assert (run_dir / "graph.svg").exists()

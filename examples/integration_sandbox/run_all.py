@@ -22,6 +22,7 @@ REPORT_DIR = SANDBOX_DIR / "reports"
 ASCII_DIR = REPORT_DIR / "ascii"
 MERMAID_DIR = REPORT_DIR / "mermaid"
 SVG_DIR = REPORT_DIR / "svg"
+COMPILED_BLOCK_DIR = REPORT_DIR / "compiled_blocks"
 RUN_ROOT = SANDBOX_DIR / "runs"
 POLICY_PATH = PROJECT_DIR / "kernel_policy.jsonc"
 
@@ -58,6 +59,10 @@ def _training_initial() -> dict[str, Any]:
 
 def _batch_initial() -> dict[str, Any]:
     return {"train.batch": SandboxBatch([2, 4])}
+
+
+COMPILED_SOURCE_REQUIRED = ("_execute_pure_outputs", "select_active_edges", "_record_edge")
+COMPILED_SOURCE_FORBIDDEN = ("_run_node(",)
 
 
 VALID_RUN_CASES = [
@@ -119,6 +124,221 @@ VALID_RUN_CASES = [
         "expected_outputs": {"value.out": 6},
         "expected_hook_delta_present": {"after_run"},
         "expected_hook_delta_absent": {"before_node", "after_node"},
+    },
+    {
+        "name": "compiled_trace_full",
+        "config": "pass_runtime_node_hooks_off.jsonc",
+        "initial": {},
+        "runtime_options": {"trace": "full", "node_hooks": False, "execution": "compiled"},
+        "expected_outputs": {"value.out": 6},
+        "expected_trace_kinds": ["block_enter", "node", "node", "node", "node", "block_exit", "runtime_summary"],
+        "expected_trace_kind_counts": {"block_enter": 1, "node": 4, "block_exit": 1},
+        "expected_trace_summary": {
+            "current_node": "end",
+            "edge_executions": {"start->seed": 1, "seed->add": 1, "add->end": 1},
+            "exec_order": ["start", "seed", "add", "end"],
+            "node_runs": {"start": 1, "seed": 1, "add": 1, "end": 1},
+            "step_count": 4,
+            "stop_reason": "completed",
+        },
+    },
+    {
+        "name": "compiled_with_node_hooks",
+        "config": "pass_runtime_node_hooks_off.jsonc",
+        "initial": {},
+        "runtime_options": {"trace": "boundary", "node_hooks": True, "execution": "compiled"},
+        "expected_outputs": {"value.out": 6},
+        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
+        "expected_trace_summary": {
+            "current_node": "end",
+            "edge_executions": {"start->seed": 1, "seed->add": 1, "add->end": 1},
+            "exec_order": ["start", "seed", "add", "end"],
+            "node_runs": {"start": 1, "seed": 1, "add": 1, "end": 1},
+            "step_count": 4,
+            "stop_reason": "completed",
+        },
+        "expected_hook_delta_present": {"before_node", "after_node", "after_run"},
+    },
+    {
+        "name": "semantic_linear_arithmetic",
+        "config": "pass_semantic_linear_arithmetic.jsonc",
+        "initial": {"calc.a": 2, "calc.b": 5},
+        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "calc.branch": 21, "calc.final": 17},
+        "expected_runtime_exec_order": ["start", "add_pair", "scale", "use_scaled", "finalize", "end"],
+        "expected_trace_summary": {
+            "current_node": "end",
+            "edge_executions": {"start->add_pair": 1, "add_pair->scale": 1, "scale->use_scaled": 1, "use_scaled->finalize": 1, "finalize->end": 1},
+            "exec_order": ["start", "add_pair", "scale", "use_scaled", "finalize", "end"],
+            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "use_scaled": 1, "finalize": 1, "end": 1},
+            "step_count": 6,
+            "stop_reason": "completed",
+        },
+    },
+    {
+        "name": "compiled_semantic_linear_arithmetic",
+        "config": "pass_semantic_linear_arithmetic.jsonc",
+        "initial": {"calc.a": 2, "calc.b": 5},
+        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
+        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "calc.branch": 21, "calc.final": 17},
+        "expected_runtime_exec_order": ["start", "add_pair", "scale", "use_scaled", "finalize", "end"],
+        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
+        "expected_trace_summary": {
+            "current_node": "end",
+            "edge_executions": {"start->add_pair": 1, "add_pair->scale": 1, "scale->use_scaled": 1, "use_scaled->finalize": 1, "finalize->end": 1},
+            "exec_order": ["start", "add_pair", "scale", "use_scaled", "finalize", "end"],
+            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "use_scaled": 1, "finalize": 1, "end": 1},
+            "step_count": 6,
+            "stop_reason": "completed",
+        },
+        "expected_blocks": [["start", "add_pair", "scale", "use_scaled", "finalize", "end"]],
+        "expected_block_source_contains": COMPILED_SOURCE_REQUIRED,
+        "expected_block_source_absent": COMPILED_SOURCE_FORBIDDEN,
+    },
+    {
+        "name": "semantic_decision_branch_left",
+        "config": "pass_semantic_decision_branch.jsonc",
+        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 9, "calc.d": 4},
+        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "left", "calc.left_branch": 31},
+        "expected_runtime_exec_order": ["start", "add_pair", "scale", "compare", "left_adjust", "left_end"],
+        "expected_trace_summary": {
+            "current_node": "left_end",
+            "edge_executions": {"start->add_pair": 1, "add_pair->scale": 1, "scale->compare": 1, "compare->left_adjust": 1, "left_adjust->left_end": 1},
+            "exec_order": ["start", "add_pair", "scale", "compare", "left_adjust", "left_end"],
+            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "left_adjust": 1, "left_end": 1},
+            "step_count": 6,
+            "stop_reason": "completed",
+        },
+    },
+    {
+        "name": "semantic_decision_branch_right",
+        "config": "pass_semantic_decision_branch.jsonc",
+        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 1, "calc.d": 4},
+        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "right", "calc.right_branch": 15},
+        "expected_runtime_exec_order": ["start", "add_pair", "scale", "compare", "right_adjust", "right_end"],
+        "expected_trace_summary": {
+            "current_node": "right_end",
+            "edge_executions": {"start->add_pair": 1, "add_pair->scale": 1, "scale->compare": 1, "compare->right_adjust": 1, "right_adjust->right_end": 1},
+            "exec_order": ["start", "add_pair", "scale", "compare", "right_adjust", "right_end"],
+            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "right_adjust": 1, "right_end": 1},
+            "step_count": 6,
+            "stop_reason": "completed",
+        },
+    },
+    {
+        "name": "compiled_semantic_decision_branch_left",
+        "config": "pass_semantic_decision_branch.jsonc",
+        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 9, "calc.d": 4},
+        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
+        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "left", "calc.left_branch": 31},
+        "expected_runtime_exec_order": ["start", "add_pair", "scale", "compare", "left_adjust", "left_end"],
+        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
+        "expected_trace_summary": {
+            "current_node": "left_end",
+            "edge_executions": {"start->add_pair": 1, "add_pair->scale": 1, "scale->compare": 1, "compare->left_adjust": 1, "left_adjust->left_end": 1},
+            "exec_order": ["start", "add_pair", "scale", "compare", "left_adjust", "left_end"],
+            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "left_adjust": 1, "left_end": 1},
+            "step_count": 6,
+            "stop_reason": "completed",
+        },
+        "expected_blocks": [["start", "add_pair", "scale", "compare", "left_adjust", "right_adjust", "left_end", "right_end"]],
+        "expected_block_source_contains": COMPILED_SOURCE_REQUIRED,
+        "expected_block_source_absent": COMPILED_SOURCE_FORBIDDEN,
+    },
+    {
+        "name": "compiled_semantic_decision_branch_right",
+        "config": "pass_semantic_decision_branch.jsonc",
+        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 1, "calc.d": 4},
+        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
+        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "right", "calc.right_branch": 15},
+        "expected_runtime_exec_order": ["start", "add_pair", "scale", "compare", "right_adjust", "right_end"],
+        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
+        "expected_trace_summary": {
+            "current_node": "right_end",
+            "edge_executions": {"start->add_pair": 1, "add_pair->scale": 1, "scale->compare": 1, "compare->right_adjust": 1, "right_adjust->right_end": 1},
+            "exec_order": ["start", "add_pair", "scale", "compare", "right_adjust", "right_end"],
+            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "right_adjust": 1, "right_end": 1},
+            "step_count": 6,
+            "stop_reason": "completed",
+        },
+        "expected_blocks": [["start", "add_pair", "scale", "compare", "left_adjust", "right_adjust", "left_end", "right_end"]],
+        "expected_block_source_contains": COMPILED_SOURCE_REQUIRED,
+        "expected_block_source_absent": COMPILED_SOURCE_FORBIDDEN,
+    },
+    {
+        "name": "semantic_decision_loop",
+        "config": "pass_semantic_decision_loop.jsonc",
+        "initial": {"loop.current": 1},
+        "expected_outputs": {"loop.next": 7, "loop.done": True},
+        "expected_runtime_exec_order": ["start", "increment", "done", "copy", "increment", "done", "copy", "increment", "done", "end"],
+        "expected_trace_summary": {
+            "current_node": "end",
+            "edge_executions": {"start->increment": 1, "increment->done": 3, "done->copy": 2, "copy->increment": 2, "done->end": 1},
+            "exec_order": ["start", "increment", "done", "copy", "increment", "done", "copy", "increment", "done", "end"],
+            "node_runs": {"start": 1, "increment": 3, "done": 3, "copy": 2, "end": 1},
+            "step_count": 10,
+            "stop_reason": "completed",
+        },
+    },
+    {
+        "name": "compiled_semantic_decision_loop",
+        "config": "pass_semantic_decision_loop.jsonc",
+        "initial": {"loop.current": 1},
+        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
+        "expected_outputs": {"loop.next": 7, "loop.done": True},
+        "expected_runtime_exec_order": ["start", "increment", "done", "copy", "increment", "done", "copy", "increment", "done", "end"],
+        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
+        "expected_trace_summary": {
+            "current_node": "end",
+            "edge_executions": {"start->increment": 1, "increment->done": 3, "done->copy": 2, "copy->increment": 2, "done->end": 1},
+            "exec_order": ["start", "increment", "done", "copy", "increment", "done", "copy", "increment", "done", "end"],
+            "node_runs": {"start": 1, "increment": 3, "done": 3, "copy": 2, "end": 1},
+            "step_count": 10,
+            "stop_reason": "completed",
+        },
+        "expected_blocks": [["start", "increment", "done", "copy", "end"]],
+        "expected_block_source_contains": COMPILED_SOURCE_REQUIRED,
+        "expected_block_source_absent": COMPILED_SOURCE_FORBIDDEN,
+    },
+    {
+        "name": "semantic_nodeset_arithmetic",
+        "config": "pass_semantic_nodeset_arithmetic.jsonc",
+        "initial": {"calc.a": 4, "calc.b": 6},
+        "expected_outputs": {"calc.scaled": 20, "calc.branch": 20, "calc.final": 25},
+        "expected_runtime_exec_order": ["start", "arithmetic", "use_scaled", "finalize", "end"],
+        "expected_trace_summary": {
+            "current_node": "end",
+            "edge_executions": {"start->arithmetic": 1, "arithmetic->use_scaled": 1, "use_scaled->finalize": 1, "finalize->end": 1},
+            "exec_order": ["start", "arithmetic", "use_scaled", "finalize", "end"],
+            "node_runs": {"start": 1, "arithmetic": 1, "use_scaled": 1, "finalize": 1, "end": 1},
+            "step_count": 5,
+            "stop_reason": "completed",
+        },
+        "expected_nodeset_subplan_params": {"arithmetic.scale": {"factor": 2}},
+        "expected_nodeset_subplan_nodes": {"arithmetic": ["start", "add_pair", "scale", "end"]},
+        "expected_nodeset_exports": {"arithmetic": ["calc.scaled"]},
+    },
+    {
+        "name": "compiled_semantic_nodeset_arithmetic",
+        "config": "pass_semantic_nodeset_arithmetic.jsonc",
+        "initial": {"calc.a": 4, "calc.b": 6},
+        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
+        "expected_outputs": {"calc.scaled": 20, "calc.branch": 20, "calc.final": 25},
+        "expected_runtime_exec_order": ["start", "arithmetic", "use_scaled", "finalize", "end"],
+        "expected_trace_kind_counts": {"nodeset_enter": 1, "nodeset_exit": 1, "block_enter": 1, "block_exit": 1},
+        "expected_trace_summary": {
+            "current_node": "end",
+            "edge_executions": {"start->arithmetic": 1, "arithmetic->use_scaled": 1, "use_scaled->finalize": 1, "finalize->end": 1},
+            "exec_order": ["start", "arithmetic", "use_scaled", "finalize", "end"],
+            "node_runs": {"start": 1, "arithmetic": 1, "use_scaled": 1, "finalize": 1, "end": 1},
+            "step_count": 5,
+            "stop_reason": "completed",
+        },
+        "expected_blocks": [["use_scaled", "finalize", "end"]],
+        "expected_nodeset_subplan_params": {"arithmetic.scale": {"factor": 2}},
+        "expected_nodeset_subplan_nodes": {"arithmetic": ["start", "add_pair", "scale", "end"]},
+        "expected_nodeset_exports": {"arithmetic": ["calc.scaled"]},
+        "expected_block_source_contains": COMPILED_SOURCE_REQUIRED,
+        "expected_block_source_absent": COMPILED_SOURCE_FORBIDDEN,
     },
     {
         "name": "execution_plan_bound_params",
@@ -184,6 +404,28 @@ VALID_RUN_CASES = [
         "expect_training_metrics": True,
         "expected_runtime_exec_order": ["start", "training_input", "forward_loss", "backward_grad", "optimizer_step", "training_metrics", "end"],
         "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
+        "expected_trace_summary": {
+            "current_node": "end",
+            "edge_executions": {
+                "start->training_input": 1,
+                "training_input->forward_loss": 1,
+                "forward_loss->backward_grad": 1,
+                "backward_grad->optimizer_step": 1,
+                "optimizer_step->training_metrics": 1,
+                "training_metrics->end": 1,
+            },
+            "node_runs": {
+                "start": 1,
+                "training_input": 1,
+                "forward_loss": 1,
+                "backward_grad": 1,
+                "optimizer_step": 1,
+                "training_metrics": 1,
+                "end": 1,
+            },
+            "step_count": 7,
+            "stop_reason": "completed",
+        },
         "expected_blocks": [["start", "training_input", "forward_loss", "backward_grad", "optimizer_step", "training_metrics", "end"]],
     },
     {
@@ -195,12 +437,80 @@ VALID_RUN_CASES = [
         "expected_runtime_exec_order": ["start", "input", "increment", "done", "copy", "increment", "done", "end"],
     },
     {
+        "name": "compiled_decision_loop",
+        "config": "pass_block_decision_loop.jsonc",
+        "initial": {"value.in": 1},
+        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
+        "expected_outputs": {"value.next": 3},
+        "expected_runtime_exec_order": ["start", "input", "increment", "done", "copy", "increment", "done", "end"],
+        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
+        "expected_trace_summary": {
+            "current_node": "end",
+            "edge_executions": {
+                "start->input": 1,
+                "input->increment": 1,
+                "increment->done": 2,
+                "done->copy": 1,
+                "copy->increment": 1,
+                "done->end": 1,
+            },
+            "exec_order": ["start", "input", "increment", "done", "copy", "increment", "done", "end"],
+            "node_runs": {"start": 1, "input": 1, "increment": 2, "done": 2, "copy": 1, "end": 1},
+            "step_count": 8,
+            "stop_reason": "completed",
+        },
+        "expected_blocks": [["start", "input", "increment", "done", "copy", "end"]],
+    },
+    {
+        "name": "compiled_decision_branch_exit",
+        "config": "pass_compiled_decision_branch_exit.jsonc",
+        "initial": {"value.in": 4},
+        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
+        "expected_outputs": {"flow.route": "external", "value.final": 15},
+        "expected_runtime_exec_order": ["start", "input", "prepare", "compute", "route", "external", "end"],
+        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
+        "expected_trace_summary": {
+            "current_node": "end",
+            "edge_executions": {
+                "start->input": 1,
+                "input->prepare": 1,
+                "prepare->compute": 1,
+                "compute->route": 1,
+                "route->external": 1,
+                "external->end": 1,
+            },
+            "exec_order": ["start", "input", "prepare", "compute", "route", "external", "end"],
+            "node_runs": {"start": 1, "input": 1, "prepare": 1, "compute": 1, "route": 1, "external": 1, "end": 1},
+            "step_count": 7,
+            "stop_reason": "completed",
+        },
+        "expected_blocks": [["start", "input", "prepare", "compute", "route", "loop_back", "external", "end"]],
+    },
+    {
         "name": "async_result_key_join",
         "config": "pass_async_result_key_join.jsonc",
         "initial": {},
         "expected_outputs": {"value.out": 12},
         "expected_trace_kind_counts": {"async_result": 1, "async_result_join": 1},
         "expected_runtime_exec_order": ["start", "seed", "add", "end"],
+    },
+    {
+        "name": "compiled_fallback_mixed_graph",
+        "config": "pass_async_result_key_join.jsonc",
+        "initial": {},
+        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
+        "expected_outputs": {"value.out": 12},
+        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
+        "expected_runtime_exec_order": ["start", "seed", "add", "end"],
+        "expected_trace_summary": {
+            "current_node": "end",
+            "edge_executions": {"start->seed": 1, "seed->add": 1, "add->end": 1},
+            "exec_order": ["start", "seed", "add", "end"],
+            "node_runs": {"start": 1, "seed": 1, "add": 1, "end": 1},
+            "step_count": 4,
+            "stop_reason": "completed",
+        },
+        "expected_blocks": [["add", "end"]],
     },
     {
         "name": "async_nodeset_result_key_join",
@@ -344,6 +654,7 @@ def _reset_outputs() -> None:
         if path.exists():
             shutil.rmtree(path)
     ASCII_DIR.mkdir(parents=True, exist_ok=True)
+    COMPILED_BLOCK_DIR.mkdir(parents=True, exist_ok=True)
     MERMAID_DIR.mkdir(parents=True, exist_ok=True)
     SVG_DIR.mkdir(parents=True, exist_ok=True)
     RUN_ROOT.mkdir(parents=True, exist_ok=True)
@@ -382,6 +693,8 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     compiled = GraphCompiler().compile(graph, registry=node_registry, plugin_registry=plugin_registry)
     plan = build_execution_plan(graph, compiled, registry=node_registry)
     _assert_execution_plan(case, plan)
+    block_source_paths = _write_compiled_block_sources(name, plan)
+    _assert_compiled_block_sources(case, plan, block_source_paths)
     health = validate_graph_health(
         graph,
         registry=node_registry,
@@ -466,7 +779,49 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
             raise AssertionError(f"missing expected hook delta: {sorted(missing)}")
         if forbidden:
             raise AssertionError(f"unexpected hook delta: {sorted(forbidden)}")
-    return CaseResult(f"valid:{name}", "PASS", payload={"health": health.status, "run_dir": str(run_result.run_dir)})
+    return CaseResult(
+        f"valid:{name}",
+        "PASS",
+        payload={
+            "compiled_blocks": [list(block.nodes) for block in plan.blocks],
+            "compiled_block_sources": block_source_paths,
+            "health": health.status,
+            "run_dir": str(run_result.run_dir),
+        },
+    )
+
+
+def _write_compiled_block_sources(name: str, plan) -> list[str]:
+    paths: list[str] = []
+    for index, block in enumerate(plan.blocks):
+        path = COMPILED_BLOCK_DIR / f"{name}.block{index}.{block.entry}.py"
+        header = [
+            f"# generated compiled block for integration sandbox case: {name}",
+            f"# block: {block.name}",
+            f"# entry: {block.entry}",
+            f"# nodes: {', '.join(block.nodes)}",
+            "",
+        ]
+        path.write_text("\n".join(header) + block.source + "\n", encoding="utf-8")
+        paths.append(str(path))
+    return paths
+
+
+def _assert_compiled_block_sources(case: dict[str, Any], plan, source_paths: list[str]) -> None:
+    if "expected_block_source_contains" not in case and "expected_block_source_absent" not in case:
+        return
+    if not plan.blocks:
+        raise AssertionError("expected compiled block source checks but plan has no compiled blocks")
+    missing_files = [path for path in source_paths if not Path(path).exists()]
+    if missing_files:
+        raise AssertionError(f"missing compiled block source files: {missing_files}")
+    source = "\n".join(block.source for block in plan.blocks)
+    for expected in case.get("expected_block_source_contains", ()):
+        if str(expected) not in source:
+            raise AssertionError(f"compiled block source missing {expected!r}")
+    for forbidden in case.get("expected_block_source_absent", ()):
+        if str(forbidden) in source:
+            raise AssertionError(f"compiled block source unexpectedly contains {forbidden!r}")
 
 
 def _runtime_trace_lines(run_dir: Path) -> list[dict[str, Any]]:

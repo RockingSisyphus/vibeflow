@@ -1,0 +1,24 @@
+{
+  "pipeline": {
+    "inputs": ["calc.a", "calc.b", "calc.c", "calc.d"],
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "add_pair", "type": "semantic.add_pair", "requires": ["calc.a", "calc.b"], "provides": ["calc.sum"]},
+      {"name": "scale", "type": "semantic.scale", "requires": ["calc.sum"], "provides": ["calc.scaled"], "factor": 3},
+      {"name": "compare", "type": "semantic.compare_gt", "requires": ["calc.c", "calc.d"], "provides": ["route.branch"]},
+      {"name": "left_adjust", "type": "semantic.left_adjust", "requires": ["calc.scaled"], "provides": ["calc.left_branch"], "bonus": 10},
+      {"name": "right_adjust", "type": "semantic.right_adjust", "requires": ["calc.scaled"], "provides": ["calc.right_branch"], "penalty": 6},
+      {"name": "left_end", "type": "semantic.left_branch_end", "requires": ["calc.left_branch"]},
+      {"name": "right_end", "type": "semantic.right_branch_end", "requires": ["calc.right_branch"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "add_pair"},
+      {"from": "add_pair", "to": "scale"},
+      {"from": "scale", "to": "compare"},
+      {"from": "compare", "to": "left_adjust", "when": "route.branch == 'left'"},
+      {"from": "compare", "to": "right_adjust", "when": "route.branch == 'right'"},
+      {"from": "left_adjust", "to": "left_end"},
+      {"from": "right_adjust", "to": "right_end"}
+    ]
+  }
+}
