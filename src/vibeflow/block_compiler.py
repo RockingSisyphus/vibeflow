@@ -35,8 +35,18 @@ class CompiledBlock:
     supports_node_hooks: bool = False
 
 
+@dataclass(frozen=True)
+class _Instrumentation:
+    trace: str
+    node_hooks: bool
+    node_events: bool
+    node_failure_events: bool
+    block_output_summary: bool
+    record_internal_edges: bool
+
+
 def compile_blocks(plan: "ExecutionPlan", runtime_options: object | None = None) -> tuple[CompiledBlock, ...]:
-    del runtime_options
+    instrumentation = _instrumentation(runtime_options)
     blocks: list[CompiledBlock] = []
     visited: set[str] = set()
     for name in plan.order:
@@ -45,9 +55,22 @@ def compile_blocks(plan: "ExecutionPlan", runtime_options: object | None = None)
         block_nodes = _cfg_region(name, plan.frames, plan.order)
         if len(block_nodes) > 1:
             block_name = f"block:{block_nodes[0]}"
-            blocks.append(_compile_cfg_block(block_name, block_nodes, plan.frames))
+            blocks.append(_compile_cfg_block(block_name, block_nodes, plan.frames, instrumentation))
             visited.update(block_nodes)
     return tuple(blocks)
+
+
+def _instrumentation(runtime_options: object | None) -> _Instrumentation:
+    trace = str(getattr(runtime_options, "trace", "full"))
+    node_hooks = bool(getattr(runtime_options, "node_hooks", True))
+    return _Instrumentation(
+        trace=trace,
+        node_hooks=node_hooks,
+        node_events=trace == "full",
+        node_failure_events=trace == "full" or node_hooks,
+        block_output_summary=trace == "full" or node_hooks,
+        record_internal_edges=trace == "full",
+    )
 
 
 def select_active_edges(edges: tuple[EdgeSpec, ...], outputs: Mapping[str, object], context: Context) -> tuple[EdgeSpec, ...]:
@@ -93,11 +116,11 @@ def _compile_cfg_block(
     name: str,
     nodes: tuple[str, ...],
     frames: Mapping[str, "NodeFrame"],
+    instrumentation: _Instrumentation,
 ) -> CompiledBlock:
     node_set = set(nodes)
     outgoing = {node: tuple(frames[node].outgoing) for node in nodes}
-    internal_edges = tuple(edge for node in nodes for edge in frames[node].outgoing if edge.target in node_set)
-    source = _cfg_block_source(name, nodes)
+    source = _cfg_block_source(name, nodes, instrumentation)
     namespace = {
         "CompiledBlockResult": CompiledBlockResult,
         "elapsed_ms": elapsed_ms,
@@ -119,21 +142,21 @@ def _compile_cfg_block(
         edge_routes={node: tuple(edge for edge in outgoing[node] if edge.target in node_set) for node in nodes},
         callable=compiled_callable,
         source=source,
-        supports_full_trace=True,
-        supports_node_hooks=True,
+        supports_full_trace=instrumentation.trace == "full",
+        supports_node_hooks=instrumentation.node_hooks,
     )
 
 
-def _cfg_block_source(name: str, nodes: tuple[str, ...]) -> str:
-    lines = _cfg_block_preamble_lines(name, nodes)
+def _cfg_block_source(name: str, nodes: tuple[str, ...], instrumentation: _Instrumentation) -> str:
+    lines = _cfg_block_preamble_lines(name, nodes, instrumentation)
     for index, node_name in enumerate(nodes):
-        lines.extend(_cfg_node_dispatch_lines(index, node_name))
+        lines.extend(_cfg_node_dispatch_lines(index, node_name, instrumentation))
     lines.extend(_cfg_block_failure_lines())
     return "\n".join(lines)
 
 
-def _cfg_block_preamble_lines(name: str, nodes: tuple[str, ...]) -> list[str]:
-    return [
+def _cfg_block_preamble_lines(name: str, nodes: tuple[str, ...], instrumentation: _Instrumentation) -> list[str]:
+    lines = [
         "def compiled_block(runtime, context):",
         "    started = now()",
         f"    block_name = {name!r}",
@@ -149,53 +172,116 @@ def _cfg_block_preamble_lines(name: str, nodes: tuple[str, ...]) -> list[str]:
         "        if not counted:",
         "            runtime.trace.step_count += steps",
         "            counted = True",
-        "        runtime._record_runtime_event(",
-        "            'block_exit',",
-        "            block_name,",
-        "            'block',",
-        "            output_summary=summarize_mapping(outputs),",
-        "            elapsed_ms=elapsed_ms(started),",
-        "        )",
-        "        runtime._call_runtime_plugins('after_block', block_name, block_nodes)",
-        "        return CompiledBlockResult(last_node=last_node, outputs=outputs)",
-        "    try:",
-        "        while True:",
-        "            if runtime.trace.step_count + steps >= runtime._plan.max_steps:",
-        "                runtime.trace.stop_reason = 'max_steps'",
-        "                raise PipelineRuntimeError(f'pipeline exceeded max_steps={runtime._plan.max_steps}')",
     ]
+    if instrumentation.block_output_summary:
+        lines.extend(
+            [
+                "        runtime._record_runtime_event(",
+                "            'block_exit',",
+                "            block_name,",
+                "            'block',",
+                "            output_summary=summarize_mapping(outputs),",
+                "            elapsed_ms=elapsed_ms(started),",
+                "        )",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "        runtime._record_runtime_event(",
+                "            'block_exit',",
+                "            block_name,",
+                "            'block',",
+                "            elapsed_ms=elapsed_ms(started),",
+                "        )",
+            ]
+        )
+    lines.extend(
+        [
+            "        runtime._call_runtime_plugins('after_block', block_name, block_nodes)",
+            "        return CompiledBlockResult(last_node=last_node, outputs=outputs)",
+            "    try:",
+            "        while True:",
+            "            if runtime.trace.step_count + steps >= runtime._plan.max_steps:",
+            "                runtime.trace.stop_reason = 'max_steps'",
+            "                raise PipelineRuntimeError(f'pipeline exceeded max_steps={runtime._plan.max_steps}')",
+        ]
+    )
+    return lines
 
 
-def _cfg_node_dispatch_lines(index: int, node_name: str) -> list[str]:
+def _cfg_node_dispatch_lines(index: int, node_name: str, instrumentation: _Instrumentation) -> list[str]:
     prefix = "if" if index == 0 else "elif"
-    return [
+    lines = [
         f"            {prefix} current == {node_name!r}:",
         f"                frame = frames[{node_name!r}]",
         f"                runtime.trace.current_node = {node_name!r}",
-        "                node_started = now()",
-        "                inputs = {}",
-        "                try:",
-        "                    inputs = {key: context.get(key) for key in frame.requires}",
-        "                    if runtime.runtime_options.node_hooks:",
-        "                        runtime._call_runtime_plugins('before_node', frame.name, frame.node_type, summarize_mapping(inputs))",
-        "                    execute = runtime._execute_pure_outputs",
-        "                    outputs = execute(frame, inputs)",
-        "                except Exception as exc:",
-        "                    runtime._record_runtime_event(",
-        "                        'node_failed',",
-        "                        frame.name,",
-        "                        frame.node_type,",
-        "                        input_summary=summarize_mapping(inputs),",
-        "                        failure=str(exc),",
-        "                        elapsed_ms=elapsed_ms(node_started),",
-        "                    )",
-        "                    if runtime.runtime_options.node_hooks:",
-        "                        runtime._call_runtime_plugins('node_failed', frame.name, frame.node_type, str(exc))",
-        "                    raise",
+    ]
+    lines.extend(_cfg_node_execution_lines(instrumentation))
+    lines.extend(_cfg_node_context_lines(instrumentation))
+    lines.extend(_cfg_node_route_lines(node_name, instrumentation))
+    return lines
+
+
+def _cfg_node_execution_lines(instrumentation: _Instrumentation) -> list[str]:
+    if instrumentation.node_events or instrumentation.node_failure_events:
+        lines = [
+            "                node_started = now()",
+            "                inputs = {}",
+            "                try:",
+            "                    inputs = {key: context.get(key) for key in frame.requires}",
+        ]
+        if instrumentation.node_hooks:
+            lines.append("                    runtime._call_runtime_plugins('before_node', frame.name, frame.node_type, summarize_mapping(inputs))")
+        lines.extend(
+            [
+                "                    execute = runtime._execute_pure_outputs",
+                "                    outputs = execute(frame, inputs)",
+                "                except Exception as exc:",
+            ]
+        )
+        if instrumentation.node_failure_events:
+            lines.extend(
+                [
+                    "                    runtime._record_runtime_event(",
+                    "                        'node_failed',",
+                    "                        frame.name,",
+                    "                        frame.node_type,",
+                    "                        input_summary=summarize_mapping(inputs),",
+                    "                        failure=str(exc),",
+                    "                        elapsed_ms=elapsed_ms(node_started),",
+                    "                    )",
+                ]
+            )
+        if instrumentation.node_hooks:
+            lines.extend(
+                [
+                    "                    runtime._call_runtime_plugins('node_failed', frame.name, frame.node_type, str(exc))",
+                ]
+            )
+        return [*lines, "                    raise"]
+    return [
+        "                inputs = {key: context.get(key) for key in frame.requires}",
+        "                execute = runtime._execute_pure_outputs",
+        "                outputs = execute(frame, inputs)",
+    ]
+
+
+def _cfg_node_context_lines(instrumentation: _Instrumentation) -> list[str]:
+    lines = [
         "                for key, value in outputs.items():",
         "                    context.set(str(key), value)",
         "                runtime._mark_node_run(frame.name)",
-        *_cfg_node_success_event_lines(),
+    ]
+    if instrumentation.node_events:
+        lines.extend(_cfg_node_success_event_lines())
+    if instrumentation.node_hooks:
+        lines.append("                runtime._call_runtime_plugins('after_node', frame.name, frame.node_type, summarize_mapping(outputs))")
+    return lines
+
+
+def _cfg_node_route_lines(node_name: str, instrumentation: _Instrumentation) -> list[str]:
+    lines = [
         "                steps += 1",
         f"                active_edges = select_active_edges(outgoing[{node_name!r}], outputs, context)",
         "                if len(active_edges) != 1:",
@@ -203,10 +289,16 @@ def _cfg_node_dispatch_lines(index: int, node_name: str) -> list[str]:
         "                edge = active_edges[0]",
         "                if edge.target not in internal_targets:",
         f"                    return finish({node_name!r})",
-        "                runtime._record_edge(edge)",
-        "                current = edge.target",
-        "                continue",
     ]
+    if instrumentation.record_internal_edges:
+        lines.append("                runtime._record_edge(edge)")
+    lines.extend(
+        [
+            "                current = edge.target",
+            "                continue",
+        ]
+    )
+    return lines
 
 
 def _cfg_node_success_event_lines() -> list[str]:
@@ -219,8 +311,6 @@ def _cfg_node_success_event_lines() -> list[str]:
         "                    output_summary=summarize_mapping(outputs),",
         "                    elapsed_ms=elapsed_ms(node_started),",
         "                )",
-        "                if runtime.runtime_options.node_hooks:",
-        "                    runtime._call_runtime_plugins('after_node', frame.name, frame.node_type, summarize_mapping(outputs))",
     ]
 
 

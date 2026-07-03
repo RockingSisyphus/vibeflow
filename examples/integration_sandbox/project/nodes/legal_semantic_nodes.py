@@ -328,3 +328,43 @@ class SemanticLoopEndNode:
 
     def run_pure(self, inputs, params):
         return {}
+
+
+class SemanticSlowAsyncValueNode:
+    NODE_INFO = NodeInfo(
+        type_key="semantic.slow_async_value",
+        display_name="Semantic Slow Async Value",
+        category="semantic",
+        description="Produces a value used to prove inactive result-key async consumers are not joined.",
+        version="0.1.0",
+        flow_kind="process",
+    )
+    CONTRACT = NodeContract(
+        provides=("async.value",),
+        output_semantics={"async.value": ("slow async value that should remain unconsumed",)},
+        output_schema={"async.value": {"type": "number"}},
+        params_schema={"value": {"type": "number"}},
+        examples=({"inputs": {}, "params": {"value": 42}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {"async.value": params.get("value", 42)}
+
+
+class SemanticAsyncValueEndNode:
+    NODE_INFO = NodeInfo(
+        type_key="semantic.async_value_end",
+        display_name="Semantic Async Value End",
+        category="semantic",
+        description="Inactive terminal branch that would consume async.value if scheduled.",
+        version="0.1.0",
+        flow_kind="terminal",
+    )
+    CONTRACT = NodeContract(
+        requires=("async.value",),
+        input_semantics={"async.value": ("async result-key value",)},
+        examples=({"inputs": {"async.value": 99}, "params": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
