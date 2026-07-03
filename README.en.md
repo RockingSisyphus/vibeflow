@@ -179,6 +179,10 @@ Humans can review the system shape, and AI tools get a clearer project map.
 - `docs/kernel_development_guide.md`: VibeFlow maintenance guide.
 - `distribution/kernel_development_pack/`: release package template.
 
+## License 📄
+
+VibeFlow is licensed under the GNU Affero General Public License v3.0 (AGPLv3). See `LICENSE`.
+
 ## Status 🚧
 
 VibeFlow is evolving quickly. The current focus is stabilizing structure discipline, flowchart representation, pre-run checks, and the release-package experience for AI-assisted development.

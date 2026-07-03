@@ -7,6 +7,10 @@ name = "vibeflow"
 version = "0.1.0"
 description = "Executable flowchart guardrails for vibe coding and AI-assisted development"
 requires-python = ">=3.11"
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+]
 dependencies = []
 
 [project.scripts]
