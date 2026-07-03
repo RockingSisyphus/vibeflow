@@ -1,0 +1,26 @@
+{
+  "pipeline": {
+    "inputs": ["value.in"],
+    "max_steps": 20,
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
+      {"name": "prepare", "type": "sandbox.prepare_value", "requires": ["value.in"], "provides": ["value.prepared"], "offset": 1},
+      {"name": "compute", "type": "sandbox.core_compute", "requires": ["value.prepared"], "provides": ["value.out"], "factor": 2},
+      {"name": "route", "type": "sandbox.route_decision", "requires": ["value.out"], "provides": ["flow.route"], "threshold": 10},
+      {"name": "loop_back", "type": "sandbox.loop_back", "requires": ["value.out"], "provides": ["value.in"]},
+      {"name": "external", "type": "sandbox.external_boost", "requires": ["value.out"], "provides": ["value.final"], "bonus": 5},
+      {"name": "end", "type": "sandbox.final_value_end", "requires": ["value.final"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "input"},
+      {"from": "input", "to": "prepare"},
+      {"from": "prepare", "to": "compute"},
+      {"from": "compute", "to": "route"},
+      {"from": "route", "to": "loop_back", "when": "flow.route == 'again'"},
+      {"from": "loop_back", "to": "prepare"},
+      {"from": "route", "to": "external", "when": "flow.route == 'external'"},
+      {"from": "external", "to": "end"}
+    ]
+  }
+}

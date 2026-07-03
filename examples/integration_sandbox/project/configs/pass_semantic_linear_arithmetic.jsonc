@@ -1,0 +1,20 @@
+{
+  "pipeline": {
+    "inputs": ["calc.a", "calc.b"],
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "add_pair", "type": "semantic.add_pair", "requires": ["calc.a", "calc.b"], "provides": ["calc.sum"]},
+      {"name": "scale", "type": "semantic.scale", "requires": ["calc.sum"], "provides": ["calc.scaled"], "factor": 3},
+      {"name": "use_scaled", "type": "semantic.use_scaled", "requires": ["calc.scaled"], "provides": ["calc.branch"]},
+      {"name": "finalize", "type": "semantic.finalize", "requires": ["calc.branch"], "provides": ["calc.final"], "offset": -4},
+      {"name": "end", "type": "semantic.final_end", "requires": ["calc.final"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "add_pair"},
+      {"from": "add_pair", "to": "scale"},
+      {"from": "scale", "to": "use_scaled"},
+      {"from": "use_scaled", "to": "finalize"},
+      {"from": "finalize", "to": "end"}
+    ]
+  }
+}

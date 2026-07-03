@@ -1,0 +1,20 @@
+{
+  "pipeline": {
+    "inputs": ["loop.current"],
+    "max_steps": 20,
+    "nodes": [
+      {"name": "start", "type": "sandbox.start"},
+      {"name": "increment", "type": "semantic.increment_until", "requires": ["loop.current"], "provides": ["loop.next"], "step": 2},
+      {"name": "done", "type": "semantic.loop_done", "requires": ["loop.next"], "provides": ["loop.done"], "target": 7},
+      {"name": "copy", "type": "semantic.copy_next", "requires": ["loop.next"], "provides": ["loop.current"]},
+      {"name": "end", "type": "semantic.loop_end", "requires": ["loop.next"]}
+    ],
+    "edges": [
+      {"from": "start", "to": "increment"},
+      {"from": "increment", "to": "done"},
+      {"from": "done", "to": "copy", "when": "loop.done == false"},
+      {"from": "copy", "to": "increment"},
+      {"from": "done", "to": "end", "when": "loop.done == true"}
+    ]
+  }
+}

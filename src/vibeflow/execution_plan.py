@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from .block_compiler import CompiledBlock, compile_blocks
 from .compiler import CompiledGraph
 from .graph_config import EdgeSpec, GraphConfig, NodeSpec
 from .node import FLOW_KIND_PREDEFINED, PureNode
@@ -31,12 +32,6 @@ class NodeFrame:
 
 
 @dataclass(frozen=True)
-class CompiledBlock:
-    name: str
-    nodes: tuple[str, ...]
-
-
-@dataclass(frozen=True)
 class ExecutionPlan:
     graph: GraphConfig
     compiled: CompiledGraph
@@ -45,12 +40,15 @@ class ExecutionPlan:
     max_steps: int
     blocks: tuple[CompiledBlock, ...] = ()
     block_by_entry: Mapping[str, CompiledBlock] | None = None
+    compiled_blocks: tuple[CompiledBlock, ...] = ()
+    compiled_block_by_entry: Mapping[str, CompiledBlock] | None = None
+    compiled_node_to_block: Mapping[str, CompiledBlock] | None = None
 
     def frame(self, name: str) -> NodeFrame:
         return self.frames[name]
 
     def block_for(self, name: str) -> CompiledBlock | None:
-        return (self.block_by_entry or {}).get(name)
+        return (self.compiled_block_by_entry or self.block_by_entry or {}).get(name)
 
 
 def build_execution_plan(
@@ -59,6 +57,7 @@ def build_execution_plan(
     *,
     registry: NodeRegistry,
     node_config_overrides: Mapping[str, Mapping[str, Any]] | None = None,
+    runtime_options: object | None = None,
 ) -> ExecutionPlan:
     overrides = normalize_node_config_overrides(node_config_overrides or {})
     frames = {
@@ -66,8 +65,22 @@ def build_execution_plan(
         for spec in graph.nodes
     }
     order = tuple(node.name for node in graph.nodes)
-    blocks = _linear_blocks(frames, order)
-    return ExecutionPlan(graph=graph, compiled=compiled, frames=frames, order=order, max_steps=graph.max_steps, blocks=blocks, block_by_entry={block.nodes[0]: block for block in blocks})
+    plan = ExecutionPlan(graph=graph, compiled=compiled, frames=frames, order=order, max_steps=graph.max_steps)
+    blocks = compile_blocks(plan, runtime_options=runtime_options)
+    block_by_entry = {block.entry: block for block in blocks}
+    node_to_block = {node: block for block in blocks for node in block.nodes}
+    return ExecutionPlan(
+        graph=graph,
+        compiled=compiled,
+        frames=frames,
+        order=order,
+        max_steps=graph.max_steps,
+        blocks=blocks,
+        block_by_entry=block_by_entry,
+        compiled_blocks=blocks,
+        compiled_block_by_entry=block_by_entry,
+        compiled_node_to_block=node_to_block,
+    )
 
 
 def _frame_for(
@@ -128,32 +141,3 @@ def _compile_nodeset(graph: GraphConfig, *, registry: NodeRegistry) -> CompiledG
     from .compiler import GraphCompiler
 
     return GraphCompiler().compile(graph, registry=registry)
-
-
-def _linear_blocks(frames: Mapping[str, NodeFrame], order: tuple[str, ...]) -> tuple[CompiledBlock, ...]:
-    blocks: list[CompiledBlock] = []
-    visited: set[str] = set()
-    for name in order:
-        if name in visited or not _blockable(frames[name]):
-            continue
-        nodes = [name]
-        seen = {name}
-        current = frames[name]
-        while len(current.outgoing) == 1:
-            target = current.outgoing[0].target
-            if target in seen or target not in frames or not _blockable(frames[target]):
-                break
-            target_frame = frames[target]
-            if len(target_frame.incoming) != 1:
-                break
-            nodes.append(target)
-            seen.add(target)
-            current = target_frame
-        if len(nodes) > 1:
-            blocks.append(CompiledBlock(name=f"block:{nodes[0]}", nodes=tuple(nodes)))
-            visited.update(nodes)
-    return tuple(blocks)
-
-
-def _blockable(frame: NodeFrame) -> bool:
-    return not frame.async_mode and not frame.is_nodeset and len(frame.outgoing) <= 1
