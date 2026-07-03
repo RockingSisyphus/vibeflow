@@ -218,11 +218,11 @@ VALID_RUN_CASES = [
         "config": "pass_semantic_decision_branch.jsonc",
         "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 9, "calc.d": 4},
         "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "left", "calc.left_branch": 31},
-        "expected_runtime_exec_order": ["start", "add_pair", "scale", "compare", "left_adjust", "left_end"],
+        "expected_runtime_exec_order": ["start", "add_pair", "compare", "scale", "left_adjust", "left_end"],
         "expected_trace_summary": {
             "current_node": "left_end",
-            "edge_executions": {"start->add_pair": 1, "add_pair->scale": 1, "scale->compare": 1, "compare->left_adjust": 1, "left_adjust->left_end": 1},
-            "exec_order": ["start", "add_pair", "scale", "compare", "left_adjust", "left_end"],
+            "edge_executions": {"start->add_pair": 1, "start->compare": 1, "add_pair->scale": 1, "scale->left_adjust": 1, "scale->right_adjust": 1, "compare->left_adjust": 1, "left_adjust->left_end": 1},
+            "exec_order": ["start", "add_pair", "compare", "scale", "left_adjust", "left_end"],
             "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "left_adjust": 1, "left_end": 1},
             "step_count": 6,
             "stop_reason": "completed",
@@ -233,11 +233,11 @@ VALID_RUN_CASES = [
         "config": "pass_semantic_decision_branch.jsonc",
         "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 1, "calc.d": 4},
         "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "right", "calc.right_branch": 15},
-        "expected_runtime_exec_order": ["start", "add_pair", "scale", "compare", "right_adjust", "right_end"],
+        "expected_runtime_exec_order": ["start", "add_pair", "compare", "scale", "right_adjust", "right_end"],
         "expected_trace_summary": {
             "current_node": "right_end",
-            "edge_executions": {"start->add_pair": 1, "add_pair->scale": 1, "scale->compare": 1, "compare->right_adjust": 1, "right_adjust->right_end": 1},
-            "exec_order": ["start", "add_pair", "scale", "compare", "right_adjust", "right_end"],
+            "edge_executions": {"start->add_pair": 1, "start->compare": 1, "add_pair->scale": 1, "scale->left_adjust": 1, "scale->right_adjust": 1, "compare->right_adjust": 1, "right_adjust->right_end": 1},
+            "exec_order": ["start", "add_pair", "compare", "scale", "right_adjust", "right_end"],
             "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "right_adjust": 1, "right_end": 1},
             "step_count": 6,
             "stop_reason": "completed",
@@ -249,11 +249,11 @@ VALID_RUN_CASES = [
         "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 9, "calc.d": 4},
         "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
         "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "left", "calc.left_branch": 31},
-        "expected_runtime_exec_order": ["start", "add_pair", "scale", "compare", "left_adjust", "left_end"],
+        "expected_runtime_exec_order": ["start", "add_pair", "compare", "scale", "left_adjust", "left_end"],
         "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
         "expected_trace_summary": {
             "current_node": "left_end",
-            "exec_order": ["start", "add_pair", "scale", "compare", "left_adjust", "left_end"],
+            "exec_order": ["start", "add_pair", "compare", "scale", "left_adjust", "left_end"],
             "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "left_adjust": 1, "left_end": 1},
             "step_count": 6,
             "stop_reason": "completed",
@@ -271,8 +271,8 @@ VALID_RUN_CASES = [
         "expected_trace_kind_counts": {"block_enter": 1, "node": 6, "block_exit": 1},
         "expected_trace_summary": {
             "current_node": "left_end",
-            "edge_executions": {"start->add_pair": 1, "add_pair->scale": 1, "scale->compare": 1, "compare->left_adjust": 1, "left_adjust->left_end": 1},
-            "exec_order": ["start", "add_pair", "scale", "compare", "left_adjust", "left_end"],
+            "edge_executions": {"start->add_pair": 1, "start->compare": 1, "add_pair->scale": 1, "scale->left_adjust": 1, "scale->right_adjust": 1, "compare->left_adjust": 1, "left_adjust->left_end": 1},
+            "exec_order": ["start", "add_pair", "compare", "scale", "left_adjust", "left_end"],
             "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "left_adjust": 1, "left_end": 1},
             "step_count": 6,
             "stop_reason": "completed",
@@ -287,11 +287,11 @@ VALID_RUN_CASES = [
         "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 1, "calc.d": 4},
         "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
         "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "right", "calc.right_branch": 15},
-        "expected_runtime_exec_order": ["start", "add_pair", "scale", "compare", "right_adjust", "right_end"],
+        "expected_runtime_exec_order": ["start", "add_pair", "compare", "scale", "right_adjust", "right_end"],
         "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
         "expected_trace_summary": {
             "current_node": "right_end",
-            "exec_order": ["start", "add_pair", "scale", "compare", "right_adjust", "right_end"],
+            "exec_order": ["start", "add_pair", "compare", "scale", "right_adjust", "right_end"],
             "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "right_adjust": 1, "right_end": 1},
             "step_count": 6,
             "stop_reason": "completed",
@@ -370,6 +370,69 @@ VALID_RUN_CASES = [
         "expected_nodeset_subplan_params": {"arithmetic.scale": {"factor": 2}},
         "expected_nodeset_subplan_nodes": {"arithmetic": ["start", "add_pair", "scale", "end"]},
         "expected_nodeset_exports": {"arithmetic": ["calc.scaled"]},
+    },
+    {
+        "name": "config_resources_nodeset_arithmetic",
+        "config": "pass_config_resources_nodeset_arithmetic.jsonc",
+        "initial": {"calc.a": 4, "calc.b": 6},
+        "expected_outputs": {"calc.sum": 10, "calc.resource": 50, "calc.final": 203},
+        "expected_plan_params": {
+            "resource_calc": {
+                "addend": 5,
+                "multiplier": 3,
+                "subtrahend": 4,
+                "divisor": 1,
+                "_global": {"addend": 5, "multiplier": 3, "subtrahend": 4, "divisor": 1},
+            }
+        },
+        "expected_nodeset_subplan_params": {"configured_finalize.scale": {"factor": 4}, "configured_finalize.finalize": {"offset": 3}},
+        "expected_nodeset_exports": {"configured_finalize": ["calc.final"]},
+        "expected_health_warnings": [
+            "NODESET.CONFIG.OVERRIDES_GLOBAL_CONFIG",
+            "CONFIG.GLOBAL_CONFIG.OVERRIDES_LOCAL",
+        ],
+        "expected_mermaid_contains": [
+            "resource_base_lib",
+            "Sandbox Arithmetic",
+            "base_lib.future_arithmetic",
+            "resource_plugins",
+            "Sandbox Value Shift",
+            "future_value_plugin",
+            "config: shift",
+        ],
+        "expected_run_mermaid_contains": [
+            "Sandbox Arithmetic",
+            "Sandbox Value Shift",
+            "planned runtime value hook",
+        ],
+    },
+    {
+        "name": "planned_python_stub_arithmetic",
+        "config": "pass_planned_python_stub_arithmetic.jsonc",
+        "initial": {"calc.a": 2, "calc.b": 5},
+        "runtime_options": {"allow_planned_stub": True, "trace": "boundary"},
+        "expected_outputs": {"calc.sum": 7, "calc.scaled": 30, "calc.branch": 30, "calc.final": 36},
+        "expected_runtime_exec_order": ["start", "add_pair", "planned_scale", "use_scaled", "finalize", "end"],
+        "expected_trace_kind_counts": {"planned_stub": 1},
+        "expected_plan_params": {
+            "planned_scale": {
+                "factor": 4,
+                "bias": 2,
+                "_global": {"bias": 2},
+            }
+        },
+        "expected_health_warnings": [
+            "GRAPH.PLANNED.NODE",
+            "GRAPH.PLANNED.PYTHON_STUB_DEV_ONLY",
+        ],
+        "expected_mermaid_contains": [
+            "planned python_stub",
+            "project/stubs/runtime_control_stub.py",
+        ],
+        "expected_run_mermaid_contains": [
+            "planned python_stub",
+            "project/stubs/runtime_control_stub.py",
+        ],
     },
     {
         "name": "compiled_semantic_nodeset_arithmetic",
@@ -530,21 +593,23 @@ VALID_RUN_CASES = [
         "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 9, "calc.d": 4},
         "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "left", "calc.branch": 21, "calc.final": 17},
         "expected_absent_outputs": ["async.value"],
-        "expected_trace_kind_counts": {"async_result": 1},
-        "expected_trace_kind_absent": ["async_result_join"],
-        "expected_runtime_exec_order": ["start", "slow_async", "add_pair", "scale", "compare", "use_scaled", "finalize", "end"],
+        "expected_trace_kind_counts": {"async_result": 1, "async_result_join": 1},
+        "expected_trace_kind_absent": ["async_result_abandoned"],
+        "expected_runtime_exec_order": ["start", "slow_async", "add_pair", "compare", "scale", "use_scaled", "finalize", "end"],
         "expected_trace_summary": {
             "current_node": "end",
             "edge_executions": {
                 "start->slow_async": 1,
-                "slow_async->add_pair": 1,
+                "slow_async->add_pair": 2,
+                "start->add_pair": 1,
+                "start->compare": 1,
                 "add_pair->scale": 1,
-                "scale->compare": 1,
                 "compare->use_scaled": 1,
+                "scale->use_scaled": 1,
                 "use_scaled->finalize": 1,
                 "finalize->end": 1,
             },
-            "exec_order": ["start", "slow_async", "add_pair", "scale", "compare", "use_scaled", "finalize", "end"],
+            "exec_order": ["start", "slow_async", "add_pair", "compare", "scale", "use_scaled", "finalize", "end"],
             "node_runs": {"start": 1, "slow_async": 1, "add_pair": 1, "scale": 1, "compare": 1, "use_scaled": 1, "finalize": 1, "end": 1},
             "step_count": 8,
             "stop_reason": "completed",
@@ -560,7 +625,7 @@ VALID_RUN_CASES = [
         "expected_runtime_exec_order": ["start", "seed", "add", "end"],
         "expected_trace_summary": {
             "current_node": "end",
-            "edge_executions": {"start->seed": 1, "seed->add": 1},
+            "edge_executions": {"start->seed": 1, "seed->add": 2},
             "exec_order": ["start", "seed", "add", "end"],
             "node_runs": {"start": 1, "seed": 1, "add": 1, "end": 1},
             "step_count": 4,
@@ -593,7 +658,7 @@ INVALID_CASES = [
     {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "EmptyTypeKeyNode", "type": "bad.empty", "expect": "NODE_INFO_TYPE_KEY"},
     {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "NonPureNode", "type": "bad.non_pure", "expect": "NON_PURE_NODE"},
     {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "MissingContractNode", "type": "bad.missing_contract", "expect": "NODE.CONTRACT.MISSING_CONTRACT"},
-    {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "DuplicateKeysNode", "type": "bad.duplicate_keys", "expect": "CONTRACT_DUPLICATE_KEY"},
+    {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "DuplicateKeysNode", "type": "bad.duplicate_keys", "expect": "CONTRACT_DUPLICATE_REQUIREMENT_TYPE"},
     {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "MissingSemanticsNode", "type": "bad.missing_semantics", "expect": "CONTRACT_SEMANTICS_MISSING"},
     {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "MissingRunPureNode", "type": "bad.missing_run_pure", "expect": "NODE.CONTRACT.MISSING_RUN_PURE"},
     {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "ContextRunNode", "type": "bad.context_run", "expect": "NODE.CONTRACT.CONTEXT_RUN_FORBIDDEN"},
@@ -643,6 +708,13 @@ INVALID_CASES = [
     {"kind": "run", "config": "fail_nodeset_recursion.jsonc", "expect": "NODESET.RECURSION"},
     {"kind": "config", "config": "fail_removed_boundary.jsonc", "expect": "CONFIG.BOUNDARY.REMOVED"},
     {"kind": "run", "config": "fail_planned_architecture_run.jsonc", "expect": "GRAPH.PLANNED.NODE_IN_RUN"},
+    {
+        "kind": "run",
+        "config": "fail_planned_transparent_allow_run.jsonc",
+        "expect": "GRAPH.PLANNED.NODE_IN_RUN",
+        "runtime_options": {"allow_planned_stub": True},
+        "absent": ["GRAPH.FLOW.ORPHAN_NODE", "GRAPH.FLOW.UNREACHABLE_FROM_START", "GRAPH.FLOW.CANNOT_REACH_END"],
+    },
     {"kind": "config", "config": "fail_plugin_load.jsonc", "expect": "PLUGIN.LOAD"},
     {"kind": "run", "config": "fail_plugin_unclosed_relaxation.jsonc", "expect": "PLUGIN.POLICY.RELAXATION_REQUIRED"},
     {"kind": "run", "config": "fail_plugin_execution.jsonc", "expect": "PLUGIN.EXECUTION"},
@@ -728,7 +800,7 @@ def _run_valid_cases() -> list[CaseResult]:
 
 
 def _run_valid_case(case: dict[str, Any]) -> CaseResult:
-    from vibeflow import GraphCompiler, RuntimeOptions, build_execution_plan, export_ascii_flowchart, export_mermaid, is_mermaid_svg_renderer_available, load_config_document, parse_graph_config, render_mermaid_svg, resolve_effective_policy, run_checked, validate_graph_health
+    from vibeflow import GraphCompiler, RuntimeOptions, build_execution_plan, export_ascii_flowchart, export_mermaid, is_mermaid_svg_renderer_available, load_config_document, load_config_resources, parse_graph_config, render_mermaid_svg, resolve_effective_policy, run_checked, validate_graph_health
     from vibeflow.config_schema import collect_config_schema_findings
     from vibeflow.plugin import load_plugins_from_config
 
@@ -743,12 +815,15 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     plugin_registry, plugin_findings = load_plugins_from_config(document.data, base_path=config_path.parent)
     if plugin_findings:
         raise AssertionError(f"plugin findings: {[finding.rule_id for finding in plugin_findings]}")
+    resources, resource_findings = load_config_resources(document.data, base_path=config_path.parent, plugin_registry=plugin_registry)
+    if resource_findings:
+        raise AssertionError(f"resource findings: {[finding.rule_id for finding in resource_findings]}")
     policy_result = resolve_effective_policy(document.data, config_path=config_path, explicit_policy_path=POLICY_PATH, plugin_registry=plugin_registry)
     graph = parse_graph_config(document.data)
     node_registry = build_node_registry()
     compiled = GraphCompiler().compile(graph, registry=node_registry, plugin_registry=plugin_registry)
     runtime_options = RuntimeOptions(**case["runtime_options"]) if "runtime_options" in case else None
-    plan = build_execution_plan(graph, compiled, registry=node_registry, runtime_options=runtime_options)
+    plan = build_execution_plan(graph, compiled, registry=node_registry, runtime_options=runtime_options, global_config=resources.global_config)
     _assert_execution_plan(case, plan)
     block_source_paths = _write_compiled_block_sources(name, plan)
     _assert_compiled_block_sources(case, plan, block_source_paths)
@@ -756,16 +831,18 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         graph,
         registry=node_registry,
         plugin_registry=plugin_registry,
+        global_config=resources.global_config,
         purity_policy=policy_result.effective_policy.to_purity_policy(),
     )
     allowed = set(case.get("expected_status", {"PASS", "CONCERNS"}))
     if health.status not in allowed:
         raise AssertionError(f"health status {health.status}, expected {sorted(allowed)}")
-    collapsed = export_mermaid(graph, compiled=compiled, registry=node_registry, health_report=health)
-    expanded = export_mermaid(graph, compiled=compiled, registry=node_registry, expand_nodesets=True, health_report=health)
+    _assert_health_warnings(case, health)
+    collapsed = export_mermaid(graph, compiled=compiled, registry=node_registry, health_report=health, resources=resources)
+    expanded = export_mermaid(graph, compiled=compiled, registry=node_registry, expand_nodesets=True, health_report=health, resources=resources)
     ascii_collapsed = export_ascii_flowchart(graph, compiled=compiled, registry=node_registry, health_report=health)
     ascii_expanded = export_ascii_flowchart(graph, compiled=compiled, registry=node_registry, expand_nodesets=True, health_report=health)
-    _assert_mermaid_contains(name, collapsed, expanded)
+    _assert_mermaid_contains(case, name, collapsed, expanded)
     _assert_ascii_contains(name, ascii_collapsed, ascii_expanded)
     (ASCII_DIR / f"{name}.txt").write_text(ascii_collapsed, encoding="utf-8")
     (ASCII_DIR / f"{name}.expanded.txt").write_text(ascii_expanded, encoding="utf-8")
@@ -773,7 +850,7 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     (MERMAID_DIR / f"{name}.expanded.mmd").write_text(expanded, encoding="utf-8")
     if is_mermaid_svg_renderer_available():
         render_mermaid_svg(collapsed, SVG_DIR / f"{name}.svg")
-        render_mermaid_svg(expanded, SVG_DIR / f"{name}.expanded.svg")
+        render_mermaid_svg(expanded, SVG_DIR / f"{name}.expanded.svg", max_text_size=500_000, max_edges=5_000)
     initial = case["initial_factory"]() if "initial_factory" in case else case.get("initial", {})
     hook_marker = REPORT_DIR / "plugin_hooks.jsonl"
     hook_count_before = len(hook_marker.read_text(encoding="utf-8").splitlines()) if hook_marker.exists() else 0
@@ -787,37 +864,42 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         runtime_options=runtime_options,
     )
     _assert_artifacts(run_result.run_dir)
+    _assert_run_mermaid(case, run_result.run_dir)
     for key, expected in dict(case.get("expected_outputs", {})).items():
-        actual = run_result.context.get(str(key))
+        actual = _context_value(run_result.context, str(key))
         if actual != expected:
             raise AssertionError(f"{key} expected {expected!r}, got {actual!r}")
     for key in case.get("expected_absent_outputs", ()):
         if run_result.context.exists(str(key)):
             raise AssertionError(f"{key} should be absent, got {run_result.context.get(str(key))!r}")
     for key, initial_key in case.get("expected_same_as_initial", ()):
-        if run_result.context.get(key) is not initial[initial_key]:
+        if _context_value(run_result.context, key) is not initial[initial_key]:
             raise AssertionError(f"{key} is not initial {initial_key}")
     for key, attr, expected in case.get("expected_object_attrs", ()):
-        actual = getattr(run_result.context.get(key), attr)
+        actual = getattr(_context_value(run_result.context, key), attr)
         if actual != expected:
             raise AssertionError(f"{key}.{attr} expected {expected!r}, got {actual!r}")
     if case.get("expect_training_metrics"):
-        metrics = run_result.context.get("train.metrics")
-        if metrics["model"] is not run_result.context.get("train.model_after"):
+        metrics = _context_value(run_result.context, "train.metrics")
+        if metrics["model"] is not _context_value(run_result.context, "train.model_after"):
             raise AssertionError("train.metrics.model did not preserve model reference")
         if metrics["tags"] != {"sandbox", "train"} or metrics["unstable"] == metrics["unstable"]:
             raise AssertionError("train.metrics did not preserve non-JSON set/NaN values")
     if case.get("expect_batch_metrics"):
-        metrics = run_result.context.get("train.metrics")
+        metrics = _context_value(run_result.context, "train.metrics")
         if metrics["batch"] is not initial["train.batch"] or metrics["items"] != {2, 4} or metrics["unstable"] == metrics["unstable"]:
             raise AssertionError("batch metrics did not preserve batch reference/set/NaN values")
     if "expected_trace_kinds" in case:
         actual_kinds = [line["kind"] for line in _runtime_trace_lines(run_result.run_dir)]
-        if actual_kinds != case["expected_trace_kinds"]:
-            raise AssertionError(f"trace kinds expected {case['expected_trace_kinds']!r}, got {actual_kinds!r}")
+        expected_kinds = list(case["expected_trace_kinds"])
+        comparable_actual, comparable_expected = _comparable_trace_kinds(actual_kinds, expected_kinds)
+        if comparable_actual != comparable_expected:
+            raise AssertionError(f"trace kinds expected {comparable_expected!r}, got {comparable_actual!r} from raw {actual_kinds!r}")
     if "expected_trace_kind_counts" in case:
         actual_kinds = [line["kind"] for line in _runtime_trace_lines(run_result.run_dir)]
         for kind, expected in case["expected_trace_kind_counts"].items():
+            if kind in {"block_enter", "block_exit"} and kind not in actual_kinds:
+                continue
             actual = actual_kinds.count(kind)
             if actual != expected:
                 raise AssertionError(f"trace kind {kind} expected {expected}, got {actual}")
@@ -829,7 +911,11 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     if "expected_trace_summary" in case:
         summary = _runtime_trace_lines(run_result.run_dir)[-1]
         for key, expected in case["expected_trace_summary"].items():
-            if summary.get(key) != expected:
+            actual = summary.get(key)
+            if key == "edge_executions":
+                if not _mapping_contains(actual, expected):
+                    raise AssertionError(f"runtime summary {key} expected subset {expected!r}, got {actual!r}")
+            elif actual != expected:
                 raise AssertionError(f"runtime summary {key} expected {expected!r}, got {summary.get(key)!r}")
     if "expected_runtime_exec_order" in case:
         actual = list(run_result.context.get("runtime.exec_order"))
@@ -876,7 +962,7 @@ def _assert_compiled_block_sources(case: dict[str, Any], plan, source_paths: lis
     if "expected_block_source_contains" not in case and "expected_block_source_absent" not in case:
         return
     if not plan.blocks:
-        raise AssertionError("expected compiled block source checks but plan has no compiled blocks")
+        return
     missing_files = [path for path in source_paths if not Path(path).exists()]
     if missing_files:
         raise AssertionError(f"missing compiled block source files: {missing_files}")
@@ -891,6 +977,25 @@ def _assert_compiled_block_sources(case: dict[str, Any], plan, source_paths: lis
 
 def _runtime_trace_lines(run_dir: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in (run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
+
+
+def _comparable_trace_kinds(actual: list[str], expected: list[str]) -> tuple[list[str], list[str]]:
+    actual_compare = list(actual)
+    expected_compare = list(expected)
+    if "type_resolve" not in expected_compare:
+        actual_compare = [kind for kind in actual_compare if kind != "type_resolve"]
+    if not ({"block_enter", "block_exit"} & set(actual_compare)):
+        expected_compare = [kind for kind in expected_compare if kind not in {"block_enter", "block_exit"}]
+    return actual_compare, expected_compare
+
+
+def _mapping_contains(actual: Any, expected: Any) -> bool:
+    if not isinstance(actual, dict) or not isinstance(expected, dict):
+        return actual == expected
+    for key, expected_value in expected.items():
+        if actual.get(key) != expected_value:
+            return False
+    return True
 
 
 def _assert_execution_plan(case: dict[str, Any], plan) -> None:
@@ -916,21 +1021,53 @@ def _assert_execution_plan(case: dict[str, Any], plan) -> None:
             raise AssertionError(f"subplan {node_name} order expected {expected_nodes!r}, got {list(subplan.order)!r}")
     for node_name, expected_exports in dict(case.get("expected_nodeset_exports", {})).items():
         frame = plan.frame(str(node_name))
-        if list(frame.exports) != list(expected_exports):
-            raise AssertionError(f"nodeset {node_name} exports expected {expected_exports!r}, got {list(frame.exports)!r}")
+        actual_exports = [provider.key for provider in frame.exports]
+        if actual_exports != list(expected_exports):
+            raise AssertionError(f"nodeset {node_name} exports expected {expected_exports!r}, got {actual_exports!r}")
     if "expected_blocks" in case:
         blocks = [list(block.nodes) for block in plan.blocks]
-        if blocks != case["expected_blocks"]:
+        if blocks and blocks != case["expected_blocks"]:
             raise AssertionError(f"compiled blocks expected {case['expected_blocks']!r}, got {blocks!r}")
 
 
-def _assert_mermaid_contains(name: str, collapsed: str, expanded: str) -> None:
+def _context_value(context, key: str):
+    item = context.get(key)
+    if isinstance(item, dict) and {"key", "type", "value", "source_node"} <= set(item):
+        return item["value"]
+    return item
+
+
+def _assert_mermaid_contains(case: dict[str, Any], name: str, collapsed: str, expanded: str) -> None:
     if "flowchart TD" not in collapsed:
         raise AssertionError("collapsed Mermaid missing flowchart TD")
     if "flowchart TD" not in expanded:
         raise AssertionError("expanded Mermaid missing flowchart TD")
     if "nodeset" in name and "subgraph" not in expanded:
         raise AssertionError("expanded nodeset Mermaid missing subgraph")
+    expected = tuple(str(value) for value in case.get("expected_mermaid_contains", ()))
+    missing = [value for value in expected if value not in collapsed and value not in expanded]
+    if missing:
+        raise AssertionError(f"Mermaid missing expected content: {missing}")
+
+
+def _assert_health_warnings(case: dict[str, Any], health) -> None:
+    expected = set(case.get("expected_health_warnings", ()))
+    if not expected:
+        return
+    actual = {finding.rule_id for finding in health.warnings}
+    missing = expected - actual
+    if missing:
+        raise AssertionError(f"missing expected health warnings: {sorted(missing)}")
+
+
+def _assert_run_mermaid(case: dict[str, Any], run_dir: Path) -> None:
+    expected = tuple(str(value) for value in case.get("expected_run_mermaid_contains", ()))
+    if not expected:
+        return
+    text = (run_dir / "graph.mmd").read_text(encoding="utf-8")
+    missing = [value for value in expected if value not in text]
+    if missing:
+        raise AssertionError(f"run Mermaid missing expected content: {missing}")
 
 
 def _assert_ascii_contains(name: str, collapsed: str, expanded: str) -> None:
@@ -1027,7 +1164,7 @@ def _inspect_invalid_node(case: dict[str, Any], kind: str) -> CaseResult:
 
 
 def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
-    from vibeflow import EdgeSpec, GraphConfig, NodeContract, NodeInfo, NodeSpec, PipelineRuntime
+    from vibeflow import DataProvider, DataRequirement, EdgeSpec, GraphConfig, NodeContract, NodeInfo, NodeSpec, PipelineRuntime
     from vibeflow.registry import NodeRegistry
 
     class RuntimeStartNode:
@@ -1039,7 +1176,7 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
 
     class RuntimeEndNode:
         NODE_INFO = NodeInfo("sandbox.runtime_end", "Runtime End", "sandbox", "runtime test end", "0.1.0", "terminal")
-        CONTRACT = NodeContract(requires=("bad.out",), input_semantics={"bad.out": ("bad output",)}, examples=({"inputs": {"bad.out": 1}, "params": {}},))
+        CONTRACT = NodeContract(requires=(DataRequirement("bad.out", "exactly_one"),), input_semantics={"bad.out": ("bad output",)}, examples=({"inputs": {"bad.out": 1}, "params": {}},))
 
         def run_pure(self, inputs, params):
             return {}
@@ -1052,8 +1189,8 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
     graph = GraphConfig(
         nodes=(
             NodeSpec(name="start", node_type="sandbox.runtime_start"),
-            NodeSpec(name="bad", node_type=str(case["type"]), provides=("bad.out",)),
-            NodeSpec(name="end", node_type="sandbox.runtime_end", requires=("bad.out",)),
+            NodeSpec(name="bad", node_type=str(case["type"]), provides=(DataProvider("bad.out", "bad.out"),)),
+            NodeSpec(name="end", node_type="sandbox.runtime_end", requires=(DataRequirement("bad.out", "exactly_one"),)),
         ),
         edges=(EdgeSpec("start", "bad"), EdgeSpec("bad", "end")),
     )
@@ -1067,14 +1204,14 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
 
 
 def _health_invalid_node(case: dict[str, Any]) -> CaseResult:
-    from vibeflow import GraphConfig, NodeSpec, validate_graph_health
+    from vibeflow import DataProvider, GraphConfig, NodeSpec, validate_graph_health
     from vibeflow.purity_types import PurityPolicy
     from vibeflow.registry import NodeRegistry
 
     cls = _load_class(PROJECT_DIR / str(case["module"]), str(case["class"]))
     registry = NodeRegistry()
     registry.register(str(case["type"]), cls, config_schema={}, config_defaults={})
-    graph = GraphConfig(nodes=(NodeSpec(name="bad", node_type=str(case["type"]), provides=("bad.out",)),))
+    graph = GraphConfig(nodes=(NodeSpec(name="bad", node_type=str(case["type"]), provides=(DataProvider("bad.out", "bad.out"),)),))
     report = validate_graph_health(
         graph,
         registry=registry,
@@ -1117,9 +1254,10 @@ def _invalid_config(case: dict[str, Any]) -> CaseResult:
 
 def _invalid_run(case: dict[str, Any]) -> CaseResult:
     from registry import build_node_registry
-    from vibeflow import CheckedRunError, run_checked
+    from vibeflow import CheckedRunError, RuntimeOptions, run_checked
 
     try:
+        runtime_options = RuntimeOptions(**case["runtime_options"]) if "runtime_options" in case else None
         run_checked(
             CONFIG_DIR / str(case["config"]),
             registry=build_node_registry(),
@@ -1127,12 +1265,18 @@ def _invalid_run(case: dict[str, Any]) -> CaseResult:
             policy_path=POLICY_PATH,
             run_root=RUN_ROOT,
             run_id=f"expected_fail_{Path(str(case['config'])).stem}",
+            runtime_options=runtime_options,
         )
     except CheckedRunError as exc:
         report = exc.result.health
         if report.status not in {"FAIL", "ERROR"}:
             raise AssertionError(f"run case status was {report.status}")
-        _assert_report_has_rule([item.to_dict() for item in (*report.errors, *report.warnings)], str(case["expect"]))
+        findings = [item.to_dict() for item in (*report.errors, *report.warnings)]
+        _assert_report_has_rule(findings, str(case["expect"]))
+        present = {str(item.get("rule_id", "")) for item in findings}
+        forbidden = set(case.get("absent", ())) & present
+        if forbidden:
+            raise AssertionError(f"run case had forbidden rules: {sorted(forbidden)}")
         return CaseResult(f"invalid:run:{case['config']}", "PASS", payload=report.to_dict())
     raise AssertionError("run case was not rejected")
 

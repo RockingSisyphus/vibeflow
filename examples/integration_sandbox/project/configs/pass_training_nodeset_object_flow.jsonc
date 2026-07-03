@@ -7,43 +7,400 @@
       "description": "One object-passing training step.",
       "version": "0.1.0",
       "purity": "pure",
-      "requires": ["train.model", "train.batch", "train.optimizer"],
-      "provides": ["train.model_after", "train.optimizer_after", "train.step_report", "train.metrics"],
-      "exports": ["train.model_after", "train.optimizer_after", "train.step_report", "train.metrics"],
+      "requires": [
+        {
+          "type": "train.model",
+          "cardinality": "exactly_one"
+        },
+        {
+          "type": "train.batch",
+          "cardinality": "exactly_one"
+        },
+        {
+          "type": "train.optimizer",
+          "cardinality": "exactly_one"
+        }
+      ],
+      "provides": [
+        {
+          "key": "train.model_after",
+          "type": "train.model_after"
+        },
+        {
+          "key": "train.optimizer_after",
+          "type": "train.optimizer_after"
+        },
+        {
+          "key": "train.step_report",
+          "type": "train.step_report"
+        },
+        {
+          "key": "train.metrics",
+          "type": "train.metrics"
+        }
+      ],
+      "exports": [
+        {
+          "key": "train.model_after",
+          "type": "train.model_after"
+        },
+        {
+          "key": "train.optimizer_after",
+          "type": "train.optimizer_after"
+        },
+        {
+          "key": "train.step_report",
+          "type": "train.step_report"
+        },
+        {
+          "key": "train.metrics",
+          "type": "train.metrics"
+        }
+      ],
       "pipeline": {
-        "inputs": ["train.model", "train.batch", "train.optimizer"],
+        "inputs": [
+          {
+            "key": "train.model",
+            "type": "train.model"
+          },
+          {
+            "key": "train.batch",
+            "type": "train.batch"
+          },
+          {
+            "key": "train.optimizer",
+            "type": "train.optimizer"
+          }
+        ],
         "nodes": [
-          {"name": "start", "type": "sandbox.start"},
-          {"name": "input", "type": "sandbox.training_input", "requires": ["train.model", "train.batch", "train.optimizer"]},
-          {"name": "forward", "type": "sandbox.forward_loss", "requires": ["train.model", "train.batch"], "provides": ["train.loss"]},
-          {"name": "backward", "type": "sandbox.backward_grad", "requires": ["train.model", "train.loss"], "provides": ["train.grad"]},
-          {"name": "step", "type": "sandbox.optimizer_step", "requires": ["train.model", "train.optimizer", "train.grad"], "provides": ["train.model_after", "train.optimizer_after", "train.step_report"]},
-          {"name": "metrics", "type": "sandbox.training_metrics", "requires": ["train.model_after", "train.loss"], "provides": ["train.metrics"]},
-          {"name": "end", "type": "sandbox.training_metrics_end", "requires": ["train.metrics"]}
+          {
+            "name": "start",
+            "type": "sandbox.start"
+          },
+          {
+            "name": "input",
+            "type": "sandbox.training_input",
+            "requires": [
+              {
+                "type": "train.model",
+                "cardinality": "exactly_one"
+              },
+              {
+                "type": "train.batch",
+                "cardinality": "exactly_one"
+              },
+              {
+                "type": "train.optimizer",
+                "cardinality": "exactly_one"
+              }
+            ],
+            "provides": [
+              {
+                "key": "train.model.input",
+                "type": "train.model"
+              },
+              {
+                "key": "train.batch.input",
+                "type": "train.batch"
+              },
+              {
+                "key": "train.optimizer.input",
+                "type": "train.optimizer"
+              }
+            ]
+          },
+          {
+            "name": "forward",
+            "type": "sandbox.forward_loss",
+            "requires": [
+              {
+                "type": "train.model",
+                "cardinality": "exactly_one"
+              },
+              {
+                "type": "train.batch",
+                "cardinality": "exactly_one"
+              }
+            ],
+            "provides": [
+              {
+                "key": "train.loss",
+                "type": "train.loss"
+              }
+            ]
+          },
+          {
+            "name": "backward",
+            "type": "sandbox.backward_grad",
+            "requires": [
+              {
+                "type": "train.model",
+                "cardinality": "exactly_one"
+              },
+              {
+                "type": "train.loss",
+                "cardinality": "exactly_one"
+              }
+            ],
+            "provides": [
+              {
+                "key": "train.grad",
+                "type": "train.grad"
+              }
+            ]
+          },
+          {
+            "name": "step",
+            "type": "sandbox.optimizer_step",
+            "requires": [
+              {
+                "type": "train.model",
+                "cardinality": "exactly_one"
+              },
+              {
+                "type": "train.optimizer",
+                "cardinality": "exactly_one"
+              },
+              {
+                "type": "train.grad",
+                "cardinality": "exactly_one"
+              }
+            ],
+            "provides": [
+              {
+                "key": "train.model_after",
+                "type": "train.model_after"
+              },
+              {
+                "key": "train.optimizer_after",
+                "type": "train.optimizer_after"
+              },
+              {
+                "key": "train.step_report",
+                "type": "train.step_report"
+              }
+            ]
+          },
+          {
+            "name": "metrics",
+            "type": "sandbox.training_metrics",
+            "requires": [
+              {
+                "type": "train.model_after",
+                "cardinality": "exactly_one"
+              },
+              {
+                "type": "train.loss",
+                "cardinality": "exactly_one"
+              }
+            ],
+            "provides": [
+              {
+                "key": "train.metrics",
+                "type": "train.metrics"
+              }
+            ]
+          },
+          {
+            "name": "end",
+            "type": "sandbox.training_metrics_end",
+            "requires": [
+              {
+                "type": "train.metrics",
+                "cardinality": "exactly_one"
+              }
+            ]
+          }
         ],
         "edges": [
-          {"from": "start", "to": "input"},
-          {"from": "input", "to": "forward"},
-          {"from": "forward", "to": "backward"},
-          {"from": "backward", "to": "step"},
-          {"from": "step", "to": "metrics"},
-          {"from": "metrics", "to": "end"}
+          {
+            "from": "start",
+            "to": "input"
+          },
+          {
+            "from": "input",
+            "to": "forward"
+          },
+          {
+            "from": "forward",
+            "to": "backward"
+          },
+          {
+            "from": "backward",
+            "to": "step"
+          },
+          {
+            "from": "step",
+            "to": "metrics"
+          },
+          {
+            "from": "metrics",
+            "to": "end"
+          },
+          {
+            "from": "forward",
+            "to": "metrics"
+          },
+          {
+            "from": "input",
+            "to": "backward"
+          },
+          {
+            "from": "input",
+            "to": "step"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "train.metrics",
+            "cardinality": "exactly_one"
+          },
+          {
+            "type": "train.step_report",
+            "cardinality": "optional_one"
+          },
+          {
+            "type": "train.model_after",
+            "cardinality": "optional_one"
+          },
+          {
+            "type": "train.optimizer_after",
+            "cardinality": "optional_one"
+          }
         ]
       }
     }
   ],
   "pipeline": {
-    "inputs": ["train.model", "train.batch", "train.optimizer"],
+    "inputs": [
+      {
+        "key": "train.model",
+        "type": "train.model"
+      },
+      {
+        "key": "train.batch",
+        "type": "train.batch"
+      },
+      {
+        "key": "train.optimizer",
+        "type": "train.optimizer"
+      }
+    ],
     "nodes": [
-      {"name": "start", "type": "sandbox.start"},
-      {"name": "input", "type": "sandbox.training_input", "requires": ["train.model", "train.batch", "train.optimizer"]},
-      {"name": "train", "type": "nodeset.training.step", "requires": ["train.model", "train.batch", "train.optimizer"], "provides": ["train.model_after", "train.optimizer_after", "train.step_report", "train.metrics"]},
-      {"name": "end", "type": "sandbox.training_metrics_end", "requires": ["train.metrics"]}
+      {
+        "name": "start",
+        "type": "sandbox.start"
+      },
+      {
+        "name": "input",
+        "type": "sandbox.training_input",
+        "requires": [
+          {
+            "type": "train.model",
+            "cardinality": "exactly_one"
+          },
+          {
+            "type": "train.batch",
+            "cardinality": "exactly_one"
+          },
+          {
+            "type": "train.optimizer",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "train.model.input",
+            "type": "train.model"
+          },
+          {
+            "key": "train.batch.input",
+            "type": "train.batch"
+          },
+          {
+            "key": "train.optimizer.input",
+            "type": "train.optimizer"
+          }
+        ]
+      },
+      {
+        "name": "train",
+        "type": "nodeset.training.step",
+        "requires": [
+          {
+            "type": "train.model",
+            "cardinality": "exactly_one"
+          },
+          {
+            "type": "train.batch",
+            "cardinality": "exactly_one"
+          },
+          {
+            "type": "train.optimizer",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "train.model_after",
+            "type": "train.model_after"
+          },
+          {
+            "key": "train.optimizer_after",
+            "type": "train.optimizer_after"
+          },
+          {
+            "key": "train.step_report",
+            "type": "train.step_report"
+          },
+          {
+            "key": "train.metrics",
+            "type": "train.metrics"
+          }
+        ]
+      },
+      {
+        "name": "end",
+        "type": "sandbox.training_metrics_end",
+        "requires": [
+          {
+            "type": "train.metrics",
+            "cardinality": "exactly_one"
+          }
+        ]
+      }
     ],
     "edges": [
-      {"from": "start", "to": "input"},
-      {"from": "input", "to": "train"},
-      {"from": "train", "to": "end"}
+      {
+        "from": "start",
+        "to": "input"
+      },
+      {
+        "from": "input",
+        "to": "train"
+      },
+      {
+        "from": "train",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "train.metrics",
+        "cardinality": "exactly_one"
+      },
+      {
+        "type": "train.step_report",
+        "cardinality": "optional_one"
+      },
+      {
+        "type": "train.model_after",
+        "cardinality": "optional_one"
+      },
+      {
+        "type": "train.optimizer_after",
+        "cardinality": "optional_one"
+      }
     ]
   }
 }

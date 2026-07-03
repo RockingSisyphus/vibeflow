@@ -1,10 +1,66 @@
 {
   "pipeline": {
-    "inputs": ["value.in"],
-    "nodes": [
-      {"name": "increment", "type": "sandbox.increment", "requires": ["value.in"], "provides": ["value.next"]},
-      {"name": "copy", "type": "sandbox.copy_back", "requires": ["value.next"], "provides": ["value.in"]}
+    "inputs": [
+      {
+        "key": "value.in",
+        "type": "value.in"
+      }
     ],
-    "loops": [{"name": "old", "edges": [["copy", "increment"]], "max_iterations": 2}]
+    "nodes": [
+      {
+        "name": "increment",
+        "type": "sandbox.increment",
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.next",
+            "type": "value.next"
+          }
+        ]
+      },
+      {
+        "name": "copy",
+        "type": "sandbox.copy_back",
+        "requires": [
+          {
+            "type": "value.next",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.in.copy",
+            "type": "value.in"
+          }
+        ]
+      }
+    ],
+    "loops": [
+      {
+        "name": "old",
+        "edges": [
+          [
+            "copy",
+            "increment"
+          ]
+        ],
+        "max_iterations": 2
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.in",
+        "cardinality": "exactly_one"
+      },
+      {
+        "type": "value.next",
+        "cardinality": "exactly_one"
+      }
+    ]
   }
 }

@@ -35,6 +35,7 @@ def validate_graph_health(
     registry: NodeRegistry,
     boundary_registry: object | None = None,
     plugin_registry: PluginRegistry | None = None,
+    global_config: Mapping[str, object] | None = None,
     purity_policy: PurityPolicy | None = None,
     effective_policy: EffectivePolicy | None = None,
 ) -> HealthReport:
@@ -66,7 +67,7 @@ def validate_graph_health(
         except GraphCompileError as exc:
             return _compile_error_report(exc)
         append_flowchart_health(graph, compiled, state, registry=registry)
-    _append_node_config_health(graph, registry, state)
+    _append_node_config_health(graph, registry, state, global_config=global_config)
     append_data_contract_warnings(graph, compiled, state)
     _append_registry_namespace_smells(registry, state)
     _append_duplicate_logic_findings(state)
@@ -166,22 +167,54 @@ def _append_base_lib_health(
         return
     imported_modules = node_base_lib_imports(node_cls)
     dependency_summary = summarize_base_lib_dependency_chain(imported_modules, base_report)
+    relevant_modules = _relevant_base_lib_modules(imported_modules, base_report)
     state.node_metrics[node_name]["base_lib_dependency_chain"] = dependency_summary.to_dict()
     append_dependency_chain_findings(state.errors, state.warnings, node_name, dependency_summary, purity_policy or PurityPolicy())
-    _append_base_report_findings(base_report.findings, state)
-    state.unhealthy_base_modules.update(finding.object_id for finding in base_report.findings)
+    _append_base_report_findings(base_report.findings, state, relevant_modules=relevant_modules)
+    state.unhealthy_base_modules.update(finding.object_id for finding in base_report.findings if finding.object_id in relevant_modules)
     _append_indirect_base_lib_findings(node_name, imported_modules, state)
 
 
-def _append_base_report_findings(findings, state: _HealthValidationState) -> None:
+def _append_base_report_findings(findings, state: _HealthValidationState, *, relevant_modules: set[str]) -> None:
     from .health_base_lib import base_lib_finding_to_health
 
     for finding in findings:
+        if finding.object_id not in relevant_modules:
+            continue
         health_finding = base_lib_finding_to_health(finding)
         if finding.severity == "warning":
             state.warnings.append(health_finding)
         else:
             state.errors.append(health_finding)
+
+
+def _relevant_base_lib_modules(imported_modules: tuple[str, ...], base_report) -> set[str]:
+    modules = {module.module for module in base_report.modules}
+    adjacency: dict[str, set[str]] = {}
+    for source, target in base_report.dependency_edges:
+        adjacency.setdefault(source, set()).add(target)
+    starts = tuple(dict.fromkeys(_resolve_base_module(imported, modules) for imported in imported_modules))
+    relevant: set[str] = set()
+
+    def visit(module: str) -> None:
+        if not module or module in relevant:
+            return
+        relevant.add(module)
+        for target in adjacency.get(module, ()):
+            visit(target)
+
+    for start in starts:
+        visit(start)
+    return relevant
+
+
+def _resolve_base_module(imported: str, modules: set[str]) -> str:
+    if imported in modules:
+        return imported
+    for module in sorted(modules):
+        if module.startswith(f"{imported}."):
+            return module
+    return ""
 
 
 def _append_indirect_base_lib_findings(node_name: str, imported_modules: tuple[str, ...], state: _HealthValidationState) -> None:
@@ -266,10 +299,15 @@ def _node_violation_finding(node_name: str, violation) -> HealthFinding:
     )
 
 
-def _append_node_config_health(graph: GraphConfig, registry: NodeRegistry, state: _HealthValidationState) -> None:
+def _append_node_config_health(graph: GraphConfig, registry: NodeRegistry, state: _HealthValidationState, *, global_config: Mapping[str, object] | None) -> None:
     from .health_node_config import validate_node_config_health
 
-    state.errors.extend(validate_node_config_health(graph, registry=registry))
+    findings = validate_node_config_health(graph, registry=registry, global_config=global_config)
+    for finding in findings:
+        if finding.severity == "warning":
+            state.warnings.append(finding)
+        else:
+            state.errors.append(finding)
 
 
 def _append_registry_namespace_smells(registry: NodeRegistry, state: _HealthValidationState) -> None:
@@ -333,6 +371,7 @@ def _build_health_report(
     effective_policy: EffectivePolicy | None = None,
 ) -> HealthReport:
     from .rule_catalog import rule_catalog
+    from .runtime_helpers import has_planned, planned_items
 
     errors: tuple[HealthFinding, ...] = tuple(state.errors)
     warnings: tuple[HealthFinding, ...] = tuple(state.warnings)
@@ -351,6 +390,8 @@ def _build_health_report(
             "node_metrics": state.node_metrics,
             "nodeset_findings": state.nodeset_findings,
             "plugins": plugin_registry.to_dict() if plugin_registry is not None else {"plugins": []},
+            "planned": [dict(item) for item in planned_items(graph)],
+            "production_ready": not has_planned(graph),
             "rule_catalog": rule_catalog(),
         },
     )

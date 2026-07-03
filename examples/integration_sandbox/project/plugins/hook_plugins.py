@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from vibeflow import PluginInfo
+
 
 def _record(value):
     marker = Path("reports/plugin_hooks.jsonl")
@@ -12,6 +14,14 @@ def _record(value):
 
 
 class CompilerPlugin:
+    PLUGIN_INFO = PluginInfo(
+        name="sandbox_compiler_hook",
+        plugin_type="compiler",
+        display_name="Sandbox Compiler Hook",
+        category="compiler",
+        description="Records compiler hook calls in the sandbox.",
+        version="0.1.0",
+    )
     name = "sandbox_compiler_hook"
     priority = 10
 
@@ -20,6 +30,14 @@ class CompilerPlugin:
 
 
 class RuntimePlugin:
+    PLUGIN_INFO = PluginInfo(
+        name="sandbox_runtime_hook",
+        plugin_type="runtime",
+        display_name="Sandbox Runtime Hook",
+        category="runtime",
+        description="Records runtime hook calls in the sandbox.",
+        version="0.1.0",
+    )
     name = "sandbox_runtime_hook"
     priority = 10
 

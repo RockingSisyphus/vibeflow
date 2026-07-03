@@ -27,6 +27,7 @@ def test_compiler_and_runtime_plugins_are_hooked(tmp_path) -> None:
         f"""
 import json
 from pathlib import Path
+from vibeflow import PluginInfo
 
 MARKER = Path({str(marker_path)!r})
 
@@ -35,11 +36,13 @@ def record(value):
         handle.write(json.dumps(value, sort_keys=True) + "\\n")
 
 class CompilerPlugin:
+    PLUGIN_INFO = PluginInfo("compiler_hook", "compiler", "Compiler Hook", "test", "Records compiler hook calls.", "0.1.0")
     name = "compiler_hook"
     def after_compile(self, graph, compiled):
         record({{"hook": "after_compile", "nodes": len(graph.nodes)}})
 
 class RuntimePlugin:
+    PLUGIN_INFO = PluginInfo("runtime_hook", "runtime", "Runtime Hook", "test", "Records runtime hook calls.", "0.1.0")
     name = "runtime_hook"
     def before_node(self, name, node_type, input_summary):
         record({{"hook": "before_node", "name": name}})

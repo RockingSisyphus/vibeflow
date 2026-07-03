@@ -7,6 +7,7 @@ from typing import Any, Mapping
 
 from .config_schema import collect_policy_schema_findings
 from .config_loader import ConfigLoadError, load_config_document
+from .config_resources import config_base_lib_policy
 from .health_types import HealthFinding
 from .plugin import PluginRegistry, plugin_error
 from .purity_types import BANNED_IMPORT_ROOTS, PurityPolicy
@@ -19,7 +20,7 @@ DEFAULT_POLICY_DATA: dict[str, Any] = {
     "imports": {
         "allowed_roots": [],
         "banned_roots": sorted(BANNED_IMPORT_ROOTS),
-        "allowed_modules": ["urllib.parse"],
+        "allowed_modules": ["urllib.parse", "vibeflow"],
         "banned_modules": ["urllib.request"],
     },
     "base_lib": {"allowed_paths": [], "allowed_modules": [], "banned_modules": []},
@@ -211,6 +212,8 @@ def resolve_effective_policy(
     if plugin_registry is not None:
         _apply_policy_plugins(effective, sources, findings, plugin_registry)
 
+    _apply_config_base_lib_declarations(effective, sources, config_data, config_path=config_path)
+
     return PolicyResolveResult(EffectivePolicy(effective, tuple(sources)), tuple(findings))
 
 
@@ -311,6 +314,25 @@ def _apply_policy_plugins(
             continue
         _merge_policy(effective, policy_update)
         sources.append(f"plugin.policy:{plugin_name}")
+
+
+def _apply_config_base_lib_declarations(
+    effective: dict[str, Any],
+    sources: list[str],
+    config_data: Mapping[str, Any],
+    *,
+    config_path: Path,
+) -> None:
+    values = config_base_lib_policy(config_data, base_path=config_path.parent)
+    if not values:
+        return
+    base_lib = effective.setdefault("base_lib", {})
+    if not isinstance(base_lib, dict):
+        effective["base_lib"] = {}
+        base_lib = effective["base_lib"]
+    base_lib["allowed_paths"] = list(values.get("allowed_paths", ()))
+    base_lib["allowed_modules"] = list(values.get("allowed_modules", ()))
+    sources.append("config.base_lib")
 
 
 def _validate_plugin_relaxations(

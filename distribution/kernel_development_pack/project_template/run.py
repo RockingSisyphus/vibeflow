@@ -10,8 +10,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 MANIFEST_PATH = ROOT / "kernel" / "MANIFEST.sha256"
+KERNEL_ARCHIVE_PATH = ROOT / "kernel" / "vibeflow-kernel.zip"
+# Treat unpacked kernel sources as unexpected so AI work stays focused on project/.
 PROTECTED_PREFIXES = ("kernel/vibeflow/",)
-PROTECTED_FILES = {"run.py", "kernel/README.md", "AGENTS.md", "README.md"}
+PROTECTED_FILES = {
+    "run.py",
+    "kernel/README.md",
+    "AGENTS.md",
+    "README.md",
+}
 
 
 class KernelIntegrityError(RuntimeError):
@@ -39,6 +46,8 @@ def _iter_protected_files() -> list[str]:
     for relative in PROTECTED_FILES:
         if (ROOT / relative).is_file():
             paths.append(relative)
+    if KERNEL_ARCHIVE_PATH.is_file():
+        paths.append(KERNEL_ARCHIVE_PATH.relative_to(ROOT).as_posix())
     kernel_root = ROOT / "kernel" / "vibeflow"
     if kernel_root.exists():
         for path in kernel_root.rglob("*"):
@@ -90,7 +99,7 @@ def _format_integrity_error(exc: KernelIntegrityError) -> str:
     lines = [
         "KERNEL INTEGRITY CHECK FAILED",
         "",
-        "The distributed kernel or launcher files were modified.",
+        "The distributed kernel file, launcher, or guide files were modified.",
         "This may mean an AI or developer changed kernel rules to bypass validation.",
         "",
     ]
@@ -112,7 +121,7 @@ def _run_integrity_check() -> None:
 
 
 _run_integrity_check()
-sys.path.insert(0, str(ROOT / "kernel"))
+sys.path.insert(0, str(KERNEL_ARCHIVE_PATH))
 sys.path.insert(0, str(ROOT / "project"))
 
 from vibeflow import (  # noqa: E402
@@ -122,6 +131,7 @@ from vibeflow import (  # noqa: E402
     export_ascii_flowchart,
     export_mermaid,
     load_config_document,
+    load_config_resources,
     load_plugins_from_config,
     parse_graph_config,
     resolve_effective_policy,
@@ -132,6 +142,13 @@ from vibeflow import (  # noqa: E402
 )
 
 from vibeflow.config_schema import collect_config_schema_findings  # noqa: E402
+from vibeflow.mermaid_render import (  # noqa: E402
+    DEFAULT_MERMAID_MAX_EDGES,
+    DEFAULT_MERMAID_MAX_TEXT_SIZE,
+    EXPANDED_MERMAID_MAX_EDGES,
+    EXPANDED_MERMAID_MAX_TEXT_SIZE,
+)
+from vibeflow.planned_behavior import project_root_for_config  # noqa: E402
 
 from registry import build_node_registry  # noqa: E402
 
@@ -155,6 +172,8 @@ def main() -> int:
     svg = _add_config_command(sub, "svg")
     svg.add_argument("--output", required=True)
     svg.add_argument("--expand-nodesets", action="store_true")
+    svg.add_argument("--mermaid-max-text-size", type=int, default=None)
+    svg.add_argument("--mermaid-max-edges", type=int, default=None)
     inspect_node = sub.add_parser("inspect-node")
     inspect_node.add_argument("--type", required=True, dest="node_type")
     inspect_node.add_argument("--module", required=True)
@@ -182,6 +201,7 @@ def _add_runtime_options(command) -> None:
     command.add_argument("--nodeset-hooks", action=argparse.BooleanOptionalAction, default=None)
     command.add_argument("--block-hooks", action=argparse.BooleanOptionalAction, default=None)
     command.add_argument("--async-flush-timeout", type=float, default=None)
+    command.add_argument("--allow-planned-stub", action="store_true")
 
 
 def _runtime_options_from_args(args) -> RuntimeOptions:
@@ -214,6 +234,8 @@ def _runtime_options_from_args(args) -> RuntimeOptions:
         values["block_hooks"] = args.block_hooks
     if args.async_flush_timeout is not None:
         values["async_flush_timeout"] = args.async_flush_timeout
+    if args.allow_planned_stub:
+        values["allow_planned_stub"] = True
     return RuntimeOptions(**values)
 
 
@@ -238,7 +260,7 @@ def _verify_kernel(args) -> int:
 
 
 def _validate(args) -> int:
-    graph, plugin_registry, effective_policy, schema_report = _preflight(args.config, args.policy)
+    graph, plugin_registry, effective_policy, resources, schema_report = _preflight(args.config, args.policy)
     if schema_report is not None:
         print(schema_report.to_json())
         return 1
@@ -246,6 +268,7 @@ def _validate(args) -> int:
         graph,
         registry=build_node_registry(),
         plugin_registry=plugin_registry,
+        global_config=resources.global_config,
         purity_policy=effective_policy.to_purity_policy(),
     )
     report = replace(report, effective_policy=effective_policy.to_dict())
@@ -254,15 +277,45 @@ def _validate(args) -> int:
 
 
 def _inspect_config(args) -> int:
-    graph = _load_graph(args.config)
+    graph, resources = _load_graph_and_resources(args.config)
     payload = {
-        "nodes": [node.__dict__ for node in graph.nodes],
+        "nodes": [
+            {
+                "name": node.name,
+                "type": node.node_type,
+                "requires": [_requirement_payload(item) for item in node.requires],
+                "provides": [_provider_payload(item) for item in node.provides],
+                "status": node.status,
+                "flow_kind": node.flow_kind,
+                "planned_behavior": node.planned_behavior.to_dict(),
+            }
+            for node in graph.nodes
+        ],
         "edges": [edge.__dict__ for edge in graph.edges],
         "max_steps": graph.max_steps,
-        "nodesets": sorted(graph.nodesets),
+        "nodesets": [
+            {
+                "name": nodeset.name,
+                "status": nodeset.status,
+                "planned_behavior": nodeset.planned_behavior.to_dict(),
+                "requires": [_requirement_payload(item) for item in nodeset.requires],
+                "provides": [_provider_payload(item) for item in nodeset.provides],
+                "exports": [_provider_payload(item) for item in nodeset.exports],
+            }
+            for nodeset in graph.nodesets.values()
+        ],
+        "resources": resources.to_dict(),
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
+
+
+def _provider_payload(item) -> dict[str, str]:
+    return {"key": item.key, "type": item.type}
+
+
+def _requirement_payload(item) -> dict[str, str]:
+    return {"type": item.type, "cardinality": item.cardinality}
 
 
 def _run(args) -> int:
@@ -292,19 +345,30 @@ def _ascii(args) -> int:
 
 
 def _svg(args) -> int:
-    graph = _load_graph(args.config)
+    graph, resources = _load_graph_and_resources(args.config)
     registry = build_node_registry()
     compiled = GraphCompiler().compile(graph, registry=registry)
-    text = export_mermaid(graph, compiled=compiled, registry=registry, expand_nodesets=bool(args.expand_nodesets))
-    render_mermaid_svg(text, Path(args.output))
+    text = export_mermaid(graph, compiled=compiled, registry=registry, expand_nodesets=bool(args.expand_nodesets), resources=resources)
+    max_text_size = (
+        int(args.mermaid_max_text_size)
+        if args.mermaid_max_text_size is not None
+        else (EXPANDED_MERMAID_MAX_TEXT_SIZE if bool(args.expand_nodesets) else DEFAULT_MERMAID_MAX_TEXT_SIZE)
+    )
+    max_edges = (
+        int(args.mermaid_max_edges)
+        if args.mermaid_max_edges is not None
+        else (EXPANDED_MERMAID_MAX_EDGES if bool(args.expand_nodesets) else DEFAULT_MERMAID_MAX_EDGES)
+    )
+    render_mermaid_svg(text, Path(args.output), max_text_size=max_text_size, max_edges=max_edges)
     return 0
 
 
 def _export_graph(args, *, exporter) -> int:
-    graph = _load_graph(args.config)
+    graph, resources = _load_graph_and_resources(args.config)
     registry = build_node_registry()
     compiled = GraphCompiler().compile(graph, registry=registry)
-    text = exporter(graph, compiled=compiled, registry=registry, expand_nodesets=bool(args.expand_nodesets))
+    kwargs = {"resources": resources} if exporter is export_mermaid else {}
+    text = exporter(graph, compiled=compiled, registry=registry, expand_nodesets=bool(args.expand_nodesets), **kwargs)
     if args.output:
         output = Path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -341,19 +405,20 @@ def _preflight(config_path: str, policy_path: str | None):
     path = Path(config_path)
     document = load_config_document(path)
     plugin_registry, plugin_findings = load_plugins_from_config(document.data, base_path=path.parent)
+    resources, resource_findings = load_config_resources(document.data, base_path=path.parent, plugin_registry=plugin_registry)
     policy_result = resolve_effective_policy(
         document.data,
         config_path=path,
         explicit_policy_path=Path(policy_path) if policy_path else None,
         plugin_registry=plugin_registry,
     )
-    findings = (*plugin_findings, *collect_config_schema_findings(document.data), *policy_result.findings)
+    findings = (*plugin_findings, *resource_findings, *collect_config_schema_findings(document.data), *policy_result.findings)
     if findings:
-        return None, plugin_registry, policy_result.effective_policy, _report_findings(
+        return None, plugin_registry, policy_result.effective_policy, resources, _report_findings(
             findings,
             policy_result.effective_policy.to_dict(),
         )
-    return parse_graph_config(document.data), plugin_registry, policy_result.effective_policy, None
+    return parse_graph_config(document.data, project_root=project_root_for_config(path)), plugin_registry, policy_result.effective_policy, resources, None
 
 
 def _report_findings(findings, effective_policy: dict[str, object]) -> HealthReport:
@@ -376,8 +441,20 @@ def _report_findings(findings, effective_policy: dict[str, object]) -> HealthRep
 
 
 def _load_graph(config_path: str):
-    document = load_config_document(Path(config_path))
-    return parse_graph_config(document.data)
+    path = Path(config_path)
+    document = load_config_document(path)
+    return parse_graph_config(document.data, project_root=project_root_for_config(path))
+
+
+def _load_graph_and_resources(config_path: str):
+    path = Path(config_path)
+    document = load_config_document(path)
+    plugin_registry, plugin_findings = load_plugins_from_config(document.data, base_path=path.parent)
+    resources, resource_findings = load_config_resources(document.data, base_path=path.parent, plugin_registry=plugin_registry)
+    findings = (*plugin_findings, *resource_findings, *collect_config_schema_findings(document.data))
+    if findings:
+        raise ValueError("; ".join(f"{finding.rule_id}: {finding.message}" for finding in findings))
+    return parse_graph_config(document.data, project_root=project_root_for_config(path)), resources
 
 
 def _load_input(path: str) -> dict[str, object]:

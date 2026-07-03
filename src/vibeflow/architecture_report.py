@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .compiler import CompiledGraph
+from .data_contract import providers_to_dicts, requirements_to_dicts
 from .graph_config import EdgeSpec, GraphConfig
 
 
@@ -33,8 +34,8 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
                 "name": node.name,
                 "type": node.node_type,
                 "flow_kind": node.flow_kind,
-                "requires": list(node.requires),
-                "provides": list(node.provides),
+                "requires": requirements_to_dicts(node.requires),
+                "provides": providers_to_dicts(node.provides),
                 "incoming": sorted(incoming.get(node.name, ())),
                 "outgoing": sorted(adjacency.get(node.name, ())),
                 "affected": affected[node.name],

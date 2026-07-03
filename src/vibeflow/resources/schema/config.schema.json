@@ -28,18 +28,93 @@
         ]
       }
     },
+    "global_config": { "$ref": "#/$defs/scopedConfig" },
+    "base_lib": {
+      "type": "object",
+      "properties": {
+        "paths": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "modules": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              { "type": "string", "minLength": 1 },
+              {
+                "type": "object",
+                "properties": {
+                  "module": { "type": "string", "minLength": 1 },
+                  "name": { "type": "string", "minLength": 1 },
+                  "status": { "enum": ["planned", "implemented"] },
+                  "description": { "type": "string" }
+                },
+                "anyOf": [
+                  { "required": ["module"] },
+                  { "required": ["name"] }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
     "policy": { "$ref": "policy.schema.json" },
     "plugins": {
       "type": "array",
-      "items": { "type": "object" }
+      "items": {
+        "anyOf": [
+          { "type": "string", "minLength": 1 },
+          {
+            "type": "object",
+            "properties": {
+              "module": { "type": "string", "minLength": 1 },
+              "path": { "type": "string", "minLength": 1 },
+              "name": { "type": "string", "minLength": 1 },
+              "class": { "type": "string", "minLength": 1 },
+              "factory": { "type": "string", "minLength": 1 },
+              "type": { "enum": ["policy", "compiler", "runtime"] },
+              "status": { "enum": ["planned", "implemented"] },
+              "priority": { "type": "integer", "minimum": 1 },
+              "enabled": { "type": "boolean" },
+              "conflict": { "enum": ["error", "replace"] },
+              "scope": { "type": "string" },
+              "description": { "type": "string" },
+              "config": { "type": "object" },
+              "settings": { "type": "object" }
+            },
+            "anyOf": [
+              { "required": ["module"] },
+              { "required": ["path"] },
+              { "required": ["name"], "properties": { "status": { "const": "planned" } } }
+            ]
+          }
+        ]
+      }
     }
   },
   "$defs": {
+    "dataProvider": {
+      "type": "object",
+      "required": ["key", "type"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "dataRequirement": {
+      "type": "object",
+      "required": ["type", "cardinality"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "cardinality": { "enum": ["exactly_one", "optional_one", "all"] }
+      },
+      "additionalProperties": false
+    },
     "pipeline": {
       "type": "object",
       "required": ["nodes"],
       "properties": {
-        "inputs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "inputs": { "type": "array", "items": { "$ref": "#/$defs/dataProvider" } },
+        "outputs": { "type": "array", "items": { "$ref": "#/$defs/dataRequirement" } },
         "nodes": { "$ref": "#/$defs/nodes" },
         "edges": { "$ref": "#/$defs/edges" },
         "max_steps": { "type": "integer", "minimum": 1 }
@@ -57,15 +132,53 @@
           "registry_key": { "type": "string", "minLength": 1 },
           "status": { "enum": ["planned", "implemented"] },
           "flow_kind": { "enum": ["terminal", "process", "decision", "io", "predefined", "data_store", "document", "preparation"] },
-          "requires": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
-          "provides": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+          "planned_behavior": { "$ref": "#/$defs/plannedBehavior" },
+          "requires": { "type": "array", "items": { "$ref": "#/$defs/dataRequirement" } },
+          "provides": { "type": "array", "items": { "$ref": "#/$defs/dataProvider" } },
+          "config": { "type": "object" },
+          "node_configs": { "type": "object" },
+          "allow_config_override": { "type": "boolean" },
+          "override_child_config": { "type": "boolean" }
         },
         "anyOf": [
           { "required": ["type"] },
           { "required": ["registry_key"] },
           { "required": ["status", "flow_kind"], "properties": { "status": { "const": "planned" } } }
+        ],
+        "allOf": [
+          {
+            "if": { "properties": { "status": { "const": "planned" } }, "required": ["status"] },
+            "then": true,
+            "else": { "not": { "required": ["planned_behavior"] } }
+          }
         ]
       }
+    },
+    "scopedConfig": {
+      "type": "object",
+      "properties": {
+        "config": { "type": "object" },
+        "values": { "type": "object" },
+        "allow_config_override": { "type": "boolean" },
+        "override_child_config": { "type": "boolean" }
+      }
+    },
+    "plannedBehavior": {
+      "oneOf": [
+        { "enum": ["blocking", "transparent"] },
+        {
+          "type": "object",
+          "required": ["kind", "stub_module"],
+          "properties": {
+            "kind": { "const": "python_stub" },
+            "stub_module": {
+              "type": "string",
+              "pattern": "^project/stubs/[^.][^\\n\\r]*\\.py$"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "edges": {
       "type": "array",

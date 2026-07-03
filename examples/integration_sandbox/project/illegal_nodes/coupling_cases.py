@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from nodes.legal_math_nodes import ConstantNode
-from vibeflow import NodeContract, NodeInfo
+from vibeflow import DataProvider, NodeContract, NodeInfo
 
 
 class NodeImportNode:
@@ -14,7 +14,7 @@ class NodeImportNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        provides=("bad.out",),
+        provides=(DataProvider("bad.out", "bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
         output_schema={"bad.out": {"type": "number"}},
     )
@@ -33,7 +33,7 @@ class DirectNodeCallNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        provides=("bad.out",),
+        provides=(DataProvider("bad.out", "bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
         output_schema={"bad.out": {"type": "number"}},
     )
@@ -53,7 +53,7 @@ class NodeInternalReadNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        provides=("bad.out",),
+        provides=(DataProvider("bad.out", "bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
         output_schema={"bad.out": {"type": "number"}},
     )

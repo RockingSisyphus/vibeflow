@@ -1,15 +1,68 @@
 {
   "pipeline": {
     "nodes": [
-      {"name": "start", "type": "sandbox.start"},
-      {"name": "seed", "type": "sandbox.constant", "provides": ["value.in"], "value": 3},
-      {"name": "add", "type": "sandbox.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 4},
-      {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+      {
+        "name": "start",
+        "type": "sandbox.start"
+      },
+      {
+        "name": "seed",
+        "type": "sandbox.constant",
+        "provides": [
+          {
+            "key": "value.in",
+            "type": "value.in"
+          }
+        ],
+        "value": 3
+      },
+      {
+        "name": "add",
+        "type": "sandbox.add",
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out"
+          }
+        ],
+        "delta": 4
+      },
+      {
+        "name": "end",
+        "type": "sandbox.out_value_end",
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one"
+          }
+        ]
+      }
     ],
     "edges": [
-      {"from": "start", "to": "seed"},
-      {"from": "seed", "to": "add"},
-      {"from": "add", "to": "end"}
+      {
+        "from": "start",
+        "to": "seed"
+      },
+      {
+        "from": "seed",
+        "to": "add"
+      },
+      {
+        "from": "add",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one"
+      }
     ]
   }
 }

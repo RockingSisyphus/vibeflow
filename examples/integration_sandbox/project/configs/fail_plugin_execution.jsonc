@@ -1,10 +1,23 @@
 {
   "plugins": [
-    {"module": "../plugins/failing_plugins.py", "class": "RaisePolicyPlugin", "type": "policy"}
+    {
+      "module": "../plugins/failing_plugins.py",
+      "class": "RaisePolicyPlugin",
+      "type": "policy"
+    }
   ],
   "pipeline": {
     "nodes": [
-      {"name": "seed", "type": "sandbox.constant", "provides": ["value.in"]}
+      {
+        "name": "seed",
+        "type": "sandbox.constant",
+        "provides": [
+          {
+            "key": "value.in",
+            "type": "value.in"
+          }
+        ]
+      }
     ]
   }
 }

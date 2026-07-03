@@ -88,6 +88,8 @@ python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
 python run.py quality --path project
 ```
 
+SVG export passes an expanded Mermaid CLI render config. Normal graphs default to `maxTextSize=200000`; `--expand-nodesets` defaults to `maxTextSize=500000`. Very large graphs can override this with `--mermaid-max-text-size` and `--mermaid-max-edges`.
+
 ## AI Development Workflow 🛠️
 
 ```text
@@ -134,6 +136,8 @@ Program control flow comes only from `pipeline.edges` in JSONC config.
 
 `requires` / `provides` are data contracts, not hidden control-flow inference. This keeps multi-round AI edits from creating implicit paths and invisible dependencies.
 
+Data contracts use strict structured fields: `provides` declares a unique `key` and logical `type`, while `requires` consumes by `type` plus `cardinality`. Runtime passes envelopes through node inboxes and edge payloads; nodes cannot read early upstream outputs through a multi-hop global Context, and final results keep only `pipeline.outputs`.
+
 ### Small Nodes And Pure Logic
 
 Business nodes are pure by default:
@@ -173,10 +177,9 @@ Humans can review the system shape, and AI tools get a clearer project map.
 ## Repository Docs 📚
 
 - `docs/kernel_target_vision.md`: vision.
-- `docs/current_implementation_status.md`: current implementation status.
-- `docs/strict_kernel_design.md`: strict flowchart design.
 - `docs/developer_guide.md`: user development guide.
 - `docs/kernel_development_guide.md`: VibeFlow maintenance guide.
+- `docs/strict_flowchart_kernel_redesign.md`, `docs/11_*.md`, `docs/12_*.md`, `docs/13_*.md`: historical design records and staged plans, not the current public API.
 - `distribution/kernel_development_pack/`: release package template.
 
 ## License 📄

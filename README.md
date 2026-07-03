@@ -88,6 +88,8 @@ python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
 python run.py quality --path project
 ```
 
+`svg` 导出会为 Mermaid CLI 传入放大的渲染配置；普通图默认 `maxTextSize=200000`，`--expand-nodesets` 默认 `maxTextSize=500000`。超大图仍可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
+
 ## AI 开发工作流 🛠️
 
 ```text
@@ -134,6 +136,8 @@ VibeFlow 的核心是一个严格的流程图运行时：node 负责局部纯计
 
 `requires` / `provides` 只是数据契约，不会被偷偷推导成控制流。这样可以避免项目在多轮 AI 修改后出现隐式路径和隐藏依赖。
 
+数据契约使用严格结构化写法：`provides` 声明唯一 `key` 和逻辑 `type`，`requires` 按 `type` 和 `cardinality` 消费。运行时通过 node inbox / edge payload 传递 envelope，不支持跨多跳从全局 Context 偷读早期输出；最终结果只保留 `pipeline.outputs` 声明的内容。
+
 ### 小 node 和纯逻辑
 
 业务 node 默认必须是纯函数：
@@ -173,10 +177,9 @@ VibeFlow 会在运行前检查：
 ## 仓库文档 📚
 
 - `docs/kernel_target_vision.md`：目标愿景。
-- `docs/current_implementation_status.md`：当前实现状态。
-- `docs/strict_kernel_design.md`：严格流程图设计。
 - `docs/developer_guide.md`：使用者开发指南。
 - `docs/kernel_development_guide.md`：VibeFlow 自身维护指南。
+- `docs/strict_flowchart_kernel_redesign.md`、`docs/11_*.md`、`docs/12_*.md`、`docs/13_*.md`：历史设计记录和阶段计划，不作为当前公开接口规范。
 - `distribution/kernel_development_pack/`：发布包模板。
 
 ## 许可证 📄

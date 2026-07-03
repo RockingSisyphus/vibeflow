@@ -1,24 +1,201 @@
 {
   "pipeline": {
-    "inputs": ["calc.a", "calc.b", "calc.c", "calc.d"],
+    "inputs": [
+      {
+        "key": "calc.a",
+        "type": "calc.a"
+      },
+      {
+        "key": "calc.b",
+        "type": "calc.b"
+      },
+      {
+        "key": "calc.c",
+        "type": "calc.c"
+      },
+      {
+        "key": "calc.d",
+        "type": "calc.d"
+      }
+    ],
     "nodes": [
-      {"name": "start", "type": "sandbox.start"},
-      {"name": "add_pair", "type": "semantic.add_pair", "requires": ["calc.a", "calc.b"], "provides": ["calc.sum"]},
-      {"name": "scale", "type": "semantic.scale", "requires": ["calc.sum"], "provides": ["calc.scaled"], "factor": 3},
-      {"name": "compare", "type": "semantic.compare_gt", "requires": ["calc.c", "calc.d"], "provides": ["route.branch"]},
-      {"name": "left_adjust", "type": "semantic.left_adjust", "requires": ["calc.scaled"], "provides": ["calc.left_branch"], "bonus": 10},
-      {"name": "right_adjust", "type": "semantic.right_adjust", "requires": ["calc.scaled"], "provides": ["calc.right_branch"], "penalty": 6},
-      {"name": "left_end", "type": "semantic.left_branch_end", "requires": ["calc.left_branch"]},
-      {"name": "right_end", "type": "semantic.right_branch_end", "requires": ["calc.right_branch"]}
+      {
+        "name": "start",
+        "type": "sandbox.start"
+      },
+      {
+        "name": "add_pair",
+        "type": "semantic.add_pair",
+        "requires": [
+          {
+            "type": "calc.a",
+            "cardinality": "exactly_one"
+          },
+          {
+            "type": "calc.b",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.sum",
+            "type": "calc.sum"
+          }
+        ]
+      },
+      {
+        "name": "scale",
+        "type": "semantic.scale",
+        "requires": [
+          {
+            "type": "calc.sum",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.scaled",
+            "type": "calc.scaled"
+          }
+        ],
+        "factor": 3
+      },
+      {
+        "name": "compare",
+        "type": "semantic.compare_gt",
+        "requires": [
+          {
+            "type": "calc.c",
+            "cardinality": "exactly_one"
+          },
+          {
+            "type": "calc.d",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "route.branch",
+            "type": "route.branch"
+          }
+        ]
+      },
+      {
+        "name": "left_adjust",
+        "type": "semantic.left_adjust",
+        "requires": [
+          {
+            "type": "calc.scaled",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.left_branch",
+            "type": "calc.left_branch"
+          }
+        ],
+        "bonus": 10
+      },
+      {
+        "name": "right_adjust",
+        "type": "semantic.right_adjust",
+        "requires": [
+          {
+            "type": "calc.scaled",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.right_branch",
+            "type": "calc.right_branch"
+          }
+        ],
+        "penalty": 6
+      },
+      {
+        "name": "left_end",
+        "type": "semantic.left_branch_end",
+        "requires": [
+          {
+            "type": "calc.left_branch",
+            "cardinality": "exactly_one"
+          }
+        ]
+      },
+      {
+        "name": "right_end",
+        "type": "semantic.right_branch_end",
+        "requires": [
+          {
+            "type": "calc.right_branch",
+            "cardinality": "exactly_one"
+          }
+        ]
+      }
     ],
     "edges": [
-      {"from": "start", "to": "add_pair"},
-      {"from": "add_pair", "to": "scale"},
-      {"from": "scale", "to": "compare"},
-      {"from": "compare", "to": "left_adjust", "when": "route.branch == 'left'"},
-      {"from": "compare", "to": "right_adjust", "when": "route.branch == 'right'"},
-      {"from": "left_adjust", "to": "left_end"},
-      {"from": "right_adjust", "to": "right_end"}
+      {
+        "from": "start",
+        "to": "add_pair"
+      },
+      {
+        "from": "add_pair",
+        "to": "scale"
+      },
+      {
+        "from": "compare",
+        "to": "left_adjust",
+        "when": "route.branch == 'left'"
+      },
+      {
+        "from": "compare",
+        "to": "right_adjust",
+        "when": "route.branch == 'right'"
+      },
+      {
+        "from": "left_adjust",
+        "to": "left_end"
+      },
+      {
+        "from": "right_adjust",
+        "to": "right_end"
+      },
+      {
+        "from": "start",
+        "to": "compare"
+      },
+      {
+        "from": "scale",
+        "to": "left_adjust"
+      },
+      {
+        "from": "scale",
+        "to": "right_adjust"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "calc.left_branch",
+        "cardinality": "optional_one"
+      },
+      {
+        "type": "calc.right_branch",
+        "cardinality": "optional_one"
+      },
+      {
+        "type": "calc.scaled",
+        "cardinality": "optional_one"
+      },
+      {
+        "type": "calc.sum",
+        "cardinality": "optional_one"
+      },
+      {
+        "type": "route.branch",
+        "cardinality": "optional_one"
+      }
     ]
   }
 }

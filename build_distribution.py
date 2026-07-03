@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -17,11 +18,14 @@ STANDARD_PROJECT_DIRS = (
     "project/plugins",
     "project/configs",
     "project/configs/nodesets",
+    "project/stubs",
 )
 MANIFEST_RELATIVE = Path("kernel/MANIFEST.sha256")
+KERNEL_ZIP_RELATIVE = Path("kernel/vibeflow-kernel.zip")
 PROTECTED_FILES = (
     "run.py",
     "kernel/README.md",
+    KERNEL_ZIP_RELATIVE.as_posix(),
     "AGENTS.md",
     "README.md",
 )
@@ -48,7 +52,7 @@ def build_distribution(output: Path, *, replace: bool = True) -> None:
     _copy_mermaid_renderer_config(output)
     _copy_third_party_notices(output)
     _copy_extra_docs(output / "docs")
-    _copy_tree(ROOT / "src" / "vibeflow", output / "kernel" / "vibeflow")
+    _write_kernel_archive(ROOT / "src" / "vibeflow", output / KERNEL_ZIP_RELATIVE)
     _ensure_standard_project_dirs(output)
     _write_root_readme(output)
     _write_project_gitignore(output)
@@ -98,6 +102,21 @@ def _copy_third_party_notices(output: Path) -> None:
     source = ROOT / "THIRD_PARTY_NOTICES.md"
     if source.exists():
         (output / source.name).write_bytes(source.read_bytes())
+
+
+def _write_kernel_archive(source: Path, target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        for path in sorted(source.rglob("*"), key=lambda item: item.relative_to(source).as_posix()):
+            relative_to_package = path.relative_to(source)
+            if path.is_dir() or _ignored(relative_to_package):
+                continue
+            archive_relative = Path("vibeflow") / relative_to_package
+            info = zipfile.ZipInfo(archive_relative.as_posix())
+            info.date_time = (1980, 1, 1, 0, 0, 0)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            archive.writestr(info, path.read_bytes())
 
 
 def _write_kernel_manifest(output: Path) -> None:
@@ -162,7 +181,7 @@ def _write_root_readme(output: Path) -> None:
 
 这个目录可以整体复制到其他位置作为新项目起点。它已经包含：
 
-- `kernel/vibeflow/`：当前仓库最新内核源码副本。
+- `kernel/vibeflow-kernel.zip`：当前仓库最新内核源码归档，`run.py` 会直接从这个单文件导入。
 - `docs/`：中文开发文档。
 - `project/`：可直接运行的示例业务项目骨架。
 - `project/nodes/`、`project/base_lib/`、`project/plugins/`、`project/configs/`：AI 和开发者放业务代码与配置的标准目录。
@@ -183,6 +202,8 @@ python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
 python run.py quality --path project
 ```
 
+`svg` 默认会为 Mermaid CLI 放大渲染上限：普通图使用 `maxTextSize=200000`、`maxEdges=2000`；`--expand-nodesets` 使用 `maxTextSize=500000`、`maxEdges=5000`。超大图可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
+
 首次使用 `svg` 前，在分发目录执行一次：
 
 ```powershell
@@ -193,7 +214,7 @@ cd ../..
 
 ## Kernel 完整性检查
 
-分发包包含 `kernel/MANIFEST.sha256`。`run.py` 会在运行前校验 kernel、启动器和 AI 指引文件是否被修改。
+分发包包含 `kernel/MANIFEST.sha256`。`run.py` 会在运行前校验 kernel 归档、启动器和 AI 指引文件是否被修改。
 
 手动检查：
 

@@ -19,6 +19,7 @@ from .node import (
     FLOW_KIND_PROCESS,
     FLOW_KIND_TERMINAL,
 )
+from .planned_behavior import effective_planned_behavior, planned_behavior_label
 
 if TYPE_CHECKING:
     from .registry import NodeRegistry
@@ -142,13 +143,16 @@ class _Renderer:
         flow_kind = node_flow_kind(node, compiled) or (nodeset.flow_kind if nodeset else FLOW_KIND_PROCESS)
         details = [f"kind={flow_kind}", f"type={node.node_type}"]
         if node.status == STATUS_PLANNED:
-            details.append("status=planned")
+            behavior = effective_planned_behavior(node, nodeset)
+            details.append(f"status={planned_behavior_label(behavior).replace(' ', '_')}")
+            if behavior.stub_module:
+                details.append(f"stub={behavior.stub_module}")
         if self._node_is_external(node):
             details.append("external=true")
         if nodeset is None:
-            details.extend((f"requires={','.join(node.requires) or '-'}", f"provides={','.join(node.provides) or '-'}"))
+            details.extend((f"requires={_contract_text(node.requires)}", f"provides={_contract_text(node.provides)}"))
         else:
-            details.extend((f"requires={','.join(nodeset.requires or node.requires) or '-'}", f"provides={','.join(nodeset.provides or node.provides) or '-'}", f"exports={','.join(nodeset.exports) or '-'}"))
+            details.extend((f"requires={_contract_text(nodeset.requires or node.requires)}", f"provides={_contract_text(nodeset.provides or node.provides)}", f"exports={_contract_text(nodeset.exports)}"))
         return details
 
     def _render_findings(self, lines: list[str]) -> None:
@@ -167,7 +171,9 @@ class _Renderer:
     def _node_label(self, node: NodeSpec, flow_kind: str) -> tuple[str, ...]:
         lines = [_badge(flow_kind, node), node.name]
         if node.status == STATUS_PLANNED:
-            lines.append("PLANNED")
+            lines.append(planned_behavior_label(node.planned_behavior).upper())
+            if node.planned_behavior.stub_module:
+                lines.append(f"stub: {node.planned_behavior.stub_module}")
         if self._node_is_external(node):
             lines.append("external")
         return tuple(line for line in lines if line)
@@ -177,7 +183,10 @@ class _Renderer:
             return self._node_label(node, flow_kind)
         lines = [_badge(flow_kind, node), node.name]
         if node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED:
-            lines.append("PLANNED")
+            behavior = effective_planned_behavior(node, nodeset)
+            lines.append(planned_behavior_label(behavior).upper())
+            if behavior.stub_module:
+                lines.append(f"stub: {behavior.stub_module}")
         return tuple(line for line in lines if line)
 
     def _node_is_external(self, node: NodeSpec) -> bool:
@@ -225,3 +234,20 @@ def _health_findings(report: object | None) -> tuple[Mapping[str, Any], ...]:
         if isinstance(items, list):
             findings.extend(item for item in items if isinstance(item, Mapping))
     return tuple(findings)
+
+
+def _contract_text(values: tuple[object, ...]) -> str:
+    if not values:
+        return "-"
+    return ",".join(_contract_item_text(item) for item in values)
+
+
+def _contract_item_text(item: object) -> str:
+    key = getattr(item, "key", "")
+    data_type = getattr(item, "type", "")
+    cardinality = getattr(item, "cardinality", "")
+    if key and data_type:
+        return f"{key}->{data_type}"
+    if data_type and cardinality:
+        return f"{data_type}({cardinality})"
+    return str(item)

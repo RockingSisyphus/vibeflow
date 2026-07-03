@@ -7,21 +7,88 @@
       "description": "Bad recursive nodeset.",
       "version": "0.1.0",
       "purity": "pure",
-      "requires": ["value.in"],
-      "provides": ["value.out"],
-      "exports": ["value.out"],
+      "requires": [
+        {
+          "type": "value.in",
+          "cardinality": "exactly_one"
+        }
+      ],
+      "provides": [
+        {
+          "key": "value.out",
+          "type": "value.out"
+        }
+      ],
+      "exports": [
+        {
+          "key": "value.out",
+          "type": "value.out"
+        }
+      ],
       "pipeline": {
-        "inputs": ["value.in"],
+        "inputs": [
+          {
+            "key": "value.in",
+            "type": "value.in"
+          }
+        ],
         "nodes": [
-          {"name": "self", "type": "nodeset.bad.self", "requires": ["value.in"], "provides": ["value.out"]}
+          {
+            "name": "self",
+            "type": "nodeset.bad.self",
+            "requires": [
+              {
+                "type": "value.in",
+                "cardinality": "exactly_one"
+              }
+            ],
+            "provides": [
+              {
+                "key": "value.out",
+                "type": "value.out"
+              }
+            ]
+          }
+        ],
+        "outputs": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one"
+          }
         ]
       }
     }
   ],
   "pipeline": {
-    "inputs": ["value.in"],
+    "inputs": [
+      {
+        "key": "value.in",
+        "type": "value.in"
+      }
+    ],
     "nodes": [
-      {"name": "self", "type": "nodeset.bad.self", "requires": ["value.in"], "provides": ["value.out"]}
+      {
+        "name": "self",
+        "type": "nodeset.bad.self",
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.in",
+        "cardinality": "exactly_one"
+      }
     ]
   }
 }

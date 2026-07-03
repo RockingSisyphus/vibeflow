@@ -7,23 +7,80 @@
       "description": "Composite nodeset that adds one to value.in.",
       "version": "0.1.0",
       "purity": "pure",
-      "requires": ["value.in"],
-      "provides": ["value.out"],
-      "exports": ["value.out"],
+      "requires": [
+        {
+          "type": "value.in",
+          "cardinality": "exactly_one"
+        }
+      ],
+      "provides": [
+        {
+          "key": "value.out",
+          "type": "value.out"
+        }
+      ],
+      "exports": [
+        {
+          "key": "value.out",
+          "type": "value.out"
+        }
+      ],
       "pipeline": {
-        "inputs": ["value.in"],
+        "inputs": [
+          {
+            "key": "value.in",
+            "type": "value.in"
+          }
+        ],
         "nodes": [
-          {"name": "start", "type": "example.start"},
+          {
+            "name": "start",
+            "type": "example.start"
+          },
           {
             "name": "add_one",
             "type": "example.add",
-            "requires": ["value.in"],
-            "provides": ["value.out"],
+            "requires": [
+              {
+                "type": "value.in",
+                "cardinality": "exactly_one"
+              }
+            ],
+            "provides": [
+              {
+                "key": "value.out",
+                "type": "value.out"
+              }
+            ],
             "delta": 1
           },
-          {"name": "end", "type": "example.end", "requires": ["value.out"]}
+          {
+            "name": "end",
+            "type": "example.end",
+            "requires": [
+              {
+                "type": "value.out",
+                "cardinality": "exactly_one"
+              }
+            ]
+          }
         ],
-        "edges": [["start", "add_one"], ["add_one", "end"]]
+        "edges": [
+          [
+            "start",
+            "add_one"
+          ],
+          [
+            "add_one",
+            "end"
+          ]
+        ],
+        "outputs": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one"
+          }
+        ]
       }
     }
   ]

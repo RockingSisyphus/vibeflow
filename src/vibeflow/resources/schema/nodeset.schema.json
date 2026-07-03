@@ -13,12 +13,64 @@
     "purity": { "type": "string", "const": "pure" },
     "status": { "enum": ["planned", "implemented"] },
     "flow_kind": { "enum": ["terminal", "process", "decision", "io", "predefined", "data_store", "document", "preparation"] },
-    "requires": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
-    "provides": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
-    "exports": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "planned_behavior": {
+      "oneOf": [
+        { "enum": ["blocking", "transparent"] },
+        {
+          "type": "object",
+          "required": ["kind", "stub_module"],
+          "properties": {
+            "kind": { "const": "python_stub" },
+            "stub_module": {
+              "type": "string",
+              "pattern": "^project/stubs/[^.][^\\n\\r]*\\.py$"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "requires": { "$ref": "#/$defs/requires" },
+    "provides": { "$ref": "#/$defs/provides" },
+    "exports": { "$ref": "#/$defs/exports" },
+    "global_config": {
+      "type": "object",
+      "properties": {
+        "config": { "type": "object" },
+        "values": { "type": "object" },
+        "allow_config_override": { "type": "boolean" },
+        "override_child_config": { "type": "boolean" }
+      }
+    },
     "pipeline": { "$ref": "config.schema.json#/$defs/pipeline" }
+  },
+  "$defs": {
+    "dataProvider": {
+      "type": "object",
+      "required": ["key", "type"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "dataRequirement": {
+      "type": "object",
+      "required": ["type", "cardinality"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "cardinality": { "enum": ["exactly_one", "optional_one", "all"] }
+      },
+      "additionalProperties": false
+    },
+    "requires": { "type": "array", "items": { "$ref": "#/$defs/dataRequirement" } },
+    "provides": { "type": "array", "items": { "$ref": "#/$defs/dataProvider" } },
+    "exports": { "type": "array", "items": { "$ref": "#/$defs/dataProvider" } }
   },
   "if": { "properties": { "status": { "const": "planned" } }, "required": ["status"] },
   "then": { "required": ["name"] },
-  "else": { "required": ["name", "display_name", "category", "description", "version", "purity", "provides", "exports", "pipeline"] }
+  "else": {
+    "required": ["name", "display_name", "category", "description", "version", "purity", "provides", "exports", "pipeline"],
+    "not": { "required": ["planned_behavior"] }
+  }
 }

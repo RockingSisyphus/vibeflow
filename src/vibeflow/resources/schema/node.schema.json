@@ -30,14 +30,32 @@
       "type": "object",
       "required": ["requires", "provides", "input_semantics", "output_semantics", "params_schema", "output_schema"],
       "properties": {
-        "requires": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
-        "provides": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "requires": { "type": "array", "items": { "$ref": "#/$defs/dataRequirement" } },
+        "provides": { "type": "array", "items": { "$ref": "#/$defs/dataProvider" } },
         "input_semantics": { "type": "object" },
         "output_semantics": { "type": "object" },
         "params_schema": { "type": "object" },
         "output_schema": { "type": "object" },
         "examples": { "type": "array", "items": { "type": "object" } }
       }
+    },
+    "dataProvider": {
+      "type": "object",
+      "required": ["key", "type"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "dataRequirement": {
+      "type": "object",
+      "required": ["type", "cardinality"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "cardinality": { "enum": ["exactly_one", "optional_one", "all"] }
+      },
+      "additionalProperties": false
     }
   }
 }

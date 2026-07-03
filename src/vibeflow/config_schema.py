@@ -4,6 +4,7 @@ from typing import Any, Mapping
 
 from .health_types import HealthFinding
 from .node import FLOW_KINDS
+from .planned_behavior import PLANNED_BEHAVIOR_BLOCKING, PLANNED_BEHAVIOR_PYTHON_STUB, PLANNED_BEHAVIOR_TRANSPARENT, validate_stub_module_ref
 from .schema_findings import schema_finding
 
 STATUSES = {"planned", "implemented"}
@@ -22,6 +23,10 @@ def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFin
         _validate_nodeset_imports(config["nodeset_imports"], findings)
     if "boundary" in config:
         findings.append(_error("CONFIG.BOUNDARY.REMOVED", "boundary is removed; use terminal/io/data_store/document nodes", "boundary"))
+    if "global_config" in config:
+        _validate_global_config(config["global_config"], "global_config", findings)
+    if "base_lib" in config:
+        _validate_base_lib_resources(config["base_lib"], findings)
     if "plugins" in config:
         _validate_plugins(config["plugins"], findings)
     if "policy" in config:
@@ -70,6 +75,7 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
         return
     status = str(value.get("status", "implemented")).strip()
     _validate_node_identity(value, prefix, findings, status=status)
+    _validate_planned_behavior(value, prefix, findings, status=status)
     _validate_node_contract_fields(value, prefix, findings)
     _validate_node_config_fields(value, prefix, findings)
     _validate_node_async_fields(value, prefix, findings)
@@ -97,9 +103,10 @@ def _validate_node_identity(value: Mapping[str, Any], prefix: str, findings: lis
 
 
 def _validate_node_contract_fields(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
-    for field in ("requires", "provides"):
-        if field in value:
-            _validate_string_list(value[field], f"{prefix}.{field}", findings, f"CONFIG.SCHEMA.NODE_{field.upper()}_LIST")
+    if "requires" in value:
+        _validate_requirement_list(value["requires"], f"{prefix}.requires", findings, "CONFIG.SCHEMA.NODE_REQUIRES_LIST")
+    if "provides" in value:
+        _validate_provider_list(value["provides"], f"{prefix}.provides", findings, "CONFIG.SCHEMA.NODE_PROVIDES_LIST")
 
 
 def _validate_node_config_fields(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
@@ -107,6 +114,9 @@ def _validate_node_config_fields(value: Mapping[str, Any], prefix: str, findings
         findings.append(_error("CONFIG.SCHEMA.NODE_CONFIG_OBJECT", f"{prefix}.config must be an object", f"{prefix}.config"))
     if "node_configs" in value:
         _validate_node_configs(value["node_configs"], f"{prefix}.node_configs", findings)
+    for field in ("allow_config_override", "override_child_config"):
+        if field in value and not isinstance(value[field], bool):
+            findings.append(_error("CONFIG.SCHEMA.CONFIG_OVERRIDE_FLAG", f"{prefix}.{field} must be a boolean", f"{prefix}.{field}"))
 
 
 def _validate_node_async_fields(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
@@ -116,10 +126,37 @@ def _validate_node_async_fields(value: Mapping[str, Any], prefix: str, findings:
     result_key = value.get("result_key", "")
     if mode == "result_key" and not _non_empty_string(result_key):
         findings.append(_error("CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY", f"{prefix}.result_key is required when async is 'result_key'", f"{prefix}.result_key"))
-    if mode == "result_key" and _non_empty_string(result_key) and str(result_key).strip() not in _string_items(value.get("provides", [])):
+    if mode == "result_key" and _non_empty_string(result_key) and str(result_key).strip() not in _provider_keys(value.get("provides", [])):
         findings.append(_error("CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY", f"{prefix}.result_key must be declared in provides", f"{prefix}.result_key"))
     if mode != "result_key" and result_key:
         findings.append(_error("CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY", f"{prefix}.result_key requires async='result_key'", f"{prefix}.result_key"))
+
+
+def _validate_planned_behavior(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
+    if "planned_behavior" not in value:
+        return
+    if status != "planned":
+        findings.append(_error("GRAPH.PLANNED.BEHAVIOR_IMPLEMENTED", f"{prefix}.planned_behavior is only allowed for planned nodes/nodesets", f"{prefix}.planned_behavior"))
+        return
+    behavior = value["planned_behavior"]
+    if isinstance(behavior, str):
+        if behavior not in {PLANNED_BEHAVIOR_BLOCKING, PLANNED_BEHAVIOR_TRANSPARENT}:
+            findings.append(_error("GRAPH.PLANNED.BEHAVIOR_INVALID", f"{prefix}.planned_behavior must be blocking, transparent, or a python_stub object", f"{prefix}.planned_behavior"))
+        return
+    if not isinstance(behavior, Mapping):
+        findings.append(_error("GRAPH.PLANNED.BEHAVIOR_INVALID", f"{prefix}.planned_behavior must be a string or object", f"{prefix}.planned_behavior"))
+        return
+    kind = str(behavior.get("kind", "")).strip()
+    if kind != PLANNED_BEHAVIOR_PYTHON_STUB:
+        findings.append(_error("GRAPH.PLANNED.BEHAVIOR_INVALID", f"{prefix}.planned_behavior.kind must be python_stub", f"{prefix}.planned_behavior.kind"))
+        return
+    stub_module = behavior.get("stub_module")
+    if not _non_empty_string(stub_module):
+        findings.append(_error("GRAPH.PLANNED.STUB_MODULE", f"{prefix}.planned_behavior.stub_module is required", f"{prefix}.planned_behavior.stub_module"))
+        return
+    path_error = validate_stub_module_ref(str(stub_module))
+    if path_error:
+        findings.append(_error("GRAPH.PLANNED.STUB_MODULE", f"{prefix}.planned_behavior.stub_module {path_error}", f"{prefix}.planned_behavior.stub_module"))
 
 
 def _validate_edge(value: Any, prefix: str, findings: list[HealthFinding]) -> None:
@@ -173,6 +210,9 @@ def _validate_nodeset(item: Mapping[str, Any], prefix: str, findings: list[Healt
     _validate_nodeset_identity(item, prefix, findings, status=status)
     _validate_nodeset_metadata(item, prefix, findings, status=status)
     _validate_nodeset_contract(item, prefix, findings, status=status)
+    _validate_planned_behavior(item, prefix, findings, status=status)
+    if "global_config" in item:
+        _validate_global_config(item["global_config"], f"{prefix}.global_config", findings)
     _validate_nodeset_pipeline(item, prefix, findings, status=status)
 
 
@@ -199,7 +239,10 @@ def _validate_nodeset_contract(item: Mapping[str, Any], prefix: str, findings: l
         if status != "planned" and required_field not in item:
             findings.append(_error("CONFIG.SCHEMA.NODESET_CONTRACT", f"{prefix}.{required_field} must be declared", f"{prefix}.{required_field}"))
         if required_field in item:
-            _validate_string_list(item[required_field], f"{prefix}.{required_field}", findings, "CONFIG.SCHEMA.NODESET_CONTRACT_LIST")
+            if required_field == "requires":
+                _validate_requirement_list(item[required_field], f"{prefix}.{required_field}", findings, "CONFIG.SCHEMA.NODESET_CONTRACT_LIST")
+            else:
+                _validate_provider_list(item[required_field], f"{prefix}.{required_field}", findings, "CONFIG.SCHEMA.NODESET_CONTRACT_LIST")
 
 
 def _validate_nodeset_pipeline(item: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
@@ -308,8 +351,13 @@ def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
         if not isinstance(item, Mapping):
             findings.append(_error("CONFIG.SCHEMA.PLUGIN_OBJECT", f"{prefix} must be a string or object", prefix))
             continue
-        if not _non_empty_string(item.get("module", item.get("path"))):
+        status = str(item.get("status", "implemented")).strip() or "implemented"
+        if status not in STATUSES:
+            findings.append(_error("CONFIG.SCHEMA.RESOURCE_STATUS", f"{prefix}.status must be implemented or planned", f"{prefix}.status"))
+        if status == "implemented" and not _non_empty_string(item.get("module", item.get("path"))):
             findings.append(_error("CONFIG.SCHEMA.PLUGIN_MODULE", f"{prefix}.module or path must be a non-empty string", f"{prefix}.module"))
+        if status == "planned" and not (_non_empty_string(item.get("module", item.get("path"))) or _non_empty_string(item.get("name"))):
+            findings.append(_error("CONFIG.SCHEMA.PLUGIN_PLANNED_ID", f"{prefix} planned plugin must define module/path or name", prefix))
         if "class" in item and not _non_empty_string(item["class"]):
             findings.append(_error("CONFIG.SCHEMA.PLUGIN_CLASS", f"{prefix}.class must be a non-empty string", f"{prefix}.class"))
         if item.get("type", "policy") == "boundary":
@@ -320,6 +368,52 @@ def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
             _validate_positive_int(item["priority"], f"{prefix}.priority", findings, "CONFIG.SCHEMA.PLUGIN_PRIORITY")
         if item.get("conflict", "error") not in {"error", "replace"}:
             findings.append(_error("CONFIG.SCHEMA.PLUGIN_CONFLICT", f"{prefix}.conflict must be error or replace", f"{prefix}.conflict"))
+        if "config" in item and not isinstance(item["config"], Mapping):
+            findings.append(_error("CONFIG.SCHEMA.PLUGIN_CONFIG", f"{prefix}.config must be an object", f"{prefix}.config"))
+        if "settings" in item and not isinstance(item["settings"], Mapping):
+            findings.append(_error("CONFIG.SCHEMA.PLUGIN_CONFIG", f"{prefix}.settings must be an object", f"{prefix}.settings"))
+
+
+def _validate_base_lib_resources(value: Any, findings: list[HealthFinding]) -> None:
+    if not isinstance(value, Mapping):
+        findings.append(_error("CONFIG.SCHEMA.BASE_LIB", "base_lib must be an object", "base_lib"))
+        return
+    if "paths" in value:
+        _validate_string_list(value["paths"], "base_lib.paths", findings, "CONFIG.SCHEMA.BASE_LIB_PATHS")
+    if "modules" not in value:
+        return
+    modules = value["modules"]
+    if not isinstance(modules, list):
+        findings.append(_error("CONFIG.SCHEMA.BASE_LIB_MODULES", "base_lib.modules must be a list", "base_lib.modules"))
+        return
+    for index, item in enumerate(modules):
+        prefix = f"base_lib.modules[{index}]"
+        if isinstance(item, str):
+            if not item.strip():
+                findings.append(_error("CONFIG.SCHEMA.BASE_LIB_MODULE", f"{prefix} must be a non-empty module string", prefix))
+            continue
+        if not isinstance(item, Mapping):
+            findings.append(_error("CONFIG.SCHEMA.BASE_LIB_MODULE", f"{prefix} must be a string or object", prefix))
+            continue
+        if not (_non_empty_string(item.get("module")) or _non_empty_string(item.get("name"))):
+            findings.append(_error("CONFIG.SCHEMA.BASE_LIB_MODULE", f"{prefix}.module or name must be a non-empty string", f"{prefix}.module"))
+        status = str(item.get("status", "implemented")).strip() or "implemented"
+        if status not in STATUSES:
+            findings.append(_error("CONFIG.SCHEMA.RESOURCE_STATUS", f"{prefix}.status must be implemented or planned", f"{prefix}.status"))
+        if "description" in item and not isinstance(item["description"], str):
+            findings.append(_error("CONFIG.SCHEMA.RESOURCE_DESCRIPTION", f"{prefix}.description must be a string", f"{prefix}.description"))
+
+
+def _validate_global_config(value: Any, prefix: str, findings: list[HealthFinding]) -> None:
+    if not isinstance(value, Mapping):
+        findings.append(_error("CONFIG.SCHEMA.GLOBAL_CONFIG", f"{prefix} must be an object", prefix))
+        return
+    for field in ("allow_config_override", "override_child_config"):
+        if field in value and not isinstance(value[field], bool):
+            findings.append(_error("CONFIG.SCHEMA.CONFIG_OVERRIDE_FLAG", f"{prefix}.{field} must be a boolean", f"{prefix}.{field}"))
+    for field in ("config", "values"):
+        if field in value and not isinstance(value[field], Mapping):
+            findings.append(_error("CONFIG.SCHEMA.GLOBAL_CONFIG_VALUES", f"{prefix}.{field} must be an object", f"{prefix}.{field}"))
 
 
 def _validate_node_configs(value: Any, prefix: str, findings: list[HealthFinding]) -> None:
@@ -369,6 +463,54 @@ def _validate_string_list(
 ) -> None:
     if not isinstance(value, list) or any(not _non_empty_string(item) for item in value):
         findings.append(_error(rule_id, f"{object_id} must be a list of non-empty strings", object_id, rule_source=rule_source))
+
+
+def _validate_provider_list(value: Any, object_id: str, findings: list[HealthFinding], rule_id: str) -> None:
+    if not isinstance(value, list):
+        findings.append(_error(rule_id, f"{object_id} must be a list of provider objects", object_id))
+        return
+    seen: set[str] = set()
+    for index, item in enumerate(value):
+        item_id = f"{object_id}[{index}]"
+        if not isinstance(item, Mapping):
+            findings.append(_error(rule_id, f"{item_id} must be an object with key and type", item_id))
+            continue
+        if set(item) - {"key", "type"}:
+            findings.append(_error(rule_id, f"{item_id} must only contain key and type", item_id))
+        key = str(item.get("key", "")).strip()
+        data_type = str(item.get("type", "")).strip()
+        if not key or not data_type:
+            findings.append(_error(rule_id, f"{item_id} must declare non-empty key and type", item_id))
+        if key in seen:
+            findings.append(_error(rule_id, f"{object_id} contains duplicate provider key: {key}", item_id))
+        seen.add(key)
+
+
+def _validate_requirement_list(value: Any, object_id: str, findings: list[HealthFinding], rule_id: str) -> None:
+    if not isinstance(value, list):
+        findings.append(_error(rule_id, f"{object_id} must be a list of requirement objects", object_id))
+        return
+    seen: set[str] = set()
+    for index, item in enumerate(value):
+        item_id = f"{object_id}[{index}]"
+        if not isinstance(item, Mapping):
+            findings.append(_error(rule_id, f"{item_id} must be an object with type and cardinality", item_id))
+            continue
+        if set(item) - {"type", "cardinality"}:
+            findings.append(_error(rule_id, f"{item_id} must only contain type and cardinality", item_id))
+        data_type = str(item.get("type", "")).strip()
+        cardinality = str(item.get("cardinality", "")).strip()
+        if not data_type or cardinality not in {"exactly_one", "optional_one", "all"}:
+            findings.append(_error(rule_id, f"{item_id} must declare non-empty type and valid cardinality", item_id))
+        if data_type in seen:
+            findings.append(_error(rule_id, f"{object_id} contains duplicate requirement type: {data_type}", item_id))
+        seen.add(data_type)
+
+
+def _provider_keys(value: Any) -> set[str]:
+    if not isinstance(value, list):
+        return set()
+    return {str(item.get("key", "")).strip() for item in value if isinstance(item, Mapping) and _non_empty_string(item.get("key"))}
 
 
 def _string_items(value: Any) -> set[str]:

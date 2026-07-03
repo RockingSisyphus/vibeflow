@@ -4,11 +4,10 @@
 
 推荐分发方式：
 
-1. 复制本目录的 `docs/` 到新项目。
-2. 复制仓库的 `src/vibeflow/` 到新项目的 `kernel/vibeflow/`。
-3. 复制 `project_template/` 作为新项目骨架。
-4. 在新项目里开发 `project/nodes/`、`project/base_lib/`、`project/plugins/` 和 `project/configs/*.jsonc`。
-5. 用模板里的 `run.py` 启动检查、运行和图形导出。
+1. 在仓库根目录运行 `python build_distribution.py`。
+2. 复制生成的 `vibeflow_distribution/` 作为新项目骨架。
+3. 在新项目里开发 `project/nodes/`、`project/base_lib/`、`project/plugins/` 和 `project/configs/*.jsonc`。
+4. 用模板里的 `run.py` 启动检查、运行和图形导出。
 
 复制后的推荐结构：
 
@@ -16,7 +15,8 @@
 my_project/
   docs/
   kernel/
-    vibeflow/
+    vibeflow-kernel.zip
+    MANIFEST.sha256
   project/
     nodes/
     base_lib/
@@ -41,6 +41,8 @@ python run.py mermaid --config project/configs/main.jsonc --output reports/graph
 python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
 python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
 ```
+
+`svg` 默认会为 Mermaid CLI 放大渲染上限：普通图使用 `maxTextSize=200000`、`maxEdges=2000`；`--expand-nodesets` 使用 `maxTextSize=500000`、`maxEdges=5000`。超大图可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
 
 `svg` 命令依赖 `tools/mermaid-renderer/` 中的 Mermaid CLI。首次使用前运行：
 

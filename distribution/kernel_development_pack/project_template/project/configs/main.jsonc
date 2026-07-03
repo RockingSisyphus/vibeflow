@@ -1,6 +1,21 @@
 {
+  "base_lib": {
+    "paths": [
+      "../base_lib"
+    ],
+    "modules": [
+      {
+        "module": "base_lib.math_tools",
+        "status": "implemented"
+      }
+    ]
+  },
   "plugins": [
-    {"module": "../plugins/policy.py", "class": "PolicyPlugin", "type": "policy"}
+    {
+      "module": "../plugins/policy.py",
+      "class": "PolicyPlugin",
+      "type": "policy"
+    }
   ],
   "pipeline": {
     "nodes": [
@@ -11,22 +26,65 @@
       {
         "name": "seed",
         "type": "demo.seed",
-        "provides": ["value.in"],
-        "config": {"value": 2}
+        "provides": [
+          {
+            "key": "value.in",
+            "type": "value.in"
+          }
+        ],
+        "config": {
+          "value": 2
+        }
       },
       {
         "name": "add",
         "type": "demo.add",
-        "requires": ["value.in"],
-        "provides": ["value.out"],
-        "config": {"delta": 3}
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out"
+          }
+        ],
+        "config": {
+          "delta": 3
+        }
       },
       {
         "name": "end",
         "type": "demo.end",
-        "requires": ["value.out"]
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one"
+          }
+        ]
       }
     ],
-    "edges": [["start", "seed"], ["seed", "add"], ["add", "end"]]
+    "edges": [
+      [
+        "start",
+        "seed"
+      ],
+      [
+        "seed",
+        "add"
+      ],
+      [
+        "add",
+        "end"
+      ]
+    ],
+    "outputs": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one"
+      }
+    ]
   }
 }

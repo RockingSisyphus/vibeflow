@@ -7,8 +7,9 @@
 ```jsonc
 {
   "plugins": [
-    {"module": "plugins/policy.py", "class": "PolicyPlugin", "type": "policy"},
-    {"module": "plugins/runtime.py", "class": "RuntimePlugin", "type": "runtime"}
+    {"module": "plugins/policy.py", "class": "PolicyPlugin", "type": "policy", "config": {"level": "strict"}},
+    {"module": "plugins/runtime.py", "class": "RuntimePlugin", "type": "runtime"},
+    {"name": "future_runtime_plugin", "type": "runtime", "status": "planned", "description": "planned runtime hook"}
   ]
 }
 ```
@@ -20,36 +21,98 @@
 - `type`：`policy`、`compiler`、`runtime` 之一。
 - `priority`：数字越小越先执行。
 - `enabled`：设为 `false` 时跳过。
+- `status`：`implemented` 或 `planned`，默认 `implemented`。
+- `config` / `settings`：传给插件的设置对象。
 - `conflict`：重复插件名时可设为 `replace`。
+- `name`：可覆盖插件实例的 `name`。
+- `scope`：默认 `project`，会出现在插件描述信息中。
+- `description`：planned 插件可用它在 Mermaid 中说明用途。
 
 `boundary` 插件类型已移除。
+
+`module` 既可以是模块名，也可以是 `.py` 文件路径。写成路径时，相对当前 config 文件所在目录解析。模板里 `project/configs/main.jsonc` 引用插件时通常写 `../plugins/policy.py`。
+
+implemented plugin 必须暴露 `PLUGIN_INFO`，用于 inspect 和 Mermaid 展示名称、类别、版本和功能说明。planned plugin 可以不存在、不会加载、不会注册到 `PluginRegistry`，也不会执行任何 policy/compiler/runtime hook。
+
+插件设置传递规则：
+
+- 加载后实例会有 `plugin.config`。
+- 如果插件实现了 `configure(config)`，内核会在注册前调用。
+- `config` 和 `settings` 只能写对象。
 
 ## PolicyPlugin
 
 ```python
+from vibeflow import PluginInfo
+
+
 class PolicyPlugin:
+    PLUGIN_INFO = PluginInfo(
+        name="project_policy",
+        plugin_type="policy",
+        display_name="Project Policy",
+        category="policy",
+        description="Project policy extension point.",
+        version="0.1.0",
+    )
     name = "project_policy"
     priority = 10
 
     def extend_policy(self, policy):
-        return {
-            "policy": {
-                "base_lib": {
-                    "allowed_paths": ["../base_lib"],
-                    "allowed_modules": ["base_lib"]
-                }
-            }
-        }
+        return None
 ```
 
 放宽限制时必须带 `relaxations`，否则会被拒绝。
+
+示例：
+
+```python
+from vibeflow import PluginInfo
+
+
+class PolicyPlugin:
+    PLUGIN_INFO = PluginInfo("temporary_policy", "policy", "Temporary Policy", "policy", "Temporary audited downgrade.", "0.1.0")
+    name = "temporary_policy"
+    priority = 20
+
+    def extend_policy(self, policy):
+        return {
+            "policy": {
+                "rules": {
+                    "downgrades": [
+                        {
+                            "rule_id": "GRAPH.SMELL.DUPLICATE_LOGIC",
+                            "scope": {"object_type": "node"},
+                            "to": "warning",
+                            "reason": "terminal start/end both return empty mapping",
+                            "expires": "2026-12-31"
+                        }
+                    ]
+                }
+            },
+            "relaxations": [
+                {
+                    "rule_id": "GRAPH.SMELL.DUPLICATE_LOGIC",
+                    "scope": {"object_type": "node"},
+                    "reason": "demo terminal nodes intentionally share empty logic",
+                    "source": "project policy"
+                }
+            ]
+        }
+```
+
+只能放宽 `rules.downgradeable` 中列出的规则。不能通过 plugin 放宽硬错误。
 
 Policy plugin 也可以追加健康 finding，例如项目级命名规范、领域语义检查、特殊 nodeset 宽度限制等。
 
 ## CompilerPlugin
 
 ```python
+from vibeflow import PluginInfo
+
+
 class CompilerPlugin:
+    PLUGIN_INFO = PluginInfo("compile_hook", "compiler", "Compile Hook", "compiler", "Observes compiler hooks.", "0.1.0")
     name = "compile_hook"
     priority = 10
 
@@ -62,10 +125,21 @@ class CompilerPlugin:
 
 Compiler plugin 可观察或追加编译期检查，但不能把非法 graph 改成合法 graph 后绕过内核规则。
 
+实际 hook 签名：
+
+- `before_compile(graph)`
+- `after_compile(graph, compiled)`
+
+如果 compiler plugin 抛异常，编译失败，健康报告会显示 `GRAPH.COMPILE` 相关错误。
+
 ## RuntimePlugin
 
 ```python
+from vibeflow import PluginInfo
+
+
 class RuntimePlugin:
+    PLUGIN_INFO = PluginInfo("runtime_hook", "runtime", "Runtime Hook", "runtime", "Observes runtime hooks.", "0.1.0")
     name = "runtime_hook"
     priority = 10
 
@@ -90,15 +164,33 @@ class RuntimePlugin:
 
 Runtime plugin 适合记录观测数据、附加 trace、统计耗时或上报进度。它不应执行业务副作用来替代 `io` / `data_store` / `document` 节点的显式契约。
 
+实际 runtime hook 签名：
+
+- `before_run(context_dict)`
+- `after_run(context_dict, trace_dict)`
+- `run_failed(context_dict, trace_dict, message)`
+- `before_node(name, node_type, input_summary)`
+- `after_node(name, node_type, output_summary)`
+- `node_failed(name, node_type, message)`
+- `before_nodeset(name, node_type)`
+- `after_nodeset(name, node_type)`
+- `nodeset_failed(name, node_type, message)`
+- `before_block(block_name, block_nodes)`
+- `after_block(block_name, block_nodes)`
+- `block_failed(block_name, block_nodes, message)`
+
+这些 hook 是否执行受 `RuntimeOptions` 和 CLI runtime flags 控制，例如 `--node-hooks/--no-node-hooks`。
+
 ## Finding plugin
 
 policy 插件也可以提供额外健康检查 hook，例如：
 
 ```python
-from vibeflow import HealthFinding
+from vibeflow import HealthFinding, PluginInfo
 
 
 class ProjectFindingPlugin:
+    PLUGIN_INFO = PluginInfo("project_findings", "policy", "Project Findings", "policy", "Adds project-specific health findings.", "0.1.0")
     name = "project_findings"
     priority = 20
 
@@ -117,3 +209,20 @@ class ProjectFindingPlugin:
 ```
 
 插件异常会导致运行拒绝。插件应保持小而明确。
+
+实际健康检查 hook：
+
+- `validate_node(spec, node_cls, metrics_dict)`
+- `validate_graph(graph, compiled)`
+- `validate_nodeset(nodeset)`
+
+这些 hook 必须返回 `list[HealthFinding]` 或 `tuple[HealthFinding, ...]`；返回其他类型或非 `HealthFinding` 项会产生 plugin error。
+
+## 插件错误排查
+
+- `PLUGIN.LOAD`：模块路径、类名或工厂返回值错误；检查 `module`、`class`、相对路径。
+- `PLUGIN.CONFIG.SCHEMA`：`plugins` 字段不是 list，或某一项不是字符串/对象。
+- `PLUGIN.POLICY.SHAPE`：`extend_policy` 返回值不是对象，或 `policy` 字段不是对象。
+- `PLUGIN.POLICY.RELAXATION_REQUIRED`：插件放宽了限制但没声明完整 `relaxations`。
+- `PLUGIN.POLICY.ABSOLUTE_RULE`：试图放宽不可降级规则。
+- `PLUGIN.EXECUTION`：插件 hook 抛异常。优先修插件，不要绕过内核校验。

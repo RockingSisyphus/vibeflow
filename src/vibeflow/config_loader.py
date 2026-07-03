@@ -96,7 +96,7 @@ def _expand_nodeset_imports(
         if not isinstance(raw_nodesets, list) or not raw_nodesets:
             raise _nodeset_import_error("CONFIG.NODESET_IMPORT.EMPTY", f"nodeset import has no nodesets: {import_path}", import_path)
         selected = _select_imported_nodesets(raw_nodesets, names, import_path)
-        imported_nodesets.extend(deepcopy(selected))
+        imported_nodesets.extend(_nodesets_with_file_global_config(selected, document.data.get("global_config")))
         import_records.append(
             {
                 "path": str(import_path),
@@ -151,6 +151,16 @@ def _select_imported_nodesets(nodesets: list[object], names: tuple[str, ...], pa
     if missing:
         raise _nodeset_import_error("CONFIG.NODESET_IMPORT.MISSING_NAME", f"nodeset import missing names {missing}: {path}", path)
     return [by_name[name] for name in names]
+
+
+def _nodesets_with_file_global_config(nodesets: list[object], global_config: object) -> list[object]:
+    copied = deepcopy(nodesets)
+    if not isinstance(global_config, Mapping) or not global_config:
+        return copied
+    for item in copied:
+        if isinstance(item, dict) and "global_config" not in item:
+            item["global_config"] = deepcopy(global_config)
+    return copied
 
 
 def _validate_unique_nodeset_names(nodesets: list[object], path: Path) -> None:

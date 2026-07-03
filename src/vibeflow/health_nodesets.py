@@ -5,6 +5,7 @@ from typing import Mapping
 from .compiler import GraphCompiler, GraphCompileError
 from .graph_config import GraphConfig, STATUS_PLANNED
 from .health_types import HealthFinding
+from .data_contract import provider_keys, providers_to_dicts, requirement_types, requirements_to_dicts
 from .registry import NodeRegistry, NodeRegistryError
 
 
@@ -119,7 +120,7 @@ def _validate_nodeset_usages(nodes, nodesets, *, owner: str) -> tuple[HealthFind
                     f"nodeset node '{node.name}' requires must match nodeset requires",
                     object_type="node",
                     object_id=node.name,
-                    details={"expected_requires": list(nodeset.requires), "actual_requires": list(node.requires), "owner": owner},
+                    details={"expected_requires": requirements_to_dicts(nodeset.requires), "actual_requires": requirements_to_dicts(node.requires), "owner": owner},
                 )
             )
         if set(node.provides) != set(nodeset.provides):
@@ -130,7 +131,7 @@ def _validate_nodeset_usages(nodes, nodesets, *, owner: str) -> tuple[HealthFind
                     f"nodeset node '{node.name}' provides must match nodeset provides",
                     object_type="node",
                     object_id=node.name,
-                    details={"expected_provides": list(nodeset.provides), "actual_provides": list(node.provides), "owner": owner},
+                    details={"expected_provides": providers_to_dicts(nodeset.provides), "actual_provides": providers_to_dicts(node.provides), "owner": owner},
                 )
             )
     return tuple(findings)
@@ -148,21 +149,23 @@ def _validate_nodeset_metadata(nodeset) -> tuple[HealthFinding, ...]:
 
 def _validate_nodeset_contract(nodeset) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
-    for field_name in ("requires", "provides", "exports"):
-        values = tuple(getattr(nodeset, field_name, ()))
-        if any(not str(value).strip() for value in values) or len(set(values)) != len(values):
+    if len(set(requirement_types(nodeset.requires))) != len(nodeset.requires):
+        findings.append(_nodeset_finding("NODESET.CONTRACT.REQUIRES", nodeset.name, "nodeset.requires must contain unique non-empty types"))
+    for field_name in ("provides", "exports"):
+        values = provider_keys(getattr(nodeset, field_name, ()))
+        if any(not value.strip() for value in values) or len(set(values)) != len(values):
             findings.append(_nodeset_finding("NODESET.CONTRACT.KEYS", nodeset.name, f"nodeset.{field_name} must contain unique non-empty keys", details={"field": field_name}))
     if not nodeset.provides:
         findings.append(_nodeset_finding("NODESET.CONTRACT.PROVIDES", nodeset.name, "nodeset.provides must declare at least one output key"))
     if not nodeset.exports:
         findings.append(_nodeset_finding("NODESET.CONTRACT.EXPORTS", nodeset.name, "nodeset.exports must declare at least one exported key"))
-    if not set(nodeset.exports) <= set(nodeset.provides):
+    if not set(provider_keys(nodeset.exports)) <= set(provider_keys(nodeset.provides)):
         findings.append(
             _nodeset_finding(
                 "NODESET.CONTRACT.EXPORTS_NOT_PROVIDES",
                 nodeset.name,
                 "nodeset.exports must be a subset of nodeset.provides",
-                details={"exports": list(nodeset.exports), "provides": list(nodeset.provides)},
+                details={"exports": providers_to_dicts(nodeset.exports), "provides": providers_to_dicts(nodeset.provides)},
             )
         )
     return tuple(findings)
@@ -170,38 +173,41 @@ def _validate_nodeset_contract(nodeset) -> tuple[HealthFinding, ...]:
 
 def _validate_nodeset_key_scope(nodeset) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
-    internal_provided = {key for node in nodeset.graph.nodes for key in node.provides}
-    internal_required = {key for node in nodeset.graph.nodes for key in node.requires}
-    if not set(nodeset.exports) <= internal_provided:
+    internal_provided = {provider.key for node in nodeset.graph.nodes for provider in node.provides}
+    internal_required = {requirement.type for node in nodeset.graph.nodes for requirement in node.requires}
+    export_keys = set(provider_keys(nodeset.exports))
+    provide_keys = set(provider_keys(nodeset.provides))
+    if not export_keys <= internal_provided:
         findings.append(
             _nodeset_finding(
                 "NODESET.EXPORT.UNKNOWN_KEY",
                 nodeset.name,
                 "nodeset exports keys not produced internally",
-                details={"missing_exports": sorted(set(nodeset.exports) - internal_provided)},
+                details={"missing_exports": sorted(export_keys - internal_provided)},
             )
         )
-    if not set(nodeset.provides) <= set(nodeset.exports):
+    if not provide_keys <= export_keys:
         findings.append(
             _nodeset_finding(
                 "NODESET.KEY_LEAK",
                 nodeset.name,
                 "nodeset.provides must not expose keys outside exports",
-                details={"leaked_keys": sorted(set(nodeset.provides) - set(nodeset.exports))},
+                details={"leaked_keys": sorted(provide_keys - export_keys)},
             )
         )
-    external_inputs = set(nodeset.graph.inputs) | (internal_required - internal_provided)
-    if not external_inputs <= set(nodeset.requires):
+    external_inputs = {provider.type for provider in nodeset.graph.inputs} | (internal_required - {provider.type for node in nodeset.graph.nodes for provider in node.provides})
+    declared_inputs = set(requirement_types(nodeset.requires))
+    if not external_inputs <= declared_inputs:
         findings.append(
             _nodeset_finding(
                 "NODESET.INPUT_SCOPE",
                 nodeset.name,
                 "nodeset internal inputs must be declared in nodeset.requires",
-                details={"undeclared_inputs": sorted(external_inputs - set(nodeset.requires))},
+                details={"undeclared_inputs": sorted(external_inputs - declared_inputs)},
             )
         )
-    internal_only = internal_provided - set(nodeset.exports)
-    leaked = internal_only & set(nodeset.provides)
+    internal_only = internal_provided - export_keys
+    leaked = internal_only & provide_keys
     if leaked:
         findings.append(_nodeset_finding("NODESET.INTERNAL_KEY_LEAK", nodeset.name, "nodeset internal intermediate keys must not leak through provides", details={"leaked_keys": sorted(leaked)}))
     return tuple(findings)

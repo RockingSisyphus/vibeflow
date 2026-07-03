@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
+from .config_resources import PluginInfo, PluginResource, normalize_plugin_config, normalize_plugin_info, plugin_status
+
 
 class PolicyPlugin(Protocol):
     name: str
@@ -29,6 +31,9 @@ class PluginDescriptor:
     priority: int
     scope: str
     source: str
+    class_name: str = "Plugin"
+    info: PluginInfo | None = None
+    config_keys: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -54,6 +59,9 @@ class PluginRegistry:
         priority: int | None = None,
         scope: str = "project",
         source: str = "manual",
+        class_name: str = "Plugin",
+        info: PluginInfo | None = None,
+        config_keys: tuple[str, ...] = (),
         conflict: str = "error",
     ) -> None:
         normalized_type = _normalize_type(plugin_type)
@@ -73,7 +81,7 @@ class PluginRegistry:
         setattr(plugin, "scope", scope)
         self._plugins[normalized_type].append(plugin)
         self._plugins[normalized_type].sort(key=lambda item: (int(getattr(item, "priority", 100)), _plugin_name(item)))
-        self._descriptors[id(plugin)] = PluginDescriptor(plugin_name, normalized_type, plugin_priority, scope, source)
+        self._descriptors[id(plugin)] = PluginDescriptor(plugin_name, normalized_type, plugin_priority, scope, source, class_name, info, tuple(config_keys))
 
     def policy_plugins(self) -> tuple[object, ...]:
         return tuple(self._plugins["policy"])
@@ -93,6 +101,22 @@ class PluginRegistry:
 
     def to_dict(self) -> dict[str, object]:
         return {"plugins": [descriptor.to_dict() for descriptor in self.descriptors()]}
+
+    def resource_map(self) -> dict[tuple[str, str, str], PluginResource]:
+        resources: dict[tuple[str, str, str], PluginResource] = {}
+        for descriptor in self.descriptors():
+            key = (descriptor.source, descriptor.class_name, descriptor.plugin_type)
+            resources[key] = PluginResource(
+                name=descriptor.name,
+                plugin_type=descriptor.plugin_type,
+                status="implemented",
+                module=descriptor.source,
+                class_name=descriptor.class_name,
+                description=descriptor.info.description if descriptor.info is not None else "",
+                config_keys=descriptor.config_keys,
+                info=descriptor.info,
+            )
+        return resources
 
 
 def load_plugins_from_config(config: Mapping[str, Any], *, base_path: Path) -> tuple[PluginRegistry, tuple[object, ...]]:
@@ -116,7 +140,13 @@ def load_plugins_from_config(config: Mapping[str, Any], *, base_path: Path) -> t
         if spec.get("enabled", True) is False:
             continue
         try:
-            plugin = _load_plugin(spec, base_path=base_path)
+            if plugin_status(spec) == "planned":
+                continue
+        except Exception as exc:
+            findings.append(_plugin_finding("PLUGIN.CONFIG.SCHEMA", str(exc), object_id))
+            continue
+        try:
+            plugin, info, config_keys = _load_plugin(spec, base_path=base_path)
             registry.register(
                 plugin,
                 plugin_type=str(spec.get("type", getattr(plugin, "plugin_type", "policy"))),
@@ -124,6 +154,9 @@ def load_plugins_from_config(config: Mapping[str, Any], *, base_path: Path) -> t
                 priority=int(spec.get("priority", getattr(plugin, "priority", 100))),
                 scope=str(spec.get("scope", getattr(plugin, "scope", "project"))),
                 source=str(spec.get("module", spec.get("path", "plugin"))),
+                class_name=str(spec.get("class", spec.get("factory", "Plugin"))),
+                info=info,
+                config_keys=config_keys,
                 conflict=str(spec.get("conflict", "error")),
             )
         except Exception as exc:
@@ -135,7 +168,7 @@ def plugin_error(rule_id: str, message: str, object_id: str, *, details: Mapping
     return _plugin_finding(rule_id, message, object_id, details=details)
 
 
-def _load_plugin(spec: Mapping[str, Any], *, base_path: Path) -> object:
+def _load_plugin(spec: Mapping[str, Any], *, base_path: Path) -> tuple[object, PluginInfo, tuple[str, ...]]:
     module_ref = str(spec.get("module", spec.get("path", ""))).strip()
     if not module_ref:
         raise ValueError("plugin module/path is required")
@@ -145,7 +178,16 @@ def _load_plugin(spec: Mapping[str, Any], *, base_path: Path) -> object:
     plugin = target() if isinstance(target, type) or callable(target) else target
     if not plugin:
         raise ValueError(f"plugin factory returned empty value: {module_ref}.{class_name}")
-    return plugin
+    plugin_config = normalize_plugin_config(spec)
+    setattr(plugin, "config", dict(plugin_config))
+    configure = getattr(plugin, "configure", None)
+    if callable(configure):
+        configure(dict(plugin_config))
+    plugin_type = str(spec.get("type", getattr(plugin, "plugin_type", "policy")))
+    if getattr(plugin, "PLUGIN_INFO", None) is None and getattr(module, "PLUGIN_INFO", None) is not None:
+        setattr(plugin, "PLUGIN_INFO", getattr(module, "PLUGIN_INFO"))
+    info = normalize_plugin_info(plugin, plugin_type=plugin_type)
+    return plugin, info, tuple(sorted(plugin_config))
 
 
 def _import_plugin_module(module_ref: str, *, base_path: Path):

@@ -7,39 +7,226 @@
       "description": "Adds calc.a and calc.b, then scales the sum for semantic nodeset acceptance.",
       "version": "0.1.0",
       "purity": "pure",
-      "requires": ["calc.a", "calc.b"],
-      "provides": ["calc.scaled"],
-      "exports": ["calc.scaled"],
+      "requires": [
+        {
+          "type": "calc.a",
+          "cardinality": "exactly_one"
+        },
+        {
+          "type": "calc.b",
+          "cardinality": "exactly_one"
+        }
+      ],
+      "provides": [
+        {
+          "key": "calc.scaled",
+          "type": "calc.scaled"
+        }
+      ],
+      "exports": [
+        {
+          "key": "calc.scaled",
+          "type": "calc.scaled"
+        }
+      ],
       "pipeline": {
-        "inputs": ["calc.a", "calc.b"],
+        "inputs": [
+          {
+            "key": "calc.a",
+            "type": "calc.a"
+          },
+          {
+            "key": "calc.b",
+            "type": "calc.b"
+          }
+        ],
         "nodes": [
-          {"name": "start", "type": "sandbox.start"},
-          {"name": "add_pair", "type": "semantic.add_pair", "requires": ["calc.a", "calc.b"], "provides": ["calc.sum"]},
-          {"name": "scale", "type": "semantic.scale", "requires": ["calc.sum"], "provides": ["calc.scaled"], "factor": 2},
-          {"name": "end", "type": "semantic.scaled_end", "requires": ["calc.scaled"]}
+          {
+            "name": "start",
+            "type": "sandbox.start"
+          },
+          {
+            "name": "add_pair",
+            "type": "semantic.add_pair",
+            "requires": [
+              {
+                "type": "calc.a",
+                "cardinality": "exactly_one"
+              },
+              {
+                "type": "calc.b",
+                "cardinality": "exactly_one"
+              }
+            ],
+            "provides": [
+              {
+                "key": "calc.sum",
+                "type": "calc.sum"
+              }
+            ]
+          },
+          {
+            "name": "scale",
+            "type": "semantic.scale",
+            "requires": [
+              {
+                "type": "calc.sum",
+                "cardinality": "exactly_one"
+              }
+            ],
+            "provides": [
+              {
+                "key": "calc.scaled",
+                "type": "calc.scaled"
+              }
+            ],
+            "factor": 2
+          },
+          {
+            "name": "end",
+            "type": "semantic.scaled_end",
+            "requires": [
+              {
+                "type": "calc.scaled",
+                "cardinality": "exactly_one"
+              }
+            ]
+          }
         ],
         "edges": [
-          {"from": "start", "to": "add_pair"},
-          {"from": "add_pair", "to": "scale"},
-          {"from": "scale", "to": "end"}
+          {
+            "from": "start",
+            "to": "add_pair"
+          },
+          {
+            "from": "add_pair",
+            "to": "scale"
+          },
+          {
+            "from": "scale",
+            "to": "end"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "calc.scaled",
+            "cardinality": "exactly_one"
+          }
         ]
       }
     }
   ],
   "pipeline": {
-    "inputs": ["calc.a", "calc.b"],
+    "inputs": [
+      {
+        "key": "calc.a",
+        "type": "calc.a"
+      },
+      {
+        "key": "calc.b",
+        "type": "calc.b"
+      }
+    ],
     "nodes": [
-      {"name": "start", "type": "sandbox.start"},
-      {"name": "arithmetic", "type": "nodeset.semantic.arithmetic", "requires": ["calc.a", "calc.b"], "provides": ["calc.scaled"]},
-      {"name": "use_scaled", "type": "semantic.use_scaled", "requires": ["calc.scaled"], "provides": ["calc.branch"]},
-      {"name": "finalize", "type": "semantic.finalize", "requires": ["calc.branch"], "provides": ["calc.final"], "offset": 5},
-      {"name": "end", "type": "semantic.final_end", "requires": ["calc.final"]}
+      {
+        "name": "start",
+        "type": "sandbox.start"
+      },
+      {
+        "name": "arithmetic",
+        "type": "nodeset.semantic.arithmetic",
+        "requires": [
+          {
+            "type": "calc.a",
+            "cardinality": "exactly_one"
+          },
+          {
+            "type": "calc.b",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.scaled",
+            "type": "calc.scaled"
+          }
+        ]
+      },
+      {
+        "name": "use_scaled",
+        "type": "semantic.use_scaled",
+        "requires": [
+          {
+            "type": "calc.scaled",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.branch",
+            "type": "calc.branch"
+          }
+        ]
+      },
+      {
+        "name": "finalize",
+        "type": "semantic.finalize",
+        "requires": [
+          {
+            "type": "calc.branch",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.final",
+            "type": "calc.final"
+          }
+        ],
+        "offset": 5
+      },
+      {
+        "name": "end",
+        "type": "semantic.final_end",
+        "requires": [
+          {
+            "type": "calc.final",
+            "cardinality": "exactly_one"
+          }
+        ]
+      }
     ],
     "edges": [
-      {"from": "start", "to": "arithmetic"},
-      {"from": "arithmetic", "to": "use_scaled"},
-      {"from": "use_scaled", "to": "finalize"},
-      {"from": "finalize", "to": "end"}
+      {
+        "from": "start",
+        "to": "arithmetic"
+      },
+      {
+        "from": "arithmetic",
+        "to": "use_scaled"
+      },
+      {
+        "from": "use_scaled",
+        "to": "finalize"
+      },
+      {
+        "from": "finalize",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "calc.final",
+        "cardinality": "exactly_one"
+      },
+      {
+        "type": "calc.branch",
+        "cardinality": "optional_one"
+      },
+      {
+        "type": "calc.scaled",
+        "cardinality": "optional_one"
+      }
     ]
   }
 }

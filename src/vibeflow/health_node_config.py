@@ -6,6 +6,7 @@ from typing import Mapping
 from .graph_config import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
 from .health_types import HealthFinding
 from .registry import NodeRegistry, NodeRegistryError
+from .runtime_config import ConfigScope, config_override_conflicts, merge_config_scopes, nested_node_config_overrides, node_invocation_scope, normalize_config_scope, scoped_node_params
 
 
 @dataclass(frozen=True)
@@ -17,11 +18,37 @@ class _OverrideContext:
     findings: list[HealthFinding]
 
 
-def validate_node_config_health(graph: GraphConfig, *, registry: NodeRegistry) -> tuple[HealthFinding, ...]:
+def validate_node_config_health(
+    graph: GraphConfig,
+    *,
+    registry: NodeRegistry,
+    global_config: Mapping[str, object] | ConfigScope | None = None,
+) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
-    _validate_graph_node_configs(graph, registry=registry, findings=findings, owner="pipeline")
+    called_nodesets: set[str] = set()
+    _validate_graph_node_configs(
+        graph,
+        registry=registry,
+        findings=findings,
+        owner="pipeline",
+        global_scope=normalize_config_scope(global_config),
+        overrides={},
+        called_nodesets=called_nodesets,
+        stack=(),
+    )
     for nodeset in graph.nodesets.values():
-        _validate_graph_node_configs(nodeset.graph, registry=registry, findings=findings, owner=f"nodeset:{nodeset.name}")
+        if nodeset.name in called_nodesets:
+            continue
+        _validate_graph_node_configs(
+            nodeset.graph,
+            registry=registry,
+            findings=findings,
+            owner=f"nodeset:{nodeset.name}",
+            global_scope=normalize_config_scope(nodeset.global_config),
+            overrides={},
+            called_nodesets=called_nodesets,
+            stack=(nodeset.name,),
+        )
     _validate_nodeset_override_paths(graph, registry=registry, findings=findings)
     return tuple(findings)
 
@@ -32,13 +59,18 @@ def _validate_graph_node_configs(
     registry: NodeRegistry,
     findings: list[HealthFinding],
     owner: str,
+    global_scope: ConfigScope,
+    overrides: Mapping[str, Mapping[str, object]],
+    called_nodesets: set[str],
+    stack: tuple[str, ...],
 ) -> None:
     for node in graph.nodes:
         if node.status == STATUS_PLANNED:
             continue
         if node.node_type.startswith("nodeset."):
+            _validate_nodeset_call_config(node, graph, registry=registry, findings=findings, owner=owner, global_scope=global_scope, overrides=overrides, called_nodesets=called_nodesets, stack=stack)
             continue
-        _append_node_config_finding(node, registry=registry, findings=findings, owner=owner)
+        _append_node_config_finding(node, registry=registry, findings=findings, owner=owner, global_scope=global_scope, overrides=overrides)
 
 
 def _append_node_config_finding(
@@ -47,18 +79,85 @@ def _append_node_config_finding(
     registry: NodeRegistry,
     findings: list[HealthFinding],
     owner: str,
+    global_scope: ConfigScope,
+    overrides: Mapping[str, Mapping[str, object]],
 ) -> None:
+    _append_override_warning(
+        findings,
+        rule_id="CONFIG.GLOBAL_CONFIG.OVERRIDES_LOCAL",
+        object_id=node.name,
+        message=f"global config overrides local node config: {node.name}",
+        base=node.params,
+        override=global_scope.values,
+        allow=global_scope.allow_config_override,
+        details={"owner": owner, "node_type": node.node_type},
+    )
     try:
-        registry.merge_config(node.node_type, node.params)
+        config_spec = registry.get_config_spec(node.node_type)
+        scoped_params = scoped_node_params(node.params, global_scope, declared_keys=set(config_spec.schema))
+        registry.merge_config(node.node_type, {**scoped_params, **dict(overrides.get(node.name, {}))})
     except NodeRegistryError as exc:
         findings.append(
             _node_config_finding(
                 "NODE.CONFIG.INVALID",
                 node.name,
                 str(exc),
-                details={"node_type": node.node_type, "owner": owner, "params": dict(node.params)},
+                details={"node_type": node.node_type, "owner": owner, "params": dict(node.params), "global_config": dict(global_scope.values)},
             )
         )
+
+
+def _validate_nodeset_call_config(
+    node: NodeSpec,
+    graph: GraphConfig,
+    *,
+    registry: NodeRegistry,
+    findings: list[HealthFinding],
+    owner: str,
+    global_scope: ConfigScope,
+    overrides: Mapping[str, Mapping[str, object]],
+    called_nodesets: set[str],
+    stack: tuple[str, ...],
+) -> None:
+    nodeset_name = node.node_type.removeprefix("nodeset.")
+    nodeset = graph.nodesets.get(nodeset_name)
+    if nodeset is None or nodeset_name in stack:
+        return
+    called_nodesets.add(nodeset_name)
+    _append_override_warning(
+        findings,
+        rule_id="CONFIG.GLOBAL_CONFIG.OVERRIDES_NODESET_CONFIG",
+        object_id=node.name,
+        message=f"global config overrides nodeset call config: {node.name}",
+        base=node.params,
+        override=global_scope.values,
+        allow=global_scope.allow_config_override,
+        details={"owner": owner, "nodeset": nodeset_name},
+    )
+    caller_values = {**dict(node.params), **dict(global_scope.values), **dict(overrides.get(node.name, {}))}
+    caller_scope = node_invocation_scope(caller_values, allow_config_override=node.allow_config_override)
+    internal_scope = normalize_config_scope(nodeset.global_config)
+    _append_override_warning(
+        findings,
+        rule_id="NODESET.CONFIG.OVERRIDES_GLOBAL_CONFIG",
+        object_id=node.name,
+        message=f"nodeset call config overrides nodeset global_config: {node.name}",
+        base=internal_scope.values,
+        override=caller_scope.values,
+        allow=caller_scope.allow_config_override,
+        details={"owner": owner, "nodeset": nodeset_name},
+    )
+    child_scope = merge_config_scopes(internal_scope, caller_scope)
+    _validate_graph_node_configs(
+        nodeset.graph,
+        registry=registry,
+        findings=findings,
+        owner=f"nodeset:{nodeset.name}",
+        global_scope=child_scope,
+        overrides=nested_node_config_overrides(node, overrides),
+        called_nodesets=called_nodesets,
+        stack=(*stack, nodeset_name),
+    )
 
 
 def _validate_nodeset_override_paths(
@@ -128,6 +227,34 @@ def _validate_direct_override(
         registry.merge_config(target.node_type, {**target.params, **value})
     except NodeRegistryError as exc:
         findings.append(_node_config_finding("NODESET.CONFIG.INVALID", caller_name, str(exc), details={"nodeset": nodeset.name, "node": target.name, "node_type": target.node_type}))
+
+
+def _append_override_warning(
+    findings: list[HealthFinding],
+    *,
+    rule_id: str,
+    object_id: str,
+    message: str,
+    base: Mapping[str, object],
+    override: Mapping[str, object],
+    allow: bool,
+    details: Mapping[str, object],
+) -> None:
+    conflicts = config_override_conflicts(base, override)
+    if allow or not conflicts:
+        return
+    findings.append(
+        HealthFinding(
+            rule_id=rule_id,
+            severity="warning",
+            object_type="node",
+            object_id=object_id,
+            failure_layer="config",
+            message=message,
+            suggested_fix_type="review_config",
+            details={**dict(details), "conflicts": conflicts},
+        )
+    )
 
 
 def _node_config_finding(

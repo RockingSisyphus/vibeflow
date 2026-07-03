@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol
 
+from .data_contract import DataProvider, DataRequirement
+
 
 FLOW_KIND_TERMINAL = "terminal"
 FLOW_KIND_PROCESS = "process"
@@ -43,8 +45,8 @@ class NodeInfo:
 
 @dataclass(frozen=True)
 class NodeContract:
-    requires: tuple[str, ...] = ()
-    provides: tuple[str, ...] = ()
+    requires: tuple[DataRequirement, ...] = ()
+    provides: tuple[DataProvider, ...] = ()
     input_semantics: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     output_semantics: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     params_schema: Mapping[str, Any] = field(default_factory=dict)

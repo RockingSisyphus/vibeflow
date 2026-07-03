@@ -1,23 +1,98 @@
 {
-  // Same topology as config.jsonc, but nodeset definitions live in nodesets.jsonc.
   "plugins": [
-    {"module": "plugins.py", "class": "Plugin", "type": "policy"}
+    {
+      "module": "plugins.py",
+      "class": "Plugin",
+      "type": "policy"
+    }
   ],
+  "base_lib": {
+    "paths": [
+      "base_lib"
+    ],
+    "modules": [
+      {
+        "module": "base_lib.math_tools",
+        "status": "implemented"
+      },
+      {
+        "name": "base_lib.future_tools",
+        "status": "planned",
+        "description": "Planned helper library."
+      }
+    ]
+  },
   "nodeset_imports": [
-    {"path": "nodesets.jsonc", "names": ["example.add_one"]}
+    {
+      "path": "nodesets.jsonc",
+      "names": [
+        "example.add_one"
+      ]
+    }
   ],
   "pipeline": {
     "nodes": [
-      {"name": "start", "type": "example.start"},
-      {"name": "seed", "type": "example.seed", "provides": ["value.in"], "value": 4},
+      {
+        "name": "start",
+        "type": "example.start"
+      },
+      {
+        "name": "seed",
+        "type": "example.seed",
+        "provides": [
+          {
+            "key": "value.in",
+            "type": "value.in"
+          }
+        ],
+        "value": 4
+      },
       {
         "name": "add_one_flow",
         "type": "nodeset.example.add_one",
-        "requires": ["value.in"],
-        "provides": ["value.out"]
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out"
+          }
+        ]
       },
-      {"name": "end", "type": "example.end", "requires": ["value.out"]}
+      {
+        "name": "end",
+        "type": "example.end",
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one"
+          }
+        ]
+      }
     ],
-    "edges": [["start", "seed"], ["seed", "add_one_flow"], ["add_one_flow", "end"]]
+    "edges": [
+      [
+        "start",
+        "seed"
+      ],
+      [
+        "seed",
+        "add_one_flow"
+      ],
+      [
+        "add_one_flow",
+        "end"
+      ]
+    ],
+    "outputs": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one"
+      }
+    ]
   }
 }

@@ -7,50 +7,322 @@
       "description": "这是综合流程图中的预定义过程节点，用来验证 nodeset 在折叠视图和展开视图中都能保留契约、中文说明、内部开始结束节点以及显式边关系。",
       "version": "0.1.0",
       "purity": "pure",
-      "requires": ["value.prepared"],
-      "provides": ["value.out"],
-      "exports": ["value.out"],
+      "requires": [
+        {
+          "type": "value.prepared",
+          "cardinality": "exactly_one"
+        }
+      ],
+      "provides": [
+        {
+          "key": "value.out",
+          "type": "value.out"
+        }
+      ],
+      "exports": [
+        {
+          "key": "value.out",
+          "type": "value.out"
+        }
+      ],
       "pipeline": {
-        "inputs": ["value.prepared"],
+        "inputs": [
+          {
+            "key": "value.prepared",
+            "type": "value.prepared"
+          }
+        ],
         "nodes": [
-          {"name": "start", "type": "sandbox.start"},
-          {"name": "compute", "type": "sandbox.core_compute", "requires": ["value.prepared"], "provides": ["value.out"], "factor": 2},
-          {"name": "end", "type": "sandbox.out_value_end", "requires": ["value.out"]}
+          {
+            "name": "start",
+            "type": "sandbox.start"
+          },
+          {
+            "name": "compute",
+            "type": "sandbox.core_compute",
+            "requires": [
+              {
+                "type": "value.prepared",
+                "cardinality": "exactly_one"
+              }
+            ],
+            "provides": [
+              {
+                "key": "value.out",
+                "type": "value.out"
+              }
+            ],
+            "factor": 2
+          },
+          {
+            "name": "end",
+            "type": "sandbox.out_value_end",
+            "requires": [
+              {
+                "type": "value.out",
+                "cardinality": "exactly_one"
+              }
+            ]
+          }
         ],
         "edges": [
-          {"from": "start", "to": "compute"},
-          {"from": "compute", "to": "end"}
+          {
+            "from": "start",
+            "to": "compute"
+          },
+          {
+            "from": "compute",
+            "to": "end"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one"
+          }
         ]
       }
     }
   ],
   "pipeline": {
-    "inputs": ["value.in"],
+    "inputs": [
+      {
+        "key": "value.in",
+        "type": "value.in"
+      }
+    ],
     "nodes": [
-      {"name": "start", "type": "sandbox.start"},
-      {"name": "input", "type": "sandbox.value_input", "requires": ["value.in"]},
-      {"name": "prepare", "type": "sandbox.prepare_value", "requires": ["value.in"], "provides": ["value.prepared"], "offset": 1},
-      {"name": "core", "type": "nodeset.comprehensive.core", "requires": ["value.prepared"], "provides": ["value.out"]},
-      {"name": "route", "type": "sandbox.route_decision", "requires": ["value.out"], "provides": ["flow.route"], "threshold": 10},
-      {"name": "loop_back", "type": "sandbox.loop_back", "requires": ["value.out"], "provides": ["value.in"]},
-      {"name": "external", "type": "sandbox.external_boost", "requires": ["value.out"], "provides": ["value.final"], "bonus": 5},
-      {"name": "store", "type": "sandbox.audit_store", "requires": ["value.final"], "provides": ["effects.request"]},
-      {"name": "document", "type": "sandbox.report_document", "requires": ["value.final", "effects.request"], "provides": ["document.report"]},
-      {"name": "output", "type": "sandbox.report_output", "requires": ["document.report"], "provides": ["io.output"]},
-      {"name": "end", "type": "sandbox.report_end", "requires": ["io.output"]}
+      {
+        "name": "start",
+        "type": "sandbox.start"
+      },
+      {
+        "name": "input",
+        "type": "sandbox.value_input",
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.in.input",
+            "type": "value.in"
+          }
+        ]
+      },
+      {
+        "name": "prepare",
+        "type": "sandbox.prepare_value",
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.prepared",
+            "type": "value.prepared"
+          }
+        ],
+        "offset": 1
+      },
+      {
+        "name": "core",
+        "type": "nodeset.comprehensive.core",
+        "requires": [
+          {
+            "type": "value.prepared",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out"
+          }
+        ]
+      },
+      {
+        "name": "route",
+        "type": "sandbox.route_decision",
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "flow.route",
+            "type": "flow.route"
+          }
+        ],
+        "threshold": 10
+      },
+      {
+        "name": "loop_back",
+        "type": "sandbox.loop_back",
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.in.loop",
+            "type": "value.in"
+          }
+        ]
+      },
+      {
+        "name": "external",
+        "type": "sandbox.external_boost",
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.final",
+            "type": "value.final"
+          }
+        ],
+        "bonus": 5
+      },
+      {
+        "name": "store",
+        "type": "sandbox.audit_store",
+        "requires": [
+          {
+            "type": "value.final",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "effects.request",
+            "type": "effects.request"
+          }
+        ]
+      },
+      {
+        "name": "document",
+        "type": "sandbox.report_document",
+        "requires": [
+          {
+            "type": "value.final",
+            "cardinality": "exactly_one"
+          },
+          {
+            "type": "effects.request",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "document.report",
+            "type": "document.report"
+          }
+        ]
+      },
+      {
+        "name": "output",
+        "type": "sandbox.report_output",
+        "requires": [
+          {
+            "type": "document.report",
+            "cardinality": "exactly_one"
+          }
+        ],
+        "provides": [
+          {
+            "key": "io.output",
+            "type": "io.output"
+          }
+        ]
+      },
+      {
+        "name": "end",
+        "type": "sandbox.report_end",
+        "requires": [
+          {
+            "type": "io.output",
+            "cardinality": "exactly_one"
+          }
+        ]
+      }
     ],
     "edges": [
-      {"from": "start", "to": "input"},
-      {"from": "input", "to": "prepare"},
-      {"from": "prepare", "to": "core"},
-      {"from": "core", "to": "route"},
-      {"from": "route", "to": "loop_back", "when": "flow.route == 'again'"},
-      {"from": "loop_back", "to": "prepare"},
-      {"from": "route", "to": "external", "when": "flow.route == 'external'"},
-      {"from": "external", "to": "store"},
-      {"from": "store", "to": "document"},
-      {"from": "document", "to": "output"},
-      {"from": "output", "to": "end"}
+      {
+        "from": "start",
+        "to": "input"
+      },
+      {
+        "from": "input",
+        "to": "prepare"
+      },
+      {
+        "from": "prepare",
+        "to": "core"
+      },
+      {
+        "from": "core",
+        "to": "route"
+      },
+      {
+        "from": "route",
+        "to": "loop_back",
+        "when": "flow.route == 'again'"
+      },
+      {
+        "from": "loop_back",
+        "to": "prepare"
+      },
+      {
+        "from": "route",
+        "to": "external",
+        "when": "flow.route == 'external'"
+      },
+      {
+        "from": "external",
+        "to": "store"
+      },
+      {
+        "from": "store",
+        "to": "document"
+      },
+      {
+        "from": "document",
+        "to": "output"
+      },
+      {
+        "from": "output",
+        "to": "end"
+      },
+      {
+        "from": "core",
+        "to": "loop_back"
+      },
+      {
+        "from": "core",
+        "to": "external"
+      },
+      {
+        "from": "external",
+        "to": "document"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "io.output",
+        "cardinality": "exactly_one"
+      }
     ]
   }
 }

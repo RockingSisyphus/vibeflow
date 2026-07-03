@@ -5,7 +5,7 @@ This guide is for people changing the VibeFlow framework itself. If you are usin
 ## Framework Ground Rules
 
 - Do not reintroduce removed public concepts such as `boundary`, `pipeline.loops`, `max_iterations`, edge `max_executions`, or edge `loop`.
-- Keep `pipeline.edges` as the only source of executable control flow. `requires` and `provides` are data-contract diagnostics, not scheduler edges.
+- Keep `pipeline.edges` as the only source of executable control flow. `requires` and `provides` are strict key/type data contracts for inbox resolution, not scheduler edges.
 - Keep implemented `flow_kind` semantics owned by registered framework metadata, not duplicated in runnable config.
 - Keep planned architecture non-runnable. Design-time placeholders may be visualized and warned about, but must not execute.
 - Keep framework rules explainable through stable health findings: `rule_id`, severity, object identity, failure layer, details, and suggested fix type.
@@ -38,7 +38,7 @@ PYTHONPATH=src python -m vibeflow quality-check --path . --check-side-effects
 
 ## Documentation
 
-- Keep `docs/current_implementation_status.md` aligned with shipped behavior.
+- Keep `docs/kernel_target_vision.md` and `docs/developer_guide.md` aligned with shipped behavior.
 - Put user-facing usage guidance in `docs/developer_guide.md`.
 - Put maintainer workflow changes in `docs/kernel_development_guide.md`.
 - Historical design records may stay in `docs/`, but should not be treated as current API.

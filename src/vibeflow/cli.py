@@ -53,6 +53,18 @@ def build_parser() -> argparse.ArgumentParser:
     svg.add_argument("--hide-semantics", action="store_true")
     svg.add_argument("--theme", default="default")
     svg.add_argument("--background", default="transparent")
+    svg.add_argument(
+        "--mermaid-max-text-size",
+        type=int,
+        default=None,
+        help="override Mermaid maxTextSize for SVG rendering",
+    )
+    svg.add_argument(
+        "--mermaid-max-edges",
+        type=int,
+        default=None,
+        help="override Mermaid maxEdges for SVG rendering",
+    )
     svg.set_defaults(expand_nodesets=False)
 
     run = sub.add_parser("run", help="run topology config after mandatory health checks")
@@ -155,18 +167,44 @@ def _handle_export_svg(args: argparse.Namespace) -> int:
 
 
 def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
-    from .cli_reports import config_load_error_report, fail_report, graph_config_error_report
+    from .cli_reports import config_load_error_report, dedupe_findings, fail_report, graph_config_error_report
     from .compiler import GraphCompiler, GraphCompileError
     from .config_loader import ConfigLoadError, load_config_document
+    from .config_resources import load_config_resources
+    from .config_schema import collect_config_schema_findings
     from .graph_config import GraphConfigError, parse_graph_config
+    from .health_types import HealthReport
     from .ascii_flowchart import export_ascii_flowchart
     from .mermaid import export_mermaid
-    from .mermaid_render import MermaidRenderError, render_mermaid_svg
+    from .mermaid_render import (
+        DEFAULT_MERMAID_MAX_EDGES,
+        DEFAULT_MERMAID_MAX_TEXT_SIZE,
+        EXPANDED_MERMAID_MAX_EDGES,
+        EXPANDED_MERMAID_MAX_TEXT_SIZE,
+        MermaidRenderError,
+        render_mermaid_svg,
+    )
+    from .planned_behavior import project_root_for_config
     from .policy import default_effective_policy
+    from .plugin import load_plugins_from_config
 
     try:
-        document = load_config_document(Path(args.config))
-        graph = parse_graph_config(document.data)
+        config_path = Path(args.config)
+        document = load_config_document(config_path)
+        plugin_registry, plugin_findings = load_plugins_from_config(document.data, base_path=config_path.parent)
+        resources, resource_findings = load_config_resources(document.data, base_path=config_path.parent, plugin_registry=plugin_registry)
+        schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *plugin_findings, *resource_findings))
+        if schema_findings:
+            status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin", "base_lib"} for finding in schema_findings) else "FAIL"
+            report = HealthReport(
+                status=status,
+                errors=tuple(finding for finding in schema_findings if finding.severity == "error"),
+                warnings=tuple(finding for finding in schema_findings if finding.severity == "warning"),
+                effective_policy=default_effective_policy().to_dict(),
+            )
+            print(report.to_json())
+            return 1
+        graph = parse_graph_config(document.data, project_root=project_root_for_config(config_path))
         compiled = GraphCompiler().compile(graph)
     except ConfigLoadError as exc:
         report = config_load_error_report(exc, object_type="config", object_id=str(args.config))
@@ -181,22 +219,68 @@ def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
         print(report.to_json())
         return 1
     if export_kind == "svg":
-        mermaid_text = export_mermaid(graph, compiled=compiled, expand_nodesets=bool(args.expand_nodesets), show_contract=not bool(args.hide_contract), show_semantics=not bool(args.hide_semantics))
+        mermaid_text = export_mermaid(
+            graph,
+            compiled=compiled,
+            expand_nodesets=bool(args.expand_nodesets),
+            show_contract=not bool(args.hide_contract),
+            show_semantics=not bool(args.hide_semantics),
+            resources=resources,
+        )
+        max_text_size = (
+            int(args.mermaid_max_text_size)
+            if args.mermaid_max_text_size is not None
+            else (EXPANDED_MERMAID_MAX_TEXT_SIZE if bool(args.expand_nodesets) else DEFAULT_MERMAID_MAX_TEXT_SIZE)
+        )
+        max_edges = (
+            int(args.mermaid_max_edges)
+            if args.mermaid_max_edges is not None
+            else (EXPANDED_MERMAID_MAX_EDGES if bool(args.expand_nodesets) else DEFAULT_MERMAID_MAX_EDGES)
+        )
         try:
             if args.output:
-                render_mermaid_svg(mermaid_text, Path(args.output), theme=str(args.theme), background=str(args.background))
+                render_mermaid_svg(
+                    mermaid_text,
+                    Path(args.output),
+                    theme=str(args.theme),
+                    background=str(args.background),
+                    max_text_size=max_text_size,
+                    max_edges=max_edges,
+                )
             else:
                 with tempfile.TemporaryDirectory(prefix="vibeflow-svg-") as temp_dir:
                     output = Path(temp_dir) / "graph.svg"
-                    render_mermaid_svg(mermaid_text, output, theme=str(args.theme), background=str(args.background))
+                    render_mermaid_svg(
+                        mermaid_text,
+                        output,
+                        theme=str(args.theme),
+                        background=str(args.background),
+                        max_text_size=max_text_size,
+                        max_edges=max_edges,
+                    )
                     print(output.read_text(encoding="utf-8"), end="")
         except MermaidRenderError as exc:
             report = fail_report("MERMAID.RENDER.SVG", str(exc), "pipeline", "pipeline", "render", effective_policy=default_effective_policy().to_dict())
             print(report.to_json())
             return 1
         return 0
-    exporter = export_ascii_flowchart if export_kind == "ascii" else export_mermaid
-    text = exporter(graph, compiled=compiled, expand_nodesets=bool(args.expand_nodesets), show_contract=not bool(args.hide_contract), show_semantics=not bool(args.hide_semantics))
+    if export_kind == "ascii":
+        text = export_ascii_flowchart(
+            graph,
+            compiled=compiled,
+            expand_nodesets=bool(args.expand_nodesets),
+            show_contract=not bool(args.hide_contract),
+            show_semantics=not bool(args.hide_semantics),
+        )
+    else:
+        text = export_mermaid(
+            graph,
+            compiled=compiled,
+            expand_nodesets=bool(args.expand_nodesets),
+            show_contract=not bool(args.hide_contract),
+            show_semantics=not bool(args.hide_semantics),
+            resources=resources,
+        )
     if args.output:
         Path(args.output).write_text(text, encoding="utf-8")
     else:
@@ -283,6 +367,7 @@ def _add_runtime_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--nodeset-hooks", action=argparse.BooleanOptionalAction, default=None, help="enable or disable nodeset-level runtime plugin hooks")
     parser.add_argument("--block-hooks", action=argparse.BooleanOptionalAction, default=None, help="enable or disable block-level runtime plugin hooks")
     parser.add_argument("--async-flush-timeout", type=float, default=None, help="seconds to wait for detached async tasks at run end")
+    parser.add_argument("--allow-planned-stub", action="store_true", help="development only: execute planned python_stub nodes")
 
 
 def _runtime_options_from_args(args: argparse.Namespace):
@@ -317,4 +402,6 @@ def _runtime_options_from_args(args: argparse.Namespace):
         values["block_hooks"] = args.block_hooks
     if args.async_flush_timeout is not None:
         values["async_flush_timeout"] = args.async_flush_timeout
+    if args.allow_planned_stub:
+        values["allow_planned_stub"] = True
     return RuntimeOptions(**values)
