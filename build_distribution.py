@@ -199,10 +199,13 @@ python run.py run --config project/configs/main.jsonc --run-root runs
 python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
 python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
 python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
+python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg
 python run.py quality --path project
 ```
 
 `svg` 默认会为 Mermaid CLI 放大渲染上限：普通图使用 `maxTextSize=200000`、`maxEdges=2000`；`--expand-nodesets` 使用 `maxTextSize=500000`、`maxEdges=5000`，并固定采用 `review-columns` SVG composer，把主流程、plugins、base_lib 和展开 nodeset 分列展示。超大图可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
+
+注意：`python run.py mermaid --expand-nodesets --output reports/graph.expanded.mmd` 只导出 Mermaid 源码，供调试源码使用。详细审查 SVG 必须用 `python run.py svg --expand-nodesets --output reports/graph.expanded.svg` 生成，不要把 `graph.expanded.mmd` 直接交给 Mermaid CLI/mmdc 转成 SVG，否则会绕过 VibeFlow 的 review-columns/detail-panel composer。
 
 首次使用 `svg` 前，在分发目录执行一次：
 

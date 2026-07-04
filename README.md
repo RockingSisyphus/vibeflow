@@ -85,11 +85,13 @@ python run.py run --config project/configs/main.jsonc --run-root runs
 python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
 python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
 python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
+python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg
 python run.py quality --path project
 ```
 
 `run` 会在 `runs/<run_id>/` 自动写出快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`。`svg` 导出会为 Mermaid CLI 传入放大的渲染配置；普通图默认 `maxTextSize=200000`，`--expand-nodesets` 默认 `maxTextSize=500000`。超大图仍可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
 展开 SVG 会固定使用确定性的 `review-columns` composer：主流程保持在左侧，右侧依次展示 plugins、base_lib 和按顶层调用顺序排列的展开 nodeset。nodeset 详情使用递归 detail-panel：叶子 nodeset 横向展示；包含子 nodeset 的父图保持 collapsed call-site 和原始连边，右侧按调用顺序纵向展示直接子 nodeset。审查图默认把单个片段显示宽度限制为 `3200px`，可用 `--review-fragment-max-width` 调整。
+`graph.expanded.mmd` 只是 Mermaid 源码调试产物，不要直接用 Mermaid CLI/mmdc 转成 SVG；详细审查 SVG 必须通过 `run.py svg --expand-nodesets` 生成。
 
 ## AI 开发工作流 🛠️
 
