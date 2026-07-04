@@ -1,5 +1,36 @@
 from tests.unit.strict_support import *
 
+
+def test_mermaid_renderer_prefers_google_chrome_over_snap_chromium(monkeypatch) -> None:
+    import vibeflow.mermaid_render as mermaid_render
+
+    paths = {
+        "chromium": "/snap/bin/chromium",
+        "chromium-browser": None,
+        "google-chrome": "/usr/bin/google-chrome",
+        "google-chrome-stable": "/usr/bin/google-chrome-stable",
+    }
+
+    monkeypatch.setattr(mermaid_render.shutil, "which", lambda name: paths.get(name))
+
+    assert mermaid_render._find_chromium() == "/usr/bin/google-chrome"
+
+
+def test_mermaid_renderer_defers_snap_chromium_until_no_other_browser(monkeypatch) -> None:
+    import vibeflow.mermaid_render as mermaid_render
+
+    paths = {
+        "chromium": "/snap/bin/chromium",
+        "chromium-browser": "/usr/bin/chromium-browser",
+        "google-chrome": None,
+        "google-chrome-stable": None,
+    }
+
+    monkeypatch.setattr(mermaid_render.shutil, "which", lambda name: paths.get(name))
+
+    assert mermaid_render._find_chromium() == "/usr/bin/chromium-browser"
+
+
 def test_cli_inspect_node_reports_unmatched_type(tmp_path, capsys) -> None:
     module_path = tmp_path / "demo_node.py"
     module_path.write_text(
