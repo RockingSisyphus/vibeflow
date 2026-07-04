@@ -89,7 +89,7 @@ python run.py quality --path project
 ```
 
 SVG export passes an expanded Mermaid CLI render config. Normal graphs default to `maxTextSize=200000`; `--expand-nodesets` defaults to `maxTextSize=500000`. Very large graphs can override this with `--mermaid-max-text-size` and `--mermaid-max-edges`.
-Expanded SVG exports always use the deterministic `review-columns` composer: the main pipeline stays on the left, followed by plugins, base_lib, and expanded nodesets in top-level call order.
+Expanded SVG exports always use the deterministic `review-columns` composer: the main pipeline stays on the left, followed by plugins, base_lib, and expanded nodesets in top-level call order. Nodeset details use a recursive detail-panel layout: leaf nodesets render horizontally; parents with child nodesets keep collapsed call-sites and original edges, with direct child nodesets stacked to the right in call order.
 
 ## AI Development Workflow 🛠️
 
