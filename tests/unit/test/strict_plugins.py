@@ -1,3 +1,4 @@
+import base64
 import re
 
 from tests.unit.strict_support import *
@@ -353,6 +354,192 @@ def test_review_columns_resource_fragments_render_root_left_to_children_right() 
     assert mermaid.startswith("flowchart LR")
     assert "resource_plugins -.-> resource_plugins_0" in mermaid
     assert "resource_plugins -.-> resource_plugins_1" in mermaid
+
+
+def test_nodeset_detail_leaf_mermaid_uses_lr_with_layout_spine() -> None:
+    from vibeflow.flowchart_render_helpers import compile_for_render
+    from vibeflow.mermaid_review_svg import _nodeset_mermaid
+
+    graph = parse_graph_config({"pipeline": _input_add_pipeline(add={"name": "inner"})})
+    mermaid = _nodeset_mermaid(
+        graph,
+        compile_for_render(graph, None, _registry()),
+        registry=_registry(),
+        show_contract=True,
+        show_semantics=True,
+        direction="LR",
+    )
+
+    assert mermaid.startswith("flowchart LR")
+    assert "classDef layoutAnchor" in mermaid
+    assert "__vibeflow_layout_start ~~~ start" in mermaid
+    assert "input ~~~ inner" in mermaid
+    assert "inner ~~~ n_end" in mermaid
+
+
+def test_nodeset_detail_parent_mermaid_preserves_collapsed_callsite_edges() -> None:
+    from vibeflow.flowchart_render_helpers import compile_for_render
+    from vibeflow.mermaid_review_svg import _nodeset_mermaid
+
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "detail.leaf",
+                    pipeline=_input_add_pipeline(add={"name": "inner"}),
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                ),
+                _nodeset_config(
+                    "detail.parent",
+                    pipeline={
+                        "nodes": [
+                            {"name": "start", "type": "test.start"},
+                            {"name": "before", "type": "test.value_input", "requires": [REQ_SPEC("value.in")]},
+                            {"name": "child", "type": "nodeset.detail.leaf"},
+                            {"name": "after", "type": "test.out_end"},
+                        ],
+                        "edges": [
+                            {"from": "start", "to": "before"},
+                            {"from": "before", "to": "child", "when": "route == 'detail'"},
+                            {"from": "child", "to": "after"},
+                        ],
+                    },
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                ),
+            ],
+            "pipeline": {
+                "nodes": [
+                    {"name": "main", "type": "nodeset.detail.parent"},
+                ],
+            },
+        }
+    )
+    parent = graph.nodesets["detail.parent"]
+    mermaid = _nodeset_mermaid(
+        parent.graph,
+        compile_for_render(parent.graph, None, _registry()),
+        registry=_registry(),
+        show_contract=True,
+        show_semantics=True,
+        direction="TD",
+    )
+
+    assert mermaid.startswith("flowchart TD")
+    assert 'child@{ shape: fr-rect, label: "child\\nnodeset.detail.leaf' in mermaid
+    assert "before -->|route == 'detail'| child" in mermaid
+    assert "child --> after" in mermaid
+    assert "inner@{ shape:" not in mermaid
+
+
+def test_nodeset_detail_panel_places_children_right_and_stacked() -> None:
+    from vibeflow.mermaid_review_svg import _SvgFragment, _compose_detail_panel_svg
+
+    svg = _compose_detail_panel_svg(
+        _SvgFragment("parent flow", '<svg viewBox="0 0 100 200"></svg>', 100.0, 200.0),
+        [
+            _SvgFragment("first - detail.leaf", '<svg viewBox="0 0 300 50"></svg>', 300.0, 50.0),
+            _SvgFragment("second - detail.leaf", '<svg viewBox="0 0 200 70"></svg>', 200.0, 70.0),
+        ],
+        background="transparent",
+    )
+
+    titles = re.findall(r'<text class="review-title" x="([0-9.]+)" y="([0-9.]+)">([^<]+)</text>', svg)
+    positions = {title: (float(x), float(y)) for x, y, title in titles}
+    assert positions["parent flow"][0] < positions["first - detail.leaf"][0]
+    assert positions["first - detail.leaf"][0] == positions["second - detail.leaf"][0]
+    assert positions["first - detail.leaf"][1] < positions["second - detail.leaf"][1]
+
+    images = re.findall(r'<image x="([0-9.]+)" y="([0-9.]+)" width="([0-9.]+)" height="([0-9.]+)"', svg)
+    assert float(images[0][0]) < float(images[1][0])
+
+
+def test_nodeset_detail_fragment_recurses_nested_child_panels(tmp_path, monkeypatch) -> None:
+    from vibeflow import mermaid_review_svg as review_svg
+
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config("detail.leaf_one", pipeline=_input_add_pipeline(add={"name": "leaf_one_add"})),
+                _nodeset_config("detail.leaf_two", pipeline=_input_add_pipeline(add={"name": "leaf_two_add"})),
+                _nodeset_config("detail.leaf_three", pipeline=_input_add_pipeline(add={"name": "leaf_three_add"})),
+                _nodeset_config(
+                    "detail.mid",
+                    pipeline={
+                        "nodes": [
+                            {"name": "mid_start", "type": "test.start"},
+                            {"name": "inner_a", "type": "nodeset.detail.leaf_two"},
+                            {"name": "inner_b", "type": "nodeset.detail.leaf_three"},
+                            {"name": "mid_end", "type": "test.out_end"},
+                        ],
+                        "edges": _edge_chain("mid_start", "inner_a", "inner_b", "mid_end"),
+                    },
+                ),
+                _nodeset_config(
+                    "detail.root",
+                    pipeline={
+                        "nodes": [
+                            {"name": "root_start", "type": "test.start"},
+                            {"name": "first", "type": "nodeset.detail.leaf_one"},
+                            {"name": "second", "type": "nodeset.detail.mid"},
+                            {"name": "third", "type": "nodeset.detail.leaf_three"},
+                            {"name": "root_end", "type": "test.out_end"},
+                        ],
+                        "edges": _edge_chain("root_start", "first", "second", "third", "root_end"),
+                    },
+                ),
+            ],
+            "pipeline": {"nodes": [{"name": "root", "type": "nodeset.detail.root"}]},
+        }
+    )
+    rendered: list[tuple[str, str]] = []
+
+    def fake_render_fragment(title, mermaid_text, temp_dir, **kwargs):
+        rendered.append((title, mermaid_text))
+        width = 180.0 + len(rendered) * 10
+        height = 80.0 + len(rendered) * 5
+        svg_text = f'<svg viewBox="0 0 {width:.3f} {height:.3f}"><text>{title}</text></svg>'
+        return review_svg._SvgFragment(title, svg_text, width, height)
+
+    monkeypatch.setattr(review_svg, "_render_fragment", fake_render_fragment)
+    fragment = review_svg._render_nodeset_detail_fragment(
+        "root - detail.root",
+        graph.nodesets["detail.root"],
+        tmp_path,
+        registry=_registry(),
+        show_contract=True,
+        show_semantics=True,
+        theme="default",
+        background="transparent",
+        max_text_size=None,
+        max_edges=None,
+        visited_nodesets=(),
+    )
+
+    assert fragment.title == "root - detail.root"
+    assert rendered[0][0] == "parent flow"
+    assert rendered[0][1].startswith("flowchart TD")
+    assert any(title == "first - detail.leaf_one" and text.startswith("flowchart LR") for title, text in rendered)
+    assert sum(1 for title, text in rendered if title == "parent flow" and text.startswith("flowchart TD")) == 2
+
+    root_titles = re.findall(r'<text class="review-title" x="([0-9.]+)" y="([0-9.]+)">([^<]+)</text>', fragment.svg_text)
+    root_positions = {title: (float(x), float(y)) for x, y, title in root_titles}
+    assert root_positions["parent flow"][0] < root_positions["first - detail.leaf_one"][0]
+    assert root_positions["first - detail.leaf_one"][0] == root_positions["second - detail.mid"][0]
+    assert root_positions["second - detail.mid"][0] == root_positions["third - detail.leaf_three"][0]
+    assert root_positions["first - detail.leaf_one"][1] < root_positions["second - detail.mid"][1] < root_positions["third - detail.leaf_three"][1]
+
+    payloads = dict.fromkeys(re.findall(r'href="data:image/svg\+xml;base64,([^"]+)"', fragment.svg_text))
+    decoded = [base64.b64decode(payload).decode("utf-8") for payload in payloads]
+    mid_svg = next(text for text in decoded if "inner_a - detail.leaf_two" in text and "inner_b - detail.leaf_three" in text)
+    mid_titles = re.findall(r'<text class="review-title" x="([0-9.]+)" y="([0-9.]+)">([^<]+)</text>', mid_svg)
+    mid_positions = {title: (float(x), float(y)) for x, y, title in mid_titles}
+    assert mid_positions["parent flow"][0] < mid_positions["inner_a - detail.leaf_two"][0]
+    assert mid_positions["inner_a - detail.leaf_two"][0] == mid_positions["inner_b - detail.leaf_three"][0]
+    assert mid_positions["inner_a - detail.leaf_two"][1] < mid_positions["inner_b - detail.leaf_three"][1]
 
 
 def test_mermaid_shows_when_edges_and_health_findings() -> None:
