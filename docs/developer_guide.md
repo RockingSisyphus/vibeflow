@@ -362,3 +362,4 @@ vibeflow export-svg --config workflow.jsonc --output graph.svg
 正式运行也会写出 `graph.mmd`、`graph.txt`、`graph.svg`。
 
 `export-svg` 会向 Mermaid CLI 传入渲染配置。普通图默认 `maxTextSize=200000`、`maxEdges=2000`；展开 nodeset 时默认 `maxTextSize=500000`、`maxEdges=5000`。如仍遇到 Mermaid 限制，可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
+展开 nodeset 的 SVG 固定使用确定性 `review-columns` composer：最外层主流程在左侧纵向展示，plugins、base_lib 分列展示，展开的 nodeset 按顶层调用顺序放到右侧。
