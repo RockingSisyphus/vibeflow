@@ -223,7 +223,8 @@ def _validate_run_health(
 def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None, resources: ConfigResources | None = None) -> None:
     from .ascii_flowchart import export_ascii_flowchart
     from .mermaid import compiled_graph_payload, export_mermaid
-    from .mermaid_render import MermaidRenderError, render_mermaid_svg
+    from .mermaid_render import EXPANDED_MERMAID_MAX_EDGES, EXPANDED_MERMAID_MAX_TEXT_SIZE, MermaidRenderError, render_mermaid_svg
+    from .mermaid_review_svg import render_review_columns_svg
 
     _write_json(run_dir / "health_report.json", health.to_dict())
     _write_json(run_dir / "compiled_graph.json", compiled_graph_payload(graph, compiled, resources=resources))
@@ -234,6 +235,19 @@ def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, heal
         render_mermaid_svg(mermaid_text, run_dir / "graph.svg")
     except MermaidRenderError as exc:
         (run_dir / "graph.svg.error.txt").write_text(str(exc), encoding="utf-8")
+    try:
+        render_review_columns_svg(
+            graph,
+            compiled,
+            run_dir / "graph.expanded.svg",
+            registry=registry,
+            resources=resources,
+            expand_nodesets=True,
+            max_text_size=EXPANDED_MERMAID_MAX_TEXT_SIZE,
+            max_edges=EXPANDED_MERMAID_MAX_EDGES,
+        )
+    except MermaidRenderError as exc:
+        (run_dir / "graph.expanded.svg.error.txt").write_text(str(exc), encoding="utf-8")
 
 
 def _refuse_on_health_failure(health: HealthReport, run_dir: Path, run_id: str) -> None:

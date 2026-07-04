@@ -248,6 +248,8 @@ runs/<run_id>/
   graph.txt
   graph.svg
   graph.svg.error.txt
+  graph.expanded.svg
+  graph.expanded.svg.error.txt
   runtime_trace.jsonl
   output_summary.json
 ```

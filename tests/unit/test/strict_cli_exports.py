@@ -169,11 +169,14 @@ def test_cli_export_svg_expand_nodesets_forces_review_columns_layout(tmp_path, m
             "--expand-nodesets",
             "--mermaid-layout",
             "default",
+            "--review-fragment-max-width",
+            "6400",
         ]
     )
 
     assert code == 0
     assert calls and calls[0]["expand_nodesets"] is True
+    assert calls[0]["review_fragment_max_width"] == 6400.0
     assert "flowchart-review-columns" in output_path.read_text(encoding="utf-8")
 
 
