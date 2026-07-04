@@ -31,6 +31,68 @@ def test_mermaid_renderer_defers_snap_chromium_until_no_other_browser(monkeypatc
     assert mermaid_render._find_chromium() == "/usr/bin/chromium-browser"
 
 
+def test_mermaid_renderer_skips_snap_chromium_as_only_system_browser(monkeypatch) -> None:
+    import vibeflow.mermaid_render as mermaid_render
+
+    paths = {
+        "chromium": "/snap/bin/chromium",
+        "chromium-browser": None,
+        "google-chrome": None,
+        "google-chrome-stable": None,
+    }
+
+    monkeypatch.setattr(mermaid_render.shutil, "which", lambda name: paths.get(name))
+
+    assert mermaid_render._find_chromium() is None
+    assert mermaid_render._puppeteer_launch_options() == [("Puppeteer bundled browser", None)]
+
+
+def test_mermaid_puppeteer_config_omits_executable_by_default(tmp_path) -> None:
+    import vibeflow.mermaid_render as mermaid_render
+
+    path = tmp_path / "puppeteer.json"
+    mermaid_render._write_puppeteer_config(path)
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["args"] == ["--no-sandbox", "--disable-setuid-sandbox"]
+    assert "executablePath" not in payload
+
+
+def test_mermaid_renderer_falls_back_to_non_snap_system_browser(tmp_path, monkeypatch) -> None:
+    import subprocess
+    import vibeflow.mermaid_render as mermaid_render
+
+    mmdc = tmp_path / "mmdc"
+    mmdc.write_text("", encoding="utf-8")
+    calls: list[dict[str, object]] = []
+
+    def fake_run(command, **kwargs):
+        config_path = Path(command[command.index("--puppeteerConfigFile") + 1])
+        output_path = Path(command[command.index("--output") + 1])
+        calls.append(json.loads(config_path.read_text(encoding="utf-8")))
+        if len(calls) == 1:
+            return subprocess.CompletedProcess(command, 1, stdout="", stderr="missing bundled browser")
+        output_path.write_text("<svg></svg>", encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(mermaid_render, "_find_mmdc", lambda: mmdc)
+    monkeypatch.setattr(mermaid_render, "_ensure_mermaid_cli_compat", lambda: None)
+    monkeypatch.setattr(
+        mermaid_render,
+        "_puppeteer_launch_options",
+        lambda: [("Puppeteer bundled browser", None), ("/usr/bin/google-chrome", "/usr/bin/google-chrome")],
+    )
+    monkeypatch.setattr(mermaid_render, "_snap_chromium_candidates", lambda: ["/snap/bin/chromium"])
+    monkeypatch.setattr(mermaid_render.subprocess, "run", fake_run)
+
+    output = tmp_path / "graph.svg"
+    mermaid_render.render_mermaid_svg("flowchart TD\n  A-->B\n", output)
+
+    assert "executablePath" not in calls[0]
+    assert calls[1]["executablePath"] == "/usr/bin/google-chrome"
+    assert output.read_text(encoding="utf-8") == "<svg></svg>"
+
+
 def test_cli_inspect_node_reports_unmatched_type(tmp_path, capsys) -> None:
     module_path = tmp_path / "demo_node.py"
     module_path.write_text(

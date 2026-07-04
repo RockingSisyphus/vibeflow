@@ -45,48 +45,54 @@ def render_mermaid_svg(
     output.parent.mkdir(parents=True, exist_ok=True)
     mmdc = _find_mmdc()
     _ensure_mermaid_cli_compat()
+    errors: list[tuple[str, str]] = []
+    skipped_snap = _snap_chromium_candidates()
     with tempfile.TemporaryDirectory(prefix="vibeflow-mermaid-") as temp_dir:
         temp = Path(temp_dir)
         input_path = temp / "graph.mmd"
         config_path = temp / "puppeteer.json"
         mermaid_config_path = temp / "mermaid.json"
         input_path.write_text(mermaid_text, encoding="utf-8")
-        _write_puppeteer_config(config_path)
         _write_mermaid_config(
             mermaid_config_path,
             max_text_size=max_text_size,
             max_edges=max_edges,
             html_labels=html_labels,
         )
-        command = [
-            str(mmdc),
-            "--input",
-            str(input_path),
-            "--output",
-            str(output),
-            "--theme",
-            theme,
-            "--backgroundColor",
-            background,
-            "--configFile",
-            str(mermaid_config_path),
-            "--puppeteerConfigFile",
-            str(config_path),
-        ]
-        completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_seconds)
-    if completed.returncode != 0:
-        detail = (completed.stderr or completed.stdout or "Mermaid CLI failed").strip()
-        raise MermaidRenderError(detail)
-    if not output.exists():
-        raise MermaidRenderError(f"Mermaid CLI did not create {output}")
-    _raise_on_error_svg(output)
-    return output
+        for label, executable_path in _puppeteer_launch_options():
+            if output.exists():
+                output.unlink()
+            _write_puppeteer_config(config_path, executable_path=executable_path)
+            command = [
+                str(mmdc),
+                "--input",
+                str(input_path),
+                "--output",
+                str(output),
+                "--theme",
+                theme,
+                "--backgroundColor",
+                background,
+                "--configFile",
+                str(mermaid_config_path),
+                "--puppeteerConfigFile",
+                str(config_path),
+            ]
+            completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_seconds)
+            if completed.returncode == 0:
+                if not output.exists():
+                    raise MermaidRenderError(f"Mermaid CLI did not create {output}")
+                _raise_on_error_svg(output)
+                return output
+            detail = (completed.stderr or completed.stdout or "Mermaid CLI failed").strip()
+            errors.append((label, detail))
+    raise MermaidRenderError(_format_render_errors(errors, skipped_snap=skipped_snap))
 
 
 def is_mermaid_svg_renderer_available() -> bool:
     try:
         _find_mmdc()
-        return _find_chromium() is not None
+        return True
     except MermaidRenderError:
         return False
 
@@ -110,11 +116,10 @@ def _ensure_mermaid_cli_compat() -> None:
         expected.write_text(fallback.read_text(encoding="utf-8"), encoding="utf-8")
 
 
-def _write_puppeteer_config(path: Path) -> None:
+def _write_puppeteer_config(path: Path, *, executable_path: str | None = None) -> None:
     config: dict[str, object] = {"args": ["--no-sandbox", "--disable-setuid-sandbox"]}
-    chromium = _find_chromium()
-    if chromium:
-        config["executablePath"] = chromium
+    if executable_path:
+        config["executablePath"] = executable_path
     path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
@@ -149,22 +154,55 @@ def _validate_positive_int(name: str, value: int) -> None:
         raise MermaidRenderError(f"Mermaid {name} must be a positive integer")
 
 
-def _find_chromium() -> str | None:
-    snap_candidates: list[str] = []
+def _puppeteer_launch_options() -> list[tuple[str, str | None]]:
+    options: list[tuple[str, str | None]] = [("Puppeteer bundled browser", None)]
+    options.extend((path, path) for path in _system_browser_candidates())
+    return options
+
+
+def _system_browser_candidates() -> list[str]:
+    candidates: list[str] = []
+    seen: set[str] = set()
     for name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
         found = shutil.which(name)
-        if not found:
+        if not found or _is_snap_chromium(found) or found in seen:
             continue
-        if _is_snap_chromium(found):
-            snap_candidates.append(found)
-            continue
-        return found
-    return snap_candidates[0] if snap_candidates else None
+        candidates.append(found)
+        seen.add(found)
+    return candidates
+
+
+def _find_chromium() -> str | None:
+    candidates = _system_browser_candidates()
+    return candidates[0] if candidates else None
+
+
+def _snap_chromium_candidates() -> list[str]:
+    candidates: list[str] = []
+    for name in ("chromium", "chromium-browser"):
+        found = shutil.which(name)
+        if found and _is_snap_chromium(found):
+            candidates.append(found)
+    return candidates
 
 
 def _is_snap_chromium(path: str) -> bool:
     browser_path = Path(path)
     return browser_path.name in {"chromium", "chromium-browser"} and browser_path.as_posix().startswith("/snap/")
+
+
+def _format_render_errors(errors: list[tuple[str, str]], *, skipped_snap: list[str]) -> str:
+    lines = ["Mermaid CLI failed to render SVG with all supported browser launch options."]
+    if skipped_snap:
+        lines.append(
+            "Skipped snap Chromium because Puppeteer commonly fails to launch it with profile-lock errors: "
+            + ", ".join(skipped_snap)
+        )
+    lines.append("Run `npm install` in tools/mermaid-renderer to install Puppeteer's browser, or install a non-snap Chrome/Chromium.")
+    for label, detail in errors:
+        first_line = detail.splitlines()[0] if detail else "Mermaid CLI failed"
+        lines.append(f"- {label}: {first_line}")
+    return "\n".join(lines)
 
 
 def _repo_root() -> Path:

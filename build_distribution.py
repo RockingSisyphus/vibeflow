@@ -215,6 +215,8 @@ npm install
 cd ../..
 ```
 
+不要求系统预装 Google Chrome。正常执行 `npm install` 后，Puppeteer 会安装并使用自己的浏览器缓存；如果该缓存不可用，VibeFlow 会再尝试非 snap 的系统 Chrome/Chromium。`/snap/bin/chromium` 会被跳过，因为它在 Puppeteer/mermaid-cli 下常见 profile lock 启动失败。
+
 ## Kernel 完整性检查
 
 分发包包含 `kernel/MANIFEST.sha256`。`run.py` 会在运行前校验 kernel 归档、启动器和 AI 指引文件是否被修改。
