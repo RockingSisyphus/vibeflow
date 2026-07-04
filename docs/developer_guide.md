@@ -127,6 +127,49 @@ def add(left: float, right: float) -> float:
 - runtime 使用 node inbox / edge payload。node 只能收到直接 incoming edge 投递的数据；早期上游输出不会被跨多跳读取。
 - `pipeline.outputs` 决定 run result 保留哪些 envelope；未声明的中间值不会出现在最终结果中。
 
+### config node 可视化元数据
+
+每个 `pipeline.nodes[]` 调用点都应该声明面向图审查的元数据：
+
+```jsonc
+{
+  "name": "add",
+  "type": "demo.add",
+  "display_name": "Add Delta",
+  "description": "Add a configured delta to the incoming value.",
+  "category": "demo",
+  "version": "0.1.0",
+  "style": {
+    "fill": "#f8fafc",
+    "stroke": "#475569",
+    "text": "#111827"
+  },
+  "requires": [{"type": "value.in", "cardinality": "exactly_one"}],
+  "provides": [{"key": "value.out", "type": "value.out"}],
+  "config": {"delta": 3}
+}
+```
+
+- `display_name` 和 `description` 是 node 实例级说明；即使注册类 `NODE_INFO` 已有说明，调用点没写也会产生 `GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME` 或 `GRAPH.SMELL.MISSING_NODE_DESCRIPTION` warning。
+- `display_name`、`category`、`version`、`description`、`style` 是可视化元数据，不会进入运行时 `params`。
+- 如果 node 运行时确实需要同名参数，必须写进 `"config": {...}`。
+- `style` 只允许 `fill`、`stroke`、`text` 三个 `#RRGGBB` hex 颜色；大小写会规范化。
+- 自定义颜色只应用于普通节点。health error/warning、planned node、resource、document、nodeset、external dependency 等系统语义样式优先级更高。
+
+VibeFlow 系统颜色是保留语义色，不能作为 `style` 自定义色使用；使用时会产生 `CONFIG.SCHEMA.NODE_STYLE_RESERVED_COLOR`。
+
+| 系统样式 | fill | stroke | text |
+| --- | --- | --- | --- |
+| 普通 node `defaultNode` | `#ECECFF` | `#9370DB` | `#333333` |
+| planned node / planned resource | `#fef08a` | `#ca8a04` | `#713f12` |
+| plugin resource | `#eff6ff` | `#2563eb` | `#1e3a8a` |
+| base_lib resource | `#ecfdf5` | `#059669` | `#064e3b` |
+| health error | `#fee2e2` | `#dc2626` | `#7f1d1d` |
+| health warning | `#fef3c7` | `#d97706` | `#78350f` |
+| external dependency | `#e0f2fe` | `#0284c7` | `#0c4a6e` |
+| document node | `#f0fdf4` | `#16a34a` | `#14532d` |
+| nodeset node | `#ede9fe` | `#7c3aed` | `#3b0764` |
+
 ```jsonc
 {
   "global_config": {"config": {"tenant": "demo"}, "allow_config_override": false},
@@ -142,20 +185,24 @@ def add(left: float, right: float) -> float:
     "inputs": [{"key": "value.in", "type": "value.in"}],
     "outputs": [{"type": "value.out", "cardinality": "exactly_one"}],
     "nodes": [
-      {"name": "start", "type": "demo.start"},
+      {"name": "start", "type": "demo.start", "display_name": "Start", "description": "Starts the demo pipeline."},
       {
         "name": "input",
         "type": "demo.input",
+        "display_name": "Read Input",
+        "description": "Reads the incoming value envelope.",
         "requires": [{"type": "value.in", "cardinality": "exactly_one"}],
         "provides": [{"key": "value.in.input", "type": "value.in"}]
       },
       {
         "name": "add",
         "type": "demo.add",
+        "display_name": "Add Delta",
+        "description": "Adds a configured delta to the input value.",
         "requires": [{"type": "value.in", "cardinality": "exactly_one"}],
         "provides": [{"key": "value.out", "type": "value.out"}]
       },
-      {"name": "end", "type": "demo.end", "requires": [{"type": "value.out", "cardinality": "exactly_one"}]}
+      {"name": "end", "type": "demo.end", "display_name": "End", "description": "Consumes the final output.", "requires": [{"type": "value.out", "cardinality": "exactly_one"}]}
     ],
     "edges": [
       ["start", "input"],
@@ -211,6 +258,8 @@ def add(left: float, right: float) -> float:
       {
         "name": "catalog",
         "type": "nodeset.paperflow.catalog",
+        "display_name": "Catalog Papers",
+        "description": "Runs the paper cataloging composite flow.",
         "requires": [{"type": "query.in", "cardinality": "exactly_one"}],
         "provides": [{"key": "catalog.out", "type": "catalog.out"}]
       }

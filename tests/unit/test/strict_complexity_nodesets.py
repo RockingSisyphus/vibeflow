@@ -50,9 +50,9 @@ def test_jsonc_loader_strips_comments_without_changing_runtime_data(tmp_path) ->
   /*
     block comment
   */
-  "pipeline": {
+    "pipeline": {
     "nodes": [
-      {"name": "seed", "type": "test.seed", "provides": ["value.in"]}
+      {"name": "seed", "type": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in"}]}
     ]
   }
 }
@@ -111,7 +111,7 @@ def test_policy_default_discovery_explicit_and_inline_merge_order(tmp_path) -> N
                         ]
                     },
                 },
-                "pipeline": {"nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"]}]},
+                "pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])]},
             }
         ),
         encoding="utf-8",
@@ -221,8 +221,8 @@ def test_cli_validate_jsonc_outputs_effective_policy(tmp_path, capsys) -> None:
   "pipeline": {
     // data edge should be inferred
     "nodes": [
-      {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
-      {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]}
+      {"name": "seed", "type": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in"}]},
+      {"name": "add", "type": "test.add", "display_name": "Add", "description": "Adds value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}], "provides": [{"key": "value.out", "type": "value.out"}]}
     ]
   }
 }
@@ -315,7 +315,7 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
         run_id="minimal_example",
     )
 
-    assert result.context.get("value.out") == 5
+    assert result.context.get("value.out")["value"] == 5
     assert result.health.status == "CONCERNS"
     assert "plugin.policy:minimal_project_policy" in result.health.effective_policy["sources"]
     assert result.health.effective_policy["base_lib"]["allowed_modules"] == ["base_lib.math_tools"]
@@ -330,5 +330,5 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
         run_root=tmp_path / "runs",
         run_id="minimal_example_imports",
     )
-    assert imported_result.context.get("value.out") == 5
+    assert imported_result.context.get("value.out")["value"] == 5
     assert imported_result.health.info["nodeset_imports"][0]["names"] == ["example.add_one"]

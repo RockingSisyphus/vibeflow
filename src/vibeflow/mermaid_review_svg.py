@@ -21,6 +21,7 @@ from .mermaid import (
     export_mermaid,
 )
 from .mermaid_render import DEFAULT_MERMAID_MAX_EDGES, DEFAULT_MERMAID_MAX_TEXT_SIZE, MermaidRenderError, render_mermaid_svg
+from .visual_style import MERMAID_RESOURCE_CLASS_ORDER, mermaid_class_def_lines
 
 
 REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH = 3200.0
@@ -501,9 +502,7 @@ def _resource_mermaid(root_label: str, resources: tuple[Mapping[str, object], ..
     child_class = "pluginResource" if kind == "plugin" else "baseLibResource"
     lines = [
         "flowchart LR",
-        "  classDef baseLibResource fill:#ecfdf5,stroke:#059669,color:#064e3b;",
-        "  classDef pluginResource fill:#eff6ff,stroke:#2563eb,color:#1e3a8a;",
-        "  classDef plannedResource fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;",
+        *(f"  {line}" for line in mermaid_class_def_lines(MERMAID_RESOURCE_CLASS_ORDER)),
         f'  {root_id}@{{ shape: hex, label: "{_escape_label(root_label)}" }}',
         f"  class {root_id} {child_class};",
     ]

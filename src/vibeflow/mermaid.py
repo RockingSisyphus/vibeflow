@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import textwrap
 from typing import TYPE_CHECKING
 from typing import Any, Mapping
 
 from .compiler import CompiledGraph
 from .data_contract import providers_to_dicts, requirements_to_dicts
-from .flowchart_render_helpers import compile_for_render, node_flow_kind, node_is_external, nodeset_for_node, shorten
+from .flowchart_render_helpers import compile_for_render, node_flow_kind, node_is_external, nodeset_for_node
 from .graph_config import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
 from .node import FLOW_KIND_DATA_STORE, FLOW_KIND_DECISION, FLOW_KIND_DOCUMENT, FLOW_KIND_IO, FLOW_KIND_PREDEFINED, FLOW_KIND_PREPARATION, FLOW_KIND_PROCESS, FLOW_KIND_TERMINAL
 from .planned_behavior import effective_planned_behavior, planned_behavior_label
 from .runtime_helpers import has_planned, planned_items
+from .visual_style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
 
 if TYPE_CHECKING:
     from .registry import NodeRegistry
@@ -58,6 +60,8 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
                 "status": node.status,
                 "planned_behavior": node.planned_behavior.to_dict(),
                 "flow_kind": node_flow_kind(node, compiled),
+                "metadata": node.metadata.to_dict(),
+                "style": node.style.to_dict(),
             }
             for node in graph.nodes
         ],
@@ -111,15 +115,7 @@ class _MermaidRenderer:
             return self._render_review_columns(graph, compiled)
         lines = [
             "flowchart TD",
-            "  classDef healthError fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;",
-            "  classDef healthWarning fill:#fef3c7,stroke:#d97706,color:#78350f;",
-            "  classDef externalDependency fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;",
-            "  classDef documentNode fill:#f0fdf4,stroke:#16a34a,color:#14532d;",
-            "  classDef nodesetNode fill:#ede9fe,stroke:#7c3aed,color:#3b0764;",
-            "  classDef plannedNode fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;",
-            "  classDef baseLibResource fill:#ecfdf5,stroke:#059669,color:#064e3b;",
-            "  classDef pluginResource fill:#eff6ff,stroke:#2563eb,color:#1e3a8a;",
-            "  classDef plannedResource fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;",
+            *(f"  {line}" for line in mermaid_class_def_lines(MERMAID_MAIN_CLASS_ORDER)),
         ]
         self._render_graph_body(lines, graph, compiled, prefix="", indent="  ", visited_nodesets=())
         self._render_edges(lines, compiled, prefix="", indent="  ")
@@ -150,11 +146,12 @@ class _MermaidRenderer:
             nodeset = nodeset_for_node(graph, node)
             if nodeset is None:
                 flow_kind = node_flow_kind(node, compiled) or FLOW_KIND_PROCESS
-                preferred_class = "externalDependency" if self._node_is_external(node) else ""
+                preferred_class = self._preferred_class_for_node(node, flow_kind=flow_kind)
                 class_name = self._class_for_node(node_id, preferred_class=preferred_class, planned=node.status == STATUS_PLANNED)
                 lines.append(f"{indent}{_node_shape(node_id, self._node_label(node), flow_kind)}")
                 if class_name:
                     lines.append(f"{indent}class {node_id} {class_name};")
+                self._render_custom_node_style(lines, node, node_id, class_name=class_name, indent=indent)
                 continue
             flow_kind = node_flow_kind(node, compiled) or nodeset.flow_kind
             class_name = self._class_for_node(node_id, preferred_class="nodesetNode", planned=node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED)
@@ -270,9 +267,35 @@ class _MermaidRenderer:
         return classes
 
     def _class_for_node(self, node_id: str, *, preferred_class: str = "", planned: bool = False) -> str:
+        finding_class = self.node_classes.get(node_id)
+        if finding_class:
+            return finding_class
         if planned:
             return "plannedNode"
-        return self.node_classes.get(node_id) or preferred_class
+        return preferred_class or "defaultNode"
+
+    def _preferred_class_for_node(self, node: NodeSpec, *, flow_kind: str) -> str:
+        if self._node_is_external(node):
+            return "externalDependency"
+        if flow_kind == FLOW_KIND_DOCUMENT:
+            return "documentNode"
+        return "defaultNode"
+
+    def _render_custom_node_style(self, lines: list[str], node: NodeSpec, node_id: str, *, class_name: str, indent: str) -> None:
+        if class_name != "defaultNode":
+            return
+        style = node.style.to_dict()
+        if not style:
+            return
+        fields: list[str] = []
+        if "fill" in style:
+            fields.append(f"fill:{style['fill']}")
+        if "stroke" in style:
+            fields.append(f"stroke:{style['stroke']}")
+        if "text" in style:
+            fields.append(f"color:{style['text']}")
+        if fields:
+            lines.append(f"{indent}style {node_id} {','.join(fields)};")
 
     def _node_is_external(self, node: NodeSpec) -> bool:
         return node_is_external(node, self.registry)
@@ -295,65 +318,70 @@ class _MermaidRenderer:
         return ()
 
     def _node_label(self, node: NodeSpec) -> str:
-        lines = [node.name, node.node_type]
+        sections: list[list[str]] = [[f"name: {node.name}", f"type: {node.node_type}"]]
         if node.status == STATUS_PLANNED:
-            lines.append(planned_behavior_label(node.planned_behavior))
+            planned_lines = [f"status: {planned_behavior_label(node.planned_behavior)}"]
             if node.planned_behavior.stub_module:
-                lines.append(f"stub: {node.planned_behavior.stub_module}")
+                planned_lines.append(f"stub: {node.planned_behavior.stub_module}")
+            sections.append(planned_lines)
         if self.show_semantics:
-            lines.extend(self._node_semantic_lines(node))
+            semantic_lines = self._node_semantic_lines(node)
+            if semantic_lines:
+                sections.append(list(semantic_lines))
         if self.show_contract:
-            lines.extend((_key_line("requires", node.requires), _key_line("provides", node.provides)))
-        return _join_label_lines(lines)
+            sections.append([_key_line("requires", node.requires), _key_line("provides", node.provides)])
+        return _join_label_sections(sections)
 
     def _nodeset_label(self, node: NodeSpec, nodeset: NodesetSpec) -> str:
-        lines = [node.name, node.node_type]
+        sections: list[list[str]] = [[f"name: {node.name}", f"type: {node.node_type}"]]
         if node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED:
             behavior = effective_planned_behavior(node, nodeset)
-            lines.append(planned_behavior_label(behavior))
+            planned_lines = [f"status: {planned_behavior_label(behavior)}"]
             if behavior.stub_module:
-                lines.append(f"stub: {behavior.stub_module}")
+                planned_lines.append(f"stub: {behavior.stub_module}")
+            sections.append(planned_lines)
         if self.show_semantics:
-            lines.extend(
-                (
-                    nodeset.display_name,
+            call_lines = _node_metadata_lines(node)
+            if call_lines:
+                sections.append(list(call_lines))
+            sections.append(
+                [
+                    f"nodeset: {nodeset.display_name}",
                     f"category: {nodeset.category}",
                     f"version: {nodeset.version}",
-                    nodeset.description,
-                )
+                    f"desc: {nodeset.description}",
+                ]
             )
         if self.show_contract:
-            lines.extend(
-                (
+            sections.append(
+                [
                     _key_line("requires", nodeset.requires or node.requires),
                     _key_line("provides", nodeset.provides or node.provides),
                     _key_line("exports", nodeset.exports),
-                )
+                ]
             )
-        return _join_label_lines(lines)
+        return _join_label_sections(sections)
 
     def _node_semantic_lines(self, node: NodeSpec) -> tuple[str, ...]:
-        lines: list[str] = []
+        lines = list(_node_metadata_lines(node))
         if self.registry is not None and node.status != STATUS_PLANNED and not node.node_type.startswith("nodeset."):
             try:
                 node_cls = self.registry.get(node.node_type)
             except Exception:
                 node_cls = None
             info = getattr(node_cls, "NODE_INFO", None) if node_cls is not None else None
-            if info is not None:
-                lines.extend(
-                    str(value)
-                    for value in (
-                        getattr(info, "display_name", ""),
-                        f"category: {getattr(info, 'category', '')}",
-                        f"version: {getattr(info, 'version', '')}",
-                        getattr(info, "description", ""),
-                    )
-                    if str(value).strip()
-                )
-                if getattr(info, "external", False):
-                    lines.append("external: true")
-        lines.extend(_node_param_semantic_lines(node))
+            if info is not None and not lines:
+                for label, value in (
+                    ("display", getattr(info, "display_name", "")),
+                    ("category", getattr(info, "category", "")),
+                    ("version", getattr(info, "version", "")),
+                    ("desc", getattr(info, "description", "")),
+                ):
+                    text = str(value).strip()
+                    if text:
+                        lines.append(f"{label}: {text}")
+            if info is not None and getattr(info, "external", False):
+                lines.append("external: true")
         return tuple(lines)
 
 
@@ -366,12 +394,17 @@ def _nodeset_node_ids(graph: GraphConfig, node_ids: Mapping[str, str]) -> dict[s
     return result
 
 
-def _node_param_semantic_lines(node: NodeSpec) -> tuple[str, ...]:
+def _node_metadata_lines(node: NodeSpec) -> tuple[str, ...]:
     lines: list[str] = []
-    for key in ("display_name", "category", "version", "description"):
-        value = node.params.get(key)
-        if isinstance(value, str) and value.strip():
-            lines.append(f"{key}: {value.strip()}" if key != "description" else value.strip())
+    metadata = node.metadata
+    if metadata.display_name:
+        lines.append(f"display: {metadata.display_name}")
+    if metadata.category:
+        lines.append(f"category: {metadata.category}")
+    if metadata.version:
+        lines.append(f"version: {metadata.version}")
+    if metadata.description:
+        lines.append(f"desc: {metadata.description}")
     return tuple(lines)
 
 
@@ -459,7 +492,36 @@ def _contract_item_text(item: object) -> str:
 
 
 def _join_label_lines(lines: tuple[str, ...] | list[str]) -> str:
-    return "\n".join(shorten(line) for line in lines if str(line).strip())
+    out: list[str] = []
+    for line in lines:
+        if not str(line).strip():
+            continue
+        out.extend(_wrap_label_line(line))
+    return "\n".join(out)
+
+
+def _join_label_sections(sections: list[list[str]]) -> str:
+    out: list[str] = []
+    for section in sections:
+        lines = _join_label_lines(section).splitlines()
+        if not lines:
+            continue
+        if out:
+            out.append("")
+        out.extend(lines)
+    return "\n".join(out)
+
+
+def _wrap_label_line(value: object, *, width: int = 56, max_lines: int = 4) -> list[str]:
+    text = str(value).replace("\r", " ").replace("\n", " ").strip()
+    if not text:
+        return []
+    wrapped = textwrap.wrap(text, width=width, break_long_words=True, break_on_hyphens=False) or [text]
+    if len(wrapped) <= max_lines:
+        return wrapped
+    truncated = wrapped[:max_lines]
+    truncated[-1] = truncated[-1].rstrip(". ") + "..."
+    return truncated
 
 
 def _escape_label(value: str) -> str:

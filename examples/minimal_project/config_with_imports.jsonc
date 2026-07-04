@@ -34,11 +34,15 @@
     "nodes": [
       {
         "name": "start",
-        "type": "example.start"
+        "type": "example.start",
+        "display_name": "Start",
+        "description": "Starts the imported-nodeset example pipeline."
       },
       {
         "name": "seed",
         "type": "example.seed",
+        "display_name": "Seed Value",
+        "description": "Produces the initial value.",
         "provides": [
           {
             "key": "value.in",
@@ -50,6 +54,8 @@
       {
         "name": "add_one_flow",
         "type": "nodeset.example.add_one",
+        "display_name": "Add One Flow",
+        "description": "Runs the imported add-one nodeset.",
         "requires": [
           {
             "type": "value.in",
@@ -66,6 +72,8 @@
       {
         "name": "end",
         "type": "example.end",
+        "display_name": "End",
+        "description": "Consumes the final pipeline output.",
         "requires": [
           {
             "type": "value.out",

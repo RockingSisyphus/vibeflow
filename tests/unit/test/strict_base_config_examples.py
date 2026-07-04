@@ -129,7 +129,7 @@ def test_policy_downgrade_schema_requires_audit_fields() -> None:
                     ]
                 }
             },
-            "pipeline": {"nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"]}]},
+            "pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])]},
         }
     )
     rule_ids = {finding.rule_id for finding in findings}
@@ -151,10 +151,10 @@ def test_mermaid_collapsed_and_expanded_views_share_top_level_compiled_edges() -
             ],
             "pipeline": {
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
-                    {"name": "flow", "type": "nodeset.math.add_one", "requires": ["value.in"], "provides": ["value.out"]},
-                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                    _node_call("start", "test.start", "Starts the nodeset fixture."),
+                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("flow", "nodeset.math.add_one", "Calls the add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": _edge_chain("start", "seed", "flow", "end"),
             },
@@ -183,7 +183,7 @@ def test_checked_run_artifact_integrity_cross_links_health_graph_trace(tmp_path)
     graph_mmd = (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
     trace = [json.loads(line) for line in (result.run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
 
-    assert result.context.get("value.out") == 8
+    assert result.context.get("value.out")["value"] == 8
     assert health["status"] == result.health.status
     assert compiled["effective_edges"] == [
         {"from": "start", "to": "seed", "when": ""},
@@ -302,10 +302,10 @@ def test_optional_architecture_report_is_not_health_gate() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
-                    {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
-                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                    _node_call("start", "test.start", "Starts the architecture fixture."),
+                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("add", "test.add", "Adds value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": _edge_chain("start", "seed", "add", "end"),
             }

@@ -154,15 +154,29 @@ def _edge_chain(*names: str) -> list[dict[str, str]]:
     return [{"from": source, "to": target} for source, target in zip(names, names[1:])]
 
 
+def _node_call(name: str, node_type: str, default_description: str, **fields) -> dict:
+    return {
+        "name": name,
+        "type": node_type,
+        "display_name": name.replace("_", " ").title(),
+        "description": default_description,
+        **fields,
+    }
+
+
 def _seed_add_pipeline(*, seed: dict | None = None, add: dict | None = None) -> dict:
-    seed_node = {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")], **(seed or {})}
-    add_node = {"name": "add", "type": "test.add", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")], **(add or {})}
+    seed_fields = dict(seed or {})
+    seed_defaults = {"provides": [PROV_SPEC("value.in")], **seed_fields}
+    seed_node = _node_call(str(seed_defaults.pop("name", "seed")), str(seed_defaults.pop("type", "test.seed")), "Produces the initial value.", **seed_defaults)
+    add_fields = dict(add or {})
+    add_defaults = {"requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")], **add_fields}
+    add_node = _node_call(str(add_defaults.pop("name", "add")), str(add_defaults.pop("type", "test.add")), "Adds delta to value.in.", **add_defaults)
     return {
         "nodes": [
-            {"name": "start", "type": "test.start"},
+            _node_call("start", "test.start", "Starts the flow."),
             seed_node,
             add_node,
-            {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+            _node_call("end", "test.out_end", "Ends after value.out is ready.", requires=[REQ_SPEC("value.out")]),
         ],
         "edges": _edge_chain("start", "seed", "add", "end"),
         "outputs": [REQ_SPEC("value.out")],
@@ -170,12 +184,14 @@ def _seed_add_pipeline(*, seed: dict | None = None, add: dict | None = None) -> 
 
 
 def _seed_only_pipeline(*, seed: dict | None = None) -> dict:
-    seed_node = {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")], **(seed or {})}
+    seed_fields = dict(seed or {})
+    seed_defaults = {"provides": [PROV_SPEC("value.in")], **seed_fields}
+    seed_node = _node_call(str(seed_defaults.pop("name", "seed")), str(seed_defaults.pop("type", "test.seed")), "Produces the initial value.", **seed_defaults)
     return {
         "nodes": [
-            {"name": "start", "type": "test.start"},
+            _node_call("start", "test.start", "Starts the flow."),
             seed_node,
-            {"name": "end", "type": "test.in_end", "requires": [REQ_SPEC("value.in")]},
+            _node_call("end", "test.in_end", "Ends after value.in is ready.", requires=[REQ_SPEC("value.in")]),
         ],
         "edges": _edge_chain("start", "seed", "end"),
         "outputs": [REQ_SPEC("value.in")],
@@ -183,17 +199,18 @@ def _seed_only_pipeline(*, seed: dict | None = None) -> dict:
 
 
 def _input_add_pipeline(*, add: dict | None = None) -> dict:
-    add_node = {"name": "add", "type": "test.add", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")], **(add or {})}
+    add_fields = dict(add or {})
+    add_defaults = {"requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")], **add_fields}
+    add_node = _node_call(str(add_defaults.pop("name", "add")), str(add_defaults.pop("type", "test.add")), "Adds delta to value.in.", **add_defaults)
     add_name = str(add_node["name"])
     return {
         "inputs": [PROV_SPEC("value.in")],
         "nodes": [
-            {"name": "start", "type": "test.start"},
-            {"name": "input", "type": "test.value_input", "requires": [REQ_SPEC("value.in")]},
+            _node_call("start", "test.start", "Starts the flow."),
             add_node,
-            {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+            _node_call("end", "test.out_end", "Ends after value.out is ready.", requires=[REQ_SPEC("value.out")]),
         ],
-        "edges": _edge_chain("start", "input", add_name, "end"),
+        "edges": _edge_chain("start", add_name, "end"),
         "outputs": [REQ_SPEC("value.out")],
     }
 

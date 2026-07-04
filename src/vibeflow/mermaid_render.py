@@ -17,6 +17,10 @@ DEFAULT_MERMAID_MAX_TEXT_SIZE = 200_000
 EXPANDED_MERMAID_MAX_TEXT_SIZE = 500_000
 DEFAULT_MERMAID_MAX_EDGES = 2_000
 EXPANDED_MERMAID_MAX_EDGES = 5_000
+DEFAULT_FLOWCHART_NODE_SPACING = 80
+DEFAULT_FLOWCHART_RANK_SPACING = 90
+DEFAULT_FLOWCHART_WRAPPING_WIDTH = 360
+DEFAULT_FLOWCHART_DIAGRAM_PADDING = 24
 
 _MERMAID_ERROR_TEXT_MARKERS = (
     "Maximum text size in diagram exceeded",
@@ -130,7 +134,13 @@ def _write_mermaid_config(path: Path, *, max_text_size: int, max_edges: int, htm
         "maxTextSize": max_text_size,
         "maxEdges": max_edges,
         "htmlLabels": html_labels,
-        "flowchart": {"htmlLabels": html_labels},
+        "flowchart": {
+            "htmlLabels": html_labels,
+            "nodeSpacing": DEFAULT_FLOWCHART_NODE_SPACING,
+            "rankSpacing": DEFAULT_FLOWCHART_RANK_SPACING,
+            "wrappingWidth": DEFAULT_FLOWCHART_WRAPPING_WIDTH,
+            "diagramPadding": DEFAULT_FLOWCHART_DIAGRAM_PADDING,
+        },
         "markdownAutoWrap": False,
     }
     path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")

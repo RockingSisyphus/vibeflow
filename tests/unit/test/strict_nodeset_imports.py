@@ -32,12 +32,13 @@ def test_nodeset_imports_expand_for_validate_inspect_mermaid_and_run(tmp_path, c
                 "nodeset_imports": [{"path": "nodesets.jsonc", "names": ["math.add_one"]}],
                 "pipeline": {
                     "nodes": [
-                        {"name": "start", "type": "test.start"},
-                        {"name": "seed", "type": "test.seed", "provides": ["value.in"], "value": 4},
-                        {"name": "flow", "type": "nodeset.math.add_one", "requires": ["value.in"], "provides": ["value.out"]},
-                        {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                        _node_call("start", "test.start", "Starts the imported nodeset fixture."),
+                        _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")], value=4),
+                        _node_call("flow", "nodeset.math.add_one", "Calls imported add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                        _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                     ],
                     "edges": _edge_chain("start", "seed", "flow", "end"),
+                    "outputs": [REQ_SPEC("value.out")],
                 },
             }
         ),
@@ -57,7 +58,7 @@ def test_nodeset_imports_expand_for_validate_inspect_mermaid_and_run(tmp_path, c
     assert "flow__add" in capsys.readouterr().out
 
     result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="nodeset-import")
-    assert result.context.get("value.out") == 5
+    assert result.context.get("value.out")["value"] == 5
     health = json.loads((result.run_dir / "health_report.json").read_text(encoding="utf-8"))
     assert health["info"]["nodeset_imports"][0]["path"] == str(imports_path.resolve())
 

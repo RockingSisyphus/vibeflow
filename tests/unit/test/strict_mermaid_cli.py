@@ -58,6 +58,25 @@ def test_mermaid_puppeteer_config_omits_executable_by_default(tmp_path) -> None:
     assert "executablePath" not in payload
 
 
+def test_mermaid_config_uses_readable_svg_spacing_defaults(tmp_path) -> None:
+    import vibeflow.mermaid_render as mermaid_render
+
+    path = tmp_path / "mermaid.json"
+    mermaid_render._write_mermaid_config(path, max_text_size=1234, max_edges=56, html_labels=False)
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    flowchart = payload["flowchart"]
+
+    assert payload["htmlLabels"] is False
+    assert payload["maxTextSize"] == 1234
+    assert payload["maxEdges"] == 56
+    assert flowchart["htmlLabels"] is False
+    assert flowchart["nodeSpacing"] == mermaid_render.DEFAULT_FLOWCHART_NODE_SPACING
+    assert flowchart["rankSpacing"] == mermaid_render.DEFAULT_FLOWCHART_RANK_SPACING
+    assert flowchart["wrappingWidth"] == mermaid_render.DEFAULT_FLOWCHART_WRAPPING_WIDTH
+    assert flowchart["diagramPadding"] == mermaid_render.DEFAULT_FLOWCHART_DIAGRAM_PADDING
+
+
 def test_mermaid_renderer_falls_back_to_non_snap_system_browser(tmp_path, monkeypatch) -> None:
     import subprocess
     import vibeflow.mermaid_render as mermaid_render
@@ -146,7 +165,7 @@ class DemoNode:
 """,
             "missing_contract",
         ),
-        (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('provides=("demo.out",)', 'provides=("demo.out", "demo.out")')), "contract_duplicate_key"),
+        (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('provides=(PROV("demo.out"),)', 'provides=(PROV("demo.out"), PROV("demo.out"))')), "contract_duplicate_key"),
         (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('output_semantics={"demo.out": ("demo output",)},', 'output_semantics={},')), "contract_semantics_missing"),
         (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('output_schema={"demo.out": {"type": "number"}},', 'output_schema={},')), "contract_schema_missing"),
         (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('output_schema={"demo.out": {"type": "number"}},', 'output_schema={"demo.out": {}},')), "contract_schema_shape"),
@@ -380,7 +399,7 @@ def test_node_internal_call_chain_recursion_fails(tmp_path, capsys) -> None:
     assert recursive["details"]["path"] == ["_a", "_b", "_a"]
 
 def test_graph_health_reports_node_call_chain_metrics() -> None:
-    graph = parse_graph_config({"pipeline": {"nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"]}]}})
+    graph = parse_graph_config({"pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])]}})
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
     assert report.info["node_metrics"]["seed"]["call_chain_length"] == 1
     assert report.info["node_metrics"]["seed"]["call_chain_path"] == ["run_pure"]
@@ -392,16 +411,17 @@ def test_runtime_allows_non_json_object_output_by_reference() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "set_output", "type": "test.set_output", "provides": ["value.out"]},
-                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                    _node_call("start", "test.start", "Starts the runtime fixture."),
+                    _node_call("set_output", "test.set_output", "Produces a non-JSON object output.", provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": _edge_chain("start", "set_output", "end"),
+                "outputs": [REQ_SPEC("value.out")],
             }
         }
     )
     context = PipelineRuntime(graph, registry=registry).run()
-    assert context.get("value.out") == {1, 2}
+    assert context.get("value.out")["value"] == {1, 2}
 
 def test_runtime_ignores_legacy_snapshot_metadata() -> None:
     registry = _registry()
@@ -410,16 +430,17 @@ def test_runtime_ignores_legacy_snapshot_metadata() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "opaque", "type": "test.opaque_output", "provides": ["value.out"]},
-                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                    _node_call("start", "test.start", "Starts the runtime fixture."),
+                    _node_call("opaque", "test.opaque_output", "Produces an opaque object output.", provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": _edge_chain("start", "opaque", "end"),
+                "outputs": [REQ_SPEC("value.out")],
             }
         }
     )
     context = PipelineRuntime(graph, registry=registry).run()
-    assert context.get("value.out") == {1, 2}
+    assert context.get("value.out")["value"] == {1, 2}
 
 def test_runtime_allows_input_mutation_by_reference() -> None:
     registry = _registry()
@@ -427,26 +448,20 @@ def test_runtime_allows_input_mutation_by_reference() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": ["value.in"],
+                "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
-                    {
-                        "name": "mutate",
-                        "type": "test.mutating_input",
-                        "requires": ["value.in"],
-                        "provides": ["value.out"],
-                    },
-                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                    _node_call("start", "test.start", "Starts the runtime fixture."),
+                    _node_call("mutate", "test.mutating_input", "Mutates the input object by reference.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
                 ],
-                "edges": _edge_chain("start", "input", "mutate", "end"),
+                "edges": _edge_chain("start", "mutate", "end"),
+                "outputs": [REQ_SPEC("value.out")],
             }
         }
     )
     value = [1, 2]
     context = PipelineRuntime(graph, registry=registry).run({"value.in": value})
-    assert context.get("value.in") is value
-    assert context.get("value.out") is value
+    assert context.get("value.out")["value"] is value
     assert value == [1, 2, 3]
 
 def test_collect_node_metrics_reports_complexity_and_contract_size() -> None:
@@ -518,8 +533,8 @@ def test_missing_examples_and_example_contract_gap_are_concerns(tmp_path, capsys
     assert any(warning["details"].get("legacy_code") == "missing_examples" for warning in payload["health"]["warnings"])
 
     gap_contract = VALID_NODE_CONTRACT.replace(
-        'provides=("demo.out",),',
-        'requires=("demo.in",),\n        provides=("demo.out",),\n        input_semantics={"demo.in": ("demo input",)},',
+        'provides=(PROV("demo.out"),),',
+        'requires=(REQ("demo.in"),),\n        provides=(PROV("demo.out"),),\n        input_semantics={"demo.in": ("demo input",)},',
     )
     code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(contract=gap_contract))
     assert code == 0

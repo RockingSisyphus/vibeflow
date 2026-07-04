@@ -6,7 +6,7 @@ def test_architecture_smells_warn_for_mismatched_metadata_and_unstable_keys(tmp_
     info = VALID_NODE_INFO.replace('description="Demo node."', 'description="Calculates invoice total."')
     contract = """
     CONTRACT = NodeContract(
-        provides=("Tmp Key",),
+        provides=(PROV("Tmp Key"),),
         output_semantics={"Tmp Key": ("scratch debug value",)},
         output_schema={"Tmp Key": {"type": "number"}},
         examples=({"inputs": {}, "params": {}},),
@@ -28,8 +28,8 @@ def test_graph_health_reports_node_metrics_duplicate_logic_and_confusing_node_na
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "DuplicateOne", "type": "test.duplicate_one", "provides": ["dup.one"]},
-                    {"name": "duplicate_two", "type": "test.duplicate_two", "provides": ["dup.two"]},
+                    _node_call("DuplicateOne", "test.duplicate_one", "Produces the first duplicate fixture value.", provides=[PROV_SPEC("dup.one")]),
+                    _node_call("duplicate_two", "test.duplicate_two", "Produces the second duplicate fixture value.", provides=[PROV_SPEC("dup.two")]),
                 ]
             }
         }
@@ -47,9 +47,9 @@ def test_graph_health_policy_can_exempt_findings() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "BadName", "type": "test.seed", "provides": ["value.in"]},
-                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                    _node_call("start", "test.start", "Starts the fixture flow."),
+                    _node_call("BadName", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("end", "test.in_end", "Consumes value.in at the end.", requires=[REQ_SPEC("value.in")]),
                 ],
                 "edges": _edge_chain("start", "BadName", "end"),
             }
@@ -88,9 +88,9 @@ def test_graph_health_warns_for_duplicate_explicit_edges() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
-                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                    _node_call("start", "test.start", "Starts the fixture flow."),
+                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("end", "test.in_end", "Consumes value.in at the end.", requires=[REQ_SPEC("value.in")]),
                 ],
                 "edges": [
                     {"from": "start", "to": "seed"},
@@ -117,13 +117,13 @@ def test_graph_health_warns_for_overwide_nodeset() -> None:
                     exports=["wide.out"],
                     pipeline={
                         "nodes": [
-                            {"name": f"n{index}", "type": "test.seed", "provides": [f"wide.k{index}"]}
+                            _node_call(f"n{index}", "test.seed", f"Produces wide.k{index}.", provides=[PROV_SPEC(f"wide.k{index}")])
                             for index in range(11)
                         ]
                     },
                 )
             ],
-            "pipeline": {"nodes": [{"name": "wide_flow", "type": "nodeset.wide.flow", "provides": ["wide.out"]}]},
+            "pipeline": {"nodes": [_node_call("wide_flow", "nodeset.wide.flow", "Calls the wide composite.", provides=[PROV_SPEC("wide.out")])]},
         }
     )
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
@@ -140,7 +140,7 @@ def test_nodeset_schema_requires_metadata_contract_and_purity() -> None:
                     "pipeline": {"nodes": [{"name": "seed", "type": "test.seed"}]},
                 }
             ],
-            "pipeline": {"nodes": [{"name": "flow", "type": "nodeset.bad.flow", "provides": ["value.out"]}]},
+            "pipeline": {"nodes": [_node_call("flow", "nodeset.bad.flow", "Calls the bad composite.", provides=[PROV_SPEC("value.out")])]},
         }
     )
     rule_ids = {finding.rule_id for finding in findings}
@@ -161,19 +161,13 @@ def test_nodeset_health_accepts_valid_contract_and_groups_no_findings() -> None:
                 )
             ],
             "pipeline": {
-                "inputs": ["value.in"],
+                "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
-                    {
-                        "name": "composite",
-                        "type": "nodeset.math.add_one",
-                        "requires": ["value.in"],
-                        "provides": ["value.out"],
-                    },
-                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                    _node_call("start", "test.start", "Starts the composite fixture."),
+                    _node_call("composite", "nodeset.math.add_one", "Calls the add-one composite.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
                 ],
-                "edges": _edge_chain("start", "input", "composite", "end"),
+                "edges": _edge_chain("start", "composite", "end"),
             },
         }
     )
@@ -190,23 +184,23 @@ def test_nodeset_health_rejects_direct_and_indirect_recursion() -> None:
                     provides=["loop.out"],
                     exports=["loop.out"],
                     pipeline={
-                        "nodes": [{"name": "self", "type": "nodeset.loop.self", "provides": ["loop.out"]}]
+                        "nodes": [_node_call("self", "nodeset.loop.self", "Calls itself recursively.", provides=[PROV_SPEC("loop.out")])]
                     },
                 ),
                 _nodeset_config(
                     "loop.a",
                     provides=["loop.out"],
                     exports=["loop.out"],
-                    pipeline={"nodes": [{"name": "to_b", "type": "nodeset.loop.b", "provides": ["loop.out"]}]},
+                    pipeline={"nodes": [_node_call("to_b", "nodeset.loop.b", "Calls loop.b.", provides=[PROV_SPEC("loop.out")])]},
                 ),
                 _nodeset_config(
                     "loop.b",
                     provides=["loop.out"],
                     exports=["loop.out"],
-                    pipeline={"nodes": [{"name": "to_a", "type": "nodeset.loop.a", "provides": ["loop.out"]}]},
+                    pipeline={"nodes": [_node_call("to_a", "nodeset.loop.a", "Calls loop.a.", provides=[PROV_SPEC("loop.out")])]},
                 ),
             ],
-            "pipeline": {"nodes": [{"name": "use_self", "type": "nodeset.loop.self", "provides": ["loop.out"]}]},
+            "pipeline": {"nodes": [_node_call("use_self", "nodeset.loop.self", "Calls the recursive composite.", provides=[PROV_SPEC("loop.out")])]},
         }
     )
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
@@ -225,19 +219,15 @@ def test_nodeset_health_rejects_export_and_internal_key_leak() -> None:
                     exports=["missing.out"],
                     pipeline={
                         "nodes": [
-                            {"name": "public", "type": "test.seed", "provides": ["public.out"]},
-                            {"name": "tmp", "type": "test.seed", "provides": ["tmp.internal"]},
+                            _node_call("public", "test.seed", "Produces public output.", provides=[PROV_SPEC("public.out")]),
+                            _node_call("tmp", "test.seed", "Produces internal temporary output.", provides=[PROV_SPEC("tmp.internal")]),
                         ]
                     },
                 )
             ],
             "pipeline": {
                 "nodes": [
-                    {
-                        "name": "bad_scope",
-                        "type": "nodeset.bad.scope",
-                        "provides": ["public.out", "tmp.internal"],
-                    }
+                    _node_call("bad_scope", "nodeset.bad.scope", "Calls a scope-violating composite.", provides=[PROV_SPEC("public.out"), PROV_SPEC("tmp.internal")])
                 ]
             },
         }
@@ -262,26 +252,20 @@ def test_nodeset_health_and_runtime_reject_external_contract_mismatch() -> None:
                 )
             ],
             "pipeline": {
-                "inputs": ["value.in"],
+                "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
-                    {
-                        "name": "bad_composite",
-                        "type": "nodeset.math.add_one",
-                        "requires": ["value.in"],
-                        "provides": ["wrong.out"],
-                    },
-                    {"name": "end", "type": "test.start"},
+                    _node_call("start", "test.start", "Starts the mismatch fixture."),
+                    _node_call("bad_composite", "nodeset.math.add_one", "Calls the composite with a wrong external contract.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("wrong.out")]),
+                    _node_call("end", "test.start", "Ends the mismatch fixture."),
                 ],
-                "edges": _edge_chain("start", "input", "bad_composite", "end"),
+                "edges": _edge_chain("start", "bad_composite", "end"),
             },
         }
     )
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
     assert any(error.rule_id == "NODESET.CONTRACT.EXTERNAL_MISMATCH" for error in report.errors)
-    with pytest.raises(PipelineRuntimeError, match="provides must match"):
-        PipelineRuntime(graph, registry=_registry()).run({"value": {"in": 2}})
+    with pytest.raises(PipelineRuntimeError, match="cannot export undeclared keys"):
+        PipelineRuntime(graph, registry=_registry()).run({"value.in": 2})
 
 def test_nodeset_health_rejects_nested_nodeset_contract_mismatch() -> None:
     graph = parse_graph_config(
@@ -291,16 +275,16 @@ def test_nodeset_health_rejects_nested_nodeset_contract_mismatch() -> None:
                     "inner.flow",
                     provides=["inner.out"],
                     exports=["inner.out"],
-                    pipeline={"nodes": [{"name": "seed", "type": "test.seed", "provides": ["inner.out"]}]},
+                    pipeline={"nodes": [_node_call("seed", "test.seed", "Produces inner output.", provides=[PROV_SPEC("inner.out")])]},
                 ),
                 _nodeset_config(
                     "outer.flow",
                     provides=["outer.out"],
                     exports=["outer.out"],
-                    pipeline={"nodes": [{"name": "inner", "type": "nodeset.inner.flow", "provides": ["outer.out"]}]},
+                    pipeline={"nodes": [_node_call("inner", "nodeset.inner.flow", "Calls inner flow with a wrong contract.", provides=[PROV_SPEC("outer.out")])]},
                 ),
             ],
-            "pipeline": {"nodes": [{"name": "outer", "type": "nodeset.outer.flow", "provides": ["outer.out"]}]},
+            "pipeline": {"nodes": [_node_call("outer", "nodeset.outer.flow", "Calls outer flow.", provides=[PROV_SPEC("outer.out")])]},
         }
     )
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))

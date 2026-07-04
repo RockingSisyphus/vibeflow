@@ -133,6 +133,11 @@
           "status": { "enum": ["planned", "implemented"] },
           "flow_kind": { "enum": ["terminal", "process", "decision", "io", "predefined", "data_store", "document", "preparation"] },
           "planned_behavior": { "$ref": "#/$defs/plannedBehavior" },
+          "display_name": { "type": "string" },
+          "category": { "type": "string" },
+          "version": { "type": "string" },
+          "description": { "type": "string" },
+          "style": { "$ref": "#/$defs/nodeStyle" },
           "requires": { "type": "array", "items": { "$ref": "#/$defs/dataRequirement" } },
           "provides": { "type": "array", "items": { "$ref": "#/$defs/dataProvider" } },
           "config": { "type": "object" },
@@ -153,6 +158,19 @@
           }
         ]
       }
+    },
+    "hexColor": {
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}$"
+    },
+    "nodeStyle": {
+      "type": "object",
+      "properties": {
+        "fill": { "$ref": "#/$defs/hexColor" },
+        "stroke": { "$ref": "#/$defs/hexColor" },
+        "text": { "$ref": "#/$defs/hexColor" }
+      },
+      "additionalProperties": false
     },
     "scopedConfig": {
       "type": "object",

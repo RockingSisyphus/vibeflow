@@ -15,22 +15,25 @@ def _planned_stub_config(*, behavior=None, node_status: str = "planned") -> dict
     return {
         "global_config": {"config": {"bonus": 3}, "allow_config_override": True},
         "pipeline": {
-            "inputs": ["value.in"],
+            "inputs": [PROV_SPEC("value.in")],
             "nodes": [
-                {"name": "start", "type": "test.start"},
-                {
-                    "name": "stub",
-                    "status": node_status,
-                    "flow_kind": "process",
-                    "requires": ["value.in"],
-                    "provides": ["value.out"],
-                    "config": {"delta": 4},
-                    "planned_behavior": behavior
+                _node_call("start", "test.start", "Starts the planned stub fixture."),
+                _node_call(
+                    "stub",
+                    "planned.stub",
+                    "Runs the planned python stub.",
+                    status=node_status,
+                    flow_kind="process",
+                    requires=[REQ_SPEC("value.in")],
+                    provides=[PROV_SPEC("value.out")],
+                    config={"delta": 4},
+                    planned_behavior=behavior
                     or {"kind": "python_stub", "stub_module": "project/stubs/runtime_control_stub.py"},
-                },
-                {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                ),
+                _node_call("end", "test.out_end", "Consumes planned stub output.", requires=[REQ_SPEC("value.out")]),
             ],
             "edges": _edge_chain("start", "stub", "end"),
+            "outputs": [REQ_SPEC("value.out")],
         },
     }
 
@@ -40,7 +43,7 @@ def test_planned_behavior_schema_and_parser_defaults() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "future", "status": "planned", "flow_kind": "process"},
+                    _node_call("future", "planned.future", "Represents future work.", status="planned", flow_kind="process"),
                 ]
             }
         }
@@ -64,15 +67,20 @@ def test_transparent_planned_participates_in_flow_health() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
+                "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {
-                        "name": "future",
-                        "status": "planned",
-                        "flow_kind": "process",
-                        "planned_behavior": "transparent",
-                    },
-                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                    _node_call("start", "test.start", "Starts the transparent planned fixture."),
+                    _node_call(
+                        "future",
+                        "planned.future",
+                        "Represents transparent future work.",
+                        status="planned",
+                        flow_kind="process",
+                        requires=[REQ_SPEC("value.in")],
+                        provides=[PROV_SPEC("value.in")],
+                        planned_behavior="transparent",
+                    ),
+                    _node_call("end", "test.in_end", "Consumes value.in.", requires=[REQ_SPEC("value.in")]),
                 ],
                 "edges": _edge_chain("start", "future", "end"),
             }
@@ -91,9 +99,9 @@ def test_blocking_planned_keeps_old_flow_health_behavior() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "future", "status": "planned", "flow_kind": "process"},
-                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                    _node_call("start", "test.start", "Starts the blocking planned fixture."),
+                    _node_call("future", "planned.future", "Represents blocking future work.", status="planned", flow_kind="process"),
+                    _node_call("end", "test.in_end", "Consumes value.in.", requires=[REQ_SPEC("value.in")]),
                 ],
                 "edges": _edge_chain("start", "future", "end"),
             }
@@ -111,7 +119,7 @@ def test_python_stub_health_validates_entry_and_safety(tmp_path) -> None:
         tmp_path,
         """
 def run_stub(inputs, params):
-    return {"value.out": inputs["value.in"] + params["delta"] + params["_global"]["bonus"]}
+    return {"value.out": inputs["value.in"]["value"] + params["delta"] + params["_global"]["bonus"]}
 """,
     )
     graph = parse_graph_config(_planned_stub_config(), project_root=tmp_path)
@@ -132,11 +140,11 @@ def run_stub(inputs, params):
     )
     assert result.health.status == "CONCERNS"
     assert result.health.info["production_ready"] is False
-    assert result.context.get("value.out") == 12
+    assert result.context.get("value.out")["value"] == 12
     trace = [json.loads(line) for line in (result.run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
     stub_event = next(item for item in trace if item["kind"] == "planned_stub")
     assert stub_event["details"]["stub_module"] == "project/stubs/runtime_control_stub.py"
-    assert stub_event["details"]["input_keys"] == ["value.in"]
+    assert stub_event["details"]["input_types"] == ["value.in"]
     assert stub_event["details"]["output_keys"] == ["value.out"]
 
 
@@ -145,7 +153,7 @@ def test_python_stub_default_run_refuses_and_allow_flag_is_behavior_strict(tmp_p
         tmp_path,
         """
 def run_stub(inputs, params):
-    return {"value.out": inputs["value.in"]}
+    return {"value.out": inputs["value.in"]["value"]}
 """,
     )
     config_path.write_text(json.dumps(_planned_stub_config()), encoding="utf-8")
@@ -173,7 +181,7 @@ def test_python_stub_return_keys_must_exactly_match_provides(tmp_path) -> None:
         tmp_path,
         """
 def run_stub(inputs, params):
-    return {"value.out": inputs["value.in"], "extra.out": 1}
+    return {"value.out": inputs["value.in"]["value"], "extra.out": 1}
 """,
     )
     config_path.write_text(json.dumps(_planned_stub_config()), encoding="utf-8")
@@ -213,36 +221,43 @@ def test_planned_python_stub_nodeset_executes_as_single_stub(tmp_path) -> None:
         tmp_path,
         """
 def run_stub(inputs, params):
-    return {"value.out": inputs["value.in"] + params["delta"]}
+    return {"value.out": inputs["value.in"]["value"] + params["delta"]}
 """,
     )
     config = {
         "nodesets": [
             {
                 "name": "future.math",
+                "display_name": "Future Math",
+                "category": "test",
+                "description": "Planned math nodeset executed by a python stub.",
+                "version": "0.1.0",
+                "purity": "pure",
                 "status": "planned",
                 "planned_behavior": {"kind": "python_stub", "stub_module": "project/stubs/runtime_control_stub.py"},
-                "requires": ["value.in"],
-                "provides": ["value.out"],
-                "exports": ["value.out"],
+                "requires": [REQ_SPEC("value.in")],
+                "provides": [PROV_SPEC("value.out")],
+                "exports": [PROV_SPEC("value.out")],
             }
         ],
         "pipeline": {
-            "inputs": ["value.in"],
+            "inputs": [PROV_SPEC("value.in")],
             "nodes": [
-                {"name": "start", "type": "test.start"},
-                {
-                    "name": "future",
-                    "type": "nodeset.future.math",
-                    "status": "planned",
-                    "flow_kind": "predefined",
-                    "requires": ["value.in"],
-                    "provides": ["value.out"],
-                    "config": {"delta": 8},
-                },
-                {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                _node_call("start", "test.start", "Starts the planned nodeset fixture."),
+                _node_call(
+                    "future",
+                    "nodeset.future.math",
+                    "Calls the planned math nodeset.",
+                    status="planned",
+                    flow_kind="predefined",
+                    requires=[REQ_SPEC("value.in")],
+                    provides=[PROV_SPEC("value.out")],
+                    config={"delta": 8},
+                ),
+                _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
             ],
             "edges": _edge_chain("start", "future", "end"),
+            "outputs": [REQ_SPEC("value.out")],
         },
     }
     config_path.write_text(json.dumps(config), encoding="utf-8")
@@ -256,5 +271,5 @@ def run_stub(inputs, params):
         runtime_options=RuntimeOptions(allow_planned_stub=True),
     )
 
-    assert result.context.get("value.out") == 10
+    assert result.context.get("value.out")["value"] == 10
     assert list(result.context.get("runtime.exec_order")) == ["start", "future", "end"]

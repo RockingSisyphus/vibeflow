@@ -6,6 +6,7 @@ from typing import Any, Mapping
 from .compiler import CompiledGraph
 from .flowchart_render_helpers import compile_for_render, nodeset_for_node
 from .graph_config import GraphConfig
+from .visual_style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
 
 
 @dataclass(frozen=True)
@@ -45,15 +46,7 @@ _BASE_LIB_COLUMN = _ResourceColumnSpec(
 def render_review_columns(renderer: Any, graph: GraphConfig, compiled: CompiledGraph) -> str:
     lines = [
         "flowchart LR",
-        "  classDef healthError fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;",
-        "  classDef healthWarning fill:#fef3c7,stroke:#d97706,color:#78350f;",
-        "  classDef externalDependency fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;",
-        "  classDef documentNode fill:#f0fdf4,stroke:#16a34a,color:#14532d;",
-        "  classDef nodesetNode fill:#ede9fe,stroke:#7c3aed,color:#3b0764;",
-        "  classDef plannedNode fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;",
-        "  classDef baseLibResource fill:#ecfdf5,stroke:#059669,color:#064e3b;",
-        "  classDef pluginResource fill:#eff6ff,stroke:#2563eb,color:#1e3a8a;",
-        "  classDef plannedResource fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;",
+        *(f"  {line}" for line in mermaid_class_def_lines(MERMAID_MAIN_CLASS_ORDER)),
         "  classDef layoutAnchor fill:transparent,stroke:transparent,color:transparent;",
     ]
     column_anchors = _render_main_column(renderer, lines, graph, compiled)

@@ -61,6 +61,7 @@ def validate_graph_health(
 
     append_planned_findings(graph, state)
     _validate_graph_nodes(graph, registry, plugin_registry, purity_policy, state)
+    _append_node_visual_metadata_warnings(graph, state)
     if not state.errors:
         try:
             compiled = GraphCompiler().compile(graph, registry=registry)
@@ -308,6 +309,29 @@ def _append_node_config_health(graph: GraphConfig, registry: NodeRegistry, state
             state.warnings.append(finding)
         else:
             state.errors.append(finding)
+
+
+def _append_node_visual_metadata_warnings(graph: GraphConfig, state: _HealthValidationState, *, owner: str = "pipeline") -> None:
+    for node in graph.nodes:
+        if not node.metadata.display_name.strip():
+            state.warnings.append(_node_visual_metadata_finding("GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME", node.name, "display_name", owner=owner))
+        if not node.metadata.description.strip():
+            state.warnings.append(_node_visual_metadata_finding("GRAPH.SMELL.MISSING_NODE_DESCRIPTION", node.name, "description", owner=owner))
+    for nodeset in graph.nodesets.values():
+        _append_node_visual_metadata_warnings(nodeset.graph, state, owner=f"nodeset:{nodeset.name}")
+
+
+def _node_visual_metadata_finding(rule_id: str, node_name: str, field: str, *, owner: str) -> HealthFinding:
+    return HealthFinding(
+        rule_id=rule_id,
+        severity="warning",
+        object_type="node",
+        object_id=node_name,
+        failure_layer="topology",
+        message=f"config node '{node_name}' should declare {field} for readable SVG diagrams",
+        suggested_fix_type="fix_config",
+        details={"field": field, "owner": owner},
+    )
 
 
 def _append_registry_namespace_smells(registry: NodeRegistry, state: _HealthValidationState) -> None:
