@@ -365,9 +365,10 @@ def test_review_columns_inline_fragments_prefix_duplicate_svg_ids() -> None:
     from vibeflow.mermaid_review_svg import _SvgFragment, _compose_svg
 
     fragment_svg = (
-        '<svg xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10">'
+        '<svg id="my-svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10">'
+        "<style>#my-svg{font-family:Arial}#my-svg .node rect{fill:#ECECFF}.edge{stroke: #abc;fill:#333333}</style>"
         '<defs><marker id="arrow"></marker></defs>'
-        '<path marker-end="url(#arrow)" href="#arrow" xlink:href="#arrow"/>'
+        '<g class="node"><rect/></g><path class="edge" marker-end="url(#arrow)" href="#arrow" xlink:href="#arrow"/>'
         "</svg>"
     )
     svg = _compose_svg(
@@ -380,9 +381,19 @@ def test_review_columns_inline_fragments_prefix_duplicate_svg_ids() -> None:
         background="transparent",
     )
 
+    assert 'id="my-svg"' not in svg
     assert 'id="arrow"' not in svg
+    assert 'id="vf_column_0_0_my-svg"' in svg
+    assert 'id="vf_column_0_1_my-svg"' in svg
     assert 'id="vf_column_0_0_arrow"' in svg
     assert 'id="vf_column_0_1_arrow"' in svg
+    assert "#my-svg" not in svg
+    assert "#vf_column_0_0_my-svg{font-family:Arial}" in svg
+    assert "#vf_column_0_0_my-svg .node rect" in svg
+    assert "#vf_column_0_1_my-svg{font-family:Arial}" in svg
+    assert "#vf_column_0_1_my-svg .node rect" in svg
+    assert "fill:#333333" in svg
+    assert "stroke: #abc" in svg
     assert 'marker-end="url(#vf_column_0_0_arrow)"' in svg
     assert 'marker-end="url(#vf_column_0_1_arrow)"' in svg
     assert 'href="#vf_column_0_0_arrow"' in svg

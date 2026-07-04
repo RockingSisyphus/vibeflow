@@ -13,8 +13,8 @@ class ProviderPlanningBoundary(DemoBoundary):
 class TwoRouteNode:
     NODE_INFO = NodeInfo("test.two_route", "Two Route", "test", "Routes flow.", "0.1.0", "decision")
     CONTRACT = NodeContract(
-        requires=("value.in",),
-        provides=("flow.route",),
+        requires=(DataRequirement("value.in", "exactly_one"),),
+        provides=(DataProvider("flow.route", "flow.route"),),
         input_semantics={"value.in": ("input",)},
         output_semantics={"flow.route": ("route",)},
         output_schema={"flow.route": {"type": "string", "enum": ["again", "done"]}},
@@ -23,6 +23,21 @@ class TwoRouteNode:
 
     def run_pure(self, inputs, params):
         return {"flow.route": "done"}
+
+
+class BodyRouteNode:
+    NODE_INFO = NodeInfo("test.body_route", "Body Route", "test", "Routes inside a loop body.", "0.1.0", "decision")
+    CONTRACT = NodeContract(
+        requires=(DataRequirement("flow.route", "exactly_one"),),
+        provides=(DataProvider("flow.inner", "flow.inner"),),
+        input_semantics={"flow.route": ("outer loop route",)},
+        output_semantics={"flow.inner": ("body branch route",)},
+        output_schema={"flow.inner": {"type": "string", "enum": ["left", "right"]}},
+        examples=({"inputs": {"flow.route": "again"}, "params": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {"flow.inner": "left"}
 
 
 def _register_fulltext_nodes(registry: NodeRegistry) -> None:
@@ -109,16 +124,15 @@ def test_decision_branch_value_must_match_output_schema() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": ["value.in"],
                 "nodes": [
                     {"name": "start", "type": "test.start"},
-                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
-                    {"name": "route", "type": "test.two_route", "requires": ["value.in"], "provides": ["flow.route"]},
-                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                    {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")]},
+                    {"name": "route", "type": "test.two_route", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("flow.route")]},
+                    {"name": "end", "type": "test.start"},
                 ],
                 "edges": [
-                    {"from": "start", "to": "input"},
-                    {"from": "input", "to": "route"},
+                    {"from": "start", "to": "seed"},
+                    {"from": "seed", "to": "route"},
                     {"from": "route", "to": "end", "when": "flow.route == 'typo'"},
                 ],
             }
@@ -135,18 +149,17 @@ def test_decision_non_loop_branch_must_reach_end_but_loop_branch_is_skipped() ->
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": ["value.in"],
                 "nodes": [
                     {"name": "start", "type": "test.start"},
-                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
-                    {"name": "route", "type": "test.two_route", "requires": ["value.in"], "provides": ["flow.route"]},
-                    {"name": "copy", "type": "test.copy", "requires": ["value.out"], "provides": ["value.in"]},
-                    {"name": "dead", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
-                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                    {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")]},
+                    {"name": "route", "type": "test.two_route", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("flow.route")]},
+                    {"name": "copy", "type": "test.seed", "provides": [{"key": "value.in.copy", "type": "value.in"}]},
+                    {"name": "dead", "type": "test.seed", "provides": [{"key": "value.in.dead", "type": "value.in"}]},
+                    {"name": "end", "type": "test.start"},
                 ],
                 "edges": [
-                    {"from": "start", "to": "input"},
-                    {"from": "input", "to": "route"},
+                    {"from": "start", "to": "seed"},
+                    {"from": "seed", "to": "route"},
                     {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
                     {"from": "copy", "to": "route"},
                     {"from": "route", "to": "dead", "when": "flow.route == 'done'"},
@@ -157,6 +170,49 @@ def test_decision_non_loop_branch_must_reach_end_but_loop_branch_is_skipped() ->
 
     report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
     assert any(item.rule_id == "GRAPH.DECISION.BRANCH_CANNOT_REACH_END" for item in report.errors)
+
+
+def test_decision_cycle_exit_is_checked_per_scc_not_per_body_decision() -> None:
+    registry = _registry()
+    register_node(registry, "test.two_route", TwoRouteNode)
+    register_node(registry, "test.body_route", BodyRouteNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")]},
+                    {"name": "controller", "type": "test.two_route", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("flow.route")]},
+                    {"name": "body_route", "type": "test.body_route", "requires": [REQ_SPEC("flow.route")], "provides": [PROV_SPEC("flow.inner")]},
+                    {
+                        "name": "left_continue",
+                        "type": "test.seed",
+                        "provides": [{"key": "value.in.left", "type": "value.in"}],
+                    },
+                    {
+                        "name": "right_continue",
+                        "type": "test.seed",
+                        "provides": [{"key": "value.in.right", "type": "value.in"}],
+                    },
+                    {"name": "end", "type": "test.start"},
+                ],
+                "edges": [
+                    {"from": "start", "to": "seed"},
+                    {"from": "seed", "to": "controller"},
+                    {"from": "controller", "to": "body_route", "when": "flow.route == 'again'"},
+                    {"from": "controller", "to": "end", "when": "flow.route == 'done'"},
+                    {"from": "body_route", "to": "left_continue", "when": "flow.inner == 'left'"},
+                    {"from": "body_route", "to": "right_continue", "when": "flow.inner == 'right'"},
+                    {"from": "left_continue", "to": "controller"},
+                    {"from": "right_continue", "to": "controller"},
+                ],
+            }
+        }
+    )
+
+    report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
+
+    assert not any(item.rule_id == "GRAPH.CYCLE.MISSING_DECISION_EXIT" for item in report.errors)
 
 
 def test_planned_node_is_concern_not_unknown_type() -> None:
