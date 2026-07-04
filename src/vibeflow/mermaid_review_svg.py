@@ -46,6 +46,8 @@ _PLACEHOLDER_STYLE = (
 )
 _SVG_NS = "http://www.w3.org/2000/svg"
 _XLINK_NS = "http://www.w3.org/1999/xlink"
+_SVG_URL_REFERENCE_PATTERN = re.compile(r"url\((?P<quote>['\"]?)#(?P<id>[^'\"\)\s]+)(?P=quote)\)")
+_CSS_ID_SELECTOR_PATTERN = re.compile(r"#(?P<id>[A-Za-z_][\w:.-]*)(?=[\s.\[>{+~,:])")
 
 ET.register_namespace("", _SVG_NS)
 ET.register_namespace("xlink", _XLINK_NS)
@@ -665,21 +667,26 @@ def _prefix_svg_ids(root: ET.Element, prefix: str) -> dict[str, str]:
 
 
 def _rewrite_svg_reference(value: str, id_map: Mapping[str, str]) -> str:
-    rewritten = value
-    for old, new in id_map.items():
-        escaped = re.escape(old)
-        rewritten = re.sub(rf"url\((['\"]?)#{escaped}\1\)", f"url(#{new})", rewritten)
-        rewritten = _rewrite_css_id_selector(rewritten, old=old, new=new)
-        if rewritten == f"#{old}":
-            rewritten = f"#{new}"
-    return rewritten
+    if "#" not in value:
+        return value
+    if value.startswith("#") and value[1:] in id_map:
+        return f"#{id_map[value[1:]]}"
+
+    def replace_url(match: re.Match[str]) -> str:
+        new = id_map.get(match.group("id"))
+        if not new:
+            return match.group(0)
+        return f"url(#{new})"
+
+    rewritten = _SVG_URL_REFERENCE_PATTERN.sub(replace_url, value)
+    return _rewrite_css_id_selectors(rewritten, id_map)
 
 
-def _rewrite_css_id_selector(value: str, *, old: str, new: str) -> str:
-    escaped = re.escape(old)
-    pattern = re.compile(rf"#{escaped}(?=[\s.\[>{{+~,:])")
-
+def _rewrite_css_id_selectors(value: str, id_map: Mapping[str, str]) -> str:
     def replace(match: re.Match[str]) -> str:
+        new = id_map.get(match.group("id"))
+        if not new:
+            return match.group(0)
         index = match.start() - 1
         while index >= 0 and value[index].isspace():
             index -= 1
@@ -687,7 +694,7 @@ def _rewrite_css_id_selector(value: str, *, old: str, new: str) -> str:
             return match.group(0)
         return f"#{new}"
 
-    return pattern.sub(replace, value)
+    return _CSS_ID_SELECTOR_PATTERN.sub(replace, value)
 
 
 def _validate_review_fragment_max_width(value: float) -> float:

@@ -150,11 +150,21 @@ def _validate_positive_int(name: str, value: int) -> None:
 
 
 def _find_chromium() -> str | None:
-    for name in ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable"):
+    snap_candidates: list[str] = []
+    for name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
         found = shutil.which(name)
-        if found:
-            return found
-    return None
+        if not found:
+            continue
+        if _is_snap_chromium(found):
+            snap_candidates.append(found)
+            continue
+        return found
+    return snap_candidates[0] if snap_candidates else None
+
+
+def _is_snap_chromium(path: str) -> bool:
+    browser_path = Path(path)
+    return browser_path.name in {"chromium", "chromium-browser"} and browser_path.as_posix().startswith("/snap/")
 
 
 def _repo_root() -> Path:
