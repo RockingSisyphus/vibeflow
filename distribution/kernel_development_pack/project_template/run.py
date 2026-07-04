@@ -142,6 +142,7 @@ from vibeflow import (  # noqa: E402
 )
 
 from vibeflow.config_schema import collect_config_schema_findings  # noqa: E402
+from vibeflow.mermaid_review_svg import render_review_columns_svg  # noqa: E402
 from vibeflow.mermaid_render import (  # noqa: E402
     DEFAULT_MERMAID_MAX_EDGES,
     DEFAULT_MERMAID_MAX_TEXT_SIZE,
@@ -348,7 +349,6 @@ def _svg(args) -> int:
     graph, resources = _load_graph_and_resources(args.config)
     registry = build_node_registry()
     compiled = GraphCompiler().compile(graph, registry=registry)
-    text = export_mermaid(graph, compiled=compiled, registry=registry, expand_nodesets=bool(args.expand_nodesets), resources=resources)
     max_text_size = (
         int(args.mermaid_max_text_size)
         if args.mermaid_max_text_size is not None
@@ -359,6 +359,19 @@ def _svg(args) -> int:
         if args.mermaid_max_edges is not None
         else (EXPANDED_MERMAID_MAX_EDGES if bool(args.expand_nodesets) else DEFAULT_MERMAID_MAX_EDGES)
     )
+    if bool(args.expand_nodesets):
+        render_review_columns_svg(
+            graph,
+            compiled,
+            Path(args.output),
+            registry=registry,
+            resources=resources,
+            expand_nodesets=True,
+            max_text_size=max_text_size,
+            max_edges=max_edges,
+        )
+        return 0
+    text = export_mermaid(graph, compiled=compiled, registry=registry, expand_nodesets=False, resources=resources)
     render_mermaid_svg(text, Path(args.output), max_text_size=max_text_size, max_edges=max_edges)
     return 0
 

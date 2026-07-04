@@ -202,7 +202,7 @@ python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
 python run.py quality --path project
 ```
 
-`svg` 默认会为 Mermaid CLI 放大渲染上限：普通图使用 `maxTextSize=200000`、`maxEdges=2000`；`--expand-nodesets` 使用 `maxTextSize=500000`、`maxEdges=5000`。超大图可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
+`svg` 默认会为 Mermaid CLI 放大渲染上限：普通图使用 `maxTextSize=200000`、`maxEdges=2000`；`--expand-nodesets` 使用 `maxTextSize=500000`、`maxEdges=5000`，并固定采用 `review-columns` SVG composer，把主流程、plugins、base_lib 和展开 nodeset 分列展示。超大图可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
 
 首次使用 `svg` 前，在分发目录执行一次：
 
