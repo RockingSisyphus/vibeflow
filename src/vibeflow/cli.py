@@ -33,6 +33,12 @@ def build_parser() -> argparse.ArgumentParser:
     mermaid.add_argument("--collapse-nodesets", dest="expand_nodesets", action="store_false")
     mermaid.add_argument("--hide-contract", action="store_true")
     mermaid.add_argument("--hide-semantics", action="store_true")
+    mermaid.add_argument(
+        "--mermaid-layout",
+        choices=("default", "review-columns"),
+        default="default",
+        help="Mermaid layout strategy: default inline layout or review-columns audit layout",
+    )
     mermaid.set_defaults(expand_nodesets=False)
 
     ascii_chart = sub.add_parser("export-ascii", help="export topology config to ASCII flowchart")
@@ -53,6 +59,12 @@ def build_parser() -> argparse.ArgumentParser:
     svg.add_argument("--hide-semantics", action="store_true")
     svg.add_argument("--theme", default="default")
     svg.add_argument("--background", default="transparent")
+    svg.add_argument(
+        "--mermaid-layout",
+        choices=("default", "review-columns"),
+        default="default",
+        help="Mermaid layout strategy for collapsed SVG rendering; expanded SVG always uses review-columns",
+    )
     svg.add_argument(
         "--mermaid-max-text-size",
         type=int,
@@ -219,14 +231,6 @@ def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
         print(report.to_json())
         return 1
     if export_kind == "svg":
-        mermaid_text = export_mermaid(
-            graph,
-            compiled=compiled,
-            expand_nodesets=bool(args.expand_nodesets),
-            show_contract=not bool(args.hide_contract),
-            show_semantics=not bool(args.hide_semantics),
-            resources=resources,
-        )
         max_text_size = (
             int(args.mermaid_max_text_size)
             if args.mermaid_max_text_size is not None
@@ -238,6 +242,53 @@ def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
             else (EXPANDED_MERMAID_MAX_EDGES if bool(args.expand_nodesets) else DEFAULT_MERMAID_MAX_EDGES)
         )
         try:
+            use_review_columns_svg = bool(args.expand_nodesets) or str(args.mermaid_layout) == "review-columns"
+            if use_review_columns_svg:
+                from .mermaid_review_svg import render_review_columns_svg
+
+                if args.output:
+                    render_review_columns_svg(
+                        graph,
+                        compiled,
+                        Path(args.output),
+                        registry=None,
+                        resources=resources,
+                        expand_nodesets=bool(args.expand_nodesets),
+                        show_contract=not bool(args.hide_contract),
+                        show_semantics=not bool(args.hide_semantics),
+                        theme=str(args.theme),
+                        background=str(args.background),
+                        max_text_size=max_text_size,
+                        max_edges=max_edges,
+                    )
+                else:
+                    with tempfile.TemporaryDirectory(prefix="vibeflow-svg-") as temp_dir:
+                        output = Path(temp_dir) / "graph.svg"
+                        render_review_columns_svg(
+                            graph,
+                            compiled,
+                            output,
+                            registry=None,
+                            resources=resources,
+                            expand_nodesets=bool(args.expand_nodesets),
+                            show_contract=not bool(args.hide_contract),
+                            show_semantics=not bool(args.hide_semantics),
+                            theme=str(args.theme),
+                            background=str(args.background),
+                            max_text_size=max_text_size,
+                            max_edges=max_edges,
+                        )
+                        print(output.read_text(encoding="utf-8"), end="")
+                return 0
+            mermaid_text = export_mermaid(
+                graph,
+                compiled=compiled,
+                expand_nodesets=bool(args.expand_nodesets),
+                show_contract=not bool(args.hide_contract),
+                show_semantics=not bool(args.hide_semantics),
+                resources=resources,
+                mermaid_layout=str(args.mermaid_layout),
+            )
             if args.output:
                 render_mermaid_svg(
                     mermaid_text,
@@ -280,6 +331,7 @@ def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
             show_contract=not bool(args.hide_contract),
             show_semantics=not bool(args.hide_semantics),
             resources=resources,
+            mermaid_layout=str(args.mermaid_layout),
         )
     if args.output:
         Path(args.output).write_text(text, encoding="utf-8")

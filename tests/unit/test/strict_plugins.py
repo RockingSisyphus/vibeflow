@@ -1,3 +1,5 @@
+import re
+
 from tests.unit.strict_support import *
 
 
@@ -11,7 +13,7 @@ class SinkNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        requires=("value.in",),
+        requires=(DataRequirement("value.in", "exactly_one"),),
         input_semantics={"value.in": ("input value",)},
         examples=({"inputs": {"value.in": 1}, "params": {}},),
     )
@@ -100,31 +102,46 @@ def test_nodeset_can_be_used_as_a_node() -> None:
                     "description": "Composite add-one flow.",
                     "version": "0.1.0",
                     "purity": "pure",
-                    "requires": ["value.in"],
-                    "provides": ["value.out"],
-                    "exports": ["value.out"],
-                    "pipeline": _input_add_pipeline(add={"delta": 1}),
+                    "requires": [REQ_SPEC("value.in")],
+                    "provides": [PROV_SPEC("value.out")],
+                    "exports": [PROV_SPEC("value.out")],
+                    "pipeline": {
+                        "inputs": [PROV_SPEC("value.in")],
+                        "nodes": [
+                            {"name": "start", "type": "test.start"},
+                            {
+                                "name": "add",
+                                "type": "test.add",
+                                "requires": [REQ_SPEC("value.in")],
+                                "provides": [PROV_SPEC("value.out")],
+                                "delta": 1,
+                            },
+                            {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                        ],
+                        "edges": _edge_chain("start", "add", "end"),
+                        "outputs": [REQ_SPEC("value.out")],
+                    },
                 }
             ],
                 "pipeline": {
-                    "inputs": ["value.in"],
+                    "inputs": [PROV_SPEC("value.in")],
                     "nodes": [
                         {"name": "start", "type": "test.start"},
-                        {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
                         {
                             "name": "composite",
                             "type": "nodeset.math.add_one",
-                            "requires": ["value.in"],
-                            "provides": ["value.out"],
+                            "requires": [REQ_SPEC("value.in")],
+                            "provides": [PROV_SPEC("value.out")],
                         },
-                        {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                        {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
                     ],
-                    "edges": _edge_chain("start", "input", "composite", "end"),
+                    "edges": _edge_chain("start", "composite", "end"),
+                    "outputs": [REQ_SPEC("value.out")],
                 },
         }
     )
-    context = PipelineRuntime(graph, registry=_registry()).run({"value": {"in": 2}})
-    assert context.get("value.out") == 3
+    context = PipelineRuntime(graph, registry=_registry()).run({"value.in": 2})
+    assert context.get("value.out")["value"] == 3
 
 def test_health_report_and_mermaid_export() -> None:
     graph = parse_graph_config(
@@ -155,17 +172,17 @@ def test_mermaid_collapses_and_expands_nodesets_with_contract_metadata() -> None
                 )
             ],
                 "pipeline": {
-                    "inputs": ["value.in"],
+                    "inputs": [PROV_SPEC("value.in")],
                     "nodes": [
                         {"name": "start", "type": "test.start"},
-                        {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
+                        {"name": "input", "type": "test.value_input", "requires": [REQ_SPEC("value.in")]},
                         {
                             "name": "composite",
                             "type": "nodeset.math.add_one",
-                            "requires": ["value.in"],
-                            "provides": ["value.out"],
+                            "requires": [REQ_SPEC("value.in")],
+                            "provides": [PROV_SPEC("value.out")],
                         },
-                        {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                        {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
                     ],
                     "edges": _edge_chain("start", "input", "composite", "end"),
                 },
@@ -183,14 +200,168 @@ def test_mermaid_collapses_and_expands_nodesets_with_contract_metadata() -> None
     assert 'composite__inner@{ shape: rect, label: "inner\\ntest.add' in expanded
     assert "Internal add step." in expanded
 
+def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nodesets() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "math.add_one",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline=_input_add_pipeline(add={"name": "inner", "description": "Internal add step."}),
+                )
+            ],
+            "pipeline": {
+                "inputs": [PROV_SPEC("value.in")],
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "input", "type": "test.value_input", "requires": [REQ_SPEC("value.in")]},
+                    {
+                        "name": "composite",
+                        "type": "nodeset.math.add_one",
+                        "requires": [REQ_SPEC("value.in")],
+                        "provides": [PROV_SPEC("value.out")],
+                    },
+                    {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                ],
+                "edges": _edge_chain("start", "input", "composite", "end"),
+            },
+        }
+    )
+    resources = {
+        "plugins": [
+            {
+                "name": "review_policy",
+                "type": "policy",
+                "module": "project.plugins.review_policy",
+                "status": "planned",
+                "info": {"display_name": "Review Policy", "description": "Checks graph policy."},
+            }
+        ],
+        "base_lib": {
+            "modules": [
+                {
+                    "name": "contracts",
+                    "module": "project.base_lib.contracts",
+                    "status": "implemented",
+                    "info": {"display_name": "Contracts", "description": "Shared contract helpers."},
+                }
+            ]
+        },
+    }
+
+    mermaid = export_mermaid(graph, expand_nodesets=True, resources=resources, mermaid_layout="review-columns")
+
+    assert mermaid.startswith("flowchart LR")
+    assert 'subgraph __vibeflow_layout_main["main pipeline"]' in mermaid
+    assert "    direction TB" in mermaid
+    assert "start --> input" in mermaid
+    assert 'subgraph __vibeflow_layout_plugins["plugins"]' in mermaid
+    assert 'subgraph __vibeflow_layout_base_lib["base_lib"]' in mermaid
+    assert 'subgraph __vibeflow_layout_nodesets["expanded nodesets"]' in mermaid
+    assert 'subgraph __vibeflow_layout_nodesets__composite__expanded["composite - math.add_one"]' in mermaid
+    assert "__vibeflow_layout_nodesets__composite__inner" in mermaid
+    assert mermaid.index("__vibeflow_layout_main") < mermaid.index("__vibeflow_layout_plugins")
+    assert mermaid.index("__vibeflow_layout_plugins") < mermaid.index("__vibeflow_layout_base_lib")
+    assert mermaid.index("__vibeflow_layout_base_lib") < mermaid.index("__vibeflow_layout_nodesets")
+
+def test_review_columns_svg_composer_places_columns_left_to_right(tmp_path) -> None:
+    if not is_mermaid_svg_renderer_available():
+        pytest.skip("Mermaid SVG renderer is not installed")
+    from vibeflow.mermaid_review_svg import render_review_columns_svg
+
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "math.add_one",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline=_input_add_pipeline(add={"name": "inner"}),
+                )
+            ],
+            "pipeline": {
+                "inputs": [PROV_SPEC("value.in")],
+                "nodes": [
+                    {"name": "start", "type": "test.start"},
+                    {"name": "input", "type": "test.value_input", "requires": [REQ_SPEC("value.in")]},
+                    {"name": "composite", "type": "nodeset.math.add_one", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")]},
+                    {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                ],
+                "edges": _edge_chain("start", "input", "composite", "end"),
+            },
+        }
+    )
+    compiled = GraphCompiler().compile(graph)
+    resources = {
+        "plugins": [{"name": "policy", "type": "policy", "module": "project.plugins.policy", "status": "planned"}],
+        "base_lib": {"modules": [{"name": "contracts", "module": "project.base_lib.contracts", "status": "implemented"}]},
+    }
+
+    output = tmp_path / "review.svg"
+    render_review_columns_svg(graph, compiled, output, resources=resources, expand_nodesets=True)
+    svg = output.read_text(encoding="utf-8")
+
+    titles = re.findall(r'<text class="review-title" x="([0-9.]+)" y="([0-9.]+)">([^<]+)</text>', svg)
+    positions = {title: (float(x), float(y)) for x, y, title in titles}
+    assert positions["main pipeline"][0] < positions["plugins"][0] < positions["base_lib"][0]
+    assert positions["base_lib"][0] < positions["composite - math.add_one"][0]
+    assert positions["main pipeline"][1] == positions["plugins"][1] == positions["base_lib"][1] == positions["composite - math.add_one"][1]
+    assert 'href="data:image/svg+xml;base64,' in svg
+    assert 'xlink:href="data:image/svg+xml;base64,' in svg
+
+
+def test_review_columns_svg_composer_stacks_nodesets_and_scales_wide_fragments() -> None:
+    from vibeflow.mermaid_review_svg import REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH, _SvgFragment, _compose_svg
+
+    svg = _compose_svg(
+        [
+            [_SvgFragment("main pipeline", '<svg viewBox="0 0 100 200"></svg>', 100.0, 200.0)],
+            [_SvgFragment("plugins", '<svg viewBox="0 0 50 50"></svg>', 50.0, 50.0)],
+            [_SvgFragment("base_lib", '<svg viewBox="0 0 50 50"></svg>', 50.0, 50.0)],
+            [
+                _SvgFragment("first - ns", '<svg viewBox="0 0 6400 1600"></svg>', 6400.0, 1600.0),
+                _SvgFragment("second - ns", '<svg viewBox="0 0 800 400"></svg>', 800.0, 400.0),
+            ],
+        ],
+        background="transparent",
+    )
+
+    titles = re.findall(r'<text class="review-title" x="([0-9.]+)" y="([0-9.]+)">([^<]+)</text>', svg)
+    positions = {title: (float(x), float(y)) for x, y, title in titles}
+    assert positions["main pipeline"][0] < positions["plugins"][0] < positions["base_lib"][0] < positions["first - ns"][0]
+    assert positions["first - ns"][0] == positions["second - ns"][0]
+    assert positions["first - ns"][1] < positions["second - ns"][1]
+    assert f'width="{REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH:.3f}" height="800.000"' in svg
+    assert 'viewBox="0 0 3640.000 1352.000"' in svg
+
+
+def test_review_columns_resource_fragments_render_root_left_to_children_right() -> None:
+    from vibeflow.mermaid_review_svg import _resource_mermaid
+
+    mermaid = _resource_mermaid(
+        "plugins",
+        (
+            {"name": "policy", "type": "policy", "module": "project.plugins.policy"},
+            {"name": "runtime", "type": "runtime", "module": "project.plugins.runtime"},
+        ),
+        kind="plugin",
+    )
+
+    assert mermaid.startswith("flowchart LR")
+    assert "resource_plugins -.-> resource_plugins_0" in mermaid
+    assert "resource_plugins -.-> resource_plugins_1" in mermaid
+
+
 def test_mermaid_shows_when_edges_and_health_findings() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": ["value.in"],
                 "nodes": [
-                    {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
-                    {"name": "consumer", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
+                    {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")]},
+                    {"name": "consumer", "type": "test.add", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")]},
                 ],
                 "edges": [{"from": "seed", "to": "consumer", "when": "flow.route == 'go'"}],
             },
@@ -221,11 +392,10 @@ def test_health_report_status_pass_when_no_findings() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": ["value.in"],
                 "nodes": [
                     {"name": "start", "type": "test.start"},
-                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
-                    {"name": "sink", "type": "test.sink", "requires": ["value.in"]},
+                    {"name": "input", "type": "test.seed", "provides": [PROV_SPEC("value.in")]},
+                    {"name": "sink", "type": "test.sink", "requires": [REQ_SPEC("value.in")]},
                     {"name": "end", "type": "test.start"},
                 ],
                 "edges": _edge_chain("start", "input", "sink", "end"),
@@ -237,7 +407,7 @@ def test_health_report_status_pass_when_no_findings() -> None:
     assert all(warning.rule_id == "GRAPH.SMELL.DUPLICATE_LOGIC" for warning in report.warnings)
 
 def test_health_report_status_fail_for_unknown_node() -> None:
-    graph = parse_graph_config({"pipeline": {"nodes": [{"name": "missing", "type": "test.missing", "provides": ["x"]}]}})
+    graph = parse_graph_config({"pipeline": {"nodes": [{"name": "missing", "type": "test.missing", "provides": [PROV_SPEC("x")]}]}})
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
     assert report.status == "FAIL"
     assert report.errors[0].rule_id == "NODE.TYPE.UNKNOWN"
@@ -324,7 +494,7 @@ def test_cli_inspect_node_with_module_reports_metadata_and_contract(tmp_path, ca
     module_path = tmp_path / "demo_node.py"
     module_path.write_text(
         """
-from vibeflow import NodeContract, NodeInfo
+from vibeflow import DataProvider, DataRequirement, NodeContract, NodeInfo
 
 class DemoNode:
     NODE_INFO = NodeInfo(
@@ -336,8 +506,8 @@ class DemoNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        requires=("demo.in",),
-        provides=("demo.out",),
+        requires=(DataRequirement("demo.in", "exactly_one"),),
+        provides=(DataProvider("demo.out", "demo.out"),),
         input_semantics={"demo.in": ("demo input",)},
         output_semantics={"demo.out": ("demo output",)},
         output_schema={"demo.out": {"type": "number"}},
@@ -354,7 +524,7 @@ class DemoNode:
     assert code == 0
     assert payload["health"]["status"] == "PASS"
     assert payload["node"]["metadata"]["type_key"] == "demo.node"
-    assert payload["node"]["contract"]["requires"] == ["demo.in"]
+    assert payload["node"]["contract"]["requires"] == [{"type": "demo.in", "cardinality": "exactly_one"}]
     assert payload["node"]["source"]["lines"] > 0
 
 def test_cli_inspect_node_requires_module_boundary(capsys) -> None:

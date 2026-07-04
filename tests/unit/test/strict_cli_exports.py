@@ -3,19 +3,58 @@ from tests.unit.strict_support import *
 
 def _write_export_config(path: Path) -> None:
     path.write_text(
-        """
-{
-  "pipeline": {
-    "nodes": [
-      {"name": "start", "type": "test.start"},
-      {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
-      {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
-      {"name": "end", "type": "test.out_end", "requires": ["value.out"]}
-    ],
-    "edges": [["start", "seed"], ["seed", "add"], ["add", "end"]]
-  }
-}
-""".strip(),
+        json.dumps(
+            {
+                "pipeline": {
+                    "nodes": [
+                        {"name": "start", "type": "test.start"},
+                        {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")]},
+                        {
+                            "name": "add",
+                            "type": "test.add",
+                            "requires": [REQ_SPEC("value.in")],
+                            "provides": [PROV_SPEC("value.out")],
+                        },
+                        {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                    ],
+                    "edges": [["start", "seed"], ["seed", "add"], ["add", "end"]],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_nodeset_export_config(path: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "nodesets": [
+                    _nodeset_config(
+                        "math.add_one",
+                        requires=["value.in"],
+                        provides=["value.out"],
+                        exports=["value.out"],
+                        pipeline=_input_add_pipeline(add={"name": "inner"}),
+                    )
+                ],
+                "pipeline": {
+                    "inputs": [PROV_SPEC("value.in")],
+                    "nodes": [
+                        {"name": "start", "type": "test.start"},
+                        {"name": "input", "type": "test.value_input", "requires": [REQ_SPEC("value.in")]},
+                        {
+                            "name": "composite",
+                            "type": "nodeset.math.add_one",
+                            "requires": [REQ_SPEC("value.in")],
+                            "provides": [PROV_SPEC("value.out")],
+                        },
+                        {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                    ],
+                    "edges": _edge_chain("start", "input", "composite", "end"),
+                },
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -101,6 +140,69 @@ def test_cli_export_svg_reads_jsonc(tmp_path, capsys) -> None:
     assert "<svg" in output_path.read_text(encoding="utf-8")
 
 
+def test_cli_export_svg_expand_nodesets_forces_review_columns_layout(tmp_path, monkeypatch) -> None:
+    import vibeflow.mermaid_render as mermaid_render_module
+    import vibeflow.mermaid_review_svg as review_svg_module
+
+    config_path = tmp_path / "workflow.jsonc"
+    output_path = tmp_path / "graph.svg"
+    _write_nodeset_export_config(config_path)
+    calls: list[dict[str, object]] = []
+
+    def fake_review_columns_svg(graph, compiled, output, **kwargs):
+        calls.append(kwargs)
+        Path(output).write_text('<svg aria-roledescription="flowchart-review-columns">review</svg>', encoding="utf-8")
+
+    def fail_default_svg(*args, **kwargs):
+        raise AssertionError("expanded SVG must use review-columns composer")
+
+    monkeypatch.setattr(review_svg_module, "render_review_columns_svg", fake_review_columns_svg)
+    monkeypatch.setattr(mermaid_render_module, "render_mermaid_svg", fail_default_svg)
+
+    code = cli_main(
+        [
+            "export-svg",
+            "--config",
+            str(config_path),
+            "--output",
+            str(output_path),
+            "--expand-nodesets",
+            "--mermaid-layout",
+            "default",
+        ]
+    )
+
+    assert code == 0
+    assert calls and calls[0]["expand_nodesets"] is True
+    assert "flowchart-review-columns" in output_path.read_text(encoding="utf-8")
+
+
+def test_cli_export_svg_collapsed_default_uses_default_renderer(tmp_path, monkeypatch) -> None:
+    import vibeflow.mermaid_render as mermaid_render_module
+    import vibeflow.mermaid_review_svg as review_svg_module
+
+    config_path = tmp_path / "workflow.jsonc"
+    output_path = tmp_path / "graph.svg"
+    _write_export_config(config_path)
+    calls: list[str] = []
+
+    def fail_review_columns_svg(*args, **kwargs):
+        raise AssertionError("collapsed default SVG must not use review-columns composer")
+
+    def fake_default_svg(mermaid_text, output, **kwargs):
+        calls.append(mermaid_text)
+        Path(output).write_text("<svg>default</svg>", encoding="utf-8")
+
+    monkeypatch.setattr(review_svg_module, "render_review_columns_svg", fail_review_columns_svg)
+    monkeypatch.setattr(mermaid_render_module, "render_mermaid_svg", fake_default_svg)
+
+    code = cli_main(["export-svg", "--config", str(config_path), "--output", str(output_path), "--mermaid-layout", "default"])
+
+    assert code == 0
+    assert calls and calls[0].startswith("flowchart TD")
+    assert output_path.read_text(encoding="utf-8") == "<svg>default</svg>"
+
+
 def test_ascii_flowchart_distinguishes_standard_shapes() -> None:
     nodes = [
         ("start", "terminal"),
@@ -140,39 +242,7 @@ def test_ascii_flowchart_distinguishes_standard_shapes() -> None:
 def test_cli_export_mermaid_writes_output_and_expands_nodesets(tmp_path, capsys) -> None:
     config_path = tmp_path / "workflow.jsonc"
     output_path = tmp_path / "graph.mmd"
-    config_path.write_text(
-        json.dumps(
-            {
-                "nodesets": [
-                    _nodeset_config(
-                        "math.add_one",
-                        requires=["value.in"],
-                        provides=["value.out"],
-                        exports=["value.out"],
-                        pipeline={
-                            **_input_add_pipeline(add={"name": "inner"}),
-                        },
-                    )
-                ],
-                "pipeline": {
-                    "inputs": ["value.in"],
-                    "nodes": [
-                        {"name": "start", "type": "test.start"},
-                        {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
-                        {
-                            "name": "composite",
-                            "type": "nodeset.math.add_one",
-                            "requires": ["value.in"],
-                            "provides": ["value.out"],
-                        },
-                        {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
-                    ],
-                    "edges": _edge_chain("start", "input", "composite", "end"),
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
+    _write_nodeset_export_config(config_path)
 
     code = cli_main(["export-mermaid", "--config", str(config_path), "--output", str(output_path), "--expand-nodesets"])
 

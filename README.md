@@ -89,6 +89,7 @@ python run.py quality --path project
 ```
 
 `svg` 导出会为 Mermaid CLI 传入放大的渲染配置；普通图默认 `maxTextSize=200000`，`--expand-nodesets` 默认 `maxTextSize=500000`。超大图仍可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
+展开 SVG 会固定使用确定性的 `review-columns` composer：主流程保持在左侧，右侧依次展示 plugins、base_lib 和按顶层调用顺序排列的展开 nodeset。
 
 ## AI 开发工作流 🛠️
 

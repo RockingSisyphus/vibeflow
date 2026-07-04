@@ -15,6 +15,11 @@ if TYPE_CHECKING:
     from .registry import NodeRegistry
 
 
+MERMAID_LAYOUT_DEFAULT = "default"
+MERMAID_LAYOUT_REVIEW_COLUMNS = "review-columns"
+_MERMAID_LAYOUTS = {MERMAID_LAYOUT_DEFAULT, MERMAID_LAYOUT_REVIEW_COLUMNS}
+
+
 def export_mermaid(
     graph: GraphConfig,
     *,
@@ -26,6 +31,7 @@ def export_mermaid(
     show_contract: bool = True,
     show_semantics: bool = True,
     show_findings: bool = True,
+    mermaid_layout: str = MERMAID_LAYOUT_DEFAULT,
 ) -> str:
     actual_compiled = compile_for_render(graph, compiled, registry)
     renderer = _MermaidRenderer(
@@ -36,6 +42,7 @@ def export_mermaid(
         show_contract=show_contract,
         show_semantics=show_semantics,
         show_findings=show_findings,
+        mermaid_layout=mermaid_layout,
     )
     return renderer.render(graph, actual_compiled)
 
@@ -80,7 +87,10 @@ class _MermaidRenderer:
         show_contract: bool,
         show_semantics: bool,
         show_findings: bool,
+        mermaid_layout: str,
     ) -> None:
+        if mermaid_layout not in _MERMAID_LAYOUTS:
+            raise ValueError(f"unknown Mermaid layout: {mermaid_layout}")
         self.expand_nodesets = expand_nodesets
         self.registry = registry
         self.health_report = health_report
@@ -88,6 +98,7 @@ class _MermaidRenderer:
         self.show_contract = show_contract
         self.show_semantics = show_semantics
         self.show_findings = show_findings
+        self.mermaid_layout = mermaid_layout
         self.node_ids: dict[str, str] = {}
         self.nodeset_node_ids: dict[str, str] = {}
         self.node_classes: dict[str, str] = {}
@@ -96,6 +107,8 @@ class _MermaidRenderer:
         self.node_ids = {node.name: _safe_id(node.name) for node in graph.nodes}
         self.nodeset_node_ids = _nodeset_node_ids(graph, self.node_ids)
         self.node_classes = self._finding_classes(graph, compiled) if self.show_findings else {}
+        if self.mermaid_layout == MERMAID_LAYOUT_REVIEW_COLUMNS:
+            return self._render_review_columns(graph, compiled)
         lines = [
             "flowchart TD",
             "  classDef healthError fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;",
@@ -115,6 +128,11 @@ class _MermaidRenderer:
             self._render_findings(lines, graph, compiled, indent="  ")
         return "\n".join(lines) + "\n"
 
+    def _render_review_columns(self, graph: GraphConfig, compiled: CompiledGraph) -> str:
+        from .mermaid_review import render_review_columns
+
+        return render_review_columns(self, graph, compiled)
+
     def _render_graph_body(
         self,
         lines: list[str],
@@ -124,7 +142,9 @@ class _MermaidRenderer:
         prefix: str,
         indent: str,
         visited_nodesets: tuple[str, ...],
+        expand_inline: bool | None = None,
     ) -> None:
+        should_expand = self.expand_nodesets if expand_inline is None else expand_inline
         for node in graph.nodes:
             node_id = _safe_id(f"{prefix}{node.name}")
             nodeset = nodeset_for_node(graph, node)
@@ -141,7 +161,7 @@ class _MermaidRenderer:
             lines.append(f"{indent}{_node_shape(node_id, self._nodeset_label(node, nodeset), flow_kind)}")
             if class_name:
                 lines.append(f"{indent}class {node_id} {class_name};")
-            if not self.expand_nodesets:
+            if not should_expand:
                 continue
             group_id = _safe_id(f"{prefix}{node.name}__expanded")
             lines.append(f'{indent}subgraph {group_id}["{_escape_label(nodeset.name)}"]')
@@ -157,6 +177,7 @@ class _MermaidRenderer:
                     prefix=nested_prefix,
                     indent=f"{indent}  ",
                     visited_nodesets=(*visited_nodesets, nodeset.name),
+                    expand_inline=True,
                 )
                 self._render_edges(lines, nested_compiled, prefix=nested_prefix, indent=f"{indent}  ")
             lines.append(f"{indent}end")
