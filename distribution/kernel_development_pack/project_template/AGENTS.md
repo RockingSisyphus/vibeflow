@@ -38,15 +38,16 @@
 1. 先把用户希望开发的程序抽象成一个粗粒度标准流程图，只保留几大块。
 2. 用 planned nodeset 表达这些大块。例如初始流程是 `a -> b -> c`，就在顶层 config 中定义 `a`、`b`、`c` 三个 `status: "planned"` 的 nodeset，并在顶层 `pipeline.edges` 中连接 `a -> b -> c`。
 3. planned node 必须声明 `flow_kind`；planned nodeset 可暂时不补齐内部 pipeline、契约和 exports。默认 `planned_behavior` 是 `blocking`，只用于架构图审查。
-4. 生成流程图给人类审核：优先用 `python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd`，需要图片时用 `python run.py svg --config project/configs/main.jsonc --output reports/graph.svg`。
-5. 告知人类审核员查看 `reports/graph.mmd` 或 `reports/graph.svg`。不要在粗粒度架构未经确认时直接实现大量 node。
-6. 人类审核通过后，再逐个细化 nodeset。比如把 planned nodeset `a` 细化为 `d -> e -> f`，可以先把 `d`、`e`、`f` 也标为 planned，再生成展开图继续审核。
-7. 细化可以继续嵌套；任何尚未确定的节点或节点集都应保持 `status: "planned"`，用流程图先暴露结构。
-8. 真正实现某个 node 时，必须创建对应 Python node，声明 `NODE_INFO`、`CONTRACT` 和 `run_pure(inputs, params)`，并在 `project/registry.py` 注册。
-9. 真正实现某个 nodeset 时，必须补齐 metadata、`requires`、`provides`、`exports`、内部 `pipeline.nodes` 和 `pipeline.edges`，且移除该 nodeset 的 `status: "planned"`。
-10. 只有当 nodeset 内部所有子 node / 子 nodeset 都已经 implemented，父 nodeset 才能变成 implemented。例外是设计期可用 `planned_behavior: "transparent"` 或 `python_stub` 子节点保持连通性，此时父 nodeset 会得到 warning；blocking planned child 仍会报错。
-11. 按同样方式实现后续 nodeset，直到顶层 `a`、`b`、`c` 全部 implemented，最终程序才能运行。
-12. 后续修改架构也使用同一模式：先放 planned 占位并导出流程图给人类审核，再逐步实现。
+4. 生成流程图给人类审核：快速源码图用 `python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd`，快速图片用 `python run.py svg --config project/configs/main.jsonc --output reports/graph.svg`。
+5. 需要展开 nodeset 给人类审查时，必须用 `python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg` 生成详细审查 SVG。不要把 `graph.expanded.mmd` 直接交给 Mermaid CLI/mmdc 渲染成 SVG；那会绕过 VibeFlow 的 review-columns/detail-panel composer，导致排版退回旧的全局展开图。
+6. 告知人类审核员查看 `reports/graph.mmd`、`reports/graph.svg` 或 `reports/graph.expanded.svg`。不要在粗粒度架构未经确认时直接实现大量 node。
+7. 人类审核通过后，再逐个细化 nodeset。比如把 planned nodeset `a` 细化为 `d -> e -> f`，可以先把 `d`、`e`、`f` 也标为 planned，再生成展开图继续审核。
+8. 细化可以继续嵌套；任何尚未确定的节点或节点集都应保持 `status: "planned"`，用流程图先暴露结构。
+9. 真正实现某个 node 时，必须创建对应 Python node，声明 `NODE_INFO`、`CONTRACT` 和 `run_pure(inputs, params)`，并在 `project/registry.py` 注册。
+10. 真正实现某个 nodeset 时，必须补齐 metadata、`requires`、`provides`、`exports`、内部 `pipeline.nodes` 和 `pipeline.edges`，且移除该 nodeset 的 `status: "planned"`。
+11. 只有当 nodeset 内部所有子 node / 子 nodeset 都已经 implemented，父 nodeset 才能变成 implemented。例外是设计期可用 `planned_behavior: "transparent"` 或 `python_stub` 子节点保持连通性，此时父 nodeset 会得到 warning；blocking planned child 仍会报错。
+12. 按同样方式实现后续 nodeset，直到顶层 `a`、`b`、`c` 全部 implemented，最终程序才能运行。
+13. 后续修改架构也使用同一模式：先放 planned 占位并导出流程图给人类审核，再逐步实现。
 
 ## 常用命令
 
@@ -54,8 +55,9 @@
 - 校验 kernel 完整性：`python run.py verify-kernel`
 - 运行程序：`python run.py run --config project/configs/main.jsonc --run-root runs`
 - 导出 Mermaid：`python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd`
-- 导出展开 nodeset 的 Mermaid：`python run.py mermaid --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.mmd`
+- 导出展开 nodeset 的 Mermaid 源码：`python run.py mermaid --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.mmd`。这个文件只用于调试源码，不要直接用 Mermaid CLI/mmdc 转成 SVG。
 - 导出 SVG：`python run.py svg --config project/configs/main.jsonc --output reports/graph.svg`
+- 导出展开 nodeset 的详细审查 SVG：`python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg`
 - 质量检查业务代码：`python run.py quality --path project`
 
 ## 判断标准

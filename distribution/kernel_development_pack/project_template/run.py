@@ -166,13 +166,21 @@ def main() -> int:
     _add_runtime_options(run_cmd)
     mermaid = _add_config_command(sub, "mermaid")
     mermaid.add_argument("--output", required=False)
-    mermaid.add_argument("--expand-nodesets", action="store_true")
+    mermaid.add_argument(
+        "--expand-nodesets",
+        action="store_true",
+        help="write expanded Mermaid source only; do not render this .mmd directly with mmdc for review SVG",
+    )
     ascii_chart = _add_config_command(sub, "ascii")
     ascii_chart.add_argument("--output", required=False)
     ascii_chart.add_argument("--expand-nodesets", action="store_true")
     svg = _add_config_command(sub, "svg")
     svg.add_argument("--output", required=True)
-    svg.add_argument("--expand-nodesets", action="store_true")
+    svg.add_argument(
+        "--expand-nodesets",
+        action="store_true",
+        help="render expanded review-columns/detail-panel SVG; use this instead of mmdc on graph.expanded.mmd",
+    )
     svg.add_argument("--mermaid-max-text-size", type=int, default=None)
     svg.add_argument("--mermaid-max-edges", type=int, default=None)
     svg.add_argument("--review-fragment-max-width", type=float, default=None)
