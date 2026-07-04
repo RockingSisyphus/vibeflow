@@ -110,12 +110,11 @@ def test_graph_health_reports_decision_cycle_without_exit() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": ["value.in"],
                 "nodes": [
-                    {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
-                    {"name": "route", "type": "test.route", "requires": ["value.out"], "provides": ["flow.route"]},
-                    {"name": "copy", "type": "test.copy", "requires": ["value.out"], "provides": ["value.in"]},
-                    {"name": "end", "type": "test.in_end", "requires": ["value.in"]},
+                    {"name": "add", "type": "test.add", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")]},
+                    {"name": "route", "type": "test.route", "requires": [REQ_SPEC("value.out")], "provides": [PROV_SPEC("flow.route")]},
+                    {"name": "copy", "type": "test.seed", "provides": [PROV_SPEC("value.in")]},
+                    {"name": "end", "type": "test.start"},
                 ],
                 "edges": [
                     {"from": "add", "to": "route"},

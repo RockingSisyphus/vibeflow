@@ -641,17 +641,19 @@ def _inline_fragment_svg(
     transform = f"translate({x:.3f} {y:.3f}) scale({scale_x:.6f} {scale_y:.6f})"
     if min_x or min_y:
         transform += f" translate({-min_x:.3f} {-min_y:.3f})"
-    return [f'<g class="review-inline-fragment" transform="{transform}">{inner}</g>']
+    root_id = root.attrib.get("id")
+    root_id_attribute = f" id={xml.sax.saxutils.quoteattr(root_id)}" if root_id else ""
+    return [f'<g class="review-inline-fragment"{root_id_attribute} transform="{transform}">{inner}</g>']
 
 
-def _prefix_svg_ids(root: ET.Element, prefix: str) -> None:
+def _prefix_svg_ids(root: ET.Element, prefix: str) -> dict[str, str]:
     id_map: dict[str, str] = {}
     for element in root.iter():
         original = element.attrib.get("id")
         if original:
             id_map[original] = f"{prefix}{original}"
     if not id_map:
-        return
+        return {}
     for element in root.iter():
         if "id" in element.attrib:
             element.attrib["id"] = id_map[element.attrib["id"]]
@@ -659,6 +661,7 @@ def _prefix_svg_ids(root: ET.Element, prefix: str) -> None:
             element.attrib[key] = _rewrite_svg_reference(value, id_map)
         if element.text:
             element.text = _rewrite_svg_reference(element.text, id_map)
+    return id_map
 
 
 def _rewrite_svg_reference(value: str, id_map: Mapping[str, str]) -> str:
@@ -666,9 +669,25 @@ def _rewrite_svg_reference(value: str, id_map: Mapping[str, str]) -> str:
     for old, new in id_map.items():
         escaped = re.escape(old)
         rewritten = re.sub(rf"url\((['\"]?)#{escaped}\1\)", f"url(#{new})", rewritten)
+        rewritten = _rewrite_css_id_selector(rewritten, old=old, new=new)
         if rewritten == f"#{old}":
             rewritten = f"#{new}"
     return rewritten
+
+
+def _rewrite_css_id_selector(value: str, *, old: str, new: str) -> str:
+    escaped = re.escape(old)
+    pattern = re.compile(rf"#{escaped}(?=[\s.\[>{{+~,:])")
+
+    def replace(match: re.Match[str]) -> str:
+        index = match.start() - 1
+        while index >= 0 and value[index].isspace():
+            index -= 1
+        if index >= 0 and value[index] not in "{},>+~":
+            return match.group(0)
+        return f"#{new}"
+
+    return pattern.sub(replace, value)
 
 
 def _validate_review_fragment_max_width(value: float) -> float:

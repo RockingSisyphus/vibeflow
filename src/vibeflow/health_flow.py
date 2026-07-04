@@ -273,10 +273,28 @@ def _append_decision_cycle_exit_health(compiled, state, *, outgoing: dict[str, l
             continue
         cycle = set(component)
         decision_nodes = [node for node in component if compiled.flow_kinds.get(node) == FLOW_KIND_DECISION]
-        for decision in decision_nodes:
-            has_exit = any(target not in cycle and target in can_reach_end for target in outgoing.get(decision, ()))
-            if not has_exit:
-                state.errors.append(_flow_finding("GRAPH.CYCLE.MISSING_DECISION_EXIT", decision, f"decision cycle containing '{decision}' needs an exit edge from a decision node to a terminal end", object_type="node"))
+        exit_edges = [
+            {"source": decision, "target": target}
+            for decision in decision_nodes
+            for target in outgoing.get(decision, ())
+            if target not in cycle and target in can_reach_end
+        ]
+        if exit_edges:
+            continue
+        cycle_id = ",".join(sorted(cycle))
+        state.errors.append(
+            _flow_finding(
+                "GRAPH.CYCLE.MISSING_DECISION_EXIT",
+                cycle_id,
+                "decision cycle needs at least one exit edge from any decision node to a terminal end",
+                object_type="cycle",
+                details={
+                    "members": sorted(cycle),
+                    "decision_nodes": sorted(decision_nodes),
+                    "exit_edges": exit_edges,
+                },
+            )
+        )
 
 
 def _append_explicit_edge_duplicate_warnings(graph, state) -> None:
@@ -384,8 +402,8 @@ def _walk(starts: set[str], adjacency: dict[str, list[str]]) -> set[str]:
 
 
 
-def _flow_finding(rule_id: str, object_id: str, message: str, *, object_type: str = "pipeline") -> HealthFinding:
-    return HealthFinding(rule_id=rule_id, severity="error", object_type=object_type, object_id=object_id, failure_layer="topology", message=message, suggested_fix_type="fix_config")
+def _flow_finding(rule_id: str, object_id: str, message: str, *, object_type: str = "pipeline", details: Mapping[str, object] | None = None) -> HealthFinding:
+    return HealthFinding(rule_id=rule_id, severity="error", object_type=object_type, object_id=object_id, failure_layer="topology", message=message, suggested_fix_type="fix_config", details=details or {})
 
 
 def _data_finding(rule_id: str, key: str, message: str, *, node: str, severity: str = "warning", details: Mapping[str, object] | None = None) -> HealthFinding:
