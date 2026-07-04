@@ -359,7 +359,7 @@ vibeflow export-ascii --config workflow.jsonc --output graph.txt
 vibeflow export-svg --config workflow.jsonc --output graph.svg
 ```
 
-正式运行也会写出 `graph.mmd`、`graph.txt`、`graph.svg`。
+正式运行也会写出 `graph.mmd`、`graph.txt`、快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`。
 
 `export-svg` 会向 Mermaid CLI 传入渲染配置。普通图默认 `maxTextSize=200000`、`maxEdges=2000`；展开 nodeset 时默认 `maxTextSize=500000`、`maxEdges=5000`。如仍遇到 Mermaid 限制，可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
-展开 nodeset 的 SVG 固定使用确定性 `review-columns` composer：最外层主流程在左侧纵向展示，plugins、base_lib 分列展示，展开的 nodeset 按顶层调用顺序放到右侧。nodeset 内部使用递归 detail-panel 布局：无直接子 nodeset 时横向展示；有直接子 nodeset 时父图保持 collapsed call-site 和原始连边，直接子 nodeset 作为右侧详情列按调用顺序纵向排列。
+展开 nodeset 的 SVG 固定使用确定性 `review-columns` composer：最外层主流程在左侧纵向展示，plugins、base_lib 分列展示，展开的 nodeset 按顶层调用顺序放到右侧。nodeset 内部使用递归 detail-panel 布局：无直接子 nodeset 时横向展示；有直接子 nodeset 时父图保持 collapsed call-site 和原始连边，直接子 nodeset 作为右侧详情列按调用顺序纵向排列。审查图单个片段显示宽度默认上限为 `3200px`，可用 `--review-fragment-max-width` 覆盖。

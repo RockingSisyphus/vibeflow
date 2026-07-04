@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import base64
 import re
 import tempfile
 import xml.sax.saxutils
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
@@ -20,7 +20,7 @@ from .mermaid import (
     _safe_id,
     export_mermaid,
 )
-from .mermaid_render import DEFAULT_MERMAID_MAX_EDGES, DEFAULT_MERMAID_MAX_TEXT_SIZE, render_mermaid_svg
+from .mermaid_render import DEFAULT_MERMAID_MAX_EDGES, DEFAULT_MERMAID_MAX_TEXT_SIZE, MermaidRenderError, render_mermaid_svg
 
 
 REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH = 3200.0
@@ -44,6 +44,11 @@ _PLACEHOLDER_STYLE = (
     ".placeholder-text{font-family:Arial,sans-serif;font-size:14px;fill:#4b5563}"
     ".placeholder-box{fill:#f9fafb;stroke:#d1d5db;stroke-width:1}</style>"
 )
+_SVG_NS = "http://www.w3.org/2000/svg"
+_XLINK_NS = "http://www.w3.org/1999/xlink"
+
+ET.register_namespace("", _SVG_NS)
+ET.register_namespace("xlink", _XLINK_NS)
 
 
 @dataclass(frozen=True)
@@ -68,7 +73,9 @@ def render_review_columns_svg(
     background: str = "transparent",
     max_text_size: int | None = None,
     max_edges: int | None = None,
+    review_fragment_max_width: float = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
 ) -> None:
+    actual_review_fragment_max_width = _validate_review_fragment_max_width(review_fragment_max_width)
     actual_max_text_size = max_text_size if max_text_size is not None else DEFAULT_MERMAID_MAX_TEXT_SIZE
     actual_max_edges = max_edges if max_edges is not None else DEFAULT_MERMAID_MAX_EDGES
     with tempfile.TemporaryDirectory(prefix="vibeflow-review-svg-") as temp_dir:
@@ -86,9 +93,10 @@ def render_review_columns_svg(
             background=background,
             max_text_size=actual_max_text_size,
             max_edges=actual_max_edges,
+            review_fragment_max_width=actual_review_fragment_max_width,
         )
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(_compose_svg(columns, background=background), encoding="utf-8")
+        output.write_text(_compose_svg(columns, background=background, review_fragment_max_width=actual_review_fragment_max_width), encoding="utf-8")
 
 
 def _build_columns(
@@ -105,6 +113,7 @@ def _build_columns(
     background: str,
     max_text_size: int | None,
     max_edges: int | None,
+    review_fragment_max_width: float,
 ) -> list[list[_SvgFragment]]:
     columns: list[list[_SvgFragment]] = [
         [
@@ -139,6 +148,7 @@ def _build_columns(
             background=background,
             max_text_size=max_text_size,
             max_edges=max_edges,
+            review_fragment_max_width=review_fragment_max_width,
         )
         if nodeset_fragments:
             columns.append(nodeset_fragments)
@@ -177,6 +187,7 @@ def _nodeset_fragments(
     background: str,
     max_text_size: int | None,
     max_edges: int | None,
+    review_fragment_max_width: float,
 ) -> list[_SvgFragment]:
     fragments: list[_SvgFragment] = []
     for node in graph.nodes:
@@ -195,6 +206,7 @@ def _nodeset_fragments(
                 background=background,
                 max_text_size=max_text_size,
                 max_edges=max_edges,
+                review_fragment_max_width=review_fragment_max_width,
                 visited_nodesets=(),
             )
         )
@@ -213,7 +225,8 @@ def _render_nodeset_detail_fragment(
     background: str,
     max_text_size: int | None,
     max_edges: int | None,
-    visited_nodesets: tuple[str, ...],
+    review_fragment_max_width: float = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
+    visited_nodesets: tuple[str, ...] = (),
 ) -> _SvgFragment:
     if nodeset.name in visited_nodesets:
         return _placeholder_fragment(
@@ -272,11 +285,17 @@ def _render_nodeset_detail_fragment(
             background=background,
             max_text_size=max_text_size,
             max_edges=max_edges,
+            review_fragment_max_width=review_fragment_max_width,
             visited_nodesets=(*visited_nodesets, nodeset.name),
         )
         for child_node, child_nodeset in child_nodesets
     ]
-    svg_text = _compose_detail_panel_svg(parent_fragment, child_fragments, background=background)
+    svg_text = _compose_detail_panel_svg(
+        parent_fragment,
+        child_fragments,
+        background=background,
+        review_fragment_max_width=review_fragment_max_width,
+    )
     width, height = _viewbox_size(svg_text)
     return _SvgFragment(title=title, svg_text=svg_text, width=width, height=height)
 
@@ -350,16 +369,19 @@ def _compose_detail_panel_svg(
     child_fragments: list[_SvgFragment],
     *,
     background: str,
+    review_fragment_max_width: float = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
 ) -> str:
+    actual_max_width = _validate_review_fragment_max_width(review_fragment_max_width)
     padding = 24.0
-    parent_width, parent_height = _display_size(parent_fragment)
-    child_width = max((_display_size(fragment)[0] for fragment in child_fragments), default=0.0)
+    parent_width, parent_height = _display_size(parent_fragment, max_width=actual_max_width)
+    child_width = max((_display_size(fragment, max_width=actual_max_width)[0] for fragment in child_fragments), default=0.0)
     parent_block_height = _DETAIL_PANEL_TITLE_HEIGHT + parent_height
     child_block_height = (
         _column_height(
             child_fragments,
             title_height=_DETAIL_PANEL_TITLE_HEIGHT,
             row_gap=_DETAIL_PANEL_ROW_GAP,
+            review_fragment_max_width=actual_max_width,
         )
         if child_fragments
         else 0.0
@@ -391,6 +413,8 @@ def _compose_detail_panel_svg(
             width=parent_width,
             title_height=_DETAIL_PANEL_TITLE_HEIGHT,
             row_gap=_DETAIL_PANEL_ROW_GAP,
+            review_fragment_max_width=actual_max_width,
+            fragment_prefix="parent",
         )
     )
     if child_fragments:
@@ -403,6 +427,8 @@ def _compose_detail_panel_svg(
                 width=child_width,
                 title_height=_DETAIL_PANEL_TITLE_HEIGHT,
                 row_gap=_DETAIL_PANEL_ROW_GAP,
+                review_fragment_max_width=actual_max_width,
+                fragment_prefix="children",
             )
         )
         guide_y = padding + _DETAIL_PANEL_TITLE_HEIGHT / 2
@@ -489,13 +515,19 @@ def _resource_mermaid(root_label: str, resources: tuple[Mapping[str, object], ..
     return "\n".join(lines) + "\n"
 
 
-def _compose_svg(columns: list[list[_SvgFragment]], *, background: str) -> str:
+def _compose_svg(
+    columns: list[list[_SvgFragment]],
+    *,
+    background: str,
+    review_fragment_max_width: float = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
+) -> str:
+    actual_max_width = _validate_review_fragment_max_width(review_fragment_max_width)
     padding = 24.0
     column_gap = 64.0
     row_gap = 44.0
     title_height = 42.0
-    column_widths = [max(_display_size(fragment)[0] for fragment in column) for column in columns]
-    column_heights = [_column_height(column, title_height=title_height, row_gap=row_gap) for column in columns]
+    column_widths = [max(_display_size(fragment, max_width=actual_max_width)[0] for fragment in column) for column in columns]
+    column_heights = [_column_height(column, title_height=title_height, row_gap=row_gap, review_fragment_max_width=actual_max_width) for column in columns]
     total_width = padding * 2 + sum(column_widths) + column_gap * max(0, len(columns) - 1)
     total_height = padding * 2 + (max(column_heights) if column_heights else 0)
     parts = [
@@ -505,19 +537,40 @@ def _compose_svg(columns: list[list[_SvgFragment]], *, background: str) -> str:
     if background != "transparent":
         parts.append(f'<rect x="0" y="0" width="{total_width:.3f}" height="{total_height:.3f}" fill="{xml.sax.saxutils.escape(background)}"/>')
     x = padding
-    for column, column_width in zip(columns, column_widths):
-        parts.extend(_column_svg(column, x=x, y=padding, width=column_width, title_height=title_height, row_gap=row_gap))
+    for column_index, (column, column_width) in enumerate(zip(columns, column_widths)):
+        parts.extend(
+            _column_svg(
+                column,
+                x=x,
+                y=padding,
+                width=column_width,
+                title_height=title_height,
+                row_gap=row_gap,
+                review_fragment_max_width=actual_max_width,
+                fragment_prefix=f"column_{column_index}",
+            )
+        )
         x += column_width + column_gap
     parts.append("</svg>")
     return "\n".join(parts) + "\n"
 
 
-def _column_svg(column: list[_SvgFragment], *, x: float, y: float, width: float, title_height: float, row_gap: float) -> list[str]:
+def _column_svg(
+    column: list[_SvgFragment],
+    *,
+    x: float,
+    y: float,
+    width: float,
+    title_height: float,
+    row_gap: float,
+    review_fragment_max_width: float,
+    fragment_prefix: str,
+) -> list[str]:
     parts: list[str] = []
     cursor = y
-    for fragment in column:
+    for index, fragment in enumerate(column):
         title = xml.sax.saxutils.escape(fragment.title)
-        display_width, display_height = _display_size(fragment)
+        display_width, display_height = _display_size(fragment, max_width=review_fragment_max_width)
         image_x = x + (width - display_width) / 2
         frame_x = x - _FRAGMENT_FRAME_PADDING
         frame_y = cursor - _FRAGMENT_FRAME_PADDING
@@ -533,28 +586,109 @@ def _column_svg(column: list[_SvgFragment], *, x: float, y: float, width: float,
         )
         parts.append(f'<text class="review-title" x="{x:.3f}" y="{cursor + title_height - 12:.3f}">{title}</text>')
         cursor += title_height
-        payload = base64.b64encode(fragment.svg_text.encode("utf-8")).decode("ascii")
-        href = f"data:image/svg+xml;base64,{payload}"
-        parts.append(f'<image x="{image_x:.3f}" y="{cursor:.3f}" width="{display_width:.3f}" height="{display_height:.3f}" href="{href}" xlink:href="{href}"/>')
+        parts.extend(
+            _inline_fragment_svg(
+                fragment,
+                x=image_x,
+                y=cursor,
+                width=display_width,
+                height=display_height,
+                fragment_prefix=fragment_prefix,
+                fragment_index=index,
+            )
+        )
         cursor += display_height + row_gap
     return parts
 
 
-def _column_height(column: list[_SvgFragment], *, title_height: float, row_gap: float) -> float:
-    return sum(title_height + _display_size(fragment)[1] for fragment in column) + row_gap * max(0, len(column) - 1)
+def _column_height(
+    column: list[_SvgFragment],
+    *,
+    title_height: float,
+    row_gap: float,
+    review_fragment_max_width: float,
+) -> float:
+    return sum(title_height + _display_size(fragment, max_width=review_fragment_max_width)[1] for fragment in column) + row_gap * max(0, len(column) - 1)
 
 
-def _display_size(fragment: _SvgFragment) -> tuple[float, float]:
-    if fragment.width <= REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH:
+def _display_size(fragment: _SvgFragment, *, max_width: float = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH) -> tuple[float, float]:
+    if fragment.width <= max_width:
         return fragment.width, fragment.height
-    scale = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH / fragment.width
-    return REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH, fragment.height * scale
+    scale = max_width / fragment.width
+    return max_width, fragment.height * scale
+
+
+def _inline_fragment_svg(
+    fragment: _SvgFragment,
+    *,
+    x: float,
+    y: float,
+    width: float,
+    height: float,
+    fragment_prefix: str,
+    fragment_index: int,
+) -> list[str]:
+    try:
+        root = ET.fromstring(fragment.svg_text)
+    except ET.ParseError as exc:
+        raise MermaidRenderError(f"could not inline SVG fragment '{fragment.title}': {exc}") from exc
+    min_x, min_y, source_width, source_height = _viewbox_box(fragment.svg_text)
+    scale_x = width / source_width if source_width else 1.0
+    scale_y = height / source_height if source_height else 1.0
+    prefix = f"vf_{fragment_prefix}_{fragment_index}_"
+    _prefix_svg_ids(root, prefix)
+    inner = "".join(ET.tostring(child, encoding="unicode") for child in list(root))
+    transform = f"translate({x:.3f} {y:.3f}) scale({scale_x:.6f} {scale_y:.6f})"
+    if min_x or min_y:
+        transform += f" translate({-min_x:.3f} {-min_y:.3f})"
+    return [f'<g class="review-inline-fragment" transform="{transform}">{inner}</g>']
+
+
+def _prefix_svg_ids(root: ET.Element, prefix: str) -> None:
+    id_map: dict[str, str] = {}
+    for element in root.iter():
+        original = element.attrib.get("id")
+        if original:
+            id_map[original] = f"{prefix}{original}"
+    if not id_map:
+        return
+    for element in root.iter():
+        if "id" in element.attrib:
+            element.attrib["id"] = id_map[element.attrib["id"]]
+        for key, value in list(element.attrib.items()):
+            element.attrib[key] = _rewrite_svg_reference(value, id_map)
+        if element.text:
+            element.text = _rewrite_svg_reference(element.text, id_map)
+
+
+def _rewrite_svg_reference(value: str, id_map: Mapping[str, str]) -> str:
+    rewritten = value
+    for old, new in id_map.items():
+        escaped = re.escape(old)
+        rewritten = re.sub(rf"url\((['\"]?)#{escaped}\1\)", f"url(#{new})", rewritten)
+        if rewritten == f"#{old}":
+            rewritten = f"#{new}"
+    return rewritten
+
+
+def _validate_review_fragment_max_width(value: float) -> float:
+    try:
+        width = float(value)
+    except (TypeError, ValueError) as exc:
+        raise MermaidRenderError("review_fragment_max_width must be a positive number") from exc
+    if width <= 0:
+        raise MermaidRenderError("review_fragment_max_width must be a positive number")
+    return width
 
 
 def _viewbox_size(svg_text: str) -> tuple[float, float]:
-    match = re.search(r'viewBox="[-0-9.]+ [-0-9.]+ ([0-9.]+) ([0-9.]+)"', svg_text)
+    return _viewbox_box(svg_text)[2:]
+
+
+def _viewbox_box(svg_text: str) -> tuple[float, float, float, float]:
+    match = re.search(r'viewBox="([-0-9.]+) ([-0-9.]+) ([0-9.]+) ([0-9.]+)"', svg_text)
     if match:
-        return float(match.group(1)), float(match.group(2))
+        return float(match.group(1)), float(match.group(2)), float(match.group(3)), float(match.group(4))
     width = re.search(r'width="([0-9.]+)"', svg_text)
     height = re.search(r'height="([0-9.]+)"', svg_text)
-    return float(width.group(1)) if width else 100.0, float(height.group(1)) if height else 100.0
+    return 0.0, 0.0, float(width.group(1)) if width else 100.0, float(height.group(1)) if height else 100.0

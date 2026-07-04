@@ -1,7 +1,17 @@
-import base64
 import re
+import xml.etree.ElementTree as ET
 
 from tests.unit.strict_support import *
+
+
+def _review_title_positions(svg_text: str) -> dict[str, tuple[float, float]]:
+    root = ET.fromstring(svg_text)
+    positions: dict[str, tuple[float, float]] = {}
+    for element in root.iter():
+        tag = element.tag.rsplit("}", 1)[-1]
+        if tag == "text" and element.attrib.get("class") == "review-title" and element.text:
+            positions[element.text] = (float(element.attrib["x"]), float(element.attrib["y"]))
+    return positions
 
 
 class SinkNode:
@@ -310,8 +320,8 @@ def test_review_columns_svg_composer_places_columns_left_to_right(tmp_path) -> N
     assert positions["main pipeline"][0] < positions["plugins"][0] < positions["base_lib"][0]
     assert positions["base_lib"][0] < positions["composite - math.add_one"][0]
     assert positions["main pipeline"][1] == positions["plugins"][1] == positions["base_lib"][1] == positions["composite - math.add_one"][1]
-    assert 'href="data:image/svg+xml;base64,' in svg
-    assert 'xlink:href="data:image/svg+xml;base64,' in svg
+    assert 'data:image/svg+xml;base64,' not in svg
+    assert 'class="review-inline-fragment"' in svg
 
 
 def test_review_columns_svg_composer_stacks_nodesets_and_scales_wide_fragments() -> None:
@@ -335,10 +345,50 @@ def test_review_columns_svg_composer_stacks_nodesets_and_scales_wide_fragments()
     assert positions["main pipeline"][0] < positions["plugins"][0] < positions["base_lib"][0] < positions["first - ns"][0]
     assert positions["first - ns"][0] == positions["second - ns"][0]
     assert positions["first - ns"][1] < positions["second - ns"][1]
-    assert f'width="{REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH:.3f}" height="800.000"' in svg
     assert 'viewBox="0 0 3640.000 1376.000"' in svg
     assert svg.count('class="review-panel-frame"') == 5
     assert svg.count('class="review-title-bar"') == 5
+    assert svg.count('class="review-inline-fragment"') == 5
+    assert 'data:image/svg+xml;base64,' not in svg
+    assert 'scale(0.500000 0.500000)' in svg
+
+    narrow_svg = _compose_svg(
+        [[_SvgFragment("wide", '<svg viewBox="0 0 6400 1600"></svg>', 6400.0, 1600.0)]],
+        background="transparent",
+        review_fragment_max_width=1600.0,
+    )
+    assert 'scale(0.250000 0.250000)' in narrow_svg
+    assert 'viewBox="0 0 1648.000 490.000"' in narrow_svg
+
+
+def test_review_columns_inline_fragments_prefix_duplicate_svg_ids() -> None:
+    from vibeflow.mermaid_review_svg import _SvgFragment, _compose_svg
+
+    fragment_svg = (
+        '<svg xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10">'
+        '<defs><marker id="arrow"></marker></defs>'
+        '<path marker-end="url(#arrow)" href="#arrow" xlink:href="#arrow"/>'
+        "</svg>"
+    )
+    svg = _compose_svg(
+        [
+            [
+                _SvgFragment("first", fragment_svg, 10.0, 10.0),
+                _SvgFragment("second", fragment_svg, 10.0, 10.0),
+            ]
+        ],
+        background="transparent",
+    )
+
+    assert 'id="arrow"' not in svg
+    assert 'id="vf_column_0_0_arrow"' in svg
+    assert 'id="vf_column_0_1_arrow"' in svg
+    assert 'marker-end="url(#vf_column_0_0_arrow)"' in svg
+    assert 'marker-end="url(#vf_column_0_1_arrow)"' in svg
+    assert 'href="#vf_column_0_0_arrow"' in svg
+    assert 'href="#vf_column_0_1_arrow"' in svg
+    assert 'xlink:href="#vf_column_0_0_arrow"' in svg
+    assert 'xlink:href="#vf_column_0_1_arrow"' in svg
 
 
 def test_review_columns_resource_fragments_render_root_left_to_children_right() -> None:
@@ -356,6 +406,59 @@ def test_review_columns_resource_fragments_render_root_left_to_children_right() 
     assert mermaid.startswith("flowchart LR")
     assert "resource_plugins -.-> resource_plugins_0" in mermaid
     assert "resource_plugins -.-> resource_plugins_1" in mermaid
+
+
+def test_run_checked_writes_quick_and_expanded_svg_artifacts(tmp_path, monkeypatch) -> None:
+    import vibeflow.mermaid_render as mermaid_render_module
+    import vibeflow.mermaid_review_svg as review_svg_module
+
+    quick_calls: list[Path] = []
+    expanded_calls: list[dict[str, object]] = []
+
+    def fake_quick_svg(mermaid_text, output, **kwargs):
+        quick_calls.append(Path(output))
+        Path(output).write_text("<svg>quick</svg>", encoding="utf-8")
+
+    def fake_expanded_svg(graph, compiled, output, **kwargs):
+        expanded_calls.append({"output": Path(output), **kwargs})
+        Path(output).write_text("<svg>expanded</svg>", encoding="utf-8")
+
+    monkeypatch.setattr(mermaid_render_module, "render_mermaid_svg", fake_quick_svg)
+    monkeypatch.setattr(review_svg_module, "render_review_columns_svg", fake_expanded_svg)
+
+    config_path = tmp_path / "workflow.json"
+    config_path.write_text(json.dumps({"pipeline": _seed_add_pipeline()}), encoding="utf-8")
+    result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="svg_artifacts")
+
+    assert quick_calls == [result.run_dir / "graph.svg"]
+    assert (result.run_dir / "graph.svg").read_text(encoding="utf-8") == "<svg>quick</svg>"
+    assert (result.run_dir / "graph.expanded.svg").read_text(encoding="utf-8") == "<svg>expanded</svg>"
+    assert expanded_calls[0]["output"] == result.run_dir / "graph.expanded.svg"
+    assert expanded_calls[0]["expand_nodesets"] is True
+    assert expanded_calls[0]["resources"] is not None
+
+
+def test_run_checked_records_expanded_svg_error_without_failing_run(tmp_path, monkeypatch) -> None:
+    import vibeflow.mermaid_render as mermaid_render_module
+    import vibeflow.mermaid_review_svg as review_svg_module
+    from vibeflow.mermaid_render import MermaidRenderError
+
+    def fake_quick_svg(mermaid_text, output, **kwargs):
+        Path(output).write_text("<svg>quick</svg>", encoding="utf-8")
+
+    def fail_expanded_svg(*args, **kwargs):
+        raise MermaidRenderError("expanded failed")
+
+    monkeypatch.setattr(mermaid_render_module, "render_mermaid_svg", fake_quick_svg)
+    monkeypatch.setattr(review_svg_module, "render_review_columns_svg", fail_expanded_svg)
+
+    config_path = tmp_path / "workflow.json"
+    config_path.write_text(json.dumps({"pipeline": _seed_add_pipeline()}), encoding="utf-8")
+    result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="svg_error")
+
+    assert (result.run_dir / "graph.svg").exists()
+    assert not (result.run_dir / "graph.expanded.svg").exists()
+    assert (result.run_dir / "graph.expanded.svg.error.txt").read_text(encoding="utf-8") == "expanded failed"
 
 
 def test_nodeset_detail_leaf_mermaid_uses_lr_with_layout_spine() -> None:
@@ -457,8 +560,9 @@ def test_nodeset_detail_panel_places_children_right_and_stacked() -> None:
     assert svg.count('class="review-panel-frame"') == 3
     assert svg.count('class="review-title-bar"') == 3
 
-    images = re.findall(r'<image x="([0-9.]+)" y="([0-9.]+)" width="([0-9.]+)" height="([0-9.]+)"', svg)
-    assert float(images[0][0]) < float(images[1][0])
+    groups = re.findall(r'<g class="review-inline-fragment" transform="translate\(([0-9.]+) ([0-9.]+)\)', svg)
+    assert float(groups[0][0]) < float(groups[1][0])
+    assert 'data:image/svg+xml;base64,' not in svg
 
 
 def test_nodeset_detail_fragment_recurses_nested_child_panels(tmp_path, monkeypatch) -> None:
@@ -536,11 +640,10 @@ def test_nodeset_detail_fragment_recurses_nested_child_panels(tmp_path, monkeypa
     assert root_positions["second - detail.mid"][0] == root_positions["third - detail.leaf_three"][0]
     assert root_positions["first - detail.leaf_one"][1] < root_positions["second - detail.mid"][1] < root_positions["third - detail.leaf_three"][1]
 
-    payloads = dict.fromkeys(re.findall(r'href="data:image/svg\+xml;base64,([^"]+)"', fragment.svg_text))
-    decoded = [base64.b64decode(payload).decode("utf-8") for payload in payloads]
-    mid_svg = next(text for text in decoded if "inner_a - detail.leaf_two" in text and "inner_b - detail.leaf_three" in text)
-    mid_titles = re.findall(r'<text class="review-title" x="([0-9.]+)" y="([0-9.]+)">([^<]+)</text>', mid_svg)
-    mid_positions = {title: (float(x), float(y)) for x, y, title in mid_titles}
+    assert 'data:image/svg+xml;base64,' not in fragment.svg_text
+    assert "inner_a - detail.leaf_two" in fragment.svg_text
+    assert "inner_b - detail.leaf_three" in fragment.svg_text
+    mid_positions = _review_title_positions(fragment.svg_text)
     assert mid_positions["parent flow"][0] < mid_positions["inner_a - detail.leaf_two"][0]
     assert mid_positions["inner_a - detail.leaf_two"][0] == mid_positions["inner_b - detail.leaf_three"][0]
     assert mid_positions["inner_a - detail.leaf_two"][1] < mid_positions["inner_b - detail.leaf_three"][1]

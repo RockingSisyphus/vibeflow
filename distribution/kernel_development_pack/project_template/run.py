@@ -175,6 +175,7 @@ def main() -> int:
     svg.add_argument("--expand-nodesets", action="store_true")
     svg.add_argument("--mermaid-max-text-size", type=int, default=None)
     svg.add_argument("--mermaid-max-edges", type=int, default=None)
+    svg.add_argument("--review-fragment-max-width", type=float, default=None)
     inspect_node = sub.add_parser("inspect-node")
     inspect_node.add_argument("--type", required=True, dest="node_type")
     inspect_node.add_argument("--module", required=True)
@@ -360,6 +361,9 @@ def _svg(args) -> int:
         else (EXPANDED_MERMAID_MAX_EDGES if bool(args.expand_nodesets) else DEFAULT_MERMAID_MAX_EDGES)
     )
     if bool(args.expand_nodesets):
+        review_kwargs = {}
+        if args.review_fragment_max_width is not None:
+            review_kwargs["review_fragment_max_width"] = float(args.review_fragment_max_width)
         render_review_columns_svg(
             graph,
             compiled,
@@ -369,6 +373,7 @@ def _svg(args) -> int:
             expand_nodesets=True,
             max_text_size=max_text_size,
             max_edges=max_edges,
+            **review_kwargs,
         )
         return 0
     text = export_mermaid(graph, compiled=compiled, registry=registry, expand_nodesets=False, resources=resources)

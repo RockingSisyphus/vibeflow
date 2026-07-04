@@ -77,6 +77,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="override Mermaid maxEdges for SVG rendering",
     )
+    svg.add_argument(
+        "--review-fragment-max-width",
+        type=float,
+        default=None,
+        help="override review-columns SVG fragment display width cap",
+    )
     svg.set_defaults(expand_nodesets=False)
 
     run = sub.add_parser("run", help="run topology config after mandatory health checks")
@@ -246,6 +252,9 @@ def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
             if use_review_columns_svg:
                 from .mermaid_review_svg import render_review_columns_svg
 
+                review_kwargs = {}
+                if args.review_fragment_max_width is not None:
+                    review_kwargs["review_fragment_max_width"] = float(args.review_fragment_max_width)
                 if args.output:
                     render_review_columns_svg(
                         graph,
@@ -260,6 +269,7 @@ def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
                         background=str(args.background),
                         max_text_size=max_text_size,
                         max_edges=max_edges,
+                        **review_kwargs,
                     )
                 else:
                     with tempfile.TemporaryDirectory(prefix="vibeflow-svg-") as temp_dir:
@@ -277,6 +287,7 @@ def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
                             background=str(args.background),
                             max_text_size=max_text_size,
                             max_edges=max_edges,
+                            **review_kwargs,
                         )
                         print(output.read_text(encoding="utf-8"), end="")
                 return 0
