@@ -55,7 +55,7 @@ def test_graph_health_suppresses_duplicate_logic_for_standard_wrappers(tmp_path)
     module_path = tmp_path / "wrapper_nodes.py"
     module_path.write_text(
         """
-from vibeflow import NodeContract, NodeInfo
+from vibeflow import DataProvider, DataRequirement, NodeContract, NodeInfo
 
 def wrap_value(value):
     return value + 1
@@ -63,8 +63,8 @@ def wrap_value(value):
 class WrapperOneNode:
     NODE_INFO = NodeInfo("test.wrapper_one", "Wrapper One", "test", "Wrapper node.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        requires=("value.in",),
-        provides=("wrap.one",),
+        requires=(DataRequirement("value.in", "exactly_one"),),
+        provides=(DataProvider("wrap.one", "wrap.one"),),
         input_semantics={"value.in": ("input value",)},
         output_semantics={"wrap.one": ("wrapped value",)},
         output_schema={"wrap.one": {"type": "number"}},
@@ -79,8 +79,8 @@ class WrapperOneNode:
 class WrapperTwoNode:
     NODE_INFO = NodeInfo("test.wrapper_two", "Wrapper Two", "test", "Wrapper node.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        requires=("value.in",),
-        provides=("wrap.two",),
+        requires=(DataRequirement("value.in", "exactly_one"),),
+        provides=(DataProvider("wrap.two", "wrap.two"),),
         input_semantics={"value.in": ("input value",)},
         output_semantics={"wrap.two": ("wrapped value",)},
         output_schema={"wrap.two": {"type": "number"}},
@@ -101,10 +101,10 @@ class WrapperTwoNode:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": ["value.in"],
+                "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
-                    {"name": "wrapper_one", "type": "test.wrapper_one", "requires": ["value.in"], "provides": ["wrap.one"]},
-                    {"name": "wrapper_two", "type": "test.wrapper_two", "requires": ["value.in"], "provides": ["wrap.two"]},
+                    _node_call("wrapper_one", "test.wrapper_one", "Wraps value.in once.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("wrap.one")]),
+                    _node_call("wrapper_two", "test.wrapper_two", "Wraps value.in twice.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("wrap.two")]),
                 ],
             }
         }

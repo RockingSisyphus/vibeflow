@@ -15,6 +15,9 @@
 - 外部输入输出必须建模为 `io`、`data_store`、`document` 类型节点，或明确的 `external=True` 节点。
 - 控制流只写在 JSONC 的 `pipeline.edges` 中；不要用 Python 调用关系隐式表达流程。
 - `requires` / `provides` 只表达数据契约，不会自动生成控制流。
+- 每个 `pipeline.nodes[]` 调用点都必须写 `display_name` 和 `description`，让 Mermaid/SVG 能直接区分节点名、易读名和说明。
+- 节点自定义颜色只能写在 `style.fill`、`style.stroke`、`style.text` 中，颜色必须是 `#RRGGBB`，且不得使用 VibeFlow 系统保留色。
+- `display_name`、`category`、`version`、`description`、`style` 是可视化元数据，不进入运行时 `params`；运行时同名参数必须写进 `config`。
 - node 间可以按引用传递普通 Python 对象；不要依赖 trace 或报告保存对象内容，报告只审计流程和 key。
 - 需要后台指标、日志或诊断任务时，只能显式使用 config 的 `async: "detached"` 或 `async: "result_key"`，不要在 node 内私自启动线程。
 - 运行或交付前必须让内核健康检查通过；不要跳过 `python run.py validate ...`。
@@ -37,7 +40,7 @@
 
 1. 先把用户希望开发的程序抽象成一个粗粒度标准流程图，只保留几大块。
 2. 用 planned nodeset 表达这些大块。例如初始流程是 `a -> b -> c`，就在顶层 config 中定义 `a`、`b`、`c` 三个 `status: "planned"` 的 nodeset，并在顶层 `pipeline.edges` 中连接 `a -> b -> c`。
-3. planned node 必须声明 `flow_kind`；planned nodeset 可暂时不补齐内部 pipeline、契约和 exports。默认 `planned_behavior` 是 `blocking`，只用于架构图审查。
+3. planned node 必须声明 `flow_kind`，并像 implemented node 一样写 `display_name` 和 `description`；planned nodeset 可暂时不补齐内部 pipeline、契约和 exports。默认 `planned_behavior` 是 `blocking`，只用于架构图审查。
 4. 生成流程图给人类审核：快速源码图用 `python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd`，快速图片用 `python run.py svg --config project/configs/main.jsonc --output reports/graph.svg`。
 5. 需要展开 nodeset 给人类审查时，必须用 `python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg` 生成详细审查 SVG。不要把 `graph.expanded.mmd` 直接交给 Mermaid CLI/mmdc 渲染成 SVG；那会绕过 VibeFlow 的 review-columns/detail-panel composer，导致排版退回旧的全局展开图。
 6. 告知人类审核员查看 `reports/graph.mmd`、`reports/graph.svg` 或 `reports/graph.expanded.svg`。不要在粗粒度架构未经确认时直接实现大量 node。
@@ -67,4 +70,5 @@
 - `planned_behavior: "transparent"` 只用于 flow health 连通性，不可运行。
 - `planned_behavior: {"kind": "python_stub", "stub_module": "project/stubs/xxx.py"}` 只用于开发测试；必须配合 `--allow-planned-stub` 才能运行，不能视为 production ready。
 - implemented 内容必须完整、可达、可校验、可运行。
-- 流程图是人类审核程序结构的主要产物；重大架构变更先出图再实现。
+- 流程图是人类审核程序结构的主要产物；重大架构变更先出图再实现。SVG 应能读清每个 node 的 `name`、`type`、`display`、`desc` 和契约字段，信息挤在一起时应先改善 config 的描述长度、拆节点或调整 style，而不是绕过 `python run.py svg`。
+- 系统保留色不能作为自定义色：普通 node 默认 `#ECECFF/#9370DB/#333333`，planned `#fef08a/#ca8a04/#713f12`，plugin resource `#eff6ff/#2563eb/#1e3a8a`，base_lib resource `#ecfdf5/#059669/#064e3b`，以及 health、external、document、nodeset 等语义色。

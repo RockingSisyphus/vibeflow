@@ -22,7 +22,7 @@ class Plugin:
         json.dumps(
             {
                 "plugins": [{"module": str(plugin_path), "type": "policy"}],
-                "pipeline": {"nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"]}]},
+                "pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])]},
             }
         ),
         encoding="utf-8",

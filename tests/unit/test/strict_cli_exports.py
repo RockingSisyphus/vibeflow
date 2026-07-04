@@ -7,15 +7,10 @@ def _write_export_config(path: Path) -> None:
             {
                 "pipeline": {
                     "nodes": [
-                        {"name": "start", "type": "test.start"},
-                        {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")]},
-                        {
-                            "name": "add",
-                            "type": "test.add",
-                            "requires": [REQ_SPEC("value.in")],
-                            "provides": [PROV_SPEC("value.out")],
-                        },
-                        {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                        _node_call("start", "test.start", "Starts the export fixture."),
+                        _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                        _node_call("add", "test.add", "Adds delta to value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                        _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
                     ],
                     "edges": [["start", "seed"], ["seed", "add"], ["add", "end"]],
                 }
@@ -41,15 +36,10 @@ def _write_nodeset_export_config(path: Path) -> None:
                 "pipeline": {
                     "inputs": [PROV_SPEC("value.in")],
                     "nodes": [
-                        {"name": "start", "type": "test.start"},
-                        {"name": "input", "type": "test.value_input", "requires": [REQ_SPEC("value.in")]},
-                        {
-                            "name": "composite",
-                            "type": "nodeset.math.add_one",
-                            "requires": [REQ_SPEC("value.in")],
-                            "provides": [PROV_SPEC("value.out")],
-                        },
-                        {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                        _node_call("start", "test.start", "Starts the nodeset export fixture."),
+                        _node_call("input", "test.value_input", "Reads value.in.", requires=[REQ_SPEC("value.in")]),
+                        _node_call("composite", "nodeset.math.add_one", "Calls the add-one composite.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                        _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
                     ],
                     "edges": _edge_chain("start", "input", "composite", "end"),
                 },
@@ -62,7 +52,7 @@ def _write_nodeset_export_config(path: Path) -> None:
 @pytest.mark.parametrize(
     ("command", "expected"),
     [
-        ("export-mermaid", ("flowchart TD", "seed --> add", "provides: value.in")),
+        ("export-mermaid", ("flowchart TD", "seed --> add", "provides: value.in -> value.in")),
         ("export-ascii", ("TOPOLOGY FLOWCHART", "seed ----> add", "provides=value.in")),
     ],
 )

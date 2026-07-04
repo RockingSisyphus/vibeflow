@@ -68,7 +68,7 @@ def test_external_flag_keeps_contract_but_skips_source_quality() -> None:
     class ExternalNode:
         NODE_INFO = NodeInfo("test.external", "External", "test", "Calls external package.", "0.1.0", "process", external=True)
         CONTRACT = NodeContract(
-            provides=("external.out",),
+            provides=(DataProvider("external.out", "external.out"),),
             output_semantics={"external.out": ("external output",)},
             output_schema={"external.out": {"type": "string"}},
             examples=({"inputs": {}, "params": {}},),
@@ -91,7 +91,7 @@ def test_external_flag_does_not_require_route_output() -> None:
     class ExternalProcessNode:
         NODE_INFO = NodeInfo("test.external_ok", "External", "test", "Calls external package.", "0.1.0", "process", external=True)
         CONTRACT = NodeContract(
-            provides=("external.out",),
+            provides=(DataProvider("external.out", "external.out"),),
             output_semantics={"external.out": ("external output",)},
             output_schema={"external.out": {"type": "number"}},
             examples=({"inputs": {}, "params": {}},),
@@ -109,8 +109,8 @@ def test_edge_when_syntax_is_static_config_error() -> None:
             {
                 "pipeline": {
                     "nodes": [
-                        {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
-                        {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
+                        _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                        _node_call("add", "test.add", "Adds value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                     ],
                     "edges": [{"from": "seed", "to": "add", "when": "route == ok"}],
                 }
@@ -125,10 +125,10 @@ def test_decision_branch_value_must_match_output_schema() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")]},
-                    {"name": "route", "type": "test.two_route", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("flow.route")]},
-                    {"name": "end", "type": "test.start"},
+                    _node_call("start", "test.start", "Starts the branch fixture."),
+                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("route", "test.two_route", "Chooses the route.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("flow.route")]),
+                    _node_call("end", "test.start", "Ends the branch fixture."),
                 ],
                 "edges": [
                     {"from": "start", "to": "seed"},
@@ -150,12 +150,12 @@ def test_decision_non_loop_branch_must_reach_end_but_loop_branch_is_skipped() ->
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")]},
-                    {"name": "route", "type": "test.two_route", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("flow.route")]},
-                    {"name": "copy", "type": "test.seed", "provides": [{"key": "value.in.copy", "type": "value.in"}]},
-                    {"name": "dead", "type": "test.seed", "provides": [{"key": "value.in.dead", "type": "value.in"}]},
-                    {"name": "end", "type": "test.start"},
+                    _node_call("start", "test.start", "Starts the branch reachability fixture."),
+                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("route", "test.two_route", "Chooses the route.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("flow.route")]),
+                    _node_call("copy", "test.seed", "Produces loop continuation data.", provides=[PROV_SPEC("value.in.copy", "value.in")]),
+                    _node_call("dead", "test.seed", "Produces dead-end data.", provides=[PROV_SPEC("value.in.dead", "value.in")]),
+                    _node_call("end", "test.start", "Ends the branch reachability fixture."),
                 ],
                 "edges": [
                     {"from": "start", "to": "seed"},
@@ -180,21 +180,13 @@ def test_decision_cycle_exit_is_checked_per_scc_not_per_body_decision() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")]},
-                    {"name": "controller", "type": "test.two_route", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("flow.route")]},
-                    {"name": "body_route", "type": "test.body_route", "requires": [REQ_SPEC("flow.route")], "provides": [PROV_SPEC("flow.inner")]},
-                    {
-                        "name": "left_continue",
-                        "type": "test.seed",
-                        "provides": [{"key": "value.in.left", "type": "value.in"}],
-                    },
-                    {
-                        "name": "right_continue",
-                        "type": "test.seed",
-                        "provides": [{"key": "value.in.right", "type": "value.in"}],
-                    },
-                    {"name": "end", "type": "test.start"},
+                    _node_call("start", "test.start", "Starts the SCC fixture."),
+                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("controller", "test.two_route", "Controls the outer route.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("flow.route")]),
+                    _node_call("body_route", "test.body_route", "Controls the body route.", requires=[REQ_SPEC("flow.route")], provides=[PROV_SPEC("flow.inner")]),
+                    _node_call("left_continue", "test.seed", "Produces left continuation data.", provides=[PROV_SPEC("value.in.left", "value.in")]),
+                    _node_call("right_continue", "test.seed", "Produces right continuation data.", provides=[PROV_SPEC("value.in.right", "value.in")]),
+                    _node_call("end", "test.start", "Ends the SCC fixture."),
                 ],
                 "edges": [
                     {"from": "start", "to": "seed"},
@@ -220,7 +212,7 @@ def test_planned_node_is_concern_not_unknown_type() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "future", "status": "planned", "flow_kind": "process"},
+                    _node_call("future", "planned.future", "Represents future work.", status="planned", flow_kind="process"),
                 ]
             }
         }
@@ -243,14 +235,14 @@ def test_implemented_nodeset_cannot_contain_planned_child() -> None:
                     exports=["value.out"],
                     pipeline={
                         "nodes": [
-                            {"name": "future", "status": "planned", "flow_kind": "process"},
+                            _node_call("future", "planned.future", "Represents a planned child.", status="planned", flow_kind="process"),
                         ]
                     },
                 )
             ],
             "pipeline": {
                 "nodes": [
-                    {"name": "a", "type": "nodeset.a", "provides": ["value.out"]},
+                    _node_call("a", "nodeset.a", "Calls nodeset a.", provides=[PROV_SPEC("value.out")]),
                 ]
             },
         }
@@ -265,16 +257,17 @@ def test_requires_provides_data_edges_are_diagnostic_and_explicit_flow_runs() ->
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "seed", "type": "test.seed", "provides": ["value.in"], "value": 4},
-                    {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 3},
-                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                    _node_call("start", "test.start", "Starts the explicit edge fixture."),
+                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")], value=4),
+                    _node_call("add", "test.add", "Adds delta to value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")], delta=3),
+                    _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": [
                     {"from": "start", "to": "seed"},
                     {"from": "seed", "to": "add"},
                     {"from": "add", "to": "end"},
                 ],
+                "outputs": [REQ_SPEC("value.out")],
             }
         }
     )
@@ -282,16 +275,16 @@ def test_requires_provides_data_edges_are_diagnostic_and_explicit_flow_runs() ->
     assert ("seed", "add") in [edge.pair for edge in compiled.data_edges]
     assert [edge.pair for edge in compiled.effective_edges] == [("start", "seed"), ("seed", "add"), ("add", "end")]
     context = PipelineRuntime(graph, registry=_registry()).run()
-    assert context.get("value.out") == 7
+    assert context.get("value.out")["value"] == 7
 
 def test_undeclared_cycle_is_rejected() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": ["value.in"],
+                "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
-                    {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
-                    {"name": "copy", "type": "test.copy", "requires": ["value.out"], "provides": ["value.copy"]},
+                    _node_call("add", "test.add", "Adds value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("copy", "test.copy", "Copies value.out back to value.in.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy", "value.in")]),
                 ],
                 "edges": [{"from": "add", "to": "copy"}, {"from": "copy", "to": "add"}],
             }
@@ -305,7 +298,7 @@ def test_removed_loop_registration_and_edge_limits_are_rejected() -> None:
         parse_graph_config(
             {
                 "pipeline": {
-                    "nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"]}],
+                    "nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])],
                     "loops": [{"name": "counter_loop", "edges": [["seed", "seed"]]}],
                 }
             }
@@ -315,7 +308,7 @@ def test_removed_loop_registration_and_edge_limits_are_rejected() -> None:
         parse_graph_config(
             {
                 "pipeline": {
-                    "nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"]}],
+                    "nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])],
                     "edges": [{"from": "seed", "to": "seed", "max_executions": 2}],
                 }
             }
@@ -331,14 +324,14 @@ def test_boundary_config_is_removed() -> None:
         parse_graph_config(
             {
                 "boundary": {"type": "test.boundary", "consumes": ["effects.request"], "provides": ["io.result"]},
-                "pipeline": {"nodes": [{"name": "seed", "type": "test.seed", "provides": ["value.in"]}]},
+                "pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])]},
             }
         )
 
 def test_registry_namespace_mismatch_is_warning() -> None:
     registry = NodeRegistry()
     _register_fulltext_nodes(registry)
-    graph = parse_graph_config({"pipeline": {"nodes": [{"name": "rank", "type": "literature.rank_records", "provides": ["value.in"]}]}})
+    graph = parse_graph_config({"pipeline": {"nodes": [_node_call("rank", "literature.rank_records", "Ranks records.", provides=[PROV_SPEC("value.in")])]}})
     report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
     warnings = [warning for warning in report.warnings if warning.rule_id == "REGISTRY.SMELL.NAMESPACE_MISMATCH"]
     assert len(warnings) == 1
@@ -369,16 +362,17 @@ def test_checked_run_writes_reproducible_artifacts_without_raw_inputs(tmp_path) 
             {
                 "pipeline": {
                     "nodes": [
-                        {"name": "start", "type": "test.start"},
-                        {"name": "seed", "type": "test.seed", "provides": ["value.in"], "value": 4},
-                        {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"], "delta": 3},
-                        {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                        _node_call("start", "test.start", "Starts the artifact fixture."),
+                        _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")], value=4),
+                        _node_call("add", "test.add", "Adds delta to value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")], delta=3),
+                        _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                     ],
                     "edges": [
                         {"from": "start", "to": "seed"},
                         {"from": "seed", "to": "add"},
                         {"from": "add", "to": "end"},
                     ],
+                    "outputs": [REQ_SPEC("value.out")],
                 }
             }
         ),
@@ -392,7 +386,7 @@ def test_checked_run_writes_reproducible_artifacts_without_raw_inputs(tmp_path) 
         run_id="run_001",
     )
     assert result.run_id == "run_001"
-    assert result.context.get("value.out") == 7
+    assert result.context.get("value.out")["value"] == 7
     expected_files = {
         "input_summary.json",
         "effective_policy.json",

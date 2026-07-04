@@ -53,11 +53,15 @@
         "nodes": [
           {
             "name": "start",
-            "type": "example.start"
+            "type": "example.start",
+            "display_name": "Start",
+            "description": "Starts the add-one nodeset."
           },
           {
             "name": "add_one",
             "type": "example.add",
+            "display_name": "Add One",
+            "description": "Adds one to the incoming value.",
             "requires": [
               {
                 "type": "value.in",
@@ -75,6 +79,8 @@
           {
             "name": "end",
             "type": "example.end",
+            "display_name": "End",
+            "description": "Consumes the add-one nodeset output.",
             "requires": [
               {
                 "type": "value.out",
@@ -106,11 +112,15 @@
     "nodes": [
       {
         "name": "start",
-        "type": "example.start"
+        "type": "example.start",
+        "display_name": "Start",
+        "description": "Starts the example pipeline."
       },
       {
         "name": "seed",
         "type": "example.seed",
+        "display_name": "Seed Value",
+        "description": "Produces the initial value.",
         "provides": [
           {
             "key": "value.in",
@@ -122,6 +132,8 @@
       {
         "name": "add_one_flow",
         "type": "nodeset.example.add_one",
+        "display_name": "Add One Flow",
+        "description": "Runs the reusable add-one nodeset.",
         "requires": [
           {
             "type": "value.in",
@@ -138,6 +150,8 @@
       {
         "name": "end",
         "type": "example.end",
+        "display_name": "End",
+        "description": "Consumes the final pipeline output.",
         "requires": [
           {
             "type": "value.out",

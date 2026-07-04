@@ -33,8 +33,8 @@
       "config": {
         "pipeline": {
           "nodes": [
-            {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
-            {"name": "copy", "type": "test.copy", "requires": ["value.out"], "provides": ["value.in"]}
+            {"name": "add", "type": "test.add", "display_name": "Add", "description": "Adds value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}], "provides": [{"key": "value.out", "type": "value.out"}]},
+            {"name": "copy", "type": "test.copy", "display_name": "Copy", "description": "Copies value.out back to value.in.", "requires": [{"type": "value.out", "cardinality": "exactly_one"}], "provides": [{"key": "value.in.copy", "type": "value.in"}]}
           ],
           "loops": [{"name": "old", "edges": [["copy", "add"]], "max_iterations": 2}]
         }
@@ -47,7 +47,7 @@
         "boundary": {"type": "bad.boundary", "consumes": ["value.out"], "provides": ["bad.result"]},
         "pipeline": {
           "nodes": [
-            {"name": "seed", "type": "test.seed", "provides": ["value.in"]}
+            {"name": "seed", "type": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in"}]}
           ]
         }
       }
@@ -66,12 +66,12 @@
       "expected_rule_id": "GRAPH.CYCLE.MISSING_DECISION_EXIT",
       "config": {
         "pipeline": {
-          "inputs": ["value.in"],
+          "inputs": [{"key": "value.in", "type": "value.in"}],
           "nodes": [
-            {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
-            {"name": "route", "type": "test.route", "requires": ["value.out"], "provides": ["flow.route"]},
-            {"name": "copy", "type": "test.copy", "requires": ["value.out"], "provides": ["value.in"]},
-            {"name": "end", "type": "test.in_end", "requires": ["value.in"]}
+            {"name": "add", "type": "test.add", "display_name": "Add", "description": "Adds value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}], "provides": [{"key": "value.out", "type": "value.out"}]},
+            {"name": "route", "type": "test.route", "display_name": "Route", "description": "Routes the loop.", "requires": [{"type": "value.out", "cardinality": "exactly_one"}], "provides": [{"key": "flow.route", "type": "flow.route"}]},
+            {"name": "copy", "type": "test.copy", "display_name": "Copy", "description": "Copies output back to the loop input.", "requires": [{"type": "value.out", "cardinality": "exactly_one"}], "provides": [{"key": "value.in.copy", "type": "value.in"}]},
+            {"name": "end", "type": "test.in_end", "display_name": "End", "description": "Consumes value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}]}
           ],
           "edges": [
             {"from": "add", "to": "route"},
@@ -87,9 +87,9 @@
       "config": {
         "pipeline": {
           "nodes": [
-            {"name": "start", "type": "test.start"},
-            {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
-            {"name": "end", "type": "test.in_end", "requires": ["value.in"]}
+            {"name": "start", "type": "test.start", "display_name": "Start", "description": "Starts the duplicate edge fixture."},
+            {"name": "seed", "type": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in"}]},
+            {"name": "end", "type": "test.in_end", "display_name": "End", "description": "Consumes value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}]}
           ],
           "edges": [
             {"from": "start", "to": "seed"},
@@ -105,8 +105,8 @@
       "config": {
         "pipeline": {
           "nodes": [
-            {"name": "route", "type": "test.route", "provides": ["flow.route"]},
-            {"name": "copy", "type": "test.copy", "requires": ["value.in"], "provides": ["value.out"]}
+            {"name": "route", "type": "test.route", "display_name": "Route", "description": "Produces route values.", "provides": [{"key": "flow.route", "type": "flow.route"}]},
+            {"name": "copy", "type": "test.copy", "display_name": "Copy", "description": "Copies value.in to value.out.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}], "provides": [{"key": "value.out", "type": "value.out"}]}
           ],
           "edges": [
             {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
@@ -136,9 +136,9 @@
         },
         "pipeline": {
           "nodes": [
-            {"name": "start", "type": "test.start"},
-            {"name": "BadName", "type": "test.seed", "provides": ["value.in"]},
-            {"name": "end", "type": "test.in_end", "requires": ["value.in"]}
+            {"name": "start", "type": "test.start", "display_name": "Start", "description": "Starts the policy fixture."},
+            {"name": "BadName", "type": "test.seed", "display_name": "Bad Name", "description": "Produces value.in for the policy fixture.", "provides": [{"key": "value.in", "type": "value.in"}]},
+            {"name": "end", "type": "test.in_end", "display_name": "End", "description": "Consumes value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}]}
           ],
           "edges": [
             {"from": "start", "to": "BadName"},
@@ -180,10 +180,10 @@
       "config": {
         "pipeline": {
           "nodes": [
-            {"name": "start", "type": "test.start"},
-            {"name": "seed", "type": "test.seed", "provides": ["value.in"]},
-            {"name": "add", "type": "test.add", "requires": ["value.in"], "provides": ["value.out"]},
-            {"name": "end", "type": "test.out_end", "requires": ["value.out"]}
+            {"name": "start", "type": "test.start", "display_name": "Start", "description": "Starts the architecture fixture."},
+            {"name": "seed", "type": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in"}]},
+            {"name": "add", "type": "test.add", "display_name": "Add", "description": "Adds value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}], "provides": [{"key": "value.out", "type": "value.out"}]},
+            {"name": "end", "type": "test.out_end", "display_name": "End", "description": "Consumes value.out.", "requires": [{"type": "value.out", "cardinality": "exactly_one"}]}
           ],
           "edges": [
             {"from": "start", "to": "seed"},

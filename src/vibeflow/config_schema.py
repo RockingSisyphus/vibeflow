@@ -6,6 +6,7 @@ from .health_types import HealthFinding
 from .node import FLOW_KINDS
 from .planned_behavior import PLANNED_BEHAVIOR_BLOCKING, PLANNED_BEHAVIOR_PYTHON_STUB, PLANNED_BEHAVIOR_TRANSPARENT, validate_stub_module_ref
 from .schema_findings import schema_finding
+from .visual_style import NODE_STYLE_FIELDS, is_hex_color, is_reserved_system_color, normalize_hex_color
 
 STATUSES = {"planned", "implemented"}
 
@@ -78,6 +79,7 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
     _validate_planned_behavior(value, prefix, findings, status=status)
     _validate_node_contract_fields(value, prefix, findings)
     _validate_node_config_fields(value, prefix, findings)
+    _validate_node_visual_fields(value, prefix, findings)
     _validate_node_async_fields(value, prefix, findings)
 
 
@@ -117,6 +119,37 @@ def _validate_node_config_fields(value: Mapping[str, Any], prefix: str, findings
     for field in ("allow_config_override", "override_child_config"):
         if field in value and not isinstance(value[field], bool):
             findings.append(_error("CONFIG.SCHEMA.CONFIG_OVERRIDE_FLAG", f"{prefix}.{field} must be a boolean", f"{prefix}.{field}"))
+
+
+def _validate_node_visual_fields(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
+    for field in ("display_name", "category", "version", "description"):
+        if field in value and not isinstance(value[field], str):
+            findings.append(_error("CONFIG.SCHEMA.NODE_METADATA_STRING", f"{prefix}.{field} must be a string", f"{prefix}.{field}"))
+    if "style" not in value:
+        return
+    style = value["style"]
+    if not isinstance(style, Mapping):
+        findings.append(_error("CONFIG.SCHEMA.NODE_STYLE_OBJECT", f"{prefix}.style must be an object", f"{prefix}.style"))
+        return
+    unknown = sorted(set(str(key) for key in style) - set(NODE_STYLE_FIELDS))
+    if unknown:
+        findings.append(_error("CONFIG.SCHEMA.NODE_STYLE_FIELD", f"{prefix}.style contains unknown keys: {unknown}", f"{prefix}.style"))
+    for field in NODE_STYLE_FIELDS:
+        if field not in style:
+            continue
+        color = style[field]
+        if not is_hex_color(color):
+            findings.append(_error("CONFIG.SCHEMA.NODE_STYLE_COLOR", f"{prefix}.style.{field} must be a #RRGGBB color", f"{prefix}.style.{field}"))
+            continue
+        normalized = normalize_hex_color(str(color))
+        if is_reserved_system_color(normalized):
+            findings.append(
+                _error(
+                    "CONFIG.SCHEMA.NODE_STYLE_RESERVED_COLOR",
+                    f"{prefix}.style.{field} uses reserved VibeFlow system color: {normalized}",
+                    f"{prefix}.style.{field}",
+                )
+            )
 
 
 def _validate_node_async_fields(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:

@@ -11,7 +11,7 @@ class GlobalParamNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        provides=("value.out",),
+        provides=(DataProvider("value.out", "value.out"),),
         output_semantics={"value.out": ("global config value",)},
         output_schema={"value.out": {"type": "number"}},
         examples=({"inputs": {}, "params": {"_global": {"offset": 1}}},),
@@ -49,7 +49,7 @@ def test_config_resource_schema_rejects_invalid_status_and_plugin_config() -> No
                         "name": "flow",
                         "type": "nodeset.math.add_one",
                         "allow_config_override": "no",
-                        "provides": ["value.out"],
+                        "provides": [PROV_SPEC("value.out")],
                     }
                 ]
             },
@@ -115,11 +115,12 @@ class RuntimePlugin:
                 ],
                 "pipeline": {
                     "nodes": [
-                        {"name": "start", "type": "test.start"},
-                        {"name": "global", "type": "test.global_param", "provides": ["value.out"]},
-                        {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                        _node_call("start", "test.start", "Starts the resource fixture."),
+                        _node_call("global", "test.global_param", "Reads global config.", provides=[PROV_SPEC("value.out")]),
+                        _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                     ],
                     "edges": _edge_chain("start", "global", "end"),
+                    "outputs": [REQ_SPEC("value.out")],
                 },
             }
         ),
@@ -130,7 +131,7 @@ class RuntimePlugin:
 
     result = run_checked(config_path, registry=registry, run_root=tmp_path / "runs", run_id="resources")
 
-    assert result.context.get("value.out") == 7
+    assert result.context.get("value.out")["value"] == 7
     assert json.loads(marker_path.read_text(encoding="utf-8")) == {"before_run": True, "configured": "ready"}
     resources = result.health.info["resources"]
     assert resources["global_config"] == {"offset": 7}
@@ -175,7 +176,7 @@ def test_global_config_overrides_node_params_and_warns_when_not_allowed(tmp_path
 
     result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="global_override")
 
-    assert result.context.get("value.out") == 6
+    assert result.context.get("value.out")["value"] == 6
     warnings = {warning.rule_id for warning in result.health.warnings}
     assert "CONFIG.GLOBAL_CONFIG.OVERRIDES_LOCAL" in warnings
 
@@ -189,7 +190,7 @@ def test_global_config_overrides_node_params_and_warns_when_not_allowed(tmp_path
         encoding="utf-8",
     )
     allowed = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="global_override_allowed")
-    assert allowed.context.get("value.out") == 6
+    assert allowed.context.get("value.out")["value"] == 6
     assert "CONFIG.GLOBAL_CONFIG.OVERRIDES_LOCAL" not in {warning.rule_id for warning in allowed.health.warnings}
 
 
@@ -207,21 +208,14 @@ def test_nodeset_call_config_overrides_nodeset_global_and_inner_node_config(tmp_
                 | {"global_config": {"config": {"delta": 2}, "allow_config_override": False}}
             ],
             "pipeline": {
-                "inputs": ["value.in"],
+                "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
-                    {
-                        "name": "flow",
-                        "type": "nodeset.math.add_one",
-                        "requires": ["value.in"],
-                        "provides": ["value.out"],
-                        "config": {"delta": 6},
-                        "allow_config_override": False,
-                    },
-                    {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                    _node_call("start", "test.start", "Starts the nodeset config fixture."),
+                    _node_call("flow", "nodeset.math.add_one", "Calls add-one with config override.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")], config={"delta": 6}, allow_config_override=False),
+                    _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                 ],
-                "edges": _edge_chain("start", "input", "flow", "end"),
+                "edges": _edge_chain("start", "flow", "end"),
+                "outputs": [REQ_SPEC("value.out")],
             },
         }
     )
@@ -230,7 +224,7 @@ def test_nodeset_call_config_overrides_nodeset_global_and_inner_node_config(tmp_
     runtime = PipelineRuntime(graph, registry=_registry())
 
     assert runtime._plan.frame("flow").subplan.frame("add").params["delta"] == 6
-    assert runtime.run({"value.in": 2}).get("value.out") == 8
+    assert runtime.run({"value.in": 2}).get("value.out")["value"] == 8
     warning_ids = {warning.rule_id for warning in report.warnings}
     assert "NODESET.CONFIG.OVERRIDES_GLOBAL_CONFIG" in warning_ids
     assert "CONFIG.GLOBAL_CONFIG.OVERRIDES_LOCAL" in warning_ids
@@ -261,23 +255,23 @@ def test_imported_nodeset_file_global_config_is_used_for_inner_nodes(tmp_path) -
             {
                 "nodeset_imports": [{"path": "nodesets.jsonc", "names": ["math.add_one"]}],
                 "pipeline": {
-                    "inputs": ["value.in"],
+                    "inputs": [PROV_SPEC("value.in")],
                     "nodes": [
-                        {"name": "start", "type": "test.start"},
-                        {"name": "input", "type": "test.value_input", "requires": ["value.in"]},
-                        {"name": "flow", "type": "nodeset.math.add_one", "requires": ["value.in"], "provides": ["value.out"]},
-                        {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                        _node_call("start", "test.start", "Starts the imported nodeset fixture."),
+                        _node_call("flow", "nodeset.math.add_one", "Calls imported add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                        _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                     ],
-                    "edges": _edge_chain("start", "input", "flow", "end"),
+                    "edges": _edge_chain("start", "flow", "end"),
+                    "outputs": [REQ_SPEC("value.out")],
                 },
             }
         ),
         encoding="utf-8",
     )
 
-    result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="imported_nodeset_global", initial={"value": {"in": 2}})
+    result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="imported_nodeset_global", initial={"value.in": 2})
 
-    assert result.context.get("value.out") == 6
+    assert result.context.get("value.out")["value"] == 6
 
 
 def test_implemented_resources_require_metadata_but_planned_resources_skip_load(tmp_path) -> None:
@@ -348,12 +342,12 @@ def test_planned_base_lib_does_not_satisfy_node_import_allowlist(tmp_path, monke
     node_path = tmp_path / "future_node.py"
     node_path.write_text(
         """
-from vibeflow import NodeContract, NodeInfo
+from vibeflow import DataProvider, NodeContract, NodeInfo
 
 class FutureNode:
     NODE_INFO = NodeInfo("test.future", "Future", "test", "Imports a planned base_lib.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        provides=("value.out",),
+        provides=(DataProvider("value.out", "value.out"),),
         output_semantics={"value.out": ("future value",)},
         output_schema={"value.out": {"type": "number"}},
         examples=({"inputs": {}, "params": {}},),
@@ -381,9 +375,9 @@ class FutureNode:
                 },
                 "pipeline": {
                     "nodes": [
-                        {"name": "start", "type": "test.start"},
-                        {"name": "future", "type": "test.future", "provides": ["value.out"]},
-                        {"name": "end", "type": "test.out_end", "requires": ["value.out"]},
+                        _node_call("start", "test.start", "Starts the planned base_lib fixture."),
+                        _node_call("future", "test.future", "Imports a planned base_lib.", provides=[PROV_SPEC("value.out")]),
+                        _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                     ],
                     "edges": _edge_chain("start", "future", "end"),
                 },

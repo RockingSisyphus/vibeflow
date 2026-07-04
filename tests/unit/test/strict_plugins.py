@@ -185,15 +185,10 @@ def test_mermaid_collapses_and_expands_nodesets_with_contract_metadata() -> None
                 "pipeline": {
                     "inputs": [PROV_SPEC("value.in")],
                     "nodes": [
-                        {"name": "start", "type": "test.start"},
-                        {"name": "input", "type": "test.value_input", "requires": [REQ_SPEC("value.in")]},
-                        {
-                            "name": "composite",
-                            "type": "nodeset.math.add_one",
-                            "requires": [REQ_SPEC("value.in")],
-                            "provides": [PROV_SPEC("value.out")],
-                        },
-                        {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                        _node_call("start", "test.start", "Starts the nodeset Mermaid fixture."),
+                        _node_call("input", "test.value_input", "Reads value.in.", requires=[REQ_SPEC("value.in")]),
+                        _node_call("composite", "nodeset.math.add_one", "Calls the add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                        _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
                     ],
                     "edges": _edge_chain("start", "input", "composite", "end"),
                 },
@@ -201,14 +196,14 @@ def test_mermaid_collapses_and_expands_nodesets_with_contract_metadata() -> None
     )
 
     collapsed = export_mermaid(graph)
-    assert 'composite@{ shape: fr-rect, label: "composite\\nnodeset.math.add_one' in collapsed
+    assert 'composite@{ shape: fr-rect, label: "name: composite\\ntype: nodeset.math.add_one' in collapsed
     assert "requires: value.in" in collapsed
     assert "exports: value.out" in collapsed
     assert "composite__inner" not in collapsed
 
     expanded = export_mermaid(graph, expand_nodesets=True)
     assert 'subgraph composite__expanded["math.add_one"]' in expanded
-    assert 'composite__inner@{ shape: rect, label: "inner\\ntest.add' in expanded
+    assert 'composite__inner@{ shape: rect, label: "name: inner\\ntype: test.add' in expanded
     assert "Internal add step." in expanded
 
 def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nodesets() -> None:
@@ -226,15 +221,10 @@ def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nod
             "pipeline": {
                 "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "input", "type": "test.value_input", "requires": [REQ_SPEC("value.in")]},
-                    {
-                        "name": "composite",
-                        "type": "nodeset.math.add_one",
-                        "requires": [REQ_SPEC("value.in")],
-                        "provides": [PROV_SPEC("value.out")],
-                    },
-                    {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                    _node_call("start", "test.start", "Starts the review-column fixture."),
+                    _node_call("input", "test.value_input", "Reads value.in.", requires=[REQ_SPEC("value.in")]),
+                    _node_call("composite", "nodeset.math.add_one", "Calls the add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": _edge_chain("start", "input", "composite", "end"),
             },
@@ -489,7 +479,7 @@ def test_nodeset_detail_leaf_mermaid_uses_lr_with_layout_spine() -> None:
     assert mermaid.startswith("flowchart LR")
     assert "classDef layoutAnchor" in mermaid
     assert "__vibeflow_layout_start ~~~ start" in mermaid
-    assert "input ~~~ inner" in mermaid
+    assert "start ~~~ inner" in mermaid
     assert "inner ~~~ n_end" in mermaid
 
 
@@ -545,7 +535,7 @@ def test_nodeset_detail_parent_mermaid_preserves_collapsed_callsite_edges() -> N
     )
 
     assert mermaid.startswith("flowchart TD")
-    assert 'child@{ shape: fr-rect, label: "child\\nnodeset.detail.leaf' in mermaid
+    assert 'child@{ shape: fr-rect, label: "name: child\\ntype: nodeset.detail.leaf' in mermaid
     assert "before -->|route == 'detail'| child" in mermaid
     assert "child --> after" in mermaid
     assert "inner@{ shape:" not in mermaid
@@ -698,10 +688,10 @@ def test_health_report_status_pass_when_no_findings() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "input", "type": "test.seed", "provides": [PROV_SPEC("value.in")]},
-                    {"name": "sink", "type": "test.sink", "requires": [REQ_SPEC("value.in")]},
-                    {"name": "end", "type": "test.start"},
+                    _node_call("start", "test.start", "Starts the sink fixture."),
+                    _node_call("input", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("sink", "test.sink", "Consumes value.in.", requires=[REQ_SPEC("value.in")]),
+                    _node_call("end", "test.start", "Ends the sink fixture."),
                 ],
                 "edges": _edge_chain("start", "input", "sink", "end"),
             }

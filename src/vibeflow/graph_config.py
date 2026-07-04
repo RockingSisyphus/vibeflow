@@ -13,10 +13,37 @@ from .data_contract import (
 )
 from .node import FLOW_KINDS, FLOW_KIND_PREDEFINED
 from .planned_behavior import PlannedBehavior, blocking_planned_behavior, parse_planned_behavior
+from .visual_style import NODE_STYLE_FIELDS, is_hex_color, is_reserved_system_color, normalize_hex_color
 
 STATUS_PLANNED = "planned"
 STATUS_IMPLEMENTED = "implemented"
 STATUSES = frozenset({STATUS_PLANNED, STATUS_IMPLEMENTED})
+
+
+@dataclass(frozen=True)
+class NodeMetadata:
+    display_name: str = ""
+    category: str = ""
+    version: str = ""
+    description: str = ""
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "display_name": self.display_name,
+            "category": self.category,
+            "version": self.version,
+            "description": self.description,
+        }
+
+
+@dataclass(frozen=True)
+class NodeStyle:
+    fill: str = ""
+    stroke: str = ""
+    text: str = ""
+
+    def to_dict(self) -> dict[str, str]:
+        return {key: value for key, value in (("fill", self.fill), ("stroke", self.stroke), ("text", self.text)) if value}
 
 
 @dataclass(frozen=True)
@@ -26,6 +53,8 @@ class NodeSpec:
     requires: tuple[DataRequirement, ...] = ()
     provides: tuple[DataProvider, ...] = ()
     params: dict[str, Any] = field(default_factory=dict)
+    metadata: NodeMetadata = field(default_factory=NodeMetadata)
+    style: NodeStyle = field(default_factory=NodeStyle)
     node_config_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
     allow_config_override: bool = False
     status: str = STATUS_IMPLEMENTED
@@ -161,6 +190,11 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         "planned_behavior",
         "async",
         "result_key",
+        "display_name",
+        "category",
+        "version",
+        "description",
+        "style",
     }
     return NodeSpec(
         name=name,
@@ -168,6 +202,8 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         requires=requires,
         provides=provides,
         params=_parse_node_params(item, reserved=reserved, field=f"node[{name}].config"),
+        metadata=_parse_node_metadata(item),
+        style=_parse_node_style(item.get("style", {}), field=f"pipeline.nodes[{index}].style"),
         node_config_overrides=_parse_node_config_overrides(item.get("node_configs", {}), field=f"node[{name}].node_configs"),
         allow_config_override=_parse_bool(item.get("allow_config_override", item.get("override_child_config", False)), field=f"node[{name}].allow_config_override"),
         status=status,
@@ -328,6 +364,41 @@ def _parse_node_params(item: Mapping[str, Any], *, reserved: set[str], field: st
         raise GraphConfigError(f"{field} must be an object")
     inline = {str(k): v for k, v in item.items() if k not in reserved}
     return {**{str(k): v for k, v in raw_config.items()}, **inline}
+
+
+def _parse_node_metadata(item: Mapping[str, Any]) -> NodeMetadata:
+    return NodeMetadata(
+        display_name=_optional_string(item.get("display_name", "")),
+        category=_optional_string(item.get("category", "")),
+        version=_optional_string(item.get("version", "")),
+        description=_optional_string(item.get("description", "")),
+    )
+
+
+def _optional_string(value: Any) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _parse_node_style(value: Any, *, field: str) -> NodeStyle:
+    if value in (None, {}):
+        return NodeStyle()
+    if not isinstance(value, Mapping):
+        raise GraphConfigError(f"{field} must be an object")
+    unknown = sorted(set(str(key) for key in value) - set(NODE_STYLE_FIELDS))
+    if unknown:
+        raise GraphConfigError(f"{field} contains unknown keys: {unknown}")
+    parsed: dict[str, str] = {}
+    for key in NODE_STYLE_FIELDS:
+        if key not in value:
+            continue
+        color = value[key]
+        if not is_hex_color(color):
+            raise GraphConfigError(f"{field}.{key} must be a #RRGGBB color")
+        normalized = normalize_hex_color(str(color))
+        if is_reserved_system_color(normalized):
+            raise GraphConfigError(f"{field}.{key} uses reserved VibeFlow system color: {normalized}")
+        parsed[key] = normalized
+    return NodeStyle(fill=parsed.get("fill", ""), stroke=parsed.get("stroke", ""), text=parsed.get("text", ""))
 
 
 def _parse_node_config_overrides(value: Any, *, field: str) -> dict[str, dict[str, Any]]:

@@ -22,6 +22,16 @@ RULE_CATALOG: dict[str, dict[str, str]] = {
         "layer": "topology",
         "suggested_fix_type": "fix_config",
     },
+    "GRAPH.SMELL.MISSING_NODE_DESCRIPTION": {
+        "severity": "warning",
+        "layer": "topology",
+        "suggested_fix_type": "fix_config",
+    },
+    "GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME": {
+        "severity": "warning",
+        "layer": "topology",
+        "suggested_fix_type": "fix_config",
+    },
     "GRAPH.DATA.UNCONSUMED_PROVIDER": {
         "severity": "warning",
         "layer": "topology",

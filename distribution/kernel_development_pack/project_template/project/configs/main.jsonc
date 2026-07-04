@@ -21,11 +21,15 @@
     "nodes": [
       {
         "name": "start",
-        "type": "demo.start"
+        "type": "demo.start",
+        "display_name": "Start",
+        "description": "Starts the demo arithmetic pipeline."
       },
       {
         "name": "seed",
         "type": "demo.seed",
+        "display_name": "Seed Value",
+        "description": "Creates the initial value used by the add node.",
         "provides": [
           {
             "key": "value.in",
@@ -39,6 +43,8 @@
       {
         "name": "add",
         "type": "demo.add",
+        "display_name": "Add Delta",
+        "description": "Adds a configured delta to the incoming value.",
         "requires": [
           {
             "type": "value.in",
@@ -58,6 +64,8 @@
       {
         "name": "end",
         "type": "demo.end",
+        "display_name": "End",
+        "description": "Consumes the final value and terminates the pipeline.",
         "requires": [
           {
             "type": "value.out",
