@@ -336,7 +336,9 @@ def test_review_columns_svg_composer_stacks_nodesets_and_scales_wide_fragments()
     assert positions["first - ns"][0] == positions["second - ns"][0]
     assert positions["first - ns"][1] < positions["second - ns"][1]
     assert f'width="{REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH:.3f}" height="800.000"' in svg
-    assert 'viewBox="0 0 3640.000 1352.000"' in svg
+    assert 'viewBox="0 0 3640.000 1376.000"' in svg
+    assert svg.count('class="review-panel-frame"') == 5
+    assert svg.count('class="review-title-bar"') == 5
 
 
 def test_review_columns_resource_fragments_render_root_left_to_children_right() -> None:
@@ -452,6 +454,8 @@ def test_nodeset_detail_panel_places_children_right_and_stacked() -> None:
     assert positions["parent flow"][0] < positions["first - detail.leaf"][0]
     assert positions["first - detail.leaf"][0] == positions["second - detail.leaf"][0]
     assert positions["first - detail.leaf"][1] < positions["second - detail.leaf"][1]
+    assert svg.count('class="review-panel-frame"') == 3
+    assert svg.count('class="review-title-bar"') == 3
 
     images = re.findall(r'<image x="([0-9.]+)" y="([0-9.]+)" width="([0-9.]+)" height="([0-9.]+)"', svg)
     assert float(images[0][0]) < float(images[1][0])

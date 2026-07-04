@@ -26,10 +26,18 @@ from .mermaid_render import DEFAULT_MERMAID_MAX_EDGES, DEFAULT_MERMAID_MAX_TEXT_
 REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH = 3200.0
 _DETAIL_PANEL_COLUMN_GAP = 56.0
 _DETAIL_PANEL_ROW_GAP = 36.0
-_DETAIL_PANEL_TITLE_HEIGHT = 28.0
+_DETAIL_PANEL_TITLE_HEIGHT = 40.0
+_FRAGMENT_FRAME_PADDING = 10.0
+_REVIEW_COLUMNS_STYLE = (
+    "<style>.review-title{font-family:Arial,sans-serif;font-size:22px;font-weight:800;fill:#0f172a}"
+    ".review-panel-frame{fill:#ffffff;fill-opacity:.94;stroke:#334155;stroke-width:2}"
+    ".review-title-bar{fill:#dbeafe;stroke:#334155;stroke-width:2}</style>"
+)
 _DETAIL_PANEL_STYLE = (
-    "<style>.review-title{font-family:Arial,sans-serif;font-size:16px;font-weight:700;fill:#111827}"
-    ".review-panel-guide{stroke:#9ca3af;stroke-width:1;stroke-dasharray:6 4;fill:none}</style>"
+    "<style>.review-title{font-family:Arial,sans-serif;font-size:20px;font-weight:800;fill:#0f172a}"
+    ".review-panel-frame{fill:#ffffff;fill-opacity:.94;stroke:#475569;stroke-width:2}"
+    ".review-title-bar{fill:#e0f2fe;stroke:#475569;stroke-width:2}"
+    ".review-panel-guide{stroke:#64748b;stroke-width:1.5;stroke-dasharray:6 4;fill:none}</style>"
 )
 _PLACEHOLDER_STYLE = (
     "<style>.placeholder-title{font-family:Arial,sans-serif;font-size:16px;font-weight:700;fill:#111827}"
@@ -485,14 +493,14 @@ def _compose_svg(columns: list[list[_SvgFragment]], *, background: str) -> str:
     padding = 24.0
     column_gap = 64.0
     row_gap = 44.0
-    title_height = 30.0
+    title_height = 42.0
     column_widths = [max(_display_size(fragment)[0] for fragment in column) for column in columns]
     column_heights = [_column_height(column, title_height=title_height, row_gap=row_gap) for column in columns]
     total_width = padding * 2 + sum(column_widths) + column_gap * max(0, len(columns) - 1)
     total_height = padding * 2 + (max(column_heights) if column_heights else 0)
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100%" style="max-width: {total_width:.3f}px; background-color: {xml.sax.saxutils.escape(background)};" viewBox="0 0 {total_width:.3f} {total_height:.3f}" role="graphics-document document" aria-roledescription="flowchart-review-columns">',
-        "<style>.review-title{font-family:Arial,sans-serif;font-size:18px;font-weight:700;fill:#111827}.review-column-bg{fill:transparent;stroke:#d1d5db;stroke-width:1}</style>",
+        _REVIEW_COLUMNS_STYLE,
     ]
     if background != "transparent":
         parts.append(f'<rect x="0" y="0" width="{total_width:.3f}" height="{total_height:.3f}" fill="{xml.sax.saxutils.escape(background)}"/>')
@@ -511,7 +519,19 @@ def _column_svg(column: list[_SvgFragment], *, x: float, y: float, width: float,
         title = xml.sax.saxutils.escape(fragment.title)
         display_width, display_height = _display_size(fragment)
         image_x = x + (width - display_width) / 2
-        parts.append(f'<text class="review-title" x="{x:.3f}" y="{cursor + 20:.3f}">{title}</text>')
+        frame_x = x - _FRAGMENT_FRAME_PADDING
+        frame_y = cursor - _FRAGMENT_FRAME_PADDING
+        frame_width = width + _FRAGMENT_FRAME_PADDING * 2
+        frame_height = title_height + display_height + _FRAGMENT_FRAME_PADDING * 2
+        parts.append(
+            f'<rect class="review-panel-frame" x="{frame_x:.3f}" y="{frame_y:.3f}" '
+            f'width="{frame_width:.3f}" height="{frame_height:.3f}" rx="6"/>'
+        )
+        parts.append(
+            f'<rect class="review-title-bar" x="{frame_x:.3f}" y="{frame_y:.3f}" '
+            f'width="{frame_width:.3f}" height="{title_height:.3f}" rx="6"/>'
+        )
+        parts.append(f'<text class="review-title" x="{x:.3f}" y="{cursor + title_height - 12:.3f}">{title}</text>')
         cursor += title_height
         payload = base64.b64encode(fragment.svg_text.encode("utf-8")).decode("ascii")
         href = f"data:image/svg+xml;base64,{payload}"
