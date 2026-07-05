@@ -512,6 +512,7 @@ def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
             findings.append(_error("CONFIG.SCHEMA.PLUGIN_CONFIG", f"{prefix}.config must be an object", f"{prefix}.config"))
         if "settings" in item and not isinstance(item["settings"], Mapping):
             findings.append(_error("CONFIG.SCHEMA.PLUGIN_CONFIG", f"{prefix}.settings must be an object", f"{prefix}.settings"))
+        _validate_resource_metadata_strings(item, prefix, findings)
 
 
 def _validate_base_lib_resources(value: Any, findings: list[HealthFinding]) -> None:
@@ -540,8 +541,7 @@ def _validate_base_lib_resources(value: Any, findings: list[HealthFinding]) -> N
         status = str(item.get("status", "implemented")).strip() or "implemented"
         if status not in STATUSES:
             findings.append(_error("CONFIG.SCHEMA.RESOURCE_STATUS", f"{prefix}.status must be implemented or planned", f"{prefix}.status"))
-        if "description" in item and not isinstance(item["description"], str):
-            findings.append(_error("CONFIG.SCHEMA.RESOURCE_DESCRIPTION", f"{prefix}.description must be a string", f"{prefix}.description"))
+        _validate_resource_metadata_strings(item, prefix, findings)
 
 
 def _validate_global_config(value: Any, prefix: str, findings: list[HealthFinding]) -> None:
@@ -565,6 +565,12 @@ def _validate_node_configs(value: Any, prefix: str, findings: list[HealthFinding
             findings.append(_error("CONFIG.SCHEMA.NODE_CONFIGS_KEY", f"{prefix} keys must be non-empty strings", prefix))
         if not isinstance(item, Mapping):
             findings.append(_error("CONFIG.SCHEMA.NODE_CONFIG_OBJECT", f"{prefix}.{key} must be an object", f"{prefix}.{key}"))
+
+
+def _validate_resource_metadata_strings(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
+    for field in ("display_name", "category", "description", "version"):
+        if field in value and not isinstance(value[field], str):
+            findings.append(_error("CONFIG.SCHEMA.RESOURCE_METADATA_STRING", f"{prefix}.{field} must be a string", f"{prefix}.{field}"))
 
 
 def _validate_policy_section(value: Any, prefix: str, findings: list[HealthFinding], *, rule_source: str) -> None:

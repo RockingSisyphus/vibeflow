@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -40,6 +41,7 @@ def render_mermaid_svg(
     max_text_size: int = DEFAULT_MERMAID_MAX_TEXT_SIZE,
     max_edges: int = DEFAULT_MERMAID_MAX_EDGES,
     html_labels: bool = False,
+    enhance_labels: bool = True,
 ) -> Path:
     """Render Mermaid source to SVG using the project-local Mermaid CLI."""
 
@@ -87,6 +89,8 @@ def render_mermaid_svg(
                 if not output.exists():
                     raise MermaidRenderError(f"Mermaid CLI did not create {output}")
                 _raise_on_error_svg(output)
+                if enhance_labels and not html_labels:
+                    _enhance_svg_labels(output)
                 return output
             detail = (completed.stderr or completed.stdout or "Mermaid CLI failed").strip()
             errors.append((label, detail))
@@ -165,6 +169,141 @@ def _raise_on_error_svg(path: Path) -> None:
     for marker in _MERMAID_ERROR_TEXT_MARKERS:
         if marker in visible_text:
             raise MermaidRenderError(f"Mermaid CLI wrote an error SVG: {marker}")
+
+
+_SVG_NS = "http://www.w3.org/2000/svg"
+_FIELD_PREFIXES = frozenset(
+    {
+        "id:",
+        "type:",
+        "status:",
+        "stub:",
+        "category:",
+        "version:",
+        "desc:",
+        "nodeset:",
+        "body:",
+        "stop:",
+        "max:",
+        "module:",
+        "class:",
+        "config:",
+    }
+)
+
+
+def _enhance_svg_labels(path: Path) -> None:
+    try:
+        ET.register_namespace("", _SVG_NS)
+        tree = ET.parse(path)
+        root = tree.getroot()
+        changed = False
+        for node in _node_groups(root):
+            label_left = _label_left_x(node)
+            for text in _node_label_texts(node):
+                rows = [child for child in list(text) if _tag(child) == "tspan" and "row" in _class_tokens(child)]
+                if not rows:
+                    continue
+                for index, row in enumerate(rows):
+                    row_text = _row_text(row)
+                    if not row_text:
+                        continue
+                    if index == 0:
+                        _style_row(row, weight="700", font_size="1.05em")
+                        changed = True
+                        continue
+                    if _is_separator_row(row_text):
+                        _style_row(row, weight="700", fill="#64748b", font_size="0.92em")
+                        changed = True
+                        continue
+                    if _is_field_row(row):
+                        if label_left is not None:
+                            row.set("x", _format_svg_number(label_left))
+                            row.set("text-anchor", "start")
+                        _style_field_prefix(row)
+                        changed = True
+        if changed:
+            tree.write(path, encoding="unicode", xml_declaration=False)
+    except Exception:
+        return
+
+
+def _node_groups(root: ET.Element) -> tuple[ET.Element, ...]:
+    return tuple(element for element in root.iter() if _tag(element) == "g" and "node" in _class_tokens(element))
+
+
+def _node_label_texts(node: ET.Element) -> tuple[ET.Element, ...]:
+    texts: list[ET.Element] = []
+    for label in node.iter():
+        if _tag(label) != "g" or "label" not in _class_tokens(label):
+            continue
+        texts.extend(element for element in label.iter() if _tag(element) == "text")
+    return tuple(dict.fromkeys(texts))
+
+
+def _label_left_x(node: ET.Element) -> float | None:
+    for element in node.iter():
+        if _tag(element) != "rect" or "label-container" not in _class_tokens(element):
+            continue
+        try:
+            return float(element.get("x", "0")) + 14.0
+        except ValueError:
+            return None
+    return None
+
+
+def _style_row(row: ET.Element, *, weight: str, fill: str = "", font_size: str = "") -> None:
+    for child in _inner_tspans(row):
+        child.set("font-weight", weight)
+        if fill:
+            _append_style(child, f"fill:{fill} !important")
+        if font_size:
+            child.set("font-size", font_size)
+
+
+def _style_field_prefix(row: ET.Element) -> None:
+    for child in _inner_tspans(row):
+        text = "".join(child.itertext()).strip()
+        if text in _FIELD_PREFIXES:
+            child.set("font-weight", "700")
+            return
+
+
+def _is_field_row(row: ET.Element) -> bool:
+    first = next(iter(_inner_tspans(row)), None)
+    return first is not None and "".join(first.itertext()).strip() in _FIELD_PREFIXES
+
+
+def _is_separator_row(text: str) -> bool:
+    return text.startswith("----")
+
+
+def _inner_tspans(row: ET.Element) -> tuple[ET.Element, ...]:
+    return tuple(child for child in list(row) if _tag(child) == "tspan")
+
+
+def _row_text(row: ET.Element) -> str:
+    return "".join(row.itertext()).strip()
+
+
+def _append_style(element: ET.Element, declaration: str) -> None:
+    existing = element.get("style", "").strip()
+    if declaration in existing:
+        return
+    separator = ";" if existing and not existing.endswith(";") else ""
+    element.set("style", f"{existing}{separator}{declaration}" if existing else declaration)
+
+
+def _class_tokens(element: ET.Element) -> set[str]:
+    return set(str(element.get("class", "")).split())
+
+
+def _tag(element: ET.Element) -> str:
+    return element.tag.rsplit("}", 1)[-1]
+
+
+def _format_svg_number(value: float) -> str:
+    return f"{value:.3f}".rstrip("0").rstrip(".")
 
 
 def _strip_svg_tags(svg_text: str) -> str:

@@ -333,7 +333,7 @@ def test_mermaid_renders_sectioned_labels_default_node_and_custom_style() -> Non
 
     assert "classDef defaultNode fill:#ECECFF,stroke:#9370DB,color:#333333;" in text
     assert 'seed@{ shape: rect, label: "Readable Seed\\n\\nid: seed\\ntype: test.seed' in text
-    assert "\\n-- meta --\\ncategory: demo\\nversion: 2.0.0\\ndesc: Produces a seed value with a long readable" in text
+    assert "\\n---------- meta ----------\\ncategory: demo\\nversion: 2.0.0\\ndesc: Produces a seed value with a long readable" in text
     assert "\\n      description that should wrap deterministically in\\n      the SVG label." in text
     assert "requires:" not in text
     assert "provides:" not in text
@@ -707,7 +707,7 @@ def test_planned_nodes_compile_without_registry_and_render_as_architecture() -> 
     assert payload["nodes"][0]["status"] == "planned"
     assert payload["nodes"][0]["flow_kind"] == "predefined"
     assert 'a@{ shape: fr-rect, label: "A\\n\\nid: a\\ntype: nodeset.a' in text
-    assert "-- status --" in text
+    assert "---------- status ----------" in text
     assert "planned" in text
     assert "class a plannedNode;" in text
 

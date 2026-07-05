@@ -28,12 +28,14 @@ def validate_config_path(path: Path, *, policy_path: Path | None = None) -> Heal
     policy_result = resolve_effective_policy(document.data, config_path=path, explicit_policy_path=policy_path, plugin_registry=plugin_registry)
     effective_policy = policy_result.effective_policy.to_dict()
     schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *resource_findings, *policy_result.findings))
-    if schema_findings:
-        status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin", "base_lib"} for finding in schema_findings) else "FAIL"
+    schema_errors = tuple(finding for finding in schema_findings if finding.severity == "error")
+    schema_warnings = tuple(finding for finding in schema_findings if finding.severity == "warning")
+    if schema_errors:
+        status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin", "base_lib"} for finding in schema_errors) else "FAIL"
         return HealthReport(
             status=status,
-            errors=tuple(finding for finding in schema_findings if finding.severity == "error"),
-            warnings=tuple(finding for finding in schema_findings if finding.severity == "warning"),
+            errors=schema_errors,
+            warnings=schema_warnings,
             effective_policy=effective_policy,
         )
 
@@ -46,7 +48,8 @@ def validate_config_path(path: Path, *, policy_path: Path | None = None) -> Heal
     except GraphCompileError as exc:
         return fail_report(exc.rule_id, str(exc), "pipeline", "pipeline", "topology", effective_policy=effective_policy)
     return HealthReport(
-        status="PASS",
+        status="CONCERNS" if schema_warnings else "PASS",
+        warnings=schema_warnings,
         info={
             "nodes": len(graph.nodes),
             "nodesets": sorted(graph.nodesets),

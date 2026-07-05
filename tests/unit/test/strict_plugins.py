@@ -197,7 +197,7 @@ def test_mermaid_collapses_and_expands_nodesets_with_contract_metadata() -> None
 
     collapsed = export_mermaid(graph)
     assert 'composite@{ shape: fr-rect, label: "Composite\\n\\nid: composite\\ntype: nodeset.math.add_one' in collapsed
-    assert "-- nodeset --" in collapsed
+    assert "---------- nodeset ----------" in collapsed
     assert "nodeset: math.add_one" in collapsed
     assert "requires:" not in collapsed
     assert "exports:" not in collapsed
@@ -263,6 +263,12 @@ def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nod
     assert "start --> input" in mermaid
     assert 'subgraph __vibeflow_layout_plugins["plugins"]' in mermaid
     assert 'subgraph __vibeflow_layout_base_lib["base_lib"]' in mermaid
+    assert "Review Policy" in mermaid
+    assert "desc: Checks graph policy." in mermaid
+    assert "Contracts" in mermaid
+    assert "desc: Shared contract helpers." in mermaid
+    assert "---------- resource ----------" in mermaid
+    assert "---------- meta ----------" in mermaid
     assert 'subgraph __vibeflow_layout_nodesets["expanded nodesets"]' in mermaid
     assert 'subgraph __vibeflow_layout_nodesets__composite__expanded["composite - math.add_one"]' in mermaid
     assert "__vibeflow_layout_nodesets__composite__inner" in mermaid
@@ -410,6 +416,9 @@ def test_review_columns_resource_fragments_render_root_left_to_children_right() 
     assert mermaid.startswith("flowchart LR")
     assert "resource_plugins -.-> resource_plugins_0" in mermaid
     assert "resource_plugins -.-> resource_plugins_1" in mermaid
+    assert "---------- resource ----------" in mermaid
+    assert "module: project.plugins.policy" in mermaid
+    assert "type: policy" in mermaid
 
 
 def test_run_checked_writes_quick_and_expanded_svg_artifacts(tmp_path, monkeypatch) -> None:

@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 MERMAID_LAYOUT_DEFAULT = "default"
 MERMAID_LAYOUT_REVIEW_COLUMNS = "review-columns"
 _MERMAID_LAYOUTS = {MERMAID_LAYOUT_DEFAULT, MERMAID_LAYOUT_REVIEW_COLUMNS}
+_SECTION_SEPARATOR_WIDTH = 10
 
 
 def export_mermaid(
@@ -323,14 +324,14 @@ class _MermaidRenderer:
     def _node_label(self, node: NodeSpec) -> str:
         sections: list[list[str]] = [[self._node_title(node)], [f"id: {node.name}", f"type: {node.node_type}"]]
         if node.status == STATUS_PLANNED:
-            planned_lines = ["-- status --", f"status: {planned_behavior_label(node.planned_behavior)}"]
+            planned_lines = [_section_label("status"), f"status: {planned_behavior_label(node.planned_behavior)}"]
             if node.planned_behavior.stub_module:
                 planned_lines.append(f"stub: {node.planned_behavior.stub_module}")
             sections.append(planned_lines)
         if self.show_semantics:
             semantic_lines = self._node_semantic_lines(node)
             if semantic_lines:
-                sections.append(["-- meta --", *semantic_lines])
+                sections.append([_section_label("meta"), *semantic_lines])
         return _join_label_sections(sections)
 
     def _nodeset_label(self, node: NodeSpec, nodeset: NodesetSpec) -> str:
@@ -338,17 +339,17 @@ class _MermaidRenderer:
         sections: list[list[str]] = [[title], [f"id: {node.name}", f"type: {node.node_type}"]]
         if node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED:
             behavior = effective_planned_behavior(node, nodeset)
-            planned_lines = ["-- status --", f"status: {planned_behavior_label(behavior)}"]
+            planned_lines = [_section_label("status"), f"status: {planned_behavior_label(behavior)}"]
             if behavior.stub_module:
                 planned_lines.append(f"stub: {behavior.stub_module}")
             sections.append(planned_lines)
         if self.show_semantics:
             call_lines = _node_metadata_lines(node)
             if call_lines:
-                sections.append(["-- call --", *call_lines])
+                sections.append([_section_label("call"), *call_lines])
             sections.append(
                 [
-                    "-- nodeset --",
+                    _section_label("nodeset"),
                     f"nodeset: {nodeset.name}",
                     f"category: {nodeset.category}",
                     f"version: {nodeset.version}",
@@ -361,12 +362,12 @@ class _MermaidRenderer:
         title = node.metadata.display_name or node.name
         sections: list[list[str]] = [[title], [f"id: {node.name}", f"type: {node.node_type}"]]
         spec = node.loop
-        loop_lines = ["-- loop --", f"body: {nodeset.name}", f"stop: {_loop_stop_text(spec)}", f"max: {spec.max_iterations}"]
+        loop_lines = [_section_label("loop"), f"body: {nodeset.name}", f"stop: {_loop_stop_text(spec)}", f"max: {spec.max_iterations}"]
         sections.append(loop_lines)
         if self.show_semantics:
             call_lines = _node_metadata_lines(node)
             if call_lines:
-                sections.append(["-- meta --", *call_lines])
+                sections.append([_section_label("meta"), *call_lines])
         return _join_label_sections(sections)
 
     def _node_title(self, node: NodeSpec) -> str:
@@ -445,6 +446,11 @@ def _loop_stop_text(spec: object) -> str:
     return "unset"
 
 
+def _section_label(name: str) -> str:
+    border = "-" * _SECTION_SEPARATOR_WIDTH
+    return f"{border} {name} {border}"
+
+
 def _node_shape(node_id: str, label: str, flow_kind: object, *, shape: str = "") -> str:
     escaped = _escape_label(label)
     kind = str(flow_kind)
@@ -482,33 +488,51 @@ def _resource_label(resource: Mapping[str, object], *, kind: str, show_semantics
     info_map = info if isinstance(info, Mapping) else {}
     module = str(resource.get("module", "")).strip()
     name = str(resource.get("name", "")).strip()
-    display_name = str(info_map.get("display_name", "")).strip() or name or module
-    lines = [display_name]
+    class_name = str(resource.get("class", "")).strip()
     status = str(resource.get("status", "implemented")).strip() or "implemented"
-    if status == STATUS_PLANNED:
-        lines.append("planned")
+    display_name = _resource_value(resource, info_map, "display_name") or name or module or class_name
+    identity_lines: list[str] = []
+    resource_id_text = name or module or class_name
+    if resource_id_text:
+        identity_lines.append(f"id: {resource_id_text}")
     if kind == "base_lib":
-        lines.append(f"module: {module}")
+        identity_lines.append("type: base_lib")
     else:
         plugin_type = str(resource.get("type", info_map.get("type", ""))).strip()
         if plugin_type:
-            lines.append(f"type: {plugin_type}")
-        if module:
-            lines.append(f"module: {module}")
+            identity_lines.append(f"type: {plugin_type}")
+    identity_lines.append(f"status: {status}")
+
+    source_lines: list[str] = []
+    if module:
+        source_lines.append(f"module: {module}")
+    if kind == "plugin" and class_name:
+        source_lines.append(f"class: {class_name}")
+
+    sections: list[list[str]] = [[display_name], identity_lines]
+    if source_lines:
+        sections.append([_section_label("resource"), *source_lines])
     if show_semantics:
-        category = str(info_map.get("category", "")).strip()
-        version = str(info_map.get("version", "")).strip()
-        description = str(resource.get("description", "")).strip() or str(info_map.get("description", "")).strip()
+        category = _resource_value(resource, info_map, "category")
+        version = _resource_value(resource, info_map, "version")
+        description = _resource_value(resource, info_map, "description")
         config_keys = resource.get("config_keys", ())
+        meta_lines: list[str] = []
         if category:
-            lines.append(f"category: {category}")
+            meta_lines.append(f"category: {category}")
         if version:
-            lines.append(f"version: {version}")
+            meta_lines.append(f"version: {version}")
         if description:
-            lines.append(description)
+            meta_lines.append(f"desc: {description}")
         if kind == "plugin" and isinstance(config_keys, list) and config_keys:
-            lines.append("config: " + ", ".join(str(key) for key in config_keys))
-    return _join_label_lines(lines)
+            meta_lines.append("config: " + ", ".join(str(key) for key in config_keys))
+        if meta_lines:
+            sections.append([_section_label("meta"), *meta_lines])
+    return _join_label_sections(sections)
+
+
+def _resource_value(resource: Mapping[str, object], info_map: Mapping[str, object], field: str) -> str:
+    return str(resource.get(field, "")).strip() or str(info_map.get(field, "")).strip()
 
 
 def _edge_contract_text(graph: GraphConfig, edge: object, *, max_items: int = 2) -> str:
@@ -581,7 +605,7 @@ def _wrap_label_line(value: object, *, width: int = 56, max_lines: int = 4) -> l
 
 
 def _label_line_indent(text: str) -> str:
-    if text.startswith("-- "):
+    if _is_section_label(text):
         return ""
     prefix, separator, _ = text.partition(": ")
     if not separator or len(prefix) > 8:
@@ -592,9 +616,13 @@ def _label_line_indent(text: str) -> str:
 def _label_line_max_lines(text: str, *, default: int) -> int:
     if text.startswith("desc: "):
         return 3
-    if text.startswith("-- "):
+    if _is_section_label(text):
         return 1
     return min(default, 2)
+
+
+def _is_section_label(text: str) -> bool:
+    return text.startswith("-" * 4)
 
 
 def _escape_label(value: str) -> str:

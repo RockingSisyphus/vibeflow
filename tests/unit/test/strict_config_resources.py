@@ -35,6 +35,16 @@ def test_config_resource_schema_rejects_invalid_status_and_plugin_config() -> No
     assert "CONFIG.SCHEMA.BASE_LIB_PATHS" in rule_ids
     assert "CONFIG.SCHEMA.RESOURCE_STATUS" in rule_ids
     assert "CONFIG.SCHEMA.PLUGIN_CONFIG" in rule_ids
+    assert "CONFIG.SCHEMA.RESOURCE_METADATA_STRING" in {
+        finding.rule_id
+        for finding in collect_config_schema_findings(
+            {
+                "base_lib": {"modules": [{"module": "base_lib.math", "display_name": 1}]},
+                "plugins": [{"name": "bad", "status": "planned", "type": "policy", "description": 2}],
+                "pipeline": _seed_only_pipeline(),
+            }
+        )
+    }
 
     flag_findings = collect_config_schema_findings(
         {
@@ -100,8 +110,21 @@ class RuntimePlugin:
                 "base_lib": {
                     "paths": ["base_lib"],
                     "modules": [
-                        "base_lib.math_tools",
-                        {"module": "base_lib.future_tools", "status": "planned", "description": "Planned helper library."},
+                        {
+                            "module": "base_lib.math_tools",
+                            "display_name": "Math Tools Resource",
+                            "category": "test",
+                            "description": "Configured arithmetic helper resource.",
+                            "version": "0.1.0",
+                        },
+                        {
+                            "module": "base_lib.future_tools",
+                            "status": "planned",
+                            "display_name": "Future Tools",
+                            "category": "test",
+                            "description": "Planned helper library.",
+                            "version": "0.1.0",
+                        },
                     ],
                 },
                 "plugins": [
@@ -109,9 +132,21 @@ class RuntimePlugin:
                         "module": str(plugin_path),
                         "class": "RuntimePlugin",
                         "type": "runtime",
+                        "display_name": "Configured Runtime Resource",
+                        "category": "test",
+                        "description": "Configured runtime hook resource.",
+                        "version": "0.1.0",
                         "config": {"marker": str(marker_path), "label": "ready"},
                     },
-                    {"name": "future_runtime_plugin", "type": "runtime", "status": "planned", "description": "Planned runtime hook."},
+                    {
+                        "name": "future_runtime_plugin",
+                        "type": "runtime",
+                        "status": "planned",
+                        "display_name": "Future Runtime Plugin",
+                        "category": "test",
+                        "description": "Planned runtime hook.",
+                        "version": "0.1.0",
+                    },
                 ],
                 "pipeline": {
                     "nodes": [
@@ -153,13 +188,42 @@ class RuntimePlugin:
     ]
     mermaid = (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
     assert "resource_base_lib" in mermaid
-    assert "Math Tools" in mermaid
+    assert "Math Tools Resource" in mermaid
     assert "base_lib.future_tools" in mermaid
-    assert "Configured Runtime" in mermaid
+    assert "Configured Runtime Resource" in mermaid
     assert "future_runtime_plugin" in mermaid
+    assert "desc: Configured runtime hook resource." in mermaid
     assert "plannedResource" in mermaid
     assert not any(finding.rule_id == "GRAPH.FLOW.ORPHAN_NODE" for finding in (*result.health.errors, *result.health.warnings))
     assert not any(finding.rule_id.startswith("BASE_LIB.") for finding in (*result.health.errors, *result.health.warnings))
+    assert not any(finding.rule_id.startswith("CONFIG.SMELL.MISSING_") for finding in result.health.warnings)
+
+
+def test_config_resource_metadata_missing_fields_warn_without_blocking(tmp_path) -> None:
+    from vibeflow.config_resources import load_config_resources
+    from vibeflow.cli_config import validate_config_path
+
+    config = {
+        "base_lib": {"modules": [{"module": "base_lib.future_tools", "status": "planned"}]},
+        "plugins": [{"name": "future_policy", "type": "policy", "status": "planned"}],
+        "pipeline": _seed_only_pipeline(),
+    }
+
+    resources, findings = load_config_resources(config, base_path=tmp_path)
+
+    assert resources.to_dict()["plugins"][0]["name"] == "future_policy"
+    rule_ids = {finding.rule_id for finding in findings}
+    assert "CONFIG.SMELL.MISSING_BASE_LIB_DISPLAY_NAME" in rule_ids
+    assert "CONFIG.SMELL.MISSING_BASE_LIB_DESCRIPTION" in rule_ids
+    assert "CONFIG.SMELL.MISSING_PLUGIN_DISPLAY_NAME" in rule_ids
+    assert "CONFIG.SMELL.MISSING_PLUGIN_DESCRIPTION" in rule_ids
+    assert {finding.severity for finding in findings} == {"warning"}
+
+    config_path = tmp_path / "workflow.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    report = validate_config_path(config_path)
+    assert report.status == "CONCERNS"
+    assert {finding.rule_id for finding in report.warnings} >= rule_ids
 
 
 def test_global_config_overrides_node_params_and_warns_when_not_allowed(tmp_path) -> None:

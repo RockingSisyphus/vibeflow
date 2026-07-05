@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib
 import sys
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Iterator, Mapping
 
@@ -56,14 +56,20 @@ class PluginInfo:
 class BaseLibResource:
     module: str
     status: str = STATUS_IMPLEMENTED
+    display_name: str = ""
+    category: str = ""
     description: str = ""
+    version: str = ""
     info: BaseLibInfo | None = None
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
             "module": self.module,
             "status": self.status,
+            "display_name": self.display_name,
+            "category": self.category,
             "description": self.description,
+            "version": self.version,
         }
         if self.info is not None:
             payload["info"] = self.info.to_dict()
@@ -77,7 +83,10 @@ class PluginResource:
     status: str = STATUS_IMPLEMENTED
     module: str = ""
     class_name: str = "Plugin"
+    display_name: str = ""
+    category: str = ""
     description: str = ""
+    version: str = ""
     config_keys: tuple[str, ...] = ()
     info: PluginInfo | None = None
 
@@ -88,7 +97,10 @@ class PluginResource:
             "status": self.status,
             "module": self.module,
             "class": self.class_name,
+            "display_name": self.display_name,
+            "category": self.category,
             "description": self.description,
+            "version": self.version,
             "config_keys": list(self.config_keys),
         }
         if self.info is not None:
@@ -223,23 +235,32 @@ def _base_lib_resources(
         spec = _base_lib_spec(item, prefix=prefix, findings=findings)
         if spec is None:
             continue
-        module, status, description = spec
+        module, status, metadata = spec
+        _append_missing_resource_metadata_warnings(metadata, prefix, "base_lib", findings)
         info = None
         if status == STATUS_IMPLEMENTED:
             info = _load_base_lib_info(module, paths=paths, findings=findings, object_id=prefix)
-            if info is not None:
-                description = description or info.description
-        resources.append(BaseLibResource(module=module, status=status, description=description, info=info))
+        resources.append(
+            BaseLibResource(
+                module=module,
+                status=status,
+                display_name=metadata["display_name"],
+                category=metadata["category"],
+                description=metadata["description"],
+                version=metadata["version"],
+                info=info,
+            )
+        )
     return paths, resources
 
 
-def _base_lib_spec(item: object, *, prefix: str, findings: list[HealthFinding]) -> tuple[str, str, str] | None:
+def _base_lib_spec(item: object, *, prefix: str, findings: list[HealthFinding]) -> tuple[str, str, dict[str, str]] | None:
     if isinstance(item, str):
         module = item.strip()
         if not module:
             findings.append(_finding("CONFIG.SCHEMA.BASE_LIB_MODULE", f"{prefix} must be a non-empty module string", prefix, "base_lib"))
             return None
-        return module, STATUS_IMPLEMENTED, ""
+        return module, STATUS_IMPLEMENTED, _empty_resource_metadata()
     if not isinstance(item, Mapping):
         findings.append(_finding("CONFIG.SCHEMA.BASE_LIB_MODULE", f"{prefix} must be a string or object", prefix, "base_lib"))
         return None
@@ -251,7 +272,7 @@ def _base_lib_spec(item: object, *, prefix: str, findings: list[HealthFinding]) 
     if status not in STATUSES:
         findings.append(_finding("CONFIG.SCHEMA.RESOURCE_STATUS", f"{prefix}.status must be implemented or planned", f"{prefix}.status", "base_lib"))
         status = STATUS_IMPLEMENTED
-    return module, status, str(item.get("description", "")).strip()
+    return module, status, _resource_metadata(item)
 
 
 def _load_base_lib_info(
@@ -319,9 +340,22 @@ def _plugin_resources(
             config_keys = ()
         registered = registry_resources.get((module, class_name, plugin_type))
         if registered is not None:
-            resources.append(registered)
+            metadata = _resource_metadata(spec)
+            _append_missing_resource_metadata_warnings(metadata, prefix, "plugin", findings)
+            resources.append(
+                replace(
+                    registered,
+                    display_name=metadata["display_name"],
+                    category=metadata["category"],
+                    description=metadata["description"],
+                    version=metadata["version"],
+                    config_keys=config_keys or registered.config_keys,
+                )
+            )
             continue
         name = str(spec.get("name", "")).strip() or module or class_name
+        metadata = _resource_metadata(spec)
+        _append_missing_resource_metadata_warnings(metadata, prefix, "plugin", findings)
         resources.append(
             PluginResource(
                 name=name,
@@ -329,11 +363,54 @@ def _plugin_resources(
                 status=status,
                 module=module,
                 class_name=class_name,
-                description=str(spec.get("description", "")).strip(),
+                display_name=metadata["display_name"],
+                category=metadata["category"],
+                description=metadata["description"],
+                version=metadata["version"],
                 config_keys=config_keys,
             )
         )
     return resources
+
+
+def _empty_resource_metadata() -> dict[str, str]:
+    return {"display_name": "", "category": "", "description": "", "version": ""}
+
+
+def _resource_metadata(spec: Mapping[str, object]) -> dict[str, str]:
+    return {
+        "display_name": str(spec.get("display_name", "")).strip(),
+        "category": str(spec.get("category", "")).strip(),
+        "description": str(spec.get("description", "")).strip(),
+        "version": str(spec.get("version", "")).strip(),
+    }
+
+
+def _append_missing_resource_metadata_warnings(
+    metadata: Mapping[str, str],
+    object_id: str,
+    resource_kind: str,
+    findings: list[HealthFinding],
+) -> None:
+    label = "plugin" if resource_kind == "plugin" else "base_lib"
+    for field, rule_id in (
+        ("display_name", f"CONFIG.SMELL.MISSING_{label.upper()}_DISPLAY_NAME"),
+        ("description", f"CONFIG.SMELL.MISSING_{label.upper()}_DESCRIPTION"),
+    ):
+        if str(metadata.get(field, "")).strip():
+            continue
+        findings.append(
+            HealthFinding(
+                rule_id=rule_id,
+                severity="warning",
+                object_type=label,
+                object_id=object_id,
+                failure_layer=resource_kind,
+                message=f"config {label} declaration '{object_id}' should declare {field} for readable SVG diagrams",
+                suggested_fix_type="fix_config",
+                details={"field": field, "resource_kind": label},
+            )
+        )
 
 
 def _normalize_base_lib_info(raw: object, *, fallback_module: str) -> BaseLibInfo:
