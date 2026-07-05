@@ -16,8 +16,6 @@ PROTECTED_PREFIXES = ("kernel/vibeflow/",)
 PROTECTED_FILES = {
     "run.py",
     "kernel/README.md",
-    "AGENTS.md",
-    "README.md",
 }
 
 
@@ -99,7 +97,7 @@ def _format_integrity_error(exc: KernelIntegrityError) -> str:
     lines = [
         "KERNEL INTEGRITY CHECK FAILED",
         "",
-        "The distributed kernel file, launcher, or guide files were modified.",
+        "The distributed kernel file or launcher was modified.",
         "This may mean an AI or developer changed kernel rules to bypass validation.",
         "",
     ]

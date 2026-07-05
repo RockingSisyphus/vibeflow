@@ -1264,3 +1264,32 @@ def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, ca
     assert plan_trace_kinds == ["run_start", "type_resolve", "run_end", "runtime_summary"]
     if is_mermaid_svg_renderer_available():
         assert (run_dir / "graph.svg").exists()
+
+
+def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_path) -> None:
+    import subprocess
+    import sys
+
+    from build_distribution import build_distribution
+
+    output = tmp_path / "distribution"
+    build_distribution(output)
+    manifest = (output / "kernel" / "MANIFEST.sha256").read_text(encoding="utf-8")
+    manifest_paths = {line.split("  ", 1)[1] for line in manifest.splitlines() if line.strip()}
+
+    assert "AGENTS.md" not in manifest_paths
+    assert "README.md" not in manifest_paths
+    assert {"run.py", "kernel/README.md", "kernel/vibeflow-kernel.zip"} <= manifest_paths
+
+    (output / "AGENTS.md").write_text("# Custom project agent guide\n", encoding="utf-8")
+    (output / "README.md").write_text("# Custom project readme\n", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "run.py", "verify-kernel"],
+        cwd=output,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr

@@ -26,8 +26,6 @@ PROTECTED_FILES = (
     "run.py",
     "kernel/README.md",
     KERNEL_ZIP_RELATIVE.as_posix(),
-    "AGENTS.md",
-    "README.md",
 )
 PROTECTED_DIRS = (
     "kernel/vibeflow",
@@ -219,7 +217,7 @@ cd ../..
 
 ## Kernel 完整性检查
 
-分发包包含 `kernel/MANIFEST.sha256`。`run.py` 会在运行前校验 kernel 归档、启动器和 AI 指引文件是否被修改。
+分发包包含 `kernel/MANIFEST.sha256`。`run.py` 会在运行前校验 kernel 归档和启动器是否被修改。根目录 `README.md` 和 `AGENTS.md` 是项目指南文件，使用者可以按项目需要自定义。
 
 手动检查：
 
