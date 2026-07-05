@@ -97,6 +97,140 @@ def test_config_node_visual_metadata_and_style_are_not_runtime_params() -> None:
     }
 
 
+def test_config_node_join_policy_and_loop_are_not_runtime_params() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "sum.step",
+                    requires=["total.current"],
+                    provides=["total.next"],
+                    exports=["total.next"],
+                    pipeline={
+                        "inputs": [PROV_SPEC("total.current")],
+                        "nodes": [_node_call("start", "test.start", "Starts loop body.")],
+                    },
+                )
+            ],
+            "pipeline": {
+                "nodes": [
+                    {
+                        "name": "loop",
+                        "type": "vibeflow.loop.while",
+                        "display_name": "Loop",
+                        "description": "Runs a body nodeset.",
+                        "requires": [REQ_SPEC("total.current")],
+                        "provides": [PROV_SPEC("total.final")],
+                        "join_policy": "all",
+                        "loop": {
+                            "body": "sum.step",
+                            "stop_after": 1,
+                            "carry": [{"from": "total.current", "as": "total.current", "update": "total.next"}],
+                            "outputs": [{"from": "total.next", "as": "total.final"}],
+                        },
+                        "config": {"join_policy": "runtime", "loop": "runtime"},
+                    }
+                ]
+            },
+        }
+    )
+
+    node = graph.nodes[0]
+    assert node.join_policy == "all"
+    assert node.loop.to_dict()["body"] == "sum.step"
+    assert node.params == {"join_policy": "runtime", "loop": "runtime"}
+
+
+def test_config_schema_rejects_invalid_join_policy_and_loop_shape() -> None:
+    findings = collect_config_schema_findings(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("bad_join", "test.seed", "Bad join.", join_policy="sometimes", provides=[PROV_SPEC("value.in")]),
+                    _node_call("bad_loop", "vibeflow.loop.while", "Bad loop.", loop={"body": "", "items": {"from": "", "as": ""}}),
+                ]
+            }
+        }
+    )
+
+    assert {finding.rule_id for finding in findings} >= {"CONFIG.SCHEMA.NODE_JOIN_POLICY", "CONFIG.SCHEMA.NODE_LOOP_INVALID"}
+
+
+def test_parse_rejects_removed_for_each_loop_type_and_old_loop_fields() -> None:
+    with pytest.raises(GraphConfigError, match="only allowed on VibeFlow loop nodes"):
+        parse_graph_config(
+            {
+                "pipeline": {
+                    "nodes": [
+                        _node_call(
+                            "loop",
+                            "vibeflow.loop.for_each",
+                            "Old for-each loop syntax is removed.",
+                            loop={"body": "body", "items": {"from": "items", "as": "item"}},
+                        )
+                    ]
+                }
+            }
+        )
+    with pytest.raises(GraphConfigError, match="unsupported loop keys"):
+        parse_graph_config(
+            {
+                "nodesets": [_nodeset_config("body", pipeline={"nodes": [_node_call("start", "test.start", "Starts body.")]})],
+                "pipeline": {
+                    "nodes": [
+                        _node_call(
+                            "loop",
+                            "vibeflow.loop.while",
+                            "Old loop fields are removed.",
+                            loop={"body": "body", "items": {"from": "items", "as": "item"}, "epochs": 2},
+                        )
+                    ]
+                },
+            }
+        )
+
+
+def test_parse_rejects_invalid_while_loop_stop_conditions() -> None:
+    body = _nodeset_config("body", pipeline={"nodes": [_node_call("start", "test.start", "Starts body.")]})
+    for loop, match in (
+        ({"body": "body"}, "exactly one"),
+        ({"body": "body", "stop_after": 2, "stop_when": {"from": "loop.done"}}, "exactly one"),
+        ({"body": "body", "max_iterations": 1, "stop_after": 2}, "<= max_iterations"),
+        ({"body": "body", "stop_when": {"from": "loop.done", "equals": "true"}}, "equals must be a boolean"),
+    ):
+        with pytest.raises(GraphConfigError, match=match):
+            parse_graph_config(
+                {
+                    "nodesets": [body],
+                    "pipeline": {
+                        "nodes": [
+                            _node_call("loop", "vibeflow.loop.while", "Invalid stop condition.", loop=loop),
+                        ]
+                    },
+                }
+            )
+
+
+def test_parse_rejects_loop_body_unknown_nodeset() -> None:
+    with pytest.raises(GraphConfigError, match="unknown nodeset"):
+        parse_graph_config(
+            {
+                "pipeline": {
+                    "nodes": [
+                        _node_call(
+                            "loop",
+                            "vibeflow.loop.while",
+                            "References a missing loop body.",
+                            requires=[REQ_SPEC("value.in")],
+                            provides=[PROV_SPEC("items.out")],
+                            loop={"body": "missing.body", "stop_after": 1},
+                        )
+                    ]
+                }
+            }
+        )
+
+
 def test_mermaid_renders_sectioned_labels_default_node_and_custom_style() -> None:
     graph = parse_graph_config(
         {
@@ -149,6 +283,41 @@ def test_mermaid_renders_contracts_on_edges_and_hides_them_when_requested() -> N
     assert "requires:" not in text
     assert "provides:" not in text
     assert "seed -->|flow.route == 'again'| add" in hidden
+
+
+def test_mermaid_renders_while_loop_shape_class_and_stop_condition() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [_nodeset_config("loop.body", pipeline={"nodes": [_node_call("start", "test.start", "Starts loop body.")]})],
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts loop render fixture."),
+                    _node_call(
+                        "loop",
+                        "vibeflow.loop.while",
+                        "Renders a structured while loop.",
+                        display_name="Loop",
+                        provides=[PROV_SPEC("loop.iterations")],
+                        loop={
+                            "body": "loop.body",
+                            "max_iterations": 5,
+                            "stop_after": 2,
+                            "outputs": [{"from": "loop.iterations", "as": "loop.iterations"}],
+                        },
+                    ),
+                    _node_call("end", "test.start", "Ends loop render fixture."),
+                ],
+                "edges": _edge_chain("start", "loop", "end"),
+            },
+        }
+    )
+
+    text = export_mermaid(graph)
+
+    assert 'loop@{ shape: hourglass, label: "Loop' in text
+    assert "class loop loopNode;" in text
+    assert "classDef loopNode" in text
+    assert "stop: stop_after: 2" in text
 
 
 def test_mermaid_edge_contract_labels_summarize_provider_key_type_mapping() -> None:
@@ -288,11 +457,13 @@ def test_compiler_rejects_cycle_without_router() -> None:
         }
     )
 
-    with pytest.raises(GraphCompileError, match="cycle requires decision"):
+    with pytest.raises(GraphCompileError, match="explicit flow cycle is forbidden") as exc_info:
         GraphCompiler().compile(graph, registry=_registry())
+    assert exc_info.value.rule_id == "GRAPH.CYCLE.FORBIDDEN"
+    assert exc_info.value.details["members"] == ["add", "copy"]
 
 
-def test_compiler_allows_cycle_with_decision_router() -> None:
+def test_compiler_rejects_cycle_with_decision_router() -> None:
     registry = _registry()
     register_node(registry, "test.route", RouteNode)
     graph = parse_graph_config(
@@ -303,22 +474,25 @@ def test_compiler_allows_cycle_with_decision_router() -> None:
                     _node_call("add", "test.add", "Adds the incoming value.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                     _node_call("route", "test.route", "Routes the cycle branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
                     _node_call("copy", "test.copy", "Copies the output value.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy")]),
+                    _node_call("end", "test.start", "Exits the old decision cycle."),
                 ],
                 "edges": [
                     {"from": "add", "to": "route"},
                     {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
+                    {"from": "route", "to": "end", "when": "flow.route == 'done'"},
                     {"from": "copy", "to": "add"},
                 ],
             }
         }
     )
 
-    compiled = GraphCompiler().compile(graph, registry=registry)
+    with pytest.raises(GraphCompileError) as exc_info:
+        GraphCompiler().compile(graph, registry=registry)
+    assert exc_info.value.rule_id == "GRAPH.CYCLE.FORBIDDEN"
+    assert exc_info.value.details["edges"] == ["add->route", "copy->add", "route->copy"]
 
-    assert ("copy", "add") in [edge.pair for edge in compiled.effective_edges]
 
-
-def test_graph_health_reports_decision_cycle_without_exit() -> None:
+def test_graph_health_reports_forbidden_cycle() -> None:
     from tests.unit.strict_support_runtime_nodes import RouteNode as RuntimeRouteNode
 
     registry = _registry()
@@ -343,7 +517,9 @@ def test_graph_health_reports_decision_cycle_without_exit() -> None:
 
     report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
 
-    assert any(error.rule_id == "GRAPH.CYCLE.MISSING_DECISION_EXIT" for error in report.errors)
+    assert any(error.rule_id == "GRAPH.CYCLE.FORBIDDEN" for error in report.errors)
+    finding = next(error for error in report.errors if error.rule_id == "GRAPH.CYCLE.FORBIDDEN")
+    assert finding.details["members"] == ["add", "copy", "route"]
 
 
 def test_compiler_rejects_unconditional_edge_from_decision() -> None:

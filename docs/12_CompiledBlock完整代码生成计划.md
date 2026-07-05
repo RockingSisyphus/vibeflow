@@ -215,7 +215,7 @@ unit tests：
 integration sandbox：
 
 - `compiled_linear_training`
-- `compiled_decision_loop`
+- `loop_while_nodeset_retry_compiled`
 - `compiled_trace_full`
 - `compiled_with_node_hooks`
 - `compiled_fallback_mixed_graph`

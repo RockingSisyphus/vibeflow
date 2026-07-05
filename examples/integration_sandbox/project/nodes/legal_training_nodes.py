@@ -59,6 +59,37 @@ class TrainingMetricsNode:
             return {'train.metrics': {'loss': VALUE(inputs, 'train.loss'), 'tags': ['train']}}
         return {'train.metrics': {'loss': VALUE(inputs, 'train.loss'), 'tags': {'sandbox', 'train'}, 'unstable': float('nan'), 'model': model}}
 
+class TrainingBatchStepNode:
+    NODE_INFO = NodeInfo('sandbox.training_batch_step', 'Training Batch Step', 'training', 'Runs one full training batch update for block-compiled loop bodies.', '0.1.0', 'process')
+    CONTRACT = NodeContract(
+        requires=(REQ('train.model'), REQ('train.batch'), REQ('train.optimizer')),
+        provides=(PROV('train.model_after'), PROV('train.optimizer_after'), PROV('train.step_report'), PROV('train.loss'), PROV('train.metrics')),
+        input_semantics={'train.model': ('model object',), 'train.batch': ('batch object',), 'train.optimizer': ('optimizer object',)},
+        output_semantics={
+            'train.model_after': ('same model object after step',),
+            'train.optimizer_after': ('same optimizer object after step',),
+            'train.step_report': ('small JSON-safe training report',),
+            'train.loss': ('numeric loss',),
+            'train.metrics': ('metrics object containing non-JSON values',),
+        },
+        output_schema={'train.model_after': {'type': 'object'}, 'train.optimizer_after': {'type': 'object'}, 'train.step_report': {'type': 'object'}, 'train.loss': {'type': 'number'}, 'train.metrics': {'type': 'object'}},
+        examples=({'inputs': {'train.model': {'key': 'train.model', 'type': 'train.model', 'value': {}, 'source_node': 'example'}, 'train.batch': {'key': 'train.batch', 'type': 'train.batch', 'value': {}, 'source_node': 'example'}, 'train.optimizer': {'key': 'train.optimizer', 'type': 'train.optimizer', 'value': {}, 'source_node': 'example'}}, 'params': {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        model = VALUE(inputs, 'train.model')
+        batch = VALUE(inputs, 'train.batch')
+        optimizer = VALUE(inputs, 'train.optimizer')
+        loss = model.loss(batch) if hasattr(model, 'loss') else 1
+        grad = model.grad(loss) if hasattr(model, 'grad') else 0.1
+        if hasattr(optimizer, 'step'):
+            optimizer.step(model, grad)
+            report = {'steps': optimizer.steps, 'weight': model.weight}
+        else:
+            report = {'steps': 1}
+        metrics = {'loss': loss, 'tags': {'sandbox', 'train'}, 'unstable': float('nan'), 'model': model}
+        return {'train.model_after': model, 'train.optimizer_after': optimizer, 'train.step_report': report, 'train.loss': loss, 'train.metrics': metrics}
+
 class BatchMetricsNode:
     NODE_INFO = NodeInfo('sandbox.batch_metrics', 'Batch Metrics', 'training', 'Emits metrics directly from a non-JSON batch object.', '0.1.0', 'process')
     CONTRACT = NodeContract(requires=(REQ('train.batch'),), provides=(PROV('train.metrics'),), input_semantics={'train.batch': ('batch object',)}, output_semantics={'train.metrics': ('non-JSON metrics',)}, output_schema={'train.metrics': {'type': 'object'}}, examples=({'inputs': {'train.batch': {'key': 'train.batch', 'type': 'train.batch', 'value': {}, 'source_node': 'example'}}, 'params': {}},))

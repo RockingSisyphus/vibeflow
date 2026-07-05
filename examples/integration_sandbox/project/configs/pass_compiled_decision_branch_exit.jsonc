@@ -80,27 +80,16 @@
         "threshold": 10
       },
       {
-        "name": "loop_back",
-        "type": "sandbox.loop_back",
+        "name": "external",
+        "type": "sandbox.external_boost",
+        "join_policy": "all",
         "requires": [
           {
             "type": "value.out",
             "cardinality": "exactly_one"
-          }
-        ],
-        "provides": [
+          },
           {
-            "key": "value.in.loop",
-            "type": "value.in"
-          }
-        ]
-      },
-      {
-        "name": "external",
-        "type": "sandbox.external_boost",
-        "requires": [
-          {
-            "type": "value.out",
+            "type": "flow.route",
             "cardinality": "exactly_one"
           }
         ],
@@ -121,6 +110,12 @@
             "cardinality": "exactly_one"
           }
         ]
+      },
+      {
+        "name": "again_end",
+        "type": "sandbox.start",
+        "display_name": "Again Branch End",
+        "description": "Terminates the inactive again branch in the acyclic compiled fixture."
       }
     ],
     "edges": [
@@ -141,13 +136,8 @@
         "to": "route"
       },
       {
-        "from": "route",
-        "to": "loop_back",
-        "when": "flow.route == 'again'"
-      },
-      {
-        "from": "loop_back",
-        "to": "prepare"
+        "from": "compute",
+        "to": "external"
       },
       {
         "from": "route",
@@ -155,16 +145,13 @@
         "when": "flow.route == 'external'"
       },
       {
+        "from": "route",
+        "to": "again_end",
+        "when": "flow.route == 'again'"
+      },
+      {
         "from": "external",
         "to": "end"
-      },
-      {
-        "from": "compute",
-        "to": "loop_back"
-      },
-      {
-        "from": "compute",
-        "to": "external"
       }
     ],
     "outputs": [

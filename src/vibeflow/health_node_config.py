@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping
 
-from .graph_config import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
+from .graph_config import GraphConfig, LOOP_NODE_TYPES, NodeSpec, NodesetSpec, STATUS_PLANNED
 from .health_types import HealthFinding
 from .registry import NodeRegistry, NodeRegistryError
 from .runtime_config import ConfigScope, config_override_conflicts, merge_config_scopes, nested_node_config_overrides, node_invocation_scope, normalize_config_scope, scoped_node_params
@@ -67,6 +67,9 @@ def _validate_graph_node_configs(
     for node in graph.nodes:
         if node.status == STATUS_PLANNED:
             continue
+        if node.node_type in LOOP_NODE_TYPES:
+            _validate_nodeset_call_config(node, graph, registry=registry, findings=findings, owner=owner, global_scope=global_scope, overrides=overrides, called_nodesets=called_nodesets, stack=stack, nodeset_name=node.loop.body)
+            continue
         if node.node_type.startswith("nodeset."):
             _validate_nodeset_call_config(node, graph, registry=registry, findings=findings, owner=owner, global_scope=global_scope, overrides=overrides, called_nodesets=called_nodesets, stack=stack)
             continue
@@ -118,8 +121,9 @@ def _validate_nodeset_call_config(
     overrides: Mapping[str, Mapping[str, object]],
     called_nodesets: set[str],
     stack: tuple[str, ...],
+    nodeset_name: str | None = None,
 ) -> None:
-    nodeset_name = node.node_type.removeprefix("nodeset.")
+    nodeset_name = nodeset_name or node.node_type.removeprefix("nodeset.")
     nodeset = graph.nodesets.get(nodeset_name)
     if nodeset is None or nodeset_name in stack:
         return
@@ -167,8 +171,8 @@ def _validate_nodeset_override_paths(
     findings: list[HealthFinding],
 ) -> None:
     for node in graph.nodes:
-        if node.node_type.startswith("nodeset."):
-            nodeset_name = node.node_type.removeprefix("nodeset.")
+        if node.node_type in LOOP_NODE_TYPES or node.node_type.startswith("nodeset."):
+            nodeset_name = node.loop.body if node.node_type in LOOP_NODE_TYPES else node.node_type.removeprefix("nodeset.")
             nodeset = graph.nodesets.get(nodeset_name)
             if nodeset is None:
                 continue

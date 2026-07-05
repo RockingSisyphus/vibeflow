@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
+from .block_compiler import graph_block, loop_block
 from .compiler import GraphCompiler
 from .data_contract import (
     CARDINALITY_ALL,
@@ -19,7 +20,7 @@ from .data_contract import (
     provider_keys,
 )
 from .execution_plan import ExecutionPlan, NodeFrame, build_execution_plan
-from .graph_config import EdgeSpec, GraphConfig
+from .graph_config import EdgeSpec, GraphConfig, JOIN_POLICY_ALL, JOIN_POLICY_ANY_ACTIVE
 from .planned_behavior import load_stub_callable, resolve_stub_module_path, signature_is_run_stub
 from .plugin import PluginRegistry
 from .registry import NodeRegistry, NodeRegistryError
@@ -224,6 +225,10 @@ class PipelineRuntime:
         raise PipelineRuntimeError(f"pipeline exceeded max_steps={self._plan.max_steps}")
 
     def _run_block_steps(self, state: _RuntimeState) -> None:
+        block = graph_block(self._plan)
+        if block is not None:
+            block.callable(self, state)
+            return
         try:
             self._assert_block_eligible()
         except PipelineRuntimeError:
@@ -252,6 +257,44 @@ class PipelineRuntime:
             node_name = edge.target
         self.trace.stop_reason = "max_steps"
         raise PipelineRuntimeError(f"pipeline exceeded max_steps={self._plan.max_steps}")
+
+    def _execute_graph_block(self, block_name: str, block_nodes: tuple[str, ...], state: _RuntimeState) -> tuple[str, Mapping[str, object]]:
+        started = time.perf_counter()
+        self._record_runtime_event("block_enter", block_name, "block")
+        self._call_runtime_plugins("before_block", block_name, block_nodes)
+        ready = self._initial_ready_nodes(state)
+        if len(ready) != 1:
+            raise PipelineRuntimeError("block execution requires exactly one ready start node")
+        node_name = ready[0]
+        outputs: Mapping[str, object] = {}
+        last_node = node_name
+        try:
+            for _ in range(self._plan.max_steps):
+                if not self._requirements_available(node_name, state):
+                    self.trace.stop_reason = "no_ready_nodes"
+                    return last_node, outputs
+                outputs = self._run_node(node_name, state)
+                last_node = node_name
+                self.trace.step_count += 1
+                if self._is_end_terminal(node_name):
+                    self.trace.stop_reason = "completed"
+                    self._record_runtime_event("block_exit", block_name, "block", output_summary=summarize_mapping(outputs), elapsed_ms=elapsed_ms(started))
+                    self._call_runtime_plugins("after_block", block_name, block_nodes)
+                    return last_node, outputs
+                self._clear_conditional_outgoing(node_name, state)
+                active = self._activated_edges(node_name, outputs, state)
+                if len(active) != 1:
+                    raise PipelineRuntimeError(f"block execution requires exactly one active edge from '{node_name}'")
+                edge = active[0]
+                self._activate_edge(edge, state)
+                self._deliver_outputs(edge, outputs, state)
+                node_name = edge.target
+            self.trace.stop_reason = "max_steps"
+            raise PipelineRuntimeError(f"pipeline exceeded max_steps={self._plan.max_steps}")
+        except Exception as exc:
+            self._record_runtime_event("block_failed", block_name, "block", failure=str(exc), elapsed_ms=elapsed_ms(started))
+            self._call_runtime_plugins("block_failed", block_name, block_nodes, str(exc))
+            raise
 
     def _assert_block_eligible(self) -> None:
         for name in self._plan.order:
@@ -285,10 +328,23 @@ class PipelineRuntime:
         return True
 
     def _conditional_gate_satisfied(self, frame: NodeFrame, state: _RuntimeState) -> bool:
-        conditional_edges = [edge for edge in frame.incoming if edge.when]
-        if not conditional_edges:
+        if not frame.incoming:
             return True
-        return any(edge.pair in state.active_edges for edge in conditional_edges)
+        if frame.join_policy == JOIN_POLICY_ALL:
+            return all(edge.pair in state.active_edges for edge in frame.incoming)
+        if frame.join_policy == JOIN_POLICY_ANY_ACTIVE:
+            return True
+        control_edges = [edge for edge in frame.incoming if edge.when and not self._edge_source_satisfies_requirement(edge, frame)]
+        if control_edges:
+            return any(edge.pair in state.active_edges for edge in control_edges)
+        return True
+
+    def _edge_source_satisfies_requirement(self, edge: EdgeSpec, frame: NodeFrame) -> bool:
+        source = self._frames.get(edge.source)
+        if source is None:
+            return False
+        required_types = {requirement.type for requirement in frame.requires}
+        return any(provider.type in required_types for provider in source.provides)
 
     def _is_end_terminal(self, node_name: str) -> bool:
         frame = self._frames[node_name]
@@ -325,6 +381,10 @@ class PipelineRuntime:
             return self._run_async_node(frame, inputs)
         if frame.is_planned_stub:
             return self._run_planned_stub_node(frame, inputs)
+        if frame.is_loop:
+            if self.runtime_options.execution in {"block", "compiled"}:
+                return self._run_loop_block_node(frame, inputs)
+            return self._run_loop_node(frame, inputs)
         if frame.is_nodeset:
             return self._run_nodeset_node(frame, inputs)
         return self._run_pure_node(frame, inputs)
@@ -405,6 +465,97 @@ class PipelineRuntime:
             self._record_runtime_event("nodeset_failed", frame.name, frame.node_type, failure=str(exc), elapsed_ms=elapsed_ms(started))
             self._call_runtime_plugins("nodeset_failed", frame.name, frame.node_type, str(exc))
             raise
+
+    def _run_loop_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
+        started = time.perf_counter()
+        self._record_runtime_event("loop_enter", frame.name, frame.node_type, input_summary=summarize_mapping(inputs), details=frame.loop_spec.to_dict())
+        self._call_runtime_plugins("before_node", frame.name, frame.node_type, summarize_mapping(inputs))
+        try:
+            outputs = self._run_loop_outputs(frame, inputs)
+            outputs = self._validate_outputs(frame, outputs, subject="loop node")
+            self._mark_node_run(frame.name)
+            self._record_runtime_event("loop_exit", frame.name, frame.node_type, output_summary=summarize_mapping(outputs), elapsed_ms=elapsed_ms(started))
+            self._call_runtime_plugins("after_node", frame.name, frame.node_type, summarize_mapping(outputs))
+            return outputs
+        except Exception as exc:
+            self._record_runtime_event("loop_failed", frame.name, frame.node_type, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started))
+            self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(exc))
+            raise
+
+    def _run_loop_block_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
+        block = loop_block(self._plan, frame.name)
+        if block is None:
+            raise PipelineRuntimeError(f"loop node '{frame.name}' is not block compiled")
+        started = time.perf_counter()
+        self._record_runtime_event("loop_enter", frame.name, frame.node_type, input_summary=summarize_mapping(inputs), details=frame.loop_spec.to_dict())
+        self._record_runtime_event("loop_block_enter", frame.name, frame.node_type, details={"block": block.name, "body": frame.loop_spec.body})
+        self._call_runtime_plugins("before_node", frame.name, frame.node_type, summarize_mapping(inputs))
+        try:
+            result = block.callable(self, inputs)
+            outputs = self._validate_outputs(frame, result.outputs, subject="loop node")
+            self._mark_node_run(frame.name)
+            self._record_runtime_event("loop_block_exit", frame.name, frame.node_type, output_summary=summarize_mapping(outputs), details={"block": block.name})
+            self._record_runtime_event("loop_exit", frame.name, frame.node_type, output_summary=summarize_mapping(outputs), elapsed_ms=elapsed_ms(started))
+            self._call_runtime_plugins("after_node", frame.name, frame.node_type, summarize_mapping(outputs))
+            return outputs
+        except Exception as exc:
+            self._record_runtime_event("loop_failed", frame.name, frame.node_type, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started))
+            self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(exc))
+            raise
+
+    def _run_loop_outputs(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
+        if frame.subplan is None:
+            raise PipelineRuntimeError(f"loop node '{frame.name}' has no body execution plan")
+        return self._run_while_loop(frame, inputs, require_block=False)
+
+    def _execute_loop_block(self, node_name: str, inputs: object) -> Mapping[str, object]:
+        frame = self._frames[node_name]
+        if not isinstance(inputs, Mapping):
+            raise PipelineRuntimeError(f"loop block '{node_name}' received non-mapping inputs")
+        if frame.subplan is None or graph_block(frame.subplan) is None:
+            raise PipelineRuntimeError(f"loop node '{frame.name}' body is not block compiled")
+        return self._run_while_loop(frame, inputs, require_block=True)
+
+    def _run_while_loop(self, frame: NodeFrame, inputs: Mapping[str, object], *, require_block: bool) -> Mapping[str, object]:
+        spec = frame.loop_spec
+        values = _initial_loop_values(inputs, spec.carry)
+        runtime = self._nodeset_runtime(frame)
+        for iteration in range(spec.max_iterations):
+            initial = _loop_body_initial(values, spec.carry)
+            iteration_path = (frame.name, f"iter_{iteration}")
+            result = self._run_loop_body_iteration(frame, runtime, initial, iteration_path, iteration)
+            _update_loop_values(values, result, spec.carry, spec.collect)
+            iteration_count = iteration + 1
+            values["loop.iterations"] = iteration_count
+            if _loop_should_stop(frame, values, iteration_count):
+                return _loop_outputs(frame, values)
+        raise PipelineRuntimeError(f"loop node '{frame.name}' exceeded max_iterations={spec.max_iterations}")
+
+    def _run_loop_body_iteration(
+        self,
+        frame: NodeFrame,
+        runtime: "PipelineRuntime",
+        initial: Mapping[str, object],
+        iteration_path: tuple[str, ...],
+        iteration_index: int,
+    ) -> RunResult:
+        if self.runtime_options.trace == "full":
+            self.trace.add_event(
+                {
+                    "kind": "loop_iteration",
+                    "node": frame.name,
+                    "type": frame.node_type,
+                    "details": {"iteration": iteration_index, "initial_keys": sorted(str(key) for key in initial)},
+                },
+                iteration_path,
+            )
+        try:
+            result = runtime.run(initial)
+        except Exception:
+            self.trace.merge_child(iteration_path, runtime.trace)
+            raise
+        self.trace.merge_child(iteration_path, runtime.trace)
+        return result
 
     def _run_pure_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
         started = time.perf_counter()
@@ -702,7 +853,7 @@ class PipelineRuntime:
     ) -> None:
         if self.runtime_options.trace == "off":
             return
-        if self.runtime_options.trace == "boundary" and kind not in {"run_start", "run_end", "nodeset_enter", "nodeset_exit", "nodeset_failed", "node_failed", "planned_stub", "async_result_abandoned", "async_detached_failed", "async_detached_timeout", "block_enter", "block_exit", "block_failed", "type_resolve"}:
+        if self.runtime_options.trace == "boundary" and kind not in {"run_start", "run_end", "nodeset_enter", "nodeset_exit", "nodeset_failed", "loop_enter", "loop_exit", "loop_block_enter", "loop_block_exit", "loop_failed", "node_failed", "planned_stub", "async_result_abandoned", "async_detached_failed", "async_detached_timeout", "block_enter", "block_exit", "block_failed", "type_resolve"}:
             return
         event: dict[str, object] = {"kind": kind, "node": node_name, "type": node_type}
         if input_summary is not None:
@@ -760,12 +911,100 @@ def _nodeset_inputs_to_initial(inputs: Mapping[str, object], graph_inputs: tuple
     return initial
 
 
+def _initial_loop_values(inputs: Mapping[str, object], carry: tuple[object, ...]) -> dict[str, object]:
+    values: dict[str, object] = {}
+    for key, item in inputs.items():
+        values[str(key)] = _result_value(item)
+    for item in _iter_input_items(inputs):
+        if isinstance(item, Mapping):
+            if "type" in item:
+                values[str(item["type"])] = item.get("value")
+            if "key" in item:
+                values[str(item["key"])] = item.get("value")
+    for entry in carry:
+        source = str(getattr(entry, "source"))
+        target = str(getattr(entry, "target"))
+        if source not in values:
+            raise PipelineRuntimeError(f"loop carry source '{source}' is not available")
+        values[target] = values[source]
+    return values
+
+
+def _loop_body_initial(values: Mapping[str, object], carry: tuple[object, ...]) -> dict[str, object]:
+    initial: dict[str, object] = {}
+    for entry in carry:
+        target = str(getattr(entry, "target"))
+        if target not in values:
+            raise PipelineRuntimeError(f"loop carry target '{target}' is not available")
+        initial[target] = values[target]
+    return initial
+
+
+def _update_loop_values(values: dict[str, object], result: RunResult, carry: tuple[object, ...], collect: tuple[object, ...]) -> None:
+    for key, item in _iter_result_envelopes(result.to_dict(), prefix=""):
+        values[key] = _result_value(item)
+    for entry in carry:
+        update = str(getattr(entry, "update"))
+        target = str(getattr(entry, "target"))
+        if update not in values:
+            raise PipelineRuntimeError(f"loop carry update '{update}' is not available from body outputs")
+        values[target] = values[update]
+    for entry in collect:
+        source = str(getattr(entry, "source"))
+        target = str(getattr(entry, "target"))
+        if source not in values:
+            raise PipelineRuntimeError(f"loop collect source '{source}' is not available from body outputs")
+        bucket = values.setdefault(target, [])
+        if not isinstance(bucket, list):
+            raise PipelineRuntimeError(f"loop collect target '{target}' conflicts with a non-list value")
+        bucket.append(values[source])
+
+
+def _loop_outputs(frame: NodeFrame, values: Mapping[str, object]) -> dict[str, object]:
+    outputs: dict[str, object] = {}
+    for entry in frame.loop_spec.outputs:
+        source = entry.source
+        if source not in values:
+            raise PipelineRuntimeError(f"loop output source '{source}' is not available")
+        outputs[entry.target] = values[source]
+    return outputs
+
+
+def _loop_should_stop(frame: NodeFrame, values: Mapping[str, object], iteration_count: int) -> bool:
+    spec = frame.loop_spec
+    if spec.stop_after:
+        return iteration_count >= spec.stop_after
+    source = spec.stop_when.source
+    if not source:
+        raise PipelineRuntimeError(f"loop node '{frame.name}' has no stop_after or stop_when")
+    if source not in values:
+        raise PipelineRuntimeError(f"loop stop_when source '{source}' is not available from body outputs or loop state")
+    value = values[source]
+    if not isinstance(value, bool):
+        raise PipelineRuntimeError(f"loop stop_when source '{source}' must be boolean, got {type(value).__name__}")
+    return value == spec.stop_when.equals
+
+
 def _iter_input_items(inputs: Mapping[str, object]):
     for value in inputs.values():
         if isinstance(value, list):
             yield from value
         else:
             yield value
+
+
+def _iter_result_envelopes(value: object, *, prefix: str):
+    if isinstance(value, Mapping) and {"key", "type", "value", "source_node"} <= set(value):
+        if prefix:
+            yield prefix, value
+        return
+    if not isinstance(value, Mapping):
+        if prefix:
+            yield prefix, value
+        return
+    for key, item in value.items():
+        child = f"{prefix}.{key}" if prefix else str(key)
+        yield from _iter_result_envelopes(item, prefix=child)
 
 
 def _copy_input_item(item: object, initial: dict[str, object]) -> None:

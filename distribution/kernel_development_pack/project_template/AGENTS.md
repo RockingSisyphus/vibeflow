@@ -19,6 +19,11 @@
 - 节点自定义颜色只能写在 `style.fill`、`style.stroke`、`style.text` 中，颜色必须是 `#RRGGBB`，且不得使用 VibeFlow 系统保留色。
 - `display_name`、`category`、`version`、`description`、`style`、`similar_to` 是调用点元数据，不进入运行时 `params`；运行时同名参数必须写进 `config`。
 - 只有确认两个 node 是有意变体或副本时才写 `similar_to`，并且必须指向同作用域已存在 node、使用 `variant` 或 `copy`、写清 `reason`；不要用它掩盖应该拆分或抽 base_lib 的重复实现。
+- 普通 `pipeline.edges` 和 nodeset 内部 `pipeline.edges` 不允许形成环；所有循环都必须使用唯一一等 loop 类型 `vibeflow.loop.while` 调用 nodeset body。
+- `decision` 只用于分支选择，不要用 decision cycle 模拟 retry、训练循环、多 batch、多 epoch、carry state 或 metrics collect。
+- loop 的退出条件只能在 `loop.stop_after` 和 `loop.stop_when` 中二选一；不要再写 `vibeflow.loop.for_each`、`loop.items`、`loop.epochs` 或 `loop.until`。
+- `execution="block"` / `execution="compiled"` 会执行结构化 `LoopBlock`，loop body 不能 block 化时会报错，不会静默降级。
+- join 默认是 safe OR；只有确认任一 active incoming 都足够触发目标时才写 `join_policy: "any_active"`，需要等待所有 incoming 时写 `join_policy: "all"`。复杂分支汇合优先写显式 merge/select node。
 - node 间可以按引用传递普通 Python 对象；不要依赖 trace 或报告保存对象内容，报告只审计流程和 key。
 - 需要后台指标、日志或诊断任务时，只能显式使用 config 的 `async: "detached"` 或 `async: "result_key"`，不要在 node 内私自启动线程。
 - 运行或交付前必须让内核健康检查通过；不要跳过 `python run.py validate ...`。
@@ -51,7 +56,8 @@
 10. 真正实现某个 nodeset 时，必须补齐 metadata、`requires`、`provides`、`exports`、内部 `pipeline.nodes` 和 `pipeline.edges`，且移除该 nodeset 的 `status: "planned"`。
 11. 只有当 nodeset 内部所有子 node / 子 nodeset 都已经 implemented，父 nodeset 才能变成 implemented。例外是设计期可用 `planned_behavior: "transparent"` 或 `python_stub` 子节点保持连通性，此时父 nodeset 会得到 warning；blocking planned child 仍会报错。
 12. 按同样方式实现后续 nodeset，直到顶层 `a`、`b`、`c` 全部 implemented，最终程序才能运行。
-13. 后续修改架构也使用同一模式：先放 planned 占位并导出流程图给人类审核，再逐步实现。
+13. 如果需要训练或批处理循环，先把循环 body 抽成 nodeset，再用 `vibeflow.loop.while` 调用；body 内只表达单轮逻辑，跨轮状态用 `loop.carry`，指标列表用 `loop.collect`，固定轮数用 `loop.stop_after`，条件退出用 body/state 输出的 bool `loop.stop_when`。
+14. 后续修改架构也使用同一模式：先放 planned 占位并导出流程图给人类审核，再逐步实现。
 
 ## 常用命令
 
@@ -72,6 +78,8 @@
 - `planned_behavior: {"kind": "python_stub", "stub_module": "project/stubs/xxx.py"}` 只用于开发测试；必须配合 `--allow-planned-stub` 才能运行，不能视为 production ready。
 - implemented 内容必须完整、可达、可校验、可运行。
 - 流程图是人类审核程序结构的主要产物；重大架构变更先出图再实现。SVG 节点内应能读清易读标题、`id`、`type`、状态和说明，contract 应显示在已有连边上；信息挤在一起时应先改善 config 的描述长度、拆节点或调整 style，而不是绕过 `python run.py svg`。
+- 一等 loop 的展开图应能看到 loop body nodeset；调试训练循环时优先看 `runtime.qualified_exec_order`、`runtime.total_step_count` 和事件 `path`，不要只看顶层 `runtime.exec_order`。
+- `GRAPH.JOIN.AMBIGUOUS_UNCONDITIONAL` 表示某个 join 可能被 unconditional provider 提前触发或和 conditional provider 争抢同一个 `exactly_one` 输入；修配置，不要靠旧 context 或节点内部判断绕过。
 - 系统保留色不能作为自定义色：普通 node 默认 `#ECECFF/#9370DB/#333333`，planned `#fef08a/#ca8a04/#713f12`，plugin resource `#eff6ff/#2563eb/#1e3a8a`，base_lib resource `#ecfdf5/#059669/#064e3b`，以及 health、external、document、nodeset 等语义色。
 - 健康检查的 warning/error 要看 `details`。`GRAPH.SMELL.DUPLICATE_LOGIC` 会列出具体 nodes、node_types、fingerprint 和 duplicate_group；只有确认为有意关系时才补 `similar_to`。
 - 调试嵌套 nodeset 或 loop 时，顶层运行顺序看 `runtime.exec_order`，完整嵌套顺序看 `runtime.qualified_exec_order` 和事件的 `path` 数组；`qualified_node` 是给人看的 dotted 展示名。

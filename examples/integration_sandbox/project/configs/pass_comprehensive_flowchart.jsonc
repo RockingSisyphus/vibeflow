@@ -160,30 +160,19 @@
             "type": "flow.route"
           }
         ],
-        "threshold": 10
-      },
-      {
-        "name": "loop_back",
-        "type": "sandbox.loop_back",
-        "requires": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.in.loop",
-            "type": "value.in"
-          }
-        ]
+        "threshold": 8
       },
       {
         "name": "external",
         "type": "sandbox.external_boost",
+        "join_policy": "all",
         "requires": [
           {
             "type": "value.out",
+            "cardinality": "exactly_one"
+          },
+          {
+            "type": "flow.route",
             "cardinality": "exactly_one"
           }
         ],
@@ -214,6 +203,7 @@
       {
         "name": "document",
         "type": "sandbox.report_document",
+        "join_policy": "all",
         "requires": [
           {
             "type": "value.final",
@@ -256,6 +246,12 @@
             "cardinality": "exactly_one"
           }
         ]
+      },
+      {
+        "name": "again_end",
+        "type": "sandbox.start",
+        "display_name": "Again Branch End",
+        "description": "Terminates the inactive again branch in the acyclic comprehensive fixture."
       }
     ],
     "edges": [
@@ -276,13 +272,8 @@
         "to": "route"
       },
       {
-        "from": "route",
-        "to": "loop_back",
-        "when": "flow.route == 'again'"
-      },
-      {
-        "from": "loop_back",
-        "to": "prepare"
+        "from": "core",
+        "to": "external"
       },
       {
         "from": "route",
@@ -290,8 +281,17 @@
         "when": "flow.route == 'external'"
       },
       {
+        "from": "route",
+        "to": "again_end",
+        "when": "flow.route == 'again'"
+      },
+      {
         "from": "external",
         "to": "store"
+      },
+      {
+        "from": "external",
+        "to": "document"
       },
       {
         "from": "store",
@@ -304,18 +304,6 @@
       {
         "from": "output",
         "to": "end"
-      },
-      {
-        "from": "core",
-        "to": "loop_back"
-      },
-      {
-        "from": "core",
-        "to": "external"
-      },
-      {
-        "from": "external",
-        "to": "document"
       }
     ],
     "outputs": [

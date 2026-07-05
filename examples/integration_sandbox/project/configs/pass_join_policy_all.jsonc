@@ -1,0 +1,50 @@
+{
+  "pipeline": {
+    "nodes": [
+      {"name": "start", "type": "sandbox.start", "display_name": "Start", "description": "Starts an explicit all-join example."},
+      {
+        "name": "left_value",
+        "type": "semantic.left_value",
+        "display_name": "Left Value",
+        "description": "Provides the primary join value.",
+        "provides": [{"key": "value.left", "type": "value.in"}],
+        "value": 3
+      },
+      {
+        "name": "other_value",
+        "type": "semantic.other_value",
+        "display_name": "Other Value",
+        "description": "Provides the secondary join value.",
+        "provides": [{"key": "other.in", "type": "other.in"}],
+        "value": 5
+      },
+      {
+        "name": "join",
+        "type": "semantic.two_input_join",
+        "display_name": "All Join",
+        "description": "Runs only after both incoming providers have activated.",
+        "join_policy": "all",
+        "requires": [
+          {"type": "value.in", "cardinality": "exactly_one"},
+          {"type": "other.in", "cardinality": "exactly_one"}
+        ],
+        "provides": [{"key": "value.out", "type": "value.out"}]
+      },
+      {
+        "name": "end",
+        "type": "semantic.value_end",
+        "display_name": "End",
+        "description": "Ends after the all join result is available.",
+        "requires": [{"type": "value.out", "cardinality": "exactly_one"}]
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "left_value"},
+      {"from": "start", "to": "other_value"},
+      {"from": "left_value", "to": "join"},
+      {"from": "other_value", "to": "join"},
+      {"from": "join", "to": "end"}
+    ],
+    "outputs": [{"type": "value.out", "cardinality": "exactly_one"}]
+  }
+}

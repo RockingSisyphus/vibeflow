@@ -31,3 +31,10 @@ class DoneCheckNode:
 
     def run_pure(self, inputs, params):
         return {'loop.done': is_done(VALUE(inputs, 'value.next'), params.get('target', 3))}
+
+class DoneValueNode:
+    NODE_INFO = NodeInfo(type_key='sandbox.done_value', display_name='Done Value', category='sandbox', description='Emits loop.done as ordinary data for while-loop stop_when.', version='0.1.0', flow_kind='process')
+    CONTRACT = NodeContract(requires=(REQ('value.next'),), provides=(PROV('loop.done'),), input_semantics={'value.next': ('next value',)}, output_semantics={'loop.done': ('whether the loop should stop',)}, params_schema={'target': {'type': 'number'}}, output_schema={'loop.done': {'type': 'boolean'}}, examples=({'inputs': {'value.next': {'key': 'value.next', 'type': 'value.next', 'value': 3, 'source_node': 'example'}}, 'params': {'target': 3}},))
+
+    def run_pure(self, inputs, params):
+        return {'loop.done': is_done(VALUE(inputs, 'value.next'), params.get('target', 3))}

@@ -14,7 +14,7 @@ from nodes.legal_comprehensive_nodes import (
     RouteDecisionNode,
 )
 from nodes.legal_external_nodes import EffectRequestNode, IoResultAddNode, IoResultInputNode
-from nodes.legal_loop_nodes import CopyBackNode, DoneCheckNode, IncrementNode
+from nodes.legal_loop_nodes import CopyBackNode, DoneCheckNode, DoneValueNode, IncrementNode
 from nodes.legal_math_nodes import (
     AddNode,
     AddOutNode,
@@ -39,26 +39,40 @@ from nodes.legal_semantic_nodes import (
     SemanticBranchTypeConsumerNode,
     SemanticAsyncValueEndNode,
     SemanticCompareGtNode,
+    SemanticConditionalValueNode,
     SemanticCopyNextNode,
     SemanticFinalEndNode,
     SemanticFinalizeNode,
     SemanticIncrementUntilNode,
+    SemanticInnerAccumulateNode,
+    SemanticInnerLoopInitNode,
+    SemanticInactiveRouteNode,
+    SemanticJoinPassthroughNode,
     SemanticLeftBranchEndNode,
     SemanticLeftAdjustNode,
+    SemanticLeftValueNode,
     SemanticLoopDoneNode,
+    SemanticLoopDoneValueNode,
     SemanticLoopEndNode,
+    SemanticNestedLoopSeedNode,
+    SemanticOtherValueNode,
+    SemanticOuterAdvanceNode,
     SemanticRightBranchEndNode,
     SemanticRightAdjustNode,
+    SemanticRightValueNode,
     SemanticScaleNode,
     SemanticScaledEndNode,
     SemanticSlowAsyncValueNode,
+    SemanticTwoInputJoinNode,
     SemanticUseScaledNode,
+    SemanticValueEndNode,
 )
 from nodes.legal_training_nodes import (
     BackwardGradNode,
     BatchMetricsNode,
     ForwardLossNode,
     OptimizerStepNode,
+    TrainingBatchStepNode,
     TrainingInputNode,
     TrainingMetricsEndNode,
     TrainingMetricsNode,
@@ -96,6 +110,7 @@ def build_node_registry() -> NodeRegistry:
     registry.register("sandbox.increment", IncrementNode, config_schema={}, config_defaults={})
     registry.register("sandbox.copy_back", CopyBackNode, config_schema={}, config_defaults={})
     registry.register("sandbox.done_check", DoneCheckNode, config_schema={"target": {"type": "number"}}, config_defaults={"target": 3})
+    registry.register("sandbox.done_value", DoneValueNode, config_schema={"target": {"type": "number"}}, config_defaults={"target": 3})
     registry.register("sandbox.effect_request", EffectRequestNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 1})
     registry.register("sandbox.io_result_add", IoResultAddNode, config_schema={"delta": {"type": "number"}}, config_defaults={"delta": 1})
     registry.register("sandbox.io_result_input", IoResultInputNode, config_schema={"delta": {"type": "number"}}, config_defaults={"delta": 1})
@@ -113,6 +128,7 @@ def build_node_registry() -> NodeRegistry:
     registry.register("sandbox.backward_grad", BackwardGradNode, config_schema={}, config_defaults={})
     registry.register("sandbox.optimizer_step", OptimizerStepNode, config_schema={}, config_defaults={})
     registry.register("sandbox.training_metrics", TrainingMetricsNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.training_batch_step", TrainingBatchStepNode, config_schema={}, config_defaults={})
     registry.register("sandbox.batch_metrics", BatchMetricsNode, config_schema={}, config_defaults={})
     registry.register("sandbox.training_metrics_end", TrainingMetricsEndNode, config_schema={}, config_defaults={})
     registry.register("semantic.add_pair", SemanticAddPairNode, config_schema={}, config_defaults={})
@@ -123,9 +139,22 @@ def build_node_registry() -> NodeRegistry:
     registry.register("semantic.right_adjust", SemanticRightAdjustNode, config_schema={"penalty": {"type": "number"}}, config_defaults={"penalty": 0})
     registry.register("semantic.branch_type_consumer", SemanticBranchTypeConsumerNode, config_schema={}, config_defaults={})
     registry.register("semantic.branch_final_end", SemanticBranchFinalEndNode, config_schema={}, config_defaults={})
+    registry.register("semantic.join_passthrough", SemanticJoinPassthroughNode, config_schema={}, config_defaults={})
+    registry.register("semantic.value_end", SemanticValueEndNode, config_schema={}, config_defaults={})
+    registry.register("semantic.inactive_route", SemanticInactiveRouteNode, config_schema={}, config_defaults={})
+    registry.register("semantic.conditional_value", SemanticConditionalValueNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 7})
+    registry.register("semantic.left_value", SemanticLeftValueNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 1})
+    registry.register("semantic.right_value", SemanticRightValueNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 2})
+    registry.register("semantic.other_value", SemanticOtherValueNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 5})
+    registry.register("semantic.two_input_join", SemanticTwoInputJoinNode, config_schema={}, config_defaults={})
     registry.register("semantic.finalize", SemanticFinalizeNode, config_schema={"offset": {"type": "number"}}, config_defaults={"offset": 0})
     registry.register("semantic.increment_until", SemanticIncrementUntilNode, config_schema={"step": {"type": "number"}}, config_defaults={"step": 1})
     registry.register("semantic.loop_done", SemanticLoopDoneNode, config_schema={"target": {"type": "number"}}, config_defaults={"target": 0})
+    registry.register("semantic.loop_done_value", SemanticLoopDoneValueNode, config_schema={"target": {"type": "number"}}, config_defaults={"target": 0})
+    registry.register("semantic.nested_loop_seed", SemanticNestedLoopSeedNode, config_schema={"outer_start": {"type": "number"}, "total_start": {"type": "number"}}, config_defaults={"outer_start": 0, "total_start": 0})
+    registry.register("semantic.inner_loop_init", SemanticInnerLoopInitNode, config_schema={"inner_start": {"type": "number"}}, config_defaults={"inner_start": 0})
+    registry.register("semantic.inner_accumulate", SemanticInnerAccumulateNode, config_schema={"inner_step": {"type": "number"}, "inner_limit": {"type": "number"}}, config_defaults={"inner_step": 1, "inner_limit": 1})
+    registry.register("semantic.outer_advance", SemanticOuterAdvanceNode, config_schema={"outer_step": {"type": "number"}, "outer_limit": {"type": "number"}}, config_defaults={"outer_step": 1, "outer_limit": 1})
     registry.register("semantic.copy_next", SemanticCopyNextNode, config_schema={}, config_defaults={})
     registry.register("semantic.slow_async_value", SemanticSlowAsyncValueNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 42})
     registry.register("semantic.async_value_end", SemanticAsyncValueEndNode, config_schema={}, config_defaults={})

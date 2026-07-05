@@ -1,0 +1,91 @@
+{
+  "pipeline": {
+    "inputs": [
+      {"key": "calc.a", "type": "calc.a"},
+      {"key": "calc.b", "type": "calc.b"},
+      {"key": "calc.c", "type": "calc.c"},
+      {"key": "calc.d", "type": "calc.d"}
+    ],
+    "nodes": [
+      {"name": "start", "type": "sandbox.start", "display_name": "Start", "description": "Starts a mutually exclusive branch join example."},
+      {
+        "name": "add_pair",
+        "type": "semantic.add_pair",
+        "display_name": "Add Pair",
+        "description": "Adds the two arithmetic inputs before branch adjustment.",
+        "requires": [
+          {"type": "calc.a", "cardinality": "exactly_one"},
+          {"type": "calc.b", "cardinality": "exactly_one"}
+        ],
+        "provides": [{"key": "calc.sum", "type": "calc.sum"}]
+      },
+      {
+        "name": "scale",
+        "type": "semantic.scale",
+        "display_name": "Scale",
+        "description": "Scales calc.sum for both mutually exclusive branch bodies.",
+        "requires": [{"type": "calc.sum", "cardinality": "exactly_one"}],
+        "provides": [{"key": "calc.scaled", "type": "calc.scaled"}],
+        "factor": 3
+      },
+      {
+        "name": "compare",
+        "type": "semantic.compare_gt",
+        "display_name": "Compare Route",
+        "description": "Chooses whether the left or right branch is active.",
+        "requires": [
+          {"type": "calc.c", "cardinality": "exactly_one"},
+          {"type": "calc.d", "cardinality": "exactly_one"}
+        ],
+        "provides": [{"key": "route.branch", "type": "route.branch"}]
+      },
+      {
+        "name": "left_adjust",
+        "type": "semantic.left_adjust",
+        "display_name": "Left Adjust",
+        "description": "Runs only when the left branch is selected.",
+        "requires": [{"type": "calc.scaled", "cardinality": "exactly_one"}],
+        "provides": [{"key": "calc.left_branch", "type": "branch_result"}],
+        "bonus": 10
+      },
+      {
+        "name": "right_adjust",
+        "type": "semantic.right_adjust",
+        "display_name": "Right Adjust",
+        "description": "Runs only when the right branch is selected.",
+        "requires": [{"type": "calc.scaled", "cardinality": "exactly_one"}],
+        "provides": [{"key": "calc.right_branch", "type": "branch_result"}],
+        "penalty": 6
+      },
+      {
+        "name": "consume_branch",
+        "type": "semantic.branch_type_consumer",
+        "display_name": "Consume Selected Branch",
+        "description": "Consumes whichever mutually exclusive branch produced a branch_result value.",
+        "join_policy": "any_active",
+        "requires": [{"type": "branch_result", "cardinality": "exactly_one"}],
+        "provides": [{"key": "branch.final", "type": "final_result"}]
+      },
+      {
+        "name": "end",
+        "type": "semantic.branch_final_end",
+        "display_name": "End",
+        "description": "Ends after the selected branch result is finalized.",
+        "requires": [{"type": "final_result", "cardinality": "exactly_one"}]
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "add_pair"},
+      {"from": "start", "to": "compare"},
+      {"from": "add_pair", "to": "scale"},
+      {"from": "scale", "to": "left_adjust"},
+      {"from": "scale", "to": "right_adjust"},
+      {"from": "compare", "to": "left_adjust", "when": "route.branch == 'left'"},
+      {"from": "compare", "to": "right_adjust", "when": "route.branch == 'right'"},
+      {"from": "left_adjust", "to": "consume_branch"},
+      {"from": "right_adjust", "to": "consume_branch"},
+      {"from": "consume_branch", "to": "end"}
+    ],
+    "outputs": [{"type": "final_result", "cardinality": "exactly_one"}]
+  }
+}

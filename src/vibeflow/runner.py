@@ -73,7 +73,13 @@ def run_checked(
     _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources, runtime_options=runtime_options)
     if health.status not in {"FAIL", "ERROR"}:
         compiled = _compile_with_registry_or_refuse(graph, registry, effective_policy, run_dir, actual_run_id)
-    _write_preflight_artifacts(run_dir, graph, compiled, health, registry=registry, resources=resources)
+    try:
+        _write_preflight_artifacts(run_dir, graph, compiled, health, registry=registry, resources=resources)
+    except Exception:
+        if health.status in {"FAIL", "ERROR"}:
+            _write_refused_artifacts(run_dir, health)
+            _refuse_on_health_failure(health, run_dir, actual_run_id)
+        raise
     _refuse_on_health_failure(health, run_dir, actual_run_id)
     context = _execute_runtime(graph, registry, plugin_registry, initial, run_dir, runtime_options, resources)
     _write_json(run_dir / "output_summary.json", summarize_mapping(dict(context.iter_flat_items())))
@@ -189,6 +195,7 @@ def _compile_health_report(exc: Exception, effective_policy: dict[str, Any]) -> 
                 failure_layer="topology",
                 message=str(exc),
                 suggested_fix_type="fix_config",
+                details=dict(getattr(exc, "details", None) or {}),
             ),
         ),
         effective_policy=effective_policy,

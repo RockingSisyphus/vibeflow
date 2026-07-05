@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Mapping
 
 from .health_types import HealthFinding, HealthReport
 from .purity_types import PurityPolicy
-from .graph_config import STATUS_PLANNED
-from .health_flow import append_data_contract_warnings, append_flowchart_health
+from .graph_config import LOOP_NODE_TYPES, STATUS_PLANNED
+from .health_flow import append_data_contract_warnings, append_flowchart_health, append_join_policy_health
 from .health_planned import append_planned_findings
 from .policy import EffectivePolicy, apply_policy_to_findings
 
@@ -72,6 +72,7 @@ def validate_graph_health(
         append_flowchart_health(graph, compiled, state, registry=registry)
     _append_node_config_health(graph, registry, state, global_config=global_config)
     append_data_contract_warnings(graph, compiled, state)
+    append_join_policy_health(graph, compiled, state)
     _append_registry_namespace_smells(registry, state)
     _append_duplicate_logic_findings(state)
     _append_nodeset_health(graph, registry, state)
@@ -91,6 +92,7 @@ def _compile_error_report(exc: GraphCompileError) -> HealthReport:
                 failure_layer="topology",
                 message=str(exc),
                 suggested_fix_type="fix_config",
+                details=dict(exc.details or {}),
             ),
         ),
     )
@@ -108,6 +110,8 @@ def _validate_graph_nodes(
         if spec.similar_to.node:
             state.node_similarities[spec.name] = spec.similar_to.to_dict()
         if spec.status == STATUS_PLANNED:
+            continue
+        if spec.node_type in LOOP_NODE_TYPES:
             continue
         if spec.node_type.startswith("nodeset."):
             continue

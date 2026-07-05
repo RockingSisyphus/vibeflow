@@ -287,6 +287,485 @@ class LoopCopyNode:
         return {"value.loop": inputs["value.out"]["value"]}
 
 
+class LoopAddItemNode:
+    NODE_INFO = NodeInfo("test.loop_add_item", "Loop Add Item", "test", "Adds one loop item into a running total.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        requires=(DataRequirement("total.current", "exactly_one"), DataRequirement("item.value", "exactly_one")),
+        provides=(DataProvider("total.next", "total.next"), DataProvider("item.metric", "item.metric")),
+        output_schema={"total.next": {"type": "number"}, "item.metric": {"type": "number"}},
+    )
+
+    def run_pure(self, inputs, params):
+        item = inputs["item.value"]["value"]
+        return {"total.next": inputs["total.current"]["value"] + item, "item.metric": item}
+
+
+class LoopStepUntilNode:
+    NODE_INFO = NodeInfo("test.loop_step_until", "Loop Step Until", "test", "Increments loop.current until it reaches target.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        requires=(DataRequirement("loop.current", "exactly_one"),),
+        provides=(DataProvider("loop.next", "loop.next"), DataProvider("loop.done", "loop.done")),
+        params_schema={"target": {"type": "number"}},
+        output_schema={"loop.next": {"type": "number"}, "loop.done": {"type": "boolean"}},
+    )
+
+    def run_pure(self, inputs, params):
+        value = inputs["loop.current"]["value"] + 1
+        return {"loop.next": value, "loop.done": value >= params.get("target", 3)}
+
+
+class JoinPassthroughNode:
+    NODE_INFO = NodeInfo("test.join_passthrough", "Join Passthrough", "test", "Copies value.in to value.out.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        requires=(DataRequirement("value.in", "exactly_one"),),
+        provides=(DataProvider("value.out", "value.out"),),
+        output_schema={"value.out": {"type": "number"}},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"value.out": inputs["value.in"]["value"]}
+
+
+class ConditionalValueNode:
+    NODE_INFO = NodeInfo("test.conditional_value", "Conditional Value", "test", "Provides value.in and a branch flag.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        provides=(DataProvider("value.alt", "value.in"), DataProvider("flow.use_alt", "flow.use_alt")),
+        output_schema={"value.alt": {"type": "number"}, "flow.use_alt": {"type": "boolean"}},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"value.alt": 99, "flow.use_alt": True}
+
+
+class LeftValueNode:
+    NODE_INFO = NodeInfo("test.left_value", "Left Value", "test", "Produces left value.in.", "0.1.0", "process")
+    CONTRACT = NodeContract(provides=(DataProvider("value.left", "value.in"),), output_schema={"value.left": {"type": "number"}})
+
+    def run_pure(self, inputs, params):
+        return {"value.left": 1}
+
+
+class RightValueNode:
+    NODE_INFO = NodeInfo("test.right_value", "Right Value", "test", "Produces right value.in.", "0.1.0", "process")
+    CONTRACT = NodeContract(provides=(DataProvider("value.right", "value.in"),), output_schema={"value.right": {"type": "number"}})
+
+    def run_pure(self, inputs, params):
+        return {"value.right": 2}
+
+
+class OtherValueNode:
+    NODE_INFO = NodeInfo("test.other_value", "Other Value", "test", "Produces other.in.", "0.1.0", "process")
+    CONTRACT = NodeContract(provides=(DataProvider("other.in", "other.in"),), output_schema={"other.in": {"type": "number"}})
+
+    def run_pure(self, inputs, params):
+        return {"other.in": 10}
+
+
+class TwoInputJoinNode:
+    NODE_INFO = NodeInfo("test.two_input_join", "Two Input Join", "test", "Adds value.in and other.in.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        requires=(DataRequirement("value.in", "exactly_one"), DataRequirement("other.in", "exactly_one")),
+        provides=(DataProvider("value.out", "value.out"),),
+        output_schema={"value.out": {"type": "number"}},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"value.out": inputs["value.in"]["value"] + inputs["other.in"]["value"]}
+
+
+class InactiveRouteNode:
+    NODE_INFO = NodeInfo("test.inactive_route", "Inactive Route", "test", "Produces a false route flag.", "0.1.0", "decision")
+    CONTRACT = NodeContract(
+        provides=(DataProvider("flow.route", "flow.route"),),
+        output_schema={"flow.route": {"type": "boolean"}},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"flow.route": False}
+
+
+def _loop_registry() -> NodeRegistry:
+    registry = _registry()
+    register_node(registry, "test.loop_add_item", LoopAddItemNode)
+    register_node(registry, "test.loop_step_until", LoopStepUntilNode, {"target": {"type": "number"}}, {"target": 3})
+    register_node(registry, "test.join_passthrough", JoinPassthroughNode)
+    register_node(registry, "test.conditional_value", ConditionalValueNode)
+    register_node(registry, "test.left_value", LeftValueNode)
+    register_node(registry, "test.right_value", RightValueNode)
+    register_node(registry, "test.other_value", OtherValueNode)
+    register_node(registry, "test.two_input_join", TwoInputJoinNode)
+    register_node(registry, "test.inactive_route", InactiveRouteNode)
+    return registry
+
+
+def _fixed_count_loop_graph(*, max_iterations: int = 10, stop_after: int = 3):
+    return parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "loop.fixed_step",
+                    requires=["loop.current"],
+                    provides=["loop.next", "loop.done"],
+                    exports=["loop.next", "loop.done"],
+                    pipeline={
+                        "inputs": [PROV_SPEC("loop.current")],
+                        "nodes": [
+                            _node_call("start", "test.start", "Starts the fixed loop body."),
+                            _node_call(
+                                "step",
+                                "test.loop_step_until",
+                                "Increments loop.current for one fixed-count iteration.",
+                                requires=[REQ_SPEC("loop.current")],
+                                provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
+                            ),
+                            _node_call("end", "test.out_end", "Ends the fixed loop body.", requires=[REQ_SPEC("loop.next")]),
+                        ],
+                        "edges": _edge_chain("start", "step", "end"),
+                        "outputs": [REQ_SPEC("loop.next"), REQ_SPEC("loop.done")],
+                    },
+                )
+            ],
+            "pipeline": {
+                "inputs": [PROV_SPEC("loop.current")],
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the fixed-count loop fixture."),
+                    _node_call(
+                        "count_loop",
+                        "vibeflow.loop.while",
+                        "Runs the body a fixed number of times.",
+                        requires=[REQ_SPEC("loop.current")],
+                        provides=[PROV_SPEC("loop.final"), PROV_SPEC("loop.history"), PROV_SPEC("loop.iterations")],
+                        loop={
+                            "body": "loop.fixed_step",
+                            "max_iterations": max_iterations,
+                            "stop_after": stop_after,
+                            "carry": [{"from": "loop.current", "as": "loop.current", "update": "loop.next"}],
+                            "collect": [{"from": "loop.next", "as": "loop.history"}],
+                            "outputs": [
+                                {"from": "loop.next", "as": "loop.final"},
+                                {"from": "loop.history", "as": "loop.history"},
+                                {"from": "loop.iterations", "as": "loop.iterations"},
+                            ],
+                        },
+                    ),
+                    _node_call("end", "test.out_end", "Ends after loop.final.", requires=[REQ_SPEC("loop.final")]),
+                ],
+                "edges": _edge_chain("start", "count_loop", "end"),
+                "outputs": [REQ_SPEC("loop.final"), REQ_SPEC("loop.history"), REQ_SPEC("loop.iterations")],
+            },
+        }
+    )
+
+
+def _while_loop_graph(*, target: int = 3, max_iterations: int = 10, stop_when_source: str = "loop.done"):
+    return parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "loop.step_until",
+                    requires=["loop.current"],
+                    provides=["loop.next", "loop.done"],
+                    exports=["loop.next", "loop.done"],
+                    pipeline={
+                        "inputs": [PROV_SPEC("loop.current")],
+                        "nodes": [
+                            _node_call("start", "test.start", "Starts the while loop body."),
+                            _node_call(
+                                "step",
+                                "test.loop_step_until",
+                                "Increments loop.current and reports loop.done.",
+                                requires=[REQ_SPEC("loop.current")],
+                                provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
+                                config={"target": target},
+                            ),
+                            _node_call("end", "test.out_end", "Ends the while body.", requires=[REQ_SPEC("loop.next")]),
+                        ],
+                        "edges": _edge_chain("start", "step", "end"),
+                        "outputs": [REQ_SPEC("loop.next"), REQ_SPEC("loop.done")],
+                    },
+                )
+            ],
+            "pipeline": {
+                "inputs": [PROV_SPEC("loop.current")],
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the while loop fixture."),
+                    _node_call(
+                        "while_loop",
+                        "vibeflow.loop.while",
+                        "Runs the body until loop.done is true.",
+                        requires=[REQ_SPEC("loop.current")],
+                        provides=[PROV_SPEC("loop.final"), PROV_SPEC("loop.iterations")],
+                        loop={
+                            "body": "loop.step_until",
+                            "max_iterations": max_iterations,
+                            "carry": [{"from": "loop.current", "as": "loop.current", "update": "loop.next"}],
+                            "stop_when": {"from": stop_when_source, "equals": True},
+                            "outputs": [
+                                {"from": "loop.next", "as": "loop.final"},
+                                {"from": "loop.iterations", "as": "loop.iterations"},
+                            ],
+                        },
+                    ),
+                    _node_call("end", "test.out_end", "Ends after loop.final.", requires=[REQ_SPEC("loop.final")]),
+                ],
+                "edges": _edge_chain("start", "while_loop", "end"),
+                "outputs": [REQ_SPEC("loop.final"), REQ_SPEC("loop.iterations")],
+            },
+        }
+    )
+
+
+def test_fixed_count_loop_runs_nodeset_body_with_carry_collect_and_trace() -> None:
+    graph = _fixed_count_loop_graph()
+    context = PipelineRuntime(graph, registry=_loop_registry(), runtime_options=RuntimeOptions(trace="full")).run({"loop.current": 0})
+
+    assert context.get("loop.final")["value"] == 3
+    assert context.get("loop.history")["value"] == [1, 2, 3]
+    assert context.get("loop.iterations")["value"] == 3
+    assert "count_loop.iter_2.step" in context.get("runtime.qualified_exec_order")
+    assert context.get("runtime.total_step_count") == 1 + 3 * 3 + 2
+
+
+def test_while_loop_runs_until_condition_and_reports_iterations() -> None:
+    graph = _while_loop_graph(target=3)
+    context = PipelineRuntime(graph, registry=_loop_registry(), runtime_options=RuntimeOptions(trace="full")).run({"loop.current": 0})
+
+    assert context.get("loop.final")["value"] == 3
+    assert context.get("loop.iterations")["value"] == 3
+    assert "while_loop.iter_2.step" in context.get("runtime.qualified_exec_order")
+
+
+def test_while_loop_outputs_match_plan_block_and_compiled_execution() -> None:
+    graph = _while_loop_graph(target=3)
+    expected = None
+    for execution in ("plan", "block", "compiled"):
+        context = PipelineRuntime(graph, registry=_loop_registry(), runtime_options=RuntimeOptions(trace="boundary", execution=execution)).run({"loop.current": 0})
+        actual = (context.get("loop.final")["value"], context.get("loop.iterations")["value"])
+        expected = actual if expected is None else expected
+        assert actual == expected
+        if execution in {"block", "compiled"}:
+            assert any(event["kind"] == "loop_block_enter" for event in context.get("runtime.events"))
+
+
+def test_loop_max_iterations_raises_runtime_error() -> None:
+    graph = _while_loop_graph(target=5, max_iterations=2)
+    runtime = PipelineRuntime(graph, registry=_loop_registry(), runtime_options=RuntimeOptions(trace="full"))
+
+    with pytest.raises(PipelineRuntimeError, match="max_iterations=2"):
+        runtime.run({"loop.current": 0})
+
+    assert "while_loop.iter_1.step" in runtime.trace.to_dict()["qualified_exec_order"]
+
+
+def test_loop_stop_when_missing_or_non_bool_source_is_runtime_error() -> None:
+    missing_graph = _while_loop_graph(target=1, stop_when_source="loop.missing")
+    with pytest.raises(PipelineRuntimeError, match="stop_when source 'loop.missing' is not available"):
+        PipelineRuntime(missing_graph, registry=_loop_registry()).run({"loop.current": 0})
+
+    non_bool_graph = _while_loop_graph(target=1, stop_when_source="loop.next")
+    with pytest.raises(PipelineRuntimeError, match="stop_when source 'loop.next' must be boolean"):
+        PipelineRuntime(non_bool_graph, registry=_loop_registry()).run({"loop.current": 0})
+
+
+def test_block_execution_rejects_loop_body_that_is_not_block_compiled() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "loop.step_until",
+                    requires=["loop.current"],
+                    provides=["loop.next", "loop.done"],
+                    exports=["loop.next", "loop.done"],
+                    pipeline={
+                        "inputs": [PROV_SPEC("loop.current")],
+                        "nodes": [
+                            _node_call("start", "test.start", "Starts inner loop step."),
+                            _node_call(
+                                "step",
+                                "test.loop_step_until",
+                                "Produces loop.next and loop.done.",
+                                requires=[REQ_SPEC("loop.current")],
+                                provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
+                            ),
+                            _node_call("end", "test.out_end", "Ends inner step.", requires=[REQ_SPEC("loop.next")]),
+                        ],
+                        "edges": _edge_chain("start", "step", "end"),
+                        "outputs": [REQ_SPEC("loop.next"), REQ_SPEC("loop.done")],
+                    },
+                ),
+                _nodeset_config(
+                    "loop.body_with_nested_nodeset",
+                    requires=["loop.current"],
+                    provides=["loop.next", "loop.done"],
+                    exports=["loop.next", "loop.done"],
+                    pipeline={
+                        "inputs": [PROV_SPEC("loop.current")],
+                        "nodes": [
+                            _node_call("start", "test.start", "Starts uncompiled body."),
+                            _node_call(
+                                "nested",
+                                "nodeset.loop.step_until",
+                                "Calls a nested nodeset, which makes this loop body not block compiled.",
+                                requires=[REQ_SPEC("loop.current")],
+                                provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
+                            ),
+                            _node_call("end", "test.out_end", "Ends uncompiled body.", requires=[REQ_SPEC("loop.next")]),
+                        ],
+                        "edges": _edge_chain("start", "nested", "end"),
+                        "outputs": [REQ_SPEC("loop.next"), REQ_SPEC("loop.done")],
+                    },
+                ),
+            ],
+            "pipeline": {
+                "inputs": [PROV_SPEC("loop.current")],
+                "nodes": [
+                    _node_call("start", "test.start", "Starts block rejection fixture."),
+                    _node_call(
+                        "while_loop",
+                        "vibeflow.loop.while",
+                        "Uses a loop body that cannot be block compiled.",
+                        requires=[REQ_SPEC("loop.current")],
+                        provides=[PROV_SPEC("loop.final"), PROV_SPEC("loop.iterations")],
+                        loop={
+                            "body": "loop.body_with_nested_nodeset",
+                            "max_iterations": 3,
+                            "carry": [{"from": "loop.current", "as": "loop.current", "update": "loop.next"}],
+                            "stop_when": {"from": "loop.done", "equals": True},
+                            "outputs": [
+                                {"from": "loop.next", "as": "loop.final"},
+                                {"from": "loop.iterations", "as": "loop.iterations"},
+                            ],
+                        },
+                    ),
+                    _node_call("end", "test.out_end", "Ends block rejection fixture.", requires=[REQ_SPEC("loop.final")]),
+                ],
+                "edges": _edge_chain("start", "while_loop", "end"),
+                "outputs": [REQ_SPEC("loop.final")],
+            },
+        }
+    )
+
+    with pytest.raises(PipelineRuntimeError, match="not block compiled"):
+        PipelineRuntime(graph, registry=_loop_registry(), runtime_options=RuntimeOptions(execution="block")).run({"loop.current": 0})
+
+
+def test_join_policy_any_active_allows_unconditional_input_when_condition_is_inactive() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the join fixture."),
+                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")], config={"value": 7}),
+                    _node_call("route", "test.inactive_route", "Produces an inactive control value.", provides=[PROV_SPEC("flow.route")]),
+                    _node_call(
+                        "join",
+                        "test.join_passthrough",
+                        "Consumes value.in even when a separate conditional control edge is inactive.",
+                        requires=[REQ_SPEC("value.in")],
+                        provides=[PROV_SPEC("value.out")],
+                        join_policy="any_active",
+                    ),
+                    _node_call("end", "test.out_end", "Ends after value.out.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": [
+                    {"from": "start", "to": "seed"},
+                    {"from": "start", "to": "route"},
+                    {"from": "seed", "to": "join"},
+                    {"from": "route", "to": "join", "when": "flow.route == true"},
+                    {"from": "join", "to": "end"},
+                ],
+                "outputs": [REQ_SPEC("value.out")],
+            }
+        }
+    )
+
+    context = PipelineRuntime(graph, registry=_loop_registry()).run({})
+
+    assert context.get("value.out")["value"] == 7
+
+
+def test_health_reports_ambiguous_unconditional_conditional_join() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the ambiguous join fixture."),
+                    _node_call("seed", "test.seed", "Produces unconditional value.in.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("alt", "test.conditional_value", "Produces conditional value.in.", provides=[PROV_SPEC("value.alt", "value.in"), PROV_SPEC("flow.use_alt")]),
+                    _node_call("join", "test.join_passthrough", "Ambiguously consumes value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Ends after value.out.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": [
+                    {"from": "start", "to": "seed"},
+                    {"from": "start", "to": "alt"},
+                    {"from": "seed", "to": "join"},
+                    {"from": "alt", "to": "join", "when": "flow.use_alt == true"},
+                    {"from": "join", "to": "end"},
+                ],
+            }
+        }
+    )
+
+    report = validate_graph_health(graph, registry=_loop_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+
+    assert any(error.rule_id == "GRAPH.JOIN.AMBIGUOUS_UNCONDITIONAL" for error in report.errors)
+
+
+def test_multiple_active_exactly_one_join_errors_at_runtime() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the conflicting join fixture."),
+                    _node_call("left", "test.left_value", "Produces left value.in.", provides=[PROV_SPEC("value.left", "value.in")]),
+                    _node_call("right", "test.right_value", "Produces right value.in.", provides=[PROV_SPEC("value.right", "value.in")]),
+                    _node_call("join", "test.join_passthrough", "Conflicts on value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                ],
+                "edges": [{"from": "start", "to": "left"}, {"from": "start", "to": "right"}, {"from": "left", "to": "join"}, {"from": "right", "to": "join"}],
+            }
+        }
+    )
+
+    with pytest.raises(PipelineRuntimeError, match="exactly once, got 2"):
+        PipelineRuntime(graph, registry=_loop_registry()).run({})
+
+
+def test_join_policy_all_waits_for_all_incoming_inputs() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the all join fixture."),
+                    _node_call("left", "test.left_value", "Produces value.in.", provides=[PROV_SPEC("value.left", "value.in")]),
+                    _node_call("other", "test.other_value", "Produces other.in.", provides=[PROV_SPEC("other.in")]),
+                    _node_call(
+                        "join",
+                        "test.two_input_join",
+                        "Runs only after both incoming inputs arrive.",
+                        requires=[REQ_SPEC("value.in"), REQ_SPEC("other.in")],
+                        provides=[PROV_SPEC("value.out")],
+                        join_policy="all",
+                    ),
+                    _node_call("end", "test.out_end", "Ends after value.out.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": [
+                    {"from": "start", "to": "left"},
+                    {"from": "left", "to": "join"},
+                    {"from": "left", "to": "other"},
+                    {"from": "other", "to": "join"},
+                    {"from": "join", "to": "end"},
+                ],
+                "outputs": [REQ_SPEC("value.out")],
+            }
+        }
+    )
+
+    context = PipelineRuntime(graph, registry=_loop_registry()).run({})
+
+    assert context.get("value.out")["value"] == 11
+    assert context.get("runtime.exec_order") == ("start", "left", "other", "join", "end")
+
+
 def test_runtime_passes_non_deepcopy_object_by_reference() -> None:
     graph = parse_graph_config(
         {
@@ -372,13 +851,13 @@ def test_runtime_options_compiled_executes_linear_block(monkeypatch) -> None:
     graph = parse_graph_config({"pipeline": _seed_add_pipeline(add={"config": {"delta": 4}})})
 
     runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
-    assert runtime._plan.blocks == ()
+    assert [(block.kind, block.nodes) for block in runtime._plan.blocks] == [("graph", ("start", "seed", "add", "end"))]
     context = runtime.run({})
 
     assert context.get("value.out")["value"] == 5
     assert list(context.get("runtime.exec_order")) == ["start", "seed", "add", "end"]
     assert context.get("runtime.edge_executions") == {"start->seed": 1, "seed->add": 1, "add->end": 1}
-    assert [event["kind"] for event in context.get("runtime.events")] == ["run_start", "type_resolve", "type_resolve", "run_end"]
+    assert [event["kind"] for event in context.get("runtime.events")] == ["run_start", "block_enter", "type_resolve", "type_resolve", "block_exit", "run_end"]
 
 
 def test_runtime_options_compiled_runs_generated_block_when_node_hooks_enabled(monkeypatch) -> None:
@@ -403,7 +882,7 @@ def test_runtime_options_compiled_runs_generated_block_when_node_hooks_enabled(m
     ).run({})
 
     assert context.get("value.out")["value"] == 5
-    assert [event["kind"] for event in context.get("runtime.events")] == ["run_start", "type_resolve", "type_resolve", "run_end"]
+    assert [event["kind"] for event in context.get("runtime.events")] == ["run_start", "block_enter", "type_resolve", "type_resolve", "block_exit", "run_end"]
     assert calls == [
         ("before", "start"),
         ("after", "start"),
@@ -420,12 +899,12 @@ def test_runtime_options_compiled_full_trace_records_node_events(monkeypatch) ->
     graph = parse_graph_config({"pipeline": _seed_add_pipeline(add={"config": {"delta": 4}})})
 
     runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="full", node_hooks=False, execution="compiled"))
-    assert runtime._plan.blocks == ()
+    assert [(block.kind, block.nodes) for block in runtime._plan.blocks] == [("graph", ("start", "seed", "add", "end"))]
     context = runtime.run({})
 
     assert context.get("value.out")["value"] == 5
     event_kinds = [event["kind"] for event in context.get("runtime.events")]
-    assert event_kinds == ["node", "node", "type_resolve", "node", "type_resolve", "node"]
+    assert event_kinds == ["block_enter", "node", "node", "type_resolve", "node", "type_resolve", "node", "block_exit"]
     assert [event["node"] for event in context.get("runtime.events") if event["kind"] == "node"] == ["start", "seed", "add", "end"]
     assert context.get("runtime.edge_executions") == {"start->seed": 1, "seed->add": 1, "add->end": 1}
 
@@ -449,8 +928,8 @@ def test_runtime_options_compiled_failure_records_node_and_block_failed() -> Non
         runtime.run({})
 
     assert runtime.trace.current_node == "bad"
-    assert [event["kind"] for event in runtime.trace.events] == ["run_start", "node_failed"]
-    assert "boom" in runtime.trace.events[1]["failure"]
+    assert [event["kind"] for event in runtime.trace.events] == ["run_start", "block_enter", "node_failed", "block_failed"]
+    assert "boom" in runtime.trace.events[2]["failure"]
 
 
 def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
@@ -464,23 +943,23 @@ def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
                     _node_call("seed", "test.seed", "Produces initial value.in.", provides=[PROV_SPEC("value.in")], config={"value": 1}),
                     _node_call("add", "test.add", "Adds value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                     _node_call("route", "test.route", "Chooses the route.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
-                    _node_call("copy", "test.copy", "Copies value.out for a potential repeat branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy", "value.in")]),
+                    _node_call("copy", "test.copy", "Copies value.out on the alternate branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy", "value.in")]),
                     _node_call("end", "test.start", "Ends the compiled branch fixture."),
                 ],
                 "edges": [
                     {"from": "start", "to": "seed"},
-                    {"from": "seed", "to": "add"},
-                    {"from": "add", "to": "route"},
-                    {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
-                    {"from": "copy", "to": "add"},
-                    {"from": "route", "to": "end", "when": "flow.route == 'done'"},
-                ],
+                        {"from": "seed", "to": "add"},
+                        {"from": "add", "to": "route"},
+                        {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
+                        {"from": "copy", "to": "end"},
+                        {"from": "route", "to": "end", "when": "flow.route == 'done'"},
+                    ],
                 "outputs": [REQ_SPEC("value.out")],
             }
         }
     )
     runtime = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
-    assert runtime._plan.blocks == ()
+    assert [(block.kind, block.nodes) for block in runtime._plan.blocks] == [("graph", ("start", "seed", "add", "route", "copy", "end"))]
     context = runtime.run({})
 
     assert context.get("value.out")["value"] == 2
@@ -493,7 +972,7 @@ def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
     }
 
 
-def test_runtime_options_compiled_executes_decision_loop(monkeypatch) -> None:
+def test_runtime_options_compiled_rejects_decision_loop() -> None:
     class DoneCheckNode:
         NODE_INFO = NodeInfo("test.done_check", "Done Check", "test", "Checks loop completion.", "0.1.0", "decision")
         CONTRACT = NodeContract(
@@ -510,15 +989,13 @@ def test_runtime_options_compiled_executes_decision_loop(monkeypatch) -> None:
     registry = _registry()
     register_node(registry, "test.done_check", DoneCheckNode, {"target": {"type": "number"}}, {"target": 3})
     graph = _decision_loop_graph(target=3)
-    runtime = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
-    context = runtime.run({})
 
-    assert context.get("runtime.stop_reason") == "no_ready_nodes"
-    assert list(context.get("runtime.exec_order")) == ["start", "seed"]
-    assert context.get("runtime.edge_executions") == {"start->seed": 1, "seed->add": 1}
+    with pytest.raises(GraphCompileError) as exc_info:
+        PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
+    assert exc_info.value.rule_id == "GRAPH.CYCLE.FORBIDDEN"
 
 
-def test_runtime_options_compiled_decision_loop_respects_max_steps() -> None:
+def test_runtime_options_block_rejects_decision_loop_before_max_steps() -> None:
     class NeverDoneNode:
         NODE_INFO = NodeInfo("test.never_done", "Never Done", "test", "Never exits loop.", "0.1.0", "decision")
         CONTRACT = NodeContract(
@@ -533,13 +1010,10 @@ def test_runtime_options_compiled_decision_loop_respects_max_steps() -> None:
     registry = _registry()
     register_node(registry, "test.done_check", NeverDoneNode, {"target": {"type": "number"}}, {"target": 3})
     graph = _decision_loop_graph(target=3, max_steps=1)
-    runtime = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
 
-    with pytest.raises(PipelineRuntimeError, match="max_steps=1"):
-        runtime.run({})
-
-    assert runtime.trace.stop_reason == "max_steps"
-    assert runtime.trace.step_count == 1
+    with pytest.raises(GraphCompileError) as exc_info:
+        PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="block"))
+    assert exc_info.value.rule_id == "GRAPH.CYCLE.FORBIDDEN"
 
 
 def test_runtime_options_compiled_falls_back_around_async_barrier() -> None:
@@ -632,17 +1106,17 @@ def test_runtime_options_block_executes_simple_conditional_route() -> None:
                     _node_call("seed", "test.seed", "Produces initial value.in.", provides=[PROV_SPEC("value.in")], config={"value": 1}),
                     _node_call("add", "test.add", "Adds value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                     _node_call("route", "test.route", "Chooses the route.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
-                    _node_call("copy", "test.copy", "Copies value.out for a potential repeat branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy", "value.in")]),
+                    _node_call("copy", "test.copy", "Copies value.out on the alternate branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy", "value.in")]),
                     _node_call("end", "test.start", "Ends the conditional route fixture."),
                 ],
                 "edges": [
                     {"from": "start", "to": "seed"},
-                    {"from": "seed", "to": "add"},
-                    {"from": "add", "to": "route"},
-                    {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
-                    {"from": "copy", "to": "add"},
-                    {"from": "route", "to": "end", "when": "flow.route == 'done'"},
-                ],
+                        {"from": "seed", "to": "add"},
+                        {"from": "add", "to": "route"},
+                        {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
+                        {"from": "copy", "to": "end"},
+                        {"from": "route", "to": "end", "when": "flow.route == 'done'"},
+                    ],
                 "outputs": [REQ_SPEC("value.out")],
             }
         }
@@ -939,7 +1413,8 @@ class RuntimePlugin:
         runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, nodeset_hooks=False, block_hooks=True, execution="compiled"),
     )
 
-    assert not marker_path.exists()
+    hooks = [json.loads(line)["hook"] for line in marker_path.read_text(encoding="utf-8").splitlines()]
+    assert hooks == ["before_block", "after_block"]
 
 def test_checked_run_trace_records_nodeset_enter_exit(tmp_path) -> None:
     config_path = tmp_path / "nodeset_workflow.json"
@@ -1033,88 +1508,71 @@ def test_runtime_trace_records_nested_nodeset_qualified_paths() -> None:
     assert inner_add["depth"] == 2
 
 
-def test_runtime_trace_counts_nodeset_internal_loop_steps() -> None:
-    class ThresholdRouteNode:
-        NODE_INFO = NodeInfo("test.threshold_route", "Threshold Route", "test", "Routes until a threshold.", "0.1.0", "decision")
-        CONTRACT = NodeContract(
-            requires=(DataRequirement("value.out", "exactly_one"),),
-            provides=(DataProvider("flow.route", "flow.route"),),
-            output_schema={"flow.route": {"type": "string"}},
-        )
-
-        def run_pure(self, inputs, params):
-            value = inputs["value.out"]["value"]
-            return {"flow.route": "done" if value >= 3 else "again"}
-
-    class LoopCopyNode:
-        NODE_INFO = NodeInfo("test.loop_copy", "Loop Copy", "test", "Copies value.out back to loop input.", "0.1.0", "process")
-        CONTRACT = NodeContract(
-            requires=(DataRequirement("value.out", "exactly_one"),),
-            provides=(DataProvider("value.loop", "value.in"),),
-            output_schema={"value.loop": {"type": "number"}},
-        )
-
-        def run_pure(self, inputs, params):
-            return {"value.loop": inputs["value.out"]["value"]}
-
-    registry = _registry()
-    register_node(registry, "test.threshold_route", ThresholdRouteNode)
-    register_node(registry, "test.loop_copy", LoopCopyNode)
+def test_runtime_trace_counts_while_loop_nodeset_steps() -> None:
     graph = parse_graph_config(
         {
             "nodesets": [
                 _nodeset_config(
                     "loop.flow",
-                    provides=["value.out"],
-                    exports=["value.out"],
+                    requires=["loop.current"],
+                    provides=["loop.next", "loop.done"],
+                    exports=["loop.next", "loop.done"],
                     pipeline={
-                        "max_steps": 10,
+                        "inputs": [PROV_SPEC("loop.current")],
                         "nodes": [
-                            _node_call("start", "test.start", "Starts inner loop."),
-                            _node_call("seed", "test.seed", "Produces loop seed.", provides=[PROV_SPEC("value.in")], config={"value": 1}),
+                            _node_call("start", "test.start", "Starts while body."),
                             _node_call(
-                                "add",
-                                "test.add",
-                                "Increments the loop value.",
-                                requires=[REQ_SPEC("value.in")],
-                                provides=[PROV_SPEC("value.out")],
+                                "step",
+                                "test.loop_step_until",
+                                "Increments loop.current and reports completion.",
+                                requires=[REQ_SPEC("loop.current")],
+                                provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
+                                config={"target": 3},
                             ),
-                            _node_call("route", "test.threshold_route", "Routes the loop.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
-                            _node_call("copy", "test.loop_copy", "Copies value.out back to value.in.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.loop", "value.in")]),
-                            _node_call("end", "test.start", "Ends the inner loop."),
+                            _node_call("end", "test.out_end", "Ends while body.", requires=[REQ_SPEC("loop.next")]),
                         ],
-                        "edges": [
-                            {"from": "start", "to": "seed"},
-                            {"from": "seed", "to": "add"},
-                            {"from": "add", "to": "route"},
-                            {"from": "add", "to": "copy"},
-                            {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
-                            {"from": "copy", "to": "add"},
-                            {"from": "route", "to": "end", "when": "flow.route == 'done'"},
-                        ],
-                        "outputs": [REQ_SPEC("value.out")],
+                        "edges": _edge_chain("start", "step", "end"),
+                        "outputs": [REQ_SPEC("loop.next"), REQ_SPEC("loop.done")],
                     },
                 )
             ],
             "pipeline": {
+                "inputs": [PROV_SPEC("loop.current")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts loop trace fixture."),
-                    _node_call("loop_call", "nodeset.loop.flow", "Calls loop flow.", provides=[PROV_SPEC("value.out")]),
+                    _node_call(
+                        "loop_call",
+                        "vibeflow.loop.while",
+                        "Runs the while loop body.",
+                        requires=[REQ_SPEC("loop.current")],
+                        provides=[PROV_SPEC("value.out"), PROV_SPEC("loop.iterations")],
+                        loop={
+                            "body": "loop.flow",
+                            "max_iterations": 5,
+                            "carry": [{"from": "loop.current", "as": "loop.current", "update": "loop.next"}],
+                            "stop_when": {"from": "loop.done", "equals": True},
+                            "outputs": [
+                                {"from": "loop.next", "as": "value.out"},
+                                {"from": "loop.iterations", "as": "loop.iterations"},
+                            ],
+                        },
+                    ),
                     _node_call("end", "test.out_end", "Consumes final value.out.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": _edge_chain("start", "loop_call", "end"),
-                "outputs": [REQ_SPEC("value.out")],
+                "outputs": [REQ_SPEC("value.out"), REQ_SPEC("loop.iterations")],
             },
         }
     )
 
-    context = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="full")).run({})
+    context = PipelineRuntime(graph, registry=_loop_registry(), runtime_options=RuntimeOptions(trace="full")).run({"loop.current": 0})
 
     assert context.get("value.out")["value"] == 3
+    assert context.get("loop.iterations")["value"] == 3
     assert context.get("runtime.step_count") == 3
-    assert context.get("runtime.total_step_count") == 11
-    assert context.get("runtime.qualified_node_runs")["loop_call.add"] == 2
-    assert context.get("runtime.qualified_exec_order").count("loop_call.add") == 2
+    assert context.get("runtime.total_step_count") == 12
+    assert context.get("runtime.qualified_node_runs")["loop_call.iter_2.step"] == 1
+    assert context.get("runtime.qualified_exec_order").count("loop_call.iter_2.step") == 1
 
 
 def test_runtime_trace_preserves_nested_failure_path() -> None:
@@ -1256,7 +1714,7 @@ def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, ca
     for name in ("compiled_graph.json", "health_report.json", "graph.txt", "graph.mmd", "runtime_trace.jsonl", "output_summary.json"):
         assert (run_dir / name).exists()
     trace_kinds = [json.loads(line)["kind"] for line in (run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
-    assert trace_kinds == ["run_start", "type_resolve", "run_end", "runtime_summary"]
+    assert trace_kinds == ["run_start", "block_enter", "type_resolve", "block_exit", "run_end", "runtime_summary"]
     assert plan_code == 0
     assert plan_payload["status"] in {"PASS", "CONCERNS"}
     plan_run_dir = Path(plan_payload["run_dir"])

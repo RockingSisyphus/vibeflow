@@ -62,8 +62,8 @@
   ],
   "health_cases": [
     {
-      "name": "decision_cycle_without_exit",
-      "expected_rule_id": "GRAPH.CYCLE.MISSING_DECISION_EXIT",
+      "name": "decision_cycle_forbidden",
+      "expected_rule_id": "GRAPH.CYCLE.FORBIDDEN",
       "config": {
         "pipeline": {
           "inputs": [{"key": "value.in", "type": "value.in"}],

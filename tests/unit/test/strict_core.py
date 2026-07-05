@@ -143,7 +143,7 @@ def test_decision_branch_value_must_match_output_schema() -> None:
     assert any(item.rule_id == "GRAPH.DECISION.UNKNOWN_BRANCH_VALUE" for item in report.errors)
 
 
-def test_decision_non_loop_branch_must_reach_end_but_loop_branch_is_skipped() -> None:
+def test_decision_branch_must_reach_end_in_acyclic_graph() -> None:
     registry = _registry()
     register_node(registry, "test.two_route", TwoRouteNode)
     graph = parse_graph_config(
@@ -161,7 +161,7 @@ def test_decision_non_loop_branch_must_reach_end_but_loop_branch_is_skipped() ->
                     {"from": "start", "to": "seed"},
                     {"from": "seed", "to": "route"},
                     {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
-                    {"from": "copy", "to": "route"},
+                    {"from": "copy", "to": "end"},
                     {"from": "route", "to": "dead", "when": "flow.route == 'done'"},
                 ],
             }
@@ -172,7 +172,7 @@ def test_decision_non_loop_branch_must_reach_end_but_loop_branch_is_skipped() ->
     assert any(item.rule_id == "GRAPH.DECISION.BRANCH_CANNOT_REACH_END" for item in report.errors)
 
 
-def test_decision_cycle_exit_is_checked_per_scc_not_per_body_decision() -> None:
+def test_decision_cycle_is_forbidden_even_with_exit() -> None:
     registry = _registry()
     register_node(registry, "test.two_route", TwoRouteNode)
     register_node(registry, "test.body_route", BodyRouteNode)
@@ -204,7 +204,7 @@ def test_decision_cycle_exit_is_checked_per_scc_not_per_body_decision() -> None:
 
     report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
 
-    assert not any(item.rule_id == "GRAPH.CYCLE.MISSING_DECISION_EXIT" for item in report.errors)
+    assert any(item.rule_id == "GRAPH.CYCLE.FORBIDDEN" for item in report.errors)
 
 
 def test_planned_node_is_concern_not_unknown_type() -> None:
@@ -290,8 +290,9 @@ def test_undeclared_cycle_is_rejected() -> None:
             }
         }
     )
-    with pytest.raises(GraphCompileError, match="cycle requires decision"):
+    with pytest.raises(GraphCompileError, match="explicit flow cycle is forbidden") as exc_info:
         GraphCompiler().compile(graph, registry=_registry())
+    assert exc_info.value.rule_id == "GRAPH.CYCLE.FORBIDDEN"
 
 def test_removed_loop_registration_and_edge_limits_are_rejected() -> None:
     with pytest.raises(GraphConfigError, match="pipeline.loops is removed"):

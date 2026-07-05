@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Mapping
 
 from .compiler import GraphCompiler, GraphCompileError
-from .graph_config import GraphConfig, STATUS_PLANNED
+from .graph_config import GraphConfig, LOOP_NODE_TYPES, STATUS_PLANNED
 from .health_types import HealthFinding
 from .data_contract import provider_keys, providers_to_dicts, requirement_types, requirements_to_dicts
 from .registry import NodeRegistry, NodeRegistryError
@@ -20,14 +20,14 @@ def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry) -> tuple[tu
         errors.extend(_validate_nodeset_contract(nodeset))
         errors.extend(_validate_nodeset_key_scope(nodeset))
         try:
-            GraphCompiler().compile(nodeset.graph)
+            GraphCompiler().compile(nodeset.graph, owner=f"nodeset:{nodeset.name}")
         except GraphCompileError as exc:
             errors.append(
                 _nodeset_finding(
                     "NODESET.GRAPH.COMPILE",
                     nodeset.name,
                     f"nodeset internal graph failed to compile: {exc}",
-                    details={"compile_error": str(exc)},
+                    details={"compile_error": str(exc), "compile_rule_id": exc.rule_id, **dict(exc.details or {})},
                 )
             )
         errors.extend(_validate_node_types_in_scope(nodeset.graph.nodes, graph.nodesets, registry=registry, owner=f"nodeset:{nodeset.name}"))
@@ -70,6 +70,8 @@ def _validate_node_types_in_scope(nodes, nodesets, *, registry: NodeRegistry, ow
     findings: list[HealthFinding] = []
     for node in nodes:
         if node.status == STATUS_PLANNED:
+            continue
+        if node.node_type in LOOP_NODE_TYPES:
             continue
         if node.node_type.startswith("nodeset."):
             continue

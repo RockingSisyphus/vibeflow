@@ -1,0 +1,49 @@
+{
+  "pipeline": {
+    "nodes": [
+      {"name": "start", "type": "sandbox.start", "display_name": "Start", "description": "Starts an ambiguous join health example."},
+      {
+        "name": "left_value",
+        "type": "semantic.left_value",
+        "display_name": "Unconditional Value",
+        "description": "Always provides value.in before the conditional provider has been selected.",
+        "provides": [{"key": "value.left", "type": "value.in"}],
+        "value": 3
+      },
+      {
+        "name": "alt_value",
+        "type": "semantic.conditional_value",
+        "display_name": "Conditional Value",
+        "description": "Also provides value.in but only through a conditional incoming edge.",
+        "provides": [
+          {"key": "value.alt", "type": "value.in"},
+          {"key": "flow.use_alt", "type": "flow.use_alt"}
+        ],
+        "value": 9
+      },
+      {
+        "name": "join",
+        "type": "semantic.join_passthrough",
+        "display_name": "Ambiguous Join",
+        "description": "Would consume value.in from either an unconditional or conditional source.",
+        "requires": [{"type": "value.in", "cardinality": "exactly_one"}],
+        "provides": [{"key": "value.out", "type": "value.out"}]
+      },
+      {
+        "name": "end",
+        "type": "semantic.value_end",
+        "display_name": "End",
+        "description": "Would end after the ambiguous join.",
+        "requires": [{"type": "value.out", "cardinality": "exactly_one"}]
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "left_value"},
+      {"from": "start", "to": "alt_value"},
+      {"from": "left_value", "to": "join"},
+      {"from": "alt_value", "to": "join", "when": "flow.use_alt == true"},
+      {"from": "join", "to": "end"}
+    ],
+    "outputs": [{"type": "value.out", "cardinality": "optional_one"}]
+  }
+}

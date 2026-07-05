@@ -1,0 +1,46 @@
+{
+  "pipeline": {
+    "nodes": [
+      {"name": "start", "type": "sandbox.start", "display_name": "Start", "description": "Starts a multiple-provider runtime join failure."},
+      {
+        "name": "left_value",
+        "type": "semantic.left_value",
+        "display_name": "Left Value",
+        "description": "Provides one active value.in source.",
+        "provides": [{"key": "value.left", "type": "value.in"}],
+        "value": 3
+      },
+      {
+        "name": "right_value",
+        "type": "semantic.right_value",
+        "display_name": "Right Value",
+        "description": "Provides a second active value.in source.",
+        "provides": [{"key": "value.right", "type": "value.in"}],
+        "value": 4
+      },
+      {
+        "name": "join",
+        "type": "semantic.join_passthrough",
+        "display_name": "Conflicting Join",
+        "description": "Requires exactly one value.in but receives two active providers.",
+        "requires": [{"type": "value.in", "cardinality": "exactly_one"}],
+        "provides": [{"key": "value.out", "type": "value.out"}]
+      },
+      {
+        "name": "end",
+        "type": "semantic.value_end",
+        "display_name": "End",
+        "description": "Would end if the join had one selected value.",
+        "requires": [{"type": "value.out", "cardinality": "exactly_one"}]
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "left_value"},
+      {"from": "start", "to": "right_value"},
+      {"from": "left_value", "to": "join"},
+      {"from": "right_value", "to": "join"},
+      {"from": "join", "to": "end"}
+    ],
+    "outputs": [{"type": "value.out", "cardinality": "optional_one"}]
+  }
+}

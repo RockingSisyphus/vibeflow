@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from .data_contract import CARDINALITY_EXACTLY_ONE, CARDINALITY_OPTIONAL_ONE, provider_keys
-from .graph_algorithms import strongly_connected_components
-from .graph_config import STATUS_PLANNED
+from .graph_config import JOIN_POLICY_ALL, STATUS_PLANNED
 from .health_types import HealthFinding
 from .node import FLOW_KIND_DECISION, FLOW_KIND_TERMINAL
 from .planned_behavior import PLANNED_BEHAVIOR_PYTHON_STUB, PLANNED_BEHAVIOR_TRANSPARENT, effective_planned_behavior
@@ -33,7 +32,6 @@ def append_flowchart_health(graph, compiled, state, *, registry, owner: str = "p
     if ends:
         decision_flow = _DecisionFlow(registry, outgoing, outgoing_edges, can_reach_end)
         _append_decision_branch_health(graph, compiled, state, decision_flow)
-        _append_decision_cycle_exit_health(compiled, state, outgoing=outgoing, can_reach_end=can_reach_end)
     _append_explicit_edge_duplicate_warnings(graph, state)
     _append_orphan_findings(active_names, incoming, outgoing, state)
     _append_nodeset_flow_health(graph, state, registry=registry)
@@ -117,7 +115,7 @@ def _append_nodeset_flow_health(graph, state, *, registry) -> None:
         if nodeset.status == STATUS_PLANNED:
             continue
         try:
-            nested = GraphCompiler().compile(nodeset.graph, registry=registry)
+            nested = GraphCompiler().compile(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.name}")
         except GraphCompileError:
             continue
         append_flowchart_health(nodeset.graph, nested, state, registry=registry, owner=f"nodeset:{nodeset.name}")
@@ -170,6 +168,53 @@ def _append_unconsumed_provider_warnings(node, compiled, nodes_by_name, outgoing
             continue
         if not any(provider.type == requirement.type for child in downstream for requirement in child.requires):
             state.warnings.append(_data_finding("GRAPH.DATA.UNCONSUMED_PROVIDER", provider.key, f"node '{node.name}' provides key '{provider.key}' type '{provider.type}' but no direct downstream flow successor requires that type", node=node.name))
+
+
+def append_join_policy_health(graph, compiled, state) -> None:
+    nodes_by_name = {node.name: node for node in graph.nodes}
+    incoming_edges: dict[str, list[object]] = {node.name: [] for node in graph.nodes}
+    for edge in compiled.effective_edges:
+        incoming_edges.setdefault(edge.target, []).append(edge)
+    for node in graph.nodes:
+        if node.join_policy == JOIN_POLICY_ALL:
+            continue
+        edges = incoming_edges.get(node.name, [])
+        if not edges or not any(edge.when for edge in edges) or not any(not edge.when for edge in edges):
+            continue
+        for requirement in node.requires:
+            unconditional = _incoming_sources_providing_type(edges, nodes_by_name, requirement.type, conditional=False)
+            conditional = _incoming_sources_providing_type(edges, nodes_by_name, requirement.type, conditional=True)
+            if not unconditional or not conditional:
+                continue
+            state.errors.append(
+                _data_finding(
+                    "GRAPH.JOIN.AMBIGUOUS_UNCONDITIONAL",
+                    requirement.type,
+                    f"node '{node.name}' mixes conditional and unconditional incoming providers for type '{requirement.type}', which can trigger safe OR join before the selected branch is ready",
+                    node=node.name,
+                    severity="error",
+                    details={
+                        "join_policy": node.join_policy,
+                        "required_type": requirement.type,
+                        "unconditional_sources": unconditional,
+                        "conditional_sources": conditional,
+                        "suggestion": "Make the sources mutually conditional, set join_policy='all' when all inputs are required, or add an explicit merge/select node.",
+                    },
+                )
+            )
+
+
+def _incoming_sources_providing_type(edges: list[object], nodes_by_name: Mapping[str, object], data_type: str, *, conditional: bool) -> list[str]:
+    sources: list[str] = []
+    for edge in edges:
+        if bool(edge.when) != conditional:
+            continue
+        source = nodes_by_name.get(edge.source)
+        if source is None:
+            continue
+        if any(provider.type == data_type for provider in getattr(source, "provides", ())):
+            sources.append(str(edge.source))
+    return sorted(set(sources))
 
 
 def _is_initial_input_node(node, graph, incoming, nodes_by_name) -> bool:
@@ -265,36 +310,6 @@ def _append_single_decision_health(node, nodes_by_name, state, flow: _DecisionFl
         if target in nodes_by_name and not _is_loop_branch(node.name, target, flow.outgoing) and target not in flow.can_reach_end:
             state.errors.append(_flow_finding("GRAPH.DECISION.BRANCH_CANNOT_REACH_END", node.name, f"decision branch {node.name}->{target} cannot reach a terminal end node", object_type="node"))
     _append_missing_schema_branches(node, schema_values, equality_values, state)
-
-
-def _append_decision_cycle_exit_health(compiled, state, *, outgoing: dict[str, list[str]], can_reach_end: set[str]) -> None:
-    for component in strongly_connected_components(outgoing):
-        if len(component) == 1 and component[0] not in outgoing.get(component[0], ()):
-            continue
-        cycle = set(component)
-        decision_nodes = [node for node in component if compiled.flow_kinds.get(node) == FLOW_KIND_DECISION]
-        exit_edges = [
-            {"source": decision, "target": target}
-            for decision in decision_nodes
-            for target in outgoing.get(decision, ())
-            if target not in cycle and target in can_reach_end
-        ]
-        if exit_edges:
-            continue
-        cycle_id = ",".join(sorted(cycle))
-        state.errors.append(
-            _flow_finding(
-                "GRAPH.CYCLE.MISSING_DECISION_EXIT",
-                cycle_id,
-                "decision cycle needs at least one exit edge from any decision node to a terminal end",
-                object_type="cycle",
-                details={
-                    "members": sorted(cycle),
-                    "decision_nodes": sorted(decision_nodes),
-                    "exit_edges": exit_edges,
-                },
-            )
-        )
 
 
 def _append_explicit_edge_duplicate_warnings(graph, state) -> None:
