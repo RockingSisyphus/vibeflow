@@ -263,6 +263,41 @@ def test_mermaid_renders_sectioned_labels_default_node_and_custom_style() -> Non
     assert "style seed fill:#123abc,stroke:#456def,color:#654321;" in text
 
 
+def test_mermaid_custom_style_overrides_health_class_color() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call(
+                        "seed",
+                        "test.seed",
+                        "Produces a styled seed with a warning class.",
+                        style={"fill": "#123abc", "stroke": "#456def", "text": "#654321"},
+                        provides=[PROV_SPEC("value.in")],
+                    )
+                ]
+            }
+        }
+    )
+    report = HealthReport(
+        status="CONCERNS",
+        warnings=(
+            HealthFinding(
+                rule_id="TEST.WARNING",
+                severity="warning",
+                object_type="node",
+                object_id="seed",
+                message="fixture warning",
+            ),
+        ),
+    )
+
+    text = export_mermaid(graph, health_report=report)
+
+    assert "class seed healthWarning;" in text
+    assert "style seed fill:#123abc,stroke:#456def,color:#654321;" in text
+
+
 def test_mermaid_renders_contracts_on_edges_and_hides_them_when_requested() -> None:
     graph = parse_graph_config(
         {
@@ -298,6 +333,7 @@ def test_mermaid_renders_while_loop_shape_class_and_stop_condition() -> None:
                         "Renders a structured while loop.",
                         display_name="Loop",
                         provides=[PROV_SPEC("loop.iterations")],
+                        style={"fill": "#123abc", "stroke": "#456def", "text": "#654321"},
                         loop={
                             "body": "loop.body",
                             "max_iterations": 5,
@@ -314,9 +350,10 @@ def test_mermaid_renders_while_loop_shape_class_and_stop_condition() -> None:
 
     text = export_mermaid(graph)
 
-    assert 'loop@{ shape: hourglass, label: "Loop' in text
+    assert 'loop@{ shape: trap-b, label: "Loop' in text
     assert "class loop loopNode;" in text
     assert "classDef loopNode" in text
+    assert "style loop fill:#123abc,stroke:#456def,color:#654321;" in text
     assert "stop: stop_after: 2" in text
 
 
