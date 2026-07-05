@@ -152,15 +152,16 @@ class _MermaidRenderer:
                 lines.append(f"{indent}{_node_shape(node_id, self._node_label(node), flow_kind)}")
                 if class_name:
                     lines.append(f"{indent}class {node_id} {class_name};")
-                self._render_custom_node_style(lines, node, node_id, class_name=class_name, indent=indent)
+                self._render_custom_node_style(lines, node, node_id, indent=indent)
                 continue
             flow_kind = node_flow_kind(node, compiled) or nodeset.flow_kind
             is_loop = node.node_type in LOOP_NODE_TYPES
             class_name = self._class_for_node(node_id, preferred_class="loopNode" if is_loop else "nodesetNode", planned=node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED)
             label = self._loop_label(node, nodeset) if is_loop else self._nodeset_label(node, nodeset)
-            lines.append(f"{indent}{_node_shape(node_id, label, flow_kind, shape='hourglass' if is_loop else '')}")
+            lines.append(f"{indent}{_node_shape(node_id, label, flow_kind, shape='trap-b' if is_loop else '')}")
             if class_name:
                 lines.append(f"{indent}class {node_id} {class_name};")
+            self._render_custom_node_style(lines, node, node_id, indent=indent)
             if not should_expand:
                 continue
             group_id = _safe_id(f"{prefix}{node.name}__expanded")
@@ -285,9 +286,7 @@ class _MermaidRenderer:
             return "documentNode"
         return "defaultNode"
 
-    def _render_custom_node_style(self, lines: list[str], node: NodeSpec, node_id: str, *, class_name: str, indent: str) -> None:
-        if class_name != "defaultNode":
-            return
+    def _render_custom_node_style(self, lines: list[str], node: NodeSpec, node_id: str, *, indent: str) -> None:
         style = node.style.to_dict()
         if not style:
             return

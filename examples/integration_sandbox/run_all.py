@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -161,6 +162,7 @@ VALID_RUN_CASES = [
             "stop_reason": "completed",
         },
         "expected_qualified_exec_contains": ["retry_loop.iter_2.increment", "retry_loop.iter_2.done"],
+        "expected_svg_text_contains": ["Retry Loop", "vibeflow.loop.while", "stop_when"],
     },
     {
         "name": "loop_while_nodeset_retry_compiled",
@@ -939,8 +941,10 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     (MERMAID_DIR / f"{name}.mmd").write_text(collapsed, encoding="utf-8")
     (MERMAID_DIR / f"{name}.expanded.mmd").write_text(expanded, encoding="utf-8")
     if is_mermaid_svg_renderer_available():
-        render_mermaid_svg(collapsed, SVG_DIR / f"{name}.svg")
+        collapsed_svg = SVG_DIR / f"{name}.svg"
+        render_mermaid_svg(collapsed, collapsed_svg)
         render_mermaid_svg(expanded, SVG_DIR / f"{name}.expanded.svg", max_text_size=500_000, max_edges=5_000)
+        _assert_svg_text_contains(case, collapsed_svg)
     initial = case["initial_factory"]() if "initial_factory" in case else case.get("initial", {})
     hook_marker = REPORT_DIR / "plugin_hooks.jsonl"
     hook_count_before = len(hook_marker.read_text(encoding="utf-8").splitlines()) if hook_marker.exists() else 0
@@ -1073,6 +1077,18 @@ def _assert_compiled_block_sources(case: dict[str, Any], plan, source_paths: lis
 
 def _runtime_trace_lines(run_dir: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in (run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
+
+
+def _assert_svg_text_contains(case: dict[str, Any], path: Path) -> None:
+    expected = [str(item) for item in case.get("expected_svg_text_contains", ())]
+    if not expected:
+        return
+    svg_text = path.read_text(encoding="utf-8", errors="ignore")
+    visible = re.sub(r"<[^>]+>", " ", svg_text)
+    visible = " ".join(visible.split())
+    missing = [item for item in expected if item not in visible]
+    if missing:
+        raise AssertionError(f"SVG {path.name} missing visible text {missing!r}")
 
 
 def _comparable_trace_kinds(actual: list[str], expected: list[str]) -> tuple[list[str], list[str]]:

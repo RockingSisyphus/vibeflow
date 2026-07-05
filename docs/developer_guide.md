@@ -160,7 +160,7 @@ def add(left: float, right: float) -> float:
 - `display_name`、`category`、`version`、`description`、`style`、`similar_to` 是调用点元数据，不会进入运行时 `params`。
 - 如果 node 运行时确实需要同名参数，必须写进 `"config": {...}`。
 - `style` 只允许 `fill`、`stroke`、`text` 三个 `#RRGGBB` hex 颜色；大小写会规范化。
-- 自定义颜色只应用于普通节点。health error/warning、planned node、resource、document、nodeset、external dependency 等系统语义样式优先级更高。
+- 自定义颜色会作为节点级 `style` 覆盖系统 class 的 fill/stroke/text 颜色，包括 health warning/error、planned、document、nodeset、loop、external dependency 等节点；节点形状、finding 注释和 planned 虚线等非颜色语义仍保留。自定义色仍不能使用 VibeFlow 系统保留色。
 - `similar_to` 用来声明本调用点是同一 pipeline 或同一 nodeset 内另一个 node 的 `variant` 或 `copy`，必须写 `node`、`relationship` 和 `reason`；它只影响 `GRAPH.SMELL.DUPLICATE_LOGIC` 的有意重复豁免，不影响运行、编译、拓扑或契约。
 - `similar_to` 也是调用点元数据，不会进入运行时 `params`。如果运行时确实需要名为 `similar_to` 的参数，必须写进 `"config": {...}`。
 - `join_policy` 是可选调度语义字段，不进入运行时 `params`；可写 `safe_any`、`any_active` 或 `all`。默认 `safe_any`。
@@ -331,7 +331,7 @@ loop node 必须声明普通 `requires/provides`，并在顶层写 `loop` 对象
 
 `execution="block"` 和 `execution="compiled"` 会执行结构化 `LoopBlock`。如果 loop body 不能被 block compiler 编译，block/compiled 模式会报错，不会静默降级到普通 nested runtime。普通 execution 仍保留同语义的 nested runtime 兼容路径。
 
-Mermaid/SVG 中 while loop 使用独立 hourglass 形状和 `loopNode` 系统样式，label 会显示 `body:`、`stop:`、`max:`。`loopNode` 颜色属于系统保留色，不允许作为自定义 `style` 颜色。
+Mermaid/SVG 中 while loop 使用独立 trapezoid (`trap-b`) 形状和默认 `loopNode` 系统样式，label 会显示 `body:`、`stop:`、`max:`。`loopNode` 默认颜色属于系统保留色，不允许作为自定义 `style` 颜色；如需改 loop 颜色，应写其他非保留 hex 色。
 
 ## Join Policy
 
