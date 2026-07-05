@@ -91,3 +91,45 @@ def test_nodeset_imports_reject_missing_duplicate_and_empty_sources(tmp_path) ->
     with pytest.raises(ConfigLoadError) as duplicate:
         load_config_document(config_path)
     assert duplicate.value.rule_id == "CONFIG.NODESET_IMPORT.DUPLICATE"
+
+
+def test_nodeset_imports_cache_reused_documents_within_one_load(tmp_path, monkeypatch) -> None:
+    imports_path = tmp_path / "nodesets.jsonc"
+    imports_path.write_text(
+        json.dumps(
+            {
+                "nodesets": [
+                    _nodeset_config("math.add_one", pipeline=_input_add_pipeline(), requires=["value.in"], provides=["value.out"], exports=["value.out"]),
+                    _nodeset_config("math.seed", pipeline=_seed_only_pipeline(), provides=["value.in"], exports=["value.in"]),
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "workflow.jsonc"
+    config_path.write_text(
+        json.dumps(
+            {
+                "nodeset_imports": [
+                    {"path": "nodesets.jsonc", "names": ["math.add_one"]},
+                    {"path": "nodesets.jsonc", "names": ["math.seed"]},
+                ],
+                "pipeline": {"nodes": [_node_call("flow", "nodeset.math.add_one", "Calls imported flow.", provides=[PROV_SPEC("value.out")])]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    original_read_text = Path.read_text
+    reads: list[Path] = []
+
+    def counting_read_text(self: Path, *args, **kwargs):
+        if self.resolve() == imports_path.resolve():
+            reads.append(self)
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", counting_read_text)
+
+    document = load_config_document(config_path)
+
+    assert reads == [imports_path]
+    assert [item["name"] for item in document.data["nodesets"]] == ["math.add_one", "math.seed"]

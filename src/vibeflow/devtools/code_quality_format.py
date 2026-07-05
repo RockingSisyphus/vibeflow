@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Mapping
 
 from .code_quality_types import QualityReport
@@ -27,7 +28,12 @@ def format_quality_summary(report: QualityReport, *, max_findings: int = 30) -> 
         location = finding.source_location.get("path", "")
         line = finding.source_location.get("line")
         suffix = f":{line}" if line else ""
-        lines.append(f"{finding.severity.upper()} {finding.rule_id} {location}{suffix} {finding.message}")
+        target = f"{finding.object_type}:{finding.object_id}"
+        location_text = f" [{location}{suffix}]" if location else ""
+        lines.append(f"{finding.severity.upper()} {finding.rule_id} {target}{location_text} {finding.message}")
+        if finding.details:
+            details = json.dumps(dict(finding.details), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            lines.append(f"  details: {details}")
     if len(report.findings) > max_findings:
         lines.append(f"... {len(report.findings) - max_findings} more findings omitted")
     return "\n".join(lines)

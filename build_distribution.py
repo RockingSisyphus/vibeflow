@@ -26,8 +26,12 @@ PROTECTED_FILES = (
     "run.py",
     "kernel/README.md",
     KERNEL_ZIP_RELATIVE.as_posix(),
+    "kernel/THIRD_PARTY_NOTICES.md",
+    "kernel/tools/mermaid-renderer/package.json",
+    "kernel/tools/mermaid-renderer/package-lock.json",
 )
 PROTECTED_DIRS = (
+    "kernel/docs",
     "kernel/vibeflow",
 )
 
@@ -46,14 +50,13 @@ def main() -> int:
 def build_distribution(output: Path, *, replace: bool = True) -> None:
     _prepare_output(output, replace=replace)
     _copy_tree(ROOT / "distribution" / "kernel_development_pack" / "project_template", output)
-    _copy_tree(ROOT / "distribution" / "kernel_development_pack" / "docs", output / "docs")
+    _copy_tree(ROOT / "distribution" / "kernel_development_pack" / "docs", output / "kernel" / "docs")
     _copy_mermaid_renderer_config(output)
     _copy_third_party_notices(output)
-    _copy_extra_docs(output / "docs")
+    _copy_extra_docs(output / "kernel" / "docs")
     _write_kernel_archive(ROOT / "src" / "vibeflow", output / KERNEL_ZIP_RELATIVE)
     _ensure_standard_project_dirs(output)
     _write_root_readme(output)
-    _write_project_gitignore(output)
     _write_kernel_manifest(output)
 
 
@@ -88,7 +91,7 @@ def _copy_extra_docs(target: Path) -> None:
 
 def _copy_mermaid_renderer_config(output: Path) -> None:
     source = ROOT / "tools" / "mermaid-renderer"
-    target = output / "tools" / "mermaid-renderer"
+    target = output / "kernel" / "tools" / "mermaid-renderer"
     target.mkdir(parents=True, exist_ok=True)
     for name in ("package.json", "package-lock.json"):
         path = source / name
@@ -99,7 +102,9 @@ def _copy_mermaid_renderer_config(output: Path) -> None:
 def _copy_third_party_notices(output: Path) -> None:
     source = ROOT / "THIRD_PARTY_NOTICES.md"
     if source.exists():
-        (output / source.name).write_bytes(source.read_bytes())
+        destination = output / "kernel" / source.name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(source.read_bytes())
 
 
 def _write_kernel_archive(source: Path, target: Path) -> None:
@@ -167,7 +172,7 @@ def _remove_tree(path: Path) -> None:
 
 
 def _ignored(relative: Path) -> bool:
-    ignored_names = {"__pycache__", ".pytest_cache", "runs", "reports"}
+    ignored_names = {"__pycache__", ".pytest_cache", "runs", "reports", "node_modules"}
     return any(part in ignored_names or part.endswith(".pyc") for part in relative.parts)
 
 
@@ -180,12 +185,13 @@ def _write_root_readme(output: Path) -> None:
 这个目录可以整体复制到其他位置作为新项目起点。它已经包含：
 
 - `kernel/vibeflow-kernel.zip`：当前仓库最新内核源码归档，`run.py` 会直接从这个单文件导入。
-- `docs/`：中文开发文档。
+- `kernel/docs/`：内核中文开发文档，可读但不应作为项目内容修改。
+- `kernel/tools/mermaid-renderer/`：SVG 渲染器依赖配置；运行 `npm install` 后启用 `svg` 命令。
+- `kernel/THIRD_PARTY_NOTICES.md`：SVG 渲染相关第三方项目致谢与许可证信息。
 - `project/`：可直接运行的示例业务项目骨架。
 - `project/nodes/`、`project/base_lib/`、`project/plugins/`、`project/configs/`：AI 和开发者放业务代码与配置的标准目录。
 - `run.py`：推荐启动器，会自动加载本地内核和项目 registry。
-- `tools/mermaid-renderer/`：SVG 渲染器依赖配置；运行 `npm install` 后启用 `svg` 命令。
-- `THIRD_PARTY_NOTICES.md`：SVG 渲染相关第三方项目致谢与许可证信息。
+- `README.md`、`AGENTS.md`：项目可定制指南文件，不属于 kernel manifest。
 
 Runtime 默认审计流程和 key，不保存真实对象内容；node 间可以按引用传递普通 Python 对象。需要指标、日志或诊断 side task 时，在 config 中显式使用 `async: "detached"` 或 `async: "result_key"`。
 
@@ -208,9 +214,9 @@ python run.py quality --path project
 首次使用 `svg` 前，在分发目录执行一次：
 
 ```powershell
-cd tools/mermaid-renderer
+cd kernel/tools/mermaid-renderer
 npm install
-cd ../..
+cd ../../..
 ```
 
 不要求系统预装 Google Chrome。正常执行 `npm install` 后，Puppeteer 会安装并使用自己的浏览器缓存；如果该缓存不可用，VibeFlow 会再尝试非 snap 的系统 Chrome/Chromium。`/snap/bin/chromium` 会被跳过，因为它在 Puppeteer/mermaid-cli 下常见 profile lock 启动失败。
@@ -218,6 +224,8 @@ cd ../..
 ## Kernel 完整性检查
 
 分发包包含 `kernel/MANIFEST.sha256`。`run.py` 会在运行前校验 kernel 归档和启动器是否被修改。根目录 `README.md` 和 `AGENTS.md` 是项目指南文件，使用者可以按项目需要自定义。
+
+分发包不内置 `.gitignore`，Git 忽略策略由项目自行决定。常见建议包括忽略 `kernel/tools/mermaid-renderer/node_modules/`、`runs/`、`reports/`、`__pycache__/` 和 `*.pyc`。
 
 手动检查：
 
@@ -239,23 +247,9 @@ python run.py verify-kernel
 
 运行前内核会强制健康检查；检查失败时拒绝执行并输出原因。
 
-更多细节见 `docs/`。
+更多细节见 `kernel/docs/`。
 """
     (output / "README.md").write_text(text, encoding="utf-8")
-
-
-def _write_project_gitignore(output: Path) -> None:
-    text = """__pycache__/
-*.py[cod]
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.venv/
-runs/
-reports/
-*.log
-"""
-    (output / ".gitignore").write_text(text, encoding="utf-8")
 
 
 if __name__ == "__main__":

@@ -218,7 +218,13 @@ def _validate_nodeset_key_scope(nodeset) -> tuple[HealthFinding, ...]:
 def _nodeset_references(graph: GraphConfig) -> dict[str, tuple[str, ...]]:
     refs: dict[str, tuple[str, ...]] = {}
     for name, nodeset in graph.nodesets.items():
-        refs[name] = tuple(node.node_type.removeprefix("nodeset.") for node in nodeset.graph.nodes if node.node_type.startswith("nodeset."))
+        targets: list[str] = []
+        for node in nodeset.graph.nodes:
+            if node.node_type.startswith("nodeset."):
+                targets.append(node.node_type.removeprefix("nodeset."))
+            elif node.node_type in LOOP_NODE_TYPES and node.loop.body:
+                targets.append(node.loop.body)
+        refs[name] = tuple(sorted(set(targets)))
     return refs
 
 

@@ -102,22 +102,35 @@ def is_mermaid_svg_renderer_available() -> bool:
 
 
 def _find_mmdc() -> Path:
-    repo_root = _repo_root()
-    local = repo_root / "tools" / "mermaid-renderer" / "node_modules" / ".bin" / ("mmdc.cmd" if _is_windows() else "mmdc")
-    if local.exists():
-        return local
+    executable = "mmdc.cmd" if _is_windows() else "mmdc"
+    for renderer_root in _renderer_roots():
+        local = renderer_root / "node_modules" / ".bin" / executable
+        if local.exists():
+            return local
     found = shutil.which("mmdc")
     if found:
         return Path(found)
-    raise MermaidRenderError("Mermaid CLI not found; run `npm install` in tools/mermaid-renderer")
+    raise MermaidRenderError(
+        "Mermaid CLI not found; run `npm install` in `tools/mermaid-renderer` "
+        "for a source checkout or `kernel/tools/mermaid-renderer` for a distribution package"
+    )
 
 
 def _ensure_mermaid_cli_compat() -> None:
-    dist = _repo_root() / "tools" / "mermaid-renderer" / "node_modules" / "mermaid" / "dist"
-    expected = dist / "mermaid.esm.mjs"
-    fallback = dist / "mermaid.core.mjs"
-    if not expected.exists() and fallback.exists():
-        expected.write_text(fallback.read_text(encoding="utf-8"), encoding="utf-8")
+    for renderer_root in _renderer_roots():
+        dist = renderer_root / "node_modules" / "mermaid" / "dist"
+        expected = dist / "mermaid.esm.mjs"
+        fallback = dist / "mermaid.core.mjs"
+        if not expected.exists() and fallback.exists():
+            expected.write_text(fallback.read_text(encoding="utf-8"), encoding="utf-8")
+
+
+def _renderer_roots() -> tuple[Path, ...]:
+    root = _repo_root()
+    return (
+        root / "tools" / "mermaid-renderer",
+        root / "kernel" / "tools" / "mermaid-renderer",
+    )
 
 
 def _write_puppeteer_config(path: Path, *, executable_path: str | None = None) -> None:
@@ -208,7 +221,11 @@ def _format_render_errors(errors: list[tuple[str, str]], *, skipped_snap: list[s
             "Skipped snap Chromium because Puppeteer commonly fails to launch it with profile-lock errors: "
             + ", ".join(skipped_snap)
         )
-    lines.append("Run `npm install` in tools/mermaid-renderer to install Puppeteer's browser, or install a non-snap Chrome/Chromium.")
+    lines.append(
+        "Run `npm install` in `tools/mermaid-renderer` for a source checkout "
+        "or `kernel/tools/mermaid-renderer` for a distribution package to install Puppeteer's browser, "
+        "or install a non-snap Chrome/Chromium."
+    )
     for label, detail in errors:
         first_line = detail.splitlines()[0] if detail else "Mermaid CLI failed"
         lines.append(f"- {label}: {first_line}")

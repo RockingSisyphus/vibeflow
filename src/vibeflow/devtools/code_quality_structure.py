@@ -16,6 +16,7 @@ from .code_quality_types import DirectoryQuality, FileQuality, PrefixClusterQual
 def analyze_directory_structure(
     files: Sequence[FileQuality],
     dependency_graph: Mapping[str, Sequence[str]],
+    import_sites_by_edge: Mapping[tuple[str, str], Sequence[Mapping[str, object]]],
     thresholds: QualityThresholds,
 ) -> tuple[tuple[DirectoryQuality, ...], tuple[PrefixClusterQuality, ...], dict[str, object], list[QualityFinding]]:
     module_directories = {file.module: directory_for_path(file.path) for file in files}
@@ -26,8 +27,8 @@ def analyze_directory_structure(
     findings = [
         *_directory_findings(directories, thresholds),
         *_prefix_cluster_findings(clusters, thresholds),
-        *_public_boundary_findings(clusters, files, dependency_graph, thresholds),
-        *dependency_distance_findings(clusters, files, dependency_graph, thresholds),
+        *_public_boundary_findings(clusters, files, dependency_graph, import_sites_by_edge, thresholds),
+        *dependency_distance_findings(clusters, files, dependency_graph, import_sites_by_edge, thresholds),
     ]
     return directories, clusters, summary, findings
 
@@ -228,6 +229,7 @@ def _public_boundary_findings(
     clusters: tuple[PrefixClusterQuality, ...],
     files: Sequence[FileQuality],
     dependency_graph: Mapping[str, Sequence[str]],
+    import_sites_by_edge: Mapping[tuple[str, str], Sequence[Mapping[str, object]]],
     thresholds: QualityThresholds,
 ) -> list[QualityFinding]:
     files_by_module = {file.module: file for file in files}
@@ -246,13 +248,14 @@ def _public_boundary_findings(
             if cluster is None or source in cluster.modules:
                 continue
             if is_internal_module(files_by_module[target].path):
-                findings.append(_internal_module_imported_finding(source, target, cluster))
+                findings.append(_internal_module_imported_finding(source, target, cluster, import_sites_by_edge))
                 targets_by_cluster[cluster.cluster_name].append(target)
         findings.extend(
             _public_entry_bypass_findings(
                 source,
                 targets_by_cluster,
                 {cluster.cluster_name: cluster for cluster in clusters},
+                import_sites_by_edge,
                 thresholds,
             )
         )
@@ -263,6 +266,7 @@ def _internal_module_imported_finding(
     source: str,
     target: str,
     cluster: PrefixClusterQuality,
+    import_sites_by_edge: Mapping[tuple[str, str], Sequence[Mapping[str, object]]],
 ) -> QualityFinding:
     return QualityFinding(
         rule_id="QUALITY.STRUCTURE.INTERNAL_MODULE_IMPORTED_EXTERNALLY",
@@ -270,12 +274,14 @@ def _internal_module_imported_finding(
         object_type="dependency_pair",
         object_id=f"{source} -> {target}",
         message="external module imports a cluster internal module directly",
+        source_location=_first_site_location(import_sites_by_edge.get((source, target), ())),
         suggested_fix_type="use_public_entry",
         details={
             "source": source,
             "target": target,
             "cluster_name": cluster.cluster_name,
             "public_entry_candidates": cluster.public_entry_candidates,
+            "import_sites": list(import_sites_by_edge.get((source, target), ())),
         },
     )
 
@@ -284,6 +290,7 @@ def _public_entry_bypass_findings(
     source: str,
     targets_by_cluster: Mapping[str, list[str]],
     clusters_by_name: Mapping[str, PrefixClusterQuality],
+    import_sites_by_edge: Mapping[tuple[str, str], Sequence[Mapping[str, object]]],
     thresholds: QualityThresholds,
 ) -> list[QualityFinding]:
     findings = []
@@ -291,6 +298,13 @@ def _public_entry_bypass_findings(
         cluster = clusters_by_name[cluster_name]
         if not cluster.public_entry_candidates or len(targets) <= thresholds.max_public_entry_bypass_imports:
             continue
+        import_site_groups = [
+            {
+                "target": target,
+                "import_sites": list(import_sites_by_edge.get((source, target), ())),
+            }
+            for target in sorted(targets)
+        ]
         findings.append(
             QualityFinding(
                 rule_id="QUALITY.STRUCTURE.PUBLIC_ENTRY_BYPASSED",
@@ -298,12 +312,14 @@ def _public_entry_bypass_findings(
                 object_type="dependency_cluster",
                 object_id=f"{source} -> {cluster_name}",
                 message=f"module imports {len(targets)} internal modules from one cluster",
+                source_location=_first_group_site_location(import_site_groups),
                 suggested_fix_type="use_public_entry",
                 details={
                     "source": source,
                     "cluster_name": cluster_name,
                     "targets": tuple(sorted(targets)),
                     "public_entry_candidates": cluster.public_entry_candidates,
+                    "import_sites": import_site_groups,
                 },
             )
         )
@@ -395,4 +411,30 @@ def _structure_suggestion(rule_id: str) -> dict[str, object]:
         return {
             "suggestion": "consider splitting coordinator responsibilities or moving tightly coupled files closer together",
         }
+    return {}
+
+
+def _first_group_site_location(groups: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    for group in groups:
+        sites = group.get("import_sites")
+        if isinstance(sites, Sequence):
+            location = _first_site_location(sites)
+            if location:
+                return location
+    return {}
+
+
+def _first_site_location(sites: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    for site in sites:
+        if not isinstance(site, Mapping):
+            continue
+        path = str(site.get("path", "")).strip()
+        if not path:
+            continue
+        location: dict[str, object] = {"path": path}
+        if site.get("line"):
+            location["line"] = site["line"]
+        if site.get("column"):
+            location["column"] = site["column"]
+        return location
     return {}

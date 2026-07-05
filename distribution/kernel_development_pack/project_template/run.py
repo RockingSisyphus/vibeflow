@@ -9,14 +9,26 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
-MANIFEST_PATH = ROOT / "kernel" / "MANIFEST.sha256"
-KERNEL_ARCHIVE_PATH = ROOT / "kernel" / "vibeflow-kernel.zip"
-# Treat unpacked kernel sources as unexpected so AI work stays focused on project/.
-PROTECTED_PREFIXES = ("kernel/vibeflow/",)
+KERNEL_ROOT = ROOT / "kernel"
+MANIFEST_PATH = KERNEL_ROOT / "MANIFEST.sha256"
+KERNEL_ARCHIVE_PATH = KERNEL_ROOT / "vibeflow-kernel.zip"
+# Treat unpacked kernel sources and shipped kernel docs as protected so AI work stays focused on project/.
+PROTECTED_DIRS = (
+    "kernel/docs",
+    "kernel/vibeflow",
+)
+PROTECTED_PREFIXES = tuple(f"{path}/" for path in PROTECTED_DIRS)
 PROTECTED_FILES = {
     "run.py",
     "kernel/README.md",
+    "kernel/vibeflow-kernel.zip",
+    "kernel/THIRD_PARTY_NOTICES.md",
+    "kernel/tools/mermaid-renderer/package.json",
+    "kernel/tools/mermaid-renderer/package-lock.json",
 }
+GENERATED_PREFIXES = (
+    "kernel/tools/mermaid-renderer/node_modules/",
+)
 
 
 class KernelIntegrityError(RuntimeError):
@@ -39,6 +51,15 @@ def _is_protected_relative(relative: str) -> bool:
     return relative in PROTECTED_FILES or any(relative.startswith(prefix) for prefix in PROTECTED_PREFIXES)
 
 
+def _is_generated_relative(relative: str) -> bool:
+    path = Path(relative)
+    return (
+        any(relative.startswith(prefix) for prefix in GENERATED_PREFIXES)
+        or "__pycache__" in path.parts
+        or path.name.endswith(".pyc")
+    )
+
+
 def _iter_protected_files() -> list[str]:
     paths: list[str] = []
     for relative in PROTECTED_FILES:
@@ -46,11 +67,14 @@ def _iter_protected_files() -> list[str]:
             paths.append(relative)
     if KERNEL_ARCHIVE_PATH.is_file():
         paths.append(KERNEL_ARCHIVE_PATH.relative_to(ROOT).as_posix())
-    kernel_root = ROOT / "kernel" / "vibeflow"
-    if kernel_root.exists():
-        for path in kernel_root.rglob("*"):
-            if path.is_file() and "__pycache__" not in path.parts and not path.name.endswith(".pyc"):
-                paths.append(path.relative_to(ROOT).as_posix())
+    for relative_dir in PROTECTED_DIRS:
+        root = ROOT / relative_dir
+        if not root.exists():
+            continue
+        for path in root.rglob("*"):
+            relative = path.relative_to(ROOT).as_posix()
+            if path.is_file() and not _is_generated_relative(relative):
+                paths.append(relative)
     return sorted(set(paths))
 
 
@@ -97,8 +121,8 @@ def _format_integrity_error(exc: KernelIntegrityError) -> str:
     lines = [
         "KERNEL INTEGRITY CHECK FAILED",
         "",
-        "The distributed kernel file or launcher was modified.",
-        "This may mean an AI or developer changed kernel rules to bypass validation.",
+        "A distributed kernel asset or launcher file was modified.",
+        "This may mean an AI or developer changed kernel rules, docs, tools, or notices that are meant to be read-only.",
         "",
     ]
     for title, items in (("Changed", exc.changed), ("Missing", exc.missing), ("Unexpected", exc.unexpected)):

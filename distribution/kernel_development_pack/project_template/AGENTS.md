@@ -6,7 +6,9 @@
 
 - 不要解包、修改或重建 `kernel/vibeflow-kernel.zip`。
 - 不要修改 `kernel/`、`run.py` 或 `kernel/MANIFEST.sha256`；这些文件由分发包构建脚本生成和校验。
-- 不要为了理解内核而读取或展开 `kernel/vibeflow-kernel.zip`；开发业务程序时只读 `docs/`、`project/` 和本文件。
+- 不要为了理解内核而读取或展开 `kernel/vibeflow-kernel.zip`；开发业务程序时只读 `kernel/docs/`、`project/` 和本文件。
+- `kernel/docs/`、`kernel/tools/` 和 `kernel/THIRD_PARTY_NOTICES.md` 是随内核分发的只读参考材料；根目录 `README.md`、`AGENTS.md` 和项目自己的说明可由项目维护者定制。
+- 分发包不内置 `.gitignore`；如果项目需要 Git 忽略规则，由项目自行添加，常见忽略项包括 `kernel/tools/mermaid-renderer/node_modules/`、`runs/`、`reports/`、`__pycache__/` 和 `*.pyc`。
 - 如果内核报错或警告，优先修改 `project/` 下的业务代码、registry 或 JSONC 配置来满足内核要求；不要 patch 内核来绕过检查。
 - 如果完整性检查失败，不要通过修改 manifest 或 `run.py` 绕过；应从可信来源重新生成或恢复分发包。
 - 业务代码只放在 `project/nodes/`、`project/base_lib/`、`project/plugins/` 和 `project/configs/`。
@@ -20,6 +22,8 @@
 - `display_name`、`category`、`version`、`description`、`style`、`similar_to` 是调用点元数据，不进入运行时 `params`；运行时同名参数必须写进 `config`。
 - 只有确认两个 node 是有意变体或副本时才写 `similar_to`，并且必须指向同作用域已存在 node、使用 `variant` 或 `copy`、写清 `reason`；不要用它掩盖应该拆分或抽 base_lib 的重复实现。
 - 普通 `pipeline.edges` 和 nodeset 内部 `pipeline.edges` 不允许形成环；所有循环都必须使用唯一一等 loop 类型 `vibeflow.loop.while` 调用 nodeset body。
+- nodeset 通过符号表解析；`nodeset.xxx` 和 `loop.body` 可以引用同一 config 中后面才声明的 nodeset，不要为了可见性调整声明顺序。
+- `nodeset.xxx` 调用和 `loop.body` 都是 nodeset dependency，不能直接或间接递归；出现 `NODESET.RECURSION` 时要拆开结构或改成真正的 `vibeflow.loop.while` 循环语义。
 - `decision` 只用于分支选择，不要用 decision cycle 模拟 retry、训练循环、多 batch、多 epoch、carry state 或 metrics collect。
 - loop 的退出条件只能在 `loop.stop_after` 和 `loop.stop_when` 中二选一；不要再写 `vibeflow.loop.for_each`、`loop.items`、`loop.epochs` 或 `loop.until`。
 - `execution="block"` / `execution="compiled"` 会执行结构化 `LoopBlock`，loop body 不能 block 化时会报错，不会静默降级。
@@ -30,15 +34,15 @@
 
 ## 先读文档
 
-- 开始设计或修改业务程序前，先读 `docs/00_内核目的与项目结构.md`。
-- 编写 node 前，读 `docs/01_Node开发规范.md`。
-- 注册 node 和配置默认值前，读 `docs/02_注册与配置默认值.md`。
-- 修改 pipeline/config 前，读 `docs/03_Config与Pipeline规范.md`。
-- 设计或细化 nodeset 前，读 `docs/04_Nodeset规范与用法.md`。
-- 编写纯 helper 或处理外部依赖前，读 `docs/05_BaseLib与外部依赖规范.md`。
-- 编写 plugin 前，读 `docs/06_Plugin开发规范.md`。
-- 运行、导出报告或定位产物前，读 `docs/07_启动命令与报告.md`。
-- 不确定约束时，读 `docs/08_给AI开发者的约束清单.md`。
+- 开始设计或修改业务程序前，先读 `kernel/docs/00_内核目的与项目结构.md`。
+- 编写 node 前，读 `kernel/docs/01_Node开发规范.md`。
+- 注册 node 和配置默认值前，读 `kernel/docs/02_注册与配置默认值.md`。
+- 修改 pipeline/config 前，读 `kernel/docs/03_Config与Pipeline规范.md`。
+- 设计或细化 nodeset 前，读 `kernel/docs/04_Nodeset规范与用法.md`。
+- 编写纯 helper 或处理外部依赖前，读 `kernel/docs/05_BaseLib与外部依赖规范.md`。
+- 编写 plugin 前，读 `kernel/docs/06_Plugin开发规范.md`。
+- 运行、导出报告或定位产物前，读 `kernel/docs/07_启动命令与报告.md`。
+- 不确定约束时，读 `kernel/docs/08_给AI开发者的约束清单.md`。
 
 如果需要内核公开 API，只通过 `from vibeflow import ...` 使用，例如 `NodeInfo`、`NodeContract`、`NodeRegistry`、`HealthFinding`、`RuntimeOptions`、`run_checked`。不要依赖未在文档中说明的内部模块或私有函数。
 
@@ -78,8 +82,11 @@
 - `planned_behavior: {"kind": "python_stub", "stub_module": "project/stubs/xxx.py"}` 只用于开发测试；必须配合 `--allow-planned-stub` 才能运行，不能视为 production ready。
 - implemented 内容必须完整、可达、可校验、可运行。
 - 流程图是人类审核程序结构的主要产物；重大架构变更先出图再实现。SVG 节点内应能读清易读标题、`id`、`type`、状态和说明，contract 应显示在已有连边上；信息挤在一起时应先改善 config 的描述长度、拆节点或调整 style，而不是绕过 `python run.py svg`。
+- 为消除 `NODESET.SMELL.TOO_WIDE` 拆成更多小 nodeset 是推荐方向；如果怀疑 config 读取或解析慢，用 `VIBEFLOW_CONFIG_TRACE=1 python run.py validate --config ...` 查看 import、nodeset 数、单个 nodeset 解析耗时和总耗时。
 - 一等 loop 的展开图应能看到 loop body nodeset；调试训练循环时优先看 `runtime.qualified_exec_order`、`runtime.total_step_count` 和事件 `path`，不要只看顶层 `runtime.exec_order`。
 - `GRAPH.JOIN.AMBIGUOUS_UNCONDITIONAL` 表示某个 join 可能被 unconditional provider 提前触发或和 conditional provider 争抢同一个 `exactly_one` 输入；修配置，不要靠旧 context 或节点内部判断绕过。
 - 系统保留色不能作为自定义色：普通 node 默认 `#ECECFF/#9370DB/#333333`，planned `#fef08a/#ca8a04/#713f12`，plugin resource `#eff6ff/#2563eb/#1e3a8a`，base_lib resource `#ecfdf5/#059669/#064e3b`，以及 health、external、document、nodeset 等语义色。
-- 健康检查的 warning/error 要看 `details`。`GRAPH.SMELL.DUPLICATE_LOGIC` 会列出具体 nodes、node_types、fingerprint 和 duplicate_group；只有确认为有意关系时才补 `similar_to`。
+- 健康检查的 warning/error 要先看 `object_id`、`source_location` 和 `details`。`details.owner` 区分顶层 `pipeline` 与 `nodeset:<name>`；flow/data 问题会列出相关 edge、direct source、provider type 或 downstream requirement 摘要。`GRAPH.SMELL.DUPLICATE_LOGIC` 会列出具体 nodes、node_types、fingerprint 和 duplicate_group；只有确认为有意关系时才补 `similar_to`。
+- 如果 `details.aggregated == true`，先修代表 finding 指向的 `owner` / `node` / `required_type` / `direct_sources`；`occurrences` 是 nested nodeset / loop body 静态展开后被压缩的重复次数，不是独立 bug 数。
+- `python run.py quality --path ...` 的文本报告也会打印 `object_id` 和紧凑 `details:`；重复函数、依赖环、双向依赖和内部模块 import warning 按 details 中的函数和 import site 修改。
 - 调试嵌套 nodeset 或 loop 时，顶层运行顺序看 `runtime.exec_order`，完整嵌套顺序看 `runtime.qualified_exec_order` 和事件的 `path` 数组；`qualified_node` 是给人看的 dotted 展示名。

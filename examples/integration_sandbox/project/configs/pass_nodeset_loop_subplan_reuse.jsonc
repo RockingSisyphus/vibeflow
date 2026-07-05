@@ -219,6 +219,10 @@
             "to": "done"
           },
           {
+            "from": "increment_step",
+            "to": "end"
+          },
+          {
             "from": "done",
             "to": "end"
           }

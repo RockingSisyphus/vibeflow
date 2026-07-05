@@ -79,6 +79,272 @@ def test_graph_health_suppresses_declared_similar_duplicate_logic_pairs() -> Non
     assert "GRAPH.SMELL.DUPLICATE_LOGIC" not in {warning.rule_id for warning in report.warnings}
 
 
+def test_graph_health_flow_and_data_findings_include_owner_and_provider_context() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "inner.flow",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline={
+                        "nodes": [
+                            _node_call("start", "test.start", "Starts the nested flow."),
+                            _node_call("add", "test.add", "Adds a missing nested input.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                            _node_call("end", "test.out_end", "Ends after nested value.out.", requires=[REQ_SPEC("value.out")]),
+                        ],
+                        "edges": [{"from": "start", "to": "end"}],
+                    },
+                )
+            ],
+            "pipeline": {
+                "inputs": [PROV_SPEC("value.in")],
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the top-level flow."),
+                    _node_call(
+                        "composite",
+                        "nodeset.inner.flow",
+                        "Runs the nested flow.",
+                        requires=[REQ_SPEC("value.in")],
+                        provides=[PROV_SPEC("value.out")],
+                    ),
+                    _node_call("end", "test.out_end", "Ends after composite output.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": _edge_chain("start", "composite", "end"),
+            },
+        }
+    )
+
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    payload = report.to_dict()
+    findings = [*payload["errors"], *payload["warnings"]]
+    orphan = next(finding for finding in findings if finding["rule_id"] == "GRAPH.FLOW.ORPHAN_NODE")
+    missing = next(finding for finding in findings if finding["rule_id"] == "GRAPH.DATA.MISSING_DIRECT_PROVIDER")
+    unconsumed = next(finding for finding in findings if finding["rule_id"] == "GRAPH.DATA.UNCONSUMED_PROVIDER")
+
+    assert orphan["details"]["owner"] == "nodeset:inner.flow"
+    assert orphan["details"]["node"] == "add"
+    assert missing["details"]["owner"] == "nodeset:inner.flow"
+    assert missing["details"]["required_type"] == "value.in"
+    assert missing["details"]["direct_sources"] == []
+    assert missing["details"]["available_provider_types"] == []
+    assert unconsumed["details"]["owner"] == "nodeset:inner.flow"
+    assert unconsumed["details"]["provider_key"] == "value.out"
+    assert unconsumed["details"]["downstream_nodes"] == []
+
+
+def test_graph_health_checks_each_nested_nodeset_definition_once() -> None:
+    graph = _nested_bad_leaf_graph(depth=6)
+
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    findings = [*report.errors, *report.warnings]
+
+    assert len(_findings(findings, "GRAPH.DATA.MISSING_DIRECT_PROVIDER", owner="nodeset:ns0", node="bad", required_type="value.in")) == 1
+    assert len(_findings(findings, "GRAPH.DATA.UNCONSUMED_PROVIDER", owner="nodeset:ns0", node="bad", provider_key="value.out")) == 1
+    assert len(_findings(findings, "GRAPH.FLOW.UNREACHABLE_FROM_START", owner="nodeset:ns0", node="bad")) == 1
+    assert len(_findings(findings, "GRAPH.FLOW.CANNOT_REACH_END", owner="nodeset:ns0", node="bad")) == 1
+    assert len(_findings(findings, "GRAPH.FLOW.ORPHAN_NODE", owner="nodeset:ns0", node="bad")) == 1
+    assert len(_findings(findings, "GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME", owner="nodeset:ns0", object_id="bad")) == 1
+    assert len(_findings(findings, "GRAPH.SMELL.MISSING_NODE_DESCRIPTION", owner="nodeset:ns0", object_id="bad")) == 1
+
+
+def test_graph_health_keeps_same_node_problem_separate_by_owner() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _bad_leaf_nodeset("left.leaf"),
+                _bad_leaf_nodeset("right.leaf"),
+            ],
+            "pipeline": {
+                "inputs": [PROV_SPEC("value.in")],
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the owner aggregation fixture."),
+                    _node_call("left", "nodeset.left.leaf", "Calls the left leaf.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("left.out")]),
+                    _node_call("right", "nodeset.right.leaf", "Calls the right leaf.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("right.out")]),
+                    _node_call("end", "test.start", "Ends the owner aggregation fixture."),
+                ],
+                "edges": [{"from": "start", "to": "left"}, {"from": "start", "to": "right"}, {"from": "left", "to": "end"}, {"from": "right", "to": "end"}],
+            },
+        }
+    )
+
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    findings = [*report.errors, *report.warnings]
+
+    assert len(_findings(findings, "GRAPH.DATA.MISSING_DIRECT_PROVIDER", node="bad", required_type="value.in")) == 2
+    assert len(_findings(findings, "GRAPH.DATA.MISSING_DIRECT_PROVIDER", owner="nodeset:left.leaf", node="bad", required_type="value.in")) == 1
+    assert len(_findings(findings, "GRAPH.DATA.MISSING_DIRECT_PROVIDER", owner="nodeset:right.leaf", node="bad", required_type="value.in")) == 1
+
+
+def test_nodeset_override_path_errors_are_not_repeated_by_nested_definition_expansion() -> None:
+    nodesets = [_bad_leaf_nodeset("ns0")]
+    first_wrapper = _wrapper_nodeset("ns1", "ns0")
+    first_wrapper["pipeline"]["nodes"][1]["node_configs"] = {"missing.path": {"delta": 1}}
+    nodesets.append(first_wrapper)
+    for index in range(2, 6):
+        nodesets.append(_wrapper_nodeset(f"ns{index}", f"ns{index - 1}"))
+    graph = parse_graph_config(
+        {
+            "nodesets": nodesets,
+            "pipeline": {
+                "inputs": [PROV_SPEC("value.in")],
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the override aggregation fixture."),
+                    _node_call("top", "nodeset.ns5", "Calls the deepest wrapper.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Ends the override aggregation fixture.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": _edge_chain("start", "top", "end"),
+            },
+        }
+    )
+
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    errors = [error for error in report.errors if error.rule_id == "NODESET.CONFIG.UNKNOWN_NODE"]
+
+    assert len(errors) == 1
+    assert errors[0].object_id == "call"
+    assert errors[0].details["nodeset"] == "ns0"
+    assert errors[0].details["path"] == "missing.path"
+
+
+def test_health_report_aggregates_duplicate_findings_but_not_different_direct_sources() -> None:
+    class DuplicateFindingPlugin:
+        name = "duplicate_finding"
+
+        def validate_graph(self, graph, compiled):
+            duplicate = HealthFinding(
+                rule_id="PLUGIN.DUPLICATE",
+                severity="warning",
+                object_type="pipeline",
+                object_id="pipeline",
+                failure_layer="plugin",
+                message="same plugin warning",
+                suggested_fix_type="fix_config",
+                details={"owner": "pipeline", "node": "seed"},
+            )
+            return [
+                duplicate,
+                duplicate,
+                HealthFinding(
+                    rule_id="GRAPH.DATA.MISSING_DIRECT_PROVIDER",
+                    severity="error",
+                    object_type="contract_key",
+                    object_id="value.in",
+                    failure_layer="topology",
+                    message="simulated missing provider",
+                    suggested_fix_type="fix_config",
+                    details={"owner": "pipeline", "node": "join", "required_type": "value.in", "direct_sources": ["left"]},
+                ),
+                HealthFinding(
+                    rule_id="GRAPH.DATA.MISSING_DIRECT_PROVIDER",
+                    severity="error",
+                    object_type="contract_key",
+                    object_id="value.in",
+                    failure_layer="topology",
+                    message="simulated missing provider",
+                    suggested_fix_type="fix_config",
+                    details={"owner": "pipeline", "node": "join", "required_type": "value.in", "direct_sources": ["right"]},
+                ),
+            ]
+
+    plugin_registry = PluginRegistry()
+    plugin_registry.register(DuplicateFindingPlugin(), plugin_type="policy")
+    graph = parse_graph_config({"pipeline": _seed_only_pipeline()})
+
+    report = validate_graph_health(graph, registry=_registry(), plugin_registry=plugin_registry, purity_policy=PurityPolicy(max_source_lines=1000))
+    duplicate = next(warning for warning in report.warnings if warning.rule_id == "PLUGIN.DUPLICATE")
+    simulated_missing = [error for error in report.errors if error.rule_id == "GRAPH.DATA.MISSING_DIRECT_PROVIDER" and error.details.get("node") == "join"]
+
+    assert duplicate.details["aggregated"] is True
+    assert duplicate.details["occurrences"] == 2
+    assert duplicate.details["suppressed_duplicates"] == 1
+    assert len(simulated_missing) == 2
+
+    from vibeflow.cli_reports import format_finding_text
+
+    text = format_finding_text(duplicate)
+    assert '"aggregated":true' in text
+    assert '"occurrences":2' in text
+    assert '"suppressed_duplicates":1' in text
+
+
+def _nested_bad_leaf_graph(*, depth: int):
+    nodesets = [_bad_leaf_nodeset("ns0")]
+    for index in range(1, depth):
+        nodesets.append(_wrapper_nodeset(f"ns{index}", f"ns{index - 1}"))
+    return parse_graph_config(
+        {
+            "nodesets": nodesets,
+            "pipeline": {
+                "inputs": [PROV_SPEC("value.in")],
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the nested aggregation fixture."),
+                    _node_call(
+                        "top",
+                        f"nodeset.ns{depth - 1}",
+                        "Calls the deepest wrapper.",
+                        requires=[REQ_SPEC("value.in")],
+                        provides=[PROV_SPEC("value.out")],
+                    ),
+                    _node_call("end", "test.out_end", "Ends the nested aggregation fixture.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": _edge_chain("start", "top", "end"),
+            },
+        }
+    )
+
+
+def _bad_leaf_nodeset(name: str) -> dict:
+    return _nodeset_config(
+        name,
+        requires=["value.in"],
+        provides=["value.out"],
+        exports=["value.out"],
+        pipeline={
+            "nodes": [
+                _node_call("start", "test.start", "Starts the bad leaf."),
+                {
+                    "name": "bad",
+                    "type": "test.add",
+                    "requires": [REQ_SPEC("value.in")],
+                    "provides": [PROV_SPEC("value.out")],
+                },
+                _node_call("end", "test.out_end", "Ends after value.out.", requires=[REQ_SPEC("value.out")]),
+            ],
+            "edges": [{"from": "start", "to": "end"}],
+        },
+    )
+
+
+def _wrapper_nodeset(name: str, child: str) -> dict:
+    return _nodeset_config(
+        name,
+        requires=["value.in"],
+        provides=["value.out"],
+        exports=["value.out"],
+        pipeline={
+            "inputs": [PROV_SPEC("value.in")],
+            "nodes": [
+                _node_call("start", "test.start", f"Starts wrapper {name}."),
+                _node_call("call", f"nodeset.{child}", f"Calls {child}.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                _node_call("end", "test.out_end", f"Ends wrapper {name}.", requires=[REQ_SPEC("value.out")]),
+            ],
+            "edges": _edge_chain("start", "call", "end"),
+        },
+    )
+
+
+def _findings(findings, rule_id: str, **details):
+    matches = [finding for finding in findings if finding.rule_id == rule_id]
+    object_id = details.pop("object_id", None)
+    if object_id is not None:
+        matches = [finding for finding in matches if finding.object_id == object_id]
+    for key, value in details.items():
+        matches = [finding for finding in matches if finding.details.get(key) == value]
+    return matches
+
+
 def test_graph_health_suppresses_duplicate_logic_when_nodes_share_declared_base() -> None:
     registry = _registry()
     register_node(registry, "test.duplicate_one", DuplicateOneNode)
@@ -307,6 +573,57 @@ def test_nodeset_health_rejects_direct_and_indirect_recursion() -> None:
     assert len(recursion_errors) == 2
     assert "loop.self" in report.info["nodeset_findings"]
     assert "loop.a" in report.info["nodeset_findings"]
+
+
+def test_nodeset_health_treats_loop_body_as_recursion_reference() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "loop.body",
+                    provides=["loop.out"],
+                    exports=["loop.out"],
+                    pipeline={
+                        "nodes": [
+                            _node_call(
+                                "again",
+                                "vibeflow.loop.while",
+                                "Calls the same loop body through a structured loop.",
+                                provides=[PROV_SPEC("loop.out")],
+                                loop={
+                                    "body": "loop.body",
+                                    "stop_after": 1,
+                                    "outputs": [{"from": "loop.out", "as": "loop.out"}],
+                                },
+                            )
+                        ]
+                    },
+                )
+            ],
+            "pipeline": {
+                "nodes": [
+                    _node_call(
+                        "outer",
+                        "vibeflow.loop.while",
+                        "Calls the recursive loop body.",
+                        provides=[PROV_SPEC("loop.out")],
+                        loop={
+                            "body": "loop.body",
+                            "stop_after": 1,
+                            "outputs": [{"from": "loop.out", "as": "loop.out"}],
+                        },
+                    )
+                ]
+            },
+        }
+    )
+
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    recursion_errors = [error for error in report.errors if error.rule_id == "NODESET.RECURSION"]
+
+    assert len(recursion_errors) == 1
+    assert recursion_errors[0].details["cycle"] == ("loop.body", "loop.body")
+
 
 def test_nodeset_health_rejects_export_and_internal_key_leak() -> None:
     graph = parse_graph_config(

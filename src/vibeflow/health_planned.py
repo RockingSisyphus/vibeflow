@@ -3,11 +3,16 @@ from __future__ import annotations
 from .graph_config import STATUS_IMPLEMENTED, STATUS_PLANNED
 from .health_types import HealthFinding
 from .planned_behavior import PLANNED_BEHAVIOR_BLOCKING, PLANNED_BEHAVIOR_PYTHON_STUB, effective_planned_behavior, planned_behavior_label, validate_python_stub_file
+from .runtime_helpers import referenced_nodeset_names
 
 
 def append_planned_findings(graph, state) -> None:
+    visited_nodesets: set[str] = set()
     _append_planned_findings_for_graph(graph, state, owner="pipeline")
     for nodeset in graph.nodesets.values():
+        if nodeset.name in visited_nodesets:
+            continue
+        visited_nodesets.add(nodeset.name)
         if nodeset.status == STATUS_PLANNED:
             state.warnings.append(_planned_nodeset_finding(nodeset))
             _append_python_stub_findings(nodeset.planned_behavior, state, object_type="nodeset", object_id=nodeset.name, project_root=graph.project_root)
@@ -19,21 +24,38 @@ def append_planned_findings(graph, state) -> None:
                 state.warnings.append(_planned_child_finding(nodeset.name, severity="warning"))
 
 
-def graph_has_planned(graph) -> bool:
-    return any(node.status == STATUS_PLANNED for node in graph.nodes) or any(nodeset.status == STATUS_PLANNED or graph_has_planned(nodeset.graph) for nodeset in graph.nodesets.values())
+def graph_has_planned(graph, *, visited_nodesets: set[str] | None = None) -> bool:
+    if visited_nodesets is None:
+        visited_nodesets = set()
+    if any(node.status == STATUS_PLANNED for node in graph.nodes):
+        return True
+    for nodeset_name in referenced_nodeset_names(graph):
+        nodeset = graph.nodesets.get(nodeset_name)
+        if nodeset is None or nodeset.name in visited_nodesets:
+            continue
+        visited_nodesets.add(nodeset.name)
+        if nodeset.status == STATUS_PLANNED or graph_has_planned(nodeset.graph, visited_nodesets=visited_nodesets):
+            return True
+    return False
 
 
-def graph_has_blocking_planned(graph) -> bool:
+def graph_has_blocking_planned(graph, *, visited_nodesets: set[str] | None = None) -> bool:
+    if visited_nodesets is None:
+        visited_nodesets = set()
     for node in graph.nodes:
         nodeset = graph.nodesets.get(node.node_type.removeprefix("nodeset.")) if node.node_type.startswith("nodeset.") else None
         if node.status == STATUS_PLANNED and effective_planned_behavior(node, nodeset).kind == PLANNED_BEHAVIOR_BLOCKING:
             return True
-    for nodeset in graph.nodesets.values():
+    for nodeset_name in referenced_nodeset_names(graph):
+        nodeset = graph.nodesets.get(nodeset_name)
+        if nodeset is None or nodeset.name in visited_nodesets:
+            continue
+        visited_nodesets.add(nodeset.name)
         if nodeset.status == STATUS_PLANNED:
             if nodeset.planned_behavior.kind == PLANNED_BEHAVIOR_BLOCKING:
                 return True
             continue
-        if graph_has_blocking_planned(nodeset.graph):
+        if graph_has_blocking_planned(nodeset.graph, visited_nodesets=visited_nodesets):
             return True
     return False
 

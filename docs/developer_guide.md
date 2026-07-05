@@ -378,10 +378,21 @@ Mermaid/SVG 中 while loop 使用独立 trapezoid (`trap-b`) 形状和默认 `lo
 - `names` 可省略，表示导入文件中的全部 nodeset。
 - 导入的 nodeset 和当前文件内联 nodeset 不允许重名。
 - `nodeset_imports` 只导入 nodeset，不导入 pipeline、policy 或 plugins。
+- VibeFlow 会先为同一 config 中所有导入和内联 nodeset 建立符号表，再解析各 nodeset；因此 `nodeset.xxx` 和 loop 的 `loop.body` 可以引用同一 config 中后面才声明的 nodeset。
+- `nodeset.xxx` 调用和 `vibeflow.loop.while.loop.body` 都构成 nodeset dependency。直接或间接递归会报 `NODESET.RECURSION`，不要用 nodeset/loop body 相互引用来表达循环；循环只能写成 loop node 自身的执行语义。
+- 为消除 `NODESET.SMELL.TOO_WIDE` 拆分出更多小 nodeset 是推荐做法；parser 按符号表解析，不要求靠声明顺序或前缀重解析来管理可见性。
 - nodeset 内部 pipeline 也必须显式写 edges。
 - nodeset 可以声明自己的 `global_config`；外部 nodeset JSONC 文件的顶层 `global_config` 会作为该文件内 nodeset 的默认内部配置。
 - 调用 nodeset 时可以在调用节点上写 `config`，这会覆盖 nodeset 内部 `global_config`，再覆盖内部 node 局部 config。
 - 调用节点上的 `allow_config_override` 控制这些覆盖是否产生 warning：为 `false` 时仍覆盖，但同名覆盖会 warning。
+
+如果怀疑配置读取或 nodeset 解析很慢，可临时加环境变量查看轻量解析 trace：
+
+```bash
+VIBEFLOW_CONFIG_TRACE=1 vibeflow validate --config workflow.jsonc
+```
+
+trace 会输出 import 文件、展开后的 nodeset 数、每个 nodeset 解析耗时、引用到的 nodeset 和总耗时。
 
 ## 运行时数据和性能选项
 
@@ -393,7 +404,9 @@ Runtime 审计流程，不默认审计数据内容：
 - 输出仍必须是 mapping，且 key 必须和调用点 `provides` 完全一致。
 - `CONTRACT.examples` 只包含 `inputs` 和 `params`，用于证明最小输入/参数可运行并返回声明 key；不要在 examples 中写 `outputs`。
 
-健康检查 warning/error 的 JSON 报告会保留 `details`，CLI 文本报告也会追加紧凑 details。`GRAPH.SMELL.DUPLICATE_LOGIC` 会列出具体相似 node、node type、fingerprint、duplicate group 和 `similar_to` 豁免提示；不要只看 rule_id 就判断原因。
+健康检查 warning/error 的 JSON 报告会保留 `details`，CLI 文本报告也会追加紧凑 details。先看 `object_id`、`source_location` 和 `details.owner`；nodeset 内部问题会用 `nodeset:<name>` 标明层级。`GRAPH.SMELL.DUPLICATE_LOGIC` 会列出具体相似 node、node type、fingerprint、duplicate group 和 `similar_to` 豁免提示；flow/data 问题会列出相关 node、incoming/outgoing edge、direct sources、provider type 或 downstream requirement 摘要。不要只看 rule_id 就判断原因。
+
+当 nested nodeset / loop body 的静态展开导致同一个根因被多条定义路径重复发现时，报告会按根因聚合。聚合后的 finding 会在 `details` 中带 `aggregated: true`、`occurrences` 和 `suppressed_duplicates`。这表示需要优先修代表 finding 指向的 `owner` / `node` / `required_type` / `direct_sources`；`occurrences` 是被压缩的重复展开次数，不是独立 bug 数。
 
 可选执行和 trace：
 

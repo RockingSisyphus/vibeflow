@@ -1,5 +1,7 @@
 from tests.unit.strict_support import *
 
+import time
+
 
 class RouteNode:
     NODE_INFO = NodeInfo(
@@ -139,6 +141,82 @@ def test_config_node_join_policy_and_loop_are_not_runtime_params() -> None:
     assert node.join_policy == "all"
     assert node.loop.to_dict()["body"] == "sum.step"
     assert node.params == {"join_policy": "runtime", "loop": "runtime"}
+
+
+def test_nodeset_parser_uses_shared_symbol_table_for_forward_references_and_large_chains() -> None:
+    nodesets = []
+    for index in range(20):
+        if index == 19:
+            nodes = [_node_call("seed", "test.seed", "Produces the terminal chain value.", provides=[PROV_SPEC("value.out")])]
+        else:
+            nodes = [
+                _node_call(
+                    "next",
+                    f"nodeset.perf.ns{index + 1}",
+                    "Calls a nodeset declared later in the same config.",
+                    provides=[PROV_SPEC("value.out")],
+                )
+            ]
+        nodesets.append(
+            _nodeset_config(
+                f"perf.ns{index}",
+                provides=["value.out"],
+                exports=["value.out"],
+                pipeline={"nodes": nodes},
+            )
+        )
+
+    started = time.perf_counter()
+    graph = parse_graph_config(
+        {
+            "nodesets": nodesets,
+            "pipeline": {
+                "nodes": [
+                    _node_call("top", "nodeset.perf.ns0", "Calls the first chain nodeset.", provides=[PROV_SPEC("value.out")]),
+                ]
+            },
+        }
+    )
+
+    assert time.perf_counter() - started < 1.0
+    assert len(graph.nodesets) == 20
+    assert graph.nodesets["perf.ns19"].graph.nodesets is graph.nodesets
+    assert graph.nodesets["perf.ns0"].graph.nodesets["perf.ns19"] is graph.nodesets["perf.ns19"]
+
+
+def test_parse_rejects_unknown_nodeset_call_with_reference_detail() -> None:
+    with pytest.raises(GraphConfigError, match="unknown nested nodeset: missing.body"):
+        parse_graph_config(
+            {
+                "pipeline": {
+                    "nodes": [
+                        _node_call("missing", "nodeset.missing.body", "References a missing composite.", provides=[PROV_SPEC("value.out")]),
+                    ]
+                }
+            }
+        )
+
+
+def test_config_parse_trace_reports_nodeset_timing(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("VIBEFLOW_CONFIG_TRACE", "1")
+
+    parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "trace.body",
+                    pipeline={"nodes": [_node_call("seed", "test.seed", "Produces trace output.", provides=[PROV_SPEC("value.out")])]},
+                )
+            ],
+            "pipeline": {
+                "nodes": [_node_call("flow", "nodeset.trace.body", "Calls trace body.", provides=[PROV_SPEC("value.out")])]
+            },
+        }
+    )
+
+    err = capsys.readouterr().err
+    assert "[vibeflow config] parsed nodeset name=trace.body" in err
+    assert "parsed graph nodes=1 nodesets=1" in err
 
 
 def test_config_schema_rejects_invalid_join_policy_and_loop_shape() -> None:

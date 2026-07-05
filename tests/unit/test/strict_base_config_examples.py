@@ -246,6 +246,9 @@ def test_code_quality_tool_reports_file_function_dependency_and_side_effect_find
     assert any("read_text" in message for message in side_effect_messages)
     assert "QUALITY.DEPENDENCY.CHAIN_TOO_DEEP" in rule_ids
     assert report.longest_dependency_chain == ("a", "b", "c")
+    chain = next(finding for finding in report.findings if finding.rule_id == "QUALITY.DEPENDENCY.CHAIN_TOO_DEEP")
+    assert chain.details["edge_import_sites"][0]["source"] == "a"
+    assert chain.details["edge_import_sites"][0]["import_sites"][0]["line"] == 3
     assert report.to_dict()["summary"]["score"] < 100
     assert report.to_dict()["top_offenders"]["files"]
 
@@ -436,6 +439,14 @@ def test_code_quality_reports_public_entry_boundary_violations(tmp_path) -> None
 
     assert "QUALITY.STRUCTURE.INTERNAL_MODULE_IMPORTED_EXTERNALLY" in rule_ids
     assert "QUALITY.STRUCTURE.PUBLIC_ENTRY_BYPASSED" in rule_ids
+    internal = next(
+        finding
+        for finding in report.findings
+        if finding.rule_id == "QUALITY.STRUCTURE.INTERNAL_MODULE_IMPORTED_EXTERNALLY"
+    )
+    assert internal.details["import_sites"][0]["raw_import"] == "import feature.feature_helpers"
+    bypass = next(finding for finding in report.findings if finding.rule_id == "QUALITY.STRUCTURE.PUBLIC_ENTRY_BYPASSED")
+    assert bypass.details["import_sites"][0]["import_sites"][0]["path"] == "consumer.py"
 
 def test_code_quality_reports_dependency_distance_violations(tmp_path) -> None:
     for directory in (
@@ -482,6 +493,13 @@ def test_code_quality_reports_dependency_distance_violations(tmp_path) -> None:
         if finding.rule_id == "QUALITY.STRUCTURE.DISTANT_INTERNAL_IMPORT"
     )
     assert "suggestion" in distance_finding.details
+    assert distance_finding.details["import_sites"][0]["line"] == 1
+    scattered = next(
+        finding
+        for finding in report.findings
+        if finding.rule_id == "QUALITY.STRUCTURE.CLUSTER_SCATTERED_DEPENDENCY"
+    )
+    assert "platform.config.settings" in scattered.details["far_targets"]
 
 def test_code_quality_tool_detects_cycles_and_duplicate_function_fingerprints(tmp_path) -> None:
     (tmp_path / "a.py").write_text(
@@ -498,6 +516,15 @@ def test_code_quality_tool_detects_cycles_and_duplicate_function_fingerprints(tm
     assert "QUALITY.DEPENDENCY.CYCLE" in rule_ids
     assert "QUALITY.DEPENDENCY.BIDIRECTIONAL" in rule_ids
     assert "QUALITY.DUPLICATE.AST_FINGERPRINT" in rule_ids
+    cycle = next(finding for finding in report.findings if finding.rule_id == "QUALITY.DEPENDENCY.CYCLE")
+    assert cycle.details["edge_import_sites"][0]["import_sites"][0]["raw_import"] == "import b"
+    bidirectional = next(finding for finding in report.findings if finding.rule_id == "QUALITY.DEPENDENCY.BIDIRECTIONAL")
+    assert bidirectional.details["forward_import_sites"][0]["line"] == 1
+    assert bidirectional.details["reverse_import_sites"][0]["line"] == 1
+    duplicate = next(finding for finding in report.findings if finding.rule_id == "QUALITY.DUPLICATE.AST_FINGERPRINT")
+    assert duplicate.details["fingerprint"]
+    assert duplicate.details["group_size"] == 2
+    assert duplicate.details["function_details"][0]["line_start"] == 3
 
 def test_code_quality_tool_reports_python_syntax_errors(tmp_path) -> None:
     (tmp_path / "bad.py").write_text("def broken(:\n    pass\n", encoding="utf-8")
@@ -508,7 +535,23 @@ def test_code_quality_tool_reports_python_syntax_errors(tmp_path) -> None:
     assert any(finding.rule_id == "QUALITY.SYNTAX.PYTHON" for finding in report.findings)
 
 def test_cli_quality_check_json_and_text_outputs(tmp_path, capsys) -> None:
-    (tmp_path / "bad.py").write_text("def side_effect():\n    return open('x.txt').read()\n", encoding="utf-8")
+    (tmp_path / "bad.py").write_text(
+        "\n".join(
+            [
+                "def side_effect():",
+                "    return open('x.txt').read()",
+                "",
+                "def normalize_one(value):",
+                "    result = value + 1",
+                "    return result",
+                "",
+                "def normalize_two(item):",
+                "    result = item + 1",
+                "    return result",
+            ]
+        ),
+        encoding="utf-8",
+    )
 
     json_code = cli_main(["quality-check", "--path", str(tmp_path), "--json", "--check-side-effects"])
     json_payload = json.loads(capsys.readouterr().out)
@@ -517,7 +560,7 @@ def test_cli_quality_check_json_and_text_outputs(tmp_path, capsys) -> None:
 
     assert json_code == 0
     assert json_payload["status"] == "CONCERNS"
-    assert json_payload["scope_summary"]["other"]["warnings"] == 1
+    assert json_payload["scope_summary"]["other"]["warnings"] >= 1
     assert "score" in json_payload["summary"]
     assert "top_offenders" in json_payload
     assert json_payload["warnings"][0]["rule_id"] == "QUALITY.SIDE_EFFECT.CALL"
@@ -525,3 +568,5 @@ def test_cli_quality_check_json_and_text_outputs(tmp_path, capsys) -> None:
     assert "scopes:" in text_output
     assert "score=" in text_output
     assert "QUALITY.SIDE_EFFECT.CALL" in text_output
+    assert "file:bad.py" in text_output
+    assert "details:" in text_output

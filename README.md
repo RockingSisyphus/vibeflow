@@ -65,16 +65,25 @@ VibeFlow 面向发布包使用。
 ## 发布包中的典型结构 📦
 
 ```text
+AGENTS.md         # 给 AI 的项目规则，可按项目定制
+README.md        # 项目说明，可按项目定制
+run.py            # 项目入口
+kernel/
+  vibeflow-kernel.zip
+  MANIFEST.sha256
+  README.md
+  docs/           # 内核说明，可读但不作为项目内容修改
+  tools/
+    mermaid-renderer/
+  THIRD_PARTY_NOTICES.md
 project/
   nodes/          # 业务 node
   base_lib/       # 纯函数 helper
   plugins/        # 可选策略和运行插件
   configs/        # JSONC 流程配置
   registry.py     # 节点注册
-kernel/
-  vibeflow/       # VibeFlow 内核副本，通常不改
-AGENTS.md         # 给 AI 的项目规则
-run.py            # 项目入口
+runs/
+reports/
 ```
 
 常用命令形态：
@@ -93,6 +102,7 @@ python run.py quality --path project
 展开 SVG 会固定使用确定性的 `review-columns` composer：主流程保持在左侧，右侧依次展示 plugins、base_lib 和按顶层调用顺序排列的展开 nodeset。nodeset 详情使用递归 detail-panel：叶子 nodeset 横向展示；包含子 nodeset 的父图保持 collapsed call-site 和原始连边，右侧按调用顺序纵向展示直接子 nodeset。审查图默认把单个片段显示宽度限制为 `3200px`，可用 `--review-fragment-max-width` 调整。
 `graph.expanded.mmd` 只是 Mermaid 源码调试产物，不要直接用 Mermaid CLI/mmdc 转成 SVG；详细审查 SVG 必须通过 `run.py svg --expand-nodesets` 生成。
 SVG 渲染不要求系统预装 Google Chrome；正常 `npm install` 后会优先使用 Puppeteer 自己安装/缓存的浏览器。`/snap/bin/chromium` 会被跳过，因为它在 Puppeteer/mermaid-cli 下常见 profile lock 启动失败。
+在发布包中首次使用 SVG 前，到 `kernel/tools/mermaid-renderer/` 执行 `npm install`。发布包不内置 `.gitignore`，项目可以自行决定是否忽略 `kernel/tools/mermaid-renderer/node_modules/`、`runs/`、`reports/` 等产物。
 
 ## AI 开发工作流 🛠️
 
@@ -162,7 +172,7 @@ VibeFlow 会在运行前检查：
 - 节点元数据是否完整。
 - 输入输出契约是否清晰。
 - 流程是否从 start 可达并能到达 end。
-- cycle 是否经过 decision。
+- 普通 graph / nodeset 内部是否存在显式环路；真实循环必须使用一等 while loop。
 - node 是否违反纯函数和结构规则。
 - 配置、插件、nodeset 是否破坏项目边界。
 
