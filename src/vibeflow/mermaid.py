@@ -7,7 +7,7 @@ from typing import Any, Mapping
 from .compiler import CompiledGraph
 from .data_contract import providers_to_dicts, requirements_to_dicts
 from .flowchart_render_helpers import compile_for_render, node_flow_kind, node_is_external, nodeset_for_node
-from .graph_config import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
+from .graph_config import GraphConfig, LOOP_NODE_TYPES, NodeSpec, NodesetSpec, STATUS_PLANNED
 from .node import FLOW_KIND_DATA_STORE, FLOW_KIND_DECISION, FLOW_KIND_DOCUMENT, FLOW_KIND_IO, FLOW_KIND_PREDEFINED, FLOW_KIND_PREPARATION, FLOW_KIND_PROCESS, FLOW_KIND_TERMINAL
 from .planned_behavior import effective_planned_behavior, planned_behavior_label
 from .runtime_helpers import has_planned, planned_items
@@ -155,8 +155,10 @@ class _MermaidRenderer:
                 self._render_custom_node_style(lines, node, node_id, class_name=class_name, indent=indent)
                 continue
             flow_kind = node_flow_kind(node, compiled) or nodeset.flow_kind
-            class_name = self._class_for_node(node_id, preferred_class="nodesetNode", planned=node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED)
-            lines.append(f"{indent}{_node_shape(node_id, self._nodeset_label(node, nodeset), flow_kind)}")
+            is_loop = node.node_type in LOOP_NODE_TYPES
+            class_name = self._class_for_node(node_id, preferred_class="loopNode" if is_loop else "nodesetNode", planned=node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED)
+            label = self._loop_label(node, nodeset) if is_loop else self._nodeset_label(node, nodeset)
+            lines.append(f"{indent}{_node_shape(node_id, label, flow_kind, shape='hourglass' if is_loop else '')}")
             if class_name:
                 lines.append(f"{indent}class {node_id} {class_name};")
             if not should_expand:
@@ -356,6 +358,18 @@ class _MermaidRenderer:
             )
         return _join_label_sections(sections)
 
+    def _loop_label(self, node: NodeSpec, nodeset: NodesetSpec) -> str:
+        title = node.metadata.display_name or node.name
+        sections: list[list[str]] = [[title], [f"id: {node.name}", f"type: {node.node_type}"]]
+        spec = node.loop
+        loop_lines = ["-- loop --", f"body: {nodeset.name}", f"stop: {_loop_stop_text(spec)}", f"max: {spec.max_iterations}"]
+        sections.append(loop_lines)
+        if self.show_semantics:
+            call_lines = _node_metadata_lines(node)
+            if call_lines:
+                sections.append(["-- meta --", *call_lines])
+        return _join_label_sections(sections)
+
     def _node_title(self, node: NodeSpec) -> str:
         if node.metadata.display_name:
             return node.metadata.display_name
@@ -420,10 +434,22 @@ def _node_metadata_lines(node: NodeSpec) -> tuple[str, ...]:
     return tuple(lines)
 
 
-def _node_shape(node_id: str, label: str, flow_kind: object) -> str:
+def _loop_stop_text(spec: object) -> str:
+    stop_after = int(getattr(spec, "stop_after", 0) or 0)
+    if stop_after:
+        return f"stop_after: {stop_after}"
+    stop_when = getattr(spec, "stop_when", None)
+    source = str(getattr(stop_when, "source", "")).strip() if stop_when is not None else ""
+    if source:
+        equals = str(getattr(stop_when, "equals", True)).lower()
+        return f"stop_when: {source} == {equals}"
+    return "unset"
+
+
+def _node_shape(node_id: str, label: str, flow_kind: object, *, shape: str = "") -> str:
     escaped = _escape_label(label)
     kind = str(flow_kind)
-    shape = {
+    actual_shape = shape or {
         FLOW_KIND_TERMINAL: "stadium",
         FLOW_KIND_PROCESS: "rect",
         FLOW_KIND_DECISION: "diam",
@@ -433,7 +459,7 @@ def _node_shape(node_id: str, label: str, flow_kind: object) -> str:
         FLOW_KIND_DOCUMENT: "doc",
         FLOW_KIND_PREPARATION: "hex",
     }.get(kind, "rect")
-    return f'{node_id}@{{ shape: {shape}, label: "{escaped}" }}'
+    return f'{node_id}@{{ shape: {actual_shape}, label: "{escaped}" }}'
 
 
 def _resources_payload(resources: object | None) -> Mapping[str, object]:

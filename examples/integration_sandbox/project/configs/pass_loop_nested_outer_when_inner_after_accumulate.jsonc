@@ -1,0 +1,243 @@
+{
+  "nodesets": [
+    {
+      "name": "loop.inner_accumulate_step",
+      "display_name": "Inner Accumulate Step",
+      "category": "loop",
+      "description": "Runs one inner-loop accumulation step and emits a bool stop signal.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": [
+        {"type": "outer.inner", "cardinality": "exactly_one"},
+        {"type": "inner.current", "cardinality": "exactly_one"},
+        {"type": "total.inner", "cardinality": "exactly_one"}
+      ],
+      "provides": [
+        {"key": "outer.inner.next", "type": "outer.inner"},
+        {"key": "inner.current.next", "type": "inner.current"},
+        {"key": "total.inner.next", "type": "total.inner"},
+        {"key": "inner.done", "type": "inner.done"}
+      ],
+      "exports": [
+        {"key": "outer.inner.next", "type": "outer.inner"},
+        {"key": "inner.current.next", "type": "inner.current"},
+        {"key": "total.inner.next", "type": "total.inner"},
+        {"key": "inner.done", "type": "inner.done"}
+      ],
+      "pipeline": {
+        "inputs": [
+          {"key": "outer.inner", "type": "outer.inner"},
+          {"key": "inner.current", "type": "inner.current"},
+          {"key": "total.inner", "type": "total.inner"}
+        ],
+        "nodes": [
+          {"name": "start", "type": "sandbox.start", "display_name": "Inner Body Start", "description": "Starts one inner accumulation step."},
+          {
+            "name": "accumulate",
+            "type": "semantic.inner_accumulate",
+            "display_name": "Accumulate",
+            "description": "Adds outer plus inner plus one into the running total and advances the inner counter.",
+            "requires": [
+              {"type": "outer.inner", "cardinality": "exactly_one"},
+              {"type": "inner.current", "cardinality": "exactly_one"},
+              {"type": "total.inner", "cardinality": "exactly_one"}
+            ],
+            "provides": [
+              {"key": "outer.inner.next", "type": "outer.inner"},
+              {"key": "inner.current.next", "type": "inner.current"},
+              {"key": "total.inner.next", "type": "total.inner"},
+              {"key": "inner.done", "type": "inner.done"}
+            ],
+            "inner_limit": 99
+          },
+          {"name": "end", "type": "sandbox.start", "display_name": "Inner Body End", "description": "Ends one inner accumulation step."}
+        ],
+        "edges": [
+          {"from": "start", "to": "accumulate"},
+          {"from": "accumulate", "to": "end"}
+        ],
+        "outputs": [
+          {"type": "outer.inner", "cardinality": "exactly_one"},
+          {"type": "inner.current", "cardinality": "exactly_one"},
+          {"type": "total.inner", "cardinality": "exactly_one"},
+          {"type": "inner.done", "cardinality": "exactly_one"}
+        ]
+      }
+    },
+    {
+      "name": "loop.outer_accumulate_body",
+      "display_name": "Outer Accumulate Body",
+      "category": "loop",
+      "description": "Initializes an inner counter, runs an inner while loop, and advances the outer counter.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": [
+        {"type": "outer.current", "cardinality": "exactly_one"},
+        {"type": "total.current", "cardinality": "exactly_one"}
+      ],
+      "provides": [
+        {"key": "outer.current.next", "type": "outer.current"},
+        {"key": "total.current.next", "type": "total.current"},
+        {"key": "outer.done", "type": "outer.done"},
+        {"key": "inner.iterations", "type": "inner.iterations"}
+      ],
+      "exports": [
+        {"key": "outer.current.next", "type": "outer.current"},
+        {"key": "total.current.next", "type": "total.current"},
+        {"key": "outer.done", "type": "outer.done"},
+        {"key": "inner.iterations", "type": "inner.iterations"}
+      ],
+      "pipeline": {
+        "inputs": [
+          {"key": "outer.current", "type": "outer.current"},
+          {"key": "total.current", "type": "total.current"}
+        ],
+        "nodes": [
+          {"name": "start", "type": "sandbox.start", "display_name": "Outer Body Start", "description": "Starts one outer loop body iteration."},
+          {
+            "name": "init_inner",
+            "type": "semantic.inner_loop_init",
+            "display_name": "Init Inner",
+            "description": "Copies outer state into inner-loop scoped keys and resets the inner counter.",
+            "requires": [
+              {"type": "outer.current", "cardinality": "exactly_one"},
+              {"type": "total.current", "cardinality": "exactly_one"}
+            ],
+            "provides": [
+              {"key": "outer.inner.seed", "type": "outer.inner"},
+              {"key": "total.inner.seed", "type": "total.inner"},
+              {"key": "inner.current.seed", "type": "inner.current"}
+            ],
+            "inner_start": 0
+          },
+          {
+            "name": "inner_loop",
+            "type": "vibeflow.loop.while",
+            "display_name": "Inner Fixed Loop",
+            "description": "Runs a fixed number of inner accumulation steps.",
+            "requires": [
+              {"type": "outer.inner", "cardinality": "exactly_one"},
+              {"type": "inner.current", "cardinality": "exactly_one"},
+              {"type": "total.inner", "cardinality": "exactly_one"}
+            ],
+            "provides": [
+              {"key": "outer.inner.loop", "type": "outer.inner"},
+              {"key": "total.inner.loop", "type": "total.inner"},
+              {"key": "inner.iterations", "type": "inner.iterations"}
+            ],
+            "loop": {
+              "body": "loop.inner_accumulate_step",
+              "max_iterations": 5,
+              "stop_after": 3,
+              "carry": [
+                {"from": "outer.inner", "as": "outer.inner", "update": "outer.inner"},
+                {"from": "inner.current", "as": "inner.current", "update": "inner.current"},
+                {"from": "total.inner", "as": "total.inner", "update": "total.inner"}
+              ],
+              "outputs": [
+                {"from": "outer.inner", "as": "outer.inner.loop"},
+                {"from": "total.inner", "as": "total.inner.loop"},
+                {"from": "loop.iterations", "as": "inner.iterations"}
+              ]
+            }
+          },
+          {
+            "name": "advance_outer",
+            "type": "semantic.outer_advance",
+            "display_name": "Advance Outer",
+            "description": "Carries the inner total back to outer state and advances the outer counter.",
+            "requires": [
+              {"type": "outer.inner", "cardinality": "exactly_one"},
+              {"type": "total.inner", "cardinality": "exactly_one"}
+            ],
+            "provides": [
+              {"key": "outer.current.next", "type": "outer.current"},
+              {"key": "total.current.next", "type": "total.current"},
+              {"key": "outer.done", "type": "outer.done"}
+            ],
+            "outer_limit": 2
+          },
+          {"name": "end", "type": "sandbox.start", "display_name": "Outer Body End", "description": "Ends one outer loop body iteration."}
+        ],
+        "edges": [
+          {"from": "start", "to": "init_inner"},
+          {"from": "init_inner", "to": "inner_loop"},
+          {"from": "inner_loop", "to": "advance_outer"},
+          {"from": "advance_outer", "to": "end"}
+        ],
+        "outputs": [
+          {"type": "outer.current", "cardinality": "exactly_one"},
+          {"type": "total.current", "cardinality": "exactly_one"},
+          {"type": "outer.done", "cardinality": "exactly_one"},
+          {"type": "inner.iterations", "cardinality": "exactly_one"}
+        ]
+      }
+    }
+  ],
+  "pipeline": {
+    "nodes": [
+      {"name": "start", "type": "sandbox.start", "display_name": "Start", "description": "Starts the nested loop accumulation fixture."},
+      {
+        "name": "seed",
+        "type": "semantic.nested_loop_seed",
+        "display_name": "Seed",
+        "description": "Creates initial outer and total values for nested loop accumulation.",
+        "provides": [
+          {"key": "outer.current", "type": "outer.current"},
+          {"key": "total.current", "type": "total.current"}
+        ],
+        "outer_start": 0,
+        "total_start": 0
+      },
+      {
+        "name": "outer_loop",
+        "type": "vibeflow.loop.while",
+        "display_name": "Outer Bool Loop",
+        "description": "Runs until the outer body emits outer.done while the inner loop uses stop_after.",
+        "requires": [
+          {"type": "outer.current", "cardinality": "exactly_one"},
+          {"type": "total.current", "cardinality": "exactly_one"}
+        ],
+        "provides": [
+          {"key": "total.final", "type": "total.final"},
+          {"key": "outer.final", "type": "outer.final"},
+          {"key": "outer.done", "type": "outer.done"},
+          {"key": "outer.iterations", "type": "outer.iterations"},
+          {"key": "inner.iterations.history", "type": "inner.iterations.history"}
+        ],
+        "loop": {
+          "body": "loop.outer_accumulate_body",
+          "max_iterations": 5,
+          "stop_when": {"from": "outer.done", "equals": true},
+          "carry": [
+            {"from": "outer.current", "as": "outer.current", "update": "outer.current"},
+            {"from": "total.current", "as": "total.current", "update": "total.current"}
+          ],
+          "collect": [
+            {"from": "inner.iterations", "as": "inner.iterations.history"}
+          ],
+          "outputs": [
+            {"from": "total.current", "as": "total.final"},
+            {"from": "outer.current", "as": "outer.final"},
+            {"from": "outer.done", "as": "outer.done"},
+            {"from": "loop.iterations", "as": "outer.iterations"},
+            {"from": "inner.iterations.history", "as": "inner.iterations.history"}
+          ]
+        }
+      },
+      {"name": "end", "type": "sandbox.start", "display_name": "End", "description": "Ends after nested loop accumulation completes."}
+    ],
+    "edges": [
+      {"from": "start", "to": "seed"},
+      {"from": "seed", "to": "outer_loop"},
+      {"from": "outer_loop", "to": "end"}
+    ],
+    "outputs": [
+      {"type": "total.final", "cardinality": "exactly_one"},
+      {"type": "outer.final", "cardinality": "exactly_one"},
+      {"type": "outer.done", "cardinality": "exactly_one"},
+      {"type": "outer.iterations", "cardinality": "exactly_one"},
+      {"type": "inner.iterations.history", "cardinality": "exactly_one"}
+    ]
+  }
+}

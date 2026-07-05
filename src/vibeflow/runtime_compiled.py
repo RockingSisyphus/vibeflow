@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from .block_compiler import graph_block
 from .runtime_errors import PipelineRuntimeError
 
 
 def run_compiled_steps(runtime, state) -> None:
+    block = graph_block(runtime._plan)
+    if block is not None:
+        block.callable(runtime, state)
+        return
     ready = list(runtime._initial_ready_nodes(state))
     queued = set(ready)
     for _ in range(runtime._plan.max_steps):

@@ -6,7 +6,7 @@ from typing import Any, Mapping
 from .block_compiler import CompiledBlock, compile_blocks
 from .compiler import CompiledGraph
 from .data_contract import DataProvider, DataRequirement, provider_keys, requirement_types
-from .graph_config import EdgeSpec, GraphConfig, NodeSpec
+from .graph_config import EdgeSpec, GraphConfig, LOOP_NODE_TYPES, LoopSpec, NodeSpec
 from .node import FLOW_KIND_PREDEFINED, PureNode
 from .planned_behavior import (
     PLANNED_BEHAVIOR_PYTHON_STUB,
@@ -42,8 +42,11 @@ class NodeFrame:
     flow_kind: str
     is_terminal: bool
     is_nodeset: bool
+    is_loop: bool = False
+    join_policy: str = ""
     nodeset_name: str = ""
     exports: tuple[DataProvider, ...] = ()
+    loop_spec: LoopSpec = field(default_factory=LoopSpec)
     async_mode: str = ""
     result_key: str = ""
     subplan: "ExecutionPlan | None" = None
@@ -136,6 +139,7 @@ def _frame_for(
     incoming = tuple(edge for edge in compiled.effective_edges if edge.target == spec.name)
     outgoing = tuple(edge for edge in compiled.effective_edges if edge.source == spec.name)
     is_nodeset = spec.node_type.startswith("nodeset.")
+    is_loop = spec.node_type in LOOP_NODE_TYPES
     nodeset_name = spec.node_type.removeprefix("nodeset.") if is_nodeset else ""
     nodeset = graph.nodesets.get(nodeset_name) if is_nodeset else None
     flow_kind = compiled.flow_kinds.get(spec.name, "")
@@ -153,10 +157,38 @@ def _frame_for(
             overrides=overrides,
             global_scope=global_scope,
         )
+    if is_loop:
+        nodeset = graph.nodesets[spec.loop.body]
+        nested_overrides = nested_node_config_overrides(spec, overrides)
+        subcompiled = _compile_nodeset(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.name}")
+        caller_values = {**dict(spec.params), **dict(global_scope.values), **dict(overrides.get(spec.name, {}))}
+        caller_scope = node_invocation_scope(caller_values, allow_config_override=spec.allow_config_override)
+        child_scope = merge_config_scopes(normalize_config_scope(nodeset.global_config), caller_scope)
+        return NodeFrame(
+            name=spec.name,
+            node_type=spec.node_type,
+            node=None,
+            requires=spec.requires,
+            provides=spec.provides,
+            params={},
+            incoming=incoming,
+            outgoing=outgoing,
+            flow_kind=flow_kind or FLOW_KIND_PREDEFINED,
+            is_terminal=False,
+            is_nodeset=False,
+            is_loop=True,
+            join_policy=spec.join_policy,
+            nodeset_name=nodeset.name,
+            exports=nodeset.exports,
+            loop_spec=spec.loop,
+            async_mode=spec.async_mode,
+            result_key=spec.result_key,
+            subplan=build_execution_plan(nodeset.graph, subcompiled, registry=registry, node_config_overrides=nested_overrides, global_config=child_scope, runtime_options=runtime_options),
+        )
     if is_nodeset:
         nodeset = graph.nodesets[nodeset_name]
         nested_overrides = nested_node_config_overrides(spec, overrides)
-        subcompiled = _compile_nodeset(nodeset.graph, registry=registry)
+        subcompiled = _compile_nodeset(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.name}")
         caller_values = {**dict(spec.params), **dict(global_scope.values), **dict(overrides.get(spec.name, {}))}
         caller_scope = node_invocation_scope(caller_values, allow_config_override=spec.allow_config_override)
         child_scope = merge_config_scopes(normalize_config_scope(nodeset.global_config), caller_scope)
@@ -172,6 +204,7 @@ def _frame_for(
             flow_kind=flow_kind or FLOW_KIND_PREDEFINED,
             is_terminal=False,
             is_nodeset=True,
+            join_policy=spec.join_policy,
             nodeset_name=nodeset_name,
             exports=nodeset.exports,
             async_mode=spec.async_mode,
@@ -195,6 +228,7 @@ def _frame_for(
         flow_kind=flow_kind,
         is_terminal=flow_kind == "terminal",
         is_nodeset=False,
+        join_policy=spec.join_policy,
         async_mode=spec.async_mode,
         result_key=spec.result_key,
     )
@@ -236,6 +270,7 @@ def _planned_stub_frame(
         flow_kind=flow_kind,
         is_terminal=flow_kind == "terminal",
         is_nodeset=nodeset is not None,
+        join_policy=spec.join_policy,
         nodeset_name=nodeset_name,
         exports=exports,
         async_mode=spec.async_mode,
@@ -247,7 +282,7 @@ def _planned_stub_frame(
     )
 
 
-def _compile_nodeset(graph: GraphConfig, *, registry: NodeRegistry) -> CompiledGraph:
+def _compile_nodeset(graph: GraphConfig, *, registry: NodeRegistry, owner: str) -> CompiledGraph:
     from .compiler import GraphCompiler
 
-    return GraphCompiler().compile(graph, registry=registry)
+    return GraphCompiler().compile(graph, registry=registry, owner=owner)

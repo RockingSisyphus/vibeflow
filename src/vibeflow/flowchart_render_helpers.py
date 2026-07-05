@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .graph_config import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
+from .graph_config import GraphConfig, LOOP_NODE_TYPES, NodeSpec, NodesetSpec, STATUS_PLANNED
 
 if TYPE_CHECKING:
     from .compiler import CompiledGraph
@@ -10,6 +10,8 @@ if TYPE_CHECKING:
 
 
 def nodeset_for_node(graph: GraphConfig, node: NodeSpec) -> NodesetSpec | None:
+    if node.node_type in LOOP_NODE_TYPES and node.loop.body:
+        return graph.nodesets.get(node.loop.body)
     if not node.node_type.startswith("nodeset."):
         return None
     return graph.nodesets.get(node.node_type.removeprefix("nodeset."))

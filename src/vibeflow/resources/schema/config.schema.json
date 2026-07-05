@@ -139,12 +139,16 @@
           "description": { "type": "string" },
           "style": { "$ref": "#/$defs/nodeStyle" },
           "similar_to": { "$ref": "#/$defs/nodeSimilarity" },
+          "join_policy": { "enum": ["safe_any", "any_active", "all"] },
+          "loop": { "$ref": "#/$defs/loopSpec" },
           "requires": { "type": "array", "items": { "$ref": "#/$defs/dataRequirement" } },
           "provides": { "type": "array", "items": { "$ref": "#/$defs/dataProvider" } },
           "config": { "type": "object" },
           "node_configs": { "type": "object" },
           "allow_config_override": { "type": "boolean" },
-          "override_child_config": { "type": "boolean" }
+          "override_child_config": { "type": "boolean" },
+          "async": { "enum": ["detached", "result_key"] },
+          "result_key": { "type": "string", "minLength": 1 }
         },
         "anyOf": [
           { "required": ["type"] },
@@ -180,6 +184,67 @@
         "node": { "type": "string", "minLength": 1 },
         "relationship": { "enum": ["variant", "copy"] },
         "reason": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "loopSpec": {
+      "type": "object",
+      "required": ["body"],
+      "oneOf": [
+        { "required": ["stop_after"], "not": { "required": ["stop_when"] } },
+        { "required": ["stop_when"], "not": { "required": ["stop_after"] } }
+      ],
+      "properties": {
+        "body": { "type": "string", "minLength": 1 },
+        "max_iterations": { "type": "integer", "minimum": 1 },
+        "stop_after": { "type": "integer", "minimum": 1 },
+        "stop_when": {
+          "type": "object",
+          "required": ["from"],
+          "properties": {
+            "from": { "type": "string", "minLength": 1 },
+            "equals": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "carry": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "as", "update"],
+            "properties": {
+              "from": { "type": "string", "minLength": 1 },
+              "as": { "type": "string", "minLength": 1 },
+              "update": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "collect": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "as"],
+            "properties": {
+              "from": { "type": "string", "minLength": 1 },
+              "as": { "type": "string", "minLength": 1 },
+              "mode": { "const": "all" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "as"],
+            "properties": {
+              "from": { "type": "string", "minLength": 1 },
+              "as": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          }
+        }
       },
       "additionalProperties": false
     },

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 RULE_CATALOG: dict[str, dict[str, str]] = {
-    "GRAPH.CYCLE.MISSING_DECISION_EXIT": {
+    "GRAPH.CYCLE.FORBIDDEN": {
         "severity": "error",
         "layer": "topology",
         "suggested_fix_type": "fix_config",

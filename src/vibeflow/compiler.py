@@ -5,7 +5,7 @@ from typing import Any
 
 from .data_contract import provider_keys
 from .graph_algorithms import strongly_connected_components
-from .graph_config import EdgeSpec, GraphConfig, NodeSpec, STATUS_PLANNED
+from .graph_config import EdgeSpec, GraphConfig, LOOP_NODE_TYPES, NodeSpec, STATUS_PLANNED
 from .node import FLOW_KIND_DECISION, FLOW_KIND_PREDEFINED
 from .plugin import PluginRegistry
 
@@ -25,6 +25,7 @@ class CompiledGraph:
 class GraphCompileError(ValueError):
     detail: str
     rule_id: str = "GRAPH.COMPILE"
+    details: dict[str, object] | None = None
 
     def __str__(self) -> str:
         return f"{self.rule_id}: Graph compile error: {self.detail}"
@@ -38,9 +39,11 @@ class GraphCompiler:
         registry: Any | None = None,
         known_nodesets: set[str] | None = None,
         plugin_registry: PluginRegistry | None = None,
+        owner: str = "pipeline",
     ) -> CompiledGraph:
         _call_compiler_plugins(plugin_registry, "before_compile", graph)
         nodes_by_name = {node.name: node for node in graph.nodes}
+        _validate_no_explicit_cycles(nodes_by_name, graph.edges, owner=owner)
         _validate_node_types(graph.nodes, registry=registry, nodesets=known_nodesets or set(graph.nodesets))
         providers = _collect_providers(graph.nodes, input_keys=set(provider_keys(graph.inputs)))
         consumers = _collect_consumers(graph.nodes)
@@ -49,7 +52,6 @@ class GraphCompiler:
         effective_edges = _merge_edges(graph.edges)
         flow_kinds = _node_flow_kinds(nodes_by_name, registry=registry)
         _validate_routing_edge_conditions(graph.edges, flow_kinds=flow_kinds)
-        _validate_routed_cycles(nodes_by_name, graph.edges, registry=registry)
         compiled = CompiledGraph(
             order=tuple(node.name for node in graph.nodes),
             explicit_edges=graph.edges,
@@ -82,6 +84,8 @@ def _validate_node_types(nodes: tuple[NodeSpec, ...], *, registry: Any | None, n
         return
     for node in nodes:
         if node.status == STATUS_PLANNED:
+            continue
+        if node.node_type in LOOP_NODE_TYPES:
             continue
         if node.node_type.startswith("nodeset."):
             nodeset_name = node.node_type.removeprefix("nodeset.")
@@ -151,23 +155,41 @@ def _merge_edge_into(merged: dict[tuple[str, str], EdgeSpec], edge: EdgeSpec) ->
     merged[edge.pair] = EdgeSpec(edge.source, edge.target, existing.when or edge.when)
 
 
-def _validate_routed_cycles(nodes_by_name: dict[str, NodeSpec], edges: tuple[EdgeSpec, ...], *, registry: Any | None) -> None:
-    if registry is None:
-        return
-    flow_kinds = _node_flow_kinds(nodes_by_name, registry=registry)
+def explicit_flow_cycles(nodes_by_name: dict[str, NodeSpec], edges: tuple[EdgeSpec, ...], *, owner: str = "pipeline") -> tuple[dict[str, object], ...]:
     adjacency: dict[str, list[str]] = {name: [] for name in nodes_by_name}
     for edge in edges:
-        adjacency.setdefault(edge.source, []).append(edge.target)
+        if edge.source in nodes_by_name and edge.target in nodes_by_name:
+            adjacency.setdefault(edge.source, []).append(edge.target)
+    cycles: list[dict[str, object]] = []
     for component in strongly_connected_components(adjacency):
         if len(component) == 1:
             node = component[0]
             if node not in adjacency.get(node, ()):
                 continue
-        if not any(flow_kinds.get(node) == FLOW_KIND_DECISION for node in component):
-            raise GraphCompileError(
-                "cycle requires decision node: " + " -> ".join(sorted(component)),
-                "GRAPH.CYCLE.MISSING_ROUTER",
-            )
+        members = sorted(component)
+        member_set = set(component)
+        cycle_edges = sorted(f"{edge.source}->{edge.target}" for edge in edges if edge.source in member_set and edge.target in member_set)
+        cycles.append({"owner": owner, "members": members, "edges": cycle_edges})
+    return tuple(cycles)
+
+
+def _validate_no_explicit_cycles(nodes_by_name: dict[str, NodeSpec], edges: tuple[EdgeSpec, ...], *, owner: str) -> None:
+    cycles = explicit_flow_cycles(nodes_by_name, edges, owner=owner)
+    if not cycles:
+        return
+    first = cycles[0]
+    members = [str(item) for item in first.get("members", ())]
+    raise GraphCompileError(
+        "explicit flow cycle is forbidden in ordinary graph: " + " -> ".join(members) + "; use vibeflow.loop.while for loops",
+        "GRAPH.CYCLE.FORBIDDEN",
+        details={
+            "owner": owner,
+            "members": list(first.get("members", ())),
+            "edges": list(first.get("edges", ())),
+            "cycles": list(cycles),
+            "suggestion": "Replace ordinary edge cycles with a vibeflow.loop.while node whose body is a nodeset.",
+        },
+    )
 
 
 def _validate_routing_edge_conditions(edges: tuple[EdgeSpec, ...], *, flow_kinds: dict[str, str]) -> None:
@@ -186,6 +208,9 @@ def _node_flow_kinds(nodes_by_name: dict[str, NodeSpec], *, registry: Any | None
     for name, spec in nodes_by_name.items():
         if spec.status == STATUS_PLANNED:
             kinds[name] = spec.flow_kind
+            continue
+        if spec.node_type in LOOP_NODE_TYPES:
+            kinds[name] = FLOW_KIND_PREDEFINED
             continue
         if spec.node_type.startswith("nodeset."):
             kinds[name] = FLOW_KIND_PREDEFINED

@@ -57,26 +57,33 @@ def _training_initial() -> dict[str, Any]:
     return {"train.model": SandboxModel(1.0), "train.batch": SandboxBatch([2, 4]), "train.optimizer": SandboxOptimizer(0.5)}
 
 
+def _training_loop_initial() -> dict[str, Any]:
+    return {
+        "train.model": SandboxModel(1.0),
+        "train.batch": SandboxBatch([2, 4]),
+        "train.optimizer": SandboxOptimizer(0.5),
+        "train.batches": [SandboxBatch([2, 4]), SandboxBatch([1, 3])],
+    }
+
+
 def _batch_initial() -> dict[str, Any]:
     return {"train.batch": SandboxBatch([2, 4])}
 
 
-COMPILED_SOURCE_FULL_REQUIRED = ("_execute_pure_outputs", "select_active_edges", "_record_edge")
-COMPILED_SOURCE_FAST_REQUIRED = ("_execute_pure_outputs", "select_active_edges")
+COMPILED_SOURCE_FULL_REQUIRED = ("runtime._execute_graph_block",)
+COMPILED_SOURCE_FAST_REQUIRED = ("runtime._execute_graph_block",)
 COMPILED_SOURCE_FORBIDDEN = ("_run_node(",)
-COMPILED_SOURCE_FAST_FORBIDDEN = ("_run_node(", "_record_edge(edge)", "summarize_mapping(inputs)", "summarize_mapping(outputs)", "'node',")
+COMPILED_SOURCE_FAST_FORBIDDEN = ("_run_node(",)
 
 
 VALID_RUN_CASES = [
     {"name": "linear", "config": "pass_linear.jsonc", "initial": {}, "expected_status": {"PASS", "CONCERNS"}, "expected_outputs": {"value.final": 14}},
     {"name": "free_nodes", "config": "pass_free_nodes.jsonc", "initial": {}, "expected_status": {"PASS", "CONCERNS"}},
-    {"name": "decision_cycle_short", "config": "pass_decision_cycle_short.jsonc", "initial": {"value.in": 0}},
-    {"name": "decision_cycle_long", "config": "pass_decision_cycle_long.jsonc", "initial": {"value.in": 0}},
     {"name": "nodeset_simple", "config": "pass_nodeset_simple.jsonc", "initial": {"value.in": 1}, "expected_outputs": {"value.out": 6}},
     {"name": "nodeset_nested", "config": "pass_nodeset_nested.jsonc", "initial": {"value.in": 1}, "expected_outputs": {"value.final": 11}},
     {"name": "io_data_store", "config": "pass_io_data_store.jsonc", "initial": {"io.result": 20}},
     {"name": "plugins", "config": "pass_plugins.jsonc", "initial": {"io.result": 20}},
-    {"name": "comprehensive_flowchart", "config": "pass_comprehensive_flowchart.jsonc", "initial": {"value.in": 3}, "expected_outputs": {"io.output": "final=23;request=23"}},
+    {"name": "comprehensive_flowchart", "config": "pass_comprehensive_flowchart.jsonc", "initial": {"value.in": 3}, "expected_outputs": {"io.output": "final=13;request=13"}},
     {
         "name": "training_object_flow",
         "config": "pass_training_object_flow.jsonc",
@@ -102,12 +109,147 @@ VALID_RUN_CASES = [
         "expect_batch_metrics": True,
     },
     {
+        "name": "loop_stop_after_nodeset_training",
+        "config": "pass_loop_stop_after_nodeset_training.jsonc",
+        "initial_factory": _training_loop_initial,
+        "expected_outputs": {
+            "train.step_report": {"steps": 4, "weight": 0.24009999999999998},
+            "train.loss_history": [6.0, 4.199999999999999, 2.94, 2.058],
+            "loop.iterations": 4,
+        },
+        "expected_same_as_initial": [("train.model_after", "train.model"), ("train.optimizer_after", "train.optimizer")],
+        "expected_object_attrs": [("train.model_after", "weight", 0.24009999999999998), ("train.optimizer_after", "steps", 4)],
+        "expected_runtime_exec_order": ["start", "train_loop", "end"],
+        "expected_trace_kind_counts": {"loop_enter": 1, "loop_exit": 1, "loop_iteration": 4},
+        "expected_trace_summary": {
+            "current_node": "end",
+            "node_runs": {"start": 1, "train_loop": 1, "end": 1},
+            "step_count": 3,
+            "total_step_count": 15,
+            "stop_reason": "completed",
+        },
+        "expected_qualified_exec_contains": [
+            "train_loop.iter_0.train_step",
+            "train_loop.iter_3.train_step",
+        ],
+    },
+    {
+        "name": "loop_stop_after_nodeset_training_block",
+        "config": "pass_loop_stop_after_nodeset_training.jsonc",
+        "initial_factory": _training_loop_initial,
+        "runtime_options": {"trace": "full", "execution": "block"},
+        "expected_outputs": {
+            "train.step_report": {"steps": 4, "weight": 0.24009999999999998},
+            "train.loss_history": [6.0, 4.199999999999999, 2.94, 2.058],
+            "loop.iterations": 4,
+        },
+        "expected_trace_kind_counts": {"loop_block_enter": 1, "loop_block_exit": 1, "loop_iteration": 4},
+        "expected_qualified_exec_contains": ["train_loop.iter_3.train_step"],
+    },
+    {
+        "name": "loop_while_nodeset_retry",
+        "config": "pass_loop_while_nodeset_retry.jsonc",
+        "initial": {"loop.current": 1},
+        "expected_outputs": {"loop.next": 7, "loop.done": True, "loop.iterations": 3},
+        "expected_runtime_exec_order": ["start", "retry_loop", "end"],
+        "expected_trace_kind_counts": {"loop_enter": 1, "loop_exit": 1, "loop_iteration": 3},
+        "expected_trace_summary": {
+            "current_node": "end",
+            "node_runs": {"start": 1, "retry_loop": 1, "end": 1},
+            "step_count": 3,
+            "total_step_count": 15,
+            "stop_reason": "completed",
+        },
+        "expected_qualified_exec_contains": ["retry_loop.iter_2.increment", "retry_loop.iter_2.done"],
+    },
+    {
+        "name": "loop_while_nodeset_retry_compiled",
+        "config": "pass_loop_while_nodeset_retry.jsonc",
+        "initial": {"loop.current": 1},
+        "runtime_options": {"trace": "full", "execution": "compiled"},
+        "expected_outputs": {"loop.next": 7, "loop.done": True, "loop.iterations": 3},
+        "expected_trace_kind_counts": {"loop_block_enter": 1, "loop_block_exit": 1, "loop_iteration": 3},
+        "expected_qualified_exec_contains": ["retry_loop.iter_2.increment", "retry_loop.iter_2.done"],
+    },
+    {
+        "name": "loop_while_inside_nodeset",
+        "config": "pass_loop_while_inside_nodeset.jsonc",
+        "initial": {"loop.current": 1},
+        "expected_outputs": {"loop.next": 7, "loop.done": True, "loop.iterations": 3},
+        "expected_runtime_exec_order": ["start", "wrapper", "end"],
+        "expected_qualified_exec_contains": ["wrapper.inner_loop.iter_2.increment", "wrapper.inner_loop.iter_2.done"],
+    },
+    {
+        "name": "loop_nested_outer_after_inner_when_accumulate",
+        "config": "pass_loop_nested_outer_after_inner_when_accumulate.jsonc",
+        "initial": {},
+        "expected_outputs": {
+            "total.final": 15,
+            "outer.final": 3,
+            "outer.done": False,
+            "outer.iterations": 3,
+            "inner.iterations.history": [2, 2, 2],
+        },
+        "expected_runtime_exec_order": ["start", "seed", "outer_loop", "end"],
+        "expected_qualified_exec_contains": [
+            "outer_loop.iter_2.inner_loop.iter_1.accumulate",
+            "outer_loop.iter_2.advance_outer",
+        ],
+    },
+    {
+        "name": "loop_nested_outer_after_inner_when_accumulate_block",
+        "config": "pass_loop_nested_outer_after_inner_when_accumulate.jsonc",
+        "initial": {},
+        "runtime_options": {"trace": "full", "execution": "block"},
+        "expected_outputs": {
+            "total.final": 15,
+            "outer.final": 3,
+            "outer.done": False,
+            "outer.iterations": 3,
+            "inner.iterations.history": [2, 2, 2],
+        },
+        "expected_trace_kind_counts": {"loop_block_enter": 4, "loop_block_exit": 4, "loop_iteration": 9},
+        "expected_qualified_exec_contains": ["outer_loop.iter_2.inner_loop.iter_1.accumulate"],
+    },
+    {
+        "name": "loop_nested_outer_when_inner_after_accumulate",
+        "config": "pass_loop_nested_outer_when_inner_after_accumulate.jsonc",
+        "initial": {},
+        "expected_outputs": {
+            "total.final": 15,
+            "outer.final": 2,
+            "outer.done": True,
+            "outer.iterations": 2,
+            "inner.iterations.history": [3, 3],
+        },
+        "expected_runtime_exec_order": ["start", "seed", "outer_loop", "end"],
+        "expected_qualified_exec_contains": [
+            "outer_loop.iter_1.inner_loop.iter_2.accumulate",
+            "outer_loop.iter_1.advance_outer",
+        ],
+    },
+    {
+        "name": "loop_nested_outer_when_inner_after_accumulate_compiled",
+        "config": "pass_loop_nested_outer_when_inner_after_accumulate.jsonc",
+        "initial": {},
+        "runtime_options": {"trace": "full", "execution": "compiled"},
+        "expected_outputs": {
+            "total.final": 15,
+            "outer.final": 2,
+            "outer.done": True,
+            "outer.iterations": 2,
+            "inner.iterations.history": [3, 3],
+        },
+        "expected_trace_kind_counts": {"loop_block_enter": 3, "loop_block_exit": 3, "loop_iteration": 8},
+        "expected_qualified_exec_contains": ["outer_loop.iter_1.inner_loop.iter_2.accumulate"],
+    },
+    {
         "name": "runtime_boundary_trace",
         "config": "pass_runtime_boundary_trace.jsonc",
         "initial": {"value.in": 1},
         "runtime_options": {"trace": "boundary"},
         "expected_outputs": {"value.out": 6},
-        "expected_trace_kinds": ["run_start", "nodeset_enter", "nodeset_exit", "run_end", "runtime_summary"],
+        "expected_trace_kinds": ["run_start", "nodeset_enter", "run_start", "run_end", "nodeset_exit", "run_end", "runtime_summary"],
     },
     {
         "name": "runtime_trace_off",
@@ -301,59 +443,6 @@ VALID_RUN_CASES = [
         "expected_block_source_absent": COMPILED_SOURCE_FAST_FORBIDDEN,
     },
     {
-        "name": "semantic_decision_loop",
-        "config": "pass_semantic_decision_loop.jsonc",
-        "initial": {"loop.current": 1},
-        "expected_outputs": {"loop.next": 7, "loop.done": True},
-        "expected_runtime_exec_order": ["start", "increment", "done", "copy", "increment", "done", "copy", "increment", "done", "end"],
-        "expected_trace_summary": {
-            "current_node": "end",
-            "edge_executions": {"start->increment": 1, "increment->done": 3, "done->copy": 2, "copy->increment": 2, "done->end": 1},
-            "exec_order": ["start", "increment", "done", "copy", "increment", "done", "copy", "increment", "done", "end"],
-            "node_runs": {"start": 1, "increment": 3, "done": 3, "copy": 2, "end": 1},
-            "step_count": 10,
-            "stop_reason": "completed",
-        },
-    },
-    {
-        "name": "compiled_semantic_decision_loop",
-        "config": "pass_semantic_decision_loop.jsonc",
-        "initial": {"loop.current": 1},
-        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
-        "expected_outputs": {"loop.next": 7, "loop.done": True},
-        "expected_runtime_exec_order": ["start", "increment", "done", "copy", "increment", "done", "copy", "increment", "done", "end"],
-        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
-        "expected_trace_summary": {
-            "current_node": "end",
-            "exec_order": ["start", "increment", "done", "copy", "increment", "done", "copy", "increment", "done", "end"],
-            "node_runs": {"start": 1, "increment": 3, "done": 3, "copy": 2, "end": 1},
-            "step_count": 10,
-            "stop_reason": "completed",
-        },
-        "expected_blocks": [["start", "increment", "done", "copy", "end"]],
-        "expected_block_source_contains": COMPILED_SOURCE_FAST_REQUIRED,
-        "expected_block_source_absent": COMPILED_SOURCE_FAST_FORBIDDEN,
-    },
-    {
-        "name": "compiled_full_semantic_decision_loop",
-        "config": "pass_semantic_decision_loop.jsonc",
-        "initial": {"loop.current": 1},
-        "runtime_options": {"trace": "full", "node_hooks": False, "execution": "compiled"},
-        "expected_outputs": {"loop.next": 7, "loop.done": True},
-        "expected_trace_kind_counts": {"block_enter": 1, "node": 10, "block_exit": 1},
-        "expected_trace_summary": {
-            "current_node": "end",
-            "edge_executions": {"start->increment": 1, "increment->done": 3, "done->copy": 2, "copy->increment": 2, "done->end": 1},
-            "exec_order": ["start", "increment", "done", "copy", "increment", "done", "copy", "increment", "done", "end"],
-            "node_runs": {"start": 1, "increment": 3, "done": 3, "copy": 2, "end": 1},
-            "step_count": 10,
-            "stop_reason": "completed",
-        },
-        "expected_blocks": [["start", "increment", "done", "copy", "end"]],
-        "expected_block_source_contains": COMPILED_SOURCE_FULL_REQUIRED,
-        "expected_block_source_absent": COMPILED_SOURCE_FORBIDDEN,
-    },
-    {
         "name": "semantic_nodeset_arithmetic",
         "config": "pass_semantic_nodeset_arithmetic.jsonc",
         "initial": {"calc.a": 4, "calc.b": 6},
@@ -485,9 +574,10 @@ VALID_RUN_CASES = [
         "name": "nodeset_loop_subplan_reuse",
         "config": "pass_nodeset_loop_subplan_reuse.jsonc",
         "initial": {"value.in": 1},
-        "expected_outputs": {"value.next": 3},
-        "expected_nodeset_exports": {"increment_step": ["value.next"]},
-        "expected_trace_kind_counts": {"nodeset_enter": 2, "nodeset_exit": 2},
+        "expected_outputs": {"value.next": 3, "loop.done": True, "loop.iterations": 2},
+        "expected_runtime_exec_order": ["start", "input", "retry_loop", "end"],
+        "expected_trace_kind_counts": {"loop_enter": 1, "loop_exit": 1, "loop_iteration": 2, "nodeset_enter": 2, "nodeset_exit": 2},
+        "expected_qualified_exec_contains": ["retry_loop.iter_0.increment_step.increment", "retry_loop.iter_1.increment_step.increment"],
     },
     {
         "name": "nodeset_reference_exports",
@@ -538,31 +628,6 @@ VALID_RUN_CASES = [
         "expected_blocks": [["start", "training_input", "forward_loss", "backward_grad", "optimizer_step", "training_metrics", "end"]],
     },
     {
-        "name": "block_decision_loop",
-        "config": "pass_block_decision_loop.jsonc",
-        "initial": {"value.in": 1},
-        "runtime_options": {"execution": "block"},
-        "expected_outputs": {"value.next": 3},
-        "expected_runtime_exec_order": ["start", "input", "increment", "done", "copy", "increment", "done", "end"],
-    },
-    {
-        "name": "compiled_decision_loop",
-        "config": "pass_block_decision_loop.jsonc",
-        "initial": {"value.in": 1},
-        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
-        "expected_outputs": {"value.next": 3},
-        "expected_runtime_exec_order": ["start", "input", "increment", "done", "copy", "increment", "done", "end"],
-        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
-        "expected_trace_summary": {
-            "current_node": "end",
-            "exec_order": ["start", "input", "increment", "done", "copy", "increment", "done", "end"],
-            "node_runs": {"start": 1, "input": 1, "increment": 2, "done": 2, "copy": 1, "end": 1},
-            "step_count": 8,
-            "stop_reason": "completed",
-        },
-        "expected_blocks": [["start", "input", "increment", "done", "copy", "end"]],
-    },
-    {
         "name": "compiled_decision_branch_exit",
         "config": "pass_compiled_decision_branch_exit.jsonc",
         "initial": {"value.in": 4},
@@ -577,7 +642,7 @@ VALID_RUN_CASES = [
             "step_count": 7,
             "stop_reason": "completed",
         },
-        "expected_blocks": [["start", "input", "prepare", "compute", "route", "loop_back", "external", "end"]],
+        "expected_blocks": [["start", "input", "prepare", "compute", "route", "external", "end"]],
     },
     {
         "name": "async_result_key_join",
@@ -649,6 +714,27 @@ VALID_RUN_CASES = [
         "expected_trace_kind_counts": {"async_detached": 1, "async_detached_done": 1},
         "expected_runtime_exec_order": ["start", "metrics", "seed", "add", "end"],
     },
+    {
+        "name": "safe_or_join_mutually_exclusive_left",
+        "config": "pass_safe_or_join_mutually_exclusive.jsonc",
+        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 9, "calc.d": 4},
+        "expected_outputs": {"final_result": 131},
+        "expected_runtime_exec_order": ["start", "add_pair", "compare", "scale", "left_adjust", "consume_branch", "end"],
+    },
+    {
+        "name": "safe_or_join_mutually_exclusive_right",
+        "config": "pass_safe_or_join_mutually_exclusive.jsonc",
+        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 1, "calc.d": 4},
+        "expected_outputs": {"final_result": 215},
+        "expected_runtime_exec_order": ["start", "add_pair", "compare", "scale", "right_adjust", "consume_branch", "end"],
+    },
+    {
+        "name": "join_policy_all",
+        "config": "pass_join_policy_all.jsonc",
+        "initial": {},
+        "expected_outputs": {"value.out": 8},
+        "expected_runtime_exec_order": ["start", "left_value", "other_value", "join", "end"],
+    },
 ]
 
 
@@ -707,6 +793,7 @@ INVALID_CASES = [
     {"kind": "run", "config": "fail_nodeset_key_leak.jsonc", "expect": "NODESET.INTERNAL_KEY_LEAK"},
     {"kind": "run", "config": "fail_nodeset_recursion.jsonc", "expect": "NODESET.RECURSION"},
     {"kind": "config", "config": "fail_removed_boundary.jsonc", "expect": "CONFIG.BOUNDARY.REMOVED"},
+    {"kind": "run", "config": "fail_decision_cycle_forbidden.jsonc", "expect": "GRAPH.CYCLE.FORBIDDEN"},
     {"kind": "run", "config": "fail_planned_architecture_run.jsonc", "expect": "GRAPH.PLANNED.NODE_IN_RUN"},
     {
         "kind": "run",
@@ -719,6 +806,9 @@ INVALID_CASES = [
     {"kind": "run", "config": "fail_plugin_unclosed_relaxation.jsonc", "expect": "PLUGIN.POLICY.RELAXATION_REQUIRED"},
     {"kind": "run", "config": "fail_plugin_execution.jsonc", "expect": "PLUGIN.EXECUTION"},
     {"kind": "config", "config": "fail_plugin_bad_shape.jsonc", "expect": "PLUGIN.POLICY.SHAPE"},
+    {"kind": "runtime_run", "config": "fail_loop_max_iterations.jsonc", "initial": {"loop.current": 1}, "expect": "max_iterations=2"},
+    {"kind": "run", "config": "fail_safe_or_join_ambiguous_unconditional.jsonc", "expect": "GRAPH.JOIN.AMBIGUOUS_UNCONDITIONAL"},
+    {"kind": "run", "config": "fail_safe_or_join_multiple_exactly_one.jsonc", "expect": "GRAPH.DATA.TYPE_CARDINALITY_AMBIGUOUS"},
 ]
 
 
@@ -917,6 +1007,12 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
                     raise AssertionError(f"runtime summary {key} expected subset {expected!r}, got {actual!r}")
             elif actual != expected:
                 raise AssertionError(f"runtime summary {key} expected {expected!r}, got {summary.get(key)!r}")
+    if "expected_qualified_exec_contains" in case:
+        summary = _runtime_trace_lines(run_result.run_dir)[-1]
+        actual = set(summary.get("qualified_exec_order", ()))
+        missing = [item for item in case["expected_qualified_exec_contains"] if item not in actual]
+        if missing:
+            raise AssertionError(f"qualified_exec_order missing {missing!r}, got {sorted(actual)!r}")
     if "expected_runtime_exec_order" in case:
         actual = list(run_result.context.get("runtime.exec_order"))
         if actual != case["expected_runtime_exec_order"]:
@@ -1138,6 +1234,8 @@ def _run_invalid_case(case: dict[str, Any], base_lib_report):
         return _invalid_config(case), base_lib_report
     if kind == "run":
         return _invalid_run(case), base_lib_report
+    if kind == "runtime_run":
+        return _invalid_runtime_run(case), base_lib_report
     raise AssertionError(f"unknown invalid case kind: {kind}")
 
 
@@ -1279,6 +1377,30 @@ def _invalid_run(case: dict[str, Any]) -> CaseResult:
             raise AssertionError(f"run case had forbidden rules: {sorted(forbidden)}")
         return CaseResult(f"invalid:run:{case['config']}", "PASS", payload=report.to_dict())
     raise AssertionError("run case was not rejected")
+
+
+def _invalid_runtime_run(case: dict[str, Any]) -> CaseResult:
+    from registry import build_node_registry
+    from vibeflow import RuntimeOptions, run_checked
+
+    runtime_options = RuntimeOptions(**case["runtime_options"]) if "runtime_options" in case else None
+    initial = case["initial_factory"]() if "initial_factory" in case else case.get("initial", {})
+    try:
+        run_checked(
+            CONFIG_DIR / str(case["config"]),
+            registry=build_node_registry(),
+            initial=initial,
+            policy_path=POLICY_PATH,
+            run_root=RUN_ROOT,
+            run_id=f"expected_runtime_fail_{Path(str(case['config'])).stem}",
+            runtime_options=runtime_options,
+        )
+    except Exception as exc:
+        text = str(exc)
+        if str(case["expect"]) not in text:
+            raise AssertionError(f"runtime run error did not include {case['expect']}: {text}") from exc
+        return CaseResult(f"invalid:runtime_run:{case['config']}", "PASS", text)
+    raise AssertionError("runtime run case was not rejected")
 
 
 def _load_class(path: Path, class_name: str):

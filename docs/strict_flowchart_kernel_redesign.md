@@ -111,9 +111,11 @@ The kernel must remove explicit loop registration:
 - remove edge `max_executions`
 - remove loop-specific runtime trace fields
 
-Cycles are legal only when each cycle contains a `decision` node. External code
-does not legalize a cycle by itself; an externally implemented router must still
-declare `flow_kind="decision"` and `external=True`. Runtime still needs
+Ordinary `pipeline.edges` cycles are forbidden, including cycles that contain a
+`decision` node. Loops must be represented by the first-class
+`vibeflow.loop.while` control node, whose body is a nodeset. External code does
+not legalize a cycle by itself; an externally implemented router may still
+declare `flow_kind="decision"` for branch selection only. Runtime still needs
 `max_steps` as a safety guard, but `max_steps` is execution protection, not
 architecture meaning.
 
@@ -182,8 +184,8 @@ Rules:
   or python_stub planned children remain warnings.
 - Mermaid must render planned nodes/nodesets with flowchart shapes and a distinct
   planned marker.
-- Conditional routes and cycles still follow the same `when` and routing-node
-  rules.
+- Conditional routes still follow `when` and routing-node rules; ordinary
+  graph cycles are forbidden and must be modeled with first-class loop nodes.
 
 ## Mermaid Output
 
@@ -239,7 +241,7 @@ The following conditions must fail strict runs:
 | `NODE.FLOW_KIND.INVALID` | Node declares an unknown kind |
 | `NODE.DECISION.MISSING_ROUTE_OUTPUT` | Decision node has no route output |
 | `GRAPH.DECISION.MISSING_EDGE_CONDITION` | Decision branch edge lacks `when` |
-| `GRAPH.CYCLE.MISSING_ROUTER` | Cycle lacks `decision` |
+| `GRAPH.CYCLE.FORBIDDEN` | Ordinary graph declares an explicit edge cycle; use `vibeflow.loop.while` |
 | `NODE.EXTERNAL.INVALID` | `NodeInfo.external` is not boolean |
 | `CONFIG.BOUNDARY.REMOVED` | Config still uses `boundary` |
 | `CONFIG.LOOPS.REMOVED` | Config still uses `pipeline.loops` |
@@ -269,8 +271,8 @@ The following conditions must fail strict runs:
 - reject `pipeline.loops`
 - reject `max_iterations` and `max_executions`
 - remove `LoopSpec`
-- allow cycles only when routed by `decision`
-- replace loop runtime with `max_steps`
+- reject ordinary edge cycles
+- replace legacy loop runtime with first-class loop nodes plus `max_steps` guards
 
 ### Phase 3: Architecture Contract
 

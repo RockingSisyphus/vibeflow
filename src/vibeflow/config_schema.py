@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from .health_types import HealthFinding
-from .graph_config import SIMILAR_TO_RELATIONSHIPS
+from .graph_config import JOIN_POLICIES, LOOP_NODE_TYPES, LOOP_WHILE_TYPE, SIMILAR_TO_RELATIONSHIPS
 from .node import FLOW_KINDS
 from .planned_behavior import PLANNED_BEHAVIOR_BLOCKING, PLANNED_BEHAVIOR_PYTHON_STUB, PLANNED_BEHAVIOR_TRANSPARENT, validate_stub_module_ref
 from .schema_findings import schema_finding
@@ -67,7 +67,7 @@ def _validate_pipeline(value: Mapping[str, Any], prefix: str, findings: list[Hea
                 _validate_edge(edge, f"{prefix}.edges[{index}]", findings)
 
     if "loops" in value:
-        findings.append(_error("CONFIG.LOOPS.REMOVED", f"{prefix}.loops is removed; use decision routed cycles", f"{prefix}.loops"))
+        findings.append(_error("CONFIG.LOOPS.REMOVED", f"{prefix}.loops is removed; use vibeflow.loop.while nodes", f"{prefix}.loops"))
     if "max_steps" in value:
         _validate_positive_int(value["max_steps"], f"{prefix}.max_steps", findings, "CONFIG.SCHEMA.MAX_STEPS")
 
@@ -84,6 +84,8 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
     _validate_node_visual_fields(value, prefix, findings)
     _validate_node_similarity(value, prefix, findings)
     _validate_node_async_fields(value, prefix, findings)
+    _validate_node_join_policy(value, prefix, findings)
+    _validate_node_loop(value, prefix, findings)
 
 
 def _validate_node_identity(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
@@ -207,6 +209,69 @@ def _validate_node_async_fields(value: Mapping[str, Any], prefix: str, findings:
         findings.append(_error("CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY", f"{prefix}.result_key requires async='result_key'", f"{prefix}.result_key"))
 
 
+def _validate_node_join_policy(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
+    if "join_policy" not in value:
+        return
+    if value["join_policy"] not in JOIN_POLICIES:
+        findings.append(_error("CONFIG.SCHEMA.NODE_JOIN_POLICY", f"{prefix}.join_policy must be one of {sorted(JOIN_POLICIES)}", f"{prefix}.join_policy"))
+
+
+def _validate_node_loop(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
+    node_type = str(value.get("type", value.get("registry_key", ""))).strip()
+    if node_type not in LOOP_NODE_TYPES:
+        if "loop" in value:
+            findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop is only allowed on VibeFlow loop nodes", f"{prefix}.loop"))
+        return
+    loop = value.get("loop")
+    if not isinstance(loop, Mapping):
+        findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop must be an object", f"{prefix}.loop"))
+        return
+    if not _non_empty_string(loop.get("body")):
+        findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop.body must be a non-empty nodeset name", f"{prefix}.loop.body"))
+    unknown = sorted(set(str(key) for key in loop) - {"body", "max_iterations", "stop_after", "stop_when", "carry", "collect", "outputs"})
+    if unknown:
+        findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop contains unsupported loop keys: {unknown}", f"{prefix}.loop"))
+    if "max_iterations" in loop:
+        _validate_positive_int(loop["max_iterations"], f"{prefix}.loop.max_iterations", findings, "CONFIG.SCHEMA.NODE_LOOP_INVALID")
+    if node_type == LOOP_WHILE_TYPE:
+        has_stop_after = "stop_after" in loop
+        has_stop_when = "stop_when" in loop
+        if has_stop_after == has_stop_when:
+            findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop must declare exactly one of stop_after or stop_when", f"{prefix}.loop"))
+        if has_stop_after:
+            _validate_positive_int(loop.get("stop_after"), f"{prefix}.loop.stop_after", findings, "CONFIG.SCHEMA.NODE_LOOP_INVALID")
+            max_iterations = loop.get("max_iterations", 1000)
+            if isinstance(loop.get("stop_after"), int) and not isinstance(loop.get("stop_after"), bool) and isinstance(max_iterations, int) and not isinstance(max_iterations, bool):
+                if loop["stop_after"] > max_iterations:
+                    findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop.stop_after must be <= max_iterations", f"{prefix}.loop.stop_after"))
+        if has_stop_when:
+            _validate_loop_mapping(loop.get("stop_when"), f"{prefix}.loop.stop_when", findings, required_fields=("from",))
+            if isinstance(loop.get("stop_when"), Mapping) and "equals" in loop["stop_when"] and not isinstance(loop["stop_when"]["equals"], bool):
+                findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop.stop_when.equals must be a boolean", f"{prefix}.loop.stop_when.equals"))
+    for field, required in (("carry", ("from", "as", "update")), ("collect", ("from", "as")), ("outputs", ("from", "as"))):
+        if field in loop:
+            _validate_loop_list(loop[field], f"{prefix}.loop.{field}", findings, required_fields=required)
+
+
+def _validate_loop_mapping(value: Any, prefix: str, findings: list[HealthFinding], *, required_fields: tuple[str, ...]) -> None:
+    if not isinstance(value, Mapping):
+        findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix} must be an object", prefix))
+        return
+    for field in required_fields:
+        if not _non_empty_string(value.get(field)):
+            findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.{field} must be a non-empty string", f"{prefix}.{field}"))
+
+
+def _validate_loop_list(value: Any, prefix: str, findings: list[HealthFinding], *, required_fields: tuple[str, ...]) -> None:
+    if not isinstance(value, list):
+        findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix} must be a list", prefix))
+        return
+    for index, item in enumerate(value):
+        _validate_loop_mapping(item, f"{prefix}[{index}]", findings, required_fields=required_fields)
+        if isinstance(item, Mapping) and "mode" in item and item["mode"] != "all":
+            findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}[{index}].mode must be 'all'", f"{prefix}[{index}].mode"))
+
+
 def _validate_planned_behavior(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
     if "planned_behavior" not in value:
         return
@@ -265,7 +330,7 @@ def _validate_removed_edge_fields(value: Mapping[str, Any], prefix: str, finding
     if "max" in value:
         findings.append(_error("CONFIG.LOOP_LIMITS.REMOVED", f"{prefix}.max is removed; use pipeline.max_steps", f"{prefix}.max"))
     if "loop" in value:
-        findings.append(_error("CONFIG.LOOPS.REMOVED", f"{prefix}.loop is removed; use edge.when", f"{prefix}.loop"))
+        findings.append(_error("CONFIG.LOOPS.REMOVED", f"{prefix}.loop is removed; use vibeflow.loop.while nodes", f"{prefix}.loop"))
 
 
 def _validate_nodesets(value: Any, findings: list[HealthFinding]) -> None:

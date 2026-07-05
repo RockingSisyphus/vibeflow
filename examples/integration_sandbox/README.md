@@ -25,11 +25,13 @@ python examples\integration_sandbox\run_all.py
 
 ## Flowchart 示例
 
-`project/configs/pass_decision_cycle_short.jsonc` 和 `pass_decision_cycle_long.jsonc` 展示了新版循环表达：
+普通 `pipeline.edges` 形成环已经被禁止；`project/configs/fail_decision_cycle_forbidden.jsonc` 验证带 decision 和 exit 的旧式 retry 环也会被 `GRAPH.CYCLE.FORBIDDEN` 拒绝。
 
-- 普通 `process` 节点 `sandbox.increment` 产生下一步值。
-- `decision` 节点 `sandbox.done_check` 输出 `loop.done`。
-- 配置边用 `when: "loop.done == false"` 表达回边是否激活。
-- 运行时只使用 `max_steps` 作为安全护栏，不再注册 `pipeline.loops`。
+循环示例请看 `project/configs/pass_loop_while_nodeset_retry.jsonc`、`pass_loop_stop_after_nodeset_training.jsonc` 和 nested loop fixtures：
+
+- `vibeflow.loop.while` 调用 nodeset body。
+- 固定轮数用 `loop.stop_after`。
+- 条件退出用 body/state 输出的 bool `loop.stop_when`。
+- 运行时仍保留 `max_steps` 作为顶层安全护栏，但不再把 decision cycle 作为循环语义。
 
 `project/configs/pass_io_data_store.jsonc` 展示外部数据/副作用的替代建模方式：`data_store` 节点产出请求数据，`io` 节点消费外部输入结果。旧 `boundary` 配置只保留在失败用例中，验证内核会以 `CONFIG.BOUNDARY.REMOVED` 拒绝。

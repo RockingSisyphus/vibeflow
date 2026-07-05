@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Mapping
 
+from .compiler import explicit_flow_cycles
 from .graph_config import EdgeSpec
 from .node import FLOW_KIND_DECISION
 from .runtime_errors import PipelineRuntimeError
@@ -32,6 +33,7 @@ class CompiledBlock:
     source: str
     supports_full_trace: bool = False
     supports_node_hooks: bool = False
+    kind: str = "graph"
 
 
 @dataclass(frozen=True)
@@ -45,21 +47,30 @@ class _Instrumentation:
 
 
 def compile_blocks(plan: "ExecutionPlan", runtime_options: object | None = None) -> tuple[CompiledBlock, ...]:
-    # Inbox-mode runtime resolves inputs and delivers payloads through shared runtime
-    # helpers. Old generated blocks used Context.get/set and are intentionally disabled.
-    return ()
     instrumentation = _instrumentation(runtime_options)
     blocks: list[CompiledBlock] = []
-    visited: set[str] = set()
     for name in plan.order:
-        if name in visited or not _frame_compilable(plan.frames[name]):
-            continue
-        block_nodes = _cfg_region(name, plan.frames, plan.order)
-        if len(block_nodes) > 1:
-            block_name = f"block:{block_nodes[0]}"
-            blocks.append(_compile_cfg_block(block_name, block_nodes, plan.frames, instrumentation))
-            visited.update(block_nodes)
+        frame = plan.frames[name]
+        if frame.is_loop and _loop_block_compilable(frame):
+            blocks.append(_compile_loop_block(frame, instrumentation))
+    if _graph_block_compilable(plan):
+        blocks.append(_compile_interpreted_graph_block(plan, instrumentation))
     return tuple(blocks)
+
+
+def graph_block(plan: "ExecutionPlan") -> CompiledBlock | None:
+    for block in plan.blocks:
+        if block.kind == "graph":
+            return block
+    return None
+
+
+def loop_block(plan: "ExecutionPlan", node_name: str) -> CompiledBlock | None:
+    expected = f"loop:{node_name}"
+    for block in plan.blocks:
+        if block.kind == "loop" and block.name == expected:
+            return block
+    return None
 
 
 def _instrumentation(runtime_options: object | None) -> _Instrumentation:
@@ -146,6 +157,82 @@ def _compile_cfg_block(
         source=source,
         supports_full_trace=instrumentation.trace == "full",
         supports_node_hooks=instrumentation.node_hooks,
+        kind="graph",
+    )
+
+
+def _compile_interpreted_graph_block(plan: "ExecutionPlan", instrumentation: _Instrumentation) -> CompiledBlock:
+    block_name = f"graph:{plan.order[0]}"
+    nodes = tuple(plan.order)
+
+    def compiled_block(runtime: "PipelineRuntime", state: object) -> CompiledBlockResult:
+        last_node, outputs = runtime._execute_graph_block(block_name, nodes, state)
+        return CompiledBlockResult(last_node=last_node, outputs=outputs)
+
+    return CompiledBlock(
+        name=block_name,
+        entry=nodes[0],
+        exits=(nodes[-1],),
+        nodes=nodes,
+        edge_routes={node: tuple(plan.frames[node].outgoing) for node in nodes},
+        callable=compiled_block,
+        source=_interpreted_graph_block_source(block_name, nodes, instrumentation),
+        supports_full_trace=instrumentation.trace == "full",
+        supports_node_hooks=instrumentation.node_hooks,
+        kind="graph",
+    )
+
+
+def _compile_loop_block(frame: "NodeFrame", instrumentation: _Instrumentation) -> CompiledBlock:
+    block_name = f"loop:{frame.name}"
+
+    def compiled_loop_block(runtime: "PipelineRuntime", inputs: object) -> CompiledBlockResult:
+        outputs = runtime._execute_loop_block(frame.name, inputs)
+        return CompiledBlockResult(last_node=frame.name, outputs=outputs)
+
+    return CompiledBlock(
+        name=block_name,
+        entry=frame.name,
+        exits=(frame.name,),
+        nodes=(frame.name,),
+        edge_routes={frame.name: ()},
+        callable=compiled_loop_block,
+        source=_loop_block_source(frame, instrumentation),
+        supports_full_trace=instrumentation.trace == "full",
+        supports_node_hooks=instrumentation.node_hooks,
+        kind="loop",
+    )
+
+
+def _interpreted_graph_block_source(name: str, nodes: tuple[str, ...], instrumentation: _Instrumentation) -> str:
+    return "\n".join(
+        [
+            "def compiled_block(runtime, state):",
+            f"    # interpreted graph block: {name}",
+            f"    # nodes: {nodes!r}",
+            "    last_node, outputs = runtime._execute_graph_block(",
+            f"        {name!r},",
+            f"        {nodes!r},",
+            "        state,",
+            "    )",
+            "    return CompiledBlockResult(last_node=last_node, outputs=outputs)",
+            f"# trace={instrumentation.trace!r} node_hooks={instrumentation.node_hooks!r}",
+        ]
+    )
+
+
+def _loop_block_source(frame: "NodeFrame", instrumentation: _Instrumentation) -> str:
+    return "\n".join(
+        [
+            "def compiled_loop_block(runtime, inputs):",
+            f"    # structured LoopBlock for {frame.name!r}",
+            f"    # body: {frame.loop_spec.body!r}",
+            f"    # max_iterations: {frame.loop_spec.max_iterations!r}",
+            f"    # stop: {_loop_stop_text(frame)!r}",
+            f"    outputs = runtime._execute_loop_block({frame.name!r}, inputs)",
+            f"    return CompiledBlockResult(last_node={frame.name!r}, outputs=outputs)",
+            f"# trace={instrumentation.trace!r} node_hooks={instrumentation.node_hooks!r}",
+        ]
     )
 
 
@@ -337,8 +424,40 @@ def _cfg_block_failure_lines() -> list[str]:
 
 
 def _frame_compilable(frame: "NodeFrame") -> bool:
-    return not frame.async_mode and not frame.is_nodeset and not frame.is_planned_stub
+    return not frame.async_mode and not frame.is_nodeset and not frame.is_loop and not frame.is_planned_stub
 
 
 def _outgoing_compilable(frame: "NodeFrame") -> bool:
     return frame.flow_kind == FLOW_KIND_DECISION or len(frame.outgoing) <= 1
+
+
+def _graph_block_compilable(plan: "ExecutionPlan") -> bool:
+    if not plan.order:
+        return False
+    nodes_by_name = {node.name: node for node in plan.graph.nodes}
+    if explicit_flow_cycles(nodes_by_name, plan.graph.edges):
+        return False
+    for name in plan.order:
+        frame = plan.frames[name]
+        if frame.async_mode or frame.is_nodeset or frame.is_planned_stub:
+            return False
+        if frame.is_loop and not _loop_block_compilable(frame):
+            return False
+        if not _outgoing_compilable(frame):
+            return False
+    return True
+
+
+def _loop_block_compilable(frame: "NodeFrame") -> bool:
+    if not frame.is_loop or frame.subplan is None:
+        return False
+    return graph_block(frame.subplan) is not None
+
+
+def _loop_stop_text(frame: "NodeFrame") -> str:
+    spec = frame.loop_spec
+    if spec.stop_after:
+        return f"stop_after: {spec.stop_after}"
+    if spec.stop_when.source:
+        return f"stop_when: {spec.stop_when.source} == {str(spec.stop_when.equals).lower()}"
+    return "unset"

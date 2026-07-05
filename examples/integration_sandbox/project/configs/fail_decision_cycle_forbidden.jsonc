@@ -1,0 +1,60 @@
+{
+  "pipeline": {
+    "inputs": [{"key": "value.in", "type": "value.in"}],
+    "nodes": [
+      {"name": "start", "type": "sandbox.start", "display_name": "Start", "description": "Starts the forbidden decision-cycle fixture."},
+      {
+        "name": "input",
+        "type": "sandbox.value_input",
+        "display_name": "Input",
+        "description": "Reads the initial loop value.",
+        "requires": [{"type": "value.in", "cardinality": "exactly_one"}],
+        "provides": [{"key": "value.in.input", "type": "value.in"}]
+      },
+      {
+        "name": "increment",
+        "type": "sandbox.increment",
+        "display_name": "Increment",
+        "description": "Advances the retry value.",
+        "requires": [{"type": "value.in", "cardinality": "exactly_one"}],
+        "provides": [{"key": "value.next", "type": "value.next"}]
+      },
+      {
+        "name": "done",
+        "type": "sandbox.done_check",
+        "display_name": "Done Check",
+        "description": "Routes to either repeat or exit.",
+        "requires": [{"type": "value.next", "cardinality": "exactly_one"}],
+        "provides": [{"key": "loop.done", "type": "loop.done"}],
+        "target": 2
+      },
+      {
+        "name": "copy",
+        "type": "sandbox.copy_back",
+        "display_name": "Copy Back",
+        "description": "Copies value.next back to value.in for the forbidden graph edge cycle.",
+        "requires": [
+          {"type": "value.next", "cardinality": "exactly_one"},
+          {"type": "loop.done", "cardinality": "exactly_one"}
+        ],
+        "provides": [{"key": "value.in.copy", "type": "value.in"}]
+      },
+      {
+        "name": "end",
+        "type": "sandbox.next_value_end",
+        "display_name": "End",
+        "description": "Shows that even an exit branch does not make ordinary cycles legal.",
+        "requires": [{"type": "value.next", "cardinality": "exactly_one"}]
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "input"},
+      {"from": "input", "to": "increment"},
+      {"from": "increment", "to": "done"},
+      {"from": "done", "to": "copy", "when": "loop.done == false"},
+      {"from": "done", "to": "end", "when": "loop.done == true"},
+      {"from": "copy", "to": "increment"}
+    ],
+    "outputs": [{"type": "value.next", "cardinality": "exactly_one"}]
+  }
+}

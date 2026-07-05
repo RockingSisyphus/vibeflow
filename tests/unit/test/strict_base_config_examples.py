@@ -110,7 +110,7 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         "CONFIG.LOOPS.REMOVED",
         "CONFIG.BOUNDARY.REMOVED",
         "BASE_LIB.FORBIDDEN_PROJECT_IMPORT",
-        "GRAPH.CYCLE.MISSING_DECISION_EXIT",
+        "GRAPH.CYCLE.FORBIDDEN",
         "GRAPH.EDGE.DUPLICATE",
         "GRAPH.EDGE.CONFLICTING_DUPLICATE",
         "GRAPH.SMELL.CONFUSING_NODE_NAME",
