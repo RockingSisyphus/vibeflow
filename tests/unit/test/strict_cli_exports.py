@@ -96,10 +96,36 @@ class Plugin:
     config_path.write_text(
         json.dumps(
             {
-                "base_lib": {"paths": ["base_lib"], "modules": ["base_lib.math_tools"]},
+                "base_lib": {
+                    "paths": ["base_lib"],
+                    "modules": [
+                        {
+                            "module": "base_lib.math_tools",
+                            "display_name": "Config Math Tools",
+                            "category": "math",
+                            "description": "Config-level math helper declaration.",
+                            "version": "0.1.0",
+                        }
+                    ],
+                },
                 "plugins": [
-                    {"module": str(plugin_path), "type": "policy"},
-                    {"name": "future_policy", "type": "policy", "status": "planned", "description": "planned policy"},
+                    {
+                        "module": str(plugin_path),
+                        "type": "policy",
+                        "display_name": "Config Policy",
+                        "category": "policy",
+                        "description": "Config-level policy declaration.",
+                        "version": "0.1.0",
+                    },
+                    {
+                        "name": "future_policy",
+                        "type": "policy",
+                        "status": "planned",
+                        "display_name": "Future Policy",
+                        "category": "policy",
+                        "description": "planned policy",
+                        "version": "0.1.0",
+                    },
                 ],
                 "pipeline": _seed_only_pipeline(),
             }
@@ -112,8 +138,10 @@ class Plugin:
 
     assert code == 0
     assert "resource_base_lib" in output
-    assert "Math Tools" in output
+    assert "Config Math Tools" in output
     assert "resource_plugins" in output
+    assert "Config Policy" in output
+    assert "desc: Config-level policy declaration." in output
     assert "future_policy" in output
 
 

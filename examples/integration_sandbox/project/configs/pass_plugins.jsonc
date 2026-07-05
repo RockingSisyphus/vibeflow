@@ -3,22 +3,38 @@
     {
       "module": "../plugins/policy_plugins.py",
       "class": "PolicyPlugin",
-      "type": "policy"
+      "type": "policy",
+      "display_name": "Policy Plugin",
+      "category": "sandbox",
+      "description": "Extends sandbox policy checks for the plugin fixture.",
+      "version": "0.1.0"
     },
     {
       "module": "../plugins/policy_plugins.py",
       "class": "FindingPlugin",
-      "type": "policy"
+      "type": "policy",
+      "display_name": "Finding Plugin",
+      "category": "sandbox",
+      "description": "Adds a sandbox graph finding through the policy plugin interface.",
+      "version": "0.1.0"
     },
     {
       "module": "../plugins/hook_plugins.py",
       "class": "CompilerPlugin",
-      "type": "compiler"
+      "type": "compiler",
+      "display_name": "Compiler Hook Plugin",
+      "category": "sandbox",
+      "description": "Records compiler hook calls for the plugin fixture.",
+      "version": "0.1.0"
     },
     {
       "module": "../plugins/hook_plugins.py",
       "class": "RuntimePlugin",
-      "type": "runtime"
+      "type": "runtime",
+      "display_name": "Runtime Hook Plugin",
+      "category": "sandbox",
+      "description": "Records runtime hook calls for the plugin fixture.",
+      "version": "0.1.0"
     }
   ],
   "nodesets": [

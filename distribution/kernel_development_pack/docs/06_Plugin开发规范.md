@@ -7,9 +7,34 @@
 ```jsonc
 {
   "plugins": [
-    {"module": "plugins/policy.py", "class": "PolicyPlugin", "type": "policy", "config": {"level": "strict"}},
-    {"module": "plugins/runtime.py", "class": "RuntimePlugin", "type": "runtime"},
-    {"name": "future_runtime_plugin", "type": "runtime", "status": "planned", "description": "planned runtime hook"}
+    {
+      "module": "plugins/policy.py",
+      "class": "PolicyPlugin",
+      "type": "policy",
+      "display_name": "Project Policy",
+      "category": "policy",
+      "description": "Project policy checks for this config.",
+      "version": "0.1.0",
+      "config": {"level": "strict"}
+    },
+    {
+      "module": "plugins/runtime.py",
+      "class": "RuntimePlugin",
+      "type": "runtime",
+      "display_name": "Runtime Hook",
+      "category": "runtime",
+      "description": "Runtime hook used by this config.",
+      "version": "0.1.0"
+    },
+    {
+      "name": "future_runtime_plugin",
+      "type": "runtime",
+      "status": "planned",
+      "display_name": "Future Runtime Plugin",
+      "category": "runtime",
+      "description": "planned runtime hook",
+      "version": "0.1.0"
+    }
   ]
 }
 ```
@@ -26,13 +51,15 @@
 - `conflict`：重复插件名时可设为 `replace`。
 - `name`：可覆盖插件实例的 `name`。
 - `scope`：默认 `project`，会出现在插件描述信息中。
-- `description`：planned 插件可用它在 Mermaid 中说明用途。
+- `display_name`：config 中本次启用该插件的易读名，用于 Mermaid/SVG。
+- `description`：config 中本次启用该插件的用途说明，用于 Mermaid/SVG。
+- `category` / `version`：可选展示元数据。
 
 `boundary` 插件类型已移除。
 
 `module` 既可以是模块名，也可以是 `.py` 文件路径。写成路径时，相对当前 config 文件所在目录解析。模板里 `project/configs/main.jsonc` 引用插件时通常写 `../plugins/policy.py`。
 
-implemented plugin 必须暴露 `PLUGIN_INFO`，用于 inspect 和 Mermaid 展示名称、类别、版本和功能说明。planned plugin 可以不存在、不会加载、不会注册到 `PluginRegistry`，也不会执行任何 policy/compiler/runtime hook。
+implemented plugin 必须暴露 `PLUGIN_INFO`，用于 inspect 和 Mermaid 展示名称、类别、版本和功能说明。config 声明本身也必须写 `display_name` 和 `description`；缺失会产生 `CONFIG.SMELL.MISSING_PLUGIN_DISPLAY_NAME` 或 `CONFIG.SMELL.MISSING_PLUGIN_DESCRIPTION` warning，即使 `PLUGIN_INFO` 已经完整。planned plugin 可以不存在、不会加载、不会注册到 `PluginRegistry`，也不会执行任何 policy/compiler/runtime hook。
 
 插件设置传递规则：
 

@@ -67,9 +67,9 @@ def run_checked(
     )
     effective_policy = policy_result.effective_policy.to_dict()
     _write_json(run_dir / "effective_policy.json", effective_policy)
-    _refuse_on_schema_findings(document.data, (*resource_findings, *policy_result.findings), effective_policy, run_dir, actual_run_id)
+    preflight_warnings = _refuse_on_schema_findings(document.data, (*resource_findings, *policy_result.findings), effective_policy, run_dir, actual_run_id)
     graph, compiled = _compile_or_refuse(document.data, plugin_registry, effective_policy, run_dir, actual_run_id, config_path=path)
-    health = _validate_run_health(graph, registry, plugin_registry, policy_result, effective_policy, document.nodeset_imports, resources)
+    health = _validate_run_health(graph, registry, plugin_registry, policy_result, effective_policy, document.nodeset_imports, resources, preflight_warnings=preflight_warnings)
     _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources, runtime_options=runtime_options)
     if health.status not in {"FAIL", "ERROR"}:
         compiled = _compile_with_registry_or_refuse(graph, registry, effective_policy, run_dir, actual_run_id)
@@ -122,21 +122,29 @@ def _refuse_on_schema_findings(
     effective_policy: dict[str, Any],
     run_dir: Path,
     run_id: str,
-) -> None:
+) -> tuple[HealthFinding, ...]:
     schema_findings = (*collect_config_schema_findings(config_data), *policy_findings)
-    if schema_findings:
+    errors = tuple(finding for finding in schema_findings if finding.severity == "error")
+    warnings = tuple(finding for finding in schema_findings if finding.severity == "warning")
+    if errors:
         health = _schema_health_report(schema_findings, effective_policy)
         _write_refused_artifacts(run_dir, health)
         result = CheckedRunResult(run_id, run_dir, health)
         raise CheckedRunError(f"run refused: health status {health.status}", result)
+    return warnings
 
 
 def _schema_health_report(findings: tuple[HealthFinding, ...], effective_policy: dict[str, Any]) -> HealthReport:
-    status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin", "base_lib"} for finding in findings) else "FAIL"
+    errors = tuple(finding for finding in findings if finding.severity == "error")
+    warnings = tuple(finding for finding in findings if finding.severity == "warning")
+    if errors:
+        status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin", "base_lib"} for finding in errors) else "FAIL"
+    else:
+        status = "CONCERNS" if warnings else "PASS"
     return HealthReport(
         status=status,
-        errors=tuple(finding for finding in findings if finding.severity == "error"),
-        warnings=tuple(finding for finding in findings if finding.severity == "warning"),
+        errors=errors,
+        warnings=warnings,
         effective_policy=effective_policy,
     )
 
@@ -210,6 +218,7 @@ def _validate_run_health(
     effective_policy: dict[str, Any],
     nodeset_imports: tuple[Mapping[str, Any], ...],
     resources: ConfigResources,
+    preflight_warnings: tuple[HealthFinding, ...] = (),
 ) -> HealthReport:
     from .health import validate_graph_health
 
@@ -224,7 +233,9 @@ def _validate_run_health(
     info = dict(health.info)
     info["nodeset_imports"] = [dict(item) for item in nodeset_imports]
     info["resources"] = resources.to_dict()
-    return replace(health, effective_policy=effective_policy, info=info)
+    warnings = (*preflight_warnings, *health.warnings)
+    status = "CONCERNS" if health.status == "PASS" and warnings else health.status
+    return replace(health, status=status, warnings=warnings, effective_policy=effective_policy, info=info)
 
 
 def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None, resources: ConfigResources | None = None) -> None:

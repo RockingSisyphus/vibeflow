@@ -3,7 +3,11 @@
     {
       "module": "plugins.py",
       "class": "Plugin",
-      "type": "policy"
+      "type": "policy",
+      "display_name": "Example Policy",
+      "category": "example",
+      "description": "Policy plugin for the minimal example project.",
+      "version": "0.1.0"
     }
   ],
   "base_lib": {
@@ -13,7 +17,11 @@
     "modules": [
       {
         "module": "base_lib.math_tools",
-        "status": "implemented"
+        "status": "implemented",
+        "display_name": "Math Tools",
+        "category": "example",
+        "description": "Arithmetic helper functions used by the minimal example.",
+        "version": "0.1.0"
       }
     ]
   },

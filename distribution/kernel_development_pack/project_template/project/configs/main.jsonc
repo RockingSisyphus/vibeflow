@@ -6,7 +6,11 @@
     "modules": [
       {
         "module": "base_lib.math_tools",
-        "status": "implemented"
+        "status": "implemented",
+        "display_name": "Math Tools",
+        "category": "demo",
+        "description": "Pure arithmetic helpers used by the template workflow.",
+        "version": "0.1.0"
       }
     ]
   },
@@ -14,7 +18,11 @@
     {
       "module": "../plugins/policy.py",
       "class": "PolicyPlugin",
-      "type": "policy"
+      "type": "policy",
+      "display_name": "Project Policy",
+      "category": "demo",
+      "description": "Template project policy extension for health checks.",
+      "version": "0.1.0"
     }
   ],
   "pipeline": {

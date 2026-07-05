@@ -212,12 +212,14 @@ def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
         plugin_registry, plugin_findings = load_plugins_from_config(document.data, base_path=config_path.parent)
         resources, resource_findings = load_config_resources(document.data, base_path=config_path.parent, plugin_registry=plugin_registry)
         schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *plugin_findings, *resource_findings))
-        if schema_findings:
-            status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin", "base_lib"} for finding in schema_findings) else "FAIL"
+        schema_errors = tuple(finding for finding in schema_findings if finding.severity == "error")
+        schema_warnings = tuple(finding for finding in schema_findings if finding.severity == "warning")
+        if schema_errors:
+            status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin", "base_lib"} for finding in schema_errors) else "FAIL"
             report = HealthReport(
                 status=status,
-                errors=tuple(finding for finding in schema_findings if finding.severity == "error"),
-                warnings=tuple(finding for finding in schema_findings if finding.severity == "warning"),
+                errors=schema_errors,
+                warnings=schema_warnings,
                 effective_policy=default_effective_policy().to_dict(),
             )
             print(report.to_json())

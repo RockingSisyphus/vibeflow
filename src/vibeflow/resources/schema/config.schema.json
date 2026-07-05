@@ -44,7 +44,10 @@
                   "module": { "type": "string", "minLength": 1 },
                   "name": { "type": "string", "minLength": 1 },
                   "status": { "enum": ["planned", "implemented"] },
-                  "description": { "type": "string" }
+                  "display_name": { "type": "string" },
+                  "category": { "type": "string" },
+                  "description": { "type": "string" },
+                  "version": { "type": "string" }
                 },
                 "anyOf": [
                   { "required": ["module"] },
@@ -76,7 +79,10 @@
               "enabled": { "type": "boolean" },
               "conflict": { "enum": ["error", "replace"] },
               "scope": { "type": "string" },
+              "display_name": { "type": "string" },
+              "category": { "type": "string" },
               "description": { "type": "string" },
+              "version": { "type": "string" },
               "config": { "type": "object" },
               "settings": { "type": "object" }
             },

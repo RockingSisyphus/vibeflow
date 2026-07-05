@@ -77,6 +77,44 @@ def test_mermaid_config_uses_readable_svg_spacing_defaults(tmp_path) -> None:
     assert flowchart["diagramPadding"] == mermaid_render.DEFAULT_FLOWCHART_DIAGRAM_PADDING
 
 
+def test_mermaid_svg_label_enhancement_styles_native_text_without_touching_edges(tmp_path) -> None:
+    import vibeflow.mermaid_render as mermaid_render
+
+    svg = tmp_path / "graph.svg"
+    svg.write_text(
+        """
+<svg xmlns="http://www.w3.org/2000/svg">
+  <g class="node defaultNode">
+    <rect class="basic label-container" x="-80" width="160"/>
+    <g class="label">
+      <text>
+        <tspan class="text-outer-tspan row" x="0"><tspan font-weight="normal">Readable</tspan><tspan font-weight="normal"> Title</tspan></tspan>
+        <tspan class="text-outer-tspan row" x="0"><tspan font-weight="normal">id:</tspan><tspan font-weight="normal"> node_a</tspan></tspan>
+        <tspan class="text-outer-tspan row" x="0"><tspan font-weight="normal">----------</tspan><tspan font-weight="normal"> meta</tspan><tspan font-weight="normal"> ----------</tspan></tspan>
+        <tspan class="text-outer-tspan row" x="0"><tspan font-weight="normal">desc:</tspan><tspan font-weight="normal"> useful</tspan></tspan>
+      </text>
+    </g>
+  </g>
+  <g class="edgeLabel">
+    <text><tspan class="text-outer-tspan row" x="0"><tspan font-weight="normal">id:</tspan></tspan></text>
+  </g>
+</svg>
+""".strip(),
+        encoding="utf-8",
+    )
+
+    mermaid_render._enhance_svg_labels(svg)
+    text = svg.read_text(encoding="utf-8")
+
+    assert 'font-weight="700" font-size="1.05em">Readable' in text
+    assert 'x="-66" text-anchor="start"><tspan font-weight="700">id:</tspan>' in text
+    assert 'x="-66" text-anchor="start"><tspan font-weight="700">desc:</tspan>' in text
+    assert 'fill:#64748b !important' in text
+    edge_text = text[text.index('<g class="edgeLabel"') :]
+    assert 'font-weight="normal">id:</tspan>' in edge_text
+    assert 'font-weight="700">id:</tspan>' not in edge_text
+
+
 def test_mermaid_renderer_finds_distribution_kernel_tool_path(tmp_path, monkeypatch) -> None:
     import vibeflow.mermaid_render as mermaid_render
 

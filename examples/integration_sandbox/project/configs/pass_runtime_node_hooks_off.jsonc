@@ -3,12 +3,20 @@
     {
       "module": "../plugins/hook_plugins.py",
       "class": "CompilerPlugin",
-      "type": "compiler"
+      "type": "compiler",
+      "display_name": "Compiler Hook Plugin",
+      "category": "sandbox",
+      "description": "Compiler hook plugin used while runtime node hooks are disabled.",
+      "version": "0.1.0"
     },
     {
       "module": "../plugins/hook_plugins.py",
       "class": "RuntimePlugin",
-      "type": "runtime"
+      "type": "runtime",
+      "display_name": "Runtime Hook Plugin",
+      "category": "sandbox",
+      "description": "Runtime hook plugin used while node-level hook execution is disabled.",
+      "version": "0.1.0"
     }
   ],
   "pipeline": {

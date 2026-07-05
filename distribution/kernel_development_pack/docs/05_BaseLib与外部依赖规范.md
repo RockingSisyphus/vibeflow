@@ -37,8 +37,22 @@ base_lib 应保持：
   "base_lib": {
     "paths": ["../base_lib"],
     "modules": [
-      {"module": "base_lib.math_tools", "status": "implemented"},
-      {"module": "base_lib.future_tools", "status": "planned", "description": "planned helper library"}
+      {
+        "module": "base_lib.math_tools",
+        "status": "implemented",
+        "display_name": "Math Tools",
+        "category": "math",
+        "description": "Pure arithmetic helpers.",
+        "version": "0.1.0"
+      },
+      {
+        "module": "base_lib.future_tools",
+        "status": "planned",
+        "display_name": "Future Tools",
+        "category": "math",
+        "description": "planned helper library",
+        "version": "0.1.0"
+      }
     ]
   }
 }
@@ -46,7 +60,7 @@ base_lib 应保持：
 
 `paths` 是相对 config 文件目录解析的路径。只有 `modules` 里声明为 `implemented` 的模块会进入 node import allowlist。声明为 `planned` 的 base_lib 只用于规划和 Mermaid 展示，不会加载，也不能满足 implemented node 的 import 校验。
 
-implemented base_lib 必须暴露 `BASE_LIB_INFO`，用于 inspect 和 Mermaid 展示模块名称、类别、版本和功能说明。planned base_lib 可以不存在，但必须至少有 `module` 或 `name`，建议写 `description`。
+implemented base_lib 必须暴露 `BASE_LIB_INFO`，用于 inspect 和 Mermaid 展示模块名称、类别、版本和功能说明。config 声明本身也必须写 `display_name` 和 `description`，说明本项目为什么启用这个 helper；缺失会产生 `CONFIG.SMELL.MISSING_BASE_LIB_DISPLAY_NAME` 或 `CONFIG.SMELL.MISSING_BASE_LIB_DESCRIPTION` warning。planned base_lib 可以不存在，但也必须至少有 `module` 或 `name`，并写清 `display_name`、`description`。
 
 ## base_lib 适合放什么
 
