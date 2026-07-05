@@ -40,6 +40,18 @@ class _RuntimeState:
     active_edges: set[tuple[str, str]] = field(default_factory=set)
 
 
+@dataclass(frozen=True)
+class _AsyncOutputs:
+    outputs: Mapping[str, object]
+    child_trace: RuntimeTrace | None = None
+
+
+class _NestedRuntimeFailure(PipelineRuntimeError):
+    def __init__(self, message: str, child_trace: RuntimeTrace) -> None:
+        super().__init__(message)
+        self.child_trace = child_trace
+
+
 class PipelineRuntime:
     def __init__(
         self,
@@ -478,22 +490,37 @@ class PipelineRuntime:
         if frame.is_planned_stub:
             return self._execute_planned_stub_outputs(frame, inputs)
         if frame.is_nodeset:
-            return self._run_nodeset_outputs(frame, inputs)
+            outputs, child_trace = self._run_nodeset_outputs_with_trace(frame, inputs, cached=False)
+            return _AsyncOutputs(outputs=outputs, child_trace=child_trace)
         return self._execute_pure_outputs(frame, inputs)
 
     def _run_nodeset_outputs(self, frame: NodeFrame, inputs: Mapping[str, object], *, cached: bool = False) -> Mapping[str, object]:
+        try:
+            outputs, child_trace = self._run_nodeset_outputs_with_trace(frame, inputs, cached=cached)
+        except _NestedRuntimeFailure as exc:
+            self._merge_child_trace(frame, exc.child_trace)
+            if exc.__cause__ is not None:
+                raise exc.__cause__ from exc
+            raise
+        self._merge_child_trace(frame, child_trace)
+        return outputs
+
+    def _run_nodeset_outputs_with_trace(self, frame: NodeFrame, inputs: Mapping[str, object], *, cached: bool = False) -> tuple[Mapping[str, object], RuntimeTrace]:
         if frame.subplan is None:
             raise PipelineRuntimeError(f"nodeset node '{frame.name}' has no execution plan")
         if set(frame.provide_keys) - set(frame.export_keys):
             raise PipelineRuntimeError(f"nodeset '{frame.nodeset_name}' cannot export undeclared keys: {sorted(set(frame.provide_keys) - set(frame.export_keys))}")
         runtime = self._nodeset_runtime(frame) if cached else PipelineRuntime._from_plan(self, frame.subplan)
         initial = _nodeset_inputs_to_initial(inputs, frame.subplan.graph.inputs)
-        nested_result = runtime.run(initial)
+        try:
+            nested_result = runtime.run(initial)
+        except Exception as exc:
+            raise _NestedRuntimeFailure(str(exc), runtime.trace) from exc
         outputs = {}
         for provider in frame.provides:
             nested_value = nested_result.get(provider.type)
             outputs[provider.key] = _result_value(nested_value)
-        return outputs
+        return outputs, runtime.trace
 
     def _nodeset_runtime(self, frame: NodeFrame) -> "PipelineRuntime":
         runtime = self._nodeset_runtimes.get(frame.name)
@@ -517,7 +544,14 @@ class PipelineRuntime:
     def _join_async_source(self, node_name: str, state: _RuntimeState) -> None:
         frame, future = self._async_results.pop(node_name)
         try:
-            outputs = future.result()
+            outputs = self._unwrap_async_outputs(frame, future.result())
+        except _NestedRuntimeFailure as exc:
+            self._merge_child_trace(frame, exc.child_trace)
+            self._record_runtime_event("node_failed", frame.name, frame.node_type, failure=str(exc))
+            self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(exc))
+            if exc.__cause__ is not None:
+                raise exc.__cause__ from exc
+            raise
         except Exception as exc:
             self._record_runtime_event("node_failed", frame.name, frame.node_type, failure=str(exc))
             self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(exc))
@@ -592,10 +626,14 @@ class PipelineRuntime:
         timeout = self.runtime_options.async_flush_timeout
         for frame, future in self._detached:
             try:
-                outputs = future.result(timeout=timeout)
+                outputs = self._unwrap_async_outputs(frame, future.result(timeout=timeout))
             except TimeoutError:
                 self._detached_timeout = True
                 self._record_runtime_event("async_detached_timeout", frame.name, frame.node_type, failure="async detached flush timed out")
+                continue
+            except _NestedRuntimeFailure as exc:
+                self._merge_child_trace(frame, exc.child_trace)
+                self._record_runtime_event("async_detached_failed", frame.name, frame.node_type, failure=str(exc))
                 continue
             except Exception as exc:
                 self._record_runtime_event("async_detached_failed", frame.name, frame.node_type, failure=str(exc))
@@ -610,8 +648,7 @@ class PipelineRuntime:
             self._executor = None
 
     def _record_edge(self, edge: EdgeSpec) -> None:
-        key = f"{edge.source}->{edge.target}"
-        self.trace.edge_executions[key] = self.trace.edge_executions.get(key, 0) + 1
+        self.trace.record_edge(edge.source, edge.target)
 
     def _activate_edge(self, edge: EdgeSpec, state: _RuntimeState) -> None:
         state.active_edges.add(edge.pair)
@@ -624,8 +661,7 @@ class PipelineRuntime:
 
     def _mark_node_run(self, node_name: str) -> None:
         self._node_runs[node_name] = self._node_runs.get(node_name, 0) + 1
-        self.trace.node_runs[node_name] = self._node_runs[node_name]
-        self.trace.exec_order.append(node_name)
+        self.trace.record_node_run(node_name, self._node_runs[node_name])
 
     def _write_trace(self, result: RunResult) -> None:
         payload = self.trace.to_dict()
@@ -633,6 +669,10 @@ class PipelineRuntime:
         result.set("runtime.edge_executions", payload["edge_executions"])
         result.set("runtime.step_count", payload["step_count"])
         result.set("runtime.node_runs", payload["node_runs"])
+        result.set("runtime.qualified_exec_order", payload["qualified_exec_order"])
+        result.set("runtime.qualified_edge_executions", payload["qualified_edge_executions"])
+        result.set("runtime.qualified_node_runs", payload["qualified_node_runs"])
+        result.set("runtime.total_step_count", payload["total_step_count"])
         result.set("runtime.stop_reason", payload["stop_reason"])
         result.set("runtime.current_node", payload["current_node"])
         result.set("runtime.exception", payload["exception"])
@@ -675,11 +715,23 @@ class PipelineRuntime:
             event["failure"] = failure
         if details is not None:
             event["details"] = dict(details)
-        self.trace.events.append(event)
+        self.trace.add_event(event, (node_name,))
 
     def _record_run_boundary(self, kind: str) -> None:
         if self.runtime_options.trace == "boundary":
             self._record_runtime_event(kind, "pipeline", "pipeline")
+
+    def _merge_child_trace(self, frame: NodeFrame, child_trace: RuntimeTrace) -> None:
+        self.trace.merge_child((frame.name,), child_trace)
+
+    def _unwrap_async_outputs(self, frame: NodeFrame, value: object) -> Mapping[str, object]:
+        if isinstance(value, _AsyncOutputs):
+            if value.child_trace is not None:
+                self._merge_child_trace(frame, value.child_trace)
+            return value.outputs
+        if isinstance(value, Mapping):
+            return value
+        raise PipelineRuntimeError(f"async node '{frame.name}' returned non-mapping outputs")
 
 
 def _store_output(result: RunResult, result_key: str, envelope: DataEnvelope) -> None:

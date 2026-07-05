@@ -138,6 +138,7 @@
           "version": { "type": "string" },
           "description": { "type": "string" },
           "style": { "$ref": "#/$defs/nodeStyle" },
+          "similar_to": { "$ref": "#/$defs/nodeSimilarity" },
           "requires": { "type": "array", "items": { "$ref": "#/$defs/dataRequirement" } },
           "provides": { "type": "array", "items": { "$ref": "#/$defs/dataProvider" } },
           "config": { "type": "object" },
@@ -169,6 +170,16 @@
         "fill": { "$ref": "#/$defs/hexColor" },
         "stroke": { "$ref": "#/$defs/hexColor" },
         "text": { "$ref": "#/$defs/hexColor" }
+      },
+      "additionalProperties": false
+    },
+    "nodeSimilarity": {
+      "type": "object",
+      "required": ["node", "relationship", "reason"],
+      "properties": {
+        "node": { "type": "string", "minLength": 1 },
+        "relationship": { "enum": ["variant", "copy"] },
+        "reason": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },

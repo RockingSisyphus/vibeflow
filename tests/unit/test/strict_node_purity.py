@@ -40,6 +40,105 @@ def test_graph_health_reports_node_metrics_duplicate_logic_and_confusing_node_na
     rule_ids = {warning["rule_id"] for warning in payload["warnings"]}
     assert "GRAPH.SMELL.CONFUSING_NODE_NAME" in rule_ids
     assert "GRAPH.SMELL.DUPLICATE_LOGIC" in rule_ids
+    duplicate = next(warning for warning in payload["warnings"] if warning["rule_id"] == "GRAPH.SMELL.DUPLICATE_LOGIC")
+    assert duplicate["details"]["nodes"] == ["DuplicateOne", "duplicate_two"]
+    assert duplicate["details"]["node_types"] == {"DuplicateOne": "test.duplicate_one", "duplicate_two": "test.duplicate_two"}
+    assert duplicate["details"]["fingerprint"]
+    assert duplicate["details"]["duplicate_group"] == ["DuplicateOne", "duplicate_two"]
+    assert "similar_to" in duplicate["details"]["suppression_hint"]
+    from vibeflow.cli_reports import format_finding_text
+
+    text = format_finding_text(next(warning for warning in report.warnings if warning.rule_id == "GRAPH.SMELL.DUPLICATE_LOGIC"))
+    assert "\n  details:" in text
+    assert '"nodes":["DuplicateOne","duplicate_two"]' in text
+
+
+def test_graph_health_suppresses_declared_similar_duplicate_logic_pairs() -> None:
+    registry = NodeRegistry()
+    register_node(registry, "test.duplicate_one", DuplicateOneNode)
+    register_node(registry, "test.duplicate_two", DuplicateTwoNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("base", "test.duplicate_one", "Produces the base duplicate fixture value.", provides=[PROV_SPEC("dup.base")]),
+                    _node_call(
+                        "variant",
+                        "test.duplicate_two",
+                        "Produces an intentional variant duplicate fixture value.",
+                        provides=[PROV_SPEC("dup.variant")],
+                        similar_to={"node": "base", "relationship": "variant", "reason": "Same pure shape, different contract semantics."},
+                    ),
+                ]
+            }
+        }
+    )
+
+    report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
+
+    assert "GRAPH.SMELL.DUPLICATE_LOGIC" not in {warning.rule_id for warning in report.warnings}
+
+
+def test_graph_health_suppresses_duplicate_logic_when_nodes_share_declared_base() -> None:
+    registry = _registry()
+    register_node(registry, "test.duplicate_one", DuplicateOneNode)
+    register_node(registry, "test.duplicate_two", DuplicateTwoNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("base", "test.seed", "Produces the shared base fixture value.", provides=[PROV_SPEC("value.in")]),
+                    _node_call(
+                        "left",
+                        "test.duplicate_one",
+                        "Produces the left duplicate fixture value.",
+                        provides=[PROV_SPEC("dup.left")],
+                        similar_to={"node": "base", "relationship": "variant", "reason": "Variant of the shared fixture base."},
+                    ),
+                    _node_call(
+                        "right",
+                        "test.duplicate_two",
+                        "Produces the right duplicate fixture value.",
+                        provides=[PROV_SPEC("dup.right")],
+                        similar_to={"node": "base", "relationship": "variant", "reason": "Variant of the shared fixture base."},
+                    ),
+                ]
+            }
+        }
+    )
+
+    report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
+
+    assert "GRAPH.SMELL.DUPLICATE_LOGIC" not in {warning.rule_id for warning in report.warnings}
+
+
+def test_graph_health_keeps_unclaimed_duplicate_logic_pairs() -> None:
+    registry = NodeRegistry()
+    register_node(registry, "test.duplicate_one", DuplicateOneNode)
+    register_node(registry, "test.duplicate_two", DuplicateTwoNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("base", "test.duplicate_one", "Produces the base duplicate fixture value.", provides=[PROV_SPEC("dup.base")]),
+                    _node_call(
+                        "variant",
+                        "test.duplicate_two",
+                        "Produces an intentional variant duplicate fixture value.",
+                        provides=[PROV_SPEC("dup.variant")],
+                        similar_to={"node": "base", "relationship": "copy", "reason": "Copied implementation for a distinct contract."},
+                    ),
+                    _node_call("unclaimed", "test.duplicate_two", "Produces an undeclared duplicate fixture value.", provides=[PROV_SPEC("dup.unclaimed")]),
+                ]
+            }
+        }
+    )
+
+    report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
+    duplicate_object_ids = {warning.object_id for warning in report.warnings if warning.rule_id == "GRAPH.SMELL.DUPLICATE_LOGIC"}
+
+    assert "base,variant" not in duplicate_object_ids
+    assert {"base,unclaimed", "unclaimed,variant"} <= duplicate_object_ids
 
 
 def test_graph_health_policy_can_exempt_findings() -> None:

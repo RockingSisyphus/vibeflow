@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from .health_types import HealthFinding
+from .graph_config import SIMILAR_TO_RELATIONSHIPS
 from .node import FLOW_KINDS
 from .planned_behavior import PLANNED_BEHAVIOR_BLOCKING, PLANNED_BEHAVIOR_PYTHON_STUB, PLANNED_BEHAVIOR_TRANSPARENT, validate_stub_module_ref
 from .schema_findings import schema_finding
@@ -55,6 +56,7 @@ def _validate_pipeline(value: Mapping[str, Any], prefix: str, findings: list[Hea
     else:
         for index, node in enumerate(nodes):
             _validate_node(node, f"{prefix}.nodes[{index}]", findings)
+        _validate_node_similarity_targets(nodes, f"{prefix}.nodes", findings)
 
     if "edges" in value:
         edges = value["edges"]
@@ -80,6 +82,7 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
     _validate_node_contract_fields(value, prefix, findings)
     _validate_node_config_fields(value, prefix, findings)
     _validate_node_visual_fields(value, prefix, findings)
+    _validate_node_similarity(value, prefix, findings)
     _validate_node_async_fields(value, prefix, findings)
 
 
@@ -150,6 +153,45 @@ def _validate_node_visual_fields(value: Mapping[str, Any], prefix: str, findings
                     f"{prefix}.style.{field}",
                 )
             )
+
+
+def _validate_node_similarity(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
+    if "similar_to" not in value:
+        return
+    similar_to = value["similar_to"]
+    if not isinstance(similar_to, Mapping):
+        findings.append(_error("CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID", f"{prefix}.similar_to must be an object", f"{prefix}.similar_to"))
+        return
+    unknown = sorted(set(str(key) for key in similar_to) - {"node", "relationship", "reason"})
+    if unknown:
+        findings.append(_error("CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID", f"{prefix}.similar_to contains unknown keys: {unknown}", f"{prefix}.similar_to"))
+    target = similar_to.get("node")
+    relationship = similar_to.get("relationship")
+    reason = similar_to.get("reason")
+    if not _non_empty_string(target):
+        findings.append(_error("CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID", f"{prefix}.similar_to.node must be a non-empty string", f"{prefix}.similar_to.node"))
+    if relationship not in SIMILAR_TO_RELATIONSHIPS:
+        findings.append(_error("CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID", f"{prefix}.similar_to.relationship must be variant or copy", f"{prefix}.similar_to.relationship"))
+    if not _non_empty_string(reason):
+        findings.append(_error("CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID", f"{prefix}.similar_to.reason must be a non-empty string", f"{prefix}.similar_to.reason"))
+
+
+def _validate_node_similarity_targets(nodes: list[Any], prefix: str, findings: list[HealthFinding]) -> None:
+    names = {str(node.get("name", "")).strip() for node in nodes if isinstance(node, Mapping) and _non_empty_string(node.get("name"))}
+    for index, node in enumerate(nodes):
+        if not isinstance(node, Mapping):
+            continue
+        similar_to = node.get("similar_to")
+        if not isinstance(similar_to, Mapping):
+            continue
+        name = str(node.get("name", "")).strip()
+        target = str(similar_to.get("node", "")).strip()
+        if not name or not target:
+            continue
+        if target == name:
+            findings.append(_error("CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID", f"{prefix}[{index}].similar_to.node cannot reference itself", f"{prefix}[{index}].similar_to.node"))
+        elif target not in names:
+            findings.append(_error("CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID", f"{prefix}[{index}].similar_to.node references unknown node: {target}", f"{prefix}[{index}].similar_to.node"))
 
 
 def _validate_node_async_fields(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:

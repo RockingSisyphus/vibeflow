@@ -67,7 +67,7 @@ def _render_main_column(renderer: Any, lines: list[str], graph: GraphConfig, com
     lines.append("    direction TB")
     _render_anchor(lines, anchor, indent="    ")
     renderer._render_graph_body(lines, graph, compiled, prefix="", indent="    ", visited_nodesets=(), expand_inline=False)
-    renderer._render_edges(lines, compiled, prefix="", indent="    ")
+    renderer._render_edges(lines, graph, compiled, prefix="", indent="    ")
     if graph.nodes:
         lines.append(f"    {anchor} ~~~ {_safe_id(graph.nodes[0].name)}")
     lines.append("  end")
@@ -152,7 +152,7 @@ def _render_one_nodeset(renderer: Any, lines: list[str], node: Any, nodeset: Any
         visited_nodesets=(nodeset.name,),
         expand_inline=True,
     )
-    renderer._render_edges(lines, nested_compiled, prefix=nested_prefix, indent="      ")
+    renderer._render_edges(lines, nodeset.graph, nested_compiled, prefix=nested_prefix, indent="      ")
     if nodeset.graph.nodes:
         lines.append(f"      {group_anchor} ~~~ {_safe_id(f'{nested_prefix}{nodeset.graph.nodes[0].name}')}")
     lines.append("    end")

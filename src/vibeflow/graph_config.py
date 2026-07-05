@@ -18,6 +18,7 @@ from .visual_style import NODE_STYLE_FIELDS, is_hex_color, is_reserved_system_co
 STATUS_PLANNED = "planned"
 STATUS_IMPLEMENTED = "implemented"
 STATUSES = frozenset({STATUS_PLANNED, STATUS_IMPLEMENTED})
+SIMILAR_TO_RELATIONSHIPS = frozenset({"variant", "copy"})
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,22 @@ class NodeStyle:
 
 
 @dataclass(frozen=True)
+class NodeSimilarity:
+    node: str = ""
+    relationship: str = ""
+    reason: str = ""
+
+    def to_dict(self) -> dict[str, str]:
+        if not self.node:
+            return {}
+        return {
+            "node": self.node,
+            "relationship": self.relationship,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
 class NodeSpec:
     name: str
     node_type: str
@@ -55,6 +72,7 @@ class NodeSpec:
     params: dict[str, Any] = field(default_factory=dict)
     metadata: NodeMetadata = field(default_factory=NodeMetadata)
     style: NodeStyle = field(default_factory=NodeStyle)
+    similar_to: NodeSimilarity = field(default_factory=NodeSimilarity)
     node_config_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
     allow_config_override: bool = False
     status: str = STATUS_IMPLEMENTED
@@ -130,6 +148,7 @@ def parse_graph_config(config: Mapping[str, Any], *, project_root: str | Path | 
     names = {node.name for node in nodes}
     if len(names) != len(nodes):
         raise GraphConfigError("duplicate node name")
+    _validate_node_similarity_targets(nodes, field="pipeline.nodes")
     edges = tuple(_parse_edge(item, index=index) for index, item in enumerate(raw.get("edges", [])))
     try:
         inputs = parse_data_providers(raw.get("inputs", ()), field="pipeline.inputs")
@@ -195,6 +214,7 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         "version",
         "description",
         "style",
+        "similar_to",
     }
     return NodeSpec(
         name=name,
@@ -204,6 +224,7 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         params=_parse_node_params(item, reserved=reserved, field=f"node[{name}].config"),
         metadata=_parse_node_metadata(item),
         style=_parse_node_style(item.get("style", {}), field=f"pipeline.nodes[{index}].style"),
+        similar_to=_parse_node_similarity(item.get("similar_to", {}), field=f"pipeline.nodes[{index}].similar_to"),
         node_config_overrides=_parse_node_config_overrides(item.get("node_configs", {}), field=f"node[{name}].node_configs"),
         allow_config_override=_parse_bool(item.get("allow_config_override", item.get("override_child_config", False)), field=f"node[{name}].allow_config_override"),
         status=status,
@@ -399,6 +420,38 @@ def _parse_node_style(value: Any, *, field: str) -> NodeStyle:
             raise GraphConfigError(f"{field}.{key} uses reserved VibeFlow system color: {normalized}")
         parsed[key] = normalized
     return NodeStyle(fill=parsed.get("fill", ""), stroke=parsed.get("stroke", ""), text=parsed.get("text", ""))
+
+
+def _parse_node_similarity(value: Any, *, field: str) -> NodeSimilarity:
+    if value in (None, {}):
+        return NodeSimilarity()
+    if not isinstance(value, Mapping):
+        raise GraphConfigError(f"CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID: {field} must be an object")
+    unknown = sorted(set(str(key) for key in value) - {"node", "relationship", "reason"})
+    if unknown:
+        raise GraphConfigError(f"CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID: {field} contains unknown keys: {unknown}")
+    node = str(value.get("node", "")).strip()
+    relationship = str(value.get("relationship", "")).strip()
+    reason = str(value.get("reason", "")).strip()
+    if not node:
+        raise GraphConfigError(f"CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID: {field}.node must be a non-empty string")
+    if relationship not in SIMILAR_TO_RELATIONSHIPS:
+        raise GraphConfigError(f"CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID: {field}.relationship must be variant or copy")
+    if not reason:
+        raise GraphConfigError(f"CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID: {field}.reason must be a non-empty string")
+    return NodeSimilarity(node=node, relationship=relationship, reason=reason)
+
+
+def _validate_node_similarity_targets(nodes: tuple[NodeSpec, ...], *, field: str) -> None:
+    names = {node.name for node in nodes}
+    for index, node in enumerate(nodes):
+        target = node.similar_to.node
+        if not target:
+            continue
+        if target == node.name:
+            raise GraphConfigError(f"CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID: {field}[{index}].similar_to.node cannot reference itself")
+        if target not in names:
+            raise GraphConfigError(f"CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID: {field}[{index}].similar_to.node references unknown node: {target}")
 
 
 def _parse_node_config_overrides(value: Any, *, field: str) -> dict[str, dict[str, Any]]:

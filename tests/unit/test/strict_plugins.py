@@ -166,9 +166,9 @@ def test_health_report_and_mermaid_export() -> None:
     assert serialized["warnings"][0]["rule_id"] == "GRAPH.SMELL.DUPLICATE_LOGIC"
     mermaid = export_mermaid(graph)
     assert "flowchart TD" in mermaid
-    assert "seed --> add" in mermaid
-    assert "provides: value.in" in mermaid
-    assert "requires: value.in" in mermaid
+    assert "seed -->|value.in| add" in mermaid
+    assert "provides:" not in mermaid
+    assert "requires:" not in mermaid
 
 def test_mermaid_collapses_and_expands_nodesets_with_contract_metadata() -> None:
     graph = parse_graph_config(
@@ -196,14 +196,17 @@ def test_mermaid_collapses_and_expands_nodesets_with_contract_metadata() -> None
     )
 
     collapsed = export_mermaid(graph)
-    assert 'composite@{ shape: fr-rect, label: "name: composite\\ntype: nodeset.math.add_one' in collapsed
-    assert "requires: value.in" in collapsed
-    assert "exports: value.out" in collapsed
+    assert 'composite@{ shape: fr-rect, label: "Composite\\n\\nid: composite\\ntype: nodeset.math.add_one' in collapsed
+    assert "-- nodeset --" in collapsed
+    assert "nodeset: math.add_one" in collapsed
+    assert "requires:" not in collapsed
+    assert "exports:" not in collapsed
+    assert "composite -->|value.out| n_end" in collapsed
     assert "composite__inner" not in collapsed
 
     expanded = export_mermaid(graph, expand_nodesets=True)
     assert 'subgraph composite__expanded["math.add_one"]' in expanded
-    assert 'composite__inner@{ shape: rect, label: "name: inner\\ntype: test.add' in expanded
+    assert 'composite__inner@{ shape: rect, label: "Inner\\n\\nid: inner\\ntype: test.add' in expanded
     assert "Internal add step." in expanded
 
 def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nodesets() -> None:
@@ -535,7 +538,7 @@ def test_nodeset_detail_parent_mermaid_preserves_collapsed_callsite_edges() -> N
     )
 
     assert mermaid.startswith("flowchart TD")
-    assert 'child@{ shape: fr-rect, label: "name: child\\ntype: nodeset.detail.leaf' in mermaid
+    assert 'child@{ shape: fr-rect, label: "Detail Leaf\\n\\nid: child\\ntype: nodeset.detail.leaf' in mermaid
     assert "before -->|route == 'detail'| child" in mermaid
     assert "child --> after" in mermaid
     assert "inner@{ shape:" not in mermaid
@@ -677,7 +680,7 @@ def test_mermaid_shows_when_edges_and_health_findings() -> None:
     )
 
     mermaid = export_mermaid(graph, health_report=report)
-    assert "seed -->|flow.route == 'go'| consumer" in mermaid
+    assert "seed -->|when: flow.route == 'go'\\ndata: value.in| consumer" in mermaid
     assert "%% finding warning POLICY.TEST node:consumer policy warning" in mermaid
     assert "class consumer healthWarning;" in mermaid
 

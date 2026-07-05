@@ -17,7 +17,8 @@
 - `requires` / `provides` 只表达数据契约，不会自动生成控制流。
 - 每个 `pipeline.nodes[]` 调用点都必须写 `display_name` 和 `description`，让 Mermaid/SVG 能直接区分节点名、易读名和说明。
 - 节点自定义颜色只能写在 `style.fill`、`style.stroke`、`style.text` 中，颜色必须是 `#RRGGBB`，且不得使用 VibeFlow 系统保留色。
-- `display_name`、`category`、`version`、`description`、`style` 是可视化元数据，不进入运行时 `params`；运行时同名参数必须写进 `config`。
+- `display_name`、`category`、`version`、`description`、`style`、`similar_to` 是调用点元数据，不进入运行时 `params`；运行时同名参数必须写进 `config`。
+- 只有确认两个 node 是有意变体或副本时才写 `similar_to`，并且必须指向同作用域已存在 node、使用 `variant` 或 `copy`、写清 `reason`；不要用它掩盖应该拆分或抽 base_lib 的重复实现。
 - node 间可以按引用传递普通 Python 对象；不要依赖 trace 或报告保存对象内容，报告只审计流程和 key。
 - 需要后台指标、日志或诊断任务时，只能显式使用 config 的 `async: "detached"` 或 `async: "result_key"`，不要在 node 内私自启动线程。
 - 运行或交付前必须让内核健康检查通过；不要跳过 `python run.py validate ...`。
@@ -70,5 +71,7 @@
 - `planned_behavior: "transparent"` 只用于 flow health 连通性，不可运行。
 - `planned_behavior: {"kind": "python_stub", "stub_module": "project/stubs/xxx.py"}` 只用于开发测试；必须配合 `--allow-planned-stub` 才能运行，不能视为 production ready。
 - implemented 内容必须完整、可达、可校验、可运行。
-- 流程图是人类审核程序结构的主要产物；重大架构变更先出图再实现。SVG 应能读清每个 node 的 `name`、`type`、`display`、`desc` 和契约字段，信息挤在一起时应先改善 config 的描述长度、拆节点或调整 style，而不是绕过 `python run.py svg`。
+- 流程图是人类审核程序结构的主要产物；重大架构变更先出图再实现。SVG 节点内应能读清易读标题、`id`、`type`、状态和说明，contract 应显示在已有连边上；信息挤在一起时应先改善 config 的描述长度、拆节点或调整 style，而不是绕过 `python run.py svg`。
 - 系统保留色不能作为自定义色：普通 node 默认 `#ECECFF/#9370DB/#333333`，planned `#fef08a/#ca8a04/#713f12`，plugin resource `#eff6ff/#2563eb/#1e3a8a`，base_lib resource `#ecfdf5/#059669/#064e3b`，以及 health、external、document、nodeset 等语义色。
+- 健康检查的 warning/error 要看 `details`。`GRAPH.SMELL.DUPLICATE_LOGIC` 会列出具体 nodes、node_types、fingerprint 和 duplicate_group；只有确认为有意关系时才补 `similar_to`。
+- 调试嵌套 nodeset 或 loop 时，顶层运行顺序看 `runtime.exec_order`，完整嵌套顺序看 `runtime.qualified_exec_order` 和事件的 `path` 数组；`qualified_node` 是给人看的 dotted 展示名。
