@@ -4,7 +4,7 @@ import operator
 import time
 from typing import Mapping
 
-from .graph_config import GraphConfig, STATUS_PLANNED
+from .graph_config import GraphConfig, LOOP_NODE_TYPES, STATUS_PLANNED
 from .planned_behavior import PLANNED_BEHAVIOR_PYTHON_STUB, effective_planned_behavior
 from .runtime_errors import PipelineRuntimeError
 
@@ -20,13 +20,23 @@ def condition_matches(expression: str, values: Mapping[str, object]) -> bool:
     raise PipelineRuntimeError(f"unsupported edge condition: {expression}")
 
 
-def has_planned(graph: GraphConfig) -> bool:
-    return any(node.status == STATUS_PLANNED for node in graph.nodes) or any(
-        nodeset.status == STATUS_PLANNED or has_planned(nodeset.graph) for nodeset in graph.nodesets.values()
-    )
+def has_planned(graph: GraphConfig, *, visited_nodesets: set[str] | None = None) -> bool:
+    if visited_nodesets is None:
+        visited_nodesets = set()
+    if any(node.status == STATUS_PLANNED for node in graph.nodes):
+        return True
+    for nodeset in graph.nodesets.values():
+        if nodeset.name in visited_nodesets:
+            continue
+        visited_nodesets.add(nodeset.name)
+        if nodeset.status == STATUS_PLANNED or has_planned(nodeset.graph, visited_nodesets=visited_nodesets):
+            return True
+    return False
 
 
-def planned_items(graph: GraphConfig, *, prefix: str = "") -> tuple[dict[str, object], ...]:
+def planned_items(graph: GraphConfig, *, prefix: str = "", visited_nodesets: set[str] | None = None) -> tuple[dict[str, object], ...]:
+    if visited_nodesets is None:
+        visited_nodesets = set()
     items: list[dict[str, object]] = []
     for node in graph.nodes:
         nodeset = graph.nodesets.get(node.node_type.removeprefix("nodeset.")) if node.node_type.startswith("nodeset.") else None
@@ -41,6 +51,9 @@ def planned_items(graph: GraphConfig, *, prefix: str = "") -> tuple[dict[str, ob
                 }
             )
     for name, nodeset in graph.nodesets.items():
+        if name in visited_nodesets:
+            continue
+        visited_nodesets.add(name)
         full_name = f"{prefix}nodeset.{name}"
         if nodeset.status == STATUS_PLANNED:
             behavior = nodeset.planned_behavior
@@ -53,13 +66,34 @@ def planned_items(graph: GraphConfig, *, prefix: str = "") -> tuple[dict[str, ob
                 }
             )
             continue
-        items.extend(planned_items(nodeset.graph, prefix=f"{full_name}."))
+        for node in nodeset.graph.nodes:
+            child_nodeset = nodeset.graph.nodesets.get(node.node_type.removeprefix("nodeset.")) if node.node_type.startswith("nodeset.") else None
+            if node.status == STATUS_PLANNED:
+                behavior = effective_planned_behavior(node, child_nodeset)
+                items.append(
+                    {
+                        "id": f"{full_name}.{node.name}",
+                        "object_type": "node",
+                        "behavior": behavior.kind,
+                        "stub_module": behavior.stub_module,
+                    }
+                )
     return tuple(items)
 
 
 def all_planned_are_python_stub(graph: GraphConfig) -> bool:
     items = planned_items(graph)
     return bool(items) and all(item.get("behavior") == PLANNED_BEHAVIOR_PYTHON_STUB for item in items)
+
+
+def referenced_nodeset_names(graph: GraphConfig) -> tuple[str, ...]:
+    refs: list[str] = []
+    for node in graph.nodes:
+        if node.node_type.startswith("nodeset."):
+            refs.append(node.node_type.removeprefix("nodeset."))
+        elif node.node_type in LOOP_NODE_TYPES and node.loop.body:
+            refs.append(node.loop.body)
+    return tuple(sorted(set(refs)))
 
 
 def elapsed_ms(started: float) -> float:

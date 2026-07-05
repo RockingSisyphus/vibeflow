@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import inspect
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 from .health_types import HealthFinding, HealthReport
 from .purity_types import PurityPolicy
@@ -320,14 +321,25 @@ def _append_node_config_health(graph: GraphConfig, registry: NodeRegistry, state
             state.errors.append(finding)
 
 
-def _append_node_visual_metadata_warnings(graph: GraphConfig, state: _HealthValidationState, *, owner: str = "pipeline") -> None:
+def _append_node_visual_metadata_warnings(
+    graph: GraphConfig,
+    state: _HealthValidationState,
+    *,
+    owner: str = "pipeline",
+    visited_nodesets: set[str] | None = None,
+) -> None:
+    if visited_nodesets is None:
+        visited_nodesets = set()
     for node in graph.nodes:
         if not node.metadata.display_name.strip():
             state.warnings.append(_node_visual_metadata_finding("GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME", node.name, "display_name", owner=owner))
         if not node.metadata.description.strip():
             state.warnings.append(_node_visual_metadata_finding("GRAPH.SMELL.MISSING_NODE_DESCRIPTION", node.name, "description", owner=owner))
     for nodeset in graph.nodesets.values():
-        _append_node_visual_metadata_warnings(nodeset.graph, state, owner=f"nodeset:{nodeset.name}")
+        if nodeset.name in visited_nodesets:
+            continue
+        visited_nodesets.add(nodeset.name)
+        _append_node_visual_metadata_warnings(nodeset.graph, state, owner=f"nodeset:{nodeset.name}", visited_nodesets=visited_nodesets)
 
 
 def _node_visual_metadata_finding(rule_id: str, node_name: str, field: str, *, owner: str) -> HealthFinding:
@@ -418,6 +430,9 @@ def _build_health_report(
     skipped: tuple[HealthFinding, ...] = ()
     if effective_policy is not None:
         errors, warnings, skipped = apply_policy_to_findings(errors, warnings, effective_policy)
+    errors = _aggregate_findings(errors)
+    warnings = _aggregate_findings(warnings)
+    skipped = _aggregate_findings(skipped)
     return HealthReport(
         status=_health_status(list(errors), list(warnings)),
         errors=errors,
@@ -435,6 +450,98 @@ def _build_health_report(
             "rule_catalog": rule_catalog(),
         },
     )
+
+
+def _aggregate_findings(findings: tuple[HealthFinding, ...]) -> tuple[HealthFinding, ...]:
+    grouped: dict[tuple[object, ...], list[HealthFinding]] = {}
+    order: list[tuple[object, ...]] = []
+    for finding in findings:
+        key = _finding_aggregation_key(finding)
+        if key not in grouped:
+            grouped[key] = []
+            order.append(key)
+        grouped[key].append(finding)
+    return tuple(_aggregated_finding(grouped[key]) for key in order)
+
+
+def _finding_aggregation_key(finding: HealthFinding) -> tuple[object, ...]:
+    details = dict(finding.details)
+    if finding.rule_id == "GRAPH.DATA.MISSING_DIRECT_PROVIDER":
+        return (
+            finding.rule_id,
+            finding.severity,
+            details.get("owner", ""),
+            details.get("node", ""),
+            details.get("required_type", finding.object_id),
+            _canonical_value(details.get("direct_sources", ())),
+        )
+    stable_detail_fields = (
+        "owner",
+        "node",
+        "path",
+        "field",
+        "required_type",
+        "provider_key",
+        "direct_sources",
+        "downstream_sources",
+        "downstream_nodes",
+        "matched_sources",
+        "unconditional_sources",
+        "conditional_sources",
+        "nodeset",
+    )
+    stable_details = tuple((field, _canonical_value(details.get(field))) for field in stable_detail_fields if field in details)
+    return (
+        finding.rule_id,
+        finding.severity,
+        finding.object_type,
+        finding.object_id,
+        finding.failure_layer,
+        finding.message,
+        _canonical_value(finding.source_location),
+        stable_details,
+        _canonical_value(details),
+    )
+
+
+def _aggregated_finding(group: list[HealthFinding]) -> HealthFinding:
+    first = group[0]
+    if len(group) == 1:
+        return first
+    details = dict(first.details)
+    details.update(
+        {
+            "aggregated": True,
+            "occurrences": len(group),
+            "suppressed_duplicates": len(group) - 1,
+        }
+    )
+    return HealthFinding(
+        rule_id=first.rule_id,
+        severity=first.severity,
+        object_type=first.object_type,
+        object_id=first.object_id,
+        source_location=first.source_location,
+        rule_source=first.rule_source,
+        failure_layer=first.failure_layer,
+        message=first.message,
+        suggested_fix_type=first.suggested_fix_type,
+        details=details,
+    )
+
+
+def _canonical_value(value: Any) -> str:
+    return json.dumps(_json_safe(value), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _json_safe(item) for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
 
 
 def _health_status(errors: list[HealthFinding], warnings: list[HealthFinding]) -> str:

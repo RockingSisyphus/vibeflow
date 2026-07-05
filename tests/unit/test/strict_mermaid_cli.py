@@ -77,6 +77,36 @@ def test_mermaid_config_uses_readable_svg_spacing_defaults(tmp_path) -> None:
     assert flowchart["diagramPadding"] == mermaid_render.DEFAULT_FLOWCHART_DIAGRAM_PADDING
 
 
+def test_mermaid_renderer_finds_distribution_kernel_tool_path(tmp_path, monkeypatch) -> None:
+    import vibeflow.mermaid_render as mermaid_render
+
+    mmdc = tmp_path / "kernel" / "tools" / "mermaid-renderer" / "node_modules" / ".bin" / ("mmdc.cmd" if mermaid_render._is_windows() else "mmdc")
+    mmdc.parent.mkdir(parents=True)
+    mmdc.write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(mermaid_render, "_repo_root", lambda: tmp_path)
+    monkeypatch.setattr(mermaid_render.shutil, "which", lambda name: None)
+
+    assert mermaid_render._find_mmdc() == mmdc
+
+
+def test_mermaid_renderer_keeps_source_tool_path_precedence(tmp_path, monkeypatch) -> None:
+    import vibeflow.mermaid_render as mermaid_render
+
+    executable = "mmdc.cmd" if mermaid_render._is_windows() else "mmdc"
+    source_mmdc = tmp_path / "tools" / "mermaid-renderer" / "node_modules" / ".bin" / executable
+    distribution_mmdc = tmp_path / "kernel" / "tools" / "mermaid-renderer" / "node_modules" / ".bin" / executable
+    source_mmdc.parent.mkdir(parents=True)
+    distribution_mmdc.parent.mkdir(parents=True)
+    source_mmdc.write_text("", encoding="utf-8")
+    distribution_mmdc.write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(mermaid_render, "_repo_root", lambda: tmp_path)
+    monkeypatch.setattr(mermaid_render.shutil, "which", lambda name: None)
+
+    assert mermaid_render._find_mmdc() == source_mmdc
+
+
 def test_mermaid_renderer_falls_back_to_non_snap_system_browser(tmp_path, monkeypatch) -> None:
     import subprocess
     import vibeflow.mermaid_render as mermaid_render

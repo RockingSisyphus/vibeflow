@@ -169,7 +169,10 @@ def _validate_nodeset_override_paths(
     *,
     registry: NodeRegistry,
     findings: list[HealthFinding],
+    visited_nodesets: set[str] | None = None,
 ) -> None:
+    if visited_nodesets is None:
+        visited_nodesets = set()
     for node in graph.nodes:
         if node.node_type in LOOP_NODE_TYPES or node.node_type.startswith("nodeset."):
             nodeset_name = node.loop.body if node.node_type in LOOP_NODE_TYPES else node.node_type.removeprefix("nodeset.")
@@ -178,7 +181,10 @@ def _validate_nodeset_override_paths(
                 continue
             _validate_override_map(node.name, nodeset, node.node_config_overrides, registry=registry, findings=findings)
     for nodeset in graph.nodesets.values():
-        _validate_nodeset_override_paths(nodeset.graph, registry=registry, findings=findings)
+        if nodeset.name in visited_nodesets:
+            continue
+        visited_nodesets.add(nodeset.name)
+        _validate_nodeset_override_paths(nodeset.graph, registry=registry, findings=findings, visited_nodesets=visited_nodesets)
 
 
 def _validate_override_map(

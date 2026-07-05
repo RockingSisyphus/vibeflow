@@ -22,6 +22,8 @@ PYTHONPATH=src python3 -m vibeflow quality-check --path .
 - `warnings` 必须为 `0`。
 - 若新增代码触发 warning，优先重构新增代码；不要为了通过检查而随意放宽通用质量规则。
 
+阅读 `quality-check` 结果时，先看每条 finding 的 `object_type:object_id` 和 source location，再看 `details`。文本输出会打印紧凑 `details:` 行；JSON 输出保留完整结构。重复函数、依赖环、双向依赖、跨目录/内部模块 import 等 warning 会在 details 中列出具体函数、import site、source/target module 和建议 public entry，优先改这些位置。
+
 ## 副作用扫描
 
 通用质量工具默认做结构、依赖图和重复逻辑检查。维护质量工具本身、运行时入口、边界层或其他可能引入 IO 的代码时，可以额外运行：

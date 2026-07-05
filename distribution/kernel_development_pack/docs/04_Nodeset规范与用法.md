@@ -170,6 +170,27 @@ planned nodeset 可以暂时不写 `pipeline`、`requires`、`provides`、`expor
 - 导入链不能循环。
 - 导入后和本文件内联 nodeset 不能重名。
 
+## nodeset 符号表与引用顺序
+
+内核会先收集同一 config 中所有导入和内联 nodeset 名称，再解析各 nodeset 的内部 pipeline。结果是：
+
+- `nodeset.demo.add_one` 可以引用后面才声明的 nodeset。
+- `vibeflow.loop.while` 的 `loop.body` 也使用同一套 nodeset 符号表，同样可以引用后置声明。
+- 未知 `nodeset.xxx` 或未知 `loop.body` 会在 parse/validate 阶段给出可定位错误。
+- `nodeset.xxx` 调用和 `loop.body` 都算 nodeset dependency；直接或间接递归会报 `NODESET.RECURSION`。
+
+不要用 nodeset 互相调用或 loop body 自引用来表达循环。循环只能由 `vibeflow.loop.while` 节点的执行语义表达，body nodeset 本身仍应是无普通 edge 环的内部流程。
+
+大型项目应按 `NODESET.SMELL.TOO_WIDE` 建议拆分小 nodeset。拆分数量增加不会要求调整声明顺序，也不应导致解析成本指数增长。
+
+如果怀疑 config 读取或 nodeset 解析慢，可临时开启解析 trace：
+
+```bash
+VIBEFLOW_CONFIG_TRACE=1 python run.py validate --config project/configs/main.jsonc
+```
+
+trace 会输出 import 文件、展开后的 nodeset 数、每个 nodeset 解析耗时、引用到的 nodeset 和总耗时。
+
 ## 关键限制
 
 - nodeset 不能递归调用自己。

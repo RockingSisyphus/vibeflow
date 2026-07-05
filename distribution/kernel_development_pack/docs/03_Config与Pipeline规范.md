@@ -221,6 +221,20 @@ edge 只能连接当前 pipeline 内已经声明的 node。对象形式也兼容
 {"source": "route", "target": "end", "when": "flow.route == 'done'"}
 ```
 
+## nodeset 引用解析
+
+VibeFlow 会先为同一 config 中所有导入和内联 nodeset 建立符号表，再解析各 nodeset 的内部 pipeline。因此 `nodeset.xxx` 调用和 `vibeflow.loop.while` 的 `loop.body` 可以引用同一 config 中后面才声明的 nodeset；不需要为了可见性把被调用 nodeset 一定写在前面。
+
+`nodeset.xxx` 调用和 `loop.body` 都构成 nodeset dependency。直接或间接递归会报 `NODESET.RECURSION`；不要用 nodeset 互相调用或 loop body 自引用来表达循环，真实循环只能由 `vibeflow.loop.while` 这个节点的执行语义承担。
+
+大型项目应放心按 `NODESET.SMELL.TOO_WIDE` 建议拆成更多小 nodeset。parser 按符号表解析每个 nodeset 一次，不依赖前缀重解析；如果怀疑配置读取或解析慢，可临时运行：
+
+```bash
+VIBEFLOW_CONFIG_TRACE=1 python run.py validate --config project/configs/main.jsonc
+```
+
+trace 会输出 import 文件、展开后的 nodeset 数、每个 nodeset 解析耗时、引用到的 nodeset 和总耗时。
+
 ## cycle
 
 普通 `pipeline.edges` 和 nodeset 内部 `pipeline.edges` 不允许形成环。旧 `pipeline.loops` 已移除，显式 edge 回环也会被 `GRAPH.CYCLE.FORBIDDEN` 拒绝；需要循环时使用 `vibeflow.loop.while`。
@@ -271,7 +285,7 @@ edge 只能连接当前 pipeline 内已经声明的 node。对象形式也兼容
 
 - `vibeflow.loop.while`：重复执行一个 nodeset body，直到固定轮数到达，或 body/state 输出的 bool 条件满足。
 
-loop node 像普通 node 一样声明 `requires/provides`，并额外写顶层 `loop` 对象。`loop` 不进入运行时 `params`；如果业务 node 真需要同名参数，必须写到 `config`。body 必须指向同一 config 或已导入的 nodeset；展开 SVG 时 loop body 会像 nodeset 一样展开。
+loop node 像普通 node 一样声明 `requires/provides`，并额外写顶层 `loop` 对象。`loop` 不进入运行时 `params`；如果业务 node 真需要同名参数，必须写到 `config`。body 必须指向同一 config 或已导入的 nodeset，可引用后面才声明的 nodeset；展开 SVG 时 loop body 会像 nodeset 一样展开。
 
 ```jsonc
 {
@@ -469,3 +483,5 @@ policy 来源优先级：
 - `GRAPH.DATA.TYPE_CARDINALITY_AMBIGUOUS`：某个 require `type` 的直接来源数量可能违反 `exactly_one` / `optional_one`。
 - `GRAPH.DATA.UNCONSUMED_PROVIDER`：某个 provider `key/type` 没有直接下游消费；如果是预期最终产物，确保 `pipeline.outputs` 声明它，且必要时由 end/io/document 节点消费。
 - `GRAPH.SMELL.DUPLICATE_LOGIC`：两个 config node 的 `run_pure` fingerprint 相同；报告 `details` 会列出具体 nodes、node_types、fingerprint、duplicate_group 和 `similar_to` 豁免提示。
+
+所有健康 finding 都应先看 `object_id` 和 `details`。flow/data finding 的 `details.owner` 会标明顶层 `pipeline` 或 `nodeset:<name>`，并尽量列出 incoming/outgoing edge、direct sources、available provider types、entry input types 或 downstream required types，按这些对象修改配置。如果 `details.aggregated == true`，说明同一个根因在 nested nodeset / loop body 静态展开中被重复发现并压缩；`occurrences` 是重复展开次数，不是独立 bug 数。

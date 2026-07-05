@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
+import sys
+import time
 from typing import Any, Mapping
 
 
@@ -27,10 +30,10 @@ class ConfigLoadError(ValueError):
 
 
 def load_config_document(path: Path) -> ConfigDocument:
-    return _load_config_document(path, import_stack=())
+    return _load_config_document(path, import_stack=(), cache={})
 
 
-def _load_config_document(path: Path, *, import_stack: tuple[Path, ...]) -> ConfigDocument:
+def _load_config_document(path: Path, *, import_stack: tuple[Path, ...], cache: dict[Path, ConfigDocument]) -> ConfigDocument:
     path = path.resolve()
     if path in import_stack:
         raise ConfigLoadError(
@@ -39,6 +42,11 @@ def _load_config_document(path: Path, *, import_stack: tuple[Path, ...]) -> Conf
             failure_layer="source",
             source_location={"path": str(path)},
         )
+    cached = cache.get(path)
+    if cached is not None:
+        _trace_config_load(f"cache hit path={path}")
+        return cached
+    started = time.perf_counter()
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
@@ -71,8 +79,14 @@ def _load_config_document(path: Path, *, import_stack: tuple[Path, ...]) -> Conf
             failure_layer="syntax",
             source_location={"path": str(path), "line": 1, "column": 1},
         )
-    data, nodeset_imports = _expand_nodeset_imports(data, path=path, import_stack=(*import_stack, path))
-    return ConfigDocument(path=path, data=data, format=config_format, nodeset_imports=nodeset_imports)
+    data, nodeset_imports = _expand_nodeset_imports(data, path=path, import_stack=(*import_stack, path), cache=cache)
+    document = ConfigDocument(path=path, data=data, format=config_format, nodeset_imports=nodeset_imports)
+    cache[path] = document
+    _trace_config_load(
+        f"loaded path={path} format={config_format} nodesets={len(data.get('nodesets', [])) if isinstance(data.get('nodesets'), list) else 0} "
+        f"imports={len(nodeset_imports)} elapsed={_elapsed_ms(started)}ms"
+    )
+    return document
 
 
 def _expand_nodeset_imports(
@@ -80,6 +94,7 @@ def _expand_nodeset_imports(
     *,
     path: Path,
     import_stack: tuple[Path, ...],
+    cache: dict[Path, ConfigDocument],
 ) -> tuple[Mapping[str, Any], tuple[Mapping[str, Any], ...]]:
     imports = data.get("nodeset_imports")
     if imports is None:
@@ -91,7 +106,7 @@ def _expand_nodeset_imports(
     import_records: list[Mapping[str, Any]] = []
     for index, item in enumerate(imports):
         import_path, names = _parse_nodeset_import(item, path=path, index=index)
-        document = _load_config_document(import_path, import_stack=import_stack)
+        document = _load_config_document(import_path, import_stack=import_stack, cache=cache)
         raw_nodesets = document.data.get("nodesets")
         if not isinstance(raw_nodesets, list) or not raw_nodesets:
             raise _nodeset_import_error("CONFIG.NODESET_IMPORT.EMPTY", f"nodeset import has no nodesets: {import_path}", import_path)
@@ -223,6 +238,16 @@ def strip_jsonc_comments(text: str, *, path: Path | None = None) -> str:
         line, column = _advance_position(char, line, column)
         index += 1
     return "".join(out)
+
+
+def _trace_config_load(message: str) -> None:
+    if str(os.environ.get("VIBEFLOW_CONFIG_TRACE", "")).lower() not in {"1", "true", "yes", "on"}:
+        return
+    print(f"[vibeflow config] {message}", file=sys.stderr)
+
+
+def _elapsed_ms(started: float) -> float:
+    return round((time.perf_counter() - started) * 1000, 3)
 
 
 def _consume_string_char(text: str, index: int, line: int, column: int, out: list[str], escape: bool) -> tuple[int, int, int, bool, bool]:

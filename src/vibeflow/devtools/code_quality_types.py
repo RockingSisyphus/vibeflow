@@ -197,6 +197,26 @@ class FunctionQuality:
 
 
 @dataclass(frozen=True)
+class ImportSite:
+    source_module: str
+    imported: str
+    raw_import: str
+    path: str
+    line: int
+    column: int
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "source_module": self.source_module,
+            "imported": self.imported,
+            "raw_import": self.raw_import,
+            "path": self.path,
+            "line": self.line,
+            "column": self.column,
+        }
+
+
+@dataclass(frozen=True)
 class FileQuality:
     path: str
     module: str
@@ -209,6 +229,7 @@ class FileQuality:
     max_nesting_depth: int
     imports: tuple[str, ...]
     functions: tuple[FunctionQuality, ...]
+    import_sites: tuple[ImportSite, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -222,6 +243,7 @@ class FileQuality:
             "branch_count": self.branch_count,
             "max_nesting_depth": self.max_nesting_depth,
             "imports": list(self.imports),
+            "import_sites": [site.to_dict() for site in self.import_sites],
             "functions": [function.to_dict() for function in self.functions],
         }
 

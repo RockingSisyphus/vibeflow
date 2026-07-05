@@ -14,6 +14,18 @@ def duplicate_function_findings(files: tuple[FileQuality, ...]) -> list[QualityF
 
 def _duplicate_group_finding(matches: list[tuple[str, FunctionQuality]]) -> QualityFinding:
     targets = [f"{path}:{function.qualname}" for path, function in matches]
+    function_details = [
+        {
+            "path": path,
+            "qualname": function.qualname,
+            "line_start": function.line_start,
+            "line_end": function.line_end,
+            "lines": function.lines,
+            "branches": function.branches,
+            "params": function.param_count,
+        }
+        for path, function in matches
+    ]
     return QualityFinding(
         "QUALITY.DUPLICATE.AST_FINGERPRINT",
         "warning",
@@ -21,5 +33,10 @@ def _duplicate_group_finding(matches: list[tuple[str, FunctionQuality]]) -> Qual
         ", ".join(targets),
         "similar function AST fingerprint detected",
         suggested_fix_type="extract_shared_helper",
-        details={"functions": targets},
+        details={
+            "functions": targets,
+            "function_details": function_details,
+            "fingerprint": matches[0][1].ast_fingerprint if matches else "",
+            "group_size": len(matches),
+        },
     )

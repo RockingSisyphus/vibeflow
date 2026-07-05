@@ -1730,24 +1730,75 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
 
     from build_distribution import build_distribution
 
+    def verify(output_path: Path) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, "run.py", "verify-kernel"],
+            cwd=output_path,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+
     output = tmp_path / "distribution"
     build_distribution(output)
     manifest = (output / "kernel" / "MANIFEST.sha256").read_text(encoding="utf-8")
     manifest_paths = {line.split("  ", 1)[1] for line in manifest.splitlines() if line.strip()}
 
+    assert not (output / "docs").exists()
+    assert not (output / "tools").exists()
+    assert not (output / "THIRD_PARTY_NOTICES.md").exists()
+    assert not (output / ".gitignore").exists()
+    assert not (output / "kernel" / ".gitignore").exists()
+    assert (output / "kernel" / "docs" / "00_内核目的与项目结构.md").is_file()
+    assert (output / "kernel" / "tools" / "mermaid-renderer" / "package.json").is_file()
+    assert (output / "kernel" / "tools" / "mermaid-renderer" / "package-lock.json").is_file()
+    assert (output / "kernel" / "THIRD_PARTY_NOTICES.md").is_file()
     assert "AGENTS.md" not in manifest_paths
     assert "README.md" not in manifest_paths
-    assert {"run.py", "kernel/README.md", "kernel/vibeflow-kernel.zip"} <= manifest_paths
+    assert {
+        "run.py",
+        "kernel/README.md",
+        "kernel/vibeflow-kernel.zip",
+        "kernel/docs/00_内核目的与项目结构.md",
+        "kernel/tools/mermaid-renderer/package.json",
+        "kernel/tools/mermaid-renderer/package-lock.json",
+        "kernel/THIRD_PARTY_NOTICES.md",
+    } <= manifest_paths
 
     (output / "AGENTS.md").write_text("# Custom project agent guide\n", encoding="utf-8")
     (output / "README.md").write_text("# Custom project readme\n", encoding="utf-8")
-    result = subprocess.run(
-        [sys.executable, "run.py", "verify-kernel"],
-        cwd=output,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
+    mmdc = output / "kernel" / "tools" / "mermaid-renderer" / "node_modules" / ".bin" / "mmdc"
+    mmdc.parent.mkdir(parents=True)
+    mmdc.write_text("", encoding="utf-8")
 
+    result = verify(output)
     assert result.returncode == 0, result.stderr
+
+    docs_failure = tmp_path / "distribution_docs_failure"
+    build_distribution(docs_failure)
+    docs_path = docs_failure / "kernel" / "docs" / "00_内核目的与项目结构.md"
+    docs_path.write_text(docs_path.read_text(encoding="utf-8") + "\nchanged\n", encoding="utf-8")
+    result = verify(docs_failure)
+    assert result.returncode == 2
+    assert "Changed:" in result.stderr
+    assert "kernel/docs/00_内核目的与项目结构.md" in result.stderr
+
+    package_failure = tmp_path / "distribution_package_failure"
+    build_distribution(package_failure)
+    package_path = package_failure / "kernel" / "tools" / "mermaid-renderer" / "package.json"
+    package_path.write_text(package_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    result = verify(package_failure)
+    assert result.returncode == 2
+    assert "Changed:" in result.stderr
+    assert "kernel/tools/mermaid-renderer/package.json" in result.stderr
+
+    unexpected_failure = tmp_path / "distribution_unexpected_failure"
+    build_distribution(unexpected_failure)
+    unpacked = unexpected_failure / "kernel" / "vibeflow" / "unpacked.py"
+    unpacked.parent.mkdir(parents=True)
+    unpacked.write_text("# unexpected unpacked kernel source\n", encoding="utf-8")
+    result = verify(unexpected_failure)
+    assert result.returncode == 2
+    assert "Unexpected:" in result.stderr
+    assert "kernel/vibeflow/unpacked.py" in result.stderr

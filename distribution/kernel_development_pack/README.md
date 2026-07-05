@@ -13,24 +13,28 @@
 
 ```text
 my_project/
-  docs/
+  AGENTS.md
+  README.md
+  run.py
   kernel/
     vibeflow-kernel.zip
     MANIFEST.sha256
+    README.md
+    docs/
+    tools/
+      mermaid-renderer/
+    THIRD_PARTY_NOTICES.md
   project/
     nodes/
     base_lib/
     plugins/
     configs/
     registry.py
-  tools/
-    mermaid-renderer/
-  run.py
   runs/
   reports/
 ```
 
-核心原则：业务开发者只写小型纯函数 node、纯 helper、必要插件和 JSONC 拓扑配置；控制流只写在显式 `pipeline.edges` 中；运行前由内核自动健康检查，检查不过不执行。运行时只审计流程和 key，node 间可按引用传递普通 Python 对象。
+核心原则：业务开发者只写小型纯函数 node、纯 helper、必要插件和 JSONC 拓扑配置；控制流只写在显式 `pipeline.edges` 中；运行前由内核自动健康检查，检查不过不执行。运行时只审计流程和 key，node 间可按引用传递普通 Python 对象。`kernel/docs/`、`kernel/tools/` 和 `kernel/THIRD_PARTY_NOTICES.md` 是随内核分发的只读参考材料；根目录 `README.md`、`AGENTS.md` 和项目自己的文档可以按项目定制。
 
 常用命令：
 
@@ -47,12 +51,14 @@ python run.py svg --config project/configs/main.jsonc --expand-nodesets --output
 
 注意：`python run.py mermaid --expand-nodesets --output reports/graph.expanded.mmd` 只导出 Mermaid 源码，供调试源码使用。详细审查 SVG 必须用 `python run.py svg --expand-nodesets --output reports/graph.expanded.svg` 生成，不要把 `graph.expanded.mmd` 直接交给 Mermaid CLI/mmdc 转成 SVG，否则会绕过 VibeFlow 的 review-columns/detail-panel composer。
 
-`svg` 命令依赖 `tools/mermaid-renderer/` 中的 Mermaid CLI。首次使用前运行：
+`svg` 命令依赖 `kernel/tools/mermaid-renderer/` 中的 Mermaid CLI。首次使用前运行：
 
 ```powershell
-cd tools/mermaid-renderer
+cd kernel/tools/mermaid-renderer
 npm install
-cd ../..
+cd ../../..
 ```
 
 不要求系统预装 Google Chrome。正常执行 `npm install` 后，Puppeteer 会安装并使用自己的浏览器缓存；如果该缓存不可用，VibeFlow 会再尝试非 snap 的系统 Chrome/Chromium。`/snap/bin/chromium` 会被跳过，因为它在 Puppeteer/mermaid-cli 下常见 profile lock 启动失败。
+
+分发包不内置 `.gitignore`，忽略策略由项目自行决定。常见建议包括忽略 `kernel/tools/mermaid-renderer/node_modules/`、`runs/`、`reports/`、`__pycache__/` 和 `*.pyc`。
