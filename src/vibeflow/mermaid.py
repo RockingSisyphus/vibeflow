@@ -62,6 +62,7 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
                 "flow_kind": node_flow_kind(node, compiled),
                 "metadata": node.metadata.to_dict(),
                 "style": node.style.to_dict(),
+                "similar_to": node.similar_to.to_dict(),
             }
             for node in graph.nodes
         ],
@@ -118,7 +119,7 @@ class _MermaidRenderer:
             *(f"  {line}" for line in mermaid_class_def_lines(MERMAID_MAIN_CLASS_ORDER)),
         ]
         self._render_graph_body(lines, graph, compiled, prefix="", indent="  ", visited_nodesets=())
-        self._render_edges(lines, compiled, prefix="", indent="  ")
+        self._render_edges(lines, graph, compiled, prefix="", indent="  ")
         self._render_resources(lines, indent="  ")
         if self.show_findings:
             self._render_findings(lines, graph, compiled, indent="  ")
@@ -176,14 +177,15 @@ class _MermaidRenderer:
                     visited_nodesets=(*visited_nodesets, nodeset.name),
                     expand_inline=True,
                 )
-                self._render_edges(lines, nested_compiled, prefix=nested_prefix, indent=f"{indent}  ")
+                self._render_edges(lines, nodeset.graph, nested_compiled, prefix=nested_prefix, indent=f"{indent}  ")
             lines.append(f"{indent}end")
 
-    def _render_edges(self, lines: list[str], compiled: CompiledGraph, *, prefix: str, indent: str) -> None:
+    def _render_edges(self, lines: list[str], graph: GraphConfig, compiled: CompiledGraph, *, prefix: str, indent: str) -> None:
         for edge in compiled.effective_edges:
             source_id = _safe_id(f"{prefix}{edge.source}")
             target_id = _safe_id(f"{prefix}{edge.target}")
-            label = f"|{_escape_label(edge.when)}|" if edge.when else ""
+            label_text = self._edge_label(graph, edge)
+            label = f"|{_escape_edge_label(label_text)}|" if label_text else ""
             lines.append(f"{indent}{source_id} -->{label} {target_id}")
 
     def _render_resources(self, lines: list[str], *, indent: str) -> None:
@@ -318,49 +320,62 @@ class _MermaidRenderer:
         return ()
 
     def _node_label(self, node: NodeSpec) -> str:
-        sections: list[list[str]] = [[f"name: {node.name}", f"type: {node.node_type}"]]
+        sections: list[list[str]] = [[self._node_title(node)], [f"id: {node.name}", f"type: {node.node_type}"]]
         if node.status == STATUS_PLANNED:
-            planned_lines = [f"status: {planned_behavior_label(node.planned_behavior)}"]
+            planned_lines = ["-- status --", f"status: {planned_behavior_label(node.planned_behavior)}"]
             if node.planned_behavior.stub_module:
                 planned_lines.append(f"stub: {node.planned_behavior.stub_module}")
             sections.append(planned_lines)
         if self.show_semantics:
             semantic_lines = self._node_semantic_lines(node)
             if semantic_lines:
-                sections.append(list(semantic_lines))
-        if self.show_contract:
-            sections.append([_key_line("requires", node.requires), _key_line("provides", node.provides)])
+                sections.append(["-- meta --", *semantic_lines])
         return _join_label_sections(sections)
 
     def _nodeset_label(self, node: NodeSpec, nodeset: NodesetSpec) -> str:
-        sections: list[list[str]] = [[f"name: {node.name}", f"type: {node.node_type}"]]
+        title = node.metadata.display_name or nodeset.display_name or node.name
+        sections: list[list[str]] = [[title], [f"id: {node.name}", f"type: {node.node_type}"]]
         if node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED:
             behavior = effective_planned_behavior(node, nodeset)
-            planned_lines = [f"status: {planned_behavior_label(behavior)}"]
+            planned_lines = ["-- status --", f"status: {planned_behavior_label(behavior)}"]
             if behavior.stub_module:
                 planned_lines.append(f"stub: {behavior.stub_module}")
             sections.append(planned_lines)
         if self.show_semantics:
             call_lines = _node_metadata_lines(node)
             if call_lines:
-                sections.append(list(call_lines))
+                sections.append(["-- call --", *call_lines])
             sections.append(
                 [
-                    f"nodeset: {nodeset.display_name}",
+                    "-- nodeset --",
+                    f"nodeset: {nodeset.name}",
                     f"category: {nodeset.category}",
                     f"version: {nodeset.version}",
                     f"desc: {nodeset.description}",
                 ]
             )
-        if self.show_contract:
-            sections.append(
-                [
-                    _key_line("requires", nodeset.requires or node.requires),
-                    _key_line("provides", nodeset.provides or node.provides),
-                    _key_line("exports", nodeset.exports),
-                ]
-            )
         return _join_label_sections(sections)
+
+    def _node_title(self, node: NodeSpec) -> str:
+        if node.metadata.display_name:
+            return node.metadata.display_name
+        if self.registry is not None and node.status != STATUS_PLANNED and not node.node_type.startswith("nodeset."):
+            try:
+                node_cls = self.registry.get(node.node_type)
+            except Exception:
+                node_cls = None
+            info = getattr(node_cls, "NODE_INFO", None) if node_cls is not None else None
+            display_name = str(getattr(info, "display_name", "")).strip() if info is not None else ""
+            if display_name:
+                return display_name
+        return node.name
+
+    def _edge_label(self, graph: GraphConfig, edge: object) -> str:
+        when = str(getattr(edge, "when", "")).strip()
+        data_text = _edge_contract_text(graph, edge) if self.show_contract else ""
+        if when and data_text:
+            return f"when: {when}\ndata: {data_text}"
+        return when or data_text
 
     def _node_semantic_lines(self, node: NodeSpec) -> tuple[str, ...]:
         lines = list(_node_metadata_lines(node))
@@ -372,7 +387,6 @@ class _MermaidRenderer:
             info = getattr(node_cls, "NODE_INFO", None) if node_cls is not None else None
             if info is not None and not lines:
                 for label, value in (
-                    ("display", getattr(info, "display_name", "")),
                     ("category", getattr(info, "category", "")),
                     ("version", getattr(info, "version", "")),
                     ("desc", getattr(info, "description", "")),
@@ -397,8 +411,6 @@ def _nodeset_node_ids(graph: GraphConfig, node_ids: Mapping[str, str]) -> dict[s
 def _node_metadata_lines(node: NodeSpec) -> tuple[str, ...]:
     lines: list[str] = []
     metadata = node.metadata
-    if metadata.display_name:
-        lines.append(f"display: {metadata.display_name}")
     if metadata.category:
         lines.append(f"category: {metadata.category}")
     if metadata.version:
@@ -474,21 +486,32 @@ def _resource_label(resource: Mapping[str, object], *, kind: str, show_semantics
     return _join_label_lines(lines)
 
 
-def _key_line(label: str, values: tuple[object, ...]) -> str:
-    if not values:
+def _edge_contract_text(graph: GraphConfig, edge: object, *, max_items: int = 2) -> str:
+    source_name = str(getattr(edge, "source", ""))
+    target_name = str(getattr(edge, "target", ""))
+    nodes = {node.name: node for node in graph.nodes}
+    source = nodes.get(source_name)
+    target = nodes.get(target_name)
+    if source is None or target is None:
         return ""
-    return f"{label}: {', '.join(_contract_item_text(item) for item in values)}"
+    required_types = {requirement.type for requirement in target.requires}
+    if not required_types:
+        return ""
+    items = [_provider_edge_text(provider) for provider in source.provides if provider.type in required_types]
+    if not items:
+        return ""
+    visible = items[:max_items]
+    if len(items) > max_items:
+        visible.append(f"+{len(items) - max_items} more")
+    return ", ".join(visible)
 
 
-def _contract_item_text(item: object) -> str:
-    key = getattr(item, "key", "")
-    data_type = getattr(item, "type", "")
-    cardinality = getattr(item, "cardinality", "")
-    if key and data_type:
+def _provider_edge_text(provider: object) -> str:
+    key = str(getattr(provider, "key", "")).strip()
+    data_type = str(getattr(provider, "type", "")).strip()
+    if key and data_type and key != data_type:
         return f"{key} -> {data_type}"
-    if data_type and cardinality:
-        return f"{data_type} ({cardinality})"
-    return str(item)
+    return data_type or key
 
 
 def _join_label_lines(lines: tuple[str, ...] | list[str]) -> str:
@@ -516,7 +539,15 @@ def _wrap_label_line(value: object, *, width: int = 56, max_lines: int = 4) -> l
     text = str(value).replace("\r", " ").replace("\n", " ").strip()
     if not text:
         return []
-    wrapped = textwrap.wrap(text, width=width, break_long_words=True, break_on_hyphens=False) or [text]
+    max_lines = _label_line_max_lines(text, default=max_lines)
+    subsequent_indent = _label_line_indent(text)
+    wrapped = textwrap.wrap(
+        text,
+        width=width,
+        subsequent_indent=subsequent_indent,
+        break_long_words=True,
+        break_on_hyphens=False,
+    ) or [text]
     if len(wrapped) <= max_lines:
         return wrapped
     truncated = wrapped[:max_lines]
@@ -524,8 +555,29 @@ def _wrap_label_line(value: object, *, width: int = 56, max_lines: int = 4) -> l
     return truncated
 
 
+def _label_line_indent(text: str) -> str:
+    if text.startswith("-- "):
+        return ""
+    prefix, separator, _ = text.partition(": ")
+    if not separator or len(prefix) > 8:
+        return ""
+    return " " * (len(prefix) + len(separator))
+
+
+def _label_line_max_lines(text: str, *, default: int) -> int:
+    if text.startswith("desc: "):
+        return 3
+    if text.startswith("-- "):
+        return 1
+    return min(default, 2)
+
+
 def _escape_label(value: str) -> str:
     return value.replace("\\", "\\\\").replace("\n", "\\n").replace('"', "'")
+
+
+def _escape_edge_label(value: str) -> str:
+    return _escape_label(value).replace("|", "/")
 
 
 def _comment_text(value: str) -> str:

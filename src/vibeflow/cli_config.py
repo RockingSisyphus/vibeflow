@@ -79,6 +79,7 @@ def inspect_config_payload(path: Path, *, policy_path: Path | None = None) -> tu
                 "provides": providers_to_dicts(node.provides),
                 "status": node.status,
                 "planned_behavior": node.planned_behavior.to_dict(),
+                "similar_to": node.similar_to.to_dict(),
             }
             for node in graph.nodes
         ],

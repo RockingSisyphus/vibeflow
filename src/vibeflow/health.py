@@ -23,6 +23,8 @@ class _HealthValidationState:
     errors: list[HealthFinding] = field(default_factory=list)
     warnings: list[HealthFinding] = field(default_factory=list)
     node_metrics: dict[str, dict[str, object]] = field(default_factory=dict)
+    node_types: dict[str, str] = field(default_factory=dict)
+    node_similarities: dict[str, dict[str, str]] = field(default_factory=dict)
     nodeset_findings: dict[str, list[dict[str, object]]] = field(default_factory=dict)
     fingerprints: dict[str, str] = field(default_factory=dict)
     scanned_base_roots: set[str] = field(default_factory=set)
@@ -102,6 +104,9 @@ def _validate_graph_nodes(
     state: _HealthValidationState,
 ) -> None:
     for spec in graph.nodes:
+        state.node_types[spec.name] = spec.node_type
+        if spec.similar_to.node:
+            state.node_similarities[spec.name] = spec.similar_to.to_dict()
         if spec.status == STATUS_PLANNED:
             continue
         if spec.node_type.startswith("nodeset."):
@@ -343,7 +348,14 @@ def _append_registry_namespace_smells(registry: NodeRegistry, state: _HealthVali
 def _append_duplicate_logic_findings(state: _HealthValidationState) -> None:
     from .health_duplicates import duplicate_logic_findings
 
-    state.warnings.extend(duplicate_logic_findings(state.fingerprints, state.node_metrics))
+    state.warnings.extend(
+        duplicate_logic_findings(
+            state.fingerprints,
+            state.node_metrics,
+            node_types=state.node_types,
+            node_similarities=state.node_similarities,
+        )
+    )
 
 
 def _append_nodeset_health(graph: GraphConfig, registry: NodeRegistry, state: _HealthValidationState) -> None:

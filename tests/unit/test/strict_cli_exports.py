@@ -52,7 +52,7 @@ def _write_nodeset_export_config(path: Path) -> None:
 @pytest.mark.parametrize(
     ("command", "expected"),
     [
-        ("export-mermaid", ("flowchart TD", "seed --> add", "provides: value.in -> value.in")),
+        ("export-mermaid", ("flowchart TD", "seed -->|value.in| add", "id: seed")),
         ("export-ascii", ("TOPOLOGY FLOWCHART", "seed ----> add", "provides=value.in")),
     ],
 )

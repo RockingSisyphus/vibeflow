@@ -816,6 +816,7 @@ def test_async_nodeset_result_key_joins_when_required() -> None:
 
     assert context.get("value.out")["value"] == 7
     assert "async_result_join" in [event["kind"] for event in context.get("runtime.events")]
+    assert "composite.add" in context.get("runtime.qualified_exec_order")
 
 
 def test_async_detached_timeout_records_warning_and_does_not_block() -> None:
@@ -976,12 +977,184 @@ def test_checked_run_trace_records_nodeset_enter_exit(tmp_path) -> None:
         run_id="nodeset_run",
     )
     assert result.context.get("value.out")["value"] == 3
-    trace_kinds = [
-        json.loads(line)["kind"]
-        for line in (result.run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()
-    ]
+    trace_lines = [json.loads(line) for line in (result.run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
+    trace_kinds = [line["kind"] for line in trace_lines]
     assert "nodeset_enter" in trace_kinds
     assert "nodeset_exit" in trace_kinds
+    assert "composite.add" in trace_lines[-1]["qualified_exec_order"]
+    assert trace_lines[-1]["step_count"] == 3
+    assert trace_lines[-1]["total_step_count"] == 6
+
+
+def test_runtime_trace_records_nested_nodeset_qualified_paths() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "inner.flow",
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline=_seed_add_pipeline(),
+                ),
+                _nodeset_config(
+                    "outer.flow",
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline={
+                        "nodes": [
+                            _node_call("start", "test.start", "Starts outer flow."),
+                            _node_call("inner_call", "nodeset.inner.flow", "Calls inner flow.", provides=[PROV_SPEC("value.out")]),
+                            _node_call("end", "test.out_end", "Consumes outer value.out.", requires=[REQ_SPEC("value.out")]),
+                        ],
+                        "edges": _edge_chain("start", "inner_call", "end"),
+                        "outputs": [REQ_SPEC("value.out")],
+                    },
+                ),
+            ],
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts nested trace fixture."),
+                    _node_call("outer_call", "nodeset.outer.flow", "Calls outer flow.", provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Consumes final value.out.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": _edge_chain("start", "outer_call", "end"),
+                "outputs": [REQ_SPEC("value.out")],
+            },
+        }
+    )
+
+    context = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="full")).run({})
+
+    assert context.get("value.out")["value"] == 2
+    assert "outer_call.inner_call.add" in context.get("runtime.qualified_exec_order")
+    node_events = [event for event in context.get("runtime.events") if event["kind"] == "node"]
+    inner_add = next(event for event in node_events if event["qualified_node"] == "outer_call.inner_call.add")
+    assert inner_add["path"] == ["outer_call", "inner_call", "add"]
+    assert inner_add["depth"] == 2
+
+
+def test_runtime_trace_counts_nodeset_internal_loop_steps() -> None:
+    class ThresholdRouteNode:
+        NODE_INFO = NodeInfo("test.threshold_route", "Threshold Route", "test", "Routes until a threshold.", "0.1.0", "decision")
+        CONTRACT = NodeContract(
+            requires=(DataRequirement("value.out", "exactly_one"),),
+            provides=(DataProvider("flow.route", "flow.route"),),
+            output_schema={"flow.route": {"type": "string"}},
+        )
+
+        def run_pure(self, inputs, params):
+            value = inputs["value.out"]["value"]
+            return {"flow.route": "done" if value >= 3 else "again"}
+
+    class LoopCopyNode:
+        NODE_INFO = NodeInfo("test.loop_copy", "Loop Copy", "test", "Copies value.out back to loop input.", "0.1.0", "process")
+        CONTRACT = NodeContract(
+            requires=(DataRequirement("value.out", "exactly_one"),),
+            provides=(DataProvider("value.loop", "value.in"),),
+            output_schema={"value.loop": {"type": "number"}},
+        )
+
+        def run_pure(self, inputs, params):
+            return {"value.loop": inputs["value.out"]["value"]}
+
+    registry = _registry()
+    register_node(registry, "test.threshold_route", ThresholdRouteNode)
+    register_node(registry, "test.loop_copy", LoopCopyNode)
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "loop.flow",
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline={
+                        "max_steps": 10,
+                        "nodes": [
+                            _node_call("start", "test.start", "Starts inner loop."),
+                            _node_call("seed", "test.seed", "Produces loop seed.", provides=[PROV_SPEC("value.in")], config={"value": 1}),
+                            _node_call(
+                                "add",
+                                "test.add",
+                                "Increments the loop value.",
+                                requires=[REQ_SPEC("value.in")],
+                                provides=[PROV_SPEC("value.out")],
+                            ),
+                            _node_call("route", "test.threshold_route", "Routes the loop.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
+                            _node_call("copy", "test.loop_copy", "Copies value.out back to value.in.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.loop", "value.in")]),
+                            _node_call("end", "test.start", "Ends the inner loop."),
+                        ],
+                        "edges": [
+                            {"from": "start", "to": "seed"},
+                            {"from": "seed", "to": "add"},
+                            {"from": "add", "to": "route"},
+                            {"from": "add", "to": "copy"},
+                            {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
+                            {"from": "copy", "to": "add"},
+                            {"from": "route", "to": "end", "when": "flow.route == 'done'"},
+                        ],
+                        "outputs": [REQ_SPEC("value.out")],
+                    },
+                )
+            ],
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts loop trace fixture."),
+                    _node_call("loop_call", "nodeset.loop.flow", "Calls loop flow.", provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Consumes final value.out.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": _edge_chain("start", "loop_call", "end"),
+                "outputs": [REQ_SPEC("value.out")],
+            },
+        }
+    )
+
+    context = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="full")).run({})
+
+    assert context.get("value.out")["value"] == 3
+    assert context.get("runtime.step_count") == 3
+    assert context.get("runtime.total_step_count") == 11
+    assert context.get("runtime.qualified_node_runs")["loop_call.add"] == 2
+    assert context.get("runtime.qualified_exec_order").count("loop_call.add") == 2
+
+
+def test_runtime_trace_preserves_nested_failure_path() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "fail.flow",
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline={
+                        "nodes": [
+                            _node_call("start", "test.start", "Starts failing nodeset."),
+                            _node_call("bad", "test.runtime_fail", "Fails inside nodeset.", provides=[PROV_SPEC("value.out")], config={"fail": True}),
+                            _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                        ],
+                        "edges": _edge_chain("start", "bad", "end"),
+                        "outputs": [REQ_SPEC("value.out")],
+                    },
+                )
+            ],
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts nested failure fixture."),
+                    _node_call("composite", "nodeset.fail.flow", "Calls failing nodeset.", provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Consumes final value.out.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": _edge_chain("start", "composite", "end"),
+            },
+        }
+    )
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="full"))
+
+    with pytest.raises(RuntimeError, match="boom"):
+        runtime.run({})
+
+    failed = [event for event in runtime.trace.events if event["kind"] == "node_failed" and event["node"] == "bad"]
+    assert failed[0]["path"] == ["composite", "bad"]
+    assert failed[0]["qualified_node"] == "composite.bad"
+    assert any(event["kind"] == "nodeset_failed" and event["path"] == ["composite"] for event in runtime.trace.events)
 
 
 def test_cli_train_profile_sets_async_flush_timeout_and_allows_override() -> None:

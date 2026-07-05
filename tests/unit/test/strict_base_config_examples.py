@@ -162,8 +162,8 @@ def test_mermaid_collapsed_and_expanded_views_share_top_level_compiled_edges() -
     )
     collapsed = export_mermaid(graph, expand_nodesets=False)
     expanded = export_mermaid(graph, expand_nodesets=True)
-    assert "seed --> flow" in collapsed
-    assert "seed --> flow" in expanded
+    assert "seed -->|value.in| flow" in collapsed
+    assert "seed -->|value.in| flow" in expanded
     assert "flow__inner" not in collapsed
     assert "flow__inner" in expanded
 
@@ -190,7 +190,7 @@ def test_checked_run_artifact_integrity_cross_links_health_graph_trace(tmp_path)
         {"from": "seed", "to": "add", "when": ""},
         {"from": "add", "to": "end", "when": ""},
     ]
-    assert "seed --> add" in graph_mmd
+    assert "seed -->|value.in| add" in graph_mmd
     assert [event["node"] for event in trace if event.get("kind") == "node"] == ["start", "seed", "add", "end"]
 
 def test_code_quality_tool_reports_file_function_dependency_and_side_effect_findings(tmp_path) -> None:

@@ -407,9 +407,9 @@ def test_checked_run_writes_reproducible_artifacts_without_raw_inputs(tmp_path) 
     graph_txt = (result.run_dir / "graph.txt").read_text(encoding="utf-8")
     for edge in compiled["effective_edges"]:
         mermaid_to = "n_end" if edge["to"] == "end" else edge["to"]
-        assert f'{edge["from"]} --> {mermaid_to}' in graph_mmd
+        assert any(line.strip().startswith(f'{edge["from"]} -->') and line.strip().endswith(f" {mermaid_to}") for line in graph_mmd.splitlines())
         assert f'{edge["from"]} ----> {edge["to"]}' in graph_txt
-    assert "provides: value.out" in graph_mmd
+    assert "add -->|value.out| n_end" in graph_mmd
     assert "TOPOLOGY FLOWCHART" in graph_txt
     assert "provides=value.out" in graph_txt
     if is_mermaid_svg_renderer_available():

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Mapping
 
@@ -83,6 +84,15 @@ def graph_config_error_report(
     effective_policy: Mapping[str, object],
 ) -> HealthReport:
     detail = getattr(exc, "detail", str(exc))
+    if detail.startswith("CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID"):
+        return fail_report(
+            "CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID",
+            str(exc),
+            "config",
+            str(path),
+            "schema",
+            effective_policy=effective_policy,
+        )
     if "unknown node" in detail or "references unknown" in detail:
         return fail_report(
             "CONFIG.TOPOLOGY",
@@ -117,7 +127,11 @@ def dedupe_findings(findings: tuple[HealthFinding, ...]) -> tuple[HealthFinding,
 def format_finding_text(finding: HealthFinding) -> str:
     location = location_text(finding.source_location)
     suffix = f" [{location}]" if location else ""
-    return f"{finding.severity}: {finding.rule_id}: {finding.message}{suffix}"
+    text = f"{finding.severity}: {finding.rule_id}: {finding.message}{suffix}"
+    if finding.details:
+        details = json.dumps(dict(finding.details), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        text = f"{text}\n  details: {details}"
+    return text
 
 
 def location_text(source_location: Mapping[str, object]) -> str:
