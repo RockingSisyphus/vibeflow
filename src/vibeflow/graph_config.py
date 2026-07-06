@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import os
 from pathlib import Path
 import sys
@@ -14,209 +14,35 @@ from .data_contract import (
     parse_data_requirements,
     provider_keys,
 )
+
+from .graph_config_types import (
+    EdgeSpec,
+    GraphConfig,
+    GraphConfigError,
+    JOIN_POLICIES,
+    JOIN_POLICY_SAFE_ANY,
+    JOIN_POLICY_ALL,
+    JOIN_POLICY_ANY_ACTIVE,
+    LOOP_NODE_TYPES,
+    LOOP_WHILE_TYPE,
+    LoopCarrySpec,
+    LoopCollectSpec,
+    LoopOutputSpec,
+    LoopSpec,
+    LoopStopWhenSpec,
+    NodeMetadata,
+    NodeSimilarity,
+    NodeSpec,
+    NodeStyle,
+    NodesetSpec,
+    SIMILAR_TO_RELATIONSHIPS,
+    STATUSES,
+    STATUS_IMPLEMENTED,
+    STATUS_PLANNED,
+)
 from .node import FLOW_KINDS, FLOW_KIND_PREDEFINED
-from .planned_behavior import PlannedBehavior, blocking_planned_behavior, parse_planned_behavior
+from .planned_behavior import PlannedBehavior, parse_planned_behavior
 from .visual_style import NODE_STYLE_FIELDS, is_hex_color, is_reserved_system_color, normalize_hex_color
-
-STATUS_PLANNED = "planned"
-STATUS_IMPLEMENTED = "implemented"
-STATUSES = frozenset({STATUS_PLANNED, STATUS_IMPLEMENTED})
-SIMILAR_TO_RELATIONSHIPS = frozenset({"variant", "copy"})
-JOIN_POLICY_SAFE_ANY = "safe_any"
-JOIN_POLICY_ANY_ACTIVE = "any_active"
-JOIN_POLICY_ALL = "all"
-JOIN_POLICIES = frozenset({JOIN_POLICY_SAFE_ANY, JOIN_POLICY_ANY_ACTIVE, JOIN_POLICY_ALL})
-LOOP_WHILE_TYPE = "vibeflow.loop.while"
-LOOP_NODE_TYPES = frozenset({LOOP_WHILE_TYPE})
-
-
-@dataclass(frozen=True)
-class NodeMetadata:
-    display_name: str = ""
-    description: str = ""
-
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "display_name": self.display_name,
-            "description": self.description,
-        }
-
-
-@dataclass(frozen=True)
-class NodeStyle:
-    fill: str = ""
-    stroke: str = ""
-    text: str = ""
-
-    def to_dict(self) -> dict[str, str]:
-        return {key: value for key, value in (("fill", self.fill), ("stroke", self.stroke), ("text", self.text)) if value}
-
-
-@dataclass(frozen=True)
-class NodeSimilarity:
-    node: str = ""
-    relationship: str = ""
-    reason: str = ""
-
-    def to_dict(self) -> dict[str, str]:
-        if not self.node:
-            return {}
-        return {
-            "node": self.node,
-            "relationship": self.relationship,
-            "reason": self.reason,
-        }
-
-
-@dataclass(frozen=True)
-class LoopCarrySpec:
-    source: str
-    target: str
-    update: str
-
-    def to_dict(self) -> dict[str, str]:
-        return {"from": self.source, "as": self.target, "update": self.update}
-
-
-@dataclass(frozen=True)
-class LoopCollectSpec:
-    source: str
-    target: str
-    mode: str = "all"
-
-    def to_dict(self) -> dict[str, str]:
-        return {"from": self.source, "as": self.target, "mode": self.mode}
-
-
-@dataclass(frozen=True)
-class LoopOutputSpec:
-    source: str
-    target: str
-
-    def to_dict(self) -> dict[str, str]:
-        return {"from": self.source, "as": self.target}
-
-
-@dataclass(frozen=True)
-class LoopStopWhenSpec:
-    source: str = ""
-    equals: bool = True
-
-    def to_dict(self) -> dict[str, Any]:
-        if not self.source:
-            return {}
-        return {"from": self.source, "equals": self.equals}
-
-
-@dataclass(frozen=True)
-class LoopSpec:
-    body: str = ""
-    max_iterations: int = 1000
-    stop_after: int = 0
-    stop_when: LoopStopWhenSpec = field(default_factory=LoopStopWhenSpec)
-    carry: tuple[LoopCarrySpec, ...] = ()
-    collect: tuple[LoopCollectSpec, ...] = ()
-    outputs: tuple[LoopOutputSpec, ...] = ()
-
-    def to_dict(self) -> dict[str, Any]:
-        if not self.body:
-            return {}
-        payload: dict[str, Any] = {
-            "body": self.body,
-            "max_iterations": self.max_iterations,
-        }
-        if self.stop_after:
-            payload["stop_after"] = self.stop_after
-        if self.stop_when.source:
-            payload["stop_when"] = self.stop_when.to_dict()
-        if self.carry:
-            payload["carry"] = [item.to_dict() for item in self.carry]
-        if self.collect:
-            payload["collect"] = [item.to_dict() for item in self.collect]
-        if self.outputs:
-            payload["outputs"] = [item.to_dict() for item in self.outputs]
-        return payload
-
-
-@dataclass(frozen=True)
-class NodeSpec:
-    id: str
-    type_used: str
-    requires: tuple[DataRequirement, ...] = ()
-    provides: tuple[DataProvider, ...] = ()
-    params: dict[str, Any] = field(default_factory=dict)
-    metadata: NodeMetadata = field(default_factory=NodeMetadata)
-    style: NodeStyle = field(default_factory=NodeStyle)
-    similar_to: NodeSimilarity = field(default_factory=NodeSimilarity)
-    join_policy: str = JOIN_POLICY_SAFE_ANY
-    loop: LoopSpec = field(default_factory=LoopSpec)
-    node_config_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
-    allow_config_override: bool = False
-    status: str = STATUS_IMPLEMENTED
-    flow_kind: str = ""
-    planned_behavior: PlannedBehavior = field(default_factory=blocking_planned_behavior)
-    async_mode: str = ""
-    result_key: str = ""
-
-    @property
-    def name(self) -> str:
-        return self.id
-
-    @property
-    def node_type(self) -> str:
-        return self.type_used
-
-
-@dataclass(frozen=True)
-class EdgeSpec:
-    source: str
-    target: str
-    when: str = ""
-
-    @property
-    def pair(self) -> tuple[str, str]:
-        return (self.source, self.target)
-
-
-@dataclass(frozen=True)
-class NodesetSpec:
-    type_key: str
-    display_name: str
-    description: str
-    requires: tuple[DataRequirement, ...]
-    provides: tuple[DataProvider, ...]
-    graph: "GraphConfig"
-    global_config: dict[str, Any] = field(default_factory=dict)
-    status: str = STATUS_IMPLEMENTED
-    flow_kind: str = FLOW_KIND_PREDEFINED
-    planned_behavior: PlannedBehavior = field(default_factory=blocking_planned_behavior)
-
-    @property
-    def name(self) -> str:
-        return self.type_key
-
-    @property
-    def exports(self) -> tuple[DataProvider, ...]:
-        return self.provides
-
-
-@dataclass(frozen=True)
-class GraphConfig:
-    nodes: tuple[NodeSpec, ...]
-    edges: tuple[EdgeSpec, ...] = ()
-    nodesets: dict[str, NodesetSpec] = field(default_factory=dict)
-    inputs: tuple[DataProvider, ...] = ()
-    outputs: tuple[DataRequirement, ...] = ()
-    max_steps: int = 1000
-    project_root: str = ""
-
-
-@dataclass
-class GraphConfigError(ValueError):
-    detail: str
-
-    def __str__(self) -> str:
-        return f"Graph config error: {self.detail}"
 
 
 def parse_graph_config(config: Mapping[str, Any], *, project_root: str | Path | None = None) -> GraphConfig:
@@ -307,6 +133,8 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         raise GraphConfigError(str(exc)) from exc
     async_mode, result_key = _parse_node_async(item, index=index, provides=provides)
     join_policy = _parse_join_policy(item.get("join_policy", JOIN_POLICY_SAFE_ANY), field=f"pipeline.nodes[{index}].join_policy")
+    from .graph_config_loop import _parse_loop_spec
+
     loop = _parse_loop_spec(item.get("loop", {}), type_used=type_used, provides=provides, field=f"pipeline.nodes[{index}].loop")
     reserved = {
         "id",
@@ -593,114 +421,6 @@ def _parse_node_similarity(value: Any, *, field: str) -> NodeSimilarity:
     if not reason:
         raise GraphConfigError(f"CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID: {field}.reason must be a non-empty string")
     return NodeSimilarity(node=node, relationship=relationship, reason=reason)
-
-
-def _parse_loop_spec(value: Any, *, type_used: str, provides: tuple[DataProvider, ...], field: str) -> LoopSpec:
-    if type_used not in LOOP_NODE_TYPES:
-        if value not in (None, {}):
-            raise GraphConfigError(f"{field} is only allowed on VibeFlow loop nodes")
-        return LoopSpec()
-    if not isinstance(value, Mapping):
-        raise GraphConfigError(f"{field} must be an object")
-    allowed = {"body", "max_iterations", "stop_after", "stop_when", "carry", "collect", "outputs"}
-    unknown = sorted(set(str(key) for key in value) - allowed)
-    if unknown:
-        raise GraphConfigError(f"{field} contains unsupported loop keys: {unknown}")
-    body = _parse_required_text(value.get("body"), field=f"{field}.body")
-    max_iterations = _parse_positive_int(value.get("max_iterations", 1000), field=f"{field}.max_iterations")
-    has_stop_after = "stop_after" in value
-    has_stop_when = "stop_when" in value
-    if has_stop_after == has_stop_when:
-        raise GraphConfigError(f"{field} must declare exactly one of stop_after or stop_when")
-    stop_after = _parse_positive_int(value.get("stop_after"), field=f"{field}.stop_after") if has_stop_after else 0
-    if stop_after and stop_after > max_iterations:
-        raise GraphConfigError(f"{field}.stop_after must be <= max_iterations")
-    stop_when = _parse_loop_stop_when(value.get("stop_when"), field=f"{field}.stop_when") if has_stop_when else LoopStopWhenSpec()
-    carry = tuple(_parse_loop_carry_item(item, field=f"{field}.carry[{index}]") for index, item in enumerate(_parse_list(value.get("carry", ()), field=f"{field}.carry")))
-    collect = tuple(_parse_loop_collect_item(item, field=f"{field}.collect[{index}]") for index, item in enumerate(_parse_list(value.get("collect", ()), field=f"{field}.collect")))
-    outputs = tuple(_parse_loop_output_item(item, field=f"{field}.outputs[{index}]") for index, item in enumerate(_parse_list(value.get("outputs", ()), field=f"{field}.outputs")))
-    if not outputs:
-        outputs = tuple(LoopOutputSpec(source=provider.key, target=provider.key) for provider in provides)
-    return LoopSpec(
-        body=_normalize_loop_body(body),
-        max_iterations=max_iterations,
-        stop_after=stop_after,
-        stop_when=stop_when,
-        carry=carry,
-        collect=collect,
-        outputs=outputs,
-    )
-
-
-def _parse_loop_stop_when(value: Any, *, field: str) -> LoopStopWhenSpec:
-    if not isinstance(value, Mapping):
-        raise GraphConfigError(f"{field} must be an object")
-    equals = value.get("equals", True)
-    if not isinstance(equals, bool):
-        raise GraphConfigError(f"{field}.equals must be a boolean")
-    return LoopStopWhenSpec(
-        source=_parse_required_text(value.get("from"), field=f"{field}.from"),
-        equals=equals,
-    )
-
-
-def _parse_loop_carry_item(value: Any, *, field: str) -> LoopCarrySpec:
-    if not isinstance(value, Mapping):
-        raise GraphConfigError(f"{field} must be an object")
-    return LoopCarrySpec(
-        source=_parse_required_text(value.get("from"), field=f"{field}.from"),
-        target=_parse_required_text(value.get("as"), field=f"{field}.as"),
-        update=_parse_required_text(value.get("update"), field=f"{field}.update"),
-    )
-
-
-def _parse_loop_collect_item(value: Any, *, field: str) -> LoopCollectSpec:
-    if not isinstance(value, Mapping):
-        raise GraphConfigError(f"{field} must be an object")
-    mode = str(value.get("mode", "all")).strip()
-    if mode != "all":
-        raise GraphConfigError(f"{field}.mode must be 'all'")
-    return LoopCollectSpec(
-        source=_parse_required_text(value.get("from"), field=f"{field}.from"),
-        target=_parse_required_text(value.get("as"), field=f"{field}.as"),
-        mode=mode,
-    )
-
-
-def _parse_loop_output_item(value: Any, *, field: str) -> LoopOutputSpec:
-    if not isinstance(value, Mapping):
-        raise GraphConfigError(f"{field} must be an object")
-    return LoopOutputSpec(
-        source=_parse_required_text(value.get("from"), field=f"{field}.from"),
-        target=_parse_required_text(value.get("as"), field=f"{field}.as"),
-    )
-
-
-def _parse_required_text(value: Any, *, field: str) -> str:
-    text = str(value or "").strip()
-    if not text:
-        raise GraphConfigError(f"{field} must be a non-empty string")
-    return text
-
-
-def _parse_positive_int(value: Any, *, field: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise GraphConfigError(f"{field} must be an integer >= 1")
-    return value
-
-
-def _parse_list(value: Any, *, field: str) -> list[Any]:
-    if value in (None, ()):
-        return []
-    if isinstance(value, str) or not isinstance(value, list):
-        raise GraphConfigError(f"{field} must be a list")
-    return value
-
-
-def _normalize_loop_body(value: str) -> str:
-    if value.startswith("nodeset."):
-        raise GraphConfigError("loop.body must use the nodeset type_key directly, not nodeset.<name>")
-    return value
 
 
 def _validate_node_similarity_targets(nodes: tuple[NodeSpec, ...], *, field: str) -> None:
