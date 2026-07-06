@@ -24,11 +24,11 @@ def append_mainline_health(graph, compiled, state, *, registry, owner: str = "pi
             )
         )
     for nodeset in graph.nodesets.values():
-        if nodeset.status == "planned" or nodeset.name in visited_nodesets:
+        if nodeset.status == "planned" or nodeset.type_key in visited_nodesets:
             continue
-        visited_nodesets.add(nodeset.name)
+        visited_nodesets.add(nodeset.type_key)
         try:
-            nested = GraphCompiler().compile(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.name}")
+            nested = GraphCompiler().compile(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.type_key}")
         except GraphCompileError:
             continue
-        append_mainline_health(nodeset.graph, nested, state, registry=registry, owner=f"nodeset:{nodeset.name}", visited_nodesets=visited_nodesets)
+        append_mainline_health(nodeset.graph, nested, state, registry=registry, owner=f"nodeset:{nodeset.type_key}", visited_nodesets=visited_nodesets)

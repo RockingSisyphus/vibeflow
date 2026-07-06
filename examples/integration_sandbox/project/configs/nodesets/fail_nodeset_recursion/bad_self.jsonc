@@ -1,0 +1,57 @@
+{
+  "display_name": "Bad Self",
+  "description": "Bad recursive nodeset.",
+  "requires": [
+    {
+      "type": "value.in",
+      "cardinality": "exactly_one",
+      "display_name": "Value In"
+    }
+  ],
+  "provides": [
+    {
+      "key": "value.out",
+      "type": "value.out",
+      "display_name": "Value Out"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "value.in",
+        "type": "value.in",
+        "display_name": "Value In"
+      }
+    ],
+    "nodes": [
+      {
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out",
+            "display_name": "Value Out"
+          }
+        ],
+        "id": "self",
+        "type_used": "bad.self",
+        "display_name": "Self",
+        "description": "Runs self."
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.in",
+        "cardinality": "exactly_one",
+        "display_name": "Value In"
+      }
+    ]
+  },
+  "type_key": "bad.self"
+}

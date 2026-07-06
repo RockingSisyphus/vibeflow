@@ -1,199 +1,102 @@
 {
-  "nodesets": [
-    {
-      "name": "semantic.arithmetic",
-      "display_name": "Semantic Arithmetic",
-      "category": "semantic",
-      "description": "Adds calc.a and calc.b, then scales the sum for semantic nodeset acceptance.",
-      "version": "0.1.0",
-      "purity": "pure",
-      "requires": [
-        {
-          "type": "calc.a",
-          "cardinality": "exactly_one"
-        },
-        {
-          "type": "calc.b",
-          "cardinality": "exactly_one"
-        }
-      ],
-      "provides": [
-        {
-          "key": "calc.scaled",
-          "type": "calc.scaled"
-        }
-      ],
-      "exports": [
-        {
-          "key": "calc.scaled",
-          "type": "calc.scaled"
-        }
-      ],
-      "pipeline": {
-        "inputs": [
-          {
-            "key": "calc.a",
-            "type": "calc.a"
-          },
-          {
-            "key": "calc.b",
-            "type": "calc.b"
-          }
-        ],
-        "nodes": [
-          {
-            "name": "start",
-            "type": "sandbox.start"
-          },
-          {
-            "name": "add_pair",
-            "type": "semantic.add_pair",
-            "requires": [
-              {
-                "type": "calc.a",
-                "cardinality": "exactly_one"
-              },
-              {
-                "type": "calc.b",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "calc.sum",
-                "type": "calc.sum"
-              }
-            ]
-          },
-          {
-            "name": "scale",
-            "type": "semantic.scale",
-            "requires": [
-              {
-                "type": "calc.sum",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "calc.scaled",
-                "type": "calc.scaled"
-              }
-            ],
-            "factor": 2
-          },
-          {
-            "name": "end",
-            "type": "semantic.scaled_end",
-            "requires": [
-              {
-                "type": "calc.scaled",
-                "cardinality": "exactly_one"
-              }
-            ]
-          }
-        ],
-        "edges": [
-          {
-            "from": "start",
-            "to": "add_pair"
-          },
-          {
-            "from": "add_pair",
-            "to": "scale"
-          },
-          {
-            "from": "scale",
-            "to": "end"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "calc.scaled",
-            "cardinality": "exactly_one"
-          }
-        ]
-      }
-    }
-  ],
   "pipeline": {
     "inputs": [
       {
         "key": "calc.a",
-        "type": "calc.a"
+        "type": "calc.a",
+        "display_name": "Calc A"
       },
       {
         "key": "calc.b",
-        "type": "calc.b"
+        "type": "calc.b",
+        "display_name": "Calc B"
       }
     ],
     "nodes": [
       {
-        "name": "start",
-        "type": "sandbox.start"
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
       },
       {
-        "name": "arithmetic",
-        "type": "nodeset.semantic.arithmetic",
         "requires": [
           {
             "type": "calc.a",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Calc A"
           },
           {
             "type": "calc.b",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Calc B"
           }
         ],
         "provides": [
           {
             "key": "calc.scaled",
-            "type": "calc.scaled"
+            "type": "calc.scaled",
+            "display_name": "Calc Scaled"
           }
-        ]
+        ],
+        "id": "arithmetic",
+        "type_used": "semantic.arithmetic",
+        "display_name": "Arithmetic",
+        "description": "Runs arithmetic."
       },
       {
-        "name": "use_scaled",
-        "type": "semantic.use_scaled",
         "requires": [
           {
             "type": "calc.scaled",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Calc Scaled"
           }
         ],
         "provides": [
           {
             "key": "calc.branch",
-            "type": "calc.branch"
+            "type": "calc.branch",
+            "display_name": "Calc Branch"
           }
-        ]
+        ],
+        "id": "use_scaled",
+        "type_used": "semantic.use_scaled",
+        "display_name": "Use Scaled",
+        "description": "Runs use_scaled."
       },
       {
-        "name": "finalize",
-        "type": "semantic.finalize",
         "requires": [
           {
             "type": "calc.branch",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Calc Branch"
           }
         ],
         "provides": [
           {
             "key": "calc.final",
-            "type": "calc.final"
+            "type": "calc.final",
+            "display_name": "Calc Final"
           }
         ],
-        "offset": 5
+        "offset": 5,
+        "id": "finalize",
+        "type_used": "semantic.finalize",
+        "display_name": "Finalize",
+        "description": "Runs finalize."
       },
       {
-        "name": "end",
-        "type": "semantic.final_end",
         "requires": [
           {
             "type": "calc.final",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Calc Final"
           }
-        ]
+        ],
+        "id": "end",
+        "type_used": "semantic.final_end",
+        "display_name": "End",
+        "description": "Runs end."
       }
     ],
     "edges": [
@@ -217,16 +120,24 @@
     "outputs": [
       {
         "type": "calc.final",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Calc Final"
       },
       {
         "type": "calc.branch",
-        "cardinality": "optional_one"
+        "cardinality": "optional_one",
+        "display_name": "Calc Branch"
       },
       {
         "type": "calc.scaled",
-        "cardinality": "optional_one"
+        "cardinality": "optional_one",
+        "display_name": "Calc Scaled"
       }
     ]
-  }
+  },
+  "nodeset_imports": [
+    {
+      "path": "nodesets/pass_semantic_nodeset_arithmetic/semantic_arithmetic.jsonc"
+    }
+  ]
 }

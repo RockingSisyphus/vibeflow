@@ -313,8 +313,8 @@ def _inspect_config(args) -> int:
     payload = {
         "nodes": [
             {
-                "name": node.name,
-                "type": node.node_type,
+                "id": node.id,
+                "type_used": node.type_used,
                 "requires": [_requirement_payload(item) for item in node.requires],
                 "provides": [_provider_payload(item) for item in node.provides],
                 "status": node.status,
@@ -327,12 +327,13 @@ def _inspect_config(args) -> int:
         "max_steps": graph.max_steps,
         "nodesets": [
             {
-                "name": nodeset.name,
+                "type_key": nodeset.type_key,
+                "display_name": nodeset.display_name,
+                "description": nodeset.description,
                 "status": nodeset.status,
                 "planned_behavior": nodeset.planned_behavior.to_dict(),
                 "requires": [_requirement_payload(item) for item in nodeset.requires],
                 "provides": [_provider_payload(item) for item in nodeset.provides],
-                "exports": [_provider_payload(item) for item in nodeset.exports],
             }
             for nodeset in graph.nodesets.values()
         ],
@@ -343,11 +344,11 @@ def _inspect_config(args) -> int:
 
 
 def _provider_payload(item) -> dict[str, str]:
-    return {"key": item.key, "type": item.type}
+    return {"key": item.key, "type": item.type, "display_name": item.display_name}
 
 
 def _requirement_payload(item) -> dict[str, str]:
-    return {"type": item.type, "cardinality": item.cardinality}
+    return {"type": item.type, "cardinality": item.cardinality, "display_name": item.display_name}
 
 
 def _run(args) -> int:

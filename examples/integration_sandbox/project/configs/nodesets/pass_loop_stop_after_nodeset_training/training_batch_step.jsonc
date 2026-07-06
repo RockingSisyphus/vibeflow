@@ -1,0 +1,176 @@
+{
+  "display_name": "Training Batch Step",
+  "description": "Runs one block-compiled training batch update and returns updated carry state plus metrics.",
+  "requires": [
+    {
+      "type": "train.model",
+      "cardinality": "exactly_one",
+      "display_name": "Train Model"
+    },
+    {
+      "type": "train.batch",
+      "cardinality": "exactly_one",
+      "display_name": "Train Batch"
+    },
+    {
+      "type": "train.optimizer",
+      "cardinality": "exactly_one",
+      "display_name": "Train Optimizer"
+    }
+  ],
+  "provides": [
+    {
+      "key": "train.model_after",
+      "type": "train.model_after",
+      "display_name": "Train Model After"
+    },
+    {
+      "key": "train.optimizer_after",
+      "type": "train.optimizer_after",
+      "display_name": "Train Optimizer After"
+    },
+    {
+      "key": "train.step_report",
+      "type": "train.step_report",
+      "display_name": "Train Step Report"
+    },
+    {
+      "key": "train.loss",
+      "type": "train.loss",
+      "display_name": "Train Loss"
+    },
+    {
+      "key": "train.metrics",
+      "type": "train.metrics",
+      "display_name": "Train Metrics"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "train.model",
+        "type": "train.model",
+        "display_name": "Train Model"
+      },
+      {
+        "key": "train.batch",
+        "type": "train.batch",
+        "display_name": "Train Batch"
+      },
+      {
+        "key": "train.optimizer",
+        "type": "train.optimizer",
+        "display_name": "Train Optimizer"
+      }
+    ],
+    "nodes": [
+      {
+        "display_name": "Body Start",
+        "description": "Starts one fixed-count training loop body invocation.",
+        "id": "start",
+        "type_used": "sandbox.start"
+      },
+      {
+        "display_name": "Train Step",
+        "description": "Runs one full training update for the current loop carry state.",
+        "requires": [
+          {
+            "type": "train.model",
+            "cardinality": "exactly_one",
+            "display_name": "Train Model"
+          },
+          {
+            "type": "train.batch",
+            "cardinality": "exactly_one",
+            "display_name": "Train Batch"
+          },
+          {
+            "type": "train.optimizer",
+            "cardinality": "exactly_one",
+            "display_name": "Train Optimizer"
+          }
+        ],
+        "provides": [
+          {
+            "key": "train.model_after",
+            "type": "train.model_after",
+            "display_name": "Train Model After"
+          },
+          {
+            "key": "train.optimizer_after",
+            "type": "train.optimizer_after",
+            "display_name": "Train Optimizer After"
+          },
+          {
+            "key": "train.step_report",
+            "type": "train.step_report",
+            "display_name": "Train Step Report"
+          },
+          {
+            "key": "train.loss",
+            "type": "train.loss",
+            "display_name": "Train Loss"
+          },
+          {
+            "key": "train.metrics",
+            "type": "train.metrics",
+            "display_name": "Train Metrics"
+          }
+        ],
+        "id": "train_step",
+        "type_used": "sandbox.training_batch_step"
+      },
+      {
+        "display_name": "Body End",
+        "description": "Ends the loop body once metrics are available.",
+        "requires": [
+          {
+            "type": "train.metrics",
+            "cardinality": "exactly_one",
+            "display_name": "Train Metrics"
+          }
+        ],
+        "id": "end",
+        "type_used": "sandbox.training_metrics_end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "train_step"
+      },
+      {
+        "from": "train_step",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "train.model_after",
+        "cardinality": "exactly_one",
+        "display_name": "Train Model After"
+      },
+      {
+        "type": "train.optimizer_after",
+        "cardinality": "exactly_one",
+        "display_name": "Train Optimizer After"
+      },
+      {
+        "type": "train.step_report",
+        "cardinality": "exactly_one",
+        "display_name": "Train Step Report"
+      },
+      {
+        "type": "train.loss",
+        "cardinality": "exactly_one",
+        "display_name": "Train Loss"
+      },
+      {
+        "type": "train.metrics",
+        "cardinality": "exactly_one",
+        "display_name": "Train Metrics"
+      }
+    ]
+  },
+  "type_key": "training.batch_step"
+}

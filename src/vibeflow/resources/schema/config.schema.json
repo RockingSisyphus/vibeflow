@@ -8,10 +8,6 @@
     "nodes": { "$ref": "#/$defs/nodes" },
     "edges": { "$ref": "#/$defs/edges" },
     "max_steps": { "type": "integer", "minimum": 1 },
-    "nodesets": {
-      "type": "array",
-      "items": { "$ref": "nodeset.schema.json" }
-    },
     "nodeset_imports": {
       "type": "array",
       "items": {
@@ -21,9 +17,9 @@
             "type": "object",
             "required": ["path"],
             "properties": {
-              "path": { "type": "string", "minLength": 1 },
-              "names": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
-            }
+              "path": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
           }
         ]
       }
@@ -99,19 +95,21 @@
   "$defs": {
     "dataProvider": {
       "type": "object",
-      "required": ["key", "type"],
+      "required": ["key", "type", "display_name"],
       "properties": {
         "key": { "type": "string", "minLength": 1 },
-        "type": { "type": "string", "minLength": 1 }
+        "type": { "type": "string", "minLength": 1 },
+        "display_name": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },
     "dataRequirement": {
       "type": "object",
-      "required": ["type", "cardinality"],
+      "required": ["type", "cardinality", "display_name"],
       "properties": {
         "type": { "type": "string", "minLength": 1 },
-        "cardinality": { "enum": ["exactly_one", "optional_one", "all"] }
+        "cardinality": { "enum": ["exactly_one", "optional_one", "all"] },
+        "display_name": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },
@@ -131,17 +129,14 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["name"],
+        "required": ["id"],
         "properties": {
-          "name": { "type": "string", "minLength": 1 },
-          "type": { "type": "string", "minLength": 1 },
-          "registry_key": { "type": "string", "minLength": 1 },
+          "id": { "type": "string", "minLength": 1 },
+          "type_used": { "type": "string", "minLength": 1 },
           "status": { "enum": ["planned", "implemented"] },
           "flow_kind": { "enum": ["terminal", "process", "decision", "io", "predefined", "data_store", "document", "preparation"] },
           "planned_behavior": { "$ref": "#/$defs/plannedBehavior" },
           "display_name": { "type": "string" },
-          "category": { "type": "string" },
-          "version": { "type": "string" },
           "description": { "type": "string" },
           "style": { "$ref": "#/$defs/nodeStyle" },
           "similar_to": { "$ref": "#/$defs/nodeSimilarity" },
@@ -157,8 +152,7 @@
           "result_key": { "type": "string", "minLength": 1 }
         },
         "anyOf": [
-          { "required": ["type"] },
-          { "required": ["registry_key"] },
+          { "required": ["type_used"] },
           { "required": ["status", "flow_kind"], "properties": { "status": { "const": "planned" } } }
         ],
         "allOf": [

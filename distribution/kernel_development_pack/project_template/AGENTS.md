@@ -17,22 +17,26 @@
 - 外部输入输出必须建模为 `io`、`data_store`、`document` 类型节点，或明确的 `external=True` 节点。
 - 控制流只写在 JSONC 的 `pipeline.edges` 中；不要用 Python 调用关系隐式表达流程。
 - `requires` / `provides` 只表达数据契约，不会自动生成控制流或图上的理论数据边；没有显式 edge，就没有图边。
+- 每个 `pipeline.nodes[]` 调用点必须写 `id` 和 `type_used`。旧 `name`、调用处旧 `type`、旧 `registry_key`、旧 `nodeset.xxx` 前缀都不再接受。
+- Python node 的实现键来自 `NodeInfo.type_key`；nodeset 的实现键来自独立 nodeset JSONC 根对象的 `type_key`。调用处 `type_used` 可以指向二者之一或系统类型。
 - Health 会推断同步主线、data bypass 和 async 相关边。主线 edge 负责调度并在 SVG/Mermaid 加粗；data bypass edge 只投递数据不触发目标并显示虚线；async edge 连接显式 async node/nodeset，不进入同步主线。
 - 每个 `pipeline.nodes[]` 调用点都必须写 `display_name` 和 `description`，让 Mermaid/SVG 能直接区分节点名、易读名和说明。
+- `requires`、`provides`、`pipeline.inputs`、`pipeline.outputs` 的每个对象都必须写非空 `display_name`。图上 contract label 先显示 `display_name`，再显示 id/key/type。
 - 每个 `plugins[]` 和 `base_lib.modules[]` 对象声明也必须写 `display_name` 和 `description`；不要只写 `module`、`path` 或字符串简写。`PLUGIN_INFO` / `BASE_LIB_INFO` 是源码级元数据，不能替代 config 中本次启用资源的用途说明。
 - 节点自定义颜色只能写在 `style.fill`、`style.stroke`、`style.text` 中，颜色必须是 `#RRGGBB`，且不得使用 VibeFlow 系统保留色。合法自定义色会覆盖节点默认/系统 class 的 fill/stroke/text 颜色。
-- `display_name`、`category`、`version`、`description`、`style`、`similar_to` 是调用点元数据，不进入运行时 `params`；运行时同名参数必须写进 `config`。
+- `display_name`、`description`、`style`、`similar_to` 是调用点元数据，不进入运行时 `params`；运行时同名参数必须写进 `config`。
 - 只有确认两个 node 是有意变体或副本时才写 `similar_to`，并且必须指向同作用域已存在 node、使用 `variant` 或 `copy`、写清 `reason`；不要用它掩盖应该拆分或抽 base_lib 的重复实现。
 - 普通 `pipeline.edges` 和 nodeset 内部 `pipeline.edges` 不允许形成环；所有循环都必须使用唯一一等 loop 类型 `vibeflow.loop.while` 调用 nodeset body。
-- nodeset 通过符号表解析；`nodeset.xxx` 和 `loop.body` 可以引用同一 config 中后面才声明的 nodeset，不要为了可见性调整声明顺序。
-- `nodeset.xxx` 调用和 `loop.body` 都是 nodeset dependency，不能直接或间接递归；出现 `NODESET.RECURSION` 时要拆开结构或改成真正的 `vibeflow.loop.while` 循环语义。
+- nodeset 必须是独立 JSONC 文件，根对象声明 `type_key`、`display_name`、`description`、`requires`、`provides` 和 `pipeline`；主 config 不允许内联 `nodesets`，nodeset 文件也不允许 `exports`、`purity`、`category`、`version`。
+- nodeset 文件可以写 `nodeset_imports` 调用其他独立 nodeset 文件；调用处直接用 nodeset `type_key` 作为 `type_used`，不要写旧 `nodeset.xxx` 前缀。
+- nodeset 调用和 `loop.body` 都是 nodeset dependency，不能直接或间接递归；出现 `NODESET.RECURSION` 时要拆开结构或改成真正的 `vibeflow.loop.while` 循环语义。
 - `decision` 只用于分支选择，不要用 decision cycle 模拟 retry、训练循环、多 batch、多 epoch、carry state 或 metrics collect。
 - loop 的退出条件只能在 `loop.stop_after` 和 `loop.stop_when` 中二选一；不要再写 `vibeflow.loop.for_each`、`loop.items`、`loop.epochs` 或 `loop.until`。
 - `execution="block"` / `execution="compiled"` 会执行结构化 `LoopBlock`，loop body 不能 block 化时会报错，不会静默降级。
 - join 默认是 safe OR；只有确认任一 active incoming 都足够触发目标时才写 `join_policy: "any_active"`，需要等待所有 incoming 时写 `join_policy: "all"`。复杂分支汇合优先写显式 merge/select node。
 - 非 decision 同步 fan-out 必须有明确语义：分支通过 `join_policy: "all"` 汇合、被识别为 data bypass，或分支目标显式写 `async`。遇到 `GRAPH.MAINLINE.*`，按 details 里的 `source`、`target`、`branch_nodes`、`branch_edges` 和 `suggested_fixes` 改配置。
 - node 间可以按引用传递普通 Python 对象；不要依赖 trace 或报告保存对象内容，报告只审计流程和 key。
-- 需要后台指标、日志或诊断任务时，只能显式使用 config 的 `async: "detached"` 或 `async: "result_key"`；复杂后台任务可把调用点写成 `type: "nodeset.xxx"` 并设置 `async`。不要在 node 内私自启动线程。
+- 需要后台指标、日志或诊断任务时，只能显式使用 config 的 `async: "detached"` 或 `async: "result_key"`；复杂后台任务可把调用点写成 nodeset `type_used` 并设置 `async`。不要在 node 内私自启动线程。
 - 运行或交付前必须让内核健康检查通过；不要跳过 `python run.py validate ...`。
 
 ## 先读文档
@@ -52,15 +56,15 @@
 ## 推荐开发流程
 
 1. 先把用户希望开发的程序抽象成一个粗粒度标准流程图，只保留几大块。
-2. 用 planned nodeset 表达这些大块。例如初始流程是 `a -> b -> c`，就在顶层 config 中定义 `a`、`b`、`c` 三个 `status: "planned"` 的 nodeset，并在顶层 `pipeline.edges` 中连接 `a -> b -> c`。
-3. planned node 必须声明 `flow_kind`，并像 implemented node 一样写 `display_name` 和 `description`；planned nodeset 可暂时不补齐内部 pipeline、契约和 exports。默认 `planned_behavior` 是 `blocking`，只用于架构图审查。
+2. 用 planned nodeset 表达这些大块。例如初始流程是 `a -> b -> c`，就为 `a`、`b`、`c` 各写一个独立 planned nodeset JSONC 文件，根对象声明 `type_key`，再在顶层 config 用 `type_used` 调用它们并连接 `pipeline.edges`。
+3. planned node 必须声明 `id`、`display_name`、`description` 和 `flow_kind`；planned nodeset 必须声明 `type_key`、`display_name`、`description`、`requires` 和 `provides`，但可暂时不写内部 `pipeline`。默认 `planned_behavior` 是 `blocking`，只用于架构图审查。
 4. 生成流程图给人类审核：快速源码图用 `python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd`，快速图片用 `python run.py svg --config project/configs/main.jsonc --output reports/graph.svg`。
 5. 需要展开 nodeset 给人类审查时，必须用 `python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg` 生成详细审查 SVG。不要把 `graph.expanded.mmd` 直接交给 Mermaid CLI/mmdc 渲染成 SVG；那会绕过 VibeFlow 的 review-columns/detail-panel composer，导致排版退回旧的全局展开图。
 6. 告知人类审核员查看 `reports/graph.mmd`、`reports/graph.svg` 或 `reports/graph.expanded.svg`。不要在粗粒度架构未经确认时直接实现大量 node。
 7. 人类审核通过后，再逐个细化 nodeset。比如把 planned nodeset `a` 细化为 `d -> e -> f`，可以先把 `d`、`e`、`f` 也标为 planned，再生成展开图继续审核。
 8. 细化可以继续嵌套；任何尚未确定的节点或节点集都应保持 `status: "planned"`，用流程图先暴露结构。
 9. 真正实现某个 node 时，必须创建对应 Python node，声明 `NODE_INFO`、`CONTRACT` 和 `run_pure(inputs, params)`，并在 `project/registry.py` 注册。
-10. 真正实现某个 nodeset 时，必须补齐 metadata、`requires`、`provides`、`exports`、内部 `pipeline.nodes` 和 `pipeline.edges`，且移除该 nodeset 的 `status: "planned"`。
+10. 真正实现某个 nodeset 时，必须补齐 `requires`、`provides`、内部 `pipeline.nodes` 和 `pipeline.edges`，且移除该 nodeset 的 `status: "planned"`；不要写已移除的 `exports` 或 `purity`。
 11. 只有当 nodeset 内部所有子 node / 子 nodeset 都已经 implemented，父 nodeset 才能变成 implemented。例外是设计期可用 `planned_behavior: "transparent"` 或 `python_stub` 子节点保持连通性，此时父 nodeset 会得到 warning；blocking planned child 仍会报错。
 12. 按同样方式实现后续 nodeset，直到顶层 `a`、`b`、`c` 全部 implemented，最终程序才能运行。
 13. 如果需要训练或批处理循环，先把循环 body 抽成 nodeset，再用 `vibeflow.loop.while` 调用；body 内只表达单轮逻辑，跨轮状态用 `loop.carry`，指标列表用 `loop.collect`，固定轮数用 `loop.stop_after`，条件退出用 body/state 输出的 bool `loop.stop_when`。
@@ -84,7 +88,7 @@
 - `planned_behavior: "transparent"` 只用于 flow health 连通性，不可运行。
 - `planned_behavior: {"kind": "python_stub", "stub_module": "project/stubs/xxx.py"}` 只用于开发测试；必须配合 `--allow-planned-stub` 才能运行，不能视为 production ready。
 - implemented 内容必须完整、可达、可校验、可运行。
-- 流程图是人类审核程序结构的主要产物；重大架构变更先出图再实现。SVG 节点和资源列内应能读清易读标题、`id`、`type`、状态和说明，contract 应显示在已有连边上；信息挤在一起时应先改善 config 的描述长度、拆节点或调整 style，而不是绕过 `python run.py svg`。SVG 默认保持 `htmlLabels=false`，并由内核对原生 SVG 文本做标题加粗、字段名前缀加粗、字段行左对齐等增强。
+- 流程图是人类审核程序结构的主要产物；重大架构变更先出图再实现。SVG 节点和资源列内应能读清易读标题、`id`、`type_used`、状态和说明，contract 应显示在已有连边上并优先显示 `display_name`；信息挤在一起时应先改善 config 的描述长度、拆节点或调整 style，而不是绕过 `python run.py svg`。SVG 默认保持 `htmlLabels=false`，并由内核对原生 SVG 文本做标题加粗、字段名前缀加粗、字段行左对齐等增强。
 - 为消除 `NODESET.SMELL.TOO_WIDE` 拆成更多小 nodeset 是推荐方向；如果怀疑 config 读取或解析慢，用 `VIBEFLOW_CONFIG_TRACE=1 python run.py validate --config ...` 查看 import、nodeset 数、单个 nodeset 解析耗时和总耗时。
 - 一等 loop 的展开图应能看到 loop body nodeset；调试训练循环时优先看 `runtime.qualified_exec_order`、`runtime.total_step_count` 和事件 `path`，不要只看顶层 `runtime.exec_order`。
 - `GRAPH.JOIN.AMBIGUOUS_UNCONDITIONAL` 表示某个 join 可能被 unconditional provider 提前触发或和 conditional provider 争抢同一个 `exactly_one` 输入；修配置，不要靠旧 context 或节点内部判断绕过。

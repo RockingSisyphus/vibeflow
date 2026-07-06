@@ -1,300 +1,64 @@
 {
-  "nodesets": [
-    {
-      "name": "loop.increment_step",
-      "display_name": "Increment Step",
-      "category": "loop",
-      "description": "Reusable increment subplan called from the while-loop body on every iteration.",
-      "version": "0.1.0",
-      "purity": "pure",
-      "requires": [
-        {
-          "type": "value.in",
-          "cardinality": "exactly_one"
-        }
-      ],
-      "provides": [
-        {
-          "key": "value.next",
-          "type": "value.next"
-        }
-      ],
-      "exports": [
-        {
-          "key": "value.next",
-          "type": "value.next"
-        }
-      ],
-      "pipeline": {
-        "inputs": [
-          {
-            "key": "value.in",
-            "type": "value.in"
-          }
-        ],
-        "nodes": [
-          {
-            "name": "start",
-            "type": "sandbox.start",
-            "display_name": "Start",
-            "description": "Starts the reusable increment subplan."
-          },
-          {
-            "name": "input",
-            "type": "sandbox.value_input",
-            "display_name": "Input",
-            "description": "Reads the current loop value.",
-            "requires": [
-              {
-                "type": "value.in",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "value.in.input",
-                "type": "value.in"
-              }
-            ]
-          },
-          {
-            "name": "increment",
-            "type": "sandbox.increment",
-            "display_name": "Increment",
-            "description": "Increments the current loop value by one.",
-            "requires": [
-              {
-                "type": "value.in",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "value.next",
-                "type": "value.next"
-              }
-            ]
-          },
-          {
-            "name": "end",
-            "type": "sandbox.next_value_end",
-            "display_name": "End",
-            "description": "Ends after value.next is produced.",
-            "requires": [
-              {
-                "type": "value.next",
-                "cardinality": "exactly_one"
-              }
-            ]
-          }
-        ],
-        "edges": [
-          {
-            "from": "start",
-            "to": "input"
-          },
-          {
-            "from": "input",
-            "to": "increment"
-          },
-          {
-            "from": "increment",
-            "to": "end"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "value.next",
-            "cardinality": "exactly_one"
-          }
-        ]
-      }
-    },
-    {
-      "name": "loop.reuse_body",
-      "display_name": "Loop Reuse Body",
-      "category": "loop",
-      "description": "While-loop body that calls the reusable increment nodeset and then decides whether to stop.",
-      "version": "0.1.0",
-      "purity": "pure",
-      "requires": [
-        {
-          "type": "value.in",
-          "cardinality": "exactly_one"
-        }
-      ],
-      "provides": [
-        {
-          "key": "value.next",
-          "type": "value.next"
-        },
-        {
-          "key": "loop.done",
-          "type": "loop.done"
-        }
-      ],
-      "exports": [
-        {
-          "key": "value.next",
-          "type": "value.next"
-        },
-        {
-          "key": "loop.done",
-          "type": "loop.done"
-        }
-      ],
-      "pipeline": {
-        "inputs": [
-          {
-            "key": "value.in",
-            "type": "value.in"
-          }
-        ],
-        "nodes": [
-          {
-            "name": "start",
-            "type": "sandbox.start",
-            "display_name": "Start",
-            "description": "Starts one while-loop body iteration."
-          },
-          {
-            "name": "increment_step",
-            "type": "nodeset.loop.increment_step",
-            "display_name": "Increment Step",
-            "description": "Calls the reusable increment nodeset for this iteration.",
-            "requires": [
-              {
-                "type": "value.in",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "value.next",
-                "type": "value.next"
-              }
-            ]
-          },
-          {
-            "name": "done",
-            "type": "sandbox.done_value",
-            "display_name": "Done Check",
-            "description": "Stops the while loop when value.next reaches the target.",
-            "requires": [
-              {
-                "type": "value.next",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "loop.done",
-                "type": "loop.done"
-              }
-            ],
-            "config": {
-              "target": 3
-            }
-          },
-          {
-            "name": "end",
-            "type": "sandbox.next_value_end",
-            "display_name": "End",
-            "description": "Ends after the iteration value is available.",
-            "requires": [
-              {
-                "type": "value.next",
-                "cardinality": "exactly_one"
-              }
-            ]
-          }
-        ],
-        "edges": [
-          {
-            "from": "start",
-            "to": "increment_step"
-          },
-          {
-            "from": "increment_step",
-            "to": "done"
-          },
-          {
-            "from": "increment_step",
-            "to": "end"
-          },
-          {
-            "from": "done",
-            "to": "end"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "value.next",
-            "cardinality": "exactly_one"
-          },
-          {
-            "type": "loop.done",
-            "cardinality": "exactly_one"
-          }
-        ]
-      }
-    }
-  ],
   "pipeline": {
     "inputs": [
       {
         "key": "value.in",
-        "type": "value.in"
+        "type": "value.in",
+        "display_name": "Value In"
       }
     ],
     "nodes": [
       {
-        "name": "start",
-        "type": "sandbox.start",
         "display_name": "Start",
-        "description": "Starts the while-loop nodeset reuse fixture."
+        "description": "Starts the while-loop nodeset reuse fixture.",
+        "id": "start",
+        "type_used": "sandbox.start"
       },
       {
-        "name": "input",
-        "type": "sandbox.value_input",
         "display_name": "Input",
         "description": "Reads the initial loop value.",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.in.input",
-            "type": "value.in"
+            "type": "value.in",
+            "display_name": "Value In Input"
           }
-        ]
+        ],
+        "id": "input",
+        "type_used": "sandbox.value_input"
       },
       {
-        "name": "retry_loop",
-        "type": "vibeflow.loop.while",
         "display_name": "Retry Loop",
         "description": "Runs the reusable increment nodeset until the loop done flag is true.",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.next",
-            "type": "value.next"
+            "type": "value.next",
+            "display_name": "Value Next"
           },
           {
             "key": "loop.done",
-            "type": "loop.done"
+            "type": "loop.done",
+            "display_name": "Loop Done"
           },
           {
             "key": "loop.iterations",
-            "type": "loop.iterations"
+            "type": "loop.iterations",
+            "display_name": "Loop Iterations"
           }
         ],
         "loop": {
@@ -325,19 +89,22 @@
               "as": "loop.iterations"
             }
           ]
-        }
+        },
+        "id": "retry_loop",
+        "type_used": "vibeflow.loop.while"
       },
       {
-        "name": "end",
-        "type": "sandbox.next_value_end",
         "display_name": "End",
         "description": "Ends after value.next is produced.",
         "requires": [
           {
             "type": "value.next",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Next"
           }
-        ]
+        ],
+        "id": "end",
+        "type_used": "sandbox.next_value_end"
       }
     ],
     "edges": [
@@ -357,16 +124,27 @@
     "outputs": [
       {
         "type": "value.next",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Value Next"
       },
       {
         "type": "loop.done",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Loop Done"
       },
       {
         "type": "loop.iterations",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Loop Iterations"
       }
     ]
-  }
+  },
+  "nodeset_imports": [
+    {
+      "path": "nodesets/pass_nodeset_loop_subplan_reuse/loop_increment_step.jsonc"
+    },
+    {
+      "path": "nodesets/pass_nodeset_loop_subplan_reuse/loop_reuse_body.jsonc"
+    }
+  ]
 }

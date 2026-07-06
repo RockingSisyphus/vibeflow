@@ -227,17 +227,13 @@ def run_stub(inputs, params):
     config = {
         "nodesets": [
             {
-                "name": "future.math",
+                "type_key": "future.math",
                 "display_name": "Future Math",
-                "category": "test",
                 "description": "Planned math nodeset executed by a python stub.",
-                "version": "0.1.0",
-                "purity": "pure",
                 "status": "planned",
                 "planned_behavior": {"kind": "python_stub", "stub_module": "project/stubs/runtime_control_stub.py"},
                 "requires": [REQ_SPEC("value.in")],
                 "provides": [PROV_SPEC("value.out")],
-                "exports": [PROV_SPEC("value.out")],
             }
         ],
         "pipeline": {
@@ -246,7 +242,7 @@ def run_stub(inputs, params):
                 _node_call("start", "test.start", "Starts the planned nodeset fixture."),
                 _node_call(
                     "future",
-                    "nodeset.future.math",
+                    "future.math",
                     "Calls the planned math nodeset.",
                     status="planned",
                     flow_kind="predefined",
@@ -260,7 +256,7 @@ def run_stub(inputs, params):
             "outputs": [REQ_SPEC("value.out")],
         },
     }
-    config_path.write_text(json.dumps(config), encoding="utf-8")
+    _write_config_file(config_path, config)
 
     result = run_checked(
         config_path,

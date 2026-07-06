@@ -33,15 +33,11 @@ LOOP_NODE_TYPES = frozenset({LOOP_WHILE_TYPE})
 @dataclass(frozen=True)
 class NodeMetadata:
     display_name: str = ""
-    category: str = ""
-    version: str = ""
     description: str = ""
 
     def to_dict(self) -> dict[str, str]:
         return {
             "display_name": self.display_name,
-            "category": self.category,
-            "version": self.version,
             "description": self.description,
         }
 
@@ -144,8 +140,8 @@ class LoopSpec:
 
 @dataclass(frozen=True)
 class NodeSpec:
-    name: str
-    node_type: str
+    id: str
+    type_used: str
     requires: tuple[DataRequirement, ...] = ()
     provides: tuple[DataProvider, ...] = ()
     params: dict[str, Any] = field(default_factory=dict)
@@ -162,6 +158,14 @@ class NodeSpec:
     async_mode: str = ""
     result_key: str = ""
 
+    @property
+    def name(self) -> str:
+        return self.id
+
+    @property
+    def node_type(self) -> str:
+        return self.type_used
+
 
 @dataclass(frozen=True)
 class EdgeSpec:
@@ -176,20 +180,24 @@ class EdgeSpec:
 
 @dataclass(frozen=True)
 class NodesetSpec:
-    name: str
+    type_key: str
     display_name: str
-    category: str
     description: str
-    version: str
-    purity: str
     requires: tuple[DataRequirement, ...]
     provides: tuple[DataProvider, ...]
-    exports: tuple[DataProvider, ...]
     graph: "GraphConfig"
     global_config: dict[str, Any] = field(default_factory=dict)
     status: str = STATUS_IMPLEMENTED
     flow_kind: str = FLOW_KIND_PREDEFINED
     planned_behavior: PlannedBehavior = field(default_factory=blocking_planned_behavior)
+
+    @property
+    def name(self) -> str:
+        return self.type_key
+
+    @property
+    def exports(self) -> tuple[DataProvider, ...]:
+        return self.provides
 
 
 @dataclass(frozen=True)
@@ -241,9 +249,9 @@ def _parse_graph_body(
     if not isinstance(nodes_raw, list) or not nodes_raw:
         raise GraphConfigError(f"{field}.nodes must be a non-empty list")
     nodes = tuple(_parse_node(item, index=index) for index, item in enumerate(nodes_raw))
-    names = {node.name for node in nodes}
+    names = {node.id for node in nodes}
     if len(names) != len(nodes):
-        raise GraphConfigError("duplicate node name")
+        raise GraphConfigError("duplicate node id")
     _validate_node_similarity_targets(nodes, field=f"{field}.nodes")
     _validate_loop_targets(nodes, known_nodesets, field=f"{field}.nodes")
     _validate_nodeset_call_targets(nodes, known_nodesets, field=f"{field}.nodes")
@@ -264,17 +272,23 @@ def _parse_graph_body(
 def _parse_node(item: Any, *, index: int) -> NodeSpec:
     if not isinstance(item, Mapping):
         raise GraphConfigError(f"pipeline.nodes[{index}] must be an object")
-    name = str(item.get("name", "")).strip()
+    if "name" in item:
+        raise GraphConfigError(f"pipeline.nodes[{index}].name is removed; use id")
+    if "type" in item or "registry_key" in item:
+        raise GraphConfigError(f"pipeline.nodes[{index}].type is removed; use type_used")
+    node_id = str(item.get("id", "")).strip()
     status = _parse_status(item.get("status", STATUS_IMPLEMENTED), field=f"pipeline.nodes[{index}].status")
-    node_type = str(item.get("type", item.get("registry_key", ""))).strip()
-    if not name:
-        raise GraphConfigError(f"pipeline.nodes[{index}] requires name")
+    type_used = str(item.get("type_used", "")).strip()
+    if not node_id:
+        raise GraphConfigError(f"pipeline.nodes[{index}] requires id")
     if status == STATUS_IMPLEMENTED and "planned_behavior" in item:
         raise GraphConfigError(f"pipeline.nodes[{index}].planned_behavior is only allowed for planned nodes")
-    if not node_type:
+    if not type_used:
         if status != STATUS_PLANNED:
-            raise GraphConfigError(f"pipeline.nodes[{index}] requires type")
-        node_type = f"planned.{name}"
+            raise GraphConfigError(f"pipeline.nodes[{index}] requires type_used")
+        type_used = f"planned.{node_id}"
+    if type_used.startswith("nodeset."):
+        raise GraphConfigError(f"pipeline.nodes[{index}].type_used must use the nodeset type_key directly, not nodeset.<name>")
     flow_kind = str(item.get("flow_kind", "")).strip()
     try:
         planned_behavior = parse_planned_behavior(item.get("planned_behavior", None), field=f"pipeline.nodes[{index}].planned_behavior")
@@ -287,17 +301,16 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
     if status == STATUS_IMPLEMENTED and flow_kind:
         raise GraphConfigError(f"pipeline.nodes[{index}].flow_kind is only allowed for planned nodes")
     try:
-        requires = parse_data_requirements(item.get("requires", ()), field=f"node[{name}].requires")
-        provides = parse_data_providers(item.get("provides", ()), field=f"node[{name}].provides")
+        requires = parse_data_requirements(item.get("requires", ()), field=f"node[{node_id}].requires")
+        provides = parse_data_providers(item.get("provides", ()), field=f"node[{node_id}].provides")
     except ValueError as exc:
         raise GraphConfigError(str(exc)) from exc
     async_mode, result_key = _parse_node_async(item, index=index, provides=provides)
     join_policy = _parse_join_policy(item.get("join_policy", JOIN_POLICY_SAFE_ANY), field=f"pipeline.nodes[{index}].join_policy")
-    loop = _parse_loop_spec(item.get("loop", {}), node_type=node_type, provides=provides, field=f"pipeline.nodes[{index}].loop")
+    loop = _parse_loop_spec(item.get("loop", {}), type_used=type_used, provides=provides, field=f"pipeline.nodes[{index}].loop")
     reserved = {
-        "name",
-        "type",
-        "registry_key",
+        "id",
+        "type_used",
         "requires",
         "provides",
         "config",
@@ -310,8 +323,6 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         "async",
         "result_key",
         "display_name",
-        "category",
-        "version",
         "description",
         "style",
         "similar_to",
@@ -319,18 +330,18 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         "loop",
     }
     return NodeSpec(
-        name=name,
-        node_type=node_type,
+        id=node_id,
+        type_used=type_used,
         requires=requires,
         provides=provides,
-        params=_parse_node_params(item, reserved=reserved, field=f"node[{name}].config"),
+        params=_parse_node_params(item, reserved=reserved, field=f"node[{node_id}].config"),
         metadata=_parse_node_metadata(item),
         style=_parse_node_style(item.get("style", {}), field=f"pipeline.nodes[{index}].style"),
         similar_to=_parse_node_similarity(item.get("similar_to", {}), field=f"pipeline.nodes[{index}].similar_to"),
         join_policy=join_policy,
         loop=loop,
-        node_config_overrides=_parse_node_config_overrides(item.get("node_configs", {}), field=f"node[{name}].node_configs"),
-        allow_config_override=_parse_bool(item.get("allow_config_override", item.get("override_child_config", False)), field=f"node[{name}].allow_config_override"),
+        node_config_overrides=_parse_node_config_overrides(item.get("node_configs", {}), field=f"node[{node_id}].node_configs"),
+        allow_config_override=_parse_bool(item.get("allow_config_override", item.get("override_child_config", False)), field=f"node[{node_id}].allow_config_override"),
         status=status,
         flow_kind=flow_kind,
         planned_behavior=planned_behavior,
@@ -360,7 +371,7 @@ def _parse_edge(item: Any, *, index: int) -> EdgeSpec:
 @dataclass(frozen=True)
 class _RawNodeset:
     index: int
-    name: str
+    type_key: str
     item: Mapping[str, Any]
     status: str
     planned_behavior: PlannedBehavior
@@ -373,16 +384,19 @@ def _parse_nodesets(value: Any, *, project_root: str = "") -> dict[str, NodesetS
     if not isinstance(value, list):
         raise GraphConfigError("nodesets must be a list")
     raw_nodesets: list[_RawNodeset] = []
-    names: set[str] = set()
+    type_keys: set[str] = set()
     for index, item in enumerate(value):
         if not isinstance(item, Mapping):
             raise GraphConfigError(f"nodesets[{index}] must be an object")
-        name = str(item.get("name", "")).strip()
-        if not name:
-            raise GraphConfigError(f"nodesets[{index}] missing name")
-        if name in names:
-            raise GraphConfigError(f"duplicate nodeset: {name}")
-        names.add(name)
+        for removed in ("name", "category", "version", "purity", "exports"):
+            if removed in item:
+                raise GraphConfigError(f"nodesets[{index}].{removed} is removed from nodeset definitions")
+        type_key = str(item.get("type_key", "")).strip()
+        if not type_key:
+            raise GraphConfigError(f"nodesets[{index}] missing type_key")
+        if type_key in type_keys:
+            raise GraphConfigError(f"duplicate nodeset type_key: {type_key}")
+        type_keys.add(type_key)
         status = _parse_status(item.get("status", STATUS_IMPLEMENTED), field=f"nodesets[{index}].status")
         if status == STATUS_IMPLEMENTED and "planned_behavior" in item:
             raise GraphConfigError(f"nodesets[{index}].planned_behavior is only allowed for planned nodes")
@@ -393,7 +407,7 @@ def _parse_nodesets(value: Any, *, project_root: str = "") -> dict[str, NodesetS
         flow_kind = str(item.get("flow_kind", FLOW_KIND_PREDEFINED)).strip() or FLOW_KIND_PREDEFINED
         if flow_kind not in FLOW_KINDS:
             raise GraphConfigError(f"nodesets[{index}].flow_kind must be one of {sorted(FLOW_KINDS)}")
-        raw_nodesets.append(_RawNodeset(index=index, name=name, item=item, status=status, planned_behavior=planned_behavior, flow_kind=flow_kind))
+        raw_nodesets.append(_RawNodeset(index=index, type_key=type_key, item=item, status=status, planned_behavior=planned_behavior, flow_kind=flow_kind))
 
     out: dict[str, NodesetSpec] = {}
     started = time.perf_counter()
@@ -404,33 +418,29 @@ def _parse_nodesets(value: Any, *, project_root: str = "") -> dict[str, NodesetS
         if pipeline is None and raw_nodeset.status == STATUS_PLANNED:
             graph = GraphConfig(nodes=(), nodesets=out, project_root=project_root)
         elif not isinstance(pipeline, Mapping):
-            raise GraphConfigError(f"nodeset '{raw_nodeset.name}' requires pipeline")
+            raise GraphConfigError(f"nodeset '{raw_nodeset.type_key}' requires pipeline")
         else:
             graph = _parse_graph_body(
                 pipeline,
                 nodesets=out,
-                known_nodesets=names,
+                known_nodesets=type_keys,
                 project_root=project_root,
                 field=f"nodesets[{raw_nodeset.index}].pipeline",
             )
-        out[raw_nodeset.name] = NodesetSpec(
-            name=raw_nodeset.name,
-            display_name=str(item.get("display_name", raw_nodeset.name)),
-            category=str(item.get("category", "composite")),
+        out[raw_nodeset.type_key] = NodesetSpec(
+            type_key=raw_nodeset.type_key,
+            display_name=str(item.get("display_name", raw_nodeset.type_key)),
             description=str(item.get("description", "")),
-            version=str(item.get("version", "0.1.0")),
-            purity=str(item.get("purity", "pure")),
-            requires=_parse_nodeset_requirements(item.get("requires", ()), field=f"nodeset[{raw_nodeset.name}].requires"),
-            provides=_parse_nodeset_providers(item.get("provides", ()), field=f"nodeset[{raw_nodeset.name}].provides"),
-            exports=_parse_nodeset_providers(item.get("exports", item.get("provides", ())), field=f"nodeset[{raw_nodeset.name}].exports"),
+            requires=_parse_nodeset_requirements(item.get("requires", ()), field=f"nodeset[{raw_nodeset.type_key}].requires"),
+            provides=_parse_nodeset_providers(item.get("provides", ()), field=f"nodeset[{raw_nodeset.type_key}].provides"),
             graph=graph,
-            global_config=_parse_mapping(item.get("global_config", {}), field=f"nodeset[{raw_nodeset.name}].global_config"),
+            global_config=_parse_mapping(item.get("global_config", {}), field=f"nodeset[{raw_nodeset.type_key}].global_config"),
             status=raw_nodeset.status,
             flow_kind=raw_nodeset.flow_kind,
             planned_behavior=raw_nodeset.planned_behavior,
         )
         _trace_config_parse(
-            f"parsed nodeset name={raw_nodeset.name} index={raw_nodeset.index} "
+            f"parsed nodeset type_key={raw_nodeset.type_key} index={raw_nodeset.index} "
             f"nodes={len(graph.nodes)} refs={','.join(_nodeset_reference_targets(graph.nodes)) or '-'} "
             f"elapsed={_elapsed_ms(nodeset_started)}ms"
         )
@@ -530,10 +540,11 @@ def _parse_node_params(item: Mapping[str, Any], *, reserved: set[str], field: st
 
 
 def _parse_node_metadata(item: Mapping[str, Any]) -> NodeMetadata:
+    for removed in ("category", "version"):
+        if removed in item:
+            raise GraphConfigError(f"node metadata field {removed!r} is removed; use display_name and description")
     return NodeMetadata(
         display_name=_optional_string(item.get("display_name", "")),
-        category=_optional_string(item.get("category", "")),
-        version=_optional_string(item.get("version", "")),
         description=_optional_string(item.get("description", "")),
     )
 
@@ -584,8 +595,8 @@ def _parse_node_similarity(value: Any, *, field: str) -> NodeSimilarity:
     return NodeSimilarity(node=node, relationship=relationship, reason=reason)
 
 
-def _parse_loop_spec(value: Any, *, node_type: str, provides: tuple[DataProvider, ...], field: str) -> LoopSpec:
-    if node_type not in LOOP_NODE_TYPES:
+def _parse_loop_spec(value: Any, *, type_used: str, provides: tuple[DataProvider, ...], field: str) -> LoopSpec:
+    if type_used not in LOOP_NODE_TYPES:
         if value not in (None, {}):
             raise GraphConfigError(f"{field} is only allowed on VibeFlow loop nodes")
         return LoopSpec()
@@ -687,16 +698,18 @@ def _parse_list(value: Any, *, field: str) -> list[Any]:
 
 
 def _normalize_loop_body(value: str) -> str:
-    return value.removeprefix("nodeset.")
+    if value.startswith("nodeset."):
+        raise GraphConfigError("loop.body must use the nodeset type_key directly, not nodeset.<name>")
+    return value
 
 
 def _validate_node_similarity_targets(nodes: tuple[NodeSpec, ...], *, field: str) -> None:
-    names = {node.name for node in nodes}
+    names = {node.id for node in nodes}
     for index, node in enumerate(nodes):
         target = node.similar_to.node
         if not target:
             continue
-        if target == node.name:
+        if target == node.id:
             raise GraphConfigError(f"CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID: {field}[{index}].similar_to.node cannot reference itself")
         if target not in names:
             raise GraphConfigError(f"CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID: {field}[{index}].similar_to.node references unknown node: {target}")
@@ -704,25 +717,20 @@ def _validate_node_similarity_targets(nodes: tuple[NodeSpec, ...], *, field: str
 
 def _validate_loop_targets(nodes: tuple[NodeSpec, ...], nodesets: set[str], *, field: str) -> None:
     for index, node in enumerate(nodes):
-        if node.node_type not in LOOP_NODE_TYPES:
+        if node.type_used not in LOOP_NODE_TYPES:
             continue
         if not node.loop.body:
             raise GraphConfigError(f"{field}[{index}].loop.body must be a non-empty nodeset name")
         if node.loop.body not in nodesets:
             raise GraphConfigError(
-                f"{field}[{index}] loop node '{node.name}' references unknown nodeset loop body: {node.loop.body}"
+                f"{field}[{index}] loop node '{node.id}' references unknown nodeset loop body: {node.loop.body}"
             )
 
 
 def _validate_nodeset_call_targets(nodes: tuple[NodeSpec, ...], nodesets: set[str], *, field: str) -> None:
     for index, node in enumerate(nodes):
-        if node.status == STATUS_PLANNED or not node.node_type.startswith("nodeset."):
+        if node.status == STATUS_PLANNED or node.type_used not in nodesets:
             continue
-        nodeset_name = node.node_type.removeprefix("nodeset.")
-        if nodeset_name not in nodesets:
-            raise GraphConfigError(
-                f"{field}[{index}] node '{node.name}' references unknown nested nodeset: {nodeset_name}"
-            )
 
 
 def _parse_node_config_overrides(value: Any, *, field: str) -> dict[str, dict[str, Any]]:
@@ -744,9 +752,7 @@ def _parse_node_config_overrides(value: Any, *, field: str) -> dict[str, dict[st
 def _nodeset_reference_targets(nodes: tuple[NodeSpec, ...]) -> tuple[str, ...]:
     refs: list[str] = []
     for node in nodes:
-        if node.node_type.startswith("nodeset."):
-            refs.append(node.node_type.removeprefix("nodeset."))
-        elif node.node_type in LOOP_NODE_TYPES and node.loop.body:
+        if node.type_used in LOOP_NODE_TYPES and node.loop.body:
             refs.append(node.loop.body)
     return tuple(sorted(set(refs)))
 

@@ -21,38 +21,36 @@ def _write_export_config(path: Path) -> None:
 
 
 def _write_nodeset_export_config(path: Path) -> None:
-    path.write_text(
-        json.dumps(
-            {
-                "nodesets": [
-                    _nodeset_config(
-                        "math.add_one",
-                        requires=["value.in"],
-                        provides=["value.out"],
-                        exports=["value.out"],
-                        pipeline=_input_add_pipeline(add={"name": "inner"}),
-                    )
+    _write_config_file(
+        path,
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "math.add_one",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline=_input_add_pipeline(add={"id": "inner"}),
+                )
+            ],
+            "pipeline": {
+                "inputs": [PROV_SPEC("value.in")],
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the nodeset export fixture."),
+                    _node_call("input", "test.value_input", "Reads value.in.", requires=[REQ_SPEC("value.in")]),
+                    _node_call("composite", "math.add_one", "Calls the add-one composite.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
                 ],
-                "pipeline": {
-                    "inputs": [PROV_SPEC("value.in")],
-                    "nodes": [
-                        _node_call("start", "test.start", "Starts the nodeset export fixture."),
-                        _node_call("input", "test.value_input", "Reads value.in.", requires=[REQ_SPEC("value.in")]),
-                        _node_call("composite", "nodeset.math.add_one", "Calls the add-one composite.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                        _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
-                    ],
-                    "edges": _edge_chain("start", "input", "composite", "end"),
-                },
-            }
-        ),
-        encoding="utf-8",
+                "edges": _edge_chain("start", "input", "composite", "end"),
+            },
+        },
     )
 
 
 @pytest.mark.parametrize(
     ("command", "expected"),
     [
-        ("export-mermaid", ("flowchart TD", "seed -->|value.in| add", "id: seed")),
+        ("export-mermaid", ("flowchart TD", "data: Value In", "id: seed")),
         ("export-ascii", ("TOPOLOGY FLOWCHART", "seed ----> add", "provides=value.in")),
     ],
 )
@@ -240,7 +238,7 @@ def test_ascii_flowchart_distinguishes_standard_shapes() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"name": name, "status": "planned", "flow_kind": flow_kind}
+                    {"id": name, "status": "planned", "flow_kind": flow_kind}
                     for name, flow_kind in nodes
                 ],
                 "edges": [
@@ -271,7 +269,7 @@ def test_cli_export_mermaid_writes_output_and_expands_nodesets(tmp_path, capsys)
     assert code == 0
     output = output_path.read_text(encoding="utf-8")
     assert "flowchart TD" in output
-    assert 'subgraph composite__expanded["math.add_one"]' in output
+    assert 'type_key: math.add_one' in output
     assert "composite__inner" in output
 
 

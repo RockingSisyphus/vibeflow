@@ -1,38 +1,102 @@
 {
   "pipeline": {
     "nodes": [
-      {"name": "start", "type": "sandbox.start"},
       {
-        "name": "left",
-        "type": "sandbox.branch_left",
-        "provides": [{"key": "branch.left", "type": "branch_result"}],
-        "value": 4
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
       },
       {
-        "name": "right",
-        "type": "sandbox.branch_right",
-        "provides": [{"key": "branch.right", "type": "branch_result"}],
-        "value": 6
+        "provides": [
+          {
+            "key": "branch.left",
+            "type": "branch_result",
+            "display_name": "Branch Left"
+          }
+        ],
+        "value": 4,
+        "id": "left",
+        "type_used": "sandbox.branch_left",
+        "display_name": "Left",
+        "description": "Runs left."
       },
       {
-        "name": "consume_branch",
-        "type": "semantic.branch_type_consumer",
-        "requires": [{"type": "branch_result", "cardinality": "exactly_one"}],
-        "provides": [{"key": "branch.final", "type": "final_result"}]
+        "provides": [
+          {
+            "key": "branch.right",
+            "type": "branch_result",
+            "display_name": "Branch Right"
+          }
+        ],
+        "value": 6,
+        "id": "right",
+        "type_used": "sandbox.branch_right",
+        "display_name": "Right",
+        "description": "Runs right."
       },
       {
-        "name": "end",
-        "type": "semantic.branch_final_end",
-        "requires": [{"type": "final_result", "cardinality": "exactly_one"}]
+        "requires": [
+          {
+            "type": "branch_result",
+            "cardinality": "exactly_one",
+            "display_name": "Branch Result"
+          }
+        ],
+        "provides": [
+          {
+            "key": "branch.final",
+            "type": "final_result",
+            "display_name": "Branch Final"
+          }
+        ],
+        "id": "consume_branch",
+        "type_used": "semantic.branch_type_consumer",
+        "display_name": "Consume Branch",
+        "description": "Runs consume_branch."
+      },
+      {
+        "requires": [
+          {
+            "type": "final_result",
+            "cardinality": "exactly_one",
+            "display_name": "Final Result"
+          }
+        ],
+        "id": "end",
+        "type_used": "semantic.branch_final_end",
+        "display_name": "End",
+        "description": "Runs end."
       }
     ],
     "edges": [
-      {"from": "start", "to": "left"},
-      {"from": "start", "to": "right"},
-      {"from": "left", "to": "consume_branch"},
-      {"from": "right", "to": "consume_branch"},
-      {"from": "consume_branch", "to": "end"}
+      {
+        "from": "start",
+        "to": "left"
+      },
+      {
+        "from": "start",
+        "to": "right"
+      },
+      {
+        "from": "left",
+        "to": "consume_branch"
+      },
+      {
+        "from": "right",
+        "to": "consume_branch"
+      },
+      {
+        "from": "consume_branch",
+        "to": "end"
+      }
     ],
-    "outputs": [{"type": "final_result", "cardinality": "exactly_one"}]
+    "outputs": [
+      {
+        "type": "final_result",
+        "cardinality": "exactly_one",
+        "display_name": "Final Result"
+      }
+    ]
   }
 }

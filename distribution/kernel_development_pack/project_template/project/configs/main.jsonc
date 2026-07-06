@@ -28,58 +28,67 @@
   "pipeline": {
     "nodes": [
       {
-        "name": "start",
-        "type": "demo.start",
         "display_name": "Start",
-        "description": "Starts the demo arithmetic pipeline."
+        "description": "Starts the demo arithmetic pipeline.",
+        "id": "start",
+        "type_used": "demo.start"
       },
       {
-        "name": "seed",
-        "type": "demo.seed",
         "display_name": "Seed Value",
         "description": "Creates the initial value used by the add node.",
         "provides": [
           {
             "key": "value.in",
-            "type": "value.in"
+            "type": "value.in",
+            "display_name": "Value In"
           }
         ],
         "config": {
           "value": 2
-        }
+        },
+        "id": "seed",
+        "type_used": "demo.seed"
       },
       {
-        "name": "add",
-        "type": "demo.add",
         "display_name": "Add Delta",
         "description": "Adds a configured delta to the incoming value.",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.out",
-            "type": "value.out"
+            "type": "value.out",
+            "display_name": "Value Out"
           }
         ],
         "config": {
           "delta": 3
-        }
+        },
+        "id": "add",
+        "type_used": "demo.add"
       },
       {
-        "name": "end",
-        "type": "demo.end",
         "display_name": "End",
         "description": "Consumes the final value and terminates the pipeline.",
+        "similar_to": {
+          "node": "start",
+          "relationship": "copy",
+          "reason": "Terminal start/end nodes intentionally return empty outputs while occupying different flow positions."
+        },
         "requires": [
           {
             "type": "value.out",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
           }
-        ]
+        ],
+        "id": "end",
+        "type_used": "demo.end"
       }
     ],
     "edges": [
@@ -99,7 +108,8 @@
     "outputs": [
       {
         "type": "value.out",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Value Out"
       }
     ]
   }

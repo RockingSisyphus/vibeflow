@@ -1,257 +1,212 @@
 {
-  "nodesets": [
-    {
-      "name": "comprehensive.core",
-      "display_name": "综合示例核心计算子流程",
-      "category": "沙箱综合流程",
-      "description": "这是综合流程图中的预定义过程节点，用来验证 nodeset 在折叠视图和展开视图中都能保留契约、中文说明、内部开始结束节点以及显式边关系。",
-      "version": "0.1.0",
-      "purity": "pure",
-      "requires": [
-        {
-          "type": "value.prepared",
-          "cardinality": "exactly_one"
-        }
-      ],
-      "provides": [
-        {
-          "key": "value.out",
-          "type": "value.out"
-        }
-      ],
-      "exports": [
-        {
-          "key": "value.out",
-          "type": "value.out"
-        }
-      ],
-      "pipeline": {
-        "inputs": [
-          {
-            "key": "value.prepared",
-            "type": "value.prepared"
-          }
-        ],
-        "nodes": [
-          {
-            "name": "start",
-            "type": "sandbox.start"
-          },
-          {
-            "name": "compute",
-            "type": "sandbox.core_compute",
-            "requires": [
-              {
-                "type": "value.prepared",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "value.out",
-                "type": "value.out"
-              }
-            ],
-            "factor": 2
-          },
-          {
-            "name": "end",
-            "type": "sandbox.out_value_end",
-            "requires": [
-              {
-                "type": "value.out",
-                "cardinality": "exactly_one"
-              }
-            ]
-          }
-        ],
-        "edges": [
-          {
-            "from": "start",
-            "to": "compute"
-          },
-          {
-            "from": "compute",
-            "to": "end"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one"
-          }
-        ]
-      }
-    }
-  ],
   "pipeline": {
     "inputs": [
       {
         "key": "value.in",
-        "type": "value.in"
+        "type": "value.in",
+        "display_name": "Value In"
       }
     ],
     "nodes": [
       {
-        "name": "start",
-        "type": "sandbox.start"
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
       },
       {
-        "name": "input",
-        "type": "sandbox.value_input",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.in.input",
-            "type": "value.in"
+            "type": "value.in",
+            "display_name": "Value In Input"
           }
-        ]
+        ],
+        "id": "input",
+        "type_used": "sandbox.value_input",
+        "display_name": "Input",
+        "description": "Runs input."
       },
       {
-        "name": "prepare",
-        "type": "sandbox.prepare_value",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.prepared",
-            "type": "value.prepared"
+            "type": "value.prepared",
+            "display_name": "Value Prepared"
           }
         ],
-        "offset": 1
+        "offset": 1,
+        "id": "prepare",
+        "type_used": "sandbox.prepare_value",
+        "display_name": "Prepare",
+        "description": "Runs prepare."
       },
       {
-        "name": "core",
-        "type": "nodeset.comprehensive.core",
         "requires": [
           {
             "type": "value.prepared",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Prepared"
           }
         ],
         "provides": [
           {
             "key": "value.out",
-            "type": "value.out"
+            "type": "value.out",
+            "display_name": "Value Out"
           }
-        ]
+        ],
+        "id": "core",
+        "type_used": "comprehensive.core",
+        "display_name": "Core",
+        "description": "Runs core."
       },
       {
-        "name": "route",
-        "type": "sandbox.route_decision",
         "requires": [
           {
             "type": "value.out",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
           }
         ],
         "provides": [
           {
             "key": "flow.route",
-            "type": "flow.route"
+            "type": "flow.route",
+            "display_name": "Flow Route"
           }
         ],
-        "threshold": 8
+        "threshold": 8,
+        "id": "route",
+        "type_used": "sandbox.route_decision",
+        "display_name": "Route",
+        "description": "Runs route."
       },
       {
-        "name": "external",
-        "type": "sandbox.external_boost",
         "join_policy": "all",
         "requires": [
           {
             "type": "value.out",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
           },
           {
             "type": "flow.route",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Flow Route"
           }
         ],
         "provides": [
           {
             "key": "value.final",
-            "type": "value.final"
+            "type": "value.final",
+            "display_name": "Value Final"
           }
         ],
-        "bonus": 5
+        "bonus": 5,
+        "id": "external",
+        "type_used": "sandbox.external_boost",
+        "display_name": "External",
+        "description": "Runs external."
       },
       {
-        "name": "store",
-        "type": "sandbox.audit_store",
         "requires": [
           {
             "type": "value.final",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Final"
           }
         ],
         "provides": [
           {
             "key": "effects.request",
-            "type": "effects.request"
+            "type": "effects.request",
+            "display_name": "Effects Request"
           }
-        ]
+        ],
+        "id": "store",
+        "type_used": "sandbox.audit_store",
+        "display_name": "Store",
+        "description": "Runs store."
       },
       {
-        "name": "document",
-        "type": "sandbox.report_document",
         "join_policy": "all",
         "requires": [
           {
             "type": "value.final",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Final"
           },
           {
             "type": "effects.request",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Effects Request"
           }
         ],
         "provides": [
           {
             "key": "document.report",
-            "type": "document.report"
+            "type": "document.report",
+            "display_name": "Document Report"
           }
-        ]
+        ],
+        "id": "document",
+        "type_used": "sandbox.report_document",
+        "display_name": "Document",
+        "description": "Runs document."
       },
       {
-        "name": "output",
-        "type": "sandbox.report_output",
         "requires": [
           {
             "type": "document.report",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Document Report"
           }
         ],
         "provides": [
           {
             "key": "io.output",
-            "type": "io.output"
+            "type": "io.output",
+            "display_name": "Io Output"
           }
-        ]
+        ],
+        "id": "output",
+        "type_used": "sandbox.report_output",
+        "display_name": "Output",
+        "description": "Runs output."
       },
       {
-        "name": "end",
-        "type": "sandbox.report_end",
         "requires": [
           {
             "type": "io.output",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Io Output"
           }
-        ]
+        ],
+        "id": "end",
+        "type_used": "sandbox.report_end",
+        "display_name": "End",
+        "description": "Runs end."
       },
       {
-        "name": "again_end",
-        "type": "sandbox.start",
         "display_name": "Again Branch End",
-        "description": "Terminates the inactive again branch in the acyclic comprehensive fixture."
+        "description": "Terminates the inactive again branch in the acyclic comprehensive fixture.",
+        "id": "again_end",
+        "type_used": "sandbox.start"
       }
     ],
     "edges": [
@@ -309,8 +264,14 @@
     "outputs": [
       {
         "type": "io.output",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Io Output"
       }
     ]
-  }
+  },
+  "nodeset_imports": [
+    {
+      "path": "nodesets/pass_comprehensive_flowchart/comprehensive_core.jsonc"
+    }
+  ]
 }

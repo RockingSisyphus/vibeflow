@@ -52,7 +52,7 @@ def test_jsonc_loader_strips_comments_without_changing_runtime_data(tmp_path) ->
   */
     "pipeline": {
     "nodes": [
-      {"name": "seed", "type": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in"}]}
+      {"id": "seed", "type_used": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in"}]}
     ]
   }
 }
@@ -166,7 +166,7 @@ def test_policy_default_discovery_explicit_and_inline_merge_order(tmp_path) -> N
 
 def test_policy_discovery_prefers_kernel_policy_over_governance(tmp_path) -> None:
     config_path = tmp_path / "workflow.json"
-    config_path.write_text('{"pipeline": {"nodes": [{"name": "seed", "type": "test.seed"}]}}', encoding="utf-8")
+    config_path.write_text('{"pipeline": {"nodes": [{"id": "seed", "type_used": "test.seed", "display_name": "Seed", "description": "Seed fixture."}]}}', encoding="utf-8")
     (tmp_path / "kernel_policy.jsonc").write_text('{"node_source": {"max_lines": 321}}', encoding="utf-8")
     (tmp_path / "governance.jsonc").write_text('{"node_source": {"max_lines": 123}}', encoding="utf-8")
     result = resolve_effective_policy(load_config_document(config_path).data, config_path=config_path)
@@ -179,31 +179,31 @@ def test_schema_validation_rejects_invalid_pipeline_shapes() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"type": "test.seed"},
-                    {"name": "bad_requires", "type": "test.seed", "requires": "x"},
+                    {"type_used": "test.seed"},
+                    {"id": "bad_requires", "type_used": "test.seed", "requires": "x"},
                 ],
                 "edges": [{"from": "a", "to": "b", "max_executions": 0}],
-                "loops": [{"name": "loop", "edges": [["a", "b"]]}],
+                "loops": [{"id": "loop", "edges": [["a", "b"]]}],
             },
-            "nodesets": [{"name": "bad"}],
+            "nodesets": [{"id": "bad"}],
             "boundary": {"config": []},
         }
     )
     rule_ids = {finding.rule_id for finding in findings}
     object_ids = {finding.object_id for finding in findings}
-    assert "CONFIG.SCHEMA.NODE_MISSING_NAME" in rule_ids
+    assert "CONFIG.SCHEMA.NODE_MISSING_ID" in rule_ids
     assert "CONFIG.SCHEMA.NODE_REQUIRES_LIST" in rule_ids
     assert "CONFIG.LOOP_LIMITS.REMOVED" in rule_ids
     assert "CONFIG.LOOPS.REMOVED" in rule_ids
-    assert "CONFIG.SCHEMA.NODESET_PIPELINE" in rule_ids
+    assert "CONFIG.NODESETS.INLINE_REMOVED" in rule_ids
     assert "CONFIG.BOUNDARY.REMOVED" in rule_ids
-    assert "pipeline.nodes[0].name" in object_ids
+    assert "pipeline.nodes[0].id" in object_ids
 
 def test_schema_validation_rejects_policy_bool_as_int() -> None:
     findings = collect_config_schema_findings(
         {
             "policy": {"node_source": {"max_lines": True}},
-            "pipeline": {"nodes": [{"name": "seed", "type": "test.seed"}]},
+        "pipeline": {"nodes": [{"id": "seed", "type_used": "test.seed", "display_name": "Seed", "description": "Seed fixture."}]},
         }
     )
     assert any(finding.object_id == "policy.node_source.max_lines" for finding in findings)
@@ -219,11 +219,15 @@ def test_cli_validate_jsonc_outputs_effective_policy(tmp_path, capsys) -> None:
     "base_lib": {"allowed_paths": ["src/shared"], "allowed_modules": ["shared.math"]}
   },
   "pipeline": {
-    // data edge should be inferred
+    // explicit edges define the graph
     "nodes": [
-      {"name": "seed", "type": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in"}]},
-      {"name": "add", "type": "test.add", "display_name": "Add", "description": "Adds value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}], "provides": [{"key": "value.out", "type": "value.out"}]}
-    ]
+      {"id": "start", "type_used": "test.start", "display_name": "Start", "description": "Starts the flow."},
+      {"id": "seed", "type_used": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in", "display_name": "Value In"}]},
+      {"id": "add", "type_used": "test.add", "display_name": "Add", "description": "Adds value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one", "display_name": "Value In"}], "provides": [{"key": "value.out", "type": "value.out", "display_name": "Value Out"}]},
+      {"id": "end", "type_used": "test.out_end", "display_name": "End", "description": "Ends the flow.", "requires": [{"type": "value.out", "cardinality": "exactly_one", "display_name": "Value Out"}]}
+    ],
+    "edges": [["start", "seed"], ["seed", "add"], ["add", "end"]],
+    "outputs": [{"type": "value.out", "cardinality": "exactly_one", "display_name": "Value Out"}]
   }
 }
 """.strip(),
@@ -250,12 +254,12 @@ def test_cli_validate_bad_jsonc_reports_syntax_layer(tmp_path, capsys) -> None:
 
 def test_cli_validate_schema_error_reports_schema_layer(tmp_path, capsys) -> None:
     config_path = tmp_path / "bad_schema.json"
-    config_path.write_text('{"pipeline": {"nodes": [{"type": "test.seed"}]}}', encoding="utf-8")
+    config_path.write_text('{"pipeline": {"nodes": [{"type_used": "test.seed"}]}}', encoding="utf-8")
     code = cli_main(["validate", "--config", str(config_path), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert code == 1
     assert payload["status"] == "FAIL"
-    assert payload["errors"][0]["rule_id"] == "CONFIG.SCHEMA.NODE_MISSING_NAME"
+    assert payload["errors"][0]["rule_id"] == "CONFIG.SCHEMA.NODE_MISSING_ID"
     assert payload["errors"][0]["failure_layer"] == "schema"
 
 def test_cli_validate_topology_error_reports_topology_layer(tmp_path, capsys) -> None:
@@ -264,7 +268,7 @@ def test_cli_validate_topology_error_reports_topology_layer(tmp_path, capsys) ->
         json.dumps(
             {
                 "pipeline": {
-                    "nodes": [{"name": "seed", "type": "test.seed"}],
+                    "nodes": [{"id": "seed", "type_used": "test.seed", "display_name": "Seed", "description": "Seed fixture."}],
                     "edges": [["seed", "missing"]],
                 }
             }
@@ -322,7 +326,7 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
     assert (result.run_dir / "compiled_graph.json").exists()
     assert (result.run_dir / "graph.txt").exists()
     assert (result.run_dir / "graph.mmd").exists()
-    assert "nodeset.example.add_one" in (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
+    assert "type_key: example.add_one" in (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
 
     imported_result = run_checked(
         project / "config_with_imports.jsonc",
@@ -331,4 +335,4 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
         run_id="minimal_example_imports",
     )
     assert imported_result.context.get("value.out")["value"] == 5
-    assert imported_result.health.info["nodeset_imports"][0]["names"] == ["example.add_one"]
+    assert imported_result.health.info["nodeset_imports"][0]["type_keys"] == ["example.add_one"]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping
 
@@ -17,18 +17,26 @@ _MISSING = object()
 class DataProvider:
     key: str
     type: str
+    display_name: str = field(default="", compare=False)
 
     def to_dict(self) -> dict[str, str]:
-        return {"key": self.key, "type": self.type}
+        payload = {"key": self.key, "type": self.type}
+        if self.display_name:
+            payload["display_name"] = self.display_name
+        return payload
 
 
 @dataclass(frozen=True)
 class DataRequirement:
     type: str
     cardinality: str
+    display_name: str = field(default="", compare=False)
 
     def to_dict(self) -> dict[str, str]:
-        return {"type": self.type, "cardinality": self.cardinality}
+        payload = {"type": self.type, "cardinality": self.cardinality}
+        if self.display_name:
+            payload["display_name"] = self.display_name
+        return payload
 
 
 @dataclass(frozen=True)
@@ -138,19 +146,20 @@ def requirements_to_dicts(requirements: Iterable[DataRequirement]) -> list[dict[
 def _parse_provider(item: Any, *, field: str) -> DataProvider:
     if not isinstance(item, Mapping):
         raise ValueError(f"{field} must be an object with key and type")
-    allowed = {"key", "type"}
+    allowed = {"key", "type", "display_name"}
     extra = sorted(str(key) for key in item if str(key) not in allowed)
     if extra:
         raise ValueError(f"{field} contains unknown fields: {extra}")
     key = _required_text(item.get("key"), field=f"{field}.key")
     data_type = _required_text(item.get("type"), field=f"{field}.type")
-    return DataProvider(key=key, type=data_type)
+    display_name = _required_text(item.get("display_name"), field=f"{field}.display_name")
+    return DataProvider(key=key, type=data_type, display_name=display_name)
 
 
 def _parse_requirement(item: Any, *, field: str) -> DataRequirement:
     if not isinstance(item, Mapping):
         raise ValueError(f"{field} must be an object with type and cardinality")
-    allowed = {"type", "cardinality"}
+    allowed = {"type", "cardinality", "display_name"}
     extra = sorted(str(key) for key in item if str(key) not in allowed)
     if extra:
         raise ValueError(f"{field} contains unknown fields: {extra}")
@@ -158,7 +167,8 @@ def _parse_requirement(item: Any, *, field: str) -> DataRequirement:
     cardinality = _required_text(item.get("cardinality"), field=f"{field}.cardinality")
     if cardinality not in CARDINALITIES:
         raise ValueError(f"{field}.cardinality must be one of {sorted(CARDINALITIES)}")
-    return DataRequirement(type=data_type, cardinality=cardinality)
+    display_name = _required_text(item.get("display_name"), field=f"{field}.display_name")
+    return DataRequirement(type=data_type, cardinality=cardinality, display_name=display_name)
 
 
 def _required_text(value: Any, *, field: str) -> str:

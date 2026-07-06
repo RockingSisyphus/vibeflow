@@ -6,7 +6,7 @@
 2. 把本目录内容复制到新项目根目录。
 3. 在 `project/nodes/` 中开发业务 node。
 4. 在 `project/registry.py` 中注册 node。
-5. 在 `project/configs/main.jsonc` 中用显式 `pipeline.edges` 组织拓扑。
+5. 在 `project/configs/main.jsonc` 中用 `id` / `type_used` 调用 node 或 nodeset，并用显式 `pipeline.edges` 组织拓扑。
 6. 运行：
 
 ```powershell
@@ -39,3 +39,5 @@ cd ../../..
 ```text
 terminal start -> process seed -> process add -> terminal end
 ```
+
+可复用 nodeset 放在 `project/configs/nodesets/` 的独立 JSONC 文件中，根对象声明 `type_key`；主 config 通过 `nodeset_imports` 导入，并在调用点把该 `type_key` 写进 `type_used`。

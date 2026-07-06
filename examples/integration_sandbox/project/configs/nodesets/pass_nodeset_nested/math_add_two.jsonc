@@ -1,0 +1,135 @@
+{
+  "display_name": "Add Two",
+  "description": "Nested nodeset that runs add-one twice.",
+  "requires": [
+    {
+      "type": "value.in",
+      "cardinality": "exactly_one",
+      "display_name": "Value In"
+    }
+  ],
+  "provides": [
+    {
+      "key": "value.final",
+      "type": "value.final",
+      "display_name": "Value Final"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "value.in",
+        "type": "value.in",
+        "display_name": "Value In"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
+      },
+      {
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.in.input",
+            "type": "value.in",
+            "display_name": "Value In Input"
+          }
+        ],
+        "id": "input",
+        "type_used": "sandbox.value_input",
+        "display_name": "Input",
+        "description": "Runs input."
+      },
+      {
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out",
+            "display_name": "Value Out"
+          }
+        ],
+        "id": "first",
+        "type_used": "math.add_one",
+        "display_name": "First",
+        "description": "Runs first."
+      },
+      {
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.final",
+            "type": "value.final",
+            "display_name": "Value Final"
+          }
+        ],
+        "delta": 1,
+        "id": "second",
+        "type_used": "sandbox.add_out",
+        "display_name": "Second",
+        "description": "Runs second."
+      },
+      {
+        "requires": [
+          {
+            "type": "value.final",
+            "cardinality": "exactly_one",
+            "display_name": "Value Final"
+          }
+        ],
+        "id": "end",
+        "type_used": "sandbox.final_value_end",
+        "display_name": "End",
+        "description": "Runs end."
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "input"
+      },
+      {
+        "from": "input",
+        "to": "first"
+      },
+      {
+        "from": "first",
+        "to": "second"
+      },
+      {
+        "from": "second",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.final",
+        "cardinality": "exactly_one",
+        "display_name": "Value Final"
+      }
+    ]
+  },
+  "type_key": "math.add_two"
+}

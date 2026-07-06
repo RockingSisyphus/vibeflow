@@ -1,0 +1,138 @@
+{
+  "display_name": "Loop Wrapper",
+  "description": "Contains a first-class while loop node inside a nodeset.",
+  "requires": [
+    {
+      "type": "loop.current",
+      "cardinality": "exactly_one",
+      "display_name": "Loop Current"
+    }
+  ],
+  "provides": [
+    {
+      "key": "loop.next",
+      "type": "loop.next",
+      "display_name": "Loop Next"
+    },
+    {
+      "key": "loop.done",
+      "type": "loop.done",
+      "display_name": "Loop Done"
+    },
+    {
+      "key": "loop.iterations",
+      "type": "loop.iterations",
+      "display_name": "Loop Iterations"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "loop.current",
+        "type": "loop.current",
+        "display_name": "Loop Current"
+      }
+    ],
+    "nodes": [
+      {
+        "display_name": "Wrapper Start",
+        "description": "Starts the wrapper nodeset.",
+        "id": "start",
+        "type_used": "sandbox.start"
+      },
+      {
+        "display_name": "Inner Retry Loop",
+        "description": "Runs a while loop from inside a nodeset.",
+        "requires": [
+          {
+            "type": "loop.current",
+            "cardinality": "exactly_one",
+            "display_name": "Loop Current"
+          }
+        ],
+        "provides": [
+          {
+            "key": "loop.next",
+            "type": "loop.next",
+            "display_name": "Loop Next"
+          },
+          {
+            "key": "loop.done",
+            "type": "loop.done",
+            "display_name": "Loop Done"
+          },
+          {
+            "key": "loop.iterations",
+            "type": "loop.iterations",
+            "display_name": "Loop Iterations"
+          }
+        ],
+        "loop": {
+          "body": "loop.retry_step",
+          "max_iterations": 5,
+          "carry": [
+            {
+              "from": "loop.current",
+              "as": "loop.current",
+              "update": "loop.next"
+            }
+          ],
+          "outputs": [
+            {
+              "from": "loop.next",
+              "as": "loop.next"
+            },
+            {
+              "from": "loop.done",
+              "as": "loop.done"
+            },
+            {
+              "from": "loop.iterations",
+              "as": "loop.iterations"
+            }
+          ],
+          "stop_when": {
+            "from": "loop.done",
+            "equals": true
+          }
+        },
+        "id": "inner_loop",
+        "type_used": "vibeflow.loop.while"
+      },
+      {
+        "display_name": "Wrapper End",
+        "description": "Ends after the inner loop outputs are available.",
+        "id": "end",
+        "type_used": "sandbox.start"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "inner_loop"
+      },
+      {
+        "from": "inner_loop",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "loop.next",
+        "cardinality": "exactly_one",
+        "display_name": "Loop Next"
+      },
+      {
+        "type": "loop.done",
+        "cardinality": "exactly_one",
+        "display_name": "Loop Done"
+      },
+      {
+        "type": "loop.iterations",
+        "cardinality": "exactly_one",
+        "display_name": "Loop Iterations"
+      }
+    ]
+  },
+  "type_key": "loop.wrapper"
+}

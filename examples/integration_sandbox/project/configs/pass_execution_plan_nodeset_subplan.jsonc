@@ -1,167 +1,76 @@
 {
-  "nodesets": [
-    {
-      "name": "math.add_one",
-      "display_name": "Add One",
-      "category": "math",
-      "description": "Composite add-one flow with caller override.",
-      "version": "0.1.0",
-      "purity": "pure",
-      "requires": [
-        {
-          "type": "value.in",
-          "cardinality": "exactly_one"
-        }
-      ],
-      "provides": [
-        {
-          "key": "value.out",
-          "type": "value.out"
-        }
-      ],
-      "exports": [
-        {
-          "key": "value.out",
-          "type": "value.out"
-        }
-      ],
-      "pipeline": {
-        "inputs": [
-          {
-            "key": "value.in",
-            "type": "value.in"
-          }
-        ],
-        "nodes": [
-          {
-            "name": "start",
-            "type": "sandbox.start"
-          },
-          {
-            "name": "input",
-            "type": "sandbox.value_input",
-            "requires": [
-              {
-                "type": "value.in",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "value.in.input",
-                "type": "value.in"
-              }
-            ]
-          },
-          {
-            "name": "add",
-            "type": "sandbox.add",
-            "requires": [
-              {
-                "type": "value.in",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "value.out",
-                "type": "value.out"
-              }
-            ],
-            "delta": 1
-          },
-          {
-            "name": "end",
-            "type": "sandbox.out_value_end",
-            "requires": [
-              {
-                "type": "value.out",
-                "cardinality": "exactly_one"
-              }
-            ]
-          }
-        ],
-        "edges": [
-          {
-            "from": "start",
-            "to": "input"
-          },
-          {
-            "from": "input",
-            "to": "add"
-          },
-          {
-            "from": "add",
-            "to": "end"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one"
-          }
-        ]
-      }
-    }
-  ],
   "pipeline": {
     "inputs": [
       {
         "key": "value.in",
-        "type": "value.in"
+        "type": "value.in",
+        "display_name": "Value In"
       }
     ],
     "nodes": [
       {
-        "name": "start",
-        "type": "sandbox.start"
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
       },
       {
-        "name": "input",
-        "type": "sandbox.value_input",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.in.input",
-            "type": "value.in"
+            "type": "value.in",
+            "display_name": "Value In Input"
           }
-        ]
+        ],
+        "id": "input",
+        "type_used": "sandbox.value_input",
+        "display_name": "Input",
+        "description": "Runs input."
       },
       {
-        "name": "add_one",
-        "type": "nodeset.math.add_one",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.out",
-            "type": "value.out"
+            "type": "value.out",
+            "display_name": "Value Out"
           }
         ],
         "node_configs": {
           "add": {
             "delta": 8
           }
-        }
+        },
+        "id": "add_one",
+        "type_used": "math.add_one",
+        "display_name": "Add One",
+        "description": "Runs add_one."
       },
       {
-        "name": "end",
-        "type": "sandbox.out_value_end",
         "requires": [
           {
             "type": "value.out",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
           }
-        ]
+        ],
+        "id": "end",
+        "type_used": "sandbox.out_value_end",
+        "display_name": "End",
+        "description": "Runs end."
       }
     ],
     "edges": [
@@ -181,8 +90,14 @@
     "outputs": [
       {
         "type": "value.out",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Value Out"
       }
     ]
-  }
+  },
+  "nodeset_imports": [
+    {
+      "path": "nodesets/pass_execution_plan_nodeset_subplan/math_add_one.jsonc"
+    }
+  ]
 }

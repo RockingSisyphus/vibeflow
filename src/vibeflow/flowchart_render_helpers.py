@@ -10,24 +10,22 @@ if TYPE_CHECKING:
 
 
 def nodeset_for_node(graph: GraphConfig, node: NodeSpec) -> NodesetSpec | None:
-    if node.node_type in LOOP_NODE_TYPES and node.loop.body:
+    if node.type_used in LOOP_NODE_TYPES and node.loop.body:
         return graph.nodesets.get(node.loop.body)
-    if not node.node_type.startswith("nodeset."):
-        return None
-    return graph.nodesets.get(node.node_type.removeprefix("nodeset."))
+    return graph.nodesets.get(node.type_used)
 
 
 def node_flow_kind(node: NodeSpec, compiled: CompiledGraph) -> str:
     if node.status == STATUS_PLANNED:
         return node.flow_kind
-    return compiled.flow_kinds.get(node.name, "")
+    return compiled.flow_kinds.get(node.id, "")
 
 
 def node_is_external(node: NodeSpec, registry) -> bool:
-    if registry is None or node.status == STATUS_PLANNED or node.node_type.startswith("nodeset."):
+    if registry is None or node.status == STATUS_PLANNED:
         return False
     try:
-        node_cls = registry.get(node.node_type)
+        node_cls = registry.get(node.type_used)
     except Exception:
         return False
     return bool(getattr(getattr(node_cls, "NODE_INFO", None), "external", False))

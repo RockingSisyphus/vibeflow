@@ -199,7 +199,7 @@ def _nodeset_fragments(
             continue
         fragments.append(
             _render_nodeset_detail_fragment(
-                f"{node.name} - {nodeset.name}",
+                _nodeset_fragment_title(node, nodeset),
                 nodeset,
                 temp_dir,
                 registry=registry,
@@ -231,10 +231,10 @@ def _render_nodeset_detail_fragment(
     review_fragment_max_width: float = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
     visited_nodesets: tuple[str, ...] = (),
 ) -> _SvgFragment:
-    if nodeset.name in visited_nodesets:
+    if nodeset.type_key in visited_nodesets:
         return _placeholder_fragment(
             title,
-            f"recursive nodeset expansion skipped: {nodeset.name}",
+            f"recursive nodeset expansion skipped: {nodeset.type_key}",
             background=background,
         )
     if not nodeset.graph.nodes:
@@ -278,7 +278,7 @@ def _render_nodeset_detail_fragment(
     )
     child_fragments = [
         _render_nodeset_detail_fragment(
-            f"{child_node.name} - {child_nodeset.name}",
+            _nodeset_fragment_title(child_node, child_nodeset),
             child_nodeset,
             temp_dir,
             registry=registry,
@@ -289,7 +289,7 @@ def _render_nodeset_detail_fragment(
             max_text_size=max_text_size,
             max_edges=max_edges,
             review_fragment_max_width=review_fragment_max_width,
-            visited_nodesets=(*visited_nodesets, nodeset.name),
+            visited_nodesets=(*visited_nodesets, nodeset.type_key),
         )
         for child_node, child_nodeset in child_nodesets
     ]
@@ -310,6 +310,11 @@ def _direct_nodeset_calls(graph: GraphConfig) -> tuple[tuple[NodeSpec, NodesetSp
         if nodeset is not None:
             calls.append((node, nodeset))
     return tuple(calls)
+
+
+def _nodeset_fragment_title(node: NodeSpec, nodeset: NodesetSpec) -> str:
+    title = node.metadata.display_name or nodeset.display_name or node.id
+    return f"{title} (id: {node.id}, type_key: {nodeset.type_key})"
 
 
 def _nodeset_mermaid(
@@ -339,7 +344,7 @@ def _force_flowchart_direction(mermaid_text: str, direction: str) -> str:
 
 
 def _inject_layout_spine(mermaid_text: str, graph: GraphConfig) -> str:
-    node_ids = tuple(_safe_id(node.name) for node in graph.nodes)
+    node_ids = tuple(_safe_id(node.id) for node in graph.nodes)
     if not node_ids:
         return mermaid_text
     start_id = _unique_layout_id("__vibeflow_layout_start", node_ids)

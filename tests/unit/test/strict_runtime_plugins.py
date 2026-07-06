@@ -136,7 +136,7 @@ def test_plugin_load_and_execution_fail_closed(tmp_path, capsys) -> None:
         json.dumps(
             {
                 "plugins": [{"module": str(tmp_path / "missing.py"), "type": "policy"}],
-                "pipeline": {"nodes": [{"name": "seed", "type": "test.seed"}]},
+                "pipeline": {"nodes": [{"id": "seed", "type_used": "test.seed"}]},
             }
         ),
         encoding="utf-8",
@@ -165,7 +165,7 @@ class Plugin:
         json.dumps(
             {
                 "plugins": [{"module": str(plugin_path), "type": "policy"}],
-                "pipeline": {"nodes": [{"name": "seed", "type": "test.seed"}]},
+                "pipeline": {"nodes": [{"id": "seed", "type_used": "test.seed"}]},
             }
         ),
         encoding="utf-8",
@@ -207,7 +207,7 @@ class Plugin:
             rule_id="PLUGIN.NODE.CHECK",
             severity="warning",
             object_type="node",
-            object_id=spec.name,
+            object_id=spec.id,
             failure_layer="plugin",
             message="plugin node check",
             suggested_fix_type="fix_node",

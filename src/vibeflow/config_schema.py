@@ -14,13 +14,21 @@ STATUSES = {"planned", "implemented"}
 
 def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
+    if _is_nodeset_definition(config):
+        _validate_nodeset(config, "nodeset", findings)
+        if "nodeset_imports" in config:
+            _validate_nodeset_imports(config["nodeset_imports"], findings)
+        return tuple(findings)
     pipeline = config.get("pipeline", config)
     if not isinstance(pipeline, Mapping):
         findings.append(_error("CONFIG.SCHEMA.PIPELINE_OBJECT", "pipeline must be an object", "pipeline"))
         return tuple(findings)
     _validate_pipeline(pipeline, "pipeline", findings)
     if "nodesets" in config:
-        _validate_nodesets(config["nodesets"], findings)
+        if config.get("__vibeflow_expanded_nodesets__") is True:
+            _validate_nodesets(config["nodesets"], findings)
+        else:
+            findings.append(_error("CONFIG.NODESETS.INLINE_REMOVED", "inline nodesets are removed; import one nodeset JSONC file per type_key with nodeset_imports", "nodesets"))
     if "nodeset_imports" in config:
         _validate_nodeset_imports(config["nodeset_imports"], findings)
     if "boundary" in config:
@@ -89,8 +97,13 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
 
 
 def _validate_node_identity(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
-    if not _non_empty_string(value.get("name")):
-        findings.append(_error("CONFIG.SCHEMA.NODE_MISSING_NAME", f"{prefix}.name must be a non-empty string", f"{prefix}.name"))
+    if "name" in value:
+        findings.append(_error("CONFIG.SCHEMA.NODE_LEGACY_NAME", f"{prefix}.name is removed; use {prefix}.id", f"{prefix}.name"))
+    if "type" in value or "registry_key" in value:
+        object_id = f"{prefix}.type" if "type" in value else f"{prefix}.registry_key"
+        findings.append(_error("CONFIG.SCHEMA.NODE_LEGACY_TYPE", f"{object_id} is removed; use {prefix}.type_used", object_id))
+    if not _non_empty_string(value.get("id")):
+        findings.append(_error("CONFIG.SCHEMA.NODE_MISSING_ID", f"{prefix}.id must be a non-empty string", f"{prefix}.id"))
     if status not in STATUSES:
         findings.append(_error("GRAPH.PLANNED.STATUS_INVALID", f"{prefix}.status must be planned or implemented", f"{prefix}.status"))
     if status == "planned" and not _non_empty_string(value.get("flow_kind")):
@@ -99,12 +112,15 @@ def _validate_node_identity(value: Mapping[str, Any], prefix: str, findings: lis
         findings.append(_error("NODE.FLOW_KIND.INVALID", f"{prefix}.flow_kind must be one of {sorted(FLOW_KINDS)}", f"{prefix}.flow_kind"))
     if status == "implemented" and _non_empty_string(value.get("flow_kind")):
         findings.append(_error("GRAPH.PLANNED.IMPLEMENTED_HAS_CONFIG_FLOW_KIND", f"{prefix}.flow_kind is only allowed for planned nodes", f"{prefix}.flow_kind"))
-    if status != "planned" and not (_non_empty_string(value.get("type")) or _non_empty_string(value.get("registry_key"))):
+    type_used = str(value.get("type_used", "")).strip()
+    if type_used.startswith("nodeset."):
+        findings.append(_error("CONFIG.SCHEMA.NODE_LEGACY_NODESET_TYPE", f"{prefix}.type_used must use the nodeset type_key directly, not nodeset.<name>", f"{prefix}.type_used"))
+    if status != "planned" and not _non_empty_string(value.get("type_used")):
         findings.append(
             _error(
                 "CONFIG.SCHEMA.NODE_MISSING_TYPE",
-                f"{prefix} must define non-empty string field 'type' or 'registry_key'",
-                f"{prefix}.type",
+                f"{prefix} must define non-empty string field 'type_used'",
+                f"{prefix}.type_used",
             )
         )
 
@@ -127,7 +143,10 @@ def _validate_node_config_fields(value: Mapping[str, Any], prefix: str, findings
 
 
 def _validate_node_visual_fields(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
-    for field in ("display_name", "category", "version", "description"):
+    for removed in ("category", "version"):
+        if removed in value:
+            findings.append(_error("CONFIG.SCHEMA.NODE_METADATA_REMOVED", f"{prefix}.{removed} is removed; use display_name and description", f"{prefix}.{removed}"))
+    for field in ("display_name", "description"):
         if field in value and not isinstance(value[field], str):
             findings.append(_error("CONFIG.SCHEMA.NODE_METADATA_STRING", f"{prefix}.{field} must be a string", f"{prefix}.{field}"))
     if "style" not in value:
@@ -179,20 +198,20 @@ def _validate_node_similarity(value: Mapping[str, Any], prefix: str, findings: l
 
 
 def _validate_node_similarity_targets(nodes: list[Any], prefix: str, findings: list[HealthFinding]) -> None:
-    names = {str(node.get("name", "")).strip() for node in nodes if isinstance(node, Mapping) and _non_empty_string(node.get("name"))}
+    ids = {str(node.get("id", "")).strip() for node in nodes if isinstance(node, Mapping) and _non_empty_string(node.get("id"))}
     for index, node in enumerate(nodes):
         if not isinstance(node, Mapping):
             continue
         similar_to = node.get("similar_to")
         if not isinstance(similar_to, Mapping):
             continue
-        name = str(node.get("name", "")).strip()
+        node_id = str(node.get("id", "")).strip()
         target = str(similar_to.get("node", "")).strip()
-        if not name or not target:
+        if not node_id or not target:
             continue
-        if target == name:
+        if target == node_id:
             findings.append(_error("CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID", f"{prefix}[{index}].similar_to.node cannot reference itself", f"{prefix}[{index}].similar_to.node"))
-        elif target not in names:
+        elif target not in ids:
             findings.append(_error("CONFIG.SCHEMA.NODE_SIMILAR_TO_INVALID", f"{prefix}[{index}].similar_to.node references unknown node: {target}", f"{prefix}[{index}].similar_to.node"))
 
 
@@ -217,7 +236,7 @@ def _validate_node_join_policy(value: Mapping[str, Any], prefix: str, findings: 
 
 
 def _validate_node_loop(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
-    node_type = str(value.get("type", value.get("registry_key", ""))).strip()
+    node_type = str(value.get("type_used", "")).strip()
     if node_type not in LOOP_NODE_TYPES:
         if "loop" in value:
             findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop is only allowed on VibeFlow loop nodes", f"{prefix}.loop"))
@@ -228,6 +247,8 @@ def _validate_node_loop(value: Mapping[str, Any], prefix: str, findings: list[He
         return
     if not _non_empty_string(loop.get("body")):
         findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop.body must be a non-empty nodeset name", f"{prefix}.loop.body"))
+    elif str(loop.get("body", "")).strip().startswith("nodeset."):
+        findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop.body must use the nodeset type_key directly, not nodeset.<name>", f"{prefix}.loop.body"))
     unknown = sorted(set(str(key) for key in loop) - {"body", "max_iterations", "stop_after", "stop_when", "carry", "collect", "outputs"})
     if unknown:
         findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop contains unsupported loop keys: {unknown}", f"{prefix}.loop"))
@@ -357,8 +378,11 @@ def _validate_nodeset(item: Mapping[str, Any], prefix: str, findings: list[Healt
 
 
 def _validate_nodeset_identity(item: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
-    if not _non_empty_string(item.get("name")):
-        findings.append(_error("CONFIG.SCHEMA.NODESET_MISSING_NAME", f"{prefix}.name must be a non-empty string", f"{prefix}.name"))
+    for removed in ("name", "category", "version", "purity", "exports"):
+        if removed in item:
+            findings.append(_error("CONFIG.SCHEMA.NODESET_FIELD_REMOVED", f"{prefix}.{removed} is removed from nodeset definitions", f"{prefix}.{removed}"))
+    if not _non_empty_string(item.get("type_key")):
+        findings.append(_error("CONFIG.SCHEMA.NODESET_MISSING_TYPE_KEY", f"{prefix}.type_key must be a non-empty string", f"{prefix}.type_key"))
     if status not in STATUSES:
         findings.append(_error("GRAPH.PLANNED.STATUS_INVALID", f"{prefix}.status must be planned or implemented", f"{prefix}.status"))
     flow_kind = str(item.get("flow_kind", "predefined")).strip() or "predefined"
@@ -367,16 +391,14 @@ def _validate_nodeset_identity(item: Mapping[str, Any], prefix: str, findings: l
 
 
 def _validate_nodeset_metadata(item: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
-    for field in ("display_name", "category", "description", "version", "purity"):
-        if status != "planned" and not _non_empty_string(item.get(field)):
+    for field in ("display_name", "description"):
+        if not _non_empty_string(item.get(field)):
             findings.append(_error("CONFIG.SCHEMA.NODESET_METADATA", f"{prefix}.{field} must be a non-empty string", f"{prefix}.{field}"))
-    if item.get("purity") not in {None, "pure"}:
-        findings.append(_error("CONFIG.SCHEMA.NODESET_PURITY", f"{prefix}.purity must be 'pure'", f"{prefix}.purity"))
 
 
 def _validate_nodeset_contract(item: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
-    for required_field in ("requires", "provides", "exports"):
-        if status != "planned" and required_field not in item:
+    for required_field in ("requires", "provides"):
+        if required_field not in item:
             findings.append(_error("CONFIG.SCHEMA.NODESET_CONTRACT", f"{prefix}.{required_field} must be declared", f"{prefix}.{required_field}"))
         if required_field in item:
             if required_field == "requires":
@@ -411,7 +433,7 @@ def _validate_nodeset_imports(value: Any, findings: list[HealthFinding]) -> None
         if not _non_empty_string(item.get("path")):
             findings.append(_error("CONFIG.SCHEMA.NODESET_IMPORT_PATH", f"{prefix}.path must be a non-empty string", f"{prefix}.path"))
         if "names" in item:
-            _validate_string_list(item["names"], f"{prefix}.names", findings, "CONFIG.SCHEMA.NODESET_IMPORT_NAMES")
+            findings.append(_error("CONFIG.SCHEMA.NODESET_IMPORT_NAMES_REMOVED", f"{prefix}.names is removed; each nodeset file defines exactly one type_key", f"{prefix}.names"))
 
 
 def _validate_policy(value: Any, prefix: str, findings: list[HealthFinding], *, rule_source: str) -> None:
@@ -621,12 +643,13 @@ def _validate_provider_list(value: Any, object_id: str, findings: list[HealthFin
         if not isinstance(item, Mapping):
             findings.append(_error(rule_id, f"{item_id} must be an object with key and type", item_id))
             continue
-        if set(item) - {"key", "type"}:
-            findings.append(_error(rule_id, f"{item_id} must only contain key and type", item_id))
+        if set(item) - {"key", "type", "display_name"}:
+            findings.append(_error(rule_id, f"{item_id} must only contain key, type, and display_name", item_id))
         key = str(item.get("key", "")).strip()
         data_type = str(item.get("type", "")).strip()
-        if not key or not data_type:
-            findings.append(_error(rule_id, f"{item_id} must declare non-empty key and type", item_id))
+        display_name = str(item.get("display_name", "")).strip()
+        if not key or not data_type or not display_name:
+            findings.append(_error(rule_id, f"{item_id} must declare non-empty key, type, and display_name", item_id))
         if key in seen:
             findings.append(_error(rule_id, f"{object_id} contains duplicate provider key: {key}", item_id))
         seen.add(key)
@@ -642,12 +665,13 @@ def _validate_requirement_list(value: Any, object_id: str, findings: list[Health
         if not isinstance(item, Mapping):
             findings.append(_error(rule_id, f"{item_id} must be an object with type and cardinality", item_id))
             continue
-        if set(item) - {"type", "cardinality"}:
-            findings.append(_error(rule_id, f"{item_id} must only contain type and cardinality", item_id))
+        if set(item) - {"type", "cardinality", "display_name"}:
+            findings.append(_error(rule_id, f"{item_id} must only contain type, cardinality, and display_name", item_id))
         data_type = str(item.get("type", "")).strip()
         cardinality = str(item.get("cardinality", "")).strip()
-        if not data_type or cardinality not in {"exactly_one", "optional_one", "all"}:
-            findings.append(_error(rule_id, f"{item_id} must declare non-empty type and valid cardinality", item_id))
+        display_name = str(item.get("display_name", "")).strip()
+        if not data_type or cardinality not in {"exactly_one", "optional_one", "all"} or not display_name:
+            findings.append(_error(rule_id, f"{item_id} must declare non-empty type, display_name, and valid cardinality", item_id))
         if data_type in seen:
             findings.append(_error(rule_id, f"{object_id} contains duplicate requirement type: {data_type}", item_id))
         seen.add(data_type)
@@ -657,6 +681,10 @@ def _provider_keys(value: Any) -> set[str]:
     if not isinstance(value, list):
         return set()
     return {str(item.get("key", "")).strip() for item in value if isinstance(item, Mapping) and _non_empty_string(item.get("key"))}
+
+
+def _is_nodeset_definition(config: Mapping[str, Any]) -> bool:
+    return isinstance(config.get("type_key"), str)
 
 
 def _string_items(value: Any) -> set[str]:

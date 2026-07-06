@@ -1,107 +1,119 @@
 {
-  "nodesets": [
-    {
-      "name": "loop.never_done_step",
-      "display_name": "Never Done Step",
-      "category": "loop",
-      "description": "Increments loop.current but never reaches the configured stop target within max_iterations.",
-      "version": "0.1.0",
-      "purity": "pure",
-      "requires": [{"type": "loop.current", "cardinality": "exactly_one"}],
-      "provides": [
-        {"key": "loop.next", "type": "loop.next"},
-        {"key": "loop.done", "type": "loop.done"}
-      ],
-      "exports": [
-        {"key": "loop.next", "type": "loop.next"},
-        {"key": "loop.done", "type": "loop.done"}
-      ],
-      "pipeline": {
-        "inputs": [{"key": "loop.current", "type": "loop.current"}],
-        "nodes": [
-          {"name": "start", "type": "sandbox.start", "display_name": "Body Start", "description": "Starts one max-iteration failure body invocation."},
-          {
-            "name": "increment",
-            "type": "semantic.increment_until",
-            "display_name": "Increment",
-            "description": "Increments too slowly to reach the target before max_iterations.",
-            "requires": [{"type": "loop.current", "cardinality": "exactly_one"}],
-            "provides": [{"key": "loop.next", "type": "loop.next"}],
-            "step": 1
-          },
-          {
-            "name": "done",
-            "type": "semantic.loop_done_value",
-            "display_name": "Done Check",
-            "description": "Uses a high target so the loop exceeds max_iterations.",
-            "requires": [{"type": "loop.next", "cardinality": "exactly_one"}],
-            "provides": [{"key": "loop.done", "type": "loop.done"}],
-            "target": 99
-          },
-          {
-            "name": "end",
-            "type": "sandbox.start",
-            "display_name": "Body End",
-            "description": "Ends a body iteration after loop.next and loop.done are available."
-          }
-        ],
-        "edges": [
-          {"from": "start", "to": "increment"},
-          {"from": "increment", "to": "done"},
-          {"from": "done", "to": "end"}
-        ],
-        "outputs": [
-          {"type": "loop.next", "cardinality": "exactly_one"},
-          {"type": "loop.done", "cardinality": "exactly_one"}
-        ]
-      }
-    }
-  ],
   "pipeline": {
-    "inputs": [{"key": "loop.current", "type": "loop.current"}],
+    "inputs": [
+      {
+        "key": "loop.current",
+        "type": "loop.current",
+        "display_name": "Loop Current"
+      }
+    ],
     "max_steps": 10,
     "nodes": [
-      {"name": "start", "type": "sandbox.start", "display_name": "Start", "description": "Starts a loop that should fail on max_iterations."},
       {
-        "name": "retry_loop",
-        "type": "vibeflow.loop.while",
+        "display_name": "Start",
+        "description": "Starts a loop that should fail on max_iterations.",
+        "id": "start",
+        "type_used": "sandbox.start"
+      },
+      {
         "display_name": "Bounded Retry Loop",
         "description": "Runs until max_iterations stops a non-converging retry body.",
-        "requires": [{"type": "loop.current", "cardinality": "exactly_one"}],
+        "requires": [
+          {
+            "type": "loop.current",
+            "cardinality": "exactly_one",
+            "display_name": "Loop Current"
+          }
+        ],
         "provides": [
-          {"key": "loop.next", "type": "loop.next"},
-          {"key": "loop.done", "type": "loop.done"},
-          {"key": "loop.iterations", "type": "loop.iterations"}
+          {
+            "key": "loop.next",
+            "type": "loop.next",
+            "display_name": "Loop Next"
+          },
+          {
+            "key": "loop.done",
+            "type": "loop.done",
+            "display_name": "Loop Done"
+          },
+          {
+            "key": "loop.iterations",
+            "type": "loop.iterations",
+            "display_name": "Loop Iterations"
+          }
         ],
         "loop": {
           "body": "loop.never_done_step",
           "max_iterations": 2,
           "carry": [
-            {"from": "loop.current", "as": "loop.current", "update": "loop.next"}
+            {
+              "from": "loop.current",
+              "as": "loop.current",
+              "update": "loop.next"
+            }
           ],
           "outputs": [
-            {"from": "loop.next", "as": "loop.next"},
-            {"from": "loop.done", "as": "loop.done"},
-            {"from": "loop.iterations", "as": "loop.iterations"}
+            {
+              "from": "loop.next",
+              "as": "loop.next"
+            },
+            {
+              "from": "loop.done",
+              "as": "loop.done"
+            },
+            {
+              "from": "loop.iterations",
+              "as": "loop.iterations"
+            }
           ],
-          "stop_when": {"from": "loop.done", "equals": true}
-        }
+          "stop_when": {
+            "from": "loop.done",
+            "equals": true
+          }
+        },
+        "id": "retry_loop",
+        "type_used": "vibeflow.loop.while"
       },
       {
-        "name": "end",
-        "type": "semantic.loop_end",
         "display_name": "End",
         "description": "Would end if the loop converged.",
-        "requires": [{"type": "loop.next", "cardinality": "exactly_one"}]
+        "requires": [
+          {
+            "type": "loop.next",
+            "cardinality": "exactly_one",
+            "display_name": "Loop Next"
+          }
+        ],
+        "id": "end",
+        "type_used": "semantic.loop_end"
       }
     ],
     "edges": [
-      {"from": "start", "to": "retry_loop"},
-      {"from": "retry_loop", "to": "end"}
+      {
+        "from": "start",
+        "to": "retry_loop"
+      },
+      {
+        "from": "retry_loop",
+        "to": "end"
+      }
     ],
     "outputs": [
-      {"type": "loop.next", "cardinality": "optional_one"},
-      {"type": "loop.done", "cardinality": "optional_one"}
+      {
+        "type": "loop.next",
+        "cardinality": "optional_one",
+        "display_name": "Loop Next"
+      },
+      {
+        "type": "loop.done",
+        "cardinality": "optional_one",
+        "display_name": "Loop Done"
+      }
     ]
-  }
+  },
+  "nodeset_imports": [
+    {
+      "path": "nodesets/fail_loop_max_iterations/loop_never_done_step.jsonc"
+    }
+  ]
 }

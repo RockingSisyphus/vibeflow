@@ -76,8 +76,8 @@ def inspect_config_payload(path: Path, *, policy_path: Path | None = None) -> tu
         "outputs": requirements_to_dicts(graph.outputs),
         "nodes": [
             {
-                "name": node.name,
-                "type": node.node_type,
+                "id": node.id,
+                "type_used": node.type_used,
                 "requires": requirements_to_dicts(node.requires),
                 "provides": providers_to_dicts(node.provides),
                 "status": node.status,
@@ -88,15 +88,11 @@ def inspect_config_payload(path: Path, *, policy_path: Path | None = None) -> tu
         ],
         "nodesets": [
             {
-                "name": nodeset.name,
+                "type_key": nodeset.type_key,
                 "display_name": nodeset.display_name,
-                "category": nodeset.category,
                 "description": nodeset.description,
-                "version": nodeset.version,
-                "purity": nodeset.purity,
                 "requires": requirements_to_dicts(nodeset.requires),
                 "provides": providers_to_dicts(nodeset.provides),
-                "exports": providers_to_dicts(nodeset.exports),
                 "status": nodeset.status,
                 "planned_behavior": nodeset.planned_behavior.to_dict(),
                 "node_count": len(nodeset.graph.nodes),

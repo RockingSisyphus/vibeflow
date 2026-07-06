@@ -1,0 +1,155 @@
+{
+  "display_name": "Inner Accumulate Step",
+  "description": "Runs one inner-loop accumulation step and emits a bool stop signal.",
+  "requires": [
+    {
+      "type": "outer.inner",
+      "cardinality": "exactly_one",
+      "display_name": "Outer Inner"
+    },
+    {
+      "type": "inner.current",
+      "cardinality": "exactly_one",
+      "display_name": "Inner Current"
+    },
+    {
+      "type": "total.inner",
+      "cardinality": "exactly_one",
+      "display_name": "Total Inner"
+    }
+  ],
+  "provides": [
+    {
+      "key": "outer.inner.next",
+      "type": "outer.inner",
+      "display_name": "Outer Inner Next"
+    },
+    {
+      "key": "inner.current.next",
+      "type": "inner.current",
+      "display_name": "Inner Current Next"
+    },
+    {
+      "key": "total.inner.next",
+      "type": "total.inner",
+      "display_name": "Total Inner Next"
+    },
+    {
+      "key": "inner.done",
+      "type": "inner.done",
+      "display_name": "Inner Done"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "outer.inner",
+        "type": "outer.inner",
+        "display_name": "Outer Inner"
+      },
+      {
+        "key": "inner.current",
+        "type": "inner.current",
+        "display_name": "Inner Current"
+      },
+      {
+        "key": "total.inner",
+        "type": "total.inner",
+        "display_name": "Total Inner"
+      }
+    ],
+    "nodes": [
+      {
+        "display_name": "Inner Body Start",
+        "description": "Starts one inner accumulation step.",
+        "id": "start",
+        "type_used": "sandbox.start"
+      },
+      {
+        "display_name": "Accumulate",
+        "description": "Adds outer plus inner plus one into the running total and advances the inner counter.",
+        "requires": [
+          {
+            "type": "outer.inner",
+            "cardinality": "exactly_one",
+            "display_name": "Outer Inner"
+          },
+          {
+            "type": "inner.current",
+            "cardinality": "exactly_one",
+            "display_name": "Inner Current"
+          },
+          {
+            "type": "total.inner",
+            "cardinality": "exactly_one",
+            "display_name": "Total Inner"
+          }
+        ],
+        "provides": [
+          {
+            "key": "outer.inner.next",
+            "type": "outer.inner",
+            "display_name": "Outer Inner Next"
+          },
+          {
+            "key": "inner.current.next",
+            "type": "inner.current",
+            "display_name": "Inner Current Next"
+          },
+          {
+            "key": "total.inner.next",
+            "type": "total.inner",
+            "display_name": "Total Inner Next"
+          },
+          {
+            "key": "inner.done",
+            "type": "inner.done",
+            "display_name": "Inner Done"
+          }
+        ],
+        "inner_limit": 99,
+        "id": "accumulate",
+        "type_used": "semantic.inner_accumulate"
+      },
+      {
+        "display_name": "Inner Body End",
+        "description": "Ends one inner accumulation step.",
+        "id": "end",
+        "type_used": "sandbox.start"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "accumulate"
+      },
+      {
+        "from": "accumulate",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "outer.inner",
+        "cardinality": "exactly_one",
+        "display_name": "Outer Inner"
+      },
+      {
+        "type": "inner.current",
+        "cardinality": "exactly_one",
+        "display_name": "Inner Current"
+      },
+      {
+        "type": "total.inner",
+        "cardinality": "exactly_one",
+        "display_name": "Total Inner"
+      },
+      {
+        "type": "inner.done",
+        "cardinality": "exactly_one",
+        "display_name": "Inner Done"
+      }
+    ]
+  },
+  "type_key": "loop.inner_accumulate_step"
+}

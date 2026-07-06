@@ -109,14 +109,14 @@ def _validate_graph_nodes(
     state: _HealthValidationState,
 ) -> None:
     for spec in graph.nodes:
-        state.node_types[spec.name] = spec.node_type
+        state.node_types[spec.id] = spec.type_used
         if spec.similar_to.node:
-            state.node_similarities[spec.name] = spec.similar_to.to_dict()
+            state.node_similarities[spec.id] = spec.similar_to.to_dict()
         if spec.status == STATUS_PLANNED:
             continue
-        if spec.node_type in LOOP_NODE_TYPES:
+        if spec.type_used in LOOP_NODE_TYPES:
             continue
-        if spec.node_type.startswith("nodeset."):
+        if spec.type_used in graph.nodesets:
             continue
         _validate_graph_node(spec, registry, plugin_registry, purity_policy, state)
 
@@ -132,18 +132,18 @@ def _validate_graph_node(
     from .registry import NodeRegistryError
 
     try:
-        node_cls = registry.get(spec.node_type)
+        node_cls = registry.get(spec.type_used)
     except NodeRegistryError as exc:
         state.errors.append(_unknown_node_finding(spec, exc))
         return
     from .purity import collect_node_metrics
 
     metrics = collect_node_metrics(node_cls)
-    state.node_metrics[spec.name] = metrics.to_dict()
-    _validate_plugin_schema_extensions(plugin_registry, state.errors, spec.name, node_cls, purity_policy)
-    _record_node_fingerprint(spec.name, metrics, state)
-    _append_base_lib_health(spec.name, node_cls, purity_policy, state)
-    _append_node_name_smell(spec.name, state)
+    state.node_metrics[spec.id] = metrics.to_dict()
+    _validate_plugin_schema_extensions(plugin_registry, state.errors, spec.id, node_cls, purity_policy)
+    _record_node_fingerprint(spec.id, metrics, state)
+    _append_base_lib_health(spec.id, node_cls, purity_policy, state)
+    _append_node_name_smell(spec.id, state)
     _append_node_purity_findings(spec, node_cls, registry, purity_policy, state)
     append_plugin_findings(plugin_registry, "validate_node", state.errors, state.warnings, spec, node_cls, metrics.to_dict())
 
@@ -153,11 +153,11 @@ def _unknown_node_finding(spec, exc: NodeRegistryError) -> HealthFinding:
         rule_id="NODE.TYPE.UNKNOWN",
         severity="error",
         object_type="node",
-        object_id=spec.name,
+        object_id=spec.id,
         failure_layer="topology",
         message=str(exc),
         suggested_fix_type="fix_config",
-        details={"node_type": spec.node_type},
+        details={"type_used": spec.type_used},
     )
 
 
@@ -282,12 +282,12 @@ def _append_node_purity_findings(
     for violation in validate_node_class(
         node_cls,
         policy=purity_policy,
-        expected_type=spec.node_type,
+        expected_type=spec.type_used,
         known_node_class_names=known_classes,
         known_node_modules=known_modules,
         scan_module=True,
     ):
-        append_finding_by_severity(_node_violation_finding(spec.name, violation), state.errors, state.warnings)
+        append_finding_by_severity(_node_violation_finding(spec.id, violation), state.errors, state.warnings)
 
 
 def _known_node_identifiers(registry: NodeRegistry, current_cls: type) -> tuple[tuple[str, ...], tuple[str, ...]]:
@@ -334,14 +334,14 @@ def _append_node_visual_metadata_warnings(
         visited_nodesets = set()
     for node in graph.nodes:
         if not node.metadata.display_name.strip():
-            state.warnings.append(_node_visual_metadata_finding("GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME", node.name, "display_name", owner=owner))
+            state.warnings.append(_node_visual_metadata_finding("GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME", node.id, "display_name", owner=owner))
         if not node.metadata.description.strip():
-            state.warnings.append(_node_visual_metadata_finding("GRAPH.SMELL.MISSING_NODE_DESCRIPTION", node.name, "description", owner=owner))
+            state.warnings.append(_node_visual_metadata_finding("GRAPH.SMELL.MISSING_NODE_DESCRIPTION", node.id, "description", owner=owner))
     for nodeset in graph.nodesets.values():
-        if nodeset.name in visited_nodesets:
+        if nodeset.type_key in visited_nodesets:
             continue
-        visited_nodesets.add(nodeset.name)
-        _append_node_visual_metadata_warnings(nodeset.graph, state, owner=f"nodeset:{nodeset.name}", visited_nodesets=visited_nodesets)
+        visited_nodesets.add(nodeset.type_key)
+        _append_node_visual_metadata_warnings(nodeset.graph, state, owner=f"nodeset:{nodeset.type_key}", visited_nodesets=visited_nodesets)
 
 
 def _node_visual_metadata_finding(rule_id: str, node_name: str, field: str, *, owner: str) -> HealthFinding:
@@ -388,7 +388,7 @@ def _append_nodeset_health(graph: GraphConfig, registry: NodeRegistry, state: _H
                     rule_id="NODESET.SMELL.TOO_WIDE",
                     severity="warning",
                     object_type="nodeset",
-                    object_id=nodeset.name,
+                    object_id=nodeset.type_key,
                     failure_layer="topology",
                     message=f"nodeset has {len(nodeset.graph.nodes)} internal nodes; consider splitting it",
                     suggested_fix_type="fix_nodeset",

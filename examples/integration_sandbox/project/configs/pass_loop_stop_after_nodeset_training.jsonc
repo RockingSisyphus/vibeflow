@@ -1,142 +1,196 @@
 {
-  "nodesets": [
-    {
-      "name": "training.batch_step",
-      "display_name": "Training Batch Step",
-      "category": "training",
-      "description": "Runs one block-compiled training batch update and returns updated carry state plus metrics.",
-      "version": "0.1.0",
-      "purity": "pure",
-      "requires": [
-        {"type": "train.model", "cardinality": "exactly_one"},
-        {"type": "train.batch", "cardinality": "exactly_one"},
-        {"type": "train.optimizer", "cardinality": "exactly_one"}
-      ],
-      "provides": [
-        {"key": "train.model_after", "type": "train.model_after"},
-        {"key": "train.optimizer_after", "type": "train.optimizer_after"},
-        {"key": "train.step_report", "type": "train.step_report"},
-        {"key": "train.loss", "type": "train.loss"},
-        {"key": "train.metrics", "type": "train.metrics"}
-      ],
-      "exports": [
-        {"key": "train.model_after", "type": "train.model_after"},
-        {"key": "train.optimizer_after", "type": "train.optimizer_after"},
-        {"key": "train.step_report", "type": "train.step_report"},
-        {"key": "train.loss", "type": "train.loss"},
-        {"key": "train.metrics", "type": "train.metrics"}
-      ],
-      "pipeline": {
-        "inputs": [
-          {"key": "train.model", "type": "train.model"},
-          {"key": "train.batch", "type": "train.batch"},
-          {"key": "train.optimizer", "type": "train.optimizer"}
-        ],
-        "nodes": [
-          {"name": "start", "type": "sandbox.start", "display_name": "Body Start", "description": "Starts one fixed-count training loop body invocation."},
-          {
-            "name": "train_step",
-            "type": "sandbox.training_batch_step",
-            "display_name": "Train Step",
-            "description": "Runs one full training update for the current loop carry state.",
-            "requires": [
-              {"type": "train.model", "cardinality": "exactly_one"},
-              {"type": "train.batch", "cardinality": "exactly_one"},
-              {"type": "train.optimizer", "cardinality": "exactly_one"}
-            ],
-            "provides": [
-              {"key": "train.model_after", "type": "train.model_after"},
-              {"key": "train.optimizer_after", "type": "train.optimizer_after"},
-              {"key": "train.step_report", "type": "train.step_report"},
-              {"key": "train.loss", "type": "train.loss"},
-              {"key": "train.metrics", "type": "train.metrics"}
-            ]
-          },
-          {
-            "name": "end",
-            "type": "sandbox.training_metrics_end",
-            "display_name": "Body End",
-            "description": "Ends the loop body once metrics are available.",
-            "requires": [{"type": "train.metrics", "cardinality": "exactly_one"}]
-          }
-        ],
-        "edges": [
-          {"from": "start", "to": "train_step"},
-          {"from": "train_step", "to": "end"}
-        ],
-        "outputs": [
-          {"type": "train.model_after", "cardinality": "exactly_one"},
-          {"type": "train.optimizer_after", "cardinality": "exactly_one"},
-          {"type": "train.step_report", "cardinality": "exactly_one"},
-          {"type": "train.loss", "cardinality": "exactly_one"},
-          {"type": "train.metrics", "cardinality": "exactly_one"}
-        ]
-      }
-    }
-  ],
   "pipeline": {
     "inputs": [
-      {"key": "train.model", "type": "train.model"},
-      {"key": "train.batch", "type": "train.batch"},
-      {"key": "train.optimizer", "type": "train.optimizer"}
+      {
+        "key": "train.model",
+        "type": "train.model",
+        "display_name": "Train Model"
+      },
+      {
+        "key": "train.batch",
+        "type": "train.batch",
+        "display_name": "Train Batch"
+      },
+      {
+        "key": "train.optimizer",
+        "type": "train.optimizer",
+        "display_name": "Train Optimizer"
+      }
     ],
     "max_steps": 20,
     "nodes": [
-      {"name": "start", "type": "sandbox.start", "display_name": "Start", "description": "Starts the first-class fixed-count while training loop example."},
       {
-        "name": "train_loop",
-        "type": "vibeflow.loop.while",
+        "display_name": "Start",
+        "description": "Starts the first-class fixed-count while training loop example.",
+        "id": "start",
+        "type_used": "sandbox.start"
+      },
+      {
         "display_name": "Fixed Training Loop",
         "description": "Runs the training batch nodeset for four iterations and carries model state forward.",
         "requires": [
-          {"type": "train.model", "cardinality": "exactly_one"},
-          {"type": "train.batch", "cardinality": "exactly_one"},
-          {"type": "train.optimizer", "cardinality": "exactly_one"}
+          {
+            "type": "train.model",
+            "cardinality": "exactly_one",
+            "display_name": "Train Model"
+          },
+          {
+            "type": "train.batch",
+            "cardinality": "exactly_one",
+            "display_name": "Train Batch"
+          },
+          {
+            "type": "train.optimizer",
+            "cardinality": "exactly_one",
+            "display_name": "Train Optimizer"
+          }
         ],
         "provides": [
-          {"key": "train.model_after", "type": "train.model_after"},
-          {"key": "train.optimizer_after", "type": "train.optimizer_after"},
-          {"key": "train.step_report", "type": "train.step_report"},
-          {"key": "train.loss_history", "type": "train.loss_history"},
-          {"key": "train.metrics_history", "type": "train.metrics_history"},
-          {"key": "loop.iterations", "type": "loop.iterations"}
+          {
+            "key": "train.model_after",
+            "type": "train.model_after",
+            "display_name": "Train Model After"
+          },
+          {
+            "key": "train.optimizer_after",
+            "type": "train.optimizer_after",
+            "display_name": "Train Optimizer After"
+          },
+          {
+            "key": "train.step_report",
+            "type": "train.step_report",
+            "display_name": "Train Step Report"
+          },
+          {
+            "key": "train.loss_history",
+            "type": "train.loss_history",
+            "display_name": "Train Loss History"
+          },
+          {
+            "key": "train.metrics_history",
+            "type": "train.metrics_history",
+            "display_name": "Train Metrics History"
+          },
+          {
+            "key": "loop.iterations",
+            "type": "loop.iterations",
+            "display_name": "Loop Iterations"
+          }
         ],
         "loop": {
           "body": "training.batch_step",
           "max_iterations": 10,
           "stop_after": 4,
           "carry": [
-            {"from": "train.model", "as": "train.model", "update": "train.model_after"},
-            {"from": "train.batch", "as": "train.batch", "update": "train.batch"},
-            {"from": "train.optimizer", "as": "train.optimizer", "update": "train.optimizer_after"}
+            {
+              "from": "train.model",
+              "as": "train.model",
+              "update": "train.model_after"
+            },
+            {
+              "from": "train.batch",
+              "as": "train.batch",
+              "update": "train.batch"
+            },
+            {
+              "from": "train.optimizer",
+              "as": "train.optimizer",
+              "update": "train.optimizer_after"
+            }
           ],
           "collect": [
-            {"from": "train.loss", "as": "train.loss_history"},
-            {"from": "train.metrics", "as": "train.metrics_history"}
+            {
+              "from": "train.loss",
+              "as": "train.loss_history"
+            },
+            {
+              "from": "train.metrics",
+              "as": "train.metrics_history"
+            }
           ],
           "outputs": [
-            {"from": "train.model_after", "as": "train.model_after"},
-            {"from": "train.optimizer_after", "as": "train.optimizer_after"},
-            {"from": "train.step_report", "as": "train.step_report"},
-            {"from": "train.loss_history", "as": "train.loss_history"},
-            {"from": "train.metrics_history", "as": "train.metrics_history"},
-            {"from": "loop.iterations", "as": "loop.iterations"}
+            {
+              "from": "train.model_after",
+              "as": "train.model_after"
+            },
+            {
+              "from": "train.optimizer_after",
+              "as": "train.optimizer_after"
+            },
+            {
+              "from": "train.step_report",
+              "as": "train.step_report"
+            },
+            {
+              "from": "train.loss_history",
+              "as": "train.loss_history"
+            },
+            {
+              "from": "train.metrics_history",
+              "as": "train.metrics_history"
+            },
+            {
+              "from": "loop.iterations",
+              "as": "loop.iterations"
+            }
           ]
-        }
+        },
+        "id": "train_loop",
+        "type_used": "vibeflow.loop.while"
       },
-      {"name": "end", "type": "sandbox.start", "display_name": "End", "description": "Ends after loop outputs are produced."}
+      {
+        "display_name": "End",
+        "description": "Ends after loop outputs are produced.",
+        "id": "end",
+        "type_used": "sandbox.start"
+      }
     ],
     "edges": [
-      {"from": "start", "to": "train_loop"},
-      {"from": "train_loop", "to": "end"}
+      {
+        "from": "start",
+        "to": "train_loop"
+      },
+      {
+        "from": "train_loop",
+        "to": "end"
+      }
     ],
     "outputs": [
-      {"type": "train.model_after", "cardinality": "exactly_one"},
-      {"type": "train.optimizer_after", "cardinality": "exactly_one"},
-      {"type": "train.step_report", "cardinality": "exactly_one"},
-      {"type": "train.loss_history", "cardinality": "exactly_one"},
-      {"type": "train.metrics_history", "cardinality": "exactly_one"},
-      {"type": "loop.iterations", "cardinality": "exactly_one"}
+      {
+        "type": "train.model_after",
+        "cardinality": "exactly_one",
+        "display_name": "Train Model After"
+      },
+      {
+        "type": "train.optimizer_after",
+        "cardinality": "exactly_one",
+        "display_name": "Train Optimizer After"
+      },
+      {
+        "type": "train.step_report",
+        "cardinality": "exactly_one",
+        "display_name": "Train Step Report"
+      },
+      {
+        "type": "train.loss_history",
+        "cardinality": "exactly_one",
+        "display_name": "Train Loss History"
+      },
+      {
+        "type": "train.metrics_history",
+        "cardinality": "exactly_one",
+        "display_name": "Train Metrics History"
+      },
+      {
+        "type": "loop.iterations",
+        "cardinality": "exactly_one",
+        "display_name": "Loop Iterations"
+      }
     ]
-  }
+  },
+  "nodeset_imports": [
+    {
+      "path": "nodesets/pass_loop_stop_after_nodeset_training/training_batch_step.jsonc"
+    }
+  ]
 }

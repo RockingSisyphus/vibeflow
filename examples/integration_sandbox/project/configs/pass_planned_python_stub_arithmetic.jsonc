@@ -9,52 +9,62 @@
     "inputs": [
       {
         "key": "calc.a",
-        "type": "calc.a"
+        "type": "calc.a",
+        "display_name": "Calc A"
       },
       {
         "key": "calc.b",
-        "type": "calc.b"
+        "type": "calc.b",
+        "display_name": "Calc B"
       }
     ],
     "nodes": [
       {
-        "name": "start",
-        "type": "sandbox.start"
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
       },
       {
-        "name": "add_pair",
-        "type": "semantic.add_pair",
         "requires": [
           {
             "type": "calc.a",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Calc A"
           },
           {
             "type": "calc.b",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Calc B"
           }
         ],
         "provides": [
           {
             "key": "calc.sum",
-            "type": "calc.sum"
+            "type": "calc.sum",
+            "display_name": "Calc Sum"
           }
-        ]
+        ],
+        "id": "add_pair",
+        "type_used": "semantic.add_pair",
+        "display_name": "Add Pair",
+        "description": "Runs add_pair."
       },
       {
-        "name": "planned_scale",
         "status": "planned",
         "flow_kind": "process",
         "requires": [
           {
             "type": "calc.sum",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Calc Sum"
           }
         ],
         "provides": [
           {
             "key": "calc.scaled",
-            "type": "calc.scaled"
+            "type": "calc.scaled",
+            "display_name": "Calc Scaled"
           }
         ],
         "config": {
@@ -63,52 +73,66 @@
         "planned_behavior": {
           "kind": "python_stub",
           "stub_module": "project/stubs/runtime_control_stub.py"
-        }
+        },
+        "id": "planned_scale",
+        "display_name": "Planned Scale",
+        "description": "Runs planned_scale."
       },
       {
-        "name": "use_scaled",
-        "type": "semantic.use_scaled",
         "requires": [
           {
             "type": "calc.scaled",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Calc Scaled"
           }
         ],
         "provides": [
           {
             "key": "calc.branch",
-            "type": "calc.branch"
+            "type": "calc.branch",
+            "display_name": "Calc Branch"
           }
-        ]
+        ],
+        "id": "use_scaled",
+        "type_used": "semantic.use_scaled",
+        "display_name": "Use Scaled",
+        "description": "Runs use_scaled."
       },
       {
-        "name": "finalize",
-        "type": "semantic.finalize",
         "requires": [
           {
             "type": "calc.branch",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Calc Branch"
           }
         ],
         "provides": [
           {
             "key": "calc.final",
-            "type": "calc.final"
+            "type": "calc.final",
+            "display_name": "Calc Final"
           }
         ],
         "config": {
           "offset": 6
-        }
+        },
+        "id": "finalize",
+        "type_used": "semantic.finalize",
+        "display_name": "Finalize",
+        "description": "Runs finalize."
       },
       {
-        "name": "end",
-        "type": "semantic.final_end",
         "requires": [
           {
             "type": "calc.final",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Calc Final"
           }
-        ]
+        ],
+        "id": "end",
+        "type_used": "semantic.final_end",
+        "display_name": "End",
+        "description": "Runs end."
       }
     ],
     "edges": [
@@ -136,19 +160,23 @@
     "outputs": [
       {
         "type": "calc.final",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Calc Final"
       },
       {
         "type": "calc.branch",
-        "cardinality": "optional_one"
+        "cardinality": "optional_one",
+        "display_name": "Calc Branch"
       },
       {
         "type": "calc.scaled",
-        "cardinality": "optional_one"
+        "cardinality": "optional_one",
+        "display_name": "Calc Scaled"
       },
       {
         "type": "calc.sum",
-        "cardinality": "optional_one"
+        "cardinality": "optional_one",
+        "display_name": "Calc Sum"
       }
     ]
   }

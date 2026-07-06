@@ -1,0 +1,87 @@
+{
+  "display_name": "综合示例核心计算子流程",
+  "description": "这是综合流程图中的预定义过程节点，用来验证 nodeset 在折叠视图和展开视图中都能保留契约、中文说明、内部开始结束节点以及显式边关系。",
+  "requires": [
+    {
+      "type": "value.prepared",
+      "cardinality": "exactly_one",
+      "display_name": "Value Prepared"
+    }
+  ],
+  "provides": [
+    {
+      "key": "value.out",
+      "type": "value.out",
+      "display_name": "Value Out"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "value.prepared",
+        "type": "value.prepared",
+        "display_name": "Value Prepared"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
+      },
+      {
+        "requires": [
+          {
+            "type": "value.prepared",
+            "cardinality": "exactly_one",
+            "display_name": "Value Prepared"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out",
+            "display_name": "Value Out"
+          }
+        ],
+        "factor": 2,
+        "id": "compute",
+        "type_used": "sandbox.core_compute",
+        "display_name": "Compute",
+        "description": "Runs compute."
+      },
+      {
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
+          }
+        ],
+        "id": "end",
+        "type_used": "sandbox.out_value_end",
+        "display_name": "End",
+        "description": "Runs end."
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "compute"
+      },
+      {
+        "from": "compute",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one",
+        "display_name": "Value Out"
+      }
+    ]
+  },
+  "type_key": "comprehensive.core"
+}

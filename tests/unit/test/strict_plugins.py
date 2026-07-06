@@ -58,7 +58,7 @@ class RuntimePlugin:
     PLUGIN_INFO = PluginInfo("runtime_hook", "runtime", "Runtime Hook", "test", "Records runtime hook calls.", "0.1.0")
     name = "runtime_hook"
     def before_node(self, name, node_type, input_summary):
-        record({{"hook": "before_node", "name": name}})
+        record({{"hook": "before_node", "id": name}})
     def after_run(self, state, trace):
         record({{"hook": "after_run", "events": len(trace.get("events", []))}})
 """.strip(),
@@ -107,27 +107,23 @@ def test_nodeset_can_be_used_as_a_node() -> None:
         {
             "nodesets": [
                 {
-                    "name": "math.add_one",
+                    "type_key": "math.add_one",
                     "display_name": "Add One",
-                    "category": "math",
                     "description": "Composite add-one flow.",
-                    "version": "0.1.0",
-                    "purity": "pure",
                     "requires": [REQ_SPEC("value.in")],
                     "provides": [PROV_SPEC("value.out")],
-                    "exports": [PROV_SPEC("value.out")],
                     "pipeline": {
                         "inputs": [PROV_SPEC("value.in")],
                         "nodes": [
-                            {"name": "start", "type": "test.start"},
+                            {"id": "start", "type_used": "test.start"},
                             {
-                                "name": "add",
-                                "type": "test.add",
+                                "id": "add",
+                                "type_used": "test.add",
                                 "requires": [REQ_SPEC("value.in")],
                                 "provides": [PROV_SPEC("value.out")],
                                 "delta": 1,
                             },
-                            {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                            {"id": "end", "type_used": "test.out_end", "requires": [REQ_SPEC("value.out")]},
                         ],
                         "edges": _edge_chain("start", "add", "end"),
                         "outputs": [REQ_SPEC("value.out")],
@@ -137,14 +133,14 @@ def test_nodeset_can_be_used_as_a_node() -> None:
                 "pipeline": {
                     "inputs": [PROV_SPEC("value.in")],
                     "nodes": [
-                        {"name": "start", "type": "test.start"},
+                        {"id": "start", "type_used": "test.start"},
                         {
-                            "name": "composite",
-                            "type": "nodeset.math.add_one",
+                            "id": "composite",
+                            "type_used": "math.add_one",
                             "requires": [REQ_SPEC("value.in")],
                             "provides": [PROV_SPEC("value.out")],
                         },
-                        {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                        {"id": "end", "type_used": "test.out_end", "requires": [REQ_SPEC("value.out")]},
                     ],
                     "edges": _edge_chain("start", "composite", "end"),
                     "outputs": [REQ_SPEC("value.out")],
@@ -166,7 +162,7 @@ def test_health_report_and_mermaid_export() -> None:
     assert serialized["warnings"][0]["rule_id"] == "GRAPH.SMELL.DUPLICATE_LOGIC"
     mermaid = export_mermaid(graph)
     assert "flowchart TD" in mermaid
-    assert "seed -->|value.in| add" in mermaid
+    assert "data: Value In" in mermaid
     assert "provides:" not in mermaid
     assert "requires:" not in mermaid
 
@@ -179,7 +175,7 @@ def test_mermaid_collapses_and_expands_nodesets_with_contract_metadata() -> None
                     requires=["value.in"],
                     provides=["value.out"],
                     exports=["value.out"],
-                    pipeline=_input_add_pipeline(add={"name": "inner", "description": "Internal add step."}),
+                    pipeline=_input_add_pipeline(add={"id": "inner", "description": "Internal add step."}),
                 )
             ],
                 "pipeline": {
@@ -187,7 +183,7 @@ def test_mermaid_collapses_and_expands_nodesets_with_contract_metadata() -> None
                     "nodes": [
                         _node_call("start", "test.start", "Starts the nodeset Mermaid fixture."),
                         _node_call("input", "test.value_input", "Reads value.in.", requires=[REQ_SPEC("value.in")]),
-                        _node_call("composite", "nodeset.math.add_one", "Calls the add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                        _node_call("composite", "math.add_one", "Calls the add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                         _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
                     ],
                     "edges": _edge_chain("start", "input", "composite", "end"),
@@ -196,17 +192,17 @@ def test_mermaid_collapses_and_expands_nodesets_with_contract_metadata() -> None
     )
 
     collapsed = export_mermaid(graph)
-    assert 'composite@{ shape: fr-rect, label: "Composite\\n\\nid: composite\\ntype: nodeset.math.add_one' in collapsed
+    assert 'composite@{ shape: fr-rect, label: "Composite\\n\\nid: composite\\ntype_used: math.add_one' in collapsed
     assert "---------- nodeset ----------" in collapsed
-    assert "nodeset: math.add_one" in collapsed
+    assert "type_key: math.add_one" in collapsed
     assert "requires:" not in collapsed
     assert "exports:" not in collapsed
-    assert "composite -->|value.out| n_end" in collapsed
+    assert "data: Value Out" in collapsed
     assert "composite__inner" not in collapsed
 
     expanded = export_mermaid(graph, expand_nodesets=True)
-    assert 'subgraph composite__expanded["math.add_one"]' in expanded
-    assert 'composite__inner@{ shape: rect, label: "Inner\\n\\nid: inner\\ntype: test.add' in expanded
+    assert 'subgraph composite__expanded["Composite (id: composite, type_key: math.add_one)"]' in expanded
+    assert 'composite__inner@{ shape: rect, label: "Inner\\n\\nid: inner\\ntype_used: test.add' in expanded
     assert "Internal add step." in expanded
 
 def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nodesets() -> None:
@@ -218,7 +214,7 @@ def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nod
                     requires=["value.in"],
                     provides=["value.out"],
                     exports=["value.out"],
-                    pipeline=_input_add_pipeline(add={"name": "inner", "description": "Internal add step."}),
+                    pipeline=_input_add_pipeline(add={"id": "inner", "description": "Internal add step."}),
                 )
             ],
             "pipeline": {
@@ -226,7 +222,7 @@ def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nod
                 "nodes": [
                     _node_call("start", "test.start", "Starts the review-column fixture."),
                     _node_call("input", "test.value_input", "Reads value.in.", requires=[REQ_SPEC("value.in")]),
-                    _node_call("composite", "nodeset.math.add_one", "Calls the add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("composite", "math.add_one", "Calls the add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                     _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": _edge_chain("start", "input", "composite", "end"),
@@ -236,7 +232,7 @@ def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nod
     resources = {
         "plugins": [
             {
-                "name": "review_policy",
+                "id": "review_policy",
                 "type": "policy",
                 "module": "project.plugins.review_policy",
                 "status": "planned",
@@ -246,7 +242,7 @@ def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nod
         "base_lib": {
             "modules": [
                 {
-                    "name": "contracts",
+                    "id": "contracts",
                     "module": "project.base_lib.contracts",
                     "status": "implemented",
                     "info": {"display_name": "Contracts", "description": "Shared contract helpers."},
@@ -270,7 +266,7 @@ def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nod
     assert "---------- resource ----------" in mermaid
     assert "---------- meta ----------" in mermaid
     assert 'subgraph __vibeflow_layout_nodesets["expanded nodesets"]' in mermaid
-    assert 'subgraph __vibeflow_layout_nodesets__composite__expanded["composite - math.add_one"]' in mermaid
+    assert "type_key: math.add_one" in mermaid
     assert "__vibeflow_layout_nodesets__composite__inner" in mermaid
     assert mermaid.index("__vibeflow_layout_main") < mermaid.index("__vibeflow_layout_plugins")
     assert mermaid.index("__vibeflow_layout_plugins") < mermaid.index("__vibeflow_layout_base_lib")
@@ -289,16 +285,16 @@ def test_review_columns_svg_composer_places_columns_left_to_right(tmp_path) -> N
                     requires=["value.in"],
                     provides=["value.out"],
                     exports=["value.out"],
-                    pipeline=_input_add_pipeline(add={"name": "inner"}),
+                    pipeline=_input_add_pipeline(add={"id": "inner"}),
                 )
             ],
             "pipeline": {
                 "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
-                    {"name": "start", "type": "test.start"},
-                    {"name": "input", "type": "test.value_input", "requires": [REQ_SPEC("value.in")]},
-                    {"name": "composite", "type": "nodeset.math.add_one", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")]},
-                    {"name": "end", "type": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                    {"id": "start", "type_used": "test.start"},
+                    {"id": "input", "type_used": "test.value_input", "requires": [REQ_SPEC("value.in")]},
+                    {"id": "composite", "type_used": "math.add_one", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")]},
+                    {"id": "end", "type_used": "test.out_end", "requires": [REQ_SPEC("value.out")]},
                 ],
                 "edges": _edge_chain("start", "input", "composite", "end"),
             },
@@ -306,8 +302,8 @@ def test_review_columns_svg_composer_places_columns_left_to_right(tmp_path) -> N
     )
     compiled = GraphCompiler().compile(graph)
     resources = {
-        "plugins": [{"name": "policy", "type": "policy", "module": "project.plugins.policy", "status": "planned"}],
-        "base_lib": {"modules": [{"name": "contracts", "module": "project.base_lib.contracts", "status": "implemented"}]},
+        "plugins": [{"id": "policy", "type": "policy", "module": "project.plugins.policy", "status": "planned"}],
+        "base_lib": {"modules": [{"id": "contracts", "module": "project.base_lib.contracts", "status": "implemented"}]},
     }
 
     output = tmp_path / "review.svg"
@@ -316,9 +312,10 @@ def test_review_columns_svg_composer_places_columns_left_to_right(tmp_path) -> N
 
     titles = re.findall(r'<text class="review-title" x="([0-9.]+)" y="([0-9.]+)">([^<]+)</text>', svg)
     positions = {title: (float(x), float(y)) for x, y, title in titles}
+    nodeset_title = next(title for title in positions if "type_key: math.add_one" in title)
     assert positions["main pipeline"][0] < positions["plugins"][0] < positions["base_lib"][0]
-    assert positions["base_lib"][0] < positions["composite - math.add_one"][0]
-    assert positions["main pipeline"][1] == positions["plugins"][1] == positions["base_lib"][1] == positions["composite - math.add_one"][1]
+    assert positions["base_lib"][0] < positions[nodeset_title][0]
+    assert positions["main pipeline"][1] == positions["plugins"][1] == positions["base_lib"][1] == positions[nodeset_title][1]
     assert 'data:image/svg+xml;base64,' not in svg
     assert 'class="review-inline-fragment"' in svg
 
@@ -407,8 +404,8 @@ def test_review_columns_resource_fragments_render_root_left_to_children_right() 
     mermaid = _resource_mermaid(
         "plugins",
         (
-            {"name": "policy", "type": "policy", "module": "project.plugins.policy"},
-            {"name": "runtime", "type": "runtime", "module": "project.plugins.runtime"},
+            {"id": "policy", "type": "policy", "module": "project.plugins.policy"},
+            {"id": "runtime", "type": "runtime", "module": "project.plugins.runtime"},
         ),
         kind="plugin",
     )
@@ -478,7 +475,7 @@ def test_nodeset_detail_leaf_mermaid_uses_lr_with_layout_spine() -> None:
     from vibeflow.flowchart_render_helpers import compile_for_render
     from vibeflow.mermaid_review_svg import _nodeset_mermaid
 
-    graph = parse_graph_config({"pipeline": _input_add_pipeline(add={"name": "inner"})})
+    graph = parse_graph_config({"pipeline": _input_add_pipeline(add={"id": "inner"})})
     mermaid = _nodeset_mermaid(
         graph,
         compile_for_render(graph, None, _registry()),
@@ -504,7 +501,7 @@ def test_nodeset_detail_parent_mermaid_preserves_collapsed_callsite_edges() -> N
             "nodesets": [
                 _nodeset_config(
                     "detail.leaf",
-                    pipeline=_input_add_pipeline(add={"name": "inner"}),
+                    pipeline=_input_add_pipeline(add={"id": "inner"}),
                     requires=["value.in"],
                     provides=["value.out"],
                     exports=["value.out"],
@@ -513,10 +510,10 @@ def test_nodeset_detail_parent_mermaid_preserves_collapsed_callsite_edges() -> N
                     "detail.parent",
                     pipeline={
                         "nodes": [
-                            {"name": "start", "type": "test.start"},
-                            {"name": "before", "type": "test.value_input", "requires": [REQ_SPEC("value.in")]},
-                            {"name": "child", "type": "nodeset.detail.leaf"},
-                            {"name": "after", "type": "test.out_end"},
+                            {"id": "start", "type_used": "test.start"},
+                            {"id": "before", "type_used": "test.value_input", "requires": [REQ_SPEC("value.in")]},
+                            {"id": "child", "type_used": "detail.leaf"},
+                            {"id": "after", "type_used": "test.out_end"},
                         ],
                         "edges": [
                             {"from": "start", "to": "before"},
@@ -531,7 +528,7 @@ def test_nodeset_detail_parent_mermaid_preserves_collapsed_callsite_edges() -> N
             ],
             "pipeline": {
                 "nodes": [
-                    {"name": "main", "type": "nodeset.detail.parent"},
+                    {"id": "main", "type_used": "detail.parent"},
                 ],
             },
         }
@@ -547,8 +544,8 @@ def test_nodeset_detail_parent_mermaid_preserves_collapsed_callsite_edges() -> N
     )
 
     assert mermaid.startswith("flowchart TD")
-    assert 'child@{ shape: fr-rect, label: "Detail Leaf\\n\\nid: child\\ntype: nodeset.detail.leaf' in mermaid
-    assert "before -->|route == 'detail'| child" in mermaid
+    assert 'child@{ shape: fr-rect, label: "Detail Leaf\\n\\nid: child\\ntype_used: detail.leaf' in mermaid
+    assert "when: route == 'detail'" in mermaid
     assert "child --> after" in mermaid
     assert "inner@{ shape:" not in mermaid
 
@@ -584,17 +581,17 @@ def test_nodeset_detail_fragment_recurses_nested_child_panels(tmp_path, monkeypa
     graph = parse_graph_config(
         {
             "nodesets": [
-                _nodeset_config("detail.leaf_one", pipeline=_input_add_pipeline(add={"name": "leaf_one_add"})),
-                _nodeset_config("detail.leaf_two", pipeline=_input_add_pipeline(add={"name": "leaf_two_add"})),
-                _nodeset_config("detail.leaf_three", pipeline=_input_add_pipeline(add={"name": "leaf_three_add"})),
+                _nodeset_config("detail.leaf_one", pipeline=_input_add_pipeline(add={"id": "leaf_one_add"})),
+                _nodeset_config("detail.leaf_two", pipeline=_input_add_pipeline(add={"id": "leaf_two_add"})),
+                _nodeset_config("detail.leaf_three", pipeline=_input_add_pipeline(add={"id": "leaf_three_add"})),
                 _nodeset_config(
                     "detail.mid",
                     pipeline={
                         "nodes": [
-                            {"name": "mid_start", "type": "test.start"},
-                            {"name": "inner_a", "type": "nodeset.detail.leaf_two"},
-                            {"name": "inner_b", "type": "nodeset.detail.leaf_three"},
-                            {"name": "mid_end", "type": "test.out_end"},
+                            {"id": "mid_start", "type_used": "test.start"},
+                            {"id": "inner_a", "type_used": "detail.leaf_two"},
+                            {"id": "inner_b", "type_used": "detail.leaf_three"},
+                            {"id": "mid_end", "type_used": "test.out_end"},
                         ],
                         "edges": _edge_chain("mid_start", "inner_a", "inner_b", "mid_end"),
                     },
@@ -603,17 +600,17 @@ def test_nodeset_detail_fragment_recurses_nested_child_panels(tmp_path, monkeypa
                     "detail.root",
                     pipeline={
                         "nodes": [
-                            {"name": "root_start", "type": "test.start"},
-                            {"name": "first", "type": "nodeset.detail.leaf_one"},
-                            {"name": "second", "type": "nodeset.detail.mid"},
-                            {"name": "third", "type": "nodeset.detail.leaf_three"},
-                            {"name": "root_end", "type": "test.out_end"},
+                            {"id": "root_start", "type_used": "test.start"},
+                            {"id": "first", "type_used": "detail.leaf_one"},
+                            {"id": "second", "type_used": "detail.mid"},
+                            {"id": "third", "type_used": "detail.leaf_three"},
+                            {"id": "root_end", "type_used": "test.out_end"},
                         ],
                         "edges": _edge_chain("root_start", "first", "second", "third", "root_end"),
                     },
                 ),
             ],
-            "pipeline": {"nodes": [{"name": "root", "type": "nodeset.detail.root"}]},
+            "pipeline": {"nodes": [{"id": "root", "type_used": "detail.root"}]},
         }
     )
     rendered: list[tuple[str, str]] = []
@@ -643,23 +640,28 @@ def test_nodeset_detail_fragment_recurses_nested_child_panels(tmp_path, monkeypa
     assert fragment.title == "root - detail.root"
     assert rendered[0][0] == "parent flow"
     assert rendered[0][1].startswith("flowchart TD")
-    assert any(title == "first - detail.leaf_one" and text.startswith("flowchart LR") for title, text in rendered)
+    assert any("type_key: detail.leaf_one" in title and text.startswith("flowchart LR") for title, text in rendered)
     assert sum(1 for title, text in rendered if title == "parent flow" and text.startswith("flowchart TD")) == 2
 
     root_titles = re.findall(r'<text class="review-title" x="([0-9.]+)" y="([0-9.]+)">([^<]+)</text>', fragment.svg_text)
     root_positions = {title: (float(x), float(y)) for x, y, title in root_titles}
-    assert root_positions["parent flow"][0] < root_positions["first - detail.leaf_one"][0]
-    assert root_positions["first - detail.leaf_one"][0] == root_positions["second - detail.mid"][0]
-    assert root_positions["second - detail.mid"][0] == root_positions["third - detail.leaf_three"][0]
-    assert root_positions["first - detail.leaf_one"][1] < root_positions["second - detail.mid"][1] < root_positions["third - detail.leaf_three"][1]
+    first_title = next(title for title in root_positions if "type_key: detail.leaf_one" in title)
+    second_title = next(title for title in root_positions if "type_key: detail.mid" in title)
+    third_title = next(title for title in root_positions if "type_key: detail.leaf_three" in title)
+    assert root_positions["parent flow"][0] < root_positions[first_title][0]
+    assert root_positions[first_title][0] == root_positions[second_title][0]
+    assert root_positions[second_title][0] == root_positions[third_title][0]
+    assert root_positions[first_title][1] < root_positions[second_title][1] < root_positions[third_title][1]
 
     assert 'data:image/svg+xml;base64,' not in fragment.svg_text
-    assert "inner_a - detail.leaf_two" in fragment.svg_text
-    assert "inner_b - detail.leaf_three" in fragment.svg_text
+    assert "type_key: detail.leaf_two" in fragment.svg_text
+    assert "type_key: detail.leaf_three" in fragment.svg_text
     mid_positions = _review_title_positions(fragment.svg_text)
-    assert mid_positions["parent flow"][0] < mid_positions["inner_a - detail.leaf_two"][0]
-    assert mid_positions["inner_a - detail.leaf_two"][0] == mid_positions["inner_b - detail.leaf_three"][0]
-    assert mid_positions["inner_a - detail.leaf_two"][1] < mid_positions["inner_b - detail.leaf_three"][1]
+    inner_a_title = next(title for title in mid_positions if "type_key: detail.leaf_two" in title)
+    inner_b_title = next(title for title in mid_positions if "type_key: detail.leaf_three" in title)
+    assert mid_positions["parent flow"][0] < mid_positions[inner_a_title][0]
+    assert mid_positions[inner_a_title][0] == mid_positions[inner_b_title][0]
+    assert mid_positions[inner_a_title][1] < mid_positions[inner_b_title][1]
 
 
 def test_mermaid_shows_when_edges_and_health_findings() -> None:
@@ -667,8 +669,8 @@ def test_mermaid_shows_when_edges_and_health_findings() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")]},
-                    {"name": "consumer", "type": "test.add", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")]},
+                    {"id": "seed", "type_used": "test.seed", "provides": [PROV_SPEC("value.in")]},
+                    {"id": "consumer", "type_used": "test.add", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")]},
                 ],
                 "edges": [{"from": "seed", "to": "consumer", "when": "flow.route == 'go'"}],
             },
@@ -689,7 +691,9 @@ def test_mermaid_shows_when_edges_and_health_findings() -> None:
     )
 
     mermaid = export_mermaid(graph, health_report=report)
-    assert "seed -->|when: flow.route == 'go'\\ndata: value.in| consumer" in mermaid
+    assert "---------- when ----------" in mermaid
+    assert "when: flow.route == 'go'" in mermaid
+    assert "data: Value In" in mermaid
     assert "%% finding warning POLICY.TEST node:consumer policy warning" in mermaid
     assert "class consumer healthWarning;" in mermaid
 
@@ -714,7 +718,7 @@ def test_health_report_status_pass_when_no_findings() -> None:
     assert all(warning.rule_id == "GRAPH.SMELL.DUPLICATE_LOGIC" for warning in report.warnings)
 
 def test_health_report_status_fail_for_unknown_node() -> None:
-    graph = parse_graph_config({"pipeline": {"nodes": [{"name": "missing", "type": "test.missing", "provides": [PROV_SPEC("x")]}]}})
+    graph = parse_graph_config({"pipeline": {"nodes": [{"id": "missing", "type_used": "test.missing", "provides": [PROV_SPEC("x")]}]}})
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
     assert report.status == "FAIL"
     assert report.errors[0].rule_id == "NODE.TYPE.UNKNOWN"
@@ -790,7 +794,7 @@ def test_cli_inspect_config_outputs_effective_edges(tmp_path, capsys) -> None:
     payload = json.loads(capsys.readouterr().out)
     assert code == 0
     assert payload["health"]["status"] == "PASS"
-    assert payload["config"]["nodes"][0]["name"] == "start"
+    assert payload["config"]["nodes"][0]["id"] == "start"
     assert payload["config"]["effective_edges"] == [
         {"from": "start", "to": "seed", "when": ""},
         {"from": "seed", "to": "add", "when": ""},

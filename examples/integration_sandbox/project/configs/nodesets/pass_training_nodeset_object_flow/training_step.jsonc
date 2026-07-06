@@ -1,0 +1,299 @@
+{
+  "display_name": "Training Step",
+  "description": "One object-passing training step.",
+  "requires": [
+    {
+      "type": "train.model",
+      "cardinality": "exactly_one",
+      "display_name": "Train Model"
+    },
+    {
+      "type": "train.batch",
+      "cardinality": "exactly_one",
+      "display_name": "Train Batch"
+    },
+    {
+      "type": "train.optimizer",
+      "cardinality": "exactly_one",
+      "display_name": "Train Optimizer"
+    }
+  ],
+  "provides": [
+    {
+      "key": "train.model_after",
+      "type": "train.model_after",
+      "display_name": "Train Model After"
+    },
+    {
+      "key": "train.optimizer_after",
+      "type": "train.optimizer_after",
+      "display_name": "Train Optimizer After"
+    },
+    {
+      "key": "train.step_report",
+      "type": "train.step_report",
+      "display_name": "Train Step Report"
+    },
+    {
+      "key": "train.metrics",
+      "type": "train.metrics",
+      "display_name": "Train Metrics"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "train.model",
+        "type": "train.model",
+        "display_name": "Train Model"
+      },
+      {
+        "key": "train.batch",
+        "type": "train.batch",
+        "display_name": "Train Batch"
+      },
+      {
+        "key": "train.optimizer",
+        "type": "train.optimizer",
+        "display_name": "Train Optimizer"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
+      },
+      {
+        "requires": [
+          {
+            "type": "train.model",
+            "cardinality": "exactly_one",
+            "display_name": "Train Model"
+          },
+          {
+            "type": "train.batch",
+            "cardinality": "exactly_one",
+            "display_name": "Train Batch"
+          },
+          {
+            "type": "train.optimizer",
+            "cardinality": "exactly_one",
+            "display_name": "Train Optimizer"
+          }
+        ],
+        "provides": [
+          {
+            "key": "train.model.input",
+            "type": "train.model",
+            "display_name": "Train Model Input"
+          },
+          {
+            "key": "train.batch.input",
+            "type": "train.batch",
+            "display_name": "Train Batch Input"
+          },
+          {
+            "key": "train.optimizer.input",
+            "type": "train.optimizer",
+            "display_name": "Train Optimizer Input"
+          }
+        ],
+        "id": "input",
+        "type_used": "sandbox.training_input",
+        "display_name": "Input",
+        "description": "Runs input."
+      },
+      {
+        "requires": [
+          {
+            "type": "train.model",
+            "cardinality": "exactly_one",
+            "display_name": "Train Model"
+          },
+          {
+            "type": "train.batch",
+            "cardinality": "exactly_one",
+            "display_name": "Train Batch"
+          }
+        ],
+        "provides": [
+          {
+            "key": "train.loss",
+            "type": "train.loss",
+            "display_name": "Train Loss"
+          }
+        ],
+        "id": "forward",
+        "type_used": "sandbox.forward_loss",
+        "display_name": "Forward",
+        "description": "Runs forward."
+      },
+      {
+        "requires": [
+          {
+            "type": "train.model",
+            "cardinality": "exactly_one",
+            "display_name": "Train Model"
+          },
+          {
+            "type": "train.loss",
+            "cardinality": "exactly_one",
+            "display_name": "Train Loss"
+          }
+        ],
+        "provides": [
+          {
+            "key": "train.grad",
+            "type": "train.grad",
+            "display_name": "Train Grad"
+          }
+        ],
+        "id": "backward",
+        "type_used": "sandbox.backward_grad",
+        "display_name": "Backward",
+        "description": "Runs backward."
+      },
+      {
+        "requires": [
+          {
+            "type": "train.model",
+            "cardinality": "exactly_one",
+            "display_name": "Train Model"
+          },
+          {
+            "type": "train.optimizer",
+            "cardinality": "exactly_one",
+            "display_name": "Train Optimizer"
+          },
+          {
+            "type": "train.grad",
+            "cardinality": "exactly_one",
+            "display_name": "Train Grad"
+          }
+        ],
+        "provides": [
+          {
+            "key": "train.model_after",
+            "type": "train.model_after",
+            "display_name": "Train Model After"
+          },
+          {
+            "key": "train.optimizer_after",
+            "type": "train.optimizer_after",
+            "display_name": "Train Optimizer After"
+          },
+          {
+            "key": "train.step_report",
+            "type": "train.step_report",
+            "display_name": "Train Step Report"
+          }
+        ],
+        "id": "step",
+        "type_used": "sandbox.optimizer_step",
+        "display_name": "Step",
+        "description": "Runs step."
+      },
+      {
+        "requires": [
+          {
+            "type": "train.model_after",
+            "cardinality": "exactly_one",
+            "display_name": "Train Model After"
+          },
+          {
+            "type": "train.loss",
+            "cardinality": "exactly_one",
+            "display_name": "Train Loss"
+          }
+        ],
+        "provides": [
+          {
+            "key": "train.metrics",
+            "type": "train.metrics",
+            "display_name": "Train Metrics"
+          }
+        ],
+        "id": "metrics",
+        "type_used": "sandbox.training_metrics",
+        "display_name": "Metrics",
+        "description": "Runs metrics."
+      },
+      {
+        "requires": [
+          {
+            "type": "train.metrics",
+            "cardinality": "exactly_one",
+            "display_name": "Train Metrics"
+          }
+        ],
+        "id": "end",
+        "type_used": "sandbox.training_metrics_end",
+        "display_name": "End",
+        "description": "Runs end."
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "input"
+      },
+      {
+        "from": "input",
+        "to": "forward"
+      },
+      {
+        "from": "forward",
+        "to": "backward"
+      },
+      {
+        "from": "backward",
+        "to": "step"
+      },
+      {
+        "from": "step",
+        "to": "metrics"
+      },
+      {
+        "from": "metrics",
+        "to": "end"
+      },
+      {
+        "from": "forward",
+        "to": "metrics"
+      },
+      {
+        "from": "input",
+        "to": "backward"
+      },
+      {
+        "from": "input",
+        "to": "step"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "train.metrics",
+        "cardinality": "exactly_one",
+        "display_name": "Train Metrics"
+      },
+      {
+        "type": "train.step_report",
+        "cardinality": "optional_one",
+        "display_name": "Train Step Report"
+      },
+      {
+        "type": "train.model_after",
+        "cardinality": "optional_one",
+        "display_name": "Train Model After"
+      },
+      {
+        "type": "train.optimizer_after",
+        "cardinality": "optional_one",
+        "display_name": "Train Optimizer After"
+      }
+    ]
+  },
+  "type_key": "training.step"
+}

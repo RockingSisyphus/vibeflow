@@ -136,25 +136,26 @@ def _render_nodesets_column(renderer: Any, lines: list[str], graph: GraphConfig)
 
 
 def _render_one_nodeset(renderer: Any, lines: list[str], node: Any, nodeset: Any) -> str:
-    group_id = _safe_id(f"__vibeflow_layout_nodesets__{node.name}__expanded")
+    group_id = _safe_id(f"__vibeflow_layout_nodesets__{node.id}__expanded")
     group_anchor = _safe_id(f"{group_id}__anchor")
-    lines.append(f'    subgraph {group_id}["{_escape_label(f"{node.name} - {nodeset.name}")}"]')
+    title = node.metadata.display_name or nodeset.display_name or node.id
+    lines.append(f'    subgraph {group_id}["{_escape_label(f"{title} (id: {node.id}, type_key: {nodeset.type_key})")}"]')
     lines.append("      direction LR")
     _render_anchor(lines, group_anchor, indent="      ")
     nested_compiled = compile_for_render(nodeset.graph, None, renderer.registry)
-    nested_prefix = f"__vibeflow_layout_nodesets__{node.name}__"
+    nested_prefix = f"__vibeflow_layout_nodesets__{node.id}__"
     renderer._render_graph_body(
         lines,
         nodeset.graph,
         nested_compiled,
         prefix=nested_prefix,
         indent="      ",
-        visited_nodesets=(nodeset.name,),
+        visited_nodesets=(nodeset.type_key,),
         expand_inline=True,
     )
     renderer._render_edges(lines, nodeset.graph, nested_compiled, prefix=nested_prefix, indent="      ")
     if nodeset.graph.nodes:
-        renderer._append_edge_line(lines, f"      {group_anchor} ~~~ {_safe_id(f'{nested_prefix}{nodeset.graph.nodes[0].name}')}")
+        renderer._append_edge_line(lines, f"      {group_anchor} ~~~ {_safe_id(f'{nested_prefix}{nodeset.graph.nodes[0].id}')}")
     lines.append("    end")
     return group_anchor
 

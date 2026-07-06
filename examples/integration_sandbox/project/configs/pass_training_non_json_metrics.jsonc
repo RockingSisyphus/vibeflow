@@ -3,39 +3,49 @@
     "inputs": [
       {
         "key": "train.batch",
-        "type": "train.batch"
+        "type": "train.batch",
+        "display_name": "Train Batch"
       }
     ],
     "nodes": [
       {
-        "name": "start",
-        "type": "sandbox.start"
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
       },
       {
-        "name": "metrics",
-        "type": "sandbox.batch_metrics",
         "requires": [
           {
             "type": "train.batch",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Batch"
           }
         ],
         "provides": [
           {
             "key": "train.metrics",
-            "type": "train.metrics"
+            "type": "train.metrics",
+            "display_name": "Train Metrics"
           }
-        ]
+        ],
+        "id": "metrics",
+        "type_used": "sandbox.batch_metrics",
+        "display_name": "Metrics",
+        "description": "Runs metrics."
       },
       {
-        "name": "end",
-        "type": "sandbox.training_metrics_end",
         "requires": [
           {
             "type": "train.metrics",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Metrics"
           }
-        ]
+        ],
+        "id": "end",
+        "type_used": "sandbox.training_metrics_end",
+        "display_name": "End",
+        "description": "Runs end."
       }
     ],
     "edges": [
@@ -51,7 +61,8 @@
     "outputs": [
       {
         "type": "train.metrics",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Train Metrics"
       }
     ]
   }
