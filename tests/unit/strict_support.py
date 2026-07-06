@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -52,11 +53,11 @@ from .strict_support_runtime_nodes import *
 
 
 def REQ_SPEC(data_type: str, cardinality: str = "exactly_one") -> dict[str, str]:
-    return {"type": data_type, "cardinality": cardinality}
+    return {"type": data_type, "cardinality": cardinality, "display_name": data_type.replace(".", " ").title()}
 
 
 def PROV_SPEC(key: str, data_type: str | None = None) -> dict[str, str]:
-    return {"key": key, "type": data_type or key}
+    return {"key": key, "type": data_type or key, "display_name": key.replace(".", " ").title()}
 
 
 def _requirement_specs(values: list[str] | None) -> list[dict[str, str]]:
@@ -137,15 +138,11 @@ def _nodeset_config(
     exports: list[str] | None = None,
 ) -> dict:
     return {
-        "name": name,
+        "type_key": name,
         "display_name": name.replace(".", " ").title(),
-        "category": "test",
         "description": f"Composite flow for {name}.",
-        "version": "0.1.0",
-        "purity": "pure",
         "requires": _requirement_specs(requires),
         "provides": _provider_specs(provides or ["value.out"]),
-        "exports": _provider_specs(exports or ["value.out"]),
         "pipeline": pipeline,
     }
 
@@ -154,11 +151,33 @@ def _edge_chain(*names: str) -> list[dict[str, str]]:
     return [{"from": source, "to": target} for source, target in zip(names, names[1:])]
 
 
+def _write_config_file(path: Path, data: dict) -> None:
+    payload = dict(data)
+    nodesets = payload.pop("nodesets", None)
+    imports = list(payload.get("nodeset_imports") or [])
+    if isinstance(nodesets, list):
+        nodeset_dir = path.parent / f"{path.stem}_nodesets"
+        nodeset_dir.mkdir(parents=True, exist_ok=True)
+        for nodeset in nodesets:
+            type_key = str(nodeset.get("type_key") or nodeset.get("name") or "nodeset")
+            filename = re.sub(r"[^A-Za-z0-9_.-]+", "_", type_key).replace(".", "_") + ".jsonc"
+            nodeset_path = nodeset_dir / filename
+            nodeset_path.write_text(json.dumps(nodeset, indent=2), encoding="utf-8")
+            imports.append({"path": nodeset_path.relative_to(path.parent).as_posix()})
+    if imports:
+        payload["nodeset_imports"] = imports
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
 def _node_call(name: str, node_type: str, default_description: str, **fields) -> dict:
+    node_id = str(fields.pop("id", fields.pop("name", name)))
+    type_used = str(fields.pop("type_used", fields.pop("type", node_type)))
+    if type_used.startswith("nodeset."):
+        type_used = type_used.removeprefix("nodeset.")
     return {
-        "name": name,
-        "type": node_type,
-        "display_name": name.replace("_", " ").title(),
+        "id": node_id,
+        "type_used": type_used,
+        "display_name": node_id.replace("_", " ").title(),
         "description": default_description,
         **fields,
     }
@@ -167,10 +186,10 @@ def _node_call(name: str, node_type: str, default_description: str, **fields) ->
 def _seed_add_pipeline(*, seed: dict | None = None, add: dict | None = None) -> dict:
     seed_fields = dict(seed or {})
     seed_defaults = {"provides": [PROV_SPEC("value.in")], **seed_fields}
-    seed_node = _node_call(str(seed_defaults.pop("name", "seed")), str(seed_defaults.pop("type", "test.seed")), "Produces the initial value.", **seed_defaults)
+    seed_node = _node_call(str(seed_defaults.pop("id", seed_defaults.pop("name", "seed"))), str(seed_defaults.pop("type_used", seed_defaults.pop("type", "test.seed"))), "Produces the initial value.", **seed_defaults)
     add_fields = dict(add or {})
     add_defaults = {"requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")], **add_fields}
-    add_node = _node_call(str(add_defaults.pop("name", "add")), str(add_defaults.pop("type", "test.add")), "Adds delta to value.in.", **add_defaults)
+    add_node = _node_call(str(add_defaults.pop("id", add_defaults.pop("name", "add"))), str(add_defaults.pop("type_used", add_defaults.pop("type", "test.add"))), "Adds delta to value.in.", **add_defaults)
     return {
         "nodes": [
             _node_call("start", "test.start", "Starts the flow."),
@@ -186,7 +205,7 @@ def _seed_add_pipeline(*, seed: dict | None = None, add: dict | None = None) -> 
 def _seed_only_pipeline(*, seed: dict | None = None) -> dict:
     seed_fields = dict(seed or {})
     seed_defaults = {"provides": [PROV_SPEC("value.in")], **seed_fields}
-    seed_node = _node_call(str(seed_defaults.pop("name", "seed")), str(seed_defaults.pop("type", "test.seed")), "Produces the initial value.", **seed_defaults)
+    seed_node = _node_call(str(seed_defaults.pop("id", seed_defaults.pop("name", "seed"))), str(seed_defaults.pop("type_used", seed_defaults.pop("type", "test.seed"))), "Produces the initial value.", **seed_defaults)
     return {
         "nodes": [
             _node_call("start", "test.start", "Starts the flow."),
@@ -201,8 +220,8 @@ def _seed_only_pipeline(*, seed: dict | None = None) -> dict:
 def _input_add_pipeline(*, add: dict | None = None) -> dict:
     add_fields = dict(add or {})
     add_defaults = {"requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")], **add_fields}
-    add_node = _node_call(str(add_defaults.pop("name", "add")), str(add_defaults.pop("type", "test.add")), "Adds delta to value.in.", **add_defaults)
-    add_name = str(add_node["name"])
+    add_node = _node_call(str(add_defaults.pop("id", add_defaults.pop("name", "add"))), str(add_defaults.pop("type_used", add_defaults.pop("type", "test.add"))), "Adds delta to value.in.", **add_defaults)
+    add_name = str(add_node["id"])
     return {
         "inputs": [PROV_SPEC("value.in")],
         "nodes": [

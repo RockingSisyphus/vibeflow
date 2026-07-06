@@ -3,155 +3,194 @@
     "inputs": [
       {
         "key": "train.model",
-        "type": "train.model"
+        "type": "train.model",
+        "display_name": "Train Model"
       },
       {
         "key": "train.batch",
-        "type": "train.batch"
+        "type": "train.batch",
+        "display_name": "Train Batch"
       },
       {
         "key": "train.optimizer",
-        "type": "train.optimizer"
+        "type": "train.optimizer",
+        "display_name": "Train Optimizer"
       }
     ],
     "nodes": [
       {
-        "name": "start",
-        "type": "sandbox.start"
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
       },
       {
-        "name": "training_input",
-        "type": "sandbox.training_input",
         "requires": [
           {
             "type": "train.model",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Model"
           },
           {
             "type": "train.batch",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Batch"
           },
           {
             "type": "train.optimizer",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Optimizer"
           }
         ],
         "provides": [
           {
             "key": "train.model.input",
-            "type": "train.model"
+            "type": "train.model",
+            "display_name": "Train Model Input"
           },
           {
             "key": "train.batch.input",
-            "type": "train.batch"
+            "type": "train.batch",
+            "display_name": "Train Batch Input"
           },
           {
             "key": "train.optimizer.input",
-            "type": "train.optimizer"
+            "type": "train.optimizer",
+            "display_name": "Train Optimizer Input"
           }
-        ]
+        ],
+        "id": "training_input",
+        "type_used": "sandbox.training_input",
+        "display_name": "Training Input",
+        "description": "Runs training_input."
       },
       {
-        "name": "forward_loss",
-        "type": "sandbox.forward_loss",
         "requires": [
           {
             "type": "train.model",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Model"
           },
           {
             "type": "train.batch",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Batch"
           }
         ],
         "provides": [
           {
             "key": "train.loss",
-            "type": "train.loss"
+            "type": "train.loss",
+            "display_name": "Train Loss"
           }
-        ]
+        ],
+        "id": "forward_loss",
+        "type_used": "sandbox.forward_loss",
+        "display_name": "Forward Loss",
+        "description": "Runs forward_loss."
       },
       {
-        "name": "backward_grad",
-        "type": "sandbox.backward_grad",
         "requires": [
           {
             "type": "train.model",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Model"
           },
           {
             "type": "train.loss",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Loss"
           }
         ],
         "provides": [
           {
             "key": "train.grad",
-            "type": "train.grad"
+            "type": "train.grad",
+            "display_name": "Train Grad"
           }
-        ]
+        ],
+        "id": "backward_grad",
+        "type_used": "sandbox.backward_grad",
+        "display_name": "Backward Grad",
+        "description": "Runs backward_grad."
       },
       {
-        "name": "optimizer_step",
-        "type": "sandbox.optimizer_step",
         "requires": [
           {
             "type": "train.model",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Model"
           },
           {
             "type": "train.optimizer",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Optimizer"
           },
           {
             "type": "train.grad",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Grad"
           }
         ],
         "provides": [
           {
             "key": "train.model_after",
-            "type": "train.model_after"
+            "type": "train.model_after",
+            "display_name": "Train Model After"
           },
           {
             "key": "train.optimizer_after",
-            "type": "train.optimizer_after"
+            "type": "train.optimizer_after",
+            "display_name": "Train Optimizer After"
           },
           {
             "key": "train.step_report",
-            "type": "train.step_report"
+            "type": "train.step_report",
+            "display_name": "Train Step Report"
           }
-        ]
+        ],
+        "id": "optimizer_step",
+        "type_used": "sandbox.optimizer_step",
+        "display_name": "Optimizer Step",
+        "description": "Runs optimizer_step."
       },
       {
-        "name": "training_metrics",
-        "type": "sandbox.training_metrics",
         "requires": [
           {
             "type": "train.model_after",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Model After"
           },
           {
             "type": "train.loss",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Loss"
           }
         ],
         "provides": [
           {
             "key": "train.metrics",
-            "type": "train.metrics"
+            "type": "train.metrics",
+            "display_name": "Train Metrics"
           }
-        ]
+        ],
+        "id": "training_metrics",
+        "type_used": "sandbox.training_metrics",
+        "display_name": "Training Metrics",
+        "description": "Runs training_metrics."
       },
       {
-        "name": "end",
-        "type": "sandbox.training_metrics_end",
         "requires": [
           {
             "type": "train.metrics",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Metrics"
           }
-        ]
+        ],
+        "id": "end",
+        "type_used": "sandbox.training_metrics_end",
+        "display_name": "End",
+        "description": "Runs end."
       }
     ],
     "edges": [
@@ -195,27 +234,33 @@
     "outputs": [
       {
         "type": "train.metrics",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Train Metrics"
       },
       {
         "type": "train.grad",
-        "cardinality": "optional_one"
+        "cardinality": "optional_one",
+        "display_name": "Train Grad"
       },
       {
         "type": "train.loss",
-        "cardinality": "optional_one"
+        "cardinality": "optional_one",
+        "display_name": "Train Loss"
       },
       {
         "type": "train.step_report",
-        "cardinality": "optional_one"
+        "cardinality": "optional_one",
+        "display_name": "Train Step Report"
       },
       {
         "type": "train.model_after",
-        "cardinality": "optional_one"
+        "cardinality": "optional_one",
+        "display_name": "Train Model After"
       },
       {
         "type": "train.optimizer_after",
-        "cardinality": "optional_one"
+        "cardinality": "optional_one",
+        "display_name": "Train Optimizer After"
       }
     ]
   }

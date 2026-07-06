@@ -1,0 +1,113 @@
+{
+  "display_name": "Add Five",
+  "description": "Adds five inside an async-capable nodeset.",
+  "requires": [
+    {
+      "type": "value.in",
+      "cardinality": "exactly_one",
+      "display_name": "Value In"
+    }
+  ],
+  "provides": [
+    {
+      "key": "value.out",
+      "type": "value.out",
+      "display_name": "Value Out"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "value.in",
+        "type": "value.in",
+        "display_name": "Value In"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
+      },
+      {
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.in.input",
+            "type": "value.in",
+            "display_name": "Value In Input"
+          }
+        ],
+        "id": "input",
+        "type_used": "sandbox.value_input",
+        "display_name": "Input",
+        "description": "Runs input."
+      },
+      {
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out",
+            "display_name": "Value Out"
+          }
+        ],
+        "config": {
+          "delta": 5
+        },
+        "id": "add",
+        "type_used": "sandbox.add",
+        "display_name": "Add",
+        "description": "Runs add."
+      },
+      {
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
+          }
+        ],
+        "id": "end",
+        "type_used": "sandbox.out_value_end",
+        "display_name": "End",
+        "description": "Runs end."
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "input"
+      },
+      {
+        "from": "input",
+        "to": "add"
+      },
+      {
+        "from": "add",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one",
+        "display_name": "Value Out"
+      }
+    ]
+  },
+  "type_key": "math.add_five"
+}

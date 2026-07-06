@@ -26,9 +26,9 @@ def has_planned(graph: GraphConfig, *, visited_nodesets: set[str] | None = None)
     if any(node.status == STATUS_PLANNED for node in graph.nodes):
         return True
     for nodeset in graph.nodesets.values():
-        if nodeset.name in visited_nodesets:
+        if nodeset.type_key in visited_nodesets:
             continue
-        visited_nodesets.add(nodeset.name)
+        visited_nodesets.add(nodeset.type_key)
         if nodeset.status == STATUS_PLANNED or has_planned(nodeset.graph, visited_nodesets=visited_nodesets):
             return True
     return False
@@ -39,12 +39,12 @@ def planned_items(graph: GraphConfig, *, prefix: str = "", visited_nodesets: set
         visited_nodesets = set()
     items: list[dict[str, object]] = []
     for node in graph.nodes:
-        nodeset = graph.nodesets.get(node.node_type.removeprefix("nodeset.")) if node.node_type.startswith("nodeset.") else None
+        nodeset = graph.nodesets.get(node.type_used)
         if node.status == STATUS_PLANNED:
             behavior = effective_planned_behavior(node, nodeset)
             items.append(
                 {
-                    "id": f"{prefix}{node.name}",
+                    "id": f"{prefix}{node.id}",
                     "object_type": "node",
                     "behavior": behavior.kind,
                     "stub_module": behavior.stub_module,
@@ -67,12 +67,12 @@ def planned_items(graph: GraphConfig, *, prefix: str = "", visited_nodesets: set
             )
             continue
         for node in nodeset.graph.nodes:
-            child_nodeset = nodeset.graph.nodesets.get(node.node_type.removeprefix("nodeset.")) if node.node_type.startswith("nodeset.") else None
+            child_nodeset = nodeset.graph.nodesets.get(node.type_used)
             if node.status == STATUS_PLANNED:
                 behavior = effective_planned_behavior(node, child_nodeset)
                 items.append(
                     {
-                        "id": f"{full_name}.{node.name}",
+                        "id": f"{full_name}.{node.id}",
                         "object_type": "node",
                         "behavior": behavior.kind,
                         "stub_module": behavior.stub_module,
@@ -89,9 +89,9 @@ def all_planned_are_python_stub(graph: GraphConfig) -> bool:
 def referenced_nodeset_names(graph: GraphConfig) -> tuple[str, ...]:
     refs: list[str] = []
     for node in graph.nodes:
-        if node.node_type.startswith("nodeset."):
-            refs.append(node.node_type.removeprefix("nodeset."))
-        elif node.node_type in LOOP_NODE_TYPES and node.loop.body:
+        if node.type_used in graph.nodesets:
+            refs.append(node.type_used)
+        elif node.type_used in LOOP_NODE_TYPES and node.loop.body:
             refs.append(node.loop.body)
     return tuple(sorted(set(refs)))
 

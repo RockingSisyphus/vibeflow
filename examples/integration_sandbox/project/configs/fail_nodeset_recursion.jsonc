@@ -1,94 +1,45 @@
 {
-  "nodesets": [
-    {
-      "name": "bad.self",
-      "display_name": "Bad Self",
-      "category": "bad",
-      "description": "Bad recursive nodeset.",
-      "version": "0.1.0",
-      "purity": "pure",
-      "requires": [
-        {
-          "type": "value.in",
-          "cardinality": "exactly_one"
-        }
-      ],
-      "provides": [
-        {
-          "key": "value.out",
-          "type": "value.out"
-        }
-      ],
-      "exports": [
-        {
-          "key": "value.out",
-          "type": "value.out"
-        }
-      ],
-      "pipeline": {
-        "inputs": [
-          {
-            "key": "value.in",
-            "type": "value.in"
-          }
-        ],
-        "nodes": [
-          {
-            "name": "self",
-            "type": "nodeset.bad.self",
-            "requires": [
-              {
-                "type": "value.in",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "value.out",
-                "type": "value.out"
-              }
-            ]
-          }
-        ],
-        "outputs": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one"
-          }
-        ]
-      }
-    }
-  ],
   "pipeline": {
     "inputs": [
       {
         "key": "value.in",
-        "type": "value.in"
+        "type": "value.in",
+        "display_name": "Value In"
       }
     ],
     "nodes": [
       {
-        "name": "self",
-        "type": "nodeset.bad.self",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.out",
-            "type": "value.out"
+            "type": "value.out",
+            "display_name": "Value Out"
           }
-        ]
+        ],
+        "id": "self",
+        "type_used": "bad.self",
+        "display_name": "Self",
+        "description": "Runs self."
       }
     ],
     "outputs": [
       {
         "type": "value.in",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Value In"
       }
     ]
-  }
+  },
+  "nodeset_imports": [
+    {
+      "path": "nodesets/fail_nodeset_recursion/bad_self.jsonc"
+    }
+  ]
 }

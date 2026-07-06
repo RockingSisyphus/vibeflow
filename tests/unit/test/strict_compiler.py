@@ -53,11 +53,9 @@ def test_config_node_visual_metadata_and_style_are_not_runtime_params() -> None:
             "pipeline": {
                 "nodes": [
                     {
-                        "name": "seed",
-                        "type": "test.seed",
+                        "id": "seed",
+                        "type_used": "test.seed",
                         "display_name": "Readable Seed",
-                        "category": "demo",
-                        "version": "2.0.0",
                         "description": "Produces a seed value for the visual metadata test.",
                         "style": {"fill": "#123ABC", "stroke": "#456DEF", "text": "#654321"},
                         "similar_to": {
@@ -82,8 +80,6 @@ def test_config_node_visual_metadata_and_style_are_not_runtime_params() -> None:
     node = graph.nodes[0]
 
     assert node.metadata.display_name == "Readable Seed"
-    assert node.metadata.category == "demo"
-    assert node.metadata.version == "2.0.0"
     assert node.metadata.description == "Produces a seed value for the visual metadata test."
     assert node.style.to_dict() == {"fill": "#123abc", "stroke": "#456def", "text": "#654321"}
     assert node.similar_to.to_dict() == {
@@ -117,8 +113,8 @@ def test_config_node_join_policy_and_loop_are_not_runtime_params() -> None:
             "pipeline": {
                 "nodes": [
                     {
-                        "name": "loop",
-                        "type": "vibeflow.loop.while",
+                        "id": "loop",
+                        "type_used": "vibeflow.loop.while",
                         "display_name": "Loop",
                         "description": "Runs a body nodeset.",
                         "requires": [REQ_SPEC("total.current")],
@@ -152,7 +148,7 @@ def test_nodeset_parser_uses_shared_symbol_table_for_forward_references_and_larg
             nodes = [
                 _node_call(
                     "next",
-                    f"nodeset.perf.ns{index + 1}",
+                    f"perf.ns{index + 1}",
                     "Calls a nodeset declared later in the same config.",
                     provides=[PROV_SPEC("value.out")],
                 )
@@ -172,7 +168,7 @@ def test_nodeset_parser_uses_shared_symbol_table_for_forward_references_and_larg
             "nodesets": nodesets,
             "pipeline": {
                 "nodes": [
-                    _node_call("top", "nodeset.perf.ns0", "Calls the first chain nodeset.", provides=[PROV_SPEC("value.out")]),
+                    _node_call("top", "perf.ns0", "Calls the first chain nodeset.", provides=[PROV_SPEC("value.out")]),
                 ]
             },
         }
@@ -185,16 +181,17 @@ def test_nodeset_parser_uses_shared_symbol_table_for_forward_references_and_larg
 
 
 def test_parse_rejects_unknown_nodeset_call_with_reference_detail() -> None:
-    with pytest.raises(GraphConfigError, match="unknown nested nodeset: missing.body"):
-        parse_graph_config(
-            {
-                "pipeline": {
-                    "nodes": [
-                        _node_call("missing", "nodeset.missing.body", "References a missing composite.", provides=[PROV_SPEC("value.out")]),
-                    ]
-                }
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("missing", "missing.body", "References a missing composite.", provides=[PROV_SPEC("value.out")]),
+                ]
             }
-        )
+        }
+    )
+    with pytest.raises(GraphCompileError, match="unknown type_used"):
+        GraphCompiler().compile(graph, registry=_registry())
 
 
 def test_config_parse_trace_reports_nodeset_timing(monkeypatch, capsys) -> None:
@@ -209,13 +206,13 @@ def test_config_parse_trace_reports_nodeset_timing(monkeypatch, capsys) -> None:
                 )
             ],
             "pipeline": {
-                "nodes": [_node_call("flow", "nodeset.trace.body", "Calls trace body.", provides=[PROV_SPEC("value.out")])]
+                "nodes": [_node_call("flow", "trace.body", "Calls trace body.", provides=[PROV_SPEC("value.out")])]
             },
         }
     )
 
     err = capsys.readouterr().err
-    assert "[vibeflow config] parsed nodeset name=trace.body" in err
+    assert "[vibeflow config] parsed nodeset type_key=trace.body" in err
     assert "parsed graph nodes=1 nodesets=1" in err
 
 
@@ -319,8 +316,6 @@ def test_mermaid_renders_sectioned_labels_default_node_and_custom_style() -> Non
                         "test.seed",
                         "Produces a seed value with a long readable description that should wrap deterministically in the SVG label.",
                         display_name="Readable Seed",
-                        category="demo",
-                        version="2.0.0",
                         style={"fill": "#123abc", "stroke": "#456def", "text": "#654321"},
                         provides=[PROV_SPEC("value.in")],
                     )
@@ -332,8 +327,8 @@ def test_mermaid_renders_sectioned_labels_default_node_and_custom_style() -> Non
     text = export_mermaid(graph)
 
     assert "classDef defaultNode fill:#ECECFF,stroke:#9370DB,color:#333333;" in text
-    assert 'seed@{ shape: rect, label: "Readable Seed\\n\\nid: seed\\ntype: test.seed' in text
-    assert "\\n---------- meta ----------\\ncategory: demo\\nversion: 2.0.0\\ndesc: Produces a seed value with a long readable" in text
+    assert 'seed@{ shape: rect, label: "Readable Seed\\n\\nid: seed\\ntype_used: test.seed' in text
+    assert "\\n---------- meta ----------\\ndesc: Produces a seed value with a long readable" in text
     assert "\\n      description that should wrap deterministically in\\n      the SVG label." in text
     assert "requires:" not in text
     assert "provides:" not in text
@@ -392,10 +387,13 @@ def test_mermaid_renders_contracts_on_edges_and_hides_them_when_requested() -> N
     text = export_mermaid(graph)
     hidden = export_mermaid(graph, show_contract=False)
 
-    assert "seed -->|when: flow.route == 'again'\\ndata: value.in| add" in text
+    assert "---------- when ----------" in text
+    assert "when: flow.route == 'again'" in text
+    assert "data: Value In" in text
     assert "requires:" not in text
     assert "provides:" not in text
-    assert "seed -->|flow.route == 'again'| add" in hidden
+    assert "when: flow.route == 'again'" in hidden
+    assert "data:" not in hidden
 
 
 def test_mermaid_styles_mainline_and_explicit_data_bypass_edges() -> None:
@@ -421,9 +419,9 @@ def test_mermaid_styles_mainline_and_explicit_data_bypass_edges() -> None:
     text = export_mermaid(graph, registry=_registry())
 
     assert "start --> seed\n  linkStyle 0 stroke-width:4px;" in text
-    assert "seed -->|value.in| add\n  linkStyle 1 stroke-width:4px;" in text
+    assert 'seed -->|"---------- data ----------\\ndata: Value In (id: value.in)"| add\n  linkStyle 1 stroke-width:4px;' in text
     assert "add --> n_end\n  linkStyle 2 stroke-width:4px;" in text
-    assert "seed -->|value.in| n_end\n  linkStyle 3 stroke-dasharray:6 4,stroke-width:2px;" in text
+    assert 'seed -->|"---------- data ----------\\ndata: Value In (id: value.in)"| n_end\n  linkStyle 3 stroke-dasharray:6 4,stroke-width:2px;' in text
 
 
 def test_mermaid_renders_while_loop_shape_class_and_stop_condition() -> None:
@@ -492,7 +490,9 @@ def test_mermaid_edge_contract_labels_summarize_provider_key_type_mapping() -> N
 
     text = export_mermaid(graph)
 
-    assert "producer -->|value.copy -> value.in, other.copy -> other.in, +1 more| consumer" in text
+    assert "Value Copy (id: value.copy -> value.in)" in text
+    assert "Other\\n      Copy (id: other.copy -> other.in)" in text
+    assert "+1 more" in text
 
 
 def test_config_schema_rejects_reserved_and_invalid_node_style_colors() -> None:
@@ -558,7 +558,7 @@ def test_graph_health_warns_when_config_node_lacks_visual_metadata() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the metadata warning fixture."),
-                    {"name": "seed", "type": "test.seed", "provides": [PROV_SPEC("value.in")]},
+                    {"id": "seed", "type_used": "test.seed", "provides": [PROV_SPEC("value.in")]},
                     _node_call("end", "test.in_end", "Consumes value.in at the end.", requires=[REQ_SPEC("value.in")]),
                 ],
                 "edges": _edge_chain("start", "seed", "end"),
@@ -580,7 +580,7 @@ def test_config_rejects_removed_loop_registration() -> None:
             {
                 "pipeline": {
                     "nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])],
-                    "loops": [{"name": "old", "edges": [["seed", "seed"]], "max_iterations": 2}],
+                    "loops": [{"id": "old", "edges": [["seed", "seed"]], "max_iterations": 2}],
                 }
             }
         )
@@ -705,7 +705,7 @@ def test_compiled_payload_uses_registry_flow_kind() -> None:
     compiled = GraphCompiler().compile(graph, registry=registry)
 
     assert compiled_graph_payload(graph, compiled)["nodes"][1]["flow_kind"] == "decision"
-    assert 'route@{ shape: diam, label: "Route\\n\\nid: route\\ntype: test.route' in export_mermaid(graph, compiled=compiled)
+    assert 'route@{ shape: diam, label: "Route\\n\\nid: route\\ntype_used: test.route' in export_mermaid(graph, compiled=compiled)
 
 
 def test_planned_nodes_compile_without_registry_and_render_as_architecture() -> None:
@@ -714,15 +714,15 @@ def test_planned_nodes_compile_without_registry_and_render_as_architecture() -> 
     graph = parse_graph_config(
         {
             "nodesets": [
-                {"name": "a", "status": "planned"},
-                {"name": "b", "status": "planned"},
-                {"name": "c", "status": "planned"},
+                {"type_key": "a", "display_name": "A", "description": "Planned a.", "requires": [], "provides": [], "status": "planned"},
+                {"type_key": "b", "display_name": "B", "description": "Planned b.", "requires": [], "provides": [], "status": "planned"},
+                {"type_key": "c", "display_name": "C", "description": "Planned c.", "requires": [], "provides": [], "status": "planned"},
             ],
             "pipeline": {
                 "nodes": [
-                    _node_call("a", "nodeset.a", "Planned composite a.", status="planned", flow_kind="predefined"),
-                    _node_call("b", "nodeset.b", "Planned composite b.", status="planned", flow_kind="predefined"),
-                    _node_call("c", "nodeset.c", "Planned composite c.", status="planned", flow_kind="predefined"),
+                    _node_call("a", "a", "Planned composite a.", status="planned", flow_kind="predefined"),
+                    _node_call("b", "b", "Planned composite b.", status="planned", flow_kind="predefined"),
+                    _node_call("c", "c", "Planned composite c.", status="planned", flow_kind="predefined"),
                 ],
                 "edges": [["a", "b"], ["b", "c"]],
             },
@@ -734,7 +734,7 @@ def test_planned_nodes_compile_without_registry_and_render_as_architecture() -> 
     text = export_mermaid(graph, compiled=compiled)
     assert payload["nodes"][0]["status"] == "planned"
     assert payload["nodes"][0]["flow_kind"] == "predefined"
-    assert 'a@{ shape: fr-rect, label: "A\\n\\nid: a\\ntype: nodeset.a' in text
+    assert 'a@{ shape: fr-rect, label: "A\\n\\nid: a\\ntype_used: a' in text
     assert "---------- status ----------" in text
     assert "planned" in text
     assert "class a plannedNode;" in text

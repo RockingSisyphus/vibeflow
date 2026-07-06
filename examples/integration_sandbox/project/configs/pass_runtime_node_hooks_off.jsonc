@@ -22,46 +22,58 @@
   "pipeline": {
     "nodes": [
       {
-        "name": "start",
-        "type": "sandbox.start"
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
       },
       {
-        "name": "seed",
-        "type": "sandbox.constant",
         "provides": [
           {
             "key": "value.in",
-            "type": "value.in"
+            "type": "value.in",
+            "display_name": "Value In"
           }
         ],
-        "value": 4
+        "value": 4,
+        "id": "seed",
+        "type_used": "sandbox.constant",
+        "display_name": "Seed",
+        "description": "Runs seed."
       },
       {
-        "name": "add",
-        "type": "sandbox.add",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.out",
-            "type": "value.out"
+            "type": "value.out",
+            "display_name": "Value Out"
           }
         ],
-        "delta": 2
+        "delta": 2,
+        "id": "add",
+        "type_used": "sandbox.add",
+        "display_name": "Add",
+        "description": "Runs add."
       },
       {
-        "name": "end",
-        "type": "sandbox.out_value_end",
         "requires": [
           {
             "type": "value.out",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
           }
-        ]
+        ],
+        "id": "end",
+        "type_used": "sandbox.out_value_end",
+        "display_name": "End",
+        "description": "Runs end."
       }
     ],
     "edges": [
@@ -81,7 +93,8 @@
     "outputs": [
       {
         "type": "value.out",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Value Out"
       }
     ]
   }

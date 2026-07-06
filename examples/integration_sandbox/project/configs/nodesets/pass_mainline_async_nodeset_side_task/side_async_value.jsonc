@@ -1,0 +1,67 @@
+{
+  "display_name": "Side Async Value",
+  "description": "Runs a detached async side calculation inside a nodeset.",
+  "requires": [],
+  "provides": [
+    {
+      "key": "async.value",
+      "type": "async.value",
+      "display_name": "Async Value"
+    }
+  ],
+  "pipeline": {
+    "nodes": [
+      {
+        "display_name": "Start",
+        "description": "Starts the async side nodeset.",
+        "id": "start",
+        "type_used": "sandbox.start"
+      },
+      {
+        "display_name": "Side Value",
+        "description": "Produces a side value without blocking the parent mainline.",
+        "provides": [
+          {
+            "key": "async.value",
+            "type": "async.value",
+            "display_name": "Async Value"
+          }
+        ],
+        "value": 99,
+        "id": "side_value",
+        "type_used": "semantic.slow_async_value"
+      },
+      {
+        "display_name": "End",
+        "description": "Ends after the side value is available.",
+        "requires": [
+          {
+            "type": "async.value",
+            "cardinality": "exactly_one",
+            "display_name": "Async Value"
+          }
+        ],
+        "id": "end",
+        "type_used": "semantic.async_value_end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "side_value"
+      },
+      {
+        "from": "side_value",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "async.value",
+        "cardinality": "exactly_one",
+        "display_name": "Async Value"
+      }
+    ]
+  },
+  "type_key": "side.async_value"
+}

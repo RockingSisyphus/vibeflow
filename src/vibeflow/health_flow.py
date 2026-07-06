@@ -60,7 +60,7 @@ def _node_participates_in_flow(graph, node) -> bool:
         return False
     if node.status != STATUS_PLANNED:
         return True
-    nodeset = graph.nodesets.get(node.node_type.removeprefix("nodeset.")) if node.node_type.startswith("nodeset.") else None
+    nodeset = graph.nodesets.get(node.type_used)
     return effective_planned_behavior(node, nodeset).kind in {PLANNED_BEHAVIOR_TRANSPARENT, PLANNED_BEHAVIOR_PYTHON_STUB}
 
 
@@ -172,16 +172,16 @@ def _append_nodeset_flow_health(graph, state, *, registry, visited_nodesets: set
     for nodeset in graph.nodesets.values():
         if nodeset.status == STATUS_PLANNED:
             continue
-        if nodeset.name in visited_nodesets:
+        if nodeset.type_key in visited_nodesets:
             continue
-        visited_nodesets.add(nodeset.name)
+        visited_nodesets.add(nodeset.type_key)
         try:
-            nested = GraphCompiler().compile(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.name}")
+            nested = GraphCompiler().compile(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.type_key}")
         except GraphCompileError:
             continue
-        append_flowchart_health(nodeset.graph, nested, state, registry=registry, owner=f"nodeset:{nodeset.name}", visited_nodesets=visited_nodesets)
-        append_data_contract_warnings(nodeset.graph, nested, state, owner=f"nodeset:{nodeset.name}")
-        append_join_policy_health(nodeset.graph, nested, state, owner=f"nodeset:{nodeset.name}")
+        append_flowchart_health(nodeset.graph, nested, state, registry=registry, owner=f"nodeset:{nodeset.type_key}", visited_nodesets=visited_nodesets)
+        append_data_contract_warnings(nodeset.graph, nested, state, owner=f"nodeset:{nodeset.type_key}")
+        append_join_policy_health(nodeset.graph, nested, state, owner=f"nodeset:{nodeset.type_key}")
 
 
 def _append_missing_provider_warnings(node, graph, nodes_by_name, incoming, state, *, owner: str) -> None:
@@ -509,10 +509,8 @@ def _is_loop_branch(node_name: str, target: str, outgoing: dict[str, list[str]])
 
 
 def _decision_schema_values(node: Any, registry) -> set[object] | None:
-    if node.node_type.startswith("nodeset."):
-        return None
     try:
-        node_cls = registry.get(node.node_type)
+        node_cls = registry.get(node.type_used)
     except Exception:
         return None
     contract = getattr(node_cls, "CONTRACT", None)

@@ -809,7 +809,7 @@ INVALID_CASES = [
     {"kind": "config", "config": "fail_schema_bad_edge.jsonc", "expect": "CONFIG.SCHEMA.EDGE_PAIR"},
     {"kind": "run", "config": "fail_unknown_node.jsonc", "expect": "NODE.TYPE.UNKNOWN"},
     {"kind": "config", "config": "fail_removed_loop_registration.jsonc", "expect": "CONFIG.LOOPS.REMOVED"},
-    {"kind": "run", "config": "fail_nodeset_key_leak.jsonc", "expect": "NODESET.INTERNAL_KEY_LEAK"},
+    {"kind": "run", "config": "fail_nodeset_key_leak.jsonc", "expect": "NODESET.PROVIDES.UNKNOWN_KEY"},
     {"kind": "run", "config": "fail_nodeset_recursion.jsonc", "expect": "NODESET.RECURSION"},
     {"kind": "config", "config": "fail_removed_boundary.jsonc", "expect": "CONFIG.BOUNDARY.REMOVED"},
     {"kind": "run", "config": "fail_decision_cycle_forbidden.jsonc", "expect": "GRAPH.CYCLE.FORBIDDEN"},
@@ -1323,9 +1323,9 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
     registry.register(str(case["type"]), cls, config_schema={}, config_defaults={})
     graph = GraphConfig(
         nodes=(
-            NodeSpec(name="start", node_type="sandbox.runtime_start"),
-            NodeSpec(name="bad", node_type=str(case["type"]), provides=(DataProvider("bad.out", "bad.out"),)),
-            NodeSpec(name="end", node_type="sandbox.runtime_end", requires=(DataRequirement("bad.out", "exactly_one"),)),
+            NodeSpec(id="start", type_used="sandbox.runtime_start"),
+            NodeSpec(id="bad", type_used=str(case["type"]), provides=(DataProvider("bad.out", "bad.out"),)),
+            NodeSpec(id="end", type_used="sandbox.runtime_end", requires=(DataRequirement("bad.out", "exactly_one"),)),
         ),
         edges=(EdgeSpec("start", "bad"), EdgeSpec("bad", "end")),
     )
@@ -1346,7 +1346,7 @@ def _health_invalid_node(case: dict[str, Any]) -> CaseResult:
     cls = _load_class(PROJECT_DIR / str(case["module"]), str(case["class"]))
     registry = NodeRegistry()
     registry.register(str(case["type"]), cls, config_schema={}, config_defaults={})
-    graph = GraphConfig(nodes=(NodeSpec(name="bad", node_type=str(case["type"]), provides=(DataProvider("bad.out", "bad.out"),)),))
+    graph = GraphConfig(nodes=(NodeSpec(id="bad", type_used=str(case["type"]), provides=(DataProvider("bad.out", "bad.out"),)),))
     report = validate_graph_health(
         graph,
         registry=registry,

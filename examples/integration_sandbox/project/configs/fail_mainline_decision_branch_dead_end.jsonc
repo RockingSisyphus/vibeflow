@@ -1,66 +1,147 @@
 {
   "pipeline": {
     "inputs": [
-      {"key": "value.in", "type": "value.in"}
+      {
+        "key": "value.in",
+        "type": "value.in",
+        "display_name": "Value In"
+      }
     ],
     "nodes": [
       {
-        "name": "start",
-        "type": "sandbox.start",
         "display_name": "Start",
-        "description": "Starts the decision dead-end fixture."
+        "description": "Starts the decision dead-end fixture.",
+        "id": "start",
+        "type_used": "sandbox.start"
       },
       {
-        "name": "prepare",
-        "type": "sandbox.add",
         "display_name": "Prepare Value",
         "description": "Produces value.out for the route decision.",
-        "requires": [{"type": "value.in", "cardinality": "exactly_one"}],
-        "provides": [{"key": "value.out", "type": "value.out"}],
-        "delta": 1
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out",
+            "display_name": "Value Out"
+          }
+        ],
+        "delta": 1,
+        "id": "prepare",
+        "type_used": "sandbox.add"
       },
       {
-        "name": "route",
-        "type": "sandbox.route_decision",
         "display_name": "Route",
         "description": "Routes either to the valid end branch or to a dead end.",
-        "requires": [{"type": "value.out", "cardinality": "exactly_one"}],
-        "provides": [{"key": "flow.route", "type": "flow.route"}],
-        "threshold": 10
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
+          }
+        ],
+        "provides": [
+          {
+            "key": "flow.route",
+            "type": "flow.route",
+            "display_name": "Flow Route"
+          }
+        ],
+        "threshold": 10,
+        "id": "route",
+        "type_used": "sandbox.route_decision"
       },
       {
-        "name": "dead",
-        "type": "sandbox.add_out",
         "display_name": "Dead Branch",
         "description": "A decision branch that cannot reach an end terminal.",
-        "requires": [{"type": "value.out", "cardinality": "exactly_one"}],
-        "provides": [{"key": "value.final", "type": "value.final"}],
-        "delta": 1
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.final",
+            "type": "value.final",
+            "display_name": "Value Final"
+          }
+        ],
+        "delta": 1,
+        "id": "dead",
+        "type_used": "sandbox.add_out"
       },
       {
-        "name": "sink",
-        "type": "sandbox.add_out",
         "display_name": "Dead Sink",
         "description": "Continues the dead branch without ever reaching an end terminal.",
-        "requires": [{"type": "value.final", "cardinality": "exactly_one"}],
-        "provides": [{"key": "value.dead", "type": "value.final"}],
-        "delta": 1
+        "requires": [
+          {
+            "type": "value.final",
+            "cardinality": "exactly_one",
+            "display_name": "Value Final"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.dead",
+            "type": "value.final",
+            "display_name": "Value Dead"
+          }
+        ],
+        "delta": 1,
+        "id": "sink",
+        "type_used": "sandbox.add_out"
       },
       {
-        "name": "end",
-        "type": "sandbox.out_value_end",
         "display_name": "End",
         "description": "Ends the valid external branch.",
-        "requires": [{"type": "value.out", "cardinality": "exactly_one"}]
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
+          }
+        ],
+        "id": "end",
+        "type_used": "sandbox.out_value_end"
       }
     ],
     "edges": [
-      {"from": "start", "to": "prepare"},
-      {"from": "prepare", "to": "route"},
-      {"from": "route", "to": "dead", "when": "flow.route == 'again'"},
-      {"from": "dead", "to": "sink"},
-      {"from": "route", "to": "end", "when": "flow.route == 'external'"}
+      {
+        "from": "start",
+        "to": "prepare"
+      },
+      {
+        "from": "prepare",
+        "to": "route"
+      },
+      {
+        "from": "route",
+        "to": "dead",
+        "when": "flow.route == 'again'"
+      },
+      {
+        "from": "dead",
+        "to": "sink"
+      },
+      {
+        "from": "route",
+        "to": "end",
+        "when": "flow.route == 'external'"
+      }
     ],
-    "outputs": [{"type": "value.out", "cardinality": "optional_one"}]
+    "outputs": [
+      {
+        "type": "value.out",
+        "cardinality": "optional_one",
+        "display_name": "Value Out"
+      }
+    ]
   }
 }

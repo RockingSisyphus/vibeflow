@@ -10,18 +10,18 @@ def append_planned_findings(graph, state) -> None:
     visited_nodesets: set[str] = set()
     _append_planned_findings_for_graph(graph, state, owner="pipeline")
     for nodeset in graph.nodesets.values():
-        if nodeset.name in visited_nodesets:
+        if nodeset.type_key in visited_nodesets:
             continue
-        visited_nodesets.add(nodeset.name)
+        visited_nodesets.add(nodeset.type_key)
         if nodeset.status == STATUS_PLANNED:
             state.warnings.append(_planned_nodeset_finding(nodeset))
-            _append_python_stub_findings(nodeset.planned_behavior, state, object_type="nodeset", object_id=nodeset.name, project_root=graph.project_root)
-        _append_planned_findings_for_graph(nodeset.graph, state, owner=f"nodeset:{nodeset.name}")
+            _append_python_stub_findings(nodeset.planned_behavior, state, object_type="nodeset", object_id=nodeset.type_key, project_root=graph.project_root)
+        _append_planned_findings_for_graph(nodeset.graph, state, owner=f"nodeset:{nodeset.type_key}")
         if nodeset.status == STATUS_IMPLEMENTED:
             if graph_has_blocking_planned(nodeset.graph):
-                state.errors.append(_planned_child_finding(nodeset.name, severity="error"))
+                state.errors.append(_planned_child_finding(nodeset.type_key, severity="error"))
             elif graph_has_planned(nodeset.graph):
-                state.warnings.append(_planned_child_finding(nodeset.name, severity="warning"))
+                state.warnings.append(_planned_child_finding(nodeset.type_key, severity="warning"))
 
 
 def graph_has_planned(graph, *, visited_nodesets: set[str] | None = None) -> bool:
@@ -31,9 +31,9 @@ def graph_has_planned(graph, *, visited_nodesets: set[str] | None = None) -> boo
         return True
     for nodeset_name in referenced_nodeset_names(graph):
         nodeset = graph.nodesets.get(nodeset_name)
-        if nodeset is None or nodeset.name in visited_nodesets:
+        if nodeset is None or nodeset.type_key in visited_nodesets:
             continue
-        visited_nodesets.add(nodeset.name)
+        visited_nodesets.add(nodeset.type_key)
         if nodeset.status == STATUS_PLANNED or graph_has_planned(nodeset.graph, visited_nodesets=visited_nodesets):
             return True
     return False
@@ -43,14 +43,14 @@ def graph_has_blocking_planned(graph, *, visited_nodesets: set[str] | None = Non
     if visited_nodesets is None:
         visited_nodesets = set()
     for node in graph.nodes:
-        nodeset = graph.nodesets.get(node.node_type.removeprefix("nodeset.")) if node.node_type.startswith("nodeset.") else None
+        nodeset = graph.nodesets.get(node.type_used)
         if node.status == STATUS_PLANNED and effective_planned_behavior(node, nodeset).kind == PLANNED_BEHAVIOR_BLOCKING:
             return True
     for nodeset_name in referenced_nodeset_names(graph):
         nodeset = graph.nodesets.get(nodeset_name)
-        if nodeset is None or nodeset.name in visited_nodesets:
+        if nodeset is None or nodeset.type_key in visited_nodesets:
             continue
-        visited_nodesets.add(nodeset.name)
+        visited_nodesets.add(nodeset.type_key)
         if nodeset.status == STATUS_PLANNED:
             if nodeset.planned_behavior.kind == PLANNED_BEHAVIOR_BLOCKING:
                 return True
@@ -63,10 +63,10 @@ def graph_has_blocking_planned(graph, *, visited_nodesets: set[str] | None = Non
 def _append_planned_findings_for_graph(graph, state, *, owner: str) -> None:
     for node in graph.nodes:
         if node.status == STATUS_PLANNED:
-            nodeset = graph.nodesets.get(node.node_type.removeprefix("nodeset.")) if node.node_type.startswith("nodeset.") else None
+            nodeset = graph.nodesets.get(node.type_used)
             behavior = effective_planned_behavior(node, nodeset)
             state.warnings.append(_planned_node_finding(node, behavior=behavior, owner=owner))
-            _append_python_stub_findings(behavior, state, object_type="node", object_id=node.name, project_root=graph.project_root)
+            _append_python_stub_findings(behavior, state, object_type="node", object_id=node.id, project_root=graph.project_root)
 
 
 def _planned_nodeset_finding(nodeset) -> HealthFinding:
@@ -75,9 +75,9 @@ def _planned_nodeset_finding(nodeset) -> HealthFinding:
         rule_id="GRAPH.PLANNED.NODESET",
         severity="warning",
         object_type="nodeset",
-        object_id=nodeset.name,
+        object_id=nodeset.type_key,
         failure_layer="topology",
-        message=f"nodeset '{nodeset.name}' is {planned_behavior_label(behavior)} and cannot run as production",
+        message=f"nodeset '{nodeset.type_key}' is {planned_behavior_label(behavior)} and cannot run as production",
         suggested_fix_type="implement_nodeset",
         details=_behavior_details(behavior),
     )
@@ -100,9 +100,9 @@ def _planned_node_finding(node, *, behavior, owner: str) -> HealthFinding:
         rule_id="GRAPH.PLANNED.NODE",
         severity="warning",
         object_type="node",
-        object_id=node.name,
+        object_id=node.id,
         failure_layer="topology",
-        message=f"node '{node.name}' is {planned_behavior_label(behavior)} and cannot run as production",
+        message=f"node '{node.id}' is {planned_behavior_label(behavior)} and cannot run as production",
         suggested_fix_type="implement_node",
         details={"owner": owner, "flow_kind": node.flow_kind, **_behavior_details(behavior)},
     )

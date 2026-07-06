@@ -1,18 +1,19 @@
 {
-  "nodesets": [
-    {
-      "name": "a",
-      "status": "planned"
-    }
-  ],
   "pipeline": {
     "nodes": [
       {
-        "name": "a",
-        "type": "nodeset.a",
         "status": "planned",
-        "flow_kind": "predefined"
+        "flow_kind": "predefined",
+        "id": "a",
+        "type_used": "a",
+        "display_name": "A",
+        "description": "Runs a."
       }
     ]
-  }
+  },
+  "nodeset_imports": [
+    {
+      "path": "nodesets/fail_planned_architecture_run/a.jsonc"
+    }
+  ]
 }

@@ -31,8 +31,8 @@ from .runtime_config import (
 
 @dataclass(frozen=True)
 class NodeFrame:
-    name: str
-    node_type: str
+    id: str
+    type_used: str
     node: PureNode | None
     requires: tuple[DataRequirement, ...]
     provides: tuple[DataProvider, ...]
@@ -46,7 +46,7 @@ class NodeFrame:
     transfer_outgoing: tuple[EdgeSpec, ...] = ()
     is_loop: bool = False
     join_policy: str = ""
-    nodeset_name: str = ""
+    nodeset_type_key: str = ""
     exports: tuple[DataProvider, ...] = ()
     loop_spec: LoopSpec = field(default_factory=LoopSpec)
     async_mode: str = ""
@@ -56,6 +56,18 @@ class NodeFrame:
     planned_stub_module: str = ""
     planned_stub_path: str = ""
     planned_stub_hash: str = ""
+
+    @property
+    def name(self) -> str:
+        return self.id
+
+    @property
+    def node_type(self) -> str:
+        return self.type_used
+
+    @property
+    def nodeset_name(self) -> str:
+        return self.nodeset_type_key
 
     @property
     def is_planned_stub(self) -> bool:
@@ -106,10 +118,10 @@ def build_execution_plan(
     overrides = normalize_node_config_overrides(node_config_overrides or {})
     scope = normalize_config_scope(global_config)
     frames = {
-        spec.name: _frame_for(spec, graph=graph, compiled=compiled, registry=registry, overrides=overrides, global_scope=scope, runtime_options=runtime_options)
+        spec.id: _frame_for(spec, graph=graph, compiled=compiled, registry=registry, overrides=overrides, global_scope=scope, runtime_options=runtime_options)
         for spec in graph.nodes
     }
-    order = tuple(node.name for node in graph.nodes)
+    order = tuple(node.id for node in graph.nodes)
     plan = ExecutionPlan(graph=graph, compiled=compiled, frames=frames, order=order, max_steps=graph.max_steps)
     blocks = compile_blocks(plan, runtime_options=runtime_options)
     block_by_entry = {block.entry: block for block in blocks}
@@ -140,15 +152,15 @@ def _frame_for(
 ) -> NodeFrame:
     schedule_edges = compiled.schedule_edges or compiled.effective_edges
     transfer_edges = compiled.transfer_edges or compiled.effective_edges
-    incoming = tuple(edge for edge in schedule_edges if edge.target == spec.name)
-    outgoing = tuple(edge for edge in schedule_edges if edge.source == spec.name)
-    transfer_incoming = tuple(edge for edge in transfer_edges if edge.target == spec.name)
-    transfer_outgoing = tuple(edge for edge in transfer_edges if edge.source == spec.name)
-    is_nodeset = spec.node_type.startswith("nodeset.")
-    is_loop = spec.node_type in LOOP_NODE_TYPES
-    nodeset_name = spec.node_type.removeprefix("nodeset.") if is_nodeset else ""
-    nodeset = graph.nodesets.get(nodeset_name) if is_nodeset else None
-    flow_kind = compiled.flow_kinds.get(spec.name, "")
+    incoming = tuple(edge for edge in schedule_edges if edge.target == spec.id)
+    outgoing = tuple(edge for edge in schedule_edges if edge.source == spec.id)
+    transfer_incoming = tuple(edge for edge in transfer_edges if edge.target == spec.id)
+    transfer_outgoing = tuple(edge for edge in transfer_edges if edge.source == spec.id)
+    is_loop = spec.type_used in LOOP_NODE_TYPES
+    is_nodeset = spec.type_used in graph.nodesets and not is_loop
+    nodeset_type_key = spec.type_used if is_nodeset else ""
+    nodeset = graph.nodesets.get(nodeset_type_key) if is_nodeset else None
+    flow_kind = compiled.flow_kinds.get(spec.id, "")
     planned_behavior = effective_planned_behavior(spec, nodeset)
     if planned_behavior.kind == PLANNED_BEHAVIOR_PYTHON_STUB:
         return _planned_stub_frame(
@@ -160,7 +172,7 @@ def _frame_for(
             transfer_outgoing=transfer_outgoing,
             flow_kind=flow_kind or (nodeset.flow_kind if nodeset is not None else ""),
             nodeset=nodeset,
-            nodeset_name=nodeset_name,
+            nodeset_type_key=nodeset_type_key,
             behavior=planned_behavior,
             overrides=overrides,
             global_scope=global_scope,
@@ -168,13 +180,13 @@ def _frame_for(
     if is_loop:
         nodeset = graph.nodesets[spec.loop.body]
         nested_overrides = nested_node_config_overrides(spec, overrides)
-        subcompiled = _compile_nodeset(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.name}")
-        caller_values = {**dict(spec.params), **dict(global_scope.values), **dict(overrides.get(spec.name, {}))}
+        subcompiled = _compile_nodeset(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.type_key}")
+        caller_values = {**dict(spec.params), **dict(global_scope.values), **dict(overrides.get(spec.id, {}))}
         caller_scope = node_invocation_scope(caller_values, allow_config_override=spec.allow_config_override)
         child_scope = merge_config_scopes(normalize_config_scope(nodeset.global_config), caller_scope)
         return NodeFrame(
-            name=spec.name,
-            node_type=spec.node_type,
+            id=spec.id,
+            type_used=spec.type_used,
             node=None,
             requires=spec.requires,
             provides=spec.provides,
@@ -188,23 +200,23 @@ def _frame_for(
             is_nodeset=False,
             is_loop=True,
             join_policy=spec.join_policy,
-            nodeset_name=nodeset.name,
-            exports=nodeset.exports,
+            nodeset_type_key=nodeset.type_key,
+            exports=nodeset.provides,
             loop_spec=spec.loop,
             async_mode=spec.async_mode,
             result_key=spec.result_key,
             subplan=build_execution_plan(nodeset.graph, subcompiled, registry=registry, node_config_overrides=nested_overrides, global_config=child_scope, runtime_options=runtime_options),
         )
     if is_nodeset:
-        nodeset = graph.nodesets[nodeset_name]
+        nodeset = graph.nodesets[nodeset_type_key]
         nested_overrides = nested_node_config_overrides(spec, overrides)
-        subcompiled = _compile_nodeset(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.name}")
-        caller_values = {**dict(spec.params), **dict(global_scope.values), **dict(overrides.get(spec.name, {}))}
+        subcompiled = _compile_nodeset(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.type_key}")
+        caller_values = {**dict(spec.params), **dict(global_scope.values), **dict(overrides.get(spec.id, {}))}
         caller_scope = node_invocation_scope(caller_values, allow_config_override=spec.allow_config_override)
         child_scope = merge_config_scopes(normalize_config_scope(nodeset.global_config), caller_scope)
         return NodeFrame(
-            name=spec.name,
-            node_type=spec.node_type,
+            id=spec.id,
+            type_used=spec.type_used,
             node=None,
             requires=spec.requires,
             provides=spec.provides,
@@ -217,20 +229,20 @@ def _frame_for(
             is_terminal=False,
             is_nodeset=True,
             join_policy=spec.join_policy,
-            nodeset_name=nodeset_name,
-            exports=nodeset.exports,
+            nodeset_type_key=nodeset_type_key,
+            exports=nodeset.provides,
             async_mode=spec.async_mode,
             result_key=spec.result_key,
             subplan=build_execution_plan(nodeset.graph, subcompiled, registry=registry, node_config_overrides=nested_overrides, global_config=child_scope, runtime_options=runtime_options),
         )
-    node_cls = registry.get(spec.node_type)
+    node_cls = registry.get(spec.type_used)
     node = node_cls()
-    config_spec = registry.get_config_spec(spec.node_type)
+    config_spec = registry.get_config_spec(spec.type_used)
     scoped_params = scoped_node_params(spec.params, global_scope, declared_keys=set(config_spec.schema))
-    node_params = registry.merge_config(spec.node_type, {**scoped_params, **dict(overrides.get(spec.name, {}))})
+    node_params = registry.merge_config(spec.type_used, {**scoped_params, **dict(overrides.get(spec.id, {}))})
     return NodeFrame(
-        name=spec.name,
-        node_type=spec.node_type,
+        id=spec.id,
+        type_used=spec.type_used,
         node=node,
         requires=spec.requires,
         provides=spec.provides,
@@ -258,12 +270,12 @@ def _planned_stub_frame(
     transfer_outgoing: tuple[EdgeSpec, ...],
     flow_kind: str,
     nodeset: object | None,
-    nodeset_name: str,
+    nodeset_type_key: str,
     behavior: PlannedBehavior,
     overrides: Mapping[str, Mapping[str, Any]],
     global_scope: ConfigScope,
 ) -> NodeFrame:
-    params = {**dict(spec.params), **dict(global_scope.values), **dict(overrides.get(spec.name, {}))}
+    params = {**dict(spec.params), **dict(global_scope.values), **dict(overrides.get(spec.id, {}))}
     stub_path = ""
     stub_hash = ""
     try:
@@ -273,10 +285,10 @@ def _planned_stub_frame(
             stub_hash = hash_file(path)
     except Exception:
         stub_path = behavior.stub_module
-    exports = tuple(getattr(nodeset, "exports", ())) if nodeset is not None else ()
+    exports = tuple(getattr(nodeset, "provides", ())) if nodeset is not None else ()
     return NodeFrame(
-        name=spec.name,
-        node_type=spec.node_type,
+        id=spec.id,
+        type_used=spec.type_used,
         node=None,
         requires=spec.requires,
         provides=spec.provides,
@@ -289,7 +301,7 @@ def _planned_stub_frame(
         is_terminal=flow_kind == "terminal",
         is_nodeset=nodeset is not None,
         join_policy=spec.join_policy,
-        nodeset_name=nodeset_name,
+        nodeset_type_key=nodeset_type_key,
         exports=exports,
         async_mode=spec.async_mode,
         result_key=spec.result_key,

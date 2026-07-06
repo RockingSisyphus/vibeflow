@@ -1,0 +1,258 @@
+{
+  "display_name": "Outer Accumulate Body",
+  "description": "Initializes an inner counter, runs an inner while loop, and advances the outer counter.",
+  "requires": [
+    {
+      "type": "outer.current",
+      "cardinality": "exactly_one",
+      "display_name": "Outer Current"
+    },
+    {
+      "type": "total.current",
+      "cardinality": "exactly_one",
+      "display_name": "Total Current"
+    }
+  ],
+  "provides": [
+    {
+      "key": "outer.current.next",
+      "type": "outer.current",
+      "display_name": "Outer Current Next"
+    },
+    {
+      "key": "total.current.next",
+      "type": "total.current",
+      "display_name": "Total Current Next"
+    },
+    {
+      "key": "outer.done",
+      "type": "outer.done",
+      "display_name": "Outer Done"
+    },
+    {
+      "key": "inner.iterations",
+      "type": "inner.iterations",
+      "display_name": "Inner Iterations"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "outer.current",
+        "type": "outer.current",
+        "display_name": "Outer Current"
+      },
+      {
+        "key": "total.current",
+        "type": "total.current",
+        "display_name": "Total Current"
+      }
+    ],
+    "nodes": [
+      {
+        "display_name": "Outer Body Start",
+        "description": "Starts one outer loop body iteration.",
+        "id": "start",
+        "type_used": "sandbox.start"
+      },
+      {
+        "display_name": "Init Inner",
+        "description": "Copies outer state into inner-loop scoped keys and resets the inner counter.",
+        "requires": [
+          {
+            "type": "outer.current",
+            "cardinality": "exactly_one",
+            "display_name": "Outer Current"
+          },
+          {
+            "type": "total.current",
+            "cardinality": "exactly_one",
+            "display_name": "Total Current"
+          }
+        ],
+        "provides": [
+          {
+            "key": "outer.inner.seed",
+            "type": "outer.inner",
+            "display_name": "Outer Inner Seed"
+          },
+          {
+            "key": "total.inner.seed",
+            "type": "total.inner",
+            "display_name": "Total Inner Seed"
+          },
+          {
+            "key": "inner.current.seed",
+            "type": "inner.current",
+            "display_name": "Inner Current Seed"
+          }
+        ],
+        "inner_start": 0,
+        "id": "init_inner",
+        "type_used": "semantic.inner_loop_init"
+      },
+      {
+        "display_name": "Inner Bool Loop",
+        "description": "Runs inner accumulation until the body emits inner.done.",
+        "requires": [
+          {
+            "type": "outer.inner",
+            "cardinality": "exactly_one",
+            "display_name": "Outer Inner"
+          },
+          {
+            "type": "inner.current",
+            "cardinality": "exactly_one",
+            "display_name": "Inner Current"
+          },
+          {
+            "type": "total.inner",
+            "cardinality": "exactly_one",
+            "display_name": "Total Inner"
+          }
+        ],
+        "provides": [
+          {
+            "key": "outer.inner.loop",
+            "type": "outer.inner",
+            "display_name": "Outer Inner Loop"
+          },
+          {
+            "key": "total.inner.loop",
+            "type": "total.inner",
+            "display_name": "Total Inner Loop"
+          },
+          {
+            "key": "inner.iterations",
+            "type": "inner.iterations",
+            "display_name": "Inner Iterations"
+          }
+        ],
+        "loop": {
+          "body": "loop.inner_accumulate_step",
+          "max_iterations": 5,
+          "carry": [
+            {
+              "from": "outer.inner",
+              "as": "outer.inner",
+              "update": "outer.inner"
+            },
+            {
+              "from": "inner.current",
+              "as": "inner.current",
+              "update": "inner.current"
+            },
+            {
+              "from": "total.inner",
+              "as": "total.inner",
+              "update": "total.inner"
+            }
+          ],
+          "outputs": [
+            {
+              "from": "outer.inner",
+              "as": "outer.inner.loop"
+            },
+            {
+              "from": "total.inner",
+              "as": "total.inner.loop"
+            },
+            {
+              "from": "loop.iterations",
+              "as": "inner.iterations"
+            }
+          ],
+          "stop_when": {
+            "from": "inner.done",
+            "equals": true
+          }
+        },
+        "id": "inner_loop",
+        "type_used": "vibeflow.loop.while"
+      },
+      {
+        "display_name": "Advance Outer",
+        "description": "Carries the inner total back to outer state and advances the outer counter.",
+        "requires": [
+          {
+            "type": "outer.inner",
+            "cardinality": "exactly_one",
+            "display_name": "Outer Inner"
+          },
+          {
+            "type": "total.inner",
+            "cardinality": "exactly_one",
+            "display_name": "Total Inner"
+          }
+        ],
+        "provides": [
+          {
+            "key": "outer.current.next",
+            "type": "outer.current",
+            "display_name": "Outer Current Next"
+          },
+          {
+            "key": "total.current.next",
+            "type": "total.current",
+            "display_name": "Total Current Next"
+          },
+          {
+            "key": "outer.done",
+            "type": "outer.done",
+            "display_name": "Outer Done"
+          }
+        ],
+        "outer_limit": 99,
+        "id": "advance_outer",
+        "type_used": "semantic.outer_advance"
+      },
+      {
+        "display_name": "Outer Body End",
+        "description": "Ends one outer loop body iteration.",
+        "id": "end",
+        "type_used": "sandbox.start"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "init_inner"
+      },
+      {
+        "from": "init_inner",
+        "to": "inner_loop"
+      },
+      {
+        "from": "inner_loop",
+        "to": "advance_outer"
+      },
+      {
+        "from": "advance_outer",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "outer.current",
+        "cardinality": "exactly_one",
+        "display_name": "Outer Current"
+      },
+      {
+        "type": "total.current",
+        "cardinality": "exactly_one",
+        "display_name": "Total Current"
+      },
+      {
+        "type": "outer.done",
+        "cardinality": "exactly_one",
+        "display_name": "Outer Done"
+      },
+      {
+        "type": "inner.iterations",
+        "cardinality": "exactly_one",
+        "display_name": "Inner Iterations"
+      }
+    ]
+  },
+  "type_key": "loop.outer_accumulate_body"
+}

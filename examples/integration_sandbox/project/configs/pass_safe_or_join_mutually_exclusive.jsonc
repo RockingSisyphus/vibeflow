@@ -1,91 +1,232 @@
 {
   "pipeline": {
     "inputs": [
-      {"key": "calc.a", "type": "calc.a"},
-      {"key": "calc.b", "type": "calc.b"},
-      {"key": "calc.c", "type": "calc.c"},
-      {"key": "calc.d", "type": "calc.d"}
+      {
+        "key": "calc.a",
+        "type": "calc.a",
+        "display_name": "Calc A"
+      },
+      {
+        "key": "calc.b",
+        "type": "calc.b",
+        "display_name": "Calc B"
+      },
+      {
+        "key": "calc.c",
+        "type": "calc.c",
+        "display_name": "Calc C"
+      },
+      {
+        "key": "calc.d",
+        "type": "calc.d",
+        "display_name": "Calc D"
+      }
     ],
     "nodes": [
-      {"name": "start", "type": "sandbox.start", "display_name": "Start", "description": "Starts a mutually exclusive branch join example."},
       {
-        "name": "add_pair",
-        "type": "semantic.add_pair",
+        "display_name": "Start",
+        "description": "Starts a mutually exclusive branch join example.",
+        "id": "start",
+        "type_used": "sandbox.start"
+      },
+      {
         "display_name": "Add Pair",
         "description": "Adds the two arithmetic inputs before branch adjustment.",
         "requires": [
-          {"type": "calc.a", "cardinality": "exactly_one"},
-          {"type": "calc.b", "cardinality": "exactly_one"}
+          {
+            "type": "calc.a",
+            "cardinality": "exactly_one",
+            "display_name": "Calc A"
+          },
+          {
+            "type": "calc.b",
+            "cardinality": "exactly_one",
+            "display_name": "Calc B"
+          }
         ],
-        "provides": [{"key": "calc.sum", "type": "calc.sum"}]
+        "provides": [
+          {
+            "key": "calc.sum",
+            "type": "calc.sum",
+            "display_name": "Calc Sum"
+          }
+        ],
+        "id": "add_pair",
+        "type_used": "semantic.add_pair"
       },
       {
-        "name": "scale",
-        "type": "semantic.scale",
         "display_name": "Scale",
         "description": "Scales calc.sum for both mutually exclusive branch bodies.",
-        "requires": [{"type": "calc.sum", "cardinality": "exactly_one"}],
-        "provides": [{"key": "calc.scaled", "type": "calc.scaled"}],
-        "factor": 3
+        "requires": [
+          {
+            "type": "calc.sum",
+            "cardinality": "exactly_one",
+            "display_name": "Calc Sum"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.scaled",
+            "type": "calc.scaled",
+            "display_name": "Calc Scaled"
+          }
+        ],
+        "factor": 3,
+        "id": "scale",
+        "type_used": "semantic.scale"
       },
       {
-        "name": "compare",
-        "type": "semantic.compare_gt",
         "display_name": "Compare Route",
         "description": "Chooses whether the left or right branch is active.",
         "requires": [
-          {"type": "calc.c", "cardinality": "exactly_one"},
-          {"type": "calc.d", "cardinality": "exactly_one"}
+          {
+            "type": "calc.c",
+            "cardinality": "exactly_one",
+            "display_name": "Calc C"
+          },
+          {
+            "type": "calc.d",
+            "cardinality": "exactly_one",
+            "display_name": "Calc D"
+          }
         ],
-        "provides": [{"key": "route.branch", "type": "route.branch"}]
+        "provides": [
+          {
+            "key": "route.branch",
+            "type": "route.branch",
+            "display_name": "Route Branch"
+          }
+        ],
+        "id": "compare",
+        "type_used": "semantic.compare_gt"
       },
       {
-        "name": "left_adjust",
-        "type": "semantic.left_adjust",
         "display_name": "Left Adjust",
         "description": "Runs only when the left branch is selected.",
-        "requires": [{"type": "calc.scaled", "cardinality": "exactly_one"}],
-        "provides": [{"key": "calc.left_branch", "type": "branch_result"}],
-        "bonus": 10
+        "requires": [
+          {
+            "type": "calc.scaled",
+            "cardinality": "exactly_one",
+            "display_name": "Calc Scaled"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.left_branch",
+            "type": "branch_result",
+            "display_name": "Calc Left Branch"
+          }
+        ],
+        "bonus": 10,
+        "id": "left_adjust",
+        "type_used": "semantic.left_adjust"
       },
       {
-        "name": "right_adjust",
-        "type": "semantic.right_adjust",
         "display_name": "Right Adjust",
         "description": "Runs only when the right branch is selected.",
-        "requires": [{"type": "calc.scaled", "cardinality": "exactly_one"}],
-        "provides": [{"key": "calc.right_branch", "type": "branch_result"}],
-        "penalty": 6
+        "requires": [
+          {
+            "type": "calc.scaled",
+            "cardinality": "exactly_one",
+            "display_name": "Calc Scaled"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.right_branch",
+            "type": "branch_result",
+            "display_name": "Calc Right Branch"
+          }
+        ],
+        "penalty": 6,
+        "id": "right_adjust",
+        "type_used": "semantic.right_adjust"
       },
       {
-        "name": "consume_branch",
-        "type": "semantic.branch_type_consumer",
         "display_name": "Consume Selected Branch",
         "description": "Consumes whichever mutually exclusive branch produced a branch_result value.",
         "join_policy": "any_active",
-        "requires": [{"type": "branch_result", "cardinality": "exactly_one"}],
-        "provides": [{"key": "branch.final", "type": "final_result"}]
+        "requires": [
+          {
+            "type": "branch_result",
+            "cardinality": "exactly_one",
+            "display_name": "Branch Result"
+          }
+        ],
+        "provides": [
+          {
+            "key": "branch.final",
+            "type": "final_result",
+            "display_name": "Branch Final"
+          }
+        ],
+        "id": "consume_branch",
+        "type_used": "semantic.branch_type_consumer"
       },
       {
-        "name": "end",
-        "type": "semantic.branch_final_end",
         "display_name": "End",
         "description": "Ends after the selected branch result is finalized.",
-        "requires": [{"type": "final_result", "cardinality": "exactly_one"}]
+        "requires": [
+          {
+            "type": "final_result",
+            "cardinality": "exactly_one",
+            "display_name": "Final Result"
+          }
+        ],
+        "id": "end",
+        "type_used": "semantic.branch_final_end"
       }
     ],
     "edges": [
-      {"from": "start", "to": "add_pair"},
-      {"from": "start", "to": "compare"},
-      {"from": "add_pair", "to": "scale"},
-      {"from": "scale", "to": "left_adjust"},
-      {"from": "scale", "to": "right_adjust"},
-      {"from": "compare", "to": "left_adjust", "when": "route.branch == 'left'"},
-      {"from": "compare", "to": "right_adjust", "when": "route.branch == 'right'"},
-      {"from": "left_adjust", "to": "consume_branch"},
-      {"from": "right_adjust", "to": "consume_branch"},
-      {"from": "consume_branch", "to": "end"}
+      {
+        "from": "start",
+        "to": "add_pair"
+      },
+      {
+        "from": "start",
+        "to": "compare"
+      },
+      {
+        "from": "add_pair",
+        "to": "scale"
+      },
+      {
+        "from": "scale",
+        "to": "left_adjust"
+      },
+      {
+        "from": "scale",
+        "to": "right_adjust"
+      },
+      {
+        "from": "compare",
+        "to": "left_adjust",
+        "when": "route.branch == 'left'"
+      },
+      {
+        "from": "compare",
+        "to": "right_adjust",
+        "when": "route.branch == 'right'"
+      },
+      {
+        "from": "left_adjust",
+        "to": "consume_branch"
+      },
+      {
+        "from": "right_adjust",
+        "to": "consume_branch"
+      },
+      {
+        "from": "consume_branch",
+        "to": "end"
+      }
     ],
-    "outputs": [{"type": "final_result", "cardinality": "exactly_one"}]
+    "outputs": [
+      {
+        "type": "final_result",
+        "cardinality": "exactly_one",
+        "display_name": "Final Result"
+      }
+    ]
   }
 }

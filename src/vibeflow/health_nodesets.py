@@ -20,23 +20,23 @@ def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry) -> tuple[tu
         errors.extend(_validate_nodeset_contract(nodeset))
         errors.extend(_validate_nodeset_key_scope(nodeset))
         try:
-            GraphCompiler().compile(nodeset.graph, owner=f"nodeset:{nodeset.name}")
+            GraphCompiler().compile(nodeset.graph, owner=f"nodeset:{nodeset.type_key}")
         except GraphCompileError as exc:
             errors.append(
                 _nodeset_finding(
                     "NODESET.GRAPH.COMPILE",
-                    nodeset.name,
+                    nodeset.type_key,
                     f"nodeset internal graph failed to compile: {exc}",
                     details={"compile_error": str(exc), "compile_rule_id": exc.rule_id, **dict(exc.details or {})},
                 )
             )
-        errors.extend(_validate_node_types_in_scope(nodeset.graph.nodes, graph.nodesets, registry=registry, owner=f"nodeset:{nodeset.name}"))
-        for ref_name in references.get(nodeset.name, ()):
+        errors.extend(_validate_node_types_in_scope(nodeset.graph.nodes, graph.nodesets, registry=registry, owner=f"nodeset:{nodeset.type_key}"))
+        for ref_name in references.get(nodeset.type_key, ()):
             if ref_name not in graph.nodesets:
                 errors.append(
                     _nodeset_finding(
                         "NODESET.REFERENCE.UNKNOWN",
-                        nodeset.name,
+                        nodeset.type_key,
                         f"nodeset references unknown nested nodeset: {ref_name}",
                         details={"referenced_nodeset": ref_name},
                     )
@@ -52,7 +52,7 @@ def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry) -> tuple[tu
         )
     errors.extend(_validate_nodeset_usages(graph.nodes, graph.nodesets, owner="pipeline"))
     for nodeset in graph.nodesets.values():
-        errors.extend(_validate_nodeset_usages(nodeset.graph.nodes, graph.nodesets, owner=f"nodeset:{nodeset.name}"))
+        errors.extend(_validate_nodeset_usages(nodeset.graph.nodes, graph.nodesets, owner=f"nodeset:{nodeset.type_key}"))
     return tuple(errors), tuple(warnings)
 
 
@@ -71,23 +71,23 @@ def _validate_node_types_in_scope(nodes, nodesets, *, registry: NodeRegistry, ow
     for node in nodes:
         if node.status == STATUS_PLANNED:
             continue
-        if node.node_type in LOOP_NODE_TYPES:
+        if node.type_used in LOOP_NODE_TYPES:
             continue
-        if node.node_type.startswith("nodeset."):
+        if node.type_used in nodesets:
             continue
         try:
-            registry.get(node.node_type)
+            registry.get(node.type_used)
         except NodeRegistryError as exc:
             findings.append(
                 HealthFinding(
                     rule_id="NODE.TYPE.UNKNOWN",
                     severity="error",
                     object_type="node",
-                    object_id=node.name,
+                    object_id=node.id,
                     failure_layer="topology",
                     message=str(exc),
                     suggested_fix_type="fix_config",
-                    details={"node_type": node.node_type, "owner": owner},
+                    details={"type_used": node.type_used, "owner": owner},
                 )
             )
     return tuple(findings)
@@ -98,9 +98,9 @@ def _validate_nodeset_usages(nodes, nodesets, *, owner: str) -> tuple[HealthFind
     for node in nodes:
         if node.status == STATUS_PLANNED:
             continue
-        if not node.node_type.startswith("nodeset."):
+        if node.type_used not in nodesets:
             continue
-        nodeset_name = node.node_type.removeprefix("nodeset.")
+        nodeset_name = node.type_used
         nodeset = nodesets.get(nodeset_name)
         if nodeset is None:
             findings.append(
@@ -109,7 +109,7 @@ def _validate_nodeset_usages(nodes, nodesets, *, owner: str) -> tuple[HealthFind
                     nodeset_name,
                     f"pipeline node references unknown nodeset: {nodeset_name}",
                     object_type="node",
-                    object_id=node.name,
+                    object_id=node.id,
                     details={"nodeset": nodeset_name, "owner": owner},
                 )
             )
@@ -118,10 +118,10 @@ def _validate_nodeset_usages(nodes, nodesets, *, owner: str) -> tuple[HealthFind
             findings.append(
                 _nodeset_finding(
                     "NODESET.CONTRACT.EXTERNAL_MISMATCH",
-                    nodeset.name,
-                    f"nodeset node '{node.name}' requires must match nodeset requires",
+                    nodeset.type_key,
+                    f"nodeset node '{node.id}' requires must match nodeset requires",
                     object_type="node",
-                    object_id=node.name,
+                    object_id=node.id,
                     details={"expected_requires": requirements_to_dicts(nodeset.requires), "actual_requires": requirements_to_dicts(node.requires), "owner": owner},
                 )
             )
@@ -129,10 +129,10 @@ def _validate_nodeset_usages(nodes, nodesets, *, owner: str) -> tuple[HealthFind
             findings.append(
                 _nodeset_finding(
                     "NODESET.CONTRACT.EXTERNAL_MISMATCH",
-                    nodeset.name,
-                    f"nodeset node '{node.name}' provides must match nodeset provides",
+                    nodeset.type_key,
+                    f"nodeset node '{node.id}' provides must match nodeset provides",
                     object_type="node",
-                    object_id=node.name,
+                    object_id=node.id,
                     details={"expected_provides": providers_to_dicts(nodeset.provides), "actual_provides": providers_to_dicts(node.provides), "owner": owner},
                 )
             )
@@ -141,35 +141,22 @@ def _validate_nodeset_usages(nodes, nodesets, *, owner: str) -> tuple[HealthFind
 
 def _validate_nodeset_metadata(nodeset) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
-    for field_name in ("name", "display_name", "category", "description", "version", "purity"):
+    for field_name in ("type_key", "display_name", "description"):
         if not str(getattr(nodeset, field_name, "")).strip():
-            findings.append(_nodeset_finding("NODESET.METADATA.MISSING", nodeset.name, f"nodeset.{field_name} must be non-empty", details={"field": field_name}))
-    if getattr(nodeset, "purity", "") != "pure":
-        findings.append(_nodeset_finding("NODESET.METADATA.PURITY", nodeset.name, "nodeset.purity must be 'pure'"))
+            findings.append(_nodeset_finding("NODESET.METADATA.MISSING", nodeset.type_key, f"nodeset.{field_name} must be non-empty", details={"field": field_name}))
     return tuple(findings)
 
 
 def _validate_nodeset_contract(nodeset) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
     if len(set(requirement_types(nodeset.requires))) != len(nodeset.requires):
-        findings.append(_nodeset_finding("NODESET.CONTRACT.REQUIRES", nodeset.name, "nodeset.requires must contain unique non-empty types"))
-    for field_name in ("provides", "exports"):
+        findings.append(_nodeset_finding("NODESET.CONTRACT.REQUIRES", nodeset.type_key, "nodeset.requires must contain unique non-empty types"))
+    for field_name in ("provides",):
         values = provider_keys(getattr(nodeset, field_name, ()))
         if any(not value.strip() for value in values) or len(set(values)) != len(values):
-            findings.append(_nodeset_finding("NODESET.CONTRACT.KEYS", nodeset.name, f"nodeset.{field_name} must contain unique non-empty keys", details={"field": field_name}))
+            findings.append(_nodeset_finding("NODESET.CONTRACT.KEYS", nodeset.type_key, f"nodeset.{field_name} must contain unique non-empty keys", details={"field": field_name}))
     if not nodeset.provides:
-        findings.append(_nodeset_finding("NODESET.CONTRACT.PROVIDES", nodeset.name, "nodeset.provides must declare at least one output key"))
-    if not nodeset.exports:
-        findings.append(_nodeset_finding("NODESET.CONTRACT.EXPORTS", nodeset.name, "nodeset.exports must declare at least one exported key"))
-    if not set(provider_keys(nodeset.exports)) <= set(provider_keys(nodeset.provides)):
-        findings.append(
-            _nodeset_finding(
-                "NODESET.CONTRACT.EXPORTS_NOT_PROVIDES",
-                nodeset.name,
-                "nodeset.exports must be a subset of nodeset.provides",
-                details={"exports": providers_to_dicts(nodeset.exports), "provides": providers_to_dicts(nodeset.provides)},
-            )
-        )
+        findings.append(_nodeset_finding("NODESET.CONTRACT.PROVIDES", nodeset.type_key, "nodeset.provides must declare at least one output key"))
     return tuple(findings)
 
 
@@ -177,24 +164,14 @@ def _validate_nodeset_key_scope(nodeset) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
     internal_provided = {provider.key for node in nodeset.graph.nodes for provider in node.provides}
     internal_required = {requirement.type for node in nodeset.graph.nodes for requirement in node.requires}
-    export_keys = set(provider_keys(nodeset.exports))
     provide_keys = set(provider_keys(nodeset.provides))
-    if not export_keys <= internal_provided:
+    if not provide_keys <= internal_provided:
         findings.append(
             _nodeset_finding(
-                "NODESET.EXPORT.UNKNOWN_KEY",
-                nodeset.name,
-                "nodeset exports keys not produced internally",
-                details={"missing_exports": sorted(export_keys - internal_provided)},
-            )
-        )
-    if not provide_keys <= export_keys:
-        findings.append(
-            _nodeset_finding(
-                "NODESET.KEY_LEAK",
-                nodeset.name,
-                "nodeset.provides must not expose keys outside exports",
-                details={"leaked_keys": sorted(provide_keys - export_keys)},
+                "NODESET.PROVIDES.UNKNOWN_KEY",
+                nodeset.type_key,
+                "nodeset provides keys not produced internally",
+                details={"missing_provides": sorted(provide_keys - internal_provided)},
             )
         )
     external_inputs = {provider.type for provider in nodeset.graph.inputs} | (internal_required - {provider.type for node in nodeset.graph.nodes for provider in node.provides})
@@ -203,15 +180,11 @@ def _validate_nodeset_key_scope(nodeset) -> tuple[HealthFinding, ...]:
         findings.append(
             _nodeset_finding(
                 "NODESET.INPUT_SCOPE",
-                nodeset.name,
+                nodeset.type_key,
                 "nodeset internal inputs must be declared in nodeset.requires",
                 details={"undeclared_inputs": sorted(external_inputs - declared_inputs)},
             )
         )
-    internal_only = internal_provided - export_keys
-    leaked = internal_only & provide_keys
-    if leaked:
-        findings.append(_nodeset_finding("NODESET.INTERNAL_KEY_LEAK", nodeset.name, "nodeset internal intermediate keys must not leak through provides", details={"leaked_keys": sorted(leaked)}))
     return tuple(findings)
 
 
@@ -220,9 +193,9 @@ def _nodeset_references(graph: GraphConfig) -> dict[str, tuple[str, ...]]:
     for name, nodeset in graph.nodesets.items():
         targets: list[str] = []
         for node in nodeset.graph.nodes:
-            if node.node_type.startswith("nodeset."):
-                targets.append(node.node_type.removeprefix("nodeset."))
-            elif node.node_type in LOOP_NODE_TYPES and node.loop.body:
+            if node.type_used in graph.nodesets:
+                targets.append(node.type_used)
+            elif node.type_used in LOOP_NODE_TYPES and node.loop.body:
                 targets.append(node.loop.body)
         refs[name] = tuple(sorted(set(targets)))
     return refs

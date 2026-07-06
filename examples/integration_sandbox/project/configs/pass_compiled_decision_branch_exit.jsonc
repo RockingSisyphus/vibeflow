@@ -3,119 +3,146 @@
     "inputs": [
       {
         "key": "value.in",
-        "type": "value.in"
+        "type": "value.in",
+        "display_name": "Value In"
       }
     ],
     "max_steps": 20,
     "nodes": [
       {
-        "name": "start",
-        "type": "sandbox.start"
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
       },
       {
-        "name": "input",
-        "type": "sandbox.value_input",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.in.input",
-            "type": "value.in"
+            "type": "value.in",
+            "display_name": "Value In Input"
           }
-        ]
+        ],
+        "id": "input",
+        "type_used": "sandbox.value_input",
+        "display_name": "Input",
+        "description": "Runs input."
       },
       {
-        "name": "prepare",
-        "type": "sandbox.prepare_value",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.prepared",
-            "type": "value.prepared"
+            "type": "value.prepared",
+            "display_name": "Value Prepared"
           }
         ],
-        "offset": 1
+        "offset": 1,
+        "id": "prepare",
+        "type_used": "sandbox.prepare_value",
+        "display_name": "Prepare",
+        "description": "Runs prepare."
       },
       {
-        "name": "compute",
-        "type": "sandbox.core_compute",
         "requires": [
           {
             "type": "value.prepared",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Prepared"
           }
         ],
         "provides": [
           {
             "key": "value.out",
-            "type": "value.out"
+            "type": "value.out",
+            "display_name": "Value Out"
           }
         ],
-        "factor": 2
+        "factor": 2,
+        "id": "compute",
+        "type_used": "sandbox.core_compute",
+        "display_name": "Compute",
+        "description": "Runs compute."
       },
       {
-        "name": "route",
-        "type": "sandbox.route_decision",
         "requires": [
           {
             "type": "value.out",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
           }
         ],
         "provides": [
           {
             "key": "flow.route",
-            "type": "flow.route"
+            "type": "flow.route",
+            "display_name": "Flow Route"
           }
         ],
-        "threshold": 10
+        "threshold": 10,
+        "id": "route",
+        "type_used": "sandbox.route_decision",
+        "display_name": "Route",
+        "description": "Runs route."
       },
       {
-        "name": "external",
-        "type": "sandbox.external_boost",
         "join_policy": "all",
         "requires": [
           {
             "type": "value.out",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
           },
           {
             "type": "flow.route",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Flow Route"
           }
         ],
         "provides": [
           {
             "key": "value.final",
-            "type": "value.final"
+            "type": "value.final",
+            "display_name": "Value Final"
           }
         ],
-        "bonus": 5
+        "bonus": 5,
+        "id": "external",
+        "type_used": "sandbox.external_boost",
+        "display_name": "External",
+        "description": "Runs external."
       },
       {
-        "name": "end",
-        "type": "sandbox.final_value_end",
         "requires": [
           {
             "type": "value.final",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Final"
           }
-        ]
+        ],
+        "id": "end",
+        "type_used": "sandbox.final_value_end",
+        "display_name": "End",
+        "description": "Runs end."
       },
       {
-        "name": "again_end",
-        "type": "sandbox.start",
         "display_name": "Again Branch End",
-        "description": "Terminates the inactive again branch in the acyclic compiled fixture."
+        "description": "Terminates the inactive again branch in the acyclic compiled fixture.",
+        "id": "again_end",
+        "type_used": "sandbox.start"
       }
     ],
     "edges": [
@@ -157,11 +184,13 @@
     "outputs": [
       {
         "type": "value.final",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Value Final"
       },
       {
         "type": "flow.route",
-        "cardinality": "optional_one"
+        "cardinality": "optional_one",
+        "display_name": "Flow Route"
       }
     ]
   }

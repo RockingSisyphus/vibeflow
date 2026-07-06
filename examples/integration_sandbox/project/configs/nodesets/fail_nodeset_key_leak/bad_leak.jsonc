@@ -1,0 +1,84 @@
+{
+  "display_name": "Bad Leak",
+  "description": "Bad nodeset leaking an internal key.",
+  "requires": [
+    {
+      "type": "value.in",
+      "cardinality": "exactly_one",
+      "display_name": "Value In"
+    }
+  ],
+  "provides": [
+    {
+      "key": "value.out",
+      "type": "value.out",
+      "display_name": "Value Out"
+    },
+    {
+      "key": "missing.out",
+      "type": "missing.out",
+      "display_name": "Missing Out"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "value.in",
+        "type": "value.in",
+        "display_name": "Value In"
+      }
+    ],
+    "nodes": [
+      {
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out",
+            "display_name": "Value Out"
+          }
+        ],
+        "delta": 1,
+        "id": "add",
+        "type_used": "sandbox.add",
+        "display_name": "Add",
+        "description": "Runs add."
+      },
+      {
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
+          }
+        ],
+        "provides": [
+          {
+            "key": "tmp.inner",
+            "type": "tmp.inner",
+            "display_name": "Tmp Inner"
+          }
+        ],
+        "delta": 2,
+        "id": "tmp",
+        "type_used": "sandbox.add",
+        "display_name": "Tmp",
+        "description": "Runs tmp."
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.in",
+        "cardinality": "exactly_one",
+        "display_name": "Value In"
+      }
+    ]
+  },
+  "type_key": "bad.leak"
+}

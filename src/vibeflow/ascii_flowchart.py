@@ -102,10 +102,10 @@ class _Renderer:
             nodeset = nodeset_for_node(graph, spec)
             flow_kind = node_flow_kind(spec, compiled) or (nodeset.flow_kind if nodeset else FLOW_KIND_PROCESS)
             label = self._nodeset_label(spec, nodeset, flow_kind) if nodeset else self._node_label(spec, flow_kind)
-            markers = findings_by_node.get(spec.name, ())
+            markers = findings_by_node.get(spec.id, ())
             if markers:
                 label = (*label, *markers)
-            nodes[spec.name] = AsciiNode(spec.name, flow_kind, tuple(shorten(line, limit=46) for line in label if line), index)
+            nodes[spec.id] = AsciiNode(spec.id, flow_kind, tuple(shorten(line, limit=46) for line in label if line), index)
         return nodes
 
     def _ascii_edges(self, compiled: CompiledGraph) -> list[AsciiEdge]:
@@ -117,7 +117,8 @@ class _Renderer:
             if nodeset is None:
                 continue
             nested_compiled = compile_for_render(nodeset.graph, None, self.registry)
-            self._render_section(lines, nodeset.graph, nested_compiled, title=f"nodeset {nodeset.name}", indent=f"{indent}  ")
+            title = node.metadata.display_name or nodeset.display_name or node.id
+            self._render_section(lines, nodeset.graph, nested_compiled, title=f"nodeset {title} (id={node.id}, type_key={nodeset.type_key})", indent=f"{indent}  ")
 
     def _render_edges(self, lines: list[str], compiled: CompiledGraph, *, indent: str) -> None:
         if not compiled.effective_edges:
@@ -135,13 +136,13 @@ class _Renderer:
     def _render_contracts(self, lines: list[str], graph: GraphConfig, compiled: CompiledGraph, *, indent: str) -> None:
         lines.append(f"{indent}Node contracts:")
         for node in graph.nodes:
-            lines.append(f"{indent}  {node.name}: " + "; ".join(self._contract_details(graph, node, compiled)))
+            lines.append(f"{indent}  {node.id}: " + "; ".join(self._contract_details(graph, node, compiled)))
         lines.append("")
 
     def _contract_details(self, graph: GraphConfig, node: NodeSpec, compiled: CompiledGraph) -> list[str]:
         nodeset = nodeset_for_node(graph, node)
         flow_kind = node_flow_kind(node, compiled) or (nodeset.flow_kind if nodeset else FLOW_KIND_PROCESS)
-        details = [f"kind={flow_kind}", f"type={node.node_type}"]
+        details = [f"kind={flow_kind}", f"type_used={node.type_used}"]
         if node.status == STATUS_PLANNED:
             behavior = effective_planned_behavior(node, nodeset)
             details.append(f"status={planned_behavior_label(behavior).replace(' ', '_')}")
@@ -152,7 +153,7 @@ class _Renderer:
         if nodeset is None:
             details.extend((f"requires={_contract_text(node.requires)}", f"provides={_contract_text(node.provides)}"))
         else:
-            details.extend((f"requires={_contract_text(nodeset.requires or node.requires)}", f"provides={_contract_text(nodeset.provides or node.provides)}", f"exports={_contract_text(nodeset.exports)}"))
+            details.extend((f"type_key={nodeset.type_key}", f"requires={_contract_text(nodeset.requires or node.requires)}", f"provides={_contract_text(nodeset.provides or node.provides)}"))
         return details
 
     def _render_findings(self, lines: list[str]) -> None:
@@ -169,7 +170,7 @@ class _Renderer:
             lines.append(f"  [{severity}] {rule_id} {object_type}:{object_id} - {message}")
 
     def _node_label(self, node: NodeSpec, flow_kind: str) -> tuple[str, ...]:
-        lines = [_badge(flow_kind, node), node.name]
+        lines = [_badge(flow_kind, node), node.id]
         if node.status == STATUS_PLANNED:
             lines.append(planned_behavior_label(node.planned_behavior).upper())
             if node.planned_behavior.stub_module:
@@ -181,7 +182,7 @@ class _Renderer:
     def _nodeset_label(self, node: NodeSpec, nodeset: NodesetSpec | None, flow_kind: str) -> tuple[str, ...]:
         if nodeset is None:
             return self._node_label(node, flow_kind)
-        lines = [_badge(flow_kind, node), node.name]
+        lines = [_badge(flow_kind, node), node.id]
         if node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED:
             behavior = effective_planned_behavior(node, nodeset)
             lines.append(planned_behavior_label(behavior).upper())
@@ -195,8 +196,8 @@ class _Renderer:
 
 def _badge(flow_kind: str, node: NodeSpec) -> str:
     if flow_kind == FLOW_KIND_TERMINAL:
-        name = node.name.lower()
-        return "● END" if name.endswith("end") or name == "end" else "● START"
+        node_id = node.id.lower()
+        return "● END" if node_id.endswith("end") or node_id == "end" else "● START"
     badges = {
         FLOW_KIND_DECISION: "DECISION",
         FLOW_KIND_IO: "⇄ I/O",

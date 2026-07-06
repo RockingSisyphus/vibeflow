@@ -242,7 +242,7 @@ def test_implemented_nodeset_cannot_contain_planned_child() -> None:
             ],
             "pipeline": {
                 "nodes": [
-                    _node_call("a", "nodeset.a", "Calls nodeset a.", provides=[PROV_SPEC("value.out")]),
+                    _node_call("a", "a", "Calls nodeset a.", provides=[PROV_SPEC("value.out")]),
                 ]
             },
         }
@@ -466,7 +466,7 @@ def test_removed_loop_registration_and_edge_limits_are_rejected() -> None:
             {
                 "pipeline": {
                     "nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])],
-                    "loops": [{"name": "counter_loop", "edges": [["seed", "seed"]]}],
+                    "loops": [{"id": "counter_loop", "edges": [["seed", "seed"]]}],
                 }
             }
         )
@@ -482,7 +482,7 @@ def test_removed_loop_registration_and_edge_limits_are_rejected() -> None:
         )
 
 def test_compiler_can_check_registry_node_types() -> None:
-    graph = parse_graph_config({"pipeline": {"nodes": [{"name": "missing", "type": "test.missing"}]}})
+    graph = parse_graph_config({"pipeline": {"nodes": [{"id": "missing", "type_used": "test.missing", "display_name": "Missing", "description": "Missing fixture."}]}})
     with pytest.raises(GraphCompileError, match="unknown type"):
         GraphCompiler().compile(graph, registry=_registry())
 
@@ -514,7 +514,7 @@ def test_boundary_schema_and_node_registry_isolation() -> None:
                 "provides": ["bad.result"],
                 "allowed_paths": "runs",
             },
-            "pipeline": {"nodes": [{"name": "seed", "type": "test.seed"}]},
+            "pipeline": {"nodes": [{"id": "seed", "type_used": "test.seed", "display_name": "Seed", "description": "Seed fixture."}]},
         }
     )
     rule_ids = {finding.rule_id for finding in findings}
@@ -577,7 +577,8 @@ def test_checked_run_writes_reproducible_artifacts_without_raw_inputs(tmp_path) 
         mermaid_to = "n_end" if edge["to"] == "end" else edge["to"]
         assert any(line.strip().startswith(f'{edge["from"]} -->') and line.strip().endswith(f" {mermaid_to}") for line in graph_mmd.splitlines())
         assert f'{edge["from"]} ----> {edge["to"]}' in graph_txt
-    assert "add -->|value.out| n_end" in graph_mmd
+    assert "---------- data ----------" in graph_mmd
+    assert "data: Value Out" in graph_mmd
     assert "TOPOLOGY FLOWCHART" in graph_txt
     assert "provides=value.out" in graph_txt
     if is_mermaid_svg_renderer_available():

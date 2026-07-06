@@ -1,0 +1,8 @@
+{
+  "status": "planned",
+  "type_key": "a",
+  "display_name": "A",
+  "description": "Nodeset implementation for a.",
+  "requires": [],
+  "provides": []
+}

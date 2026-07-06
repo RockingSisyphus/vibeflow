@@ -2,76 +2,96 @@
   "pipeline": {
     "nodes": [
       {
-        "name": "start",
-        "type": "sandbox.start"
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
       },
       {
-        "name": "left",
-        "type": "sandbox.branch_left",
         "provides": [
           {
             "key": "branch.left",
-            "type": "branch.left"
+            "type": "branch.left",
+            "display_name": "Branch Left"
           }
         ],
-        "value": 4
+        "value": 4,
+        "id": "left",
+        "type_used": "sandbox.branch_left",
+        "display_name": "Left",
+        "description": "Runs left."
       },
       {
-        "name": "right",
-        "type": "sandbox.branch_right",
         "provides": [
           {
             "key": "branch.right",
-            "type": "branch.right"
+            "type": "branch.right",
+            "display_name": "Branch Right"
           }
         ],
-        "value": 6
+        "value": 6,
+        "id": "right",
+        "type_used": "sandbox.branch_right",
+        "display_name": "Right",
+        "description": "Runs right."
       },
       {
-        "name": "sum",
-        "type": "sandbox.sum_pair",
         "requires": [
           {
             "type": "branch.left",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Branch Left"
           },
           {
             "type": "branch.right",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Branch Right"
           }
         ],
         "provides": [
           {
             "key": "value.in",
-            "type": "value.in"
+            "type": "value.in",
+            "display_name": "Value In"
           }
-        ]
+        ],
+        "id": "sum",
+        "type_used": "sandbox.sum_pair",
+        "display_name": "Sum",
+        "description": "Runs sum."
       },
       {
-        "name": "add",
-        "type": "sandbox.add_three",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.out",
-            "type": "value.out"
+            "type": "value.out",
+            "display_name": "Value Out"
           }
-        ]
+        ],
+        "id": "add",
+        "type_used": "sandbox.add_three",
+        "display_name": "Add",
+        "description": "Runs add."
       },
       {
-        "name": "end",
-        "type": "sandbox.out_value_end",
         "requires": [
           {
             "type": "value.out",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
           }
-        ]
+        ],
+        "id": "end",
+        "type_used": "sandbox.out_value_end",
+        "display_name": "End",
+        "description": "Runs end."
       }
     ],
     "edges": [
@@ -103,7 +123,8 @@
     "outputs": [
       {
         "type": "value.out",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Value Out"
       }
     ]
   }

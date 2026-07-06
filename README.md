@@ -152,7 +152,7 @@ VibeFlow 的核心是一个严格的流程图运行时：node 负责局部纯计
 
 Health 会在显式 edge 中推断同步主线、data bypass 和 async 相关边：主线 edge 负责调度并在 SVG/Mermaid 加粗，data bypass 只投递数据不触发目标并显示虚线，async edge 连接显式 async node/nodeset。
 
-数据契约使用严格结构化写法：`provides` 声明唯一 `key` 和逻辑 `type`，`requires` 按 `type` 和 `cardinality` 消费。运行时通过 node inbox / edge payload 传递 envelope，不支持跨多跳从全局 Context 偷读早期输出；最终结果只保留 `pipeline.outputs` 声明的内容。
+配置调用点使用 `id` 和 `type_used`：`type_used` 指向 Python node 的 `NodeInfo.type_key`、独立 nodeset JSONC 的 `type_key` 或系统类型。数据契约使用严格结构化写法：`provides` 声明唯一 `key`、逻辑 `type` 和 `display_name`，`requires` 按 `type`、`cardinality` 和 `display_name` 消费。运行时通过 node inbox / edge payload 传递 envelope，不支持跨多跳从全局 Context 偷读早期输出；最终结果只保留 `pipeline.outputs` 声明的内容。
 
 ### 小 node 和纯逻辑
 

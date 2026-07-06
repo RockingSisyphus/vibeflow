@@ -47,19 +47,19 @@ class GraphCompiler:
         owner: str = "pipeline",
     ) -> CompiledGraph:
         _call_compiler_plugins(plugin_registry, "before_compile", graph)
-        nodes_by_name = {node.name: node for node in graph.nodes}
+        nodes_by_name = {node.id: node for node in graph.nodes}
         _validate_no_explicit_cycles(nodes_by_name, graph.edges, owner=owner)
         _validate_node_types(graph.nodes, registry=registry, nodesets=known_nodesets or set(graph.nodesets))
         providers = _collect_providers(graph.nodes, input_keys=set(provider_keys(graph.inputs)))
         consumers = _collect_consumers(graph.nodes)
         effective_edges = _merge_edges(graph.edges)
-        flow_kinds = _node_flow_kinds(nodes_by_name, registry=registry)
+        flow_kinds = _node_flow_kinds(nodes_by_name, registry=registry, nodesets=known_nodesets or set(graph.nodesets))
         from .mainline import analyze_mainline
 
         mainline = analyze_mainline(graph, effective_edges, flow_kinds, owner=owner)
         _validate_routing_edge_conditions(graph.edges, flow_kinds=flow_kinds)
         compiled = CompiledGraph(
-            order=tuple(node.name for node in graph.nodes),
+            order=tuple(node.id for node in graph.nodes),
             explicit_edges=graph.edges,
             data_edges=mainline.data_bypass_edges,
             effective_edges=effective_edges,
@@ -91,22 +91,30 @@ def _call_compiler_plugins(plugin_registry: PluginRegistry | None, hook: str, *a
 
 
 def _validate_node_types(nodes: tuple[NodeSpec, ...], *, registry: Any | None, nodesets: set[str]) -> None:
+    if registry is not None:
+        for type_key in nodesets:
+            try:
+                registry.get(type_key)
+            except Exception:
+                continue
+            raise GraphCompileError(
+                f"type_key '{type_key}' is defined by both a Python node and a nodeset",
+                "NODE.TYPE.CONFLICT",
+                details={"type_key": type_key, "sources": ["python_node", "nodeset"]},
+            )
     if registry is None:
         return
     for node in nodes:
         if node.status == STATUS_PLANNED:
             continue
-        if node.node_type in LOOP_NODE_TYPES:
+        if node.type_used in LOOP_NODE_TYPES:
             continue
-        if node.node_type.startswith("nodeset."):
-            nodeset_name = node.node_type.removeprefix("nodeset.")
-            if nodeset_name not in nodesets:
-                raise GraphCompileError(f"node '{node.name}' references unknown nodeset '{nodeset_name}'")
+        if node.type_used in nodesets:
             continue
         try:
-            registry.get(node.node_type)
+            registry.get(node.type_used)
         except Exception as exc:
-            raise GraphCompileError(f"node '{node.name}' has unknown type '{node.node_type}'") from exc
+            raise GraphCompileError(f"node '{node.id}' has unknown type_used '{node.type_used}'") from exc
 
 
 def _collect_providers(nodes: tuple[NodeSpec, ...], *, input_keys: set[str] | None = None) -> dict[str, str]:
@@ -118,10 +126,10 @@ def _collect_providers(nodes: tuple[NodeSpec, ...], *, input_keys: set[str] | No
         for provider_spec in node.provides:
             key = provider_spec.key
             if key in input_keys:
-                raise GraphCompileError(f"key '{key}' is declared by pipeline.inputs and provided by node '{node.name}'")
+                raise GraphCompileError(f"key '{key}' is declared by pipeline.inputs and provided by node '{node.id}'")
             if key in providers:
-                raise GraphCompileError(f"key '{key}' provided by both '{providers[key]}' and '{node.name}'")
-            providers[key] = node.name
+                raise GraphCompileError(f"key '{key}' provided by both '{providers[key]}' and '{node.id}'")
+            providers[key] = node.id
     return providers
 
 
@@ -131,7 +139,7 @@ def _collect_consumers(nodes: tuple[NodeSpec, ...]) -> dict[str, tuple[str, ...]
         if node.status == STATUS_PLANNED:
             continue
         for requirement in node.requires:
-            consumers.setdefault(requirement.type, []).append(node.name)
+            consumers.setdefault(requirement.type, []).append(node.id)
     return {key: tuple(values) for key, values in consumers.items()}
 
 
@@ -198,22 +206,22 @@ def _validate_routing_edge_conditions(edges: tuple[EdgeSpec, ...], *, flow_kinds
             )
 
 
-def _node_flow_kinds(nodes_by_name: dict[str, NodeSpec], *, registry: Any | None) -> dict[str, str]:
+def _node_flow_kinds(nodes_by_name: dict[str, NodeSpec], *, registry: Any | None, nodesets: set[str]) -> dict[str, str]:
     kinds: dict[str, str] = {}
     for name, spec in nodes_by_name.items():
         if spec.status == STATUS_PLANNED:
             kinds[name] = spec.flow_kind
             continue
-        if spec.node_type in LOOP_NODE_TYPES:
+        if spec.type_used in LOOP_NODE_TYPES:
             kinds[name] = FLOW_KIND_PREDEFINED
             continue
-        if spec.node_type.startswith("nodeset."):
+        if spec.type_used in nodesets:
             kinds[name] = FLOW_KIND_PREDEFINED
             continue
         if registry is None:
             kinds[name] = ""
             continue
-        node_cls = registry.get(spec.node_type)
+        node_cls = registry.get(spec.type_used)
         info = getattr(node_cls, "NODE_INFO", None)
         kinds[name] = str(getattr(info, "flow_kind", ""))
     return kinds

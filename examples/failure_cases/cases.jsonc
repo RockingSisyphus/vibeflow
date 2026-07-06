@@ -33,10 +33,59 @@
       "config": {
         "pipeline": {
           "nodes": [
-            {"name": "add", "type": "test.add", "display_name": "Add", "description": "Adds value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}], "provides": [{"key": "value.out", "type": "value.out"}]},
-            {"name": "copy", "type": "test.copy", "display_name": "Copy", "description": "Copies value.out back to value.in.", "requires": [{"type": "value.out", "cardinality": "exactly_one"}], "provides": [{"key": "value.in.copy", "type": "value.in"}]}
+            {
+              "display_name": "Add",
+              "description": "Adds value.in.",
+              "requires": [
+                {
+                  "type": "value.in",
+                  "cardinality": "exactly_one",
+                  "display_name": "Value In"
+                }
+              ],
+              "provides": [
+                {
+                  "key": "value.out",
+                  "type": "value.out",
+                  "display_name": "Value Out"
+                }
+              ],
+              "id": "add",
+              "type_used": "test.add"
+            },
+            {
+              "display_name": "Copy",
+              "description": "Copies value.out back to value.in.",
+              "requires": [
+                {
+                  "type": "value.out",
+                  "cardinality": "exactly_one",
+                  "display_name": "Value Out"
+                }
+              ],
+              "provides": [
+                {
+                  "key": "value.in.copy",
+                  "type": "value.in",
+                  "display_name": "Value In Copy"
+                }
+              ],
+              "id": "copy",
+              "type_used": "test.copy"
+            }
           ],
-          "loops": [{"name": "old", "edges": [["copy", "add"]], "max_iterations": 2}]
+          "loops": [
+            {
+              "name": "old",
+              "edges": [
+                [
+                  "copy",
+                  "add"
+                ]
+              ],
+              "max_iterations": 2
+            }
+          ]
         }
       }
     },
@@ -44,10 +93,30 @@
       "name": "illegal_boundary",
       "expected_rule_id": "CONFIG.BOUNDARY.REMOVED",
       "config": {
-        "boundary": {"type": "bad.boundary", "consumes": ["value.out"], "provides": ["bad.result"]},
+        "boundary": {
+          "type": "bad.boundary",
+          "consumes": [
+            "value.out"
+          ],
+          "provides": [
+            "bad.result"
+          ]
+        },
         "pipeline": {
           "nodes": [
-            {"name": "seed", "type": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in"}]}
+            {
+              "display_name": "Seed",
+              "description": "Produces value.in.",
+              "provides": [
+                {
+                  "key": "value.in",
+                  "type": "value.in",
+                  "display_name": "Value In"
+                }
+              ],
+              "id": "seed",
+              "type_used": "test.seed"
+            }
           ]
         }
       }
@@ -66,17 +135,102 @@
       "expected_rule_id": "GRAPH.CYCLE.FORBIDDEN",
       "config": {
         "pipeline": {
-          "inputs": [{"key": "value.in", "type": "value.in"}],
+          "inputs": [
+            {
+              "key": "value.in",
+              "type": "value.in",
+              "display_name": "Value In"
+            }
+          ],
           "nodes": [
-            {"name": "add", "type": "test.add", "display_name": "Add", "description": "Adds value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}], "provides": [{"key": "value.out", "type": "value.out"}]},
-            {"name": "route", "type": "test.route", "display_name": "Route", "description": "Routes the loop.", "requires": [{"type": "value.out", "cardinality": "exactly_one"}], "provides": [{"key": "flow.route", "type": "flow.route"}]},
-            {"name": "copy", "type": "test.copy", "display_name": "Copy", "description": "Copies output back to the loop input.", "requires": [{"type": "value.out", "cardinality": "exactly_one"}], "provides": [{"key": "value.in.copy", "type": "value.in"}]},
-            {"name": "end", "type": "test.in_end", "display_name": "End", "description": "Consumes value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}]}
+            {
+              "display_name": "Add",
+              "description": "Adds value.in.",
+              "requires": [
+                {
+                  "type": "value.in",
+                  "cardinality": "exactly_one",
+                  "display_name": "Value In"
+                }
+              ],
+              "provides": [
+                {
+                  "key": "value.out",
+                  "type": "value.out",
+                  "display_name": "Value Out"
+                }
+              ],
+              "id": "add",
+              "type_used": "test.add"
+            },
+            {
+              "display_name": "Route",
+              "description": "Routes the loop.",
+              "requires": [
+                {
+                  "type": "value.out",
+                  "cardinality": "exactly_one",
+                  "display_name": "Value Out"
+                }
+              ],
+              "provides": [
+                {
+                  "key": "flow.route",
+                  "type": "flow.route",
+                  "display_name": "Flow Route"
+                }
+              ],
+              "id": "route",
+              "type_used": "test.route"
+            },
+            {
+              "display_name": "Copy",
+              "description": "Copies output back to the loop input.",
+              "requires": [
+                {
+                  "type": "value.out",
+                  "cardinality": "exactly_one",
+                  "display_name": "Value Out"
+                }
+              ],
+              "provides": [
+                {
+                  "key": "value.in.copy",
+                  "type": "value.in",
+                  "display_name": "Value In Copy"
+                }
+              ],
+              "id": "copy",
+              "type_used": "test.copy"
+            },
+            {
+              "display_name": "End",
+              "description": "Consumes value.in.",
+              "requires": [
+                {
+                  "type": "value.in",
+                  "cardinality": "exactly_one",
+                  "display_name": "Value In"
+                }
+              ],
+              "id": "end",
+              "type_used": "test.in_end"
+            }
           ],
           "edges": [
-            {"from": "add", "to": "route"},
-            {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
-            {"from": "copy", "to": "add"}
+            {
+              "from": "add",
+              "to": "route"
+            },
+            {
+              "from": "route",
+              "to": "copy",
+              "when": "flow.route == 'again'"
+            },
+            {
+              "from": "copy",
+              "to": "add"
+            }
           ]
         }
       }
@@ -87,14 +241,52 @@
       "config": {
         "pipeline": {
           "nodes": [
-            {"name": "start", "type": "test.start", "display_name": "Start", "description": "Starts the duplicate edge fixture."},
-            {"name": "seed", "type": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in"}]},
-            {"name": "end", "type": "test.in_end", "display_name": "End", "description": "Consumes value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}]}
+            {
+              "display_name": "Start",
+              "description": "Starts the duplicate edge fixture.",
+              "id": "start",
+              "type_used": "test.start"
+            },
+            {
+              "display_name": "Seed",
+              "description": "Produces value.in.",
+              "provides": [
+                {
+                  "key": "value.in",
+                  "type": "value.in",
+                  "display_name": "Value In"
+                }
+              ],
+              "id": "seed",
+              "type_used": "test.seed"
+            },
+            {
+              "display_name": "End",
+              "description": "Consumes value.in.",
+              "requires": [
+                {
+                  "type": "value.in",
+                  "cardinality": "exactly_one",
+                  "display_name": "Value In"
+                }
+              ],
+              "id": "end",
+              "type_used": "test.in_end"
+            }
           ],
           "edges": [
-            {"from": "start", "to": "seed"},
-            {"from": "start", "to": "seed"},
-            {"from": "seed", "to": "end"}
+            {
+              "from": "start",
+              "to": "seed"
+            },
+            {
+              "from": "start",
+              "to": "seed"
+            },
+            {
+              "from": "seed",
+              "to": "end"
+            }
           ]
         }
       }
@@ -105,12 +297,51 @@
       "config": {
         "pipeline": {
           "nodes": [
-            {"name": "route", "type": "test.route", "display_name": "Route", "description": "Produces route values.", "provides": [{"key": "flow.route", "type": "flow.route"}]},
-            {"name": "copy", "type": "test.copy", "display_name": "Copy", "description": "Copies value.in to value.out.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}], "provides": [{"key": "value.out", "type": "value.out"}]}
+            {
+              "display_name": "Route",
+              "description": "Produces route values.",
+              "provides": [
+                {
+                  "key": "flow.route",
+                  "type": "flow.route",
+                  "display_name": "Flow Route"
+                }
+              ],
+              "id": "route",
+              "type_used": "test.route"
+            },
+            {
+              "display_name": "Copy",
+              "description": "Copies value.in to value.out.",
+              "requires": [
+                {
+                  "type": "value.in",
+                  "cardinality": "exactly_one",
+                  "display_name": "Value In"
+                }
+              ],
+              "provides": [
+                {
+                  "key": "value.out",
+                  "type": "value.out",
+                  "display_name": "Value Out"
+                }
+              ],
+              "id": "copy",
+              "type_used": "test.copy"
+            }
           ],
           "edges": [
-            {"from": "route", "to": "copy", "when": "flow.route == 'again'"},
-            {"from": "route", "to": "copy", "when": "flow.route == 'done'"}
+            {
+              "from": "route",
+              "to": "copy",
+              "when": "flow.route == 'again'"
+            },
+            {
+              "from": "route",
+              "to": "copy",
+              "when": "flow.route == 'done'"
+            }
           ]
         }
       }
@@ -127,7 +358,9 @@
             "exemptions": [
               {
                 "rule_id": "GRAPH.SMELL.CONFUSING_NODE_NAME",
-                "scope": {"object_id": "BadName"},
+                "scope": {
+                  "object_id": "BadName"
+                },
                 "reason": "documented failure-case exemption",
                 "expires": "2099-01-01"
               }
@@ -136,13 +369,48 @@
         },
         "pipeline": {
           "nodes": [
-            {"name": "start", "type": "test.start", "display_name": "Start", "description": "Starts the policy fixture."},
-            {"name": "BadName", "type": "test.seed", "display_name": "Bad Name", "description": "Produces value.in for the policy fixture.", "provides": [{"key": "value.in", "type": "value.in"}]},
-            {"name": "end", "type": "test.in_end", "display_name": "End", "description": "Consumes value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}]}
+            {
+              "display_name": "Start",
+              "description": "Starts the policy fixture.",
+              "id": "start",
+              "type_used": "test.start"
+            },
+            {
+              "display_name": "Bad Name",
+              "description": "Produces value.in for the policy fixture.",
+              "provides": [
+                {
+                  "key": "value.in",
+                  "type": "value.in",
+                  "display_name": "Value In"
+                }
+              ],
+              "id": "BadName",
+              "type_used": "test.seed"
+            },
+            {
+              "display_name": "End",
+              "description": "Consumes value.in.",
+              "requires": [
+                {
+                  "type": "value.in",
+                  "cardinality": "exactly_one",
+                  "display_name": "Value In"
+                }
+              ],
+              "id": "end",
+              "type_used": "test.in_end"
+            }
           ],
           "edges": [
-            {"from": "start", "to": "BadName"},
-            {"from": "BadName", "to": "end"}
+            {
+              "from": "start",
+              "to": "BadName"
+            },
+            {
+              "from": "BadName",
+              "to": "end"
+            }
           ]
         }
       }
@@ -152,7 +420,10 @@
     {
       "name": "too_many_function_params",
       "expected_rule_id": "QUALITY.FUNCTION.TOO_MANY_PARAMS",
-      "args": ["--max-function-params", "2"],
+      "args": [
+        "--max-function-params",
+        "2"
+      ],
       "files": {
         "wide.py": "def too_wide(a, b, c):\n    return a + b + c\n"
       }
@@ -160,7 +431,9 @@
     {
       "name": "aliased_side_effect_call",
       "expected_rule_id": "QUALITY.SIDE_EFFECT.CALL",
-      "args": ["--check-side-effects"],
+      "args": [
+        "--check-side-effects"
+      ],
       "files": {
         "side_effect.py": "from subprocess import run as r\n\ndef call():\n    return r(['true'])\n"
       }
@@ -168,7 +441,9 @@
     {
       "name": "skips_sensitive_file",
       "expected_absent_rule_id": "QUALITY.SIDE_EFFECT.CALL",
-      "args": ["--check-side-effects"],
+      "args": [
+        "--check-side-effects"
+      ],
       "files": {
         "secrets.py": "def leak():\n    return open('secret.txt').read()\n"
       }
@@ -180,15 +455,72 @@
       "config": {
         "pipeline": {
           "nodes": [
-            {"name": "start", "type": "test.start", "display_name": "Start", "description": "Starts the architecture fixture."},
-            {"name": "seed", "type": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in"}]},
-            {"name": "add", "type": "test.add", "display_name": "Add", "description": "Adds value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one"}], "provides": [{"key": "value.out", "type": "value.out"}]},
-            {"name": "end", "type": "test.out_end", "display_name": "End", "description": "Consumes value.out.", "requires": [{"type": "value.out", "cardinality": "exactly_one"}]}
+            {
+              "display_name": "Start",
+              "description": "Starts the architecture fixture.",
+              "id": "start",
+              "type_used": "test.start"
+            },
+            {
+              "display_name": "Seed",
+              "description": "Produces value.in.",
+              "provides": [
+                {
+                  "key": "value.in",
+                  "type": "value.in",
+                  "display_name": "Value In"
+                }
+              ],
+              "id": "seed",
+              "type_used": "test.seed"
+            },
+            {
+              "display_name": "Add",
+              "description": "Adds value.in.",
+              "requires": [
+                {
+                  "type": "value.in",
+                  "cardinality": "exactly_one",
+                  "display_name": "Value In"
+                }
+              ],
+              "provides": [
+                {
+                  "key": "value.out",
+                  "type": "value.out",
+                  "display_name": "Value Out"
+                }
+              ],
+              "id": "add",
+              "type_used": "test.add"
+            },
+            {
+              "display_name": "End",
+              "description": "Consumes value.out.",
+              "requires": [
+                {
+                  "type": "value.out",
+                  "cardinality": "exactly_one",
+                  "display_name": "Value Out"
+                }
+              ],
+              "id": "end",
+              "type_used": "test.out_end"
+            }
           ],
           "edges": [
-            {"from": "start", "to": "seed"},
-            {"from": "seed", "to": "add"},
-            {"from": "add", "to": "end"}
+            {
+              "from": "start",
+              "to": "seed"
+            },
+            {
+              "from": "seed",
+              "to": "add"
+            },
+            {
+              "from": "add",
+              "to": "end"
+            }
           ]
         }
       }

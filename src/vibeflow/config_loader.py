@@ -97,7 +97,11 @@ def _expand_nodeset_imports(
     cache: dict[Path, ConfigDocument],
 ) -> tuple[Mapping[str, Any], tuple[Mapping[str, Any], ...]]:
     imports = data.get("nodeset_imports")
+    if "nodesets" in data:
+        raise _nodeset_import_error("CONFIG.NODESETS.INLINE_REMOVED", "inline nodesets are removed; import one nodeset JSONC file per type_key with nodeset_imports", path)
     if imports is None:
+        if _is_nodeset_definition(data):
+            return {str(key): deepcopy(value) for key, value in data.items()}, ()
         return data, ()
     if not isinstance(imports, list):
         raise _nodeset_import_error("CONFIG.NODESET_IMPORTS.SHAPE", "nodeset_imports must be a list", path)
@@ -105,50 +109,39 @@ def _expand_nodeset_imports(
     imported_nodesets: list[object] = []
     import_records: list[Mapping[str, Any]] = []
     for index, item in enumerate(imports):
-        import_path, names = _parse_nodeset_import(item, path=path, index=index)
+        import_path = _parse_nodeset_import(item, path=path, index=index)
         document = _load_config_document(import_path, import_stack=import_stack, cache=cache)
-        raw_nodesets = document.data.get("nodesets")
-        if not isinstance(raw_nodesets, list) or not raw_nodesets:
-            raise _nodeset_import_error("CONFIG.NODESET_IMPORT.EMPTY", f"nodeset import has no nodesets: {import_path}", import_path)
-        selected = _select_imported_nodesets(raw_nodesets, names, import_path)
+        selected = _nodeset_definitions_from_document(document.data, import_path)
         imported_nodesets.extend(_nodesets_with_file_global_config(selected, document.data.get("global_config")))
         import_records.append(
             {
                 "path": str(import_path),
-                "names": [str(node.get("name", "")) for node in selected if isinstance(node, Mapping)],
-                "requested_names": list(names),
+                "type_keys": [str(node.get("type_key", "")) for node in selected if isinstance(node, Mapping)],
             }
         )
         import_records.extend(document.nodeset_imports)
 
-    local_nodesets = data.get("nodesets", [])
-    if local_nodesets is None:
-        local_nodesets = []
-    if not isinstance(local_nodesets, list):
-        raise _nodeset_import_error("CONFIG.NODESET_IMPORT.LOCAL_NODESETS", "nodesets must be a list when using nodeset_imports", path)
-    expanded_nodesets = [*imported_nodesets, *deepcopy(local_nodesets)]
-    _validate_unique_nodeset_names(expanded_nodesets, path)
+    expanded_nodesets = [*imported_nodesets]
+    _validate_unique_nodeset_type_keys(expanded_nodesets, path)
     expanded = {str(key): deepcopy(value) for key, value in data.items() if key != "nodeset_imports"}
     expanded["nodesets"] = expanded_nodesets
+    expanded["__vibeflow_expanded_nodesets__"] = True
     return expanded, tuple(import_records)
 
 
-def _parse_nodeset_import(item: object, *, path: Path, index: int) -> tuple[Path, tuple[str, ...]]:
+def _parse_nodeset_import(item: object, *, path: Path, index: int) -> Path:
     if isinstance(item, str):
         if not item.strip():
             raise _nodeset_import_error("CONFIG.NODESET_IMPORT.PATH", f"nodeset_imports[{index}] path must be non-empty", path)
-        return _resolve_import_path(item, path), ()
+        return _resolve_import_path(item, path)
     if not isinstance(item, Mapping):
         raise _nodeset_import_error("CONFIG.NODESET_IMPORT.SHAPE", f"nodeset_imports[{index}] must be a string or object", path)
     raw_path = item.get("path")
     if not isinstance(raw_path, str) or not raw_path.strip():
         raise _nodeset_import_error("CONFIG.NODESET_IMPORT.PATH", f"nodeset_imports[{index}].path must be a non-empty string", path)
-    raw_names = item.get("names", [])
-    if raw_names is None:
-        raw_names = []
-    if not isinstance(raw_names, list) or any(not isinstance(name, str) or not name.strip() for name in raw_names):
-        raise _nodeset_import_error("CONFIG.NODESET_IMPORT.NAMES", f"nodeset_imports[{index}].names must be a list of non-empty strings", path)
-    return _resolve_import_path(raw_path, path), tuple(str(name).strip() for name in raw_names)
+    if "names" in item:
+        raise _nodeset_import_error("CONFIG.NODESET_IMPORT.NAMES_REMOVED", f"nodeset_imports[{index}].names is removed; each nodeset file defines exactly one type_key", path)
+    return _resolve_import_path(raw_path, path)
 
 
 def _resolve_import_path(value: str, base_path: Path) -> Path:
@@ -158,14 +151,20 @@ def _resolve_import_path(value: str, base_path: Path) -> Path:
     return import_path.resolve()
 
 
-def _select_imported_nodesets(nodesets: list[object], names: tuple[str, ...], path: Path) -> list[object]:
-    if not names:
-        return list(nodesets)
-    by_name = {str(item.get("name", "")): item for item in nodesets if isinstance(item, Mapping)}
-    missing = [name for name in names if name not in by_name]
-    if missing:
-        raise _nodeset_import_error("CONFIG.NODESET_IMPORT.MISSING_NAME", f"nodeset import missing names {missing}: {path}", path)
-    return [by_name[name] for name in names]
+def _nodeset_definitions_from_document(data: Mapping[str, Any], path: Path) -> list[object]:
+    definitions: list[object] = []
+    nested = data.get("nodesets", ())
+    if isinstance(nested, list):
+        definitions.extend(deepcopy(nested))
+    if _is_nodeset_definition(data):
+        definitions.append({str(key): deepcopy(value) for key, value in data.items() if key not in {"nodesets", "__vibeflow_expanded_nodesets__"}})
+    if not definitions:
+        raise _nodeset_import_error("CONFIG.NODESET_IMPORT.EMPTY", f"nodeset import must point to a nodeset definition file: {path}", path)
+    return definitions
+
+
+def _is_nodeset_definition(data: Mapping[str, Any]) -> bool:
+    return isinstance(data.get("type_key"), str)
 
 
 def _nodesets_with_file_global_config(nodesets: list[object], global_config: object) -> list[object]:
@@ -178,20 +177,20 @@ def _nodesets_with_file_global_config(nodesets: list[object], global_config: obj
     return copied
 
 
-def _validate_unique_nodeset_names(nodesets: list[object], path: Path) -> None:
+def _validate_unique_nodeset_type_keys(nodesets: list[object], path: Path) -> None:
     seen: set[str] = set()
     duplicates: set[str] = set()
     for item in nodesets:
         if not isinstance(item, Mapping):
             continue
-        name = str(item.get("name", "")).strip()
-        if not name:
+        type_key = str(item.get("type_key", "")).strip()
+        if not type_key:
             continue
-        if name in seen:
-            duplicates.add(name)
-        seen.add(name)
+        if type_key in seen:
+            duplicates.add(type_key)
+        seen.add(type_key)
     if duplicates:
-        raise _nodeset_import_error("CONFIG.NODESET_IMPORT.DUPLICATE", f"duplicate nodeset after imports: {sorted(duplicates)}", path)
+        raise _nodeset_import_error("CONFIG.NODESET_IMPORT.DUPLICATE", f"duplicate nodeset type_key after imports: {sorted(duplicates)}", path)
 
 
 def _nodeset_import_error(rule_id: str, message: str, path: Path) -> ConfigLoadError:

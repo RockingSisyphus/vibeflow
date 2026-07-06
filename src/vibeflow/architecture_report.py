@@ -9,7 +9,7 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
     edges = compiled.effective_edges if compiled is not None else graph.edges
     adjacency = _adjacency(graph, edges)
     incoming = _incoming(graph, edges)
-    nodes = [node.name for node in graph.nodes]
+    nodes = [node.id for node in graph.nodes]
     affected = {node: _reachable(node, adjacency) for node in nodes}
     degrees = {node: len(adjacency.get(node, ())) + len(incoming.get(node, ())) for node in nodes}
     threshold = max(4, len(nodes) // 2)
@@ -31,14 +31,14 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
         ],
         "nodes": [
             {
-                "name": node.name,
-                "type": node.node_type,
+                "id": node.id,
+                "type_used": node.type_used,
                 "flow_kind": node.flow_kind,
                 "requires": requirements_to_dicts(node.requires),
                 "provides": providers_to_dicts(node.provides),
-                "incoming": sorted(incoming.get(node.name, ())),
-                "outgoing": sorted(adjacency.get(node.name, ())),
-                "affected": affected[node.name],
+                "incoming": sorted(incoming.get(node.id, ())),
+                "outgoing": sorted(adjacency.get(node.id, ())),
+                "affected": affected[node.id],
             }
             for node in graph.nodes
         ],
@@ -46,14 +46,14 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
 
 
 def _adjacency(graph: GraphConfig, edges: tuple[EdgeSpec, ...]) -> dict[str, set[str]]:
-    out = {node.name: set() for node in graph.nodes}
+    out = {node.id: set() for node in graph.nodes}
     for edge in edges:
         out.setdefault(edge.source, set()).add(edge.target)
     return out
 
 
 def _incoming(graph: GraphConfig, edges: tuple[EdgeSpec, ...]) -> dict[str, set[str]]:
-    incoming = {node.name: set() for node in graph.nodes}
+    incoming = {node.id: set() for node in graph.nodes}
     for edge in edges:
         incoming.setdefault(edge.target, set()).add(edge.source)
     return incoming

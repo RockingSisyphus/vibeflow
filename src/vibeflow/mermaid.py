@@ -54,8 +54,8 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
     payload: dict[str, object] = {
         "nodes": [
             {
-                "name": node.name,
-                "type": node.node_type,
+                "id": node.id,
+                "type_used": node.type_used,
                 "requires": requirements_to_dicts(node.requires),
                 "provides": providers_to_dicts(node.provides),
                 "status": node.status,
@@ -116,7 +116,7 @@ class _MermaidRenderer:
         self.edge_index = 0
 
     def render(self, graph: GraphConfig, compiled: CompiledGraph) -> str:
-        self.node_ids = {node.name: _safe_id(node.name) for node in graph.nodes}
+        self.node_ids = {node.id: _safe_id(node.id) for node in graph.nodes}
         self.nodeset_node_ids = _nodeset_node_ids(graph, self.node_ids)
         self.node_classes = self._finding_classes(graph, compiled) if self.show_findings else {}
         self.edge_index = 0
@@ -151,7 +151,7 @@ class _MermaidRenderer:
     ) -> None:
         should_expand = self.expand_nodesets if expand_inline is None else expand_inline
         for node in graph.nodes:
-            node_id = _safe_id(f"{prefix}{node.name}")
+            node_id = _safe_id(f"{prefix}{node.id}")
             nodeset = nodeset_for_node(graph, node)
             if nodeset is None:
                 flow_kind = node_flow_kind(node, compiled) or FLOW_KIND_PROCESS
@@ -163,7 +163,7 @@ class _MermaidRenderer:
                 self._render_custom_node_style(lines, node, node_id, indent=indent)
                 continue
             flow_kind = node_flow_kind(node, compiled) or nodeset.flow_kind
-            is_loop = node.node_type in LOOP_NODE_TYPES
+            is_loop = node.type_used in LOOP_NODE_TYPES
             class_name = self._class_for_node(node_id, preferred_class="loopNode" if is_loop else "nodesetNode", planned=node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED)
             label = self._loop_label(node, nodeset) if is_loop else self._nodeset_label(node, nodeset)
             lines.append(f"{indent}{_node_shape(node_id, label, flow_kind, shape='trap-b' if is_loop else '')}")
@@ -172,20 +172,21 @@ class _MermaidRenderer:
             self._render_custom_node_style(lines, node, node_id, indent=indent)
             if not should_expand:
                 continue
-            group_id = _safe_id(f"{prefix}{node.name}__expanded")
-            lines.append(f'{indent}subgraph {group_id}["{_escape_label(nodeset.name)}"]')
-            if nodeset.name in visited_nodesets:
-                lines.append(f"{indent}  %% recursive nodeset expansion skipped: {nodeset.name}")
+            group_id = _safe_id(f"{prefix}{node.id}__expanded")
+            group_title = _expanded_nodeset_title(node, nodeset)
+            lines.append(f'{indent}subgraph {group_id}["{_escape_label(group_title)}"]')
+            if nodeset.type_key in visited_nodesets:
+                lines.append(f"{indent}  %% recursive nodeset expansion skipped: {nodeset.type_key}")
             else:
                 nested_compiled = compile_for_render(nodeset.graph, None, self.registry)
-                nested_prefix = f"{prefix}{node.name}__"
+                nested_prefix = f"{prefix}{node.id}__"
                 self._render_graph_body(
                     lines,
                     nodeset.graph,
                     nested_compiled,
                     prefix=nested_prefix,
                     indent=f"{indent}  ",
-                    visited_nodesets=(*visited_nodesets, nodeset.name),
+                    visited_nodesets=(*visited_nodesets, nodeset.type_key),
                     expand_inline=True,
                 )
                 self._render_edges(lines, nodeset.graph, nested_compiled, prefix=nested_prefix, indent=f"{indent}  ")
@@ -196,7 +197,7 @@ class _MermaidRenderer:
             source_id = _safe_id(f"{prefix}{edge.source}")
             target_id = _safe_id(f"{prefix}{edge.target}")
             label_text = self._edge_label(graph, edge)
-            label = f"|{_escape_edge_label(label_text)}|" if label_text else ""
+            label = f'|"{_escape_edge_label(label_text)}"|' if label_text else ""
             self._append_edge_line(lines, f"{indent}{source_id} -->{label} {target_id}", style=_edge_style(compiled, edge))
 
     def _append_edge_line(self, lines: list[str], line: str, *, style: str = "") -> None:
@@ -337,7 +338,7 @@ class _MermaidRenderer:
         return ()
 
     def _node_label(self, node: NodeSpec) -> str:
-        sections: list[list[str]] = [[self._node_title(node)], [f"id: {node.name}", f"type: {node.node_type}"]]
+        sections: list[list[str]] = [[self._node_title(node)], [f"id: {node.id}", f"type_used: {node.type_used}"]]
         if node.status == STATUS_PLANNED:
             planned_lines = [_section_label("status"), f"status: {planned_behavior_label(node.planned_behavior)}"]
             if node.planned_behavior.stub_module:
@@ -350,8 +351,8 @@ class _MermaidRenderer:
         return _join_label_sections(sections)
 
     def _nodeset_label(self, node: NodeSpec, nodeset: NodesetSpec) -> str:
-        title = node.metadata.display_name or nodeset.display_name or node.name
-        sections: list[list[str]] = [[title], [f"id: {node.name}", f"type: {node.node_type}"]]
+        title = node.metadata.display_name or nodeset.display_name or node.id
+        sections: list[list[str]] = [[title], [f"id: {node.id}", f"type_used: {node.type_used}"]]
         if node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED:
             behavior = effective_planned_behavior(node, nodeset)
             planned_lines = [_section_label("status"), f"status: {planned_behavior_label(behavior)}"]
@@ -365,19 +366,17 @@ class _MermaidRenderer:
             sections.append(
                 [
                     _section_label("nodeset"),
-                    f"nodeset: {nodeset.name}",
-                    f"category: {nodeset.category}",
-                    f"version: {nodeset.version}",
+                    f"type_key: {nodeset.type_key}",
                     f"desc: {nodeset.description}",
                 ]
             )
         return _join_label_sections(sections)
 
     def _loop_label(self, node: NodeSpec, nodeset: NodesetSpec) -> str:
-        title = node.metadata.display_name or node.name
-        sections: list[list[str]] = [[title], [f"id: {node.name}", f"type: {node.node_type}"]]
+        title = node.metadata.display_name or nodeset.display_name or node.id
+        sections: list[list[str]] = [[title], [f"id: {node.id}", f"type_used: {node.type_used}"]]
         spec = node.loop
-        loop_lines = [_section_label("loop"), f"body: {nodeset.name}", f"stop: {_loop_stop_text(spec)}", f"max: {spec.max_iterations}"]
+        loop_lines = [_section_label("loop"), f"body: {nodeset.type_key}", f"stop: {_loop_stop_text(spec)}", f"max: {spec.max_iterations}"]
         sections.append(loop_lines)
         if self.show_semantics:
             call_lines = _node_metadata_lines(node)
@@ -388,29 +387,32 @@ class _MermaidRenderer:
     def _node_title(self, node: NodeSpec) -> str:
         if node.metadata.display_name:
             return node.metadata.display_name
-        if self.registry is not None and node.status != STATUS_PLANNED and not node.node_type.startswith("nodeset."):
+        if self.registry is not None and node.status != STATUS_PLANNED:
             try:
-                node_cls = self.registry.get(node.node_type)
+                node_cls = self.registry.get(node.type_used)
             except Exception:
                 node_cls = None
             info = getattr(node_cls, "NODE_INFO", None) if node_cls is not None else None
             display_name = str(getattr(info, "display_name", "")).strip() if info is not None else ""
             if display_name:
                 return display_name
-        return node.name
+        return node.id
 
     def _edge_label(self, graph: GraphConfig, edge: object) -> str:
         when = str(getattr(edge, "when", "")).strip()
         data_text = _edge_contract_text(graph, edge) if self.show_contract else ""
-        if when and data_text:
-            return f"when: {when}\ndata: {data_text}"
-        return when or data_text
+        sections: list[list[str]] = []
+        if when:
+            sections.append([_section_label("when"), f"when: {when}"])
+        if data_text:
+            sections.append([_section_label("data"), f"data: {data_text}"])
+        return _join_label_sections(sections)
 
     def _node_semantic_lines(self, node: NodeSpec) -> tuple[str, ...]:
         lines = list(_node_metadata_lines(node))
-        if self.registry is not None and node.status != STATUS_PLANNED and not node.node_type.startswith("nodeset."):
+        if self.registry is not None and node.status != STATUS_PLANNED:
             try:
-                node_cls = self.registry.get(node.node_type)
+                node_cls = self.registry.get(node.type_used)
             except Exception:
                 node_cls = None
             info = getattr(node_cls, "NODE_INFO", None) if node_cls is not None else None
@@ -433,17 +435,18 @@ def _nodeset_node_ids(graph: GraphConfig, node_ids: Mapping[str, str]) -> dict[s
     for node in graph.nodes:
         nodeset = nodeset_for_node(graph, node)
         if nodeset is not None:
-            result[nodeset.name] = node_ids[node.name]
+            result[nodeset.type_key] = node_ids[node.id]
     return result
+
+
+def _expanded_nodeset_title(node: NodeSpec, nodeset: NodesetSpec) -> str:
+    title = node.metadata.display_name or nodeset.display_name or node.id or nodeset.type_key
+    return f"{title} (id: {node.id}, type_key: {nodeset.type_key})"
 
 
 def _node_metadata_lines(node: NodeSpec) -> tuple[str, ...]:
     lines: list[str] = []
     metadata = node.metadata
-    if metadata.category:
-        lines.append(f"category: {metadata.category}")
-    if metadata.version:
-        lines.append(f"version: {metadata.version}")
     if metadata.description:
         lines.append(f"desc: {metadata.description}")
     return tuple(lines)
@@ -553,7 +556,7 @@ def _resource_value(resource: Mapping[str, object], info_map: Mapping[str, objec
 def _edge_contract_text(graph: GraphConfig, edge: object, *, max_items: int = 2) -> str:
     source_name = str(getattr(edge, "source", ""))
     target_name = str(getattr(edge, "target", ""))
-    nodes = {node.name: node for node in graph.nodes}
+    nodes = {node.id: node for node in graph.nodes}
     source = nodes.get(source_name)
     target = nodes.get(target_name)
     if source is None or target is None:
@@ -573,6 +576,12 @@ def _edge_contract_text(graph: GraphConfig, edge: object, *, max_items: int = 2)
 def _provider_edge_text(provider: object) -> str:
     key = str(getattr(provider, "key", "")).strip()
     data_type = str(getattr(provider, "type", "")).strip()
+    display_name = str(getattr(provider, "display_name", "")).strip()
+    identity = f"{key} -> {data_type}" if key and data_type and key != data_type else (data_type or key)
+    if display_name and identity:
+        return f"{display_name} (id: {identity})"
+    if display_name:
+        return display_name
     if key and data_type and key != data_type:
         return f"{key} -> {data_type}"
     return data_type or key

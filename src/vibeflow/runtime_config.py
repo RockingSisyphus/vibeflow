@@ -27,7 +27,7 @@ class ConfigScope:
 
 
 def effective_node_params(spec: NodeSpec, overrides: Mapping[str, Mapping[str, object]]) -> dict[str, object]:
-    return {**dict(spec.params), **dict(overrides.get(spec.name, {}))}
+    return {**dict(spec.params), **dict(overrides.get(spec.id, {}))}
 
 
 def attach_global_config(params: Mapping[str, object], global_config: Mapping[str, Any] | None) -> dict[str, object]:
@@ -84,7 +84,7 @@ def nested_node_config_overrides(
 ) -> dict[str, dict[str, object]]:
     nested = _copy_overrides(spec.node_config_overrides)
     for path, value in parent_overrides.items():
-        prefix = f"{spec.name}."
+        prefix = f"{spec.id}."
         if path.startswith(prefix):
             stripped = path.removeprefix(prefix)
             nested[stripped] = {**nested.get(stripped, {}), **dict(value)}

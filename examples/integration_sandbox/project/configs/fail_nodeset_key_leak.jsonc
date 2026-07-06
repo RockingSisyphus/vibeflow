@@ -1,120 +1,50 @@
 {
-  "nodesets": [
-    {
-      "name": "bad.leak",
-      "display_name": "Bad Leak",
-      "category": "bad",
-      "description": "Bad nodeset leaking an internal key.",
-      "version": "0.1.0",
-      "purity": "pure",
-      "requires": [
-        {
-          "type": "value.in",
-          "cardinality": "exactly_one"
-        }
-      ],
-      "provides": [
-        {
-          "key": "value.out",
-          "type": "value.out"
-        },
-        {
-          "key": "tmp.inner",
-          "type": "tmp.inner"
-        }
-      ],
-      "exports": [
-        {
-          "key": "value.out",
-          "type": "value.out"
-        }
-      ],
-      "pipeline": {
-        "inputs": [
-          {
-            "key": "value.in",
-            "type": "value.in"
-          }
-        ],
-        "nodes": [
-          {
-            "name": "add",
-            "type": "sandbox.add",
-            "requires": [
-              {
-                "type": "value.in",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "value.out",
-                "type": "value.out"
-              }
-            ],
-            "delta": 1
-          },
-          {
-            "name": "tmp",
-            "type": "sandbox.add",
-            "requires": [
-              {
-                "type": "value.in",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "tmp.inner",
-                "type": "tmp.inner"
-              }
-            ],
-            "delta": 2
-          }
-        ],
-        "outputs": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one"
-          }
-        ]
-      }
-    }
-  ],
   "pipeline": {
     "inputs": [
       {
         "key": "value.in",
-        "type": "value.in"
+        "type": "value.in",
+        "display_name": "Value In"
       }
     ],
     "nodes": [
       {
-        "name": "leak",
-        "type": "nodeset.bad.leak",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.out",
-            "type": "value.out"
+            "type": "value.out",
+            "display_name": "Value Out"
           },
           {
-            "key": "tmp.inner",
-            "type": "tmp.inner"
+            "key": "missing.out",
+            "type": "missing.out",
+            "display_name": "Missing Out"
           }
-        ]
+        ],
+        "id": "leak",
+        "type_used": "bad.leak",
+        "display_name": "Leak",
+        "description": "Runs leak."
       }
     ],
     "outputs": [
       {
         "type": "value.in",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Value In"
       }
     ]
-  }
+  },
+  "nodeset_imports": [
+    {
+      "path": "nodesets/fail_nodeset_key_leak/bad_leak.jsonc"
+    }
+  ]
 }

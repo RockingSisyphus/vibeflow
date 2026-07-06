@@ -1,0 +1,115 @@
+{
+  "display_name": "Retry Step",
+  "description": "Increments loop.current and reports whether the retry loop should stop.",
+  "requires": [
+    {
+      "type": "loop.current",
+      "cardinality": "exactly_one",
+      "display_name": "Loop Current"
+    }
+  ],
+  "provides": [
+    {
+      "key": "loop.next",
+      "type": "loop.next",
+      "display_name": "Loop Next"
+    },
+    {
+      "key": "loop.done",
+      "type": "loop.done",
+      "display_name": "Loop Done"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "loop.current",
+        "type": "loop.current",
+        "display_name": "Loop Current"
+      }
+    ],
+    "nodes": [
+      {
+        "display_name": "Body Start",
+        "description": "Starts one nested while-loop body invocation.",
+        "id": "start",
+        "type_used": "sandbox.start"
+      },
+      {
+        "display_name": "Increment",
+        "description": "Moves the nested retry value toward the target.",
+        "requires": [
+          {
+            "type": "loop.current",
+            "cardinality": "exactly_one",
+            "display_name": "Loop Current"
+          }
+        ],
+        "provides": [
+          {
+            "key": "loop.next",
+            "type": "loop.next",
+            "display_name": "Loop Next"
+          }
+        ],
+        "step": 2,
+        "id": "increment",
+        "type_used": "semantic.increment_until"
+      },
+      {
+        "display_name": "Done Check",
+        "description": "Checks whether loop.next has reached the nested retry target.",
+        "requires": [
+          {
+            "type": "loop.next",
+            "cardinality": "exactly_one",
+            "display_name": "Loop Next"
+          }
+        ],
+        "provides": [
+          {
+            "key": "loop.done",
+            "type": "loop.done",
+            "display_name": "Loop Done"
+          }
+        ],
+        "target": 7,
+        "id": "done",
+        "type_used": "semantic.loop_done_value"
+      },
+      {
+        "display_name": "Body End",
+        "description": "Ends one nested body iteration.",
+        "id": "end",
+        "type_used": "sandbox.start"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "increment"
+      },
+      {
+        "from": "increment",
+        "to": "done"
+      },
+      {
+        "from": "done",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "loop.next",
+        "cardinality": "exactly_one",
+        "display_name": "Loop Next"
+      },
+      {
+        "type": "loop.done",
+        "cardinality": "exactly_one",
+        "display_name": "Loop Done"
+      }
+    ]
+  },
+  "type_key": "loop.retry_step"
+}

@@ -146,14 +146,14 @@ def test_mermaid_collapsed_and_expanded_views_share_top_level_compiled_edges() -
                     requires=["value.in"],
                     provides=["value.out"],
                     exports=["value.out"],
-                    pipeline=_input_add_pipeline(add={"name": "inner"}),
+                    pipeline=_input_add_pipeline(add={"id": "inner"}),
                 )
             ],
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the nodeset fixture."),
                     _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
-                    _node_call("flow", "nodeset.math.add_one", "Calls the add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("flow", "math.add_one", "Calls the add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                     _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": _edge_chain("start", "seed", "flow", "end"),
@@ -162,8 +162,8 @@ def test_mermaid_collapsed_and_expanded_views_share_top_level_compiled_edges() -
     )
     collapsed = export_mermaid(graph, expand_nodesets=False)
     expanded = export_mermaid(graph, expand_nodesets=True)
-    assert "seed -->|value.in| flow" in collapsed
-    assert "seed -->|value.in| flow" in expanded
+    assert "data: Value In" in collapsed
+    assert "data: Value In" in expanded
     assert "flow__inner" not in collapsed
     assert "flow__inner" in expanded
 
@@ -190,7 +190,7 @@ def test_checked_run_artifact_integrity_cross_links_health_graph_trace(tmp_path)
         {"from": "seed", "to": "add", "when": ""},
         {"from": "add", "to": "end", "when": ""},
     ]
-    assert "seed -->|value.in| add" in graph_mmd
+    assert "data: Value In" in graph_mmd
     assert [event["node"] for event in trace if event.get("kind") == "node"] == ["start", "seed", "add", "end"]
 
 def test_code_quality_tool_reports_file_function_dependency_and_side_effect_findings(tmp_path) -> None:
@@ -317,7 +317,7 @@ def test_optional_architecture_report_is_not_health_gate() -> None:
     compiled = GraphCompiler().compile(graph, registry=_registry())
     health = validate_graph_health(graph, registry=_registry())
     report = build_architecture_report(graph, compiled=compiled)
-    add = next(node for node in report["nodes"] if node["name"] == "add")
+    add = next(node for node in report["nodes"] if node["id"] == "add")
 
     assert "architecture_report" not in health.info
     assert report["summary"]["nodes"] == 4

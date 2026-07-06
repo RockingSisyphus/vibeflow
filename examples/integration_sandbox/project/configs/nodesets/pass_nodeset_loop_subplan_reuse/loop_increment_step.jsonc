@@ -1,0 +1,110 @@
+{
+  "display_name": "Increment Step",
+  "description": "Reusable increment subplan called from the while-loop body on every iteration.",
+  "requires": [
+    {
+      "type": "value.in",
+      "cardinality": "exactly_one",
+      "display_name": "Value In"
+    }
+  ],
+  "provides": [
+    {
+      "key": "value.next",
+      "type": "value.next",
+      "display_name": "Value Next"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "value.in",
+        "type": "value.in",
+        "display_name": "Value In"
+      }
+    ],
+    "nodes": [
+      {
+        "display_name": "Start",
+        "description": "Starts the reusable increment subplan.",
+        "id": "start",
+        "type_used": "sandbox.start"
+      },
+      {
+        "display_name": "Input",
+        "description": "Reads the current loop value.",
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.in.input",
+            "type": "value.in",
+            "display_name": "Value In Input"
+          }
+        ],
+        "id": "input",
+        "type_used": "sandbox.value_input"
+      },
+      {
+        "display_name": "Increment",
+        "description": "Increments the current loop value by one.",
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.next",
+            "type": "value.next",
+            "display_name": "Value Next"
+          }
+        ],
+        "id": "increment",
+        "type_used": "sandbox.increment"
+      },
+      {
+        "display_name": "End",
+        "description": "Ends after value.next is produced.",
+        "requires": [
+          {
+            "type": "value.next",
+            "cardinality": "exactly_one",
+            "display_name": "Value Next"
+          }
+        ],
+        "id": "end",
+        "type_used": "sandbox.next_value_end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "input"
+      },
+      {
+        "from": "input",
+        "to": "increment"
+      },
+      {
+        "from": "increment",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.next",
+        "cardinality": "exactly_one",
+        "display_name": "Value Next"
+      }
+    ]
+  },
+  "type_key": "loop.increment_step"
+}

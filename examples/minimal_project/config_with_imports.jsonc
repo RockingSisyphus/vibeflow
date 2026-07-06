@@ -35,62 +35,63 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets.jsonc",
-      "names": [
-        "example.add_one"
-      ]
+      "path": "nodesets.jsonc"
     }
   ],
   "pipeline": {
     "nodes": [
       {
-        "name": "start",
-        "type": "example.start",
         "display_name": "Start",
-        "description": "Starts the imported-nodeset example pipeline."
+        "description": "Starts the imported-nodeset example pipeline.",
+        "id": "start",
+        "type_used": "example.start"
       },
       {
-        "name": "seed",
-        "type": "example.seed",
         "display_name": "Seed Value",
         "description": "Produces the initial value.",
         "provides": [
           {
             "key": "value.in",
-            "type": "value.in"
+            "type": "value.in",
+            "display_name": "Value In"
           }
         ],
-        "value": 4
+        "value": 4,
+        "id": "seed",
+        "type_used": "example.seed"
       },
       {
-        "name": "add_one_flow",
-        "type": "nodeset.example.add_one",
         "display_name": "Add One Flow",
         "description": "Runs the imported add-one nodeset.",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.out",
-            "type": "value.out"
+            "type": "value.out",
+            "display_name": "Value Out"
           }
-        ]
+        ],
+        "id": "add_one_flow",
+        "type_used": "example.add_one"
       },
       {
-        "name": "end",
-        "type": "example.end",
         "display_name": "End",
         "description": "Consumes the final pipeline output.",
         "requires": [
           {
             "type": "value.out",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
           }
-        ]
+        ],
+        "id": "end",
+        "type_used": "example.end"
       }
     ],
     "edges": [
@@ -110,7 +111,8 @@
     "outputs": [
       {
         "type": "value.out",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Value Out"
       }
     ]
   }

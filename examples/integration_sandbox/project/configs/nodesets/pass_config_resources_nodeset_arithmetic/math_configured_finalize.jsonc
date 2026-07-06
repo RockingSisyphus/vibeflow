@@ -1,0 +1,143 @@
+{
+  "display_name": "Configured Finalize",
+  "description": "Scales a resource arithmetic value and finalizes it with nodeset call config.",
+  "requires": [
+    {
+      "type": "calc.resource",
+      "cardinality": "exactly_one",
+      "display_name": "Calc Resource"
+    }
+  ],
+  "provides": [
+    {
+      "key": "calc.final",
+      "type": "calc.final",
+      "display_name": "Calc Final"
+    }
+  ],
+  "global_config": {
+    "config": {
+      "factor": 2,
+      "offset": 1
+    },
+    "allow_config_override": false
+  },
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "calc.resource",
+        "type": "calc.resource",
+        "display_name": "Calc Resource"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
+      },
+      {
+        "requires": [
+          {
+            "type": "calc.resource",
+            "cardinality": "exactly_one",
+            "display_name": "Calc Resource"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.scaled",
+            "type": "calc.scaled",
+            "display_name": "Calc Scaled"
+          }
+        ],
+        "factor": 100,
+        "id": "scale",
+        "type_used": "sandbox.resource_scale",
+        "display_name": "Scale",
+        "description": "Runs scale."
+      },
+      {
+        "requires": [
+          {
+            "type": "calc.scaled",
+            "cardinality": "exactly_one",
+            "display_name": "Calc Scaled"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.branch",
+            "type": "calc.branch",
+            "display_name": "Calc Branch"
+          }
+        ],
+        "id": "use_scaled",
+        "type_used": "semantic.use_scaled",
+        "display_name": "Use Scaled",
+        "description": "Runs use_scaled."
+      },
+      {
+        "requires": [
+          {
+            "type": "calc.branch",
+            "cardinality": "exactly_one",
+            "display_name": "Calc Branch"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.final",
+            "type": "calc.final",
+            "display_name": "Calc Final"
+          }
+        ],
+        "offset": -100,
+        "id": "finalize",
+        "type_used": "semantic.finalize",
+        "display_name": "Finalize",
+        "description": "Runs finalize."
+      },
+      {
+        "requires": [
+          {
+            "type": "calc.final",
+            "cardinality": "exactly_one",
+            "display_name": "Calc Final"
+          }
+        ],
+        "id": "end",
+        "type_used": "semantic.final_end",
+        "display_name": "End",
+        "description": "Runs end."
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "scale"
+      },
+      {
+        "from": "scale",
+        "to": "use_scaled"
+      },
+      {
+        "from": "use_scaled",
+        "to": "finalize"
+      },
+      {
+        "from": "finalize",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "calc.final",
+        "cardinality": "exactly_one",
+        "display_name": "Calc Final"
+      }
+    ]
+  },
+  "type_key": "math.configured_finalize"
+}

@@ -2,14 +2,17 @@
   "pipeline": {
     "nodes": [
       {
-        "name": "seed",
-        "type": "sandbox.constant",
         "provides": [
           {
             "key": "value.in",
-            "type": "value.in"
+            "type": "value.in",
+            "display_name": "Value In"
           }
-        ]
+        ],
+        "id": "seed",
+        "type_used": "sandbox.constant",
+        "display_name": "Seed",
+        "description": "Runs seed."
       }
     ],
     "edges": [

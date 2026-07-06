@@ -1,373 +1,126 @@
 {
-  "nodesets": [
-    {
-      "name": "training.reference_step",
-      "display_name": "Training Reference Step",
-      "category": "training",
-      "description": "Training nodeset that exports object references back to the parent context.",
-      "version": "0.1.0",
-      "purity": "pure",
-      "requires": [
-        {
-          "type": "train.model",
-          "cardinality": "exactly_one"
-        },
-        {
-          "type": "train.batch",
-          "cardinality": "exactly_one"
-        },
-        {
-          "type": "train.optimizer",
-          "cardinality": "exactly_one"
-        }
-      ],
-      "provides": [
-        {
-          "key": "train.model_after",
-          "type": "train.model_after"
-        },
-        {
-          "key": "train.optimizer_after",
-          "type": "train.optimizer_after"
-        },
-        {
-          "key": "train.step_report",
-          "type": "train.step_report"
-        },
-        {
-          "key": "train.metrics",
-          "type": "train.metrics"
-        }
-      ],
-      "exports": [
-        {
-          "key": "train.model_after",
-          "type": "train.model_after"
-        },
-        {
-          "key": "train.optimizer_after",
-          "type": "train.optimizer_after"
-        },
-        {
-          "key": "train.step_report",
-          "type": "train.step_report"
-        },
-        {
-          "key": "train.metrics",
-          "type": "train.metrics"
-        }
-      ],
-      "pipeline": {
-        "inputs": [
-          {
-            "key": "train.model",
-            "type": "train.model"
-          },
-          {
-            "key": "train.batch",
-            "type": "train.batch"
-          },
-          {
-            "key": "train.optimizer",
-            "type": "train.optimizer"
-          }
-        ],
-        "nodes": [
-          {
-            "name": "start",
-            "type": "sandbox.start"
-          },
-          {
-            "name": "training_input",
-            "type": "sandbox.training_input",
-            "requires": [
-              {
-                "type": "train.model",
-                "cardinality": "exactly_one"
-              },
-              {
-                "type": "train.batch",
-                "cardinality": "exactly_one"
-              },
-              {
-                "type": "train.optimizer",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "train.model.input",
-                "type": "train.model"
-              },
-              {
-                "key": "train.batch.input",
-                "type": "train.batch"
-              },
-              {
-                "key": "train.optimizer.input",
-                "type": "train.optimizer"
-              }
-            ]
-          },
-          {
-            "name": "forward_loss",
-            "type": "sandbox.forward_loss",
-            "requires": [
-              {
-                "type": "train.model",
-                "cardinality": "exactly_one"
-              },
-              {
-                "type": "train.batch",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "train.loss",
-                "type": "train.loss"
-              }
-            ]
-          },
-          {
-            "name": "backward_grad",
-            "type": "sandbox.backward_grad",
-            "requires": [
-              {
-                "type": "train.model",
-                "cardinality": "exactly_one"
-              },
-              {
-                "type": "train.loss",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "train.grad",
-                "type": "train.grad"
-              }
-            ]
-          },
-          {
-            "name": "optimizer_step",
-            "type": "sandbox.optimizer_step",
-            "requires": [
-              {
-                "type": "train.model",
-                "cardinality": "exactly_one"
-              },
-              {
-                "type": "train.optimizer",
-                "cardinality": "exactly_one"
-              },
-              {
-                "type": "train.grad",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "train.model_after",
-                "type": "train.model_after"
-              },
-              {
-                "key": "train.optimizer_after",
-                "type": "train.optimizer_after"
-              },
-              {
-                "key": "train.step_report",
-                "type": "train.step_report"
-              }
-            ]
-          },
-          {
-            "name": "training_metrics",
-            "type": "sandbox.training_metrics",
-            "requires": [
-              {
-                "type": "train.model_after",
-                "cardinality": "exactly_one"
-              },
-              {
-                "type": "train.loss",
-                "cardinality": "exactly_one"
-              }
-            ],
-            "provides": [
-              {
-                "key": "train.metrics",
-                "type": "train.metrics"
-              }
-            ]
-          },
-          {
-            "name": "end",
-            "type": "sandbox.training_metrics_end",
-            "requires": [
-              {
-                "type": "train.metrics",
-                "cardinality": "exactly_one"
-              }
-            ]
-          }
-        ],
-        "edges": [
-          {
-            "from": "start",
-            "to": "training_input"
-          },
-          {
-            "from": "training_input",
-            "to": "forward_loss"
-          },
-          {
-            "from": "forward_loss",
-            "to": "backward_grad"
-          },
-          {
-            "from": "backward_grad",
-            "to": "optimizer_step"
-          },
-          {
-            "from": "optimizer_step",
-            "to": "training_metrics"
-          },
-          {
-            "from": "training_metrics",
-            "to": "end"
-          },
-          {
-            "from": "forward_loss",
-            "to": "training_metrics"
-          },
-          {
-            "from": "training_input",
-            "to": "backward_grad"
-          },
-          {
-            "from": "training_input",
-            "to": "optimizer_step"
-          }
-        ],
-        "outputs": [
-          {
-            "type": "train.metrics",
-            "cardinality": "exactly_one"
-          },
-          {
-            "type": "train.step_report",
-            "cardinality": "optional_one"
-          },
-          {
-            "type": "train.model_after",
-            "cardinality": "optional_one"
-          },
-          {
-            "type": "train.optimizer_after",
-            "cardinality": "optional_one"
-          }
-        ]
-      }
-    }
-  ],
   "pipeline": {
     "inputs": [
       {
         "key": "train.model",
-        "type": "train.model"
+        "type": "train.model",
+        "display_name": "Train Model"
       },
       {
         "key": "train.batch",
-        "type": "train.batch"
+        "type": "train.batch",
+        "display_name": "Train Batch"
       },
       {
         "key": "train.optimizer",
-        "type": "train.optimizer"
+        "type": "train.optimizer",
+        "display_name": "Train Optimizer"
       }
     ],
     "nodes": [
       {
-        "name": "start",
-        "type": "sandbox.start"
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
       },
       {
-        "name": "training_input",
-        "type": "sandbox.training_input",
         "requires": [
           {
             "type": "train.model",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Model"
           },
           {
             "type": "train.batch",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Batch"
           },
           {
             "type": "train.optimizer",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Optimizer"
           }
         ],
         "provides": [
           {
             "key": "train.model.input",
-            "type": "train.model"
+            "type": "train.model",
+            "display_name": "Train Model Input"
           },
           {
             "key": "train.batch.input",
-            "type": "train.batch"
+            "type": "train.batch",
+            "display_name": "Train Batch Input"
           },
           {
             "key": "train.optimizer.input",
-            "type": "train.optimizer"
+            "type": "train.optimizer",
+            "display_name": "Train Optimizer Input"
           }
-        ]
+        ],
+        "id": "training_input",
+        "type_used": "sandbox.training_input",
+        "display_name": "Training Input",
+        "description": "Runs training_input."
       },
       {
-        "name": "train_step",
-        "type": "nodeset.training.reference_step",
         "requires": [
           {
             "type": "train.model",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Model"
           },
           {
             "type": "train.batch",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Batch"
           },
           {
             "type": "train.optimizer",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Optimizer"
           }
         ],
         "provides": [
           {
             "key": "train.model_after",
-            "type": "train.model_after"
+            "type": "train.model_after",
+            "display_name": "Train Model After"
           },
           {
             "key": "train.optimizer_after",
-            "type": "train.optimizer_after"
+            "type": "train.optimizer_after",
+            "display_name": "Train Optimizer After"
           },
           {
             "key": "train.step_report",
-            "type": "train.step_report"
+            "type": "train.step_report",
+            "display_name": "Train Step Report"
           },
           {
             "key": "train.metrics",
-            "type": "train.metrics"
+            "type": "train.metrics",
+            "display_name": "Train Metrics"
           }
-        ]
+        ],
+        "id": "train_step",
+        "type_used": "training.reference_step",
+        "display_name": "Train Step",
+        "description": "Runs train_step."
       },
       {
-        "name": "end",
-        "type": "sandbox.training_metrics_end",
         "requires": [
           {
             "type": "train.metrics",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Train Metrics"
           }
-        ]
+        ],
+        "id": "end",
+        "type_used": "sandbox.training_metrics_end",
+        "display_name": "End",
+        "description": "Runs end."
       }
     ],
     "edges": [
@@ -387,20 +140,29 @@
     "outputs": [
       {
         "type": "train.metrics",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Train Metrics"
       },
       {
         "type": "train.step_report",
-        "cardinality": "optional_one"
+        "cardinality": "optional_one",
+        "display_name": "Train Step Report"
       },
       {
         "type": "train.model_after",
-        "cardinality": "optional_one"
+        "cardinality": "optional_one",
+        "display_name": "Train Model After"
       },
       {
         "type": "train.optimizer_after",
-        "cardinality": "optional_one"
+        "cardinality": "optional_one",
+        "display_name": "Train Optimizer After"
       }
     ]
-  }
+  },
+  "nodeset_imports": [
+    {
+      "path": "nodesets/pass_nodeset_reference_exports/training_reference_step.jsonc"
+    }
+  ]
 }

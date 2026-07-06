@@ -1,0 +1,126 @@
+{
+  "display_name": "Semantic Arithmetic",
+  "description": "Adds calc.a and calc.b, then scales the sum for semantic nodeset acceptance.",
+  "requires": [
+    {
+      "type": "calc.a",
+      "cardinality": "exactly_one",
+      "display_name": "Calc A"
+    },
+    {
+      "type": "calc.b",
+      "cardinality": "exactly_one",
+      "display_name": "Calc B"
+    }
+  ],
+  "provides": [
+    {
+      "key": "calc.scaled",
+      "type": "calc.scaled",
+      "display_name": "Calc Scaled"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "calc.a",
+        "type": "calc.a",
+        "display_name": "Calc A"
+      },
+      {
+        "key": "calc.b",
+        "type": "calc.b",
+        "display_name": "Calc B"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
+      },
+      {
+        "requires": [
+          {
+            "type": "calc.a",
+            "cardinality": "exactly_one",
+            "display_name": "Calc A"
+          },
+          {
+            "type": "calc.b",
+            "cardinality": "exactly_one",
+            "display_name": "Calc B"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.sum",
+            "type": "calc.sum",
+            "display_name": "Calc Sum"
+          }
+        ],
+        "id": "add_pair",
+        "type_used": "semantic.add_pair",
+        "display_name": "Add Pair",
+        "description": "Runs add_pair."
+      },
+      {
+        "requires": [
+          {
+            "type": "calc.sum",
+            "cardinality": "exactly_one",
+            "display_name": "Calc Sum"
+          }
+        ],
+        "provides": [
+          {
+            "key": "calc.scaled",
+            "type": "calc.scaled",
+            "display_name": "Calc Scaled"
+          }
+        ],
+        "factor": 2,
+        "id": "scale",
+        "type_used": "semantic.scale",
+        "display_name": "Scale",
+        "description": "Runs scale."
+      },
+      {
+        "requires": [
+          {
+            "type": "calc.scaled",
+            "cardinality": "exactly_one",
+            "display_name": "Calc Scaled"
+          }
+        ],
+        "id": "end",
+        "type_used": "semantic.scaled_end",
+        "display_name": "End",
+        "description": "Runs end."
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "add_pair"
+      },
+      {
+        "from": "add_pair",
+        "to": "scale"
+      },
+      {
+        "from": "scale",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "calc.scaled",
+        "cardinality": "exactly_one",
+        "display_name": "Calc Scaled"
+      }
+    ]
+  },
+  "type_key": "semantic.arithmetic"
+}

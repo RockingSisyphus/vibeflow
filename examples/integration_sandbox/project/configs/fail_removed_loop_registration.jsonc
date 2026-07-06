@@ -3,41 +3,50 @@
     "inputs": [
       {
         "key": "value.in",
-        "type": "value.in"
+        "type": "value.in",
+        "display_name": "Value In"
       }
     ],
     "nodes": [
       {
-        "name": "increment",
-        "type": "sandbox.increment",
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
           }
         ],
         "provides": [
           {
             "key": "value.next",
-            "type": "value.next"
+            "type": "value.next",
+            "display_name": "Value Next"
           }
-        ]
+        ],
+        "id": "increment",
+        "type_used": "sandbox.increment",
+        "display_name": "Increment",
+        "description": "Runs increment."
       },
       {
-        "name": "copy",
-        "type": "sandbox.copy_back",
         "requires": [
           {
             "type": "value.next",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Next"
           }
         ],
         "provides": [
           {
             "key": "value.in.copy",
-            "type": "value.in"
+            "type": "value.in",
+            "display_name": "Value In Copy"
           }
-        ]
+        ],
+        "id": "copy",
+        "type_used": "sandbox.copy_back",
+        "display_name": "Copy",
+        "description": "Runs copy."
       }
     ],
     "loops": [
@@ -55,11 +64,13 @@
     "outputs": [
       {
         "type": "value.in",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Value In"
       },
       {
         "type": "value.next",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Value Next"
       }
     ]
   }

@@ -77,7 +77,7 @@ def test_execution_plan_prebuilds_nodeset_subplan_with_overrides() -> None:
                     _node_call("start", "test.start", "Starts the nodeset override fixture."),
                     _node_call(
                         "composite",
-                        "nodeset.math.add_one",
+                        "math.add_one",
                         "Calls add-one with inner override.",
                         requires=[REQ_SPEC("value.in")],
                         provides=[PROV_SPEC("value.out")],
@@ -123,7 +123,7 @@ def test_nodeset_runner_reuses_cached_subruntime() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the cached nodeset fixture."),
-                    _node_call("composite", "nodeset.count.once", "Calls count-once nodeset.", provides=[PROV_SPEC("value.out")]),
+                    _node_call("composite", "count.once", "Calls count-once nodeset.", provides=[PROV_SPEC("value.out")]),
                     _node_call("end", "test.start", "Ends the compiled branch fixture."),
                 ],
                 "edges": _edge_chain("start", "composite", "end"),
@@ -167,7 +167,7 @@ def test_nodeset_inputs_and_exports_preserve_object_reference() -> None:
                 "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the object reference fixture."),
-                    _node_call("composite", "nodeset.identity.object", "Calls identity nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("composite", "identity.object", "Calls identity nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                     _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": _edge_chain("start", "composite", "end"),
@@ -199,28 +199,25 @@ def test_node_config_invalid_override_fails_health_before_runtime() -> None:
 
 def test_checked_run_refuses_planned_architecture(tmp_path) -> None:
     config_path = tmp_path / "planned.json"
-    config_path.write_text(
-        json.dumps(
-            {
-                "nodesets": [
-                    {
-                        "name": "a",
-                        "display_name": "A",
-                        "category": "test",
-                        "description": "Planned architecture nodeset.",
-                        "version": "0.1.0",
-                        "purity": "pure",
-                        "status": "planned",
-                    }
-                ],
-                "pipeline": {
-                    "nodes": [
-                        _node_call("a", "nodeset.a", "Calls planned architecture nodeset.", status="planned", flow_kind="predefined"),
-                    ]
-                },
-            }
-        ),
-        encoding="utf-8",
+    _write_config_file(
+        config_path,
+        {
+            "nodesets": [
+                {
+                    "type_key": "a",
+                    "display_name": "A",
+                    "description": "Planned architecture nodeset.",
+                    "requires": [],
+                    "provides": [],
+                    "status": "planned",
+                }
+            ],
+            "pipeline": {
+                "nodes": [
+                    _node_call("a", "a", "Calls planned architecture nodeset.", status="planned", flow_kind="predefined"),
+                ]
+            },
+        },
     )
 
     with pytest.raises(CheckedRunError) as exc_info:
@@ -251,7 +248,7 @@ def test_nodeset_call_can_override_inner_node_config_independently() -> None:
                         _node_call("start", "test.start", "Starts the nodeset override fixture."),
                         _node_call(
                             "composite",
-                            "nodeset.math.add_one",
+                            "math.add_one",
                             "Calls add-one with an inner override.",
                             requires=[REQ_SPEC("value.in")],
                             provides=[PROV_SPEC("value.out")],
@@ -604,7 +601,7 @@ def test_block_execution_rejects_loop_body_that_is_not_block_compiled() -> None:
                             _node_call("start", "test.start", "Starts uncompiled body."),
                             _node_call(
                                 "nested",
-                                "nodeset.loop.step_until",
+                                "loop.step_until",
                                 "Calls a nested nodeset, which makes this loop body not block compiled.",
                                 requires=[REQ_SPEC("loop.current")],
                                 provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
@@ -871,7 +868,7 @@ def test_runtime_options_compiled_runs_generated_block_when_node_hooks_enabled(m
     def after_node(self, name, node_type, output_summary):
         calls.append(("after", name))
 
-    plugin = type("NodeHookPlugin", (), {"name": "node_hook", "before_node": before_node, "after_node": after_node})()
+    plugin = type("NodeHookPlugin", (), {"id": "node_hook", "before_node": before_node, "after_node": after_node})()
     plugin_registry = PluginRegistry()
     plugin_registry.register(plugin, plugin_type="runtime")
     context = PipelineRuntime(
@@ -1277,7 +1274,7 @@ def test_async_nodeset_result_key_joins_when_required() -> None:
                 "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the async nodeset fixture."),
-                    _node_call("composite", "nodeset.math.add_one", "Calls add-one asynchronously.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")], result_key="value.out", **{"async": "result_key"}),
+                    _node_call("composite", "math.add_one", "Calls add-one asynchronously.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")], result_key="value.out", **{"async": "result_key"}),
                     _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": _edge_chain("start", "composite", "end"),
@@ -1418,31 +1415,29 @@ class RuntimePlugin:
 
 def test_checked_run_trace_records_nodeset_enter_exit(tmp_path) -> None:
     config_path = tmp_path / "nodeset_workflow.json"
-    config_path.write_text(
-        json.dumps(
-            {
-                "nodesets": [
-                    _nodeset_config(
-                        "math.add_one",
-                        requires=["value.in"],
-                        provides=["value.out"],
-                        exports=["value.out"],
-                        pipeline=_input_add_pipeline(),
+    _write_config_file(
+        config_path,
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "math.add_one",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline=_input_add_pipeline(),
                 )
             ],
-                "pipeline": {
-                    "inputs": [PROV_SPEC("value.in")],
-                    "nodes": [
-                        _node_call("start", "test.start", "Starts the nodeset trace fixture."),
-                        _node_call("composite", "nodeset.math.add_one", "Calls add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                        _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
-                    ],
-                    "edges": _edge_chain("start", "composite", "end"),
-                    "outputs": [REQ_SPEC("value.out")],
-                },
-        }
-        ),
-        encoding="utf-8",
+            "pipeline": {
+                "inputs": [PROV_SPEC("value.in")],
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the nodeset trace fixture."),
+                    _node_call("composite", "math.add_one", "Calls add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": _edge_chain("start", "composite", "end"),
+                "outputs": [REQ_SPEC("value.out")],
+            },
+        },
     )
     result = run_checked(
         config_path,
@@ -1478,7 +1473,7 @@ def test_runtime_trace_records_nested_nodeset_qualified_paths() -> None:
                     pipeline={
                         "nodes": [
                             _node_call("start", "test.start", "Starts outer flow."),
-                            _node_call("inner_call", "nodeset.inner.flow", "Calls inner flow.", provides=[PROV_SPEC("value.out")]),
+                            _node_call("inner_call", "inner.flow", "Calls inner flow.", provides=[PROV_SPEC("value.out")]),
                             _node_call("end", "test.out_end", "Consumes outer value.out.", requires=[REQ_SPEC("value.out")]),
                         ],
                         "edges": _edge_chain("start", "inner_call", "end"),
@@ -1489,7 +1484,7 @@ def test_runtime_trace_records_nested_nodeset_qualified_paths() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts nested trace fixture."),
-                    _node_call("outer_call", "nodeset.outer.flow", "Calls outer flow.", provides=[PROV_SPEC("value.out")]),
+                    _node_call("outer_call", "outer.flow", "Calls outer flow.", provides=[PROV_SPEC("value.out")]),
                     _node_call("end", "test.out_end", "Consumes final value.out.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": _edge_chain("start", "outer_call", "end"),
@@ -1597,7 +1592,7 @@ def test_runtime_trace_preserves_nested_failure_path() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts nested failure fixture."),
-                    _node_call("composite", "nodeset.fail.flow", "Calls failing nodeset.", provides=[PROV_SPEC("value.out")]),
+                    _node_call("composite", "fail.flow", "Calls failing nodeset.", provides=[PROV_SPEC("value.out")]),
                     _node_call("end", "test.out_end", "Consumes final value.out.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": _edge_chain("start", "composite", "end"),

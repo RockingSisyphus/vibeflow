@@ -176,7 +176,11 @@ _FIELD_PREFIXES = frozenset(
     {
         "id:",
         "type:",
+        "type_used:",
+        "type_key:",
         "status:",
+        "when:",
+        "data:",
         "stub:",
         "category:",
         "version:",
@@ -198,9 +202,9 @@ def _enhance_svg_labels(path: Path) -> None:
         tree = ET.parse(path)
         root = tree.getroot()
         changed = False
-        for node in _node_groups(root):
-            label_left = _label_left_x(node)
-            for text in _node_label_texts(node):
+        for label_group in (*_node_groups(root), *_edge_label_groups(root)):
+            label_left = _label_left_x(label_group) if "node" in _class_tokens(label_group) else None
+            for text in _label_texts(label_group):
                 rows = [child for child in list(text) if _tag(child) == "tspan" and "row" in _class_tokens(child)]
                 if not rows:
                     continue
@@ -232,7 +236,11 @@ def _node_groups(root: ET.Element) -> tuple[ET.Element, ...]:
     return tuple(element for element in root.iter() if _tag(element) == "g" and "node" in _class_tokens(element))
 
 
-def _node_label_texts(node: ET.Element) -> tuple[ET.Element, ...]:
+def _edge_label_groups(root: ET.Element) -> tuple[ET.Element, ...]:
+    return tuple(element for element in root.iter() if _tag(element) == "g" and "edgeLabel" in _class_tokens(element))
+
+
+def _label_texts(node: ET.Element) -> tuple[ET.Element, ...]:
     texts: list[ET.Element] = []
     for label in node.iter():
         if _tag(label) != "g" or "label" not in _class_tokens(label):

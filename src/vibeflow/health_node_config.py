@@ -37,17 +37,17 @@ def validate_node_config_health(
         stack=(),
     )
     for nodeset in graph.nodesets.values():
-        if nodeset.name in called_nodesets:
+        if nodeset.type_key in called_nodesets:
             continue
         _validate_graph_node_configs(
             nodeset.graph,
             registry=registry,
             findings=findings,
-            owner=f"nodeset:{nodeset.name}",
+            owner=f"nodeset:{nodeset.type_key}",
             global_scope=normalize_config_scope(nodeset.global_config),
             overrides={},
             called_nodesets=called_nodesets,
-            stack=(nodeset.name,),
+            stack=(nodeset.type_key,),
         )
     _validate_nodeset_override_paths(graph, registry=registry, findings=findings)
     return tuple(findings)
@@ -67,10 +67,10 @@ def _validate_graph_node_configs(
     for node in graph.nodes:
         if node.status == STATUS_PLANNED:
             continue
-        if node.node_type in LOOP_NODE_TYPES:
+        if node.type_used in LOOP_NODE_TYPES:
             _validate_nodeset_call_config(node, graph, registry=registry, findings=findings, owner=owner, global_scope=global_scope, overrides=overrides, called_nodesets=called_nodesets, stack=stack, nodeset_name=node.loop.body)
             continue
-        if node.node_type.startswith("nodeset."):
+        if node.type_used in graph.nodesets:
             _validate_nodeset_call_config(node, graph, registry=registry, findings=findings, owner=owner, global_scope=global_scope, overrides=overrides, called_nodesets=called_nodesets, stack=stack)
             continue
         _append_node_config_finding(node, registry=registry, findings=findings, owner=owner, global_scope=global_scope, overrides=overrides)
@@ -88,24 +88,24 @@ def _append_node_config_finding(
     _append_override_warning(
         findings,
         rule_id="CONFIG.GLOBAL_CONFIG.OVERRIDES_LOCAL",
-        object_id=node.name,
-        message=f"global config overrides local node config: {node.name}",
+        object_id=node.id,
+        message=f"global config overrides local node config: {node.id}",
         base=node.params,
         override=global_scope.values,
         allow=global_scope.allow_config_override,
-        details={"owner": owner, "node_type": node.node_type},
+        details={"owner": owner, "type_used": node.type_used},
     )
     try:
-        config_spec = registry.get_config_spec(node.node_type)
+        config_spec = registry.get_config_spec(node.type_used)
         scoped_params = scoped_node_params(node.params, global_scope, declared_keys=set(config_spec.schema))
-        registry.merge_config(node.node_type, {**scoped_params, **dict(overrides.get(node.name, {}))})
+        registry.merge_config(node.type_used, {**scoped_params, **dict(overrides.get(node.id, {}))})
     except NodeRegistryError as exc:
         findings.append(
             _node_config_finding(
                 "NODE.CONFIG.INVALID",
-                node.name,
+                node.id,
                 str(exc),
-                details={"node_type": node.node_type, "owner": owner, "params": dict(node.params), "global_config": dict(global_scope.values)},
+                details={"type_used": node.type_used, "owner": owner, "params": dict(node.params), "global_config": dict(global_scope.values)},
             )
         )
 
@@ -123,7 +123,7 @@ def _validate_nodeset_call_config(
     stack: tuple[str, ...],
     nodeset_name: str | None = None,
 ) -> None:
-    nodeset_name = nodeset_name or node.node_type.removeprefix("nodeset.")
+    nodeset_name = nodeset_name or node.type_used
     nodeset = graph.nodesets.get(nodeset_name)
     if nodeset is None or nodeset_name in stack:
         return
@@ -131,21 +131,21 @@ def _validate_nodeset_call_config(
     _append_override_warning(
         findings,
         rule_id="CONFIG.GLOBAL_CONFIG.OVERRIDES_NODESET_CONFIG",
-        object_id=node.name,
-        message=f"global config overrides nodeset call config: {node.name}",
+        object_id=node.id,
+        message=f"global config overrides nodeset call config: {node.id}",
         base=node.params,
         override=global_scope.values,
         allow=global_scope.allow_config_override,
         details={"owner": owner, "nodeset": nodeset_name},
     )
-    caller_values = {**dict(node.params), **dict(global_scope.values), **dict(overrides.get(node.name, {}))}
+    caller_values = {**dict(node.params), **dict(global_scope.values), **dict(overrides.get(node.id, {}))}
     caller_scope = node_invocation_scope(caller_values, allow_config_override=node.allow_config_override)
     internal_scope = normalize_config_scope(nodeset.global_config)
     _append_override_warning(
         findings,
         rule_id="NODESET.CONFIG.OVERRIDES_GLOBAL_CONFIG",
-        object_id=node.name,
-        message=f"nodeset call config overrides nodeset global_config: {node.name}",
+        object_id=node.id,
+        message=f"nodeset call config overrides nodeset global_config: {node.id}",
         base=internal_scope.values,
         override=caller_scope.values,
         allow=caller_scope.allow_config_override,
@@ -156,7 +156,7 @@ def _validate_nodeset_call_config(
         nodeset.graph,
         registry=registry,
         findings=findings,
-        owner=f"nodeset:{nodeset.name}",
+        owner=f"nodeset:{nodeset.type_key}",
         global_scope=child_scope,
         overrides=nested_node_config_overrides(node, overrides),
         called_nodesets=called_nodesets,
@@ -174,16 +174,16 @@ def _validate_nodeset_override_paths(
     if visited_nodesets is None:
         visited_nodesets = set()
     for node in graph.nodes:
-        if node.node_type in LOOP_NODE_TYPES or node.node_type.startswith("nodeset."):
-            nodeset_name = node.loop.body if node.node_type in LOOP_NODE_TYPES else node.node_type.removeprefix("nodeset.")
+        if node.type_used in LOOP_NODE_TYPES or node.type_used in graph.nodesets:
+            nodeset_name = node.loop.body if node.type_used in LOOP_NODE_TYPES else node.type_used
             nodeset = graph.nodesets.get(nodeset_name)
             if nodeset is None:
                 continue
-            _validate_override_map(node.name, nodeset, node.node_config_overrides, registry=registry, findings=findings)
+            _validate_override_map(node.id, nodeset, node.node_config_overrides, registry=registry, findings=findings)
     for nodeset in graph.nodesets.values():
-        if nodeset.name in visited_nodesets:
+        if nodeset.type_key in visited_nodesets:
             continue
-        visited_nodesets.add(nodeset.name)
+        visited_nodesets.add(nodeset.type_key)
         _validate_nodeset_override_paths(nodeset.graph, registry=registry, findings=findings, visited_nodesets=visited_nodesets)
 
 
@@ -195,7 +195,7 @@ def _validate_override_map(
     registry: NodeRegistry,
     findings: list[HealthFinding],
 ) -> None:
-    nodes_by_name = {node.name: node for node in nodeset.graph.nodes}
+    nodes_by_name = {node.id: node for node in nodeset.graph.nodes}
     context = _OverrideContext(caller_name, nodeset, nodes_by_name, registry, findings)
     for path, value in overrides.items():
         _validate_override_path(str(path), dict(value), context)
@@ -205,15 +205,15 @@ def _validate_override_path(path: str, value: dict[str, object], context: _Overr
     head, sep, tail = path.partition(".")
     target = context.nodes_by_name.get(head)
     if target is None:
-        context.findings.append(_node_config_finding("NODESET.CONFIG.UNKNOWN_NODE", context.caller_name, f"nodeset override references unknown node: {path}", details={"nodeset": context.nodeset.name, "path": path}))
+        context.findings.append(_node_config_finding("NODESET.CONFIG.UNKNOWN_NODE", context.caller_name, f"nodeset override references unknown node: {path}", details={"nodeset": context.nodeset.type_key, "path": path}))
         return
     if not sep:
         _validate_direct_override(context.caller_name, target, value, nodeset=context.nodeset, registry=context.registry, findings=context.findings)
         return
-    if not target.node_type.startswith("nodeset."):
-        context.findings.append(_node_config_finding("NODESET.CONFIG.INVALID_PATH", context.caller_name, f"override path passes through non-nodeset node: {path}", details={"nodeset": context.nodeset.name, "path": path}))
+    if target.type_used not in context.nodeset.graph.nodesets:
+        context.findings.append(_node_config_finding("NODESET.CONFIG.INVALID_PATH", context.caller_name, f"override path passes through non-nodeset node: {path}", details={"nodeset": context.nodeset.type_key, "path": path}))
         return
-    child = context.nodeset.graph.nodesets.get(target.node_type.removeprefix("nodeset."))
+    child = context.nodeset.graph.nodesets.get(target.type_used)
     if child is None:
         return
     _validate_override_map(context.caller_name, child, {tail: value}, registry=context.registry, findings=context.findings)
@@ -228,15 +228,15 @@ def _validate_direct_override(
     registry: NodeRegistry,
     findings: list[HealthFinding],
 ) -> None:
-    if target.node_type.startswith("nodeset."):
-        findings.append(_node_config_finding("NODESET.CONFIG.NESTED_PATH_REQUIRED", caller_name, f"override for nested nodeset must use a dotted path: {target.name}", details={"nodeset": nodeset.name, "node": target.name}))
+    if target.type_used in nodeset.graph.nodesets:
+        findings.append(_node_config_finding("NODESET.CONFIG.NESTED_PATH_REQUIRED", caller_name, f"override for nested nodeset must use a dotted path: {target.id}", details={"nodeset": nodeset.type_key, "node": target.id}))
         return
     if target.status == STATUS_PLANNED:
         return
     try:
-        registry.merge_config(target.node_type, {**target.params, **value})
+        registry.merge_config(target.type_used, {**target.params, **value})
     except NodeRegistryError as exc:
-        findings.append(_node_config_finding("NODESET.CONFIG.INVALID", caller_name, str(exc), details={"nodeset": nodeset.name, "node": target.name, "node_type": target.node_type}))
+        findings.append(_node_config_finding("NODESET.CONFIG.INVALID", caller_name, str(exc), details={"nodeset": nodeset.type_key, "node": target.id, "type_used": target.type_used}))
 
 
 def _append_override_warning(

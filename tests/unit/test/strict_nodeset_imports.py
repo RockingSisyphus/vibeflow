@@ -2,26 +2,16 @@ from tests.unit.strict_support import *
 
 
 def test_nodeset_imports_expand_for_validate_inspect_mermaid_and_run(tmp_path, capsys) -> None:
-    imports_path = tmp_path / "nodesets.jsonc"
+    imports_path = tmp_path / "math_add_one.jsonc"
     imports_path.write_text(
         json.dumps(
-            {
-                "nodesets": [
-                    _nodeset_config(
-                        "math.add_one",
-                        requires=["value.in"],
-                        provides=["value.out"],
-                        exports=["value.out"],
-                        pipeline=_input_add_pipeline(),
-                    ),
-                    _nodeset_config(
-                        "math.seed",
-                        provides=["value.in"],
-                        exports=["value.in"],
-                        pipeline=_seed_only_pipeline(seed={"value": 4}),
-                    ),
-                ]
-            }
+            _nodeset_config(
+                "math.add_one",
+                requires=["value.in"],
+                provides=["value.out"],
+                exports=["value.out"],
+                pipeline=_input_add_pipeline(),
+            )
         ),
         encoding="utf-8",
     )
@@ -29,12 +19,12 @@ def test_nodeset_imports_expand_for_validate_inspect_mermaid_and_run(tmp_path, c
     config_path.write_text(
         json.dumps(
             {
-                "nodeset_imports": [{"path": "nodesets.jsonc", "names": ["math.add_one"]}],
+                "nodeset_imports": [{"path": "math_add_one.jsonc"}],
                 "pipeline": {
                     "nodes": [
                         _node_call("start", "test.start", "Starts the imported nodeset fixture."),
                         _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")], value=4),
-                        _node_call("flow", "nodeset.math.add_one", "Calls imported add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                        _node_call("flow", "math.add_one", "Calls imported add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                         _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                     ],
                     "edges": _edge_chain("start", "seed", "flow", "end"),
@@ -48,11 +38,11 @@ def test_nodeset_imports_expand_for_validate_inspect_mermaid_and_run(tmp_path, c
     assert cli_main(["validate", "--config", str(config_path), "--json"]) == 0
     validate_payload = json.loads(capsys.readouterr().out)
     assert validate_payload["info"]["nodesets"] == ["math.add_one"]
-    assert validate_payload["info"]["nodeset_imports"][0]["names"] == ["math.add_one"]
+    assert validate_payload["info"]["nodeset_imports"][0]["type_keys"] == ["math.add_one"]
 
     assert cli_main(["inspect-config", "--config", str(config_path)]) == 0
     inspect_payload = json.loads(capsys.readouterr().out)
-    assert inspect_payload["config"]["nodeset_imports"][0]["requested_names"] == ["math.add_one"]
+    assert inspect_payload["config"]["nodeset_imports"][0]["type_keys"] == ["math.add_one"]
 
     assert cli_main(["export-mermaid", "--config", str(config_path), "--expand-nodesets"]) == 0
     assert "flow__add" in capsys.readouterr().out
@@ -65,25 +55,24 @@ def test_nodeset_imports_expand_for_validate_inspect_mermaid_and_run(tmp_path, c
 
 def test_nodeset_imports_reject_missing_duplicate_and_empty_sources(tmp_path) -> None:
     empty_path = tmp_path / "empty.jsonc"
-    empty_path.write_text('{"nodesets": []}', encoding="utf-8")
+    empty_path.write_text("{}", encoding="utf-8")
     with pytest.raises(ConfigLoadError) as empty_error:
         load_config_document(tmp_path / "missing-parent.jsonc")
     assert empty_error.value.rule_id == "CONFIG.READ"
 
     config_path = tmp_path / "workflow.jsonc"
-    config_path.write_text('{"nodeset_imports": ["empty.jsonc"], "pipeline": {"nodes": [{"name": "seed", "type": "test.seed"}]}}', encoding="utf-8")
+    config_path.write_text('{"nodeset_imports": ["empty.jsonc"], "pipeline": {"nodes": [{"id": "seed", "type_used": "test.seed"}]}}', encoding="utf-8")
     with pytest.raises(ConfigLoadError) as empty_import:
         load_config_document(config_path)
     assert empty_import.value.rule_id == "CONFIG.NODESET_IMPORT.EMPTY"
 
     imports_path = tmp_path / "nodesets.jsonc"
-    imports_path.write_text(json.dumps({"nodesets": [_nodeset_config("dup.flow", pipeline={"nodes": [{"name": "seed", "type": "test.seed"}]})]}), encoding="utf-8")
+    imports_path.write_text(json.dumps(_nodeset_config("dup.flow", pipeline={"nodes": [{"id": "seed", "type_used": "test.seed"}]})), encoding="utf-8")
     config_path.write_text(
         json.dumps(
             {
-                "nodeset_imports": ["nodesets.jsonc"],
-                "nodesets": [_nodeset_config("dup.flow", pipeline={"nodes": [{"name": "seed", "type": "test.seed"}]})],
-                "pipeline": {"nodes": [{"name": "flow", "type": "nodeset.dup.flow"}]},
+                "nodeset_imports": ["nodesets.jsonc", "nodesets.jsonc"],
+                "pipeline": {"nodes": [{"id": "flow", "type_used": "dup.flow"}]},
             }
         ),
         encoding="utf-8",
@@ -97,12 +86,7 @@ def test_nodeset_imports_cache_reused_documents_within_one_load(tmp_path, monkey
     imports_path = tmp_path / "nodesets.jsonc"
     imports_path.write_text(
         json.dumps(
-            {
-                "nodesets": [
-                    _nodeset_config("math.add_one", pipeline=_input_add_pipeline(), requires=["value.in"], provides=["value.out"], exports=["value.out"]),
-                    _nodeset_config("math.seed", pipeline=_seed_only_pipeline(), provides=["value.in"], exports=["value.in"]),
-                ]
-            }
+            _nodeset_config("math.add_one", pipeline=_input_add_pipeline(), requires=["value.in"], provides=["value.out"], exports=["value.out"])
         ),
         encoding="utf-8",
     )
@@ -111,10 +95,10 @@ def test_nodeset_imports_cache_reused_documents_within_one_load(tmp_path, monkey
         json.dumps(
             {
                 "nodeset_imports": [
-                    {"path": "nodesets.jsonc", "names": ["math.add_one"]},
-                    {"path": "nodesets.jsonc", "names": ["math.seed"]},
+                    {"path": "nodesets.jsonc"},
+                    {"path": "nodesets.jsonc"},
                 ],
-                "pipeline": {"nodes": [_node_call("flow", "nodeset.math.add_one", "Calls imported flow.", provides=[PROV_SPEC("value.out")])]},
+                "pipeline": {"nodes": [_node_call("flow", "math.add_one", "Calls imported flow.", provides=[PROV_SPEC("value.out")])]},
             }
         ),
         encoding="utf-8",
@@ -129,7 +113,8 @@ def test_nodeset_imports_cache_reused_documents_within_one_load(tmp_path, monkey
 
     monkeypatch.setattr(Path, "read_text", counting_read_text)
 
-    document = load_config_document(config_path)
+    with pytest.raises(ConfigLoadError) as duplicate:
+        load_config_document(config_path)
 
     assert reads == [imports_path]
-    assert [item["name"] for item in document.data["nodesets"]] == ["math.add_one", "math.seed"]
+    assert duplicate.value.rule_id == "CONFIG.NODESET_IMPORT.DUPLICATE"

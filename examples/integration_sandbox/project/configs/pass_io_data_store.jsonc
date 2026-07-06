@@ -3,67 +3,84 @@
     "inputs": [
       {
         "key": "io.result",
-        "type": "io.result"
+        "type": "io.result",
+        "display_name": "Io Result"
       }
     ],
     "nodes": [
       {
-        "name": "start",
-        "type": "sandbox.start"
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
       },
       {
-        "name": "input",
-        "type": "sandbox.io_input",
         "requires": [
           {
             "type": "io.result",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Io Result"
           }
         ],
         "provides": [
           {
             "key": "io.result.input",
-            "type": "io.result"
+            "type": "io.result",
+            "display_name": "Io Result Input"
           }
-        ]
+        ],
+        "id": "input",
+        "type_used": "sandbox.io_input",
+        "display_name": "Input",
+        "description": "Runs input."
       },
       {
-        "name": "request",
-        "type": "sandbox.effect_request",
         "provides": [
           {
             "key": "effects.request",
-            "type": "effects.request"
+            "type": "effects.request",
+            "display_name": "Effects Request"
           }
         ],
-        "value": 5
+        "value": 5,
+        "id": "request",
+        "type_used": "sandbox.effect_request",
+        "display_name": "Request",
+        "description": "Runs request."
       },
       {
-        "name": "add_result",
-        "type": "sandbox.io_result_add",
         "requires": [
           {
             "type": "io.result",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Io Result"
           }
         ],
         "provides": [
           {
             "key": "value.final",
-            "type": "value.final"
+            "type": "value.final",
+            "display_name": "Value Final"
           }
         ],
-        "delta": 1
+        "delta": 1,
+        "id": "add_result",
+        "type_used": "sandbox.io_result_add",
+        "display_name": "Add Result",
+        "description": "Runs add_result."
       },
       {
-        "name": "end",
-        "type": "sandbox.final_value_end",
         "requires": [
           {
             "type": "value.final",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "Value Final"
           }
-        ]
+        ],
+        "id": "end",
+        "type_used": "sandbox.final_value_end",
+        "display_name": "End",
+        "description": "Runs end."
       }
     ],
     "edges": [
@@ -91,7 +108,8 @@
     "outputs": [
       {
         "type": "value.final",
-        "cardinality": "exactly_one"
+        "cardinality": "exactly_one",
+        "display_name": "Value Final"
       }
     ]
   }

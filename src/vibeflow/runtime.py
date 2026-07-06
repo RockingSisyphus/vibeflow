@@ -616,17 +616,15 @@ class PipelineRuntime:
         return {str(key): value for key, value in outputs.items()}
 
     def _assert_planned_stub_nodeset_contract(self, frame: NodeFrame) -> None:
-        nodeset = self.graph.nodesets.get(frame.nodeset_name)
+        nodeset = self.graph.nodesets.get(frame.nodeset_type_key)
         if nodeset is None:
-            raise PipelineRuntimeError(f"unknown planned python_stub nodeset: {frame.nodeset_name}")
-        if not nodeset.provides or not nodeset.exports:
-            raise PipelineRuntimeError(f"planned python_stub nodeset '{nodeset.name}' must declare provides and exports")
+            raise PipelineRuntimeError(f"unknown planned python_stub nodeset: {frame.nodeset_type_key}")
+        if not nodeset.provides:
+            raise PipelineRuntimeError(f"planned python_stub nodeset '{nodeset.type_key}' must declare provides")
         if set(frame.requires) != set(nodeset.requires):
-            raise PipelineRuntimeError(f"planned python_stub nodeset node '{frame.name}' requires must match nodeset '{nodeset.name}' requires")
+            raise PipelineRuntimeError(f"planned python_stub nodeset instance '{frame.id}' requires must match nodeset '{nodeset.type_key}' requires")
         if set(frame.provides) != set(nodeset.provides):
-            raise PipelineRuntimeError(f"planned python_stub nodeset node '{frame.name}' provides must match nodeset '{nodeset.name}' provides")
-        if set(frame.provide_keys) != set(frame.export_keys):
-            raise PipelineRuntimeError(f"planned python_stub nodeset '{nodeset.name}' provides must match exports")
+            raise PipelineRuntimeError(f"planned python_stub nodeset instance '{frame.id}' provides must match nodeset '{nodeset.type_key}' provides")
 
     def _run_async_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
         if frame.async_mode == "result_key" and frame.result_key not in frame.provide_keys:
@@ -664,8 +662,6 @@ class PipelineRuntime:
     def _run_nodeset_outputs_with_trace(self, frame: NodeFrame, inputs: Mapping[str, object], *, cached: bool = False) -> tuple[Mapping[str, object], RuntimeTrace]:
         if frame.subplan is None:
             raise PipelineRuntimeError(f"nodeset node '{frame.name}' has no execution plan")
-        if set(frame.provide_keys) - set(frame.export_keys):
-            raise PipelineRuntimeError(f"nodeset '{frame.nodeset_name}' cannot export undeclared keys: {sorted(set(frame.provide_keys) - set(frame.export_keys))}")
         runtime = self._nodeset_runtime(frame) if cached else PipelineRuntime._from_plan(self, frame.subplan)
         initial = _nodeset_inputs_to_initial(inputs, frame.subplan.graph.inputs)
         try:
@@ -674,7 +670,13 @@ class PipelineRuntime:
             raise _NestedRuntimeFailure(str(exc), runtime.trace) from exc
         outputs = {}
         for provider in frame.provides:
-            nested_value = nested_result.get(provider.type)
+            try:
+                nested_value = nested_result.get(provider.type)
+            except KeyError as exc:
+                raise PipelineRuntimeError(
+                    f"nodeset instance '{frame.id}' provides type '{provider.type}' "
+                    f"for key '{provider.key}', but the nodeset body did not produce it"
+                ) from exc
             outputs[provider.key] = _result_value(nested_value)
         return outputs, runtime.trace
 

@@ -2,51 +2,105 @@
   "pipeline": {
     "nodes": [
       {
-        "name": "start",
-        "type": "sandbox.start",
         "display_name": "Start",
-        "description": "Starts the undeclared sync fanout fixture."
+        "description": "Starts the undeclared sync fanout fixture.",
+        "id": "start",
+        "type_used": "sandbox.start"
       },
       {
-        "name": "source",
-        "type": "sandbox.constant",
         "display_name": "Fanout Source",
         "description": "Branches synchronously without being a decision node.",
-        "provides": [{"key": "value.in", "type": "value.in"}],
-        "value": 1
+        "provides": [
+          {
+            "key": "value.in",
+            "type": "value.in",
+            "display_name": "Value In"
+          }
+        ],
+        "value": 1,
+        "id": "source",
+        "type_used": "sandbox.constant"
       },
       {
-        "name": "side",
-        "type": "sandbox.add_out",
         "display_name": "Unjoined Side Branch",
         "description": "Looks like synchronous side work but never rejoins the mainline and is not async.",
-        "requires": [{"type": "value.in", "cardinality": "exactly_one"}],
-        "provides": [{"key": "side.value", "type": "value.final"}],
-        "delta": 99
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
+          }
+        ],
+        "provides": [
+          {
+            "key": "side.value",
+            "type": "value.final",
+            "display_name": "Side Value"
+          }
+        ],
+        "delta": 99,
+        "id": "side",
+        "type_used": "sandbox.add_out"
       },
       {
-        "name": "add",
-        "type": "sandbox.add",
         "display_name": "Finalize",
         "description": "Produces the final output on the mainline.",
-        "requires": [{"type": "value.in", "cardinality": "exactly_one"}],
-        "provides": [{"key": "value.out", "type": "value.out"}],
-        "delta": 4
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out",
+            "display_name": "Value Out"
+          }
+        ],
+        "delta": 4,
+        "id": "add",
+        "type_used": "sandbox.add"
       },
       {
-        "name": "end",
-        "type": "sandbox.out_value_end",
         "display_name": "End",
         "description": "Ends after value.out is available.",
-        "requires": [{"type": "value.out", "cardinality": "exactly_one"}]
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
+          }
+        ],
+        "id": "end",
+        "type_used": "sandbox.out_value_end"
       }
     ],
     "edges": [
-      {"from": "start", "to": "source"},
-      {"from": "source", "to": "add"},
-      {"from": "source", "to": "side"},
-      {"from": "add", "to": "end"}
+      {
+        "from": "start",
+        "to": "source"
+      },
+      {
+        "from": "source",
+        "to": "add"
+      },
+      {
+        "from": "source",
+        "to": "side"
+      },
+      {
+        "from": "add",
+        "to": "end"
+      }
     ],
-    "outputs": [{"type": "value.out", "cardinality": "exactly_one"}]
+    "outputs": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one",
+        "display_name": "Value Out"
+      }
+    ]
   }
 }

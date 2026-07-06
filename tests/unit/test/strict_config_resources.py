@@ -26,7 +26,7 @@ def test_config_resource_schema_rejects_invalid_status_and_plugin_config() -> No
         {
             "global_config": [],
             "base_lib": {"paths": "base_lib", "modules": [{"module": "base_lib.math", "status": "future"}]},
-            "plugins": [{"name": "bad", "status": "later", "config": []}],
+            "plugins": [{"id": "bad", "status": "later", "config": []}],
             "pipeline": _seed_only_pipeline(),
         }
     )
@@ -40,7 +40,7 @@ def test_config_resource_schema_rejects_invalid_status_and_plugin_config() -> No
         for finding in collect_config_schema_findings(
             {
                 "base_lib": {"modules": [{"module": "base_lib.math", "display_name": 1}]},
-                "plugins": [{"name": "bad", "status": "planned", "type": "policy", "description": 2}],
+                "plugins": [{"id": "bad", "status": "planned", "type": "policy", "description": 2}],
                 "pipeline": _seed_only_pipeline(),
             }
         )
@@ -49,15 +49,11 @@ def test_config_resource_schema_rejects_invalid_status_and_plugin_config() -> No
     flag_findings = collect_config_schema_findings(
         {
             "global_config": {"config": {"delta": 1}, "allow_config_override": "no"},
-            "nodesets": [
-                _nodeset_config("math.add_one", pipeline=_input_add_pipeline())
-                | {"global_config": {"values": [], "override_child_config": "no"}}
-            ],
             "pipeline": {
                 "nodes": [
                     {
-                        "name": "flow",
-                        "type": "nodeset.math.add_one",
+                        "id": "flow",
+                        "type_used": "math.add_one",
                         "allow_config_override": "no",
                         "provides": [PROV_SPEC("value.out")],
                     }
@@ -65,9 +61,14 @@ def test_config_resource_schema_rejects_invalid_status_and_plugin_config() -> No
             },
         }
     )
+    nodeset_flag_findings = collect_config_schema_findings(
+        _nodeset_config("math.add_one", pipeline=_input_add_pipeline())
+        | {"global_config": {"values": [], "override_child_config": "no"}}
+    )
     flag_rule_ids = {finding.rule_id for finding in flag_findings}
+    nodeset_flag_rule_ids = {finding.rule_id for finding in nodeset_flag_findings}
     assert "CONFIG.SCHEMA.CONFIG_OVERRIDE_FLAG" in flag_rule_ids
-    assert "CONFIG.SCHEMA.GLOBAL_CONFIG_VALUES" in flag_rule_ids
+    assert "CONFIG.SCHEMA.GLOBAL_CONFIG_VALUES" in nodeset_flag_rule_ids
 
 
 def test_config_resources_global_config_plugins_base_lib_and_mermaid(tmp_path) -> None:
@@ -275,7 +276,7 @@ def test_nodeset_call_config_overrides_nodeset_global_and_inner_node_config(tmp_
                 "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the nodeset config fixture."),
-                    _node_call("flow", "nodeset.math.add_one", "Calls add-one with config override.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")], config={"delta": 6}, allow_config_override=False),
+                    _node_call("flow", "math.add_one", "Calls add-one with config override.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")], config={"delta": 6}, allow_config_override=False),
                     _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": _edge_chain("start", "flow", "end"),
@@ -298,18 +299,14 @@ def test_imported_nodeset_file_global_config_is_used_for_inner_nodes(tmp_path) -
     imports_path = tmp_path / "nodesets.jsonc"
     imports_path.write_text(
         json.dumps(
-            {
-                "global_config": {"config": {"delta": 4}, "allow_config_override": True},
-                "nodesets": [
-                    _nodeset_config(
-                        "math.add_one",
-                        requires=["value.in"],
-                        provides=["value.out"],
-                        exports=["value.out"],
-                        pipeline=_input_add_pipeline(add={"config": {"delta": 1}}),
-                    )
-                ],
-            }
+            _nodeset_config(
+                "math.add_one",
+                requires=["value.in"],
+                provides=["value.out"],
+                exports=["value.out"],
+                pipeline=_input_add_pipeline(add={"config": {"delta": 1}}),
+            )
+            | {"global_config": {"config": {"delta": 4}, "allow_config_override": True}}
         ),
         encoding="utf-8",
     )
@@ -317,12 +314,12 @@ def test_imported_nodeset_file_global_config_is_used_for_inner_nodes(tmp_path) -
     config_path.write_text(
         json.dumps(
             {
-                "nodeset_imports": [{"path": "nodesets.jsonc", "names": ["math.add_one"]}],
+                "nodeset_imports": [{"path": "nodesets.jsonc"}],
                 "pipeline": {
                     "inputs": [PROV_SPEC("value.in")],
                     "nodes": [
                         _node_call("start", "test.start", "Starts the imported nodeset fixture."),
-                        _node_call("flow", "nodeset.math.add_one", "Calls imported add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                        _node_call("flow", "math.add_one", "Calls imported add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                         _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
                     ],
                     "edges": _edge_chain("start", "flow", "end"),
