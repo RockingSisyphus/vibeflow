@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
+import subprocess
+import sys
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -36,18 +39,28 @@ PROTECTED_DIRS = (
 )
 
 
+class BuildDistributionError(RuntimeError):
+    pass
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build a copyable VibeFlow distribution directory.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="directory to rebuild")
     parser.add_argument("--keep-existing", action="store_true", help="fail instead of replacing an existing output directory")
     args = parser.parse_args()
     output = Path(args.output).resolve()
-    build_distribution(output, replace=not args.keep_existing)
+    try:
+        build_distribution(output, replace=not args.keep_existing)
+    except BuildDistributionError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     print(f"built distribution: {output}")
     return 0
 
 
-def build_distribution(output: Path, *, replace: bool = True) -> None:
+def build_distribution(output: Path, *, replace: bool = True, run_self_check: bool = True) -> None:
+    if run_self_check:
+        _run_core_self_check()
     _prepare_output(output, replace=replace)
     _copy_tree(ROOT / "distribution" / "kernel_development_pack" / "project_template", output)
     _copy_tree(ROOT / "distribution" / "kernel_development_pack" / "docs", output / "kernel" / "docs")
@@ -58,6 +71,20 @@ def build_distribution(output: Path, *, replace: bool = True) -> None:
     _ensure_standard_project_dirs(output)
     _write_root_readme(output)
     _write_kernel_manifest(output)
+
+
+def _run_core_self_check() -> None:
+    env = os.environ.copy()
+    src_path = str(ROOT / "src")
+    existing_pythonpath = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = src_path if not existing_pythonpath else os.pathsep.join((src_path, existing_pythonpath))
+    command = [sys.executable, "-m", "vibeflow", "quality-check", "--path", "."]
+    result = subprocess.run(command, cwd=ROOT, env=env, check=False)
+    if result.returncode != 0:
+        raise BuildDistributionError(
+            "refusing to build distribution because kernel self-check failed: "
+            + "PYTHONPATH=src python -m vibeflow quality-check --path ."
+        )
 
 
 def _prepare_output(output: Path, *, replace: bool) -> None:

@@ -1736,7 +1736,7 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
         )
 
     output = tmp_path / "distribution"
-    build_distribution(output)
+    build_distribution(output, run_self_check=False)
     manifest = (output / "kernel" / "MANIFEST.sha256").read_text(encoding="utf-8")
     manifest_paths = {line.split("  ", 1)[1] for line in manifest.splitlines() if line.strip()}
 
@@ -1771,7 +1771,7 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     assert result.returncode == 0, result.stderr
 
     docs_failure = tmp_path / "distribution_docs_failure"
-    build_distribution(docs_failure)
+    build_distribution(docs_failure, run_self_check=False)
     docs_path = docs_failure / "kernel" / "docs" / "00_内核目的与项目结构.md"
     docs_path.write_text(docs_path.read_text(encoding="utf-8") + "\nchanged\n", encoding="utf-8")
     result = verify(docs_failure)
@@ -1780,7 +1780,7 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     assert "kernel/docs/00_内核目的与项目结构.md" in result.stderr
 
     package_failure = tmp_path / "distribution_package_failure"
-    build_distribution(package_failure)
+    build_distribution(package_failure, run_self_check=False)
     package_path = package_failure / "kernel" / "tools" / "mermaid-renderer" / "package.json"
     package_path.write_text(package_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     result = verify(package_failure)
@@ -1789,7 +1789,7 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     assert "kernel/tools/mermaid-renderer/package.json" in result.stderr
 
     unexpected_failure = tmp_path / "distribution_unexpected_failure"
-    build_distribution(unexpected_failure)
+    build_distribution(unexpected_failure, run_self_check=False)
     unpacked = unexpected_failure / "kernel" / "vibeflow" / "unpacked.py"
     unpacked.parent.mkdir(parents=True)
     unpacked.write_text("# unexpected unpacked kernel source\n", encoding="utf-8")
@@ -1797,3 +1797,51 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     assert result.returncode == 2
     assert "Unexpected:" in result.stderr
     assert "kernel/vibeflow/unpacked.py" in result.stderr
+
+
+def test_distribution_build_runs_core_self_check_before_writing(tmp_path, monkeypatch) -> None:
+    import build_distribution as distribution_builder
+
+    calls: list[str] = []
+
+    def fail_self_check() -> None:
+        calls.append("self_check")
+        raise distribution_builder.BuildDistributionError("self-check failed")
+
+    output = tmp_path / "distribution"
+    output.mkdir()
+    marker = output / "marker.txt"
+    marker.write_text("keep", encoding="utf-8")
+    monkeypatch.setattr(distribution_builder, "_run_core_self_check", fail_self_check)
+
+    with pytest.raises(distribution_builder.BuildDistributionError, match="self-check failed"):
+        distribution_builder.build_distribution(output)
+
+    assert calls == ["self_check"]
+    assert marker.read_text(encoding="utf-8") == "keep"
+
+
+def test_distribution_core_self_check_uses_ci_quality_command(monkeypatch) -> None:
+    import build_distribution as distribution_builder
+
+    captured: dict[str, object] = {}
+
+    def fake_run(command, *, cwd, env, check):
+        captured["command"] = command
+        captured["cwd"] = cwd
+        captured["env"] = env
+        captured["check"] = check
+
+        class Result:
+            returncode = 0
+
+        return Result()
+
+    monkeypatch.setattr(distribution_builder.subprocess, "run", fake_run)
+
+    distribution_builder._run_core_self_check()
+
+    assert captured["command"] == [sys.executable, "-m", "vibeflow", "quality-check", "--path", "."]
+    assert captured["cwd"] == distribution_builder.ROOT
+    assert str(distribution_builder.ROOT / "src") in str(captured["env"]["PYTHONPATH"])
+    assert captured["check"] is False
