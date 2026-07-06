@@ -243,7 +243,7 @@ terminal start -> io input -> process... -> io output -> terminal end
 规则：
 
 - `pipeline.edges` 是唯一控制流来源。
-- `requires/provides` 不会自动推导控制流；图上只会在已有连边上标出能匹配到的 contract。
+- `requires/provides` 不会自动推导控制流或诊断边；没有显式 edge，就没有图上的边。图上只会在已有连边上标出能匹配到的 contract。
 - `when` 只支持小表达式：`key == 'value'`、`key != 'value'`、`flag == true`、`flag == false`。字符串可以用单引号或双引号；布尔值必须小写 `true` / `false`。
 - 从 `decision` 出发的 edge 必须写 `when`。
 
@@ -310,6 +310,25 @@ trace 会输出 import 文件、展开后的 nodeset 数、每个 nodeset 解析
 `max_steps` 是运行时防护，不是架构语义。普通 `pipeline.edges` / nodeset 内部 `pipeline.edges` 不允许形成环；出现环会报 `GRAPH.CYCLE.FORBIDDEN`。
 
 `decision` 只负责分支选择，不再承担 retry / again / done 循环语义。训练循环、批处理循环和 retry-until 循环都应使用一等 loop node。
+
+## Mainline Analysis 与显式 edge 语义
+
+只有用户写在 `pipeline.edges` 中的 edge 才是图结构。`requires/provides` 只用于校验和解释这些显式 edge，不会自动生成控制流、诊断 data edge 或 Mermaid/SVG 边。某个上游 provider 和下游 requirement 类型匹配，但用户没有写 edge，核心会认为这条图边不存在。
+
+Health 会在显式 edge 中推断三类边：
+
+- `mainline`：同步主线边，负责调度。Mermaid/SVG 中加粗。
+- `data_bypass`：显式旁路数据边，source 和 target 已经由同步主线连接；只投递数据，不触发 target。Mermaid/SVG 中虚线。
+- `async`：连接到 `async: "detached"` 或 `async: "result_key"` node / nodeset 调用的边；不进入同步主线。
+
+普通同步节点应处于从 start 到 end 的主线或 decision 主线变体中。非 decision 同步 fan-out 只有在分支通过 `join_policy: "all"` 明确汇合、被识别为 data bypass，或分支目标显式 async 时才是合法语义。否则会产生：
+
+- `GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT`
+- `GRAPH.MAINLINE.AMBIGUOUS_SIDE_BRANCH`
+- `GRAPH.MAINLINE.DATA_BYPASS_WITHOUT_MAINLINE_TRIGGER`
+- `GRAPH.MAINLINE.DECISION_BRANCH_DEAD_END`
+
+这些 finding 的 `details` 会包含 `owner`、`source`、`target`、`edge`、尝试分类、`mainline_path` / `mainline_variant`、`branch_nodes`、`branch_edges`、`async_nodes_seen`、`why_invalid` 和 `suggested_fixes`。按这些字段修改配置：删除无用边、把旁路节点或 nodeset 调用标成 async、把分支串回主线，或给真正的同步汇合 node 写 `join_policy: "all"`。
 
 ## 一等 loop node
 
@@ -458,7 +477,7 @@ planned node / planned nodeset 可选 `planned_behavior`：
 - `detached`：主流程不等待，run 结束时 flush；失败记录 trace warning，不默认中断主流程。
 - `result_key`：下游直接 edge 上的节点按 `type` require 该异步结果时 join，结果写入 `result_key` 对应的 provider key。
 - runtime 不自动 merge async context；共享对象的线程安全由业务对象负责。
-- async 不支持 nodeset。
+- 复杂后台工作可以通过 `type: "nodeset.xxx"` 调用 nodeset，并在该调用点设置 `async`；nodeset 内部仍按自己的显式 edges 和契约运行。
 
 CLI 中 `--runtime-profile train` 会自动启用偏训练场景的选项：`trace="boundary"`、`execution="compiled"`、run/block hooks 开启、node/nodeset hooks 关闭、async flush timeout 为 30 秒。`--runtime-profile debug` 会启用完整 trace 和所有 hook。
 
@@ -511,9 +530,13 @@ policy 来源优先级：
 - `GRAPH.FLOW.CANNOT_REACH_END`：某个 implemented node 不能到达 end。
 - `GRAPH.DECISION.MISSING_BRANCH_VALUE`：decision 的 `output_schema` 声明了 enum/boolean 分支，但 edge 没覆盖。
 - `GRAPH.CYCLE.FORBIDDEN`：普通 graph 中出现显式 edge 环；请改用 `vibeflow.loop.while`。
+- `GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT`：非 decision 同步节点分出多条同步主线，但没有 data bypass、async 或 `join_policy: "all"` 汇合语义；看 `details.branch_nodes` / `branch_edges` 修改。
+- `GRAPH.MAINLINE.AMBIGUOUS_SIDE_BRANCH`：某个同步旁路不在任何主线变体中；通常应接回主线、删除，或把它标成 async。
+- `GRAPH.MAINLINE.DATA_BYPASS_WITHOUT_MAINLINE_TRIGGER`：一条旁路数据边的 target 没有独立主线触发；补主线 edge 或删除该旁路。
+- `GRAPH.MAINLINE.DECISION_BRANCH_DEAD_END`：decision 的某个 `when` 分支不能到达 terminal end 或合法汇合；看 `details.edge.when` 和 `details.branch_nodes`。
 - `GRAPH.DATA.MISSING_DIRECT_PROVIDER`：某个 require `type` 没有直接 incoming flow predecessor 或入口输入提供；检查 edge、`pipeline.inputs` 或中间 pass-through node。
 - `GRAPH.DATA.TYPE_CARDINALITY_AMBIGUOUS`：某个 require `type` 的直接来源数量可能违反 `exactly_one` / `optional_one`。
 - `GRAPH.DATA.UNCONSUMED_PROVIDER`：某个 provider `key/type` 没有直接下游消费；如果是预期最终产物，确保 `pipeline.outputs` 声明它，且必要时由 end/io/document 节点消费。
 - `GRAPH.SMELL.DUPLICATE_LOGIC`：两个 config node 的 `run_pure` fingerprint 相同；报告 `details` 会列出具体 nodes、node_types、fingerprint、duplicate_group 和 `similar_to` 豁免提示。
 
-所有健康 finding 都应先看 `object_id` 和 `details`。flow/data finding 的 `details.owner` 会标明顶层 `pipeline` 或 `nodeset:<name>`，并尽量列出 incoming/outgoing edge、direct sources、available provider types、entry input types 或 downstream required types，按这些对象修改配置。如果 `details.aggregated == true`，说明同一个根因在 nested nodeset / loop body 静态展开中被重复发现并压缩；`occurrences` 是重复展开次数，不是独立 bug 数。
+所有健康 finding 都应先看 `object_id` 和 `details`。flow/data finding 的 `details.owner` 会标明顶层 `pipeline` 或 `nodeset:<name>`，并尽量列出 incoming/outgoing edge、direct sources、available provider types、entry input types 或 downstream required types，按这些对象修改配置。mainline finding 会给出 `source` / `target`、`branch_nodes`、`branch_edges`、`mainline_path` 和 `suggested_fixes`。如果 `details.aggregated == true`，说明同一个根因在 nested nodeset / loop body 静态展开中被重复发现并压缩；`occurrences` 是重复展开次数，不是独立 bug 数。

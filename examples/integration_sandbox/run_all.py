@@ -644,7 +644,16 @@ VALID_RUN_CASES = [
             "step_count": 7,
             "stop_reason": "completed",
         },
-        "expected_blocks": [["start", "input", "prepare", "compute", "route", "external", "end"]],
+        "expected_blocks": [["start", "input", "prepare", "compute", "route", "external", "end", "again_end"]],
+    },
+    {
+        "name": "mainline_data_bypass",
+        "config": "pass_mainline_data_bypass.jsonc",
+        "initial": {},
+        "expected_outputs": {"value.final": 14},
+        "expected_runtime_exec_order": ["start", "seed", "prepare", "add", "multiply", "end"],
+        "expected_mermaid_contains": ["linkStyle 5 stroke-dasharray:6 4,stroke-width:2px;"],
+        "expected_run_mermaid_contains": ["linkStyle 5 stroke-dasharray:6 4,stroke-width:2px;"],
     },
     {
         "name": "async_result_key_join",
@@ -662,7 +671,7 @@ VALID_RUN_CASES = [
         "expected_absent_outputs": ["async.value"],
         "expected_trace_kind_counts": {"async_result": 1, "async_result_join": 1},
         "expected_trace_kind_absent": ["async_result_abandoned"],
-        "expected_runtime_exec_order": ["start", "slow_async", "add_pair", "compare", "scale", "use_scaled", "finalize", "end"],
+        "expected_runtime_exec_order": ["start", "add_pair", "compare", "slow_async", "scale", "use_scaled", "finalize", "end"],
         "expected_trace_summary": {
             "current_node": "end",
             "edge_executions": {
@@ -676,7 +685,7 @@ VALID_RUN_CASES = [
                 "use_scaled->finalize": 1,
                 "finalize->end": 1,
             },
-            "exec_order": ["start", "slow_async", "add_pair", "compare", "scale", "use_scaled", "finalize", "end"],
+            "exec_order": ["start", "add_pair", "compare", "slow_async", "scale", "use_scaled", "finalize", "end"],
             "node_runs": {"start": 1, "slow_async": 1, "add_pair": 1, "scale": 1, "compare": 1, "use_scaled": 1, "finalize": 1, "end": 1},
             "step_count": 8,
             "stop_reason": "completed",
@@ -714,7 +723,15 @@ VALID_RUN_CASES = [
         "initial_factory": _batch_initial,
         "expected_outputs": {"value.out": 10},
         "expected_trace_kind_counts": {"async_detached": 1, "async_detached_done": 1},
-        "expected_runtime_exec_order": ["start", "metrics", "seed", "add", "end"],
+        "expected_runtime_exec_order": ["start", "seed", "metrics", "add", "end"],
+    },
+    {
+        "name": "mainline_async_nodeset_side_task",
+        "config": "pass_mainline_async_nodeset_side_task.jsonc",
+        "initial": {},
+        "expected_outputs": {"value.out": 10},
+        "expected_trace_kind_counts": {"async_detached": 1, "async_detached_done": 1},
+        "expected_runtime_exec_order": ["start", "seed", "side_task", "main_add", "end"],
     },
     {
         "name": "safe_or_join_mutually_exclusive_left",
@@ -809,6 +826,8 @@ INVALID_CASES = [
     {"kind": "run", "config": "fail_plugin_execution.jsonc", "expect": "PLUGIN.EXECUTION"},
     {"kind": "config", "config": "fail_plugin_bad_shape.jsonc", "expect": "PLUGIN.POLICY.SHAPE"},
     {"kind": "runtime_run", "config": "fail_loop_max_iterations.jsonc", "initial": {"loop.current": 1}, "expect": "max_iterations=2"},
+    {"kind": "concerns", "config": "concern_mainline_unjoined_sync_fanout.jsonc", "expect": "GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT", "details": ["owner", "source", "target", "branch_nodes", "branch_edges", "suggested_fixes"]},
+    {"kind": "run", "config": "fail_mainline_decision_branch_dead_end.jsonc", "expect": "GRAPH.MAINLINE.DECISION_BRANCH_DEAD_END"},
     {"kind": "run", "config": "fail_safe_or_join_ambiguous_unconditional.jsonc", "expect": "GRAPH.JOIN.AMBIGUOUS_UNCONDITIONAL"},
     {"kind": "run", "config": "fail_safe_or_join_multiple_exactly_one.jsonc", "expect": "GRAPH.DATA.TYPE_CARDINALITY_AMBIGUOUS"},
 ]
@@ -1248,6 +1267,8 @@ def _run_invalid_case(case: dict[str, Any], base_lib_report):
         return CaseResult("invalid:base_lib_chain", "PASS", payload=summary.to_dict()), report
     if kind == "config":
         return _invalid_config(case), base_lib_report
+    if kind == "concerns":
+        return _concern_config(case), base_lib_report
     if kind == "run":
         return _invalid_run(case), base_lib_report
     if kind == "runtime_run":
@@ -1364,6 +1385,42 @@ def _invalid_config(case: dict[str, Any]) -> CaseResult:
         raise AssertionError(f"config case was not rejected: {report.status}")
     _assert_report_has_rule([item.to_dict() for item in (*report.errors, *report.warnings)], str(case["expect"]))
     return CaseResult(f"invalid:config:{case['config']}", "PASS", payload=report.to_dict())
+
+
+def _concern_config(case: dict[str, Any]) -> CaseResult:
+    from registry import build_node_registry
+    from vibeflow import load_config_document, load_config_resources, parse_graph_config, resolve_effective_policy, validate_graph_health
+    from vibeflow.plugin import load_plugins_from_config
+
+    config_path = CONFIG_DIR / str(case["config"])
+    document = load_config_document(config_path)
+    plugin_registry, plugin_findings = load_plugins_from_config(document.data, base_path=config_path.parent)
+    if plugin_findings:
+        raise AssertionError(f"plugin findings: {[finding.rule_id for finding in plugin_findings]}")
+    resources, resource_findings = load_config_resources(document.data, base_path=config_path.parent, plugin_registry=plugin_registry)
+    if resource_findings:
+        raise AssertionError(f"resource findings: {[finding.rule_id for finding in resource_findings]}")
+    policy_result = resolve_effective_policy(document.data, config_path=config_path, explicit_policy_path=POLICY_PATH, plugin_registry=plugin_registry)
+    graph = parse_graph_config(document.data)
+    report = validate_graph_health(
+        graph,
+        registry=build_node_registry(),
+        plugin_registry=plugin_registry,
+        global_config=resources.global_config,
+        purity_policy=policy_result.effective_policy.to_purity_policy(),
+    )
+    if report.status not in {"CONCERNS", "FAIL", "ERROR"}:
+        raise AssertionError(f"concern case had status {report.status}")
+    findings = [item.to_dict() for item in (*report.errors, *report.warnings)]
+    _assert_report_has_rule(findings, str(case["expect"]))
+    matches = [item for item in findings if item.get("rule_id") == case["expect"]]
+    if not matches:
+        raise AssertionError(f"concern case missing exact rule {case['expect']}")
+    details = matches[0].get("details", {})
+    missing = [field for field in case.get("details", ()) if field not in details]
+    if missing:
+        raise AssertionError(f"concern details missing {missing}: {details}")
+    return CaseResult(f"invalid:concerns:{case['config']}", "PASS", payload=report.to_dict())
 
 
 def _invalid_run(case: dict[str, Any]) -> CaseResult:

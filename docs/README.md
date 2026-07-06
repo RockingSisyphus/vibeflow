@@ -6,7 +6,7 @@ This directory contains current user documentation, maintainer documentation, an
 
 - `../README.md`: project overview and release-package workflow.
 - `developer_guide.md`: how to build business nodes, base_lib helpers, plugins, nodesets, and JSONC configs.
-- Config node/resource visual metadata (`display_name`, `description`, `style`, `similar_to` where applicable), symbol-table nodeset parsing and forward references, first-class loop nodes, safe OR join / `join_policy`, SVG color rules and native-text label enhancement, actionable and aggregated health/quality `details`, config parse tracing, and nested runtime trace fields are documented in `developer_guide.md` and `kernel_development_guide.md`.
+- Config node/resource visual metadata (`display_name`, `description`, `style`, `similar_to` where applicable), symbol-table nodeset parsing and forward references, explicit-edge mainline analysis / data bypass / async edge semantics, first-class loop nodes, safe OR join / `join_policy`, SVG color rules and native-text label enhancement, actionable and aggregated health/quality `details`, config parse tracing, and nested runtime trace fields are documented in `developer_guide.md` and `kernel_development_guide.md`.
 - `kernel_target_vision.md`: target vision and current public architecture principles.
 - `kernel_development_guide.md`: checks and workflow for maintaining VibeFlow itself.
 

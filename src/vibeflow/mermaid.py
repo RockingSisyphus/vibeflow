@@ -70,6 +70,11 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
         "explicit_edges": [list(edge.pair) for edge in compiled.explicit_edges],
         "data_edges": [list(edge.pair) for edge in compiled.data_edges],
         "effective_edges": [{"from": edge.source, "to": edge.target, "when": edge.when} for edge in compiled.effective_edges],
+        "mainline_edges": [list(edge.pair) for edge in compiled.mainline_edges],
+        "data_bypass_edges": [list(edge.pair) for edge in compiled.data_bypass_edges],
+        "async_edges": [list(edge.pair) for edge in compiled.async_edges],
+        "schedule_edges": [list(edge.pair) for edge in compiled.schedule_edges],
+        "transfer_edges": [list(edge.pair) for edge in compiled.transfer_edges],
         "providers": dict(compiled.providers),
         "consumers": {key: list(values) for key, values in compiled.consumers.items()},
         "nodesets": sorted(graph.nodesets),
@@ -108,11 +113,13 @@ class _MermaidRenderer:
         self.node_ids: dict[str, str] = {}
         self.nodeset_node_ids: dict[str, str] = {}
         self.node_classes: dict[str, str] = {}
+        self.edge_index = 0
 
     def render(self, graph: GraphConfig, compiled: CompiledGraph) -> str:
         self.node_ids = {node.name: _safe_id(node.name) for node in graph.nodes}
         self.nodeset_node_ids = _nodeset_node_ids(graph, self.node_ids)
         self.node_classes = self._finding_classes(graph, compiled) if self.show_findings else {}
+        self.edge_index = 0
         if self.mermaid_layout == MERMAID_LAYOUT_REVIEW_COLUMNS:
             return self._render_review_columns(graph, compiled)
         lines = [
@@ -190,7 +197,15 @@ class _MermaidRenderer:
             target_id = _safe_id(f"{prefix}{edge.target}")
             label_text = self._edge_label(graph, edge)
             label = f"|{_escape_edge_label(label_text)}|" if label_text else ""
-            lines.append(f"{indent}{source_id} -->{label} {target_id}")
+            self._append_edge_line(lines, f"{indent}{source_id} -->{label} {target_id}", style=_edge_style(compiled, edge))
+
+    def _append_edge_line(self, lines: list[str], line: str, *, style: str = "") -> None:
+        edge_index = self.edge_index
+        lines.append(line)
+        self.edge_index += 1
+        if style:
+            indent = line[: len(line) - len(line.lstrip())]
+            lines.append(f"{indent}linkStyle {edge_index} {style};")
 
     def _render_resources(self, lines: list[str], *, indent: str) -> None:
         payload = _resources_payload(self.resources)
@@ -244,7 +259,7 @@ class _MermaidRenderer:
             resource_id = f"{root_id}_{index}"
             label = _resource_label(resource, kind=label_kind, show_semantics=self.show_semantics)
             lines.append(f'{indent}{resource_id}@{{ shape: {child_shape}, label: "{_escape_label(label)}" }}')
-            lines.append(f"{indent}{root_id} -.-> {resource_id}")
+            self._append_edge_line(lines, f"{indent}{root_id} -.-> {resource_id}")
             status = str(resource.get("status", "implemented"))
             lines.append(f"{indent}class {resource_id} {'plannedResource' if status == STATUS_PLANNED else child_class};")
 
@@ -561,6 +576,15 @@ def _provider_edge_text(provider: object) -> str:
     if key and data_type and key != data_type:
         return f"{key} -> {data_type}"
     return data_type or key
+
+
+def _edge_style(compiled: CompiledGraph, edge: object) -> str:
+    pair = (str(getattr(edge, "source", "")), str(getattr(edge, "target", "")))
+    if pair in {item.pair for item in getattr(compiled, "data_bypass_edges", ())}:
+        return "stroke-dasharray:6 4,stroke-width:2px"
+    if pair in {item.pair for item in getattr(compiled, "mainline_edges", ())}:
+        return "stroke-width:4px"
+    return ""
 
 
 def _join_label_lines(lines: tuple[str, ...] | list[str]) -> str:

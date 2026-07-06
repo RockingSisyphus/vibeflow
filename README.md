@@ -148,7 +148,9 @@ VibeFlow 的核心是一个严格的流程图运行时：node 负责局部纯计
 
 程序控制流只来自 JSONC 配置里的 `pipeline.edges`。
 
-`requires` / `provides` 只是数据契约，不会被偷偷推导成控制流。这样可以避免项目在多轮 AI 修改后出现隐式路径和隐藏依赖。
+`requires` / `provides` 只是数据契约，不会被偷偷推导成控制流或图上的理论数据边。这样可以避免项目在多轮 AI 修改后出现隐式路径和隐藏依赖。
+
+Health 会在显式 edge 中推断同步主线、data bypass 和 async 相关边：主线 edge 负责调度并在 SVG/Mermaid 加粗，data bypass 只投递数据不触发目标并显示虚线，async edge 连接显式 async node/nodeset。
 
 数据契约使用严格结构化写法：`provides` 声明唯一 `key` 和逻辑 `type`，`requires` 按 `type` 和 `cardinality` 消费。运行时通过 node inbox / edge payload 传递 envelope，不支持跨多跳从全局 Context 偷读早期输出；最终结果只保留 `pipeline.outputs` 声明的内容。
 
@@ -172,6 +174,7 @@ VibeFlow 会在运行前检查：
 - 节点元数据是否完整。
 - 输入输出契约是否清晰。
 - 流程是否从 start 可达并能到达 end。
+- 同步分支是否能解释为 mainline、data bypass、async 或显式 `join_policy: "all"` 汇合。
 - 普通 graph / nodeset 内部是否存在显式环路；真实循环必须使用一等 while loop。
 - node 是否违反纯函数和结构规则。
 - 配置、插件、nodeset 是否破坏项目边界。

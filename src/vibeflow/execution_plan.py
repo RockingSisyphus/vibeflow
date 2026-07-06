@@ -42,6 +42,8 @@ class NodeFrame:
     flow_kind: str
     is_terminal: bool
     is_nodeset: bool
+    transfer_incoming: tuple[EdgeSpec, ...] = ()
+    transfer_outgoing: tuple[EdgeSpec, ...] = ()
     is_loop: bool = False
     join_policy: str = ""
     nodeset_name: str = ""
@@ -136,8 +138,12 @@ def _frame_for(
     global_scope: ConfigScope,
     runtime_options: object | None,
 ) -> NodeFrame:
-    incoming = tuple(edge for edge in compiled.effective_edges if edge.target == spec.name)
-    outgoing = tuple(edge for edge in compiled.effective_edges if edge.source == spec.name)
+    schedule_edges = compiled.schedule_edges or compiled.effective_edges
+    transfer_edges = compiled.transfer_edges or compiled.effective_edges
+    incoming = tuple(edge for edge in schedule_edges if edge.target == spec.name)
+    outgoing = tuple(edge for edge in schedule_edges if edge.source == spec.name)
+    transfer_incoming = tuple(edge for edge in transfer_edges if edge.target == spec.name)
+    transfer_outgoing = tuple(edge for edge in transfer_edges if edge.source == spec.name)
     is_nodeset = spec.node_type.startswith("nodeset.")
     is_loop = spec.node_type in LOOP_NODE_TYPES
     nodeset_name = spec.node_type.removeprefix("nodeset.") if is_nodeset else ""
@@ -150,6 +156,8 @@ def _frame_for(
             graph=graph,
             incoming=incoming,
             outgoing=outgoing,
+            transfer_incoming=transfer_incoming,
+            transfer_outgoing=transfer_outgoing,
             flow_kind=flow_kind or (nodeset.flow_kind if nodeset is not None else ""),
             nodeset=nodeset,
             nodeset_name=nodeset_name,
@@ -173,6 +181,8 @@ def _frame_for(
             params={},
             incoming=incoming,
             outgoing=outgoing,
+            transfer_incoming=transfer_incoming,
+            transfer_outgoing=transfer_outgoing,
             flow_kind=flow_kind or FLOW_KIND_PREDEFINED,
             is_terminal=False,
             is_nodeset=False,
@@ -201,6 +211,8 @@ def _frame_for(
             params={},
             incoming=incoming,
             outgoing=outgoing,
+            transfer_incoming=transfer_incoming,
+            transfer_outgoing=transfer_outgoing,
             flow_kind=flow_kind or FLOW_KIND_PREDEFINED,
             is_terminal=False,
             is_nodeset=True,
@@ -225,6 +237,8 @@ def _frame_for(
         params=attach_global_config(node_params, global_scope.values),
         incoming=incoming,
         outgoing=outgoing,
+        transfer_incoming=transfer_incoming,
+        transfer_outgoing=transfer_outgoing,
         flow_kind=flow_kind,
         is_terminal=flow_kind == "terminal",
         is_nodeset=False,
@@ -240,6 +254,8 @@ def _planned_stub_frame(
     graph: GraphConfig,
     incoming: tuple[EdgeSpec, ...],
     outgoing: tuple[EdgeSpec, ...],
+    transfer_incoming: tuple[EdgeSpec, ...],
+    transfer_outgoing: tuple[EdgeSpec, ...],
     flow_kind: str,
     nodeset: object | None,
     nodeset_name: str,
@@ -267,6 +283,8 @@ def _planned_stub_frame(
         params=attach_global_config(params, global_scope.values),
         incoming=incoming,
         outgoing=outgoing,
+        transfer_incoming=transfer_incoming,
+        transfer_outgoing=transfer_outgoing,
         flow_kind=flow_kind,
         is_terminal=flow_kind == "terminal",
         is_nodeset=nodeset is not None,

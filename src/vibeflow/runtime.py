@@ -215,12 +215,15 @@ class PipelineRuntime:
                 self.trace.stop_reason = "completed"
                 return
             self._clear_conditional_outgoing(node_name, state)
-            for edge in self._activated_edges(node_name, outputs, state):
+            active_edges = self._activated_edges(node_name, outputs, state)
+            active_pairs = {edge.pair for edge in active_edges}
+            for edge in active_edges:
                 self._activate_edge(edge, state)
                 self._deliver_outputs(edge, outputs, state)
                 if edge.target not in queued:
                     ready.append(edge.target)
                     queued.add(edge.target)
+            self._deliver_transfer_only_edges(node_name, outputs, state, active_pairs)
         self.trace.stop_reason = "max_steps"
         raise PipelineRuntimeError(f"pipeline exceeded max_steps={self._plan.max_steps}")
 
@@ -254,6 +257,7 @@ class PipelineRuntime:
             edge = active[0]
             self._activate_edge(edge, state)
             self._deliver_outputs(edge, outputs, state)
+            self._deliver_transfer_only_edges(node_name, outputs, state, {edge.pair})
             node_name = edge.target
         self.trace.stop_reason = "max_steps"
         raise PipelineRuntimeError(f"pipeline exceeded max_steps={self._plan.max_steps}")
@@ -288,6 +292,7 @@ class PipelineRuntime:
                 edge = active[0]
                 self._activate_edge(edge, state)
                 self._deliver_outputs(edge, outputs, state)
+                self._deliver_transfer_only_edges(node_name, outputs, state, {edge.pair})
                 node_name = edge.target
             self.trace.stop_reason = "max_steps"
             raise PipelineRuntimeError(f"pipeline exceeded max_steps={self._plan.max_steps}")
@@ -708,11 +713,24 @@ class PipelineRuntime:
             self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(exc))
             raise
         self._clear_conditional_outgoing(frame.name, state)
-        for edge in self._activated_edges(frame.name, outputs, state):
+        active_edges = self._activated_edges(frame.name, outputs, state)
+        active_pairs = {edge.pair for edge in active_edges}
+        for edge in active_edges:
             self._activate_edge(edge, state)
             self._deliver_outputs(edge, outputs, state)
+        self._deliver_transfer_only_edges(frame.name, outputs, state, active_pairs)
         self._call_runtime_plugins("after_node", frame.name, frame.node_type, summarize_mapping(outputs))
         self._record_runtime_event("async_result_join", frame.name, frame.node_type, output_summary=summarize_mapping(outputs))
+
+    def _deliver_transfer_only_edges(self, node_name: str, outputs: Mapping[str, object], state: _RuntimeState, scheduled_pairs: set[tuple[str, str]]) -> None:
+        values = self._condition_values(node_name, outputs, state)
+        for edge in self._frames[node_name].transfer_outgoing:
+            if edge.pair in scheduled_pairs:
+                continue
+            if edge.when and not condition_matches(edge.when, values):
+                continue
+            self._record_edge(edge)
+            self._deliver_outputs(edge, outputs, state)
 
     def _deliver_outputs(self, edge: EdgeSpec, outputs: Mapping[str, object], state: _RuntimeState) -> None:
         source = self._frames[edge.source]

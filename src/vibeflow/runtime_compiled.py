@@ -25,11 +25,14 @@ def run_compiled_steps(runtime, state) -> None:
             runtime.trace.stop_reason = "completed"
             return
         runtime._clear_conditional_outgoing(node_name, state)
-        for edge in runtime._activated_edges(node_name, outputs, state):
+        active_edges = runtime._activated_edges(node_name, outputs, state)
+        active_pairs = {edge.pair for edge in active_edges}
+        for edge in active_edges:
             runtime._activate_edge(edge, state)
             runtime._deliver_outputs(edge, outputs, state)
             if edge.target not in queued:
                 ready.append(edge.target)
                 queued.add(edge.target)
+        runtime._deliver_transfer_only_edges(node_name, outputs, state, active_pairs)
     runtime.trace.stop_reason = "max_steps"
     raise PipelineRuntimeError(f"pipeline exceeded max_steps={runtime._plan.max_steps}")

@@ -252,7 +252,7 @@ def test_implemented_nodeset_cannot_contain_planned_child() -> None:
     assert report.status == "FAIL"
     assert any(error.rule_id == "GRAPH.PLANNED.PARENT_HAS_PLANNED_CHILD" for error in report.errors)
 
-def test_requires_provides_data_edges_are_diagnostic_and_explicit_flow_runs() -> None:
+def test_requires_provides_do_not_create_data_edges_and_explicit_flow_runs() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -272,10 +272,176 @@ def test_requires_provides_data_edges_are_diagnostic_and_explicit_flow_runs() ->
         }
     )
     compiled = GraphCompiler().compile(graph)
-    assert ("seed", "add") in [edge.pair for edge in compiled.data_edges]
+    assert [edge.pair for edge in compiled.data_edges] == []
     assert [edge.pair for edge in compiled.effective_edges] == [("start", "seed"), ("seed", "add"), ("add", "end")]
     context = PipelineRuntime(graph, registry=_registry()).run()
     assert context.get("value.out")["value"] == 7
+
+
+def test_explicit_shortcut_edge_is_data_bypass_and_does_not_trigger_target() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the data bypass fixture."),
+                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")], value=4),
+                    _node_call("add", "test.add", "Runs the mainline timing step.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")], delta=3),
+                    _node_call("end", "test.in_end", "Consumes the bypassed seed value after add has run.", requires=[REQ_SPEC("value.in")]),
+                ],
+                "edges": [
+                    {"from": "start", "to": "seed"},
+                    {"from": "seed", "to": "add"},
+                    {"from": "add", "to": "end"},
+                    {"from": "seed", "to": "end"},
+                ],
+            }
+        }
+    )
+    compiled = GraphCompiler().compile(graph, registry=_registry())
+
+    assert [edge.pair for edge in compiled.mainline_edges] == [("start", "seed"), ("seed", "add"), ("add", "end")]
+    assert [edge.pair for edge in compiled.data_bypass_edges] == [("seed", "end")]
+    result = PipelineRuntime(graph, registry=_registry()).run()
+    assert result.get("runtime.exec_order") == ("start", "seed", "add", "end")
+
+
+def test_mainline_data_bypass_without_trigger_has_actionable_details() -> None:
+    registry = _registry()
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the bypass trigger fixture."),
+                    _node_call("end", "test.start", "Ends the only reachable mainline."),
+                    _node_call("source", "test.seed", "Disconnected bypass source.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("middle", "test.copy", "Disconnected intermediate node.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.copy", "value.in")]),
+                    _node_call("target", "test.in_end", "Disconnected bypass target.", requires=[REQ_SPEC("value.in")]),
+                ],
+                "edges": [
+                    {"from": "start", "to": "end"},
+                    {"from": "source", "to": "middle"},
+                    {"from": "middle", "to": "target"},
+                    {"from": "source", "to": "target"},
+                ],
+            }
+        }
+    )
+
+    report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
+    warning = next(item for item in report.warnings if item.rule_id == "GRAPH.MAINLINE.DATA_BYPASS_WITHOUT_MAINLINE_TRIGGER")
+
+    assert warning.details["owner"] == "pipeline"
+    assert warning.details["source"] == "source"
+    assert warning.details["target"] == "target"
+    assert warning.details["edge"] == {"from": "source", "to": "target"}
+    assert warning.details["branch_nodes"] == ["target"]
+    assert warning.details["suggested_fixes"]
+
+
+def test_mainline_unexpected_sync_fanout_warning_has_actionable_details() -> None:
+    registry = _registry()
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the fanout fixture."),
+                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("source", "test.add", "Branches without decision semantics.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("side", "test.copy", "Side synchronous branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy", "value.in")]),
+                    _node_call("end", "test.out_end", "Ends the fanout fixture.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": [
+                    {"from": "start", "to": "seed"},
+                    {"from": "seed", "to": "source"},
+                    {"from": "source", "to": "side"},
+                    {"from": "source", "to": "end"},
+                ],
+            }
+        }
+    )
+
+    report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
+    warning = next(item for item in report.warnings if item.rule_id == "GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT")
+
+    assert warning.details["owner"] == "pipeline"
+    assert warning.details["source"] == "source"
+    assert warning.details["branch_nodes"] == ["end", "side"]
+    assert {"from": "source", "to": "side"} in warning.details["branch_edges"]
+    assert {"from": "source", "to": "end"} in warning.details["branch_edges"]
+    assert warning.details["suggested_fixes"]
+
+
+def test_mainline_sync_fanout_with_explicit_all_join_is_allowed() -> None:
+    registry = _registry()
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the explicit join fixture."),
+                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("left", "test.copy", "Left joined branch.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.left", "value.left")]),
+                    _node_call("right", "test.copy", "Right joined branch.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.right", "value.right")]),
+                    _node_call(
+                        "join",
+                        "test.copy",
+                        "Explicitly waits for both branches.",
+                        requires=[REQ_SPEC("value.left"), REQ_SPEC("value.right")],
+                        provides=[PROV_SPEC("value.join", "value.out")],
+                        join_policy="all",
+                    ),
+                    _node_call("end", "test.out_end", "Ends after joined value.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": [
+                    {"from": "start", "to": "seed"},
+                    {"from": "seed", "to": "left"},
+                    {"from": "seed", "to": "right"},
+                    {"from": "left", "to": "join"},
+                    {"from": "right", "to": "join"},
+                    {"from": "join", "to": "end"},
+                ],
+            }
+        }
+    )
+
+    report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
+
+    assert not any(item.rule_id == "GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT" for item in (*report.errors, *report.warnings))
+
+
+def test_mainline_decision_dead_end_warning_has_actionable_details() -> None:
+    registry = _registry()
+    register_node(registry, "test.two_route", TwoRouteNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the decision mainline fixture."),
+                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("route", "test.two_route", "Chooses the branch.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("flow.route")]),
+                    _node_call("dead", "test.copy", "Dead branch node.", provides=[PROV_SPEC("value.dead", "value.in")]),
+                    _node_call("sink", "test.copy", "Dead branch sink.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.sink", "value.out")]),
+                    _node_call("end", "test.start", "Valid terminal end."),
+                ],
+                "edges": [
+                    {"from": "start", "to": "seed"},
+                    {"from": "seed", "to": "route"},
+                    {"from": "route", "to": "dead", "when": "flow.route == 'again'"},
+                    {"from": "dead", "to": "sink"},
+                    {"from": "route", "to": "end", "when": "flow.route == 'done'"},
+                ],
+            }
+        }
+    )
+
+    report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
+    warning = next(item for item in report.warnings if item.rule_id == "GRAPH.MAINLINE.DECISION_BRANCH_DEAD_END")
+
+    assert warning.details["owner"] == "pipeline"
+    assert warning.details["source"] == "route"
+    assert warning.details["target"] == "dead"
+    assert warning.details["edge"] == {"from": "route", "to": "dead", "when": "flow.route == 'again'"}
+    assert warning.details["branch_nodes"] == ["dead", "sink"]
+    assert warning.details["suggested_fixes"]
 
 def test_undeclared_cycle_is_rejected() -> None:
     graph = parse_graph_config(
@@ -403,7 +569,8 @@ def test_checked_run_writes_reproducible_artifacts_without_raw_inputs(tmp_path) 
     assert input_summary["secret"] == {"size": 16, "type": "str"}
     assert "top-secret-value" not in (result.run_dir / "input_summary.json").read_text(encoding="utf-8")
     compiled = json.loads((result.run_dir / "compiled_graph.json").read_text(encoding="utf-8"))
-    assert [edge for edge in compiled["data_edges"] if edge == ["seed", "add"]]
+    assert compiled["data_edges"] == []
+    assert compiled["mainline_edges"] == [["start", "seed"], ["seed", "add"], ["add", "end"]]
     graph_mmd = (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
     graph_txt = (result.run_dir / "graph.txt").read_text(encoding="utf-8")
     for edge in compiled["effective_edges"]:
