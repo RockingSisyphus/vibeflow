@@ -45,7 +45,7 @@ def _flow_maps(compiled, active_names: set[str]) -> tuple[dict[str, list[str]], 
     outgoing = {name: [] for name in active_names}
     outgoing_edges = {name: [] for name in active_names}
     incoming_edges = {name: [] for name in active_names}
-    for edge in compiled.effective_edges:
+    for edge in getattr(compiled, "schedule_edges", ()) or compiled.effective_edges:
         if edge.source not in active_names or edge.target not in active_names:
             continue
         outgoing[edge.source].append(edge.target)
@@ -56,6 +56,8 @@ def _flow_maps(compiled, active_names: set[str]) -> tuple[dict[str, list[str]], 
 
 
 def _node_participates_in_flow(graph, node) -> bool:
+    if getattr(node, "async_mode", "") == "detached":
+        return False
     if node.status != STATUS_PLANNED:
         return True
     nodeset = graph.nodesets.get(node.node_type.removeprefix("nodeset.")) if node.node_type.startswith("nodeset.") else None
@@ -264,7 +266,7 @@ def _append_unconsumed_provider_warnings(node, compiled, nodes_by_name, outgoing
 def append_join_policy_health(graph, compiled, state, *, owner: str = "pipeline") -> None:
     nodes_by_name = {node.name: node for node in graph.nodes}
     incoming_edges: dict[str, list[object]] = {node.name: [] for node in graph.nodes}
-    for edge in compiled.effective_edges:
+    for edge in getattr(compiled, "schedule_edges", ()) or compiled.effective_edges:
         incoming_edges.setdefault(edge.target, []).append(edge)
     for node in graph.nodes:
         if node.join_policy == JOIN_POLICY_ALL:

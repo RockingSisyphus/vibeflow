@@ -1,0 +1,62 @@
+{
+  "pipeline": {
+    "nodes": [
+      {
+        "name": "start",
+        "type": "sandbox.start",
+        "display_name": "Start",
+        "description": "Starts the explicit data bypass fixture."
+      },
+      {
+        "name": "seed",
+        "type": "sandbox.constant",
+        "display_name": "Seed Value",
+        "description": "Produces value.in for both the mainline preparation step and the explicit bypass edge.",
+        "provides": [{"key": "value.in", "type": "value.in"}],
+        "value": 4
+      },
+      {
+        "name": "prepare",
+        "type": "sandbox.effect_request",
+        "display_name": "Prepare Timing Step",
+        "description": "Consumes value.in as a mainline timing step before the final add runs.",
+        "requires": [{"type": "value.in", "cardinality": "exactly_one"}],
+        "provides": [{"key": "effects.request", "type": "effects.request"}]
+      },
+      {
+        "name": "add",
+        "type": "sandbox.add",
+        "display_name": "Final Add",
+        "description": "Consumes value.in delivered by the explicit data bypass edge after prepare triggers it.",
+        "requires": [{"type": "value.in", "cardinality": "exactly_one"}],
+        "provides": [{"key": "value.out", "type": "value.out"}],
+        "delta": 10
+      },
+      {
+        "name": "multiply",
+        "type": "sandbox.multiply",
+        "display_name": "Finalize Value",
+        "description": "Converts value.out into value.final for the end node.",
+        "requires": [{"type": "value.out", "cardinality": "exactly_one"}],
+        "provides": [{"key": "value.final", "type": "value.final"}],
+        "factor": 1
+      },
+      {
+        "name": "end",
+        "type": "sandbox.final_value_end",
+        "display_name": "End",
+        "description": "Ends after the final value is available.",
+        "requires": [{"type": "value.final", "cardinality": "exactly_one"}]
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "seed"},
+      {"from": "seed", "to": "prepare"},
+      {"from": "prepare", "to": "add"},
+      {"from": "add", "to": "multiply"},
+      {"from": "multiply", "to": "end"},
+      {"from": "seed", "to": "add"}
+    ],
+    "outputs": [{"type": "value.final", "cardinality": "exactly_one"}]
+  }
+}

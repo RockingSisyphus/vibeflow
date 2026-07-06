@@ -30,6 +30,7 @@ class _HealthValidationState:
     fingerprints: dict[str, str] = field(default_factory=dict)
     scanned_base_roots: set[str] = field(default_factory=set)
     unhealthy_base_modules: set[str] = field(default_factory=set)
+    mainline: dict[str, dict[str, object]] = field(default_factory=dict)
 
 
 def validate_graph_health(
@@ -71,6 +72,7 @@ def validate_graph_health(
         except GraphCompileError as exc:
             return _compile_error_report(exc)
         append_flowchart_health(graph, compiled, state, registry=registry)
+        _append_mainline_health(graph, compiled, registry, state)
     _append_node_config_health(graph, registry, state, global_config=global_config)
     append_data_contract_warnings(graph, compiled, state)
     append_join_policy_health(graph, compiled, state)
@@ -400,6 +402,12 @@ def _append_nodeset_health(graph: GraphConfig, registry: NodeRegistry, state: _H
         append_nodeset_finding(state.warnings, state.nodeset_findings, finding)
 
 
+def _append_mainline_health(graph: GraphConfig, compiled: CompiledGraph, registry: NodeRegistry, state: _HealthValidationState) -> None:
+    from .health_mainline import append_mainline_health
+
+    append_mainline_health(graph, compiled, state, registry=registry)
+
+
 def _append_graph_plugin_findings(
     graph: GraphConfig,
     compiled: CompiledGraph,
@@ -442,6 +450,7 @@ def _build_health_report(
             "explicit_edges": [edge.pair for edge in compiled.explicit_edges],
             "data_edges": [edge.pair for edge in compiled.data_edges],
             "effective_edges": [edge.pair for edge in compiled.effective_edges],
+            "mainline": state.mainline,
             "node_metrics": state.node_metrics,
             "nodeset_findings": state.nodeset_findings,
             "plugins": plugin_registry.to_dict() if plugin_registry is not None else {"plugins": []},
@@ -477,6 +486,8 @@ def _finding_aggregation_key(finding: HealthFinding) -> tuple[object, ...]:
         )
     stable_detail_fields = (
         "owner",
+        "source",
+        "target",
         "node",
         "path",
         "field",

@@ -6,7 +6,7 @@ from .graph_config import EdgeSpec, GraphConfig
 
 
 def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | None = None) -> dict[str, object]:
-    edges = (*compiled.effective_edges, *compiled.data_edges) if compiled is not None else graph.edges
+    edges = compiled.effective_edges if compiled is not None else graph.edges
     adjacency = _adjacency(graph, edges)
     incoming = _incoming(graph, edges)
     nodes = [node.name for node in graph.nodes]

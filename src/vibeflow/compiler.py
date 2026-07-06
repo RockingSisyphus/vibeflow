@@ -19,6 +19,11 @@ class CompiledGraph:
     providers: dict[str, str]
     consumers: dict[str, tuple[str, ...]]
     flow_kinds: dict[str, str]
+    mainline_edges: tuple[EdgeSpec, ...] = ()
+    data_bypass_edges: tuple[EdgeSpec, ...] = ()
+    async_edges: tuple[EdgeSpec, ...] = ()
+    schedule_edges: tuple[EdgeSpec, ...] = ()
+    transfer_edges: tuple[EdgeSpec, ...] = ()
 
 
 @dataclass
@@ -47,19 +52,25 @@ class GraphCompiler:
         _validate_node_types(graph.nodes, registry=registry, nodesets=known_nodesets or set(graph.nodesets))
         providers = _collect_providers(graph.nodes, input_keys=set(provider_keys(graph.inputs)))
         consumers = _collect_consumers(graph.nodes)
-        provider_types = {provider.key: provider.type for node in graph.nodes for provider in node.provides}
-        data_edges = _derive_data_edges(graph.nodes, providers, provider_types, available_inputs=set(provider_keys(graph.inputs)))
         effective_edges = _merge_edges(graph.edges)
         flow_kinds = _node_flow_kinds(nodes_by_name, registry=registry)
+        from .mainline import analyze_mainline
+
+        mainline = analyze_mainline(graph, effective_edges, flow_kinds, owner=owner)
         _validate_routing_edge_conditions(graph.edges, flow_kinds=flow_kinds)
         compiled = CompiledGraph(
             order=tuple(node.name for node in graph.nodes),
             explicit_edges=graph.edges,
-            data_edges=data_edges,
+            data_edges=mainline.data_bypass_edges,
             effective_edges=effective_edges,
             providers=providers,
             consumers=consumers,
             flow_kinds=flow_kinds,
+            mainline_edges=mainline.mainline_edges,
+            data_bypass_edges=mainline.data_bypass_edges,
+            async_edges=mainline.async_edges,
+            schedule_edges=mainline.schedule_edges,
+            transfer_edges=mainline.transfer_edges,
         )
         _call_compiler_plugins(plugin_registry, "after_compile", graph, compiled)
         return compiled
@@ -122,22 +133,6 @@ def _collect_consumers(nodes: tuple[NodeSpec, ...]) -> dict[str, tuple[str, ...]
         for requirement in node.requires:
             consumers.setdefault(requirement.type, []).append(node.name)
     return {key: tuple(values) for key, values in consumers.items()}
-
-
-def _derive_data_edges(
-    nodes: tuple[NodeSpec, ...],
-    providers: dict[str, str],
-    provider_types: dict[str, str],
-    *,
-    available_inputs: set[str],
-) -> tuple[EdgeSpec, ...]:
-    edges: list[EdgeSpec] = []
-    for node in nodes:
-        for requirement in node.requires:
-            for provider_key, provider in providers.items():
-                if provider_types.get(provider_key) == requirement.type and provider_key not in available_inputs and provider != node.name:
-                    edges.append(EdgeSpec(source=provider, target=node.name))
-    return tuple(edges)
 
 
 def _merge_edges(edges: tuple[EdgeSpec, ...]) -> tuple[EdgeSpec, ...]:

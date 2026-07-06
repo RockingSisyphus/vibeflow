@@ -25,7 +25,7 @@ class RouteNode:
         return {"flow.route": "done"}
 
 
-def test_compiler_merges_duplicate_explicit_and_data_edges_with_when() -> None:
+def test_compiler_merges_duplicate_explicit_edges_with_when() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -396,6 +396,34 @@ def test_mermaid_renders_contracts_on_edges_and_hides_them_when_requested() -> N
     assert "requires:" not in text
     assert "provides:" not in text
     assert "seed -->|flow.route == 'again'| add" in hidden
+
+
+def test_mermaid_styles_mainline_and_explicit_data_bypass_edges() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the styled edge fixture."),
+                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("add", "test.add", "Runs before the end node.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("end", "test.in_end", "Consumes bypassed value.in.", requires=[REQ_SPEC("value.in")]),
+                ],
+                "edges": [
+                    {"from": "start", "to": "seed"},
+                    {"from": "seed", "to": "add"},
+                    {"from": "add", "to": "end"},
+                    {"from": "seed", "to": "end"},
+                ],
+            }
+        }
+    )
+
+    text = export_mermaid(graph, registry=_registry())
+
+    assert "start --> seed\n  linkStyle 0 stroke-width:4px;" in text
+    assert "seed -->|value.in| add\n  linkStyle 1 stroke-width:4px;" in text
+    assert "add --> n_end\n  linkStyle 2 stroke-width:4px;" in text
+    assert "seed -->|value.in| n_end\n  linkStyle 3 stroke-dasharray:6 4,stroke-width:2px;" in text
 
 
 def test_mermaid_renders_while_loop_shape_class_and_stop_condition() -> None:

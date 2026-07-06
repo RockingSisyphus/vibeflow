@@ -55,7 +55,7 @@ def render_review_columns(renderer: Any, graph: GraphConfig, compiled: CompiledG
     if nodeset_anchor:
         column_anchors.append(nodeset_anchor)
     for source, target in zip(column_anchors, column_anchors[1:]):
-        lines.append(f"  {source} ~~~ {target}")
+        renderer._append_edge_line(lines, f"  {source} ~~~ {target}")
     if renderer.show_findings:
         renderer._render_findings(lines, graph, compiled, indent="  ")
     return "\n".join(lines) + "\n"
@@ -69,7 +69,7 @@ def _render_main_column(renderer: Any, lines: list[str], graph: GraphConfig, com
     renderer._render_graph_body(lines, graph, compiled, prefix="", indent="    ", visited_nodesets=(), expand_inline=False)
     renderer._render_edges(lines, graph, compiled, prefix="", indent="    ")
     if graph.nodes:
-        lines.append(f"    {anchor} ~~~ {_safe_id(graph.nodes[0].name)}")
+        renderer._append_edge_line(lines, f"    {anchor} ~~~ {_safe_id(graph.nodes[0].name)}")
     lines.append("  end")
     return [anchor]
 
@@ -108,7 +108,7 @@ def _render_resource_column(renderer: Any, lines: list[str], spec: _ResourceColu
         label_kind=spec.label_kind,
         indent="    ",
     )
-    lines.append(f"    {anchor} ~~~ {spec.root_id}")
+    renderer._append_edge_line(lines, f"    {anchor} ~~~ {spec.root_id}")
     lines.append("  end")
     return anchor
 
@@ -129,7 +129,7 @@ def _render_nodesets_column(renderer: Any, lines: list[str], graph: GraphConfig)
         if nodeset is None:
             continue
         group_anchor = _render_one_nodeset(renderer, lines, node, nodeset)
-        lines.append(f"    {previous_anchor} ~~~ {group_anchor}")
+        renderer._append_edge_line(lines, f"    {previous_anchor} ~~~ {group_anchor}")
         previous_anchor = group_anchor
     lines.append("  end")
     return column_anchor
@@ -154,7 +154,7 @@ def _render_one_nodeset(renderer: Any, lines: list[str], node: Any, nodeset: Any
     )
     renderer._render_edges(lines, nodeset.graph, nested_compiled, prefix=nested_prefix, indent="      ")
     if nodeset.graph.nodes:
-        lines.append(f"      {group_anchor} ~~~ {_safe_id(f'{nested_prefix}{nodeset.graph.nodes[0].name}')}")
+        renderer._append_edge_line(lines, f"      {group_anchor} ~~~ {_safe_id(f'{nested_prefix}{nodeset.graph.nodes[0].name}')}")
     lines.append("    end")
     return group_anchor
 

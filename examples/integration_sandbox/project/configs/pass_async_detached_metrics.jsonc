@@ -73,7 +73,7 @@
         "to": "metrics"
       },
       {
-        "from": "metrics",
+        "from": "start",
         "to": "seed"
       },
       {

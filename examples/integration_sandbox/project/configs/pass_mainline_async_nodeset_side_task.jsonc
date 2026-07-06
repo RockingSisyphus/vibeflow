@@ -1,0 +1,94 @@
+{
+  "nodesets": [
+    {
+      "name": "side.async_value",
+      "display_name": "Side Async Value",
+      "category": "mainline",
+      "description": "Runs a detached async side calculation inside a nodeset.",
+      "version": "0.1.0",
+      "purity": "pure",
+      "requires": [],
+      "provides": [{"key": "async.value", "type": "async.value"}],
+      "exports": [{"key": "async.value", "type": "async.value"}],
+      "pipeline": {
+        "nodes": [
+          {
+            "name": "start",
+            "type": "sandbox.start",
+            "display_name": "Start",
+            "description": "Starts the async side nodeset."
+          },
+          {
+            "name": "side_value",
+            "type": "semantic.slow_async_value",
+            "display_name": "Side Value",
+            "description": "Produces a side value without blocking the parent mainline.",
+            "provides": [{"key": "async.value", "type": "async.value"}],
+            "value": 99
+          },
+          {
+            "name": "end",
+            "type": "semantic.async_value_end",
+            "display_name": "End",
+            "description": "Ends after the side value is available.",
+            "requires": [{"type": "async.value", "cardinality": "exactly_one"}]
+          }
+        ],
+        "edges": [
+          {"from": "start", "to": "side_value"},
+          {"from": "side_value", "to": "end"}
+        ],
+        "outputs": [{"type": "async.value", "cardinality": "exactly_one"}]
+      }
+    }
+  ],
+  "pipeline": {
+    "nodes": [
+      {
+        "name": "start",
+        "type": "sandbox.start",
+        "display_name": "Start",
+        "description": "Starts the async nodeset side task fixture."
+      },
+      {
+        "name": "seed",
+        "type": "sandbox.constant",
+        "display_name": "Seed Value",
+        "description": "Produces value.in for the mainline and the async side nodeset.",
+        "provides": [{"key": "value.in", "type": "value.in"}],
+        "value": 4
+      },
+      {
+        "name": "side_task",
+        "type": "nodeset.side.async_value",
+        "display_name": "Async Side Task",
+        "description": "Runs the side nodeset as detached async work.",
+        "provides": [{"key": "async.value", "type": "async.value"}],
+        "async": "detached"
+      },
+      {
+        "name": "main_add",
+        "type": "sandbox.add",
+        "display_name": "Main Add",
+        "description": "Continues the synchronous mainline without waiting for side_task.",
+        "requires": [{"type": "value.in", "cardinality": "exactly_one"}],
+        "provides": [{"key": "value.out", "type": "value.out"}],
+        "delta": 6
+      },
+      {
+        "name": "end",
+        "type": "sandbox.out_value_end",
+        "display_name": "End",
+        "description": "Ends after the mainline output is available.",
+        "requires": [{"type": "value.out", "cardinality": "exactly_one"}]
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "seed"},
+      {"from": "start", "to": "side_task"},
+      {"from": "seed", "to": "main_add"},
+      {"from": "main_add", "to": "end"}
+    ],
+    "outputs": [{"type": "value.out", "cardinality": "exactly_one"}]
+  }
+}

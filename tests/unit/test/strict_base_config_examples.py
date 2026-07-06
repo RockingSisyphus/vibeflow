@@ -321,7 +321,7 @@ def test_optional_architecture_report_is_not_health_gate() -> None:
 
     assert "architecture_report" not in health.info
     assert report["summary"]["nodes"] == 4
-    assert report["summary"]["data_edges"] == 2
+    assert report["summary"]["data_edges"] == 0
     assert report["entry_nodes"] == ["start"]
     assert add["affected"] == ["end"]
 
