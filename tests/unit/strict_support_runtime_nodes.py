@@ -77,6 +77,19 @@ class SeedNode:
         return {"value.in": params.get("value", 1)}
 
 
+class LargePredictionNode:
+    NODE_INFO = NodeInfo("test.large_prediction", "Large Prediction", "test", "Produces many prediction rows.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        provides=(PROV("value.out"),),
+        output_semantics={"value.out": ("prediction mapping",)},
+        output_schema={"value.out": {"type": "object"}},
+        examples=({"inputs": {}, "params": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {"value.out": {f"sample_{index:04d}": index for index in range(1000)}}
+
+
 class AddNode:
     NODE_INFO = NodeInfo("test.add", "Add", "test", "Adds delta to input.", "0.1.0", "process")
     CONTRACT = NodeContract(
@@ -306,6 +319,7 @@ __all__ = (
     "EffectRequestNode",
     "InEndNode",
     "IdentityObjectNode",
+    "LargePredictionNode",
     "MutatingInputNode",
     "NanOutputNode",
     "OpaqueOutputNode",

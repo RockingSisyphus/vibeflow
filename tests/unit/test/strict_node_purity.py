@@ -208,6 +208,95 @@ def test_nodeset_override_path_errors_are_not_repeated_by_nested_definition_expa
     assert errors[0].details["path"] == "missing.path"
 
 
+def test_node_config_override_path_can_pass_through_loop_body() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "loop.add_body",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline=_input_add_pipeline(add={"delta": 1}),
+                )
+            ],
+            "pipeline": {
+                "inputs": [PROV_SPEC("value.in")],
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the loop override health fixture."),
+                    _node_call(
+                        "loop_call",
+                        "vibeflow.loop.while",
+                        "Runs an add body with a node config override.",
+                        requires=[REQ_SPEC("value.in")],
+                        provides=[PROV_SPEC("value.out")],
+                        node_configs={"add": {"delta": 5}},
+                        loop={
+                            "body": "loop.add_body",
+                            "max_iterations": 3,
+                            "stop_after": 1,
+                            "carry": [{"from": "value.in", "as": "value.in", "update": "value.out"}],
+                            "outputs": [{"from": "value.out", "as": "value.out"}],
+                        },
+                    ),
+                    _node_call("end", "test.out_end", "Ends after value.out.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": _edge_chain("start", "loop_call", "end"),
+                "outputs": [REQ_SPEC("value.out")],
+            },
+        }
+    )
+
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    rule_ids = {error.rule_id for error in report.errors}
+
+    assert "NODESET.CONFIG.INVALID_PATH" not in rule_ids
+    assert "NODESET.CONFIG.UNKNOWN_NODE" not in rule_ids
+    assert "NODESET.CONFIG.INVALID" not in rule_ids
+
+
+def test_node_config_override_path_still_rejects_traversing_plain_node() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "plain.body",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline=_input_add_pipeline(add={"delta": 1}),
+                )
+            ],
+            "pipeline": {
+                "inputs": [PROV_SPEC("value.in")],
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the invalid override fixture."),
+                    _node_call(
+                        "composite",
+                        "plain.body",
+                        "Calls a body with an invalid nested override path.",
+                        requires=[REQ_SPEC("value.in")],
+                        provides=[PROV_SPEC("value.out")],
+                        node_configs={"add.inner": {"delta": 5}},
+                    ),
+                    _node_call("end", "test.out_end", "Ends after value.out.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": _edge_chain("start", "composite", "end"),
+                "outputs": [REQ_SPEC("value.out")],
+            },
+        }
+    )
+
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    invalid = next(error for error in report.errors if error.rule_id == "NODESET.CONFIG.INVALID_PATH")
+
+    assert invalid.object_id == "composite"
+    assert invalid.details["path"] == "add.inner"
+    assert invalid.details["node"] == "add"
+    assert invalid.details["type_used"] == "test.add"
+    assert invalid.details["composite_kind"] == "none"
+
+
 def test_health_report_aggregates_duplicate_findings_but_not_different_direct_sources() -> None:
     class DuplicateFindingPlugin:
         name = "duplicate_finding"

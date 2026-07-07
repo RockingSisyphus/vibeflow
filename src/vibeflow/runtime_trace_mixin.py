@@ -35,7 +35,9 @@ class RuntimeTraceMixin:
         result.set("runtime.stop_reason", payload["stop_reason"])
         result.set("runtime.current_node", payload["current_node"])
         result.set("runtime.exception", payload["exception"])
-        result.set("runtime.events", payload["events"])
+        result.set("runtime.event_count", payload["event_count"])
+        result.set("runtime.trace_path", payload["trace_path"])
+        result.set("runtime.events_streamed", payload["events_streamed"])
 
     def _call_runtime_plugins(self, hook: str, *args) -> None:
         methods = self._hook_plan.for_hook(hook)
@@ -74,7 +76,7 @@ class RuntimeTraceMixin:
             event["failure"] = failure
         if details is not None:
             event["details"] = dict(details)
-        self.trace.add_event(event, (node_name,))
+        self.trace.add_event(event, self._trace_event_path((node_name,)), self._trace_sink)
 
     def _record_run_boundary(self, kind: str) -> None:
         if self.runtime_options.trace == "boundary":
@@ -82,3 +84,6 @@ class RuntimeTraceMixin:
 
     def _merge_child_trace(self, frame: NodeFrame, child_trace: RuntimeTrace) -> None:
         self.trace.merge_child((frame.name,), child_trace)
+
+    def _trace_event_path(self, path: tuple[str, ...]) -> tuple[str, ...]:
+        return (*self._trace_path_prefix, *path)

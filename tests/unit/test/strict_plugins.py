@@ -60,7 +60,7 @@ class RuntimePlugin:
     def before_node(self, name, node_type, input_summary):
         record({{"hook": "before_node", "id": name}})
     def after_run(self, state, trace):
-        record({{"hook": "after_run", "events": len(trace.get("events", []))}})
+        record({{"hook": "after_run", "event_count": trace.get("event_count"), "trace_path": trace.get("trace_path")}})
 """.strip(),
         encoding="utf-8",
     )
@@ -78,10 +78,15 @@ class RuntimePlugin:
         encoding="utf-8",
     )
     run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="plugin_hooks")
-    hooks = [json.loads(line)["hook"] for line in marker_path.read_text(encoding="utf-8").splitlines()]
+    records = [json.loads(line) for line in marker_path.read_text(encoding="utf-8").splitlines()]
+    hooks = [record["hook"] for record in records]
     assert "after_compile" in hooks
     assert "before_node" in hooks
     assert "after_run" in hooks
+    after_run = next(record for record in records if record["hook"] == "after_run")
+    assert after_run["event_count"] >= 1
+    assert after_run["trace_path"].endswith("runtime_trace.jsonl")
+    assert "events" not in after_run
 
 def test_plugin_registry_priority_scope_and_conflict_strategy() -> None:
     class A:

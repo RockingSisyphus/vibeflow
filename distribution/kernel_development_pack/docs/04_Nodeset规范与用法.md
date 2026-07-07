@@ -169,7 +169,7 @@ planned nodeset 不要求 `pipeline`，但仍必须写 `type_key`、`display_nam
 }
 ```
 
-这里 `add` 是 nodeset 内部 node 的 `id`。嵌套 nodeset 使用 dotted path，例如 `first.add`、`outer.inner.add`。
+这里 `add` 是 nodeset 内部 node 的 `id`。嵌套 nodeset 或 `vibeflow.loop.while` 使用 dotted path，例如 `first.add`、`outer.inner.add`、`train_loop.batch_step`。loop 路径段指向调用点 `id`，并进入该调用点的 `loop.body`，不是直接写 body nodeset 的 `type_key`。
 
 nodeset 也可以声明内部 `global_config`；调用点 `config` 会覆盖 nodeset 内部 `global_config`，再覆盖内部 node 局部 `config`。当 `allow_config_override` 为 `false` 且出现同名覆盖时，健康检查会 warning，但实际覆盖仍会发生。
 
@@ -198,5 +198,5 @@ trace 会输出 import 文件、展开后的 nodeset 数、每个 nodeset 解析
 - `NODESET.RECURSION`：nodeset 调用或 loop body 形成递归。
 - `NODESET.PROVIDES.UNKNOWN_KEY`：nodeset 声明的 `provides` 无法由内部结果产生。
 - `NODESET.CONFIG.UNKNOWN_NODE`：`node_configs` 覆盖路径指向不存在的内部 node。
-- `NODESET.CONFIG.NESTED_PATH_REQUIRED`：覆盖嵌套 nodeset 时没有使用 dotted path。
-- `NODESET.CONFIG.INVALID_PATH`：dotted path 穿过了普通 node，而不是 nodeset 调用。
+- `NODESET.CONFIG.NESTED_PATH_REQUIRED`：覆盖嵌套 nodeset 或 loop 内部节点时没有使用 dotted path。
+- `NODESET.CONFIG.INVALID_PATH`：dotted path 穿过了普通 node，而不是 nodeset 或 loop 调用。
