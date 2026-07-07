@@ -37,6 +37,33 @@ PROTECTED_DIRS = (
     "kernel/docs",
     "kernel/vibeflow",
 )
+CORE_SELF_CHECK_STRUCTURE_ARGS = (
+    "--enable-structure-limits",
+    "--warn-root-code-files",
+    "150",
+    "--max-root-code-files",
+    "200",
+    "--warn-code-dirs",
+    "16",
+    "--max-code-dirs",
+    "24",
+    "--warn-code-files-per-dir",
+    "20",
+    "--max-code-files-per-dir",
+    "30",
+    "--warn-code-dir-depth",
+    "4",
+    "--max-code-dir-depth",
+    "5",
+    "--warn-child-code-dirs-per-dir",
+    "6",
+    "--max-child-code-dirs-per-dir",
+    "10",
+    "--warn-root-level-code-files",
+    "110",
+    "--max-root-level-code-files",
+    "120",
+)
 
 
 class BuildDistributionError(RuntimeError):
@@ -78,12 +105,13 @@ def _run_core_self_check() -> None:
     src_path = str(ROOT / "src")
     existing_pythonpath = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = src_path if not existing_pythonpath else os.pathsep.join((src_path, existing_pythonpath))
-    command = [sys.executable, "-m", "vibeflow", "quality-check", "--path", "."]
+    command = [sys.executable, "-m", "vibeflow", "quality-check", "--path", "src/vibeflow", *CORE_SELF_CHECK_STRUCTURE_ARGS]
     result = subprocess.run(command, cwd=ROOT, env=env, check=False)
     if result.returncode != 0:
+        command_text = " ".join(command)
         raise BuildDistributionError(
             "refusing to build distribution because kernel self-check failed: "
-            + "PYTHONPATH=src python -m vibeflow quality-check --path ."
+            + f"PYTHONPATH=src {command_text}"
         )
 
 
@@ -217,7 +245,9 @@ def _write_root_readme(output: Path) -> None:
 - `kernel/THIRD_PARTY_NOTICES.md`：SVG 渲染相关第三方项目致谢与许可证信息。
 - `project/`：可直接运行的示例业务项目骨架。
 - `project/nodes/`、`project/base_lib/`、`project/plugins/`、`project/configs/`：AI 和开发者放业务代码与配置的标准目录。
-- `run.py`：推荐启动器，会自动加载本地内核和项目 registry。
+- `vibeflow_config.jsonc`：workspace 索引，声明参与加载的 source roots。
+- `project/vibeflow_project.jsonc`：project 级配置，声明 registry、base_lib、plugins 和 quality 开关。
+- `run.py`：推荐启动器，会自动加载本地内核和 workspace 配置。
 - `README.md`、`AGENTS.md`：项目可定制指南文件，不属于 kernel manifest。
 
 Runtime 默认审计流程和 key，不保存真实对象内容；node 间可以按引用传递普通 Python 对象。需要指标、日志或诊断 side task 时，在 config 中显式使用 `async: "detached"` 或 `async: "result_key"`。
@@ -232,6 +262,43 @@ python run.py ascii --config project/configs/main.jsonc --output reports/graph.t
 python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
 python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg
 python run.py quality --path project
+```
+
+## Workspace 配置
+
+根目录 `vibeflow_config.jsonc` 只声明 workspace roots 和全局 policy；每个 root 自己放 `vibeflow_project.jsonc`，声明该 root 的 registry、base_lib、plugins 和 quality 开关。单项目模板默认是：
+
+```jsonc
+{{
+  "policy": {{}},
+  "roots": [
+    {{"id": "project", "path": "project"}}
+  ]
+}}
+```
+
+同一个仓库如果要同时放框架层和任务层，可以改成多 root：
+
+```jsonc
+{{
+  "policy": {{}},
+  "roots": [
+    {{"id": "vibetrain", "path": "vibetrain"}},
+    {{"id": "project", "path": "project"}}
+  ]
+}}
+```
+
+每个 root 下都需要自己的 `vibeflow_project.jsonc`。其中 `registry`、`base_lib.paths` 和 plugin 文件路径都相对所属 root 目录解析。`quality.structure` 使用 warning/error 双阈值治理 root 代码布局，默认允许最多 120 个 `.py`，但单个代码目录超过 16 个 `.py` 会失败，用来推动 `nodes/`、`base_lib/`、`plugins/` 按功能拆分。pipeline config 仍通过 `--config project/configs/main.jsonc` 指定，workspace 模式下不要在 pipeline config 顶层声明 `policy`、`base_lib` 或 `plugins`。
+
+跨 root nodeset import 使用 root id：
+
+```jsonc
+{{
+  "nodeset_imports": [
+    {{"root": "vibetrain", "path": "configs/nodesets/train_step.jsonc"}}
+  ]
+}}
 ```
 
 `svg` 默认会为 Mermaid CLI 放大渲染上限：普通图使用 `maxTextSize=200000`、`maxEdges=2000`；`--expand-nodesets` 使用 `maxTextSize=500000`、`maxEdges=5000`，并固定采用 `review-columns` SVG composer，把主流程、plugins、base_lib 和展开 nodeset 分列展示。超大图可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from .compiler import CompiledGraph
-from .data_contract import providers_to_dicts, requirements_to_dicts
-from .graph_config import EdgeSpec, GraphConfig
+from vibeflow.compiler import CompiledGraph
+from vibeflow.data_contract import providers_to_dicts, requirements_to_dicts
+from vibeflow.graph_config import EdgeSpec, GraphConfig
 
 
 def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | None = None) -> dict[str, object]:

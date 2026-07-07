@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol
 
-from .data_contract import DataProvider, DataRequirement
+from vibeflow.data_contract import DataProvider, DataRequirement
 
 
 FLOW_KIND_TERMINAL = "terminal"

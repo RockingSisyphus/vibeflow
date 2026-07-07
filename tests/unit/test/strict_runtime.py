@@ -2020,7 +2020,16 @@ def test_distribution_core_self_check_uses_ci_quality_command(monkeypatch) -> No
 
     distribution_builder._run_core_self_check()
 
-    assert captured["command"] == [sys.executable, "-m", "vibeflow", "quality-check", "--path", "."]
+    expected_command = [
+        sys.executable,
+        "-m",
+        "vibeflow",
+        "quality-check",
+        "--path",
+        "src/vibeflow",
+        *distribution_builder.CORE_SELF_CHECK_STRUCTURE_ARGS,
+    ]
+    assert captured["command"] == expected_command
     assert captured["cwd"] == distribution_builder.ROOT
     assert str(distribution_builder.ROOT / "src") in str(captured["env"]["PYTHONPATH"])
     assert captured["check"] is False

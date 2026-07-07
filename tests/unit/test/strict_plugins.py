@@ -280,7 +280,7 @@ def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nod
 def test_review_columns_svg_composer_places_columns_left_to_right(tmp_path) -> None:
     if not is_mermaid_svg_renderer_available():
         pytest.skip("Mermaid SVG renderer is not installed")
-    from vibeflow.mermaid_review_svg import render_review_columns_svg
+    from vibeflow.rendering.mermaid.review_svg import render_review_columns_svg
 
     graph = parse_graph_config(
         {
@@ -326,7 +326,7 @@ def test_review_columns_svg_composer_places_columns_left_to_right(tmp_path) -> N
 
 
 def test_review_columns_svg_composer_stacks_nodesets_and_scales_wide_fragments() -> None:
-    from vibeflow.mermaid_review_svg import REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH, _SvgFragment, _compose_svg
+    from vibeflow.rendering.mermaid.review_svg import REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH, _SvgFragment, _compose_svg
 
     svg = _compose_svg(
         [
@@ -363,7 +363,7 @@ def test_review_columns_svg_composer_stacks_nodesets_and_scales_wide_fragments()
 
 
 def test_review_columns_inline_fragments_prefix_duplicate_svg_ids() -> None:
-    from vibeflow.mermaid_review_svg import _SvgFragment, _compose_svg
+    from vibeflow.rendering.mermaid.review_svg import _SvgFragment, _compose_svg
 
     fragment_svg = (
         '<svg id="my-svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10">'
@@ -404,7 +404,7 @@ def test_review_columns_inline_fragments_prefix_duplicate_svg_ids() -> None:
 
 
 def test_review_columns_resource_fragments_render_root_left_to_children_right() -> None:
-    from vibeflow.mermaid_review_svg import _resource_mermaid
+    from vibeflow.rendering.mermaid.review_svg import _resource_mermaid
 
     mermaid = _resource_mermaid(
         "plugins",
@@ -424,8 +424,8 @@ def test_review_columns_resource_fragments_render_root_left_to_children_right() 
 
 
 def test_run_checked_writes_quick_and_expanded_svg_artifacts(tmp_path, monkeypatch) -> None:
-    import vibeflow.mermaid_render as mermaid_render_module
-    import vibeflow.mermaid_review_svg as review_svg_module
+    import vibeflow.rendering.mermaid.render as mermaid_render_module
+    import vibeflow.rendering.mermaid.review_svg as review_svg_module
 
     quick_calls: list[Path] = []
     expanded_calls: list[dict[str, object]] = []
@@ -454,9 +454,9 @@ def test_run_checked_writes_quick_and_expanded_svg_artifacts(tmp_path, monkeypat
 
 
 def test_run_checked_records_expanded_svg_error_without_failing_run(tmp_path, monkeypatch) -> None:
-    import vibeflow.mermaid_render as mermaid_render_module
-    import vibeflow.mermaid_review_svg as review_svg_module
-    from vibeflow.mermaid_render import MermaidRenderError
+    import vibeflow.rendering.mermaid.render as mermaid_render_module
+    import vibeflow.rendering.mermaid.review_svg as review_svg_module
+    from vibeflow.rendering.mermaid.render import MermaidRenderError
 
     def fake_quick_svg(mermaid_text, output, **kwargs):
         Path(output).write_text("<svg>quick</svg>", encoding="utf-8")
@@ -477,8 +477,8 @@ def test_run_checked_records_expanded_svg_error_without_failing_run(tmp_path, mo
 
 
 def test_nodeset_detail_leaf_mermaid_uses_lr_with_layout_spine() -> None:
-    from vibeflow.flowchart_render_helpers import compile_for_render
-    from vibeflow.mermaid_review_svg import _nodeset_mermaid
+    from vibeflow.rendering.helpers import compile_for_render
+    from vibeflow.rendering.mermaid.review_svg import _nodeset_mermaid
 
     graph = parse_graph_config({"pipeline": _input_add_pipeline(add={"id": "inner"})})
     mermaid = _nodeset_mermaid(
@@ -498,8 +498,8 @@ def test_nodeset_detail_leaf_mermaid_uses_lr_with_layout_spine() -> None:
 
 
 def test_nodeset_detail_parent_mermaid_preserves_collapsed_callsite_edges() -> None:
-    from vibeflow.flowchart_render_helpers import compile_for_render
-    from vibeflow.mermaid_review_svg import _nodeset_mermaid
+    from vibeflow.rendering.helpers import compile_for_render
+    from vibeflow.rendering.mermaid.review_svg import _nodeset_mermaid
 
     graph = parse_graph_config(
         {
@@ -556,7 +556,7 @@ def test_nodeset_detail_parent_mermaid_preserves_collapsed_callsite_edges() -> N
 
 
 def test_nodeset_detail_panel_places_children_right_and_stacked() -> None:
-    from vibeflow.mermaid_review_svg import _SvgFragment, _compose_detail_panel_svg
+    from vibeflow.rendering.mermaid.review_svg import _SvgFragment, _compose_detail_panel_svg
 
     svg = _compose_detail_panel_svg(
         _SvgFragment("parent flow", '<svg viewBox="0 0 100 200"></svg>', 100.0, 200.0),
@@ -581,7 +581,7 @@ def test_nodeset_detail_panel_places_children_right_and_stacked() -> None:
 
 
 def test_nodeset_detail_fragment_recurses_nested_child_panels(tmp_path, monkeypatch) -> None:
-    from vibeflow import mermaid_review_svg as review_svg
+    from vibeflow.rendering.mermaid import review_svg
 
     graph = parse_graph_config(
         {

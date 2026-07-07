@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from ..ast_rules import import_aliases, import_roots, path_effect_call_name, qualified_call_name
+from vibeflow.purity.ast_rules import import_aliases, import_roots, path_effect_call_name, qualified_call_name
 from .code_quality_types import SIDE_EFFECT_ATTR_CALLS, SIDE_EFFECT_CALLS, SIDE_EFFECT_IMPORT_ROOTS, QualityFinding
 
 

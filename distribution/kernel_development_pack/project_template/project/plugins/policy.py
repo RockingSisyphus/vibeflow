@@ -19,7 +19,7 @@ class PolicyPlugin:
         return {
             "policy": {
                 "base_lib": {
-                    "allowed_paths": ["../base_lib"],
+                    "allowed_paths": ["base_lib"],
                     "allowed_modules": ["base_lib"],
                 }
             }

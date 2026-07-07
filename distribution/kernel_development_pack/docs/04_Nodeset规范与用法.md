@@ -110,7 +110,8 @@ nodeset 是独立 JSONC 实现文件，作用类似 Python node 的 `.py` 文件
 {
   "nodeset_imports": [
     {"path": "math/demo_add_one.jsonc"},
-    {"path": "reporting/summary.jsonc"}
+    {"path": "reporting/summary.jsonc"},
+    {"root": "vibetrain", "path": "configs/nodesets/train_step.jsonc"}
   ],
   "type_key": "demo.pipeline_part",
   "display_name": "Pipeline Part",
@@ -123,11 +124,13 @@ nodeset 是独立 JSONC 实现文件，作用类似 Python node 的 `.py` 文件
 
 规则：
 
-- `path` 相对当前 JSONC 文件解析。
+- 字符串形式和 `{"path": ...}` 都相对当前 JSONC 文件解析，用于导入同 root 或同目录树内的 nodeset。
+- workspace 模式下可以写 `{"root": "<root_id>", "path": "<path>"}` 导入其他 source root 下的 nodeset；`root` 必须匹配根目录 `vibeflow_config.jsonc` 中的 `roots[].id`，`path` 相对该 root 目录解析。
 - 每个导入文件根对象就是一个 nodeset definition；不再支持一个文件里内联 `nodesets: [...]`。
 - `names` 选择器已移除；需要拆分时把每个 nodeset 放到独立文件。
 - 导入链会去重并检测循环；递归导入或递归 nodeset 调用会报 `NODESET.RECURSION`。
 - `vibeflow.loop.while.loop.body` 也引用 nodeset `type_key`，同样参与依赖和递归检查。
+- 健康检查、Mermaid 和 SVG 会标注 nodeset 来自哪个 root/source，方便区分框架层 nodeset 和项目层 nodeset。
 
 ## planned nodeset
 
