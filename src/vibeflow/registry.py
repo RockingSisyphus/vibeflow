@@ -4,9 +4,9 @@ from dataclasses import dataclass
 import inspect
 from typing import Any, Callable, Mapping
 
-from .node_config import NodeConfigError, NodeConfigSpec, merge_node_config, normalize_node_config_spec
-from .node import PureNode
-from .registry_base import RegistryBase
+from vibeflow.node_config import NodeConfigError, NodeConfigSpec, merge_node_config, normalize_node_config_spec
+from vibeflow.node import PureNode
+from vibeflow.registry_base import RegistryBase
 
 
 @dataclass

@@ -201,8 +201,8 @@ class RuntimePlugin:
 
 
 def test_config_resource_metadata_missing_fields_warn_without_blocking(tmp_path) -> None:
-    from vibeflow.config_resources import load_config_resources
-    from vibeflow.cli_config import validate_config_path
+    from vibeflow.config.resources import load_config_resources
+    from vibeflow.cli.config import validate_config_path
 
     config = {
         "base_lib": {"modules": [{"module": "base_lib.future_tools", "status": "planned"}]},

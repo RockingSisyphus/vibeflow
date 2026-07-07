@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
-from .config_resources import PluginInfo, PluginResource, normalize_plugin_config, normalize_plugin_info, plugin_status
+from vibeflow.config.resources import PluginInfo, PluginResource, normalize_plugin_config, normalize_plugin_info, plugin_status
 
 
 class PolicyPlugin(Protocol):
@@ -34,15 +34,25 @@ class PluginDescriptor:
     class_name: str = "Plugin"
     info: PluginInfo | None = None
     config_keys: tuple[str, ...] = ()
+    root_id: str = ""
+    root_path: str = ""
+    source_path: str = ""
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        payload = {
             "name": self.name,
             "type": self.plugin_type,
             "priority": self.priority,
             "scope": self.scope,
             "source": self.source,
         }
+        if self.root_id:
+            payload["root_id"] = self.root_id
+        if self.root_path:
+            payload["root_path"] = self.root_path
+        if self.source_path:
+            payload["source_path"] = self.source_path
+        return payload
 
 
 class PluginRegistry:
@@ -62,6 +72,9 @@ class PluginRegistry:
         class_name: str = "Plugin",
         info: PluginInfo | None = None,
         config_keys: tuple[str, ...] = (),
+        root_id: str = "",
+        root_path: str = "",
+        source_path: str = "",
         conflict: str = "error",
     ) -> None:
         normalized_type = _normalize_type(plugin_type)
@@ -81,7 +94,19 @@ class PluginRegistry:
         setattr(plugin, "scope", scope)
         self._plugins[normalized_type].append(plugin)
         self._plugins[normalized_type].sort(key=lambda item: (int(getattr(item, "priority", 100)), _plugin_name(item)))
-        self._descriptors[id(plugin)] = PluginDescriptor(plugin_name, normalized_type, plugin_priority, scope, source, class_name, info, tuple(config_keys))
+        self._descriptors[id(plugin)] = PluginDescriptor(
+            plugin_name,
+            normalized_type,
+            plugin_priority,
+            scope,
+            source,
+            class_name,
+            info,
+            tuple(config_keys),
+            root_id,
+            root_path,
+            source_path,
+        )
 
     def policy_plugins(self) -> tuple[object, ...]:
         return tuple(self._plugins["policy"])
@@ -115,11 +140,21 @@ class PluginRegistry:
                 description=descriptor.info.description if descriptor.info is not None else "",
                 config_keys=descriptor.config_keys,
                 info=descriptor.info,
+                root_id=descriptor.root_id,
+                root_path=descriptor.root_path,
+                source_path=descriptor.source_path,
             )
         return resources
 
 
-def load_plugins_from_config(config: Mapping[str, Any], *, base_path: Path) -> tuple[PluginRegistry, tuple[object, ...]]:
+def load_plugins_from_config(
+    config: Mapping[str, Any],
+    *,
+    base_path: Path,
+    root_id: str = "",
+    root_path: str = "",
+    source_path: str = "",
+) -> tuple[PluginRegistry, tuple[object, ...]]:
     registry = PluginRegistry()
     findings: list[object] = []
     raw = config.get("plugins", [])
@@ -157,6 +192,9 @@ def load_plugins_from_config(config: Mapping[str, Any], *, base_path: Path) -> t
                 class_name=str(spec.get("class", spec.get("factory", "Plugin"))),
                 info=info,
                 config_keys=config_keys,
+                root_id=root_id,
+                root_path=root_path,
+                source_path=source_path,
                 conflict=str(spec.get("conflict", "error")),
             )
         except Exception as exc:
@@ -193,7 +231,7 @@ def _load_plugin(spec: Mapping[str, Any], *, base_path: Path) -> tuple[object, P
 def _import_plugin_module(module_ref: str, *, base_path: Path):
     candidate = (base_path / module_ref).resolve()
     if module_ref.endswith(".py") or candidate.exists():
-        path = candidate if candidate.exists() else Path(module_ref).resolve()
+        path = Path(module_ref).resolve() if Path(module_ref).is_absolute() else candidate
         module_name = f"_vibeflow_plugin_{abs(hash(path))}"
         spec = importlib.util.spec_from_file_location(module_name, path)
         if spec is None or spec.loader is None:
@@ -218,7 +256,7 @@ def _normalize_type(value: str) -> str:
 
 
 def _plugin_finding(rule_id: str, message: str, object_id: str, *, details: Mapping[str, object] | None = None):
-    from .health_types import HealthFinding
+    from vibeflow.health.types import HealthFinding
 
     return HealthFinding(
         rule_id=rule_id,

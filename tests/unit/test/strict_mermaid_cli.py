@@ -2,7 +2,7 @@ from tests.unit.strict_support import *
 
 
 def test_mermaid_renderer_prefers_google_chrome_over_snap_chromium(monkeypatch) -> None:
-    import vibeflow.mermaid_render as mermaid_render
+    import vibeflow.rendering.mermaid.render as mermaid_render
 
     paths = {
         "chromium": "/snap/bin/chromium",
@@ -17,7 +17,7 @@ def test_mermaid_renderer_prefers_google_chrome_over_snap_chromium(monkeypatch) 
 
 
 def test_mermaid_renderer_defers_snap_chromium_until_no_other_browser(monkeypatch) -> None:
-    import vibeflow.mermaid_render as mermaid_render
+    import vibeflow.rendering.mermaid.render as mermaid_render
 
     paths = {
         "chromium": "/snap/bin/chromium",
@@ -32,7 +32,7 @@ def test_mermaid_renderer_defers_snap_chromium_until_no_other_browser(monkeypatc
 
 
 def test_mermaid_renderer_skips_snap_chromium_as_only_system_browser(monkeypatch) -> None:
-    import vibeflow.mermaid_render as mermaid_render
+    import vibeflow.rendering.mermaid.render as mermaid_render
 
     paths = {
         "chromium": "/snap/bin/chromium",
@@ -48,7 +48,7 @@ def test_mermaid_renderer_skips_snap_chromium_as_only_system_browser(monkeypatch
 
 
 def test_mermaid_puppeteer_config_omits_executable_by_default(tmp_path) -> None:
-    import vibeflow.mermaid_render as mermaid_render
+    import vibeflow.rendering.mermaid.render as mermaid_render
 
     path = tmp_path / "puppeteer.json"
     mermaid_render._write_puppeteer_config(path)
@@ -59,7 +59,7 @@ def test_mermaid_puppeteer_config_omits_executable_by_default(tmp_path) -> None:
 
 
 def test_mermaid_config_uses_readable_svg_spacing_defaults(tmp_path) -> None:
-    import vibeflow.mermaid_render as mermaid_render
+    import vibeflow.rendering.mermaid.render as mermaid_render
 
     path = tmp_path / "mermaid.json"
     mermaid_render._write_mermaid_config(path, max_text_size=1234, max_edges=56, html_labels=False)
@@ -78,7 +78,7 @@ def test_mermaid_config_uses_readable_svg_spacing_defaults(tmp_path) -> None:
 
 
 def test_mermaid_svg_label_enhancement_styles_native_text_without_touching_edges(tmp_path) -> None:
-    import vibeflow.mermaid_render as mermaid_render
+    import vibeflow.rendering.mermaid.render as mermaid_render
 
     svg = tmp_path / "graph.svg"
     svg.write_text(
@@ -116,7 +116,7 @@ def test_mermaid_svg_label_enhancement_styles_native_text_without_touching_edges
 
 
 def test_mermaid_renderer_finds_distribution_kernel_tool_path(tmp_path, monkeypatch) -> None:
-    import vibeflow.mermaid_render as mermaid_render
+    import vibeflow.rendering.mermaid.render as mermaid_render
 
     mmdc = tmp_path / "kernel" / "tools" / "mermaid-renderer" / "node_modules" / ".bin" / ("mmdc.cmd" if mermaid_render._is_windows() else "mmdc")
     mmdc.parent.mkdir(parents=True)
@@ -129,7 +129,7 @@ def test_mermaid_renderer_finds_distribution_kernel_tool_path(tmp_path, monkeypa
 
 
 def test_mermaid_renderer_keeps_source_tool_path_precedence(tmp_path, monkeypatch) -> None:
-    import vibeflow.mermaid_render as mermaid_render
+    import vibeflow.rendering.mermaid.render as mermaid_render
 
     executable = "mmdc.cmd" if mermaid_render._is_windows() else "mmdc"
     source_mmdc = tmp_path / "tools" / "mermaid-renderer" / "node_modules" / ".bin" / executable
@@ -147,7 +147,7 @@ def test_mermaid_renderer_keeps_source_tool_path_precedence(tmp_path, monkeypatc
 
 def test_mermaid_renderer_falls_back_to_non_snap_system_browser(tmp_path, monkeypatch) -> None:
     import subprocess
-    import vibeflow.mermaid_render as mermaid_render
+    import vibeflow.rendering.mermaid.render as mermaid_render
 
     mmdc = tmp_path / "mmdc"
     mmdc.write_text("", encoding="utf-8")

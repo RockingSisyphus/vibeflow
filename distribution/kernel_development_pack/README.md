@@ -15,6 +15,7 @@
 my_project/
   AGENTS.md
   README.md
+  vibeflow_config.jsonc
   run.py
   kernel/
     vibeflow-kernel.zip
@@ -25,6 +26,7 @@ my_project/
       mermaid-renderer/
     THIRD_PARTY_NOTICES.md
   project/
+    vibeflow_project.jsonc
     nodes/
     base_lib/
     plugins/
@@ -34,7 +36,7 @@ my_project/
   reports/
 ```
 
-核心原则：业务开发者只写小型纯函数 node、纯 helper、必要插件和 JSONC 拓扑配置；控制流只写在显式 `pipeline.edges` 中；运行前由内核自动健康检查，检查不过不执行。运行时只审计流程和 key，node 间可按引用传递普通 Python 对象。`kernel/docs/`、`kernel/tools/` 和 `kernel/THIRD_PARTY_NOTICES.md` 是随内核分发的只读参考材料；根目录 `README.md`、`AGENTS.md` 和项目自己的文档可以按项目定制。
+核心原则：根目录 `vibeflow_config.jsonc` 只声明 workspace roots 和全局 policy；每个 root 的 `vibeflow_project.jsonc` 声明 registry、base_lib、plugins 和 quality 开关。`quality.structure` 默认用 warning/error 双阈值治理 root 代码布局，允许 root 总文件数增长到 120，但单个代码目录超过 16 个 `.py` 会失败，促使 `nodes/`、`base_lib/`、`plugins/` 按功能拆分。业务开发者只写小型纯函数 node、纯 helper、必要插件和 JSONC 拓扑配置；控制流只写在显式 `pipeline.edges` 中；运行前由内核自动健康检查，检查不过不执行。运行时只审计流程和 key，node 间可按引用传递普通 Python 对象。`kernel/docs/`、`kernel/tools/` 和 `kernel/THIRD_PARTY_NOTICES.md` 是随内核分发的只读参考材料；根目录 `README.md`、`AGENTS.md` 和项目自己的文档可以按项目定制。
 
 常用命令：
 

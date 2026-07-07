@@ -5,9 +5,10 @@
 1. 使用 `build_distribution.py` 生成包含 `kernel/vibeflow-kernel.zip` 的完整开发包。
 2. 把本目录内容复制到新项目根目录。
 3. 在 `project/nodes/` 中开发业务 node。
-4. 在 `project/registry.py` 中注册 node。
-5. 在 `project/configs/main.jsonc` 中用 `id` / `type_used` 调用 node 或 nodeset，并用显式 `pipeline.edges` 组织拓扑。
-6. 运行：
+4. 在 `project/registry.py` 中注册 node，并在 `project/vibeflow_project.jsonc` 声明 registry、base_lib、plugins 和 quality 开关。
+5. 根目录 `vibeflow_config.jsonc` 声明 workspace roots；单项目模板默认只包含 `project/`。
+6. 在 `project/configs/main.jsonc` 中用 `id` / `type_used` 调用 node 或 nodeset，并用显式 `pipeline.edges` 组织拓扑。
+7. 运行：
 
 ```powershell
 python run.py validate --config project/configs/main.jsonc
@@ -16,6 +17,39 @@ python run.py mermaid --config project/configs/main.jsonc --output reports/graph
 python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
 python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
 python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg
+```
+
+配置文件分两层：根目录 `vibeflow_config.jsonc` 只声明 workspace roots 和全局 policy；每个 root 的 `vibeflow_project.jsonc` 声明 registry、base_lib、plugins 和 quality 开关。单项目模板默认是：
+
+```jsonc
+{
+  "policy": {},
+  "roots": [
+    {"id": "project", "path": "project"}
+  ]
+}
+```
+
+多 root 仓库可以改成：
+
+```jsonc
+{
+  "policy": {},
+  "roots": [
+    {"id": "vibetrain", "path": "vibetrain"},
+    {"id": "project", "path": "project"}
+  ]
+}
+```
+
+每个 root 下都需要自己的 `vibeflow_project.jsonc`。`registry`、`base_lib.paths` 和 plugin 文件路径都相对所属 root 目录解析。`quality.structure` 使用 warning/error 双阈值治理 root 代码布局，默认允许最多 120 个 `.py`，但单个代码目录超过 16 个 `.py` 会失败，用来推动 `nodes/`、`base_lib/`、`plugins/` 按功能拆分。pipeline config 不再声明 `policy`、`base_lib` 或 `plugins`；跨 root nodeset import 使用：
+
+```jsonc
+{
+  "nodeset_imports": [
+    {"root": "vibetrain", "path": "configs/nodesets/train_step.jsonc"}
+  ]
+}
 ```
 
 `run` 会在 `runs/<run_id>/` 自动写出快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`。`svg` 默认会为 Mermaid CLI 放大渲染上限：普通图使用 `maxTextSize=200000`、`maxEdges=2000`；`--expand-nodesets` 使用 `maxTextSize=500000`、`maxEdges=5000`，并固定采用 `review-columns` SVG composer，把主流程、plugins、base_lib 和展开 nodeset 分列展示。SVG 保持 `htmlLabels=false`，但内核会对原生 SVG 文本做标题加粗、字段名前缀加粗和字段行左对齐增强。超大图可用 `--mermaid-max-text-size`、`--mermaid-max-edges` 和 `--review-fragment-max-width` 覆盖。

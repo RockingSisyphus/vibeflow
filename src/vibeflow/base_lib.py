@@ -4,7 +4,7 @@ import ast
 import inspect
 from pathlib import Path
 
-from .ast_rules import (
+from vibeflow.purity.ast_rules import (
     boolop_branch_count,
     call_name,
     import_aliases_from_node,
@@ -15,11 +15,11 @@ from .ast_rules import (
     module_statement_kind,
     path_effect_call_name,
 )
-from .base_lib_types import BaseLibDependencySummary, BaseLibFinding, BaseLibModuleReport, BaseLibScanReport
-from .purity_types import BANNED_ATTR_CALLS, BANNED_CALL_NAMES, BANNED_IMPORT_ROOTS, PurityPolicy
+from vibeflow.base_lib_types import BaseLibDependencySummary, BaseLibFinding, BaseLibModuleReport, BaseLibScanReport
+from vibeflow.purity.types import BANNED_ATTR_CALLS, BANNED_CALL_NAMES, BANNED_IMPORT_ROOTS, PurityPolicy
 
 
-FORBIDDEN_PROJECT_IMPORT_PARTS = {"boundary", "boundaries", "nodes", "runtime"}
+FORBIDDEN_PROJECT_IMPORT_PARTS = {"boundary", "boundaries", "nodes", "plugin", "plugins", "runtime"}
 
 
 def scan_base_lib(project_root: Path, *, policy: PurityPolicy | None = None) -> BaseLibScanReport:
@@ -233,7 +233,7 @@ class _BaseLibAstScanner(ast.NodeVisitor):
     def _check_import(self, module: str, node: ast.AST) -> None:
         self.imports.add(module)
         if any(part in FORBIDDEN_PROJECT_IMPORT_PARTS for part in module.split(".")):
-            self._add("BASE_LIB.FORBIDDEN_PROJECT_IMPORT", f"base_lib must not import node, boundary, runtime, or side-effect layer: {module}", node)
+            self._add("BASE_LIB.FORBIDDEN_PROJECT_IMPORT", f"base_lib must not import node, plugin, boundary, runtime, or side-effect layer: {module}", node)
             return
         if module_matches(module, self.policy.banned_base_lib_modules):
             self._add("BASE_LIB.BANNED_MODULE", f"base_lib module is banned by policy: {module}", node)

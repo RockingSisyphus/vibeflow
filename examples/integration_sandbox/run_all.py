@@ -912,7 +912,7 @@ def _run_valid_cases() -> list[CaseResult]:
 
 def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     from vibeflow import GraphCompiler, RuntimeOptions, build_execution_plan, export_ascii_flowchart, export_mermaid, is_mermaid_svg_renderer_available, load_config_document, load_config_resources, parse_graph_config, render_mermaid_svg, resolve_effective_policy, run_checked, validate_graph_health
-    from vibeflow.config_schema import collect_config_schema_findings
+    from vibeflow.config.schema import collect_config_schema_findings
     from vibeflow.plugin import load_plugins_from_config
 
     from registry import build_node_registry
@@ -1278,7 +1278,7 @@ def _run_invalid_case(case: dict[str, Any], base_lib_report):
 
 def _inspect_invalid_node(case: dict[str, Any], kind: str) -> CaseResult:
     from vibeflow.purity import validate_node_class
-    from vibeflow.purity_types import PurityPolicy
+    from vibeflow.purity.types import PurityPolicy
 
     cls = _load_class(PROJECT_DIR / str(case["module"]), str(case["class"]))
     policy = PurityPolicy(max_source_lines=500, warn_source_lines=None, allowed_base_lib_modules=("base_lib",))
@@ -1340,7 +1340,7 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
 
 def _health_invalid_node(case: dict[str, Any]) -> CaseResult:
     from vibeflow import DataProvider, GraphConfig, NodeSpec, validate_graph_health
-    from vibeflow.purity_types import PurityPolicy
+    from vibeflow.purity.types import PurityPolicy
     from vibeflow.registry import NodeRegistry
 
     cls = _load_class(PROJECT_DIR / str(case["module"]), str(case["class"]))
@@ -1363,7 +1363,7 @@ def _health_invalid_node(case: dict[str, Any]) -> CaseResult:
 
 def _bad_base_lib_report():
     from vibeflow import scan_base_lib
-    from vibeflow.purity_types import PurityPolicy
+    from vibeflow.purity.types import PurityPolicy
 
     return scan_base_lib(
         PROJECT_DIR,
@@ -1378,7 +1378,7 @@ def _bad_base_lib_report():
 
 
 def _invalid_config(case: dict[str, Any]) -> CaseResult:
-    from vibeflow.cli_config import validate_config_path
+    from vibeflow.cli.config import validate_config_path
 
     report = validate_config_path(CONFIG_DIR / str(case["config"]), policy_path=POLICY_PATH)
     if report.status not in {"FAIL", "ERROR"}:

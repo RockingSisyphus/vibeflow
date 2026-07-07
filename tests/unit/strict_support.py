@@ -45,9 +45,9 @@ from vibeflow import (
     build_execution_plan,
 )
 from vibeflow.graph_config import GraphConfigError
-from vibeflow.config_schema import collect_config_schema_findings
-from vibeflow.devtools import QualityThresholds, scan_code_quality
-from vibeflow.purity_types import PurityPolicy
+from vibeflow.config.schema import collect_config_schema_findings
+from vibeflow.devtools import QualityStructureLimits, QualityThresholds, scan_code_quality
+from vibeflow.purity.types import PurityPolicy
 
 from .strict_support_boundaries import *
 from .strict_support_runtime_nodes import *

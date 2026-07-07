@@ -7,18 +7,18 @@ from pathlib import Path
 from typing import Any, Mapping
 from uuid import uuid4
 
-from .config_loader import ConfigLoadError, load_config_document
-from .config_resources import ConfigResources, load_config_resources
-from .config_schema import collect_config_schema_findings
-from .health_types import HealthFinding, HealthReport
-from .plugin import load_plugins_from_config
-from .policy import default_effective_policy, resolve_effective_policy
-from .summaries import summarize_mapping
+from vibeflow.config.loader import ConfigLoadError, load_config_document
+from vibeflow.config.resources import ConfigResources, load_config_resources
+from vibeflow.config.schema import collect_config_schema_findings
+from vibeflow.health.types import HealthFinding, HealthReport
+from vibeflow.plugin import load_plugins_from_config
+from vibeflow.policy import default_effective_policy, resolve_effective_policy
+from vibeflow.runtime.summaries import summarize_mapping
 
-from .graph_config import GraphConfig
-from .planned_behavior import project_root_for_config
-from .registry import NodeRegistry
-from .runtime_options import runtime_options as normalize_runtime_options
+from vibeflow.graph_config import GraphConfig
+from vibeflow.graph_config.planned_behavior import project_root_for_config
+from vibeflow.registry import NodeRegistry
+from vibeflow.runtime.options import runtime_options as normalize_runtime_options
 
 
 @dataclass(frozen=True)
@@ -158,8 +158,8 @@ def _compile_or_refuse(
     *,
     config_path: Path,
 ):
-    from .compiler import GraphCompiler
-    from .graph_config import GraphConfigError, parse_graph_config
+    from vibeflow.compiler import GraphCompiler
+    from vibeflow.graph_config import GraphConfigError, parse_graph_config
 
     try:
         graph = parse_graph_config(config_data, project_root=project_root_for_config(config_path))
@@ -179,7 +179,7 @@ def _compile_with_registry_or_refuse(
     run_dir: Path,
     run_id: str,
 ):
-    from .compiler import GraphCompiler, GraphCompileError
+    from vibeflow.compiler import GraphCompiler, GraphCompileError
 
     try:
         return GraphCompiler().compile(graph, registry=registry)
@@ -220,7 +220,7 @@ def _validate_run_health(
     resources: ConfigResources,
     preflight_warnings: tuple[HealthFinding, ...] = (),
 ) -> HealthReport:
-    from .health import validate_graph_health
+    from vibeflow.health import validate_graph_health
 
     health = validate_graph_health(
         graph,
@@ -239,10 +239,10 @@ def _validate_run_health(
 
 
 def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None, resources: ConfigResources | None = None) -> None:
-    from .ascii_flowchart import export_ascii_flowchart
-    from .mermaid import compiled_graph_payload, export_mermaid
-    from .mermaid_render import EXPANDED_MERMAID_MAX_EDGES, EXPANDED_MERMAID_MAX_TEXT_SIZE, MermaidRenderError, render_mermaid_svg
-    from .mermaid_review_svg import render_review_columns_svg
+    from vibeflow.rendering.ascii_flowchart import export_ascii_flowchart
+    from vibeflow.rendering.mermaid import compiled_graph_payload, export_mermaid
+    from vibeflow.rendering.mermaid.render import EXPANDED_MERMAID_MAX_EDGES, EXPANDED_MERMAID_MAX_TEXT_SIZE, MermaidRenderError, render_mermaid_svg
+    from vibeflow.rendering.mermaid.review_svg import render_review_columns_svg
 
     _write_json(run_dir / "health_report.json", health.to_dict())
     _write_json(run_dir / "compiled_graph.json", compiled_graph_payload(graph, compiled, resources=resources))
@@ -285,8 +285,8 @@ def _refuse_on_planned_run(
     resources: ConfigResources,
     runtime_options: object | None,
 ) -> None:
-    from .compiler import GraphCompiler
-    from .runtime_helpers import planned_items
+    from vibeflow.compiler import GraphCompiler
+    from vibeflow.runtime.helpers import planned_items
 
     options = normalize_runtime_options(runtime_options)
     planned = planned_items(graph)
@@ -325,7 +325,7 @@ def _execute_runtime(
     runtime_options: object | None,
     resources: ConfigResources,
 ):
-    from .runtime import PipelineRuntime
+    from vibeflow.runtime import PipelineRuntime
 
     runtime = PipelineRuntime(
         graph,

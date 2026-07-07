@@ -1,0 +1,52 @@
+{
+  "registry": "registry.py:build_node_registry",
+  "quality_enabled": true,
+  "quality": {
+    "structure": {
+      "enabled": true,
+      "warn_root_code_files": 96,
+      "max_root_code_files": 120,
+      "warn_code_dirs": 18,
+      "max_code_dirs": 24,
+      "warn_code_files_per_dir": 12,
+      "max_code_files_per_dir": 16,
+      "warn_code_dir_depth": 3,
+      "max_code_dir_depth": 4,
+      "warn_child_code_dirs_per_dir": 6,
+      "max_child_code_dirs_per_dir": 8,
+      "warn_root_level_code_files": 1,
+      "max_root_level_code_files": 2,
+      "allowed_root_code_files": [
+        "__init__.py",
+        "registry.py"
+      ],
+      "enforce_role_imports": true
+    }
+  },
+  "base_lib": {
+    "paths": [
+      "base_lib"
+    ],
+    "modules": [
+      {
+        "module": "base_lib.math_tools",
+        "status": "implemented",
+        "display_name": "Math Tools",
+        "category": "demo",
+        "description": "Pure arithmetic helpers used by the template workflow.",
+        "version": "0.1.0"
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "module": "plugins/policy.py",
+      "class": "PolicyPlugin",
+      "type": "policy",
+      "display_name": "Project Policy",
+      "category": "demo",
+      "description": "Template project policy extension for health checks.",
+      "version": "0.1.0"
+    }
+  ]
+}

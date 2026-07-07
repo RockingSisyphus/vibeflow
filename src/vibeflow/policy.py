@@ -5,13 +5,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-from .config_schema import collect_policy_schema_findings
-from .config_loader import ConfigLoadError, load_config_document
-from .config_resources import config_base_lib_policy
-from .health_types import HealthFinding
-from .plugin import PluginRegistry, plugin_error
-from .purity_types import BANNED_IMPORT_ROOTS, PurityPolicy
-from .schema_findings import schema_finding
+from vibeflow.config.schema import collect_policy_schema_findings
+from vibeflow.config.loader import ConfigLoadError, load_config_document
+from vibeflow.config.resources import config_base_lib_policy
+from vibeflow.health.types import HealthFinding
+from vibeflow.plugin import PluginRegistry, plugin_error
+from vibeflow.purity.types import BANNED_IMPORT_ROOTS, PurityPolicy
+from vibeflow.health.schema_findings import schema_finding
 
 
 DEFAULT_POLICY_DATA: dict[str, Any] = {
@@ -166,6 +166,9 @@ def _policy_adjusted_finding(finding: HealthFinding, severity: str, rule: Mappin
         message=finding.message,
         suggested_fix_type=finding.suggested_fix_type,
         details=details,
+        root_id=finding.root_id,
+        root_path=finding.root_path,
+        source_path=finding.source_path,
     )
 
 
