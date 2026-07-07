@@ -42,10 +42,17 @@ class RuntimeNodesetMixin:
             raise PipelineRuntimeError(f"nodeset node '{frame.name}' has no execution plan")
         runtime = self._nodeset_runtime(frame) if cached else type(self)._from_plan(self, frame.subplan)
         initial = _nodeset_inputs_to_initial(inputs, frame.subplan.graph.inputs)
+        previous_sink = runtime._trace_sink
+        previous_prefix = runtime._trace_path_prefix
+        runtime._trace_sink = self._trace_sink
+        runtime._trace_path_prefix = self._trace_event_path((frame.name,))
         try:
             nested_result = runtime.run(initial)
         except Exception as exc:
             raise _NestedRuntimeFailure(str(exc), runtime.trace) from exc
+        finally:
+            runtime._trace_sink = previous_sink
+            runtime._trace_path_prefix = previous_prefix
         outputs = {}
         for provider in frame.provides:
             try:

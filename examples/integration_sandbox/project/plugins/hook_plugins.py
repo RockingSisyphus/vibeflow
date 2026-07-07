@@ -51,4 +51,4 @@ class RuntimePlugin:
         _record({"hook": "before_nodeset", "name": name, "type": node_type})
 
     def after_run(self, state, trace):
-        _record({"hook": "after_run", "events": len(trace.get("events", []))})
+        _record({"hook": "after_run", "event_count": trace.get("event_count"), "trace_path": trace.get("trace_path")})

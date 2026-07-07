@@ -437,6 +437,9 @@ Mermaid/SVG 中 while loop 使用独立 trapezoid (`trap-b`) 形状和默认 `lo
 - nodeset 内部 pipeline 也必须显式写 edges。
 - nodeset 可以声明自己的 `global_config`；外部 nodeset JSONC 文件的顶层 `global_config` 会作为该文件内 nodeset 的默认内部配置。
 - 调用 nodeset 时可以在调用节点上写 `config`，这会覆盖 nodeset 内部 `global_config`，再覆盖内部 node 局部 config。
+- 调用 nodeset 或 `vibeflow.loop.while` 时可以在调用节点上写 `node_configs` 精确覆盖内部 node 配置；loop 的路径段会进入该 loop 的 `loop.body`。
+- `node_configs` 的 dotted path 使用调用点 `id`，不是 nodeset 或 loop body 的 `type_key`；例如 `inner.add` 覆盖内部 nodeset/loop 调用 `inner` 的 body 里的 `add`。
+- dotted path 只能穿过 nodeset 调用或 loop 调用。穿过普通 node 会报 `NODESET.CONFIG.INVALID_PATH`，直接覆盖 nested nodeset/loop 调用本身会报 `NODESET.CONFIG.NESTED_PATH_REQUIRED`。
 - 调用节点上的 `allow_config_override` 控制这些覆盖是否产生 warning：为 `false` 时仍覆盖，但同名覆盖会 warning。
 
 如果怀疑配置读取或 nodeset 解析很慢，可临时加环境变量查看轻量解析 trace：
@@ -469,14 +472,14 @@ from vibeflow import RuntimeOptions, run_checked
 run_checked(..., runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
 ```
 
-- `trace="full"`：默认逐 node/nodeset 事件。
+- `trace="full"`：默认逐 node/nodeset 事件；完整事件流无界写入 `runtime_trace.jsonl`。
 - `trace="boundary"`：只保留 run/nodeset/failure 边界事件。
 - `trace="off"`：只写 runtime summary。
 - `execution="plan"`：默认执行计划模式。
 - `execution="block"`：显式 opt-in 的保守 block 模式，仅支持线性链和简单条件 loop。
 - `execution="compiled"`：显式 opt-in 的低开销线性 `CompiledBlock` 模式；遇到不满足条件的图会回退到 plan。
 
-trace 兼容两层视图：`runtime.exec_order`、`runtime.node_runs`、`runtime.edge_executions`、`runtime.step_count` 仍表示顶层 pipeline；嵌套 nodeset/loop 的完整顺序看 `runtime.qualified_exec_order`、`runtime.qualified_node_runs`、`runtime.qualified_edge_executions` 和 `runtime.total_step_count`。事件中同时有机器可读 `path` 数组和人类可读 `qualified_node`，例如 `["outer", "inner", "add"]` / `outer.inner.add`。
+trace 兼容两层视图：`runtime.exec_order`、`runtime.node_runs`、`runtime.edge_executions`、`runtime.step_count` 仍表示顶层 pipeline；嵌套 nodeset/loop 的完整顺序看 `runtime.qualified_exec_order`、`runtime.qualified_node_runs`、`runtime.qualified_edge_executions` 和 `runtime.total_step_count`。完整事件不再保存在 `RunResult.runtime.events` 或 runtime hook 参数中；读取完整事件请逐行读取 `runtime_trace.jsonl`。`RunResult` 和 `after_run(state, trace)` / `run_failed(state, trace, message)` 中的 `trace` 只包含 summary、`event_count`、`trace_path` 和 `events_streamed=true`。事件中同时有机器可读 `path` 数组和人类可读 `qualified_node`，例如 `["outer", "inner", "add"]` / `outer.inner.add`。
 
 异步 side task 只通过 config 显式开启：
 

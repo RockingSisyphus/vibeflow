@@ -82,7 +82,7 @@ def run_checked(
         raise
     _refuse_on_health_failure(health, run_dir, actual_run_id)
     context = _execute_runtime(graph, registry, plugin_registry, initial, run_dir, runtime_options, resources)
-    _write_json(run_dir / "output_summary.json", summarize_mapping(dict(context.iter_flat_items())))
+    _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
     return CheckedRunResult(actual_run_id, run_dir, health, context)
 
 
@@ -338,7 +338,6 @@ def _execute_runtime(
     try:
         context = runtime.run(initial)
     finally:
-        _write_runtime_trace(run_dir / "runtime_trace.jsonl", runtime.trace.to_dict())
         _ensure_trace_files(run_dir)
     return context
 
@@ -374,19 +373,68 @@ def _load_error_report(exc: ConfigLoadError) -> HealthReport:
     )
 
 
-def _write_runtime_trace(path: Path, trace: Mapping[str, object]) -> None:
-    events = trace.get("events", [])
-    with path.open("w", encoding="utf-8") as handle:
-        if isinstance(events, list):
-            for event in events:
-                handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
-        summary = {key: value for key, value in trace.items() if key != "events"}
-        summary["kind"] = "runtime_summary"
-        handle.write(json.dumps(summary, ensure_ascii=False, sort_keys=True) + "\n")
-
-
 def _write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _summarize_run_result(result: object) -> dict[str, object]:
+    if not hasattr(result, "to_dict"):
+        return {}
+    data = result.to_dict()
+    if not isinstance(data, Mapping):
+        return {}
+    return {key: _summarize_result_item(value) for key, value in _iter_result_summary_items(data, prefix="")}
+
+
+def _iter_result_summary_items(value: object, *, prefix: str):
+    if _is_data_envelope_payload(value):
+        if prefix:
+            yield prefix, value
+        return
+    if not isinstance(value, Mapping):
+        if prefix:
+            yield prefix, value
+        return
+    for key, item in value.items():
+        child = f"{prefix}.{key}" if prefix else str(key)
+        yield from _iter_result_summary_items(item, prefix=child)
+
+
+def _summarize_result_item(value: object) -> dict[str, object]:
+    if _is_data_envelope_payload(value):
+        return {
+            "type": "DataEnvelope",
+            "key": str(value.get("key", "")),
+            "data_type": str(value.get("type", "")),
+            "source_node": str(value.get("source_node", "")),
+            "value": _summarize_shallow_value(value.get("value")),
+        }
+    return _summarize_shallow_value(value)
+
+
+def _summarize_shallow_value(value: object) -> dict[str, object]:
+    summary: dict[str, object] = {"type": type(value).__name__}
+    if isinstance(value, Mapping):
+        summary["size"] = len(value)
+        return summary
+    if isinstance(value, (list, tuple, set)):
+        summary["size"] = len(value)
+        return summary
+    if isinstance(value, (str, bytes)):
+        summary["size"] = len(value)
+        return summary
+    if value is None or isinstance(value, (int, float, bool)):
+        summary["scalar"] = True
+        return summary
+    if isinstance(value, Path):
+        summary["path"] = True
+        return summary
+    summary["repr_type"] = type(value).__qualname__
+    return summary
+
+
+def _is_data_envelope_payload(value: object) -> bool:
+    return isinstance(value, Mapping) and {"key", "type", "value", "source_node"} <= set(value)
 
 
 def _ensure_trace_files(run_dir: Path) -> None:

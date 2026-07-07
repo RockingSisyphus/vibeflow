@@ -18,6 +18,13 @@ class _OverrideContext:
     findings: list[HealthFinding]
 
 
+@dataclass(frozen=True)
+class _CompositeChild:
+    kind: str
+    type_key: str
+    nodeset: NodesetSpec | None
+
+
 def validate_node_config_health(
     graph: GraphConfig,
     *,
@@ -174,12 +181,11 @@ def _validate_nodeset_override_paths(
     if visited_nodesets is None:
         visited_nodesets = set()
     for node in graph.nodes:
-        if node.type_used in LOOP_NODE_TYPES or node.type_used in graph.nodesets:
-            nodeset_name = node.loop.body if node.type_used in LOOP_NODE_TYPES else node.type_used
-            nodeset = graph.nodesets.get(nodeset_name)
-            if nodeset is None:
+        child = _resolve_composite_child(node, graph)
+        if child is not None:
+            if child.nodeset is None:
                 continue
-            _validate_override_map(node.id, nodeset, node.node_config_overrides, registry=registry, findings=findings)
+            _validate_override_map(node.id, child.nodeset, node.node_config_overrides, registry=registry, findings=findings)
     for nodeset in graph.nodesets.values():
         if nodeset.type_key in visited_nodesets:
             continue
@@ -210,13 +216,35 @@ def _validate_override_path(path: str, value: dict[str, object], context: _Overr
     if not sep:
         _validate_direct_override(context.caller_name, target, value, nodeset=context.nodeset, registry=context.registry, findings=context.findings)
         return
-    if target.type_used not in context.nodeset.graph.nodesets:
-        context.findings.append(_node_config_finding("NODESET.CONFIG.INVALID_PATH", context.caller_name, f"override path passes through non-nodeset node: {path}", details={"nodeset": context.nodeset.type_key, "path": path}))
-        return
-    child = context.nodeset.graph.nodesets.get(target.type_used)
+    child = _resolve_composite_child(target, context.nodeset.graph)
     if child is None:
+        context.findings.append(
+            _node_config_finding(
+                "NODESET.CONFIG.INVALID_PATH",
+                context.caller_name,
+                f"override path passes through non-composite node: {path}",
+                details={
+                    "owner": f"nodeset:{context.nodeset.type_key}",
+                    "nodeset": context.nodeset.type_key,
+                    "path": path,
+                    "node": target.id,
+                    "type_used": target.type_used,
+                    "composite_kind": "none",
+                },
+            )
+        )
         return
-    _validate_override_map(context.caller_name, child, {tail: value}, registry=context.registry, findings=context.findings)
+    if child.nodeset is None:
+        context.findings.append(
+            _node_config_finding(
+                "NODESET.CONFIG.INVALID_PATH",
+                context.caller_name,
+                f"override path passes through unresolved {child.kind} node: {path}",
+                details=_override_path_details(context.nodeset, path, target, child),
+            )
+        )
+        return
+    _validate_override_map(context.caller_name, child.nodeset, {tail: value}, registry=context.registry, findings=context.findings)
 
 
 def _validate_direct_override(
@@ -228,8 +256,16 @@ def _validate_direct_override(
     registry: NodeRegistry,
     findings: list[HealthFinding],
 ) -> None:
-    if target.type_used in nodeset.graph.nodesets:
-        findings.append(_node_config_finding("NODESET.CONFIG.NESTED_PATH_REQUIRED", caller_name, f"override for nested nodeset must use a dotted path: {target.id}", details={"nodeset": nodeset.type_key, "node": target.id}))
+    child = _resolve_composite_child(target, nodeset.graph)
+    if child is not None:
+        findings.append(
+            _node_config_finding(
+                "NODESET.CONFIG.NESTED_PATH_REQUIRED",
+                caller_name,
+                f"override for nested {child.kind} must use a dotted path: {target.id}",
+                details=_override_path_details(nodeset, target.id, target, child),
+            )
+        )
         return
     if target.status == STATUS_PLANNED:
         return
@@ -237,6 +273,31 @@ def _validate_direct_override(
         registry.merge_config(target.type_used, {**target.params, **value})
     except NodeRegistryError as exc:
         findings.append(_node_config_finding("NODESET.CONFIG.INVALID", caller_name, str(exc), details={"nodeset": nodeset.type_key, "node": target.id, "type_used": target.type_used}))
+
+
+def _resolve_composite_child(target: NodeSpec, graph: GraphConfig) -> _CompositeChild | None:
+    if target.type_used in LOOP_NODE_TYPES:
+        body = target.loop.body
+        return _CompositeChild("loop", body, graph.nodesets.get(body))
+    if target.type_used in graph.nodesets:
+        return _CompositeChild("nodeset", target.type_used, graph.nodesets.get(target.type_used))
+    return None
+
+
+def _override_path_details(nodeset: NodesetSpec, path: str, target: NodeSpec, child: _CompositeChild) -> dict[str, object]:
+    details: dict[str, object] = {
+        "owner": f"nodeset:{nodeset.type_key}",
+        "nodeset": nodeset.type_key,
+        "path": path,
+        "node": target.id,
+        "type_used": target.type_used,
+        "composite_kind": child.kind,
+    }
+    if child.kind == "loop":
+        details["loop_body"] = child.type_key
+    else:
+        details["child_nodeset"] = child.type_key
+    return details
 
 
 def _append_override_warning(

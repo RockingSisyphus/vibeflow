@@ -98,12 +98,20 @@ class RuntimeLoopMixin:
                     "type": frame.node_type,
                     "details": {"iteration": iteration_index, "initial_keys": sorted(str(key) for key in initial)},
                 },
-                iteration_path,
+                self._trace_event_path(iteration_path),
+                self._trace_sink,
             )
+        previous_sink = runtime._trace_sink
+        previous_prefix = runtime._trace_path_prefix
+        runtime._trace_sink = self._trace_sink
+        runtime._trace_path_prefix = self._trace_event_path(iteration_path)
         try:
             result = runtime.run(initial)
         except Exception:
             self.trace.merge_child(iteration_path, runtime.trace)
             raise
+        finally:
+            runtime._trace_sink = previous_sink
+            runtime._trace_path_prefix = previous_prefix
         self.trace.merge_child(iteration_path, runtime.trace)
         return result

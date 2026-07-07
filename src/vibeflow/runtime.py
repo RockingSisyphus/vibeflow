@@ -26,7 +26,7 @@ from .runtime_compiled import run_compiled_steps
 from .runtime_errors import PipelineRuntimeError
 from .runtime_helpers import condition_matches, elapsed_ms, has_planned, planned_items
 from .runtime_options import RuntimeOptions, runtime_hook_plan, runtime_options as normalize_runtime_options
-from .runtime_trace import RuntimeTrace
+from .runtime_trace import RuntimeTrace, RuntimeTraceSink
 
 from .runtime_async_mixin import RuntimeAsyncMixin
 from .runtime_loop_mixin import RuntimeLoopMixin
@@ -79,6 +79,8 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
         self._detached_timeout = False
         self._abandoned_async_results = False
         self._run_dir = Path(run_dir) if run_dir is not None else Path("runs") / "vibeflow"
+        self._trace_sink: RuntimeTraceSink | None = None
+        self._trace_path_prefix: tuple[str, ...] = ()
 
     def _assert_planned_runtime_allowed(self, graph: GraphConfig) -> None:
         if not has_planned(graph):
@@ -111,10 +113,17 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
         runtime._detached_timeout = False
         runtime._abandoned_async_results = False
         runtime._run_dir = parent._run_dir
+        runtime._trace_sink = parent._trace_sink
+        runtime._trace_path_prefix = parent._trace_path_prefix
         runtime.runtime_options = parent.runtime_options
         return runtime
 
     def run(self, initial: Mapping[str, Any] | None = None) -> RunResult:
+        owns_trace_sink = self._trace_sink is None
+        if owns_trace_sink:
+            self._trace_path_prefix = ()
+            self._trace_sink = RuntimeTraceSink(self._trace_file_path())
+            self._trace_sink.open()
         self._reset_run_state()
         state = self._new_state(initial or {})
         try:
@@ -142,6 +151,11 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
             self._call_runtime_plugins("run_failed", state.result.to_dict(), self.trace.to_dict(), str(exc))
             self._shutdown_executor()
             raise
+        finally:
+            if owns_trace_sink and self._trace_sink is not None:
+                self._trace_sink.write_summary(self.trace)
+                self._trace_sink.close()
+                self._trace_sink = None
         self._shutdown_executor()
         return state.result
 
@@ -176,12 +190,17 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
         return bool(frame and frame.is_terminal and not frame.incoming and not frame.requires and not frame.provides)
 
     def _reset_run_state(self) -> None:
-        self.trace = RuntimeTrace()
+        self.trace = RuntimeTrace(trace_path=str(self._trace_file_path()))
         self._node_runs = {name: 0 for name in self._plan.order}
         self._async_results = {}
         self._detached = []
         self._detached_timeout = False
         self._abandoned_async_results = False
+
+    def _trace_file_path(self) -> Path:
+        if self._trace_sink is not None:
+            return self._trace_sink.path
+        return self._run_dir / "runtime_trace.jsonl"
 
     def _run_steps(self, state: _RuntimeState) -> None:
         ready = list(self._initial_ready_nodes(state))

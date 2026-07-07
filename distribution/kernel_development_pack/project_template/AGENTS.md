@@ -30,6 +30,7 @@
 - nodeset 必须是独立 JSONC 文件，根对象声明 `type_key`、`display_name`、`description`、`requires`、`provides` 和 `pipeline`；主 config 不允许内联 `nodesets`，nodeset 文件也不允许 `exports`、`purity`、`category`、`version`。
 - nodeset 文件可以写 `nodeset_imports` 调用其他独立 nodeset 文件；调用处直接用 nodeset `type_key` 作为 `type_used`，不要写旧 `nodeset.xxx` 前缀。
 - nodeset 调用和 `loop.body` 都是 nodeset dependency，不能直接或间接递归；出现 `NODESET.RECURSION` 时要拆开结构或改成真正的 `vibeflow.loop.while` 循环语义。
+- `node_configs` 可以穿透 nodeset 调用和 `vibeflow.loop.while` 调用；dotted path 的每一段都写调用点 `id`，loop 段会进入该调用点的 `loop.body`，不要把 body `type_key` 当成路径段。
 - `decision` 只用于分支选择，不要用 decision cycle 模拟 retry、训练循环、多 batch、多 epoch、carry state 或 metrics collect。
 - loop 的退出条件只能在 `loop.stop_after` 和 `loop.stop_when` 中二选一；不要再写 `vibeflow.loop.for_each`、`loop.items`、`loop.epochs` 或 `loop.until`。
 - `execution="block"` / `execution="compiled"` 会执行结构化 `LoopBlock`，loop body 不能 block 化时会报错，不会静默降级。
