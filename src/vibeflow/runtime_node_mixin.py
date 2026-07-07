@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 from typing import Mapping
 
+from .block_compiler import loop_block, nodeset_block
 from .planned_behavior import load_stub_callable, resolve_stub_module_path, signature_is_run_stub
 from .registry import NodeRegistryError
 from .runtime_errors import PipelineRuntimeError
@@ -11,6 +12,25 @@ from .runtime_helpers import elapsed_ms
 from .summaries import summarize_mapping
 
 class RuntimeNodeMixin:
+    def _run_compiled_frame(self, frame: NodeFrame, state: "_RuntimeState") -> Mapping[str, object]:
+        self.trace.current_node = frame.name
+        inputs = self._resolve_inputs(frame, state)
+        state.last_inputs[frame.name] = inputs
+        state.inboxes[frame.name] = []
+        if frame.async_mode:
+            return self._run_async_node(frame, inputs)
+        if frame.is_planned_stub:
+            return self._run_planned_stub_node(frame, inputs)
+        if frame.is_loop:
+            if loop_block(self._plan, frame.name) is not None:
+                return self._run_loop_block_node(frame, inputs)
+            return self._run_loop_node(frame, inputs)
+        if frame.is_nodeset:
+            if nodeset_block(self._plan, frame.name) is not None:
+                return self._run_nodeset_block_node(frame, inputs)
+            return self._run_nodeset_node(frame, inputs)
+        return self._run_pure_node(frame, inputs)
+
     def _run_planned_stub_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
         started = time.perf_counter()
         try:

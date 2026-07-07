@@ -208,7 +208,7 @@ unit tests：
 - `trace="full"` 不回退 plan。
 - `node_hooks=True` 不回退 plan。
 - compiled edge_executions 完整。
-- async / nodeset / 复杂 DAG fallback。
+- async helper / nodeset / 同步 DAG 进入 generated graph block；明确不可编译区域 fallback。
 - compiled failure 记录 `current_node`、`node_failed`、`block_failed`。
 - train preset 默认使用 `execution="compiled"`，显式 `--execution plan` 可覆盖。
 

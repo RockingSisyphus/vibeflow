@@ -71,8 +71,8 @@ def _batch_initial() -> dict[str, Any]:
     return {"train.batch": SandboxBatch([2, 4])}
 
 
-COMPILED_SOURCE_FULL_REQUIRED = ("runtime._execute_graph_block",)
-COMPILED_SOURCE_FAST_REQUIRED = ("runtime._execute_graph_block",)
+COMPILED_SOURCE_FULL_REQUIRED = ("runtime._run_compiled_frame",)
+COMPILED_SOURCE_FAST_REQUIRED = ("runtime._run_compiled_frame",)
 COMPILED_SOURCE_FORBIDDEN = ("_run_node(",)
 COMPILED_SOURCE_FAST_FORBIDDEN = ("_run_node(",)
 
@@ -532,7 +532,7 @@ VALID_RUN_CASES = [
         "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
         "expected_outputs": {"calc.scaled": 20, "calc.branch": 20, "calc.final": 25},
         "expected_runtime_exec_order": ["start", "arithmetic", "use_scaled", "finalize", "end"],
-        "expected_trace_kind_counts": {"nodeset_enter": 1, "nodeset_exit": 1, "block_enter": 1, "block_exit": 1},
+        "expected_trace_kind_counts": {"nodeset_enter": 1, "nodeset_exit": 1, "block_enter": 2, "block_exit": 2},
         "expected_trace_summary": {
             "current_node": "end",
             "edge_executions": {"start->arithmetic": 1, "arithmetic->use_scaled": 1},
@@ -541,7 +541,7 @@ VALID_RUN_CASES = [
             "step_count": 5,
             "stop_reason": "completed",
         },
-        "expected_blocks": [["use_scaled", "finalize", "end"]],
+        "expected_blocks": [["arithmetic"], ["start", "arithmetic", "use_scaled", "finalize", "end"]],
         "expected_nodeset_subplan_params": {"arithmetic.scale": {"factor": 2}},
         "expected_nodeset_subplan_nodes": {"arithmetic": ["start", "add_pair", "scale", "end"]},
         "expected_nodeset_exports": {"arithmetic": ["calc.scaled"]},
@@ -707,7 +707,7 @@ VALID_RUN_CASES = [
             "step_count": 4,
             "stop_reason": "completed",
         },
-        "expected_blocks": [["add", "end"]],
+        "expected_blocks": [["start", "seed", "add", "end"]],
     },
     {
         "name": "async_nodeset_result_key_join",

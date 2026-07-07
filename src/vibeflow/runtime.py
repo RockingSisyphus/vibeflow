@@ -5,7 +5,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Mapping
 
-from .block_compiler import graph_block, loop_block
+from .block_compiler import explain_block_compilation, graph_block, loop_block, nodeset_block
 from .compiler import GraphCompiler
 from .data_contract import (
     CARDINALITY_ALL,
@@ -236,35 +236,8 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
         if block is not None:
             block.callable(self, state)
             return
-        try:
-            self._assert_block_eligible()
-        except PipelineRuntimeError:
-            self._run_steps(state)
-            return
-        ready = self._initial_ready_nodes(state)
-        if len(ready) != 1:
-            raise PipelineRuntimeError("block execution requires exactly one ready start node")
-        node_name = ready[0]
-        for _ in range(self._plan.max_steps):
-            if not self._requirements_available(node_name, state):
-                self.trace.stop_reason = "no_ready_nodes"
-                return
-            outputs = self._run_node(node_name, state)
-            self.trace.step_count += 1
-            if self._is_end_terminal(node_name):
-                self.trace.stop_reason = "completed"
-                return
-            self._clear_conditional_outgoing(node_name, state)
-            active = self._activated_edges(node_name, outputs, state)
-            if len(active) != 1:
-                raise PipelineRuntimeError(f"block execution requires exactly one active edge from '{node_name}'")
-            edge = active[0]
-            self._activate_edge(edge, state)
-            self._deliver_outputs(edge, outputs, state)
-            self._deliver_transfer_only_edges(node_name, outputs, state, {edge.pair})
-            node_name = edge.target
-        self.trace.stop_reason = "max_steps"
-        raise PipelineRuntimeError(f"pipeline exceeded max_steps={self._plan.max_steps}")
+        details = _block_compile_error_details(self._plan)
+        raise PipelineRuntimeError(f"block execution requires a compiled graph block: {details}")
 
     def _execute_graph_block(self, block_name: str, block_nodes: tuple[str, ...], state: _RuntimeState) -> tuple[str, Mapping[str, object]]:
         started = time.perf_counter()
@@ -391,10 +364,14 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
         if frame.is_planned_stub:
             return self._run_planned_stub_node(frame, inputs)
         if frame.is_loop:
-            if self.runtime_options.execution in {"block", "compiled"}:
+            if self.runtime_options.execution == "block":
+                return self._run_loop_block_node(frame, inputs)
+            if self.runtime_options.execution == "compiled" and loop_block(self._plan, frame.name) is not None:
                 return self._run_loop_block_node(frame, inputs)
             return self._run_loop_node(frame, inputs)
         if frame.is_nodeset:
+            if self.runtime_options.execution == "compiled" and nodeset_block(self._plan, frame.name) is not None:
+                return self._run_nodeset_block_node(frame, inputs)
             return self._run_nodeset_node(frame, inputs)
         return self._run_pure_node(frame, inputs)
 
@@ -416,3 +393,11 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
             else:
                 raise PipelineRuntimeError(f"node '{frame.name}' has invalid cardinality '{requirement.cardinality}'")
         return inputs
+
+
+def _block_compile_error_details(plan: ExecutionPlan) -> str:
+    findings = [item for item in explain_block_compilation(plan) if not bool(item.get("compiled"))]
+    if not findings:
+        return "unknown"
+    first = findings[0]
+    return f"{first.get('path')}: {first.get('reason')}"

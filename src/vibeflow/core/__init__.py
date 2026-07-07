@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ..compiler import CompiledGraph, GraphCompileError, GraphCompiler
+from ..block_compiler import explain_block_compilation
 from ..config_resources import BaseLibInfo, BaseLibResource, ConfigResources, PluginInfo, PluginResource, load_config_resources
 from ..data_contract import DataEnvelope, DataProvider, DataRequirement, RunResult
 from ..graph_config import EdgeSpec, GraphConfig, GraphConfigError, NodeSpec, NodesetSpec, parse_graph_config
@@ -54,6 +55,7 @@ __all__ = [
     "PureNode",
     "RunResult",
     "default_effective_policy",
+    "explain_block_compilation",
     "load_config_resources",
     "parse_graph_config",
     "resolve_effective_policy",

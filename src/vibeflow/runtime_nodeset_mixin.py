@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from typing import Mapping
 
+from .block_compiler import graph_block, nodeset_block
 from .runtime_errors import PipelineRuntimeError
 from .runtime_helpers import elapsed_ms
 from .runtime_trace import RuntimeTrace
@@ -11,6 +12,25 @@ from .runtime_values import _nodeset_inputs_to_initial, _result_value
 from .summaries import summarize_mapping
 
 class RuntimeNodesetMixin:
+    def _run_nodeset_block_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
+        block = nodeset_block(self._plan, frame.name)
+        if block is None:
+            raise PipelineRuntimeError(f"nodeset node '{frame.name}' is not block compiled")
+        started = time.perf_counter()
+        self._record_runtime_event("nodeset_enter", frame.name, frame.node_type)
+        self._call_runtime_plugins("before_nodeset", frame.name, frame.node_type)
+        try:
+            result = block.callable(self, inputs)
+            outputs = self._validate_outputs(frame, result.outputs, subject="nodeset node")
+            self._mark_node_run(frame.name)
+            self._record_runtime_event("nodeset_exit", frame.name, frame.node_type, output_summary=summarize_mapping(outputs), elapsed_ms=elapsed_ms(started))
+            self._call_runtime_plugins("after_nodeset", frame.name, frame.node_type)
+            return outputs
+        except Exception as exc:
+            self._record_runtime_event("nodeset_failed", frame.name, frame.node_type, failure=str(exc), elapsed_ms=elapsed_ms(started))
+            self._call_runtime_plugins("nodeset_failed", frame.name, frame.node_type, str(exc))
+            raise
+
     def _run_nodeset_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
         started = time.perf_counter()
         self._record_runtime_event("nodeset_enter", frame.name, frame.node_type)
@@ -64,6 +84,14 @@ class RuntimeNodesetMixin:
                 ) from exc
             outputs[provider.key] = _result_value(nested_value)
         return outputs, runtime.trace
+
+    def _execute_nodeset_block(self, node_name: str, inputs: object) -> Mapping[str, object]:
+        frame = self._frames[node_name]
+        if not isinstance(inputs, Mapping):
+            raise PipelineRuntimeError(f"nodeset block '{node_name}' received non-mapping inputs")
+        if frame.subplan is None or graph_block(frame.subplan) is None:
+            raise PipelineRuntimeError(f"nodeset node '{frame.name}' body is not graph compiled")
+        return self._run_nodeset_outputs(frame, inputs, cached=True)
 
     def _nodeset_runtime(self, frame: NodeFrame) -> "PipelineRuntime":
         runtime = self._nodeset_runtimes.get(frame.name)

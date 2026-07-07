@@ -6,6 +6,7 @@ from .config_loader import ConfigDocument, ConfigLoadError, load_config_document
 from .compiler import CompiledGraph, GraphCompileError, GraphCompiler
 from .config_resources import BaseLibInfo, BaseLibResource, ConfigResources, PluginInfo, PluginResource, load_config_resources
 from .data_contract import DataEnvelope, DataProvider, DataRequirement, RunResult
+from .block_compiler import explain_block_compilation
 from .execution_plan import CompiledBlock, ExecutionPlan, NodeFrame, build_execution_plan
 from .graph_config import EdgeSpec, GraphConfig, NodeSpec, NodesetSpec, parse_graph_config
 from .health import HealthFinding, HealthReport, validate_graph_health
@@ -90,6 +91,7 @@ __all__ = [
     "default_effective_policy",
     "export_mermaid",
     "export_ascii_flowchart",
+    "explain_block_compilation",
     "is_mermaid_svg_renderer_available",
     "load_config_document",
     "load_config_resources",
