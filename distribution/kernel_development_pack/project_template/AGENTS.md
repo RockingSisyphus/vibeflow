@@ -33,7 +33,7 @@
 - `node_configs` 可以穿透 nodeset 调用和 `vibeflow.loop.while` 调用；dotted path 的每一段都写调用点 `id`，loop 段会进入该调用点的 `loop.body`，不要把 body `type_key` 当成路径段。
 - `decision` 只用于分支选择，不要用 decision cycle 模拟 retry、训练循环、多 batch、多 epoch、carry state 或 metrics collect。
 - loop 的退出条件只能在 `loop.stop_after` 和 `loop.stop_when` 中二选一；不要再写 `vibeflow.loop.for_each`、`loop.items`、`loop.epochs` 或 `loop.until`。
-- `execution="block"` / `execution="compiled"` 会执行结构化 `LoopBlock`，loop body 不能 block 化时会报错，不会静默降级。
+- `execution="block"` 是严格 block 模式，loop/body 不能 block 化时会启动前报错；`execution="compiled"` 会优先生成 graph/nodeset/loop block，不适合的区域回退 plan。
 - join 默认是 safe OR；只有确认任一 active incoming 都足够触发目标时才写 `join_policy: "any_active"`，需要等待所有 incoming 时写 `join_policy: "all"`。复杂分支汇合优先写显式 merge/select node。
 - 非 decision 同步 fan-out 必须有明确语义：分支通过 `join_policy: "all"` 汇合、被识别为 data bypass，或分支目标显式写 `async`。遇到 `GRAPH.MAINLINE.*`，按 details 里的 `source`、`target`、`branch_nodes`、`branch_edges` 和 `suggested_fixes` 改配置。
 - node 间可以按引用传递普通 Python 对象；不要依赖 trace 或报告保存对象内容，报告只审计流程和 key。

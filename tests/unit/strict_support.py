@@ -33,6 +33,7 @@ from vibeflow import (
     schema_text,
     export_ascii_flowchart,
     export_mermaid,
+    explain_block_compilation,
     is_mermaid_svg_renderer_available,
     load_config_document,
     parse_graph_config,

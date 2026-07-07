@@ -652,7 +652,7 @@ def test_loop_stop_when_missing_or_non_bool_source_is_runtime_error() -> None:
         PipelineRuntime(non_bool_graph, registry=_loop_registry()).run({"loop.current": 0})
 
 
-def test_block_execution_rejects_loop_body_that_is_not_block_compiled() -> None:
+def test_block_execution_compiles_loop_body_with_nested_nodeset() -> None:
     graph = parse_graph_config(
         {
             "nodesets": [
@@ -690,7 +690,7 @@ def test_block_execution_rejects_loop_body_that_is_not_block_compiled() -> None:
                             _node_call(
                                 "nested",
                                 "loop.step_until",
-                                "Calls a nested nodeset, which makes this loop body not block compiled.",
+                                "Calls a nested nodeset inside a block-compiled loop body.",
                                 requires=[REQ_SPEC("loop.current")],
                                 provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
                             ),
@@ -708,7 +708,7 @@ def test_block_execution_rejects_loop_body_that_is_not_block_compiled() -> None:
                     _node_call(
                         "while_loop",
                         "vibeflow.loop.while",
-                        "Uses a loop body that cannot be block compiled.",
+                        "Uses a loop body with a nested nodeset.",
                         requires=[REQ_SPEC("loop.current")],
                         provides=[PROV_SPEC("loop.final"), PROV_SPEC("loop.iterations")],
                         loop={
@@ -730,8 +730,59 @@ def test_block_execution_rejects_loop_body_that_is_not_block_compiled() -> None:
         }
     )
 
-    with pytest.raises(PipelineRuntimeError, match="not block compiled"):
-        PipelineRuntime(graph, registry=_loop_registry(), runtime_options=RuntimeOptions(execution="block")).run({"loop.current": 0})
+    runtime = PipelineRuntime(graph, registry=_loop_registry(), runtime_options=RuntimeOptions(trace="boundary", execution="block"))
+    assert any(block.kind == "loop" and block.entry == "while_loop" for block in runtime._plan.blocks)
+    assert not [finding for finding in explain_block_compilation(runtime._plan) if not finding["compiled"]]
+
+    context = runtime.run({"loop.current": 0})
+
+    assert context.get("loop.final")["value"] == 3
+    assert any(event["kind"] == "loop_block_enter" for event in _runtime_trace_events_from_context(context))
+
+
+def test_block_execution_fail_fast_reports_compile_reason_for_unsupported_loop() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "loop.add_once",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline=_input_add_pipeline(add={"delta": 1}),
+                )
+            ],
+            "pipeline": {
+                "inputs": [PROV_SPEC("value.in")],
+                "nodes": [
+                    _node_call("start", "test.start", "Starts unsupported block fixture."),
+                    _node_call(
+                        "async_loop",
+                        "vibeflow.loop.while",
+                        "Async loops are not block compiled.",
+                        requires=[REQ_SPEC("value.in")],
+                        provides=[PROV_SPEC("value.out")],
+                        loop={
+                            "body": "loop.add_once",
+                            "max_iterations": 3,
+                            "stop_after": 1,
+                            "carry": [{"from": "value.in", "as": "value.in", "update": "value.out"}],
+                            "outputs": [{"from": "value.out", "as": "value.out"}],
+                        },
+                        **{"async": "detached"},
+                    ),
+                    _node_call("end", "test.out_end", "Ends unsupported block fixture.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": _edge_chain("start", "async_loop", "end"),
+                "outputs": [REQ_SPEC("value.out")],
+            },
+        }
+    )
+
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="boundary", execution="block"))
+
+    with pytest.raises(PipelineRuntimeError, match="async_loop=detached"):
+        runtime.run({"value.in": 1})
 
 
 def test_join_policy_any_active_allows_unconditional_input_when_condition_is_inactive() -> None:
@@ -1109,7 +1160,7 @@ def test_runtime_options_block_rejects_decision_loop_before_max_steps() -> None:
     assert exc_info.value.rule_id == "GRAPH.CYCLE.FORBIDDEN"
 
 
-def test_runtime_options_compiled_falls_back_around_async_barrier() -> None:
+def test_runtime_options_compiled_generates_block_with_async_barrier() -> None:
     class OutToNextNode:
         NODE_INFO = NodeInfo("test.out_to_next", "Out To Next", "test", "Copies value.out to value.next.", "0.1.0", "process")
         CONTRACT = NodeContract(
@@ -1146,22 +1197,23 @@ def test_runtime_options_compiled_falls_back_around_async_barrier() -> None:
         }
     )
     runtime = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
-    assert runtime._plan.blocks == ()
+    assert [(block.kind, block.nodes) for block in runtime._plan.blocks] == [("graph", ("start", "seed", "async_add", "out_to_next", "end"))]
     interpreted_nodes = []
-    original_run_node = PipelineRuntime._run_node
+    original_run_compiled_frame = PipelineRuntime._run_compiled_frame
 
-    def spy_run_node(self, node_name, context):
-        interpreted_nodes.append(node_name)
-        return original_run_node(self, node_name, context)
+    def spy_run_compiled_frame(self, frame, context):
+        interpreted_nodes.append(frame.name)
+        return original_run_compiled_frame(self, frame, context)
 
-    PipelineRuntime._run_node = spy_run_node
+    PipelineRuntime._run_compiled_frame = spy_run_compiled_frame
     try:
         context = runtime.run({})
     finally:
-        PipelineRuntime._run_node = original_run_node
+        PipelineRuntime._run_compiled_frame = original_run_compiled_frame
 
     assert interpreted_nodes == ["start", "seed", "async_add", "out_to_next", "end"]
     assert context.get("value.next")["value"] == 7
+    assert any(event["kind"] == "block_enter" for event in _runtime_trace_events_from_context(context))
 
 
 def _decision_loop_graph(*, target: int, max_steps: int = 20):

@@ -414,7 +414,7 @@ loop node 像普通 node 一样声明 `requires/provides`，并额外写顶层 `
 
 `vibeflow.loop.for_each`、`loop.items`、`loop.epochs`、`loop.until` 已移除。`max_iterations` 是 loop 的硬上限，超过会抛 runtime error。顶层 `runtime.step_count` 仍只统计顶层 node；包含 loop body 的总步数看 `runtime.total_step_count`，完整顺序看 `runtime.qualified_exec_order`。
 
-`execution="block"` 和 `execution="compiled"` 会执行结构化 `LoopBlock`。如果 loop body 不能被 block compiler 编译，block/compiled 模式会报错，不会静默降级到普通 nested runtime。普通 execution 仍保留同语义的 nested runtime 兼容路径。
+`execution="block"` 和 `execution="compiled"` 会优先执行结构化 `LoopBlock`。loop body 可以包含同步 nested nodeset、嵌套 while、普通 DAG fan-out/merge 和现有 async helper 支持的节点。`execution="block"` 是严格模式，不能生成 block 时会在启动阶段报出 block compile reason；`execution="compiled"` 是性能模式，不能生成 block 的区域会回退到 plan runtime。
 
 Mermaid/SVG 中 while loop 使用独立 trapezoid (`trap-b`) 形状和默认 `loopNode` 系统样式，label 会显示 `body:`、`stop:`、`max:`。`loopNode` 默认颜色属于系统保留色，不允许作为自定义 `style` 颜色；如需改 loop 颜色，应写其他非保留 hex 色。
 
