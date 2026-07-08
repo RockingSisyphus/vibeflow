@@ -187,6 +187,12 @@ class QualityStructureLimits:
 
 
 @dataclass(frozen=True)
+class QualityStructureRoles:
+    base_lib_paths: tuple[str, ...] = ("base_lib",)
+    base_lib_modules: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class QualityFinding:
     rule_id: str
     severity: str

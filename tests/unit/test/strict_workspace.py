@@ -270,6 +270,43 @@ def test_workspace_quality_applies_root_structure_limits_by_default(tmp_path) ->
     assert finding.source_path.endswith("project/nodes/part_0.py")
 
 
+def test_workspace_quality_role_imports_use_declared_base_lib_paths_and_modules(tmp_path) -> None:
+    workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
+    _write_project_config(framework_root, quality_enabled=False)
+    _write_registry(project_root, [])
+    (project_root / "vibeflow_project.jsonc").write_text(
+        json.dumps(
+            {
+                "registry": "registry.py:build_node_registry",
+                "quality_enabled": True,
+                "base_lib": {
+                    "paths": ["task_base_lib"],
+                    "modules": [{"module": "task_base_lib.helpers"}],
+                },
+                "plugins": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    for directory in ("nodes", "task_base_lib", "plugins"):
+        package = project_root / directory
+        package.mkdir()
+        (package / "__init__.py").write_text("", encoding="utf-8")
+    (project_root / "nodes" / "main.py").write_text("import task_base_lib.helpers\n", encoding="utf-8")
+    (project_root / "task_base_lib" / "helpers.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (project_root / "task_base_lib" / "bad.py").write_text("import plugins.policy\n", encoding="utf-8")
+    (project_root / "plugins" / "policy.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    report = scan_workspace_code_quality(load_workspace_config(workspace_path))
+    rule_ids = {finding.rule_id for finding in report.findings}
+
+    assert "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT" not in rule_ids
+    assert "QUALITY.STRUCTURE.BASE_LIB_UPWARD_IMPORT" in rule_ids
+    upward = next(finding for finding in report.findings if finding.rule_id == "QUALITY.STRUCTURE.BASE_LIB_UPWARD_IMPORT")
+    assert upward.object_id == "task_base_lib.bad -> plugins.policy"
+    assert upward.root_id == "project"
+
+
 def test_workspace_resources_have_root_source_and_feed_policy(tmp_path) -> None:
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
     _write_registry(project_root, [])

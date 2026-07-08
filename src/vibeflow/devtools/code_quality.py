@@ -30,6 +30,7 @@ from .code_quality_types import (
     QualityFinding,
     QualityReport,
     QualityStructureLimits,
+    QualityStructureRoles,
     QualityThresholds,
     SIDE_EFFECT_BOUNDARY_PATHS,
 )
@@ -48,6 +49,7 @@ def scan_code_quality(
     *,
     thresholds: QualityThresholds | None = None,
     structure_limits: QualityStructureLimits | None = None,
+    structure_roles: QualityStructureRoles | None = None,
     excluded_dirs: Iterable[str] = DEFAULT_EXCLUDED_DIRS,
     check_side_effects: bool = False,
 ) -> QualityReport:
@@ -82,6 +84,7 @@ def scan_code_quality(
         dependency_graph,
         import_sites_by_edge,
         structure_limits,
+        roles=structure_roles,
     )
     structure_summary.update(root_structure_summary)
     findings.extend(root_structure_findings)
