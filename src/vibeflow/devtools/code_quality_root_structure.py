@@ -5,7 +5,7 @@ from pathlib import PurePosixPath
 from typing import Mapping, Sequence
 
 from .code_quality_structure_distance import directory_for_path
-from .code_quality_types import FileQuality, ImportSite, QualityFinding, QualityStructureLimits
+from .code_quality_types import FileQuality, ImportSite, QualityFinding, QualityStructureLimits, QualityStructureRoles
 
 
 _ROOT_DIR = "(root)"
@@ -19,6 +19,8 @@ def analyze_root_structure(
     dependency_graph: Mapping[str, Sequence[str]],
     import_sites_by_edge: Mapping[tuple[str, str], Sequence[Mapping[str, object]]],
     limits: QualityStructureLimits | None,
+    *,
+    roles: QualityStructureRoles | None = None,
 ) -> tuple[dict[str, object], tuple[QualityFinding, ...]]:
     if limits is None or not limits.enabled:
         return {}, ()
@@ -31,7 +33,7 @@ def analyze_root_structure(
         *_root_level_file_findings(stats, limits),
     ]
     if limits.enforce_role_imports:
-        findings.extend(_role_import_findings(files, dependency_graph, import_sites_by_edge))
+        findings.extend(_role_import_findings(files, dependency_graph, import_sites_by_edge, roles or QualityStructureRoles()))
     return _summary(stats, limits), tuple(findings)
 
 
@@ -188,6 +190,7 @@ def _role_import_findings(
     files: Sequence[FileQuality],
     dependency_graph: Mapping[str, Sequence[str]],
     import_sites_by_edge: Mapping[tuple[str, str], Sequence[Mapping[str, object]]],
+    roles: QualityStructureRoles,
 ) -> list[QualityFinding]:
     files_by_module = {file.module: file for file in files}
     findings: list[QualityFinding] = []
@@ -195,12 +198,12 @@ def _role_import_findings(
         source_file = files_by_module.get(source)
         if source_file is None:
             continue
-        source_role = _role_for_path(source_file.path)
+        source_role = _role_for_file(source_file, roles)
         for target in sorted(targets):
             target_file = files_by_module.get(target)
             if target_file is None:
                 continue
-            finding = _role_import_finding(source, target, source_role, _role_for_path(target_file.path), import_sites_by_edge)
+            finding = _role_import_finding(source, target, source_role, _role_for_file(target_file, roles), import_sites_by_edge)
             if finding:
                 findings.append(finding)
     return findings
@@ -287,6 +290,30 @@ def _summary(stats: Mapping[str, object], limits: QualityStructureLimits) -> dic
 def _directory(path: PurePosixPath) -> str:
     directory = directory_for_path(str(path))
     return directory if directory and directory != "." else _ROOT_DIR
+
+
+def _role_for_file(file: FileQuality, roles: QualityStructureRoles) -> str:
+    if _is_declared_base_lib(file, roles):
+        return _BASE_LIB_ROLE
+    return _role_for_path(file.path)
+
+
+def _is_declared_base_lib(file: FileQuality, roles: QualityStructureRoles) -> bool:
+    return any(_path_matches(file.path, path) for path in roles.base_lib_paths) or any(_module_matches(file.module, module) for module in roles.base_lib_modules)
+
+
+def _path_matches(path: str, prefix: str) -> bool:
+    normalized = prefix.strip().replace("\\", "/").strip("/")
+    if not normalized or normalized == ".":
+        return False
+    return path == normalized or path.startswith(f"{normalized}/")
+
+
+def _module_matches(module: str, prefix: str) -> bool:
+    normalized = prefix.strip().strip(".")
+    if not normalized:
+        return False
+    return module == normalized or module.startswith(f"{normalized}.")
 
 
 def _role_for_path(path: str) -> str:

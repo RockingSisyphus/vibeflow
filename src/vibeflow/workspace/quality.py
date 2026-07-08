@@ -5,7 +5,16 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from vibeflow.devtools.code_quality import DEFAULT_EXCLUDED_DIRS, QualityThresholds, scan_code_quality
-from vibeflow.devtools.code_quality_types import DirectoryQuality, FileQuality, PrefixClusterQuality, QualityFinding, QualityReport, QualityStructureLimits
+from vibeflow.devtools.code_quality_types import (
+    DirectoryQuality,
+    FileQuality,
+    PrefixClusterQuality,
+    QualityFinding,
+    QualityReport,
+    QualityStructureLimits,
+    QualityStructureRoles,
+)
+from vibeflow.graph_config import STATUS_IMPLEMENTED
 from vibeflow.workspace.types import WorkspaceConfig, WorkspaceRoot
 
 
@@ -33,6 +42,7 @@ def scan_workspace_code_quality(
             root.path,
             thresholds=active_thresholds,
             structure_limits=_structure_limits_for_root(root.quality_structure, overrides=structure_overrides, enabled=structure_enabled),
+            structure_roles=_structure_roles_for_root(root),
             excluded_dirs=excluded_dirs,
             check_side_effects=check_side_effects,
         )
@@ -92,6 +102,51 @@ def _structure_limits_for_root(
     if enabled is not None:
         values["enabled"] = enabled
     return replace(limits, **values) if values else limits
+
+
+def _structure_roles_for_root(root: WorkspaceRoot) -> QualityStructureRoles:
+    raw = root.project_config.get("base_lib")
+    if not isinstance(raw, Mapping):
+        return QualityStructureRoles()
+    paths = tuple(_base_lib_role_paths(raw.get("paths", ()), root=root))
+    modules = tuple(_base_lib_role_modules(raw.get("modules", ())))
+    return QualityStructureRoles(base_lib_paths=paths or QualityStructureRoles().base_lib_paths, base_lib_modules=modules)
+
+
+def _base_lib_role_paths(value: object, *, root: WorkspaceRoot) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    paths: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            continue
+        resolved = Path(item)
+        if not resolved.is_absolute():
+            resolved = root.path / resolved
+        try:
+            paths.append(resolved.resolve().relative_to(root.path).as_posix())
+        except ValueError:
+            continue
+    return list(dict.fromkeys(paths))
+
+
+def _base_lib_role_modules(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    modules: list[str] = []
+    for item in value:
+        if isinstance(item, str):
+            module = item.strip()
+        elif isinstance(item, Mapping):
+            status = str(item.get("status", STATUS_IMPLEMENTED)).strip() or STATUS_IMPLEMENTED
+            if status != STATUS_IMPLEMENTED:
+                continue
+            module = str(item.get("module", item.get("name", ""))).strip()
+        else:
+            module = ""
+        if module:
+            modules.append(module)
+    return list(dict.fromkeys(modules))
 
 
 def _prefix_dependency_graph(graph: Mapping[str, Any], *, root: WorkspaceRoot) -> dict[str, tuple[str, ...]]:
