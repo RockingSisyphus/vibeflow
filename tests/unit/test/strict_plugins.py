@@ -240,8 +240,15 @@ def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nod
                 "id": "review_policy",
                 "type": "policy",
                 "module": "project.plugins.review_policy",
-                "status": "planned",
+                "status": "implemented",
                 "info": {"display_name": "Review Policy", "description": "Checks graph policy."},
+            },
+            {
+                "id": "future_policy",
+                "type": "policy",
+                "module": "project.plugins.future_policy",
+                "status": "planned",
+                "info": {"display_name": "Future Policy", "description": "Not active in this review."},
             }
         ],
         "base_lib": {
@@ -266,6 +273,7 @@ def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nod
     assert 'subgraph __vibeflow_layout_base_lib["base_lib"]' in mermaid
     assert "Review Policy" in mermaid
     assert "desc: Checks graph policy." in mermaid
+    assert "Future Policy" not in mermaid
     assert "Contracts" in mermaid
     assert "desc: Shared contract helpers." in mermaid
     assert "---------- resource ----------" in mermaid
@@ -307,7 +315,7 @@ def test_review_columns_svg_composer_places_columns_left_to_right(tmp_path) -> N
     )
     compiled = GraphCompiler().compile(graph)
     resources = {
-        "plugins": [{"id": "policy", "type": "policy", "module": "project.plugins.policy", "status": "planned"}],
+        "plugins": [{"id": "policy", "type": "policy", "module": "project.plugins.policy", "status": "implemented"}],
         "base_lib": {"modules": [{"id": "contracts", "module": "project.base_lib.contracts", "status": "implemented"}]},
     }
 

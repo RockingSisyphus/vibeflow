@@ -13,8 +13,8 @@ from vibeflow.rendering.mermaid import (
     MERMAID_LAYOUT_DEFAULT,
     _escape_label,
     _mapping_items,
+    _rendered_resources_payload,
     _resource_label,
-    _resources_payload,
     _safe_id,
     export_mermaid,
 )
@@ -155,7 +155,7 @@ def _build_columns(
             )
         ]
     ]
-    columns.extend(_resource_columns(resources, temp_dir, theme=theme, background=background, max_text_size=max_text_size, max_edges=max_edges))
+    columns.extend(_resource_columns(graph, resources, temp_dir, theme=theme, background=background, max_text_size=max_text_size, max_edges=max_edges))
     if expand_nodesets:
         nodeset_fragments = _nodeset_fragments(
             graph,
@@ -175,6 +175,7 @@ def _build_columns(
 
 
 def _resource_columns(
+    graph: GraphConfig,
     resources: object | None,
     temp_dir: Path,
     *,
@@ -183,7 +184,7 @@ def _resource_columns(
     max_text_size: int | None,
     max_edges: int | None,
 ) -> list[list[_SvgFragment]]:
-    payload = _resources_payload(resources)
+    payload = _rendered_resources_payload(resources, graph)
     columns: list[list[_SvgFragment]] = []
     plugins = _mapping_items(payload.get("plugins", ()))
     if plugins:

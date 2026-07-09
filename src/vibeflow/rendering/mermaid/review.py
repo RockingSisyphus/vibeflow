@@ -50,7 +50,7 @@ def render_review_columns(renderer: Any, graph: GraphConfig, compiled: CompiledG
         "  classDef layoutAnchor fill:transparent,stroke:transparent,color:transparent;",
     ]
     column_anchors = _render_main_column(renderer, lines, graph, compiled)
-    column_anchors.extend(_render_resource_columns(renderer, lines))
+    column_anchors.extend(_render_resource_columns(renderer, lines, graph))
     nodeset_anchor = _render_nodesets_column(renderer, lines, graph)
     if nodeset_anchor:
         column_anchors.append(nodeset_anchor)
@@ -74,8 +74,8 @@ def _render_main_column(renderer: Any, lines: list[str], graph: GraphConfig, com
     return [anchor]
 
 
-def _render_resource_columns(renderer: Any, lines: list[str]) -> list[str]:
-    payload = _resources_payload(renderer.resources)
+def _render_resource_columns(renderer: Any, lines: list[str], graph: GraphConfig) -> list[str]:
+    payload = _rendered_resources_payload(renderer.resources, graph)
     if not payload:
         return []
     anchors: list[str] = []
@@ -165,10 +165,10 @@ def _render_anchor(lines: list[str], node_id: str, *, indent: str) -> None:
     lines.append(f"{indent}class {node_id} layoutAnchor;")
 
 
-def _resources_payload(resources: object | None) -> Mapping[str, object]:
-    from vibeflow.rendering.mermaid import _resources_payload as impl
+def _rendered_resources_payload(resources: object | None, graph: GraphConfig) -> Mapping[str, object]:
+    from vibeflow.rendering.mermaid import _rendered_resources_payload as impl
 
-    return impl(resources)
+    return impl(resources, graph)
 
 
 def _mapping_items(value: object) -> tuple[Mapping[str, object], ...]:

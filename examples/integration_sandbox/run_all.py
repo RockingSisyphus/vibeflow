@@ -485,15 +485,22 @@ VALID_RUN_CASES = [
         "expected_mermaid_contains": [
             "resource_base_lib",
             "Sandbox Arithmetic",
-            "base_lib.future_arithmetic",
             "resource_plugins",
             "Sandbox Value Shift",
-            "future_value_plugin",
             "config: shift",
+        ],
+        "expected_mermaid_not_contains": [
+            "base_lib.future_arithmetic",
+            "future_value_plugin",
+            "planned runtime value hook",
         ],
         "expected_run_mermaid_contains": [
             "Sandbox Arithmetic",
             "Sandbox Value Shift",
+        ],
+        "expected_run_mermaid_not_contains": [
+            "base_lib.future_arithmetic",
+            "future_value_plugin",
             "planned runtime value hook",
         ],
     },
@@ -1179,6 +1186,10 @@ def _assert_mermaid_contains(case: dict[str, Any], name: str, collapsed: str, ex
     missing = [value for value in expected if value not in collapsed and value not in expanded]
     if missing:
         raise AssertionError(f"Mermaid missing expected content: {missing}")
+    forbidden = tuple(str(value) for value in case.get("expected_mermaid_not_contains", ()))
+    present = [value for value in forbidden if value in collapsed or value in expanded]
+    if present:
+        raise AssertionError(f"Mermaid contained forbidden content: {present}")
 
 
 def _assert_health_warnings(case: dict[str, Any], health) -> None:
@@ -1199,6 +1210,10 @@ def _assert_run_mermaid(case: dict[str, Any], run_dir: Path) -> None:
     missing = [value for value in expected if value not in text]
     if missing:
         raise AssertionError(f"run Mermaid missing expected content: {missing}")
+    forbidden = tuple(str(value) for value in case.get("expected_run_mermaid_not_contains", ()))
+    present = [value for value in forbidden if value in text]
+    if present:
+        raise AssertionError(f"run Mermaid contained forbidden content: {present}")
 
 
 def _assert_ascii_contains(name: str, collapsed: str, expanded: str) -> None:
