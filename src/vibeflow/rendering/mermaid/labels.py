@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from vibeflow.rendering.helpers import nodeset_for_node
-from vibeflow.graph_config import GraphConfig, NodeSpec, NodesetSpec
+from vibeflow.graph_config import GraphConfig, NodeSpec, NodesetSpec, STATUS_IMPLEMENTED
 from vibeflow.node import (
     FLOW_KIND_DATA_STORE,
     FLOW_KIND_DECISION,
@@ -97,6 +97,59 @@ def _resources_payload(resources: object | None) -> Mapping[str, object]:
     else:
         payload = resources
     return payload if isinstance(payload, Mapping) else {}
+
+def _rendered_resources_payload(resources: object | None, graph: GraphConfig | None = None) -> dict[str, object]:
+    payload = _resources_payload(resources)
+    if not payload:
+        return {}
+    root_ids = _graph_root_ids(graph)
+    plugins = _rendered_resource_items(_mapping_items(payload.get("plugins", ())), root_ids=root_ids)
+    base_lib_payload = payload.get("base_lib", {})
+    modules = _rendered_resource_items(
+        _mapping_items(base_lib_payload.get("modules", ()) if isinstance(base_lib_payload, Mapping) else ()),
+        root_ids=root_ids,
+    )
+    result: dict[str, object] = {}
+    if modules:
+        result["base_lib"] = {"modules": list(modules)}
+    if plugins:
+        result["plugins"] = list(plugins)
+    return result
+
+def _rendered_resource_items(resources: tuple[Mapping[str, object], ...], *, root_ids: frozenset[str]) -> tuple[Mapping[str, object], ...]:
+    return tuple(resource for resource in resources if _resource_is_rendered(resource, root_ids=root_ids))
+
+def _resource_is_rendered(resource: Mapping[str, object], *, root_ids: frozenset[str]) -> bool:
+    status = str(resource.get("status", STATUS_IMPLEMENTED)).strip() or STATUS_IMPLEMENTED
+    if status != STATUS_IMPLEMENTED:
+        return False
+    root_id = str(resource.get("root_id", "")).strip()
+    return not root_ids or not root_id or root_id in root_ids
+
+def _graph_root_ids(graph: GraphConfig | None) -> frozenset[str]:
+    if graph is None:
+        return frozenset()
+    root_ids: set[str] = set()
+    visited_nodesets: set[str] = set()
+
+    def collect(current: GraphConfig) -> None:
+        root_id = str(getattr(current, "root_id", "") or "").strip()
+        if root_id:
+            root_ids.add(root_id)
+        for node in current.nodes:
+            nodeset = current.nodesets.get(node.type_used)
+            if nodeset is None:
+                continue
+            nodeset_root_id = str(getattr(nodeset, "root_id", "") or "").strip()
+            if nodeset_root_id:
+                root_ids.add(nodeset_root_id)
+            if nodeset.type_key in visited_nodesets:
+                continue
+            visited_nodesets.add(nodeset.type_key)
+            collect(nodeset.graph)
+
+    collect(graph)
+    return frozenset(root_ids)
 
 def _mapping_items(value: object) -> tuple[Mapping[str, object], ...]:
     if not isinstance(value, list):

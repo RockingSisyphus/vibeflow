@@ -380,6 +380,69 @@ class Plugin:
     assert "base_lib.math_tools" in env.effective_policy.to_dict()["base_lib"]["allowed_modules"]
 
 
+def test_workspace_mermaid_hides_resources_from_unused_roots(tmp_path) -> None:
+    workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
+    _write_registry(project_root, [("test.start", "StartNode", {}, {}), ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}), ("test.in_end", "InEndNode", {}, {})])
+    _write_registry(framework_root, [])
+    framework_base = framework_root / "base_lib"
+    framework_base.mkdir()
+    (framework_base / "math_tools.py").write_text(
+        """
+from vibeflow import BaseLibInfo
+
+BASE_LIB_INFO = BaseLibInfo("base_lib.math_tools", "Framework Math", "math", "Unused workspace helper.", "0.1.0")
+""".strip(),
+        encoding="utf-8",
+    )
+    project_plugin = project_root / "runtime_plugin.py"
+    project_plugin.write_text(
+        """
+from vibeflow import PluginInfo
+
+PLUGIN_INFO = PluginInfo("project_runtime", "runtime", "Project Runtime", "runtime", "Project runtime plugin.", "0.1.0")
+
+class Plugin:
+    plugin_type = "runtime"
+    name = "project_runtime"
+""".strip(),
+        encoding="utf-8",
+    )
+    (framework_root / "vibeflow_project.jsonc").write_text(
+        json.dumps(
+            {
+                "registry": "registry.py:build_node_registry",
+                "quality_enabled": True,
+                "base_lib": {"paths": ["base_lib"], "modules": [{"module": "base_lib.math_tools", "display_name": "Framework Math", "description": "Unused workspace helper."}]},
+                "plugins": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (project_root / "vibeflow_project.jsonc").write_text(
+        json.dumps(
+            {
+                "registry": "registry.py:build_node_registry",
+                "quality_enabled": True,
+                "base_lib": {"paths": [], "modules": []},
+                "plugins": [{"module": "runtime_plugin.py", "class": "Plugin", "type": "runtime", "display_name": "Project Runtime", "description": "Project runtime plugin."}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    config_path = project_root / "configs" / "main.jsonc"
+    config_path.parent.mkdir()
+    config_path.write_text(json.dumps({"pipeline": _seed_only_pipeline()}), encoding="utf-8")
+
+    graph, compiled, _, resources, error = load_workspace_graph_for_export(config_path, workspace=load_workspace_config(workspace_path))
+
+    assert error is None
+    assert [item["root_id"] for item in resources.to_dict()["base_lib"]["modules"]] == ["vibetrain"]
+    mermaid = export_mermaid(graph, compiled=compiled, resources=resources)
+    assert "Project Runtime" in mermaid
+    assert "Framework Math" not in mermaid
+    assert "resource_base_lib" not in mermaid
+
+
 def test_cli_workspace_validate_and_quality_default_roots(tmp_path, capsys) -> None:
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
     _write_registry(

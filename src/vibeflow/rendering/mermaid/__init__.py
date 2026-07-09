@@ -24,6 +24,7 @@ from vibeflow.rendering.mermaid.labels import (
     _node_shape,
     _nodeset_node_ids,
     _resource_label,
+    _rendered_resources_payload,
     _resources_payload,
     _safe_id,
     _section_label,
@@ -164,7 +165,7 @@ class _MermaidRenderer:
         ]
         self._render_graph_body(lines, graph, compiled, prefix="", indent="  ", visited_nodesets=())
         self._render_edges(lines, graph, compiled, prefix="", indent="  ")
-        self._render_resources(lines, indent="  ")
+        self._render_resources(lines, graph=graph, indent="  ")
         if self.show_findings:
             self._render_findings(lines, graph, compiled, indent="  ")
         return "\n".join(lines) + "\n"
@@ -244,8 +245,8 @@ class _MermaidRenderer:
             indent = line[: len(line) - len(line.lstrip())]
             lines.append(f"{indent}linkStyle {edge_index} {style};")
 
-    def _render_resources(self, lines: list[str], *, indent: str) -> None:
-        payload = _resources_payload(self.resources)
+    def _render_resources(self, lines: list[str], *, graph: GraphConfig, indent: str) -> None:
+        payload = _rendered_resources_payload(self.resources, graph)
         if not payload:
             return
         base_lib = payload.get("base_lib", {})
