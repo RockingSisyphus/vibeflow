@@ -1,0 +1,170 @@
+name: Temporary VibeFlow paper fetch fast
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  fetch-papers-fast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download verified public PDFs in parallel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact/papers artifact/official_docs artifact/metadata
+          python - <<'PY'
+          from __future__ import annotations
+
+          import concurrent.futures
+          import csv
+          import hashlib
+          import json
+          import subprocess
+          import urllib.parse
+          from pathlib import Path
+          from typing import Any
+
+          ROOT = Path('artifact')
+          PAPERS = ROOT / 'papers'
+          DOCS = ROOT / 'official_docs'
+          META = ROOT / 'metadata'
+          USER_AGENT = 'Mozilla/5.0 VibeFlow-Paper-Fetch-Fast/1.0'
+
+          papers: list[dict[str, Any]] = [
+              {'id': 1, 'category': '核心相关论文', 'title': 'Competition-Level Code Generation with AlphaCode', 'year': 2022, 'venue': 'Science / arXiv', 'doi': '10.1126/science.abq1158', 'arxiv': '2203.07814', 'filename': '01_AlphaCode_2022.pdf', 'urls': ['https://arxiv.org/pdf/2203.07814.pdf', 'https://export.arxiv.org/pdf/2203.07814.pdf']},
+              {'id': 2, 'category': '核心相关论文', 'title': 'CodeT5+: Open Code Large Language Models for Code Understanding and Generation', 'year': 2023, 'venue': 'EMNLP 2023', 'doi': '10.18653/v1/2023.emnlp-main.68', 'filename': '02_CodeT5Plus_EMNLP2023.pdf', 'urls': ['https://aclanthology.org/2023.emnlp-main.68.pdf']},
+              {'id': 3, 'category': '核心相关论文', 'title': 'RepoCoder: Repository-Level Code Completion Through Iterative Retrieval and Generation', 'year': 2023, 'venue': 'EMNLP 2023', 'doi': '10.18653/v1/2023.emnlp-main.151', 'filename': '03_RepoCoder_EMNLP2023.pdf', 'urls': ['https://aclanthology.org/2023.emnlp-main.151.pdf']},
+              {'id': 4, 'category': '核心相关论文', 'title': 'Teaching Large Language Models to Self-Debug', 'year': 2024, 'venue': 'ICLR 2024', 'arxiv': '2304.05128', 'filename': '04_Self_Debug_ICLR2024.pdf', 'urls': ['https://arxiv.org/pdf/2304.05128.pdf', 'https://export.arxiv.org/pdf/2304.05128.pdf']},
+              {'id': 5, 'category': '核心相关论文', 'title': 'SWE-bench: Can Language Models Resolve Real-World GitHub Issues?', 'year': 2024, 'venue': 'ICLR 2024', 'arxiv': '2310.06770', 'filename': '05_SWE_bench_ICLR2024.pdf', 'urls': ['https://arxiv.org/pdf/2310.06770.pdf', 'https://export.arxiv.org/pdf/2310.06770.pdf']},
+              {'id': 6, 'category': '核心相关论文', 'title': 'SWE-agent: Agent-Computer Interfaces Enable Automated Software Engineering', 'year': 2024, 'venue': 'NeurIPS 2024', 'arxiv': '2405.15793', 'filename': '06_SWE_agent_NeurIPS2024.pdf', 'urls': ['https://arxiv.org/pdf/2405.15793.pdf', 'https://export.arxiv.org/pdf/2405.15793.pdf']},
+              {'id': 7, 'category': '核心相关论文', 'title': 'AutoCodeRover: Autonomous Program Improvement', 'year': 2024, 'venue': 'ISSTA 2024', 'doi': '10.1145/3650212.3680384', 'arxiv': '2404.05427', 'filename': '07_AutoCodeRover_ISSTA2024.pdf', 'urls': ['https://arxiv.org/pdf/2404.05427.pdf', 'https://export.arxiv.org/pdf/2404.05427.pdf']},
+              {'id': 8, 'category': '核心相关论文', 'title': 'Planning-Driven Programming: A Large Language Model Programming Workflow', 'year': 2025, 'venue': 'ACL 2025', 'doi': '10.18653/v1/2025.acl-long.621', 'arxiv': '2411.14503', 'filename': '08_Planning_Driven_Programming_ACL2025.pdf', 'urls': ['https://aclanthology.org/2025.acl-long.621.pdf', 'https://arxiv.org/pdf/2411.14503.pdf']},
+              {'id': 9, 'category': '核心相关论文', 'title': 'Flow2Code: Evaluating Large Language Models for Flowchart-based Code Generation Capability', 'year': 2025, 'venue': 'arXiv', 'arxiv': '2506.02073', 'filename': '09_Flow2Code_2025.pdf', 'urls': ['https://arxiv.org/pdf/2506.02073.pdf', 'https://export.arxiv.org/pdf/2506.02073.pdf']},
+              {'id': 10, 'category': '核心相关论文', 'title': 'Agentless: Demystifying LLM-based Software Engineering Agents', 'year': 2025, 'venue': 'FSE / PACMSE', 'doi': '10.1145/3715754', 'arxiv': '2407.01489', 'filename': '10_Agentless_FSE2025.pdf', 'urls': ['https://arxiv.org/pdf/2407.01489.pdf', 'https://export.arxiv.org/pdf/2407.01489.pdf']},
+              {'id': 11, 'category': '经典软件工程支撑文献', 'title': 'A Metrics Suite for Object-Oriented Design', 'year': 1994, 'venue': 'IEEE TSE', 'doi': '10.1109/32.295895', 'filename': '11_CK_Metrics_TSE1994.pdf', 'urls': []},
+              {'id': 12, 'category': '经典软件工程支撑文献', 'title': 'Software Reflexion Models: Bridging the Gap Between Source and High-Level Models', 'year': 1995, 'venue': 'FSE 1995', 'doi': '10.1145/222124.222136', 'filename': '12_Reflexion_Models_FSE1995.pdf', 'urls': []},
+              {'id': 13, 'category': '经典软件工程支撑文献', 'title': 'Software Reflexion Models: Bridging the Gap Between Design and Implementation', 'year': 2001, 'venue': 'IEEE TSE', 'doi': '10.1109/32.917525', 'filename': '13_Reflexion_Models_TSE2001.pdf', 'urls': []},
+              {'id': 14, 'category': '经典软件工程支撑文献', 'title': 'Flexible Architecture Conformance Assessment with ConQAT', 'year': 2010, 'venue': 'ICSE 2010', 'doi': '10.1145/1810295.1810343', 'filename': '14_ConQAT_ICSE2010.pdf', 'urls': ['https://www.cqse.eu/publications/2010-flexible-architecture-conformance-assessment-with-conqat.pdf']},
+              {'id': 15, 'category': '经典软件工程支撑文献', 'title': 'An Empirical Validation of Cognitive Complexity as a Measure of Source Code Understandability', 'year': 2020, 'venue': 'ESEM 2020', 'doi': '10.1145/3382494.3410636', 'arxiv': '2007.12520', 'filename': '15_Cognitive_Complexity_ESEM2020.pdf', 'urls': ['https://arxiv.org/pdf/2007.12520.pdf', 'https://export.arxiv.org/pdf/2007.12520.pdf']},
+              {'id': 16, 'category': '报告涉及的基准论文', 'title': 'RepoBench: Benchmarking Repository-Level Code Auto-Completion Systems', 'year': 2023, 'venue': 'arXiv', 'arxiv': '2306.03091', 'filename': '16_RepoBench_2023.pdf', 'urls': ['https://arxiv.org/pdf/2306.03091.pdf', 'https://export.arxiv.org/pdf/2306.03091.pdf']},
+              {'id': 17, 'category': '报告涉及的基准论文', 'title': 'Evaluating Large Language Models Trained on Code', 'year': 2021, 'venue': 'arXiv (HumanEval)', 'arxiv': '2107.03374', 'filename': '17_HumanEval_Codex_2021.pdf', 'urls': ['https://arxiv.org/pdf/2107.03374.pdf', 'https://export.arxiv.org/pdf/2107.03374.pdf']},
+              {'id': 18, 'category': '报告涉及的基准论文', 'title': 'Program Synthesis with Large Language Models', 'year': 2021, 'venue': 'arXiv (MBPP)', 'arxiv': '2108.07732', 'filename': '18_MBPP_2021.pdf', 'urls': ['https://arxiv.org/pdf/2108.07732.pdf', 'https://export.arxiv.org/pdf/2108.07732.pdf']},
+              {'id': 19, 'category': '报告涉及的基准论文', 'title': 'Training Software Engineering Agents and Verifiers with SWE-Gym', 'year': 2024, 'venue': 'arXiv', 'arxiv': '2412.21139', 'filename': '19_SWE_Gym_2024.pdf', 'urls': ['https://arxiv.org/pdf/2412.21139.pdf', 'https://export.arxiv.org/pdf/2412.21139.pdf']},
+              {'id': 20, 'category': '用户原始问题点名的相近基准', 'title': 'SWE-Lancer: Can Frontier LLMs Earn $1 Million from Real-World Freelance Software Engineering?', 'year': 2025, 'venue': 'arXiv', 'arxiv': '2502.12115', 'filename': '20_SWE_Lancer_2025.pdf', 'urls': ['https://arxiv.org/pdf/2502.12115.pdf', 'https://export.arxiv.org/pdf/2502.12115.pdf']},
+              {'id': 21, 'category': '用户原始问题点名的相近基准', 'title': 'DevEval: A Manually-Annotated Code Generation Benchmark Aligned with Real-World Code Repositories', 'year': 2024, 'venue': 'arXiv', 'arxiv': '2405.19856', 'filename': '21_DevEval_2024.pdf', 'urls': ['https://arxiv.org/pdf/2405.19856.pdf', 'https://export.arxiv.org/pdf/2405.19856.pdf']},
+              {'id': 22, 'category': '报告实验设计涉及的基准论文', 'title': 'Measuring Coding Challenge Competence With APPS', 'year': 2021, 'venue': 'NeurIPS 2021', 'arxiv': '2105.09938', 'filename': '22_APPS_NeurIPS2021.pdf', 'urls': ['https://arxiv.org/pdf/2105.09938.pdf', 'https://export.arxiv.org/pdf/2105.09938.pdf']},
+              {'id': 23, 'category': '报告实验设计涉及的基准论文', 'title': 'LiveCodeBench: Holistic and Contamination Free Evaluation of Large Language Models for Code', 'year': 2024, 'venue': 'arXiv', 'arxiv': '2403.07974', 'filename': '23_LiveCodeBench_2024.pdf', 'urls': ['https://arxiv.org/pdf/2403.07974.pdf', 'https://export.arxiv.org/pdf/2403.07974.pdf']},
+          ]
+
+          docs = [
+              ('SWE-bench_GitHub_README.md', 'https://raw.githubusercontent.com/SWE-bench/SWE-bench/main/README.md'),
+              ('SWE-bench_HuggingFace_Dataset_Card.md', 'https://huggingface.co/datasets/SWE-bench/SWE-bench/raw/main/README.md'),
+              ('RepoBench_GitHub_README.md', 'https://raw.githubusercontent.com/Leolty/repobench/main/README.md'),
+              ('HumanEval_GitHub_README.md', 'https://raw.githubusercontent.com/openai/human-eval/master/README.md'),
+              ('SWE-Lancer_GitHub_README.md', 'https://raw.githubusercontent.com/openai/SWELancer-Benchmark/main/README.md'),
+              ('Flow2Code_GitHub_README.md', 'https://raw.githubusercontent.com/hml-github/Flow2Code/main/README.md'),
+              ('SWE-agent_GitHub_README.md', 'https://raw.githubusercontent.com/SWE-agent/SWE-agent/main/README.md'),
+              ('fuck-u-code_GitHub_README.md', 'https://raw.githubusercontent.com/Done-0/fuck-u-code/main/README.md'),
+              ('Graphify_GitHub_README.md', 'https://raw.githubusercontent.com/Graphify-Labs/graphify/v8/README.md'),
+              ('SWE-bench_Verified_OpenAI.html', 'https://openai.com/index/introducing-swe-bench-verified/'),
+          ]
+
+          def curl_download(url: str, output: Path, timeout: int = 150) -> tuple[bool, str]:
+              command = [
+                  'curl', '-fL', '--retry', '2', '--retry-all-errors', '--retry-delay', '2',
+                  '--connect-timeout', '20', '--max-time', str(timeout), '-A', USER_AGENT,
+                  '-o', str(output), url,
+              ]
+              result = subprocess.run(command, text=True, capture_output=True)
+              return result.returncode == 0, (result.stderr or result.stdout)[-800:]
+
+          def valid_pdf(path: Path) -> bool:
+              return path.exists() and path.stat().st_size >= 4096 and path.read_bytes()[:5] == b'%PDF'
+
+          def fetch_paper(paper: dict[str, Any]) -> dict[str, Any]:
+              destination = PAPERS / paper['filename']
+              if not paper['urls']:
+                  return {**{k: v for k, v in paper.items() if k != 'urls'}, 'status': 'official_metadata_only', 'downloaded_from': '', 'size_bytes': 0, 'errors': []}
+              errors: list[str] = []
+              for url in paper['urls']:
+                  partial = destination.with_suffix('.pdf.part')
+                  ok, error = curl_download(url, partial)
+                  if ok and valid_pdf(partial):
+                      partial.replace(destination)
+                      return {**{k: v for k, v in paper.items() if k != 'urls'}, 'status': 'downloaded', 'downloaded_from': url, 'size_bytes': destination.stat().st_size, 'errors': errors}
+                  if partial.exists():
+                      partial.unlink()
+                  errors.append(f'{url}: {error or "invalid PDF"}')
+              return {**{k: v for k, v in paper.items() if k != 'urls'}, 'status': 'download_failed', 'downloaded_from': '', 'size_bytes': 0, 'errors': errors}
+
+          with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+              results = list(executor.map(fetch_paper, papers))
+          results.sort(key=lambda item: item['id'])
+
+          doc_results = []
+          with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+              futures = {executor.submit(curl_download, url, DOCS / filename, 120): (filename, url) for filename, url in docs}
+              for future in concurrent.futures.as_completed(futures):
+                  filename, url = futures[future]
+                  ok, error = future.result()
+                  path = DOCS / filename
+                  doc_results.append({'filename': filename, 'url': url, 'status': 'downloaded' if ok and path.exists() and path.stat().st_size else 'failed', 'size_bytes': path.stat().st_size if path.exists() else 0, 'error': error})
+          doc_results.sort(key=lambda item: item['filename'])
+
+          for paper in papers:
+              if paper.get('doi'):
+                  url = f"https://api.crossref.org/works/{urllib.parse.quote(paper['doi'], safe='')}"
+                  curl_download(url, META / f"{paper['id']:02d}_crossref.json", 90)
+              landing = f"https://doi.org/{paper['doi']}" if paper.get('doi') else f"https://arxiv.org/abs/{paper['arxiv']}"
+              curl_download(landing, DOCS / f"{paper['id']:02d}_official_landing.html", 90)
+
+          (META / 'papers_manifest.json').write_text(json.dumps(results, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          (META / 'official_docs_manifest.json').write_text(json.dumps(doc_results, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          with (META / 'papers_manifest.csv').open('w', encoding='utf-8-sig', newline='') as handle:
+              fields = ['id', 'category', 'title', 'year', 'venue', 'doi', 'arxiv', 'filename', 'status', 'size_bytes', 'downloaded_from']
+              writer = csv.DictWriter(handle, fieldnames=fields, extrasaction='ignore')
+              writer.writeheader()
+              writer.writerows(results)
+
+          checksum_lines = []
+          for path in sorted(ROOT.rglob('*')):
+              if path.is_file() and path.name != 'SHA256SUMS.txt':
+                  checksum_lines.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(ROOT).as_posix()}")
+          (ROOT / 'SHA256SUMS.txt').write_text('\n'.join(checksum_lines) + '\n', encoding='utf-8')
+
+          downloaded = [item for item in results if item['status'] == 'downloaded']
+          metadata_only = [item for item in results if item['status'] == 'official_metadata_only']
+          failed = [item for item in results if item['status'] == 'download_failed']
+          lines = [
+              '# VibeFlow 相关论文与官方资料包', '',
+              f'- 论文条目：{len(results)}',
+              f'- 已下载并验证 PDF：{len(downloaded)}',
+              f'- 仅正式元数据/页面：{len(metadata_only)}',
+              f'- 下载失败：{len(failed)}',
+              f'- 官方说明快照成功：{sum(1 for item in doc_results if item["status"] == "downloaded")}', '',
+              '## 仅正式元数据/页面', '',
+          ]
+          lines.extend([f"- {item['title']} — https://doi.org/{item['doi']}" for item in metadata_only])
+          lines.extend(['', '## 下载失败', ''])
+          lines.extend([f"- {item['title']}" for item in failed] or ['- 无。'])
+          lines.extend(['', 'PDF 仅从 arXiv、ACL Anthology、作者/机构公开保存稿等合法公开来源获取；每个 PDF 均检查 `%PDF` 文件头。', ''])
+          (ROOT / 'README_资料包说明.md').write_text('\n'.join(lines), encoding='utf-8')
+          print(json.dumps({'total': len(results), 'downloaded': len(downloaded), 'metadata_only': len(metadata_only), 'failed': len(failed)}, ensure_ascii=False))
+          PY
+          find artifact -maxdepth 3 -type f -print
+          du -sh artifact
+
+      - name: Upload fast paper corpus
+        uses: actions/upload-artifact@v4
+        with:
+          name: vibeflow-paper-corpus-fast
+          path: artifact
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 1
