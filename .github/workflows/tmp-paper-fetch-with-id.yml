@@ -1,0 +1,84 @@
+name: Temporary VibeFlow paper fetch with artifact id
+
+on:
+  push:
+    branches:
+      - tmp-paper-fetch-20260712
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-papers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the temporary branch
+        uses: actions/checkout@v4
+        with:
+          ref: tmp-paper-fetch-20260712
+
+      - name: Extract and run the downloader embedded in the first workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          workflow_path = Path('.github/workflows/tmp-paper-fetch.yml')
+          workflow_text = workflow_path.read_text(encoding='utf-8')
+          start_marker = "          python - <<'PY'\n"
+          end_marker = "\n          PY\n"
+          start = workflow_text.index(start_marker) + len(start_marker)
+          end = workflow_text.index(end_marker, start)
+          embedded = workflow_text[start:end]
+          script_lines = []
+          for line in embedded.splitlines():
+              script_lines.append(line[10:] if line.startswith('          ') else line)
+          script_path = Path('/tmp/vibeflow_paper_fetch.py')
+          script_path.write_text('\n'.join(script_lines) + '\n', encoding='utf-8')
+          print(f'Extracted downloader to {script_path}')
+          PY
+          python /tmp/vibeflow_paper_fetch.py
+          find artifact -maxdepth 3 -type f -print
+          du -sh artifact
+
+      - name: Upload paper corpus
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: vibeflow-paper-corpus-complete
+          path: artifact
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 1
+
+      - name: Record the artifact id on the temporary branch
+        shell: bash
+        env:
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              'run_id': int(os.environ['RUN_ID']),
+              'run_attempt': int(os.environ['RUN_ATTEMPT']),
+              'artifact_id': int(os.environ['ARTIFACT_ID']),
+              'artifact_url': os.environ['ARTIFACT_URL'],
+          }
+          target = Path('.github/tmp-paper-artifact-info.json')
+          target.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          print(target.read_text(encoding='utf-8'))
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/tmp-paper-artifact-info.json
+          git commit -m 'Record temporary paper artifact id'
+          git push origin HEAD:tmp-paper-fetch-20260712
