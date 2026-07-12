@@ -1,0 +1,115 @@
+name: Temporary VibeFlow PDF-only corpus
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  download-pdfs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download and validate public paper PDFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p corpus/papers corpus/metadata
+          python - <<'PY'
+          from __future__ import annotations
+
+          import concurrent.futures
+          import hashlib
+          import json
+          import subprocess
+          from pathlib import Path
+
+          root = Path('corpus')
+          papers_dir = root / 'papers'
+          user_agent = 'Mozilla/5.0 VibeFlow-PDF-Corpus/1.0'
+
+          items = [
+              (1, 'Competition-Level Code Generation with AlphaCode', '01_AlphaCode_2022.pdf', ['https://arxiv.org/pdf/2203.07814.pdf', 'https://export.arxiv.org/pdf/2203.07814.pdf']),
+              (2, 'CodeT5+: Open Code Large Language Models for Code Understanding and Generation', '02_CodeT5Plus_EMNLP2023.pdf', ['https://aclanthology.org/2023.emnlp-main.68.pdf']),
+              (3, 'RepoCoder: Repository-Level Code Completion Through Iterative Retrieval and Generation', '03_RepoCoder_EMNLP2023.pdf', ['https://aclanthology.org/2023.emnlp-main.151.pdf']),
+              (4, 'Teaching Large Language Models to Self-Debug', '04_Self_Debug_ICLR2024.pdf', ['https://arxiv.org/pdf/2304.05128.pdf', 'https://export.arxiv.org/pdf/2304.05128.pdf']),
+              (5, 'SWE-bench: Can Language Models Resolve Real-World GitHub Issues?', '05_SWE_bench_ICLR2024.pdf', ['https://arxiv.org/pdf/2310.06770.pdf', 'https://export.arxiv.org/pdf/2310.06770.pdf']),
+              (6, 'SWE-agent: Agent-Computer Interfaces Enable Automated Software Engineering', '06_SWE_agent_NeurIPS2024.pdf', ['https://arxiv.org/pdf/2405.15793.pdf', 'https://export.arxiv.org/pdf/2405.15793.pdf']),
+              (7, 'AutoCodeRover: Autonomous Program Improvement', '07_AutoCodeRover_ISSTA2024.pdf', ['https://arxiv.org/pdf/2404.05427.pdf', 'https://export.arxiv.org/pdf/2404.05427.pdf']),
+              (8, 'Planning-Driven Programming: A Large Language Model Programming Workflow', '08_Planning_Driven_Programming_ACL2025.pdf', ['https://aclanthology.org/2025.acl-long.621.pdf', 'https://arxiv.org/pdf/2411.14503.pdf']),
+              (9, 'Flow2Code: Evaluating Large Language Models for Flowchart-based Code Generation Capability', '09_Flow2Code_2025.pdf', ['https://arxiv.org/pdf/2506.02073.pdf', 'https://export.arxiv.org/pdf/2506.02073.pdf']),
+              (10, 'Agentless: Demystifying LLM-based Software Engineering Agents', '10_Agentless_FSE2025.pdf', ['https://arxiv.org/pdf/2407.01489.pdf', 'https://export.arxiv.org/pdf/2407.01489.pdf']),
+              (14, 'Flexible Architecture Conformance Assessment with ConQAT', '14_ConQAT_ICSE2010.pdf', ['https://www.cqse.eu/publications/2010-flexible-architecture-conformance-assessment-with-conqat.pdf']),
+              (15, 'An Empirical Validation of Cognitive Complexity as a Measure of Source Code Understandability', '15_Cognitive_Complexity_ESEM2020.pdf', ['https://arxiv.org/pdf/2007.12520.pdf', 'https://export.arxiv.org/pdf/2007.12520.pdf']),
+              (16, 'RepoBench: Benchmarking Repository-Level Code Auto-Completion Systems', '16_RepoBench_2023.pdf', ['https://arxiv.org/pdf/2306.03091.pdf', 'https://export.arxiv.org/pdf/2306.03091.pdf']),
+              (17, 'Evaluating Large Language Models Trained on Code', '17_HumanEval_Codex_2021.pdf', ['https://arxiv.org/pdf/2107.03374.pdf', 'https://export.arxiv.org/pdf/2107.03374.pdf']),
+              (18, 'Program Synthesis with Large Language Models', '18_MBPP_2021.pdf', ['https://arxiv.org/pdf/2108.07732.pdf', 'https://export.arxiv.org/pdf/2108.07732.pdf']),
+              (19, 'Training Software Engineering Agents and Verifiers with SWE-Gym', '19_SWE_Gym_2024.pdf', ['https://arxiv.org/pdf/2412.21139.pdf', 'https://export.arxiv.org/pdf/2412.21139.pdf']),
+              (20, 'SWE-Lancer: Can Frontier LLMs Earn $1 Million from Real-World Freelance Software Engineering?', '20_SWE_Lancer_2025.pdf', ['https://arxiv.org/pdf/2502.12115.pdf', 'https://export.arxiv.org/pdf/2502.12115.pdf']),
+              (21, 'DevEval: A Manually-Annotated Code Generation Benchmark Aligned with Real-World Code Repositories', '21_DevEval_2024.pdf', ['https://arxiv.org/pdf/2405.19856.pdf', 'https://export.arxiv.org/pdf/2405.19856.pdf']),
+              (22, 'Measuring Coding Challenge Competence With APPS', '22_APPS_NeurIPS2021.pdf', ['https://arxiv.org/pdf/2105.09938.pdf', 'https://export.arxiv.org/pdf/2105.09938.pdf']),
+              (23, 'LiveCodeBench: Holistic and Contamination Free Evaluation of Large Language Models for Code', '23_LiveCodeBench_2024.pdf', ['https://arxiv.org/pdf/2403.07974.pdf', 'https://export.arxiv.org/pdf/2403.07974.pdf']),
+          ]
+
+          def download(item):
+              paper_id, title, filename, urls = item
+              destination = papers_dir / filename
+              errors = []
+              for url in urls:
+                  partial = destination.with_suffix('.pdf.part')
+                  command = [
+                      'curl', '-fL', '--retry', '3', '--retry-all-errors', '--retry-delay', '2',
+                      '--connect-timeout', '20', '--max-time', '180', '-A', user_agent,
+                      '-o', str(partial), url,
+                  ]
+                  result = subprocess.run(command, text=True, capture_output=True)
+                  valid = partial.exists() and partial.stat().st_size >= 4096 and partial.read_bytes()[:4] == b'%PDF'
+                  if result.returncode == 0 and valid:
+                      partial.replace(destination)
+                      return {
+                          'id': paper_id,
+                          'title': title,
+                          'filename': filename,
+                          'status': 'downloaded',
+                          'size_bytes': destination.stat().st_size,
+                          'source_url': url,
+                          'sha256': hashlib.sha256(destination.read_bytes()).hexdigest(),
+                      }
+                  if partial.exists():
+                      first_bytes = partial.read_bytes()[:32].hex()
+                      partial.unlink()
+                  else:
+                      first_bytes = ''
+                  errors.append({'url': url, 'returncode': result.returncode, 'first_bytes_hex': first_bytes, 'stderr': (result.stderr or '')[-500:]})
+              return {'id': paper_id, 'title': title, 'filename': filename, 'status': 'failed', 'size_bytes': 0, 'errors': errors}
+
+          with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+              results = list(executor.map(download, items))
+          results.sort(key=lambda item: item['id'])
+          (root / 'metadata' / 'pdf_manifest.json').write_text(json.dumps(results, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          checksums = [f"{item['sha256']}  papers/{item['filename']}" for item in results if item['status'] == 'downloaded']
+          (root / 'SHA256SUMS.txt').write_text('\n'.join(checksums) + '\n', encoding='utf-8')
+          summary = {
+              'total_requested': len(results),
+              'downloaded': sum(item['status'] == 'downloaded' for item in results),
+              'failed': sum(item['status'] == 'failed' for item in results),
+          }
+          (root / 'metadata' / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(summary, ensure_ascii=False))
+          if summary['downloaded'] < 15:
+              raise SystemExit('Too many PDF downloads failed')
+          PY
+          find corpus/papers -type f -maxdepth 1 -exec file {} \;
+          du -sh corpus
+
+      - name: Upload PDF corpus
+        uses: actions/upload-artifact@v4
+        with:
+          name: vibeflow-pdf-only-corpus
+          path: corpus
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 1
