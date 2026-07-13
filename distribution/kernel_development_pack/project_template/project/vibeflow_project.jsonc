@@ -1,6 +1,10 @@
 {
   "registry": "registry.py:build_node_registry",
   "quality_enabled": true,
+  "runtime": {
+    "async_max_workers": 4,
+    "async_flush_timeout": null
+  },
   "quality": {
     "structure": {
       "enabled": true,
@@ -22,31 +26,5 @@
       ],
       "enforce_role_imports": true
     }
-  },
-  "base_lib": {
-    "paths": [
-      "base_lib"
-    ],
-    "modules": [
-      {
-        "module": "base_lib.math_tools",
-        "status": "implemented",
-        "display_name": "Math Tools",
-        "category": "demo",
-        "description": "Pure arithmetic helpers used by the template workflow.",
-        "version": "0.1.0"
-      }
-    ]
-  },
-  "plugins": [
-    {
-      "module": "plugins/policy.py",
-      "class": "PolicyPlugin",
-      "type": "policy",
-      "display_name": "Project Policy",
-      "category": "demo",
-      "description": "Template project policy extension for health checks.",
-      "version": "0.1.0"
-    }
-  ]
+  }
 }

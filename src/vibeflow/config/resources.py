@@ -24,13 +24,7 @@ class BaseLibInfo:
     version: str
 
     def to_dict(self) -> dict[str, object]:
-        return {
-            "module": self.module,
-            "display_name": self.display_name,
-            "category": self.category,
-            "description": self.description,
-            "version": self.version,
-        }
+        return {"module": self.module, "display_name": self.display_name, "category": self.category, "description": self.description, "version": self.version}
 
 
 @dataclass(frozen=True)
@@ -43,19 +37,13 @@ class PluginInfo:
     version: str
 
     def to_dict(self) -> dict[str, object]:
-        return {
-            "name": self.name,
-            "type": self.plugin_type,
-            "display_name": self.display_name,
-            "category": self.category,
-            "description": self.description,
-            "version": self.version,
-        }
+        return {"name": self.name, "type": self.plugin_type, "display_name": self.display_name, "category": self.category, "description": self.description, "version": self.version}
 
 
 @dataclass(frozen=True)
 class BaseLibResource:
     module: str
+    id: str = ""
     status: str = STATUS_IMPLEMENTED
     display_name: str = ""
     category: str = ""
@@ -68,6 +56,7 @@ class BaseLibResource:
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
+            "id": self.id,
             "module": self.module,
             "status": self.status,
             "display_name": self.display_name,
@@ -89,6 +78,7 @@ class BaseLibResource:
 @dataclass(frozen=True)
 class PluginResource:
     name: str
+    id: str = ""
     plugin_type: str = "policy"
     status: str = STATUS_IMPLEMENTED
     module: str = ""
@@ -105,6 +95,7 @@ class PluginResource:
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
+            "id": self.id,
             "name": self.name,
             "type": self.plugin_type,
             "status": self.status,
@@ -139,14 +130,10 @@ class ConfigResources:
         return tuple(item.module for item in self.base_libs if item.status == STATUS_IMPLEMENTED and item.module)
 
     def to_dict(self) -> dict[str, object]:
-        return {
-            "global_config": dict(self.global_config),
-            "base_lib": {
-                "paths": list(self.base_lib_paths),
-                "modules": [item.to_dict() for item in self.base_libs],
-            },
-            "plugins": [item.to_dict() for item in self.plugins],
-        }
+        return {"global_config": dict(self.global_config), "base_lib": {"paths": list(self.base_lib_paths), "modules": [item.to_dict() for item in self.base_libs]}, "plugins": [item.to_dict() for item in self.plugins]}
+
+
+from vibeflow.config.resource_registry_types import BaseLibRegistry, PluginResourceRegistry
 
 
 def load_config_resources(
@@ -154,11 +141,22 @@ def load_config_resources(
     *,
     base_path: Path,
     plugin_registry: object | None = None,
+    base_lib_registry: BaseLibRegistry | None = None,
+    plugin_resource_registry: PluginResourceRegistry | None = None,
+    base_lib_paths: tuple[str, ...] = (),
 ) -> tuple[ConfigResources, tuple[HealthFinding, ...]]:
     findings: list[HealthFinding] = []
     global_config = _global_config(config, findings)
-    base_lib_paths, base_libs = _base_lib_resources(config, base_path=base_path, findings=findings)
-    plugins = _plugin_resources(config, plugin_registry=plugin_registry, findings=findings)
+    base_lib_paths, base_libs = _base_lib_resources(
+        config,
+        base_path=base_path,
+        findings=findings,
+        base_lib_registry=base_lib_registry,
+        default_paths=base_lib_paths,
+    )
+    from vibeflow.config.plugin_resource_loader import plugin_resources
+
+    plugins = plugin_resources(config, plugin_registry=plugin_registry, plugin_resource_registry=plugin_resource_registry, findings=findings)
     return (
         ConfigResources(
             global_config=global_config,
@@ -184,7 +182,7 @@ def config_base_lib_policy(config: Mapping[str, Any], *, base_path: Path) -> dic
             status = str(item.get("status", STATUS_IMPLEMENTED)).strip() or STATUS_IMPLEMENTED
             if status != STATUS_IMPLEMENTED:
                 continue
-            module = str(item.get("module", item.get("name", ""))).strip()
+            module = str(item.get("module", item.get("name", item.get("id", "")))).strip()
             if module:
                 modules.append(module)
     return {
@@ -233,6 +231,8 @@ def _base_lib_resources(
     *,
     base_path: Path,
     findings: list[HealthFinding],
+    base_lib_registry: BaseLibRegistry | None,
+    default_paths: tuple[str, ...],
 ) -> tuple[tuple[str, ...], list[BaseLibResource]]:
     raw = config.get("base_lib")
     if raw in (None, {}):
@@ -240,7 +240,8 @@ def _base_lib_resources(
     if not isinstance(raw, Mapping):
         findings.append(_finding("CONFIG.SCHEMA.BASE_LIB", "base_lib must be an object", "base_lib", "base_lib"))
         return (), []
-    paths = tuple(_resolve_paths(_string_list(raw.get("paths", ())), base_path=base_path))
+    explicit_paths = tuple(_resolve_paths(_string_list(raw.get("paths", ())), base_path=base_path))
+    paths = explicit_paths or tuple(str(Path(path).resolve()) for path in default_paths) or (str(base_path.resolve()),)
     modules = raw.get("modules", ())
     if modules in (None, ()):
         return paths, []
@@ -251,9 +252,16 @@ def _base_lib_resources(
     resources: list[BaseLibResource] = []
     for index, item in enumerate(modules):
         prefix = f"base_lib.modules[{index}]"
+        registered = _registered_base_lib_resource(item, registry=base_lib_registry, prefix=prefix, findings=findings)
+        if registered is not None:
+            info = _load_base_lib_info(registered.module, paths=paths, findings=findings, object_id=prefix)
+            resources.append(replace(registered, status=STATUS_IMPLEMENTED, info=info))
+            continue
         spec = _base_lib_spec(item, prefix=prefix, findings=findings)
         if spec is None:
             continue
+        if base_lib_registry is not None:
+            _append_legacy_resource_warning(prefix, "base_lib", findings)
         module, status, metadata = spec
         _append_missing_resource_metadata_warnings(metadata, prefix, "base_lib", findings)
         info = None
@@ -261,6 +269,7 @@ def _base_lib_resources(
             info = _load_base_lib_info(module, paths=paths, findings=findings, object_id=prefix)
         resources.append(
             BaseLibResource(
+                id=str(item.get("id", "")).strip() if isinstance(item, Mapping) else "",
                 module=module,
                 status=status,
                 display_name=metadata["display_name"],
@@ -294,6 +303,42 @@ def _base_lib_spec(item: object, *, prefix: str, findings: list[HealthFinding]) 
     return module, status, _resource_metadata(item)
 
 
+def _registered_base_lib_resource(
+    item: object,
+    *,
+    registry: BaseLibRegistry | None,
+    prefix: str,
+    findings: list[HealthFinding],
+) -> BaseLibResource | None:
+    if registry is None:
+        return None
+    resource_id = ""
+    if isinstance(item, str):
+        resource_id = item.strip()
+    elif isinstance(item, Mapping) and "id" in item and "module" not in item and "name" not in item:
+        resource_id = str(item.get("id", "")).strip()
+    if not resource_id:
+        return None
+    registered = registry.get(resource_id)
+    if registered is None:
+        findings.append(_finding("CONFIG.RESOURCE.UNKNOWN_BASE_LIB", f"unknown base_lib resource id: {resource_id}", prefix, "base_lib"))
+        return None
+    return _overlay_base_lib_metadata(registered, item)
+
+
+def _overlay_base_lib_metadata(resource: BaseLibResource, item: object) -> BaseLibResource:
+    if not isinstance(item, Mapping):
+        return resource
+    metadata = _resource_metadata(item)
+    return replace(
+        resource,
+        display_name=metadata["display_name"] or resource.display_name,
+        category=metadata["category"] or resource.category,
+        description=metadata["description"] or resource.description,
+        version=metadata["version"] or resource.version,
+    )
+
+
 def _load_base_lib_info(
     module_name: str,
     *,
@@ -316,80 +361,6 @@ def _load_base_lib_info(
     except ValueError as exc:
         findings.append(_finding("BASE_LIB.INFO.INVALID", str(exc), object_id, "base_lib"))
         return None
-
-
-def _plugin_resources(
-    config: Mapping[str, Any],
-    *,
-    plugin_registry: object | None,
-    findings: list[HealthFinding],
-) -> list[PluginResource]:
-    raw = config.get("plugins", [])
-    if raw in (None, []):
-        return []
-    if not isinstance(raw, list):
-        findings.append(_finding("CONFIG.SCHEMA.PLUGINS_LIST", "plugins must be a list", "plugins", "plugin"))
-        return []
-
-    registry_resources = {}
-    if plugin_registry is not None and callable(getattr(plugin_registry, "resource_map", None)):
-        registry_resources = plugin_registry.resource_map()
-
-    resources: list[PluginResource] = []
-    for index, item in enumerate(raw):
-        prefix = f"plugins[{index}]"
-        if isinstance(item, str):
-            spec: dict[str, object] = {"module": item}
-        elif isinstance(item, Mapping):
-            spec = {str(key): value for key, value in item.items()}
-        else:
-            continue
-        if spec.get("enabled", True) is False:
-            continue
-        status = str(spec.get("status", STATUS_IMPLEMENTED)).strip() or STATUS_IMPLEMENTED
-        if status not in STATUSES:
-            status = STATUS_IMPLEMENTED
-        module = str(spec.get("module", spec.get("path", ""))).strip()
-        class_name = str(spec.get("class", spec.get("factory", "Plugin"))).strip() or "Plugin"
-        plugin_type = str(spec.get("type", "policy")).strip() or "policy"
-        try:
-            config_keys = tuple(sorted(normalize_plugin_config(spec).keys())) if isinstance(spec, Mapping) else ()
-        except ValueError as exc:
-            findings.append(_finding("CONFIG.SCHEMA.PLUGIN_CONFIG", str(exc), f"{prefix}.config", "plugin"))
-            config_keys = ()
-        registered = registry_resources.get((module, class_name, plugin_type))
-        if registered is not None:
-            metadata = _resource_metadata(spec)
-            _append_missing_resource_metadata_warnings(metadata, prefix, "plugin", findings)
-            resources.append(
-                replace(
-                    registered,
-                    display_name=metadata["display_name"],
-                    category=metadata["category"],
-                    description=metadata["description"],
-                    version=metadata["version"],
-                    config_keys=config_keys or registered.config_keys,
-                )
-            )
-            continue
-        name = str(spec.get("name", "")).strip() or module or class_name
-        metadata = _resource_metadata(spec)
-        _append_missing_resource_metadata_warnings(metadata, prefix, "plugin", findings)
-        resources.append(
-            PluginResource(
-                name=name,
-                plugin_type=plugin_type,
-                status=status,
-                module=module,
-                class_name=class_name,
-                display_name=metadata["display_name"],
-                category=metadata["category"],
-                description=metadata["description"],
-                version=metadata["version"],
-                config_keys=config_keys,
-            )
-        )
-    return resources
 
 
 def _empty_resource_metadata() -> dict[str, str]:
@@ -430,6 +401,22 @@ def _append_missing_resource_metadata_warnings(
                 details={"field": field, "resource_kind": label},
             )
         )
+
+
+def _append_legacy_resource_warning(object_id: str, resource_kind: str, findings: list[HealthFinding]) -> None:
+    label = "plugin" if resource_kind == "plugin" else "base_lib"
+    findings.append(
+        HealthFinding(
+            rule_id="CONFIG.SMELL.LEGACY_INLINE_RESOURCE",
+            severity="warning",
+            object_type=label,
+            object_id=object_id,
+            failure_layer=resource_kind,
+            message=f"inline {label} declarations are legacy in registry-backed configs; use an id registered in project/registry.py",
+            suggested_fix_type="fix_config",
+            details={"resource_kind": label},
+        )
+    )
 
 
 def _normalize_base_lib_info(raw: object, *, fallback_module: str) -> BaseLibInfo:

@@ -6,6 +6,7 @@ from typing import Any, Mapping, Sequence
 from vibeflow.data_contract import CARDINALITY_EXACTLY_ONE, CARDINALITY_OPTIONAL_ONE, provider_keys
 from vibeflow.graph_config import JOIN_POLICY_ALL, STATUS_PLANNED
 from vibeflow.health.flow_data import _append_nodeset_flow_health, _data_finding, _incoming_sources_providing_type, append_data_contract_warnings
+from vibeflow.health.join_exclusivity import append_all_join_mutual_exclusion_finding
 from vibeflow.health.types import HealthFinding
 from vibeflow.node import FLOW_KIND_DECISION, FLOW_KIND_TERMINAL
 from vibeflow.graph_config.planned_behavior import PLANNED_BEHAVIOR_PYTHON_STUB, PLANNED_BEHAVIOR_TRANSPARENT, effective_planned_behavior
@@ -150,11 +151,34 @@ def _append_orphan_findings(
 
 def append_join_policy_health(graph, compiled, state, *, owner: str = "pipeline") -> None:
     nodes_by_name = {node.name: node for node in graph.nodes}
+    schedule_edges = tuple(getattr(compiled, "schedule_edges", ()) or compiled.effective_edges)
+    transfer_edges = tuple(getattr(compiled, "transfer_edges", ()) or compiled.effective_edges)
     incoming_edges: dict[str, list[object]] = {node.name: [] for node in graph.nodes}
-    for edge in getattr(compiled, "schedule_edges", ()) or compiled.effective_edges:
+    transfer_incoming: dict[str, list[object]] = {node.name: [] for node in graph.nodes}
+    for edge in schedule_edges:
         incoming_edges.setdefault(edge.target, []).append(edge)
+    for edge in transfer_edges:
+        transfer_incoming.setdefault(edge.target, []).append(edge)
     for node in graph.nodes:
         if node.join_policy == JOIN_POLICY_ALL:
+            _append_all_join_edge_class_findings(
+                node,
+                incoming_edges.get(node.name, ()),
+                transfer_incoming.get(node.name, ()),
+                nodes_by_name,
+                state,
+                owner=owner,
+            )
+            append_all_join_mutual_exclusion_finding(
+                node,
+                incoming_edges.get(node.name, ()),
+                transfer_incoming.get(node.name, ()),
+                schedule_edges,
+                nodes_by_name,
+                getattr(compiled, "flow_kinds", {}),
+                state,
+                owner=owner,
+            )
             continue
         edges = incoming_edges.get(node.name, [])
         if not edges or not any(edge.when for edge in edges) or not any(not edge.when for edge in edges):
@@ -181,6 +205,65 @@ def append_join_policy_health(graph, compiled, state, *, owner: str = "pipeline"
                     },
                 )
             )
+
+
+def _append_all_join_edge_class_findings(node, schedule_incoming, transfer_incoming, nodes_by_name, state, *, owner: str) -> None:
+    schedule_pairs = {edge.pair for edge in schedule_incoming}
+    transfer_only = [edge for edge in transfer_incoming if edge.pair not in schedule_pairs]
+    schedule_details = [_edge_summary(edge) for edge in schedule_incoming]
+    transfer_details = [_edge_summary(edge) for edge in transfer_incoming]
+    provider_details = [
+        {
+            "node": source.name,
+            "provides": [{"key": item.key, "type": item.type} for item in source.provides],
+        }
+        for source in (nodes_by_name.get(edge.source) for edge in transfer_incoming)
+        if source is not None
+    ]
+    base_details = {
+        "owner": owner,
+        "node": node.name,
+        "join_policy": node.join_policy,
+        "required_types": sorted({requirement.type for requirement in node.requires}),
+        "schedule_incoming": schedule_details,
+        "transfer_incoming": transfer_details,
+        "transfer_only_incoming": [_edge_summary(edge) for edge in transfer_only],
+        "candidate_providers": provider_details,
+    }
+    if len(schedule_incoming) < 2 and transfer_only:
+        state.errors.append(
+            _data_finding(
+                "GRAPH.JOIN.ALL_DEPENDS_ON_TRANSFER_ONLY",
+                node.name,
+                (
+                    f"node '{node.name}' declares join_policy='all', but only {len(schedule_incoming)} "
+                    "incoming edge participates in scheduling; transfer-only edges never activate the join"
+                ),
+                node=node.name,
+                severity="error",
+                details={
+                    **base_details,
+                    "suggestion": (
+                        "Keep join_policy='all' only for at least two real parallel schedule branches. "
+                        "For a sequential chain, remove 'all' and keep payload shortcuts as valid data-bypass edges."
+                    ),
+                },
+            )
+        )
+        return
+    if len(schedule_incoming) == 1:
+        state.warnings.append(
+            _data_finding(
+                "GRAPH.JOIN.REDUNDANT_ALL",
+                node.name,
+                f"node '{node.name}' has join_policy='all' but only one scheduling predecessor",
+                node=node.name,
+                details={
+                    **base_details,
+                    "suggestion": "Remove join_policy='all'; the default safe_any join is sufficient for one schedule incoming edge.",
+                },
+            )
+        )
 
 
 def _append_decision_branch_health(graph, compiled, state, flow: _DecisionFlow, *, owner: str) -> None:

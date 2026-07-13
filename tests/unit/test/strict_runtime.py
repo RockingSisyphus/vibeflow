@@ -1,3 +1,5 @@
+import threading
+
 from tests.unit.strict_support import *
 
 
@@ -1278,6 +1280,70 @@ def test_runtime_options_rejects_unknown_execution() -> None:
         RuntimeOptions(execution="native")
 
 
+@pytest.mark.parametrize("value", [0, -1, True, 1.5, "4"])
+def test_runtime_options_rejects_invalid_async_max_workers(value) -> None:
+    with pytest.raises(ValueError, match="async_max_workers"):
+        RuntimeOptions(async_max_workers=value)
+
+
+def test_async_executor_defaults_to_four_workers() -> None:
+    graph = parse_graph_config({"pipeline": _seed_add_pipeline()})
+    runtime = PipelineRuntime(graph, registry=_registry())
+
+    try:
+        assert runtime._executor_for_async()._max_workers == 4
+    finally:
+        runtime._shutdown_executor()
+
+
+def test_async_executor_can_run_six_tasks_concurrently() -> None:
+    graph = parse_graph_config({"pipeline": _seed_add_pipeline()})
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(async_max_workers=6))
+    barrier = threading.Barrier(7)
+
+    def task() -> str:
+        barrier.wait(timeout=2)
+        return threading.current_thread().name
+
+    try:
+        executor = runtime._executor_for_async()
+        futures = [executor.submit(task) for _ in range(6)]
+        barrier.wait(timeout=2)
+        assert len({future.result(timeout=2) for future in futures}) == 6
+    finally:
+        runtime._shutdown_executor()
+
+
+def test_async_executor_queues_tasks_beyond_worker_limit() -> None:
+    graph = parse_graph_config({"pipeline": _seed_add_pipeline()})
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(async_max_workers=2))
+    blockers_ready = threading.Barrier(3)
+    release = threading.Event()
+    queued_started = threading.Event()
+
+    def blocker() -> str:
+        blockers_ready.wait(timeout=2)
+        release.wait(timeout=2)
+        return "blocker"
+
+    def queued() -> str:
+        queued_started.set()
+        return "queued"
+
+    try:
+        executor = runtime._executor_for_async()
+        blockers = [executor.submit(blocker) for _ in range(2)]
+        blockers_ready.wait(timeout=2)
+        queued_future = executor.submit(queued)
+        assert not queued_started.wait(timeout=0.05)
+        release.set()
+        assert [future.result(timeout=2) for future in blockers] == ["blocker", "blocker"]
+        assert queued_future.result(timeout=2) == "queued"
+    finally:
+        release.set()
+        runtime._shutdown_executor()
+
+
 def test_async_result_key_joins_when_required() -> None:
     graph = parse_graph_config(
         {
@@ -1799,8 +1865,8 @@ def test_cli_train_profile_sets_async_flush_timeout_and_allows_override() -> Non
     train_options = _runtime_options_from_args(parser.parse_args(["--runtime-profile", "train"]))
     override_options = _runtime_options_from_args(parser.parse_args(["--runtime-profile", "train", "--async-flush-timeout", "1.5"]))
 
-    assert train_options.async_flush_timeout == 30.0
-    assert override_options.async_flush_timeout == 1.5
+    assert train_options["async_flush_timeout"] == 30.0
+    assert override_options["async_flush_timeout"] == 1.5
 
 
 def test_cli_run_uses_checked_run_and_refuses_without_registered_nodes(tmp_path, capsys) -> None:
@@ -1919,6 +1985,44 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     manifest = (output / "kernel" / "MANIFEST.sha256").read_text(encoding="utf-8")
     manifest_paths = {line.split("  ", 1)[1] for line in manifest.splitlines() if line.strip()}
 
+    generic_context_example = 'result.context.get("value.out")["value"]'
+    template_context_example = 'result.context.get("response.value")["value"]'
+    scalar_summary_marker = '"scalar": true'
+    repository_root = Path(__file__).resolve().parents[3]
+    source_guides = [
+        repository_root / "distribution" / "kernel_development_pack" / "project_template" / "README.md",
+        repository_root / "distribution" / "kernel_development_pack" / "project_template" / "AGENTS.md",
+        repository_root / "distribution" / "kernel_development_pack" / "docs" / "07_启动命令与报告.md",
+        repository_root / "docs" / "developer_guide.md",
+    ]
+    generated_guides = [
+        output / "AGENTS.md",
+        output / "kernel" / "docs" / "07_启动命令与报告.md",
+        output / "kernel" / "docs" / "10_Kernel能力与项目开发指南.md",
+    ]
+    for guide in [*source_guides, *generated_guides]:
+        text = guide.read_text(encoding="utf-8")
+        expected_context = (
+            template_context_example
+            if guide.name in {"README.md", "AGENTS.md"}
+            else generic_context_example
+        )
+        assert expected_context in text
+        assert scalar_summary_marker in text
+
+    template_config = json.loads(
+        (output / "project" / "configs" / "main.jsonc").read_text(encoding="utf-8")
+    )
+    template_nodes = {
+        node["id"]: node for node in template_config["pipeline"]["nodes"]
+    }
+    assert template_nodes["end"].get("requires") in (None, [])
+    assert template_nodes["end"].get("provides") in (None, [])
+    assert template_nodes["output"]["type_used"] == "demo.output"
+    assert template_nodes["output"]["requires"][0]["type"] == "semantic.value"
+    assert template_nodes["output"]["provides"][0]["type"] == "response.value"
+    assert template_config["pipeline"]["outputs"][0]["type"] == "response.value"
+
     assert not (output / "docs").exists()
     assert not (output / "tools").exists()
     assert not (output / "THIRD_PARTY_NOTICES.md").exists()
@@ -1949,6 +2053,7 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     result = verify(output)
     assert result.returncode == 0, result.stderr
 
+
     docs_failure = tmp_path / "distribution_docs_failure"
     build_distribution(docs_failure, run_self_check=False)
     docs_path = docs_failure / "kernel" / "docs" / "00_内核目的与项目结构.md"
@@ -1976,6 +2081,59 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     assert result.returncode == 2
     assert "Unexpected:" in result.stderr
     assert "kernel/vibeflow/unpacked.py" in result.stderr
+
+
+def test_distribution_build_honors_source_date_epoch(tmp_path, monkeypatch) -> None:
+    from build_distribution import build_distribution
+
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "1783784063")
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    build_distribution(first, run_self_check=False)
+    build_distribution(second, run_self_check=False)
+
+    first_files = {
+        path.relative_to(first): path.read_bytes()
+        for path in first.rglob("*")
+        if path.is_file()
+    }
+    second_files = {
+        path.relative_to(second): path.read_bytes()
+        for path in second.rglob("*")
+        if path.is_file()
+    }
+    assert first_files == second_files
+    assert "生成时间：2026-07-11 15:34:23 UTC" in (first / "README.md").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_distribution_build_normalizes_portable_modes_deterministically(tmp_path) -> None:
+    import stat
+
+    from build_distribution import build_distribution
+
+    def modes(root: Path) -> dict[Path, int]:
+        entries = [root, *root.rglob("*")]
+        assert not any(path.is_symlink() for path in entries)
+        assert all(path.is_dir() or path.is_file() for path in entries)
+        return {
+            path.relative_to(root): stat.S_IMODE(path.stat().st_mode)
+            for path in entries
+        }
+
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    build_distribution(first, run_self_check=False)
+    build_distribution(second, run_self_check=False)
+
+    first_modes = modes(first)
+    second_modes = modes(second)
+    assert first_modes == second_modes
+    assert all(
+        mode == (0o755 if (first / relative).is_dir() else 0o644)
+        for relative, mode in first_modes.items()
+    )
 
 
 def test_distribution_build_runs_core_self_check_before_writing(tmp_path, monkeypatch) -> None:

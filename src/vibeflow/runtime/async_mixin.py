@@ -32,7 +32,7 @@ class RuntimeAsyncMixin:
 
     def _executor_for_async(self) -> ThreadPoolExecutor:
         if self._executor is None:
-            self._executor = ThreadPoolExecutor(max_workers=4)
+            self._executor = ThreadPoolExecutor(max_workers=self.runtime_options.async_max_workers)
         return self._executor
 
     def _join_async_incoming(self, node_name: str, state: _RuntimeState) -> None:

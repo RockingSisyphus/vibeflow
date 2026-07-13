@@ -20,6 +20,10 @@ This directory contains current user documentation, maintainer documentation, an
 
 - `kernel_development_guide.md`: checks and workflow for maintaining VibeFlow itself.
 
+## Research References
+
+- `14_AI辅助软件开发架构护栏参考论文.md`: 2024–2026 literature on coding-agent maintainability, architecture erosion, executable specifications, software-architecture benchmarks, and structural guardrails relevant to VibeFlow.
+
 ## Design Records And Historical Notes
 
 - `strict_flowchart_kernel_redesign.md`: design record for the strict flowchart redesign.

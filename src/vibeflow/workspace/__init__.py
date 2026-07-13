@@ -7,12 +7,15 @@ from typing import Any, Mapping
 from vibeflow.cli.reports import config_load_error_report, dedupe_findings, fail_report
 from vibeflow.compiler import GraphCompiler, GraphCompileError
 from vibeflow.config.loader import ConfigLoadError, load_workspace_config_document
-from vibeflow.config.resources import ConfigResources, load_config_resources
+from vibeflow.config.resources import ConfigResources, config_base_lib_policy, load_config_resources
 from vibeflow.config.schema import collect_config_schema_findings
 from vibeflow.graph_config import GraphConfigError, parse_graph_config
 from vibeflow.health.types import HealthFinding, HealthReport
 from vibeflow.policy import EffectivePolicy, default_effective_policy
+from vibeflow.plugin import load_plugins_from_config
+from vibeflow.workspace.policy import resolve_workspace_effective_policy
 from vibeflow.runner import CheckedRunError, CheckedRunResult
+from vibeflow.runtime.options import RuntimeOptions, runtime_options as normalize_runtime_options
 from vibeflow.runtime.summaries import summarize_mapping
 from vibeflow.workspace.core import (
     annotate_findings,
@@ -41,8 +44,31 @@ def validate_workspace_config_path(path: Path, *, workspace: WorkspaceConfig) ->
     prepared = _prepare_workspace_graph(path, workspace=workspace, env=env)
     if isinstance(prepared, HealthReport):
         return prepared
-    document, graph, compiled, resources, warnings = prepared
-    return _validate_prepared_workspace_graph(document, graph, compiled, resources, warnings, env=env, workspace=workspace)
+    document, graph, compiled, resources, plugin_registry, effective_policy, warnings = prepared
+    return _validate_prepared_workspace_graph(document, graph, compiled, resources, plugin_registry, effective_policy, warnings, env=env, workspace=workspace)
+
+
+def _workspace_runtime_options(
+    config_path: str | Path,
+    *,
+    workspace: WorkspaceConfig,
+    overrides: object | None = None,
+) -> RuntimeOptions:
+    root = workspace.root_for_path(config_path)
+    if root is None:
+        raise WorkspaceConfigError(
+            "WORKSPACE.CONFIG.OUTSIDE_ROOT",
+            f"config is not under any workspace root: {Path(config_path).resolve()}",
+            {"path": str(Path(config_path).resolve())},
+        )
+    if isinstance(overrides, RuntimeOptions):
+        return overrides
+    values = dict(root.runtime_options)
+    if overrides is not None:
+        if not isinstance(overrides, Mapping):
+            return normalize_runtime_options(overrides)
+        values.update(dict(overrides))
+    return normalize_runtime_options(values)
 
 
 def run_workspace_checked(
@@ -78,15 +104,16 @@ def run_workspace_checked(
     if isinstance(prepared, HealthReport):
         _write_refused_artifacts(run_dir, prepared, include_effective_policy=True)
         raise CheckedRunError(f"run refused: health status {prepared.status}", CheckedRunResult(actual_run_id, run_dir, prepared))
-    document, graph, compiled, resources, warnings = prepared
-    _write_json(run_dir / "effective_policy.json", env.effective_policy.to_dict())
-    health = _validate_prepared_workspace_graph(document, graph, compiled, resources, warnings, env=env, workspace=workspace)
-    _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=env.registry, resources=resources, runtime_options=runtime_options)
+    effective_runtime_options = _workspace_runtime_options(config_path, workspace=workspace, overrides=runtime_options)
+    document, graph, compiled, resources, plugin_registry, effective_policy, warnings = prepared
+    _write_json(run_dir / "effective_policy.json", effective_policy.to_dict())
+    health = _validate_prepared_workspace_graph(document, graph, compiled, resources, plugin_registry, effective_policy, warnings, env=env, workspace=workspace)
+    _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=env.registry, resources=resources, runtime_options=effective_runtime_options)
     if health.status not in {"FAIL", "ERROR"}:
-        compiled = _compile_with_registry_or_refuse(graph, env.registry, env.effective_policy.to_dict(), run_dir, actual_run_id)
+        compiled = _compile_with_registry_or_refuse(graph, env.registry, effective_policy.to_dict(), run_dir, actual_run_id)
     _write_preflight_artifacts(run_dir, graph, compiled, health, registry=env.registry, resources=resources)
     _refuse_on_health_failure(health, run_dir, actual_run_id)
-    context = _execute_runtime(graph, env.registry, env.plugin_registry, initial, run_dir, runtime_options, resources)
+    context = _execute_runtime(graph, env.registry, plugin_registry, initial, run_dir, effective_runtime_options, resources)
     _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
     return CheckedRunResult(actual_run_id, run_dir, health, context)
 
@@ -102,7 +129,7 @@ def load_workspace_graph_for_export(
     prepared = _prepare_workspace_graph(path, workspace=workspace, env=env)
     if isinstance(prepared, HealthReport):
         return None, None, None, ConfigResources(), prepared
-    _, graph, compiled, resources, _ = prepared
+    _, graph, compiled, resources, _, _, _ = prepared
     return graph, compiled, env.registry, resources, None
 
 
@@ -120,6 +147,8 @@ def _validate_prepared_workspace_graph(
     graph,
     compiled,
     resources: ConfigResources,
+    plugin_registry,
+    effective_policy: EffectivePolicy,
     warnings: tuple[HealthFinding, ...],
     *,
     env: WorkspaceEnvironment,
@@ -130,14 +159,16 @@ def _validate_prepared_workspace_graph(
     health = validate_graph_health(
         graph,
         registry=env.registry,
-        plugin_registry=env.plugin_registry,
+        plugin_registry=plugin_registry,
         global_config=resources.global_config,
-        purity_policy=env.effective_policy.to_purity_policy(),
-        effective_policy=env.effective_policy,
+        purity_policy=effective_policy.to_purity_policy(),
+        effective_policy=effective_policy,
     )
     info = dict(health.info)
     info["nodeset_imports"] = [dict(item) for item in document.nodeset_imports]
     info["resources"] = resources.to_dict()
+    info["effective_resources"] = resources.to_dict()
+    info["available_resources"] = env.available_resources.to_dict()
     info["workspace"] = _workspace_info(workspace)
     info["explicit_edges"] = [edge.pair for edge in compiled.explicit_edges]
     info["data_edges"] = [edge.pair for edge in compiled.data_edges]
@@ -147,7 +178,7 @@ def _validate_prepared_workspace_graph(
         status="CONCERNS" if health.status == "PASS" and warnings else health.status,
         warnings=(*warnings, *health.warnings),
         info=info,
-        effective_policy=env.effective_policy.to_dict(),
+        effective_policy=effective_policy.to_dict(),
     )
     return annotate_health_report(report, graph, workspace=workspace)
 
@@ -162,27 +193,64 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
     except ConfigLoadError as exc:
         return config_load_error_report(exc, object_type="config", object_id=str(config_path))
     preflight_findings = [*_forbidden_config_findings(document.data, root=root, source_path=config_path), *annotate_findings(env.findings, root=root, source_path=config_path)]
-    config_resources, global_findings = load_config_resources(
-        {"global_config": document.data.get("global_config", {})},
-        base_path=config_path.parent,
-        plugin_registry=env.plugin_registry,
+    root_registries = env.resource_registries.get(root.id)
+    plugin_registry, plugin_findings = load_plugins_from_config(
+        document.data,
+        base_path=root.path,
+        root_id=root.id,
+        root_path=str(root.path),
+        source_path=str(config_path),
+        plugin_resource_registry=root_registries.plugins if root_registries and root_registries.has_plugin_registry else None,
     )
-    preflight_findings.extend(annotate_findings(global_findings, root=root, source_path=config_path))
-    resources = replace(env.resources, global_config=config_resources.global_config)
+    preflight_findings.extend(annotate_findings(plugin_findings, root=root, source_path=config_path))
+    resources, resource_findings = load_config_resources(
+        document.data,
+        base_path=root.path,
+        plugin_registry=plugin_registry,
+        base_lib_registry=root_registries.base_libs if root_registries and root_registries.has_base_lib_registry else None,
+        plugin_resource_registry=root_registries.plugins if root_registries and root_registries.has_plugin_registry else None,
+        base_lib_paths=root_registries.base_lib_paths if root_registries else (str(root.path),),
+    )
+    resources = replace(
+        resources,
+        base_libs=_with_effective_resource_source(resources.base_libs, root=root, source_path=config_path),
+        plugins=_with_effective_resource_source(resources.plugins, root=root, source_path=config_path),
+    )
+    preflight_findings.extend(annotate_findings(resource_findings, root=root, source_path=config_path))
+    policy_result = resolve_workspace_effective_policy(
+        workspace.policy,
+        workspace_path=workspace.path,
+        base_lib_policies=(config_base_lib_policy(resources.to_dict(), base_path=root.path),),
+        plugin_registry=plugin_registry,
+    )
+    preflight_findings.extend(annotate_findings(policy_result.findings, root=root, source_path=config_path))
+    effective_policy = policy_result.effective_policy
     schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *preflight_findings))
     errors = tuple(finding for finding in schema_findings if finding.severity == "error")
     warnings = tuple(finding for finding in schema_findings if finding.severity == "warning")
     if errors:
         status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin", "base_lib", "workspace"} for finding in errors) else "FAIL"
-        return HealthReport(status=status, errors=errors, warnings=warnings, effective_policy=env.effective_policy.to_dict())
+        return HealthReport(status=status, errors=errors, warnings=warnings, effective_policy=effective_policy.to_dict())
     try:
         graph = parse_graph_config(document.data, project_root=root.path, root_id=root.id, root_path=root.path, source_path=config_path)
-        compiled = GraphCompiler().compile(graph, registry=env.registry, plugin_registry=env.plugin_registry)
+        compiled = GraphCompiler().compile(graph, registry=env.registry, plugin_registry=plugin_registry)
     except GraphConfigError as exc:
-        return fail_report("CONFIG.SCHEMA.PARSE", str(exc), "config", str(config_path), "schema", effective_policy=env.effective_policy.to_dict())
+        return fail_report("CONFIG.SCHEMA.PARSE", str(exc), "config", str(config_path), "schema", effective_policy=effective_policy.to_dict())
     except GraphCompileError as exc:
-        return fail_report(exc.rule_id, str(exc), "pipeline", "pipeline", "topology", effective_policy=env.effective_policy.to_dict())
-    return document, graph, compiled, resources, warnings
+        return fail_report(exc.rule_id, str(exc), "pipeline", "pipeline", "topology", effective_policy=effective_policy.to_dict())
+    return document, graph, compiled, resources, plugin_registry, effective_policy, warnings
+
+
+def _with_effective_resource_source(resources, *, root: WorkspaceRoot, source_path: Path) -> tuple[object, ...]:
+    return tuple(
+        replace(
+            resource,
+            root_id=getattr(resource, "root_id", "") or root.id,
+            root_path=getattr(resource, "root_path", "") or str(root.path),
+            source_path=getattr(resource, "source_path", "") or str(source_path),
+        )
+        for resource in resources
+    )
 
 
 def _environment_or_report(workspace: WorkspaceConfig) -> WorkspaceEnvironment | HealthReport:
@@ -198,11 +266,10 @@ def _environment_or_report(workspace: WorkspaceConfig) -> WorkspaceEnvironment |
 def _forbidden_config_findings(config: Mapping[str, Any], *, root: WorkspaceRoot, source_path: Path) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
     for field in sorted(WORKSPACE_FORBIDDEN_CONFIG_FIELDS & set(config)):
-        target = WORKSPACE_CONFIG_NAME if field == "policy" else PROJECT_CONFIG_NAME
         findings.append(
             workspace_finding(
                 "WORKSPACE.CONFIG.FIELD_FORBIDDEN",
-                f"workspace mode does not allow config field '{field}'; move it to {target}",
+                f"workspace mode does not allow config field '{field}'; move it to {WORKSPACE_CONFIG_NAME}",
                 root=root,
                 source_path=source_path,
                 object_id=field,

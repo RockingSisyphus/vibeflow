@@ -2,64 +2,79 @@
 
 插件用于扩展策略、编译和运行 hook。插件不能绕过内核硬规则；如果插件放宽策略，必须按内核要求声明 relaxation。
 
-## 配置插件
+## 注册和启用插件
+
+每个 root 的 `project/registry.py` 可以用 `build_plugin_registry()` 声明可用插件：
+
+```python
+from vibeflow import PluginResourceRegistry
+
+def build_plugin_registry() -> PluginResourceRegistry:
+    registry = PluginResourceRegistry()
+    registry.register(
+        "project_policy",
+        module="plugins.policy",
+        class_name="PolicyPlugin",
+        plugin_type="policy",
+        display_name="Project Policy",
+        category="policy",
+        description="Project policy checks.",
+        version="0.1.0",
+    )
+    registry.register(
+        "runtime_hook",
+        module="plugins.runtime",
+        class_name="RuntimePlugin",
+        plugin_type="runtime",
+        display_name="Runtime Hook",
+        category="runtime",
+        description="Runtime hook used by selected workflows.",
+        version="0.1.0",
+    )
+    return registry
+```
+
+workflow config 再按 id 启用本流程实际使用的插件：
 
 ```jsonc
 {
   "plugins": [
     {
-      "module": "plugins/policy.py",
-      "class": "PolicyPlugin",
-      "type": "policy",
-      "display_name": "Project Policy",
-      "category": "policy",
-      "description": "Project policy checks for this config.",
-      "version": "0.1.0",
+      "id": "project_policy",
       "config": {"level": "strict"}
     },
     {
-      "module": "plugins/runtime.py",
-      "class": "RuntimePlugin",
-      "type": "runtime",
-      "display_name": "Runtime Hook",
-      "category": "runtime",
-      "description": "Runtime hook used by this config.",
-      "version": "0.1.0"
-    },
-    {
-      "name": "future_runtime_plugin",
-      "type": "runtime",
-      "status": "planned",
-      "display_name": "Future Runtime Plugin",
-      "category": "runtime",
-      "description": "planned runtime hook",
-      "version": "0.1.0"
+      "id": "runtime_hook"
     }
   ]
 }
 ```
 
-字段说明：
+registry 字段说明：
 
-- `module`：Python 模块路径或 `.py` 文件路径，相对 config 所在目录解析。
+- `id`：workflow config 引用的资源 id。
+- `module`：Python 模块路径或 `.py` 文件路径，相对所属 root 解析。
 - `class`：插件类名，默认 `Plugin`。
-- `type`：`policy`、`compiler`、`runtime` 之一。
+- `plugin_type`：`policy`、`compiler`、`runtime` 之一。
+- `display_name` / `description`：审查图和报告中的可读资源说明。
+
+config 字段说明：
+
+- `id`：必须引用当前 root `build_plugin_registry()` 中已注册的插件。
 - `priority`：数字越小越先执行。
 - `enabled`：设为 `false` 时跳过。
-- `status`：`implemented` 或 `planned`，默认 `implemented`。
 - `config` / `settings`：传给插件的设置对象。
 - `conflict`：重复插件名时可设为 `replace`。
 - `name`：可覆盖插件实例的 `name`。
 - `scope`：默认 `project`，会出现在插件描述信息中。
-- `display_name`：config 中本次启用该插件的易读名，用于 Mermaid/SVG。
-- `description`：config 中本次启用该插件的用途说明，用于 Mermaid/SVG。
-- `category` / `version`：可选展示元数据。
 
 `boundary` 插件类型已移除。
 
-`module` 既可以是模块名，也可以是 `.py` 文件路径。写成路径时，相对当前 config 文件所在目录解析。模板里 `project/configs/main.jsonc` 引用插件时通常写 `../plugins/policy.py`。
+`module` 既可以是模块名，也可以是 `.py` 文件路径。写成路径时，相对 registry 所属 root 目录解析。模板里通常写 `plugins.policy` 或 `plugins/policy.py`。
 
-implemented plugin 必须暴露 `PLUGIN_INFO`，用于 inspect 和 Mermaid 展示名称、类别、版本和功能说明。config 声明本身也必须写 `display_name` 和 `description`；缺失会产生 `CONFIG.SMELL.MISSING_PLUGIN_DISPLAY_NAME` 或 `CONFIG.SMELL.MISSING_PLUGIN_DESCRIPTION` warning，即使 `PLUGIN_INFO` 已经完整。planned plugin 可以不存在、不会加载、不会注册到 `PluginRegistry`，也不会执行任何 policy/compiler/runtime hook。
+implemented plugin 必须暴露 `PLUGIN_INFO`，用于实现自检和 inspect 信息。审查图里的资源名称、类别、版本和说明来自 `build_plugin_registry().register(...)`。未在当前 workflow config 中引用的 registered plugin 不会加载、不会注册到 active `PluginRegistry`，也不会执行任何 policy/compiler/runtime hook。planned plugin 不进入 resource registry；需要计划占位时，用 planned node 或 planned nodeset 表达。
+
+旧 inline `module` / `class` 写法短期兼容，但在 registry-backed config 中会产生 legacy warning；新项目不要使用。
 
 插件设置传递规则：
 

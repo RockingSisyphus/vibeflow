@@ -1,6 +1,7 @@
 from tests.unit.strict_support import *
 
 from vibeflow.workspace import (
+    _workspace_runtime_options,
     WorkspaceConfigError,
     build_workspace_environment,
     build_workspace_node_registry,
@@ -133,6 +134,131 @@ def test_workspace_project_config_override_and_missing_project_config(tmp_path) 
     assert missing.value.rule_id == "WORKSPACE.PROJECT_CONFIG.MISSING"
 
 
+def test_workspace_project_runtime_config_and_override_precedence(tmp_path) -> None:
+    workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
+    _write_project_config(framework_root, runtime={"async_max_workers": 2, "async_flush_timeout": 5})
+    _write_project_config(project_root, runtime={"async_max_workers": 8, "async_flush_timeout": 30})
+    framework_config = framework_root / "configs" / "main.jsonc"
+    project_config = project_root / "configs" / "main.jsonc"
+    framework_config.parent.mkdir(parents=True)
+    project_config.parent.mkdir(parents=True)
+    framework_config.write_text("{}", encoding="utf-8")
+    project_config.write_text("{}", encoding="utf-8")
+
+    workspace = load_workspace_config(workspace_path)
+
+    framework_options = _workspace_runtime_options(framework_config, workspace=workspace)
+    project_options = _workspace_runtime_options(project_config, workspace=workspace)
+    sparse_override = _workspace_runtime_options(
+        project_config,
+        workspace=workspace,
+        overrides={"trace": "boundary", "async_flush_timeout": 1.5},
+    )
+    full_override = _workspace_runtime_options(
+        project_config,
+        workspace=workspace,
+        overrides=RuntimeOptions(async_max_workers=3),
+    )
+
+    assert framework_options.async_max_workers == 2
+    assert framework_options.async_flush_timeout == 5
+    assert project_options.async_max_workers == 8
+    assert project_options.async_flush_timeout == 30
+    assert sparse_override.async_max_workers == 8
+    assert sparse_override.async_flush_timeout == 1.5
+    assert sparse_override.trace == "boundary"
+    assert full_override.async_max_workers == 3
+    assert full_override.async_flush_timeout is None
+
+
+def test_run_workspace_checked_uses_one_effective_root_runtime_options_object(tmp_path, monkeypatch) -> None:
+    import vibeflow.runner as runner_module
+
+    workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
+    _write_project_config(framework_root, runtime={"async_max_workers": 2})
+    _write_registry(
+        project_root,
+        [
+            ("test.start", "StartNode", {}, {}),
+            ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}),
+            ("test.in_end", "InEndNode", {}, {}),
+        ],
+    )
+    _write_project_config(project_root, runtime={"async_max_workers": 7, "async_flush_timeout": 20})
+    config_path = project_root / "configs" / "main.jsonc"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(
+        json.dumps(
+            {
+                "pipeline": {
+                    "nodes": [
+                        _node_call("start", "test.start", "Starts root runtime options fixture."),
+                        _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
+                        _node_call("end", "test.in_end", "Consumes value.in.", requires=[REQ_SPEC("value.in")]),
+                    ],
+                    "edges": _edge_chain("start", "seed", "end"),
+                    "outputs": [REQ_SPEC("value.in")],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    seen: dict[str, object] = {}
+    original_refuse = runner_module._refuse_on_planned_run
+    original_execute = runner_module._execute_runtime
+
+    def record_refuse(*args, **kwargs):
+        seen["refuse"] = kwargs["runtime_options"]
+        return original_refuse(*args, **kwargs)
+
+    def record_execute(graph, registry, plugin_registry, initial, run_dir, runtime_options, resources):
+        seen["execute"] = runtime_options
+        return original_execute(graph, registry, plugin_registry, initial, run_dir, runtime_options, resources)
+
+    monkeypatch.setattr(runner_module, "_refuse_on_planned_run", record_refuse)
+    monkeypatch.setattr(runner_module, "_execute_runtime", record_execute)
+
+    result = run_workspace_checked(
+        config_path,
+        workspace=load_workspace_config(workspace_path),
+        run_root=tmp_path / "runs",
+        runtime_options={"trace": "boundary", "async_flush_timeout": 1.25},
+    )
+
+    assert result.context.get("value.in")["value"] == 1
+    assert seen["refuse"] is seen["execute"]
+    assert seen["execute"].async_max_workers == 7
+    assert seen["execute"].async_flush_timeout == 1.25
+    assert seen["execute"].trace == "boundary"
+
+
+@pytest.mark.parametrize(
+    "runtime",
+    [
+        [],
+        {"unknown": 1},
+        {"async_max_workers": 0},
+        {"async_max_workers": True},
+        {"async_max_workers": 1.5},
+        {"async_flush_timeout": -1},
+        {"async_flush_timeout": True},
+        {"async_flush_timeout": "30"},
+    ],
+)
+def test_workspace_project_runtime_config_validation(tmp_path, runtime) -> None:
+    workspace_path, project_root, _ = _workspace_fixture(tmp_path, write_workspace=False)
+    _write_project_config(project_root)
+    payload = json.loads((project_root / "vibeflow_project.jsonc").read_text(encoding="utf-8"))
+    payload["runtime"] = runtime
+    (project_root / "vibeflow_project.jsonc").write_text(json.dumps(payload), encoding="utf-8")
+    workspace_path.write_text(json.dumps({"roots": [{"id": "project", "path": "project"}]}), encoding="utf-8")
+
+    with pytest.raises(WorkspaceConfigError) as invalid:
+        load_workspace_config(workspace_path)
+
+    assert invalid.value.rule_id == "WORKSPACE.PROJECT_CONFIG.RUNTIME"
+
+
 def test_workspace_project_quality_structure_config_validation(tmp_path) -> None:
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path, write_workspace=False)
     _write_project_config(framework_root)
@@ -210,7 +336,7 @@ def test_workspace_registry_import_and_factory_errors_are_explicit(tmp_path) -> 
     assert missing_factory.value.rule_id == "WORKSPACE.REGISTRY.FACTORY"
 
 
-def test_workspace_mode_rejects_config_level_project_resources(tmp_path) -> None:
+def test_workspace_mode_rejects_config_level_policy(tmp_path) -> None:
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
     _write_registry(project_root, [("test.start", "StartNode", {}, {})])
     _write_project_config(project_root)
@@ -218,10 +344,10 @@ def test_workspace_mode_rejects_config_level_project_resources(tmp_path) -> None
     config_path = project_root / "bad.jsonc"
     config_path.write_text(
         json.dumps(
-            {
-                "base_lib": {"paths": ["base_lib"]},
-                "pipeline": {"nodes": [_node_call("start", "test.start", "Starts forbidden resource config.")]},
-            }
+                {
+                    "policy": {"node_source": {"max_lines": 100}},
+                    "pipeline": {"nodes": [_node_call("start", "test.start", "Starts forbidden resource config.")]},
+                }
         ),
         encoding="utf-8",
     )
@@ -309,10 +435,11 @@ def test_workspace_quality_role_imports_use_declared_base_lib_paths_and_modules(
 
 def test_workspace_resources_have_root_source_and_feed_policy(tmp_path) -> None:
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
-    _write_registry(project_root, [])
+    _write_registry(project_root, [("test.start", "StartNode", {}, {})])
     _write_registry(framework_root, [])
-    base_dir = framework_root / "base_lib"
+    base_dir = project_root / "base_lib"
     base_dir.mkdir()
+    (base_dir / "__init__.py").write_text("", encoding="utf-8")
     (base_dir / "math_tools.py").write_text(
         """
 from vibeflow import BaseLibInfo
@@ -335,57 +462,49 @@ class Plugin:
 """.strip(),
         encoding="utf-8",
     )
-    (framework_root / "vibeflow_project.jsonc").write_text(
-        json.dumps(
-            {
-                "registry": "registry.py:build_node_registry",
-                "quality_enabled": True,
-                "base_lib": {
-                    "paths": ["base_lib"],
-                    "modules": [{"module": "base_lib.math_tools", "display_name": "Math Tools", "description": "Workspace helper."}],
-                },
-                "plugins": [],
-            }
-        ),
-        encoding="utf-8",
+    _append_resource_registry(
+        project_root,
+        base_libs=[("math_tools", "base_lib.math_tools", "Math Tools", "Workspace helper.")],
+        plugins=[("workspace_runtime", "runtime_plugin.py", "Plugin", "runtime", "Workspace Runtime", "Workspace runtime plugin.")],
     )
-    (project_root / "vibeflow_project.jsonc").write_text(
+    _write_project_config(project_root)
+    _write_project_config(framework_root)
+    config_path = project_root / "configs" / "main.jsonc"
+    config_path.parent.mkdir()
+    config_path.write_text(
         json.dumps(
             {
-                "registry": "registry.py:build_node_registry",
-                "quality_enabled": True,
-                "base_lib": {"paths": [], "modules": []},
-                "plugins": [
-                    {
-                        "module": "runtime_plugin.py",
-                        "class": "Plugin",
-                        "type": "runtime",
-                        "display_name": "Workspace Runtime",
-                        "description": "Workspace runtime plugin.",
-                    }
-                ],
+                "base_lib": {"modules": ["math_tools"]},
+                "plugins": [{"id": "workspace_runtime"}],
+                "pipeline": {"nodes": [_node_call("start", "test.start", "Starts resource flow.")]},
             }
         ),
         encoding="utf-8",
     )
 
-    env = build_workspace_environment(load_workspace_config(workspace_path))
-    resources = env.resources.to_dict()
+    workspace = load_workspace_config(workspace_path)
+    env = build_workspace_environment(workspace)
+    available = env.available_resources.to_dict()
+    report = validate_workspace_config_path(config_path, workspace=workspace)
+    resources = report.info["resources"]
 
-    assert resources["base_lib"]["modules"][0]["root_id"] == "vibetrain"
-    assert resources["base_lib"]["modules"][0]["source_path"].endswith("vibetrain/vibeflow_project.jsonc")
-    assert resources["plugins"][0]["root_id"] == "project"
-    assert resources["plugins"][0]["source_path"].endswith("project/vibeflow_project.jsonc")
-    assert str((framework_root / "base_lib").resolve()) in env.effective_policy.to_dict()["base_lib"]["allowed_paths"]
-    assert "base_lib.math_tools" in env.effective_policy.to_dict()["base_lib"]["allowed_modules"]
+    assert available["base_lib"]["modules"][0]["root_id"] == "project"
+    assert available["base_lib"]["modules"][0]["source_path"].endswith("project/vibeflow_project.jsonc")
+    assert available["plugins"][0]["root_id"] == "project"
+    assert resources["base_lib"]["modules"][0]["id"] == "math_tools"
+    assert resources["base_lib"]["modules"][0]["source_path"].endswith("project/configs/main.jsonc")
+    assert resources["plugins"][0]["id"] == "workspace_runtime"
+    assert str(project_root.resolve()) in report.effective_policy["base_lib"]["allowed_paths"]
+    assert "base_lib.math_tools" in report.effective_policy["base_lib"]["allowed_modules"]
 
 
 def test_workspace_mermaid_hides_resources_from_unused_roots(tmp_path) -> None:
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
     _write_registry(project_root, [("test.start", "StartNode", {}, {}), ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}), ("test.in_end", "InEndNode", {}, {})])
     _write_registry(framework_root, [])
-    framework_base = framework_root / "base_lib"
+    framework_base = project_root / "base_lib"
     framework_base.mkdir()
+    (framework_base / "__init__.py").write_text("", encoding="utf-8")
     (framework_base / "math_tools.py").write_text(
         """
 from vibeflow import BaseLibInfo
@@ -407,40 +526,134 @@ class Plugin:
 """.strip(),
         encoding="utf-8",
     )
-    (framework_root / "vibeflow_project.jsonc").write_text(
-        json.dumps(
-            {
-                "registry": "registry.py:build_node_registry",
-                "quality_enabled": True,
-                "base_lib": {"paths": ["base_lib"], "modules": [{"module": "base_lib.math_tools", "display_name": "Framework Math", "description": "Unused workspace helper."}]},
-                "plugins": [],
-            }
-        ),
-        encoding="utf-8",
+    _append_resource_registry(
+        project_root,
+        base_libs=[("framework_math", "base_lib.math_tools", "Framework Math", "Unused workspace helper.")],
+        plugins=[("project_runtime", "runtime_plugin.py", "Plugin", "runtime", "Project Runtime", "Project runtime plugin.")],
     )
-    (project_root / "vibeflow_project.jsonc").write_text(
-        json.dumps(
-            {
-                "registry": "registry.py:build_node_registry",
-                "quality_enabled": True,
-                "base_lib": {"paths": [], "modules": []},
-                "plugins": [{"module": "runtime_plugin.py", "class": "Plugin", "type": "runtime", "display_name": "Project Runtime", "description": "Project runtime plugin."}],
-            }
-        ),
-        encoding="utf-8",
-    )
+    _write_project_config(project_root)
+    _write_project_config(framework_root)
     config_path = project_root / "configs" / "main.jsonc"
     config_path.parent.mkdir()
-    config_path.write_text(json.dumps({"pipeline": _seed_only_pipeline()}), encoding="utf-8")
+    config_path.write_text(json.dumps({"plugins": [{"id": "project_runtime"}], "pipeline": _seed_only_pipeline()}), encoding="utf-8")
 
     graph, compiled, _, resources, error = load_workspace_graph_for_export(config_path, workspace=load_workspace_config(workspace_path))
 
     assert error is None
-    assert [item["root_id"] for item in resources.to_dict()["base_lib"]["modules"]] == ["vibetrain"]
+    assert resources.to_dict()["base_lib"]["modules"] == []
     mermaid = export_mermaid(graph, compiled=compiled, resources=resources)
     assert "Project Runtime" in mermaid
     assert "Framework Math" not in mermaid
     assert "resource_base_lib" not in mermaid
+
+
+def test_workspace_unknown_resource_ids_are_preflight_errors(tmp_path) -> None:
+    workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
+    _write_registry(project_root, [("test.start", "StartNode", {}, {})])
+    _append_resource_registry(project_root)
+    _write_project_config(project_root)
+    _write_project_config(framework_root)
+    config_path = project_root / "configs" / "main.jsonc"
+    config_path.parent.mkdir()
+    config_path.write_text(
+        json.dumps(
+            {
+                "base_lib": {"modules": ["missing_base"]},
+                "plugins": [{"id": "missing_plugin"}],
+                "pipeline": {"nodes": [_node_call("start", "test.start", "Starts resource flow.")]},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = validate_workspace_config_path(config_path, workspace=load_workspace_config(workspace_path))
+    rule_ids = {finding.rule_id for finding in report.errors}
+
+    assert report.status in {"FAIL", "ERROR"}
+    assert "CONFIG.RESOURCE.UNKNOWN_BASE_LIB" in rule_ids
+    assert "PLUGIN.CONFIG.UNKNOWN_RESOURCE" in rule_ids
+
+
+def test_workspace_available_base_lib_does_not_allow_node_import_until_config_references_it(tmp_path) -> None:
+    workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
+    _write_project_config(framework_root)
+    for directory in ("nodes", "base_lib"):
+        package = project_root / directory
+        package.mkdir()
+        (package / "__init__.py").write_text("", encoding="utf-8")
+    (project_root / "base_lib" / "math_tools.py").write_text(
+        """
+from vibeflow import BaseLibInfo
+
+BASE_LIB_INFO = BaseLibInfo("base_lib.math_tools", "Math Tools", "math", "Registered helper.", "0.1.0")
+VALUE = 1
+""".strip(),
+        encoding="utf-8",
+    )
+    (project_root / "nodes" / "uses_math.py").write_text(
+        """
+import base_lib.math_tools
+from vibeflow import DataProvider, NodeContract, NodeInfo
+
+class UsesMathNode:
+    NODE_INFO = NodeInfo("test.uses_math", "Uses Math", "test", "Imports a helper.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        provides=(DataProvider("value.out", "value.out"),),
+        output_semantics={"value.out": ("computed value",)},
+        output_schema={"value.out": {"type": "number"}},
+        examples=({"inputs": {}, "params": {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        return {"value.out": 1}
+""".strip(),
+        encoding="utf-8",
+    )
+    (project_root / "registry.py").write_text(
+        """
+from vibeflow import BaseLibRegistry, NodeRegistry
+from tests.unit import strict_support_runtime_nodes as support
+from nodes.uses_math import UsesMathNode
+
+def build_node_registry():
+    registry = NodeRegistry()
+    registry.register("test.start", support.StartNode, config_schema={}, config_defaults={})
+    registry.register("test.uses_math", UsesMathNode, config_schema={}, config_defaults={})
+    registry.register("test.out_end", support.OutEndNode, config_schema={}, config_defaults={})
+    return registry
+
+def build_base_lib_registry():
+    registry = BaseLibRegistry()
+    registry.register("math_tools", module="base_lib.math_tools", display_name="Math Tools", description="Registered helper.")
+    return registry
+""".strip(),
+        encoding="utf-8",
+    )
+    _write_project_config(project_root)
+    config_path = project_root / "configs" / "main.jsonc"
+    config_path.parent.mkdir()
+    nodes = [
+        _node_call("start", "test.start", "Starts flow."),
+        _node_call("math", "test.uses_math", "Uses registered helper.", provides=[PROV_SPEC("value.out")]),
+        _node_call("end", "test.out_end", "Ends flow.", requires=[REQ_SPEC("value.out")]),
+    ]
+    config_path.write_text(json.dumps({"pipeline": {"nodes": nodes, "edges": _edge_chain("start", "math", "end")}}), encoding="utf-8")
+
+    missing = validate_workspace_config_path(config_path, workspace=load_workspace_config(workspace_path))
+    config_path.write_text(
+        json.dumps(
+                {
+                    "base_lib": {"modules": ["math_tools"]},
+                    "pipeline": {"nodes": nodes, "edges": _edge_chain("start", "math", "end")},
+                }
+        ),
+        encoding="utf-8",
+    )
+    referenced = validate_workspace_config_path(config_path, workspace=load_workspace_config(workspace_path))
+
+    assert "base_lib.math_tools" not in missing.effective_policy["base_lib"]["allowed_modules"]
+    assert "base_lib.math_tools" in referenced.effective_policy["base_lib"]["allowed_modules"]
+    assert "NODE.BASE_LIB.BASE_LIB_UNDECLARED" not in {finding.rule_id for finding in (*referenced.errors, *referenced.warnings)}
 
 
 def test_cli_workspace_validate_and_quality_default_roots(tmp_path, capsys) -> None:
@@ -494,17 +707,18 @@ def _workspace_fixture(tmp_path: Path, *, write_workspace: bool = True) -> tuple
     return workspace_path, project_root, framework_root
 
 
-def _write_project_config(root: Path, *, quality_enabled: bool = True) -> None:
+def _write_project_config(root: Path, *, quality_enabled: bool = True, runtime: dict[str, object] | None = None) -> None:
     root.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "registry": "registry.py:build_node_registry",
+        "quality_enabled": quality_enabled,
+        "base_lib": {"paths": [], "modules": []},
+        "plugins": [],
+    }
+    if runtime is not None:
+        payload["runtime"] = runtime
     (root / "vibeflow_project.jsonc").write_text(
-        json.dumps(
-            {
-                "registry": "registry.py:build_node_registry",
-                "quality_enabled": quality_enabled,
-                "base_lib": {"paths": [], "modules": []},
-                "plugins": [],
-            }
-        ),
+        json.dumps(payload),
         encoding="utf-8",
     )
     if not (root / "registry.py").exists():
@@ -525,3 +739,35 @@ def _write_registry(root: Path, registrations: list[tuple[str, str, dict, dict]]
     lines.append("")
     root.mkdir(parents=True, exist_ok=True)
     (root / "registry.py").write_text("\n".join(lines), encoding="utf-8")
+
+
+def _append_resource_registry(
+    root: Path,
+    *,
+    base_libs: list[tuple[str, str, str, str]] = (),
+    plugins: list[tuple[str, str, str, str, str, str]] = (),
+) -> None:
+    lines = [
+        "",
+        "from vibeflow import BaseLibRegistry, PluginResourceRegistry",
+        "",
+        "def build_base_lib_registry():",
+        "    registry = BaseLibRegistry()",
+    ]
+    for resource_id, module, display_name, description in base_libs:
+        lines.append(f"    registry.register({resource_id!r}, module={module!r}, display_name={display_name!r}, description={description!r})")
+    lines.extend(
+        [
+            "    return registry",
+            "",
+            "def build_plugin_registry():",
+            "    registry = PluginResourceRegistry()",
+        ]
+    )
+    for resource_id, module, class_name, plugin_type, display_name, description in plugins:
+        lines.append(
+            f"    registry.register({resource_id!r}, module={module!r}, class_name={class_name!r}, plugin_type={plugin_type!r}, display_name={display_name!r}, description={description!r})"
+        )
+    lines.append("    return registry")
+    with (root / "registry.py").open("a", encoding="utf-8") as handle:
+        handle.write("\n".join(lines))

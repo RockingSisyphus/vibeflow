@@ -30,37 +30,37 @@ base_lib 应保持：
 - 依赖链不要过长。
 - 函数短小、分支少、嵌套浅。
 
-workspace 模式下，每个 root 的 `vibeflow_project.jsonc` 必须声明允许使用的 base_lib 路径和模块：
+每个 root 的 `project/registry.py` 可以用 `build_base_lib_registry()` 声明该 root 下可用的 base_lib：
+
+```python
+from vibeflow import BaseLibRegistry
+
+def build_base_lib_registry() -> BaseLibRegistry:
+    registry = BaseLibRegistry()
+    registry.register(
+        "math_tools",
+        module="base_lib.math_tools",
+        display_name="Math Tools",
+        category="math",
+        description="Pure arithmetic helpers.",
+        version="0.1.0",
+    )
+    return registry
+```
+
+workflow config 再声明本流程实际使用的 base_lib id：
 
 ```jsonc
 {
   "base_lib": {
-    "paths": ["../base_lib"],
-    "modules": [
-      {
-        "module": "base_lib.math_tools",
-        "status": "implemented",
-        "display_name": "Math Tools",
-        "category": "math",
-        "description": "Pure arithmetic helpers.",
-        "version": "0.1.0"
-      },
-      {
-        "module": "base_lib.future_tools",
-        "status": "planned",
-        "display_name": "Future Tools",
-        "category": "math",
-        "description": "planned helper library",
-        "version": "0.1.0"
-      }
-    ]
+    "modules": [{"id": "math_tools"}]
   }
 }
 ```
 
-workspace 模式下 `paths` 相对所属 root 目录解析；无 workspace 的旧模式下才相对 pipeline config 文件目录解析。只有 `modules` 里声明为 `implemented` 的模块会进入 node import allowlist。声明为 `planned` 的 base_lib 只用于规划和 Mermaid 展示，不会加载，也不能满足 implemented node 的 import 校验。
+registry 中的 `module` 相对所属 root 解析。只有当前 workflow config 引用的 base_lib 会进入 node import allowlist；即使某个 helper 已注册为可用，当前 config 未引用时，implemented node 导入它仍会被健康检查拒绝。
 
-implemented base_lib 必须暴露 `BASE_LIB_INFO`，用于 inspect 和 Mermaid 展示模块名称、类别、版本和功能说明。config 声明本身也必须写 `display_name` 和 `description`，说明本项目为什么启用这个 helper；缺失会产生 `CONFIG.SMELL.MISSING_BASE_LIB_DISPLAY_NAME` 或 `CONFIG.SMELL.MISSING_BASE_LIB_DESCRIPTION` warning。planned base_lib 可以不存在，但也必须至少有 `module` 或 `name`，并写清 `display_name`、`description`。
+implemented base_lib 必须暴露 `BASE_LIB_INFO`，用于实现自检和 inspect 信息。审查图里的资源名称、类别、版本和说明来自 `build_base_lib_registry().register(...)`。planned base_lib 不进入 resource registry；需要计划占位时，用 planned node 或 planned nodeset 表达。
 
 ## base_lib 适合放什么
 

@@ -9,13 +9,13 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from vibeflow.config.loader import ConfigLoadError, load_raw_config_document
-from vibeflow.config.resources import ConfigResources, config_base_lib_policy, load_config_resources
+from vibeflow.config.resources import BaseLibRegistry, ConfigResources, PluginResourceRegistry, config_base_lib_policy, load_config_resources
 from vibeflow.devtools.code_quality_types import QualityStructureLimits
 from vibeflow.health.types import HealthFinding
 from vibeflow.plugin import PluginRegistry, load_plugins_from_config
 from vibeflow.registry import NodeRegistrationInfo, NodeRegistry
 from vibeflow.workspace.policy import resolve_workspace_effective_policy
-from vibeflow.workspace.types import PROJECT_CONFIG_NAME, WorkspaceConfig, WorkspaceConfigError, WorkspaceEnvironment, WorkspaceRoot
+from vibeflow.workspace.types import PROJECT_CONFIG_NAME, WorkspaceConfig, WorkspaceConfigError, WorkspaceEnvironment, WorkspaceResourceRegistries, WorkspaceRoot
 
 
 def load_workspace_config(path: str | Path) -> WorkspaceConfig:
@@ -32,17 +32,17 @@ def load_workspace_config(path: str | Path) -> WorkspaceConfig:
 
 def build_workspace_environment(workspace: WorkspaceConfig) -> WorkspaceEnvironment:
     registry = build_workspace_node_registry(workspace)
-    plugin_registry, resources, resource_findings = load_workspace_resources(workspace)
-    base_lib_policies = tuple(config_base_lib_policy(root.project_config, base_path=root.path) for root in workspace.roots)
+    resource_registries, available_resources, resource_findings = load_workspace_resources(workspace)
     policy_result = resolve_workspace_effective_policy(
         workspace.policy,
         workspace_path=workspace.path,
-        base_lib_policies=base_lib_policies,
     )
     return WorkspaceEnvironment(
         registry=registry,
-        plugin_registry=plugin_registry,
-        resources=resources,
+        plugin_registry=PluginRegistry(),
+        resources=available_resources,
+        available_resources=available_resources,
+        resource_registries=resource_registries,
         effective_policy=policy_result.effective_policy,
         findings=(*resource_findings, *policy_result.findings),
     )
@@ -59,32 +59,24 @@ def build_workspace_node_registry(workspace: WorkspaceConfig) -> NodeRegistry:
     return registry
 
 
-def load_workspace_resources(workspace: WorkspaceConfig) -> tuple[PluginRegistry, ConfigResources, tuple[HealthFinding, ...]]:
-    plugin_registry = PluginRegistry()
+def load_workspace_resources(workspace: WorkspaceConfig) -> tuple[dict[str, WorkspaceResourceRegistries], ConfigResources, tuple[HealthFinding, ...]]:
     findings: list[HealthFinding] = []
     base_lib_paths: list[str] = []
     base_libs: list[object] = []
     plugins: list[object] = []
+    registries: dict[str, WorkspaceResourceRegistries] = {}
     for root in workspace.roots:
-        per_plugin_registry, plugin_findings = load_plugins_from_config(
-            root.project_config,
-            base_path=root.path,
-            root_id=root.id,
-            root_path=str(root.path),
-            source_path=str(root.config_path),
-        )
-        findings.extend(annotate_findings(plugin_findings, root=root, source_path=root.config_path))
-        try:
-            _merge_plugin_registry(plugin_registry, per_plugin_registry)
-        except ValueError as exc:
-            findings.append(workspace_finding("WORKSPACE.PLUGIN.CONFLICT", str(exc), root=root, source_path=root.config_path, failure_layer="plugin"))
-        resources, resource_findings = load_config_resources(root.project_config, base_path=root.path, plugin_registry=per_plugin_registry)
+        base_registry, plugin_registry, has_base_registry, has_plugin_registry, registry_findings = _load_root_resource_registries(root)
+        findings.extend(annotate_findings(registry_findings, root=root, source_path=root.config_path))
+        legacy_resources, resource_findings = load_config_resources(root.project_config, base_path=root.path)
         findings.extend(annotate_findings(resource_findings, root=root, source_path=root.config_path))
-        base_lib_paths.extend(resources.base_lib_paths)
-        base_libs.extend(_with_resource_source(resources.base_libs, root=root))
-        plugins.extend(_with_resource_source(resources.plugins, root=root))
+        root_base_paths = legacy_resources.base_lib_paths or (str(root.path),)
+        registries[root.id] = WorkspaceResourceRegistries(base_registry, plugin_registry, root_base_paths, has_base_registry, has_plugin_registry)
+        base_lib_paths.extend(root_base_paths)
+        base_libs.extend(_with_resource_source((*base_registry.resources(), *legacy_resources.base_libs), root=root))
+        plugins.extend(_with_resource_source((*plugin_registry.resources(), *legacy_resources.plugins), root=root))
     return (
-        plugin_registry,
+        registries,
         ConfigResources(base_lib_paths=tuple(dict.fromkeys(base_lib_paths)), base_libs=tuple(base_libs), plugins=tuple(plugins)),
         tuple(findings),
     )
@@ -171,6 +163,7 @@ def _workspace_root_from_item(root_id: str, item: Mapping[str, Any], *, workspac
         registry_ref=str(project_config.get("registry", "")).strip(),
         quality_enabled=bool(project_config.get("quality_enabled", True)),
         quality_structure=_project_quality_structure(project_config, config_path),
+        runtime_options=_project_runtime_options(project_config, config_path),
     )
 
 
@@ -180,7 +173,7 @@ def _load_project_config(path: Path) -> Mapping[str, Any]:
     except ConfigLoadError as exc:
         raise WorkspaceConfigError(exc.rule_id, exc.message, exc.source_location, exc.failure_layer) from exc
     data = document.data
-    unknown = set(data) - {"registry", "quality_enabled", "quality", "base_lib", "plugins"}
+    unknown = set(data) - {"registry", "quality_enabled", "quality", "runtime", "base_lib", "plugins"}
     if unknown:
         raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.UNKNOWN_FIELD", f"project config contains unknown fields: {sorted(unknown)}", {"path": str(path)})
     if "registry" in data and not isinstance(data["registry"], str):
@@ -188,7 +181,43 @@ def _load_project_config(path: Path) -> Mapping[str, Any]:
     if "quality_enabled" in data and not isinstance(data["quality_enabled"], bool):
         raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.QUALITY", "project config quality_enabled must be a boolean", {"path": str(path)})
     _project_quality_structure(data, path)
+    _project_runtime_options(data, path)
     return data
+
+
+def _project_runtime_options(data: Mapping[str, Any], path: Path) -> Mapping[str, object]:
+    raw_runtime = data.get("runtime")
+    if raw_runtime in (None, {}):
+        return {}
+    if not isinstance(raw_runtime, Mapping):
+        raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.RUNTIME", "project config runtime must be an object", {"path": str(path)})
+    unknown = set(raw_runtime) - {"async_max_workers", "async_flush_timeout"}
+    if unknown:
+        raise WorkspaceConfigError(
+            "WORKSPACE.PROJECT_CONFIG.RUNTIME",
+            f"project config runtime contains unknown fields: {sorted(unknown)}",
+            {"path": str(path)},
+        )
+    values: dict[str, object] = {}
+    if "async_max_workers" in raw_runtime:
+        value = raw_runtime["async_max_workers"]
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise WorkspaceConfigError(
+                "WORKSPACE.PROJECT_CONFIG.RUNTIME",
+                "runtime.async_max_workers must be a positive integer",
+                {"path": str(path)},
+            )
+        values["async_max_workers"] = value
+    if "async_flush_timeout" in raw_runtime:
+        value = raw_runtime["async_flush_timeout"]
+        if value is not None and (not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0):
+            raise WorkspaceConfigError(
+                "WORKSPACE.PROJECT_CONFIG.RUNTIME",
+                "runtime.async_flush_timeout must be null or a non-negative number",
+                {"path": str(path)},
+            )
+        values["async_flush_timeout"] = value
+    return values
 
 
 def _project_quality_structure(data: Mapping[str, Any], path: Path) -> QualityStructureLimits:
@@ -288,6 +317,61 @@ def _load_root_registry(root: WorkspaceRoot) -> NodeRegistry:
     if not isinstance(registry, NodeRegistry):
         raise WorkspaceConfigError("WORKSPACE.REGISTRY.RETURN", f"registry factory must return NodeRegistry: {root.registry_ref}", {"path": str(root.config_path)})
     return registry
+
+
+def _load_root_resource_registries(root: WorkspaceRoot) -> tuple[BaseLibRegistry, PluginResourceRegistry, bool, bool, tuple[HealthFinding, ...]]:
+    base_registry = BaseLibRegistry()
+    plugin_registry = PluginResourceRegistry()
+    has_base_registry = False
+    has_plugin_registry = False
+    findings: list[HealthFinding] = []
+    if not root.registry_ref:
+        return base_registry, plugin_registry, has_base_registry, has_plugin_registry, ()
+    module_ref, sep, _ = root.registry_ref.partition(":")
+    if not sep or not module_ref.strip():
+        return base_registry, plugin_registry, has_base_registry, has_plugin_registry, ()
+    try:
+        with _temporary_sys_path(root.path):
+            module = _registry_module_or_error(module_ref.strip(), root=root)
+    except WorkspaceConfigError as exc:
+        findings.append(
+            workspace_finding(
+                exc.rule_id,
+                exc.message,
+                root=root,
+                source_path=root.config_path,
+                object_id="registry",
+                failure_layer=exc.failure_layer,
+            )
+        )
+        return base_registry, plugin_registry, has_base_registry, has_plugin_registry, tuple(findings)
+    for function_name, expected_type, target in (
+        ("build_base_lib_registry", BaseLibRegistry, "base_lib"),
+        ("build_plugin_registry", PluginResourceRegistry, "plugin"),
+    ):
+        factory = getattr(module, function_name, None)
+        if factory is None:
+            continue
+        if target == "base_lib":
+            has_base_registry = True
+        else:
+            has_plugin_registry = True
+        if not callable(factory):
+            findings.append(workspace_finding("WORKSPACE.REGISTRY.FACTORY", f"registry factory is not callable for root '{root.id}': {function_name}", root=root, source_path=root.config_path, object_id=function_name, failure_layer=target))
+            continue
+        try:
+            value = factory()
+        except Exception as exc:
+            findings.append(workspace_finding("WORKSPACE.REGISTRY.FACTORY", f"registry factory failed for root '{root.id}' ({function_name}): {exc}", root=root, source_path=root.config_path, object_id=function_name, failure_layer=target))
+            continue
+        if not isinstance(value, expected_type):
+            findings.append(workspace_finding("WORKSPACE.REGISTRY.RETURN", f"registry factory must return {expected_type.__name__}: {function_name}", root=root, source_path=root.config_path, object_id=function_name, failure_layer=target))
+            continue
+        if target == "base_lib":
+            base_registry = value
+        else:
+            plugin_registry = value
+    return base_registry, plugin_registry, has_base_registry, has_plugin_registry, tuple(findings)
 
 
 def _registry_module_or_error(module_ref: str, *, root: WorkspaceRoot):

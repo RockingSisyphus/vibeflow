@@ -37,6 +37,31 @@ RULE_CATALOG: dict[str, dict[str, str]] = {
         "layer": "topology",
         "suggested_fix_type": "fix_config",
     },
+    "GRAPH.DATA.RUNTIME_REQUIREMENT_UNREACHABLE": {
+        "severity": "error",
+        "layer": "topology",
+        "suggested_fix_type": "fix_config",
+    },
+    "GRAPH.DATA.NO_PAYLOAD_BYPASS": {
+        "severity": "error",
+        "layer": "topology",
+        "suggested_fix_type": "fix_config",
+    },
+    "GRAPH.JOIN.ALL_DEPENDS_ON_TRANSFER_ONLY": {
+        "severity": "error",
+        "layer": "topology",
+        "suggested_fix_type": "fix_config",
+    },
+    "GRAPH.JOIN.ALL_BRANCHES_MUTUALLY_EXCLUSIVE": {
+        "severity": "error",
+        "layer": "topology",
+        "suggested_fix_type": "fix_config",
+    },
+    "GRAPH.JOIN.REDUNDANT_ALL": {
+        "severity": "warning",
+        "layer": "topology",
+        "suggested_fix_type": "fix_config",
+    },
     "NODESET.SMELL.TOO_WIDE": {
         "severity": "warning",
         "layer": "topology",

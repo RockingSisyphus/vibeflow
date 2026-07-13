@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
-from vibeflow.config.resources import PluginInfo, PluginResource, normalize_plugin_config, normalize_plugin_info, plugin_status
+from vibeflow.config.resources import PluginInfo, PluginResource, PluginResourceRegistry, normalize_plugin_config, normalize_plugin_info, plugin_status
 
 
 class PolicyPlugin(Protocol):
@@ -133,6 +134,7 @@ class PluginRegistry:
             key = (descriptor.source, descriptor.class_name, descriptor.plugin_type)
             resources[key] = PluginResource(
                 name=descriptor.name,
+                id=descriptor.name,
                 plugin_type=descriptor.plugin_type,
                 status="implemented",
                 module=descriptor.source,
@@ -154,6 +156,7 @@ def load_plugins_from_config(
     root_id: str = "",
     root_path: str = "",
     source_path: str = "",
+    plugin_resource_registry: PluginResourceRegistry | None = None,
 ) -> tuple[PluginRegistry, tuple[object, ...]]:
     registry = PluginRegistry()
     findings: list[object] = []
@@ -174,6 +177,12 @@ def load_plugins_from_config(
             continue
         if spec.get("enabled", True) is False:
             continue
+        resolved = _resolve_registered_plugin_spec(spec, item, registry=plugin_resource_registry, object_id=object_id, findings=findings)
+        if resolved is None:
+            if plugin_resource_registry is not None and _looks_like_plugin_id_reference(spec, item):
+                continue
+        else:
+            spec = resolved
         try:
             if plugin_status(spec) == "planned":
                 continue
@@ -204,6 +213,39 @@ def load_plugins_from_config(
 
 def plugin_error(rule_id: str, message: str, object_id: str, *, details: Mapping[str, object] | None = None):
     return _plugin_finding(rule_id, message, object_id, details=details)
+
+
+def _resolve_registered_plugin_spec(
+    spec: Mapping[str, Any],
+    item: object,
+    *,
+    registry: PluginResourceRegistry | None,
+    object_id: str,
+    findings: list[object],
+) -> dict[str, object] | None:
+    if registry is None or not _looks_like_plugin_id_reference(spec, item):
+        return None
+    resource_id = item.strip() if isinstance(item, str) else str(spec.get("id", "")).strip()
+    registered = registry.get(resource_id)
+    if registered is None:
+        findings.append(_plugin_finding("PLUGIN.CONFIG.UNKNOWN_RESOURCE", f"unknown plugin resource id: {resource_id}", object_id))
+        return None
+    resolved: dict[str, object] = dict(spec)
+    resolved.setdefault("name", registered.name)
+    resolved.setdefault("type", registered.plugin_type)
+    resolved.setdefault("module", registered.module)
+    resolved.setdefault("class", registered.class_name)
+    resolved.setdefault("display_name", registered.display_name)
+    resolved.setdefault("description", registered.description)
+    resolved.setdefault("category", registered.category)
+    resolved.setdefault("version", registered.version)
+    return resolved
+
+
+def _looks_like_plugin_id_reference(spec: Mapping[str, Any], item: object) -> bool:
+    if isinstance(item, str):
+        return True
+    return "id" in spec and "module" not in spec and "path" not in spec
 
 
 def _load_plugin(spec: Mapping[str, Any], *, base_path: Path) -> tuple[object, PluginInfo, tuple[str, ...]]:
@@ -239,7 +281,18 @@ def _import_plugin_module(module_ref: str, *, base_path: Path):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module
-    return importlib.import_module(module_ref)
+    base = str(base_path.resolve())
+    inserted = base not in sys.path
+    if inserted:
+        sys.path.insert(0, base)
+    try:
+        return importlib.import_module(module_ref)
+    finally:
+        if inserted:
+            try:
+                sys.path.remove(base)
+            except ValueError:
+                pass
 
 
 def _plugin_name(plugin: object) -> str:

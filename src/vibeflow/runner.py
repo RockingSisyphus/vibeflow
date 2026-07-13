@@ -8,6 +8,7 @@ from typing import Any, Mapping
 from uuid import uuid4
 
 from vibeflow.config.loader import ConfigLoadError, load_config_document
+from vibeflow.config.resource_registries import discover_config_resource_registry_context
 from vibeflow.config.resources import ConfigResources, load_config_resources
 from vibeflow.config.schema import collect_config_schema_findings
 from vibeflow.health.types import HealthFinding, HealthReport
@@ -57,8 +58,16 @@ def run_checked(
     _write_json(run_dir / "input_summary.json", summarize_mapping(dict(initial or {})))
 
     document = _load_document_or_refuse(path, run_dir, actual_run_id)
-    plugin_registry = _load_plugins_or_refuse(document.data, path, run_dir, actual_run_id)
-    resources, resource_findings = load_config_resources(document.data, base_path=path.parent, plugin_registry=plugin_registry)
+    registry_context = discover_config_resource_registry_context(document.data, config_path=path)
+    plugin_registry = _load_plugins_or_refuse(document.data, path, run_dir, actual_run_id, registry_context=registry_context)
+    resources, resource_findings = load_config_resources(
+        document.data,
+        base_path=registry_context.base_path,
+        plugin_registry=plugin_registry,
+        base_lib_registry=registry_context.base_lib_registry,
+        plugin_resource_registry=registry_context.plugin_resource_registry,
+        base_lib_paths=registry_context.base_lib_paths,
+    )
     policy_result = resolve_effective_policy(
         document.data,
         config_path=path,
@@ -67,7 +76,7 @@ def run_checked(
     )
     effective_policy = policy_result.effective_policy.to_dict()
     _write_json(run_dir / "effective_policy.json", effective_policy)
-    preflight_warnings = _refuse_on_schema_findings(document.data, (*resource_findings, *policy_result.findings), effective_policy, run_dir, actual_run_id)
+    preflight_warnings = _refuse_on_schema_findings(document.data, (*registry_context.findings, *resource_findings, *policy_result.findings), effective_policy, run_dir, actual_run_id)
     graph, compiled = _compile_or_refuse(document.data, plugin_registry, effective_policy, run_dir, actual_run_id, config_path=path)
     health = _validate_run_health(graph, registry, plugin_registry, policy_result, effective_policy, document.nodeset_imports, resources, preflight_warnings=preflight_warnings)
     _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources, runtime_options=runtime_options)
@@ -102,8 +111,12 @@ def _load_document_or_refuse(path: Path, run_dir: Path, run_id: str):
         raise CheckedRunError("run refused: config load failed", result) from exc
 
 
-def _load_plugins_or_refuse(config_data: Mapping[str, Any], path: Path, run_dir: Path, run_id: str):
-    plugin_registry, plugin_findings = load_plugins_from_config(config_data, base_path=path.parent)
+def _load_plugins_or_refuse(config_data: Mapping[str, Any], path: Path, run_dir: Path, run_id: str, *, registry_context=None):
+    plugin_registry, plugin_findings = load_plugins_from_config(
+        config_data,
+        base_path=registry_context.base_path if registry_context is not None else path.parent,
+        plugin_resource_registry=registry_context.plugin_resource_registry if registry_context is not None else None,
+    )
     if plugin_findings:
         health = HealthReport(
             status="ERROR",

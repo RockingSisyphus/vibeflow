@@ -6,7 +6,8 @@ from typing import Mapping
 
 from vibeflow.config.schema import collect_policy_schema_findings
 from vibeflow.health.types import HealthFinding
-from vibeflow.policy import DEFAULT_POLICY_DATA, EffectivePolicy, PolicyResolveResult, _merge_policy
+from vibeflow.plugin import PluginRegistry
+from vibeflow.policy import DEFAULT_POLICY_DATA, EffectivePolicy, PolicyResolveResult, _apply_policy_plugins, _merge_policy
 from vibeflow.health.schema_findings import schema_finding
 
 
@@ -15,6 +16,7 @@ def resolve_workspace_effective_policy(
     *,
     workspace_path: Path,
     base_lib_policies: tuple[Mapping[str, tuple[str, ...]], ...] = (),
+    plugin_registry: PluginRegistry | None = None,
 ) -> PolicyResolveResult:
     effective = deepcopy(DEFAULT_POLICY_DATA)
     sources: list[str] = ["kernel.default_policy"]
@@ -43,6 +45,8 @@ def resolve_workspace_effective_policy(
                 _merge_policy(effective, workspace_policy)
                 sources.append(f"workspace.policy:{workspace_path}")
     _apply_workspace_base_lib_declarations(effective, sources, base_lib_policies)
+    if plugin_registry is not None:
+        _apply_policy_plugins(effective, sources, findings, plugin_registry)
     return PolicyResolveResult(EffectivePolicy(effective, tuple(sources)), tuple(findings))
 
 

@@ -5,6 +5,7 @@ from pathlib import Path
 from vibeflow.cli.reports import config_load_error_report, dedupe_findings, fail_report, graph_config_error_report
 from vibeflow.compiler import GraphCompiler, GraphCompileError
 from vibeflow.config.loader import ConfigLoadError, load_config_document
+from vibeflow.config.resource_registries import discover_config_resource_registry_context
 from vibeflow.config.resources import load_config_resources
 from vibeflow.config.schema import collect_config_schema_findings
 from vibeflow.data_contract import providers_to_dicts, requirements_to_dicts
@@ -21,13 +22,25 @@ def validate_config_path(path: Path, *, policy_path: Path | None = None) -> Heal
     except ConfigLoadError as exc:
         return config_load_error_report(exc, object_type="config", object_id=str(path))
 
-    plugin_registry, plugin_findings = load_plugins_from_config(document.data, base_path=path.parent)
+    registry_context = discover_config_resource_registry_context(document.data, config_path=path)
+    plugin_registry, plugin_findings = load_plugins_from_config(
+        document.data,
+        base_path=registry_context.base_path,
+        plugin_resource_registry=registry_context.plugin_resource_registry,
+    )
     if plugin_findings:
         return HealthReport(status="ERROR", errors=tuple(plugin_findings), effective_policy=default_effective_policy().to_dict())
-    resources, resource_findings = load_config_resources(document.data, base_path=path.parent, plugin_registry=plugin_registry)
+    resources, resource_findings = load_config_resources(
+        document.data,
+        base_path=registry_context.base_path,
+        plugin_registry=plugin_registry,
+        base_lib_registry=registry_context.base_lib_registry,
+        plugin_resource_registry=registry_context.plugin_resource_registry,
+        base_lib_paths=registry_context.base_lib_paths,
+    )
     policy_result = resolve_effective_policy(document.data, config_path=path, explicit_policy_path=policy_path, plugin_registry=plugin_registry)
     effective_policy = policy_result.effective_policy.to_dict()
-    schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *resource_findings, *policy_result.findings))
+    schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *registry_context.findings, *resource_findings, *policy_result.findings))
     schema_errors = tuple(finding for finding in schema_findings if finding.severity == "error")
     schema_warnings = tuple(finding for finding in schema_findings if finding.severity == "warning")
     if schema_errors:
@@ -58,6 +71,7 @@ def validate_config_path(path: Path, *, policy_path: Path | None = None) -> Heal
             "data_edges": [edge.pair for edge in compiled.data_edges],
             "effective_edges": [edge.pair for edge in compiled.effective_edges],
             "resources": resources.to_dict(),
+            "available_resources": registry_context.available_resources.to_dict(),
         },
         effective_policy=effective_policy,
     )

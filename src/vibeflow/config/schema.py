@@ -281,10 +281,10 @@ def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
         status = str(item.get("status", "implemented")).strip() or "implemented"
         if status not in STATUSES:
             findings.append(_error("CONFIG.SCHEMA.RESOURCE_STATUS", f"{prefix}.status must be implemented or planned", f"{prefix}.status"))
-        if status == "implemented" and not _non_empty_string(item.get("module", item.get("path"))):
-            findings.append(_error("CONFIG.SCHEMA.PLUGIN_MODULE", f"{prefix}.module or path must be a non-empty string", f"{prefix}.module"))
-        if status == "planned" and not (_non_empty_string(item.get("module", item.get("path"))) or _non_empty_string(item.get("name"))):
-            findings.append(_error("CONFIG.SCHEMA.PLUGIN_PLANNED_ID", f"{prefix} planned plugin must define module/path or name", prefix))
+        if status == "implemented" and not (_non_empty_string(item.get("id")) or _non_empty_string(item.get("module", item.get("path")))):
+            findings.append(_error("CONFIG.SCHEMA.PLUGIN_MODULE", f"{prefix}.id, module, or path must be a non-empty string", f"{prefix}.module"))
+        if status == "planned" and not (_non_empty_string(item.get("id")) or _non_empty_string(item.get("module", item.get("path"))) or _non_empty_string(item.get("name"))):
+            findings.append(_error("CONFIG.SCHEMA.PLUGIN_PLANNED_ID", f"{prefix} planned plugin must define id, module/path, or name", prefix))
         if "class" in item and not _non_empty_string(item["class"]):
             findings.append(_error("CONFIG.SCHEMA.PLUGIN_CLASS", f"{prefix}.class must be a non-empty string", f"{prefix}.class"))
         if item.get("type", "policy") == "boundary":
@@ -323,8 +323,8 @@ def _validate_base_lib_resources(value: Any, findings: list[HealthFinding]) -> N
         if not isinstance(item, Mapping):
             findings.append(_error("CONFIG.SCHEMA.BASE_LIB_MODULE", f"{prefix} must be a string or object", prefix))
             continue
-        if not (_non_empty_string(item.get("module")) or _non_empty_string(item.get("name"))):
-            findings.append(_error("CONFIG.SCHEMA.BASE_LIB_MODULE", f"{prefix}.module or name must be a non-empty string", f"{prefix}.module"))
+        if not (_non_empty_string(item.get("id")) or _non_empty_string(item.get("module")) or _non_empty_string(item.get("name"))):
+            findings.append(_error("CONFIG.SCHEMA.BASE_LIB_MODULE", f"{prefix}.id, module, or name must be a non-empty string", f"{prefix}.module"))
         status = str(item.get("status", "implemented")).strip() or "implemented"
         if status not in STATUSES:
             findings.append(_error("CONFIG.SCHEMA.RESOURCE_STATUS", f"{prefix}.status must be implemented or planned", f"{prefix}.status"))
