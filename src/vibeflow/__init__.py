@@ -4,7 +4,7 @@ from vibeflow.base_lib import BaseLibDependencySummary, BaseLibFinding, BaseLibM
 from vibeflow.architecture_report import build_architecture_report
 from vibeflow.config.loader import ConfigDocument, ConfigLoadError, load_config_document, strip_jsonc_comments
 from vibeflow.compiler import CompiledGraph, GraphCompileError, GraphCompiler
-from vibeflow.config.resources import BaseLibInfo, BaseLibResource, ConfigResources, PluginInfo, PluginResource, load_config_resources
+from vibeflow.config.resources import BaseLibInfo, BaseLibRegistry, BaseLibResource, ConfigResources, PluginInfo, PluginResource, PluginResourceRegistry, load_config_resources
 from vibeflow.data_contract import DataEnvelope, DataProvider, DataRequirement, RunResult
 from vibeflow.runtime.block_compiler import explain_block_compilation
 from vibeflow.runtime.planning import CompiledBlock, ExecutionPlan, NodeFrame, build_execution_plan
@@ -50,6 +50,7 @@ __all__ = [
     "BaseLibFinding",
     "BaseLibDependencySummary",
     "BaseLibInfo",
+    "BaseLibRegistry",
     "BaseLibModuleReport",
     "BaseLibResource",
     "BaseLibScanReport",
@@ -91,6 +92,7 @@ __all__ = [
     "PluginInfo",
     "PluginRegistry",
     "PluginResource",
+    "PluginResourceRegistry",
     "PlannedBehavior",
     "PolicyPlugin",
     "PolicyResolveResult",

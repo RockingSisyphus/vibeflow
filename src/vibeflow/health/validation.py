@@ -75,7 +75,7 @@ def validate_graph_health(
         append_flowchart_health(graph, compiled, state, registry=registry)
         _append_mainline_health(graph, compiled, registry, state)
     _append_node_config_health(graph, registry, state, global_config=global_config)
-    append_data_contract_warnings(graph, compiled, state)
+    append_data_contract_warnings(graph, compiled, state, registry=registry)
     append_join_policy_health(graph, compiled, state)
     _append_registry_namespace_smells(registry, state)
     _append_duplicate_logic_findings(state)

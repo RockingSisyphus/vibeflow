@@ -9,66 +9,24 @@
     "allow_config_override": true
   },
   "base_lib": {
-    "paths": [
-      "../base_lib"
-    ],
     "modules": [
       {
-        "module": "base_lib.good_math",
-        "status": "implemented",
-        "display_name": "Good Math",
-        "category": "sandbox",
-        "description": "Validated arithmetic helper functions for sandbox resource checks.",
-        "version": "0.1.0"
+        "id": "good_math"
       },
       {
-        "module": "base_lib.good_chain_a",
-        "status": "implemented",
-        "display_name": "Good Chain A",
-        "category": "sandbox",
-        "description": "A valid dependency-chain helper module for sandbox resource checks.",
-        "version": "0.1.0"
+        "id": "good_chain_a"
       },
       {
-        "module": "base_lib.sandbox_arithmetic",
-        "status": "implemented",
-        "display_name": "Sandbox Arithmetic",
-        "category": "sandbox",
-        "description": "Arithmetic helper functions used by the resource nodeset fixture.",
-        "version": "0.1.0"
-      },
-      {
-        "module": "base_lib.future_arithmetic",
-        "status": "planned",
-        "display_name": "Future Arithmetic",
-        "category": "sandbox",
-        "description": "planned arithmetic helpers for later sandbox cases",
-        "version": "0.1.0"
+        "id": "sandbox_arithmetic"
       }
     ]
   },
   "plugins": [
     {
-      "module": "plugins.value_plugin",
-      "class": "ValueShiftPlugin",
-      "type": "runtime",
-      "status": "implemented",
-      "display_name": "Sandbox Value Shift",
-      "category": "sandbox",
-      "description": "Runtime plugin that shifts sandbox values during resource fixture execution.",
-      "version": "0.1.0",
+      "id": "value_shift",
       "config": {
         "shift": 9
       }
-    },
-    {
-      "name": "future_value_plugin",
-      "type": "runtime",
-      "status": "planned",
-      "display_name": "Future Value Plugin",
-      "category": "sandbox",
-      "description": "planned runtime value hook",
-      "version": "0.1.0"
     }
   ],
   "pipeline": {

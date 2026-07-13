@@ -376,8 +376,6 @@ def _add_runtime_options(parser: argparse.ArgumentParser) -> None:
 
 
 def _runtime_options_from_args(args: argparse.Namespace):
-    from vibeflow.runtime.options import RuntimeOptions
-
     values: dict[str, object] = {}
     if args.runtime_profile == "train":
         values.update(
@@ -409,4 +407,4 @@ def _runtime_options_from_args(args: argparse.Namespace):
         values["async_flush_timeout"] = args.async_flush_timeout
     if args.allow_planned_stub:
         values["allow_planned_stub"] = True
-    return RuntimeOptions(**values)
+    return values

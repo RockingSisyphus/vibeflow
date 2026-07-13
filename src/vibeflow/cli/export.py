@@ -126,6 +126,7 @@ def _load_legacy_graph(args):
     from vibeflow.cli.reports import dedupe_findings
     from vibeflow.compiler import GraphCompiler
     from vibeflow.config.loader import load_config_document
+    from vibeflow.config.resource_registries import discover_config_resource_registry_context
     from vibeflow.config.resources import load_config_resources
     from vibeflow.config.schema import collect_config_schema_findings
     from vibeflow.graph_config import parse_graph_config
@@ -136,9 +137,21 @@ def _load_legacy_graph(args):
 
     config_path = Path(args.config)
     document = load_config_document(config_path)
-    plugin_registry, plugin_findings = load_plugins_from_config(document.data, base_path=config_path.parent)
-    resources, resource_findings = load_config_resources(document.data, base_path=config_path.parent, plugin_registry=plugin_registry)
-    schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *plugin_findings, *resource_findings))
+    registry_context = discover_config_resource_registry_context(document.data, config_path=config_path)
+    plugin_registry, plugin_findings = load_plugins_from_config(
+        document.data,
+        base_path=registry_context.base_path,
+        plugin_resource_registry=registry_context.plugin_resource_registry,
+    )
+    resources, resource_findings = load_config_resources(
+        document.data,
+        base_path=registry_context.base_path,
+        plugin_registry=plugin_registry,
+        base_lib_registry=registry_context.base_lib_registry,
+        plugin_resource_registry=registry_context.plugin_resource_registry,
+        base_lib_paths=registry_context.base_lib_paths,
+    )
+    schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *registry_context.findings, *plugin_findings, *resource_findings))
     schema_errors = tuple(finding for finding in schema_findings if finding.severity == "error")
     if schema_errors:
         status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin", "base_lib"} for finding in schema_errors) else "FAIL"

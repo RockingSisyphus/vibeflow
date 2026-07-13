@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from vibeflow.compiler import CompiledGraph, GraphCompileError, GraphCompiler
 from vibeflow.runtime.block_compiler import explain_block_compilation
-from vibeflow.config.resources import BaseLibInfo, BaseLibResource, ConfigResources, PluginInfo, PluginResource, load_config_resources
+from vibeflow.config.resources import BaseLibInfo, BaseLibRegistry, BaseLibResource, ConfigResources, PluginInfo, PluginResource, PluginResourceRegistry, load_config_resources
 from vibeflow.data_contract import DataEnvelope, DataProvider, DataRequirement, RunResult
 from vibeflow.graph_config import EdgeSpec, GraphConfig, GraphConfigError, NodeSpec, NodesetSpec, parse_graph_config
 from vibeflow.health import HealthFinding, HealthReport, validate_graph_health
@@ -17,6 +17,7 @@ __all__ = [
     "CheckedRunError",
     "CheckedRunResult",
     "BaseLibInfo",
+    "BaseLibRegistry",
     "BaseLibResource",
     "CompiledGraph",
     "ConfigResources",
@@ -49,6 +50,7 @@ __all__ = [
     "PipelineRuntime",
     "PipelineRuntimeError",
     "PluginInfo",
+    "PluginResourceRegistry",
     "PluginResource",
     "PlannedBehavior",
     "PolicyResolveResult",

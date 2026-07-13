@@ -12,6 +12,7 @@ class RuntimeOptions:
     nodeset_hooks: bool = True
     block_hooks: bool = True
     execution: str = "plan"
+    async_max_workers: int = 4
     async_flush_timeout: float | None = None
     allow_planned_stub: bool = False
 
@@ -20,6 +21,8 @@ class RuntimeOptions:
             raise ValueError("runtime trace must be one of: full, boundary, off")
         if self.execution not in {"plan", "block", "compiled"}:
             raise ValueError("runtime execution must be one of: plan, block, compiled")
+        if not isinstance(self.async_max_workers, int) or isinstance(self.async_max_workers, bool) or self.async_max_workers <= 0:
+            raise ValueError("runtime async_max_workers must be a positive integer")
         if self.async_flush_timeout is not None and self.async_flush_timeout < 0:
             raise ValueError("runtime async_flush_timeout must be >= 0")
 

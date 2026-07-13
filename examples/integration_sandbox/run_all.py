@@ -919,6 +919,7 @@ def _run_valid_cases() -> list[CaseResult]:
 
 def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     from vibeflow import GraphCompiler, RuntimeOptions, build_execution_plan, export_ascii_flowchart, export_mermaid, is_mermaid_svg_renderer_available, load_config_document, load_config_resources, parse_graph_config, render_mermaid_svg, resolve_effective_policy, run_checked, validate_graph_health
+    from vibeflow.config.resource_registries import discover_config_resource_registry_context
     from vibeflow.config.schema import collect_config_schema_findings
     from vibeflow.plugin import load_plugins_from_config
 
@@ -930,10 +931,22 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     schema_findings = collect_config_schema_findings(document.data)
     if schema_findings:
         raise AssertionError(f"schema findings: {[finding.rule_id for finding in schema_findings]}")
-    plugin_registry, plugin_findings = load_plugins_from_config(document.data, base_path=config_path.parent)
+    registry_context = discover_config_resource_registry_context(document.data, config_path=config_path)
+    plugin_registry, plugin_findings = load_plugins_from_config(
+        document.data,
+        base_path=registry_context.base_path,
+        plugin_resource_registry=registry_context.plugin_resource_registry,
+    )
     if plugin_findings:
         raise AssertionError(f"plugin findings: {[finding.rule_id for finding in plugin_findings]}")
-    resources, resource_findings = load_config_resources(document.data, base_path=config_path.parent, plugin_registry=plugin_registry)
+    resources, resource_findings = load_config_resources(
+        document.data,
+        base_path=registry_context.base_path,
+        plugin_registry=plugin_registry,
+        base_lib_registry=registry_context.base_lib_registry,
+        plugin_resource_registry=registry_context.plugin_resource_registry,
+        base_lib_paths=registry_context.base_lib_paths,
+    )
     if resource_findings:
         raise AssertionError(f"resource findings: {[finding.rule_id for finding in resource_findings]}")
     policy_result = resolve_effective_policy(document.data, config_path=config_path, explicit_policy_path=POLICY_PATH, plugin_registry=plugin_registry)
@@ -1405,14 +1418,27 @@ def _invalid_config(case: dict[str, Any]) -> CaseResult:
 def _concern_config(case: dict[str, Any]) -> CaseResult:
     from registry import build_node_registry
     from vibeflow import load_config_document, load_config_resources, parse_graph_config, resolve_effective_policy, validate_graph_health
+    from vibeflow.config.resource_registries import discover_config_resource_registry_context
     from vibeflow.plugin import load_plugins_from_config
 
     config_path = CONFIG_DIR / str(case["config"])
     document = load_config_document(config_path)
-    plugin_registry, plugin_findings = load_plugins_from_config(document.data, base_path=config_path.parent)
+    registry_context = discover_config_resource_registry_context(document.data, config_path=config_path)
+    plugin_registry, plugin_findings = load_plugins_from_config(
+        document.data,
+        base_path=registry_context.base_path,
+        plugin_resource_registry=registry_context.plugin_resource_registry,
+    )
     if plugin_findings:
         raise AssertionError(f"plugin findings: {[finding.rule_id for finding in plugin_findings]}")
-    resources, resource_findings = load_config_resources(document.data, base_path=config_path.parent, plugin_registry=plugin_registry)
+    resources, resource_findings = load_config_resources(
+        document.data,
+        base_path=registry_context.base_path,
+        plugin_registry=plugin_registry,
+        base_lib_registry=registry_context.base_lib_registry,
+        plugin_resource_registry=registry_context.plugin_resource_registry,
+        base_lib_paths=registry_context.base_lib_paths,
+    )
     if resource_findings:
         raise AssertionError(f"resource findings: {[finding.rule_id for finding in resource_findings]}")
     policy_result = resolve_effective_policy(document.data, config_path=config_path, explicit_policy_path=POLICY_PATH, plugin_registry=plugin_registry)

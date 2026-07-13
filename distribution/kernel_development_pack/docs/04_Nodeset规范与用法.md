@@ -39,21 +39,35 @@ nodeset 是独立 JSONC 实现文件，作用类似 Python node 的 `.py` 文件
           {"type": "value.in", "cardinality": "exactly_one", "display_name": "Value In"}
         ],
         "provides": [
-          {"key": "value.out", "type": "value.out", "display_name": "Value Out"}
+          {"key": "semantic.value", "type": "semantic.value", "display_name": "Semantic Value"}
         ],
         "config": {"delta": 1}
+      },
+      {
+        "id": "output",
+        "type_used": "demo.output",
+        "display_name": "Output I/O",
+        "description": "Adapts the internal semantic value to the external nodeset contract.",
+        "requires": [
+          {"type": "semantic.value", "cardinality": "exactly_one", "display_name": "Semantic Value"}
+        ],
+        "provides": [
+          {"key": "value.out", "type": "value.out", "display_name": "Value Out"}
+        ]
       },
       {
         "id": "end",
         "type_used": "demo.end",
         "display_name": "End",
-        "description": "Consumes the add-one output.",
-        "requires": [
-          {"type": "value.out", "cardinality": "exactly_one", "display_name": "Value Out"}
-        ]
+        "description": "Ends after the add-one output is produced.",
+        "similar_to": {
+          "node": "start",
+          "relationship": "copy",
+          "reason": "Both terminal calls intentionally use the same empty lifecycle implementation."
+        }
       }
     ],
-    "edges": [["start", "add"], ["add", "end"]],
+    "edges": [["start", "add"], ["add", "output"], ["output", "end"]],
     "outputs": [
       {"type": "value.out", "cardinality": "exactly_one", "display_name": "Value Out"}
     ]
@@ -68,6 +82,14 @@ nodeset 是独立 JSONC 实现文件，作用类似 Python node 的 `.py` 文件
 - `name`、`category`、`version`、`purity`、`exports` 已从 nodeset 模型中移除，出现即为 schema/config error。
 - nodeset 内部允许 `io`、`data_store`、`document`、`external=True` 等节点；可读性通过展开 SVG 审查，不再要求 nodeset 纯函数属性。
 - nodeset 对外输出只看根对象 `provides`。运行时会从内部 pipeline result 中按 `provides[].type` 取值，再写入调用点的 `provides[].key`。
+
+## Nodeset 内部的数据与运行时门禁
+
+- terminal start/end 只负责生命周期，不读取、不提供、不转发业务数据；nodeset 也使用 `terminal → input I/O → process → output I/O → terminal` 的控制脊柱。
+- `requires` 是数据需求，不是控制分支数。顺序语义链保持默认 join；只有至少两条每轮都会激活的真实并行 schedule 分支才能使用 `join_policy="all"`。data-bypass 只传输 payload，必须从真正拥有所需 envelope 的 provider 发出，不会激活目标。
+- 修改图后必须消除 `GRAPH.DATA.RUNTIME_REQUIREMENT_UNREACHABLE`、`GRAPH.DATA.NO_PAYLOAD_BYPASS`、`GRAPH.JOIN.ALL_DEPENDS_ON_TRANSFER_ONLY`、`GRAPH.JOIN.ALL_BRANCHES_MUTUALLY_EXCLUSIVE` 和 `GRAPH.JOIN.REDUNDANT_ALL`；按 finding 中的 schedule/transfer incoming、候选 provider、decision 分支条件和修复建议改真实数据流。
+- 如果使用 tagged value，tag 必须是规范的精确字面量，value 必须是匹配的 Python 原生类型，不得缩写 tag 或把整数保留为字符串。
+- `validate` 和 `quality` 只是静态门禁。每个入口还要执行最小 runtime probe，检查结果 key 和原生类型、`runtime.stop_reason` 等于 `completed`，以及 `runtime.qualified_exec_order` 真实经过预期的内部路径。
 
 ## 在主 config 中导入和调用
 
@@ -185,6 +207,16 @@ nodeset 也可以声明内部 `global_config`；调用点 `config` 会覆盖 nod
 - nodeset 根 `provides` 必须能由内部 pipeline output 或内部 provider 产生，否则报 `NODESET.PROVIDES.UNKNOWN_KEY`。
 - nodeset 内部需要从外层读取的类型必须声明在 nodeset `requires` 中。
 - 内部 node 数量超过 10 会给 `NODESET.SMELL.TOO_WIDE` warning，推荐继续拆分小 nodeset。
+
+## Nodeset 内部的调度与数据边
+
+- nodeset 内部的 terminal start/end 同样不携带业务数据。外部输入只会注入真正的初始输入 node：没有 schedule incoming，或直接由空 start 调度的有 `requires` node。
+- `requires` 不会自动生成控制分支，也不会让较后的 node 再次获得 nodeset input。需要保留上游 envelope 时，从真实 provider 写显式 data-bypass，不要从空 start 画“数据线”。
+- 顺序语义 nodeset 不要因为 node 有多个 requirement 就写 `join_policy: "all"`。只有 fan-out 后两条真实 schedule 分支都会在本轮激活时，汇合 node 才使用 `all`。
+- 优先在 nodeset 内保持 `terminal → input I/O → semantic process → output I/O → terminal` 脊柱。nodeset 根 `provides` 导出 output I/O 的边界 contract，不要让 terminal 或外部 caller 代替输出适配。
+- Health 会在每个 nested nodeset owner 内单独检查 runtime requirement、bypass payload 和 join edge class；修复时先看 `details.owner=nodeset:<type_key>`。
+
+完整且由 pytest 实际执行的三种中性图形见 `03_Config与Pipeline规范.md` 的“可执行的中性拓扑示例”：顺序数据 bypass、真实并行 `all` 汇合、typed I/O 边界。这些规则在顶层 pipeline 和 nodeset 内部完全一致。
 
 如果怀疑 config 读取或 nodeset 解析慢，可开启解析 trace：
 

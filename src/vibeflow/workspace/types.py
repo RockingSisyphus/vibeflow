@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
-from vibeflow.config.resources import ConfigResources
+from vibeflow.config.resources import BaseLibRegistry, ConfigResources, PluginResourceRegistry
 from vibeflow.devtools.code_quality_types import QualityStructureLimits
 from vibeflow.health.types import HealthFinding
 from vibeflow.config.path_utils import is_relative_to
@@ -15,7 +15,16 @@ from vibeflow.registry import NodeRegistry
 
 WORKSPACE_CONFIG_NAME = "vibeflow_config.jsonc"
 PROJECT_CONFIG_NAME = "vibeflow_project.jsonc"
-WORKSPACE_FORBIDDEN_CONFIG_FIELDS = frozenset({"policy", "base_lib", "plugins"})
+WORKSPACE_FORBIDDEN_CONFIG_FIELDS = frozenset({"policy"})
+
+
+@dataclass(frozen=True)
+class WorkspaceResourceRegistries:
+    base_libs: BaseLibRegistry = field(default_factory=BaseLibRegistry)
+    plugins: PluginResourceRegistry = field(default_factory=PluginResourceRegistry)
+    base_lib_paths: tuple[str, ...] = ()
+    has_base_lib_registry: bool = False
+    has_plugin_registry: bool = False
 
 
 @dataclass
@@ -38,6 +47,7 @@ class WorkspaceRoot:
     registry_ref: str = ""
     quality_enabled: bool = True
     quality_structure: QualityStructureLimits = field(default_factory=QualityStructureLimits)
+    runtime_options: Mapping[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -77,5 +87,7 @@ class WorkspaceEnvironment:
     registry: NodeRegistry
     plugin_registry: PluginRegistry
     resources: ConfigResources
+    available_resources: ConfigResources
+    resource_registries: Mapping[str, WorkspaceResourceRegistries]
     effective_policy: EffectivePolicy
     findings: tuple[HealthFinding, ...]

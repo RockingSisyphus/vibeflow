@@ -98,6 +98,7 @@ def build_distribution(output: Path, *, replace: bool = True, run_self_check: bo
     _ensure_standard_project_dirs(output)
     _write_root_readme(output)
     _write_kernel_manifest(output)
+    _normalize_output_modes(output)
 
 
 def _run_core_self_check() -> None:
@@ -217,6 +218,24 @@ def _ensure_standard_project_dirs(output: Path) -> None:
         (output / relative).mkdir(parents=True, exist_ok=True)
 
 
+def _normalize_output_modes(output: Path) -> None:
+    """Make the directory tree and its deterministic ZIP use identical modes.
+
+    The project is commonly built under a collaborative ``umask 0002``, which
+    otherwise leaves generated files at 0664 while the frozen ZIP correctly
+    records portable 0644 entries.  Tree hashes include modes, so normalize the
+    generated source tree before it is validated or frozen.
+    """
+
+    for path in sorted(output.rglob("*"), key=lambda item: item.as_posix()):
+        if path.is_symlink():
+            raise BuildDistributionError(
+                f"refusing to normalize a distribution containing a symlink: {path}"
+            )
+        path.chmod(0o755 if path.is_dir() else 0o644)
+    output.chmod(0o755)
+
+
 def _remove_tree(path: Path) -> None:
     for item in sorted(path.rglob("*"), key=lambda candidate: len(candidate.parts), reverse=True):
         if item.is_dir():
@@ -232,7 +251,15 @@ def _ignored(relative: Path) -> bool:
 
 
 def _write_root_readme(output: Path) -> None:
-    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    source_date_epoch = os.environ.get("SOURCE_DATE_EPOCH")
+    if source_date_epoch is None:
+        generated = datetime.now(timezone.utc)
+    else:
+        try:
+            generated = datetime.fromtimestamp(int(source_date_epoch), timezone.utc)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise BuildDistributionError("SOURCE_DATE_EPOCH must be an integer Unix timestamp") from exc
+    generated_at = generated.strftime("%Y-%m-%d %H:%M:%S UTC")
     text = f"""# VibeFlow 可复制开发包
 
 生成时间：{generated_at}
@@ -261,7 +288,7 @@ python run.py mermaid --config project/configs/main.jsonc --output reports/graph
 python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
 python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
 python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg
-python run.py quality --path project
+python run.py quality
 ```
 
 ## Workspace 配置
