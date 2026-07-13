@@ -19,7 +19,7 @@ from vibeflow.runtime.summaries import summarize_mapping
 from vibeflow.graph_config import GraphConfig
 from vibeflow.graph_config.planned_behavior import project_root_for_config
 from vibeflow.registry import NodeRegistry
-from vibeflow.runtime.options import runtime_options as normalize_runtime_options
+from vibeflow.runtime.options import RuntimeOptions, runtime_options as normalize_runtime_options
 
 
 @dataclass(frozen=True)
@@ -54,6 +54,7 @@ def run_checked(
     actual_run_id = run_id or _new_run_id()
     if boundary_registry is not None:
         raise ValueError("boundary_registry is removed; use flowchart nodes")
+    effective_runtime_options = normalize_runtime_options(runtime_options)
     run_dir = _prepare_run_dir(run_root, actual_run_id)
     _write_json(run_dir / "input_summary.json", summarize_mapping(dict(initial or {})))
 
@@ -78,8 +79,17 @@ def run_checked(
     _write_json(run_dir / "effective_policy.json", effective_policy)
     preflight_warnings = _refuse_on_schema_findings(document.data, (*registry_context.findings, *resource_findings, *policy_result.findings), effective_policy, run_dir, actual_run_id)
     graph, compiled = _compile_or_refuse(document.data, plugin_registry, effective_policy, run_dir, actual_run_id, config_path=path)
-    health = _validate_run_health(graph, registry, plugin_registry, policy_result, effective_policy, document.nodeset_imports, resources, preflight_warnings=preflight_warnings)
-    _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources, runtime_options=runtime_options)
+    health = _validate_run_health(
+        graph,
+        registry,
+        plugin_registry,
+        policy_result,
+        document.nodeset_imports,
+        resources,
+        runtime_options=effective_runtime_options,
+        preflight_warnings=preflight_warnings,
+    )
+    _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources, runtime_options=effective_runtime_options)
     if health.status not in {"FAIL", "ERROR"}:
         compiled = _compile_with_registry_or_refuse(graph, registry, effective_policy, run_dir, actual_run_id)
     try:
@@ -90,7 +100,7 @@ def run_checked(
             _refuse_on_health_failure(health, run_dir, actual_run_id)
         raise
     _refuse_on_health_failure(health, run_dir, actual_run_id)
-    context = _execute_runtime(graph, registry, plugin_registry, initial, run_dir, runtime_options, resources)
+    context = _execute_runtime(graph, registry, plugin_registry, initial, run_dir, effective_runtime_options, resources)
     _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
     return CheckedRunResult(actual_run_id, run_dir, health, context)
 
@@ -228,9 +238,9 @@ def _validate_run_health(
     registry: NodeRegistry,
     plugin_registry,
     policy_result,
-    effective_policy: dict[str, Any],
     nodeset_imports: tuple[Mapping[str, Any], ...],
     resources: ConfigResources,
+    runtime_options: RuntimeOptions,
     preflight_warnings: tuple[HealthFinding, ...] = (),
 ) -> HealthReport:
     from vibeflow.health import validate_graph_health
@@ -242,13 +252,20 @@ def _validate_run_health(
         global_config=resources.global_config,
         purity_policy=policy_result.effective_policy.to_purity_policy(),
         effective_policy=policy_result.effective_policy,
+        nodeset_max_depth=runtime_options.nodeset_max_depth,
     )
     info = dict(health.info)
     info["nodeset_imports"] = [dict(item) for item in nodeset_imports]
     info["resources"] = resources.to_dict()
     warnings = (*preflight_warnings, *health.warnings)
     status = "CONCERNS" if health.status == "PASS" and warnings else health.status
-    return replace(health, status=status, warnings=warnings, effective_policy=effective_policy, info=info)
+    return replace(
+        health,
+        status=status,
+        warnings=warnings,
+        effective_policy=policy_result.effective_policy.to_dict(),
+        info=info,
+    )
 
 
 def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None, resources: ConfigResources | None = None) -> None:

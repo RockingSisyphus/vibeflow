@@ -11,6 +11,7 @@ from vibeflow.config.schema import collect_config_schema_findings
 from vibeflow.data_contract import providers_to_dicts, requirements_to_dicts
 from vibeflow.graph_config import GraphConfigError, parse_graph_config
 from vibeflow.health.types import HealthReport
+from vibeflow.health.nodesets import validate_nodeset_depth
 from vibeflow.graph_config.planned_behavior import project_root_for_config
 from vibeflow.policy import default_effective_policy, resolve_effective_policy
 from vibeflow.plugin import load_plugins_from_config
@@ -56,6 +57,14 @@ def validate_config_path(path: Path, *, policy_path: Path | None = None) -> Heal
         graph = parse_graph_config(document.data, project_root=project_root_for_config(path))
     except GraphConfigError as exc:
         return graph_config_error_report(exc, path=path, effective_policy=effective_policy)
+    depth_findings = validate_nodeset_depth(graph, max_depth=4)
+    if depth_findings:
+        return HealthReport(
+            status="FAIL",
+            errors=depth_findings,
+            warnings=schema_warnings,
+            effective_policy=effective_policy,
+        )
     try:
         compiled = GraphCompiler().compile(graph)
     except GraphCompileError as exc:

@@ -273,7 +273,7 @@ def _write_root_readme(output: Path) -> None:
 - `project/`：可直接运行的示例业务项目骨架。
 - `project/nodes/`、`project/base_lib/`、`project/plugins/`、`project/configs/`：AI 和开发者放业务代码与配置的标准目录。
 - `vibeflow_config.jsonc`：workspace 索引，声明参与加载的 source roots。
-- `project/vibeflow_project.jsonc`：project 级配置，声明 registry、base_lib、plugins 和 quality 开关。
+- `project/vibeflow_project.jsonc`：project 级配置，声明 registry、base_lib、plugins、quality 和 runtime 限制。
 - `run.py`：推荐启动器，会自动加载本地内核和 workspace 配置。
 - `README.md`、`AGENTS.md`：项目可定制指南文件，不属于 kernel manifest。
 
@@ -293,7 +293,7 @@ python run.py quality
 
 ## Workspace 配置
 
-根目录 `vibeflow_config.jsonc` 只声明 workspace roots 和全局 policy；每个 root 自己放 `vibeflow_project.jsonc`，声明该 root 的 registry、base_lib、plugins 和 quality 开关。单项目模板默认是：
+根目录 `vibeflow_config.jsonc` 只声明 workspace roots 和全局 policy；每个 root 自己放 `vibeflow_project.jsonc`，声明该 root 的 registry、base_lib、plugins、quality 和 runtime 限制。单项目模板默认是：
 
 ```jsonc
 {{
@@ -316,7 +316,7 @@ python run.py quality
 }}
 ```
 
-每个 root 下都需要自己的 `vibeflow_project.jsonc`。其中 `registry`、`base_lib.paths` 和 plugin 文件路径都相对所属 root 目录解析。`quality.structure` 使用 warning/error 双阈值治理 root 代码布局，默认允许最多 120 个 `.py`，但单个代码目录超过 16 个 `.py` 会失败，用来推动 `nodes/`、`base_lib/`、`plugins/` 按功能拆分。pipeline config 仍通过 `--config project/configs/main.jsonc` 指定，workspace 模式下不要在 pipeline config 顶层声明 `policy`、`base_lib` 或 `plugins`。
+每个 root 下都需要自己的 `vibeflow_project.jsonc`。其中 `registry`、`base_lib.paths` 和 plugin 文件路径都相对所属 root 目录解析；`runtime.nodeset_max_depth` 默认限制普通 nodeset 与 loop body 最多嵌套 4 层。`quality.structure` 使用 warning/error 双阈值治理 root 代码布局，默认允许最多 120 个 `.py`，但单个代码目录超过 16 个 `.py` 会失败，用来推动 `nodes/`、`base_lib/`、`plugins` 按功能拆分。pipeline config 仍通过 `--config project/configs/main.jsonc` 指定，workspace 模式下不要在 pipeline config 顶层声明 `policy`、`base_lib` 或 `plugins`。
 
 跨 root nodeset import 使用 root id：
 

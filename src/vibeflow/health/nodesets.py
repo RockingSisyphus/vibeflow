@@ -4,7 +4,12 @@ from typing import Mapping
 
 from vibeflow.compiler import GraphCompiler, GraphCompileError
 from vibeflow.graph_config import GraphConfig, LOOP_NODE_TYPES, STATUS_PLANNED
-from vibeflow.health.types import HealthFinding
+from vibeflow.graph_config.nodeset_dependencies import (
+    analyze_nodeset_dependencies,
+    nodeset_dependency_cycles,
+    nodeset_depth_violations,
+)
+from vibeflow.health.types import HealthFinding, HealthReport
 from vibeflow.data_contract import provider_keys, providers_to_dicts, requirement_types, requirements_to_dicts
 from vibeflow.registry import NodeRegistry, NodeRegistryError
 
@@ -12,7 +17,11 @@ from vibeflow.registry import NodeRegistry, NodeRegistryError
 def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry) -> tuple[tuple[HealthFinding, ...], tuple[HealthFinding, ...]]:
     errors: list[HealthFinding] = []
     warnings: list[HealthFinding] = []
-    references = _nodeset_references(graph)
+    dependencies = analyze_nodeset_dependencies(graph)
+    references = {
+        name: tuple(sorted({dependency.target for dependency in items}))
+        for name, items in dependencies.nodesets.items()
+    }
     for nodeset in graph.nodesets.values():
         if nodeset.status == STATUS_PLANNED:
             continue
@@ -41,7 +50,7 @@ def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry) -> tuple[tu
                         details={"referenced_nodeset": ref_name},
                     )
                 )
-    for cycle in _nodeset_cycles(references):
+    for cycle in nodeset_dependency_cycles(dependencies):
         errors.append(
             _nodeset_finding(
                 "NODESET.RECURSION",
@@ -54,6 +63,40 @@ def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry) -> tuple[tu
     for nodeset in graph.nodesets.values():
         errors.extend(_validate_nodeset_usages(nodeset.graph.nodes, graph.nodesets, owner=f"nodeset:{nodeset.type_key}"))
     return tuple(errors), tuple(warnings)
+
+
+def validate_nodeset_depth(graph: GraphConfig, *, max_depth: int) -> tuple[HealthFinding, ...]:
+    findings: list[HealthFinding] = []
+    for violation in nodeset_depth_violations(graph, max_depth=max_depth):
+        chain_text = " -> ".join(violation.chain)
+        findings.append(
+            _nodeset_finding(
+                "NODESET.NESTING.DEPTH_EXCEEDED",
+                violation.chain[0],
+                f"nodeset nesting depth {violation.actual_depth} exceeds configured maximum {max_depth}: {chain_text}",
+                details=violation.to_details(),
+            )
+        )
+    return tuple(findings)
+
+
+def nodeset_depth_error_report(graph: GraphConfig, compiled, *, max_depth: int) -> HealthReport | None:
+    findings = validate_nodeset_depth(graph, max_depth=max_depth)
+    if not findings:
+        return None
+    grouped: dict[str, list[dict[str, object]]] = {}
+    for finding in findings:
+        grouped.setdefault(finding.object_id, []).append(finding.to_dict())
+    return HealthReport(
+        status="FAIL",
+        errors=findings,
+        info={
+            "explicit_edges": [edge.pair for edge in compiled.explicit_edges],
+            "data_edges": [edge.pair for edge in compiled.data_edges],
+            "effective_edges": [edge.pair for edge in compiled.effective_edges],
+            "nodeset_findings": grouped,
+        },
+    )
 
 
 def append_nodeset_finding(
@@ -186,44 +229,6 @@ def _validate_nodeset_key_scope(nodeset) -> tuple[HealthFinding, ...]:
             )
         )
     return tuple(findings)
-
-
-def _nodeset_references(graph: GraphConfig) -> dict[str, tuple[str, ...]]:
-    refs: dict[str, tuple[str, ...]] = {}
-    for name, nodeset in graph.nodesets.items():
-        targets: list[str] = []
-        for node in nodeset.graph.nodes:
-            if node.type_used in graph.nodesets:
-                targets.append(node.type_used)
-            elif node.type_used in LOOP_NODE_TYPES and node.loop.body:
-                targets.append(node.loop.body)
-        refs[name] = tuple(sorted(set(targets)))
-    return refs
-
-
-def _nodeset_cycles(references: dict[str, tuple[str, ...]]) -> tuple[tuple[str, ...], ...]:
-    cycles: list[tuple[str, ...]] = []
-    visiting: list[str] = []
-    visited: set[str] = set()
-
-    def dfs(name: str) -> None:
-        if name in visiting:
-            cycle = tuple((*visiting[visiting.index(name) :], name))
-            if cycle not in cycles:
-                cycles.append(cycle)
-            return
-        if name in visited:
-            return
-        visiting.append(name)
-        for child in references.get(name, ()):
-            if child in references:
-                dfs(child)
-        visiting.pop()
-        visited.add(name)
-
-    for name in sorted(references):
-        dfs(name)
-    return tuple(cycles)
 
 
 def _nodeset_finding(

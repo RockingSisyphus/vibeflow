@@ -1275,6 +1275,59 @@ def test_runtime_options_block_executes_simple_conditional_route() -> None:
     assert list(context.get("runtime.exec_order")) == ["start", "seed", "add", "route", "end"]
 
 
+def _runtime_nodeset_depth_config(depth: int) -> dict:
+    nodesets = [
+        _nodeset_config(
+            "runtime.depth.0",
+            requires=["value.in"],
+            provides=["value.out"],
+            pipeline=_input_add_pipeline(add={"delta": 1}),
+        )
+    ]
+    for index in range(1, depth):
+        child = f"runtime.depth.{index - 1}"
+        nodesets.append(
+            _nodeset_config(
+                f"runtime.depth.{index}",
+                requires=["value.in"],
+                provides=["value.out"],
+                pipeline={
+                    "inputs": [PROV_SPEC("value.in")],
+                    "nodes": [
+                        _node_call("start", "test.start", f"Starts runtime depth wrapper {index}."),
+                        _node_call("call", child, f"Calls {child}.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                        _node_call("end", "test.out_end", f"Ends runtime depth wrapper {index}.", requires=[REQ_SPEC("value.out")]),
+                    ],
+                    "edges": _edge_chain("start", "call", "end"),
+                    "outputs": [REQ_SPEC("value.out")],
+                },
+            )
+        )
+    return {
+        "nodesets": nodesets,
+        "pipeline": {
+            "inputs": [PROV_SPEC("value.in")],
+            "nodes": [
+                _node_call("start", "test.start", "Starts the runtime depth fixture."),
+                _node_call(
+                    "top",
+                    f"runtime.depth.{depth - 1}",
+                    "Calls the runtime depth fixture.",
+                    requires=[REQ_SPEC("value.in")],
+                    provides=[PROV_SPEC("value.out")],
+                ),
+                _node_call("end", "test.out_end", "Ends the runtime depth fixture.", requires=[REQ_SPEC("value.out")]),
+            ],
+            "edges": _edge_chain("start", "top", "end"),
+            "outputs": [REQ_SPEC("value.out")],
+        },
+    }
+
+
+def _runtime_nodeset_depth_graph(depth: int):
+    return parse_graph_config(_runtime_nodeset_depth_config(depth))
+
+
 def test_runtime_options_rejects_unknown_execution() -> None:
     with pytest.raises(ValueError, match="runtime execution"):
         RuntimeOptions(execution="native")
@@ -1284,6 +1337,57 @@ def test_runtime_options_rejects_unknown_execution() -> None:
 def test_runtime_options_rejects_invalid_async_max_workers(value) -> None:
     with pytest.raises(ValueError, match="async_max_workers"):
         RuntimeOptions(async_max_workers=value)
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 1.5, "4"])
+def test_runtime_options_rejects_invalid_nodeset_max_depth(value) -> None:
+    with pytest.raises(ValueError, match="nodeset_max_depth"):
+        RuntimeOptions(nodeset_max_depth=value)
+
+
+def test_runtime_options_default_nodeset_max_depth_is_four() -> None:
+    assert RuntimeOptions().nodeset_max_depth == 4
+
+
+def test_pipeline_runtime_rejects_depth_five_and_allows_explicit_override() -> None:
+    graph = _runtime_nodeset_depth_graph(5)
+
+    with pytest.raises(PipelineRuntimeError, match="nodeset nesting depth 5.*maximum 4"):
+        PipelineRuntime(graph, registry=_registry())
+
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(nodeset_max_depth=5))
+    assert runtime._plan.frames["top"].subplan is not None
+
+
+def test_checked_run_and_validate_use_effective_nodeset_max_depth(tmp_path) -> None:
+    from vibeflow.cli.config import validate_config_path
+
+    config_path = tmp_path / "depth.jsonc"
+    _write_config_file(config_path, _runtime_nodeset_depth_config(5))
+
+    validation = validate_config_path(config_path)
+    with pytest.raises(CheckedRunError) as refused:
+        run_checked(config_path, registry=_registry(), initial={"value.in": 2}, run_root=tmp_path / "runs", run_id="default-depth")
+    result = run_checked(
+        config_path,
+        registry=_registry(),
+        initial={"value.in": 2},
+        run_root=tmp_path / "runs",
+        run_id="custom-depth",
+        runtime_options=RuntimeOptions(nodeset_max_depth=5),
+    )
+
+    assert any(error.rule_id == "NODESET.NESTING.DEPTH_EXCEEDED" for error in validation.errors)
+    assert any(error.rule_id == "NODESET.NESTING.DEPTH_EXCEEDED" for error in refused.value.result.health.errors)
+    assert result.context.get("value.out")["value"] == 3
+
+
+def test_loop_iterations_do_not_increase_nodeset_nesting_depth() -> None:
+    graph = _while_loop_graph(target=5, max_iterations=10)
+
+    context = PipelineRuntime(graph, registry=_loop_registry(), runtime_options=RuntimeOptions(nodeset_max_depth=1)).run({"loop.current": 0})
+
+    assert context.get("loop.final")["value"] == 5
 
 
 def test_async_executor_defaults_to_four_workers() -> None:

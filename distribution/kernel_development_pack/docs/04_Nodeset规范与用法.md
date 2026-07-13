@@ -152,6 +152,8 @@ nodeset 是独立 JSONC 实现文件，作用类似 Python node 的 `.py` 文件
 - `names` 选择器已移除；需要拆分时把每个 nodeset 放到独立文件。
 - 导入链会去重并检测循环；递归导入或递归 nodeset 调用会报 `NODESET.RECURSION`。
 - `vibeflow.loop.while.loop.body` 也引用 nodeset `type_key`，同样参与依赖和递归检查。
+- 普通 nodeset 调用和 `loop.body` 共用最大嵌套深度。顶层 pipeline 为 0，第一次进入 body 为 1，循环迭代次数不增加深度；默认上限为 4，可在所属 root 的 `vibeflow_project.jsonc` 中用 `runtime.nodeset_max_depth` 提高。
+- 深度检查覆盖所有已加载定义，包括未使用和 planned nodeset。超过上限会报 `NODESET.NESTING.DEPTH_EXCEEDED`，`details` 会列出 `limit`、`actual_depth`、`chain` 和逐跳调用点。
 - 健康检查、Mermaid 和 SVG 会标注 nodeset 来自哪个 root/source，方便区分框架层 nodeset 和项目层 nodeset。
 
 ## planned nodeset
@@ -231,6 +233,7 @@ trace 会输出 import 文件、展开后的 nodeset 数、每个 nodeset 解析
 - `CONFIG.NODESETS.INLINE_REMOVED`：主 config 或 nodeset 文件仍写了内联 `nodesets`。
 - `CONFIG.NODESET_IMPORT.NAMES_REMOVED`：`nodeset_imports` 仍写了 `names` 选择器。
 - `NODESET.RECURSION`：nodeset 调用或 loop body 形成递归。
+- `NODESET.NESTING.DEPTH_EXCEEDED`：普通 nodeset/loop body 的最长调用链超过 root 配置的最大深度。
 - `NODESET.PROVIDES.UNKNOWN_KEY`：nodeset 声明的 `provides` 无法由内部结果产生。
 - `NODESET.CONFIG.UNKNOWN_NODE`：`node_configs` 覆盖路径指向不存在的内部 node。
 - `NODESET.CONFIG.NESTED_PATH_REQUIRED`：覆盖嵌套 nodeset 或 loop 内部节点时没有使用 dotted path。

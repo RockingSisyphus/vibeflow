@@ -7,6 +7,7 @@ from vibeflow.runtime.block_compiler import CompiledBlock, compile_blocks
 from vibeflow.compiler import CompiledGraph
 from vibeflow.data_contract import DataProvider, DataRequirement, provider_keys, requirement_types
 from vibeflow.graph_config import EdgeSpec, GraphConfig, LOOP_NODE_TYPES, LoopSpec, NodeSpec
+from vibeflow.graph_config.nodeset_dependencies import nodeset_depth_violations
 from vibeflow.node import FLOW_KIND_PREDEFINED, PureNode
 from vibeflow.graph_config.planned_behavior import (
     PLANNED_BEHAVIOR_PYTHON_STUB,
@@ -17,6 +18,8 @@ from vibeflow.graph_config.planned_behavior import (
     resolve_stub_module_path,
 )
 from vibeflow.registry import NodeRegistry
+from vibeflow.runtime.errors import PipelineRuntimeError
+from vibeflow.runtime.options import runtime_options as normalize_runtime_options
 from vibeflow.runtime.config import (
     ConfigScope,
     attach_global_config,
@@ -114,7 +117,17 @@ def build_execution_plan(
     node_config_overrides: Mapping[str, Mapping[str, Any]] | None = None,
     global_config: Mapping[str, Any] | ConfigScope | None = None,
     runtime_options: object | None = None,
+    _check_nodeset_depth: bool = True,
 ) -> ExecutionPlan:
+    if _check_nodeset_depth:
+        options = normalize_runtime_options(runtime_options)
+        violations = nodeset_depth_violations(graph, max_depth=options.nodeset_max_depth)
+        if violations:
+            violation = violations[0]
+            raise PipelineRuntimeError(
+                f"nodeset nesting depth {violation.actual_depth} exceeds configured maximum "
+                f"{violation.limit}: {' -> '.join(violation.chain)}"
+            )
     overrides = normalize_node_config_overrides(node_config_overrides or {})
     scope = normalize_config_scope(global_config)
     frames = {
@@ -205,7 +218,7 @@ def _frame_for(
             loop_spec=spec.loop,
             async_mode=spec.async_mode,
             result_key=spec.result_key,
-            subplan=build_execution_plan(nodeset.graph, subcompiled, registry=registry, node_config_overrides=nested_overrides, global_config=child_scope, runtime_options=runtime_options),
+            subplan=build_execution_plan(nodeset.graph, subcompiled, registry=registry, node_config_overrides=nested_overrides, global_config=child_scope, runtime_options=runtime_options, _check_nodeset_depth=False),
         )
     if is_nodeset:
         nodeset = graph.nodesets[nodeset_type_key]
@@ -233,7 +246,7 @@ def _frame_for(
             exports=nodeset.provides,
             async_mode=spec.async_mode,
             result_key=spec.result_key,
-            subplan=build_execution_plan(nodeset.graph, subcompiled, registry=registry, node_config_overrides=nested_overrides, global_config=child_scope, runtime_options=runtime_options),
+            subplan=build_execution_plan(nodeset.graph, subcompiled, registry=registry, node_config_overrides=nested_overrides, global_config=child_scope, runtime_options=runtime_options, _check_nodeset_depth=False),
         )
     node_cls = registry.get(spec.type_used)
     node = node_cls()

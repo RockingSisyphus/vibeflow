@@ -136,8 +136,8 @@ def test_workspace_project_config_override_and_missing_project_config(tmp_path) 
 
 def test_workspace_project_runtime_config_and_override_precedence(tmp_path) -> None:
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
-    _write_project_config(framework_root, runtime={"async_max_workers": 2, "async_flush_timeout": 5})
-    _write_project_config(project_root, runtime={"async_max_workers": 8, "async_flush_timeout": 30})
+    _write_project_config(framework_root, runtime={"async_max_workers": 2, "async_flush_timeout": 5, "nodeset_max_depth": 2})
+    _write_project_config(project_root, runtime={"async_max_workers": 8, "async_flush_timeout": 30, "nodeset_max_depth": 8})
     framework_config = framework_root / "configs" / "main.jsonc"
     project_config = project_root / "configs" / "main.jsonc"
     framework_config.parent.mkdir(parents=True)
@@ -162,13 +162,17 @@ def test_workspace_project_runtime_config_and_override_precedence(tmp_path) -> N
 
     assert framework_options.async_max_workers == 2
     assert framework_options.async_flush_timeout == 5
+    assert framework_options.nodeset_max_depth == 2
     assert project_options.async_max_workers == 8
     assert project_options.async_flush_timeout == 30
+    assert project_options.nodeset_max_depth == 8
     assert sparse_override.async_max_workers == 8
     assert sparse_override.async_flush_timeout == 1.5
+    assert sparse_override.nodeset_max_depth == 8
     assert sparse_override.trace == "boundary"
     assert full_override.async_max_workers == 3
     assert full_override.async_flush_timeout is None
+    assert full_override.nodeset_max_depth == 4
 
 
 def test_run_workspace_checked_uses_one_effective_root_runtime_options_object(tmp_path, monkeypatch) -> None:
@@ -184,7 +188,7 @@ def test_run_workspace_checked_uses_one_effective_root_runtime_options_object(tm
             ("test.in_end", "InEndNode", {}, {}),
         ],
     )
-    _write_project_config(project_root, runtime={"async_max_workers": 7, "async_flush_timeout": 20})
+    _write_project_config(project_root, runtime={"async_max_workers": 7, "async_flush_timeout": 20, "nodeset_max_depth": 7})
     config_path = project_root / "configs" / "main.jsonc"
     config_path.parent.mkdir(parents=True)
     config_path.write_text(
@@ -229,6 +233,7 @@ def test_run_workspace_checked_uses_one_effective_root_runtime_options_object(tm
     assert seen["refuse"] is seen["execute"]
     assert seen["execute"].async_max_workers == 7
     assert seen["execute"].async_flush_timeout == 1.25
+    assert seen["execute"].nodeset_max_depth == 7
     assert seen["execute"].trace == "boundary"
 
 
@@ -243,6 +248,11 @@ def test_run_workspace_checked_uses_one_effective_root_runtime_options_object(tm
         {"async_flush_timeout": -1},
         {"async_flush_timeout": True},
         {"async_flush_timeout": "30"},
+        {"nodeset_max_depth": 0},
+        {"nodeset_max_depth": -1},
+        {"nodeset_max_depth": True},
+        {"nodeset_max_depth": 1.5},
+        {"nodeset_max_depth": "4"},
     ],
 )
 def test_workspace_project_runtime_config_validation(tmp_path, runtime) -> None:
@@ -257,6 +267,27 @@ def test_workspace_project_runtime_config_validation(tmp_path, runtime) -> None:
         load_workspace_config(workspace_path)
 
     assert invalid.value.rule_id == "WORKSPACE.PROJECT_CONFIG.RUNTIME"
+
+
+def test_workspace_nodeset_depth_limit_uses_workflow_root_config(tmp_path) -> None:
+    workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
+    _write_project_config(framework_root, runtime={"nodeset_max_depth": 4})
+    _write_project_config(project_root, runtime={"nodeset_max_depth": 5})
+    framework_config = framework_root / "configs" / "depth.jsonc"
+    project_config = project_root / "configs" / "depth.jsonc"
+    framework_config.parent.mkdir(parents=True)
+    project_config.parent.mkdir(parents=True)
+    _write_config_file(framework_config, _workspace_nodeset_depth_config(5))
+    _write_config_file(project_config, _workspace_nodeset_depth_config(5))
+    workspace = load_workspace_config(workspace_path)
+
+    framework_report = validate_workspace_config_path(framework_config, workspace=workspace)
+    project_report = validate_workspace_config_path(project_config, workspace=workspace)
+
+    framework_depth = next(error for error in framework_report.errors if error.rule_id == "NODESET.NESTING.DEPTH_EXCEEDED")
+    assert framework_depth.details["limit"] == 4
+    assert framework_depth.root_id == "vibetrain"
+    assert "NODESET.NESTING.DEPTH_EXCEEDED" not in {error.rule_id for error in project_report.errors}
 
 
 def test_workspace_project_quality_structure_config_validation(tmp_path) -> None:
@@ -690,6 +721,59 @@ def test_cli_workspace_quality_config_error_text_output(tmp_path, capsys) -> Non
     output = capsys.readouterr().out
     assert "ERROR" in output
     assert "CONFIG.READ" in output
+
+
+def _workspace_nodeset_depth_config(depth: int) -> dict:
+    nodesets = [
+        {
+            **_nodeset_config(
+                "workspace.depth.0",
+                provides=["value.out"],
+                pipeline={
+                    "nodes": [
+                        _node_call(
+                            "placeholder",
+                            "planned.placeholder",
+                            "Provides a planned leaf for the depth fixture.",
+                            status="planned",
+                            flow_kind="process",
+                            provides=[PROV_SPEC("value.out")],
+                        )
+                    ]
+                },
+            ),
+            "status": "planned",
+        }
+    ]
+    for index in range(1, depth):
+        child = f"workspace.depth.{index - 1}"
+        nodesets.append(
+            {
+                **_nodeset_config(
+                    f"workspace.depth.{index}",
+                    provides=["value.out"],
+                    pipeline={
+                        "nodes": [
+                            _node_call("call", child, f"Calls {child}.", provides=[PROV_SPEC("value.out")])
+                        ]
+                    },
+                ),
+                "status": "planned",
+            }
+        )
+    return {
+        "nodesets": nodesets,
+        "pipeline": {
+            "nodes": [
+                _node_call(
+                    "top",
+                    f"workspace.depth.{depth - 1}",
+                    "Calls the workspace depth fixture.",
+                    provides=[PROV_SPEC("value.out")],
+                )
+            ]
+        },
+    }
 
 
 def _workspace_fixture(tmp_path: Path, *, write_workspace: bool = True) -> tuple[Path, Path, Path]:

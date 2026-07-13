@@ -191,33 +191,36 @@ def _project_runtime_options(data: Mapping[str, Any], path: Path) -> Mapping[str
         return {}
     if not isinstance(raw_runtime, Mapping):
         raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.RUNTIME", "project config runtime must be an object", {"path": str(path)})
-    unknown = set(raw_runtime) - {"async_max_workers", "async_flush_timeout"}
+    allowed = {"async_max_workers", "async_flush_timeout", "nodeset_max_depth"}
+    unknown = set(raw_runtime) - allowed
     if unknown:
         raise WorkspaceConfigError(
             "WORKSPACE.PROJECT_CONFIG.RUNTIME",
             f"project config runtime contains unknown fields: {sorted(unknown)}",
             {"path": str(path)},
         )
-    values: dict[str, object] = {}
-    if "async_max_workers" in raw_runtime:
-        value = raw_runtime["async_max_workers"]
-        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-            raise WorkspaceConfigError(
-                "WORKSPACE.PROJECT_CONFIG.RUNTIME",
-                "runtime.async_max_workers must be a positive integer",
-                {"path": str(path)},
-            )
-        values["async_max_workers"] = value
-    if "async_flush_timeout" in raw_runtime:
-        value = raw_runtime["async_flush_timeout"]
-        if value is not None and (not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0):
-            raise WorkspaceConfigError(
-                "WORKSPACE.PROJECT_CONFIG.RUNTIME",
-                "runtime.async_flush_timeout must be null or a non-negative number",
-                {"path": str(path)},
-            )
-        values["async_flush_timeout"] = value
-    return values
+    return {
+        name: _project_runtime_value(name, value, path=path)
+        for name, value in raw_runtime.items()
+    }
+
+
+def _project_runtime_value(name: str, value: object, *, path: Path) -> object:
+    if name in {"async_max_workers", "nodeset_max_depth"}:
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return value
+        raise WorkspaceConfigError(
+            "WORKSPACE.PROJECT_CONFIG.RUNTIME",
+            f"runtime.{name} must be a positive integer",
+            {"path": str(path)},
+        )
+    if value is None or (isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0):
+        return value
+    raise WorkspaceConfigError(
+        "WORKSPACE.PROJECT_CONFIG.RUNTIME",
+        "runtime.async_flush_timeout must be null or a non-negative number",
+        {"path": str(path)},
+    )
 
 
 def _project_quality_structure(data: Mapping[str, Any], path: Path) -> QualityStructureLimits:
