@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 import textwrap
-from pathlib import Path
 from typing import Any, Mapping
 
 from vibeflow.rendering.helpers import nodeset_for_node
-from vibeflow.graph_config import GraphConfig, NodeSpec, NodesetSpec, STATUS_IMPLEMENTED
+from vibeflow.rendering.review_model import (
+    display_source_path,
+    edge_roles,
+    edge_transfers,
+    mapping_items,
+    rendered_resources_payload,
+    resources_payload,
+)
+from vibeflow.graph_config import GraphConfig, NodeSpec, NodesetSpec
 from vibeflow.node import (
     FLOW_KIND_DATA_STORE,
     FLOW_KIND_DECISION,
@@ -52,12 +59,7 @@ def _source_lines(root_id: object = "", root_path: object = "", source_path: obj
     return tuple(lines)
 
 def _display_source_path(source_path: str, root_path: str) -> str:
-    if not root_path:
-        return source_path
-    try:
-        return Path(source_path).resolve().relative_to(Path(root_path).resolve()).as_posix()
-    except Exception:
-        return source_path
+    return display_source_path(source_path, root_path) or source_path
 
 def _loop_stop_text(spec: object) -> str:
     stop_after = int(getattr(spec, "stop_after", 0) or 0)
@@ -90,71 +92,13 @@ def _node_shape(node_id: str, label: str, flow_kind: object, *, shape: str = "")
     return f'{node_id}@{{ shape: {actual_shape}, label: "{escaped}" }}'
 
 def _resources_payload(resources: object | None) -> Mapping[str, object]:
-    if resources is None:
-        return {}
-    if hasattr(resources, "to_dict") and callable(getattr(resources, "to_dict")):
-        payload = resources.to_dict()
-    else:
-        payload = resources
-    return payload if isinstance(payload, Mapping) else {}
+    return resources_payload(resources)
 
 def _rendered_resources_payload(resources: object | None, graph: GraphConfig | None = None) -> dict[str, object]:
-    payload = _resources_payload(resources)
-    if not payload:
-        return {}
-    root_ids = _graph_root_ids(graph)
-    plugins = _rendered_resource_items(_mapping_items(payload.get("plugins", ())), root_ids=root_ids)
-    base_lib_payload = payload.get("base_lib", {})
-    modules = _rendered_resource_items(
-        _mapping_items(base_lib_payload.get("modules", ()) if isinstance(base_lib_payload, Mapping) else ()),
-        root_ids=root_ids,
-    )
-    result: dict[str, object] = {}
-    if modules:
-        result["base_lib"] = {"modules": list(modules)}
-    if plugins:
-        result["plugins"] = list(plugins)
-    return result
-
-def _rendered_resource_items(resources: tuple[Mapping[str, object], ...], *, root_ids: frozenset[str]) -> tuple[Mapping[str, object], ...]:
-    return tuple(resource for resource in resources if _resource_is_rendered(resource, root_ids=root_ids))
-
-def _resource_is_rendered(resource: Mapping[str, object], *, root_ids: frozenset[str]) -> bool:
-    status = str(resource.get("status", STATUS_IMPLEMENTED)).strip() or STATUS_IMPLEMENTED
-    if status != STATUS_IMPLEMENTED:
-        return False
-    root_id = str(resource.get("root_id", "")).strip()
-    return not root_ids or not root_id or root_id in root_ids
-
-def _graph_root_ids(graph: GraphConfig | None) -> frozenset[str]:
-    if graph is None:
-        return frozenset()
-    root_ids: set[str] = set()
-    visited_nodesets: set[str] = set()
-
-    def collect(current: GraphConfig) -> None:
-        root_id = str(getattr(current, "root_id", "") or "").strip()
-        if root_id:
-            root_ids.add(root_id)
-        for node in current.nodes:
-            nodeset = current.nodesets.get(node.type_used)
-            if nodeset is None:
-                continue
-            nodeset_root_id = str(getattr(nodeset, "root_id", "") or "").strip()
-            if nodeset_root_id:
-                root_ids.add(nodeset_root_id)
-            if nodeset.type_key in visited_nodesets:
-                continue
-            visited_nodesets.add(nodeset.type_key)
-            collect(nodeset.graph)
-
-    collect(graph)
-    return frozenset(root_ids)
+    return rendered_resources_payload(resources, graph)
 
 def _mapping_items(value: object) -> tuple[Mapping[str, object], ...]:
-    if not isinstance(value, list):
-        return ()
-    return tuple(item for item in value if isinstance(item, Mapping))
+    return mapping_items(value)
 
 def _resource_label(resource: Mapping[str, object], *, kind: str, show_semantics: bool) -> str:
     info = resource.get("info", {})
@@ -216,17 +160,7 @@ def _resource_value(resource: Mapping[str, object], info_map: Mapping[str, objec
     return str(resource.get(field, "")).strip() or str(info_map.get(field, "")).strip()
 
 def _edge_contract_text(graph: GraphConfig, edge: object, *, max_items: int = 2) -> str:
-    source_name = str(getattr(edge, "source", ""))
-    target_name = str(getattr(edge, "target", ""))
-    nodes = {node.id: node for node in graph.nodes}
-    source = nodes.get(source_name)
-    target = nodes.get(target_name)
-    if source is None or target is None:
-        return ""
-    required_types = {requirement.type for requirement in target.requires}
-    if not required_types:
-        return ""
-    items = [_provider_edge_text(provider) for provider in source.provides if provider.type in required_types]
+    items = [_provider_edge_text(item["provider"]) for item in edge_transfers(graph, edge)]
     if not items:
         return ""
     visible = items[:max_items]
@@ -235,9 +169,14 @@ def _edge_contract_text(graph: GraphConfig, edge: object, *, max_items: int = 2)
     return ", ".join(visible)
 
 def _provider_edge_text(provider: object) -> str:
-    key = str(getattr(provider, "key", "")).strip()
-    data_type = str(getattr(provider, "type", "")).strip()
-    display_name = str(getattr(provider, "display_name", "")).strip()
+    if isinstance(provider, Mapping):
+        key = str(provider.get("key", "")).strip()
+        data_type = str(provider.get("type", "")).strip()
+        display_name = str(provider.get("display_name", "")).strip()
+    else:
+        key = str(getattr(provider, "key", "")).strip()
+        data_type = str(getattr(provider, "type", "")).strip()
+        display_name = str(getattr(provider, "display_name", "")).strip()
     identity = f"{key} -> {data_type}" if key and data_type and key != data_type else (data_type or key)
     if display_name and identity:
         return f"{display_name} (id: {identity})"
@@ -248,10 +187,10 @@ def _provider_edge_text(provider: object) -> str:
     return data_type or key
 
 def _edge_style(compiled: object, edge: object) -> str:
-    pair = (str(getattr(edge, "source", "")), str(getattr(edge, "target", "")))
-    if pair in {item.pair for item in getattr(compiled, "data_bypass_edges", ())}:
+    roles = edge_roles(compiled, edge)
+    if "data_bypass" in roles:
         return "stroke-dasharray:6 4,stroke-width:2px"
-    if pair in {item.pair for item in getattr(compiled, "mainline_edges", ())}:
+    if "mainline" in roles:
         return "stroke-width:4px"
     return ""
 

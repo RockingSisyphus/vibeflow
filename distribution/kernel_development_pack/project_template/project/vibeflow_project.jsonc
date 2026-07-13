@@ -6,6 +6,14 @@
     "async_flush_timeout": null,
     "nodeset_max_depth": 4
   },
+  "architecture": {
+    "documents": [
+      {
+        "workflow": "configs/main.jsonc",
+        "document": "ARCHITECTURE.jsonc"
+      }
+    ]
+  },
   "quality": {
     "structure": {
       "enabled": true,

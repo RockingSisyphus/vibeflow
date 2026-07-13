@@ -149,26 +149,20 @@ NodeInfo(
 
 ## Planned Architecture
 
-现有 `pipeline + nodesets` 就是架构契约。AI 可以先提交 planned 设计，再逐步实现：
+现有 workflow pipeline 与导入的独立 nodeset 文件就是架构 source of truth。登记的 `ARCHITECTURE.jsonc` 只是从这些 source、registry metadata/config schema 和有效资源确定性生成的单文件审查视图，不是可手工编辑的第二份契约。AI 可以先提交 planned 设计，再逐步实现：
 
 ```jsonc
 {
-  "nodesets": [
-    {
-      "name": "paperflow.catalog",
-      "status": "planned",
-      "flow_kind": "predefined"
-    }
-  ],
-  "pipeline": {
-    "nodes": [
-      {"name": "start", "status": "planned", "flow_kind": "terminal"},
-      {"name": "catalog", "type": "nodeset.paperflow.catalog", "status": "planned", "flow_kind": "predefined"}
-    ],
-    "edges": [["start", "catalog"]]
-  }
+  "type_key": "paperflow.catalog",
+  "display_name": "Catalog Papers",
+  "description": "Planned paper catalog flow.",
+  "status": "planned",
+  "requires": [],
+  "provides": []
 }
 ```
+
+planned nodeset 也可以包含由 planned nodes/edges 构成的 `pipeline` body，用于逐步细化和展开审查。
 
 规则：
 
@@ -177,6 +171,8 @@ NodeInfo(
 - implemented node 不允许在 config 中伪造 `flow_kind`。
 - `planned_behavior` 默认是 `blocking`；也可写 `transparent` 让 planned 内容参与 flow 连通性检查。
 - `python_stub` planned 内容只用于开发测试，必须写 `project/stubs/*.py` 下的 `run_stub(inputs, params)`，并通过显式运行开关才可执行。
+- planned nodeset 可无 body 占位，也可带 body；body 会进入架构 JSONC、展开图及适用的 dependency、recursion、depth、planned-descendant 检查。
+- planned body 不按 implemented body 执行；`python_stub` nodeset 只执行一个 stub 调用。implemented nodeset 必须有完整 pipeline。
 - implemented nodeset 不能包含 blocking planned child；transparent/python_stub child 会保留 warning。
 - health 对 planned 内容给 warning。
 - runtime 默认拒绝运行 planned 内容；开启 planned stub 后也只允许 python_stub 运行。
@@ -207,6 +203,7 @@ node 仍然不能直接做真实 IO。推荐表达方式：
 
 内核应从同一份编译结果输出：
 
+- `architecture.jsonc`：确定性、不可执行的单文件架构审查视图。
 - `graph.mmd`：Mermaid flowchart 源码。
 - `graph.txt`：无外部依赖的 ASCII flowchart。
 - `graph.svg`：通过 Mermaid CLI 渲染的 SVG 图。
@@ -217,6 +214,7 @@ node 仍然不能直接做真实 IO。推荐表达方式：
 - planned / external 标记。
 - decision `when` 条件。
 - nodeset 折叠/展开。
+- planned nodeset 的已有 body；无 body 时保留明确占位。
 - 契约 `key -> type`、cardinality、中文说明、健康警告/错误。
 
 ## 健康报告目标
@@ -250,6 +248,7 @@ runs/<run_id>/
   graph.svg.error.txt
   graph.expanded.svg
   graph.expanded.svg.error.txt
+  architecture.jsonc
   runtime_trace.jsonl
   output_summary.json
 ```

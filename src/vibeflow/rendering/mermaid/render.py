@@ -384,6 +384,10 @@ def _repo_root() -> Path:
     for parent in module_path.parents:
         if parent.suffix == ".zip":
             return parent.parent.parent
+        if (parent / "tools" / "mermaid-renderer" / "package.json").is_file():
+            return parent
+        if (parent / "kernel" / "tools" / "mermaid-renderer" / "package.json").is_file():
+            return parent
     return module_path.parents[2]
 
 

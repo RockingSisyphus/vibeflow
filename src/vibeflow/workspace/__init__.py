@@ -27,6 +27,7 @@ from vibeflow.workspace.core import (
 )
 from vibeflow.workspace.quality import scan_workspace_code_quality
 from vibeflow.workspace.types import (
+    ArchitectureDocumentSpec,
     PROJECT_CONFIG_NAME,
     WORKSPACE_CONFIG_NAME,
     WORKSPACE_FORBIDDEN_CONFIG_FIELDS,
@@ -127,6 +128,7 @@ def load_workspace_graph_for_export(
     path: Path,
     *,
     workspace: WorkspaceConfig,
+    validate_health: bool = False,
 ) -> tuple[object, object, object, ConfigResources, HealthReport | None]:
     env = _environment_or_report(workspace)
     if isinstance(env, HealthReport):
@@ -135,6 +137,16 @@ def load_workspace_graph_for_export(
     if isinstance(prepared, HealthReport):
         return None, None, None, ConfigResources(), prepared
     _, graph, compiled, resources, _, _, _ = prepared
+    if validate_health:
+        health = _validate_prepared_workspace_graph(
+            prepared,
+            env=env,
+            workspace=workspace,
+            runtime_options=_workspace_runtime_options(path, workspace=workspace),
+            check_architecture_document=False,
+        )
+        if health.status in {"FAIL", "ERROR"}:
+            return None, None, None, ConfigResources(), health
     return graph, compiled, env.registry, resources, None
 
 
@@ -153,6 +165,7 @@ def _validate_prepared_workspace_graph(
     env: WorkspaceEnvironment,
     workspace: WorkspaceConfig,
     runtime_options: RuntimeOptions,
+    check_architecture_document: bool = True,
 ) -> HealthReport:
     from vibeflow.health import validate_graph_health
 
@@ -182,7 +195,70 @@ def _validate_prepared_workspace_graph(
         info=info,
         effective_policy=effective_policy.to_dict(),
     )
-    return annotate_health_report(report, graph, workspace=workspace)
+    report = annotate_health_report(report, graph, workspace=workspace)
+    if report.status in {"FAIL", "ERROR"} or not check_architecture_document:
+        return report
+    return _validate_registered_architecture_document(
+        report,
+        document_path=document.path,
+        graph=graph,
+        compiled=compiled,
+        registry=env.registry,
+        resources=resources,
+        workspace=workspace,
+    )
+
+
+def _validate_registered_architecture_document(
+    report: HealthReport,
+    *,
+    document_path: Path,
+    graph: object,
+    compiled: object,
+    registry: object,
+    resources: ConfigResources,
+    workspace: WorkspaceConfig,
+) -> HealthReport:
+    from vibeflow.architecture_validation import architecture_finding_status, check_architecture_document
+    from vibeflow.rendering.architecture_document import build_architecture_document, render_architecture_payload
+
+    root = workspace.root_for_path(document_path)
+    if root is None:
+        return report
+    resolved_document_path = document_path.resolve()
+    spec = next(
+        (
+            item
+            for item in root.architecture_documents
+            if item.workflow_path.resolve() == resolved_document_path
+        ),
+        None,
+    )
+    if spec is None:
+        return report
+    expected_payload = build_architecture_document(
+        graph,
+        compiled=compiled,
+        registry=registry,
+        resources=resources,
+    )
+    expected_text = render_architecture_payload(expected_payload)
+    finding = check_architecture_document(
+        spec.document_path,
+        expected_payload=expected_payload,
+        expected_text=expected_text,
+        workflow_path=spec.workflow_path,
+        project_config_path=root.config_path,
+        workspace_path=workspace.path,
+        registration_field=spec.registration_field,
+    )
+    if finding is None:
+        return report
+    return replace(
+        report,
+        status=architecture_finding_status(finding),
+        errors=(*report.errors, finding),
+    )
 
 
 def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: WorkspaceEnvironment):

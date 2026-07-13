@@ -15,6 +15,7 @@ from vibeflow.health.types import HealthFinding
 from vibeflow.plugin import PluginRegistry, load_plugins_from_config
 from vibeflow.registry import NodeRegistrationInfo, NodeRegistry
 from vibeflow.workspace.policy import resolve_workspace_effective_policy
+from vibeflow.workspace.project_architecture import project_architecture_documents
 from vibeflow.workspace.types import PROJECT_CONFIG_NAME, WorkspaceConfig, WorkspaceConfigError, WorkspaceEnvironment, WorkspaceResourceRegistries, WorkspaceRoot
 
 
@@ -154,7 +155,7 @@ def _workspace_root_from_item(root_id: str, item: Mapping[str, Any], *, workspac
     config_path = _resolve_workspace_relative(config_name, base=root_path)
     if not config_path.is_file():
         raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.MISSING", f"project config does not exist: {config_path}", {"path": str(config_path)})
-    project_config = _load_project_config(config_path)
+    project_config = _load_project_config(config_path, root_path=root_path)
     return WorkspaceRoot(
         id=root_id,
         path=root_path,
@@ -164,16 +165,17 @@ def _workspace_root_from_item(root_id: str, item: Mapping[str, Any], *, workspac
         quality_enabled=bool(project_config.get("quality_enabled", True)),
         quality_structure=_project_quality_structure(project_config, config_path),
         runtime_options=_project_runtime_options(project_config, config_path),
+        architecture_documents=project_architecture_documents(project_config, root_path=root_path, path=config_path),
     )
 
 
-def _load_project_config(path: Path) -> Mapping[str, Any]:
+def _load_project_config(path: Path, *, root_path: Path) -> Mapping[str, Any]:
     try:
         document = load_raw_config_document(path)
     except ConfigLoadError as exc:
         raise WorkspaceConfigError(exc.rule_id, exc.message, exc.source_location, exc.failure_layer) from exc
     data = document.data
-    unknown = set(data) - {"registry", "quality_enabled", "quality", "runtime", "base_lib", "plugins"}
+    unknown = set(data) - {"registry", "quality_enabled", "quality", "runtime", "architecture", "base_lib", "plugins"}
     if unknown:
         raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.UNKNOWN_FIELD", f"project config contains unknown fields: {sorted(unknown)}", {"path": str(path)})
     if "registry" in data and not isinstance(data["registry"], str):
@@ -182,6 +184,7 @@ def _load_project_config(path: Path) -> Mapping[str, Any]:
         raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.QUALITY", "project config quality_enabled must be a boolean", {"path": str(path)})
     _project_quality_structure(data, path)
     _project_runtime_options(data, path)
+    project_architecture_documents(data, root_path=root_path, path=path)
     return data
 
 

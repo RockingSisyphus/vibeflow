@@ -138,30 +138,23 @@ hooks or boundary trace events.
 
 ## Architecture Contract
 
-The existing `pipeline` and `nodesets` config is the architecture contract. Do
-not add a parallel `architecture_flow`; that would duplicate the graph and create
-drift between two sources of truth.
+The workflow pipeline and imported standalone nodeset files are the architecture
+source of truth. Do not add an editable parallel `architecture_flow`; that would
+duplicate the graph and create drift. A registered `ARCHITECTURE.jsonc` is allowed
+only as a deterministic, non-executable review projection regenerated from the
+real workflow, nodesets, registry metadata, and effective resources.
 
 Before implementation, AI-authored design can register planned nodes and
 nodesets directly in config:
 
 ```jsonc
 {
-  "nodesets": {
-    "classify_flow": {
-      "status": "planned",
-      "flow_kind": "predefined"
-    }
-  },
-  "pipeline": {
-    "nodes": [
-      {"name": "start", "status": "planned", "flow_kind": "terminal"},
-      {"name": "classify", "status": "planned", "flow_kind": "decision"}
-    ],
-    "edges": [
-      {"from": "start", "to": "classify"}
-    ]
-  }
+  "type_key": "classify_flow",
+  "display_name": "Classify Flow",
+  "description": "Planned classification architecture.",
+  "status": "planned",
+  "requires": [],
+  "provides": []
 }
 ```
 
@@ -172,6 +165,10 @@ Rules:
 - Implemented pipeline nodes must not declare config `flow_kind`; their kind comes
   from registered `NodeInfo.flow_kind`.
 - Planned nodes and nodesets default to `planned_behavior: "blocking"`.
+- A planned nodeset may omit `pipeline` as a placeholder or include a progressively
+  refined planned body. An implemented nodeset must contain a complete pipeline.
+- Planned bodies appear in architecture JSONC and expanded diagrams and participate
+  in applicable dependency, recursion, depth, and planned-descendant checks.
 - `planned_behavior: "transparent"` keeps the planned warning but participates in
   flow connectivity checks.
 - `planned_behavior: {"kind": "python_stub", "stub_module": "project/stubs/x.py"}`
@@ -180,10 +177,13 @@ Rules:
 - Blocking and transparent planned content cannot run. Python stub planned
   content can run only with an explicit development flag. Any config containing
   planned content is not production ready.
+- A planned nodeset body is never executed as an implemented body. A `python_stub`
+  nodeset executes as one stub call even when a review body is present.
 - An implemented nodeset cannot contain blocking planned children; transparent
   or python_stub planned children remain warnings.
 - Mermaid must render planned nodes/nodesets with flowchart shapes and a distinct
-  planned marker.
+  planned marker, and expanded review output must show a planned nodeset body when
+  one exists.
 - Conditional routes still follow `when` and routing-node rules; ordinary
   graph cycles are forbidden and must be modeled with first-class loop nodes.
 
@@ -276,13 +276,15 @@ The following conditions must fail strict runs:
 
 ### Phase 3: Architecture Contract
 
-- treat existing `pipeline` and `nodesets` as the contract
+- treat workflow pipeline and imported standalone nodesets as the source contract
 - add `status: planned | implemented`
 - allow planned nodes/nodesets to declare design-time `flow_kind`
 - reject config `flow_kind` on implemented nodes
 - warn on planned design content during health checks
 - refuse planned content at runtime by default
 - render planned content in Mermaid
+- generate a canonical single-file architecture review document without creating
+  a second editable source of truth
 
 The shortest correct path is to land Phase 1 first, then remove old semantics,
 then let the existing topology config act as the architecture contract.

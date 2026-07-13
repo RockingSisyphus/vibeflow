@@ -49,7 +49,7 @@ VibeFlow is designed for release-package usage.
 1. Download the latest package from GitHub Releases.
 2. Extract it into your workspace.
 3. Open or create a project in that directory with any vibe coding tool, such as OpenCode, Codex, or Claude Code.
-4. Let AI follow `AGENTS.md`: design a planned flowchart first, review the structure, then implement business nodes, base_lib helpers, plugins, and JSONC configs step by step.
+4. Let AI follow `AGENTS.md`: read or generate the single-file architecture document and planned flowchart first, review the structure, then implement business nodes, base_lib helpers, plugins, and JSONC configs step by step.
 
 The release package root includes `AGENTS.md`. AI tools that support project instructions can read it automatically and learn:
 
@@ -57,6 +57,7 @@ The release package root includes `AGENTS.md`. AI tools that support project ins
 - Which kernel files should not be modified.
 - How to add nodes, nodesets, and plugins.
 - How to run validate, run, quality, and diagram commands.
+- How to read and regenerate `ARCHITECTURE.jsonc` without editing it by hand.
 - Which health checks must pass before execution.
 - How to design planned nodesets first, export diagrams for human review, and only then implement them.
 
@@ -66,6 +67,7 @@ You do not need to understand the full kernel source first. Treat the release pa
 
 ```text
 project/
+  ARCHITECTURE.jsonc # generated single-file architecture review view
   nodes/          # business nodes
   base_lib/       # pure helper functions
   plugins/        # optional policy/runtime plugins
@@ -80,6 +82,8 @@ run.py            # project entrypoint
 Common commands:
 
 ```bash
+python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc
+python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc --check
 python run.py validate --config project/configs/main.jsonc
 python run.py run --config project/configs/main.jsonc --run-root runs
 python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
@@ -88,6 +92,8 @@ python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
 python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg
 python run.py quality --path project
 ```
+
+Each root can register workflow/document pairs under `architecture.documents` in `vibeflow_project.jsonc`. Fixed comments mark the generated document as non-executable; mutable-looking status properties are deliberately absent. AI should read it first, edit the real workflow/nodeset/registry sources, and regenerate it. Workspace validation and execution reject a registered document that is missing, stale, or manually reformatted, with source locations and a repair command.
 
 SVG export passes an expanded Mermaid CLI render config. Normal graphs default to `maxTextSize=200000`; `--expand-nodesets` defaults to `maxTextSize=500000`. Very large graphs can override this with `--mermaid-max-text-size` and `--mermaid-max-edges`.
 Expanded SVG exports always use the deterministic `review-columns` composer: the main pipeline stays on the left, followed by plugins, base_lib, and expanded nodesets in top-level call order. Nodeset details use a recursive detail-panel layout: leaf nodesets render horizontally; parents with child nodesets keep collapsed call-sites and original edges, with direct child nodesets stacked to the right in call order.
@@ -98,6 +104,7 @@ SVG rendering does not require Google Chrome to be preinstalled. After a normal 
 
 ```text
 Describe requirement
+  -> AI reads the registered ARCHITECTURE.jsonc
   -> AI abstracts it into a coarse standard flowchart
   -> Write planned nodesets into JSONC
   -> Export Mermaid or SVG for human review
@@ -107,7 +114,7 @@ Describe requirement
   -> Iterate
 ```
 
-Major architecture changes use the same loop: planned first, diagram first, review first, implementation second. Anything still undecided stays as `status: "planned"`; VibeFlow allows it for design review but will not let it pretend to be runnable.
+Major architecture changes use the same loop: planned first, architecture document and diagrams first, review first, implementation second. A planned nodeset may omit its body or include a progressively refined body. That body appears in the architecture document, expanded diagrams, and applicable static checks, but it is not executed as an implemented body. A `python_stub` nodeset remains one stub call; an implemented nodeset requires a complete pipeline.
 
 VibeFlow does not stop you from vibe coding. It makes every vibe return to a checkable structure.
 

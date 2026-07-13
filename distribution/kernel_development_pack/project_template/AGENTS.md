@@ -25,12 +25,14 @@
 - 每个 `pipeline.nodes[]` 调用点都必须写 `display_name` 和 `description`，让 Mermaid/SVG 能直接区分节点名、易读名和说明。
 - `requires`、`provides`、`pipeline.inputs`、`pipeline.outputs` 的每个对象都必须写非空 `display_name`。图上 contract label 先显示 `display_name`，再显示 id/key/type。
 - `project/registry.py` 同时声明可用 node、base_lib 和 plugin；base_lib/plugin 的 `register(...)` 必须写 `display_name` 和 `description`。workflow config 只用 `base_lib.modules[].id` 和 `plugins[].id` 引用本流程实际使用的资源，不要把未使用资源写进 config。
-- `vibeflow_project.jsonc` 只保留 `registry`、`quality_enabled`、`quality` 和可选的 `runtime.async_max_workers` / `runtime.async_flush_timeout` / `runtime.nodeset_max_depth`；不要把 base_lib/plugin 当成 root 级全局启用项写在这里。
+- `vibeflow_project.jsonc` 只保留 `registry`、`quality_enabled`、`quality`、可选 `runtime`，以及用于登记生成文档的 `architecture.documents`；不要把 base_lib/plugin 当成 root 级全局启用项写在这里。
+- `project/ARCHITECTURE.jsonc` 是由真实 workflow、nodeset、registry 和资源配置确定性生成的单文件审查视图。开始修改架构前先读它；不要手工编辑它，也不要把它当成可执行 config。修改源文件后用 `python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc` 重新生成。
 - 节点自定义颜色只能写在 `style.fill`、`style.stroke`、`style.text` 中，颜色必须是 `#RRGGBB`，且不得使用 VibeFlow 系统保留色。合法自定义色会覆盖节点默认/系统 class 的 fill/stroke/text 颜色。
 - `display_name`、`description`、`style`、`similar_to` 是调用点元数据，不进入运行时 `params`；运行时同名参数必须写进 `config`。
 - 只有确认两个 node 是有意变体或副本时才写 `similar_to`，并且必须指向同作用域已存在 node、使用 `variant` 或 `copy`、写清 `reason`；不要用它掩盖应该拆分或抽 base_lib 的重复实现。
 - 普通 `pipeline.edges` 和 nodeset 内部 `pipeline.edges` 不允许形成环；所有循环都必须使用唯一一等 loop 类型 `vibeflow.loop.while` 调用 nodeset body。
-- nodeset 必须是独立 JSONC 文件，根对象声明 `type_key`、`display_name`、`description`、`requires`、`provides` 和 `pipeline`；主 config 不允许内联 `nodesets`，nodeset 文件也不允许 `exports`、`purity`、`category`、`version`。
+- nodeset 必须是独立 JSONC 文件，根对象声明 `type_key`、`display_name`、`description`、`requires` 和 `provides`。implemented nodeset 还必须包含完整 `pipeline`；planned nodeset 可省略 `pipeline` 作为粗粒度占位，也可带 planned body 逐步细化。主 config 不允许内联 `nodesets`，nodeset 文件也不允许 `exports`、`purity`、`category`、`version`。
+- planned nodeset 的 body 会进入 `ARCHITECTURE.jsonc` 和展开 Mermaid/SVG，并参与适用的 dependency、recursion、depth 与 planned-descendant 检查；它不会因此按 implemented body 执行。`python_stub` planned nodeset 始终作为单个 stub 执行，不展开 body。
 - nodeset 文件可以写 `nodeset_imports` 调用其他独立 nodeset 文件；调用处直接用 nodeset `type_key` 作为 `type_used`，不要写旧 `nodeset.xxx` 前缀。
 - nodeset 调用和 `loop.body` 都是 nodeset dependency，不能直接或间接递归；出现 `NODESET.RECURSION` 时要拆开结构或改成真正的 `vibeflow.loop.while` 循环语义。
 - nodeset dependency 默认最多 4 层：顶层 pipeline 为 0，普通 nodeset 或 `loop.body` 首次进入为 1，循环迭代不累计。所有已加载和 planned 定义都检查；需要更深结构时在所属 root 的 `runtime.nodeset_max_depth` 中显式提高。
@@ -62,6 +64,7 @@
 
 ## 先读文档
 
+- 开始设计或修改架构前，先读 root 中登记的 `project/ARCHITECTURE.jsonc`；若文件缺失，先用 architecture 命令生成。
 - 开始设计或修改业务程序前，先读 `kernel/docs/00_内核目的与项目结构.md`。
 - 编写 node 前，读 `kernel/docs/01_Node开发规范.md`。
 - 注册 node 和配置默认值前，读 `kernel/docs/02_注册与配置默认值.md`。
@@ -78,10 +81,10 @@
 
 1. 先把用户希望开发的程序抽象成一个粗粒度标准流程图，只保留几大块。
 2. 用 planned nodeset 表达这些大块。例如初始流程是 `a -> b -> c`，就为 `a`、`b`、`c` 各写一个独立 planned nodeset JSONC 文件，根对象声明 `type_key`，再在顶层 config 用 `type_used` 调用它们并连接 `pipeline.edges`。
-3. planned node 必须声明 `id`、`display_name`、`description` 和 `flow_kind`；planned nodeset 必须声明 `type_key`、`display_name`、`description`、`requires` 和 `provides`，但可暂时不写内部 `pipeline`。默认 `planned_behavior` 是 `blocking`，只用于架构图审查。
-4. 生成流程图给人类审核：快速源码图用 `python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd`，快速图片用 `python run.py svg --config project/configs/main.jsonc --output reports/graph.svg`。
+3. planned node 必须声明 `id`、`display_name`、`description` 和 `flow_kind`；planned nodeset 必须声明 `type_key`、`display_name`、`description`、`requires` 和 `provides`。它可以暂时省略内部 `pipeline`，也可以用 planned nodes/edges 写出待审核 body。默认 `planned_behavior` 是 `blocking`，只用于架构审查。
+4. 生成单文件架构文档和流程图给人类审核：先用 `python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc` 更新登记文件，再按需生成 Mermaid/SVG。
 5. 需要展开 nodeset 给人类审查时，必须用 `python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg` 生成详细审查 SVG。不要把 `graph.expanded.mmd` 直接交给 Mermaid CLI/mmdc 渲染成 SVG；那会绕过 VibeFlow 的 review-columns/detail-panel composer，导致排版退回旧的全局展开图。
-6. 告知人类审核员查看 `reports/graph.mmd`、`reports/graph.svg` 或 `reports/graph.expanded.svg`。不要在粗粒度架构未经确认时直接实现大量 node。
+6. 告知人类审核员先查看 `project/ARCHITECTURE.jsonc`，再按需查看 `reports/graph.mmd`、`reports/graph.svg` 或 `reports/graph.expanded.svg`。不要在粗粒度架构未经确认时直接实现大量 node。
 7. 人类审核通过后，再逐个细化 nodeset。比如把 planned nodeset `a` 细化为 `d -> e -> f`，可以先把 `d`、`e`、`f` 也标为 planned，再生成展开图继续审核。
 8. 细化可以继续嵌套，但默认不得超过 4 层 nodeset/loop body；任何尚未确定的节点或节点集都应保持 `status: "planned"`，用流程图先暴露结构。确有需要时先在所属 root 的 `runtime.nodeset_max_depth` 中明确提高上限。
 9. 真正实现某个 node 时，必须创建对应 Python node，声明 `NODE_INFO`、`CONTRACT` 和 `run_pure(inputs, params)`，并在 `project/registry.py` 注册。真正实现某个 base_lib/plugin 时，也在同一个 `project/registry.py` 的 `build_base_lib_registry()` / `build_plugin_registry()` 注册为可用资源；实际 workflow 需要时再在 config 中按 id 引用。
@@ -89,12 +92,15 @@
 11. 只有当 nodeset 内部所有子 node / 子 nodeset 都已经 implemented，父 nodeset 才能变成 implemented。例外是设计期可用 `planned_behavior: "transparent"` 或 `python_stub` 子节点保持连通性，此时父 nodeset 会得到 warning；blocking planned child 仍会报错。
 12. 按同样方式实现后续 nodeset，直到顶层 `a`、`b`、`c` 全部 implemented，最终程序才能运行。
 13. 如果需要训练或批处理循环，先把循环 body 抽成 nodeset，再用 `vibeflow.loop.while` 调用；body 内只表达单轮逻辑，跨轮状态用 `loop.carry`，指标列表用 `loop.collect`，固定轮数用 `loop.stop_after`，条件退出用 body/state 输出的 bool `loop.stop_when`。
-14. 后续修改架构也使用同一模式：先放 planned 占位并导出流程图给人类审核，再逐步实现。
-15. `validate` 和 `quality` 只是静态门禁。每个 runnable config 还必须用最小代表输入做一次 runtime probe（运行时探针），检查业务结果 key、envelope `value` 的 Python 原生类型、`runtime.stop_reason == "completed"` 和 `runtime.qualified_exec_order`。
+14. 后续修改架构也使用同一模式：先放 planned 占位或 body，重新生成架构文档和流程图给人类审核，再逐步实现。
+15. 每次修改 workflow、nodeset、相关 NodeInfo/config schema 或启用资源后，都要重新生成 `ARCHITECTURE.jsonc`；登记文档缺失、陈旧或被手工改写时，`validate` 和 `run` 会拒绝继续。
+16. `validate` 和 `quality` 只是静态门禁。每个 runnable config 还必须用最小代表输入做一次 runtime probe（运行时探针），检查业务结果 key、envelope `value` 的 Python 原生类型、`runtime.stop_reason == "completed"` 和 `runtime.qualified_exec_order`。
 
 ## 常用命令
 
 - 校验配置和健康检查：`python run.py validate --config project/configs/main.jsonc`
+- 生成登记的单文件架构文档：`python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc`
+- 只检查架构文档是否是当前确定性输出：`python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc --check`
 - 校验 kernel 完整性：`python run.py verify-kernel`
 - 运行程序：`python run.py run --config project/configs/main.jsonc --run-root runs`
 - 导出 Mermaid：`python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd`
@@ -107,10 +113,11 @@
 
 - 内核报错代表架构、配置、契约或实现不满足约束；修业务项目，不修内核。
 - planned 内容用于设计审查；默认不可运行，只有 `python_stub` 在显式开发开关下可执行。
+- planned nodeset 可以没有 body，也可以带 body 逐步细化；带 body 会出现在单文件架构文档和展开图中，但不会因此获得 implemented 执行语义。
 - `planned_behavior: "transparent"` 只用于 flow health 连通性，不可运行。
 - `planned_behavior: {"kind": "python_stub", "stub_module": "project/stubs/xxx.py"}` 只用于开发测试；必须配合 `--allow-planned-stub` 才能运行，不能视为 production ready。
 - implemented 内容必须完整、可达、可校验、可运行。
-- 流程图是人类审核程序结构的主要产物；重大架构变更先出图再实现。SVG 节点和资源列内应能读清易读标题、`id`、`type_used`、状态和说明，contract 应显示在已有连边上并优先显示 `display_name`；信息挤在一起时应先改善 config 的描述长度、拆节点或调整 style，而不是绕过 `python run.py svg`。SVG 默认保持 `htmlLabels=false`，并由内核对原生 SVG 文本做标题加粗、字段名前缀加粗、字段行左对齐等增强。
+- `ARCHITECTURE.jsonc` 是 AI/开发者先读的完整结构索引，流程图用于视觉审核；重大架构变更先更新两类产物再实现。SVG 节点和资源列内应能读清易读标题、`id`、`type_used`、状态和说明，contract 应显示在已有连边上并优先显示 `display_name`；信息挤在一起时应先改善 config 的描述长度、拆节点或调整 style，而不是绕过 `python run.py svg`。
 - 为消除 `NODESET.SMELL.TOO_WIDE` 拆成更多小 nodeset 是推荐方向；如果怀疑 config 读取或解析慢，用 `VIBEFLOW_CONFIG_TRACE=1 python run.py validate --config ...` 查看 import、nodeset 数、单个 nodeset 解析耗时和总耗时。
 - 一等 loop 的展开图应能看到 loop body nodeset；调试训练循环时优先看 `runtime.qualified_exec_order`、`runtime.total_step_count` 和事件 `path`，不要只看顶层 `runtime.exec_order`。
 - `GRAPH.JOIN.AMBIGUOUS_UNCONDITIONAL` 表示某个 join 可能被 unconditional provider 提前触发或和 conditional provider 争抢同一个 `exactly_one` 输入；修配置，不要靠旧 context 或节点内部判断绕过。

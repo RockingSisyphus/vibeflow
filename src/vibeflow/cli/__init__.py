@@ -43,6 +43,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     mermaid.set_defaults(expand_nodesets=False)
 
+    architecture = sub.add_parser("export-architecture", help="export a generated non-executable architecture review document")
+    architecture.add_argument("--config", required=True)
+    architecture.add_argument("--workspace", required=False, help="workspace vibeflow_config.jsonc path")
+    architecture.add_argument("--output", required=False)
+    architecture.add_argument("--check", action="store_true", help="check that --output is canonical and current without writing it")
+
     ascii_chart = sub.add_parser("export-ascii", help="export topology config to ASCII flowchart")
     ascii_chart.add_argument("--config", required=True)
     ascii_chart.add_argument("--workspace", required=False, help="workspace vibeflow_config.jsonc path")
@@ -112,6 +118,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "inspect-node": _handle_inspect_node,
         "inspect-config": _handle_inspect_config,
         "export-ascii": _handle_export_ascii,
+        "export-architecture": _handle_export_architecture,
         "export-svg": _handle_export_svg,
         "export-mermaid": _handle_export_mermaid,
         "run": _handle_run,
@@ -182,6 +189,10 @@ def _handle_export_mermaid(args: argparse.Namespace) -> int:
 
 def _handle_export_ascii(args: argparse.Namespace) -> int:
     return _handle_export_graph(args, export_kind="ascii")
+
+
+def _handle_export_architecture(args: argparse.Namespace) -> int:
+    return _handle_export_graph(args, export_kind="architecture")
 
 
 def _handle_export_svg(args: argparse.Namespace) -> int:

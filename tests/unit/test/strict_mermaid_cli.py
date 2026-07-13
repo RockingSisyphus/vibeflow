@@ -145,6 +145,29 @@ def test_mermaid_renderer_keeps_source_tool_path_precedence(tmp_path, monkeypatc
     assert mermaid_render._find_mmdc() == source_mmdc
 
 
+def test_mermaid_renderer_discovers_source_checkout_root(tmp_path, monkeypatch) -> None:
+    import vibeflow.rendering.mermaid.render as mermaid_render
+
+    module_path = tmp_path / "src" / "vibeflow" / "rendering" / "mermaid" / "render.py"
+    module_path.parent.mkdir(parents=True)
+    module_path.write_text("", encoding="utf-8")
+    renderer_manifest = tmp_path / "tools" / "mermaid-renderer" / "package.json"
+    renderer_manifest.parent.mkdir(parents=True)
+    renderer_manifest.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(mermaid_render, "__file__", str(module_path))
+
+    assert mermaid_render._repo_root() == tmp_path
+
+
+def test_mermaid_renderer_keeps_distribution_zip_root(tmp_path, monkeypatch) -> None:
+    import vibeflow.rendering.mermaid.render as mermaid_render
+
+    module_path = tmp_path / "kernel" / "vibeflow-kernel.zip" / "vibeflow" / "rendering" / "mermaid" / "render.py"
+    monkeypatch.setattr(mermaid_render, "__file__", str(module_path))
+
+    assert mermaid_render._repo_root() == tmp_path
+
+
 def test_mermaid_renderer_falls_back_to_non_snap_system_browser(tmp_path, monkeypatch) -> None:
     import subprocess
     import vibeflow.rendering.mermaid.render as mermaid_render

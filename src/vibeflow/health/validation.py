@@ -37,7 +37,7 @@ class _HealthValidationState:
 def validate_graph_health(
     graph: GraphConfig,
     *,
-    registry: NodeRegistry,
+    registry: NodeRegistry | None = None,
     boundary_registry: object | None = None,
     plugin_registry: PluginRegistry | None = None,
     global_config: Mapping[str, object] | None = None,
@@ -79,12 +79,15 @@ def validate_graph_health(
             compiled = GraphCompiler().compile(graph, registry=registry)
         except GraphCompileError as exc:
             return _compile_error_report(exc)
-        append_flowchart_health(graph, compiled, state, registry=registry)
-        _append_mainline_health(graph, compiled, registry, state)
-    _append_node_config_health(graph, registry, state, global_config=global_config)
+        if registry is not None:
+            append_flowchart_health(graph, compiled, state, registry=registry)
+            _append_mainline_health(graph, compiled, registry, state)
+    if registry is not None:
+        _append_node_config_health(graph, registry, state, global_config=global_config)
     append_data_contract_warnings(graph, compiled, state, registry=registry)
     append_join_policy_health(graph, compiled, state)
-    _append_registry_namespace_smells(registry, state)
+    if registry is not None:
+        _append_registry_namespace_smells(registry, state)
     _append_duplicate_logic_findings(state)
     _append_nodeset_health(graph, registry, state)
     _append_graph_plugin_findings(graph, compiled, plugin_registry, state)
@@ -110,7 +113,7 @@ def _compile_error_report(exc: GraphCompileError) -> HealthReport:
 
 def _validate_graph_nodes(
     graph: GraphConfig,
-    registry: NodeRegistry,
+    registry: NodeRegistry | None,
     plugin_registry: PluginRegistry | None,
     purity_policy: PurityPolicy | None,
     state: _HealthValidationState,
@@ -124,6 +127,8 @@ def _validate_graph_nodes(
         if spec.type_used in LOOP_NODE_TYPES:
             continue
         if spec.type_used in graph.nodesets:
+            continue
+        if registry is None:
             continue
         _validate_graph_node(spec, registry, plugin_registry, purity_policy, state)
 
@@ -383,7 +388,7 @@ def _append_duplicate_logic_findings(state: _HealthValidationState) -> None:
     )
 
 
-def _append_nodeset_health(graph: GraphConfig, registry: NodeRegistry, state: _HealthValidationState) -> None:
+def _append_nodeset_health(graph: GraphConfig, registry: NodeRegistry | None, state: _HealthValidationState) -> None:
     from vibeflow.health.nodesets import append_nodeset_finding, validate_nodesets
 
     for nodeset in graph.nodesets.values():

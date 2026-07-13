@@ -10,6 +10,7 @@ from vibeflow.runtime.block_compiler import explain_block_compilation
 from vibeflow.runtime.planning import CompiledBlock, ExecutionPlan, NodeFrame, build_execution_plan
 from vibeflow.graph_config import EdgeSpec, GraphConfig, NodeSpec, NodesetSpec, parse_graph_config
 from vibeflow.health import HealthFinding, HealthReport, validate_graph_health
+from vibeflow.rendering.architecture_document import build_architecture_document, render_architecture_document
 from vibeflow.rendering.ascii_flowchart import export_ascii_flowchart
 from vibeflow.rendering.mermaid import export_mermaid
 from vibeflow.rendering.mermaid.render import MermaidRenderError, is_mermaid_svg_renderer_available, render_mermaid_svg
@@ -25,6 +26,7 @@ from vibeflow.runtime import PipelineRuntime, PipelineRuntimeError
 from vibeflow.runtime.options import HookPlan, RuntimeOptions
 from vibeflow.runner import CheckedRunError, CheckedRunResult, run_checked
 from vibeflow.workspace import (
+    ArchitectureDocumentSpec,
     PROJECT_CONFIG_NAME,
     WORKSPACE_CONFIG_NAME,
     WorkspaceConfig,
@@ -41,6 +43,7 @@ from vibeflow.workspace import (
 )
 
 __all__ = [
+    "ArchitectureDocumentSpec",
     "CompiledGraph",
     "CompiledBlock",
     "ConfigDocument",
@@ -55,6 +58,7 @@ __all__ = [
     "BaseLibResource",
     "BaseLibScanReport",
     "build_architecture_report",
+    "build_architecture_document",
     "build_execution_plan",
     "CompilerPlugin",
     "ConfigResources",
@@ -118,6 +122,7 @@ __all__ = [
     "parse_graph_config",
     "resolve_effective_policy",
     "render_mermaid_svg",
+    "render_architecture_document",
     "run_checked",
     "scan_base_lib",
     "schema_text",

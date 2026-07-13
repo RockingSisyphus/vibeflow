@@ -2,23 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from vibeflow.graph_config import GraphConfig, LOOP_NODE_TYPES, NodeSpec, NodesetSpec, STATUS_PLANNED
+from vibeflow.graph_config import GraphConfig, NodeSpec, STATUS_PLANNED
+from vibeflow.rendering.review_model import node_flow_kind, nodeset_for_node
 
 if TYPE_CHECKING:
     from vibeflow.compiler import CompiledGraph
     from vibeflow.registry import NodeRegistry
-
-
-def nodeset_for_node(graph: GraphConfig, node: NodeSpec) -> NodesetSpec | None:
-    if node.type_used in LOOP_NODE_TYPES and node.loop.body:
-        return graph.nodesets.get(node.loop.body)
-    return graph.nodesets.get(node.type_used)
-
-
-def node_flow_kind(node: NodeSpec, compiled: CompiledGraph) -> str:
-    if node.status == STATUS_PLANNED:
-        return node.flow_kind
-    return compiled.flow_kinds.get(node.id, "")
 
 
 def node_is_external(node: NodeSpec, registry) -> bool:
