@@ -43,6 +43,7 @@ def validate_graph_health(
     global_config: Mapping[str, object] | None = None,
     purity_policy: PurityPolicy | None = None,
     effective_policy: EffectivePolicy | None = None,
+    nodeset_max_depth: int = 4,
 ) -> HealthReport:
     from vibeflow.compiler import GraphCompiler, GraphCompileError
 
@@ -64,6 +65,12 @@ def validate_graph_health(
     except GraphCompileError as exc:
         return _compile_error_report(exc)
 
+    from vibeflow.health.nodesets import nodeset_depth_error_report
+
+    depth_report = nodeset_depth_error_report(graph, compiled, max_depth=nodeset_max_depth)
+    if depth_report is not None:
+        return depth_report
+
     append_planned_findings(graph, state)
     _validate_graph_nodes(graph, registry, plugin_registry, purity_policy, state)
     _append_node_visual_metadata_warnings(graph, state)
@@ -82,7 +89,6 @@ def validate_graph_health(
     _append_nodeset_health(graph, registry, state)
     _append_graph_plugin_findings(graph, compiled, plugin_registry, state)
     return _build_health_report(graph, compiled, plugin_registry, state, effective_policy=effective_policy)
-
 
 def _compile_error_report(exc: GraphCompileError) -> HealthReport:
     return HealthReport(

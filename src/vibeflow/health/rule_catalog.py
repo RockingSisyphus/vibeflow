@@ -67,6 +67,11 @@ RULE_CATALOG: dict[str, dict[str, str]] = {
         "layer": "topology",
         "suggested_fix_type": "fix_nodeset",
     },
+    "NODESET.NESTING.DEPTH_EXCEEDED": {
+        "severity": "error",
+        "layer": "topology",
+        "suggested_fix_type": "fix_nodeset",
+    },
 }
 
 

@@ -14,6 +14,7 @@ class RuntimeOptions:
     execution: str = "plan"
     async_max_workers: int = 4
     async_flush_timeout: float | None = None
+    nodeset_max_depth: int = 4
     allow_planned_stub: bool = False
 
     def __post_init__(self) -> None:
@@ -25,6 +26,8 @@ class RuntimeOptions:
             raise ValueError("runtime async_max_workers must be a positive integer")
         if self.async_flush_timeout is not None and self.async_flush_timeout < 0:
             raise ValueError("runtime async_flush_timeout must be >= 0")
+        if not isinstance(self.nodeset_max_depth, int) or isinstance(self.nodeset_max_depth, bool) or self.nodeset_max_depth <= 0:
+            raise ValueError("runtime nodeset_max_depth must be a positive integer")
 
 
 RuntimeHook = tuple[str, Callable[..., object]]

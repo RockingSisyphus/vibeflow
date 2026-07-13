@@ -3,7 +3,8 @@
   "quality_enabled": true,
   "runtime": {
     "async_max_workers": 4,
-    "async_flush_timeout": null
+    "async_flush_timeout": null,
+    "nodeset_max_depth": 4
   },
   "quality": {
     "structure": {

@@ -421,6 +421,7 @@ Mermaid/SVG 中 while loop 使用独立 trapezoid (`trap-b`) 形状和默认 `lo
 - `nodeset_imports` 只导入 nodeset，不导入 pipeline、policy 或 plugins。
 - VibeFlow 会先为所有导入的 nodeset 建立符号表，再解析各 nodeset；因此调用点 `type_used` 和 loop 的 `loop.body` 可以引用已导入 nodeset 的 `type_key`。
 - nodeset 调用和 `vibeflow.loop.while.loop.body` 都构成 nodeset dependency。直接或间接递归会报 `NODESET.RECURSION`，不要用 nodeset/loop body 相互引用来表达循环；循环只能写成 loop node 自身的执行语义。
+- 默认最多连续进入 4 层 nodeset body。顶层 pipeline 深度为 0，普通 nodeset 调用和 `loop.body` 各增加 1 层；循环执行多少次都不会增加静态嵌套深度。所有已加载定义都会检查，包括未使用和 planned nodeset；超限会报 `NODESET.NESTING.DEPTH_EXCEEDED`。
 - 为消除 `NODESET.SMELL.TOO_WIDE` 拆分出更多小 nodeset 是推荐做法；parser 按符号表解析，不要求靠声明顺序或前缀重解析来管理可见性。
 - nodeset 内部 pipeline 也必须显式写 edges。
 - nodeset 可以声明自己的 `global_config`；外部 nodeset JSONC 文件的顶层 `global_config` 会作为该文件内 nodeset 的默认内部配置。
@@ -475,18 +476,19 @@ run_checked(..., runtime_options=RuntimeOptions(trace="boundary", node_hooks=Fal
 - `execution="block"`：显式 opt-in 的严格 block 模式；不能生成 graph/loop/nodeset block 时 fail fast，并给出 block compile reason。
 - `execution="compiled"`：显式 opt-in 的 generated `CompiledBlock` 模式；会递归生成 graph/nodeset/loop block，遇到不满足条件的区域会回退到 plan。
 
-workspace 模式可以在每个 root 的 `vibeflow_project.jsonc` 中设置异步运行参数：
+workspace 模式可以在每个 root 的 `vibeflow_project.jsonc` 中设置运行参数：
 
 ```jsonc
 {
   "runtime": {
     "async_max_workers": 8,
-    "async_flush_timeout": 30
+    "async_flush_timeout": 30,
+    "nodeset_max_depth": 4
   }
 }
 ```
 
-`async_max_workers` 必须是正整数，缺省为 4，控制每个 `PipelineRuntime` 自有线程池的最大并发数；嵌套 Runtime 继承数值但不共享线程池。`async_flush_timeout` 可以是 `null` 或非负秒数。程序化显式参数优先于 root 配置；现有 `--async-flush-timeout` 和 runtime profile 也会覆盖 root 中的超时值。
+`async_max_workers` 必须是正整数，缺省为 4，控制每个 `PipelineRuntime` 自有线程池的最大并发数；嵌套 Runtime 继承数值但不共享线程池。`async_flush_timeout` 可以是 `null` 或非负秒数。`nodeset_max_depth` 必须是正整数，缺省为 4，控制普通 nodeset 与 loop body 共用的最大静态嵌套深度。程序化稀疏 Mapping 只覆盖显式字段，完整 `RuntimeOptions` 视为完整配置；优先级为默认值、root 配置、显式调用参数。现有 `--async-flush-timeout` 和 runtime profile 仍只覆盖相关运行字段，不提供 nodeset 深度 CLI 参数。
 
 trace 兼容两层视图：`runtime.exec_order`、`runtime.node_runs`、`runtime.edge_executions`、`runtime.step_count` 仍表示顶层 pipeline；嵌套 nodeset/loop 的完整顺序看 `runtime.qualified_exec_order`、`runtime.qualified_node_runs`、`runtime.qualified_edge_executions` 和 `runtime.total_step_count`。完整事件不再保存在 `RunResult.runtime.events` 或 runtime hook 参数中；读取完整事件请逐行读取 `runtime_trace.jsonl`。`RunResult` 和 `after_run(state, trace)` / `run_failed(state, trace, message)` 中的 `trace` 只包含 summary、`event_count`、`trace_path` 和 `events_streamed=true`。事件中同时有机器可读 `path` 数组和人类可读 `qualified_node`，例如 `["outer", "inner", "add"]` / `outer.inner.add`。
 

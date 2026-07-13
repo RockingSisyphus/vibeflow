@@ -44,8 +44,13 @@ def validate_workspace_config_path(path: Path, *, workspace: WorkspaceConfig) ->
     prepared = _prepare_workspace_graph(path, workspace=workspace, env=env)
     if isinstance(prepared, HealthReport):
         return prepared
-    document, graph, compiled, resources, plugin_registry, effective_policy, warnings = prepared
-    return _validate_prepared_workspace_graph(document, graph, compiled, resources, plugin_registry, effective_policy, warnings, env=env, workspace=workspace)
+    effective_runtime_options = _workspace_runtime_options(path, workspace=workspace)
+    return _validate_prepared_workspace_graph(
+        prepared,
+        env=env,
+        workspace=workspace,
+        runtime_options=effective_runtime_options,
+    )
 
 
 def _workspace_runtime_options(
@@ -107,7 +112,7 @@ def run_workspace_checked(
     effective_runtime_options = _workspace_runtime_options(config_path, workspace=workspace, overrides=runtime_options)
     document, graph, compiled, resources, plugin_registry, effective_policy, warnings = prepared
     _write_json(run_dir / "effective_policy.json", effective_policy.to_dict())
-    health = _validate_prepared_workspace_graph(document, graph, compiled, resources, plugin_registry, effective_policy, warnings, env=env, workspace=workspace)
+    health = _validate_prepared_workspace_graph(prepared, env=env, workspace=workspace, runtime_options=effective_runtime_options)
     _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=env.registry, resources=resources, runtime_options=effective_runtime_options)
     if health.status not in {"FAIL", "ERROR"}:
         compiled = _compile_with_registry_or_refuse(graph, env.registry, effective_policy.to_dict(), run_dir, actual_run_id)
@@ -143,19 +148,15 @@ def annotate_health_report(report: HealthReport, graph, *, workspace: WorkspaceC
 
 
 def _validate_prepared_workspace_graph(
-    document,
-    graph,
-    compiled,
-    resources: ConfigResources,
-    plugin_registry,
-    effective_policy: EffectivePolicy,
-    warnings: tuple[HealthFinding, ...],
+    prepared,
     *,
     env: WorkspaceEnvironment,
     workspace: WorkspaceConfig,
+    runtime_options: RuntimeOptions,
 ) -> HealthReport:
     from vibeflow.health import validate_graph_health
 
+    document, graph, compiled, resources, plugin_registry, effective_policy, warnings = prepared
     health = validate_graph_health(
         graph,
         registry=env.registry,
@@ -163,6 +164,7 @@ def _validate_prepared_workspace_graph(
         global_config=resources.global_config,
         purity_policy=effective_policy.to_purity_policy(),
         effective_policy=effective_policy,
+        nodeset_max_depth=runtime_options.nodeset_max_depth,
     )
     info = dict(health.info)
     info["nodeset_imports"] = [dict(item) for item in document.nodeset_imports]

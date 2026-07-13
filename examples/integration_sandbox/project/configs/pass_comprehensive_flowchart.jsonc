@@ -97,7 +97,6 @@
         "description": "Runs route."
       },
       {
-        "join_policy": "all",
         "requires": [
           {
             "type": "value.out",
@@ -144,7 +143,6 @@
         "description": "Runs store."
       },
       {
-        "join_policy": "all",
         "requires": [
           {
             "type": "value.final",

@@ -25,7 +25,7 @@
 - 每个 `pipeline.nodes[]` 调用点都必须写 `display_name` 和 `description`，让 Mermaid/SVG 能直接区分节点名、易读名和说明。
 - `requires`、`provides`、`pipeline.inputs`、`pipeline.outputs` 的每个对象都必须写非空 `display_name`。图上 contract label 先显示 `display_name`，再显示 id/key/type。
 - `project/registry.py` 同时声明可用 node、base_lib 和 plugin；base_lib/plugin 的 `register(...)` 必须写 `display_name` 和 `description`。workflow config 只用 `base_lib.modules[].id` 和 `plugins[].id` 引用本流程实际使用的资源，不要把未使用资源写进 config。
-- `vibeflow_project.jsonc` 只保留 `registry`、`quality_enabled`、`quality` 和可选的 `runtime.async_max_workers` / `runtime.async_flush_timeout`；不要把 base_lib/plugin 当成 root 级全局启用项写在这里。
+- `vibeflow_project.jsonc` 只保留 `registry`、`quality_enabled`、`quality` 和可选的 `runtime.async_max_workers` / `runtime.async_flush_timeout` / `runtime.nodeset_max_depth`；不要把 base_lib/plugin 当成 root 级全局启用项写在这里。
 - 节点自定义颜色只能写在 `style.fill`、`style.stroke`、`style.text` 中，颜色必须是 `#RRGGBB`，且不得使用 VibeFlow 系统保留色。合法自定义色会覆盖节点默认/系统 class 的 fill/stroke/text 颜色。
 - `display_name`、`description`、`style`、`similar_to` 是调用点元数据，不进入运行时 `params`；运行时同名参数必须写进 `config`。
 - 只有确认两个 node 是有意变体或副本时才写 `similar_to`，并且必须指向同作用域已存在 node、使用 `variant` 或 `copy`、写清 `reason`；不要用它掩盖应该拆分或抽 base_lib 的重复实现。
@@ -33,6 +33,7 @@
 - nodeset 必须是独立 JSONC 文件，根对象声明 `type_key`、`display_name`、`description`、`requires`、`provides` 和 `pipeline`；主 config 不允许内联 `nodesets`，nodeset 文件也不允许 `exports`、`purity`、`category`、`version`。
 - nodeset 文件可以写 `nodeset_imports` 调用其他独立 nodeset 文件；调用处直接用 nodeset `type_key` 作为 `type_used`，不要写旧 `nodeset.xxx` 前缀。
 - nodeset 调用和 `loop.body` 都是 nodeset dependency，不能直接或间接递归；出现 `NODESET.RECURSION` 时要拆开结构或改成真正的 `vibeflow.loop.while` 循环语义。
+- nodeset dependency 默认最多 4 层：顶层 pipeline 为 0，普通 nodeset 或 `loop.body` 首次进入为 1，循环迭代不累计。所有已加载和 planned 定义都检查；需要更深结构时在所属 root 的 `runtime.nodeset_max_depth` 中显式提高。
 - `node_configs` 可以穿透 nodeset 调用和 `vibeflow.loop.while` 调用；dotted path 的每一段都写调用点 `id`，loop 段会进入该调用点的 `loop.body`，不要把 body `type_key` 当成路径段。
 - `decision` 只用于分支选择，不要用 decision cycle 模拟 retry、训练循环、多 batch、多 epoch、carry state 或 metrics collect。
 - loop 的退出条件只能在 `loop.stop_after` 和 `loop.stop_when` 中二选一；不要再写 `vibeflow.loop.for_each`、`loop.items`、`loop.epochs` 或 `loop.until`。
@@ -82,7 +83,7 @@
 5. 需要展开 nodeset 给人类审查时，必须用 `python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg` 生成详细审查 SVG。不要把 `graph.expanded.mmd` 直接交给 Mermaid CLI/mmdc 渲染成 SVG；那会绕过 VibeFlow 的 review-columns/detail-panel composer，导致排版退回旧的全局展开图。
 6. 告知人类审核员查看 `reports/graph.mmd`、`reports/graph.svg` 或 `reports/graph.expanded.svg`。不要在粗粒度架构未经确认时直接实现大量 node。
 7. 人类审核通过后，再逐个细化 nodeset。比如把 planned nodeset `a` 细化为 `d -> e -> f`，可以先把 `d`、`e`、`f` 也标为 planned，再生成展开图继续审核。
-8. 细化可以继续嵌套；任何尚未确定的节点或节点集都应保持 `status: "planned"`，用流程图先暴露结构。
+8. 细化可以继续嵌套，但默认不得超过 4 层 nodeset/loop body；任何尚未确定的节点或节点集都应保持 `status: "planned"`，用流程图先暴露结构。确有需要时先在所属 root 的 `runtime.nodeset_max_depth` 中明确提高上限。
 9. 真正实现某个 node 时，必须创建对应 Python node，声明 `NODE_INFO`、`CONTRACT` 和 `run_pure(inputs, params)`，并在 `project/registry.py` 注册。真正实现某个 base_lib/plugin 时，也在同一个 `project/registry.py` 的 `build_base_lib_registry()` / `build_plugin_registry()` 注册为可用资源；实际 workflow 需要时再在 config 中按 id 引用。
 10. 真正实现某个 nodeset 时，必须补齐 `requires`、`provides`、内部 `pipeline.nodes` 和 `pipeline.edges`，且移除该 nodeset 的 `status: "planned"`；不要写已移除的 `exports` 或 `purity`。
 11. 只有当 nodeset 内部所有子 node / 子 nodeset 都已经 implemented，父 nodeset 才能变成 implemented。例外是设计期可用 `planned_behavior: "transparent"` 或 `python_stub` 子节点保持连通性，此时父 nodeset 会得到 warning；blocking planned child 仍会报错。

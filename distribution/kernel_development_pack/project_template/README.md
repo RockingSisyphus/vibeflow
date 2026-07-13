@@ -5,7 +5,7 @@
 1. 使用 `build_distribution.py` 生成包含 `kernel/vibeflow-kernel.zip` 的完整开发包。
 2. 把本目录内容复制到新项目根目录。
 3. 在 `project/nodes/` 中开发业务 node。
-4. 在 `project/registry.py` 中注册可用 node、base_lib 和 plugin；在 `project/vibeflow_project.jsonc` 声明 registry、quality 和可选的异步 runtime 参数。
+4. 在 `project/registry.py` 中注册可用 node、base_lib 和 plugin；在 `project/vibeflow_project.jsonc` 声明 registry、quality 和可选 runtime 参数。
 5. 根目录 `vibeflow_config.jsonc` 声明 workspace roots；单项目模板默认只包含 `project/`。
 6. 在 `project/configs/main.jsonc` 中用 `id` / `type_used` 调用 node 或 nodeset，并用显式 `pipeline.edges` 组织拓扑。
 7. 运行：
@@ -29,7 +29,7 @@ value = result.context.get("response.value")["value"]
 
 `input_summary.json`、`output_summary.json` 和 trace 只保存脱敏摘要。其中的 `"scalar": true` 只表示原值是标量，不是业务布尔值 `True`，也无法区分 `True` 和 `False`。不要解析 `output_summary.json` 作为业务输出，也不要对摘要字典做 `bool(...)`。
 
-配置文件分两层：根目录 `vibeflow_config.jsonc` 只声明 workspace roots 和全局 policy；每个 root 的 `vibeflow_project.jsonc` 声明 registry、quality 和可选的异步 runtime 参数。可用的 node/base_lib/plugin 都在同一个 `project/registry.py` 里注册；每个 workflow config 用 id 声明本流程实际使用哪些 base_lib/plugin。单项目模板默认是：
+配置文件分两层：根目录 `vibeflow_config.jsonc` 只声明 workspace roots 和全局 policy；每个 root 的 `vibeflow_project.jsonc` 声明 registry、quality 和可选 runtime 参数。可用的 node/base_lib/plugin 都在同一个 `project/registry.py` 里注册；每个 workflow config 用 id 声明本流程实际使用哪些 base_lib/plugin。单项目模板默认是：
 
 ```jsonc
 {
@@ -52,7 +52,7 @@ value = result.context.get("response.value")["value"]
 }
 ```
 
-每个 root 下都需要自己的 `vibeflow_project.jsonc`。`registry` 相对所属 root 目录解析；`runtime.async_max_workers` 控制该 root 内每个 Runtime 自有线程池的并发数（默认 4），`runtime.async_flush_timeout` 控制 detached task 的收尾等待时间。`build_base_lib_registry()` / `build_plugin_registry()` 中的 module 或文件路径也按该 root 解析。`quality.structure` 使用 warning/error 双阈值治理 root 代码布局，默认允许最多 120 个 `.py`，但单个代码目录超过 16 个 `.py` 会失败，用来推动 `nodes/`、`base_lib/`、`plugins/` 按功能拆分。pipeline config 不再声明 `policy`，但必须声明本 workflow 实际使用的资源：
+每个 root 下都需要自己的 `vibeflow_project.jsonc`。`registry` 相对所属 root 目录解析；`runtime.async_max_workers` 控制该 root 内每个 Runtime 自有线程池的并发数（默认 4），`runtime.async_flush_timeout` 控制 detached task 的收尾等待时间，`runtime.nodeset_max_depth` 控制普通 nodeset 与 loop body 的最大静态嵌套深度（默认 4）。`build_base_lib_registry()` / `build_plugin_registry()` 中的 module 或文件路径也按该 root 解析。`quality.structure` 使用 warning/error 双阈值治理 root 代码布局，默认允许最多 120 个 `.py`，但单个代码目录超过 16 个 `.py` 会失败，用来推动 `nodes/`、`base_lib/`、`plugins/` 按功能拆分。pipeline config 不再声明 `policy`，但必须声明本 workflow 实际使用的资源：
 
 ```jsonc
 {

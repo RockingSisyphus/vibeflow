@@ -137,7 +137,12 @@ def test_graph_health_flow_and_data_findings_include_owner_and_provider_context(
 def test_graph_health_checks_each_nested_nodeset_definition_once() -> None:
     graph = _nested_bad_leaf_graph(depth=6)
 
-    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    report = validate_graph_health(
+        graph,
+        registry=_registry(),
+        purity_policy=PurityPolicy(max_source_lines=1000),
+        nodeset_max_depth=8,
+    )
     findings = [*report.errors, *report.warnings]
 
     assert len(_findings(findings, "GRAPH.DATA.MISSING_DIRECT_PROVIDER", owner="nodeset:ns0", node="bad", required_type="value.in")) == 1
@@ -199,7 +204,12 @@ def test_nodeset_override_path_errors_are_not_repeated_by_nested_definition_expa
         }
     )
 
-    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    report = validate_graph_health(
+        graph,
+        registry=_registry(),
+        purity_policy=PurityPolicy(max_source_lines=1000),
+        nodeset_max_depth=8,
+    )
     errors = [error for error in report.errors if error.rule_id == "NODESET.CONFIG.UNKNOWN_NODE"]
 
     assert len(errors) == 1
@@ -382,6 +392,67 @@ def _nested_bad_leaf_graph(*, depth: int):
             },
         }
     )
+
+
+def _nodeset_depth_graph(
+    depth: int,
+    *,
+    loop_layer: int | None = None,
+    loop_layers: set[int] | None = None,
+    async_layer: int | None = None,
+    branch: bool = False,
+    pipeline_uses_chain: bool = True,
+    planned: bool = False,
+):
+    nodesets = [
+        _nodeset_config(
+            "depth.0",
+            provides=["value.out"],
+            pipeline={
+                "nodes": [
+                    _node_call("leaf", "test.seed", "Produces the depth fixture output.", provides=[PROV_SPEC("value.out")])
+                ]
+            },
+        )
+    ]
+    for index in range(1, depth):
+        child = f"depth.{index - 1}"
+        if index == loop_layer or index in (loop_layers or set()):
+            call = _node_call(
+                "call",
+                "vibeflow.loop.while",
+                f"Calls {child} as a loop body.",
+                provides=[PROV_SPEC("value.out")],
+                loop={
+                    "body": child,
+                    "max_iterations": 10,
+                    "stop_after": 1,
+                    "outputs": [{"from": "value.out", "as": "value.out"}],
+                },
+            )
+        else:
+            call = _node_call("call", child, f"Calls {child}.", provides=[PROV_SPEC("value.out")])
+        if index == async_layer:
+            call["async"] = "detached"
+        calls = [call]
+        if branch and index == depth - 1:
+            calls.append(_node_call("branch", "depth.0", "Calls a shallow branch.", provides=[PROV_SPEC("branch.out")]))
+        nodesets.append(
+            _nodeset_config(
+                f"depth.{index}",
+                provides=["value.out"],
+                pipeline={"nodes": calls},
+            )
+        )
+    if planned:
+        for nodeset in nodesets:
+            nodeset["status"] = "planned"
+    pipeline_node = (
+        _node_call("top", f"depth.{depth - 1}", "Calls the depth fixture.", provides=[PROV_SPEC("value.out")])
+        if pipeline_uses_chain
+        else _node_call("seed", "test.seed", "Leaves the depth fixture unused.", provides=[PROV_SPEC("value.out")])
+    )
+    return parse_graph_config({"nodesets": nodesets, "pipeline": {"nodes": [pipeline_node]}})
 
 
 def _bad_leaf_nodeset(name: str) -> dict:
@@ -655,6 +726,7 @@ def test_nodeset_health_rejects_direct_and_indirect_recursion() -> None:
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
     recursion_errors = [error for error in report.errors if error.rule_id == "NODESET.RECURSION"]
     assert len(recursion_errors) == 2
+    assert "NODESET.NESTING.DEPTH_EXCEEDED" not in {error.rule_id for error in report.errors}
     assert "loop.self" in report.info["nodeset_findings"]
     assert "loop.a" in report.info["nodeset_findings"]
 
@@ -707,6 +779,66 @@ def test_nodeset_health_treats_loop_body_as_recursion_reference() -> None:
 
     assert len(recursion_errors) == 1
     assert recursion_errors[0].details["cycle"] == ("loop.body", "loop.body")
+    assert "NODESET.NESTING.DEPTH_EXCEEDED" not in {error.rule_id for error in report.errors}
+
+
+def test_nodeset_depth_limit_accepts_four_and_rejects_five_mixed_layers() -> None:
+    accepted = validate_graph_health(
+        _nodeset_depth_graph(4, loop_layer=2, async_layer=3, branch=True),
+        registry=_registry(),
+        purity_policy=PurityPolicy(max_source_lines=1000),
+    )
+    rejected = validate_graph_health(
+        _nodeset_depth_graph(5, loop_layer=2, async_layer=4, branch=True),
+        registry=_registry(),
+        purity_policy=PurityPolicy(max_source_lines=1000),
+    )
+
+    assert "NODESET.NESTING.DEPTH_EXCEEDED" not in {error.rule_id for error in accepted.errors}
+    depth_error = next(error for error in rejected.errors if error.rule_id == "NODESET.NESTING.DEPTH_EXCEEDED")
+    assert depth_error.details["limit"] == 4
+    assert depth_error.details["actual_depth"] == 5
+    assert depth_error.details["chain"] == ("depth.4", "depth.3", "depth.2", "depth.1", "depth.0")
+    assert [call["kind"] for call in depth_error.details["calls"]] == ["nodeset", "nodeset", "nodeset", "loop_body", "nodeset"]
+
+
+def test_nodeset_depth_limit_counts_nested_while_bodies() -> None:
+    accepted = validate_graph_health(
+        _nodeset_depth_graph(4, loop_layers={1, 2, 3}),
+        registry=_registry(),
+        purity_policy=PurityPolicy(max_source_lines=1000),
+    )
+    rejected = validate_graph_health(
+        _nodeset_depth_graph(5, loop_layers={1, 2, 3, 4}),
+        registry=_registry(),
+        purity_policy=PurityPolicy(max_source_lines=1000),
+    )
+
+    assert "NODESET.NESTING.DEPTH_EXCEEDED" not in {error.rule_id for error in accepted.errors}
+    depth_error = next(error for error in rejected.errors if error.rule_id == "NODESET.NESTING.DEPTH_EXCEEDED")
+    assert depth_error.details["actual_depth"] == 5
+    assert [call["kind"] for call in depth_error.details["calls"]] == ["nodeset", "loop_body", "loop_body", "loop_body", "loop_body"]
+
+
+def test_nodeset_depth_limit_checks_unused_planned_definitions() -> None:
+    report = validate_graph_health(
+        _nodeset_depth_graph(5, pipeline_uses_chain=False, planned=True),
+        registry=_registry(),
+        purity_policy=PurityPolicy(max_source_lines=1000),
+    )
+
+    depth_error = next(error for error in report.errors if error.rule_id == "NODESET.NESTING.DEPTH_EXCEEDED")
+    assert depth_error.details["owner"] == "nodeset:depth.4"
+    assert depth_error.details["actual_depth"] == 5
+    assert depth_error.details["chain"][0] == "depth.4"
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 1.5, "4"])
+def test_graph_health_rejects_invalid_nodeset_max_depth(value) -> None:
+    graph = parse_graph_config({"pipeline": _seed_only_pipeline()})
+
+    with pytest.raises(ValueError, match="nodeset max depth"):
+        validate_graph_health(graph, registry=_registry(), nodeset_max_depth=value)
 
 
 def test_nodeset_health_rejects_export_and_internal_key_leak() -> None:
