@@ -148,12 +148,14 @@ from vibeflow.cli import main as kernel_cli_main  # noqa: E402
 
 WORKSPACE_CONFIG_PATH = ROOT / "vibeflow_config.jsonc"
 COMMAND_ALIASES = {
+    "architecture": "export-architecture",
     "ascii": "export-ascii",
     "mermaid": "export-mermaid",
     "quality": "quality-check",
     "svg": "export-svg",
 }
 WORKSPACE_COMMANDS = {
+    "export-architecture",
     "export-ascii",
     "export-mermaid",
     "export-svg",

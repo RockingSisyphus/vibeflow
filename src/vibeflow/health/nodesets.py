@@ -14,7 +14,7 @@ from vibeflow.data_contract import provider_keys, providers_to_dicts, requiremen
 from vibeflow.registry import NodeRegistry, NodeRegistryError
 
 
-def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry) -> tuple[tuple[HealthFinding, ...], tuple[HealthFinding, ...]]:
+def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry | None) -> tuple[tuple[HealthFinding, ...], tuple[HealthFinding, ...]]:
     errors: list[HealthFinding] = []
     warnings: list[HealthFinding] = []
     dependencies = analyze_nodeset_dependencies(graph)
@@ -39,7 +39,8 @@ def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry) -> tuple[tu
                     details={"compile_error": str(exc), "compile_rule_id": exc.rule_id, **dict(exc.details or {})},
                 )
             )
-        errors.extend(_validate_node_types_in_scope(nodeset.graph.nodes, graph.nodesets, registry=registry, owner=f"nodeset:{nodeset.type_key}"))
+        if registry is not None:
+            errors.extend(_validate_node_types_in_scope(nodeset.graph.nodes, graph.nodesets, registry=registry, owner=f"nodeset:{nodeset.type_key}"))
         for ref_name in references.get(nodeset.type_key, ()):
             if ref_name not in graph.nodesets:
                 errors.append(

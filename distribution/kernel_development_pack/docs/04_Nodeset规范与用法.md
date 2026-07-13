@@ -4,7 +4,7 @@ nodeset 是独立 JSONC 实现文件，作用类似 Python node 的 `.py` 文件
 
 普通 node 的实现键来自 Python `NodeInfo.type_key`；nodeset 的实现键来自 nodeset JSONC 根对象的 `type_key`。两者共享同一个全局命名空间，不能重复。
 
-## 最小 nodeset 文件
+## 最小 implemented nodeset 文件
 
 `project/configs/nodesets/demo_add_one.jsonc`：
 
@@ -77,7 +77,7 @@ nodeset 是独立 JSONC 实现文件，作用类似 Python node 的 `.py` 文件
 
 规则：
 
-- 根对象必须写 `type_key`、`display_name`、`description`、`requires`、`provides` 和 `pipeline`。
+- 所有 nodeset 根对象都必须写 `type_key`、`display_name`、`description`、`requires` 和 `provides`；implemented nodeset 还必须写完整 `pipeline`。
 - `requires`、`provides`、`pipeline.inputs`、`pipeline.outputs` 都必须使用对象契约，并写非空 `display_name`。
 - `name`、`category`、`version`、`purity`、`exports` 已从 nodeset 模型中移除，出现即为 schema/config error。
 - nodeset 内部允许 `io`、`data_store`、`document`、`external=True` 等节点；可读性通过展开 SVG 审查，不再要求 nodeset 纯函数属性。
@@ -174,6 +174,29 @@ nodeset 是独立 JSONC 实现文件，作用类似 Python node 的 `.py` 文件
 
 planned nodeset 不要求 `pipeline`，但仍必须写 `type_key`、`display_name`、`description`、`requires` 和 `provides`。默认 `planned_behavior` 是 `blocking`，只能用于架构审查；需要运行时 stub 时按 planned node 的 `python_stub` 规则处理。
 
+planned nodeset 也可以包含待逐步细化的 body，例如：
+
+```jsonc
+{
+  "type_key": "demo.future_module",
+  "display_name": "Future Module",
+  "description": "Planned internal flow for review.",
+  "status": "planned",
+  "requires": [],
+  "provides": [],
+  "pipeline": {
+    "nodes": [
+      {"id": "start", "status": "planned", "flow_kind": "terminal", "display_name": "Start", "description": "Starts the planned module."},
+      {"id": "design_step", "status": "planned", "flow_kind": "process", "display_name": "Design Step", "description": "Represents the next implementation step."},
+      {"id": "end", "status": "planned", "flow_kind": "terminal", "display_name": "End", "description": "Ends the planned module."}
+    ],
+    "edges": [["start", "design_step"], ["design_step", "end"]]
+  }
+}
+```
+
+这类 body 不是可执行实现，但不是被忽略的注释：它会完整进入登记的架构 JSONC 和展开 Mermaid/SVG，并参与 nodeset dependency、recursion、最大深度和 planned-descendant 等适用检查。即使 planned nodeset 使用 `python_stub`，运行时也只把整个调用当作一个 stub 执行，不展开 body。只有补齐可执行 pipeline、满足内部健康检查并切换为 implemented 后，body 才具有 implemented 执行语义。
+
 ## 配置覆盖
 
 调用 nodeset 时，可以给内部 node 覆盖配置：
@@ -204,9 +227,9 @@ nodeset 也可以声明内部 `global_config`；调用点 `config` 会覆盖 nod
 
 - nodeset 不能直接或间接递归调用自己。
 - nodeset 内部普通 `pipeline.edges` 不允许形成环；循环必须用 `vibeflow.loop.while` 调用 nodeset body。
-- nodeset 内部 pipeline 必须有 terminal start/end。
+- implemented nodeset 的内部 pipeline 必须有 terminal start/end；planned body 仍应写出 start/end，便于架构审查并接受适用的 flow 检查。
 - nodeset 内部控制流必须显式写 `edges`；`requires/provides` 不会自动生成边。
-- nodeset 根 `provides` 必须能由内部 pipeline output 或内部 provider 产生，否则报 `NODESET.PROVIDES.UNKNOWN_KEY`。
+- implemented nodeset（以及声明了 body 的 planned nodeset）根 `provides` 必须能由内部 pipeline output 或内部 provider 产生，否则报 `NODESET.PROVIDES.UNKNOWN_KEY`；无 body 的 planned 占位只保留对外契约。
 - nodeset 内部需要从外层读取的类型必须声明在 nodeset `requires` 中。
 - 内部 node 数量超过 10 会给 `NODESET.SMELL.TOO_WIDE` warning，推荐继续拆分小 nodeset。
 

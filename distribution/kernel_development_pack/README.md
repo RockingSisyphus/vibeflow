@@ -27,6 +27,7 @@ my_project/
     THIRD_PARTY_NOTICES.md
   project/
     vibeflow_project.jsonc
+    ARCHITECTURE.jsonc
     nodes/
     base_lib/
     plugins/
@@ -36,11 +37,13 @@ my_project/
   reports/
 ```
 
-核心原则：根目录 `vibeflow_config.jsonc` 只声明 workspace roots 和全局 policy；每个 root 的 `vibeflow_project.jsonc` 声明 registry、quality 和可选 runtime 参数，包括异步线程池与 nodeset 最大嵌套深度；同一个 `project/registry.py` 声明可用 node、base_lib 和 plugin。每个 workflow config 再按 id 声明本流程实际使用的 base_lib/plugin，审查图只展示实际引用的资源。`quality.structure` 默认用 warning/error 双阈值治理 root 代码布局，允许 root 总文件数增长到 120，但单个代码目录超过 16 个 `.py` 会失败，促使 `nodes/`、`base_lib/`、`plugins/` 按功能拆分。业务开发者只写小型纯函数 node、纯 helper、必要插件和 JSONC 拓扑配置；控制流只写在显式 `pipeline.edges` 中；运行前由内核自动健康检查，检查不过不执行。运行时只审计流程和 key，node 间可按引用传递普通 Python 对象。`kernel/docs/`、`kernel/tools/` 和 `kernel/THIRD_PARTY_NOTICES.md` 是随内核分发的只读参考材料；根目录 `README.md`、`AGENTS.md` 和项目自己的文档可以按项目定制。
+核心原则：根目录 `vibeflow_config.jsonc` 只声明 workspace roots 和全局 policy；每个 root 的 `vibeflow_project.jsonc` 声明 registry、quality、可选 runtime 参数和 `architecture.documents`。登记的 `ARCHITECTURE.jsonc` 是从真实 workflow/nodeset/registry 确定性生成的单文件审查视图，AI 应先读它、修改真实 source、再重新生成，而不是手工编辑。同一个 `project/registry.py` 声明可用 node、base_lib 和 plugin。每个 workflow config 再按 id 声明本流程实际使用的 base_lib/plugin，审查产物只展示实际引用的资源。`quality.structure` 默认用 warning/error 双阈值治理 root 代码布局，允许 root 总文件数增长到 120，但单个代码目录超过 16 个 `.py` 会失败，促使 `nodes/`、`base_lib/`、`plugins/` 按功能拆分。业务开发者只写小型纯函数 node、纯 helper、必要插件和 JSONC 拓扑配置；控制流只写在显式 `pipeline.edges` 中；运行前由内核自动健康检查，检查不过不执行。
 
 常用命令：
 
 ```powershell
+python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc
+python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc --check
 python run.py validate --config project/configs/main.jsonc
 python run.py run --config project/configs/main.jsonc --run-root runs
 python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
@@ -49,7 +52,9 @@ python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
 python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg
 ```
 
-`run` 会在 `runs/<run_id>/` 自动写出快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`。`svg` 默认会为 Mermaid CLI 放大渲染上限：普通图使用 `maxTextSize=200000`、`maxEdges=2000`；`--expand-nodesets` 使用 `maxTextSize=500000`、`maxEdges=5000`，并固定采用 `review-columns` SVG composer，把主流程、当前 workflow 实际启用的 plugins/base_lib 和展开 nodeset 分列展示。SVG 保持 `htmlLabels=false`，但内核会对原生 SVG 文本做标题加粗、字段名前缀加粗和字段行左对齐增强。超大图可用 `--mermaid-max-text-size`、`--mermaid-max-edges` 和 `--review-fragment-max-width` 覆盖。
+implemented nodeset 必须包含完整 pipeline。planned nodeset 可以无 body 占位，也可以带 body 逐步细化；body 会进入架构 JSONC 与展开图及适用静态检查，但仍不可按 implemented body 执行，`python_stub` 仍是单个 stub。
+
+`run` 会在 `runs/<run_id>/` 自动写出 `architecture.jsonc`、快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`，但不会覆盖 root 中登记的架构文档。`svg` 默认会为 Mermaid CLI 放大渲染上限：普通图使用 `maxTextSize=200000`、`maxEdges=2000`；`--expand-nodesets` 使用 `maxTextSize=500000`、`maxEdges=5000`，并固定采用 `review-columns` SVG composer，把主流程、当前 workflow 实际启用的 plugins/base_lib 和展开 nodeset 分列展示。
 
 注意：`python run.py mermaid --expand-nodesets --output reports/graph.expanded.mmd` 只导出 Mermaid 源码，供调试源码使用。详细审查 SVG 必须用 `python run.py svg --expand-nodesets --output reports/graph.expanded.svg` 生成，不要把 `graph.expanded.mmd` 直接交给 Mermaid CLI/mmdc 转成 SVG，否则会绕过 VibeFlow 的 review-columns/detail-panel composer。
 

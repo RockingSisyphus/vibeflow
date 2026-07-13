@@ -2,6 +2,7 @@ from tests.unit.strict_support import *
 
 from vibeflow.workspace import (
     _workspace_runtime_options,
+    ArchitectureDocumentSpec,
     WorkspaceConfigError,
     build_workspace_environment,
     build_workspace_node_registry,
@@ -267,6 +268,158 @@ def test_workspace_project_runtime_config_validation(tmp_path, runtime) -> None:
         load_workspace_config(workspace_path)
 
     assert invalid.value.rule_id == "WORKSPACE.PROJECT_CONFIG.RUNTIME"
+
+
+def test_workspace_project_architecture_documents_are_normalized_and_typed(tmp_path) -> None:
+    workspace_path, project_root, _ = _workspace_fixture(tmp_path, write_workspace=False)
+    _write_project_config(project_root)
+    workflow_path = project_root / "configs" / "main.jsonc"
+    workflow_path.parent.mkdir(parents=True)
+    workflow_path.write_text("{}", encoding="utf-8")
+    project_config_path = project_root / "vibeflow_project.jsonc"
+    payload = json.loads(project_config_path.read_text(encoding="utf-8"))
+    payload["architecture"] = {
+        "documents": [
+            {
+                "workflow": "configs/./main.jsonc",
+                "document": "review/ARCHITECTURE.architecture.jsonc",
+            }
+        ]
+    }
+    project_config_path.write_text(json.dumps(payload), encoding="utf-8")
+    workspace_path.write_text(json.dumps({"roots": [{"id": "project", "path": "project"}]}), encoding="utf-8")
+
+    workspace = load_workspace_config(workspace_path)
+    documents = workspace.root_by_id("project").architecture_documents
+
+    assert len(documents) == 1
+    spec = documents[0]
+    assert isinstance(spec, ArchitectureDocumentSpec)
+    assert spec.workflow == "configs/main.jsonc"
+    assert spec.document == "review/ARCHITECTURE.architecture.jsonc"
+    assert spec.workflow_path == workflow_path.resolve()
+    assert spec.document_path == (project_root / "review" / "ARCHITECTURE.architecture.jsonc").resolve()
+    assert spec.registration_field == "architecture.documents[0]"
+    assert not spec.document_path.exists()
+
+
+@pytest.mark.parametrize(
+    "architecture",
+    [
+        None,
+        [],
+        {},
+        {"documents": []},
+        {"documents": "configs/main.jsonc"},
+        {"documents": [{"workflow": "configs/main.jsonc", "document": "ARCHITECTURE.jsonc"}], "unknown": True},
+        {"documents": [None]},
+        {"documents": [{"workflow": "configs/main.jsonc"}]},
+        {"documents": [{"workflow": "configs/main.jsonc", "document": "ARCHITECTURE.jsonc", "unknown": True}]},
+        {"documents": [{"workflow": "", "document": "ARCHITECTURE.jsonc"}]},
+        {"documents": [{"workflow": "configs/main.jsonc", "document": 1}]},
+        {"documents": [{"workflow": "configs/main.json", "document": "ARCHITECTURE.jsonc"}]},
+        {"documents": [{"workflow": "configs/main.jsonc", "document": "ARCHITECTURE.md"}]},
+        {"documents": [{"workflow": "../outside.jsonc", "document": "ARCHITECTURE.jsonc"}]},
+        {"documents": [{"workflow": "configs/main.jsonc", "document": "../ARCHITECTURE.jsonc"}]},
+        {"documents": [{"workflow": "C:\\outside\\main.jsonc", "document": "ARCHITECTURE.jsonc"}]},
+    ],
+)
+def test_workspace_project_architecture_schema_and_paths_are_strict(tmp_path, architecture) -> None:
+    workspace_path, project_root, _ = _workspace_fixture(tmp_path, write_workspace=False)
+    _write_project_config(project_root)
+    workflow_path = project_root / "configs" / "main.jsonc"
+    workflow_path.parent.mkdir(parents=True)
+    workflow_path.write_text("{}", encoding="utf-8")
+    project_config_path = project_root / "vibeflow_project.jsonc"
+    payload = json.loads(project_config_path.read_text(encoding="utf-8"))
+    payload["architecture"] = architecture
+    project_config_path.write_text(json.dumps(payload), encoding="utf-8")
+    workspace_path.write_text(json.dumps({"roots": [{"id": "project", "path": "project"}]}), encoding="utf-8")
+
+    with pytest.raises(WorkspaceConfigError) as invalid:
+        load_workspace_config(workspace_path)
+
+    assert invalid.value.rule_id == "WORKSPACE.PROJECT_CONFIG.ARCHITECTURE"
+    assert invalid.value.source_location["path"] == str(project_config_path.resolve())
+    assert invalid.value.source_location["project_config_path"] == str(project_config_path.resolve())
+    assert str(invalid.value.source_location["field"]).startswith("architecture")
+    assert str(project_config_path.resolve()) in invalid.value.message
+    assert str(invalid.value.source_location["field"]) in invalid.value.message
+
+
+def test_workspace_project_architecture_rejects_absolute_same_and_duplicate_paths(tmp_path) -> None:
+    workspace_path, project_root, _ = _workspace_fixture(tmp_path, write_workspace=False)
+    _write_project_config(project_root)
+    configs = project_root / "configs"
+    configs.mkdir(parents=True)
+    (configs / "main.jsonc").write_text("{}", encoding="utf-8")
+    (configs / "other.jsonc").write_text("{}", encoding="utf-8")
+    project_config_path = project_root / "vibeflow_project.jsonc"
+    base_payload = json.loads(project_config_path.read_text(encoding="utf-8"))
+    workspace_path.write_text(json.dumps({"roots": [{"id": "project", "path": "project"}]}), encoding="utf-8")
+    cases = (
+        {
+            "documents": [
+                {"workflow": str((configs / "main.jsonc").resolve()), "document": "ARCHITECTURE.jsonc"},
+            ]
+        },
+        {"documents": [{"workflow": "configs/main.jsonc", "document": "configs/./main.jsonc"}]},
+        {
+            "documents": [
+                {"workflow": "configs/main.jsonc", "document": "main.architecture.jsonc"},
+                {"workflow": "configs/./main.jsonc", "document": "other.architecture.jsonc"},
+            ]
+        },
+        {
+            "documents": [
+                {"workflow": "configs/main.jsonc", "document": "ARCHITECTURE.jsonc"},
+                {"workflow": "configs/other.jsonc", "document": "./ARCHITECTURE.jsonc"},
+            ]
+        },
+        {
+            "documents": [
+                {"workflow": "configs/main.jsonc", "document": "configs/other.jsonc"},
+                {"workflow": "configs/other.jsonc", "document": "other.architecture.jsonc"},
+            ]
+        },
+        {
+            "documents": [
+                {"workflow": "configs/main.jsonc", "document": "main.architecture.jsonc"},
+                {"workflow": "configs/other.jsonc", "document": "configs/main.jsonc"},
+            ]
+        },
+    )
+
+    for architecture in cases:
+        payload = {**base_payload, "architecture": architecture}
+        project_config_path.write_text(json.dumps(payload), encoding="utf-8")
+        with pytest.raises(WorkspaceConfigError) as invalid:
+            load_workspace_config(workspace_path)
+        assert invalid.value.rule_id == "WORKSPACE.PROJECT_CONFIG.ARCHITECTURE"
+        assert "architecture.documents[" in invalid.value.message
+
+
+def test_workspace_project_architecture_requires_existing_workflow_but_not_document(tmp_path) -> None:
+    workspace_path, project_root, _ = _workspace_fixture(tmp_path, write_workspace=False)
+    _write_project_config(project_root)
+    project_config_path = project_root / "vibeflow_project.jsonc"
+    payload = json.loads(project_config_path.read_text(encoding="utf-8"))
+    payload["architecture"] = {
+        "documents": [
+            {"workflow": "configs/missing.jsonc", "document": "ARCHITECTURE.architecture.jsonc"},
+        ]
+    }
+    project_config_path.write_text(json.dumps(payload), encoding="utf-8")
+    workspace_path.write_text(json.dumps({"roots": [{"id": "project", "path": "project"}]}), encoding="utf-8")
+
+    with pytest.raises(WorkspaceConfigError) as missing:
+        load_workspace_config(workspace_path)
+
+    assert missing.value.rule_id == "WORKSPACE.PROJECT_CONFIG.ARCHITECTURE"
+    assert missing.value.source_location["field"] == "architecture.documents[0].workflow"
+    assert missing.value.source_location["workflow"] == "configs/missing.jsonc"
+    assert missing.value.source_location["resolved_path"] == str((project_root / "configs" / "missing.jsonc").resolve())
+    assert "create or correct 'configs/missing.jsonc'" in missing.value.message
 
 
 def test_workspace_nodeset_depth_limit_uses_workflow_root_config(tmp_path) -> None:

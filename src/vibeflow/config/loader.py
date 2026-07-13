@@ -72,6 +72,9 @@ def _load_config_document(
             source_location={"path": str(path)},
         ) from exc
 
+    if expand_nodeset_imports and _is_architecture_document(text):
+        raise _architecture_document_error(path, workspace=workspace)
+
     suffix = path.suffix.lower()
     config_format = "jsonc" if suffix == ".jsonc" else "json"
     if config_format == "jsonc":
@@ -94,6 +97,8 @@ def _load_config_document(
             failure_layer="syntax",
             source_location={"path": str(path), "line": 1, "column": 1},
         )
+    if expand_nodeset_imports and _is_architecture_document_payload(data):
+        raise _architecture_document_error(path, workspace=workspace)
     if expand_nodeset_imports:
         data, nodeset_imports = _expand_nodeset_imports(data, path=path, import_stack=(*import_stack, path), cache=cache, workspace=workspace)
     else:
@@ -105,6 +110,44 @@ def _load_config_document(
         f"imports={len(nodeset_imports)} elapsed={_elapsed_ms(started)}ms"
     )
     return document
+
+
+def _is_architecture_document(text: str) -> bool:
+    from vibeflow.rendering.architecture_document import ARCHITECTURE_DOCUMENT_HEADER
+
+    header = "\n".join(text.splitlines()[:4])
+    return text.startswith(ARCHITECTURE_DOCUMENT_HEADER) or "NON-EXECUTABLE ARCHITECTURE REVIEW DOCUMENT." in header
+
+
+def _is_architecture_document_payload(data: Mapping[str, Any]) -> bool:
+    return set(data) == {"workflow", "nodesets", "node_types", "resources"} and all(
+        isinstance(data.get(field), Mapping)
+        for field in ("workflow", "nodesets", "node_types", "resources")
+    )
+
+
+def _architecture_document_error(path: Path, *, workspace: object | None) -> ConfigLoadError:
+    workflow_path = ""
+    project_config_path = ""
+    for root in getattr(workspace, "roots", ()):
+        for spec in getattr(root, "architecture_documents", ()):
+            if Path(getattr(spec, "document_path", "")).resolve() != path:
+                continue
+            workflow_path = str(Path(getattr(spec, "workflow_path", "")).resolve())
+            project_config_path = str(Path(getattr(root, "config_path", "")).resolve())
+            break
+        if workflow_path:
+            break
+    if workflow_path:
+        instruction = f"use the registered workflow {workflow_path} from {project_config_path}"
+    else:
+        instruction = "use the workflow registered for this document in vibeflow_project.jsonc"
+    return ConfigLoadError(
+        rule_id="CONFIG.ARCHITECTURE_DOCUMENT.NON_EXECUTABLE",
+        message=f"architecture review document is not executable: {path}; {instruction}",
+        failure_layer="source",
+        source_location={"path": str(path), "line": 1, "column": 1},
+    )
 
 
 def _expand_nodeset_imports(

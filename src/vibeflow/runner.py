@@ -185,7 +185,13 @@ def _compile_or_refuse(
     from vibeflow.graph_config import GraphConfigError, parse_graph_config
 
     try:
-        graph = parse_graph_config(config_data, project_root=project_root_for_config(config_path))
+        project_root = project_root_for_config(config_path)
+        graph = parse_graph_config(
+            config_data,
+            project_root=project_root,
+            root_path=project_root,
+            source_path=config_path,
+        )
         compiled = GraphCompiler().compile(graph, plugin_registry=plugin_registry)
     except (GraphConfigError, Exception) as exc:
         health = _compile_health_report(exc, effective_policy)
@@ -270,12 +276,17 @@ def _validate_run_health(
 
 def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None, resources: ConfigResources | None = None) -> None:
     from vibeflow.rendering.ascii_flowchart import export_ascii_flowchart
+    from vibeflow.rendering.architecture_document import render_architecture_document
     from vibeflow.rendering.mermaid import compiled_graph_payload, export_mermaid
     from vibeflow.rendering.mermaid.render import EXPANDED_MERMAID_MAX_EDGES, EXPANDED_MERMAID_MAX_TEXT_SIZE, MermaidRenderError, render_mermaid_svg
     from vibeflow.rendering.mermaid.review_svg import render_review_columns_svg
 
     _write_json(run_dir / "health_report.json", health.to_dict())
     _write_json(run_dir / "compiled_graph.json", compiled_graph_payload(graph, compiled, resources=resources))
+    (run_dir / "architecture.jsonc").write_text(
+        render_architecture_document(graph, compiled=compiled, registry=registry, resources=resources),
+        encoding="utf-8",
+    )
     (run_dir / "graph.txt").write_text(export_ascii_flowchart(graph, compiled=compiled, registry=registry, health_report=health), encoding="utf-8")
     mermaid_text = export_mermaid(graph, compiled=compiled, registry=registry, health_report=health, resources=resources)
     (run_dir / "graph.mmd").write_text(mermaid_text, encoding="utf-8")

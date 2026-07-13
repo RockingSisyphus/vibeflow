@@ -11,6 +11,7 @@ from vibeflow.config.path_utils import is_relative_to
 from vibeflow.plugin import PluginRegistry
 from vibeflow.policy import EffectivePolicy
 from vibeflow.registry import NodeRegistry
+from vibeflow.workspace.architecture_types import ArchitectureDocumentSpec, WorkspaceConfigError
 
 
 WORKSPACE_CONFIG_NAME = "vibeflow_config.jsonc"
@@ -27,17 +28,6 @@ class WorkspaceResourceRegistries:
     has_plugin_registry: bool = False
 
 
-@dataclass
-class WorkspaceConfigError(ValueError):
-    rule_id: str
-    message: str
-    source_location: Mapping[str, object]
-    failure_layer: str = "workspace"
-
-    def __str__(self) -> str:
-        return self.message
-
-
 @dataclass(frozen=True)
 class WorkspaceRoot:
     id: str
@@ -48,6 +38,7 @@ class WorkspaceRoot:
     quality_enabled: bool = True
     quality_structure: QualityStructureLimits = field(default_factory=QualityStructureLimits)
     runtime_options: Mapping[str, object] = field(default_factory=dict)
+    architecture_documents: tuple[ArchitectureDocumentSpec, ...] = ()
 
 
 @dataclass(frozen=True)
