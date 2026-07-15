@@ -84,12 +84,12 @@ implemented base_lib 必须暴露 `BASE_LIB_INFO`，用于实现自检和 inspec
 
 旧 `boundary` 模型已移除。当前推荐用标准 flowchart node 表达外部交互边界：
 
-- `io`：输入/输出动作。
-- `data_store`：数据存储请求、数据库引用、缓存请求。
-- `document`：文档结构或文档内容。
+- `io`：适配已传入的外部表示，或形成供外部 adapter 消费的输出对象。
+- `data_store`：形成结构化存储请求、数据库/缓存引用。
+- `document`：形成文档对象、文档结构或文档写入请求。
 - `process` + `external=True`：包装第三方库或外部维护代码。
 
-这些 node 仍然是内核拓扑的一部分，必须声明 `CONTRACT`、`requires/provides` 和示例。
+这些 `flow_kind` 只决定流程语义、图形和适用校验，不授予文件、网络、数据库、浏览器或进程能力。它们仍然是内核拓扑的一部分，必须声明 `CONTRACT`、`requires/provides` 和示例，并遵守 node 的纯度边界。
 
 ## io node
 
@@ -99,7 +99,7 @@ implemented base_lib 必须暴露 `BASE_LIB_INFO`，用于实现自检和 inspec
 terminal start -> io input -> process... -> io output -> terminal end
 ```
 
-`io` node 应只做输入/输出数据整理，不应直接读写文件或网络。真实外部系统可以在内核外部准备 `pipeline.inputs`，或消费运行输出。
+`io` node 应只适配已由调用方传入的输入表示，或将内部结果转成结构化输出对象；不应直接读写文件、网络、数据库或浏览器。真实外部系统可以在内核外部准备 `pipeline.inputs`，或消费运行输出。
 
 ## data_store node
 
@@ -128,7 +128,7 @@ CONTRACT = NodeContract(
 NODE_INFO = NodeInfo(..., flow_kind="document")
 ```
 
-它可以输出 `document.report` 这类 key，再由下游 `io` node 或外部系统消费。
+它可以输出 `document.report` 这类 key，再由下游 `io` node 转成输出对象，最终交给外部系统消费。它本身不因 `flow_kind="document"` 而获得文件写入能力。
 
 ## external=True
 
@@ -142,16 +142,16 @@ NODE_INFO = NodeInfo(
 )
 ```
 
-`external=True` 只跳过源码质量检查；不会跳过契约、拓扑、输出、运行时 trace 检查。如果这个外部 node 负责分支路由，必须同时声明 `flow_kind="decision"` 并满足 decision 规则。
+`external=True` 表示实现由第三方或外部主体维护，是一个信任/检查边界：它只跳过源码质量、复杂度和导入链等内部实现检查。它不是 IO 权限，也不是 purity 绕过开关；不会跳过契约、`flow_kind`、拓扑、输出或运行时 trace 检查。如果这个外部 node 负责分支路由，必须同时声明 `flow_kind="decision"` 并满足 decision 规则。
 
 ## 真实副作用应该放在哪里
 
 内核内的 node/base_lib 默认不直接做真实 IO。推荐模式：
 
-1. 内核外部系统准备输入对象，作为 `run.py run --input input.json` 或自定义启动器的 `initial` 传入。
+1. VibeFlow 调用方或内核外部 adapter 准备输入对象，作为 `run.py run --input input.json` 或自定义启动器的 `initial` 传入。
 2. `io` node 把输入对象转成流程内 key。
 3. `process` / `decision` / `nodeset` 做纯计算和路由。
 4. `data_store` 或 `document` node 生成结构化请求或文档对象。
-5. 外部系统消费运行输出，真正写文件、数据库、网络或 UI。
+5. 调用方或外部 adapter 消费运行输出，真正写文件、数据库、网络或 UI。
 
 这样做的目的是让 VibeFlow 审计“流程和契约”，而不是把外部系统副作用藏进某个 node。

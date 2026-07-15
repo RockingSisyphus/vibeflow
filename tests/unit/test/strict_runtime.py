@@ -2072,7 +2072,7 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     import subprocess
     import sys
 
-    from build_distribution import build_distribution
+    from build_distribution import ROOT_README_GENERATED_AT_MARKER, build_distribution
 
     def verify(output_path: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -2100,6 +2100,7 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
         repository_root / "docs" / "developer_guide.md",
     ]
     generated_guides = [
+        output / "README.md",
         output / "AGENTS.md",
         output / "kernel" / "docs" / "07_启动命令与报告.md",
         output / "kernel" / "docs" / "10_Kernel能力与项目开发指南.md",
@@ -2113,6 +2114,37 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
         )
         assert expected_context in text
         assert scalar_summary_marker in text
+
+    source_readme = source_guides[0].read_text(encoding="utf-8")
+    generated_readme = (output / "README.md").read_text(encoding="utf-8")
+    generated_at_line = next(
+        line for line in generated_readme.splitlines() if line.startswith("生成时间：")
+    )
+    assert generated_readme == source_readme.replace(
+        ROOT_README_GENERATED_AT_MARKER,
+        generated_at_line,
+    )
+    for required in (
+        "project/ARCHITECTURE.jsonc",
+        "真实 workflow config",
+        "相关 nodeset",
+        "runtime.async_max_workers",
+        "runtime.async_flush_timeout",
+        "runtime.nodeset_max_depth",
+        "planned nodeset",
+    ):
+        assert required in generated_readme
+
+    generated_agents = (output / "AGENTS.md").read_text(encoding="utf-8")
+    for required in (
+        "必须优先阅读",
+        "真实 workflow config",
+        "相关 nodeset JSONC",
+        "runtime.async_max_workers",
+        "runtime.async_flush_timeout",
+        "runtime.nodeset_max_depth",
+    ):
+        assert required in generated_agents
 
     template_config = json.loads(
         (output / "project" / "configs" / "main.jsonc").read_text(encoding="utf-8")
@@ -2188,7 +2220,7 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
 
 
 def test_distribution_build_honors_source_date_epoch(tmp_path, monkeypatch) -> None:
-    from build_distribution import build_distribution
+    from build_distribution import ROOT_README_GENERATED_AT_MARKER, build_distribution
 
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "1783784063")
     first = tmp_path / "first"
@@ -2207,8 +2239,17 @@ def test_distribution_build_honors_source_date_epoch(tmp_path, monkeypatch) -> N
         if path.is_file()
     }
     assert first_files == second_files
-    assert "生成时间：2026-07-11 15:34:23 UTC" in (first / "README.md").read_text(
-        encoding="utf-8"
+    generated_line = "生成时间：2026-07-11 15:34:23 UTC"
+    source_readme = (
+        Path(__file__).resolve().parents[3]
+        / "distribution"
+        / "kernel_development_pack"
+        / "project_template"
+        / "README.md"
+    ).read_text(encoding="utf-8")
+    assert (first / "README.md").read_text(encoding="utf-8") == source_readme.replace(
+        ROOT_README_GENERATED_AT_MARKER,
+        generated_line,
     )
 
 

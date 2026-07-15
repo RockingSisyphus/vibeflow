@@ -1,6 +1,6 @@
 # VibeFlow Documentation Index
 
-This directory contains current user documentation, maintainer documentation, and historical design records. Start with the current docs unless you are researching why a design changed.
+This directory contains current user documentation, maintainer documentation, and historical design records. The release package also carries topic-specific user docs and a separate AI instruction file; these artifacts have different responsibilities and must stay semantically aligned. Start with the current docs unless you are researching why a design changed.
 
 ## Start Here
 
@@ -9,6 +9,17 @@ This directory contains current user documentation, maintainer documentation, an
 - Config node/resource visual metadata (`display_name`, `description`, `style`, `similar_to` where applicable), symbol-table nodeset parsing and forward references, explicit-edge mainline analysis / data bypass / async edge semantics, first-class loop nodes, safe OR join / `join_policy`, SVG color rules and native-text label enhancement, actionable and aggregated health/quality `details`, config parse tracing, and nested runtime trace fields are documented in `developer_guide.md` and `kernel_development_guide.md`.
 - `kernel_target_vision.md`: target vision and current public architecture principles.
 - `kernel_development_guide.md`: checks and workflow for maintaining VibeFlow itself.
+
+## Documentation Responsibilities
+
+- `kernel_target_vision.md` records long-lived product invariants and architecture-review principles. It should describe what must remain true, not implementation history.
+- `kernel_development_guide.md` is the maintainer contract for VibeFlow itself, including CLI orchestration, failure semantics, regression coverage, and repository checks.
+- `developer_guide.md` is the shared user guide. It is also the source copied into the release package as `kernel/docs/10_Kernel能力与项目开发指南.md`; edit the source once rather than patching generated output.
+- `../distribution/kernel_development_pack/docs/` contains topic-specific source documents for release-package users. The build places them under `kernel/docs/`.
+- `../distribution/kernel_development_pack/project_template/AGENTS.md` is the additional high-salience instruction set for AI agents. It carries operational prohibitions and review gates, while the human README should stay concise.
+- `../README.md` and `../README.en.md` provide the repository overview and a short two-path quick start for greenfield and existing projects.
+
+All current user- and AI-facing layers must agree that existing workflows are edited in place, formal review uses the VibeFlow `review` command and fails closed, Mermaid CLI/mmdc is an internal implementation detail, and human approval requires an explicit later message when requested.
 
 ## Current Design
 

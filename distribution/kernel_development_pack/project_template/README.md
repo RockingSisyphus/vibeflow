@@ -1,26 +1,35 @@
-# 项目模板
+# VibeFlow 可复制开发包
 
-使用方法：
+<!-- VIBEFLOW_DISTRIBUTION_GENERATED_AT -->
 
-1. 使用 `build_distribution.py` 生成包含 `kernel/vibeflow-kernel.zip` 的完整开发包。
-2. 把本目录内容复制到新项目根目录。
-3. 在 `project/nodes/` 中开发业务 node。
-4. 在 `project/registry.py` 中注册可用 node、base_lib 和 plugin；在 `project/vibeflow_project.jsonc` 声明 registry、quality、可选 runtime 参数和架构文档映射。
-5. 根目录 `vibeflow_config.jsonc` 声明 workspace roots；单项目模板默认只包含 `project/`。
-6. 在 `project/configs/main.jsonc` 中用 `id` / `type_used` 调用 node 或 nodeset，并用显式 `pipeline.edges` 组织拓扑。
-7. 运行：
+这个目录可以整体复制到其他位置作为新项目起点。它包含本地 kernel、内核文档、AI 开发提示词和可运行的示例项目骨架。
+
+开始开发前，AI 和开发者都应先阅读 `AGENTS.md`，并按任务类型工作：
+
+- 新建项目（greenfield）可以从粗粒度 planned 流程开始。
+- 修改已有项目（existing）先读 `project/ARCHITECTURE.jsonc`，沿 source 定位真实 workflow config 及其导入 nodeset，然后原位修改。不为审核新建平行 config，不用概念图替代真实 config。
+
+修改后用 `python run.py review` 完成正式架构审核。任务判定、`复用 / 修改 / 删除 / 新增`清单和人类批准门见 `AGENTS.md`。
+
+业务 node、base_lib 和 plugin 分别放在 `project/nodes/`、`project/base_lib/` 和 `project/plugins/`，并在 `project/registry.py` 注册。每个 root 的 `vibeflow_project.jsonc` 声明 registry、quality、可选 runtime 参数和架构文档映射；根目录 `vibeflow_config.jsonc` 声明 workspace roots。
+
+常用命令：
 
 ```powershell
 python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc
+python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc --check
+python run.py review --config project/configs/main.jsonc --output reports/graph.expanded.svg
 python run.py validate --config project/configs/main.jsonc
 python run.py run --config project/configs/main.jsonc --run-root runs
 python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
 python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
 python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
 python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg
+python run.py quality --path project
+python run.py verify-kernel
 ```
 
-模板把 `project/configs/main.jsonc` 登记到 `project/ARCHITECTURE.jsonc`。这是带固定“生成且不可执行”头注释的单文件架构审查文档，不是 workflow config；AI 和开发者应先读它，再修改真实 source。每次修改 workflow、导入 nodeset、相关 node metadata/config schema 或启用资源后，用显式 `--output project/ARCHITECTURE.jsonc` 重新生成。`python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc --check` 只检查字节级新鲜度，不写文件；登记文档缺失、陈旧或手工改写时，普通 `validate` / `run` 会拒绝继续并打印可直接运行的修复命令。
+默认项目把 `project/configs/main.jsonc` 登记到 `project/ARCHITECTURE.jsonc`。这是带固定“生成且不可执行”头注释的单文件架构审查文档，不是 workflow config；AI 和开发者应先用它理解入口流程、nodeset 调用、节点职责、数据契约、资源和配置来源。架构变更必须落到真实 workflow config、相关 nodeset、registry metadata/config schema 或资源声明中。正式 `review` 会自动重新生成登记文档、执行正式 validate，并且只在 canonical expanded SVG 结构检查通过后发布 SVG；失败时不得用 mmdc、手写 SVG 或旧产物补位。
 
 ## 读取真实运行结果
 
@@ -75,11 +84,11 @@ value = result.context.get("response.value")["value"]
 }
 ```
 
-`run` 会在 `runs/<run_id>/` 自动写出快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`。`svg` 默认会为 Mermaid CLI 放大渲染上限：普通图使用 `maxTextSize=200000`、`maxEdges=2000`；`--expand-nodesets` 使用 `maxTextSize=500000`、`maxEdges=5000`，并固定采用 `review-columns` SVG composer，把主流程、当前 workflow 实际启用的 plugins/base_lib 和展开 nodeset 分列展示。SVG 保持 `htmlLabels=false`，但内核会对原生 SVG 文本做标题加粗、字段名前缀加粗和字段行左对齐增强。超大图可用 `--mermaid-max-text-size`、`--mermaid-max-edges` 和 `--review-fragment-max-width` 覆盖。
+`run` 会在 `runs/<run_id>/` 自动写出快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`。VibeFlow 命令内部使用 bundled Mermaid CLI 渲染 SVG；Mermaid CLI/mmdc 是实现细节，不是公开审核入口。普通单项 `svg` 命令保留图形导出/诊断参数，正式架构审核则使用参数固定的 `review`。
 
 `run` 还会在当次运行目录写出预期的 `architecture.jsonc` 供审计，但不会替你覆盖 root 中登记的 `project/ARCHITECTURE.jsonc`。
 
-注意：`python run.py mermaid --expand-nodesets --output reports/graph.expanded.mmd` 只导出 Mermaid 源码，供调试源码使用。详细审查 SVG 必须用 `python run.py svg --expand-nodesets --output reports/graph.expanded.svg` 生成，不要把 `graph.expanded.mmd` 直接交给 Mermaid CLI/mmdc 转成 SVG，否则会绕过 VibeFlow 的 review-columns/detail-panel composer。
+注意：`python run.py mermaid --expand-nodesets --output reports/graph.expanded.mmd` 只导出 Mermaid 源码，供调试源码使用。不要把 `graph.expanded.mmd` 直接交给 Mermaid CLI/mmdc 转成 SVG；正式审核使用 `python run.py review --config ... --output ...`。
 
 如果要使用 `svg`，确保项目根目录存在 `kernel/tools/mermaid-renderer/`，并先执行：
 

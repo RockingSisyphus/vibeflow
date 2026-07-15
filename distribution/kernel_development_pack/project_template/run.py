@@ -161,6 +161,7 @@ WORKSPACE_COMMANDS = {
     "export-svg",
     "inspect-config",
     "quality-check",
+    "review",
     "run",
     "validate",
 }
