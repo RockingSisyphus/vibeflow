@@ -49,7 +49,8 @@ VibeFlow is designed for release-package usage.
 1. Download the latest package from GitHub Releases.
 2. Extract it into your workspace.
 3. Open or create a project in that directory with any vibe coding tool, such as OpenCode, Codex, or Claude Code.
-4. Let AI follow `AGENTS.md`: read or generate the single-file architecture document and planned flowchart first, review the structure, then implement business nodes, base_lib helpers, plugins, and JSONC configs step by step.
+4. Let AI follow `AGENTS.md` and classify the task first: for an existing project, read the registered architecture document and modify the real workflow/nodeset in place; only a greenfield project starts from a coarse planned flowchart.
+5. Generate the formal architecture review artifact with `python run.py review`. If you asked for implementation only after review, AI must wait for your explicit approval in a later message.
 
 The release package root includes `AGENTS.md`. AI tools that support project instructions can read it automatically and learn:
 
@@ -59,7 +60,8 @@ The release package root includes `AGENTS.md`. AI tools that support project ins
 - How to run validate, run, quality, and diagram commands.
 - How to read and regenerate `ARCHITECTURE.jsonc` without editing it by hand.
 - Which health checks must pass before execution.
-- How to design planned nodesets first, export diagrams for human review, and only then implement them.
+- How to distinguish greenfield work from changes to an existing project and edit the real sources.
+- How to generate a formal review with `review` and wait for explicit human approval before implementation.
 
 You do not need to understand the full kernel source first. Treat the release package as an AI development workspace with built-in rules.
 
@@ -84,6 +86,7 @@ Common commands:
 ```bash
 python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc
 python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc --check
+python run.py review --config project/configs/main.jsonc --output reports/graph.expanded.svg
 python run.py validate --config project/configs/main.jsonc
 python run.py run --config project/configs/main.jsonc --run-root runs
 python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
@@ -93,28 +96,38 @@ python run.py svg --config project/configs/main.jsonc --expand-nodesets --output
 python run.py quality --path project
 ```
 
-Each root can register workflow/document pairs under `architecture.documents` in `vibeflow_project.jsonc`. Fixed comments mark the generated document as non-executable; mutable-looking status properties are deliberately absent. AI should read it first, edit the real workflow/nodeset/registry sources, and regenerate it. Workspace validation and execution reject a registered document that is missing, stale, or manually reformatted, with source locations and a repair command.
+Each root can register workflow/document pairs under `architecture.documents` in `vibeflow_project.jsonc`. Fixed comments mark the generated document as non-executable; mutable-looking status properties are deliberately absent. AI should read it first to understand the project architecture. To change that architecture, edit the real workflow config or relevant nodesets, update registry metadata/config schema when needed, and regenerate the document; never edit the generated document itself. Workspace validation and execution reject a registered document that is missing, stale, or manually reformatted, with source locations and a repair command.
 
-SVG export passes an expanded Mermaid CLI render config. Normal graphs default to `maxTextSize=200000`; `--expand-nodesets` defaults to `maxTextSize=500000`. Very large graphs can override this with `--mermaid-max-text-size` and `--mermaid-max-edges`.
+`review` is the formal architecture-review entry point. It checks registration and the existing graph, refreshes and verifies the canonical `ARCHITECTURE.jsonc`, runs workspace validation, then generates and checks an expanded `review-columns` SVG. If any stage fails, it does not substitute an old SVG, a hand-written diagram, or a direct mmdc render, and it does not publish the failed artifact to the target path. `PASS` or `CONCERNS` only means that machine review completed; when the task says “implement after review,” explicit human approval in a later message is still required.
+
+The same root config can set `runtime.async_max_workers` (default 4), `runtime.async_flush_timeout` (default `null`), and `runtime.nodeset_max_depth` (default 4). Each Runtime owns its thread pool; ordinary nodeset calls and `loop.body` share the static depth limit, while loop iteration count does not increase it. Worker count and nodeset depth have no CLI flags.
+
+The `svg` command internally passes an expanded render config to the bundled Mermaid CLI. Mermaid CLI/mmdc is a kernel implementation detail, not a public review entry point. Normal graphs default to `maxTextSize=200000`; `--expand-nodesets` defaults to `maxTextSize=500000`. Very large graphs can override this with `--mermaid-max-text-size` and `--mermaid-max-edges`.
 Expanded SVG exports always use the deterministic `review-columns` composer: the main pipeline stays on the left, followed by plugins, base_lib, and expanded nodesets in top-level call order. Nodeset details use a recursive detail-panel layout: leaf nodesets render horizontally; parents with child nodesets keep collapsed call-sites and original edges, with direct child nodesets stacked to the right in call order.
-`graph.expanded.mmd` is a Mermaid source debug artifact only. Do not render it directly with Mermaid CLI/mmdc for review SVG; detailed review SVG must be generated through `run.py svg --expand-nodesets`.
+`graph.expanded.mmd` is a Mermaid source debug artifact only. Do not render it directly with Mermaid CLI/mmdc. Formal architecture review must use `run.py review`; `run.py svg --expand-nodesets` remains a single-artifact export or diagnostic entry point.
 SVG rendering does not require Google Chrome to be preinstalled. After a normal `npm install`, VibeFlow first uses Puppeteer's installed/cached browser. `/snap/bin/chromium` is skipped because it commonly fails under Puppeteer/mermaid-cli with profile-lock launch errors.
 
 ## AI Development Workflow 🛠️
 
+Classify the task first, then follow the matching path:
+
 ```text
-Describe requirement
-  -> AI reads the registered ARCHITECTURE.jsonc
-  -> AI abstracts it into a coarse standard flowchart
-  -> Write planned nodesets into JSONC
-  -> Export Mermaid or SVG for human review
-  -> Expand nodesets after review
-  -> Implement node/base_lib/plugin/config
+Modify an existing project
+  -> Read the registered ARCHITECTURE.jsonc
+  -> Locate the real workflow / nodeset sources referenced by it
+  -> List reused / modified / deleted / added objects
+  -> Make the smallest change in the original config and nodesets
+  -> run.py review -> explicit later human approval -> implement -> validate / quality / run
+
+Create a greenfield project
+  -> Abstract a coarse standard flowchart
+  -> Write planned nodesets into the real JSONC
+  -> run.py review -> explicit later human approval
+  -> Implement node / base_lib / plugin / config in stages
   -> validate / quality / run
-  -> Iterate
 ```
 
-Major architecture changes use the same loop: planned first, architecture document and diagrams first, review first, implementation second. A planned nodeset may omit its body or include a progressively refined body. That body appears in the architecture document, expanded diagrams, and applicable static checks, but it is not executed as an implemented body. A `python_stub` nodeset remains one stub call; an implemented nodeset requires a complete pipeline.
+An existing workflow is modified in place by default. A parallel review config, hand-written Mermaid, conceptual diagram, or vague delta picture cannot replace review of the real config. Only a greenfield project or a full redesign explicitly approved by a human starts from a new coarse planned topology. A planned nodeset may omit its body or include a progressively refined body. That body appears in the architecture document, expanded diagrams, and applicable static checks, but it is not executed as an implemented body. A `python_stub` nodeset remains one stub call; an implemented nodeset requires a complete pipeline.
 
 VibeFlow does not stop you from vibe coding. It makes every vibe return to a checkable structure.
 
@@ -139,7 +152,7 @@ Every node declares a standard `flow_kind`:
 - `document`: document generation or document structure.
 - `preparation`: setup / initialization.
 
-This means AI-written code must not only run; it must fit back into a reviewable flowchart.
+`flow_kind` declares architecture semantics, diagram shape, and applicable checks; it does not grant file, network, database, or process permissions. This means AI-written code must not only run; it must fit back into a reviewable flowchart.
 
 ### Explicit Flow Edges
 
@@ -160,7 +173,7 @@ Business nodes are pure by default:
 - No environment variable reads.
 - No direct calls to other nodes.
 
-Real IO is modeled through flowchart nodes such as `io`, `data_store`, and `document`. Third-party or externally maintained code is marked with `NodeInfo.external=True`.
+An `io` node only adapts an external representation already passed in or forms an output object; `data_store` and `document` nodes only form storage requests, references, or document objects. The caller or an adapter outside the kernel performs real file, network, database, and process side effects. Third-party or externally maintained code is marked with `NodeInfo.external=True`; this is a source-maintenance and inspection boundary, not an IO permission or purity bypass.
 
 ### Pre-Run Health Checks
 
@@ -169,7 +182,7 @@ Before execution, VibeFlow checks:
 - Node metadata completeness.
 - Input and output contracts.
 - Reachability from start to end.
-- Whether cycles pass through a decision node.
+- Whether ordinary graph/nodeset cycles are absent; iteration must use the first-class `vibeflow.loop.while` node.
 - Node purity and structure rules.
 - Whether config, plugins, or nodesets break project boundaries.
 

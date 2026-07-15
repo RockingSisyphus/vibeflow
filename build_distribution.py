@@ -12,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_OUTPUT = ROOT / "vibeflow_distribution"
+ROOT_README_GENERATED_AT_MARKER = "<!-- VIBEFLOW_DISTRIBUTION_GENERATED_AT -->"
 EXTRA_DOCS = (
     ("developer_guide.md", "10_Kernel能力与项目开发指南.md"),
 )
@@ -260,117 +261,19 @@ def _write_root_readme(output: Path) -> None:
         except (TypeError, ValueError, OverflowError) as exc:
             raise BuildDistributionError("SOURCE_DATE_EPOCH must be an integer Unix timestamp") from exc
     generated_at = generated.strftime("%Y-%m-%d %H:%M:%S UTC")
-    text = f"""# VibeFlow 可复制开发包
-
-生成时间：{generated_at}
-
-这个目录可以整体复制到其他位置作为新项目起点。它已经包含：
-
-- `kernel/vibeflow-kernel.zip`：当前仓库最新内核源码归档，`run.py` 会直接从这个单文件导入。
-- `kernel/docs/`：内核中文开发文档，可读但不应作为项目内容修改。
-- `kernel/tools/mermaid-renderer/`：SVG 渲染器依赖配置；运行 `npm install` 后启用 `svg` 命令。
-- `kernel/THIRD_PARTY_NOTICES.md`：SVG 渲染相关第三方项目致谢与许可证信息。
-- `project/`：可直接运行的示例业务项目骨架。
-- `project/nodes/`、`project/base_lib/`、`project/plugins/`、`project/configs/`：AI 和开发者放业务代码与配置的标准目录。
-- `vibeflow_config.jsonc`：workspace 索引，声明参与加载的 source roots。
-- `project/vibeflow_project.jsonc`：project 级配置，声明 registry、base_lib、plugins、quality 和 runtime 限制。
-- `run.py`：推荐启动器，会自动加载本地内核和 workspace 配置。
-- `README.md`、`AGENTS.md`：项目可定制指南文件，不属于 kernel manifest。
-
-Runtime 默认审计流程和 key，不保存真实对象内容；node 间可以按引用传递普通 Python 对象。需要指标、日志或诊断 side task 时，在 config 中显式使用 `async: "detached"` 或 `async: "result_key"`。
-
-## 开始使用
-
-```powershell
-python run.py validate --config project/configs/main.jsonc
-python run.py run --config project/configs/main.jsonc --run-root runs
-python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
-python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
-python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
-python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg
-python run.py quality
-```
-
-## Workspace 配置
-
-根目录 `vibeflow_config.jsonc` 只声明 workspace roots 和全局 policy；每个 root 自己放 `vibeflow_project.jsonc`，声明该 root 的 registry、base_lib、plugins、quality 和 runtime 限制。单项目模板默认是：
-
-```jsonc
-{{
-  "policy": {{}},
-  "roots": [
-    {{"id": "project", "path": "project"}}
-  ]
-}}
-```
-
-同一个仓库如果要同时放框架层和任务层，可以改成多 root：
-
-```jsonc
-{{
-  "policy": {{}},
-  "roots": [
-    {{"id": "vibetrain", "path": "vibetrain"}},
-    {{"id": "project", "path": "project"}}
-  ]
-}}
-```
-
-每个 root 下都需要自己的 `vibeflow_project.jsonc`。其中 `registry`、`base_lib.paths` 和 plugin 文件路径都相对所属 root 目录解析；`runtime.nodeset_max_depth` 默认限制普通 nodeset 与 loop body 最多嵌套 4 层。`quality.structure` 使用 warning/error 双阈值治理 root 代码布局，默认允许最多 120 个 `.py`，但单个代码目录超过 16 个 `.py` 会失败，用来推动 `nodes/`、`base_lib/`、`plugins` 按功能拆分。pipeline config 仍通过 `--config project/configs/main.jsonc` 指定，workspace 模式下不要在 pipeline config 顶层声明 `policy`、`base_lib` 或 `plugins`。
-
-跨 root nodeset import 使用 root id：
-
-```jsonc
-{{
-  "nodeset_imports": [
-    {{"root": "vibetrain", "path": "configs/nodesets/train_step.jsonc"}}
-  ]
-}}
-```
-
-`svg` 默认会为 Mermaid CLI 放大渲染上限：普通图使用 `maxTextSize=200000`、`maxEdges=2000`；`--expand-nodesets` 使用 `maxTextSize=500000`、`maxEdges=5000`，并固定采用 `review-columns` SVG composer，把主流程、plugins、base_lib 和展开 nodeset 分列展示。超大图可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
-
-注意：`python run.py mermaid --expand-nodesets --output reports/graph.expanded.mmd` 只导出 Mermaid 源码，供调试源码使用。详细审查 SVG 必须用 `python run.py svg --expand-nodesets --output reports/graph.expanded.svg` 生成，不要把 `graph.expanded.mmd` 直接交给 Mermaid CLI/mmdc 转成 SVG，否则会绕过 VibeFlow 的 review-columns/detail-panel composer。
-
-首次使用 `svg` 前，在分发目录执行一次：
-
-```powershell
-cd kernel/tools/mermaid-renderer
-npm install
-cd ../../..
-```
-
-不要求系统预装 Google Chrome。正常执行 `npm install` 后，Puppeteer 会安装并使用自己的浏览器缓存；如果该缓存不可用，VibeFlow 会再尝试非 snap 的系统 Chrome/Chromium。`/snap/bin/chromium` 会被跳过，因为它在 Puppeteer/mermaid-cli 下常见 profile lock 启动失败。
-
-## Kernel 完整性检查
-
-分发包包含 `kernel/MANIFEST.sha256`。`run.py` 会在运行前校验 kernel 归档和启动器是否被修改。根目录 `README.md` 和 `AGENTS.md` 是项目指南文件，使用者可以按项目需要自定义。
-
-分发包不内置 `.gitignore`，Git 忽略策略由项目自行决定。常见建议包括忽略 `kernel/tools/mermaid-renderer/node_modules/`、`runs/`、`reports/`、`__pycache__/` 和 `*.pyc`。
-
-手动检查：
-
-```powershell
-python run.py verify-kernel
-```
-
-如果检查失败，不要继续信任当前分发包；请从可信来源重新生成或恢复。
-
-业务开发原则：
-
-- 只在 `project/nodes/` 写纯函数 node。
-- 只在 `project/base_lib/` 写纯 helper。
-- 只在 `project/plugins/` 写插件。
-- 只用 `project/configs/*.jsonc` 和 nodeset 组织程序结构。
-- 控制流必须显式写在 `pipeline.edges` 中。
-- 外部输入输出用 `io`、`data_store`、`document` 或 `external=True` node 建模。
-- trace 和报告只记录 summary，不序列化 tensor/model/optimizer 等对象。
-
-运行前内核会强制健康检查；检查失败时拒绝执行并输出原因。
-
-更多细节见 `kernel/docs/`。
-"""
-    (output / "README.md").write_text(text, encoding="utf-8")
+    path = output / "README.md"
+    text = path.read_text(encoding="utf-8")
+    marker_count = text.count(ROOT_README_GENERATED_AT_MARKER)
+    if marker_count != 1:
+        raise BuildDistributionError(
+            "distribution project template README must contain exactly one "
+            + ROOT_README_GENERATED_AT_MARKER
+        )
+    rendered = text.replace(
+        ROOT_README_GENERATED_AT_MARKER,
+        f"生成时间：{generated_at}",
+    )
+    path.write_text(rendered, encoding="utf-8")
 
 
 if __name__ == "__main__":

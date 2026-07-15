@@ -63,7 +63,7 @@ my_project/
 }
 ```
 
-`runtime` 只允许 `async_max_workers`、`async_flush_timeout` 与 `nodeset_max_depth`。`async_max_workers` 必须是正整数，控制每个 Runtime 自有线程池的并发数并默认取 4；`async_flush_timeout` 可以是 `null` 或非负秒数，用于 detached task 收尾；`nodeset_max_depth` 必须是正整数，控制普通 nodeset 和 loop body 共用的最大静态嵌套深度并默认取 4。嵌套 Runtime 继承配置但不共享线程池。
+`runtime` 只允许 `async_max_workers`、`async_flush_timeout` 与 `nodeset_max_depth`。`async_max_workers` 必须是正整数，控制每个 Runtime 自有线程池的并发数并默认取 4；`async_flush_timeout` 默认是 `null`，也可设为非负秒数，用于 detached task 收尾；`nodeset_max_depth` 必须是正整数，控制普通 nodeset 和 loop body 共用的最大静态嵌套深度并默认取 4。嵌套 Runtime 继承配置但不共享线程池。线程数和深度不提供 CLI 参数；现有 `--async-flush-timeout` 只覆盖超时值。
 
 `architecture.documents` 可选地把一个 workflow 登记到同 root 下的单文件架构审查文档。`workflow` 和 `document` 都是相对该 root 的 POSIX 路径；禁止绝对路径、越出 root、两者指向同一文件、同一 workflow 重复登记或多个条目写入同一 document。`architecture` 和 document 条目出现未知字段也会以 `WORKSPACE.PROJECT_CONFIG.ARCHITECTURE` 失败，并在消息中指出应修改的 `vibeflow_project.jsonc`、字段和值。
 
@@ -75,6 +75,19 @@ my_project/
 ```
 
 文档根对象不包含 `format`、`format_version`、`generated`、`executable`、时间戳或 digest 属性。不要手工调整注释、顺序或格式；即使解析后的 JSON 值相同，也不再是 canonical 输出。已登记 workflow 在普通 workspace `validate` / `run` 前会检查文档新鲜度；源图本身有错误时优先报告真实源文件问题，图可审查后才执行文档门禁。
+
+## 修改已有 workflow 的变更清单
+
+修改已登记 workflow 前，先读 `ARCHITECTURE.jsonc`，然后按其 `source` 追溯到同一个真实 workflow config、导入的 nodeset 和 registry。在动手前建立`复用 / 修改 / 删除 / 新增`清单。这个清单是人类审核记录，不是新的 config schema；至少写明：
+
+| 分类 | 必填信息 |
+| --- | --- |
+| 复用 | source path，node/edge/hook id，当前职责，保持不变的原因 |
+| 修改 | source path，node/edge/hook id，当前职责，精确计划变化 |
+| 删除 | source path，node/edge/hook id，当前职责，删除原因和受影响连接 |
+| 新增 | 目标 source path，新 id，职责，与已有拓扑的连接点 |
+
+清单未列出的 node id、edge、hook、nodeset 调用层级和调用关系默认保持不变。只修改清单中的真实 source；不得为了生成审核图而新建平行 workflow config，也不得用概念 config、手写 Mermaid/SVG 或笼统的差异图替代原位修改。只有 greenfield 项目或用户明确批准整体重构时，才可以从新的粗粒度 planned 拓扑开始。
 
 同一个 `registry.py` 可以提供三个工厂：
 

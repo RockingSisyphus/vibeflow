@@ -65,11 +65,13 @@ class AddNode:
 | `terminal` | 开始 / 结束 |
 | `process` | 普通处理 |
 | `decision` | 判断 / 路由 |
-| `io` | 输入 / 输出动作 |
+| `io` | 输入 / 输出边界表示适配 |
 | `predefined` | 预定义过程 / nodeset |
 | `data_store` | 数据存储请求或引用 |
-| `document` | 文档生成或文档结构 |
+| `document` | 文档对象或文档请求 |
 | `preparation` | 准备 / 初始化 |
+
+`flow_kind` 是流程语义、图形和适用校验的分类，不是能力或权限声明。把 node 标成 `io`、`data_store` 或 `document` 不会授予读写文件、访问网络/数据库、控制浏览器或启动进程的能力。`io` 只适配已传入的外部表示或形成待交给外部 adapter 的输出对象；`data_store` 形成存储请求/引用；`document` 形成文档对象/请求。真实副作用由 VibeFlow 调用方或内核外部 adapter 完成。
 
 `purity` 默认是 `"pure"`，不要改成其他值。
 
@@ -89,7 +91,7 @@ class AddNode:
 NODE_INFO = NodeInfo(..., flow_kind="process", external=True)
 ```
 
-`external=True` 不改变流程图形状，不代表 decision，也不会让 cycle 合法化。它只跳过源码质量、复杂度、导入链等内部实现检查。契约、拓扑、输出 key、运行 trace 仍然被检查。
+`external=True` 是“实现由第三方或外部维护”的信任/检查边界，只跳过源码质量、复杂度、导入链等内部实现检查。它不是 IO 权限，不是 purity 绕过开关，不改变流程图形状，不代表 decision，也不会让 cycle 合法化。契约、拓扑、输出 key、`flow_kind` 和运行 trace 仍然被检查。
 
 ## 必填契约
 

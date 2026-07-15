@@ -104,6 +104,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--run-id", required=False, help="optional deterministic run id for tests or controlled runs")
     _add_runtime_options(run)
 
+    from vibeflow.cli.review import add_review_parser
+
+    add_review_parser(sub)
+
     from vibeflow.cli.quality import add_quality_parser
 
     add_quality_parser(sub)
@@ -121,6 +125,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "export-architecture": _handle_export_architecture,
         "export-svg": _handle_export_svg,
         "export-mermaid": _handle_export_mermaid,
+        "review": _handle_review,
         "run": _handle_run,
         "quality-check": _handle_quality_check,
     }
@@ -197,6 +202,12 @@ def _handle_export_architecture(args: argparse.Namespace) -> int:
 
 def _handle_export_svg(args: argparse.Namespace) -> int:
     return _handle_export_graph(args, export_kind="svg")
+
+
+def _handle_review(args: argparse.Namespace) -> int:
+    from vibeflow.cli.review import handle_review
+
+    return handle_review(args)
 
 
 def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
