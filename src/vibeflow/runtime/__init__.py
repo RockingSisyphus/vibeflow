@@ -23,7 +23,7 @@ from vibeflow.graph_config.planned_behavior import load_stub_callable, resolve_s
 from vibeflow.plugin import PluginRegistry
 from vibeflow.registry import NodeRegistry, NodeRegistryError
 from vibeflow.runtime.compiled import run_compiled_steps
-from vibeflow.runtime.errors import PipelineRuntimeError
+from vibeflow.runtime.errors import DelegateCliExit, PipelineRuntimeError
 from vibeflow.runtime.helpers import condition_matches, elapsed_ms, has_planned, planned_items
 from vibeflow.runtime.options import RuntimeOptions, runtime_hook_plan, runtime_options as normalize_runtime_options
 from vibeflow.runtime.trace import RuntimeTrace, RuntimeTraceSink
@@ -50,8 +50,10 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
         node_config_overrides: Mapping[str, Mapping[str, object]] | None = None,
         global_config: Mapping[str, Any] | None = None,
         runtime_options: RuntimeOptions | Mapping[str, object] | None = None,
+        delegate_cli: bool = False,
     ) -> None:
         self.runtime_options = normalize_runtime_options(runtime_options)
+        self.delegate_cli = bool(delegate_cli)
         if boundary_registry is not None:
             raise PipelineRuntimeError("boundary_registry is removed; use flowchart nodes")
         self._assert_planned_runtime_allowed(graph)
@@ -116,6 +118,7 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
         runtime._trace_sink = parent._trace_sink
         runtime._trace_path_prefix = parent._trace_path_prefix
         runtime.runtime_options = parent.runtime_options
+        runtime.delegate_cli = parent.delegate_cli
         return runtime
 
     def run(self, initial: Mapping[str, Any] | None = None) -> RunResult:
@@ -135,29 +138,77 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
                 self._run_block_steps(state)
             else:
                 self._run_steps(state)
-            self._abandon_async_results()
+            if self.delegate_cli:
+                self._drain_async_results_for_delegate(exit_in_progress=False)
+            else:
+                self._abandon_async_results()
             self._flush_detached()
             self.trace.stop_reason = self.trace.stop_reason or "completed"
             self._finalize_pipeline_outputs(state)
             self._record_run_boundary("run_end")
             self._write_trace(state.result)
             self._call_runtime_plugins("after_run", state.result.to_dict(), self.trace.to_dict())
+        except DelegateCliExit as exc:
+            try:
+                self._settle_async_for_delegate_exit()
+            except Exception as pending_exc:
+                self._record_runtime_failure(state, pending_exc, force_node_failed=True)
+                raise
+            if not owns_trace_sink:
+                self.trace.stop_reason = "business_exit"
+                self.trace.exception = ""
+                raise
+            self.trace.stop_reason = "business_exit"
+            self.trace.exception = ""
+            self._record_runtime_event(
+                "business_exit",
+                exc.source,
+                "delegate_cli",
+                details={"exit_code": exc.exit_code},
+            )
+            state.result.set(
+                "cli.exit_code",
+                DataEnvelope(
+                    key="cli.exit_code",
+                    type="cli.exit_code",
+                    value=exc.exit_code,
+                    source_node=exc.source,
+                ).to_input(),
+            )
+            self._write_trace(state.result)
         except Exception as exc:
             self._abandon_async_results()
-            self._flush_detached()
-            self.trace.stop_reason = self.trace.stop_reason or "node_failed"
-            self.trace.exception = str(exc)
-            self._write_trace(state.result)
-            self._call_runtime_plugins("run_failed", state.result.to_dict(), self.trace.to_dict(), str(exc))
-            self._shutdown_executor()
+            try:
+                self._flush_detached(exit_in_progress=True)
+            except Exception:
+                # The original framework failure remains authoritative. Detached
+                # failures are already represented by their runtime events, and
+                # a later business exit must never replace the original error.
+                pass
+            self._record_runtime_failure(state, exc)
             raise
         finally:
             if owns_trace_sink and self._trace_sink is not None:
                 self._trace_sink.write_summary(self.trace)
                 self._trace_sink.close()
                 self._trace_sink = None
-        self._shutdown_executor()
+            self._shutdown_executor()
         return state.result
+
+    def _record_runtime_failure(
+        self,
+        state: _RuntimeState,
+        exc: Exception,
+        *,
+        force_node_failed: bool = False,
+    ) -> None:
+        if force_node_failed:
+            self.trace.stop_reason = "node_failed"
+        else:
+            self.trace.stop_reason = self.trace.stop_reason or "node_failed"
+        self.trace.exception = str(exc)
+        self._write_trace(state.result)
+        self._call_runtime_plugins("run_failed", state.result.to_dict(), self.trace.to_dict(), str(exc))
 
     def _new_state(self, initial: Mapping[str, Any]) -> _RuntimeState:
         state = _RuntimeState(inboxes={name: [] for name in self._frames})

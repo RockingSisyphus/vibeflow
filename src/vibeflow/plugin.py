@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol
 
 from vibeflow.config.resources import PluginInfo, PluginResource, PluginResourceRegistry, normalize_plugin_config, normalize_plugin_info, plugin_status
+from vibeflow.node import EFFECT_SCOPE_TRUSTED
 
 
 class PolicyPlugin(Protocol):
@@ -46,6 +47,7 @@ class PluginDescriptor:
             "priority": self.priority,
             "scope": self.scope,
             "source": self.source,
+            "effect_scope": EFFECT_SCOPE_TRUSTED,
         }
         if self.root_id:
             payload["root_id"] = self.root_id

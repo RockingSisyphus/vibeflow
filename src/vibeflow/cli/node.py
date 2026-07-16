@@ -10,7 +10,7 @@ from vibeflow.cli.reports import error_report, fail_report
 from vibeflow.data_contract import providers_to_dicts, requirements_to_dicts
 from vibeflow.health.base_lib import append_dependency_chain_findings, base_lib_finding_to_health, matching_unhealthy_base_module
 from vibeflow.health.types import HealthFinding, HealthReport
-from vibeflow.node import NodeContract, NodeInfo, PureNode
+from vibeflow.node import NodeContract, NodeInfo, PureNode, effective_effect_scope
 from vibeflow.policy import resolve_effective_policy
 from vibeflow.purity import collect_node_metrics, validate_node_class
 
@@ -99,7 +99,10 @@ def node_info_payload(info: object) -> dict[str, object]:
         "category": info.category,
         "description": info.description,
         "version": info.version,
+        "flow_kind": info.flow_kind,
         "purity": info.purity,
+        "external": info.external,
+        "effect_scope": effective_effect_scope(info),
     }
 
 

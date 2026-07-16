@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import sys
 from pathlib import Path
 from typing import Sequence
+
+from vibeflow.run_directory import parse_run_id_argument
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -101,8 +105,17 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--policy", required=False, help="explicit kernel_policy.jsonc/governance.jsonc path")
     run.add_argument("--input", required=False, help="optional JSON object file for initial context")
     run.add_argument("--run-root", required=False, help="directory where run artifacts are created")
-    run.add_argument("--run-id", required=False, help="optional deterministic run id for tests or controlled runs")
+    run.add_argument(
+        "--run-id",
+        required=False,
+        type=parse_run_id_argument,
+        help="optional deterministic run id for tests or controlled runs",
+    )
     _add_runtime_options(run)
+
+    from vibeflow.cli.delegate_cli import add_delegate_cli_parser
+
+    add_delegate_cli_parser(sub, _add_runtime_options)
 
     from vibeflow.cli.review import add_review_parser
 
@@ -116,7 +129,21 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    raw_args = list(sys.argv[1:] if argv is None else argv)
+    if raw_args and raw_args[0] == "delegate-cli":
+        if "--" in raw_args:
+            separator = raw_args.index("--")
+            kernel_args = raw_args[:separator]
+            delegated_args = raw_args[separator + 1 :]
+        else:
+            kernel_args = raw_args
+            delegated_args = []
+        args, unknown = parser.parse_known_args(kernel_args)
+        args.delegate_argv = [*unknown, *delegated_args]
+        if args.policy is not None:
+            parser.error("delegate-cli does not accept --policy; configure workspace policy in vibeflow_config.jsonc")
+    else:
+        args = parser.parse_args(raw_args)
     handlers = {
         "validate": _handle_validate,
         "inspect-node": _handle_inspect_node,
@@ -127,6 +154,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "export-mermaid": _handle_export_mermaid,
         "review": _handle_review,
         "run": _handle_run,
+        "delegate-cli": _handle_delegate_cli,
         "quality-check": _handle_quality_check,
     }
     handler = handlers.get(args.command)
@@ -264,6 +292,12 @@ def _handle_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_delegate_cli(args: argparse.Namespace) -> int:
+    from vibeflow.cli.delegate_cli import handle_delegate_cli
+
+    return handle_delegate_cli(args)
+
+
 def _handle_quality_check(args: argparse.Namespace) -> int:
     from vibeflow.cli.quality import handle_quality_check
 
@@ -393,8 +427,23 @@ def _add_runtime_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--node-hooks", action=argparse.BooleanOptionalAction, default=None, help="enable or disable node-level runtime plugin hooks")
     parser.add_argument("--nodeset-hooks", action=argparse.BooleanOptionalAction, default=None, help="enable or disable nodeset-level runtime plugin hooks")
     parser.add_argument("--block-hooks", action=argparse.BooleanOptionalAction, default=None, help="enable or disable block-level runtime plugin hooks")
-    parser.add_argument("--async-flush-timeout", type=float, default=None, help="seconds to wait for detached async tasks at run end")
+    parser.add_argument(
+        "--async-flush-timeout",
+        type=_non_negative_finite_float,
+        default=None,
+        help="non-negative finite seconds to wait for detached async tasks at run end",
+    )
     parser.add_argument("--allow-planned-stub", action="store_true", help="development only: execute planned python_stub nodes")
+
+
+def _non_negative_finite_float(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a non-negative finite number") from exc
+    if not math.isfinite(parsed) or parsed < 0:
+        raise argparse.ArgumentTypeError("must be a non-negative finite number")
+    return parsed
 
 
 def _runtime_options_from_args(args: argparse.Namespace):

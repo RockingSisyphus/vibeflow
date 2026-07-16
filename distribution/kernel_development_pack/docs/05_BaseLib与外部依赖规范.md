@@ -84,12 +84,25 @@ implemented base_lib 必须暴露 `BASE_LIB_INFO`，用于实现自检和 inspec
 
 旧 `boundary` 模型已移除。当前推荐用标准 flowchart node 表达外部交互边界：
 
-- `io`：适配已传入的外部表示，或形成供外部 adapter 消费的输出对象。
-- `data_store`：形成结构化存储请求、数据库/缓存引用。
-- `document`：形成文档对象、文档结构或文档写入请求。
-- `process` + `external=True`：包装第三方库或外部维护代码。
+- `io`：交互式终端边界，可使用真实 stdin/stdout/stderr、`print`、`input` 和 `argparse`。
+- `data_store`：存储语义，可执行文件、环境、网络、数据库、subprocess 和终端 IO。
+- `document`：文档/文件语义，可执行同一组 Python IO。
+- 任意真实 `flow_kind` + `external=True`：包装第三方库或外部维护代码，使用最高优先级的 trusted 边界。
 
-这些 `flow_kind` 只决定流程语义、图形和适用校验，不授予文件、网络、数据库、浏览器或进程能力。它们仍然是内核拓扑的一部分，必须声明 `CONTRACT`、`requires/provides` 和示例，并遵守 node 的纯度边界。
+内核从实现分类派生固定 `effect_scope`：
+
+| 分类 | effect_scope |
+| --- | --- |
+| 其他普通 implemented node（即非 `io` / `document` / `data_store`，且 `external=False`） | `none` |
+| `flow_kind=io` | `terminal` |
+| `flow_kind=document` / `data_store` | `python_io` |
+| 任意 `external=True` node | `trusted`（最高优先级） |
+| plugin | `trusted` |
+| planned `python_stub` | `none` |
+
+`effect_scope` 不是 config 可调的权限字段。图形 `flow_kind=terminal` 仍是 `none`，不等于权限档位 `terminal`。选择 `flow_kind` 必须先符合业务语义，不得仅为了获得更宽 IO 能力而把普通处理伪装成 `document` 或 `data_store`。
+
+这些 node 仍然是内核拓扑的一部分，必须声明 `CONTRACT`、`requires/provides` 和 examples，并遵守契约、拓扑、输出 key 和 trace 检查。`terminal` / `python_io` 或 `external=True` node 的 examples 可能触发真实副作用，内核只验证结构，不执行。
 
 ## io node
 
@@ -99,11 +112,11 @@ implemented base_lib 必须暴露 `BASE_LIB_INFO`，用于实现自检和 inspec
 terminal start -> io input -> process... -> io output -> terminal end
 ```
 
-`io` node 应只适配已由调用方传入的输入表示，或将内部结果转成结构化输出对象；不应直接读写文件、网络、数据库或浏览器。真实外部系统可以在内核外部准备 `pipeline.inputs`，或消费运行输出。
+`io` node 的 `effect_scope=terminal`。它可以直接使用真实 stdin/stdout/stderr、`print`、`input` 和 `argparse`，适合 CLI 让渡模式 / `delegate-cli` 中的参数解析、交互提示和业务输出。它不获得文件、环境、网络、数据库或 subprocess 能力；这些工作应按真实语义交给 `document` / `data_store` 或受信任外部实现。
 
 ## data_store node
 
-`data_store` node 用于生成结构化存储请求或引用：
+`data_store` node 用于执行或编排数据存储语义：
 
 ```python
 from vibeflow import DataProvider, DataRequirement
@@ -118,17 +131,17 @@ CONTRACT = NodeContract(
 )
 ```
 
-它不应直接写数据库或文件。
+其 `effect_scope=python_io`，可以读写文件、环境、网络、数据库、subprocess 和终端。契约应输出可审计的结果/回执或引用，不要把与存储无关的业务逻辑塞进来。
 
 ## document node
 
-`document` node 用于生成文档结构、报告文本或文档写入请求：
+`document` node 用于生成、读取或写入文档/文件产物：
 
 ```python
 NODE_INFO = NodeInfo(..., flow_kind="document")
 ```
 
-它可以输出 `document.report` 这类 key，再由下游 `io` node 转成输出对象，最终交给外部系统消费。它本身不因 `flow_kind="document"` 而获得文件写入能力。
+其 `effect_scope=python_io`，可以使用文件、环境、网络、数据库、subprocess 和终端。它可输出 `document.report` 这类文档内容、路径、句柄或写入回执；仍应把与文档无关的语义判断留在正确的 process/decision node。
 
 ## external=True
 
@@ -142,16 +155,14 @@ NODE_INFO = NodeInfo(
 )
 ```
 
-`external=True` 表示实现由第三方或外部主体维护，是一个信任/检查边界：它只跳过源码质量、复杂度和导入链等内部实现检查。它不是 IO 权限，也不是 purity 绕过开关；不会跳过契约、`flow_kind`、拓扑、输出或运行时 trace 检查。如果这个外部 node 负责分支路由，必须同时声明 `flow_kind="decision"` 并满足 decision 规则。
+`external=True` 表示实现由第三方或外部主体维护，并以最高优先级把有效 `effect_scope` 设为 `trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 IO/purity 绕过，由项目承担信任责任。它不会跳过契约、`flow_kind`、拓扑、输出或 trace 检查。如果这个外部 node 负责分支路由，必须同时声明 `flow_kind="decision"` 并满足 decision 规则。
 
 ## 真实副作用应该放在哪里
 
-内核内的 node/base_lib 默认不直接做真实 IO。推荐模式：
+推荐模式：
 
-1. VibeFlow 调用方或内核外部 adapter 准备输入对象，作为 `run.py run --input input.json` 或自定义启动器的 `initial` 传入。
-2. `io` node 把输入对象转成流程内 key。
-3. `process` / `decision` / `nodeset` 做纯计算和路由。
-4. `data_store` 或 `document` node 生成结构化请求或文档对象。
-5. 调用方或外部 adapter 消费运行输出，真正写文件、数据库、网络或 UI。
-
-这样做的目的是让 VibeFlow 审计“流程和契约”，而不是把外部系统副作用藏进某个 node。
+1. 交互式 CLI 的参数解析、提示和输出放在 `flow_kind=io` node；CLI 让渡模式 / `delegate-cli` 传入 `cli.argv`，业务代码直接使用真实标准流。
+2. 文件/文档操作放在 `document`，存储/数据系统操作放在 `data_store`；二者均由 `python_io` 档位审计。
+3. `process` / `decision` / 图形 `terminal` 等普通 node 保持 `none`，只做纯计算、路由和生命周期表达。
+4. 必须调用外部维护实现时才使用 `external=True`；plugin 同样属于 `trusted`。对这两类实现做项目级审计。
+5. 所有真实副作用仍通过显式 node/plugin、契约和图上路径呈现；不要藏在 `base_lib`、普通 node 或未声明资源中。

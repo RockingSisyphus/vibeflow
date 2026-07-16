@@ -46,7 +46,7 @@ def _register_fulltext_nodes(registry: NodeRegistry) -> None:
 def test_pure_node_metadata_and_static_check() -> None:
     assert validate_node_class(SeedNode, policy=PurityPolicy(max_source_lines=1000)) == []
     violations = validate_node_class(BadIoNode, policy=PurityPolicy(max_source_lines=1000))
-    assert any(item.code == "banned_call" for item in violations)
+    assert any(item.code == "effect_call" and item.rule_id == "NODE.EFFECT.CALL_FORBIDDEN" for item in violations)
 
 def test_source_size_limit_is_enforced() -> None:
     violations = validate_node_class(SeedNode, policy=PurityPolicy(max_source_lines=1))

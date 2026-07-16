@@ -10,6 +10,7 @@ from typing import Any, Iterator, Mapping
 from vibeflow.graph_config import STATUS_IMPLEMENTED, STATUS_PLANNED
 from vibeflow.config.resource_helpers import _finding, _module_search_path, _resolve_paths
 from vibeflow.health.types import HealthFinding
+from vibeflow.node import EFFECT_SCOPE_TRUSTED
 
 
 STATUSES = frozenset({STATUS_IMPLEMENTED, STATUS_PLANNED})
@@ -106,6 +107,7 @@ class PluginResource:
             "description": self.description,
             "version": self.version,
             "config_keys": list(self.config_keys),
+            "effect_scope": EFFECT_SCOPE_TRUSTED,
         }
         if self.info is not None:
             payload["info"] = self.info.to_dict()

@@ -5,7 +5,6 @@ import os
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-import sys
 import time
 from typing import Any, Mapping
 
@@ -350,7 +349,9 @@ def strip_jsonc_comments(text: str, *, path: Path | None = None) -> str:
 def _trace_config_load(message: str) -> None:
     if str(os.environ.get("VIBEFLOW_CONFIG_TRACE", "")).lower() not in {"1", "true", "yes", "on"}:
         return
-    print(f"[vibeflow config] {message}", file=sys.stderr)
+    from vibeflow.diagnostics import emit_core_diagnostic
+
+    emit_core_diagnostic(f"[vibeflow config] {message}")
 
 
 def _elapsed_ms(started: float) -> float:

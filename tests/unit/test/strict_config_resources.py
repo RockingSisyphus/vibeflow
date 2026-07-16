@@ -173,6 +173,7 @@ class RuntimePlugin:
     assert resources["global_config"] == {"offset": 7}
     assert [item["status"] for item in resources["base_lib"]["modules"]] == ["implemented", "planned"]
     assert [item["status"] for item in resources["plugins"]] == ["implemented", "planned"]
+    assert {item["effect_scope"] for item in resources["plugins"]} == {"trusted"}
     assert result.health.info["plugins"]["plugins"] == [
         {
             "name": "configured_runtime",
@@ -180,6 +181,7 @@ class RuntimePlugin:
             "priority": 100,
             "scope": "project",
             "source": str(plugin_path),
+            "effect_scope": "trusted",
         }
     ]
     graph_payload = json.loads((result.run_dir / "compiled_graph.json").read_text(encoding="utf-8"))

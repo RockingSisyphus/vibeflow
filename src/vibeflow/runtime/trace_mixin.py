@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Mapping
 
 from vibeflow.data_contract import DataEnvelope, DataRequirement, RunResult
-from vibeflow.runtime.errors import PipelineRuntimeError
+from vibeflow.runtime.errors import PipelineRuntimeError, normalize_delegate_cli_system_exit
 from vibeflow.runtime.trace import RuntimeTrace
 
 class RuntimeTraceMixin:
@@ -46,6 +46,16 @@ class RuntimeTraceMixin:
         for plugin_name, method in methods:
             try:
                 method(*args)
+            except SystemExit as exc:
+                if not self.delegate_cli:
+                    raise PipelineRuntimeError(
+                        f"runtime plugin '{plugin_name}' {hook} attempted SystemExit outside delegate CLI mode"
+                    ) from exc
+                if hook.endswith("_failed"):
+                    raise PipelineRuntimeError(
+                        f"runtime plugin '{plugin_name}' {hook} cannot replace an existing runtime failure with SystemExit"
+                    ) from exc
+                raise normalize_delegate_cli_system_exit(exc, source=f"plugin:{plugin_name}") from exc
             except Exception as exc:
                 raise PipelineRuntimeError(f"runtime plugin '{plugin_name}' {hook} failed: {exc}") from exc
 
@@ -63,7 +73,7 @@ class RuntimeTraceMixin:
     ) -> None:
         if self.runtime_options.trace == "off":
             return
-        if self.runtime_options.trace == "boundary" and kind not in {"run_start", "run_end", "nodeset_enter", "nodeset_exit", "nodeset_failed", "loop_enter", "loop_exit", "loop_block_enter", "loop_block_exit", "loop_failed", "node_failed", "planned_stub", "async_result_abandoned", "async_detached_failed", "async_detached_timeout", "block_enter", "block_exit", "block_failed", "type_resolve"}:
+        if self.runtime_options.trace == "boundary" and kind not in {"run_start", "run_end", "business_exit", "nodeset_enter", "nodeset_exit", "nodeset_failed", "loop_enter", "loop_exit", "loop_block_enter", "loop_block_exit", "loop_failed", "node_failed", "planned_stub", "async_result_abandoned", "async_detached_failed", "async_detached_timeout", "block_enter", "block_exit", "block_failed", "type_resolve"}:
             return
         event: dict[str, object] = {"kind": kind, "node": node_name, "type": node_type}
         if input_summary is not None:

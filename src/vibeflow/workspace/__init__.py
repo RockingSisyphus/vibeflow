@@ -15,6 +15,7 @@ from vibeflow.policy import EffectivePolicy, default_effective_policy
 from vibeflow.plugin import load_plugins_from_config
 from vibeflow.workspace.policy import resolve_workspace_effective_policy
 from vibeflow.runner import CheckedRunError, CheckedRunResult
+from vibeflow.run_directory import validate_run_id
 from vibeflow.runtime.options import RuntimeOptions, runtime_options as normalize_runtime_options
 from vibeflow.runtime.summaries import summarize_mapping
 from vibeflow.workspace.core import (
@@ -85,6 +86,8 @@ def run_workspace_checked(
     run_root: str | Path | None = None,
     run_id: str | None = None,
     runtime_options: object | None = None,
+    delegate_cli: bool = False,
+    _prepared_run_dir: Path | None = None,
 ) -> CheckedRunResult:
     from vibeflow.runner import (
         _compile_with_registry_or_refuse,
@@ -99,8 +102,14 @@ def run_workspace_checked(
         _write_refused_artifacts,
     )
 
-    actual_run_id = run_id or _new_run_id()
-    run_dir = _prepare_run_dir(run_root, actual_run_id)
+    actual_run_id = _new_run_id() if run_id is None else validate_run_id(run_id)
+    if _prepared_run_dir is None:
+        run_dir = _prepare_run_dir(run_root, actual_run_id)
+    else:
+        run_dir = Path(_prepared_run_dir)
+        expected_run_dir = (Path(run_root) if run_root is not None else Path("runs")) / actual_run_id
+        if run_dir != expected_run_dir or not run_dir.is_dir():
+            raise ValueError("_prepared_run_dir must be the already claimed directory for this checked run")
     _write_json(run_dir / "input_summary.json", summarize_mapping(dict(initial or {})))
     env = _environment_or_report(workspace)
     if isinstance(env, HealthReport):
@@ -113,13 +122,30 @@ def run_workspace_checked(
     effective_runtime_options = _workspace_runtime_options(config_path, workspace=workspace, overrides=runtime_options)
     document, graph, compiled, resources, plugin_registry, effective_policy, warnings = prepared
     _write_json(run_dir / "effective_policy.json", effective_policy.to_dict())
-    health = _validate_prepared_workspace_graph(prepared, env=env, workspace=workspace, runtime_options=effective_runtime_options)
+    validation_kwargs = {"delegate_cli": True} if delegate_cli else {}
+    health = _validate_prepared_workspace_graph(
+        prepared,
+        env=env,
+        workspace=workspace,
+        runtime_options=effective_runtime_options,
+        **validation_kwargs,
+    )
     _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=env.registry, resources=resources, runtime_options=effective_runtime_options)
     if health.status not in {"FAIL", "ERROR"}:
         compiled = _compile_with_registry_or_refuse(graph, env.registry, effective_policy.to_dict(), run_dir, actual_run_id)
     _write_preflight_artifacts(run_dir, graph, compiled, health, registry=env.registry, resources=resources)
     _refuse_on_health_failure(health, run_dir, actual_run_id)
-    context = _execute_runtime(graph, env.registry, plugin_registry, initial, run_dir, effective_runtime_options, resources)
+    execute_kwargs = {"delegate_cli": True} if delegate_cli else {}
+    context = _execute_runtime(
+        graph,
+        env.registry,
+        plugin_registry,
+        initial,
+        run_dir,
+        effective_runtime_options,
+        resources,
+        **execute_kwargs,
+    )
     _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
     return CheckedRunResult(actual_run_id, run_dir, health, context)
 
@@ -166,6 +192,7 @@ def _validate_prepared_workspace_graph(
     workspace: WorkspaceConfig,
     runtime_options: RuntimeOptions,
     check_architecture_document: bool = True,
+    delegate_cli: bool = False,
 ) -> HealthReport:
     from vibeflow.health import validate_graph_health
 
@@ -196,6 +223,10 @@ def _validate_prepared_workspace_graph(
         effective_policy=effective_policy.to_dict(),
     )
     report = annotate_health_report(report, graph, workspace=workspace)
+    if delegate_cli:
+        from vibeflow.cli.delegate_cli import validate_delegate_cli_graph_contract
+
+        report = validate_delegate_cli_graph_contract(graph, report)
     if report.status in {"FAIL", "ERROR"} or not check_architecture_document:
         return report
     return _validate_registered_architecture_document(

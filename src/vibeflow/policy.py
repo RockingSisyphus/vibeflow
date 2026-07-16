@@ -43,6 +43,18 @@ DEFAULT_POLICY_DATA: dict[str, Any] = {
 }
 
 
+_ABSOLUTE_FINDING_RULES = frozenset(
+    {
+        "BASE_LIB.BANNED_IMPORT",
+        "BASE_LIB.FORBIDDEN_PROJECT_IMPORT",
+        "BASE_LIB.GLOBAL_STATE",
+        "BASE_LIB.SIDE_EFFECT_CALL",
+        "BASE_LIB.TOP_LEVEL_SIDE_EFFECT",
+        "NODE.BASE_LIB.INDIRECT_VIOLATION",
+    }
+)
+
+
 @dataclass(frozen=True)
 class EffectivePolicy:
     data: dict[str, Any]
@@ -116,6 +128,8 @@ def default_effective_policy() -> EffectivePolicy:
 
 
 def _policy_bucket(finding: HealthFinding, exemptions: list[Mapping[str, Any]], downgrades: list[Mapping[str, Any]]) -> tuple[str, HealthFinding]:
+    if finding.rule_id.startswith("NODE.EFFECT.") or finding.rule_id in _ABSOLUTE_FINDING_RULES:
+        return "error", finding
     exemption = _matching_rule_override(finding, exemptions)
     if exemption is not None:
         return "skipped", _policy_adjusted_finding(finding, "skipped", exemption)

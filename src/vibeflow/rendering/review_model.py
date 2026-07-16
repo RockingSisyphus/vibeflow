@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Mapping
 
 from vibeflow.graph_config import GraphConfig, LOOP_NODE_TYPES, LoopSpec, NodeSpec, NodesetSpec, STATUS_IMPLEMENTED, STATUS_PLANNED
+from vibeflow.node import EFFECT_SCOPE_NONE, effective_effect_scope
 
 if TYPE_CHECKING:
     from vibeflow.compiler import CompiledGraph
@@ -89,6 +90,15 @@ def node_flow_kind(node: NodeSpec, compiled: CompiledGraph) -> str:
     if node.status == STATUS_PLANNED:
         return node.flow_kind
     return compiled.flow_kinds.get(node.id, "")
+
+
+def node_review_effect_scope(graph: GraphConfig, node: NodeSpec, registry: NodeRegistry | None) -> str:
+    """Return a review-safe scope; planned and composite calls never gain effects."""
+
+    if node.status == STATUS_PLANNED or node.type_used in LOOP_NODE_TYPES or invocation_for_node(graph, node) is not None:
+        return EFFECT_SCOPE_NONE
+    node_cls = registry_node_class(registry, node.type_used)
+    return effective_effect_scope(getattr(node_cls, "NODE_INFO", None)) if node_cls is not None else EFFECT_SCOPE_NONE
 
 
 def registry_node_class(registry: NodeRegistry | None, type_key: str) -> type | None:

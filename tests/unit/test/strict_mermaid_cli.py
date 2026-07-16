@@ -311,12 +311,12 @@ class DemoNode:
             _valid_node_source(run_body='        return {"demo.out": 1}').replace("class DemoNode:", "class DemoNode:\n    def __init__(self):\n        self.session = None"),
             "resource_field",
         ),
-        (_valid_node_source(run_body='        open("x.txt", "w")\n        return {"demo.out": 1}'), "banned_call"),
-        (_valid_node_source(run_body='        import os\n        return {"demo.out": 1}'), "banned_import"),
-        (_valid_node_source(run_body='        os.getenv("HOME")\n        return {"demo.out": 1}'), "banned_call"),
-        (_valid_node_source(run_body='        subprocess.run(["echo", "x"])\n        return {"demo.out": 1}'), "banned_call"),
-        (_valid_node_source(run_body='        requests.get("https://example.com")\n        return {"demo.out": 1}'), "banned_call"),
-        (_valid_node_source(run_body='        sqlite3.connect("x.db")\n        return {"demo.out": 1}'), "banned_call"),
+        (_valid_node_source(run_body='        open("x.txt", "w")\n        return {"demo.out": 1}'), "effect_call"),
+        (_valid_node_source(run_body='        import os\n        return {"demo.out": 1}'), "effect_import"),
+        (_valid_node_source(run_body='        os.getenv("HOME")\n        return {"demo.out": 1}'), "effect_call"),
+        (_valid_node_source(run_body='        subprocess.run(["echo", "x"])\n        return {"demo.out": 1}'), "effect_call"),
+        (_valid_node_source(run_body='        requests.get("https://example.com")\n        return {"demo.out": 1}'), "effect_call"),
+        (_valid_node_source(run_body='        sqlite3.connect("x.db")\n        return {"demo.out": 1}'), "effect_call"),
         (_valid_node_source(run_body='        eval("1 + 1")\n        return {"demo.out": 1}'), "banned_call"),
         (_valid_node_source(run_body='        importlib.import_module("math")\n        return {"demo.out": 1}'), "banned_call"),
         (_valid_node_source(run_body='        global X\n        X = 1\n        return {"demo.out": 1}'), "global_state"),
@@ -331,18 +331,18 @@ class DemoNode:
             _valid_node_source().replace(VALID_NODE_IMPORT, VALID_NODE_IMPORT + "if True:\n    X = 1\n\n"),
             "module_side_effect",
         ),
-        (_valid_node_source(run_body='        Path("x").read_text()\n        return {"demo.out": 1}'), "banned_call"),
+        (_valid_node_source(run_body='        Path("x").read_text()\n        return {"demo.out": 1}'), "effect_call"),
         (
             _valid_node_source(
                 run_body='        path = Path("x")\n        path.write_text("bad")\n        return {"demo.out": 1}'
             ),
-            "banned_call",
+            "effect_call",
         ),
         (
             _valid_node_source(
                 run_body='        path = Path("x")\n        (path / "child").open()\n        return {"demo.out": 1}'
             ),
-            "banned_call",
+            "effect_call",
         ),
         (_valid_node_source(run_body='        compile("1", "<x>", "eval")\n        return {"demo.out": 1}'), "banned_call"),
     ],

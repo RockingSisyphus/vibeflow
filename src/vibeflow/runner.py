@@ -19,6 +19,7 @@ from vibeflow.runtime.summaries import summarize_mapping
 from vibeflow.graph_config import GraphConfig
 from vibeflow.graph_config.planned_behavior import project_root_for_config
 from vibeflow.registry import NodeRegistry
+from vibeflow.run_directory import RunDirectoryExistsError, prepare_run_dir as _prepare_run_dir, validate_run_id
 from vibeflow.runtime.options import RuntimeOptions, runtime_options as normalize_runtime_options
 
 
@@ -49,9 +50,10 @@ def run_checked(
     run_root: str | Path | None = None,
     run_id: str | None = None,
     runtime_options: object | None = None,
+    delegate_cli: bool = False,
 ) -> CheckedRunResult:
     path = Path(config_path)
-    actual_run_id = run_id or _new_run_id()
+    actual_run_id = _new_run_id() if run_id is None else validate_run_id(run_id)
     if boundary_registry is not None:
         raise ValueError("boundary_registry is removed; use flowchart nodes")
     effective_runtime_options = normalize_runtime_options(runtime_options)
@@ -88,6 +90,7 @@ def run_checked(
         resources,
         runtime_options=effective_runtime_options,
         preflight_warnings=preflight_warnings,
+        delegate_cli=delegate_cli,
     )
     _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources, runtime_options=effective_runtime_options)
     if health.status not in {"FAIL", "ERROR"}:
@@ -100,15 +103,12 @@ def run_checked(
             _refuse_on_health_failure(health, run_dir, actual_run_id)
         raise
     _refuse_on_health_failure(health, run_dir, actual_run_id)
-    context = _execute_runtime(graph, registry, plugin_registry, initial, run_dir, effective_runtime_options, resources)
+    context = _execute_runtime(
+        graph, registry, plugin_registry, initial, run_dir, effective_runtime_options, resources,
+        delegate_cli=delegate_cli,
+    )
     _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
     return CheckedRunResult(actual_run_id, run_dir, health, context)
-
-
-def _prepare_run_dir(run_root: str | Path | None, run_id: str) -> Path:
-    run_dir = (Path(run_root) if run_root is not None else Path("runs")) / run_id
-    run_dir.mkdir(parents=True, exist_ok=False)
-    return run_dir
 
 
 def _load_document_or_refuse(path: Path, run_dir: Path, run_id: str):
@@ -248,6 +248,7 @@ def _validate_run_health(
     resources: ConfigResources,
     runtime_options: RuntimeOptions,
     preflight_warnings: tuple[HealthFinding, ...] = (),
+    delegate_cli: bool = False,
 ) -> HealthReport:
     from vibeflow.health import validate_graph_health
 
@@ -265,13 +266,18 @@ def _validate_run_health(
     info["resources"] = resources.to_dict()
     warnings = (*preflight_warnings, *health.warnings)
     status = "CONCERNS" if health.status == "PASS" and warnings else health.status
-    return replace(
+    report = replace(
         health,
         status=status,
         warnings=warnings,
         effective_policy=policy_result.effective_policy.to_dict(),
         info=info,
     )
+    if delegate_cli:
+        from vibeflow.cli.delegate_cli import validate_delegate_cli_graph_contract
+
+        report = validate_delegate_cli_graph_contract(graph, report)
+    return report
 
 
 def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None, resources: ConfigResources | None = None) -> None:
@@ -365,6 +371,8 @@ def _execute_runtime(
     run_dir: Path,
     runtime_options: object | None,
     resources: ConfigResources,
+    *,
+    delegate_cli: bool = False,
 ):
     from vibeflow.runtime import PipelineRuntime
 
@@ -375,6 +383,7 @@ def _execute_runtime(
         run_dir=run_dir,
         global_config=resources.global_config,
         runtime_options=runtime_options,
+        delegate_cli=delegate_cli,
     )
     try:
         context = runtime.run(initial)
