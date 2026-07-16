@@ -299,7 +299,13 @@ def _validate_contract_examples_shape(value: object, *, source: _SourceInfo) -> 
     return []
 
 
-def _validate_examples(node_cls: type[PureNode], contract: NodeContract, *, source: _SourceInfo) -> list[PurityViolation]:
+def _validate_examples(
+    node_cls: type[PureNode],
+    contract: NodeContract,
+    *,
+    source: _SourceInfo,
+    execute: bool = True,
+) -> list[PurityViolation]:
     if not contract.examples:
         return [_missing_examples_violation(source)]
     findings: list[PurityViolation] = []
@@ -308,12 +314,17 @@ def _validate_examples(node_cls: type[PureNode], contract: NodeContract, *, sour
         if not isinstance(example, Mapping):
             continue
         inputs, params = _example_payload(example)
+        undeclared_params = set(params) - set(contract.params_schema)
+        if undeclared_params:
+            findings.append(_example_params_gap_violation(index, undeclared_params, source=source))
+            continue
         if _example_covers_contract(contract, inputs):
             covers_contract = True
         else:
             findings.append(_example_gap_violation(index, source=source))
             continue
-        findings.extend(_validate_example_output(node_cls, contract, inputs, params, index, source=source))
+        if execute:
+            findings.extend(_validate_example_output(node_cls, contract, inputs, params, index, source=source))
     if not covers_contract:
         findings.append(_no_covering_example_violation(source))
     return findings
@@ -355,6 +366,15 @@ def _run_example(
 ) -> tuple[object, PurityViolation | None]:
     try:
         return node_cls().run_pure(dict(inputs), dict(params)), None
+    except SystemExit as exc:
+        return None, _violation(
+            "example_failed",
+            f"CONTRACT.examples[{index}] raised SystemExit: {exc}",
+            source=source,
+            failure_layer="contract",
+            suggested_fix_type="fix_node",
+            details={"example_index": index},
+        )
     except Exception as exc:  # noqa: BLE001 - health report must contain checker-visible failure.
         return None, _violation(
             "example_failed",
@@ -398,6 +418,18 @@ def _example_gap_violation(index: int, *, source: _SourceInfo) -> PurityViolatio
     )
 
 
+def _example_params_gap_violation(index: int, undeclared: set[str], *, source: _SourceInfo) -> PurityViolation:
+    return _violation(
+        "example_contract_gap",
+        f"CONTRACT.examples[{index}] params contain undeclared keys: {sorted(undeclared)}",
+        source=source,
+        severity="warning",
+        failure_layer="contract",
+        suggested_fix_type="fix_contract",
+        details={"example_index": index, "undeclared_params": sorted(undeclared)},
+    )
+
+
 def _no_covering_example_violation(source: _SourceInfo) -> PurityViolation:
     return _contract_example_warning("example_contract_gap", "node examples exist but none covers all requires/provides", source=source)
 
@@ -411,5 +443,3 @@ def _contract_example_warning(code: str, message: str, *, source: _SourceInfo) -
         failure_layer="contract",
         suggested_fix_type="fix_contract",
     )
-
-

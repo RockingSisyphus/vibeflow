@@ -4,18 +4,11 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from vibeflow.data_contract import DataProvider, DataRequirement
-from vibeflow.node import NodeContract, NodeInfo, PureNode
+from vibeflow.node import EFFECT_SCOPE_NONE, EFFECT_SCOPE_TRUSTED, NodeContract, NodeInfo, PureNode, effective_effect_scope
 from vibeflow.purity.helpers import _dedupe_violations, _violation
 from vibeflow.purity.metrics import _ComplexityCounter, _analyze_internal_call_chain
 from vibeflow.purity.source import _parse_source, _source_info
-from vibeflow.purity.types import (
-    BANNED_ATTR_CALLS,
-    BANNED_CALL_NAMES,
-    BANNED_IMPORT_ROOTS,
-    NodeMetrics,
-    PurityPolicy,
-    PurityViolation,
-)
+from vibeflow.purity.types import NodeMetrics, PurityPolicy, PurityViolation
 from vibeflow.purity.validators import (
     _validate_architecture_smells,
     _validate_call_chain_metrics,
@@ -38,6 +31,7 @@ class _ClassVisitorContext:
     source: object
     known_node_modules: tuple[str, ...]
     known_node_class_names: tuple[str, ...]
+    effect_scope: str
 
 
 def validate_node_class(
@@ -54,16 +48,17 @@ def validate_node_class(
     violations: list[PurityViolation] = []
     info = getattr(node_cls, "NODE_INFO", None)
     contract = getattr(node_cls, "CONTRACT", None)
+    effect_scope = effective_effect_scope(info)
 
     _append_contract_violations(node_cls, info, contract, expected_type, source, violations)
+
+    if effect_scope == EFFECT_SCOPE_TRUSTED:
+        _append_examples_if_clean(node_cls, contract, source, violations, execute=False)
+        return _dedupe_violations(violations)
 
     if source.class_text is None:
         violations.append(_source_unavailable_violation(source))
         return violations
-
-    if isinstance(info, NodeInfo) and info.external:
-        _append_examples_if_clean(node_cls, contract, source, violations)
-        return _dedupe_violations(violations)
 
     violations.extend(_validate_source_size(source.class_text, policy=policy, source=source))
     class_tree = _parse_source(source.class_text, source=source)
@@ -76,12 +71,12 @@ def validate_node_class(
     if isinstance(info, NodeInfo) and isinstance(contract, NodeContract) and _contract_items_valid(contract):
         violations.extend(_validate_architecture_smells(info, contract, source=source, metrics=metrics))
 
-    visitor_context = _ClassVisitorContext(class_tree, contract, policy, source, known_node_modules, known_node_class_names)
+    visitor_context = _ClassVisitorContext(class_tree, contract, policy, source, known_node_modules, known_node_class_names, effect_scope)
     _append_class_visitor_violations(visitor_context, violations)
-    _append_examples_if_clean(node_cls, contract, source, violations)
 
     if scan_module:
-        _append_module_violations(node_cls, source, policy, known_node_modules, known_node_class_names, violations)
+        _append_module_violations(node_cls, source, policy, known_node_modules, known_node_class_names, effect_scope, violations)
+    _append_examples_if_clean(node_cls, contract, source, violations, execute=effect_scope == EFFECT_SCOPE_NONE)
 
     return _dedupe_violations(violations)
 
@@ -103,9 +98,9 @@ def _source_unavailable_violation(source) -> PurityViolation:
     )
 
 
-def _append_examples_if_clean(node_cls, contract, source, violations: list[PurityViolation]) -> None:
+def _append_examples_if_clean(node_cls, contract, source, violations: list[PurityViolation], *, execute: bool) -> None:
     if isinstance(contract, NodeContract) and not any(violation.severity == "error" for violation in violations):
-        violations.extend(_validate_examples(node_cls, contract, source=source))
+        violations.extend(_validate_examples(node_cls, contract, source=source, execute=execute))
 
 
 def _append_class_visitor_violations(context: _ClassVisitorContext, violations: list[PurityViolation]) -> None:
@@ -117,6 +112,7 @@ def _append_class_visitor_violations(context: _ClassVisitorContext, violations: 
         known_node_modules=context.known_node_modules,
         known_node_class_names=context.known_node_class_names,
         line_offset=context.source.class_start_line - 1,
+        effect_scope=context.effect_scope,
     )
     visitor.visit(context.class_tree)
     violations.extend(visitor.violations)
@@ -132,6 +128,7 @@ def _append_module_violations(
     policy: PurityPolicy,
     known_node_modules: tuple[str, ...],
     known_node_class_names: tuple[str, ...],
+    effect_scope: str,
     violations: list[PurityViolation],
 ) -> None:
     if not source.module_text:
@@ -146,6 +143,7 @@ def _append_module_violations(
         node_class_name=node_cls.__name__,
         known_node_modules=known_node_modules,
         known_node_class_names=known_node_class_names,
+        effect_scope=effect_scope,
     )
     module_visitor.visit(module_tree)
     violations.extend(module_visitor.violations)
@@ -183,4 +181,3 @@ def collect_node_metrics(node_cls: type[Any]) -> NodeMetrics:
         call_chain_path=call_chain.path,
         recursive_call_chains=call_chain.recursive_paths,
     )
-

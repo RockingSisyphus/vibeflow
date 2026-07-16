@@ -21,6 +21,7 @@ python run.py architecture --config project/configs/main.jsonc --output project/
 python run.py review --config project/configs/main.jsonc --output reports/graph.expanded.svg
 python run.py validate --config project/configs/main.jsonc
 python run.py run --config project/configs/main.jsonc --run-root runs
+python run.py delegate-cli --config project/configs/main.jsonc -- --input data.yaml --verbose
 python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
 python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
 python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
@@ -30,6 +31,10 @@ python run.py verify-kernel
 ```
 
 默认项目把 `project/configs/main.jsonc` 登记到 `project/ARCHITECTURE.jsonc`。这是带固定“生成且不可执行”头注释的单文件架构审查文档，不是 workflow config；AI 和开发者应先用它理解入口流程、nodeset 调用、节点职责、数据契约、资源和配置来源。架构变更必须落到真实 workflow config、相关 nodeset、registry metadata/config schema 或资源声明中。正式 `review` 会自动重新生成登记文档、执行正式 validate，并且只在 canonical expanded SVG 结构检查通过后发布 SVG；失败时不得用 mmdc、手写 SVG 或旧产物补位。
+
+CLI 让渡模式 / `delegate-cli` 用于把 workflow 当成普通业务 CLI。首个 `--` 可选地分隔 core 与业务参数；让渡 token 以 `cli.argv` 进入图，图以唯一 `cli.exit_code` 返回非 bool 整数 `0..255`。业务使用真实 stdin/stdout/stderr，VibeFlow 诊断只写当次 run 的 `vibeflow.log`。授权 `SystemExit(None)` 返回 0，合法整数原样返回；框架/未授权退出错误返回 1，已知 core 参数的 argparse 错误返回 2。详细终端/IO/授权规则见 `kernel/docs/07_启动命令与报告.md`。`run` 与 `review` 的原职责不变。
+
+副作用权限由内核派生：普通 implemented node 和 planned `python_stub` 是 `none`；`flow_kind=io` 是 `terminal`；`document` / `data_store` 是 `python_io`；任意 `external=True` node 和 plugin 是最高优先级 `trusted`。图形 `flow_kind=terminal` 仍是 `none`。effectful / external node 的 examples 只检查结构，不执行。
 
 ## 读取真实运行结果
 

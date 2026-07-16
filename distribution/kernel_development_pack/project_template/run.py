@@ -155,6 +155,7 @@ COMMAND_ALIASES = {
     "svg": "export-svg",
 }
 WORKSPACE_COMMANDS = {
+    "delegate-cli",
     "export-architecture",
     "export-ascii",
     "export-mermaid",
@@ -172,8 +173,14 @@ def main(argv: list[str] | None = None) -> int:
     if args and args[0] == "verify-kernel":
         print("kernel integrity: OK")
         return 0
-    _prepare_workspace_import_paths()
-    return kernel_cli_main(_kernel_cli_args(args))
+    kernel_args = _kernel_cli_args(args)
+    # delegate-cli installs the selected workspace roots only after its run
+    # directory and private diagnostic sink exist.  Preloading here would both
+    # leak core diagnostics and let the distribution's default workspace shadow
+    # an explicitly selected workspace.
+    if not kernel_args or kernel_args[0] != "delegate-cli":
+        _prepare_workspace_import_paths(kernel_args)
+    return kernel_cli_main(kernel_args)
 
 
 def _kernel_cli_args(args: list[str]) -> list[str]:
@@ -181,24 +188,52 @@ def _kernel_cli_args(args: list[str]) -> list[str]:
         return args
     command = COMMAND_ALIASES.get(args[0], args[0])
     kernel_args = [command, *args[1:]]
-    if WORKSPACE_CONFIG_PATH.is_file() and command in WORKSPACE_COMMANDS and "--workspace" not in kernel_args:
+    passthrough_at = kernel_args.index("--") if "--" in kernel_args else len(kernel_args)
+    kernel_options = kernel_args[1:passthrough_at]
+    has_workspace = any(
+        value == "--workspace" or value.startswith("--workspace=")
+        for value in kernel_options
+    )
+    if WORKSPACE_CONFIG_PATH.is_file() and command in WORKSPACE_COMMANDS and not has_workspace:
         kernel_args[1:1] = ["--workspace", str(WORKSPACE_CONFIG_PATH)]
     return kernel_args
 
 
-def _prepare_workspace_import_paths() -> None:
-    if not WORKSPACE_CONFIG_PATH.is_file():
+def _prepare_workspace_import_paths(args: list[str]) -> None:
+    workspace_path = _selected_workspace_path(args)
+    if workspace_path is None or not workspace_path.is_file():
         return
     try:
         from vibeflow.workspace import load_workspace_config
 
-        workspace = load_workspace_config(WORKSPACE_CONFIG_PATH)
+        workspace = load_workspace_config(workspace_path)
     except Exception:
         return
     for root in reversed(workspace.roots):
         value = str(root.path)
         if value not in sys.path:
             sys.path.insert(0, value)
+
+
+def _selected_workspace_path(args: list[str]) -> Path | None:
+    passthrough_at = args.index("--") if "--" in args else len(args)
+    options = args[1:passthrough_at]
+    selected: Path | None = None
+    explicit = False
+    index = 0
+    while index < len(options):
+        value = options[index]
+        if value == "--workspace":
+            explicit = True
+            if index + 1 < len(options) and not options[index + 1].startswith("--"):
+                selected = Path(options[index + 1])
+                index += 1
+        elif value.startswith("--workspace="):
+            explicit = True
+            raw_path = value.partition("=")[2]
+            selected = Path(raw_path) if raw_path else None
+        index += 1
+    return selected if explicit else WORKSPACE_CONFIG_PATH
 
 
 if __name__ == "__main__":

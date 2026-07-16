@@ -104,7 +104,14 @@ def test_plugin_registry_priority_scope_and_conflict_strategy() -> None:
     registry.register(B(), plugin_type="policy", conflict="replace", scope="nodeset")
     descriptors = registry.to_dict()["plugins"]
     assert descriptors == [
-        {"name": "same", "type": "policy", "priority": 10, "scope": "nodeset", "source": "manual"}
+        {
+            "name": "same",
+            "type": "policy",
+            "priority": 10,
+            "scope": "nodeset",
+            "source": "manual",
+            "effect_scope": "trusted",
+        }
     ]
 
 def test_nodeset_can_be_used_as_a_node() -> None:

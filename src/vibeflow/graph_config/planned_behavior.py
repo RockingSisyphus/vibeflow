@@ -8,10 +8,23 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Mapping
 
-from vibeflow.purity.ast_rules import import_aliases, is_banned_import, path_effect_call_name, qualified_call_name
 from vibeflow.health.types import HealthFinding
 from vibeflow.config.path_utils import is_relative_to
-from vibeflow.purity.types import BANNED_ATTR_CALLS, BANNED_CALL_NAMES, BANNED_IMPORT_ROOTS
+from vibeflow.node import EFFECT_SCOPE_NONE
+from vibeflow.purity.ast_rules import import_aliases
+from vibeflow.purity.effects import (
+    call_violation,
+    from_import_effect_is_forbidden,
+    import_violation_code,
+    process_argv_import_is_forbidden,
+    process_argv_reference,
+    system_exit_is_forbidden,
+    system_exit_reference,
+    terminal_stream_import_is_forbidden,
+    terminal_stream_is_forbidden,
+    terminal_stream_reference,
+)
+from vibeflow.purity.types import PurityPolicy
 
 PLANNED_BEHAVIOR_BLOCKING = "blocking"
 PLANNED_BEHAVIOR_TRANSPARENT = "transparent"
@@ -213,6 +226,7 @@ class _StubSafetyVisitor(ast.NodeVisitor):
         self.object_id = object_id
         self.path = path
         self.aliases: dict[str, str] = {}
+        self.policy = PurityPolicy()
         self.findings: list[HealthFinding] = []
 
     def visit_Module(self, node: ast.Module) -> None:
@@ -227,26 +241,43 @@ class _StubSafetyVisitor(ast.NodeVisitor):
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         if node.module:
+            names = {alias.name for alias in node.names}
+            if process_argv_import_is_forbidden(node.module, names):
+                self._add("GRAPH.PLANNED.STUB_UNSAFE_IMPORT", "planned python_stub must not import process sys.argv", node)
+            if terminal_stream_import_is_forbidden(node.module, names, effect_scope=EFFECT_SCOPE_NONE):
+                self._add("GRAPH.PLANNED.STUB_UNSAFE_IMPORT", "planned python_stub must not import terminal streams", node)
+            if from_import_effect_is_forbidden(node.module, names, effect_scope=EFFECT_SCOPE_NONE):
+                self._add("GRAPH.PLANNED.STUB_UNSAFE_IMPORT", f"planned python_stub imports high-risk member from: {node.module}", node)
             self._check_import(node.module, node)
 
     def visit_Call(self, node: ast.Call) -> None:
-        name = qualified_call_name(node.func, self.aliases)
-        root = name.split(".", 1)[0]
-        if name in BANNED_CALL_NAMES or root in BANNED_CALL_NAMES or name in BANNED_ATTR_CALLS or _matches_prefix(name, BANNED_ATTR_CALLS):
-            self._add("GRAPH.PLANNED.STUB_UNSAFE_CALL", f"planned python_stub uses banned call: {name}", node)
-        path_effect = path_effect_call_name(node, self.aliases)
-        if path_effect:
-            self._add("GRAPH.PLANNED.STUB_UNSAFE_CALL", f"planned python_stub uses file/path side-effect call: {path_effect}", node)
+        violation_code, forbidden = call_violation(
+            node,
+            aliases=self.aliases,
+            effect_scope=EFFECT_SCOPE_NONE,
+        )
+        if violation_code:
+            self._add("GRAPH.PLANNED.STUB_UNSAFE_CALL", f"planned python_stub uses banned call: {forbidden}", node)
+        self.generic_visit(node)
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        reference = process_argv_reference(node, self.aliases)
+        if reference:
+            self._add("GRAPH.PLANNED.STUB_UNSAFE_CALL", f"planned python_stub uses process arguments: {reference}", node)
+        reference = terminal_stream_reference(node, self.aliases)
+        if reference and terminal_stream_is_forbidden(EFFECT_SCOPE_NONE):
+            self._add("GRAPH.PLANNED.STUB_UNSAFE_CALL", f"planned python_stub uses terminal stream: {reference}", node)
+        self.generic_visit(node)
+
+    def visit_Raise(self, node: ast.Raise) -> None:
+        if not isinstance(node.exc, ast.Call):
+            reference = system_exit_reference(node.exc, self.aliases)
+            if reference and system_exit_is_forbidden(EFFECT_SCOPE_NONE):
+                self._add("GRAPH.PLANNED.STUB_UNSAFE_CALL", f"planned python_stub uses process exit: {reference}", node)
         self.generic_visit(node)
 
     def _check_import(self, module: str, node: ast.AST) -> None:
-        if is_banned_import(
-            module,
-            allowed_roots=(),
-            banned_roots=tuple(sorted(BANNED_IMPORT_ROOTS)),
-            allowed_modules=("typing",),
-            banned_modules=("urllib.request",),
-        ):
+        if import_violation_code(module, effect_scope=EFFECT_SCOPE_NONE, policy=self.policy):
             self._add("GRAPH.PLANNED.STUB_UNSAFE_IMPORT", f"planned python_stub imports high-risk module: {module}", node)
 
     def _check_top_level(self, stmt: ast.stmt) -> None:
@@ -283,10 +314,6 @@ def _is_immutable(node: ast.AST) -> bool:
     if isinstance(node, ast.Tuple):
         return all(_is_immutable(item) for item in node.elts)
     return False
-
-
-def _matches_prefix(value: str, patterns: set[str] | frozenset[str]) -> bool:
-    return any(value == pattern or value.startswith(f"{pattern}.") for pattern in patterns)
 
 
 def _stub_finding(

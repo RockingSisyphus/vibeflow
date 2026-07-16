@@ -105,6 +105,7 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
     assert {
         "source_too_large",
         "banned_call",
+        "effect_call",
         "node_direct_call",
         "module_side_effect",
         "CONFIG.LOOPS.REMOVED",

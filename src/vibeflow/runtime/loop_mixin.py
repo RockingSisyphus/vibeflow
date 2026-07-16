@@ -5,7 +5,7 @@ from typing import Mapping
 
 from vibeflow.runtime.block_compiler import graph_block, loop_block
 from vibeflow.data_contract import RunResult
-from vibeflow.runtime.errors import PipelineRuntimeError
+from vibeflow.runtime.errors import DelegateCliExit, PipelineRuntimeError
 from vibeflow.runtime.helpers import elapsed_ms
 from vibeflow.runtime.values import (
     _initial_loop_values,
@@ -107,6 +107,9 @@ class RuntimeLoopMixin:
         runtime._trace_path_prefix = self._trace_event_path(iteration_path)
         try:
             result = runtime.run(initial)
+        except DelegateCliExit:
+            self.trace.merge_child(iteration_path, runtime.trace)
+            raise
         except Exception:
             self.trace.merge_child(iteration_path, runtime.trace)
             raise

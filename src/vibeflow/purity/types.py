@@ -185,6 +185,12 @@ class _CallChainAnalysis:
 
 
 def _default_rule_id(code: str) -> str:
+    effect_rules = {
+        "effect_call": "NODE.EFFECT.CALL_FORBIDDEN",
+        "effect_import": "NODE.EFFECT.IMPORT_FORBIDDEN",
+    }
+    if code in effect_rules:
+        return effect_rules[code]
     flow_rules = {
         "node_info_flow_kind": "NODE.FLOW_KIND.MISSING",
         "node_flow_kind_invalid": "NODE.FLOW_KIND.INVALID",

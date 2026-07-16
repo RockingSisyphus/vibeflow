@@ -1,6 +1,6 @@
 # 01. Node 开发规范
 
-Node 是业务逻辑的最小执行单元。它必须是纯函数对象：相同输入和配置必须得到相同输出，不允许读写文件、访问网络、访问数据库、读取环境变量、启动进程、持有外部资源、调用其他 node。
+Node 是业务逻辑的最小执行单元。普通 node 必须是纯函数对象：相同输入和配置必须得到相同输出，不读写外部系统。真实副作用只能放在内核根据 `flow_kind` / `external` 派生的明确 `effect_scope` 中；任何 node 都不能直接调用其他 node。
 
 ## 最小合法 node
 
@@ -65,15 +65,28 @@ class AddNode:
 | `terminal` | 开始 / 结束 |
 | `process` | 普通处理 |
 | `decision` | 判断 / 路由 |
-| `io` | 输入 / 输出边界表示适配 |
+| `io` | 交互式输入 / 输出，可使用真实标准流 |
 | `predefined` | 预定义过程 / nodeset |
-| `data_store` | 数据存储请求或引用 |
-| `document` | 文档对象或文档请求 |
+| `data_store` | 数据存储交互 |
+| `document` | 文档、文件或外部资源交互 |
 | `preparation` | 准备 / 初始化 |
 
-`flow_kind` 是流程语义、图形和适用校验的分类，不是能力或权限声明。把 node 标成 `io`、`data_store` 或 `document` 不会授予读写文件、访问网络/数据库、控制浏览器或启动进程的能力。`io` 只适配已传入的外部表示或形成待交给外部 adapter 的输出对象；`data_store` 形成存储请求/引用；`document` 形成文档对象/请求。真实副作用由 VibeFlow 调用方或内核外部 adapter 完成。
+`flow_kind` 与 `external` 一起决定内核派生的 `effect_scope`：
 
-`purity` 默认是 `"pure"`，不要改成其他值。
+| 实现分类 | effect_scope | 允许能力 |
+| --- | --- | --- |
+| 其他普通 implemented（即非 `io` / `document` / `data_store`，且 `external=False`） | `none` | 无业务 IO |
+| `flow_kind=io` | `terminal` | stdin/stdout/stderr、`print`、`input`、`argparse` |
+| `flow_kind=document` / `data_store` | `python_io` | 文件、环境、网络、数据库、subprocess、终端 |
+| 任意 `flow_kind` + `external=True` | `trusted` | 最高优先级信任边界 |
+| plugin | `trusted` | 信任边界 |
+| planned `python_stub` | `none` | 无业务 IO |
+
+`effect_scope` 不是可在 config 中自由声明的字段。图形 `flow_kind=terminal` 仍属于 `none`；它与仅由 `flow_kind=io` 获得的权限档位 `effect_scope=terminal` 不是一回事。
+
+`run_pure(inputs, params)` 是稳定 node ABI 的方法名，不单独证明实现无副作用；真正的 IO 检查边界以派生 `effect_scope` 为准。
+
+`purity` 为了 ABI 兼容仍默认是 `"pure"`，不要改成其他值。它不会覆盖派生的 `effect_scope`，也不能用来申请副作用能力。
 
 可选字段：
 
@@ -91,7 +104,7 @@ class AddNode:
 NODE_INFO = NodeInfo(..., flow_kind="process", external=True)
 ```
 
-`external=True` 是“实现由第三方或外部维护”的信任/检查边界，只跳过源码质量、复杂度、导入链等内部实现检查。它不是 IO 权限，不是 purity 绕过开关，不改变流程图形状，不代表 decision，也不会让 cycle 合法化。契约、拓扑、输出 key、`flow_kind` 和运行 trace 仍然被检查。
+`external=True` 是“实现由第三方或外部维护”的最高优先级信任边界，使有效 `effect_scope=trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 purity/IO 绕过；不要为了让内部代码通过检查而滥用。它不改变流程图形状，不代表 decision，也不会让 cycle 合法化；契约、拓扑、输出 key、`flow_kind` 和 trace 仍然被检查。
 
 ## 必填契约
 
@@ -103,9 +116,11 @@ NODE_INFO = NodeInfo(..., flow_kind="process", external=True)
 - `output_semantics`：必须覆盖所有 `provides`。
 - `params_schema`：必须声明 `run_pure` 读取的每个配置参数。
 - `output_schema`：必须覆盖所有 `provides`。
-- `examples`：建议提供输入和参数示例，方便人和 AI 理解，也用于证明最小输入/参数可运行并返回声明 key。
+- `examples`：建议提供输入和参数示例，方便人和 AI 理解。对 `effect_scope=none` 的普通 node，它还用于证明最小输入/参数可运行并返回声明 key；effectful/external examples 不执行。
 
 `requires` 不允许重复 type；`provides` 不允许重复 key。旧的字符串契约不再支持。
+
+`effect_scope=none` 的普通 node 会执行 examples 以验证最小样例。`terminal` / `python_io` 或 `external=True` node 的 examples 可能触发真实副作用，内核只检查其结构，不执行。
 
 `examples` 只写：
 
@@ -154,13 +169,13 @@ def run_pure(self, inputs, params):
 - 返回动态 output key
 - 少返回或多返回 key
 
-Runtime 允许输出任意 Python 对象，并按引用传给下游；不要求输出 JSON serializable，也不要求可 deepcopy。输出仍必须是 mapping，且 key 必须和 `provides` 完全一致。`CONTRACT.examples` 只包含 `inputs` 和 `params`，用于证明最小输入/参数可运行并返回声明 key；不要在 examples 中写 `outputs`。
+Runtime 允许输出任意 Python 对象，并按引用传给下游；不要求输出 JSON serializable，也不要求可 deepcopy。输出仍必须是 mapping，且 key 必须和 `provides` 完全一致。`CONTRACT.examples` 只包含 `inputs` 和 `params`；对 `none` 范围普通 node，它用于证明最小输入/参数可运行并返回声明 key，effectful/external node 则只检查结构。不要在 examples 中写 `outputs`。
 
 `terminal` start/end node 也使用同一接口。start node 通常 `requires=()`、`provides=()` 并返回 `{}`；end node 通常只声明 `requires`，返回 `{}`。
 
 ## 导入和副作用限制
 
-node 中禁止常见副作用和外部耦合能力，包括但不限于：
+`effect_scope=none` 的普通 node 和 planned `python_stub` 禁止常见副作用和外部耦合能力，包括但不限于：
 
 - `open`
 - `os.getenv` / `os.environ` / `os.system`
@@ -172,6 +187,8 @@ node 中禁止常见副作用和外部耦合能力，包括但不限于：
 - `playwright` / `selenium`
 - `eval` / `exec` / `compile` / `__import__`
 - `importlib.import_module`
+
+`effect_scope=terminal` 只额外开放真实 stdin/stdout/stderr、`print`、`input` 和 `argparse`，不开放文件、环境、网络、数据库或 subprocess。`python_io` 可以使用这些 Python IO 能力。`trusted` 跳过这组实现限制，由项目承担信任责任。
 
 node 不能导入其他 node，不能直接调用其他 node，不能读取其他 node 的 `NODE_INFO` 或 `CONTRACT`。
 

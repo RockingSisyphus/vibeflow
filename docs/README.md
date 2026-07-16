@@ -19,7 +19,7 @@ This directory contains current user documentation, maintainer documentation, an
 - `../distribution/kernel_development_pack/project_template/AGENTS.md` is the additional high-salience instruction set for AI agents. It carries operational prohibitions and review gates, while the human README should stay concise.
 - `../README.md` and `../README.en.md` provide the repository overview and a short two-path quick start for greenfield and existing projects.
 
-All current user- and AI-facing layers must agree that existing workflows are edited in place, formal review uses the VibeFlow `review` command and fails closed, Mermaid CLI/mmdc is an internal implementation detail, and human approval requires an explicit later message when requested.
+All current user- and AI-facing layers must agree that existing workflows are edited in place, formal review uses the VibeFlow `review` command and fails closed, Mermaid CLI/mmdc is an internal implementation detail, and human approval requires an explicit later message when requested. They must also use the public name “CLI 让渡模式 / `delegate-cli`”, keep `run` and `review` responsibilities unchanged, and describe the same derived effect-scope matrix (`none`, `terminal`, `python_io`, `trusted`) without reverting to the obsolete claim that `flow_kind` never authorizes IO or that `external=True` is not a purity bypass.
 
 ## Current Design
 

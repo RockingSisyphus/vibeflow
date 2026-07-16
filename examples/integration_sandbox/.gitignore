@@ -1,6 +1,7 @@
 runs/
 runs_tmp/
 reports/
+project/review_artifacts/
 kernel/topology_kernel
 kernel/topology_kernel/
 kernel/topology_kernel.lnk

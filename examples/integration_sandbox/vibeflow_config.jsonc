@@ -1,0 +1,9 @@
+{
+  "policy": {},
+  "roots": [
+    {
+      "id": "project",
+      "path": "project"
+    }
+  ]
+}

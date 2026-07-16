@@ -12,6 +12,7 @@ from vibeflow.graph_config import LOOP_NODE_TYPES, STATUS_PLANNED
 from vibeflow.health.flow import append_data_contract_warnings, append_flowchart_health, append_join_policy_health
 from vibeflow.health.planned import append_planned_findings
 from vibeflow.health.report import _build_health_report
+from vibeflow.node import EFFECT_SCOPE_NONE, effective_effect_scope
 from vibeflow.policy import EffectivePolicy, apply_policy_to_findings
 
 if TYPE_CHECKING:
@@ -25,6 +26,7 @@ class _HealthValidationState:
     errors: list[HealthFinding] = field(default_factory=list)
     warnings: list[HealthFinding] = field(default_factory=list)
     node_metrics: dict[str, dict[str, object]] = field(default_factory=dict)
+    node_effect_scopes: dict[str, str] = field(default_factory=dict)
     node_types: dict[str, str] = field(default_factory=dict)
     node_similarities: dict[str, dict[str, str]] = field(default_factory=dict)
     nodeset_findings: dict[str, list[dict[str, object]]] = field(default_factory=dict)
@@ -120,6 +122,7 @@ def _validate_graph_nodes(
 ) -> None:
     for spec in graph.nodes:
         state.node_types[spec.id] = spec.type_used
+        state.node_effect_scopes[spec.id] = EFFECT_SCOPE_NONE
         if spec.similar_to.node:
             state.node_similarities[spec.id] = spec.similar_to.to_dict()
         if spec.status == STATUS_PLANNED:
@@ -150,6 +153,7 @@ def _validate_graph_node(
         return
     from vibeflow.purity import collect_node_metrics
 
+    state.node_effect_scopes[spec.id] = effective_effect_scope(getattr(node_cls, "NODE_INFO", None))
     metrics = collect_node_metrics(node_cls)
     state.node_metrics[spec.id] = metrics.to_dict()
     _validate_plugin_schema_extensions(plugin_registry, state.errors, spec.id, node_cls, purity_policy)

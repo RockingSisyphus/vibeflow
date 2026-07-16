@@ -62,6 +62,7 @@ The release package root includes `AGENTS.md`. AI tools that support project ins
 - Which health checks must pass before execution.
 - How to distinguish greenfield work from changes to an existing project and edit the real sources.
 - How to generate a formal review with `review` and wait for explicit human approval before implementation.
+- How to expose a workflow as an ordinary business command with CLI delegation mode / `delegate-cli`.
 
 You do not need to understand the full kernel source first. Treat the release package as an AI development workspace with built-in rules.
 
@@ -89,6 +90,7 @@ python run.py architecture --config project/configs/main.jsonc --output project/
 python run.py review --config project/configs/main.jsonc --output reports/graph.expanded.svg
 python run.py validate --config project/configs/main.jsonc
 python run.py run --config project/configs/main.jsonc --run-root runs
+python run.py delegate-cli --config project/configs/main.jsonc -- --input data.yaml --verbose
 python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
 python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
 python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
@@ -99,6 +101,8 @@ python run.py quality --path project
 Each root can register workflow/document pairs under `architecture.documents` in `vibeflow_project.jsonc`. Fixed comments mark the generated document as non-executable; mutable-looking status properties are deliberately absent. AI should read it first to understand the project architecture. To change that architecture, edit the real workflow config or relevant nodesets, update registry metadata/config schema when needed, and regenerate the document; never edit the generated document itself. Workspace validation and execution reject a registered document that is missing, stale, or manually reformatted, with source locations and a repair command.
 
 `review` is the formal architecture-review entry point. It checks registration and the existing graph, refreshes and verifies the canonical `ARCHITECTURE.jsonc`, runs workspace validation, then generates and checks an expanded `review-columns` SVG. If any stage fails, it does not substitute an old SVG, a hand-written diagram, or a direct mmdc render, and it does not publish the failed artifact to the target path. `PASS` or `CONCERNS` only means that machine review completed; when the task says “implement after review,” explicit human approval in a later message is still required.
+
+CLI delegation mode / `delegate-cli` exposes a workflow as an ordinary business CLI. The first `--` optionally separates core and business arguments; tokens not consumed by the core retain their order and enter the graph as `cli.argv`. The graph must produce exactly one `cli.exit_code`, a non-bool integer from 0 through 255. Business code uses the real process stdin/stdout/stderr: VibeFlow does not capture, rewrite, or append JSON/newlines. Kernel diagnostics go to the run's `vibeflow.log`, which records neither raw argv nor business streams. Only `io`, `document`, and `data_store` nodes and runtime plugins may issue an authorized `SystemExit`. Normal and authorized business exits return 0–255, framework failures return 1, and argparse errors in known core options return 2. `delegate-cli` does not change the general execution role of `run` or the formal architecture-review role of `review`.
 
 The same root config can set `runtime.async_max_workers` (default 4), `runtime.async_flush_timeout` (default `null`), and `runtime.nodeset_max_depth` (default 4). Each Runtime owns its thread pool; ordinary nodeset calls and `loop.body` share the static depth limit, while loop iteration count does not increase it. Worker count and nodeset depth have no CLI flags.
 
@@ -133,7 +137,7 @@ VibeFlow does not stop you from vibe coding. It makes every vibe return to a che
 
 ## How It Works ⚙️
 
-VibeFlow is a strict flowchart runtime. Nodes handle local pure computation, JSONC config declares control flow, the compiler builds an executable graph, and the health checker blocks structural drift and contract errors before runtime.
+VibeFlow is a strict flowchart runtime. Ordinary nodes handle local pure computation, explicitly classified nodes/plugins perform real effects within derived effect scopes, JSONC config declares control flow, the compiler builds an executable graph, and the health checker blocks structural drift and contract errors before runtime.
 
 It turns project architecture from a verbal convention into executable checks.
 
@@ -152,7 +156,7 @@ Every node declares a standard `flow_kind`:
 - `document`: document generation or document structure.
 - `preparation`: setup / initialization.
 
-`flow_kind` declares architecture semantics, diagram shape, and applicable checks; it does not grant file, network, database, or process permissions. This means AI-written code must not only run; it must fit back into a reviewable flowchart.
+`flow_kind` and `external` determine the derived `effect_scope`: ordinary implemented nodes and planned `python_stub`s use `none`; `flow_kind=io` uses `terminal` and may access real standard streams plus `print`, `input`, and `argparse`; `document` and `data_store` use `python_io` and may access files, environment, network, databases, subprocesses, and the terminal; any `external=True` node and every plugin use highest-priority `trusted`. Diagram role `flow_kind=terminal` still maps to `none` and is unrelated to the `terminal` effect scope.
 
 ### Explicit Flow Edges
 
@@ -162,9 +166,9 @@ Program control flow comes only from `pipeline.edges` in JSONC config.
 
 Data contracts use strict structured fields: `provides` declares a unique `key` and logical `type`, while `requires` consumes by `type` plus `cardinality`. Runtime passes envelopes through node inboxes and edge payloads; nodes cannot read early upstream outputs through a multi-hop global Context, and final results keep only `pipeline.outputs`.
 
-### Small Nodes And Pure Logic
+### Small Nodes And Explicit Effects
 
-Business nodes are pure by default:
+Ordinary `effect_scope=none` business nodes are pure:
 
 - No file reads or writes.
 - No network access.
@@ -173,7 +177,7 @@ Business nodes are pure by default:
 - No environment variable reads.
 - No direct calls to other nodes.
 
-An `io` node only adapts an external representation already passed in or forms an output object; `data_store` and `document` nodes only form storage requests, references, or document objects. The caller or an adapter outside the kernel performs real file, network, database, and process side effects. Third-party or externally maintained code is marked with `NodeInfo.external=True`; this is a source-maintenance and inspection boundary, not an IO permission or purity bypass.
+An `io` node may perform real terminal interaction; `data_store` and `document` nodes may perform Python IO. `external=True` and plugins are `trusted` boundaries. `external=True` explicitly bypasses ordinary IO/purity restrictions, so it is reserved for genuinely external or audited trusted implementations—not a way to relabel internal code until checks pass. Contracts, topology, output keys, and trace rules still apply. Effectful or external node `CONTRACT.examples` are checked structurally but are not executed.
 
 ### Pre-Run Health Checks
 
@@ -183,7 +187,7 @@ Before execution, VibeFlow checks:
 - Input and output contracts.
 - Reachability from start to end.
 - Whether ordinary graph/nodeset cycles are absent; iteration must use the first-class `vibeflow.loop.while` node.
-- Node purity and structure rules.
+- Each node's derived effect scope and structure rules.
 - Whether config, plugins, or nodesets break project boundaries.
 
 If checks fail, the run is refused with traceable reasons.

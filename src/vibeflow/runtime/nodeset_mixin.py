@@ -4,7 +4,7 @@ import time
 from typing import Mapping
 
 from vibeflow.runtime.block_compiler import graph_block, nodeset_block
-from vibeflow.runtime.errors import PipelineRuntimeError
+from vibeflow.runtime.errors import DelegateCliExit, PipelineRuntimeError
 from vibeflow.runtime.helpers import elapsed_ms
 from vibeflow.runtime.trace import RuntimeTrace
 from vibeflow.runtime.types import _NestedRuntimeFailure
@@ -68,6 +68,9 @@ class RuntimeNodesetMixin:
         runtime._trace_path_prefix = self._trace_event_path((frame.name,))
         try:
             nested_result = runtime.run(initial)
+        except DelegateCliExit:
+            self._merge_child_trace(frame, runtime.trace)
+            raise
         except Exception as exc:
             raise _NestedRuntimeFailure(str(exc), runtime.trace) from exc
         finally:

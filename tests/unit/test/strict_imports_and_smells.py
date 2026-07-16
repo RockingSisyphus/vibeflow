@@ -20,7 +20,7 @@ def test_urllib_parse_is_allowed_but_urllib_request_is_banned_for_nodes(tmp_path
     )
     code, payload = _inspect_node_source(tmp_path / "request", capsys, request_source)
     assert code == 1
-    assert any(error["details"].get("legacy_code") == "banned_import" for error in payload["health"]["errors"])
+    assert any(error["details"].get("legacy_code") == "effect_import" for error in payload["health"]["errors"])
 
 
 def test_urllib_parse_is_allowed_but_urllib_request_is_banned_for_base_lib(tmp_path) -> None:

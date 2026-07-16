@@ -2,6 +2,16 @@ from __future__ import annotations
 
 
 RULE_CATALOG: dict[str, dict[str, str]] = {
+    "NODE.EFFECT.CALL_FORBIDDEN": {
+        "severity": "error",
+        "layer": "implementation",
+        "suggested_fix_type": "fix_contract",
+    },
+    "NODE.EFFECT.IMPORT_FORBIDDEN": {
+        "severity": "error",
+        "layer": "implementation",
+        "suggested_fix_type": "fix_contract",
+    },
     "GRAPH.CYCLE.FORBIDDEN": {
         "severity": "error",
         "layer": "topology",

@@ -8,7 +8,7 @@
     {
       "name": "hidden_side_effect",
       "run_body": "        open(\"x.txt\", \"w\")\n        return {\"demo.out\": 1}",
-      "expected_legacy_code": "banned_call"
+      "expected_legacy_code": "effect_call"
     },
     {
       "name": "dynamic_import",

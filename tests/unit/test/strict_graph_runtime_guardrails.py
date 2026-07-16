@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
 
 from vibeflow import (
     DataProvider,
@@ -492,6 +491,8 @@ def test_join_policy_all_allows_same_condition_decision_fanout() -> None:
 
 
 def test_documented_neutral_topologies_are_extracted_validated_and_executed(tmp_path) -> None:
+    from pathlib import Path
+
     repository_root = Path(__file__).resolve().parents[3]
     guide = repository_root / "distribution" / "kernel_development_pack" / "docs" / "03_Config与Pipeline规范.md"
     pattern = re.compile(
@@ -541,6 +542,8 @@ def test_documented_neutral_topologies_are_extracted_validated_and_executed(tmp_
 
 
 def test_ai_guidance_is_generic_and_contains_required_runtime_guardrails() -> None:
+    from pathlib import Path
+
     repository_root = Path(__file__).resolve().parents[3]
     guides = [
         repository_root / "distribution" / "kernel_development_pack" / "project_template" / "AGENTS.md",

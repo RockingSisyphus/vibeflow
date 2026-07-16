@@ -1,0 +1,24 @@
+{
+  "registry": "registry.py:build_node_registry",
+  "quality_enabled": false,
+  "architecture": {
+    "documents": [
+      {
+        "workflow": "configs/pass_nodeset_nested.jsonc",
+        "document": "review_artifacts/ARCHITECTURE.jsonc"
+      },
+      {
+        "workflow": "configs/pass_delegate_cli.jsonc",
+        "document": "review_artifacts/DELEGATE_CLI_ARCHITECTURE.jsonc"
+      },
+      {
+        "workflow": "configs/pass_delegate_cli_numeric_pathlib.jsonc",
+        "document": "review_artifacts/NUMERIC_PATHLIB_CLI_ARCHITECTURE.jsonc"
+      },
+      {
+        "workflow": "configs/pass_delegate_cli_numeric_streams.jsonc",
+        "document": "review_artifacts/NUMERIC_STREAMS_CLI_ARCHITECTURE.jsonc"
+      }
+    ]
+  }
+}

@@ -54,9 +54,15 @@ def _assert_review_protocol(layer: str, text: str) -> None:
         or "not a public review entry" in lowered
     ), layer
     assert "flow_kind" in text, layer
-    assert "不授予" in text or "does not grant" in lowered, layer
+    for scope in ("none", "terminal", "python_io", "trusted"):
+        assert scope in lowered, (layer, scope)
+    assert "effect_scope" in text, layer
+    assert "flow_kind=io" in text or "flow_kind = io" in lowered, layer
     assert "external=True" in text, layer
-    assert "不是 IO 权限" in text or "not an IO permission" in text, layer
+    assert "trusted" in lowered, layer
+    assert "delegate-cli" in lowered, layer
+    assert "cli.argv" in text and "cli.exit_code" in text, layer
+    assert "vibeflow.log" in text, layer
 
 
 def test_distribution_copies_review_docs_and_preserves_customizable_root_guides(

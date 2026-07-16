@@ -41,6 +41,7 @@ def _build_health_report(
             "effective_edges": [edge.pair for edge in compiled.effective_edges],
             "mainline": state.mainline,
             "node_metrics": state.node_metrics,
+            "node_effect_scopes": state.node_effect_scopes,
             "nodeset_findings": state.nodeset_findings,
             "plugins": plugin_registry.to_dict() if plugin_registry is not None else {"plugins": []},
             "planned": [dict(item) for item in planned_items(graph)],

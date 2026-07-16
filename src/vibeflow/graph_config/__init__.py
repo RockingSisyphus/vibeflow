@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-import sys
 import time
 from typing import Any, Mapping
 
@@ -475,7 +474,9 @@ def _nodeset_reference_targets(nodes: tuple[NodeSpec, ...]) -> tuple[str, ...]:
 def _trace_config_parse(message: str) -> None:
     if str(os.environ.get("VIBEFLOW_CONFIG_TRACE", "")).lower() not in {"1", "true", "yes", "on"}:
         return
-    print(f"[vibeflow config] {message}", file=sys.stderr)
+    from vibeflow.diagnostics import emit_core_diagnostic
+
+    emit_core_diagnostic(f"[vibeflow config] {message}")
 
 
 def _elapsed_ms(started: float) -> float:

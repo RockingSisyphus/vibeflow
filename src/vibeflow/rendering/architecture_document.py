@@ -8,6 +8,7 @@ from vibeflow.compiler import CompiledGraph
 from vibeflow.data_contract import providers_to_dicts, requirements_to_dicts
 from vibeflow.graph_config import GraphConfig, LOOP_NODE_TYPES, LoopSpec, NodeSpec, STATUS_PLANNED
 from vibeflow.graph_config.planned_behavior import effective_planned_behavior
+from vibeflow.node import EFFECT_SCOPE_NONE, EFFECT_SCOPE_TRUSTED, effective_effect_scope
 from vibeflow.rendering.helpers import compile_for_render
 from vibeflow.rendering.review_model import (
     edge_roles,
@@ -15,6 +16,7 @@ from vibeflow.rendering.review_model import (
     invocation_for_node,
     loop_field_schema,
     node_flow_kind,
+    node_review_effect_scope,
     node_review_metadata,
     reachable_nodesets,
     registry_node_class,
@@ -95,6 +97,7 @@ def _nodesets_document(graph: GraphConfig, *, registry: object | None) -> dict[s
             "status": nodeset.status,
             "planned_behavior": nodeset.planned_behavior.to_dict() if nodeset.status == STATUS_PLANNED else None,
             "flow_kind": nodeset.flow_kind,
+            "effect_scope": EFFECT_SCOPE_NONE,
             "reachable_from_workflow": type_key in reachable,
             "requires": requirements_to_dicts(nodeset.requires),
             "provides": providers_to_dicts(nodeset.provides),
@@ -146,6 +149,7 @@ def _node_document(
         "source": source,
         "role": node_review_metadata(graph, node, registry),
         "flow_kind": node_flow_kind(node, compiled),
+        "effect_scope": node_review_effect_scope(graph, node, registry),
         "status": node.status,
         "planned_behavior": effective_planned_behavior(node, target).to_dict() if planned else None,
         "requires": requirements_to_dicts(node.requires),
@@ -205,7 +209,8 @@ def _node_type_document(
 ) -> dict[str, object]:
     if type_key in LOOP_NODE_TYPES:
         return _loop_node_type_document(type_key, roots=roots)
-    node_cls = registry_node_class(registry, type_key)
+    has_implemented_occurrence = any(node.status != STATUS_PLANNED for _, node in occurrences)
+    node_cls = registry_node_class(registry, type_key) if has_implemented_occurrence else None
     if node_cls is None:
         owner, node = occurrences[0]
         metadata = node_review_metadata(owner, node, registry)
@@ -216,6 +221,7 @@ def _node_type_document(
                 "display_name": metadata["display_name"],
                 "description": metadata["description"],
                 "flow_kind": node.flow_kind,
+                "effect_scope": EFFECT_SCOPE_NONE,
             },
             "contract": None,
             "config": None,
@@ -247,6 +253,7 @@ def _loop_node_type_document(type_key: str, *, roots: Mapping[str, str]) -> dict
             "description": "Repeats one nodeset body with explicit termination, carried state, collected values, and exposed outputs.",
             "version": "",
             "flow_kind": "predefined",
+            "effect_scope": EFFECT_SCOPE_NONE,
             "purity": "runtime_control",
             "author": None,
             "tags": ["loop", "nodeset", "control_flow"],
@@ -286,6 +293,7 @@ def _node_info_document(info: object) -> dict[str, object]:
         "version": str(getattr(info, "version", "") or ""),
         "flow_kind": str(getattr(info, "flow_kind", "") or ""),
         "purity": str(getattr(info, "purity", "") or ""),
+        "effect_scope": effective_effect_scope(info),
         "author": getattr(info, "author", None),
         "tags": list(getattr(info, "tags", ()) or ()),
         "external": bool(getattr(info, "external", False)),
@@ -354,6 +362,7 @@ def _resource_document(item: Mapping[str, object], *, kind: str, roots: Mapping[
     return {
         "name": str(item.get("name", "") or ""),
         "type": str(item.get("type", info_map.get("type", "")) or ""),
+        "effect_scope": EFFECT_SCOPE_TRUSTED,
         "module": str(item.get("module", "") or ""),
         "class": str(item.get("class", "") or ""),
         "config_keys": sorted(str(key) for key in item.get("config_keys", ()) if isinstance(key, str)),

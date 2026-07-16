@@ -7,7 +7,7 @@ from typing import Mapping
 from vibeflow.runtime.block_compiler import loop_block, nodeset_block
 from vibeflow.graph_config.planned_behavior import load_stub_callable, resolve_stub_module_path, signature_is_run_stub
 from vibeflow.registry import NodeRegistryError
-from vibeflow.runtime.errors import PipelineRuntimeError
+from vibeflow.runtime.errors import PipelineRuntimeError, normalize_delegate_cli_system_exit
 from vibeflow.runtime.helpers import elapsed_ms
 from vibeflow.runtime.summaries import summarize_mapping
 
@@ -54,6 +54,20 @@ class RuntimeNodeMixin:
             )
             self._call_runtime_plugins("after_node", frame.name, frame.node_type, summarize_mapping(outputs))
             return outputs
+        except SystemExit as exc:
+            failure = PipelineRuntimeError(
+                f"planned python_stub node '{frame.name}' attempted SystemExit; planned stubs use effect scope none"
+            )
+            self._record_runtime_event(
+                "node_failed",
+                frame.name,
+                frame.node_type,
+                input_summary=summarize_mapping(inputs),
+                failure=str(failure),
+                elapsed_ms=elapsed_ms(started),
+            )
+            self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(failure))
+            raise failure from exc
         except Exception as exc:
             self._record_runtime_event("node_failed", frame.name, frame.node_type, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started))
             self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(exc))
@@ -71,6 +85,36 @@ class RuntimeNodeMixin:
             self._record_runtime_event("node", frame.name, frame.node_type, input_summary=summarize_mapping(inputs), output_summary=summarize_mapping(outputs), elapsed_ms=elapsed_ms(started))
             self._call_runtime_plugins("after_node", frame.name, frame.node_type, summarize_mapping(outputs))
             return outputs
+        except SystemExit as exc:
+            if not self.delegate_cli:
+                failure = PipelineRuntimeError(
+                    f"node '{frame.name}' attempted SystemExit outside delegate CLI mode"
+                )
+                self._record_runtime_event(
+                    "node_failed",
+                    frame.name,
+                    frame.node_type,
+                    input_summary=summarize_mapping(inputs),
+                    failure=str(failure),
+                    elapsed_ms=elapsed_ms(started),
+                )
+                self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(failure))
+                raise failure from exc
+            if frame.flow_kind not in {"io", "document", "data_store"}:
+                failure = PipelineRuntimeError(
+                    f"node '{frame.name}' with flow_kind '{frame.flow_kind}' cannot control delegate CLI exit"
+                )
+                self._record_runtime_event(
+                    "node_failed",
+                    frame.name,
+                    frame.node_type,
+                    input_summary=summarize_mapping(inputs),
+                    failure=str(failure),
+                    elapsed_ms=elapsed_ms(started),
+                )
+                self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(failure))
+                raise failure from exc
+            raise normalize_delegate_cli_system_exit(exc, source=frame.name) from exc
         except NodeRegistryError as exc:
             failure = PipelineRuntimeError(str(exc))
             self._record_runtime_event("node_failed", frame.name, frame.node_type, failure=str(failure), elapsed_ms=elapsed_ms(started))

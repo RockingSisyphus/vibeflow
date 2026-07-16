@@ -1,6 +1,6 @@
 # 06. Plugin 开发规范
 
-插件用于扩展策略、编译和运行 hook。插件不能绕过内核硬规则；如果插件放宽策略，必须按内核要求声明 relaxation。
+插件用于扩展策略、编译和运行 hook。所有 plugin 都使用 `effect_scope=trusted`：可以执行 Python IO，并由当前 workflow 项目承担信任责任。这不允许插件绕过契约、拓扑或内核硬规则；如果插件放宽策略，必须按内核要求声明 relaxation。
 
 ## 注册和启用插件
 
@@ -204,7 +204,7 @@ class RuntimePlugin:
         return None
 ```
 
-Runtime plugin 适合记录观测数据、附加 trace、统计耗时或上报进度。它不应执行业务副作用来替代 `io` / `data_store` / `document` 节点的显式契约。
+Runtime plugin 适合记录观测数据、附加 trace、统计耗时或上报进度。它的 `trusted` 档位允许真实 IO，但不要用 hook 隐藏本应由 `io` / `data_store` / `document` node 和显式契约表达的业务主流副作用。在 CLI 让渡模式 / `delegate-cli` 中，runtime plugin 可以抛出授权 `SystemExit`：`None` 等于 0，非 bool 整数 `0..255` 原样透传，其他值是框架错误 1。
 
 实际 runtime hook 签名：
 

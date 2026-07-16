@@ -8,11 +8,26 @@
 python examples\integration_sandbox\run_all.py
 ```
 
-脚本会自动创建或刷新 `kernel/vibeflow` 软链接，批量运行合法配置、非法 node、非法 `base_lib`、非法配置和非法插件，并输出：
+脚本会自动创建或刷新 `kernel/vibeflow` 软链接，批量运行合法配置、非法 node、非法 `base_lib`、非法配置和非法插件。它还会使用真实 CLI 验证本工作区新增的 `review` 审核流程：
+
+- 对已登记的嵌套 nodeset workflow，先写入陈旧架构，再确认 `review` 自动刷新 canonical `ARCHITECTURE.jsonc` 并发布 expanded `review-columns` SVG。
+- 对未登记的 workflow，确认返回 `REVIEW.ARCHITECTURE.UNREGISTERED`，不修改已登记架构，也不发布 SVG。
+- 确认审核结果不发布中间 `.mmd`、provenance sidecar 或嵌入式 provenance metadata。
+- 使用真实 `delegate-cli -- --input data.yaml --verbose` 启动 graph，确认 argv 原样进入、document 节点读取文件、业务 stdout/stderr 不被内核污染，并由 `cli.exit_code` 控制进程退出。
+- 使用两个真实数值 CLI graph 覆盖多种 Python IO：IO 节点从 stdin 读取数字，两个 document 节点分别从文件读取数字，process 节点求和，再由 document 节点写文件、IO 节点写 stdout/stderr。`pathlib` 用例组合 `input()`、`Path.read_text/write_text`、`open().readline()`、`print()` 和 `sys.stderr.write()`，验证 `7 + 11 + 13 = 31`；标准流用例组合 `sys.stdin.readline()`、`open().read/write()`、`Path.read_text()` 和 `sys.stdout/stderr.write()`，验证 `5 + 17 + 19 = 41`。
+- 两个数值用例都按 UTF-8 字节精确检查 stdout、stderr 和输出文件，并检查退出码；同时确认 architecture/health 不会执行 effectful examples、派生 effect scope 符合节点职责、health 为 `PASS/CONCERNS`、`output_summary.json` 包含 `cli.exit_code`、关键节点各执行一次，以及 `vibeflow.log` 不泄露 stdin、文件内容、业务路径或输出内容。
+
+脚本输出：
 
 - `reports/summary.json`
 - `reports/summary.md`
 - `reports/mermaid/*.mmd`
+- `reports/review/pass_nodeset_nested.expanded.svg`
+- `reports/delegate_cli_numeric/pathlib_sum.txt`
+- `reports/delegate_cli_numeric/streams_sum.txt`
+- `runs/delegate_cli/vibeflow.log`
+- `runs/delegate_cli_numeric_pathlib/vibeflow.log`
+- `runs/delegate_cli_numeric_streams/vibeflow.log`
 - `runs/<case_name>/...`
 
 退出码：

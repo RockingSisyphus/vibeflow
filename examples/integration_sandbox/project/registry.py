@@ -14,6 +14,27 @@ from nodes.legal_comprehensive_nodes import (
     RouteDecisionNode,
 )
 from nodes.legal_external_nodes import EffectRequestNode, IoResultAddNode, IoResultInputNode
+from nodes.legal_delegate_cli_nodes import (
+    DelegateArgvNode,
+    DelegateBusinessNode,
+    DelegateDocumentNode,
+    DelegateEndNode,
+    DelegateOutputNode,
+)
+from nodes.legal_delegate_numeric_nodes import (
+    NumericArgvNode,
+    NumericBuiltinInputNode,
+    NumericOpenLeftNode,
+    NumericOpenRightNode,
+    NumericOpenWriterNode,
+    NumericPathLeftNode,
+    NumericPathRightNode,
+    NumericPathWriterNode,
+    NumericPrintOutputNode,
+    NumericStreamInputNode,
+    NumericStreamOutputNode,
+    NumericSumNode,
+)
 from nodes.legal_loop_nodes import CopyBackNode, DoneCheckNode, DoneValueNode, IncrementNode
 from nodes.legal_math_nodes import (
     AddNode,
@@ -123,6 +144,23 @@ def build_node_registry() -> NodeRegistry:
     registry.register("sandbox.report_document", ReportDocumentNode, config_schema={}, config_defaults={})
     registry.register("sandbox.report_output", ReportOutputNode, config_schema={}, config_defaults={})
     registry.register("sandbox.report_end", ReportEndNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.delegate_argv", DelegateArgvNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.delegate_document", DelegateDocumentNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.delegate_business", DelegateBusinessNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.delegate_output", DelegateOutputNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.delegate_end", DelegateEndNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_argv", NumericArgvNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_builtin_input", NumericBuiltinInputNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_stream_input", NumericStreamInputNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_path_left", NumericPathLeftNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_path_right", NumericPathRightNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_open_left", NumericOpenLeftNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_open_right", NumericOpenRightNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_sum", NumericSumNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_path_writer", NumericPathWriterNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_open_writer", NumericOpenWriterNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_print_output", NumericPrintOutputNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_stream_output", NumericStreamOutputNode, config_schema={}, config_defaults={})
     registry.register("sandbox.training_input", TrainingInputNode, config_schema={}, config_defaults={})
     registry.register("sandbox.forward_loss", ForwardLossNode, config_schema={}, config_defaults={})
     registry.register("sandbox.backward_grad", BackwardGradNode, config_schema={}, config_defaults={})

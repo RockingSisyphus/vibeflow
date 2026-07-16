@@ -12,6 +12,15 @@
 - `review` 必须 fail-closed：任何阶段失败立即停止，不得直接调用 Mermaid CLI/mmdc，不得用 expanded `.mmd`、手写 SVG 或旧产物补位。
 - 用户要求“审核后再实现”或“等我确认”时，当前轮在生成审核产物后必须停止。只有后续一条明确用户批准消息才算通过；`validate`、`architecture`、`svg` 或 `review` 成功都不等于人类批准。
 
+## CLI 让渡模式 / delegate-cli
+
+- 用户要求普通业务 CLI 时，使用 `python run.py delegate-cli --config project/configs/main.jsonc -- <business argv>`；不另写顶层 launcher 绕过 manifest、workspace、health 和 run artifact。
+- 首个 `--` 是可选分界：分界前的已知 core 参数由 VibeFlow 消费，未知 token 原序让渡；分界后全部原样让渡。业务参数与 core 同名时放到 `--` 之后。
+- workflow 必须接受 `cli.argv` pipeline input，并通过 `exactly_one` pipeline output 产生唯一 `cli.exit_code`；最终 provider 的 key/type 都必须是 `cli.exit_code`，值是非 bool 整数 `0..255`。
+- 业务 stdin/stdout/stderr 是真实进程标准流；不包装成 `cli.response`，不让 VibeFlow 捕获/重放，不添加 JSON 或换行。VibeFlow 诊断只写当次 run 的 `vibeflow.log`，不记录 argv 原文或业务流。
+- 只有 `io` / `document` / `data_store` node 或 runtime plugin 可抛授权 `SystemExit`。`None` 返回 0，非 bool 整数 `0..255` 原样返回；其他值、未授权 `SystemExit`、health/runtime/CLI contract 失败返回 1。已知 core 参数的 argparse 错误返回 2 且不创建 run；run 目录无法创建时才可向 stderr 写最小诊断并返回 1。
+- `delegate-cli` 不替代 `run` 的通用执行/结构化诊断职责，也不改变 `review` 的正式架构审核职责。
+
 ## 硬性边界
 
 - 不要解包、修改或重建 `kernel/vibeflow-kernel.zip`。
@@ -24,9 +33,10 @@
 - 业务代码只放在 `project/nodes/`、`project/base_lib/`、`project/plugins/` 和 `project/configs/`。
 - `project/nodes/` 放业务 node；`project/base_lib/` 放可复用纯 helper；`project/plugins/` 放 policy/compiler/runtime 插件；`project/configs/` 放可运行 JSONC；`project/configs/nodesets/` 放可复用 nodeset JSONC。
 - 不要把业务 `.py` 堆在 root 顶层或单个宽目录；`quality.structure` 默认允许 root 总文件数到 120，但单个代码目录超过 16 个 `.py` 会失败。
-- node 默认必须是纯函数：不要读写文件、网络、数据库、浏览器、环境变量或启动外部进程。
-- `flow_kind` 只决定流程语义、图形和适用校验，不授予副作用能力。`io` 只适配已传入的外部表示或形成输出对象，`data_store` 只形成存储请求/引用，`document` 只形成文档对象/请求；真实文件、网络、数据库、浏览器和进程副作用由调用方或内核外部 adapter 完成。
-- `external=True` 是外部维护实现的信任/检查边界，只跳过内部源码质量检查；它不是 IO 权限或 purity 绕过开关，不跳过契约、`flow_kind`、拓扑、输出和 trace 检查。
+- 普通 implemented node 和 planned `python_stub` 使用 `effect_scope=none`，无业务 IO。`flow_kind=io` 使用 `terminal`，只开放真实标准流、`print` / `input` / `argparse`。`flow_kind=document` / `data_store` 使用 `python_io`，开放文件、环境、网络、数据库、subprocess 和终端。
+- 图形 `flow_kind=terminal` 仍是 `effect_scope=none`，不要和权限档位 `terminal` 混淆。`effect_scope` 由内核派生，不在 config 中自由声明。
+- 任意 node 只要 `external=True` 就以最高优先级使用 `effect_scope=trusted`；plugin 也是 `trusted`。`external=True` 会显式绕过普通 IO/purity 限制，只能用于真正外部维护/受信任实现，不能用来给项目内部代码逃避检查。契约、`flow_kind`、拓扑、输出和 trace 仍检查。
+- effectful 或 `external=True` node 的 `CONTRACT.examples` 只做结构检查、不执行；只有 `none` 范围的普通实现样例可执行。
 - 控制流只写在 JSONC 的 `pipeline.edges` 中；不要用 Python 调用关系隐式表达流程。
 - `requires` / `provides` 只表达数据契约，不会自动生成控制流或图上的理论数据边；没有显式 edge，就没有图边。
 - 每个 `pipeline.nodes[]` 调用点必须写 `id` 和 `type_used`。旧 `name`、调用处旧 `type`、旧 `registry_key`、旧 `nodeset.xxx` 前缀都不再接受。
@@ -62,12 +72,12 @@
 
 ## 业务语义边界与完成契约
 
-- 输入/输出边界节点只负责接收调用方已传入的外部表示、格式解码、字段规范化、外部表示转换和形成供外部 adapter 消费的输出对象；业务规则、分类、合并、校验与错误语义应由明确的 process/decision 节点负责。不要在边界、guard、聚合器和输出节点中各复制一份业务逻辑。
-- 在进入共享业务判断之前，边界必须无损保留未知字段/值、字段缺失状态和异常身份；它只能做表示/词法适配并产生显式 malformed 标记，不能提前把不同输入压成同一个默认错误。
+- `io` 边界可以从真实标准流读写、用 `argparse` 解析 `cli.argv`，并做格式/词法适配；业务规则、分类、语义合并、领域校验与错误语义应由明确的 process/decision node 负责。不要在边界、guard、聚合器和输出节点中各复制一份业务逻辑。
+- 在进入共享业务判断之前，`io` 边界必须无损保留未知字段/值、字段缺失状态和异常身份；不能提前把不同输入压成同一个默认错误。
 - 多个入口承诺相同语义时，它们必须在图上汇入同一套实际执行的共享语义节点或 nodeset。仅仅复用一个 Python helper、使用相似名字，或分别复制等价代码，不等于共享语义链。
 - guard 可以识别入口特有的词法或封装错误，但必须把规范化后的错误身份原样传递给后续错误处理；不要把不同错误统一改写成一个默认错误。错误构造节点只负责形成输出表示，不应重新判断或覆盖错误类别。
 - guard/error 分支不能形成从原始输入直达业务输出的捷径，从而绕过字段解析、类型转换、合并、校验或其他声明的共享职责。`data bypass` 只用于不触发目标的辅助数据投递，不能冒充业务主线或规避结构约束。
-- 外部交互必须由显式 `io` / `data_store` / `document` 节点及其 contract 建模，但这些 node 只形成边界表示、请求或对象；真实外部读写由调用方/外部 adapter 完成。业务结果应由拥有该语义的节点提供，再由 output I/O 节点无损适配；不要让输出节点扫描原始输入重新计算结果。
+- 外部交互必须由显式 `io` / `data_store` / `document` node 及其 contract 建模。`io` 可做真实终端交互；`data_store` / `document` 可做真实 Python IO。业务结果应由拥有该语义的 node 提供；不要仅为获得更宽权限而伪造 `flow_kind`，也不要让输出 node 扫描原始输入重新计算结果。
 - 优先建立 `terminal → input I/O → process/nodeset → output I/O → terminal` 控制脊柱。内部语义结果与外部输出用不同的明确 key/type，由 output I/O 无损适配，不要重复声明 provider key。
 - tagged value 的 tag 必须使用业务规范中的精确字面量，value 必须转换为匹配的 Python 原生类型；不缩写 tag，不把整数留作字符串。
 - 测试门禁的顶层 `OVERALL`/退出状态是完成判据；局部维度 PASS、若干 case 通过或生成了报告都不能替代顶层 PASS。任何代码修改都会使此前的通过结果失效，必须重新运行 required gate；只有最新结果与当前代码一致且顶层 PASS 时才能声明完成。
@@ -110,6 +120,7 @@
 - 只检查架构文档是否是当前确定性输出：`python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc --check`
 - 校验 kernel 完整性：`python run.py verify-kernel`
 - 运行程序：`python run.py run --config project/configs/main.jsonc --run-root runs`
+- 作为普通业务 CLI 运行：`python run.py delegate-cli --config project/configs/main.jsonc -- --input data.yaml --verbose`
 - 导出 Mermaid：`python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd`
 - 导出展开 nodeset 的 Mermaid 源码：`python run.py mermaid --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.mmd`。这个文件只用于调试源码，不要直接用 Mermaid CLI/mmdc 转成 SVG。
 - 导出 SVG：`python run.py svg --config project/configs/main.jsonc --output reports/graph.svg`

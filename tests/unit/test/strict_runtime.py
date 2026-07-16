@@ -1973,6 +1973,53 @@ def test_cli_train_profile_sets_async_flush_timeout_and_allows_override() -> Non
     assert override_options["async_flush_timeout"] == 1.5
 
 
+@pytest.mark.parametrize(
+    "run_id",
+    ["", ".", "..", "../escape", "nested/id", "nested\\id", "/absolute", "nul\x00id"],
+)
+def test_cli_run_rejects_unsafe_run_id_before_creating_run(tmp_path, capsys, run_id) -> None:
+    run_root = tmp_path / "runs"
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_main(
+            [
+                "run",
+                "--config",
+                str(tmp_path / "unused.json"),
+                "--run-root",
+                str(run_root),
+                "--run-id",
+                run_id,
+            ]
+        )
+
+    assert exc_info.value.code == 2
+    assert "run id must be one non-empty path component" in capsys.readouterr().err
+    assert not run_root.exists()
+    assert not (tmp_path / "escape").exists()
+
+
+@pytest.mark.parametrize(
+    "run_id",
+    ["", ".", "..", "../escape", "nested/id", "nested\\id", "/absolute", "nul\x00id"],
+)
+def test_checked_run_rejects_unsafe_programmatic_run_id_without_writing(tmp_path, run_id) -> None:
+    from vibeflow.run_directory import InvalidRunIdError
+
+    run_root = tmp_path / "runs"
+
+    with pytest.raises(InvalidRunIdError, match="one non-empty path component"):
+        run_checked(
+            tmp_path / "unused.json",
+            registry=_registry(),
+            run_root=run_root,
+            run_id=run_id,
+        )
+
+    assert not run_root.exists()
+    assert not (tmp_path / "escape").exists()
+
+
 def test_cli_run_uses_checked_run_and_refuses_without_registered_nodes(tmp_path, capsys) -> None:
     config_path = tmp_path / "workflow.json"
     config_path.write_text(

@@ -1,0 +1,137 @@
+{
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "cli.argv",
+        "type": "cli.argv",
+        "display_name": "CLI Argv"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "cli.exit_code",
+        "cardinality": "exactly_one",
+        "display_name": "CLI Exit Code"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Starts the delegated CLI graph."
+      },
+      {
+        "id": "parse_argv",
+        "type_used": "sandbox.delegate_argv",
+        "display_name": "Parse argv",
+        "description": "Parses the business argv injected by delegate-cli.",
+        "requires": [
+          {
+            "type": "cli.argv",
+            "cardinality": "exactly_one",
+            "display_name": "CLI Argv"
+          }
+        ],
+        "provides": [
+          {
+            "key": "cli.input_path",
+            "type": "cli.input_path",
+            "display_name": "CLI Input Path"
+          },
+          {
+            "key": "cli.verbose",
+            "type": "cli.verbose",
+            "display_name": "CLI Verbose"
+          }
+        ]
+      },
+      {
+        "id": "read_document",
+        "type_used": "sandbox.delegate_document",
+        "display_name": "Read document",
+        "description": "Reads the requested input document through a document node.",
+        "requires": [
+          {
+            "type": "cli.input_path",
+            "cardinality": "exactly_one",
+            "display_name": "CLI Input Path"
+          }
+        ],
+        "provides": [
+          {
+            "key": "document.message",
+            "type": "document.message",
+            "display_name": "Document Message"
+          }
+        ]
+      },
+      {
+        "id": "process_message",
+        "type_used": "sandbox.delegate_business",
+        "display_name": "Process message",
+        "description": "Runs the core business transformation.",
+        "requires": [
+          {
+            "type": "document.message",
+            "cardinality": "exactly_one",
+            "display_name": "Document Message"
+          }
+        ],
+        "provides": [
+          {
+            "key": "business.message",
+            "type": "business.message",
+            "display_name": "Business Message"
+          }
+        ]
+      },
+      {
+        "id": "write_output",
+        "type_used": "sandbox.delegate_output",
+        "display_name": "Write output",
+        "description": "Writes business streams and returns cli.exit_code.",
+        "requires": [
+          {
+            "type": "business.message",
+            "cardinality": "exactly_one",
+            "display_name": "Business Message"
+          },
+          {
+            "type": "cli.verbose",
+            "cardinality": "exactly_one",
+            "display_name": "CLI Verbose"
+          }
+        ],
+        "provides": [
+          {
+            "key": "cli.exit_code",
+            "type": "cli.exit_code",
+            "display_name": "CLI Exit Code"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.delegate_end",
+        "display_name": "End",
+        "description": "Ends after the CLI exit code has been formed.",
+        "requires": [
+          {
+            "type": "cli.exit_code",
+            "cardinality": "exactly_one",
+            "display_name": "CLI Exit Code"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      ["start", "parse_argv"],
+      ["parse_argv", "read_document"],
+      ["parse_argv", "write_output"],
+      ["read_document", "process_message"],
+      ["process_message", "write_output"],
+      ["write_output", "end"]
+    ]
+  }
+}
