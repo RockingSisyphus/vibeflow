@@ -7,18 +7,20 @@ from pathlib import Path
 from typing import Any, Mapping
 from uuid import uuid4
 
-from .config_loader import ConfigLoadError, load_config_document
-from .config_resources import ConfigResources, load_config_resources
-from .config_schema import collect_config_schema_findings
-from .health_types import HealthFinding, HealthReport
-from .plugin import load_plugins_from_config
-from .policy import default_effective_policy, resolve_effective_policy
-from .summaries import summarize_mapping
+from vibeflow.config.loader import ConfigLoadError, load_config_document
+from vibeflow.config.resource_registries import discover_config_resource_registry_context
+from vibeflow.config.resources import ConfigResources, load_config_resources
+from vibeflow.config.schema import collect_config_schema_findings
+from vibeflow.health.types import HealthFinding, HealthReport
+from vibeflow.plugin import load_plugins_from_config
+from vibeflow.policy import default_effective_policy, resolve_effective_policy
+from vibeflow.runtime.summaries import summarize_mapping
 
-from .graph_config import GraphConfig
-from .planned_behavior import project_root_for_config
-from .registry import NodeRegistry
-from .runtime_options import runtime_options as normalize_runtime_options
+from vibeflow.graph_config import GraphConfig
+from vibeflow.graph_config.planned_behavior import project_root_for_config
+from vibeflow.registry import NodeRegistry
+from vibeflow.run_directory import RunDirectoryExistsError, prepare_run_dir as _prepare_run_dir, validate_run_id
+from vibeflow.runtime.options import RuntimeOptions, runtime_options as normalize_runtime_options
 
 
 @dataclass(frozen=True)
@@ -48,17 +50,27 @@ def run_checked(
     run_root: str | Path | None = None,
     run_id: str | None = None,
     runtime_options: object | None = None,
+    delegate_cli: bool = False,
 ) -> CheckedRunResult:
     path = Path(config_path)
-    actual_run_id = run_id or _new_run_id()
+    actual_run_id = _new_run_id() if run_id is None else validate_run_id(run_id)
     if boundary_registry is not None:
         raise ValueError("boundary_registry is removed; use flowchart nodes")
+    effective_runtime_options = normalize_runtime_options(runtime_options)
     run_dir = _prepare_run_dir(run_root, actual_run_id)
     _write_json(run_dir / "input_summary.json", summarize_mapping(dict(initial or {})))
 
     document = _load_document_or_refuse(path, run_dir, actual_run_id)
-    plugin_registry = _load_plugins_or_refuse(document.data, path, run_dir, actual_run_id)
-    resources, resource_findings = load_config_resources(document.data, base_path=path.parent, plugin_registry=plugin_registry)
+    registry_context = discover_config_resource_registry_context(document.data, config_path=path)
+    plugin_registry = _load_plugins_or_refuse(document.data, path, run_dir, actual_run_id, registry_context=registry_context)
+    resources, resource_findings = load_config_resources(
+        document.data,
+        base_path=registry_context.base_path,
+        plugin_registry=plugin_registry,
+        base_lib_registry=registry_context.base_lib_registry,
+        plugin_resource_registry=registry_context.plugin_resource_registry,
+        base_lib_paths=registry_context.base_lib_paths,
+    )
     policy_result = resolve_effective_policy(
         document.data,
         config_path=path,
@@ -67,10 +79,20 @@ def run_checked(
     )
     effective_policy = policy_result.effective_policy.to_dict()
     _write_json(run_dir / "effective_policy.json", effective_policy)
-    preflight_warnings = _refuse_on_schema_findings(document.data, (*resource_findings, *policy_result.findings), effective_policy, run_dir, actual_run_id)
+    preflight_warnings = _refuse_on_schema_findings(document.data, (*registry_context.findings, *resource_findings, *policy_result.findings), effective_policy, run_dir, actual_run_id)
     graph, compiled = _compile_or_refuse(document.data, plugin_registry, effective_policy, run_dir, actual_run_id, config_path=path)
-    health = _validate_run_health(graph, registry, plugin_registry, policy_result, effective_policy, document.nodeset_imports, resources, preflight_warnings=preflight_warnings)
-    _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources, runtime_options=runtime_options)
+    health = _validate_run_health(
+        graph,
+        registry,
+        plugin_registry,
+        policy_result,
+        document.nodeset_imports,
+        resources,
+        runtime_options=effective_runtime_options,
+        preflight_warnings=preflight_warnings,
+        delegate_cli=delegate_cli,
+    )
+    _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources, runtime_options=effective_runtime_options)
     if health.status not in {"FAIL", "ERROR"}:
         compiled = _compile_with_registry_or_refuse(graph, registry, effective_policy, run_dir, actual_run_id)
     try:
@@ -81,15 +103,12 @@ def run_checked(
             _refuse_on_health_failure(health, run_dir, actual_run_id)
         raise
     _refuse_on_health_failure(health, run_dir, actual_run_id)
-    context = _execute_runtime(graph, registry, plugin_registry, initial, run_dir, runtime_options, resources)
-    _write_json(run_dir / "output_summary.json", summarize_mapping(dict(context.iter_flat_items())))
+    context = _execute_runtime(
+        graph, registry, plugin_registry, initial, run_dir, effective_runtime_options, resources,
+        delegate_cli=delegate_cli,
+    )
+    _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
     return CheckedRunResult(actual_run_id, run_dir, health, context)
-
-
-def _prepare_run_dir(run_root: str | Path | None, run_id: str) -> Path:
-    run_dir = (Path(run_root) if run_root is not None else Path("runs")) / run_id
-    run_dir.mkdir(parents=True, exist_ok=False)
-    return run_dir
 
 
 def _load_document_or_refuse(path: Path, run_dir: Path, run_id: str):
@@ -102,8 +121,12 @@ def _load_document_or_refuse(path: Path, run_dir: Path, run_id: str):
         raise CheckedRunError("run refused: config load failed", result) from exc
 
 
-def _load_plugins_or_refuse(config_data: Mapping[str, Any], path: Path, run_dir: Path, run_id: str):
-    plugin_registry, plugin_findings = load_plugins_from_config(config_data, base_path=path.parent)
+def _load_plugins_or_refuse(config_data: Mapping[str, Any], path: Path, run_dir: Path, run_id: str, *, registry_context=None):
+    plugin_registry, plugin_findings = load_plugins_from_config(
+        config_data,
+        base_path=registry_context.base_path if registry_context is not None else path.parent,
+        plugin_resource_registry=registry_context.plugin_resource_registry if registry_context is not None else None,
+    )
     if plugin_findings:
         health = HealthReport(
             status="ERROR",
@@ -158,11 +181,17 @@ def _compile_or_refuse(
     *,
     config_path: Path,
 ):
-    from .compiler import GraphCompiler
-    from .graph_config import GraphConfigError, parse_graph_config
+    from vibeflow.compiler import GraphCompiler
+    from vibeflow.graph_config import GraphConfigError, parse_graph_config
 
     try:
-        graph = parse_graph_config(config_data, project_root=project_root_for_config(config_path))
+        project_root = project_root_for_config(config_path)
+        graph = parse_graph_config(
+            config_data,
+            project_root=project_root,
+            root_path=project_root,
+            source_path=config_path,
+        )
         compiled = GraphCompiler().compile(graph, plugin_registry=plugin_registry)
     except (GraphConfigError, Exception) as exc:
         health = _compile_health_report(exc, effective_policy)
@@ -179,7 +208,7 @@ def _compile_with_registry_or_refuse(
     run_dir: Path,
     run_id: str,
 ):
-    from .compiler import GraphCompiler, GraphCompileError
+    from vibeflow.compiler import GraphCompiler, GraphCompileError
 
     try:
         return GraphCompiler().compile(graph, registry=registry)
@@ -215,12 +244,13 @@ def _validate_run_health(
     registry: NodeRegistry,
     plugin_registry,
     policy_result,
-    effective_policy: dict[str, Any],
     nodeset_imports: tuple[Mapping[str, Any], ...],
     resources: ConfigResources,
+    runtime_options: RuntimeOptions,
     preflight_warnings: tuple[HealthFinding, ...] = (),
+    delegate_cli: bool = False,
 ) -> HealthReport:
-    from .health import validate_graph_health
+    from vibeflow.health import validate_graph_health
 
     health = validate_graph_health(
         graph,
@@ -229,23 +259,40 @@ def _validate_run_health(
         global_config=resources.global_config,
         purity_policy=policy_result.effective_policy.to_purity_policy(),
         effective_policy=policy_result.effective_policy,
+        nodeset_max_depth=runtime_options.nodeset_max_depth,
     )
     info = dict(health.info)
     info["nodeset_imports"] = [dict(item) for item in nodeset_imports]
     info["resources"] = resources.to_dict()
     warnings = (*preflight_warnings, *health.warnings)
     status = "CONCERNS" if health.status == "PASS" and warnings else health.status
-    return replace(health, status=status, warnings=warnings, effective_policy=effective_policy, info=info)
+    report = replace(
+        health,
+        status=status,
+        warnings=warnings,
+        effective_policy=policy_result.effective_policy.to_dict(),
+        info=info,
+    )
+    if delegate_cli:
+        from vibeflow.cli.delegate_cli import validate_delegate_cli_graph_contract
+
+        report = validate_delegate_cli_graph_contract(graph, report)
+    return report
 
 
 def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None, resources: ConfigResources | None = None) -> None:
-    from .ascii_flowchart import export_ascii_flowchart
-    from .mermaid import compiled_graph_payload, export_mermaid
-    from .mermaid_render import EXPANDED_MERMAID_MAX_EDGES, EXPANDED_MERMAID_MAX_TEXT_SIZE, MermaidRenderError, render_mermaid_svg
-    from .mermaid_review_svg import render_review_columns_svg
+    from vibeflow.rendering.ascii_flowchart import export_ascii_flowchart
+    from vibeflow.rendering.architecture_document import render_architecture_document
+    from vibeflow.rendering.mermaid import compiled_graph_payload, export_mermaid
+    from vibeflow.rendering.mermaid.render import EXPANDED_MERMAID_MAX_EDGES, EXPANDED_MERMAID_MAX_TEXT_SIZE, MermaidRenderError, render_mermaid_svg
+    from vibeflow.rendering.mermaid.review_svg import render_review_columns_svg
 
     _write_json(run_dir / "health_report.json", health.to_dict())
     _write_json(run_dir / "compiled_graph.json", compiled_graph_payload(graph, compiled, resources=resources))
+    (run_dir / "architecture.jsonc").write_text(
+        render_architecture_document(graph, compiled=compiled, registry=registry, resources=resources),
+        encoding="utf-8",
+    )
     (run_dir / "graph.txt").write_text(export_ascii_flowchart(graph, compiled=compiled, registry=registry, health_report=health), encoding="utf-8")
     mermaid_text = export_mermaid(graph, compiled=compiled, registry=registry, health_report=health, resources=resources)
     (run_dir / "graph.mmd").write_text(mermaid_text, encoding="utf-8")
@@ -285,8 +332,8 @@ def _refuse_on_planned_run(
     resources: ConfigResources,
     runtime_options: object | None,
 ) -> None:
-    from .compiler import GraphCompiler
-    from .runtime_helpers import planned_items
+    from vibeflow.compiler import GraphCompiler
+    from vibeflow.runtime.helpers import planned_items
 
     options = normalize_runtime_options(runtime_options)
     planned = planned_items(graph)
@@ -324,8 +371,10 @@ def _execute_runtime(
     run_dir: Path,
     runtime_options: object | None,
     resources: ConfigResources,
+    *,
+    delegate_cli: bool = False,
 ):
-    from .runtime import PipelineRuntime
+    from vibeflow.runtime import PipelineRuntime
 
     runtime = PipelineRuntime(
         graph,
@@ -334,11 +383,11 @@ def _execute_runtime(
         run_dir=run_dir,
         global_config=resources.global_config,
         runtime_options=runtime_options,
+        delegate_cli=delegate_cli,
     )
     try:
         context = runtime.run(initial)
     finally:
-        _write_runtime_trace(run_dir / "runtime_trace.jsonl", runtime.trace.to_dict())
         _ensure_trace_files(run_dir)
     return context
 
@@ -374,19 +423,68 @@ def _load_error_report(exc: ConfigLoadError) -> HealthReport:
     )
 
 
-def _write_runtime_trace(path: Path, trace: Mapping[str, object]) -> None:
-    events = trace.get("events", [])
-    with path.open("w", encoding="utf-8") as handle:
-        if isinstance(events, list):
-            for event in events:
-                handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
-        summary = {key: value for key, value in trace.items() if key != "events"}
-        summary["kind"] = "runtime_summary"
-        handle.write(json.dumps(summary, ensure_ascii=False, sort_keys=True) + "\n")
-
-
 def _write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _summarize_run_result(result: object) -> dict[str, object]:
+    if not hasattr(result, "to_dict"):
+        return {}
+    data = result.to_dict()
+    if not isinstance(data, Mapping):
+        return {}
+    return {key: _summarize_result_item(value) for key, value in _iter_result_summary_items(data, prefix="")}
+
+
+def _iter_result_summary_items(value: object, *, prefix: str):
+    if _is_data_envelope_payload(value):
+        if prefix:
+            yield prefix, value
+        return
+    if not isinstance(value, Mapping):
+        if prefix:
+            yield prefix, value
+        return
+    for key, item in value.items():
+        child = f"{prefix}.{key}" if prefix else str(key)
+        yield from _iter_result_summary_items(item, prefix=child)
+
+
+def _summarize_result_item(value: object) -> dict[str, object]:
+    if _is_data_envelope_payload(value):
+        return {
+            "type": "DataEnvelope",
+            "key": str(value.get("key", "")),
+            "data_type": str(value.get("type", "")),
+            "source_node": str(value.get("source_node", "")),
+            "value": _summarize_shallow_value(value.get("value")),
+        }
+    return _summarize_shallow_value(value)
+
+
+def _summarize_shallow_value(value: object) -> dict[str, object]:
+    summary: dict[str, object] = {"type": type(value).__name__}
+    if isinstance(value, Mapping):
+        summary["size"] = len(value)
+        return summary
+    if isinstance(value, (list, tuple, set)):
+        summary["size"] = len(value)
+        return summary
+    if isinstance(value, (str, bytes)):
+        summary["size"] = len(value)
+        return summary
+    if value is None or isinstance(value, (int, float, bool)):
+        summary["scalar"] = True
+        return summary
+    if isinstance(value, Path):
+        summary["path"] = True
+        return summary
+    summary["repr_type"] = type(value).__qualname__
+    return summary
+
+
+def _is_data_envelope_payload(value: object) -> bool:
+    return isinstance(value, Mapping) and {"key", "type", "value", "source_node"} <= set(value)
 
 
 def _ensure_trace_files(run_dir: Path) -> None:

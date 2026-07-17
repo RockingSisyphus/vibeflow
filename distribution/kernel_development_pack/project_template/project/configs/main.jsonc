@@ -1,28 +1,14 @@
 {
   "base_lib": {
-    "paths": [
-      "../base_lib"
-    ],
     "modules": [
       {
-        "module": "base_lib.math_tools",
-        "status": "implemented",
-        "display_name": "Math Tools",
-        "category": "demo",
-        "description": "Pure arithmetic helpers used by the template workflow.",
-        "version": "0.1.0"
+        "id": "math_tools"
       }
     ]
   },
   "plugins": [
     {
-      "module": "../plugins/policy.py",
-      "class": "PolicyPlugin",
-      "type": "policy",
-      "display_name": "Project Policy",
-      "category": "demo",
-      "description": "Template project policy extension for health checks.",
-      "version": "0.1.0"
+      "id": "project_policy"
     }
   ],
   "pipeline": {
@@ -50,8 +36,8 @@
         "type_used": "demo.seed"
       },
       {
-        "display_name": "Add Delta",
-        "description": "Adds a configured delta to the incoming value.",
+        "display_name": "Semantic Add",
+        "description": "Adds a configured delta and produces the internal semantic value.",
         "requires": [
           {
             "type": "value.in",
@@ -61,9 +47,9 @@
         ],
         "provides": [
           {
-            "key": "value.out",
-            "type": "value.out",
-            "display_name": "Value Out"
+            "key": "semantic.value",
+            "type": "semantic.value",
+            "display_name": "Internal Value"
           }
         ],
         "config": {
@@ -73,20 +59,33 @@
         "type_used": "demo.add"
       },
       {
+        "display_name": "Output Value",
+        "description": "Adapts the internal arithmetic result to the external response contract.",
+        "requires": [
+          {
+            "type": "semantic.value",
+            "cardinality": "exactly_one",
+            "display_name": "Internal Value"
+          }
+        ],
+        "provides": [
+          {
+            "key": "response.value",
+            "type": "response.value",
+            "display_name": "Response Value"
+          }
+        ],
+        "id": "output",
+        "type_used": "demo.output"
+      },
+      {
         "display_name": "End",
-        "description": "Consumes the final value and terminates the pipeline.",
+        "description": "Terminates after the explicit output boundary completes.",
         "similar_to": {
           "node": "start",
           "relationship": "copy",
           "reason": "Terminal start/end nodes intentionally return empty outputs while occupying different flow positions."
         },
-        "requires": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one",
-            "display_name": "Value Out"
-          }
-        ],
         "id": "end",
         "type_used": "demo.end"
       }
@@ -102,14 +101,18 @@
       ],
       [
         "add",
+        "output"
+      ],
+      [
+        "output",
         "end"
       ]
     ],
     "outputs": [
       {
-        "type": "value.out",
+        "type": "response.value",
         "cardinality": "exactly_one",
-        "display_name": "Value Out"
+        "display_name": "Response Value"
       }
     ]
   }

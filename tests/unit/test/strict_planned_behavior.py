@@ -216,6 +216,59 @@ def wrong(inputs, params):
     assert "GRAPH.PLANNED.STUB_UNSAFE_IMPORT" in rule_ids
 
 
+def test_python_stub_uses_none_effect_scope_gate(tmp_path) -> None:
+    _stub_project(
+        tmp_path,
+        """
+import builtins
+import sys
+
+def run_stub(inputs, params):
+    print("planned")
+    builtins.open("artifact.txt", "w")
+    argv = sys.argv
+    if argv:
+        raise SystemExit(2)
+    return {"value.out": inputs["value.in"]["value"]}
+""",
+    )
+    graph = parse_graph_config(_planned_stub_config(), project_root=tmp_path)
+
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+
+    messages = "\n".join(error.message for error in report.errors)
+    assert "print" in messages
+    assert "builtins.open" in messages
+    assert "sys.argv" in messages
+    assert "SystemExit" in messages
+    assert {error.rule_id for error in report.errors} == {"GRAPH.PLANNED.STUB_UNSAFE_CALL"}
+
+
+@pytest.mark.parametrize("delegate_cli", [False, True])
+def test_planned_python_stub_system_exit_is_always_pipeline_failure(tmp_path, delegate_cli) -> None:
+    _stub_project(
+        tmp_path,
+        """
+def run_stub(inputs, params):
+    raise SystemExit(4)
+""",
+    )
+    graph = parse_graph_config(_planned_stub_config(), project_root=tmp_path)
+    runtime = PipelineRuntime(
+        graph,
+        registry=_registry(),
+        run_dir=tmp_path / ("delegate" if delegate_cli else "normal"),
+        runtime_options=RuntimeOptions(allow_planned_stub=True),
+        delegate_cli=delegate_cli,
+    )
+
+    with pytest.raises(PipelineRuntimeError, match="planned python_stub.*attempted SystemExit"):
+        runtime.run({"value.in": 5})
+
+    assert runtime.trace.stop_reason == "node_failed"
+    assert "planned stubs use effect scope none" in runtime.trace.exception
+
+
 def test_planned_python_stub_nodeset_executes_as_single_stub(tmp_path) -> None:
     config_path, _ = _stub_project(
         tmp_path,

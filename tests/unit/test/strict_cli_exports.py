@@ -140,7 +140,7 @@ class Plugin:
     assert "resource_plugins" in output
     assert "Config Policy" in output
     assert "desc: Config-level policy declaration." in output
-    assert "future_policy" in output
+    assert "future_policy" not in output
 
 
 def test_cli_export_svg_reads_jsonc(tmp_path, capsys) -> None:
@@ -157,8 +157,8 @@ def test_cli_export_svg_reads_jsonc(tmp_path, capsys) -> None:
 
 
 def test_cli_export_svg_expand_nodesets_forces_review_columns_layout(tmp_path, monkeypatch) -> None:
-    import vibeflow.mermaid_render as mermaid_render_module
-    import vibeflow.mermaid_review_svg as review_svg_module
+    import vibeflow.rendering.mermaid.render as mermaid_render_module
+    import vibeflow.rendering.mermaid.review_svg as review_svg_module
 
     config_path = tmp_path / "workflow.jsonc"
     output_path = tmp_path / "graph.svg"
@@ -197,8 +197,8 @@ def test_cli_export_svg_expand_nodesets_forces_review_columns_layout(tmp_path, m
 
 
 def test_cli_export_svg_collapsed_default_uses_default_renderer(tmp_path, monkeypatch) -> None:
-    import vibeflow.mermaid_render as mermaid_render_module
-    import vibeflow.mermaid_review_svg as review_svg_module
+    import vibeflow.rendering.mermaid.render as mermaid_render_module
+    import vibeflow.rendering.mermaid.review_svg as review_svg_module
 
     config_path = tmp_path / "workflow.jsonc"
     output_path = tmp_path / "graph.svg"

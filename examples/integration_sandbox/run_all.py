@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,17 @@ SVG_DIR = REPORT_DIR / "svg"
 COMPILED_BLOCK_DIR = REPORT_DIR / "compiled_blocks"
 RUN_ROOT = SANDBOX_DIR / "runs"
 POLICY_PATH = PROJECT_DIR / "kernel_policy.jsonc"
+WORKSPACE_PATH = SANDBOX_DIR / "vibeflow_config.jsonc"
+REVIEW_ARCHITECTURE_DIR = PROJECT_DIR / "review_artifacts"
+REVIEW_ARCHITECTURE_PATH = REVIEW_ARCHITECTURE_DIR / "ARCHITECTURE.jsonc"
+DELEGATE_ARCHITECTURE_PATH = REVIEW_ARCHITECTURE_DIR / "DELEGATE_CLI_ARCHITECTURE.jsonc"
+NUMERIC_PATHLIB_ARCHITECTURE_PATH = REVIEW_ARCHITECTURE_DIR / "NUMERIC_PATHLIB_CLI_ARCHITECTURE.jsonc"
+NUMERIC_STREAMS_ARCHITECTURE_PATH = REVIEW_ARCHITECTURE_DIR / "NUMERIC_STREAMS_CLI_ARCHITECTURE.jsonc"
+REVIEW_DIR = REPORT_DIR / "review"
+DELEGATE_CONFIG_PATH = CONFIG_DIR / "pass_delegate_cli.jsonc"
+DELEGATE_INPUT_PATH = PROJECT_DIR / "data" / "delegate_input.yaml"
+NUMERIC_PATHLIB_CONFIG_PATH = CONFIG_DIR / "pass_delegate_cli_numeric_pathlib.jsonc"
+NUMERIC_STREAMS_CONFIG_PATH = CONFIG_DIR / "pass_delegate_cli_numeric_streams.jsonc"
 
 
 class SandboxBatch:
@@ -71,8 +83,8 @@ def _batch_initial() -> dict[str, Any]:
     return {"train.batch": SandboxBatch([2, 4])}
 
 
-COMPILED_SOURCE_FULL_REQUIRED = ("runtime._execute_graph_block",)
-COMPILED_SOURCE_FAST_REQUIRED = ("runtime._execute_graph_block",)
+COMPILED_SOURCE_FULL_REQUIRED = ("runtime._run_compiled_frame",)
+COMPILED_SOURCE_FAST_REQUIRED = ("runtime._run_compiled_frame",)
 COMPILED_SOURCE_FORBIDDEN = ("_run_node(",)
 COMPILED_SOURCE_FAST_FORBIDDEN = ("_run_node(",)
 
@@ -485,15 +497,22 @@ VALID_RUN_CASES = [
         "expected_mermaid_contains": [
             "resource_base_lib",
             "Sandbox Arithmetic",
-            "base_lib.future_arithmetic",
             "resource_plugins",
             "Sandbox Value Shift",
-            "future_value_plugin",
             "config: shift",
+        ],
+        "expected_mermaid_not_contains": [
+            "base_lib.future_arithmetic",
+            "future_value_plugin",
+            "planned runtime value hook",
         ],
         "expected_run_mermaid_contains": [
             "Sandbox Arithmetic",
             "Sandbox Value Shift",
+        ],
+        "expected_run_mermaid_not_contains": [
+            "base_lib.future_arithmetic",
+            "future_value_plugin",
             "planned runtime value hook",
         ],
     },
@@ -532,7 +551,7 @@ VALID_RUN_CASES = [
         "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
         "expected_outputs": {"calc.scaled": 20, "calc.branch": 20, "calc.final": 25},
         "expected_runtime_exec_order": ["start", "arithmetic", "use_scaled", "finalize", "end"],
-        "expected_trace_kind_counts": {"nodeset_enter": 1, "nodeset_exit": 1, "block_enter": 1, "block_exit": 1},
+        "expected_trace_kind_counts": {"nodeset_enter": 1, "nodeset_exit": 1, "block_enter": 2, "block_exit": 2},
         "expected_trace_summary": {
             "current_node": "end",
             "edge_executions": {"start->arithmetic": 1, "arithmetic->use_scaled": 1},
@@ -541,7 +560,7 @@ VALID_RUN_CASES = [
             "step_count": 5,
             "stop_reason": "completed",
         },
-        "expected_blocks": [["use_scaled", "finalize", "end"]],
+        "expected_blocks": [["arithmetic"], ["start", "arithmetic", "use_scaled", "finalize", "end"]],
         "expected_nodeset_subplan_params": {"arithmetic.scale": {"factor": 2}},
         "expected_nodeset_subplan_nodes": {"arithmetic": ["start", "add_pair", "scale", "end"]},
         "expected_nodeset_exports": {"arithmetic": ["calc.scaled"]},
@@ -707,7 +726,7 @@ VALID_RUN_CASES = [
             "step_count": 4,
             "stop_reason": "completed",
         },
-        "expected_blocks": [["add", "end"]],
+        "expected_blocks": [["start", "seed", "add", "end"]],
     },
     {
         "name": "async_nodeset_result_key_join",
@@ -774,13 +793,13 @@ INVALID_CASES = [
     {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "ResourceFieldNode", "type": "bad.resource_field", "expect": "NODE.PURITY.RESOURCE_FIELD"},
     {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "AsyncRunPureNode", "type": "bad.async_run_pure", "expect": "NODE.CONTRACT.ASYNC_RUN_PURE"},
     {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "GeneratorRunPureNode", "type": "bad.generator_run_pure", "expect": "NODE.PURITY.GENERATOR_RUN_PURE"},
-    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "OpenFileNode", "type": "bad.open", "expect": "NODE.PURITY.BANNED_CALL"},
-    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "PathReadTextNode", "type": "bad.path_read", "expect": "NODE.PURITY.BANNED_IMPORT"},
-    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "OsGetenvNode", "type": "bad.getenv", "expect": "NODE.PURITY.BANNED_IMPORT"},
-    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "SubprocessNode", "type": "bad.subprocess", "expect": "NODE.PURITY.BANNED_IMPORT"},
-    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "SocketNode", "type": "bad.socket", "expect": "NODE.PURITY.BANNED_IMPORT"},
-    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "RequestsNode", "type": "bad.requests", "expect": "NODE.PURITY.BANNED_IMPORT"},
-    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "SqliteNode", "type": "bad.sqlite", "expect": "NODE.PURITY.BANNED_IMPORT"},
+    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "OpenFileNode", "type": "bad.open", "expect": "NODE.EFFECT.CALL_FORBIDDEN"},
+    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "PathReadTextNode", "type": "bad.path_read", "expect": "NODE.EFFECT.IMPORT_FORBIDDEN"},
+    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "OsGetenvNode", "type": "bad.getenv", "expect": "NODE.EFFECT.IMPORT_FORBIDDEN"},
+    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "SubprocessNode", "type": "bad.subprocess", "expect": "NODE.EFFECT.IMPORT_FORBIDDEN"},
+    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "SocketNode", "type": "bad.socket", "expect": "NODE.EFFECT.IMPORT_FORBIDDEN"},
+    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "RequestsNode", "type": "bad.requests", "expect": "NODE.EFFECT.IMPORT_FORBIDDEN"},
+    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "SqliteNode", "type": "bad.sqlite", "expect": "NODE.EFFECT.IMPORT_FORBIDDEN"},
     {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "EvalNode", "type": "bad.eval", "expect": "NODE.PURITY.BANNED_CALL"},
     {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "DynamicImportNode", "type": "bad.dynamic_import", "expect": "NODE.PURITY.BANNED_IMPORT"},
     {"kind": "inspect_node", "module": "illegal_nodes/coupling_cases.py", "class": "NodeImportNode", "type": "bad.node_import", "expect": "NODE_IMPORT"},
@@ -845,7 +864,7 @@ def main() -> int:
     try:
         _prepare_environment()
         _reset_outputs()
-        results = [*_run_valid_cases(), *_run_invalid_cases()]
+        results = [*_run_review_cases(), *_run_delegate_cli_cases(), *_run_valid_cases(), *_run_invalid_cases()]
         _write_reports(results)
     except EnvironmentError as exc:
         print(f"ENVIRONMENT ERROR: {exc}")
@@ -889,14 +908,490 @@ def _ensure_kernel_link() -> None:
 
 
 def _reset_outputs() -> None:
-    for path in (REPORT_DIR, RUN_ROOT):
+    for path in (REPORT_DIR, RUN_ROOT, REVIEW_ARCHITECTURE_DIR):
         if path.exists():
             shutil.rmtree(path)
     ASCII_DIR.mkdir(parents=True, exist_ok=True)
     COMPILED_BLOCK_DIR.mkdir(parents=True, exist_ok=True)
     MERMAID_DIR.mkdir(parents=True, exist_ok=True)
     SVG_DIR.mkdir(parents=True, exist_ok=True)
+    REVIEW_DIR.mkdir(parents=True, exist_ok=True)
     RUN_ROOT.mkdir(parents=True, exist_ok=True)
+
+
+def _run_review_cases() -> list[CaseResult]:
+    cases = (
+        ("review:registered_expanded", _run_registered_review_case),
+        ("review:unregistered_fail_closed", _run_unregistered_review_case),
+    )
+    results: list[CaseResult] = []
+    for name, runner in cases:
+        try:
+            result = runner()
+        except Exception as exc:
+            result = CaseResult(name, "FAIL", str(exc))
+        results.append(result)
+    return results
+
+
+def _run_delegate_cli_cases() -> list[CaseResult]:
+    cases = (
+        ("delegate-cli:native_process", _run_delegate_cli_case),
+        ("delegate-cli:numeric_pathlib", _run_numeric_pathlib_delegate_cli_case),
+        ("delegate-cli:numeric_streams", _run_numeric_streams_delegate_cli_case),
+    )
+    results: list[CaseResult] = []
+    for name, runner in cases:
+        try:
+            result = runner()
+        except Exception as exc:
+            result = CaseResult(name, "FAIL", str(exc))
+        results.append(result)
+    return results
+
+
+def _run_delegate_cli_case() -> CaseResult:
+    environment = os.environ.copy()
+    python_paths = [str(KERNEL_DIR), str(PROJECT_DIR)]
+    if environment.get("PYTHONPATH"):
+        python_paths.append(environment["PYTHONPATH"])
+    environment["PYTHONPATH"] = os.pathsep.join(python_paths)
+
+    architecture = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "vibeflow",
+            "export-architecture",
+            "--workspace",
+            str(WORKSPACE_PATH),
+            "--config",
+            str(DELEGATE_CONFIG_PATH),
+            "--output",
+            str(DELEGATE_ARCHITECTURE_PATH),
+        ],
+        cwd=SANDBOX_DIR,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if architecture.returncode != 0 or not DELEGATE_ARCHITECTURE_PATH.is_file():
+        raise AssertionError(
+            f"delegate architecture generation failed: code={architecture.returncode}, "
+            f"stdout={architecture.stdout!r}, stderr={architecture.stderr!r}"
+        )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "vibeflow",
+            "delegate-cli",
+            "--workspace",
+            str(WORKSPACE_PATH),
+            "--config",
+            str(DELEGATE_CONFIG_PATH),
+            "--run-root",
+            str(RUN_ROOT),
+            "--run-id",
+            "delegate_cli",
+            "--",
+            "--input",
+            str(DELEGATE_INPUT_PATH),
+            "--verbose",
+        ],
+        cwd=SANDBOX_DIR,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise AssertionError(
+            f"delegate-cli returned {completed.returncode}: stdout={completed.stdout!r}, stderr={completed.stderr!r}"
+        )
+    if completed.stdout != "processed:hello-vibeflow\n":
+        raise AssertionError(f"delegate-cli polluted or changed stdout: {completed.stdout!r}")
+    if completed.stderr != "verbose:delegate-cli\n":
+        raise AssertionError(f"delegate-cli polluted or changed stderr: {completed.stderr!r}")
+
+    run_dir = RUN_ROOT / "delegate_cli"
+    log_text = (run_dir / "vibeflow.log").read_text(encoding="utf-8")
+    if "CLI.DELEGATE.END" not in log_text or "exit_code=0" not in log_text:
+        raise AssertionError("delegate-cli core log is missing the successful exit record")
+    for business_text in ("processed:hello-vibeflow", "verbose:delegate-cli", str(DELEGATE_INPUT_PATH)):
+        if business_text in log_text:
+            raise AssertionError("delegate-cli core log captured business data")
+    health = json.loads((run_dir / "health_report.json").read_text(encoding="utf-8"))
+    if health.get("status") not in {"PASS", "CONCERNS"}:
+        raise AssertionError(f"delegate-cli health failed: {health.get('status')}")
+    output_summary = json.loads((run_dir / "output_summary.json").read_text(encoding="utf-8"))
+    if output_summary.get("cli.exit_code", {}).get("data_type") != "cli.exit_code":
+        raise AssertionError(f"delegate-cli output summary is missing cli.exit_code: {output_summary}")
+
+    return CaseResult(
+        "delegate-cli:native_process",
+        "PASS",
+        payload={
+            "stdout": completed.stdout.rstrip("\n"),
+            "stderr": completed.stderr.rstrip("\n"),
+            "exit_code": completed.returncode,
+            "run_log": str((run_dir / "vibeflow.log").relative_to(SANDBOX_DIR)),
+        },
+    )
+
+
+def _run_numeric_pathlib_delegate_cli_case() -> CaseResult:
+    return _run_numeric_delegate_cli_case(
+        name="pathlib",
+        config_path=NUMERIC_PATHLIB_CONFIG_PATH,
+        architecture_path=NUMERIC_PATHLIB_ARCHITECTURE_PATH,
+        left_path=PROJECT_DIR / "data" / "numeric_pathlib_left.txt",
+        right_path=PROJECT_DIR / "data" / "numeric_pathlib_right.txt",
+        stdin_text="7\n",
+        expected_left="11\n",
+        expected_right="13\n",
+        expected_stdout="sum=31\n",
+        expected_stderr="writer=pathlib\n",
+        expected_output="31\n",
+    )
+
+
+def _run_numeric_streams_delegate_cli_case() -> CaseResult:
+    return _run_numeric_delegate_cli_case(
+        name="streams",
+        config_path=NUMERIC_STREAMS_CONFIG_PATH,
+        architecture_path=NUMERIC_STREAMS_ARCHITECTURE_PATH,
+        left_path=PROJECT_DIR / "data" / "numeric_streams_left.txt",
+        right_path=PROJECT_DIR / "data" / "numeric_streams_right.txt",
+        stdin_text="5\n",
+        expected_left="17\n",
+        expected_right="19\n",
+        expected_stdout="sum=41\n",
+        expected_stderr="writer=open\n",
+        expected_output="41\n",
+    )
+
+
+def _run_numeric_delegate_cli_case(
+    *,
+    name: str,
+    config_path: Path,
+    architecture_path: Path,
+    left_path: Path,
+    right_path: Path,
+    stdin_text: str,
+    expected_left: str,
+    expected_right: str,
+    expected_stdout: str,
+    expected_stderr: str,
+    expected_output: str,
+) -> CaseResult:
+    if left_path.read_text(encoding="utf-8") != expected_left:
+        raise AssertionError(f"unexpected left numeric fixture: {left_path}")
+    if right_path.read_text(encoding="utf-8") != expected_right:
+        raise AssertionError(f"unexpected right numeric fixture: {right_path}")
+
+    output_dir = REPORT_DIR / "delegate_cli_numeric"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"{name}_sum.txt"
+    output_path.unlink(missing_ok=True)
+    run_id = f"delegate_cli_numeric_{name}"
+
+    environment = os.environ.copy()
+    python_paths = [str(KERNEL_DIR), str(PROJECT_DIR)]
+    if environment.get("PYTHONPATH"):
+        python_paths.append(environment["PYTHONPATH"])
+    environment["PYTHONPATH"] = os.pathsep.join(python_paths)
+
+    architecture = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "vibeflow",
+            "export-architecture",
+            "--workspace",
+            str(WORKSPACE_PATH),
+            "--config",
+            str(config_path),
+            "--output",
+            str(architecture_path),
+        ],
+        cwd=SANDBOX_DIR,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if architecture.returncode != 0 or not architecture_path.is_file():
+        raise AssertionError(
+            f"{name} architecture generation failed: code={architecture.returncode}, "
+            f"stdout={architecture.stdout!r}, stderr={architecture.stderr!r}"
+        )
+    if output_path.exists():
+        raise AssertionError(f"{name} architecture export executed an effectful example")
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "vibeflow",
+            "delegate-cli",
+            "--workspace",
+            str(WORKSPACE_PATH),
+            "--config",
+            str(config_path),
+            "--run-root",
+            str(RUN_ROOT),
+            "--run-id",
+            run_id,
+            "--",
+            "--left",
+            str(left_path),
+            "--right",
+            str(right_path),
+            "--output",
+            str(output_path),
+        ],
+        cwd=SANDBOX_DIR,
+        env=environment,
+        input=stdin_text.encode("utf-8"),
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise AssertionError(
+            f"{name} delegate-cli returned {completed.returncode}: "
+            f"stdout={completed.stdout!r}, stderr={completed.stderr!r}"
+        )
+    if completed.stdout != expected_stdout.encode("utf-8"):
+        raise AssertionError(f"{name} stdout mismatch: {completed.stdout!r}")
+    if completed.stderr != expected_stderr.encode("utf-8"):
+        raise AssertionError(f"{name} stderr mismatch: {completed.stderr!r}")
+    if not output_path.is_file():
+        raise AssertionError(f"{name} output file was not created: {output_path}")
+    if output_path.read_bytes() != expected_output.encode("utf-8"):
+        raise AssertionError(f"{name} output file mismatch: {output_path.read_bytes()!r}")
+
+    run_dir = RUN_ROOT / run_id
+    health = json.loads((run_dir / "health_report.json").read_text(encoding="utf-8"))
+    if health.get("status") not in {"PASS", "CONCERNS"}:
+        raise AssertionError(f"{name} delegate-cli health failed: {health.get('status')}")
+    effect_scopes = health.get("info", {}).get("node_effect_scopes", {})
+    expected_scopes = {
+        "start": "none",
+        "parse_argv": "terminal",
+        "read_stdin": "terminal",
+        "read_left": "python_io",
+        "read_right": "python_io",
+        "sum_numbers": "none",
+        "write_file": "python_io",
+        "write_output": "terminal",
+        "end": "none",
+    }
+    wrong_scopes = {
+        node: effect_scopes.get(node)
+        for node, expected in expected_scopes.items()
+        if effect_scopes.get(node) != expected
+    }
+    if wrong_scopes:
+        raise AssertionError(f"{name} effect scopes did not match the graph roles: {wrong_scopes}")
+    output_summary = json.loads((run_dir / "output_summary.json").read_text(encoding="utf-8"))
+    exit_summary = output_summary.get("cli.exit_code")
+    if not isinstance(exit_summary, dict) or exit_summary.get("data_type") != "cli.exit_code":
+        raise AssertionError(f"{name} output summary is missing cli.exit_code: {output_summary}")
+    if exit_summary.get("value") != {"scalar": True, "type": "int"}:
+        raise AssertionError(f"{name} output summary has an invalid cli.exit_code: {exit_summary}")
+
+    trace = _runtime_trace_lines(run_dir)
+    if not trace or trace[-1].get("kind") != "runtime_summary":
+        raise AssertionError(f"{name} runtime trace is missing its summary")
+    node_runs = trace[-1].get("qualified_node_runs")
+    expected_nodes = {
+        "start",
+        "parse_argv",
+        "read_stdin",
+        "read_left",
+        "read_right",
+        "sum_numbers",
+        "write_file",
+        "write_output",
+        "end",
+    }
+    if not isinstance(node_runs, dict):
+        raise AssertionError(f"{name} runtime summary is missing qualified_node_runs")
+    bad_runs = {node: node_runs.get(node) for node in expected_nodes if node_runs.get(node) != 1}
+    if bad_runs:
+        raise AssertionError(f"{name} nodes did not execute exactly once: {bad_runs}")
+
+    log_text = (run_dir / "vibeflow.log").read_text(encoding="utf-8")
+    if "CLI.DELEGATE.END" not in log_text or "exit_code=0" not in log_text:
+        raise AssertionError(f"{name} delegate-cli core log is missing the successful exit record")
+    sensitive_business_text = {
+        stdin_text.strip(),
+        expected_left.strip(),
+        expected_right.strip(),
+        str(left_path),
+        str(right_path),
+        str(output_path),
+        expected_stdout.strip(),
+        expected_stderr.strip(),
+        expected_output.strip(),
+    }
+    leaked = sorted(text for text in sensitive_business_text if text and text in log_text)
+    if leaked:
+        raise AssertionError(f"{name} delegate-cli core log captured business data: {leaked}")
+
+    return CaseResult(
+        f"delegate-cli:numeric_{name}",
+        "PASS",
+        payload={
+            "stdin": stdin_text.rstrip("\n"),
+            "stdout": completed.stdout.decode("utf-8").rstrip("\n"),
+            "stderr": completed.stderr.decode("utf-8").rstrip("\n"),
+            "output": expected_output.rstrip("\n"),
+            "exit_code": completed.returncode,
+            "run_log": str((run_dir / "vibeflow.log").relative_to(SANDBOX_DIR)),
+        },
+    )
+
+
+def _run_registered_review_case() -> CaseResult:
+    REVIEW_ARCHITECTURE_DIR.mkdir(parents=True, exist_ok=True)
+    REVIEW_ARCHITECTURE_PATH.write_text("stale architecture\n", encoding="utf-8")
+    output_path = REVIEW_DIR / "pass_nodeset_nested.expanded.svg"
+    output_path.write_text("legacy svg\n", encoding="utf-8")
+
+    completed, payload = _run_review_cli(CONFIG_DIR / "pass_nodeset_nested.jsonc", output_path)
+    if completed.returncode != 0:
+        raise AssertionError(f"review returned {completed.returncode}: {payload}")
+    if payload.get("status") not in {"PASS", "CONCERNS"}:
+        raise AssertionError(f"unexpected review status: {payload.get('status')}")
+    if payload.get("failed_stage") is not None or payload.get("published") is not True:
+        raise AssertionError(f"review did not publish successfully: {payload}")
+    expected_paths = {
+        "config": str((CONFIG_DIR / "pass_nodeset_nested.jsonc").resolve()),
+        "architecture": str(REVIEW_ARCHITECTURE_PATH.resolve()),
+        "svg": str(output_path.resolve()),
+    }
+    for field, expected in expected_paths.items():
+        if payload.get(field) != expected:
+            raise AssertionError(f"unexpected {field}: {payload.get(field)!r}, expected {expected!r}")
+    validation = payload.get("validation")
+    if not isinstance(validation, dict) or validation.get("status") != payload.get("status"):
+        raise AssertionError(f"review validation summary is inconsistent: {validation}")
+
+    architecture_text = REVIEW_ARCHITECTURE_PATH.read_text(encoding="utf-8")
+    if not architecture_text.startswith("// GENERATED BY VIBEFLOW. DO NOT EDIT."):
+        raise AssertionError("review did not replace the stale architecture with a canonical document")
+    for marker in ("math.add_one", "math.add_two"):
+        if marker not in architecture_text:
+            raise AssertionError(f"canonical architecture is missing nested nodeset marker {marker!r}")
+
+    root = ET.parse(output_path).getroot()
+    if _xml_local_name(root.tag) != "svg":
+        raise AssertionError("review output root is not svg")
+    if root.attrib.get("aria-roledescription") != "flowchart-review-columns":
+        raise AssertionError("review output is missing the canonical review-columns marker")
+    fragments = [
+        element
+        for element in root.iter()
+        if _xml_local_name(element.tag) == "g"
+        and "review-inline-fragment" in element.attrib.get("class", "").split()
+        and len(list(element)) > 0
+    ]
+    if len(fragments) < 2:
+        raise AssertionError(f"expected expanded main/nodeset SVG fragments, got {len(fragments)}")
+    if list(REVIEW_DIR.rglob("*.provenance.json")):
+        raise AssertionError("review unexpectedly emitted a provenance sidecar")
+    if list(REVIEW_DIR.rglob("*.mmd")):
+        raise AssertionError("review unexpectedly published an intermediate Mermaid file")
+    if "provenance" in output_path.read_text(encoding="utf-8").lower():
+        raise AssertionError("review unexpectedly embedded provenance metadata")
+
+    return CaseResult(
+        "review:registered_expanded",
+        "PASS",
+        payload={
+            "status": payload["status"],
+            "published": True,
+            "architecture": str(REVIEW_ARCHITECTURE_PATH.relative_to(SANDBOX_DIR)),
+            "svg": str(output_path.relative_to(SANDBOX_DIR)),
+            "svg_fragments": len(fragments),
+        },
+    )
+
+
+def _run_unregistered_review_case() -> CaseResult:
+    output_path = REVIEW_DIR / "unregistered.svg"
+    output_path.unlink(missing_ok=True)
+    architecture_before = REVIEW_ARCHITECTURE_PATH.read_bytes()
+
+    completed, payload = _run_review_cli(CONFIG_DIR / "pass_free_nodes.jsonc", output_path)
+    if completed.returncode != 1:
+        raise AssertionError(f"unregistered review returned {completed.returncode}, expected 1: {payload}")
+    if payload.get("status") != "FAIL" or payload.get("failed_stage") != "architecture":
+        raise AssertionError(f"unregistered review failed with the wrong stage/status: {payload}")
+    if payload.get("published") is not False:
+        raise AssertionError("unregistered review reported an SVG publication")
+    error = payload.get("error")
+    if not isinstance(error, dict) or error.get("rule_id") != "REVIEW.ARCHITECTURE.UNREGISTERED":
+        raise AssertionError(f"unexpected unregistered review error: {error}")
+    if output_path.exists():
+        raise AssertionError("unregistered review published an SVG")
+    if REVIEW_ARCHITECTURE_PATH.read_bytes() != architecture_before:
+        raise AssertionError("unregistered review modified the registered architecture document")
+
+    return CaseResult(
+        "review:unregistered_fail_closed",
+        "PASS",
+        payload={
+            "status": payload["status"],
+            "published": False,
+            "rule_id": error["rule_id"],
+        },
+    )
+
+
+def _run_review_cli(config_path: Path, output_path: Path) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
+    environment = os.environ.copy()
+    python_paths = [str(KERNEL_DIR), str(PROJECT_DIR)]
+    if environment.get("PYTHONPATH"):
+        python_paths.append(environment["PYTHONPATH"])
+    environment["PYTHONPATH"] = os.pathsep.join(python_paths)
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "vibeflow",
+            "review",
+            "--workspace",
+            str(WORKSPACE_PATH),
+            "--config",
+            str(config_path),
+            "--output",
+            str(output_path),
+        ],
+        cwd=SANDBOX_DIR,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise AssertionError(
+            f"review stdout is not one JSON object: stdout={completed.stdout!r}, stderr={completed.stderr!r}"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise AssertionError(f"review stdout JSON is not an object: {payload!r}")
+    return completed, payload
+
+
+def _xml_local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
 
 
 def _run_valid_cases() -> list[CaseResult]:
@@ -912,7 +1407,8 @@ def _run_valid_cases() -> list[CaseResult]:
 
 def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     from vibeflow import GraphCompiler, RuntimeOptions, build_execution_plan, export_ascii_flowchart, export_mermaid, is_mermaid_svg_renderer_available, load_config_document, load_config_resources, parse_graph_config, render_mermaid_svg, resolve_effective_policy, run_checked, validate_graph_health
-    from vibeflow.config_schema import collect_config_schema_findings
+    from vibeflow.config.resource_registries import discover_config_resource_registry_context
+    from vibeflow.config.schema import collect_config_schema_findings
     from vibeflow.plugin import load_plugins_from_config
 
     from registry import build_node_registry
@@ -923,10 +1419,22 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     schema_findings = collect_config_schema_findings(document.data)
     if schema_findings:
         raise AssertionError(f"schema findings: {[finding.rule_id for finding in schema_findings]}")
-    plugin_registry, plugin_findings = load_plugins_from_config(document.data, base_path=config_path.parent)
+    registry_context = discover_config_resource_registry_context(document.data, config_path=config_path)
+    plugin_registry, plugin_findings = load_plugins_from_config(
+        document.data,
+        base_path=registry_context.base_path,
+        plugin_resource_registry=registry_context.plugin_resource_registry,
+    )
     if plugin_findings:
         raise AssertionError(f"plugin findings: {[finding.rule_id for finding in plugin_findings]}")
-    resources, resource_findings = load_config_resources(document.data, base_path=config_path.parent, plugin_registry=plugin_registry)
+    resources, resource_findings = load_config_resources(
+        document.data,
+        base_path=registry_context.base_path,
+        plugin_registry=plugin_registry,
+        base_lib_registry=registry_context.base_lib_registry,
+        plugin_resource_registry=registry_context.plugin_resource_registry,
+        base_lib_paths=registry_context.base_lib_paths,
+    )
     if resource_findings:
         raise AssertionError(f"resource findings: {[finding.rule_id for finding in resource_findings]}")
     policy_result = resolve_effective_policy(document.data, config_path=config_path, explicit_policy_path=POLICY_PATH, plugin_registry=plugin_registry)
@@ -1179,6 +1687,10 @@ def _assert_mermaid_contains(case: dict[str, Any], name: str, collapsed: str, ex
     missing = [value for value in expected if value not in collapsed and value not in expanded]
     if missing:
         raise AssertionError(f"Mermaid missing expected content: {missing}")
+    forbidden = tuple(str(value) for value in case.get("expected_mermaid_not_contains", ()))
+    present = [value for value in forbidden if value in collapsed or value in expanded]
+    if present:
+        raise AssertionError(f"Mermaid contained forbidden content: {present}")
 
 
 def _assert_health_warnings(case: dict[str, Any], health) -> None:
@@ -1199,6 +1711,10 @@ def _assert_run_mermaid(case: dict[str, Any], run_dir: Path) -> None:
     missing = [value for value in expected if value not in text]
     if missing:
         raise AssertionError(f"run Mermaid missing expected content: {missing}")
+    forbidden = tuple(str(value) for value in case.get("expected_run_mermaid_not_contains", ()))
+    present = [value for value in forbidden if value in text]
+    if present:
+        raise AssertionError(f"run Mermaid contained forbidden content: {present}")
 
 
 def _assert_ascii_contains(name: str, collapsed: str, expanded: str) -> None:
@@ -1278,7 +1794,7 @@ def _run_invalid_case(case: dict[str, Any], base_lib_report):
 
 def _inspect_invalid_node(case: dict[str, Any], kind: str) -> CaseResult:
     from vibeflow.purity import validate_node_class
-    from vibeflow.purity_types import PurityPolicy
+    from vibeflow.purity.types import PurityPolicy
 
     cls = _load_class(PROJECT_DIR / str(case["module"]), str(case["class"]))
     policy = PurityPolicy(max_source_lines=500, warn_source_lines=None, allowed_base_lib_modules=("base_lib",))
@@ -1340,7 +1856,7 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
 
 def _health_invalid_node(case: dict[str, Any]) -> CaseResult:
     from vibeflow import DataProvider, GraphConfig, NodeSpec, validate_graph_health
-    from vibeflow.purity_types import PurityPolicy
+    from vibeflow.purity.types import PurityPolicy
     from vibeflow.registry import NodeRegistry
 
     cls = _load_class(PROJECT_DIR / str(case["module"]), str(case["class"]))
@@ -1363,7 +1879,7 @@ def _health_invalid_node(case: dict[str, Any]) -> CaseResult:
 
 def _bad_base_lib_report():
     from vibeflow import scan_base_lib
-    from vibeflow.purity_types import PurityPolicy
+    from vibeflow.purity.types import PurityPolicy
 
     return scan_base_lib(
         PROJECT_DIR,
@@ -1378,7 +1894,7 @@ def _bad_base_lib_report():
 
 
 def _invalid_config(case: dict[str, Any]) -> CaseResult:
-    from vibeflow.cli_config import validate_config_path
+    from vibeflow.cli.config import validate_config_path
 
     report = validate_config_path(CONFIG_DIR / str(case["config"]), policy_path=POLICY_PATH)
     if report.status not in {"FAIL", "ERROR"}:
@@ -1390,14 +1906,27 @@ def _invalid_config(case: dict[str, Any]) -> CaseResult:
 def _concern_config(case: dict[str, Any]) -> CaseResult:
     from registry import build_node_registry
     from vibeflow import load_config_document, load_config_resources, parse_graph_config, resolve_effective_policy, validate_graph_health
+    from vibeflow.config.resource_registries import discover_config_resource_registry_context
     from vibeflow.plugin import load_plugins_from_config
 
     config_path = CONFIG_DIR / str(case["config"])
     document = load_config_document(config_path)
-    plugin_registry, plugin_findings = load_plugins_from_config(document.data, base_path=config_path.parent)
+    registry_context = discover_config_resource_registry_context(document.data, config_path=config_path)
+    plugin_registry, plugin_findings = load_plugins_from_config(
+        document.data,
+        base_path=registry_context.base_path,
+        plugin_resource_registry=registry_context.plugin_resource_registry,
+    )
     if plugin_findings:
         raise AssertionError(f"plugin findings: {[finding.rule_id for finding in plugin_findings]}")
-    resources, resource_findings = load_config_resources(document.data, base_path=config_path.parent, plugin_registry=plugin_registry)
+    resources, resource_findings = load_config_resources(
+        document.data,
+        base_path=registry_context.base_path,
+        plugin_registry=plugin_registry,
+        base_lib_registry=registry_context.base_lib_registry,
+        plugin_resource_registry=registry_context.plugin_resource_registry,
+        base_lib_paths=registry_context.base_lib_paths,
+    )
     if resource_findings:
         raise AssertionError(f"resource findings: {[finding.rule_id for finding in resource_findings]}")
     policy_result = resolve_effective_policy(document.data, config_path=config_path, explicit_policy_path=POLICY_PATH, plugin_registry=plugin_registry)

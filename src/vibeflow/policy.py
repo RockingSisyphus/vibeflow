@@ -5,13 +5,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-from .config_schema import collect_policy_schema_findings
-from .config_loader import ConfigLoadError, load_config_document
-from .config_resources import config_base_lib_policy
-from .health_types import HealthFinding
-from .plugin import PluginRegistry, plugin_error
-from .purity_types import BANNED_IMPORT_ROOTS, PurityPolicy
-from .schema_findings import schema_finding
+from vibeflow.config.schema import collect_policy_schema_findings
+from vibeflow.config.loader import ConfigLoadError, load_config_document
+from vibeflow.config.resources import config_base_lib_policy
+from vibeflow.health.types import HealthFinding
+from vibeflow.plugin import PluginRegistry, plugin_error
+from vibeflow.purity.types import BANNED_IMPORT_ROOTS, PurityPolicy
+from vibeflow.health.schema_findings import schema_finding
 
 
 DEFAULT_POLICY_DATA: dict[str, Any] = {
@@ -41,6 +41,18 @@ DEFAULT_POLICY_DATA: dict[str, Any] = {
         ],
     },
 }
+
+
+_ABSOLUTE_FINDING_RULES = frozenset(
+    {
+        "BASE_LIB.BANNED_IMPORT",
+        "BASE_LIB.FORBIDDEN_PROJECT_IMPORT",
+        "BASE_LIB.GLOBAL_STATE",
+        "BASE_LIB.SIDE_EFFECT_CALL",
+        "BASE_LIB.TOP_LEVEL_SIDE_EFFECT",
+        "NODE.BASE_LIB.INDIRECT_VIOLATION",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -116,6 +128,8 @@ def default_effective_policy() -> EffectivePolicy:
 
 
 def _policy_bucket(finding: HealthFinding, exemptions: list[Mapping[str, Any]], downgrades: list[Mapping[str, Any]]) -> tuple[str, HealthFinding]:
+    if finding.rule_id.startswith("NODE.EFFECT.") or finding.rule_id in _ABSOLUTE_FINDING_RULES:
+        return "error", finding
     exemption = _matching_rule_override(finding, exemptions)
     if exemption is not None:
         return "skipped", _policy_adjusted_finding(finding, "skipped", exemption)
@@ -166,6 +180,9 @@ def _policy_adjusted_finding(finding: HealthFinding, severity: str, rule: Mappin
         message=finding.message,
         suggested_fix_type=finding.suggested_fix_type,
         details=details,
+        root_id=finding.root_id,
+        root_path=finding.root_path,
+        source_path=finding.source_path,
     )
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from vibeflow import NodeRegistry
+from vibeflow import BaseLibRegistry, NodeRegistry, PluginResourceRegistry
 
 from nodes.legal_comprehensive_nodes import (
     AuditStoreNode,
@@ -14,6 +14,27 @@ from nodes.legal_comprehensive_nodes import (
     RouteDecisionNode,
 )
 from nodes.legal_external_nodes import EffectRequestNode, IoResultAddNode, IoResultInputNode
+from nodes.legal_delegate_cli_nodes import (
+    DelegateArgvNode,
+    DelegateBusinessNode,
+    DelegateDocumentNode,
+    DelegateEndNode,
+    DelegateOutputNode,
+)
+from nodes.legal_delegate_numeric_nodes import (
+    NumericArgvNode,
+    NumericBuiltinInputNode,
+    NumericOpenLeftNode,
+    NumericOpenRightNode,
+    NumericOpenWriterNode,
+    NumericPathLeftNode,
+    NumericPathRightNode,
+    NumericPathWriterNode,
+    NumericPrintOutputNode,
+    NumericStreamInputNode,
+    NumericStreamOutputNode,
+    NumericSumNode,
+)
 from nodes.legal_loop_nodes import CopyBackNode, DoneCheckNode, DoneValueNode, IncrementNode
 from nodes.legal_math_nodes import (
     AddNode,
@@ -123,6 +144,23 @@ def build_node_registry() -> NodeRegistry:
     registry.register("sandbox.report_document", ReportDocumentNode, config_schema={}, config_defaults={})
     registry.register("sandbox.report_output", ReportOutputNode, config_schema={}, config_defaults={})
     registry.register("sandbox.report_end", ReportEndNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.delegate_argv", DelegateArgvNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.delegate_document", DelegateDocumentNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.delegate_business", DelegateBusinessNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.delegate_output", DelegateOutputNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.delegate_end", DelegateEndNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_argv", NumericArgvNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_builtin_input", NumericBuiltinInputNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_stream_input", NumericStreamInputNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_path_left", NumericPathLeftNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_path_right", NumericPathRightNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_open_left", NumericOpenLeftNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_open_right", NumericOpenRightNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_sum", NumericSumNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_path_writer", NumericPathWriterNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_open_writer", NumericOpenWriterNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_print_output", NumericPrintOutputNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.numeric_stream_output", NumericStreamOutputNode, config_schema={}, config_defaults={})
     registry.register("sandbox.training_input", TrainingInputNode, config_schema={}, config_defaults={})
     registry.register("sandbox.forward_loss", ForwardLossNode, config_schema={}, config_defaults={})
     registry.register("sandbox.backward_grad", BackwardGradNode, config_schema={}, config_defaults={})
@@ -163,4 +201,88 @@ def build_node_registry() -> NodeRegistry:
     registry.register("semantic.left_branch_end", SemanticLeftBranchEndNode, config_schema={}, config_defaults={})
     registry.register("semantic.right_branch_end", SemanticRightBranchEndNode, config_schema={}, config_defaults={})
     registry.register("semantic.loop_end", SemanticLoopEndNode, config_schema={}, config_defaults={})
+    return registry
+
+
+def build_base_lib_registry() -> BaseLibRegistry:
+    registry = BaseLibRegistry()
+    registry.register(
+        "good_math",
+        module="base_lib.good_math",
+        display_name="Good Math",
+        category="sandbox",
+        description="Validated arithmetic helper functions for sandbox resource checks.",
+        version="0.1.0",
+    )
+    registry.register(
+        "good_chain_a",
+        module="base_lib.good_chain_a",
+        display_name="Good Chain A",
+        category="sandbox",
+        description="A valid dependency-chain helper module for sandbox resource checks.",
+        version="0.1.0",
+    )
+    registry.register(
+        "sandbox_arithmetic",
+        module="base_lib.sandbox_arithmetic",
+        display_name="Sandbox Arithmetic",
+        category="sandbox",
+        description="Arithmetic helper functions used by the resource nodeset fixture.",
+        version="0.1.0",
+    )
+    return registry
+
+
+def build_plugin_registry() -> PluginResourceRegistry:
+    registry = PluginResourceRegistry()
+    registry.register(
+        "value_shift",
+        module="plugins.value_plugin",
+        class_name="ValueShiftPlugin",
+        plugin_type="runtime",
+        display_name="Sandbox Value Shift",
+        category="sandbox",
+        description="Runtime plugin that shifts sandbox values during resource fixture execution.",
+        version="0.1.0",
+    )
+    registry.register(
+        "policy_plugin",
+        module="plugins.policy_plugins",
+        class_name="PolicyPlugin",
+        plugin_type="policy",
+        display_name="Policy Plugin",
+        category="sandbox",
+        description="Extends sandbox policy checks for the plugin fixture.",
+        version="0.1.0",
+    )
+    registry.register(
+        "finding_plugin",
+        module="plugins.policy_plugins",
+        class_name="FindingPlugin",
+        plugin_type="policy",
+        display_name="Finding Plugin",
+        category="sandbox",
+        description="Adds a sandbox graph finding through the policy plugin interface.",
+        version="0.1.0",
+    )
+    registry.register(
+        "compiler_hook",
+        module="plugins.hook_plugins",
+        class_name="CompilerPlugin",
+        plugin_type="compiler",
+        display_name="Compiler Hook Plugin",
+        category="sandbox",
+        description="Records compiler hook calls for the plugin fixture.",
+        version="0.1.0",
+    )
+    registry.register(
+        "runtime_hook",
+        module="plugins.hook_plugins",
+        class_name="RuntimePlugin",
+        plugin_type="runtime",
+        display_name="Runtime Hook Plugin",
+        category="sandbox",
+        description="Records runtime hook calls for the plugin fixture.",
+        version="0.1.0",
+    )
     return registry

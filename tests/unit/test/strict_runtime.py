@@ -1,4 +1,19 @@
+import threading
+
 from tests.unit.strict_support import *
+
+
+def _runtime_trace_lines_from_context(context) -> list[dict[str, object]]:
+    return _runtime_trace_lines(Path(context.get("runtime.trace_path")))
+
+
+def _runtime_trace_events_from_context(context) -> list[dict[str, object]]:
+    return [line for line in _runtime_trace_lines_from_context(context) if line.get("kind") != "runtime_summary"]
+
+
+def _runtime_trace_lines(trace_path: Path) -> list[dict[str, object]]:
+    return [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines() if line]
+
 
 def test_checked_run_refuses_failed_health_before_runtime(tmp_path) -> None:
     config_path = tmp_path / "bad.json"
@@ -541,7 +556,82 @@ def test_while_loop_outputs_match_plan_block_and_compiled_execution() -> None:
         expected = actual if expected is None else expected
         assert actual == expected
         if execution in {"block", "compiled"}:
-            assert any(event["kind"] == "loop_block_enter" for event in context.get("runtime.events"))
+            assert any(event["kind"] == "loop_block_enter" for event in _runtime_trace_events_from_context(context))
+
+
+def test_node_config_overrides_pass_through_nested_loop_body_in_all_execution_modes() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "loop.add_once",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline=_input_add_pipeline(add={"delta": 1}),
+                ),
+                _nodeset_config(
+                    "loop.outer_body",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline={
+                        "inputs": [PROV_SPEC("value.in")],
+                        "nodes": [
+                            _node_call("start", "test.start", "Starts the outer loop body."),
+                            _node_call(
+                                "inner_loop",
+                                "vibeflow.loop.while",
+                                "Runs the inner add loop once.",
+                                requires=[REQ_SPEC("value.in")],
+                                provides=[PROV_SPEC("value.out")],
+                                loop={
+                                    "body": "loop.add_once",
+                                    "max_iterations": 3,
+                                    "stop_after": 1,
+                                    "carry": [{"from": "value.in", "as": "value.in", "update": "value.out"}],
+                                    "outputs": [{"from": "value.out", "as": "value.out"}],
+                                },
+                            ),
+                            _node_call("end", "test.out_end", "Ends after inner value.out.", requires=[REQ_SPEC("value.out")]),
+                        ],
+                        "edges": _edge_chain("start", "inner_loop", "end"),
+                        "outputs": [REQ_SPEC("value.out")],
+                    },
+                ),
+            ],
+            "pipeline": {
+                "inputs": [PROV_SPEC("value.in")],
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the nested loop override fixture."),
+                    _node_call(
+                        "outer_loop",
+                        "vibeflow.loop.while",
+                        "Runs a body containing another loop.",
+                        requires=[REQ_SPEC("value.in")],
+                        provides=[PROV_SPEC("value.out")],
+                        node_configs={"inner_loop.add": {"delta": 5}},
+                        loop={
+                            "body": "loop.outer_body",
+                            "max_iterations": 3,
+                            "stop_after": 1,
+                            "carry": [{"from": "value.in", "as": "value.in", "update": "value.out"}],
+                            "outputs": [{"from": "value.out", "as": "value.out"}],
+                        },
+                    ),
+                    _node_call("end", "test.out_end", "Ends after outer value.out.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": _edge_chain("start", "outer_loop", "end"),
+                "outputs": [REQ_SPEC("value.out")],
+            },
+        }
+    )
+    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
+    assert not any(error.rule_id.startswith("NODESET.CONFIG.") for error in report.errors)
+
+    for execution in ("plan", "block", "compiled"):
+        context = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="boundary", execution=execution)).run({"value.in": 2})
+        assert context.get("value.out")["value"] == 7
 
 
 def test_loop_max_iterations_raises_runtime_error() -> None:
@@ -564,7 +654,7 @@ def test_loop_stop_when_missing_or_non_bool_source_is_runtime_error() -> None:
         PipelineRuntime(non_bool_graph, registry=_loop_registry()).run({"loop.current": 0})
 
 
-def test_block_execution_rejects_loop_body_that_is_not_block_compiled() -> None:
+def test_block_execution_compiles_loop_body_with_nested_nodeset() -> None:
     graph = parse_graph_config(
         {
             "nodesets": [
@@ -602,7 +692,7 @@ def test_block_execution_rejects_loop_body_that_is_not_block_compiled() -> None:
                             _node_call(
                                 "nested",
                                 "loop.step_until",
-                                "Calls a nested nodeset, which makes this loop body not block compiled.",
+                                "Calls a nested nodeset inside a block-compiled loop body.",
                                 requires=[REQ_SPEC("loop.current")],
                                 provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
                             ),
@@ -620,7 +710,7 @@ def test_block_execution_rejects_loop_body_that_is_not_block_compiled() -> None:
                     _node_call(
                         "while_loop",
                         "vibeflow.loop.while",
-                        "Uses a loop body that cannot be block compiled.",
+                        "Uses a loop body with a nested nodeset.",
                         requires=[REQ_SPEC("loop.current")],
                         provides=[PROV_SPEC("loop.final"), PROV_SPEC("loop.iterations")],
                         loop={
@@ -642,8 +732,59 @@ def test_block_execution_rejects_loop_body_that_is_not_block_compiled() -> None:
         }
     )
 
-    with pytest.raises(PipelineRuntimeError, match="not block compiled"):
-        PipelineRuntime(graph, registry=_loop_registry(), runtime_options=RuntimeOptions(execution="block")).run({"loop.current": 0})
+    runtime = PipelineRuntime(graph, registry=_loop_registry(), runtime_options=RuntimeOptions(trace="boundary", execution="block"))
+    assert any(block.kind == "loop" and block.entry == "while_loop" for block in runtime._plan.blocks)
+    assert not [finding for finding in explain_block_compilation(runtime._plan) if not finding["compiled"]]
+
+    context = runtime.run({"loop.current": 0})
+
+    assert context.get("loop.final")["value"] == 3
+    assert any(event["kind"] == "loop_block_enter" for event in _runtime_trace_events_from_context(context))
+
+
+def test_block_execution_fail_fast_reports_compile_reason_for_unsupported_loop() -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    "loop.add_once",
+                    requires=["value.in"],
+                    provides=["value.out"],
+                    exports=["value.out"],
+                    pipeline=_input_add_pipeline(add={"delta": 1}),
+                )
+            ],
+            "pipeline": {
+                "inputs": [PROV_SPEC("value.in")],
+                "nodes": [
+                    _node_call("start", "test.start", "Starts unsupported block fixture."),
+                    _node_call(
+                        "async_loop",
+                        "vibeflow.loop.while",
+                        "Async loops are not block compiled.",
+                        requires=[REQ_SPEC("value.in")],
+                        provides=[PROV_SPEC("value.out")],
+                        loop={
+                            "body": "loop.add_once",
+                            "max_iterations": 3,
+                            "stop_after": 1,
+                            "carry": [{"from": "value.in", "as": "value.in", "update": "value.out"}],
+                            "outputs": [{"from": "value.out", "as": "value.out"}],
+                        },
+                        **{"async": "detached"},
+                    ),
+                    _node_call("end", "test.out_end", "Ends unsupported block fixture.", requires=[REQ_SPEC("value.out")]),
+                ],
+                "edges": _edge_chain("start", "async_loop", "end"),
+                "outputs": [REQ_SPEC("value.out")],
+            },
+        }
+    )
+
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(trace="boundary", execution="block"))
+
+    with pytest.raises(PipelineRuntimeError, match="async_loop=detached"):
+        runtime.run({"value.in": 1})
 
 
 def test_join_policy_any_active_allows_unconditional_input_when_condition_is_inactive() -> None:
@@ -818,7 +959,7 @@ def test_runtime_options_boundary_trace_records_only_boundaries() -> None:
     context = runtime.run({})
 
     assert context.get("value.in")["value"] == 1
-    assert [event["kind"] for event in runtime.trace.events] == ["run_start", "type_resolve", "run_end"]
+    assert [event["kind"] for event in _runtime_trace_events_from_context(context)] == ["run_start", "type_resolve", "run_end"]
     assert runtime.trace.exec_order == ["start", "seed", "end"]
     assert runtime.trace.current_node == "end"
 
@@ -829,7 +970,10 @@ def test_runtime_options_off_keeps_summary_without_events() -> None:
 
     context = runtime.run({})
 
-    assert context.get("runtime.events") == []
+    assert not context.exists("runtime.events")
+    assert context.get("runtime.event_count") == 0
+    assert context.get("runtime.events_streamed") is True
+    assert [line["kind"] for line in _runtime_trace_lines_from_context(context)] == ["runtime_summary"]
     assert context.get("runtime.current_node") == "end"
     assert context.get("runtime.stop_reason") == "completed"
     assert context.get("runtime.exception") == ""
@@ -854,7 +998,7 @@ def test_runtime_options_compiled_executes_linear_block(monkeypatch) -> None:
     assert context.get("value.out")["value"] == 5
     assert list(context.get("runtime.exec_order")) == ["start", "seed", "add", "end"]
     assert context.get("runtime.edge_executions") == {"start->seed": 1, "seed->add": 1, "add->end": 1}
-    assert [event["kind"] for event in context.get("runtime.events")] == ["run_start", "block_enter", "type_resolve", "type_resolve", "block_exit", "run_end"]
+    assert [event["kind"] for event in _runtime_trace_events_from_context(context)] == ["run_start", "block_enter", "type_resolve", "type_resolve", "block_exit", "run_end"]
 
 
 def test_runtime_options_compiled_runs_generated_block_when_node_hooks_enabled(monkeypatch) -> None:
@@ -879,7 +1023,7 @@ def test_runtime_options_compiled_runs_generated_block_when_node_hooks_enabled(m
     ).run({})
 
     assert context.get("value.out")["value"] == 5
-    assert [event["kind"] for event in context.get("runtime.events")] == ["run_start", "block_enter", "type_resolve", "type_resolve", "block_exit", "run_end"]
+    assert [event["kind"] for event in _runtime_trace_events_from_context(context)] == ["run_start", "block_enter", "type_resolve", "type_resolve", "block_exit", "run_end"]
     assert calls == [
         ("before", "start"),
         ("after", "start"),
@@ -900,9 +1044,13 @@ def test_runtime_options_compiled_full_trace_records_node_events(monkeypatch) ->
     context = runtime.run({})
 
     assert context.get("value.out")["value"] == 5
-    event_kinds = [event["kind"] for event in context.get("runtime.events")]
+    events = _runtime_trace_events_from_context(context)
+    event_kinds = [event["kind"] for event in events]
     assert event_kinds == ["block_enter", "node", "node", "type_resolve", "node", "type_resolve", "node", "block_exit"]
-    assert [event["node"] for event in context.get("runtime.events") if event["kind"] == "node"] == ["start", "seed", "add", "end"]
+    assert [event["node"] for event in events if event["kind"] == "node"] == ["start", "seed", "add", "end"]
+    assert not context.exists("runtime.events")
+    assert context.get("runtime.event_count") == len(events)
+    assert _runtime_trace_lines_from_context(context)[-1]["event_count"] == len(events)
     assert context.get("runtime.edge_executions") == {"start->seed": 1, "seed->add": 1, "add->end": 1}
 
 
@@ -925,8 +1073,9 @@ def test_runtime_options_compiled_failure_records_node_and_block_failed() -> Non
         runtime.run({})
 
     assert runtime.trace.current_node == "bad"
-    assert [event["kind"] for event in runtime.trace.events] == ["run_start", "block_enter", "node_failed", "block_failed"]
-    assert "boom" in runtime.trace.events[2]["failure"]
+    events = [line for line in _runtime_trace_lines(Path(runtime.trace.trace_path)) if line["kind"] != "runtime_summary"]
+    assert [event["kind"] for event in events] == ["run_start", "block_enter", "node_failed", "block_failed"]
+    assert "boom" in events[2]["failure"]
 
 
 def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
@@ -1013,7 +1162,7 @@ def test_runtime_options_block_rejects_decision_loop_before_max_steps() -> None:
     assert exc_info.value.rule_id == "GRAPH.CYCLE.FORBIDDEN"
 
 
-def test_runtime_options_compiled_falls_back_around_async_barrier() -> None:
+def test_runtime_options_compiled_generates_block_with_async_barrier() -> None:
     class OutToNextNode:
         NODE_INFO = NodeInfo("test.out_to_next", "Out To Next", "test", "Copies value.out to value.next.", "0.1.0", "process")
         CONTRACT = NodeContract(
@@ -1050,22 +1199,23 @@ def test_runtime_options_compiled_falls_back_around_async_barrier() -> None:
         }
     )
     runtime = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
-    assert runtime._plan.blocks == ()
+    assert [(block.kind, block.nodes) for block in runtime._plan.blocks] == [("graph", ("start", "seed", "async_add", "out_to_next", "end"))]
     interpreted_nodes = []
-    original_run_node = PipelineRuntime._run_node
+    original_run_compiled_frame = PipelineRuntime._run_compiled_frame
 
-    def spy_run_node(self, node_name, context):
-        interpreted_nodes.append(node_name)
-        return original_run_node(self, node_name, context)
+    def spy_run_compiled_frame(self, frame, context):
+        interpreted_nodes.append(frame.name)
+        return original_run_compiled_frame(self, frame, context)
 
-    PipelineRuntime._run_node = spy_run_node
+    PipelineRuntime._run_compiled_frame = spy_run_compiled_frame
     try:
         context = runtime.run({})
     finally:
-        PipelineRuntime._run_node = original_run_node
+        PipelineRuntime._run_compiled_frame = original_run_compiled_frame
 
     assert interpreted_nodes == ["start", "seed", "async_add", "out_to_next", "end"]
     assert context.get("value.next")["value"] == 7
+    assert any(event["kind"] == "block_enter" for event in _runtime_trace_events_from_context(context))
 
 
 def _decision_loop_graph(*, target: int, max_steps: int = 20):
@@ -1125,9 +1275,177 @@ def test_runtime_options_block_executes_simple_conditional_route() -> None:
     assert list(context.get("runtime.exec_order")) == ["start", "seed", "add", "route", "end"]
 
 
+def _runtime_nodeset_depth_config(depth: int) -> dict:
+    nodesets = [
+        _nodeset_config(
+            "runtime.depth.0",
+            requires=["value.in"],
+            provides=["value.out"],
+            pipeline=_input_add_pipeline(add={"delta": 1}),
+        )
+    ]
+    for index in range(1, depth):
+        child = f"runtime.depth.{index - 1}"
+        nodesets.append(
+            _nodeset_config(
+                f"runtime.depth.{index}",
+                requires=["value.in"],
+                provides=["value.out"],
+                pipeline={
+                    "inputs": [PROV_SPEC("value.in")],
+                    "nodes": [
+                        _node_call("start", "test.start", f"Starts runtime depth wrapper {index}."),
+                        _node_call("call", child, f"Calls {child}.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                        _node_call("end", "test.out_end", f"Ends runtime depth wrapper {index}.", requires=[REQ_SPEC("value.out")]),
+                    ],
+                    "edges": _edge_chain("start", "call", "end"),
+                    "outputs": [REQ_SPEC("value.out")],
+                },
+            )
+        )
+    return {
+        "nodesets": nodesets,
+        "pipeline": {
+            "inputs": [PROV_SPEC("value.in")],
+            "nodes": [
+                _node_call("start", "test.start", "Starts the runtime depth fixture."),
+                _node_call(
+                    "top",
+                    f"runtime.depth.{depth - 1}",
+                    "Calls the runtime depth fixture.",
+                    requires=[REQ_SPEC("value.in")],
+                    provides=[PROV_SPEC("value.out")],
+                ),
+                _node_call("end", "test.out_end", "Ends the runtime depth fixture.", requires=[REQ_SPEC("value.out")]),
+            ],
+            "edges": _edge_chain("start", "top", "end"),
+            "outputs": [REQ_SPEC("value.out")],
+        },
+    }
+
+
+def _runtime_nodeset_depth_graph(depth: int):
+    return parse_graph_config(_runtime_nodeset_depth_config(depth))
+
+
 def test_runtime_options_rejects_unknown_execution() -> None:
     with pytest.raises(ValueError, match="runtime execution"):
         RuntimeOptions(execution="native")
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 1.5, "4"])
+def test_runtime_options_rejects_invalid_async_max_workers(value) -> None:
+    with pytest.raises(ValueError, match="async_max_workers"):
+        RuntimeOptions(async_max_workers=value)
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 1.5, "4"])
+def test_runtime_options_rejects_invalid_nodeset_max_depth(value) -> None:
+    with pytest.raises(ValueError, match="nodeset_max_depth"):
+        RuntimeOptions(nodeset_max_depth=value)
+
+
+def test_runtime_options_default_nodeset_max_depth_is_four() -> None:
+    assert RuntimeOptions().nodeset_max_depth == 4
+
+
+def test_pipeline_runtime_rejects_depth_five_and_allows_explicit_override() -> None:
+    graph = _runtime_nodeset_depth_graph(5)
+
+    with pytest.raises(PipelineRuntimeError, match="nodeset nesting depth 5.*maximum 4"):
+        PipelineRuntime(graph, registry=_registry())
+
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(nodeset_max_depth=5))
+    assert runtime._plan.frames["top"].subplan is not None
+
+
+def test_checked_run_and_validate_use_effective_nodeset_max_depth(tmp_path) -> None:
+    from vibeflow.cli.config import validate_config_path
+
+    config_path = tmp_path / "depth.jsonc"
+    _write_config_file(config_path, _runtime_nodeset_depth_config(5))
+
+    validation = validate_config_path(config_path)
+    with pytest.raises(CheckedRunError) as refused:
+        run_checked(config_path, registry=_registry(), initial={"value.in": 2}, run_root=tmp_path / "runs", run_id="default-depth")
+    result = run_checked(
+        config_path,
+        registry=_registry(),
+        initial={"value.in": 2},
+        run_root=tmp_path / "runs",
+        run_id="custom-depth",
+        runtime_options=RuntimeOptions(nodeset_max_depth=5),
+    )
+
+    assert any(error.rule_id == "NODESET.NESTING.DEPTH_EXCEEDED" for error in validation.errors)
+    assert any(error.rule_id == "NODESET.NESTING.DEPTH_EXCEEDED" for error in refused.value.result.health.errors)
+    assert result.context.get("value.out")["value"] == 3
+
+
+def test_loop_iterations_do_not_increase_nodeset_nesting_depth() -> None:
+    graph = _while_loop_graph(target=5, max_iterations=10)
+
+    context = PipelineRuntime(graph, registry=_loop_registry(), runtime_options=RuntimeOptions(nodeset_max_depth=1)).run({"loop.current": 0})
+
+    assert context.get("loop.final")["value"] == 5
+
+
+def test_async_executor_defaults_to_four_workers() -> None:
+    graph = parse_graph_config({"pipeline": _seed_add_pipeline()})
+    runtime = PipelineRuntime(graph, registry=_registry())
+
+    try:
+        assert runtime._executor_for_async()._max_workers == 4
+    finally:
+        runtime._shutdown_executor()
+
+
+def test_async_executor_can_run_six_tasks_concurrently() -> None:
+    graph = parse_graph_config({"pipeline": _seed_add_pipeline()})
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(async_max_workers=6))
+    barrier = threading.Barrier(7)
+
+    def task() -> str:
+        barrier.wait(timeout=2)
+        return threading.current_thread().name
+
+    try:
+        executor = runtime._executor_for_async()
+        futures = [executor.submit(task) for _ in range(6)]
+        barrier.wait(timeout=2)
+        assert len({future.result(timeout=2) for future in futures}) == 6
+    finally:
+        runtime._shutdown_executor()
+
+
+def test_async_executor_queues_tasks_beyond_worker_limit() -> None:
+    graph = parse_graph_config({"pipeline": _seed_add_pipeline()})
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(async_max_workers=2))
+    blockers_ready = threading.Barrier(3)
+    release = threading.Event()
+    queued_started = threading.Event()
+
+    def blocker() -> str:
+        blockers_ready.wait(timeout=2)
+        release.wait(timeout=2)
+        return "blocker"
+
+    def queued() -> str:
+        queued_started.set()
+        return "queued"
+
+    try:
+        executor = runtime._executor_for_async()
+        blockers = [executor.submit(blocker) for _ in range(2)]
+        blockers_ready.wait(timeout=2)
+        queued_future = executor.submit(queued)
+        assert not queued_started.wait(timeout=0.05)
+        release.set()
+        assert [future.result(timeout=2) for future in blockers] == ["blocker", "blocker"]
+        assert queued_future.result(timeout=2) == "queued"
+    finally:
+        release.set()
+        runtime._shutdown_executor()
 
 
 def test_async_result_key_joins_when_required() -> None:
@@ -1149,7 +1467,7 @@ def test_async_result_key_joins_when_required() -> None:
     context = PipelineRuntime(graph, registry=_registry()).run({})
 
     assert context.get("value.out")["value"] == 7
-    assert "async_result_join" in [event["kind"] for event in context.get("runtime.events")]
+    assert "async_result_join" in [event["kind"] for event in _runtime_trace_events_from_context(context)]
 
 
 def test_async_result_key_not_joined_when_unconsumed() -> None:
@@ -1182,7 +1500,7 @@ def test_async_result_key_not_joined_when_unconsumed() -> None:
 
     assert context.get("value.in")["value"] == 2
     assert not context.exists("value.async")
-    assert "async_result_join" not in [event["kind"] for event in context.get("runtime.events")]
+    assert "async_result_join" not in [event["kind"] for event in _runtime_trace_events_from_context(context)]
 
 
 def test_async_detached_failure_records_warning_and_completes() -> None:
@@ -1205,7 +1523,7 @@ def test_async_detached_failure_records_warning_and_completes() -> None:
 
     assert context.get("runtime.stop_reason") == "completed"
     assert context.get("value.in")["value"] == 2
-    events = context.get("runtime.events")
+    events = _runtime_trace_events_from_context(context)
     assert any(event["kind"] == "async_detached_failed" and "boom" in event["failure"] for event in events)
 
 
@@ -1286,7 +1604,7 @@ def test_async_nodeset_result_key_joins_when_required() -> None:
     context = PipelineRuntime(graph, registry=_registry()).run({"value.in": 5})
 
     assert context.get("value.out")["value"] == 7
-    assert "async_result_join" in [event["kind"] for event in context.get("runtime.events")]
+    assert "async_result_join" in [event["kind"] for event in _runtime_trace_events_from_context(context)]
     assert "composite.add" in context.get("runtime.qualified_exec_order")
 
 
@@ -1319,7 +1637,7 @@ def test_async_detached_timeout_records_warning_and_does_not_block() -> None:
     context = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(async_flush_timeout=0)).run({})
 
     assert context.get("value.in")["value"] == 3
-    assert any(event["kind"] == "async_detached_timeout" for event in context.get("runtime.events"))
+    assert any(event["kind"] == "async_detached_timeout" for event in _runtime_trace_events_from_context(context))
 
 
 def test_runtime_options_node_hooks_false_skips_per_node_hooks(tmp_path) -> None:
@@ -1456,6 +1774,36 @@ def test_checked_run_trace_records_nodeset_enter_exit(tmp_path) -> None:
     assert trace_lines[-1]["total_step_count"] == 6
 
 
+def test_checked_run_output_summary_does_not_expand_large_prediction_mapping(tmp_path) -> None:
+    registry = _registry()
+    register_node(registry, "test.large_prediction", LargePredictionNode)
+    config_path = tmp_path / "large_prediction.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "pipeline": {
+                    "nodes": [
+                        _node_call("start", "test.start", "Starts large prediction fixture."),
+                        _node_call("predict", "test.large_prediction", "Produces large prediction mapping.", provides=[PROV_SPEC("value.out")]),
+                        _node_call("end", "test.out_end", "Consumes predictions.", requires=[REQ_SPEC("value.out")]),
+                    ],
+                    "edges": _edge_chain("start", "predict", "end"),
+                    "outputs": [REQ_SPEC("value.out")],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_checked(config_path, registry=registry, run_root=tmp_path / "runs", run_id="large_prediction")
+
+    assert result.context.get("value.out")["value"]["sample_0999"] == 999
+    summary_text = (result.run_dir / "output_summary.json").read_text(encoding="utf-8")
+    summary = json.loads(summary_text)
+    assert summary["value.out"]["value"] == {"size": 1000, "type": "dict"}
+    assert "sample_0999" not in summary_text
+
+
 def test_runtime_trace_records_nested_nodeset_qualified_paths() -> None:
     graph = parse_graph_config(
         {
@@ -1497,7 +1845,7 @@ def test_runtime_trace_records_nested_nodeset_qualified_paths() -> None:
 
     assert context.get("value.out")["value"] == 2
     assert "outer_call.inner_call.add" in context.get("runtime.qualified_exec_order")
-    node_events = [event for event in context.get("runtime.events") if event["kind"] == "node"]
+    node_events = [event for event in _runtime_trace_events_from_context(context) if event["kind"] == "node"]
     inner_add = next(event for event in node_events if event["qualified_node"] == "outer_call.inner_call.add")
     assert inner_add["path"] == ["outer_call", "inner_call", "add"]
     assert inner_add["depth"] == 2
@@ -1604,10 +1952,11 @@ def test_runtime_trace_preserves_nested_failure_path() -> None:
     with pytest.raises(RuntimeError, match="boom"):
         runtime.run({})
 
-    failed = [event for event in runtime.trace.events if event["kind"] == "node_failed" and event["node"] == "bad"]
+    events = [line for line in _runtime_trace_lines(Path(runtime.trace.trace_path)) if line["kind"] != "runtime_summary"]
+    failed = [event for event in events if event["kind"] == "node_failed" and event["node"] == "bad"]
     assert failed[0]["path"] == ["composite", "bad"]
     assert failed[0]["qualified_node"] == "composite.bad"
-    assert any(event["kind"] == "nodeset_failed" and event["path"] == ["composite"] for event in runtime.trace.events)
+    assert any(event["kind"] == "nodeset_failed" and event["path"] == ["composite"] for event in events)
 
 
 def test_cli_train_profile_sets_async_flush_timeout_and_allows_override() -> None:
@@ -1620,8 +1969,55 @@ def test_cli_train_profile_sets_async_flush_timeout_and_allows_override() -> Non
     train_options = _runtime_options_from_args(parser.parse_args(["--runtime-profile", "train"]))
     override_options = _runtime_options_from_args(parser.parse_args(["--runtime-profile", "train", "--async-flush-timeout", "1.5"]))
 
-    assert train_options.async_flush_timeout == 30.0
-    assert override_options.async_flush_timeout == 1.5
+    assert train_options["async_flush_timeout"] == 30.0
+    assert override_options["async_flush_timeout"] == 1.5
+
+
+@pytest.mark.parametrize(
+    "run_id",
+    ["", ".", "..", "../escape", "nested/id", "nested\\id", "/absolute", "nul\x00id"],
+)
+def test_cli_run_rejects_unsafe_run_id_before_creating_run(tmp_path, capsys, run_id) -> None:
+    run_root = tmp_path / "runs"
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_main(
+            [
+                "run",
+                "--config",
+                str(tmp_path / "unused.json"),
+                "--run-root",
+                str(run_root),
+                "--run-id",
+                run_id,
+            ]
+        )
+
+    assert exc_info.value.code == 2
+    assert "run id must be one non-empty path component" in capsys.readouterr().err
+    assert not run_root.exists()
+    assert not (tmp_path / "escape").exists()
+
+
+@pytest.mark.parametrize(
+    "run_id",
+    ["", ".", "..", "../escape", "nested/id", "nested\\id", "/absolute", "nul\x00id"],
+)
+def test_checked_run_rejects_unsafe_programmatic_run_id_without_writing(tmp_path, run_id) -> None:
+    from vibeflow.run_directory import InvalidRunIdError
+
+    run_root = tmp_path / "runs"
+
+    with pytest.raises(InvalidRunIdError, match="one non-empty path component"):
+        run_checked(
+            tmp_path / "unused.json",
+            registry=_registry(),
+            run_root=run_root,
+            run_id=run_id,
+        )
+
+    assert not run_root.exists()
+    assert not (tmp_path / "escape").exists()
 
 
 def test_cli_run_uses_checked_run_and_refuses_without_registered_nodes(tmp_path, capsys) -> None:
@@ -1723,7 +2119,7 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     import subprocess
     import sys
 
-    from build_distribution import build_distribution
+    from build_distribution import ROOT_README_GENERATED_AT_MARKER, build_distribution
 
     def verify(output_path: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -1739,6 +2135,76 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     build_distribution(output, run_self_check=False)
     manifest = (output / "kernel" / "MANIFEST.sha256").read_text(encoding="utf-8")
     manifest_paths = {line.split("  ", 1)[1] for line in manifest.splitlines() if line.strip()}
+
+    generic_context_example = 'result.context.get("value.out")["value"]'
+    template_context_example = 'result.context.get("response.value")["value"]'
+    scalar_summary_marker = '"scalar": true'
+    repository_root = Path(__file__).resolve().parents[3]
+    source_guides = [
+        repository_root / "distribution" / "kernel_development_pack" / "project_template" / "README.md",
+        repository_root / "distribution" / "kernel_development_pack" / "project_template" / "AGENTS.md",
+        repository_root / "distribution" / "kernel_development_pack" / "docs" / "07_启动命令与报告.md",
+        repository_root / "docs" / "developer_guide.md",
+    ]
+    generated_guides = [
+        output / "README.md",
+        output / "AGENTS.md",
+        output / "kernel" / "docs" / "07_启动命令与报告.md",
+        output / "kernel" / "docs" / "10_Kernel能力与项目开发指南.md",
+    ]
+    for guide in [*source_guides, *generated_guides]:
+        text = guide.read_text(encoding="utf-8")
+        expected_context = (
+            template_context_example
+            if guide.name in {"README.md", "AGENTS.md"}
+            else generic_context_example
+        )
+        assert expected_context in text
+        assert scalar_summary_marker in text
+
+    source_readme = source_guides[0].read_text(encoding="utf-8")
+    generated_readme = (output / "README.md").read_text(encoding="utf-8")
+    generated_at_line = next(
+        line for line in generated_readme.splitlines() if line.startswith("生成时间：")
+    )
+    assert generated_readme == source_readme.replace(
+        ROOT_README_GENERATED_AT_MARKER,
+        generated_at_line,
+    )
+    for required in (
+        "project/ARCHITECTURE.jsonc",
+        "真实 workflow config",
+        "相关 nodeset",
+        "runtime.async_max_workers",
+        "runtime.async_flush_timeout",
+        "runtime.nodeset_max_depth",
+        "planned nodeset",
+    ):
+        assert required in generated_readme
+
+    generated_agents = (output / "AGENTS.md").read_text(encoding="utf-8")
+    for required in (
+        "必须优先阅读",
+        "真实 workflow config",
+        "相关 nodeset JSONC",
+        "runtime.async_max_workers",
+        "runtime.async_flush_timeout",
+        "runtime.nodeset_max_depth",
+    ):
+        assert required in generated_agents
+
+    template_config = json.loads(
+        (output / "project" / "configs" / "main.jsonc").read_text(encoding="utf-8")
+    )
+    template_nodes = {
+        node["id"]: node for node in template_config["pipeline"]["nodes"]
+    }
+    assert template_nodes["end"].get("requires") in (None, [])
+    assert template_nodes["end"].get("provides") in (None, [])
+    assert template_nodes["output"]["type_used"] == "demo.output"
+    assert template_nodes["output"]["requires"][0]["type"] == "semantic.value"
+    assert template_nodes["output"]["provides"][0]["type"] == "response.value"
+    assert template_config["pipeline"]["outputs"][0]["type"] == "response.value"
 
     assert not (output / "docs").exists()
     assert not (output / "tools").exists()
@@ -1770,6 +2236,7 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     result = verify(output)
     assert result.returncode == 0, result.stderr
 
+
     docs_failure = tmp_path / "distribution_docs_failure"
     build_distribution(docs_failure, run_self_check=False)
     docs_path = docs_failure / "kernel" / "docs" / "00_内核目的与项目结构.md"
@@ -1797,6 +2264,68 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     assert result.returncode == 2
     assert "Unexpected:" in result.stderr
     assert "kernel/vibeflow/unpacked.py" in result.stderr
+
+
+def test_distribution_build_honors_source_date_epoch(tmp_path, monkeypatch) -> None:
+    from build_distribution import ROOT_README_GENERATED_AT_MARKER, build_distribution
+
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "1783784063")
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    build_distribution(first, run_self_check=False)
+    build_distribution(second, run_self_check=False)
+
+    first_files = {
+        path.relative_to(first): path.read_bytes()
+        for path in first.rglob("*")
+        if path.is_file()
+    }
+    second_files = {
+        path.relative_to(second): path.read_bytes()
+        for path in second.rglob("*")
+        if path.is_file()
+    }
+    assert first_files == second_files
+    generated_line = "生成时间：2026-07-11 15:34:23 UTC"
+    source_readme = (
+        Path(__file__).resolve().parents[3]
+        / "distribution"
+        / "kernel_development_pack"
+        / "project_template"
+        / "README.md"
+    ).read_text(encoding="utf-8")
+    assert (first / "README.md").read_text(encoding="utf-8") == source_readme.replace(
+        ROOT_README_GENERATED_AT_MARKER,
+        generated_line,
+    )
+
+
+def test_distribution_build_normalizes_portable_modes_deterministically(tmp_path) -> None:
+    import stat
+
+    from build_distribution import build_distribution
+
+    def modes(root: Path) -> dict[Path, int]:
+        entries = [root, *root.rglob("*")]
+        assert not any(path.is_symlink() for path in entries)
+        assert all(path.is_dir() or path.is_file() for path in entries)
+        return {
+            path.relative_to(root): stat.S_IMODE(path.stat().st_mode)
+            for path in entries
+        }
+
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    build_distribution(first, run_self_check=False)
+    build_distribution(second, run_self_check=False)
+
+    first_modes = modes(first)
+    second_modes = modes(second)
+    assert first_modes == second_modes
+    assert all(
+        mode == (0o755 if (first / relative).is_dir() else 0o644)
+        for relative, mode in first_modes.items()
+    )
 
 
 def test_distribution_build_runs_core_self_check_before_writing(tmp_path, monkeypatch) -> None:
@@ -1841,7 +2370,16 @@ def test_distribution_core_self_check_uses_ci_quality_command(monkeypatch) -> No
 
     distribution_builder._run_core_self_check()
 
-    assert captured["command"] == [sys.executable, "-m", "vibeflow", "quality-check", "--path", "."]
+    expected_command = [
+        sys.executable,
+        "-m",
+        "vibeflow",
+        "quality-check",
+        "--path",
+        "src/vibeflow",
+        *distribution_builder.CORE_SELF_CHECK_STRUCTURE_ARGS,
+    ]
+    assert captured["command"] == expected_command
     assert captured["cwd"] == distribution_builder.ROOT
     assert str(distribution_builder.ROOT / "src") in str(captured["env"]["PYTHONPATH"])
     assert captured["check"] is False

@@ -9,10 +9,18 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tools/mermaid-renderer/package-lock.json
+      - name: Install Mermaid renderer
+        working-directory: tools/mermaid-renderer
+        run: npm ci
       - name: Install package
         run: python -m pip install -e . pytest
       - name: Compile Python files
@@ -22,4 +30,18 @@ jobs:
       - name: Run integration sandbox
         run: PYTHONPATH=src python examples/integration_sandbox/run_all.py
       - name: Run quality check
-        run: PYTHONPATH=src python -m vibeflow quality-check --path .
+        run: >
+          PYTHONPATH=src python -m vibeflow quality-check --path src/vibeflow
+          --enable-structure-limits
+          --warn-root-code-files 150
+          --max-root-code-files 200
+          --warn-code-dirs 16
+          --max-code-dirs 24
+          --warn-code-files-per-dir 20
+          --max-code-files-per-dir 30
+          --warn-code-dir-depth 4
+          --max-code-dir-depth 5
+          --warn-child-code-dirs-per-dir 6
+          --max-child-code-dirs-per-dir 10
+          --warn-root-level-code-files 110
+          --max-root-level-code-files 120

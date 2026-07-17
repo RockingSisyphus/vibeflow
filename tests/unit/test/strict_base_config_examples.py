@@ -3,7 +3,7 @@ from tests.unit.strict_support import *
 import ast
 
 from vibeflow import build_architecture_report
-from vibeflow.ast_rules import import_aliases, import_roots, qualified_call_name
+from vibeflow.purity.ast_rules import import_aliases, import_roots, qualified_call_name
 
 def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) -> None:
     manifest = load_config_document(_repo_root() / "examples" / "failure_cases" / "cases.jsonc").data
@@ -105,6 +105,7 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
     assert {
         "source_too_large",
         "banned_call",
+        "effect_call",
         "node_direct_call",
         "module_side_effect",
         "CONFIG.LOOPS.REMOVED",
@@ -381,6 +382,44 @@ def test_code_quality_report_includes_directory_structure_graph(tmp_path) -> Non
     fanin = next(finding for finding in report.findings if finding.rule_id == "QUALITY.STRUCTURE.DIRECTORY_FANIN")
     assert fanin.details["suggested_entry_files"] == ("__init__.py", "api.py")
 
+
+def test_code_quality_root_structure_limits_report_warning_error_and_role_imports(tmp_path) -> None:
+    nodes = tmp_path / "nodes"
+    base_lib = tmp_path / "base_lib"
+    plugins = tmp_path / "plugins"
+    for directory in (nodes, base_lib, plugins):
+        directory.mkdir()
+        (directory / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "registry.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (tmp_path / "helper.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (nodes / "main.py").write_text("import helper\n", encoding="utf-8")
+    (base_lib / "bad.py").write_text("import plugins.policy\n", encoding="utf-8")
+    (plugins / "policy.py").write_text("import nodes.main\n", encoding="utf-8")
+    for index in range(17):
+        (nodes / f"part_{index}.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    report = scan_code_quality(tmp_path, structure_limits=QualityStructureLimits())
+    by_rule = {finding.rule_id: finding for finding in report.findings}
+
+    assert report.status == "FAIL"
+    assert by_rule["QUALITY.STRUCTURE.DIRECTORY_TOO_MANY_CODE_FILES"].severity == "error"
+    assert by_rule["QUALITY.STRUCTURE.ROOT_LEVEL_CODE_FILE"].severity == "warning"
+    assert by_rule["QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT"].object_id == "nodes.main -> helper"
+    assert by_rule["QUALITY.STRUCTURE.BASE_LIB_UPWARD_IMPORT"].object_id == "base_lib.bad -> plugins.policy"
+    assert by_rule["QUALITY.STRUCTURE.PLUGIN_NODE_IMPORT"].object_id == "plugins.policy -> nodes.main"
+    assert report.structure_summary["root_layout"]["code_files"] == 25
+    assert report.structure_summary["root_layout"]["code_dirs"] == 3
+
+
+def test_code_quality_path_scan_does_not_enable_root_structure_by_default(tmp_path) -> None:
+    (tmp_path / "helper.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    report = scan_code_quality(tmp_path)
+
+    assert report.status == "PASS"
+    assert not any(finding.rule_id.startswith("QUALITY.STRUCTURE.ROOT_LEVEL") for finding in report.findings)
+
+
 def test_code_quality_report_identifies_prefix_clusters(tmp_path) -> None:
     feature = tmp_path / "feature"
     feature.mkdir()
@@ -570,3 +609,16 @@ def test_cli_quality_check_json_and_text_outputs(tmp_path, capsys) -> None:
     assert "QUALITY.SIDE_EFFECT.CALL" in text_output
     assert "file:bad.py" in text_output
     assert "details:" in text_output
+
+
+def test_cli_quality_structure_limits_are_explicit_for_path_scans(tmp_path, capsys) -> None:
+    (tmp_path / "helper.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    assert cli_main(["quality-check", "--path", str(tmp_path), "--json"]) == 0
+    default_payload = json.loads(capsys.readouterr().out)
+    assert default_payload["errors"] == []
+    assert default_payload["warnings"] == []
+
+    assert cli_main(["quality-check", "--path", str(tmp_path), "--json", "--enable-structure-limits"]) == 0
+    enabled_payload = json.loads(capsys.readouterr().out)
+    assert [finding["rule_id"] for finding in enabled_payload["warnings"]] == ["QUALITY.STRUCTURE.ROOT_LEVEL_CODE_FILE"]

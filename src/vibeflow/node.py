@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any, Mapping, Protocol
 
-from .data_contract import DataProvider, DataRequirement
+from vibeflow.data_contract import DataProvider, DataRequirement
 
 
 FLOW_KIND_TERMINAL = "terminal"
@@ -14,6 +15,11 @@ FLOW_KIND_PREDEFINED = "predefined"
 FLOW_KIND_DATA_STORE = "data_store"
 FLOW_KIND_DOCUMENT = "document"
 FLOW_KIND_PREPARATION = "preparation"
+
+EFFECT_SCOPE_NONE = "none"
+EFFECT_SCOPE_TERMINAL = "terminal"
+EFFECT_SCOPE_PYTHON_IO = "python_io"
+EFFECT_SCOPE_TRUSTED = "trusted"
 
 FLOW_KINDS = frozenset(
     {
@@ -27,6 +33,31 @@ FLOW_KINDS = frozenset(
         FLOW_KIND_PREPARATION,
     }
 )
+
+# Effect authorization is derived from semantic node metadata.  ``purity`` is
+# retained as a compatibility field, but is deliberately not an authorization
+# input so projects cannot create two conflicting sources of truth.
+_EFFECT_SCOPE_BY_FLOW_KIND: Mapping[str, str] = MappingProxyType(
+    {
+        FLOW_KIND_TERMINAL: EFFECT_SCOPE_NONE,
+        FLOW_KIND_PROCESS: EFFECT_SCOPE_NONE,
+        FLOW_KIND_DECISION: EFFECT_SCOPE_NONE,
+        FLOW_KIND_IO: EFFECT_SCOPE_TERMINAL,
+        FLOW_KIND_PREDEFINED: EFFECT_SCOPE_NONE,
+        FLOW_KIND_DATA_STORE: EFFECT_SCOPE_PYTHON_IO,
+        FLOW_KIND_DOCUMENT: EFFECT_SCOPE_PYTHON_IO,
+        FLOW_KIND_PREPARATION: EFFECT_SCOPE_NONE,
+    }
+)
+
+
+def effective_effect_scope(info: NodeInfo | None) -> str:
+    """Derive the sole fail-closed effect authorization from NodeInfo."""
+
+    if getattr(info, "external", False) is True:
+        return EFFECT_SCOPE_TRUSTED
+    flow_kind = str(getattr(info, "flow_kind", "") or "")
+    return _EFFECT_SCOPE_BY_FLOW_KIND.get(flow_kind, EFFECT_SCOPE_NONE)
 
 
 @dataclass(frozen=True)

@@ -1,30 +1,62 @@
 from __future__ import annotations
 
-from .base_lib import BaseLibDependencySummary, BaseLibFinding, BaseLibModuleReport, BaseLibScanReport, scan_base_lib, summarize_base_lib_dependency_chain
-from .architecture_report import build_architecture_report
-from .config_loader import ConfigDocument, ConfigLoadError, load_config_document, strip_jsonc_comments
-from .compiler import CompiledGraph, GraphCompileError, GraphCompiler
-from .config_resources import BaseLibInfo, BaseLibResource, ConfigResources, PluginInfo, PluginResource, load_config_resources
-from .data_contract import DataEnvelope, DataProvider, DataRequirement, RunResult
-from .execution_plan import CompiledBlock, ExecutionPlan, NodeFrame, build_execution_plan
-from .graph_config import EdgeSpec, GraphConfig, NodeSpec, NodesetSpec, parse_graph_config
-from .health import HealthFinding, HealthReport, validate_graph_health
-from .ascii_flowchart import export_ascii_flowchart
-from .mermaid import export_mermaid
-from .mermaid_render import MermaidRenderError, is_mermaid_svg_renderer_available, render_mermaid_svg
-from .node import FLOW_KINDS, FLOW_KIND_DATA_STORE, FLOW_KIND_DECISION, FLOW_KIND_DOCUMENT, FLOW_KIND_IO, FLOW_KIND_PREDEFINED, FLOW_KIND_PREPARATION, FLOW_KIND_PROCESS, FLOW_KIND_TERMINAL, NodeContract, NodeInfo, PureNode
-from .node_config import NodeConfigSpec
-from .policy import EffectivePolicy, PolicyResolveResult, default_effective_policy, resolve_effective_policy
-from .plugin import CompilerPlugin, PluginDescriptor, PluginRegistry, PolicyPlugin, RuntimePlugin, load_plugins_from_config
-from .planned_behavior import PlannedBehavior
-from .purity import NodeMetrics, collect_node_metrics
-from .registry import NodeRegistry, NodeRegistryError
-from .resources import schema_text
-from .runtime import PipelineRuntime, PipelineRuntimeError
-from .runtime_options import HookPlan, RuntimeOptions
-from .runner import CheckedRunError, CheckedRunResult, run_checked
+from vibeflow.base_lib import BaseLibDependencySummary, BaseLibFinding, BaseLibModuleReport, BaseLibScanReport, scan_base_lib, summarize_base_lib_dependency_chain
+from vibeflow.architecture_report import build_architecture_report
+from vibeflow.config.loader import ConfigDocument, ConfigLoadError, load_config_document, strip_jsonc_comments
+from vibeflow.compiler import CompiledGraph, GraphCompileError, GraphCompiler
+from vibeflow.config.resources import BaseLibInfo, BaseLibRegistry, BaseLibResource, ConfigResources, PluginInfo, PluginResource, PluginResourceRegistry, load_config_resources
+from vibeflow.data_contract import DataEnvelope, DataProvider, DataRequirement, RunResult
+from vibeflow.runtime.block_compiler import explain_block_compilation
+from vibeflow.runtime.planning import CompiledBlock, ExecutionPlan, NodeFrame, build_execution_plan
+from vibeflow.graph_config import EdgeSpec, GraphConfig, NodeSpec, NodesetSpec, parse_graph_config
+from vibeflow.health import HealthFinding, HealthReport, validate_graph_health
+from vibeflow.rendering.architecture_document import build_architecture_document, render_architecture_document
+from vibeflow.rendering.ascii_flowchart import export_ascii_flowchart
+from vibeflow.rendering.mermaid import export_mermaid
+from vibeflow.rendering.mermaid.render import MermaidRenderError, is_mermaid_svg_renderer_available, render_mermaid_svg
+from vibeflow.node import (
+    FLOW_KINDS,
+    FLOW_KIND_DATA_STORE,
+    FLOW_KIND_DECISION,
+    FLOW_KIND_DOCUMENT,
+    FLOW_KIND_IO,
+    FLOW_KIND_PREDEFINED,
+    FLOW_KIND_PREPARATION,
+    FLOW_KIND_PROCESS,
+    FLOW_KIND_TERMINAL,
+    NodeContract,
+    NodeInfo,
+    PureNode,
+)
+from vibeflow.node_config import NodeConfigSpec
+from vibeflow.policy import EffectivePolicy, PolicyResolveResult, default_effective_policy, resolve_effective_policy
+from vibeflow.plugin import CompilerPlugin, PluginDescriptor, PluginRegistry, PolicyPlugin, RuntimePlugin, load_plugins_from_config
+from vibeflow.graph_config.planned_behavior import PlannedBehavior
+from vibeflow.purity import NodeMetrics, collect_node_metrics
+from vibeflow.registry import NodeRegistry, NodeRegistryError
+from vibeflow.resources import schema_text
+from vibeflow.runtime import PipelineRuntime, PipelineRuntimeError
+from vibeflow.runtime.options import HookPlan, RuntimeOptions
+from vibeflow.runner import CheckedRunError, CheckedRunResult, run_checked
+from vibeflow.workspace import (
+    ArchitectureDocumentSpec,
+    PROJECT_CONFIG_NAME,
+    WORKSPACE_CONFIG_NAME,
+    WorkspaceConfig,
+    WorkspaceConfigError,
+    WorkspaceEnvironment,
+    WorkspaceRoot,
+    build_workspace_environment,
+    build_workspace_node_registry,
+    load_workspace_config,
+    load_workspace_graph_for_export,
+    run_workspace_checked,
+    scan_workspace_code_quality,
+    validate_workspace_config_path,
+)
 
 __all__ = [
+    "ArchitectureDocumentSpec",
     "CompiledGraph",
     "CompiledBlock",
     "ConfigDocument",
@@ -34,10 +66,12 @@ __all__ = [
     "BaseLibFinding",
     "BaseLibDependencySummary",
     "BaseLibInfo",
+    "BaseLibRegistry",
     "BaseLibModuleReport",
     "BaseLibResource",
     "BaseLibScanReport",
     "build_architecture_report",
+    "build_architecture_document",
     "build_execution_plan",
     "CompilerPlugin",
     "ConfigResources",
@@ -75,6 +109,7 @@ __all__ = [
     "PluginInfo",
     "PluginRegistry",
     "PluginResource",
+    "PluginResourceRegistry",
     "PlannedBehavior",
     "PolicyPlugin",
     "PolicyResolveResult",
@@ -82,6 +117,8 @@ __all__ = [
     "RuntimeOptions",
     "RunResult",
     "STABLE_PUBLIC_API",
+    "PROJECT_CONFIG_NAME",
+    "WORKSPACE_CONFIG_NAME",
     "NodesetSpec",
     "PipelineRuntime",
     "PipelineRuntimeError",
@@ -90,6 +127,7 @@ __all__ = [
     "default_effective_policy",
     "export_mermaid",
     "export_ascii_flowchart",
+    "explain_block_compilation",
     "is_mermaid_svg_renderer_available",
     "load_config_document",
     "load_config_resources",
@@ -97,12 +135,24 @@ __all__ = [
     "parse_graph_config",
     "resolve_effective_policy",
     "render_mermaid_svg",
+    "render_architecture_document",
     "run_checked",
     "scan_base_lib",
     "schema_text",
     "strip_jsonc_comments",
     "summarize_base_lib_dependency_chain",
     "validate_graph_health",
+    "WorkspaceConfig",
+    "WorkspaceConfigError",
+    "WorkspaceEnvironment",
+    "WorkspaceRoot",
+    "build_workspace_environment",
+    "build_workspace_node_registry",
+    "load_workspace_config",
+    "load_workspace_graph_for_export",
+    "run_workspace_checked",
+    "scan_workspace_code_quality",
+    "validate_workspace_config_path",
 ]
 
 STABLE_PUBLIC_API = tuple(__all__)

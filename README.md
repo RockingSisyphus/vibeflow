@@ -49,7 +49,8 @@ VibeFlow 面向发布包使用。
 1. 到 GitHub Releases 下载最新发布包。
 2. 解压到你的工作目录。
 3. 用任意 vibe coding 软件在该目录创建或打开项目，例如 OpenCode、Codex、Claude Code。
-4. 让 AI 先按 `AGENTS.md` 生成 planned 流程图，确认结构后再逐步实现业务 node、base_lib、plugin 和 JSONC config。
+4. 让 AI 先按 `AGENTS.md` 判断任务类型：已有项目先读登记的架构文档并原位修改真实 workflow/nodeset；空白项目才从粗粒度 planned 流程图开始。
+5. 用 `python run.py review` 生成正式架构审核产物；如果你要求“审核后再实现”，AI 必须等待你在后续消息中明确批准。
 
 发布包根目录会带有 `AGENTS.md`。支持项目指令的 AI 工具会自动读取它，并理解：
 
@@ -57,8 +58,11 @@ VibeFlow 面向发布包使用。
 - 哪些内核文件不能改。
 - 如何新增 node、nodeset、plugin。
 - 如何运行 validate、run、quality、diagram 命令。
+- 如何先读并更新不可手工编辑的 `ARCHITECTURE.jsonc`。
 - 运行前必须满足哪些健康检查。
-- 如何先设计 planned nodeset，导出流程图给人审核，再逐层实现。
+- 如何区分空白项目与已有项目，并在真实 source 上完成修改。
+- 如何用 `review` 生成正式审核图，在人类明确批准后再实现。
+- 如何用 CLI 让渡模式 / `delegate-cli` 把 workflow 当成普通业务命令行程序。
 
 你不需要先理解完整内核源码，也不需要手工配置复杂工程。把发布包当成一个带规则的 AI 开发工作目录即可。
 
@@ -77,11 +81,12 @@ kernel/
     mermaid-renderer/
   THIRD_PARTY_NOTICES.md
 project/
+  ARCHITECTURE.jsonc # 由真实 source 生成的单文件架构审查视图
   nodes/          # 业务 node
   base_lib/       # 纯函数 helper
   plugins/        # 可选策略和运行插件
   configs/        # JSONC 流程配置
-  registry.py     # 节点注册
+  registry.py     # 注册 node/base_lib/plugin 可用资源
 runs/
 reports/
 ```
@@ -89,8 +94,12 @@ reports/
 常用命令形态：
 
 ```bash
+python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc
+python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc --check
+python run.py review --config project/configs/main.jsonc --output reports/graph.expanded.svg
 python run.py validate --config project/configs/main.jsonc
 python run.py run --config project/configs/main.jsonc --run-root runs
+python run.py delegate-cli --config project/configs/main.jsonc -- --input data.yaml --verbose
 python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
 python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
 python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
@@ -98,32 +107,47 @@ python run.py svg --config project/configs/main.jsonc --expand-nodesets --output
 python run.py quality --path project
 ```
 
-`run` 会在 `runs/<run_id>/` 自动写出快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`。`svg` 导出会为 Mermaid CLI 传入放大的渲染配置；普通图默认 `maxTextSize=200000`，`--expand-nodesets` 默认 `maxTextSize=500000`。超大图仍可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
-展开 SVG 会固定使用确定性的 `review-columns` composer：主流程保持在左侧，右侧依次展示 plugins、base_lib 和按顶层调用顺序排列的展开 nodeset。nodeset 详情使用递归 detail-panel：叶子 nodeset 横向展示；包含子 nodeset 的父图保持 collapsed call-site 和原始连边，右侧按调用顺序纵向展示直接子 nodeset。审查图默认把单个片段显示宽度限制为 `3200px`，可用 `--review-fragment-max-width` 调整。
-`graph.expanded.mmd` 只是 Mermaid 源码调试产物，不要直接用 Mermaid CLI/mmdc 转成 SVG；详细审查 SVG 必须通过 `run.py svg --expand-nodesets` 生成。
+每个 root 可以在 `vibeflow_project.jsonc` 的 `architecture.documents` 中登记 workflow 与架构文档。生成文件用固定注释明确标记为 generated、non-executable，不用可手改的状态属性伪装；AI 应优先读文档理解项目架构。要改变架构，应修改真实 workflow config 或相关 nodeset，必要时再修改 registry metadata/config schema，然后重新生成；不要手工编辑架构文档。已登记文档缺失、陈旧或被手工改写时，`validate` / `run` 会拒绝继续并给出源文件位置与修复命令。
+
+`review` 是正式架构审核入口：它检查登记关系和现有图、更新并复核 canonical `ARCHITECTURE.jsonc`、执行 workspace validate，再生成并检查 expanded `review-columns` SVG。任一步失败都不会用旧 SVG、手写图或直接调用 mmdc 补位，也不会把失败产物发布到目标路径。`PASS` 或 `CONCERNS` 只表示机器审核完成；如果任务约定“审核后再实现”，仍需等待人类在后续消息中明确批准。
+
+CLI 让渡模式 / `delegate-cli` 用于面向最终用户的普通业务 CLI。首个 `--` 可选地分隔 core 与业务参数；未被 core 消费的 token 按原序作为 `cli.argv` 进入 workflow，图必须从唯一 `cli.exit_code` 输出非 bool 整数 `0..255`。业务直接使用真实 stdin/stdout/stderr，VibeFlow 不捕获、重写或添加 JSON/换行；内核诊断写入当次 run 的 `vibeflow.log`，不记录 argv 原文或业务流。只有 `io` / `document` / `data_store` node 和 runtime plugin 可发出授权 `SystemExit`；正常/授权退出返回 `0..255`，框架失败返回 1，已知 core 参数的 argparse 错误返回 2。`delegate-cli` 不改变 `run` 的通用执行职责或 `review` 的架构审核职责。
+
+同一份 root 配置还可设置 `runtime.async_max_workers`（默认 4）、`runtime.async_flush_timeout`（默认 `null`）和 `runtime.nodeset_max_depth`（默认 4）。线程数控制每个 Runtime 的独立线程池；普通 nodeset 与 `loop.body` 共用深度限制，循环迭代次数不累计。线程数和深度不提供 CLI 参数。
+
+`run` 会在 `runs/<run_id>/` 自动写出当次 `architecture.jsonc`、快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`；它不会覆盖 root 中登记的文档。`svg` 命令内部会为 bundled Mermaid CLI 传入放大的渲染配置；Mermaid CLI/mmdc 是内核实现细节，不是公开的审核入口。普通图默认 `maxTextSize=200000`，`--expand-nodesets` 默认 `maxTextSize=500000`。
+展开 SVG 会固定使用确定性的 `review-columns` composer：主流程保持在左侧，右侧依次展示当前 workflow 实际启用的 plugins/base_lib 和按顶层调用顺序排列的展开 nodeset。nodeset 详情使用递归 detail-panel：叶子 nodeset 横向展示；包含子 nodeset 的父图保持 collapsed call-site 和原始连边，右侧按调用顺序纵向展示直接子 nodeset。审查图默认把单个片段显示宽度限制为 `3200px`，可用 `--review-fragment-max-width` 调整。
+`graph.expanded.mmd` 只是 Mermaid 源码调试产物，不要直接用 Mermaid CLI/mmdc 转成 SVG。正式架构审核必须使用 `run.py review`；`run.py svg --expand-nodesets` 只保留为单项导出或诊断入口。
 SVG 渲染不要求系统预装 Google Chrome；正常 `npm install` 后会优先使用 Puppeteer 自己安装/缓存的浏览器。`/snap/bin/chromium` 会被跳过，因为它在 Puppeteer/mermaid-cli 下常见 profile lock 启动失败。
 在发布包中首次使用 SVG 前，到 `kernel/tools/mermaid-renderer/` 执行 `npm install`。发布包不内置 `.gitignore`，项目可以自行决定是否忽略 `kernel/tools/mermaid-renderer/node_modules/`、`runs/`、`reports/` 等产物。
 
 ## AI 开发工作流 🛠️
 
+先判定任务类型，再进入对应路径：
+
 ```text
-描述需求
-  -> AI 抽象成粗粒度标准流程图
-  -> 用 planned nodeset 写入 JSONC
-  -> 导出 Mermaid 或 SVG 给人审核
-  -> 审核通过后逐层展开 nodeset
-  -> 实现 node/base_lib/plugin/config
+修改已有项目
+  -> 读已登记的 ARCHITECTURE.jsonc
+  -> 定位文档指向的真实 workflow / nodeset source
+  -> 列出复用 / 修改 / 删除 / 新增清单
+  -> 在原 config 和 nodeset 上作最小修改
+  -> run.py review -> 人类后续明确批准 -> 实现 -> validate / quality / run
+
+新建空白项目
+  -> 抽象粗粒度标准流程图
+  -> 用 planned nodeset 写入真实 JSONC
+  -> run.py review -> 人类后续明确批准
+  -> 逐层实现 node / base_lib / plugin / config
   -> validate / quality / run
-  -> 继续迭代
 ```
 
-重大结构变更也走同一模式：先 planned、先出图、先审核，再实现。尚未确定的部分保留为 `status: "planned"`，VibeFlow 会允许它用于设计审查，但不会让它伪装成可运行程序。
+已有 workflow 默认原位修改；不得用平行 review config、手写 Mermaid、概念图或笼统差异图代替真实 config 的审核。只有空白项目或人类明确批准整体重构时，才从新的粗粒度 planned 拓扑开始。planned nodeset 可以无 body 占位，也可以带 body 逐步细化；body 会进入单文件架构文档、展开图和适用的静态检查，但不会按 implemented body 执行。`python_stub` nodeset 仍只作为单个 stub，implemented nodeset 则必须有完整 pipeline。
 
 VibeFlow 不阻止你 vibe coding。它只是让每一轮 vibe 都必须回到可检查的结构里。
 
 ## 原理简述 ⚙️
 
-VibeFlow 的核心是一个严格的流程图运行时：node 负责局部纯计算，JSONC config 负责声明控制流，compiler 负责把流程编译成可执行图，health checker 负责在运行前拦截结构漂移和契约错误。
+VibeFlow 的核心是一个严格的流程图运行时：普通 node 负责局部纯计算，具有显式语义的 node/plugin 在派生 effect scope 内执行真实副作用，JSONC config 负责声明控制流，compiler 负责把流程编译成可执行图，health checker 负责在运行前拦截结构漂移和契约错误。
 
 它把“项目架构”从口头约定变成机器可以执行的检查。
 
@@ -142,7 +166,7 @@ VibeFlow 的核心是一个严格的流程图运行时：node 负责局部纯计
 - `document`：文档生成或文档结构。
 - `preparation`：准备 / 初始化。
 
-这让 AI 写出的代码不只是“能跑”，还必须能放回一张可审查的流程图里。
+`flow_kind` 与 `external` 一起决定内核派生的 `effect_scope`：普通 implemented node 和 planned `python_stub` 为 `none`；`flow_kind=io` 为 `terminal`，开放真实标准流、`print` / `input` / `argparse`；`document` / `data_store` 为 `python_io`，开放文件、环境、网络、数据库、subprocess 和终端；任意 `external=True` node 和 plugin 为最高优先级 `trusted`。图形 `flow_kind=terminal` 仍是 `none`，不等于权限档位 `terminal`。
 
 ### 显式流程边
 
@@ -154,9 +178,9 @@ Health 会在显式 edge 中推断同步主线、data bypass 和 async 相关边
 
 配置调用点使用 `id` 和 `type_used`：`type_used` 指向 Python node 的 `NodeInfo.type_key`、独立 nodeset JSONC 的 `type_key` 或系统类型。数据契约使用严格结构化写法：`provides` 声明唯一 `key`、逻辑 `type` 和 `display_name`，`requires` 按 `type`、`cardinality` 和 `display_name` 消费。运行时通过 node inbox / edge payload 传递 envelope，不支持跨多跳从全局 Context 偷读早期输出；最终结果只保留 `pipeline.outputs` 声明的内容。
 
-### 小 node 和纯逻辑
+### 小 node 和显式副作用
 
-业务 node 默认必须是纯函数：
+普通 `effect_scope=none` 业务 node 必须是纯函数：
 
 - 不读写文件。
 - 不访问网络。
@@ -165,7 +189,7 @@ Health 会在显式 edge 中推断同步主线、data bypass 和 async 相关边
 - 不读取环境变量。
 - 不直接调用其他 node。
 
-真实 IO 通过 `io`、`data_store`、`document` 等流程图节点建模；第三方或外部维护代码用 `NodeInfo.external=True` 标记。
+`io` node 可使用真实终端流，`data_store` / `document` node 可使用 Python IO。`external=True` 和 plugin 是 `trusted` 边界；`external=True` 确实会显式绕过普通 IO/purity 限制，因此只能用于真正外部维护或受信任实现。这些类别仍必须遵守契约、拓扑、输出和 trace，也不能仅为获得权限而伪造 `flow_kind`。effectful / external node 的 `CONTRACT.examples` 只做结构检查，不执行。
 
 ### 运行前健康检查
 
@@ -176,7 +200,7 @@ VibeFlow 会在运行前检查：
 - 流程是否从 start 可达并能到达 end。
 - 同步分支是否能解释为 mainline、data bypass、async 或显式 `join_policy: "all"` 汇合。
 - 普通 graph / nodeset 内部是否存在显式环路；真实循环必须使用一等 while loop。
-- node 是否违反纯函数和结构规则。
+- node 是否违反其派生 effect scope 和结构规则。
 - 配置、插件、nodeset 是否破坏项目边界。
 
 检查失败就拒绝运行，并输出可追踪的原因。

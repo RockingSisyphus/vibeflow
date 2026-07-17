@@ -17,6 +17,7 @@ from .code_quality_imports import (
     _resolve_relative_import,
 )
 from .code_quality_rules import side_effect_findings
+from .code_quality_root_structure import analyze_root_structure
 from .code_quality_structure import analyze_directory_structure
 from .code_quality_types import (
     BRANCH_NODES,
@@ -28,11 +29,11 @@ from .code_quality_types import (
     PrefixClusterQuality,
     QualityFinding,
     QualityReport,
+    QualityStructureLimits,
+    QualityStructureRoles,
     QualityThresholds,
     SIDE_EFFECT_BOUNDARY_PATHS,
 )
-
-
 @dataclass(frozen=True)
 class _FileShape:
     path: Path
@@ -43,12 +44,12 @@ class _FileShape:
     class_count: int
     public_api_count: int
     branch_count: int
-
-
 def scan_code_quality(
     root: Path | str,
     *,
     thresholds: QualityThresholds | None = None,
+    structure_limits: QualityStructureLimits | None = None,
+    structure_roles: QualityStructureRoles | None = None,
     excluded_dirs: Iterable[str] = DEFAULT_EXCLUDED_DIRS,
     check_side_effects: bool = False,
 ) -> QualityReport:
@@ -78,6 +79,15 @@ def scan_code_quality(
         active_thresholds,
     )
     findings.extend(structure_findings)
+    root_structure_summary, root_structure_findings = analyze_root_structure(
+        files,
+        dependency_graph,
+        import_sites_by_edge,
+        structure_limits,
+        roles=structure_roles,
+    )
+    structure_summary.update(root_structure_summary)
+    findings.extend(root_structure_findings)
     dependency_findings, longest_chain = _dependency_findings(dependency_graph, import_sites_by_edge, active_thresholds)
     findings.extend(dependency_findings)
     findings.extend(duplicate_function_findings(tuple(files)))
@@ -96,8 +106,6 @@ def scan_code_quality(
         prefix_clusters=prefix_clusters,
         structure_summary=structure_summary,
     )
-
-
 def _iter_python_files(root: Path, excluded_dirs: set[str]) -> Iterable[Path]:
     if root.is_file() and root.suffix == ".py":
         if not _skip_file(root):
@@ -436,8 +444,6 @@ def _fingerprint_function(node: ast.AST) -> str:
     clone = Normalizer().visit(ast.fix_missing_locations(copy.deepcopy(node)))
     ast.fix_missing_locations(clone)
     return ast.dump(clone, include_attributes=False)
-
-
 def _longest_acyclic_chain(graph: Mapping[str, Sequence[str]]) -> list[str]:
     best: list[str] = []
 

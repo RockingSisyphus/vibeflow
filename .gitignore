@@ -25,3 +25,19 @@ htmlcov/
 .coverage
 coverage.xml
 references/
+
+# Local build, test, document-rendering, and release artifacts.
+/tmp/
+/output/
+/docs/pdfs/
+/vibeflow_distribution-*.zip
+
+# Large or protected VF-EvoBench assets kept outside normal Git history.
+/experiments/**/sealed-hidden/
+/experiments/**/external_sources/
+/experiments/vf_evobench/archives/
+/experiments/**/*.zip
+/experiments/**/*.tar.gz
+/experiments/**/*.tar.zst
+/experiments/**/*.zst
+/experiments/**/*.whl

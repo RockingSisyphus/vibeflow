@@ -99,7 +99,6 @@
         "description": "Runs route."
       },
       {
-        "join_policy": "all",
         "requires": [
           {
             "type": "value.out",

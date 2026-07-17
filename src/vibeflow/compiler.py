@@ -3,11 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .data_contract import provider_keys
-from .graph_algorithms import strongly_connected_components
-from .graph_config import EdgeSpec, GraphConfig, LOOP_NODE_TYPES, NodeSpec, STATUS_PLANNED
-from .node import FLOW_KIND_DECISION, FLOW_KIND_PREDEFINED
-from .plugin import PluginRegistry
+from vibeflow.data_contract import provider_keys
+from vibeflow.graph_config.algorithms import strongly_connected_components
+from vibeflow.graph_config import EdgeSpec, GraphConfig, LOOP_NODE_TYPES, NodeSpec, STATUS_PLANNED
+from vibeflow.node import FLOW_KIND_DECISION, FLOW_KIND_PREDEFINED
+from vibeflow.plugin import PluginRegistry
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,7 @@ class GraphCompiler:
         consumers = _collect_consumers(graph.nodes)
         effective_edges = _merge_edges(graph.edges)
         flow_kinds = _node_flow_kinds(nodes_by_name, registry=registry, nodesets=known_nodesets or set(graph.nodesets))
-        from .mainline import analyze_mainline
+        from vibeflow.graph_config.mainline import analyze_mainline
 
         mainline = analyze_mainline(graph, effective_edges, flow_kinds, owner=owner)
         _validate_routing_edge_conditions(graph.edges, flow_kinds=flow_kinds)

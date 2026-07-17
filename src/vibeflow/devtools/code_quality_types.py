@@ -149,6 +149,50 @@ class QualityThresholds:
 
 
 @dataclass(frozen=True)
+class QualityStructureLimits:
+    enabled: bool = True
+    warn_root_code_files: int = 96
+    max_root_code_files: int = 120
+    warn_code_dirs: int = 18
+    max_code_dirs: int = 24
+    warn_code_files_per_dir: int = 12
+    max_code_files_per_dir: int = 16
+    warn_code_dir_depth: int = 3
+    max_code_dir_depth: int = 4
+    warn_child_code_dirs_per_dir: int = 6
+    max_child_code_dirs_per_dir: int = 8
+    warn_root_level_code_files: int = 1
+    max_root_level_code_files: int = 2
+    allowed_root_code_files: tuple[str, ...] = ("__init__.py", "registry.py")
+    enforce_role_imports: bool = True
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "enabled": self.enabled,
+            "warn_root_code_files": self.warn_root_code_files,
+            "max_root_code_files": self.max_root_code_files,
+            "warn_code_dirs": self.warn_code_dirs,
+            "max_code_dirs": self.max_code_dirs,
+            "warn_code_files_per_dir": self.warn_code_files_per_dir,
+            "max_code_files_per_dir": self.max_code_files_per_dir,
+            "warn_code_dir_depth": self.warn_code_dir_depth,
+            "max_code_dir_depth": self.max_code_dir_depth,
+            "warn_child_code_dirs_per_dir": self.warn_child_code_dirs_per_dir,
+            "max_child_code_dirs_per_dir": self.max_child_code_dirs_per_dir,
+            "warn_root_level_code_files": self.warn_root_level_code_files,
+            "max_root_level_code_files": self.max_root_level_code_files,
+            "allowed_root_code_files": list(self.allowed_root_code_files),
+            "enforce_role_imports": self.enforce_role_imports,
+        }
+
+
+@dataclass(frozen=True)
+class QualityStructureRoles:
+    base_lib_paths: tuple[str, ...] = ("base_lib",)
+    base_lib_modules: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class QualityFinding:
     rule_id: str
     severity: str
@@ -158,9 +202,12 @@ class QualityFinding:
     source_location: Mapping[str, object] = field(default_factory=dict)
     suggested_fix_type: str = "refactor"
     details: Mapping[str, object] = field(default_factory=dict)
+    root_id: str = ""
+    root_path: str = ""
+    source_path: str = ""
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        payload = {
             "rule_id": self.rule_id,
             "severity": self.severity,
             "object_type": self.object_type,
@@ -170,6 +217,13 @@ class QualityFinding:
             "suggested_fix_type": self.suggested_fix_type,
             "details": dict(self.details),
         }
+        if self.root_id:
+            payload["root_id"] = self.root_id
+        if self.root_path:
+            payload["root_path"] = self.root_path
+        if self.source_path:
+            payload["source_path"] = self.source_path
+        return payload
 
 
 @dataclass(frozen=True)
@@ -304,11 +358,12 @@ class QualityReport:
     directory_graph: tuple[DirectoryQuality, ...] = ()
     prefix_clusters: tuple[PrefixClusterQuality, ...] = ()
     structure_summary: Mapping[str, object] = field(default_factory=dict)
+    workspace_roots: tuple[Mapping[str, object], ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         errors = [finding.to_dict() for finding in self.findings if finding.severity == "error"]
         warnings = [finding.to_dict() for finding in self.findings if finding.severity == "warning"]
-        return {
+        payload = {
             "status": self.status,
             "root": self.root,
             "summary": {
@@ -330,6 +385,9 @@ class QualityReport:
             "errors": errors,
             "warnings": warnings,
         }
+        if self.workspace_roots:
+            payload["workspace_roots"] = [dict(root) for root in self.workspace_roots]
+        return payload
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=2, sort_keys=False)

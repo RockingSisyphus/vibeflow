@@ -4,22 +4,28 @@ import ast
 import inspect
 from pathlib import Path
 
-from .ast_rules import (
+from vibeflow.purity.ast_rules import (
     boolop_branch_count,
-    call_name,
     import_aliases_from_node,
     import_modules,
-    is_banned_import,
     module_assignment_is_allowed,
     module_matches,
     module_statement_kind,
-    path_effect_call_name,
 )
-from .base_lib_types import BaseLibDependencySummary, BaseLibFinding, BaseLibModuleReport, BaseLibScanReport
-from .purity_types import BANNED_ATTR_CALLS, BANNED_CALL_NAMES, BANNED_IMPORT_ROOTS, PurityPolicy
+from vibeflow.base_lib_types import BaseLibDependencySummary, BaseLibFinding, BaseLibModuleReport, BaseLibScanReport
+from vibeflow.node import EFFECT_SCOPE_NONE
+from vibeflow.purity.effects import (
+    call_violation,
+    import_violation_code,
+    process_argv_import_is_forbidden,
+    process_argv_reference,
+    system_exit_is_forbidden,
+    system_exit_reference,
+)
+from vibeflow.purity.types import PurityPolicy
 
 
-FORBIDDEN_PROJECT_IMPORT_PARTS = {"boundary", "boundaries", "nodes", "runtime"}
+FORBIDDEN_PROJECT_IMPORT_PARTS = {"boundary", "boundaries", "nodes", "plugin", "plugins", "runtime"}
 
 
 def scan_base_lib(project_root: Path, *, policy: PurityPolicy | None = None) -> BaseLibScanReport:
@@ -195,17 +201,32 @@ class _BaseLibAstScanner(ast.NodeVisitor):
         self._check_import_node(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        module = node.module or ""
+        if process_argv_import_is_forbidden(module, {alias.name for alias in node.names}):
+            self._add("BASE_LIB.BANNED_IMPORT", "base_lib must not import process sys.argv", node)
         self._check_import_node(node)
 
     def visit_Call(self, node: ast.Call) -> None:
-        name = call_name(node.func)
-        root = name.split(".", 1)[0]
-        banned = name in BANNED_CALL_NAMES or name in BANNED_ATTR_CALLS or root in BANNED_CALL_NAMES or _matches_prefix(name, BANNED_ATTR_CALLS)
-        if banned:
-            self._add("BASE_LIB.SIDE_EFFECT_CALL", f"base_lib banned side-effect call: {name}", node)
-        path_effect = path_effect_call_name(node, self.import_aliases)
-        if path_effect and not banned:
-            self._add("BASE_LIB.SIDE_EFFECT_CALL", f"base_lib banned side-effect call: {path_effect}", node)
+        violation_code, forbidden = call_violation(
+            node,
+            aliases=self.import_aliases,
+            effect_scope=EFFECT_SCOPE_NONE,
+        )
+        if violation_code:
+            self._add("BASE_LIB.SIDE_EFFECT_CALL", f"base_lib banned side-effect call: {forbidden}", node)
+        self.generic_visit(node)
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        reference = process_argv_reference(node, self.import_aliases)
+        if reference:
+            self._add("BASE_LIB.SIDE_EFFECT_CALL", f"base_lib banned process argument access: {reference}", node)
+        self.generic_visit(node)
+
+    def visit_Raise(self, node: ast.Raise) -> None:
+        if not isinstance(node.exc, ast.Call):
+            reference = system_exit_reference(node.exc, self.import_aliases)
+            if reference and system_exit_is_forbidden(EFFECT_SCOPE_NONE):
+                self._add("BASE_LIB.SIDE_EFFECT_CALL", f"base_lib banned process exit: {reference}", node)
         self.generic_visit(node)
 
     def visit_Global(self, node: ast.Global) -> None:
@@ -233,18 +254,12 @@ class _BaseLibAstScanner(ast.NodeVisitor):
     def _check_import(self, module: str, node: ast.AST) -> None:
         self.imports.add(module)
         if any(part in FORBIDDEN_PROJECT_IMPORT_PARTS for part in module.split(".")):
-            self._add("BASE_LIB.FORBIDDEN_PROJECT_IMPORT", f"base_lib must not import node, boundary, runtime, or side-effect layer: {module}", node)
+            self._add("BASE_LIB.FORBIDDEN_PROJECT_IMPORT", f"base_lib must not import node, plugin, boundary, runtime, or side-effect layer: {module}", node)
             return
         if module_matches(module, self.policy.banned_base_lib_modules):
             self._add("BASE_LIB.BANNED_MODULE", f"base_lib module is banned by policy: {module}", node)
             return
-        if is_banned_import(
-            module,
-            allowed_roots=self.policy.allowed_import_roots,
-            banned_roots=self.policy.banned_import_roots or tuple(sorted(BANNED_IMPORT_ROOTS)),
-            allowed_modules=self.policy.allowed_import_modules,
-            banned_modules=self.policy.banned_import_modules,
-        ):
+        if import_violation_code(module, effect_scope=EFFECT_SCOPE_NONE, policy=self.policy):
             self._add("BASE_LIB.BANNED_IMPORT", f"base_lib banned import: {module}", node)
 
     def _add(self, rule_id: str, message: str, node: ast.AST) -> None:
@@ -372,10 +387,6 @@ def _module_name(path: Path, *, root: Path) -> str:
     parts = tuple(part for part in rel.parts if part != "__init__")
     prefix = root.name if root.name else "base_lib"
     return ".".join((prefix, *parts)) if parts else prefix
-
-
-def _matches_prefix(name: str, patterns: set[str]) -> bool:
-    return any(name.startswith(f"{pattern}.") for pattern in patterns)
 
 
 def _is_base_lib_module(module: str) -> bool:
