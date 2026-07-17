@@ -13,6 +13,14 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tools/mermaid-renderer/package-lock.json
+      - name: Install Mermaid renderer
+        working-directory: tools/mermaid-renderer
+        run: npm ci
       - name: Install package
         run: python -m pip install -e . pytest
       - name: Compile Python files
