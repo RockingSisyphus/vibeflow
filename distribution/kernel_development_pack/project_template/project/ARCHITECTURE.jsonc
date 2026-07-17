@@ -36,6 +36,7 @@
           "description_source": "call"
         },
         "flow_kind": "terminal",
+        "effect_scope": "none",
         "status": "implemented",
         "planned_behavior": null,
         "requires": [],
@@ -75,6 +76,7 @@
           "description_source": "call"
         },
         "flow_kind": "process",
+        "effect_scope": "none",
         "status": "implemented",
         "planned_behavior": null,
         "requires": [],
@@ -122,6 +124,7 @@
           "description_source": "call"
         },
         "flow_kind": "process",
+        "effect_scope": "none",
         "status": "implemented",
         "planned_behavior": null,
         "requires": [
@@ -175,6 +178,7 @@
           "description_source": "call"
         },
         "flow_kind": "io",
+        "effect_scope": "terminal",
         "status": "implemented",
         "planned_behavior": null,
         "requires": [
@@ -226,6 +230,7 @@
           "description_source": "call"
         },
         "flow_kind": "terminal",
+        "effect_scope": "none",
         "status": "implemented",
         "planned_behavior": null,
         "requires": [],
@@ -344,6 +349,7 @@
         "version": "0.1.0",
         "flow_kind": "process",
         "purity": "pure",
+        "effect_scope": "none",
         "author": null,
         "tags": [],
         "external": false
@@ -409,6 +415,7 @@
         "version": "0.1.0",
         "flow_kind": "terminal",
         "purity": "pure",
+        "effect_scope": "none",
         "author": null,
         "tags": [],
         "external": false
@@ -442,6 +449,7 @@
         "version": "0.1.0",
         "flow_kind": "io",
         "purity": "pure",
+        "effect_scope": "terminal",
         "author": null,
         "tags": [],
         "external": false
@@ -497,6 +505,7 @@
         "version": "0.1.0",
         "flow_kind": "process",
         "purity": "pure",
+        "effect_scope": "none",
         "author": null,
         "tags": [],
         "external": false
@@ -553,6 +562,7 @@
         "version": "0.1.0",
         "flow_kind": "terminal",
         "purity": "pure",
+        "effect_scope": "none",
         "author": null,
         "tags": [],
         "external": false
@@ -591,6 +601,7 @@
       {
         "name": "project_policy",
         "type": "policy",
+        "effect_scope": "trusted",
         "module": "plugins.policy",
         "class": "PolicyPlugin",
         "config_keys": [],
