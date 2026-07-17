@@ -1,5 +1,7 @@
 # VibeFlow 可复制开发包
 
+版本：0.6.0
+
 <!-- VIBEFLOW_DISTRIBUTION_GENERATED_AT -->
 
 这个目录可以整体复制到其他位置作为新项目起点。它包含本地 kernel、内核文档、AI 开发提示词和可运行的示例项目骨架。

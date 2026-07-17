@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -75,6 +76,12 @@ def test_distribution_copies_review_docs_and_preserves_customizable_root_guides(
 
     source_readme = (TEMPLATE_ROOT / "README.md").read_text(encoding="utf-8")
     rendered_readme = generated_readme.read_text(encoding="utf-8")
+    project_version = tomllib.loads(
+        (REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )["project"]["version"]
+    version_line = f"版本：{project_version}"
+    assert source_readme.splitlines().count(version_line) == 1
+    assert rendered_readme.splitlines().count(version_line) == 1
     generated_at_lines = [
         line for line in rendered_readme.splitlines() if line.startswith("生成时间：")
     ]
@@ -122,6 +129,26 @@ def test_distribution_copies_review_docs_and_preserves_customizable_root_guides(
         check=False,
     )
     assert verification.returncode == 0, verification.stderr
+
+
+def test_built_distribution_template_is_canonical_and_validates(
+    built_distribution: Path,
+) -> None:
+    validation = subprocess.run(
+        [
+            sys.executable,
+            "run.py",
+            "validate",
+            "--config",
+            "project/configs/main.jsonc",
+        ],
+        cwd=built_distribution,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    assert validation.returncode == 0, validation.stderr or validation.stdout
 
 
 def test_developer_published_and_ai_guides_share_the_review_protocol(
