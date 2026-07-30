@@ -131,19 +131,19 @@ def node_contract_check(
                     if isinstance(output_schemas, Mapping)
                     else {}
                 )
-                output_members = [
-                    (
-                        f"readonly {json.dumps(provider.key)}: "
-                        f"{schema_to_typescript(_provider_schema(
-                            provider.key,
-                            provider.type,
-                            output_schema_mapping,
-                            plan,
-                            workflow,
-                        ))}"
+                output_members = []
+                for provider in node.provides:
+                    provider_schema = _provider_schema(
+                        provider.key,
+                        provider.type,
+                        output_schema_mapping,
+                        plan,
+                        workflow,
                     )
-                    for provider in node.provides
-                ]
+                    output_members.append(
+                        f"readonly {json.dumps(provider.key)}: "
+                        f"{schema_to_typescript(provider_schema)}"
+                    )
                 input_type = (
                     "{ " + "; ".join(input_members) + " }"
                     if input_members
