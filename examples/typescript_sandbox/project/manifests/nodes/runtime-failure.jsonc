@@ -1,0 +1,52 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.runtime_failure",
+  "display_name": "Runtime failure fixture",
+  "category": "sandbox",
+  "description": "Produces a controlled node exception or invalid runtime output.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.number",
+        "cardinality": "exactly_one",
+        "display_name": "Number"
+      }
+    ],
+    "provides": [
+      {
+        "key": "result",
+        "type": "sandbox.math.result",
+        "display_name": "Result"
+      }
+    ],
+    "params_schema": {
+      "mode": {
+        "type": "string",
+        "enum": ["throw", "bad_output"]
+      }
+    },
+    "params_defaults": {
+      "mode": "throw"
+    },
+    "output_schema": {
+      "result": {
+        "type": "number"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/runtime_failure.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": []
+}

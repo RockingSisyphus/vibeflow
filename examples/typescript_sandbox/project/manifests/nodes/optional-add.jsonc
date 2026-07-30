@@ -1,0 +1,50 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.optional_add",
+  "display_name": "Optional add",
+  "category": "sandbox",
+  "description": "Adds an optional offset to x through the registered TypeScript base_lib.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.x",
+        "cardinality": "exactly_one",
+        "display_name": "X"
+      },
+      {
+        "type": "sandbox.optional.offset",
+        "cardinality": "optional_one",
+        "display_name": "Optional offset"
+      }
+    ],
+    "provides": [
+      {
+        "key": "result",
+        "type": "sandbox.math.result",
+        "display_name": "Result"
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {
+      "result": {
+        "type": "number"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/optional_add.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": ["sandbox.math"],
+  "capabilities": []
+}

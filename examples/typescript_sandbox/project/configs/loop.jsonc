@@ -1,0 +1,97 @@
+{
+  "nodeset_imports": [
+    {
+      "path": "nodesets/loop_body.jsonc"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.loop.value",
+        "display_name": "Loop value",
+        "required": true
+      }
+    ],
+    "max_steps": 20,
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts the bounded loop workflow."
+      },
+      {
+        "id": "loop",
+        "type_used": "vibeflow.loop.while",
+        "display_name": "Increment three times",
+        "description": "Carries x through three bounded +1 iterations.",
+        "requires": [
+          {
+            "type": "sandbox.loop.value",
+            "cardinality": "exactly_one",
+            "display_name": "Loop value"
+          }
+        ],
+        "provides": [
+          {
+            "key": "result",
+            "type": "sandbox.loop.result",
+            "display_name": "Loop result"
+          },
+          {
+            "key": "iterations",
+            "type": "sandbox.loop.iterations",
+            "display_name": "Iterations"
+          }
+        ],
+        "loop": {
+          "body": "sandbox.loop_body",
+          "max_iterations": 3,
+          "stop_after": 3,
+          "carry": [
+            {
+              "from": "sandbox.loop.value",
+              "as": "sandbox.loop.value",
+              "update": "next"
+            }
+          ],
+          "outputs": [
+            {
+              "from": "next",
+              "as": "result"
+            },
+            {
+              "from": "loop.iterations",
+              "as": "iterations"
+            }
+          ]
+        }
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Ends after the bounded loop completes."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "loop"},
+      {"from": "loop", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.loop.result",
+        "cardinality": "exactly_one",
+        "display_name": "Loop result",
+        "as": "result"
+      },
+      {
+        "type": "sandbox.loop.iterations",
+        "cardinality": "exactly_one",
+        "display_name": "Iterations",
+        "as": "iterations"
+      }
+    ]
+  }
+}

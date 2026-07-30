@@ -113,6 +113,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_runtime_options(run)
 
+    from vibeflow.cli.build_command import add_build_parser
+
+    add_build_parser(sub)
+
     from vibeflow.cli.delegate_cli import add_delegate_cli_parser
 
     add_delegate_cli_parser(sub, _add_runtime_options)
@@ -128,6 +132,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    from vibeflow.cli.build_command import handle_build
+
     parser = build_parser()
     raw_args = list(sys.argv[1:] if argv is None else argv)
     if raw_args and raw_args[0] == "delegate-cli":
@@ -154,6 +160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "export-mermaid": _handle_export_mermaid,
         "review": _handle_review,
         "run": _handle_run,
+        "build": handle_build,
         "delegate-cli": _handle_delegate_cli,
         "quality-check": _handle_quality_check,
     }

@@ -1,0 +1,49 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.host_double",
+  "display_name": "Host double",
+  "category": "sandbox",
+  "description": "Doubles a number with a Host Extension Capability.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.number",
+        "cardinality": "exactly_one",
+        "display_name": "Number"
+      }
+    ],
+    "provides": [
+      {
+        "key": "result",
+        "type": "sandbox.math.result",
+        "display_name": "Result"
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {
+      "result": {"type": "number"}
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "completion": "immediate",
+      "source": {
+        "kind": "file",
+        "ref": "nodes/host_double.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": [
+    {
+      "id": "sandbox.host_math",
+      "operations": ["double"]
+    }
+  ]
+}

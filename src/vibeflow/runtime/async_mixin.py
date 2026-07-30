@@ -2,13 +2,39 @@ from __future__ import annotations
 
 from concurrent.futures import TimeoutError, ThreadPoolExecutor
 from contextvars import copy_context
-from typing import Mapping
+from typing import Mapping, TYPE_CHECKING
 
 from vibeflow.runtime.errors import DelegateCliExit, PipelineRuntimeError, normalize_delegate_cli_system_exit
 from vibeflow.runtime.types import _AsyncOutputs, _NestedRuntimeFailure, _RuntimeState
 from vibeflow.runtime.summaries import summarize_mapping
 
+if TYPE_CHECKING:
+    from vibeflow.graph_config import EdgeSpec
+
+
 class RuntimeAsyncMixin:
+    def _scheduled_targets(
+        self,
+        node_name: str,
+        active_edges: tuple["EdgeSpec", ...],
+    ) -> tuple[str, ...]:
+        """Return runnable and deferred-result targets in stable edge order.
+
+        A ``result_key`` node starts before its outputs exist, so conditions on
+        those outputs cannot be evaluated on the first scheduler pass. Queueing
+        its possible targets lets the first target join the future; that join
+        re-evaluates all outgoing conditions, activates only the matching
+        routes, and delivers the resolved data before readiness is checked.
+        """
+
+        targets = [str(edge.target) for edge in active_edges]
+        if node_name in self._async_results:
+            for edge in self._frames[node_name].outgoing:
+                target = str(edge.target)
+                if target not in targets:
+                    targets.append(target)
+        return tuple(targets)
+
     def _run_async_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
         if frame.async_mode == "result_key" and frame.result_key not in frame.provide_keys:
             raise PipelineRuntimeError(f"async node '{frame.name}' result_key must be declared in provides")
@@ -87,6 +113,7 @@ class RuntimeAsyncMixin:
             self._record_runtime_event("node_failed", frame.name, frame.node_type, failure=str(exc))
             self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(exc))
             raise
+        self._record_node_output_candidates(frame.name, outputs, state)
         self._clear_conditional_outgoing(frame.name, state)
         active_edges = self._activated_edges(frame.name, outputs, state)
         active_pairs = {edge.pair for edge in active_edges}

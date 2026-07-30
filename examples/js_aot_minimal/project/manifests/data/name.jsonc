@@ -1,0 +1,9 @@
+{
+  "kind": "data_schema",
+  "type_key": "name.text",
+  "representation": "json",
+  "schema": {
+    "type": "string",
+    "minLength": 1
+  }
+}

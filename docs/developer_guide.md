@@ -1,8 +1,21 @@
 # VibeFlow 使用者开发引导
 
-本文面向使用 VibeFlow（包名 `vibeflow`）编写业务 node、nodeset、plugin、base_lib 和 JSONC config 的开发者。
+本文面向使用 VibeFlow（包名 `vibeflow`）编写业务 node、nodeset、plugin、base_lib 和 JSONC config 的开发者。VibeFlow 目前有两条公开开发路径：
 
-## Node
+- **Python Runtime**：Python node、base_lib 和 plugin 通过 `project/registry.py` 注册，由 VibeFlow Runtime 校验并执行；本文主体详细说明这条路径。
+- **JavaScript/TypeScript AOT**：JS/TS node、base_lib、数据 Schema、Capability 和 Host Extension 通过 `project/manifests/` 下的 JSONC descriptor 登记，由 `build` 命令生成独立 ESM 或 Web 应用；生成物运行时不需要 Python 或 VibeFlow Runtime。默认同步入口导出 `runWorkflow()`，显式异步入口导出 `runWorkflowAsync()`。完整格式、工具链和三个 profile 在源码仓库见 `docs/js_aot_build.md`，在分发包见 `kernel/docs/11_JS_TS与Web_AOT构建指南.md`。
+
+两条路径共享 JSONC workflow、显式 `pipeline.edges`、contract、分支、合流、nodeset、有限/永久 loop 和 `vibeflow.io` 等可移植流程语义，但实现登记、宿主能力和公共输出 ABI 不相同。不要让 JS/TS node 通过 Python registry 注册，也不要把 Python Runtime plugin 当作 AOT 宿主接口；AOT 的宿主交互使用每次调用注入的 Capability，长期宿主接线使用 JS/TS Host Extension。
+
+## 入口模式、长期 Loop 与原生 Port
+
+`pipeline.entry_mode` 为 `sync | async`，缺省 `sync`。同步 JS 构建只能使用立即完成、内联调度的实现；需要 Promise、deferred/result_key、detached 或 `vibeflow.io.receive` 时必须显式选择 `async`。Python `runtime.run()` 继续阻塞返回，旧 `async: result_key|detached` 线程池语义保持兼容。
+
+`vibeflow.loop.while.loop.max_iterations` 省略时默认 1000，写 `null` 表示无次数上限。stop 可以不写、单独写或同时写；`stop_after` 与 `stop_when` 同时存在时按 OR。`null` 且没有 stop 是合法永久循环，只产生 warning，不会被内核偷偷添加 timeout、yield 或退出条件。
+
+原生 Port 使用 `type_used: "vibeflow.io"` 和 `io: {operation, port}`。`receive` 零输入、一个输出；JS 完成方式固定为 suspend。`send` 一个 `exactly_one` 输入、零输出，完成方式固定为 immediate。Python 宿主可通过 `PipelineRuntime(..., capabilities=...)` 或 `run_checked(..., capabilities=...)` 注入同步阻塞 provider；JS 宿主通过 workflow options 或 Host Extension 提供 `vibeflow.port`。
+
+## Python Runtime Node
 
 node 只实现：
 
@@ -65,7 +78,7 @@ NODE_INFO = NodeInfo(
 - node 不修改 `inputs`；如果训练类场景确实需要共享对象原地更新，应让这个行为成为显式业务语义，并通过输出 key 暴露更新后的引用。
 - 简单 wrapper node 可以只取输入、调用纯 helper/base_lib 函数、返回固定输出；VibeFlow 会识别这种标准形态，避免误报 duplicate logic。
 
-## 外部依赖 Node
+## Python 外部依赖 Node
 
 如果 node 只是包装第三方库或外部维护代码，设置：
 
@@ -86,7 +99,7 @@ NodeInfo(..., flow_kind="process", external=True)
 
 普通纯 node 的 `CONTRACT.examples` 会被执行以验证最小样例；`terminal` / `python_io` scope 或 `external=True` 的 node 可能触发真实副作用，其 examples 只做结构校验，不在健康检查中执行。
 
-## Base Lib
+## Python Base Lib
 
 `base_lib/` 只放纯函数 helper，可被 node 导入。
 
@@ -129,6 +142,11 @@ def build_base_lib_registry() -> BaseLibRegistry:
 
 workflow config 再按 id 引用本流程实际使用的 base_lib：`"base_lib": {"modules": [{"id": "math_tools"}]}`。只有当前 workflow config 引用的 base_lib 会进入 node import allowlist；registry 中只注册但未引用的 helper 不能满足 implemented node 的 import 校验。implemented base_lib 必须提供 `BASE_LIB_INFO`；审查图资源元数据来自 `BaseLibRegistry.register(...)`。planned 资源不进入 resource registry，需要计划占位时用 planned node/nodeset。
 
+JS/TS `base_lib` 也放在 `project/base_lib/`，但由
+`project/manifests/base_lib/*.jsonc` descriptor 登记，不使用
+`BASE_LIB_INFO` 或 Python registry。node 只能导入自己 descriptor 已声明且当前
+workflow 启用的 `base_lib`；详细依赖边界见 JS/TS AOT 指南。
+
 ## Config / Pipeline
 
 控制流只来自显式 `pipeline.edges`：
@@ -147,6 +165,12 @@ workflow config 再按 id 引用本流程实际使用的 base_lib：`"base_lib":
 - `cardinality` 必须显式写 `exactly_one`、`optional_one` 或 `all`。
 - runtime 使用 node inbox / edge payload。node 只能收到直接 incoming edge 投递的数据；早期上游输出不会被跨多跳读取。
 - `pipeline.outputs` 决定 run result 保留哪些 envelope；未声明的中间值不会出现在最终结果中。
+
+JS/Web AOT 还要求每个 `pipeline.inputs[]` 显式声明
+`required: true | false`，并允许 pipeline output 使用 `as` 别名；它的
+`runWorkflow()` 返回普通业务值，不暴露内部 envelope。旧 Python Runtime
+配置缺少 `required` 时继续沿用现有兼容行为。不要把两种公共输出 ABI 混为
+一谈。
 
 ### config node 可视化元数据
 
@@ -176,13 +200,15 @@ workflow config 再按 id 引用本流程实际使用的 base_lib：`"base_lib":
 ```
 
 - `display_name` 和 `description` 是 node 实例级说明；即使注册类 `NODE_INFO` 已有说明，调用点没写也会产生 `GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME` 或 `GRAPH.SMELL.MISSING_NODE_DESCRIPTION` warning。
-- `id` 是调用点唯一 id；`type_used` 指向 Python node `NodeInfo.type_key`、nodeset `type_key` 或系统类型。
+- `id` 是调用点唯一 id；`type_used` 指向 Python node
+  `NodeInfo.type_key`、JS/TS node descriptor 的 `type_key`、nodeset
+  `type_key` 或系统类型。
 - `display_name`、`description`、`style`、`similar_to` 是调用点元数据，不会进入运行时 `params`。
 - 旧调用字段 `name`、`type` 和 `registry_key` 不再接受。
 - `requires`、`provides`、`pipeline.inputs` 和 `pipeline.outputs` 的 contract 对象都必须写非空 `display_name`。
 - 如果 node 运行时确实需要同名参数，必须写进 `"config": {...}`。
 - `style` 只允许 `fill`、`stroke`、`text` 三个 `#RRGGBB` hex 颜色；大小写会规范化。
-- 自定义颜色会作为节点级 `style` 覆盖系统 class 的 fill/stroke/text 颜色，包括 health warning/error、planned、document、nodeset、loop、external dependency 等节点；节点形状、finding 注释和 planned 虚线等非颜色语义仍保留。自定义色仍不能使用 VibeFlow 系统保留色。
+- 自定义颜色会作为节点级 `style` 覆盖系统 class 的 fill/stroke/text 颜色，包括 health warning/error、planned、document、nodeset、loop、external dependency 等节点；节点形状、finding 注释、planned 虚线和 external 粗边框等非颜色语义仍保留。自定义色仍不能使用 VibeFlow 系统保留色。
 - `similar_to` 用来声明本调用点是同一 pipeline 或同一 nodeset 内另一个 node 的 `variant` 或 `copy`，必须写 `node`、`relationship` 和 `reason`；它只影响 `GRAPH.SMELL.DUPLICATE_LOGIC` 的有意重复豁免，不影响运行、编译、拓扑或契约。
 - `similar_to` 也是调用点元数据，不会进入运行时 `params`。如果运行时确实需要名为 `similar_to` 的参数，必须写进 `"config": {...}`。
 - `join_policy` 是可选调度语义字段，不进入运行时 `params`；可写 `safe_any`、`any_active` 或 `all`。默认 `safe_any`。
@@ -200,6 +226,8 @@ VibeFlow 系统颜色是保留语义色，不能作为 `style` 自定义色使�
 | external dependency | `#e0f2fe` | `#0284c7` | `#0c4a6e` |
 | document node | `#f0fdf4` | `#16a34a` | `#14532d` |
 | nodeset node | `#ede9fe` | `#7c3aed` | `#3b0764` |
+
+implemented Python node 的 `NodeInfo.external=True` 会在原有 `flow_kind` 形状与颜色语义之上叠加 `externalBoundary`：标题确定性增加 `[EXTERNAL]`，节点保留 `external: true` 字段，并使用 `stroke-width:7px,vector-effect:non-scaling-stroke`。health 状态或调用点自定义 `style.stroke` 可以改变边框颜色，但不能取消这条 non-scaling 粗边框。
 
 ```jsonc
 {
@@ -278,6 +306,12 @@ Health 只基于用户写在 `pipeline.edges` 里的显式 edge 推断同步主�
 - data bypass edge：显式写出的旁路数据线，source 和 target 已经被同步主线连接；它只投递数据，不触发 target，SVG/Mermaid 中用虚线。
 - async edge：连接到 `async: "detached"` 或 `async: "result_key"` 的 node / nodeset 调用；不进入同步主线。
 
+对象形式 edge 可用 `schedule: false` 显式声明 transfer-only，或用
+`transfer: false` 声明 schedule-only。未写的角色仍由上述规则推断，以兼容
+已有配置；`schedule` 与 `transfer` 不能同时为 `false`。`join_policy`、
+readiness 和条件激活只计算 schedule edge，数据可达性和 inbox 投递只计算
+transfer edge。
+
 普通同步节点应位于某条从 start 到 end 的主线或 decision 主线变体中。非 decision 的同步 fan-out 只有在分支明确通过 `join_policy: "all"` 汇合、被识别为 data bypass，或分叉目标显式声明为 async 时才是合法语义。否则 health 会给 `GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT`、`GRAPH.MAINLINE.AMBIGUOUS_SIDE_BRANCH`、`GRAPH.MAINLINE.DATA_BYPASS_WITHOUT_MAINLINE_TRIGGER` 或 `GRAPH.MAINLINE.DECISION_BRANCH_DEAD_END` warning。
 
 这些 warning 的 `details` 会指出 `owner`、`source`、`target`、问题 edge、尝试分类、相关主线片段、旁路节点/边、附近 async node 和 `suggested_fixes`。优先按这些字段改配置：删掉无用 edge、把旁路节点/节点集标成 async、把分支串回主线，或给汇合 node 写明确的 `join_policy: "all"`。
@@ -315,7 +349,7 @@ Health 只基于用户写在 `pipeline.edges` 里的显式 edge 推断同步主�
 
 训练循环、批处理循环和 retry-until 循环用系统 loop node 表达，不要用 decision edge cycle 模拟循环。当前唯一一等 loop 类型是：
 
-- `vibeflow.loop.while`：重复执行一个 nodeset body，直到固定轮数到达，或 body/state 输出的 bool 条件满足。
+- `vibeflow.loop.while`：重复执行一个 nodeset body；可以按固定轮数、body/state 条件或二者的 OR 退出，也可以显式永久运行。
 
 loop node 必须声明普通 `requires/provides`，并在顶层写 `loop` 对象。`loop` 是执行语义元数据，不进入运行时 `params`。body 指向同一 config 中的 nodeset；展开 SVG 时，loop body 会像 nodeset 一样展开。
 
@@ -356,10 +390,13 @@ loop node 必须声明普通 `requires/provides`，并在顶层写 `loop` 对象
 
 `carry` 把上一轮 body output 写回下一轮 body input；`collect` 把每轮 body output 追加成 list；`outputs` 决定 loop node 最终返回哪些 key。batch/epoch/遍历语义不要写成 `items` 或 `epochs`，而是在 body nodeset 内用 index/counter/batch selector 节点表达，并通过 `carry` 写回下一轮状态。
 
-退出条件必须二选一：
+退出条件可以省略、单独使用或同时使用：
 
-- `stop_after`：固定执行 N 轮，必须是 `>= 1` 的整数，且不能大于 `max_iterations`。
+- `stop_after`：固定执行 N 轮，必须是 `>= 1` 的整数；存在有限 `max_iterations` 时不能大于它。
 - `stop_when`：从 body output 或 loop state 读取 bool，例如 `{"from": "loop.done", "equals": true}`；缺失或非 bool 会在运行时报明确错误。
+- 同时声明时按 OR，任一条件先满足就退出。
+
+`max_iterations` 省略时默认 1000；正整数表示安全上限，写 `null` 表示无次数上限。`max_iterations: null` 且没有 stop 是合法的永久 loop，静态检查只给 warning，不阻止构建或执行。有限 loop 没有 stop 时精确执行上限轮数并正常返回；有限 loop 有 stop 但在达到上限前一直未满足时抛出 runtime error。
 
 固定轮数循环：
 
@@ -384,7 +421,7 @@ loop node 必须声明普通 `requires/provides`，并在顶层写 `loop` 对象
 }
 ```
 
-`vibeflow.loop.for_each`、`loop.items`、`loop.epochs`、`loop.until` 已移除。`max_iterations` 是 loop 的硬上限，超过会抛 runtime error。顶层 `runtime.step_count` 仍只统计顶层 node；包含 loop body 的总步数看 `runtime.total_step_count`，完整顺序看 `runtime.qualified_exec_order`。
+`vibeflow.loop.for_each`、`loop.items`、`loop.epochs`、`loop.until` 已移除。有限 `max_iterations` 是 loop 的硬上限；写 `null` 时没有该次数上限。顶层 `runtime.step_count` 仍只统计顶层 node；包含 loop body 的总步数看 `runtime.total_step_count`，完整顺序看 `runtime.qualified_exec_order`。
 
 `execution="block"` 和 `execution="compiled"` 会优先执行结构化 `LoopBlock`。loop body 可以包含同步 nested nodeset、嵌套 while、普通 DAG fan-out/merge 和现有 async helper 支持的节点。`execution="block"` 是严格模式，不能生成 block 时会在启动阶段报出 block compile reason；`execution="compiled"` 是性能模式，不能生成 block 的区域会回退到 plan runtime。
 
@@ -456,7 +493,7 @@ VIBEFLOW_CONFIG_TRACE=1 vibeflow validate --config workflow.jsonc
 
 trace 会输出 import 文件、展开后的 nodeset 数、每个 nodeset 解析耗时、引用到的 nodeset 和总耗时。
 
-## 运行时数据和性能选项
+## Python Runtime 数据和性能选项
 
 Runtime 审计流程，不默认审计数据内容：
 
@@ -523,7 +560,12 @@ workspace 模式可以在每个 root 的 `vibeflow_project.jsonc` 中设置运�
 
 两个路径都相对 root；禁止绝对路径、越出 root、相同路径、重复 workflow/document 或未知字段。登记后，workspace `validate` / `run` 会在真实 config、compile 和 health 通过后比较预期文档；缺失、损坏、陈旧或非 canonical 时硬拒绝。错误文本会同时给出 project config、workflow、document、差异 JSON path、相关 source 和可直接执行的重新生成命令。
 
-修改已登记的已有项目（existing）时，先读 `ARCHITECTURE.jsonc`，再按其 source 定位同一个真实 workflow config、导入 nodeset 和 registry。修改前建立`复用 / 修改 / 删除 / 新增`清单，对每项写明 source path、node/edge/hook id、现有职责和计划变化。清单未列出的 id、edge、hook 和调用层级默认保持。只在真实 source 上原位修改；不得为审核新建平行 config，不得用概念图或手写 Mermaid/SVG 替代原项目。
+修改已登记的已有项目（existing）时，先读 `ARCHITECTURE.jsonc`，再按其
+source 定位同一个真实 workflow config、导入 nodeset，以及该路径使用的
+Python registry 或 JS/TS descriptor。修改前建立`复用 / 修改 / 删除 / 新增`
+清单，对每项写明 source path、node/edge/hook id、现有职责和计划变化。清单
+未列出的 id、edge、hook 和调用层级默认保持。只在真实 source 上原位修改；
+不得为审核新建平行 config，不得用概念图或手写 Mermaid/SVG 替代原项目。
 
 trace 兼容两层视图：`runtime.exec_order`、`runtime.node_runs`、`runtime.edge_executions`、`runtime.step_count` 仍表示顶层 pipeline；嵌套 nodeset/loop 的完整顺序看 `runtime.qualified_exec_order`、`runtime.qualified_node_runs`、`runtime.qualified_edge_executions` 和 `runtime.total_step_count`。完整事件不再保存在 `RunResult.runtime.events` 或 runtime hook 参数中；读取完整事件请逐行读取 `runtime_trace.jsonl`。`RunResult` 和 `after_run(state, trace)` / `run_failed(state, trace, message)` 中的 `trace` 只包含 summary、`event_count`、`trace_path` 和 `events_streamed=true`。事件中同时有机器可读 `path` 数组和人类可读 `qualified_node`，例如 `["outer", "inner", "add"]` / `outer.inner.add`。
 
@@ -555,7 +597,7 @@ trace 兼容两层视图：`runtime.exec_order`、`runtime.node_runs`、`runtime
 - runtime 不自动 merge async context；共享对象线程安全由业务对象负责。
 - 复杂后台工作可以把调用节点写成 nodeset `type_used` 并在该调用点设置 `async`；nodeset 内部仍按自己的显式 edges 和契约运行。
 
-## CLI 让渡模式 / delegate-cli
+## Python Runtime CLI 让渡模式 / delegate-cli
 
 需要让最终用户把 VibeFlow 项目当成普通命令行程序时，使用：
 
@@ -634,7 +676,7 @@ planned 内容只用于架构审查：
 
 stub 模块必须位于主项目的 `project/stubs/` 下，入口固定为 `run_stub(inputs, params)`。内核会检查文件存在、签名、危险 import/call；运行时只传入该节点声明的 `requires` 输入和合并后的 params，返回 mapping 的 key 必须严格等于 `provides`。含 planned 或 python_stub 的配置始终不是 production ready。
 
-## Plugin
+## Python Runtime Plugin
 
 plugin 可扩展治理规则，但不能绕过绝对规则。支持类型：
 
@@ -661,7 +703,7 @@ plugin 可扩展治理规则，但不能绕过绝对规则。支持类型：
 
 若 plugin 放宽可降级规则，必须声明作用域、原因和来源。项目级语义规则适合通过 policy plugin 增加。
 
-## Registry
+## Python Runtime Registry
 
 推荐按 namespace 分组注册：
 
@@ -704,15 +746,15 @@ vibeflow export-svg --config workflow.jsonc --expand-nodesets --output graph.exp
 
 正式运行也会写出 `graph.mmd`、`graph.txt`、快速图 `graph.svg`、详细审查图 `graph.expanded.svg` 和当次预期的 `architecture.jsonc`；运行产物不会覆盖 root 中登记的文档。
 
-Mermaid/SVG 节点 label 使用纯文本分区展示：首行是 `display_name`，缺省时回退到注册类 `NODE_INFO.display_name` 或 `id`；随后显示 `id:`、`type_used:`，nodeset/loop 还会显示 `type_key:` / `body:`，再用 `---------- meta ----------`、`---------- status ----------`、`---------- nodeset ----------` 等分区展示说明。`requires/provides` 不再塞进节点内；数据契约显示在连边 label 上，优先显示 contract `display_name`，再显示 id/key/type 信息。
+Mermaid/SVG 节点 label 使用纯文本分区展示：首行是 `display_name`，缺省时回退到注册类 `NODE_INFO.display_name` 或 `id`；external implemented node 的首行增加 `[EXTERNAL]`；随后显示 `id:`、`type_used:`，nodeset/loop 还会显示 `type_key:` / `body:`。所有异步调用显示 `async:`，`result_key` 模式同时显示 `result_key:`，再用 `---------- meta ----------`、`---------- status ----------`、`---------- nodeset ----------` 等分区展示说明。`requires/provides` 不再塞进节点内；数据契约显示在连边 label 上，优先显示 contract `display_name`，再显示 id/key/type 信息。
 
 Mermaid/SVG 只画显式 edge。主线 edge 会加粗；data bypass edge 用虚线；async 相关 edge 保持 async 语义，不会被误标成同步主线。旧版本根据 `requires/provides` 自动派生的理论 data edge 不再画出。
 
 架构 JSONC 与 Mermaid 共用 nodeset/loop 调用识别、编译边角色、contract 匹配、metadata fallback、资源筛选和 source path 语义；SVG 继续消费 Mermaid。planned nodeset 有 body 时会出现在 JSONC 和展开图中，无 body 时则明确保留空占位。
 
-SVG 渲染保持 `htmlLabels=false`，但会在 VibeFlow 内部调用 bundled Mermaid CLI 后对原生 SVG 文本做增强：标题加粗，字段名前缀加粗，字段行左对齐，分区行加粗并弱化颜色。Mermaid CLI/mmdc 是内部实现，不是公开审核入口。plugin/base_lib 资源列使用同样的 label 规则，且只展示当前 workflow config 实际引用的资源；资源元数据来自 `project/registry.py` 的 resource registry。
+SVG 渲染保持 `htmlLabels=false`，但会在 VibeFlow 内部调用 bundled Mermaid CLI 后对原生 SVG 文本做增强：标题加粗，包含 `external:`、`async:`、`result_key:` 在内的字段名前缀加粗，字段行左对齐，分区行加粗并弱化颜色。Mermaid CLI/mmdc 是内部实现，不是公开审核入口。plugin/base_lib 资源列使用同样的 label 规则，且只展示当前 workflow config 实际引用的资源；资源元数据来自 `project/registry.py` 的 resource registry。
 
 `export-svg` 会向 Mermaid CLI 传入渲染配置。普通图默认 `maxTextSize=200000`、`maxEdges=2000`；展开 nodeset 时默认 `maxTextSize=500000`、`maxEdges=5000`。如仍遇到 Mermaid 限制，可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
-展开 nodeset 的 SVG 固定使用确定性 `review-columns` composer：最外层主流程在左侧纵向展示，当前 workflow 实际启用的 plugins/base_lib 分列展示，展开的 nodeset 按顶层调用顺序放到右侧。nodeset 内部使用递归 detail-panel 布局：无直接子 nodeset 时横向展示；有直接子 nodeset 时父图保持 collapsed call-site 和原始连边，直接子 nodeset 作为右侧详情列按调用顺序纵向排列。审查图单个片段显示宽度默认上限为 `3200px`，可用 `--review-fragment-max-width` 覆盖。
-展开 Mermaid 源码只用于调试源码，不是详细审查 SVG 的输入；不要把 expanded `.mmd` 直接交给 Mermaid CLI/mmdc 转成 SVG。单项图形诊断可用 `export-svg --expand-nodesets`，正式架构审核使用 `review`。
+展开 nodeset 的 SVG 固定使用确定性 `review-columns` composer：最外层主流程在左侧纵向展示，当前 workflow 实际启用的 plugins/base_lib 分列展示，展开的 nodeset 放到右侧。nodeset 内部使用递归 detail-panel 布局：无直接子 nodeset 时横向展示；有直接子 nodeset 时父图保持全部 collapsed call-site 和原始连边。每个父 `GraphConfig` 只对直接调用做局部分组，键为 `(invocation.kind, type_key)`，并保持首次出现顺序；同组调用共享一个详情 fragment，其多调用标题显示总数、前三个调用 ID、剩余 `+N`，以及 async 模式、`result_key`、call config 数量和 `node_configs` 数量的紧凑摘要，不输出配置值。普通 nodeset 与 loop body 不混合，不同 `type_key` 不合并，同一定义在不同父上下文分别展开；`similar_to` 语义不变。审查图单个片段显示宽度默认上限为 `3200px`，可用 `--review-fragment-max-width` 覆盖。
+展开 Mermaid 源码只用于调试源码，不是详细审查 SVG 的输入；`export-mermaid --expand-nodesets` 及其 `review-columns` 调试布局仍按调用点展开，不使用局部详情去重。不要把 expanded `.mmd` 直接交给 Mermaid CLI/mmdc 转成 SVG。单项图形诊断可用 `export-svg --expand-nodesets`，正式架构审核使用 `review`。
 SVG 渲染不要求系统预装 Google Chrome；正常 `npm install` 后会优先使用 Puppeteer 自己安装/缓存的浏览器。如果该缓存不可用，再尝试非 snap 的系统 Chrome/Chromium。`/snap/bin/chromium` 会被跳过，因为它在 Puppeteer/mermaid-cli 下常见 profile lock 启动失败。

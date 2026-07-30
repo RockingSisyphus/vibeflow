@@ -21,6 +21,10 @@ class RuntimeOutputMixin:
 
     def _deliver_outputs(self, edge: EdgeSpec, outputs: Mapping[str, object], state: _RuntimeState) -> None:
         source = self._frames[edge.source]
+        if edge.pair not in {
+            candidate.pair for candidate in source.transfer_outgoing
+        }:
+            return
         target = self._frames[edge.target]
         providers_by_key = {provider.key: provider for provider in source.provides}
         required_types = {requirement.type for requirement in target.requires}
@@ -29,7 +33,6 @@ class RuntimeOutputMixin:
             if provider is None:
                 continue
             envelope = DataEnvelope(key=provider.key, type=provider.type, value=value, source_node=source.name)
-            self._record_pipeline_output_candidate(envelope, state)
             if provider.type in required_types:
                 state.inboxes[target.name] = [
                     item
@@ -37,6 +40,28 @@ class RuntimeOutputMixin:
                     if (item.key, item.type, item.source_node) != (envelope.key, envelope.type, envelope.source_node)
                 ]
                 state.inboxes[target.name].append(envelope)
+
+    def _record_node_output_candidates(
+        self,
+        node_name: str,
+        outputs: Mapping[str, object],
+        state: _RuntimeState,
+    ) -> None:
+        frame = self._frames[node_name]
+        providers_by_key = {provider.key: provider for provider in frame.provides}
+        for key, value in outputs.items():
+            provider = providers_by_key.get(str(key))
+            if provider is None:
+                continue
+            self._record_pipeline_output_candidate(
+                DataEnvelope(
+                    key=provider.key,
+                    type=provider.type,
+                    value=value,
+                    source_node=frame.name,
+                ),
+                state,
+            )
 
     def _record_pipeline_output_candidate(self, envelope: DataEnvelope, state: _RuntimeState) -> None:
         if any(output.type == envelope.type for output in self.graph.outputs):
@@ -55,14 +80,14 @@ class RuntimeOutputMixin:
             if output.cardinality == CARDINALITY_EXACTLY_ONE:
                 if len(matches) != 1:
                     raise PipelineRuntimeError(f"pipeline output type '{output.type}' expected exactly one value, got {len(matches)}")
-                _store_output(state.result, output.type, matches[0])
+                _store_output(state.result, output.public_name, matches[0])
             elif output.cardinality == CARDINALITY_OPTIONAL_ONE:
                 if len(matches) > 1:
                     raise PipelineRuntimeError(f"pipeline output type '{output.type}' expected at most one value, got {len(matches)}")
                 if matches:
-                    _store_output(state.result, output.type, matches[0])
+                    _store_output(state.result, output.public_name, matches[0])
             elif output.cardinality == CARDINALITY_ALL:
-                state.result.set(output.type, [match.to_input() for match in matches])
+                state.result.set(output.public_name, [match.to_input() for match in matches])
 
     def _record_edge(self, edge: EdgeSpec) -> None:
         self.trace.record_edge(edge.source, edge.target)

@@ -1,0 +1,96 @@
+{
+  "type_key": "sandbox.affine_inner_default",
+  "display_name": "Default inner affine nodeset",
+  "description": "Applies the affine descriptor defaults on the non-overridden sibling path.",
+  "requires": [
+    {
+      "type": "sandbox.number",
+      "cardinality": "exactly_one",
+      "display_name": "Number"
+    }
+  ],
+  "provides": [
+    {
+      "key": "default_result",
+      "type": "sandbox.override.default",
+      "display_name": "Default result"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Default sibling start",
+        "description": "Starts the non-overridden sibling calculation."
+      },
+      {
+        "id": "math",
+        "type_used": "sandbox.math",
+        "display_name": "Default affine transform",
+        "description": "Uses the node descriptor defaults without a call-site override.",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "result",
+            "type": "sandbox.math.result",
+            "display_name": "Result"
+          }
+        ]
+      },
+      {
+        "id": "expose",
+        "type_used": "sandbox.override_default",
+        "display_name": "Expose default result",
+        "description": "Gives the sibling result a distinct portable data type.",
+        "requires": [
+          {
+            "type": "sandbox.math.result",
+            "cardinality": "exactly_one",
+            "display_name": "Result"
+          }
+        ],
+        "provides": [
+          {
+            "key": "default_result",
+            "type": "sandbox.override.default",
+            "display_name": "Default result"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "Default sibling end",
+        "description": "Ends the non-overridden sibling calculation."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "math"},
+      {"from": "math", "to": "expose"},
+      {"from": "expose", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.override.default",
+        "cardinality": "exactly_one",
+        "display_name": "Default result",
+        "as": "default_result"
+      }
+    ]
+  }
+}

@@ -469,7 +469,35 @@ def _fixed_count_loop_graph(*, max_iterations: int = 10, stop_after: int = 3):
     )
 
 
-def _while_loop_graph(*, target: int = 3, max_iterations: int = 10, stop_when_source: str = "loop.done"):
+def _while_loop_graph(
+    *,
+    target: int = 3,
+    max_iterations: int | None = 10,
+    stop_when_source: str | None = "loop.done",
+    stop_after: int | None = None,
+):
+    loop = {
+        "body": "loop.step_until",
+        "max_iterations": max_iterations,
+        "carry": [
+            {
+                "from": "loop.current",
+                "as": "loop.current",
+                "update": "loop.next",
+            }
+        ],
+        "outputs": [
+            {"from": "loop.next", "as": "loop.final"},
+            {"from": "loop.iterations", "as": "loop.iterations"},
+        ],
+    }
+    if stop_when_source is not None:
+        loop["stop_when"] = {
+            "from": stop_when_source,
+            "equals": True,
+        }
+    if stop_after is not None:
+        loop["stop_after"] = stop_after
     return parse_graph_config(
         {
             "nodesets": [
@@ -507,16 +535,7 @@ def _while_loop_graph(*, target: int = 3, max_iterations: int = 10, stop_when_so
                         "Runs the body until loop.done is true.",
                         requires=[REQ_SPEC("loop.current")],
                         provides=[PROV_SPEC("loop.final"), PROV_SPEC("loop.iterations")],
-                        loop={
-                            "body": "loop.step_until",
-                            "max_iterations": max_iterations,
-                            "carry": [{"from": "loop.current", "as": "loop.current", "update": "loop.next"}],
-                            "stop_when": {"from": stop_when_source, "equals": True},
-                            "outputs": [
-                                {"from": "loop.next", "as": "loop.final"},
-                                {"from": "loop.iterations", "as": "loop.iterations"},
-                            ],
-                        },
+                        loop=loop,
                     ),
                     _node_call("end", "test.out_end", "Ends after loop.final.", requires=[REQ_SPEC("loop.final")]),
                 ],
@@ -545,6 +564,32 @@ def test_while_loop_runs_until_condition_and_reports_iterations() -> None:
     assert context.get("loop.final")["value"] == 3
     assert context.get("loop.iterations")["value"] == 3
     assert "while_loop.iter_2.step" in context.get("runtime.qualified_exec_order")
+
+
+def test_unbounded_while_loop_stops_from_condition() -> None:
+    graph = _while_loop_graph(target=3, max_iterations=None)
+    context = PipelineRuntime(
+        graph,
+        registry=_loop_registry(),
+    ).run({"loop.current": 0})
+
+    assert context.get("loop.final")["value"] == 3
+    assert context.get("loop.iterations")["value"] == 3
+
+
+def test_dual_loop_stop_conditions_use_or() -> None:
+    graph = _while_loop_graph(
+        target=9,
+        max_iterations=None,
+        stop_after=2,
+    )
+    context = PipelineRuntime(
+        graph,
+        registry=_loop_registry(),
+    ).run({"loop.current": 0})
+
+    assert context.get("loop.final")["value"] == 2
+    assert context.get("loop.iterations")["value"] == 2
 
 
 def test_while_loop_outputs_match_plan_block_and_compiled_execution() -> None:

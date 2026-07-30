@@ -1,0 +1,13 @@
+{
+  "descriptors": {
+    "nodes": ["manifests/nodes"],
+    "base_lib": ["manifests/base_lib"],
+    "data_schemas": ["manifests/data"],
+    "capabilities": ["manifests/capabilities"]
+  },
+  "javascript": {
+    "package_root": ".",
+    "external_packages": []
+  },
+  "quality_enabled": false
+}

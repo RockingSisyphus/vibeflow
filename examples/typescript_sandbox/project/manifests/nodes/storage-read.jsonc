@@ -1,0 +1,51 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.storage_read",
+  "display_name": "Read storage",
+  "category": "sandbox",
+  "description": "Reads a value from a per-run injected storage Capability.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.storage.key",
+        "cardinality": "exactly_one",
+        "display_name": "Storage key"
+      }
+    ],
+    "provides": [
+      {
+        "key": "value",
+        "type": "sandbox.storage.value",
+        "display_name": "Stored value"
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {
+      "value": {
+        "type": "string"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "completion": "suspend",
+      "source": {
+        "kind": "file",
+        "ref": "nodes/storage_read.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": [
+    {
+      "id": "sandbox.storage",
+      "operations": ["read"]
+    }
+  ]
+}

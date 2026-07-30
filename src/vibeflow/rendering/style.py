@@ -30,11 +30,16 @@ SYSTEM_STYLE_COLORS: Mapping[str, StyleColors] = {
     "plannedResource": StyleColors(fill="#fef08a", stroke="#ca8a04", text="#713f12", extra="stroke-width:3px,stroke-dasharray: 6 3"),
 }
 
+SYSTEM_MODIFIER_STYLES: Mapping[str, str] = {
+    "externalBoundary": "stroke-width:7px,vector-effect:non-scaling-stroke",
+}
+
 MERMAID_MAIN_CLASS_ORDER = (
     "defaultNode",
     "healthError",
     "healthWarning",
     "externalDependency",
+    "externalBoundary",
     "documentNode",
     "nodesetNode",
     "loopNode",
@@ -67,6 +72,9 @@ def is_reserved_system_color(value: str) -> bool:
 
 
 def mermaid_class_def(class_name: str) -> str:
+    modifier = SYSTEM_MODIFIER_STYLES.get(class_name)
+    if modifier is not None:
+        return f"classDef {class_name} {modifier};"
     style = SYSTEM_STYLE_COLORS[class_name]
     fields = [f"fill:{style.fill}", f"stroke:{style.stroke}"]
     if style.extra:

@@ -13,6 +13,7 @@ from vibeflow.config.schema_common import (
 from vibeflow.config.schema_node import _validate_node, _validate_node_similarity_targets, _validate_planned_behavior
 from vibeflow.health.types import HealthFinding
 from vibeflow.node import FLOW_KINDS
+from vibeflow.graph_config.types import ENTRY_MODES
 
 STATUSES = {"planned", "implemented"}
 
@@ -61,6 +62,14 @@ def collect_policy_schema_findings(
 
 
 def _validate_pipeline(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
+    if "entry_mode" in value and value["entry_mode"] not in ENTRY_MODES:
+        findings.append(
+            _error(
+                "CONFIG.SCHEMA.ENTRY_MODE",
+                f"{prefix}.entry_mode must be one of {sorted(ENTRY_MODES)}",
+                f"{prefix}.entry_mode",
+            )
+        )
     nodes = value.get("nodes")
     if not isinstance(nodes, list):
         findings.append(_error("CONFIG.SCHEMA.NODES_LIST", f"{prefix}.nodes must be a non-empty list", f"{prefix}.nodes"))
@@ -96,6 +105,23 @@ def _validate_edge(value: Any, prefix: str, findings: list[HealthFinding]) -> No
     _validate_removed_edge_fields(value, prefix, findings)
     if "when" in value and not isinstance(value["when"], str):
         findings.append(_error("CONFIG.SCHEMA.EDGE_WHEN", f"{prefix}.when must be a string", f"{prefix}.when"))
+    for role in ("schedule", "transfer"):
+        if role in value and not isinstance(value[role], bool):
+            findings.append(
+                _error(
+                    f"CONFIG.SCHEMA.EDGE_{role.upper()}",
+                    f"{prefix}.{role} must be a boolean",
+                    f"{prefix}.{role}",
+                )
+            )
+    if value.get("schedule") is False and value.get("transfer") is False:
+        findings.append(
+            _error(
+                "CONFIG.SCHEMA.EDGE_ROLES",
+                f"{prefix} must schedule, transfer, or both",
+                prefix,
+            )
+        )
 
 
 def _validate_edge_pair(value: list[Any], prefix: str, findings: list[HealthFinding]) -> None:

@@ -1,0 +1,19 @@
+{
+  "kind": "host_extension",
+  "id": "sandbox.math_host",
+  "targets": ["browser", "node"],
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "host_extensions/math_host.ts",
+        "export": "createHostExtension"
+      }
+    }
+  ],
+  "provides": ["sandbox.host_math"],
+  "dependencies": [],
+  "external_packages": []
+}

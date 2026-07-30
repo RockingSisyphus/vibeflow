@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import re
 import xml.sax.saxutils
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
-from vibeflow.rendering.helpers import compile_for_render, nodeset_for_node
+from vibeflow.rendering.helpers import compile_for_render
 from vibeflow.graph_config import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
 from vibeflow.rendering.mermaid import MERMAID_LAYOUT_DEFAULT, _escape_label, _resource_label, _safe_id, export_mermaid
 from vibeflow.rendering.mermaid.render import DEFAULT_MERMAID_MAX_EDGES, DEFAULT_MERMAID_MAX_TEXT_SIZE, render_mermaid_svg
 from vibeflow.rendering.mermaid.review_layout import _column_height, _column_svg, _display_size, _validate_review_fragment_max_width, _viewbox_size
+from vibeflow.rendering.review_model import invocation_for_node
 from vibeflow.rendering.mermaid.review_types import (
     DETAIL_PANEL_COLUMN_GAP as _DETAIL_PANEL_COLUMN_GAP,
     DETAIL_PANEL_ROW_GAP as _DETAIL_PANEL_ROW_GAP,
@@ -20,6 +22,17 @@ from vibeflow.rendering.mermaid.review_types import (
     _SvgFragment,
 )
 from vibeflow.rendering.style import MERMAID_RESOURCE_CLASS_ORDER, mermaid_class_def_lines
+
+
+_MAX_GROUP_TITLE_CALL_IDS = 3
+
+
+@dataclass(frozen=True)
+class _NodesetInvocationGroup:
+    kind: str
+    nodeset: NodesetSpec
+    nodes: tuple[NodeSpec, ...]
+
 
 def _nodeset_fragments(
     graph: GraphConfig,
@@ -35,14 +48,11 @@ def _nodeset_fragments(
     review_fragment_max_width: float,
 ) -> list[_SvgFragment]:
     fragments: list[_SvgFragment] = []
-    for node in graph.nodes:
-        nodeset = nodeset_for_node(graph, node)
-        if nodeset is None:
-            continue
+    for group in _direct_nodeset_call_groups(graph):
         fragments.append(
             _render_nodeset_detail_fragment(
-                _nodeset_fragment_title(node, nodeset),
-                nodeset,
+                _nodeset_group_fragment_title(group),
+                group.nodeset,
                 temp_dir,
                 registry=registry,
                 show_contract=show_contract,
@@ -82,8 +92,8 @@ def _render_nodeset_detail_fragment(
         return _placeholder_fragment(title, "nodeset has no concrete pipeline", background=background)
 
     compiled = compile_for_render(nodeset.graph, None, registry)
-    child_nodesets = _direct_nodeset_calls(nodeset.graph)
-    if not child_nodesets:
+    child_groups = _direct_nodeset_call_groups(nodeset.graph)
+    if not child_groups:
         return _render_fragment(
             title,
             _nodeset_mermaid(
@@ -119,8 +129,8 @@ def _render_nodeset_detail_fragment(
     )
     child_fragments = [
         _render_nodeset_detail_fragment(
-            _nodeset_fragment_title(child_node, child_nodeset),
-            child_nodeset,
+            _nodeset_group_fragment_title(group),
+            group.nodeset,
             temp_dir,
             registry=registry,
             show_contract=show_contract,
@@ -132,7 +142,7 @@ def _render_nodeset_detail_fragment(
             review_fragment_max_width=review_fragment_max_width,
             visited_nodesets=(*visited_nodesets, nodeset.type_key),
         )
-        for child_node, child_nodeset in child_nodesets
+        for group in child_groups
     ]
     svg_text = _compose_detail_panel_svg(
         parent_fragment,
@@ -143,13 +153,53 @@ def _render_nodeset_detail_fragment(
     width, height = _viewbox_size(svg_text)
     return _SvgFragment(title=title, svg_text=svg_text, width=width, height=height)
 
-def _direct_nodeset_calls(graph: GraphConfig) -> tuple[tuple[NodeSpec, NodesetSpec], ...]:
-    calls: list[tuple[NodeSpec, NodesetSpec]] = []
+
+def _direct_nodeset_call_groups(graph: GraphConfig) -> tuple[_NodesetInvocationGroup, ...]:
+    order: list[tuple[str, str]] = []
+    nodesets: dict[tuple[str, str], NodesetSpec] = {}
+    nodes: dict[tuple[str, str], list[NodeSpec]] = {}
     for node in graph.nodes:
-        nodeset = nodeset_for_node(graph, node)
-        if nodeset is not None:
-            calls.append((node, nodeset))
-    return tuple(calls)
+        invocation = invocation_for_node(graph, node)
+        if invocation is None:
+            continue
+        key = (invocation.kind, invocation.target)
+        if key not in nodes:
+            order.append(key)
+            nodesets[key] = invocation.nodeset
+            nodes[key] = []
+        nodes[key].append(node)
+    return tuple(
+        _NodesetInvocationGroup(kind=kind, nodeset=nodesets[(kind, target)], nodes=tuple(nodes[(kind, target)]))
+        for kind, target in order
+    )
+
+
+def _nodeset_group_fragment_title(group: _NodesetInvocationGroup) -> str:
+    if len(group.nodes) == 1:
+        return _nodeset_fragment_title(group.nodes[0], group.nodeset)
+    title = group.nodeset.display_name or group.nodeset.type_key
+    visible = [_nodeset_call_summary(node) for node in group.nodes[:_MAX_GROUP_TITLE_CALL_IDS]]
+    hidden = len(group.nodes) - len(visible)
+    if hidden:
+        visible.append(f"+{hidden}")
+    calls = ", ".join(visible)
+    return f"{title} (calls: {len(group.nodes)} [{calls}], type_key: {group.nodeset.type_key})"
+
+
+def _nodeset_call_summary(node: NodeSpec) -> str:
+    details: list[str] = []
+    if node.async_mode:
+        details.append(f"async={node.async_mode}")
+    if node.result_key:
+        details.append(f"result_key={node.result_key}")
+    if node.params:
+        details.append(f"config={len(node.params)}")
+    if node.node_config_overrides:
+        details.append(f"node_configs={len(node.node_config_overrides)}")
+    if not details:
+        return node.id
+    return f"{node.id}{{{','.join(details)}}}"
+
 
 def _nodeset_fragment_title(node: NodeSpec, nodeset: NodesetSpec) -> str:
     title = node.metadata.display_name or nodeset.display_name or node.id

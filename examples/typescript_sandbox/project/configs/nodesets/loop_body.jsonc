@@ -1,0 +1,75 @@
+{
+  "type_key": "sandbox.loop_body",
+  "display_name": "Loop body",
+  "description": "One pure TypeScript +1 loop iteration.",
+  "requires": [
+    {
+      "type": "sandbox.loop.value",
+      "cardinality": "exactly_one",
+      "display_name": "Loop value"
+    }
+  ],
+  "provides": [
+    {
+      "key": "next",
+      "type": "sandbox.loop.next",
+      "display_name": "Next value"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "sandbox.loop.value",
+        "type": "sandbox.loop.value",
+        "display_name": "Loop value",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Loop body start",
+        "description": "Starts one loop iteration."
+      },
+      {
+        "id": "increment",
+        "type_used": "sandbox.loop_increment",
+        "display_name": "Increment",
+        "description": "Adds one to the carry value.",
+        "requires": [
+          {
+            "type": "sandbox.loop.value",
+            "cardinality": "exactly_one",
+            "display_name": "Loop value"
+          }
+        ],
+        "provides": [
+          {
+            "key": "next",
+            "type": "sandbox.loop.next",
+            "display_name": "Next value"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "Loop body end",
+        "description": "Ends one loop iteration."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "increment"},
+      {"from": "increment", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.loop.next",
+        "cardinality": "exactly_one",
+        "display_name": "Next value",
+        "as": "next"
+      }
+    ]
+  }
+}

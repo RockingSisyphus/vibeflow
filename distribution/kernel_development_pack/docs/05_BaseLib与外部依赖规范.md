@@ -155,7 +155,7 @@ NODE_INFO = NodeInfo(
 )
 ```
 
-`external=True` 表示实现由第三方或外部主体维护，并以最高优先级把有效 `effect_scope` 设为 `trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 IO/purity 绕过，由项目承担信任责任。它不会跳过契约、`flow_kind`、拓扑、输出或 trace 检查。如果这个外部 node 负责分支路由，必须同时声明 `flow_kind="decision"` 并满足 decision 规则。
+`external=True` 表示实现由第三方或外部主体维护，并以最高优先级把有效 `effect_scope` 设为 `trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 IO/purity 绕过，由项目承担信任责任。它不会跳过契约、`flow_kind`、拓扑、输出或 trace 检查，也不改变 `flow_kind` 形状；审查图会叠加 `[EXTERNAL]` 标题和 `7px` non-scaling 粗边框。如果这个外部 node 负责分支路由，必须同时声明 `flow_kind="decision"` 并满足 decision 规则。
 
 ## 真实副作用应该放在哪里
 

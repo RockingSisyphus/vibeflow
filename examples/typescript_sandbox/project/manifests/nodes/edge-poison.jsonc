@@ -1,0 +1,45 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.edge_poison",
+  "display_name": "Edge poison",
+  "category": "sandbox",
+  "description": "Produces a same-typed sentinel that a schedule-only edge must not transfer.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [],
+    "provides": [
+      {
+        "key": "poisoned",
+        "type": "sandbox.fanout.added",
+        "display_name": "Poisoned payload"
+      }
+    ],
+    "params_schema": {
+      "value": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "value": 999
+    },
+    "output_schema": {
+      "poisoned": {
+        "type": "number"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/edge_poison.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": []
+}

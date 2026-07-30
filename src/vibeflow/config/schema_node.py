@@ -10,8 +10,9 @@ from vibeflow.config.schema_common import (
     _validate_positive_int,
     _validate_provider_list,
     _validate_requirement_list,
+    _warning,
 )
-from vibeflow.graph_config import JOIN_POLICIES, LOOP_NODE_TYPES, LOOP_WHILE_TYPE, SIMILAR_TO_RELATIONSHIPS
+from vibeflow.graph_config import IO_NODE_TYPE, JOIN_POLICIES, LOOP_NODE_TYPES, LOOP_WHILE_TYPE, SIMILAR_TO_RELATIONSHIPS
 from vibeflow.health.types import HealthFinding
 from vibeflow.node import FLOW_KINDS
 from vibeflow.graph_config.planned_behavior import PLANNED_BEHAVIOR_BLOCKING, PLANNED_BEHAVIOR_PYTHON_STUB, PLANNED_BEHAVIOR_TRANSPARENT, validate_stub_module_ref
@@ -33,6 +34,7 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
     _validate_node_async_fields(value, prefix, findings)
     _validate_node_join_policy(value, prefix, findings)
     _validate_node_loop(value, prefix, findings)
+    _validate_node_io(value, prefix, findings)
 
 def _validate_node_identity(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
     if "name" in value:
@@ -182,26 +184,148 @@ def _validate_node_loop(value: Mapping[str, Any], prefix: str, findings: list[He
     unknown = sorted(set(str(key) for key in loop) - {"body", "max_iterations", "stop_after", "stop_when", "carry", "collect", "outputs"})
     if unknown:
         findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop contains unsupported loop keys: {unknown}", f"{prefix}.loop"))
-    if "max_iterations" in loop:
+    if "max_iterations" in loop and loop["max_iterations"] is not None:
         _validate_positive_int(loop["max_iterations"], f"{prefix}.loop.max_iterations", findings, "CONFIG.SCHEMA.NODE_LOOP_INVALID")
     if node_type == LOOP_WHILE_TYPE:
         has_stop_after = "stop_after" in loop
         has_stop_when = "stop_when" in loop
-        if has_stop_after == has_stop_when:
-            findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop must declare exactly one of stop_after or stop_when", f"{prefix}.loop"))
         if has_stop_after:
             _validate_positive_int(loop.get("stop_after"), f"{prefix}.loop.stop_after", findings, "CONFIG.SCHEMA.NODE_LOOP_INVALID")
-            max_iterations = loop.get("max_iterations", 1000)
-            if isinstance(loop.get("stop_after"), int) and not isinstance(loop.get("stop_after"), bool) and isinstance(max_iterations, int) and not isinstance(max_iterations, bool):
-                if loop["stop_after"] > max_iterations:
-                    findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop.stop_after must be <= max_iterations", f"{prefix}.loop.stop_after"))
         if has_stop_when:
             _validate_loop_mapping(loop.get("stop_when"), f"{prefix}.loop.stop_when", findings, required_fields=("from",))
             if isinstance(loop.get("stop_when"), Mapping) and "equals" in loop["stop_when"] and not isinstance(loop["stop_when"]["equals"], bool):
                 findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop.stop_when.equals must be a boolean", f"{prefix}.loop.stop_when.equals"))
+        if (
+            loop.get("max_iterations", 1000) is None
+            and not has_stop_after
+            and not has_stop_when
+        ):
+            findings.append(
+                _warning(
+                    "CONFIG.LOOP.PERMANENT",
+                    (
+                        f"{prefix}.loop explicitly declares an unbounded loop "
+                        "without a stop condition"
+                    ),
+                    f"{prefix}.loop",
+                )
+            )
+        if (
+            isinstance(loop.get("max_iterations"), int)
+            and not isinstance(loop.get("max_iterations"), bool)
+            and isinstance(loop.get("stop_after"), int)
+            and not isinstance(loop.get("stop_after"), bool)
+            and loop["stop_after"] > loop["max_iterations"]
+        ):
+            findings.append(
+                _warning(
+                    "CONFIG.LOOP.STOP_AFTER_UNREACHABLE",
+                    (
+                        f"{prefix}.loop.stop_after is greater than "
+                        "max_iterations and cannot be reached"
+                    ),
+                    f"{prefix}.loop.stop_after",
+                )
+            )
     for field, required in (("carry", ("from", "as", "update")), ("collect", ("from", "as")), ("outputs", ("from", "as"))):
         if field in loop:
             _validate_loop_list(loop[field], f"{prefix}.loop.{field}", findings, required_fields=required)
+
+
+def _validate_node_io(
+    value: Mapping[str, Any],
+    prefix: str,
+    findings: list[HealthFinding],
+) -> None:
+    node_type = str(value.get("type_used", "")).strip()
+    raw = value.get("io")
+    if node_type != IO_NODE_TYPE:
+        if "io" in value:
+            findings.append(
+                _error(
+                    "CONFIG.SCHEMA.NODE_IO_INVALID",
+                    f"{prefix}.io is only allowed on {IO_NODE_TYPE}",
+                    f"{prefix}.io",
+                )
+            )
+        return
+    if not isinstance(raw, Mapping):
+        findings.append(
+            _error(
+                "CONFIG.SCHEMA.NODE_IO_INVALID",
+                f"{prefix}.io must be an object",
+                f"{prefix}.io",
+            )
+        )
+        return
+    unknown = sorted(set(raw) - {"operation", "port"})
+    if unknown:
+        findings.append(
+            _error(
+                "CONFIG.SCHEMA.NODE_IO_INVALID",
+                f"{prefix}.io contains unsupported keys: {unknown}",
+                f"{prefix}.io",
+            )
+        )
+    operation = raw.get("operation")
+    if operation not in {"receive", "send"}:
+        findings.append(
+            _error(
+                "CONFIG.SCHEMA.NODE_IO_INVALID",
+                f"{prefix}.io.operation must be receive or send",
+                f"{prefix}.io.operation",
+            )
+        )
+    if "port" in raw and not _non_empty_string(raw.get("port")):
+        findings.append(
+            _error(
+                "CONFIG.SCHEMA.NODE_IO_INVALID",
+                f"{prefix}.io.port must be a non-empty string",
+                f"{prefix}.io.port",
+            )
+        )
+    requires = value.get("requires", [])
+    provides = value.get("provides", [])
+    if operation == "receive" and (
+        not isinstance(requires, list)
+        or requires
+        or not isinstance(provides, list)
+        or len(provides) != 1
+    ):
+        findings.append(
+            _error(
+                "CONFIG.SCHEMA.NODE_IO_CONTRACT",
+                "receive requires zero inputs and exactly one output",
+                prefix,
+            )
+        )
+    if operation == "send":
+        valid_requirement = (
+            isinstance(requires, list)
+            and len(requires) == 1
+            and isinstance(requires[0], Mapping)
+            and requires[0].get("cardinality") == "exactly_one"
+        )
+        if (
+            not valid_requirement
+            or not isinstance(provides, list)
+            or provides
+        ):
+            findings.append(
+                _error(
+                    "CONFIG.SCHEMA.NODE_IO_CONTRACT",
+                    "send requires one exactly_one input and zero outputs",
+                    prefix,
+                )
+            )
+    if value.get("async"):
+        findings.append(
+            _error(
+                "CONFIG.SCHEMA.NODE_IO_ASYNC",
+                "vibeflow.io cannot also use legacy node.async",
+                f"{prefix}.async",
+            )
+        )
 
 def _validate_loop_mapping(value: Any, prefix: str, findings: list[HealthFinding], *, required_fields: tuple[str, ...]) -> None:
     if not isinstance(value, Mapping):

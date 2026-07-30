@@ -155,6 +155,7 @@ COMMAND_ALIASES = {
     "svg": "export-svg",
 }
 WORKSPACE_COMMANDS = {
+    "build",
     "delegate-cli",
     "export-architecture",
     "export-ascii",

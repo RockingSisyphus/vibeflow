@@ -25,14 +25,13 @@ def _parse_loop_spec(value: Any, *, type_used: str, provides: tuple[DataProvider
     if unknown:
         raise GraphConfigError(f"{field} contains unsupported loop keys: {unknown}")
     body = _parse_required_text(value.get("body"), field=f"{field}.body")
-    max_iterations = _parse_positive_int(value.get("max_iterations", 1000), field=f"{field}.max_iterations")
+    max_iterations = _parse_iteration_limit(
+        value.get("max_iterations", 1000),
+        field=f"{field}.max_iterations",
+    )
     has_stop_after = "stop_after" in value
     has_stop_when = "stop_when" in value
-    if has_stop_after == has_stop_when:
-        raise GraphConfigError(f"{field} must declare exactly one of stop_after or stop_when")
     stop_after = _parse_positive_int(value.get("stop_after"), field=f"{field}.stop_after") if has_stop_after else 0
-    if stop_after and stop_after > max_iterations:
-        raise GraphConfigError(f"{field}.stop_after must be <= max_iterations")
     stop_when = _parse_loop_stop_when(value.get("stop_when"), field=f"{field}.stop_when") if has_stop_when else LoopStopWhenSpec()
     carry = tuple(_parse_loop_carry_item(item, field=f"{field}.carry[{index}]") for index, item in enumerate(_parse_list(value.get("carry", ()), field=f"{field}.carry")))
     collect = tuple(_parse_loop_collect_item(item, field=f"{field}.collect[{index}]") for index, item in enumerate(_parse_list(value.get("collect", ()), field=f"{field}.collect")))
@@ -99,6 +98,12 @@ def _parse_positive_int(value: Any, *, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise GraphConfigError(f"{field} must be an integer >= 1")
     return value
+
+
+def _parse_iteration_limit(value: Any, *, field: str) -> int | None:
+    if value is None:
+        return None
+    return _parse_positive_int(value, field=field)
 
 def _parse_list(value: Any, *, field: str) -> list[Any]:
     if value in (None, ()):

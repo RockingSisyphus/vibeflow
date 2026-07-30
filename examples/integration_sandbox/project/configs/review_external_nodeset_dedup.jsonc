@@ -1,0 +1,299 @@
+{
+  "metadata": {
+    "name": "review.external_nodeset_dedup",
+    "version": "0.1.0"
+  },
+  "pipeline": {
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Starts the external-boundary and local-dedup review fixture."
+      },
+      {
+        "id": "seed",
+        "type_used": "sandbox.constant",
+        "display_name": "Seed Value",
+        "description": "Produces the value used by the synchronous mainline.",
+        "provides": [
+          {
+            "key": "value.in",
+            "type": "value.in",
+            "display_name": "Value In"
+          }
+        ],
+        "value": 4
+      },
+      {
+        "id": "worker_a",
+        "type_used": "vibeflow.loop.while",
+        "display_name": "Worker Loop A",
+        "description": "Runs the first valid invocation of the reusable worker body.",
+        "provides": [
+          {
+            "key": "worker.a",
+            "type": "worker.a",
+            "display_name": "Worker A Result"
+          }
+        ],
+        "loop": {
+          "body": "visual.reusable_worker",
+          "max_iterations": 1,
+          "stop_after": 1,
+          "outputs": [
+            {
+              "from": "async.value",
+              "as": "worker.a"
+            }
+          ]
+        }
+      },
+      {
+        "id": "worker_b",
+        "type_used": "vibeflow.loop.while",
+        "display_name": "Worker Loop B",
+        "description": "Runs the same worker body with one internal node override.",
+        "provides": [
+          {
+            "key": "worker.b",
+            "type": "worker.b",
+            "display_name": "Worker B Result"
+          }
+        ],
+        "node_configs": {
+          "side_value": {
+            "value": 101
+          }
+        },
+        "loop": {
+          "body": "visual.reusable_worker",
+          "max_iterations": 1,
+          "stop_after": 1,
+          "outputs": [
+            {
+              "from": "async.value",
+              "as": "worker.b"
+            }
+          ]
+        }
+      },
+      {
+        "id": "worker_c",
+        "type_used": "vibeflow.loop.while",
+        "display_name": "Worker Loop C",
+        "description": "Runs the third valid invocation of the reusable worker body.",
+        "provides": [
+          {
+            "key": "worker.c",
+            "type": "worker.c",
+            "display_name": "Worker C Result"
+          }
+        ],
+        "node_configs": {
+          "side_value": {
+            "value": 202
+          }
+        },
+        "loop": {
+          "body": "visual.reusable_worker",
+          "max_iterations": 1,
+          "stop_after": 1,
+          "outputs": [
+            {
+              "from": "async.value",
+              "as": "worker.c"
+            }
+          ]
+        }
+      },
+      {
+        "id": "worker_d",
+        "type_used": "vibeflow.loop.while",
+        "display_name": "Worker Loop D",
+        "description": "Runs the fourth worker body invocation represented by the grouped title's +1 marker.",
+        "provides": [
+          {
+            "key": "worker.d",
+            "type": "worker.d",
+            "display_name": "Worker D Result"
+          }
+        ],
+        "loop": {
+          "body": "visual.reusable_worker",
+          "max_iterations": 1,
+          "stop_after": 1,
+          "outputs": [
+            {
+              "from": "async.value",
+              "as": "worker.d"
+            }
+          ]
+        }
+      },
+      {
+        "id": "add",
+        "type_used": "sandbox.add",
+        "display_name": "Mainline Add",
+        "description": "Continues the mainline before the repeated worker-body branches fan out.",
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.out",
+            "type": "value.out",
+            "display_name": "Value Out"
+          }
+        ],
+        "delta": 6
+      },
+      {
+        "id": "external_boost",
+        "type_used": "sandbox.external_boost",
+        "display_name": "External Boost",
+        "description": "Calls a trusted implementation maintained outside this project.",
+        "requires": [
+          {
+            "type": "value.out",
+            "cardinality": "exactly_one",
+            "display_name": "Value Out"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.final",
+            "type": "value.final",
+            "display_name": "Value Final"
+          }
+        ],
+        "bonus": 5
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.review_join_end",
+        "display_name": "End",
+        "description": "Joins the external result and all four repeated worker-body invocations.",
+        "similar_to": {
+          "node": "start",
+          "relationship": "variant",
+          "reason": "Both are terminal boundary nodes with empty runtime outputs, but one starts the graph and the other joins all results."
+        },
+        "join_policy": "all",
+        "requires": [
+          {
+            "type": "value.final",
+            "cardinality": "exactly_one",
+            "display_name": "Value Final"
+          },
+          {
+            "type": "worker.a",
+            "cardinality": "exactly_one",
+            "display_name": "Worker A Result"
+          },
+          {
+            "type": "worker.b",
+            "cardinality": "exactly_one",
+            "display_name": "Worker B Result"
+          },
+          {
+            "type": "worker.c",
+            "cardinality": "exactly_one",
+            "display_name": "Worker C Result"
+          },
+          {
+            "type": "worker.d",
+            "cardinality": "exactly_one",
+            "display_name": "Worker D Result"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "seed"
+      },
+      {
+        "from": "seed",
+        "to": "add"
+      },
+      {
+        "from": "add",
+        "to": "external_boost"
+      },
+      {
+        "from": "external_boost",
+        "to": "worker_a"
+      },
+      {
+        "from": "external_boost",
+        "to": "worker_b"
+      },
+      {
+        "from": "external_boost",
+        "to": "worker_c"
+      },
+      {
+        "from": "external_boost",
+        "to": "worker_d"
+      },
+      {
+        "from": "external_boost",
+        "to": "end"
+      },
+      {
+        "from": "worker_a",
+        "to": "end"
+      },
+      {
+        "from": "worker_b",
+        "to": "end"
+      },
+      {
+        "from": "worker_c",
+        "to": "end"
+      },
+      {
+        "from": "worker_d",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.final",
+        "cardinality": "exactly_one",
+        "display_name": "Value Final"
+      },
+      {
+        "type": "worker.a",
+        "cardinality": "exactly_one",
+        "display_name": "Worker A Result"
+      },
+      {
+        "type": "worker.b",
+        "cardinality": "exactly_one",
+        "display_name": "Worker B Result"
+      },
+      {
+        "type": "worker.c",
+        "cardinality": "exactly_one",
+        "display_name": "Worker C Result"
+      },
+      {
+        "type": "worker.d",
+        "cardinality": "exactly_one",
+        "display_name": "Worker D Result"
+      }
+    ]
+  },
+  "nodeset_imports": [
+    {
+      "path": "nodesets/review_external_nodeset_dedup/visual_reusable_worker.jsonc"
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.x",
+        "display_name": "X",
+        "required": true
+      },
+      {
+        "key": "offset",
+        "type": "sandbox.optional.offset",
+        "display_name": "Optional offset",
+        "required": false
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts the optional pipeline input fixture."
+      },
+      {
+        "id": "add",
+        "type_used": "sandbox.optional_add",
+        "display_name": "Add optional offset",
+        "description": "Adds offset when supplied and otherwise adds zero.",
+        "requires": [
+          {
+            "type": "sandbox.x",
+            "cardinality": "exactly_one",
+            "display_name": "X"
+          },
+          {
+            "type": "sandbox.optional.offset",
+            "cardinality": "optional_one",
+            "display_name": "Optional offset"
+          }
+        ],
+        "provides": [
+          {
+            "key": "result",
+            "type": "sandbox.math.result",
+            "display_name": "Result"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Ends after the optional arithmetic result is available."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "add"},
+      {"from": "add", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.math.result",
+        "cardinality": "exactly_one",
+        "display_name": "Result",
+        "as": "result"
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "kind": "data_schema",
+  "type_key": "sandbox.branch.output",
+  "representation": "json",
+  "schema": {
+    "type": "string",
+    "minLength": 1
+  }
+}

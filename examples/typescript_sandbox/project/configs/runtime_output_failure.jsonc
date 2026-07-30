@@ -1,0 +1,61 @@
+{
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts the controlled output failure workflow."
+      },
+      {
+        "id": "invalid",
+        "type_used": "sandbox.runtime_failure",
+        "display_name": "Return invalid output",
+        "description": "Returns a value that violates the declared numeric Schema.",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "result",
+            "type": "sandbox.math.result",
+            "display_name": "Result"
+          }
+        ],
+        "config": {
+          "mode": "bad_output"
+        }
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Must not run after output validation fails."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "invalid"},
+      {"from": "invalid", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.math.result",
+        "cardinality": "exactly_one",
+        "display_name": "Result",
+        "as": "result"
+      }
+    ]
+  }
+}

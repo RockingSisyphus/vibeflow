@@ -684,6 +684,169 @@ def test_nodeset_detail_fragment_recurses_nested_child_panels(tmp_path, monkeypa
     assert mid_positions[inner_a_title][1] < mid_positions[inner_b_title][1]
 
 
+def test_nodeset_detail_groups_direct_calls_by_kind_in_first_occurrence_order(tmp_path, monkeypatch) -> None:
+    from vibeflow.rendering.mermaid import review_fragments
+
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config("detail.shared", pipeline=_input_add_pipeline(add={"id": "inner"})),
+                _nodeset_config("detail.other", pipeline=_input_add_pipeline(add={"id": "other_inner"})),
+            ],
+            "pipeline": {
+                "nodes": [
+                    {"id": "a", "type_used": "detail.shared"},
+                    {"id": "other", "type_used": "detail.other"},
+                    {
+                        "id": "b",
+                        "type_used": "detail.shared",
+                        "async": "result_key",
+                        "result_key": "shared.result",
+                        "provides": [PROV_SPEC("shared.result")],
+                    },
+                    {
+                        "id": "c",
+                        "type_used": "detail.shared",
+                        "config": {"delta": 2},
+                        "node_configs": {"inner": {"delta": 3}},
+                    },
+                    {"id": "d", "type_used": "detail.shared"},
+                    {
+                        "id": "loop",
+                        "type_used": "vibeflow.loop.while",
+                        "loop": {"body": "detail.shared", "stop_after": 1},
+                    },
+                ]
+            },
+        }
+    )
+
+    groups = review_fragments._direct_nodeset_call_groups(graph)
+
+    assert [(group.kind, group.nodeset.type_key) for group in groups] == [
+        ("nodeset", "detail.shared"),
+        ("nodeset", "detail.other"),
+        ("loop_body", "detail.shared"),
+    ]
+    assert [node.id for node in groups[0].nodes] == ["a", "b", "c", "d"]
+    group_title = review_fragments._nodeset_group_fragment_title(groups[0])
+    assert group_title == (
+        "Detail Shared (calls: 4 [a, b{async=result_key,result_key=shared.result}, "
+        "c{config=1,node_configs=1}, +1], type_key: detail.shared)"
+    )
+    assert "delta" not in group_title
+    assert review_fragments._nodeset_group_fragment_title(groups[1]) == (
+        "Detail Other (id: other, type_key: detail.other)"
+    )
+
+    debug_mermaid = export_mermaid(graph, expand_nodesets=True)
+    for call_id in ("a", "b", "c", "d"):
+        assert f"{call_id}__inner" in debug_mermaid
+
+    rendered: list[tuple[str, str]] = []
+
+    def fake_detail(title, nodeset, temp_dir, **kwargs):
+        rendered.append((title, nodeset.type_key))
+        return review_fragments._SvgFragment(title, '<svg viewBox="0 0 10 10"></svg>', 10.0, 10.0)
+
+    monkeypatch.setattr(review_fragments, "_render_nodeset_detail_fragment", fake_detail)
+    fragments = review_fragments._nodeset_fragments(
+        graph,
+        tmp_path,
+        registry=_registry(),
+        show_contract=True,
+        show_semantics=True,
+        theme="default",
+        background="transparent",
+        max_text_size=None,
+        max_edges=None,
+        review_fragment_max_width=3200.0,
+    )
+
+    assert len(fragments) == 3
+    assert rendered == [
+        (review_fragments._nodeset_group_fragment_title(groups[0]), "detail.shared"),
+        (review_fragments._nodeset_group_fragment_title(groups[1]), "detail.other"),
+        (review_fragments._nodeset_group_fragment_title(groups[2]), "detail.shared"),
+    ]
+
+
+def test_nodeset_detail_deduplication_is_local_to_each_parent(tmp_path, monkeypatch) -> None:
+    from vibeflow.rendering.mermaid import review_fragments
+
+    shared_body = _input_add_pipeline(add={"id": "leaf_add"})
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config("detail.shared", pipeline=shared_body),
+                _nodeset_config("detail.same_shape", pipeline=shared_body),
+                _nodeset_config(
+                    "detail.parent_one",
+                    pipeline={
+                        "nodes": [
+                            {"id": "one_start", "type_used": "test.start"},
+                            {"id": "first", "type_used": "detail.shared"},
+                            {"id": "second", "type_used": "detail.shared"},
+                            {"id": "same_shape", "type_used": "detail.same_shape"},
+                            {"id": "one_end", "type_used": "test.out_end"},
+                        ],
+                        "edges": _edge_chain("one_start", "first", "second", "same_shape", "one_end"),
+                    },
+                ),
+                _nodeset_config(
+                    "detail.parent_two",
+                    pipeline={
+                        "nodes": [
+                            {"id": "two_start", "type_used": "test.start"},
+                            {"id": "third", "type_used": "detail.shared"},
+                            {"id": "two_end", "type_used": "test.out_end"},
+                        ],
+                        "edges": _edge_chain("two_start", "third", "two_end"),
+                    },
+                ),
+            ],
+            "pipeline": {
+                "nodes": [
+                    {"id": "parent_one", "type_used": "detail.parent_one"},
+                    {"id": "parent_two", "type_used": "detail.parent_two"},
+                ]
+            },
+        }
+    )
+    rendered: list[tuple[str, str]] = []
+
+    def fake_render_fragment(title, mermaid_text, temp_dir, **kwargs):
+        rendered.append((title, mermaid_text))
+        svg_text = f'<svg viewBox="0 0 200 100"><text>{title}</text></svg>'
+        return review_fragments._SvgFragment(title, svg_text, 200.0, 100.0)
+
+    monkeypatch.setattr(review_fragments, "_render_fragment", fake_render_fragment)
+    fragments = review_fragments._nodeset_fragments(
+        graph,
+        tmp_path,
+        registry=_registry(),
+        show_contract=True,
+        show_semantics=True,
+        theme="default",
+        background="transparent",
+        max_text_size=None,
+        max_edges=None,
+        review_fragment_max_width=3200.0,
+    )
+
+    assert len(fragments) == 2
+    shared_titles = [title for title, _ in rendered if "type_key: detail.shared" in title]
+    assert len(shared_titles) == 2
+    assert any("calls: 2 [first, second]" in title for title in shared_titles)
+    assert any("id: third" in title for title in shared_titles)
+    assert sum(1 for title, _ in rendered if "type_key: detail.same_shape" in title) == 1
+
+    parent_flows = [text for title, text in rendered if title == "parent flow"]
+    assert len(parent_flows) == 2
+    assert any("first@{" in text and "second@{" in text and "first --> second" in text for text in parent_flows)
+    assert any("third@{" in text for text in parent_flows)
+
+
 def test_mermaid_shows_when_edges_and_health_findings() -> None:
     graph = parse_graph_config(
         {

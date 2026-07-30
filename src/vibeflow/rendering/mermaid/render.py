@@ -192,6 +192,9 @@ _FIELD_PREFIXES = frozenset(
         "module:",
         "class:",
         "config:",
+        "external:",
+        "async:",
+        "result_key:",
     }
 )
 

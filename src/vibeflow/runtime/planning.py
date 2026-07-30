@@ -6,7 +6,7 @@ from typing import Any, Mapping
 from vibeflow.runtime.block_compiler import CompiledBlock, compile_blocks
 from vibeflow.compiler import CompiledGraph
 from vibeflow.data_contract import DataProvider, DataRequirement, provider_keys, requirement_types
-from vibeflow.graph_config import EdgeSpec, GraphConfig, LOOP_NODE_TYPES, LoopSpec, NodeSpec
+from vibeflow.graph_config import EdgeSpec, GraphConfig, IO_NODE_TYPE, IoSpec, LOOP_NODE_TYPES, LoopSpec, NodeSpec
 from vibeflow.graph_config.nodeset_dependencies import nodeset_depth_violations
 from vibeflow.node import FLOW_KIND_PREDEFINED, PureNode
 from vibeflow.graph_config.planned_behavior import (
@@ -48,10 +48,12 @@ class NodeFrame:
     transfer_incoming: tuple[EdgeSpec, ...] = ()
     transfer_outgoing: tuple[EdgeSpec, ...] = ()
     is_loop: bool = False
+    is_io: bool = False
     join_policy: str = ""
     nodeset_type_key: str = ""
     exports: tuple[DataProvider, ...] = ()
     loop_spec: LoopSpec = field(default_factory=LoopSpec)
+    io_spec: IoSpec = field(default_factory=IoSpec)
     async_mode: str = ""
     result_key: str = ""
     subplan: "ExecutionPlan | None" = None
@@ -108,6 +110,31 @@ class ExecutionPlan:
     def block_for(self, name: str) -> CompiledBlock | None:
         return (self.compiled_block_by_entry or self.block_by_entry or {}).get(name)
 
+    def to_workflow_plan(
+        self,
+        *,
+        workflow_id: str | None = None,
+        source_by_type: Mapping[str, object] | None = None,
+        pipeline_inputs: object | None = None,
+        pipeline_outputs: object | None = None,
+    ):
+        """Project the Python compatibility plan into the portable IR.
+
+        The import remains lazy so the established Python execution path does
+        not acquire a dependency cycle. Non-JSON Python params fail explicitly
+        in the portable planner while remaining valid for Python execution.
+        """
+
+        from vibeflow.portable import workflow_plan_from_execution_plan
+
+        return workflow_plan_from_execution_plan(
+            self,
+            workflow_id=workflow_id,
+            source_by_type=source_by_type,
+            pipeline_inputs=pipeline_inputs,
+            pipeline_outputs=pipeline_outputs,
+        )
+
 
 def build_execution_plan(
     graph: GraphConfig,
@@ -163,13 +190,14 @@ def _frame_for(
     global_scope: ConfigScope,
     runtime_options: object | None,
 ) -> NodeFrame:
-    schedule_edges = compiled.schedule_edges or compiled.effective_edges
-    transfer_edges = compiled.transfer_edges or compiled.effective_edges
+    schedule_edges = compiled.resolved_schedule_edges
+    transfer_edges = compiled.resolved_transfer_edges
     incoming = tuple(edge for edge in schedule_edges if edge.target == spec.id)
     outgoing = tuple(edge for edge in schedule_edges if edge.source == spec.id)
     transfer_incoming = tuple(edge for edge in transfer_edges if edge.target == spec.id)
     transfer_outgoing = tuple(edge for edge in transfer_edges if edge.source == spec.id)
     is_loop = spec.type_used in LOOP_NODE_TYPES
+    is_io = spec.type_used == IO_NODE_TYPE
     is_nodeset = spec.type_used in graph.nodesets and not is_loop
     nodeset_type_key = spec.type_used if is_nodeset else ""
     nodeset = graph.nodesets.get(nodeset_type_key) if is_nodeset else None
@@ -247,6 +275,25 @@ def _frame_for(
             async_mode=spec.async_mode,
             result_key=spec.result_key,
             subplan=build_execution_plan(nodeset.graph, subcompiled, registry=registry, node_config_overrides=nested_overrides, global_config=child_scope, runtime_options=runtime_options, _check_nodeset_depth=False),
+        )
+    if is_io:
+        return NodeFrame(
+            id=spec.id,
+            type_used=spec.type_used,
+            node=None,
+            requires=spec.requires,
+            provides=spec.provides,
+            params={},
+            incoming=incoming,
+            outgoing=outgoing,
+            transfer_incoming=transfer_incoming,
+            transfer_outgoing=transfer_outgoing,
+            flow_kind=flow_kind,
+            is_terminal=True,
+            is_nodeset=False,
+            is_io=True,
+            join_policy=spec.join_policy,
+            io_spec=spec.io,
         )
     node_cls = registry.get(spec.type_used)
     node = node_cls()

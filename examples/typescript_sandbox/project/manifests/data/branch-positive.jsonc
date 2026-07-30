@@ -1,0 +1,8 @@
+{
+  "kind": "data_schema",
+  "type_key": "sandbox.branch.positive",
+  "representation": "json",
+  "schema": {
+    "type": "boolean"
+  }
+}

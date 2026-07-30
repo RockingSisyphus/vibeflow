@@ -1,0 +1,135 @@
+{
+  "type_key": "sandbox.affine_outer",
+  "display_name": "Outer affine nodeset",
+  "description": "Runs sibling affine nodesets to prove qualified overrides do not leak.",
+  "requires": [
+    {
+      "type": "sandbox.number",
+      "cardinality": "exactly_one",
+      "display_name": "Number"
+    }
+  ],
+  "provides": [
+    {
+      "key": "joined_result",
+      "type": "sandbox.override.joined",
+      "display_name": "Overridden result"
+    },
+    {
+      "key": "default_result",
+      "type": "sandbox.override.default",
+      "display_name": "Default result"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Outer start",
+        "description": "Starts the outer wrapper block."
+      },
+      {
+        "id": "inner",
+        "type_used": "sandbox.affine_inner",
+        "display_name": "Call overridden transform",
+        "description": "Calls the sibling whose qualified math node is overridden.",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "result",
+            "type": "sandbox.math.result",
+            "display_name": "Result"
+          }
+        ]
+      },
+      {
+        "id": "sibling",
+        "type_used": "sandbox.affine_inner_default",
+        "display_name": "Call default transform",
+        "description": "Calls the sibling whose math node must retain descriptor defaults.",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "default_result",
+            "type": "sandbox.override.default",
+            "display_name": "Default result"
+          }
+        ]
+      },
+      {
+        "id": "join",
+        "type_used": "sandbox.override_join",
+        "display_name": "Join sibling results",
+        "description": "Waits for both sibling paths before exposing the overridden result.",
+        "join_policy": "all",
+        "requires": [
+          {
+            "type": "sandbox.math.result",
+            "cardinality": "exactly_one",
+            "display_name": "Overridden result"
+          },
+          {
+            "type": "sandbox.override.default",
+            "cardinality": "exactly_one",
+            "display_name": "Default result"
+          }
+        ],
+        "provides": [
+          {
+            "key": "joined_result",
+            "type": "sandbox.override.joined",
+            "display_name": "Joined overridden result"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "Outer end",
+        "description": "Ends the outer wrapper block."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "inner"},
+      {"from": "start", "to": "sibling"},
+      {"from": "inner", "to": "join"},
+      {"from": "sibling", "to": "join"},
+      {"from": "join", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.override.joined",
+        "cardinality": "exactly_one",
+        "display_name": "Overridden result",
+        "as": "joined_result"
+      },
+      {
+        "type": "sandbox.override.default",
+        "cardinality": "exactly_one",
+        "display_name": "Default result",
+        "as": "default_result"
+      }
+    ]
+  }
+}

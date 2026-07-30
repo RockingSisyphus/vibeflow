@@ -107,3 +107,21 @@ def _error(
         suggested_fix_type="fix_config",
         rule_source=rule_source,
     )
+
+
+def _warning(
+    rule_id: str,
+    message: str,
+    object_id: str,
+    *,
+    rule_source: str = "kernel.default_policy",
+) -> HealthFinding:
+    return schema_finding(
+        rule_id=rule_id,
+        message=message,
+        object_id=object_id,
+        object_type="config",
+        suggested_fix_type="review_config",
+        rule_source=rule_source,
+        severity="warning",
+    )

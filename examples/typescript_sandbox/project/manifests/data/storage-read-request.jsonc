@@ -1,0 +1,16 @@
+{
+  "kind": "data_schema",
+  "type_key": "sandbox.storage.read.request",
+  "representation": "json",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "key": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": ["key"],
+    "additionalProperties": false
+  }
+}

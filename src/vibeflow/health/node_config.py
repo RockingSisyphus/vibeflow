@@ -3,7 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping
 
-from vibeflow.graph_config import GraphConfig, LOOP_NODE_TYPES, NodeSpec, NodesetSpec, STATUS_PLANNED
+from vibeflow.graph_config import (
+    GraphConfig,
+    IO_NODE_TYPE,
+    LOOP_NODE_TYPES,
+    NodeSpec,
+    NodesetSpec,
+    STATUS_PLANNED,
+)
 from vibeflow.health.types import HealthFinding
 from vibeflow.registry import NodeRegistry, NodeRegistryError
 from vibeflow.runtime.config import ConfigScope, config_override_conflicts, merge_config_scopes, nested_node_config_overrides, node_invocation_scope, normalize_config_scope, scoped_node_params
@@ -73,6 +80,8 @@ def _validate_graph_node_configs(
 ) -> None:
     for node in graph.nodes:
         if node.status == STATUS_PLANNED:
+            continue
+        if node.type_used == IO_NODE_TYPE:
             continue
         if node.type_used in LOOP_NODE_TYPES:
             _validate_nodeset_call_config(node, graph, registry=registry, findings=findings, owner=owner, global_scope=global_scope, overrides=overrides, called_nodesets=called_nodesets, stack=stack, nodeset_name=node.loop.body)

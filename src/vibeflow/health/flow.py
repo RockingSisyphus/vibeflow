@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
 from vibeflow.data_contract import CARDINALITY_EXACTLY_ONE, CARDINALITY_OPTIONAL_ONE, provider_keys
-from vibeflow.graph_config import JOIN_POLICY_ALL, STATUS_PLANNED
+from vibeflow.graph_config import IO_NODE_TYPE, JOIN_POLICY_ALL, LOOP_NODE_TYPES, STATUS_PLANNED
 from vibeflow.health.flow_data import _append_nodeset_flow_health, _data_finding, _incoming_sources_providing_type, append_data_contract_warnings
 from vibeflow.health.join_exclusivity import append_all_join_mutual_exclusion_finding
 from vibeflow.health.types import HealthFinding
@@ -29,8 +29,26 @@ def append_flowchart_health(graph, compiled, state, *, registry, owner: str = "p
         return
     active_names = {node.name for node in active_nodes}
     incoming, outgoing, outgoing_edges, incoming_edges = _flow_maps(compiled, active_names)
-    starts = {name for name in active_names if compiled.flow_kinds.get(name) == FLOW_KIND_TERMINAL and not incoming[name]}
-    ends = {name for name in active_names if compiled.flow_kinds.get(name) == FLOW_KIND_TERMINAL and not outgoing[name]}
+    node_by_name = {node.name: node for node in active_nodes}
+    starts = {
+        name
+        for name in active_names
+        if (
+            compiled.flow_kinds.get(name) == FLOW_KIND_TERMINAL
+            or _is_io_boundary(node_by_name[name], "receive")
+        )
+        and not incoming[name]
+    }
+    ends = {
+        name
+        for name in active_names
+        if (
+            compiled.flow_kinds.get(name) == FLOW_KIND_TERMINAL
+            or _is_io_boundary(node_by_name[name], "send")
+            or _is_permanent_loop(node_by_name[name])
+        )
+        and not outgoing[name]
+    }
     _append_boundary_findings(starts, ends, state, owner=owner)
     _append_reachability_findings(starts, active_names, incoming_edges, outgoing_edges, outgoing, state, owner=owner)
     can_reach_end = _append_end_reachability_findings(ends, active_names, incoming_edges, outgoing_edges, incoming, state, owner=owner)
@@ -47,7 +65,7 @@ def _flow_maps(compiled, active_names: set[str]) -> tuple[dict[str, list[str]], 
     outgoing = {name: [] for name in active_names}
     outgoing_edges = {name: [] for name in active_names}
     incoming_edges = {name: [] for name in active_names}
-    for edge in getattr(compiled, "schedule_edges", ()) or compiled.effective_edges:
+    for edge in compiled.resolved_schedule_edges:
         if edge.source not in active_names or edge.target not in active_names:
             continue
         outgoing[edge.source].append(edge.target)
@@ -64,6 +82,26 @@ def _node_participates_in_flow(graph, node) -> bool:
         return True
     nodeset = graph.nodesets.get(node.type_used)
     return effective_planned_behavior(node, nodeset).kind in {PLANNED_BEHAVIOR_TRANSPARENT, PLANNED_BEHAVIOR_PYTHON_STUB}
+
+
+def _is_permanent_loop(node: object) -> bool:
+    if getattr(node, "type_used", "") not in LOOP_NODE_TYPES:
+        return False
+    loop = getattr(node, "loop", None)
+    stop_when = getattr(loop, "stop_when", None)
+    return (
+        getattr(loop, "max_iterations", 1000) is None
+        and not getattr(loop, "stop_after", 0)
+        and not getattr(stop_when, "source", "")
+    )
+
+
+def _is_io_boundary(node: object, operation: str) -> bool:
+    return (
+        getattr(node, "type_used", "") == IO_NODE_TYPE
+        and getattr(getattr(node, "io", None), "operation", "")
+        == operation
+    )
 
 
 def _append_boundary_findings(starts: set[str], ends: set[str], state, *, owner: str) -> None:
@@ -151,8 +189,8 @@ def _append_orphan_findings(
 
 def append_join_policy_health(graph, compiled, state, *, owner: str = "pipeline") -> None:
     nodes_by_name = {node.name: node for node in graph.nodes}
-    schedule_edges = tuple(getattr(compiled, "schedule_edges", ()) or compiled.effective_edges)
-    transfer_edges = tuple(getattr(compiled, "transfer_edges", ()) or compiled.effective_edges)
+    schedule_edges = tuple(compiled.resolved_schedule_edges)
+    transfer_edges = tuple(compiled.resolved_transfer_edges)
     incoming_edges: dict[str, list[object]] = {node.name: [] for node in graph.nodes}
     transfer_incoming: dict[str, list[object]] = {node.name: [] for node in graph.nodes}
     for edge in schedule_edges:

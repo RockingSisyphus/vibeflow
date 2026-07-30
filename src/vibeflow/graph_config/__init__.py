@@ -5,12 +5,22 @@ from pathlib import Path
 import time
 from typing import Any, Mapping
 
-from vibeflow.data_contract import DataProvider, DataRequirement, parse_data_providers, parse_data_requirements, provider_keys
+from vibeflow.data_contract import (
+    DataProvider,
+    DataRequirement,
+    parse_data_providers,
+    parse_data_requirements,
+    parse_pipeline_inputs,
+    parse_pipeline_outputs,
+    provider_keys,
+)
 from vibeflow.graph_config.types import (
     EdgeSpec, GraphConfig, GraphConfigError, JOIN_POLICIES, JOIN_POLICY_SAFE_ANY, JOIN_POLICY_ALL, JOIN_POLICY_ANY_ACTIVE,
-    LOOP_NODE_TYPES, LOOP_WHILE_TYPE, LoopCarrySpec, LoopCollectSpec, LoopOutputSpec, LoopSpec, LoopStopWhenSpec,
+    ENTRY_MODES, ENTRY_MODE_SYNC,
+    IO_NODE_TYPE, IO_OPERATIONS, IoSpec, LOOP_NODE_TYPES, LOOP_WHILE_TYPE, LoopCarrySpec, LoopCollectSpec, LoopOutputSpec, LoopSpec, LoopStopWhenSpec,
     NodeMetadata, NodeSimilarity, NodeSpec, NodeStyle, NodesetSpec, SIMILAR_TO_RELATIONSHIPS, STATUSES, STATUS_IMPLEMENTED, STATUS_PLANNED,
 )
+from vibeflow.graph_config.edge_parser import parse_edge as _parse_edge
 from vibeflow.node import FLOW_KINDS, FLOW_KIND_PREDEFINED
 from vibeflow.graph_config.planned_behavior import PlannedBehavior, parse_planned_behavior
 from vibeflow.rendering.style import NODE_STYLE_FIELDS, is_hex_color, is_reserved_system_color, normalize_hex_color
@@ -80,11 +90,15 @@ def _parse_graph_body(
     _validate_nodeset_call_targets(nodes, known_nodesets, field=f"{field}.nodes")
     edges = tuple(_parse_edge(item, index=index) for index, item in enumerate(raw.get("edges", [])))
     try:
-        inputs = parse_data_providers(raw.get("inputs", ()), field=f"{field}.inputs")
-        outputs = parse_data_requirements(raw.get("outputs", ()), field=f"{field}.outputs")
+        inputs = parse_pipeline_inputs(raw.get("inputs", ()), field=f"{field}.inputs")
+        outputs = parse_pipeline_outputs(raw.get("outputs", ()), field=f"{field}.outputs")
     except ValueError as exc:
         raise GraphConfigError(str(exc)) from exc
     max_steps = _parse_max_steps(raw.get("max_steps", 1000))
+    entry_mode = _parse_entry_mode(
+        raw.get("entry_mode", ENTRY_MODE_SYNC),
+        field=f"{field}.entry_mode",
+    )
 
     for edge in edges:
         if edge.source not in names or edge.target not in names:
@@ -96,6 +110,7 @@ def _parse_graph_body(
         inputs=inputs,
         outputs=outputs,
         max_steps=max_steps,
+        entry_mode=entry_mode,
         project_root=project_root,
         root_id=root_id,
         root_path=root_path,
@@ -144,7 +159,15 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
     from vibeflow.graph_config.loop import _parse_loop_spec
 
     loop = _parse_loop_spec(item.get("loop", {}), type_used=type_used, provides=provides, field=f"pipeline.nodes[{index}].loop")
-    reserved = {"id", "type_used", "requires", "provides", "config", "node_configs", "allow_config_override", "override_child_config", "status", "flow_kind", "planned_behavior", "async", "result_key", "display_name", "description", "style", "similar_to", "join_policy", "loop"}
+    io = _parse_io_spec(
+        item.get("io", {}),
+        type_used=type_used,
+        requires=requires,
+        provides=provides,
+        async_mode=async_mode,
+        field=f"pipeline.nodes[{index}].io",
+    )
+    reserved = {"id", "type_used", "requires", "provides", "config", "node_configs", "allow_config_override", "override_child_config", "status", "flow_kind", "planned_behavior", "async", "result_key", "display_name", "description", "style", "similar_to", "join_policy", "loop", "io"}
     return NodeSpec(
         id=node_id,
         type_used=type_used,
@@ -156,6 +179,7 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         similar_to=_parse_node_similarity(item.get("similar_to", {}), field=f"pipeline.nodes[{index}].similar_to"),
         join_policy=join_policy,
         loop=loop,
+        io=io,
         node_config_overrides=_parse_node_config_overrides(item.get("node_configs", {}), field=f"node[{node_id}].node_configs"),
         allow_config_override=_parse_bool(item.get("allow_config_override", item.get("override_child_config", False)), field=f"node[{node_id}].allow_config_override"),
         status=status,
@@ -166,22 +190,59 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
     )
 
 
-def _parse_edge(item: Any, *, index: int) -> EdgeSpec:
-    if isinstance(item, (list, tuple)) and len(item) == 2:
-        return EdgeSpec(source=str(item[0]).strip(), target=str(item[1]).strip())
-    if not isinstance(item, Mapping):
-        raise GraphConfigError(f"pipeline.edges[{index}] must be [from, to] or object")
-    source = str(item.get("from", item.get("source", ""))).strip()
-    target = str(item.get("to", item.get("target", ""))).strip()
-    if not source or not target:
-        raise GraphConfigError(f"pipeline.edges[{index}] requires from/to")
-    for field in ("max_executions", "max", "loop"):
-        if field in item:
-            raise GraphConfigError(f"pipeline.edges[{index}].{field} is removed; use when/max_steps")
-    when = str(item.get("when", "")).strip()
-    if when:
-        _validate_when_expression(when, field=f"pipeline.edges[{index}].when")
-    return EdgeSpec(source=source, target=target, when=when)
+def _parse_io_spec(
+    value: Any,
+    *,
+    type_used: str,
+    requires: tuple[DataRequirement, ...],
+    provides: tuple[DataProvider, ...],
+    async_mode: str,
+    field: str,
+) -> IoSpec:
+    if type_used != IO_NODE_TYPE:
+        if value not in (None, {}):
+            raise GraphConfigError(
+                f"{field} is only allowed on {IO_NODE_TYPE}"
+            )
+        return IoSpec()
+    if not isinstance(value, Mapping):
+        raise GraphConfigError(f"{field} must be an object")
+    unknown = sorted(
+        set(str(key) for key in value) - {"operation", "port"}
+    )
+    if unknown:
+        raise GraphConfigError(
+            f"{field} contains unsupported keys: {unknown}"
+        )
+    operation = str(value.get("operation", "")).strip()
+    if operation not in IO_OPERATIONS:
+        raise GraphConfigError(
+            f"{field}.operation must be receive or send"
+        )
+    port = str(value.get("port", "default")).strip()
+    if not port:
+        raise GraphConfigError(
+            f"{field}.port must be a non-empty string"
+        )
+    if async_mode:
+        raise GraphConfigError(
+            f"{IO_NODE_TYPE} uses its operation completion and cannot "
+            "also declare legacy node.async"
+        )
+    if operation == "receive":
+        if requires or len(provides) != 1:
+            raise GraphConfigError(
+                f"{field} receive requires zero inputs and exactly one output"
+            )
+    elif (
+        len(requires) != 1
+        or requires[0].cardinality != "exactly_one"
+        or provides
+    ):
+        raise GraphConfigError(
+            f"{field} send requires one exactly_one input and zero outputs"
+        )
+    return IoSpec(operation=operation, port=port)
 
 
 def _parse_nodesets(value: Any, *, project_root: str = "", root_id: str = "", root_path: str = "") -> dict[str, NodesetSpec]:
@@ -290,6 +351,15 @@ def _parse_max_steps(value: Any) -> int:
     return value
 
 
+def _parse_entry_mode(value: Any, *, field: str) -> str:
+    mode = str(value or ENTRY_MODE_SYNC).strip()
+    if mode not in ENTRY_MODES:
+        raise GraphConfigError(
+            f"{field} must be one of {sorted(ENTRY_MODES)}"
+        )
+    return mode
+
+
 def _parse_bool(value: Any, *, field: str) -> bool:
     if isinstance(value, bool):
         return value
@@ -335,20 +405,6 @@ def _parse_async_mode(value: Any, *, field: str) -> str:
     if mode in {"", "detached", "result_key"}:
         return mode
     raise GraphConfigError(f"{field} must be 'detached' or 'result_key'")
-
-
-def _validate_when_expression(value: str, *, field: str) -> None:
-    operators = [operator for operator in ("==", "!=") if operator in value]
-    if len(operators) != 1:
-        raise GraphConfigError(f"{field} must use == or !=")
-    left, right = (part.strip() for part in value.split(operators[0], 1))
-    if not left or not right:
-        raise GraphConfigError(f"{field} must compare a key to a literal")
-    if right in {"true", "false"}:
-        return
-    if len(right) >= 2 and right[0] == right[-1] and right[0] in {"'", '"'}:
-        return
-    raise GraphConfigError(f"{field} literal must be true, false, or quoted string")
 
 
 def _parse_node_params(item: Mapping[str, Any], *, reserved: set[str], field: str) -> dict[str, Any]:

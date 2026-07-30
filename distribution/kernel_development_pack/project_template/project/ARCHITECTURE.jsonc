@@ -22,6 +22,7 @@
       }
     ],
     "max_steps": 1000,
+    "entry_mode": "sync",
     "nodes": [
       {
         "id": "start",
@@ -44,6 +45,7 @@
         "join_policy": "safe_any",
         "async": null,
         "loop": null,
+        "io": null,
         "invokes": null,
         "config": {
           "call": {
@@ -90,6 +92,7 @@
         "join_policy": "safe_any",
         "async": null,
         "loop": null,
+        "io": null,
         "invokes": null,
         "config": {
           "call": {
@@ -144,6 +147,7 @@
         "join_policy": "safe_any",
         "async": null,
         "loop": null,
+        "io": null,
         "invokes": null,
         "config": {
           "call": {
@@ -198,6 +202,7 @@
         "join_policy": "safe_any",
         "async": null,
         "loop": null,
+        "io": null,
         "invokes": null,
         "config": {
           "call": {
@@ -238,6 +243,7 @@
         "join_policy": "safe_any",
         "async": null,
         "loop": null,
+        "io": null,
         "invokes": null,
         "config": {
           "call": {

@@ -25,6 +25,22 @@ class RouteNode:
         return {"flow.route": "done"}
 
 
+class ExternalVisualNode:
+    NODE_INFO = NodeInfo(
+        type_key="test.external_visual",
+        display_name="External Visual",
+        category="test",
+        description="Exercises external review styling.",
+        version="0.1.0",
+        flow_kind="process",
+        external=True,
+    )
+    CONTRACT = NodeContract()
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
 def test_compiler_merges_duplicate_explicit_edges_with_when() -> None:
     graph = parse_graph_config(
         {
@@ -265,25 +281,89 @@ def test_parse_rejects_removed_for_each_loop_type_and_old_loop_fields() -> None:
         )
 
 
-def test_parse_rejects_invalid_while_loop_stop_conditions() -> None:
+def test_parse_accepts_flexible_while_loop_stop_conditions() -> None:
     body = _nodeset_config("body", pipeline={"nodes": [_node_call("start", "test.start", "Starts body.")]})
-    for loop, match in (
-        ({"body": "body"}, "exactly one"),
-        ({"body": "body", "stop_after": 2, "stop_when": {"from": "loop.done"}}, "exactly one"),
-        ({"body": "body", "max_iterations": 1, "stop_after": 2}, "<= max_iterations"),
-        ({"body": "body", "stop_when": {"from": "loop.done", "equals": "true"}}, "equals must be a boolean"),
+    for loop in (
+        {"body": "body"},
+        {
+            "body": "body",
+            "stop_after": 2,
+            "stop_when": {"from": "loop.done"},
+        },
+        {"body": "body", "max_iterations": 1, "stop_after": 2},
+        {"body": "body", "max_iterations": None},
     ):
-        with pytest.raises(GraphConfigError, match=match):
-            parse_graph_config(
-                {
-                    "nodesets": [body],
-                    "pipeline": {
-                        "nodes": [
-                            _node_call("loop", "vibeflow.loop.while", "Invalid stop condition.", loop=loop),
-                        ]
-                    },
-                }
-            )
+        graph = parse_graph_config(
+            {
+                "nodesets": [body],
+                "pipeline": {
+                    "nodes": [
+                        _node_call(
+                            "loop",
+                            "vibeflow.loop.while",
+                            "Supported stop condition.",
+                            loop=loop,
+                        ),
+                    ]
+                },
+            }
+        )
+        assert graph.nodes[0].loop is not None
+
+
+def test_config_schema_warns_but_does_not_reject_permanent_loop() -> None:
+    findings = collect_config_schema_findings(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call(
+                        "loop",
+                        "vibeflow.loop.while",
+                        "Explicit permanent loop.",
+                        loop={"body": "body", "max_iterations": None},
+                    )
+                ]
+            }
+        }
+    )
+
+    assert any(
+        finding.rule_id == "CONFIG.LOOP.PERMANENT"
+        for finding in findings
+    )
+    assert not any(
+        finding.rule_id == "CONFIG.SCHEMA.NODE_LOOP_INVALID"
+        for finding in findings
+    )
+
+
+def test_parse_rejects_invalid_while_loop_stop_condition_value() -> None:
+    body = _nodeset_config(
+        "body",
+        pipeline={"nodes": [_node_call("start", "test.start", "Starts body.")]},
+    )
+    with pytest.raises(GraphConfigError, match="equals must be a boolean"):
+        parse_graph_config(
+            {
+                "nodesets": [body],
+                "pipeline": {
+                    "nodes": [
+                        _node_call(
+                            "loop",
+                            "vibeflow.loop.while",
+                            "Invalid stop condition.",
+                            loop={
+                                "body": "body",
+                                "stop_when": {
+                                    "from": "loop.done",
+                                    "equals": "true",
+                                },
+                            },
+                        ),
+                    ]
+                },
+            }
+        )
 
 
 def test_parse_rejects_loop_body_unknown_nodeset() -> None:
@@ -371,6 +451,67 @@ def test_mermaid_custom_style_overrides_health_class_color() -> None:
     assert "style seed fill:#123abc,stroke:#456def,color:#654321;" in text
 
 
+def test_mermaid_external_boundary_composes_with_health_custom_style_and_async_metadata(tmp_path) -> None:
+    registry = _registry()
+    register_node(registry, "test.external_visual", ExternalVisualNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("external_default", "test.external_visual", "Uses the default external style."),
+                    _node_call("external_warning", "test.external_visual", "Keeps its external boundary under a warning."),
+                    _node_call(
+                        "external_custom",
+                        "test.external_visual",
+                        "Keeps its external boundary under custom colors.",
+                        display_name="[EXTERNAL] Custom External",
+                        style={"fill": "#123abc", "stroke": "#456def", "text": "#654321"},
+                        provides=[PROV_SPEC("external.result")],
+                        result_key="external.result",
+                        **{"async": "result_key"},
+                    ),
+                ]
+            }
+        }
+    )
+    report = HealthReport(
+        status="CONCERNS",
+        warnings=(
+            HealthFinding(
+                rule_id="TEST.WARNING",
+                severity="warning",
+                object_type="node",
+                object_id="external_warning",
+                message="fixture warning",
+            ),
+        ),
+    )
+
+    text = export_mermaid(graph, registry=registry, health_report=report)
+
+    assert "classDef externalBoundary stroke-width:7px,vector-effect:non-scaling-stroke;" in text
+    assert "class external_default externalDependency;" in text
+    assert "class external_warning healthWarning;" in text
+    assert "class external_custom externalDependency;" in text
+    for node_id in ("external_default", "external_warning", "external_custom"):
+        assert f"class {node_id} externalBoundary;" in text
+    assert "style external_custom fill:#123abc,stroke:#456def,color:#654321;" in text
+    assert text.count("[EXTERNAL] Custom External") == 1
+    assert "[EXTERNAL] [EXTERNAL]" not in text
+    assert "external: true" in text
+    assert "async: result_key" in text
+    assert "result_key: external.result" in text
+
+    if not is_mermaid_svg_renderer_available():
+        pytest.skip("Mermaid SVG renderer is not installed")
+    svg_path = tmp_path / "external.svg"
+    render_mermaid_svg(text, svg_path)
+    svg = svg_path.read_text(encoding="utf-8")
+    assert ".externalBoundary rect{stroke-width:7px!important;vector-effect:non-scaling-stroke!important;}" in svg
+    assert "externalDependency externalBoundary" in svg
+    assert "healthWarning externalBoundary" in svg
+
+
 def test_mermaid_renders_contracts_on_edges_and_hides_them_when_requested() -> None:
     graph = parse_graph_config(
         {
@@ -422,6 +563,500 @@ def test_mermaid_styles_mainline_and_explicit_data_bypass_edges() -> None:
     assert 'seed -->|"---------- data ----------\\ndata: Value In (id: value.in)"| add\n  linkStyle 1 stroke-width:4px;' in text
     assert "add --> n_end\n  linkStyle 2 stroke-width:4px;" in text
     assert 'seed -->|"---------- data ----------\\ndata: Value In (id: value.in)"| n_end\n  linkStyle 3 stroke-dasharray:6 4,stroke-width:2px;' in text
+
+
+def test_edge_role_fields_are_typed_and_noop_edges_are_rejected() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the edge role fixture."),
+                    _node_call("end", "test.start", "Ends the edge role fixture."),
+                ],
+                "edges": [
+                    {
+                        "from": "start",
+                        "to": "end",
+                        "schedule": False,
+                        "transfer": True,
+                    }
+                ],
+            }
+        }
+    )
+
+    assert graph.edges[0].schedule is False
+    assert graph.edges[0].transfer is True
+
+    findings = collect_config_schema_findings(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the invalid edge fixture."),
+                    _node_call("end", "test.start", "Ends the invalid edge fixture."),
+                ],
+                "edges": [
+                    {
+                        "from": "start",
+                        "to": "end",
+                        "schedule": "no",
+                        "transfer": 1,
+                    },
+                    {
+                        "from": "start",
+                        "to": "end",
+                        "schedule": False,
+                        "transfer": False,
+                    },
+                ],
+            }
+        }
+    )
+    assert {finding.rule_id for finding in findings} >= {
+        "CONFIG.SCHEMA.EDGE_SCHEDULE",
+        "CONFIG.SCHEMA.EDGE_TRANSFER",
+        "CONFIG.SCHEMA.EDGE_ROLES",
+    }
+
+    with pytest.raises(GraphConfigError, match="must schedule, transfer, or both"):
+        parse_graph_config(
+            {
+                "pipeline": {
+                    "nodes": [
+                        _node_call("start", "test.start", "Starts the invalid edge fixture."),
+                        _node_call("end", "test.start", "Ends the invalid edge fixture."),
+                    ],
+                    "edges": [
+                        {
+                            "from": "start",
+                            "to": "end",
+                            "schedule": False,
+                            "transfer": False,
+                        }
+                    ],
+                }
+            }
+        )
+
+
+def test_compiler_applies_explicit_edge_roles_after_default_inference() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the explicit role fixture."),
+                    _node_call(
+                        "seed",
+                        "test.seed",
+                        "Produces transfer-only data.",
+                        provides=[PROV_SPEC("value.in")],
+                    ),
+                    _node_call(
+                        "end",
+                        "test.in_end",
+                        "Receives data without being scheduled by the edge.",
+                        requires=[REQ_SPEC("value.in")],
+                    ),
+                ],
+                "edges": [
+                    {"from": "start", "to": "seed"},
+                    {
+                        "from": "seed",
+                        "to": "end",
+                        "schedule": False,
+                    },
+                ],
+            }
+        }
+    )
+
+    compiled = GraphCompiler().compile(graph, registry=_registry())
+
+    assert [edge.pair for edge in compiled.schedule_edges] == [
+        ("start", "seed")
+    ]
+    assert [edge.pair for edge in compiled.transfer_edges] == [
+        ("start", "seed"),
+        ("seed", "end"),
+    ]
+    assert [edge.pair for edge in compiled.data_bypass_edges] == [
+        ("seed", "end")
+    ]
+
+
+def test_schedule_edges_keep_sync_mainline_before_async_branches() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call(
+                        "start",
+                        "test.start",
+                        "Starts sync and async branches.",
+                    ),
+                    _node_call(
+                        "background",
+                        "test.seed",
+                        "Runs as a detached async side branch.",
+                        provides=[PROV_SPEC("background.value")],
+                        **{"async": "detached"},
+                    ),
+                    _node_call(
+                        "seed",
+                        "test.seed",
+                        "Runs first on the synchronous mainline.",
+                        provides=[PROV_SPEC("value.in")],
+                    ),
+                    _node_call(
+                        "end",
+                        "test.in_end",
+                        "Ends the synchronous mainline.",
+                        requires=[REQ_SPEC("value.in")],
+                    ),
+                ],
+                "edges": [
+                    {"from": "start", "to": "background"},
+                    {"from": "start", "to": "seed"},
+                    {"from": "seed", "to": "end"},
+                ],
+            }
+        }
+    )
+
+    compiled = GraphCompiler().compile(graph, registry=_registry())
+
+    assert [edge.pair for edge in compiled.schedule_edges] == [
+        ("start", "seed"),
+        ("seed", "end"),
+        ("start", "background"),
+    ]
+
+
+def test_compiler_rejects_edge_with_no_effective_role_after_inference() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the inferred role fixture."),
+                    _node_call(
+                        "seed",
+                        "test.seed",
+                        "Produces a shortcut value.",
+                        provides=[PROV_SPEC("value.in")],
+                    ),
+                    _node_call(
+                        "add",
+                        "test.add",
+                        "Runs on the mainline.",
+                        requires=[REQ_SPEC("value.in")],
+                        provides=[PROV_SPEC("value.out")],
+                    ),
+                    _node_call(
+                        "end",
+                        "test.out_end",
+                        "Ends the inferred role fixture.",
+                        requires=[REQ_SPEC("value.out")],
+                    ),
+                ],
+                "edges": [
+                    {"from": "start", "to": "seed"},
+                    {"from": "seed", "to": "add"},
+                    {"from": "add", "to": "end"},
+                    {"from": "seed", "to": "end", "transfer": False},
+                ],
+            }
+        }
+    )
+
+    with pytest.raises(GraphCompileError) as exc_info:
+        GraphCompiler().compile(graph, registry=_registry())
+
+    assert exc_info.value.rule_id == "GRAPH.EDGE.NO_ROLE"
+
+
+@pytest.mark.parametrize("execution", ["plan", "block", "compiled"])
+def test_python_runtime_separates_schedule_and_transfer_edges(
+    execution: str,
+) -> None:
+    class GatePoisonNode:
+        NODE_INFO = NodeInfo(
+            "test.edge_gate",
+            "Edge Gate",
+            "test",
+            "Produces a same-typed value that must not cross a schedule-only edge.",
+            "0.1.0",
+            "process",
+        )
+        CONTRACT = NodeContract(
+            requires=(DataRequirement("value.out", "exactly_one"),),
+            provides=(DataProvider("gate.value", "value.in"),),
+            output_schema={"gate.value": {"type": "number"}},
+        )
+
+        def run_pure(self, inputs, params):
+            return {"gate.value": inputs["value.out"]["value"] + 100}
+
+    class MixedEdgeConsumerNode:
+        NODE_INFO = NodeInfo(
+            "test.edge_consumer",
+            "Edge Consumer",
+            "test",
+            "Consumes only the transfer-only payload.",
+            "0.1.0",
+            "process",
+        )
+        CONTRACT = NodeContract(
+            requires=(DataRequirement("value.in", "exactly_one"),),
+            provides=(DataProvider("result", "mixed.result"),),
+            output_schema={"result": {"type": "number"}},
+        )
+
+        def run_pure(self, inputs, params):
+            return {"result": inputs["value.in"]["value"] + 10}
+
+    registry = _registry()
+    register_node(registry, "test.edge_gate", GatePoisonNode)
+    register_node(registry, "test.edge_consumer", MixedEdgeConsumerNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the mixed edge fixture."),
+                    _node_call(
+                        "seed",
+                        "test.seed",
+                        "Produces the value delivered by the transfer-only edge.",
+                        provides=[PROV_SPEC("value.in")],
+                        value=4,
+                    ),
+                    _node_call(
+                        "prepare",
+                        "test.add",
+                        "Produces an intermediate mainline value.",
+                        requires=[REQ_SPEC("value.in")],
+                        provides=[PROV_SPEC("value.out")],
+                        delta=3,
+                    ),
+                    _node_call(
+                        "gate",
+                        "test.edge_gate",
+                        "Produces a same-typed value that the schedule-only edge must not deliver.",
+                        requires=[REQ_SPEC("value.out")],
+                        provides=[PROV_SPEC("gate.value", "value.in")],
+                    ),
+                    _node_call(
+                        "consume",
+                        "test.edge_consumer",
+                        "Runs when gate schedules it but consumes the bypassed seed.",
+                        requires=[REQ_SPEC("value.in")],
+                        provides=[PROV_SPEC("result", "mixed.result")],
+                    ),
+                    _node_call(
+                        "end",
+                        "test.start",
+                        "Ends after the consumer result.",
+                    ),
+                ],
+                "edges": [
+                    {"from": "start", "to": "seed"},
+                    {"from": "seed", "to": "prepare"},
+                    {"from": "prepare", "to": "gate"},
+                    {"from": "gate", "to": "consume", "transfer": False},
+                    {"from": "consume", "to": "end"},
+                    {"from": "seed", "to": "consume", "schedule": False},
+                ],
+                "outputs": [REQ_SPEC("mixed.result")],
+            }
+        }
+    )
+
+    compiled = GraphCompiler().compile(graph, registry=registry)
+    roles = {
+        edge.pair: (
+            edge in compiled.schedule_edges,
+            edge in compiled.transfer_edges,
+        )
+        for edge in compiled.effective_edges
+    }
+    assert roles[("seed", "consume")] == (False, True)
+    assert roles[("gate", "consume")] == (True, False)
+
+    result = PipelineRuntime(
+        graph,
+        registry=registry,
+        runtime_options=RuntimeOptions(execution=execution),
+    ).run()
+
+    assert result.get("runtime.exec_order") == (
+        "start",
+        "seed",
+        "prepare",
+        "gate",
+        "consume",
+        "end",
+    )
+    assert result.get("mixed.result")["value"] == 14
+
+
+@pytest.mark.parametrize("execution", ["plan", "block", "compiled"])
+def test_terminal_records_outputs_and_transfer_before_completion(
+    execution: str,
+) -> None:
+    class TerminalProducerNode:
+        NODE_INFO = NodeInfo(
+            "test.terminal_producer",
+            "Terminal Producer",
+            "test",
+            "Produces a final value before completing the workflow.",
+            "0.1.0",
+            "terminal",
+        )
+        CONTRACT = NodeContract(
+            provides=(DataProvider("terminal.value", "terminal.value"),),
+            output_schema={"terminal.value": {"type": "number"}},
+        )
+
+        def run_pure(self, inputs, params):
+            return {"terminal.value": 9}
+
+    class TransferSinkNode:
+        NODE_INFO = NodeInfo(
+            "test.transfer_sink",
+            "Transfer Sink",
+            "test",
+            "Accepts a transfer-only terminal value without being scheduled.",
+            "0.1.0",
+            "process",
+        )
+        CONTRACT = NodeContract(
+            requires=(DataRequirement("terminal.value", "exactly_one"),),
+        )
+
+        def run_pure(self, inputs, params):
+            return {}
+
+    registry = _registry()
+    register_node(registry, "test.terminal_producer", TerminalProducerNode)
+    register_node(registry, "test.transfer_sink", TransferSinkNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call(
+                        "finish",
+                        "test.terminal_producer",
+                        "Produces the final value.",
+                        provides=[PROV_SPEC("terminal.value")],
+                    ),
+                    _node_call(
+                        "sink",
+                        "test.transfer_sink",
+                        "Receives the value without running.",
+                        requires=[REQ_SPEC("terminal.value")],
+                    ),
+                ],
+                "edges": [
+                    {
+                        "from": "finish",
+                        "to": "sink",
+                        "schedule": False,
+                    }
+                ],
+                "outputs": [REQ_SPEC("terminal.value")],
+            }
+        }
+    )
+
+    result = PipelineRuntime(
+        graph,
+        registry=registry,
+        runtime_options=RuntimeOptions(execution=execution),
+    ).run()
+
+    assert result.get("terminal.value")["value"] == 9
+    assert result.get("runtime.exec_order") == ("finish",)
+    assert result.get("runtime.edge_executions") == {"finish->sink": 1}
+    assert result.get("runtime.stop_reason") == "completed"
+
+
+def test_cycle_validation_is_role_specific() -> None:
+    nodes = [
+        _node_call("left", "test.start", "Left cycle endpoint."),
+        _node_call("right", "test.start", "Right cycle endpoint."),
+    ]
+    transfer_cycle = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": nodes,
+                "edges": [
+                    {"from": "left", "to": "right", "schedule": False},
+                    {"from": "right", "to": "left", "schedule": False},
+                ],
+            }
+        }
+    )
+    with pytest.raises(GraphCompileError) as transfer_exc:
+        GraphCompiler().compile(transfer_cycle, registry=_registry())
+    assert transfer_exc.value.rule_id == "GRAPH.DATA.CYCLE.FORBIDDEN"
+    assert transfer_exc.value.details["edge_role"] == "transfer"
+
+    mixed_roles = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": nodes,
+                "edges": [
+                    {"from": "left", "to": "right", "transfer": False},
+                    {"from": "right", "to": "left", "schedule": False},
+                ],
+            }
+        }
+    )
+    compiled = GraphCompiler().compile(mixed_roles, registry=_registry())
+    assert [edge.pair for edge in compiled.schedule_edges] == [
+        ("left", "right")
+    ]
+    assert [edge.pair for edge in compiled.transfer_edges] == [
+        ("right", "left")
+    ]
+
+
+def test_async_result_key_rejects_transfer_only_outgoing_edge() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the async role fixture."),
+                    _node_call(
+                        "async_seed",
+                        "test.seed",
+                        "Produces a result that requires a scheduled join.",
+                        provides=[PROV_SPEC("value.in")],
+                        result_key="value.in",
+                        **{"async": "result_key"},
+                    ),
+                    _node_call(
+                        "end",
+                        "test.in_end",
+                        "Would receive only transferred async data.",
+                        requires=[REQ_SPEC("value.in")],
+                    ),
+                ],
+                "edges": [
+                    {"from": "start", "to": "async_seed"},
+                    {
+                        "from": "async_seed",
+                        "to": "end",
+                        "schedule": False,
+                    },
+                ],
+            }
+        }
+    )
+
+    with pytest.raises(GraphCompileError) as exc_info:
+        GraphCompiler().compile(graph, registry=_registry())
+
+    assert exc_info.value.rule_id == "GRAPH.ASYNC.RESULT_UNJOINABLE"
 
 
 def test_mermaid_renders_while_loop_shape_class_and_stop_condition() -> None:

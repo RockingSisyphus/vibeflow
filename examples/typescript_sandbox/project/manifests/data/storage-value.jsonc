@@ -1,0 +1,8 @@
+{
+  "kind": "data_schema",
+  "type_key": "sandbox.storage.value",
+  "representation": "json",
+  "schema": {
+    "type": "string"
+  }
+}

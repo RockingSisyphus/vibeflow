@@ -1,0 +1,11 @@
+{
+  "kind": "data_schema",
+  "type_key": "sandbox.loop.history",
+  "representation": "json",
+  "schema": {
+    "type": "array",
+    "items": {
+      "type": "number"
+    }
+  }
+}

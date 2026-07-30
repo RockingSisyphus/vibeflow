@@ -1,0 +1,95 @@
+# VibeFlow TypeScript Sandbox
+
+This sandbox exercises the JavaScript/TypeScript AOT project format without
+containing host-specific integration code.
+
+Positive workflows:
+
+- `project/configs/linear.jsonc` computes `(x + a) - b` with two TypeScript
+  nodes importing the registered pure `sandbox.math` base_lib;
+- `project/configs/fanout_join.jsonc` fans out into add/subtract branches and
+  rejoins them with `join_policy: "all"`;
+- `project/configs/edge_roles.jsonc` separates a transfer-only data edge from
+  a schedule-only control edge and proves neither role leaks into the other;
+- `project/configs/branch_join.jsonc` conditionally selects one branch and
+  rejoins it with `join_policy: "any_active"`;
+- `project/configs/nodeset.jsonc` computes `(x + a) - b` inside a reusable
+  nodeset;
+- `project/configs/nested_override.jsonc` applies a qualified config override
+  to one of two sibling nested `math` nodes and proves it does not leak;
+- `project/configs/loop.jsonc` carries a number through a bounded three-step
+  while loop;
+- `project/configs/loop_stop_when.jsonc` stops from body data and collects each
+  carried value;
+- `project/configs/loop_max_failure.jsonc` verifies the stable bounded-loop
+  failure when the stop condition cannot converge in time;
+- `project/configs/async_capability.jsonc` combines a Promise node with a
+  per-run injected `sandbox.storage` Capability. The execution-model case
+  proves its serial suspend, deferred TaskPlan and Capability all use the JS
+  event loop rather than a thread executor;
+- `project/configs/optional_input.jsonc` adds an optional offset, treating an
+  omitted `required: false` input as zero;
+- `project/configs/detached.jsonc` checks detached cleanup and timeout behavior
+  through a fake `sandbox.audit` Capability;
+- `project/configs/port_math.jsonc` verifies the async
+  `receive → TypeScript math node/base_lib → send` Port chain;
+- `project/configs/host_extension.jsonc` uses a separately enabled
+  `sandbox.math_host` descriptor to verify import/create side-effect freedom,
+  explicit start/stop, idempotent stop, Capability injection, and manifest
+  packaging;
+- `project/configs/runtime_node_failure.jsonc` and
+  `project/configs/runtime_output_failure.jsonc` exercise the stable error ABI
+  for node exceptions and output Schema failures.
+
+The negative configs under `project/configs/negative/` each select one isolated
+invalid node or workflow. They cover direct
+node-to-node import, undeclared base_lib import, non-static dynamic import,
+runtime/local helper import, browser use of a Node builtin, and both directions
+of an immediate/suspend completion mismatch. They also reject a valid
+suspending node or a deferred TaskPlan placed inside a synchronous workflow,
+and reject discarded/unowned Promise work.
+
+The runner also verifies that the default synchronous ABI returns a plain,
+non-thenable value immediately, while the explicit `runWorkflowAsync` ABI
+returns a Promise and remains pending across a held suspending Capability. It
+inspects the generated plan for `completion`, `schedule`, `executor` and
+TaskPlan metadata, confirms JS uses `event_loop` rather than pretending to
+spawn Python-style threads, and covers import side-effect freedom, repeated and concurrent
+call isolation, input preflight, cancellation, trace modes and trace callback
+errors, Capability isolation, declaration-file consumption under strict
+TypeScript, source-map origins, deterministic manifests, atomic publication,
+single-file bundling, and the `web-app` no-auto-start contract.
+
+From the repository root, install the project-owned pinned toolchain and run
+the complete sandbox with:
+
+```bash
+npm ci --prefix examples/typescript_sandbox/project
+npm ci --prefix tools/mermaid-renderer
+PYTHONPATH=src python examples/typescript_sandbox/run_all.py \
+  --puppeteer-root tools/mermaid-renderer
+```
+
+The official VibeFlow distribution also contains this sandbox under
+`examples/typescript_sandbox/`. Its runner automatically imports the colocated
+`kernel/vibeflow-kernel.zip`, so it does not need a source checkout or an
+installed Python package:
+
+```bash
+cd <vibeflow_distribution>
+npm ci --prefix examples/typescript_sandbox/project
+python examples/typescript_sandbox/run_all.py --skip-browser
+```
+
+For the browser case, also install the distributed renderer dependencies with
+`npm ci --prefix kernel/tools/mermaid-renderer`, then omit `--skip-browser`.
+The distribution builder copies `package.json` and `package-lock.json`, but
+deliberately neither copies `node_modules` nor runs `npm install`. With a
+pre-populated npm cache, the dependency preparation can use `npm ci --offline`.
+
+Use `--skip-browser` when Puppeteer is unavailable. The runner builds the
+positive and negative fixtures through VibeFlow's normal build API. The
+`web-app` fixture only registers a button handler; importing its generated
+module does not auto-run `runWorkflow()`. A stable JSON and Markdown summary is
+written under `reports/`; that generated directory is not included in a
+distribution build.

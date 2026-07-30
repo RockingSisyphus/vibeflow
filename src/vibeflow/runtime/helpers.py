@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import operator
 import time
 from typing import Mapping
 
@@ -10,13 +9,17 @@ from vibeflow.runtime.errors import PipelineRuntimeError
 
 
 def condition_matches(expression: str, values: Mapping[str, object]) -> bool:
-    for token, op in (("==", operator.eq), ("!=", operator.ne)):
+    for token, negate in (("==", False), ("!=", True)):
         if token not in expression:
             continue
         left, right = (part.strip() for part in expression.split(token, 1))
         if not left or not right:
             raise PipelineRuntimeError(f"invalid edge condition: {expression}")
-        return bool(op(values.get(left), _literal_value(right)))
+        matches = _portable_literal_equal(
+            values.get(left),
+            _literal_value(right),
+        )
+        return not matches if negate else matches
     raise PipelineRuntimeError(f"unsupported edge condition: {expression}")
 
 
@@ -106,3 +109,9 @@ def _literal_value(value: str) -> object:
     if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
         return value[1:-1]
     return value
+
+
+def _portable_literal_equal(left: object, right: object) -> bool:
+    """Match JSON literals without Python's bool/int equality coercion."""
+
+    return type(left) is type(right) and left == right

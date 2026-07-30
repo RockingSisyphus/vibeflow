@@ -1,0 +1,58 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.fanout_join",
+  "display_name": "Fanout join",
+  "category": "sandbox",
+  "description": "Collects both fanout branches after an all join.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.fanout.added",
+        "cardinality": "exactly_one",
+        "display_name": "Added branch"
+      },
+      {
+        "type": "sandbox.fanout.subtracted",
+        "cardinality": "exactly_one",
+        "display_name": "Subtracted branch"
+      }
+    ],
+    "provides": [
+      {
+        "key": "added",
+        "type": "sandbox.fanout.added.output",
+        "display_name": "Added"
+      },
+      {
+        "key": "subtracted",
+        "type": "sandbox.fanout.subtracted.output",
+        "display_name": "Subtracted"
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {
+      "added": {
+        "type": "number"
+      },
+      "subtracted": {
+        "type": "number"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/fanout_join.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": []
+}

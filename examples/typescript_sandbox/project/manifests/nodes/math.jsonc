@@ -1,0 +1,55 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.math",
+  "display_name": "Affine math",
+  "category": "sandbox",
+  "description": "Applies a configured scale and offset through a TS base_lib.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.number",
+        "cardinality": "exactly_one",
+        "display_name": "Number"
+      }
+    ],
+    "provides": [
+      {
+        "key": "result",
+        "type": "sandbox.math.result",
+        "display_name": "Result"
+      }
+    ],
+    "params_schema": {
+      "scale": {
+        "type": "number"
+      },
+      "offset": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "scale": 2,
+      "offset": 1
+    },
+    "output_schema": {
+      "result": {
+        "type": "number"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/math.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": ["sandbox.math"],
+  "capabilities": []
+}

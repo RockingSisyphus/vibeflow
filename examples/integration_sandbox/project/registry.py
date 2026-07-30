@@ -50,6 +50,7 @@ from nodes.legal_math_nodes import (
     OutValueEndNode,
     ResourceArithmeticNode,
     ResourceScaleNode,
+    ReviewJoinEndNode,
     StartNode,
     SumPairNode,
     ValueInputNode,
@@ -106,6 +107,7 @@ def build_node_registry() -> NodeRegistry:
     registry.register("sandbox.value_input", ValueInputNode, config_schema={}, config_defaults={})
     registry.register("sandbox.io_input", IoInputNode, config_schema={}, config_defaults={})
     registry.register("sandbox.final_value_end", FinalValueEndNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.review_join_end", ReviewJoinEndNode, config_schema={}, config_defaults={})
     registry.register("sandbox.out_value_end", OutValueEndNode, config_schema={}, config_defaults={})
     registry.register("sandbox.next_value_end", NextValueEndNode, config_schema={}, config_defaults={})
     registry.register("sandbox.constant", ConstantNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 1})

@@ -11,10 +11,11 @@ def schema_finding(
     object_type: str,
     suggested_fix_type: str,
     rule_source: str = "kernel.default_policy",
+    severity: str = "error",
 ) -> HealthFinding:
     return HealthFinding(
         rule_id=rule_id,
-        severity="error",
+        severity=severity,
         object_type=object_type,
         object_id=object_id,
         failure_layer="schema",

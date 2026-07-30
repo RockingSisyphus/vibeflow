@@ -1,0 +1,45 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.override_default",
+  "display_name": "Expose default result",
+  "category": "sandbox",
+  "description": "Copies a math result into the distinct default-sibling data type.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.math.result",
+        "cardinality": "exactly_one",
+        "display_name": "Result"
+      }
+    ],
+    "provides": [
+      {
+        "key": "default_result",
+        "type": "sandbox.override.default",
+        "display_name": "Default result"
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {
+      "default_result": {
+        "type": "number"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/override_default.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": []
+}

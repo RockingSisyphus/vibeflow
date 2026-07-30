@@ -1,0 +1,72 @@
+{
+  "type_key": "visual.reusable_worker",
+  "display_name": "Reusable Async Worker",
+  "description": "A reusable worker body invoked four times from one valid parent review graph.",
+  "requires": [],
+  "provides": [
+    {
+      "key": "async.value",
+      "type": "async.value",
+      "display_name": "Async Value"
+    }
+  ],
+  "global_config": {
+    "config": {
+      "value": 42
+    },
+    "allow_config_override": true
+  },
+  "pipeline": {
+    "nodes": [
+      {
+        "id": "worker_start",
+        "type_used": "sandbox.start",
+        "display_name": "Worker Start",
+        "description": "Starts one reusable worker invocation."
+      },
+      {
+        "id": "side_value",
+        "type_used": "semantic.slow_async_value",
+        "display_name": "Produce Side Value",
+        "description": "Produces the configured detached worker value.",
+        "provides": [
+          {
+            "key": "async.value",
+            "type": "async.value",
+            "display_name": "Async Value"
+          }
+        ]
+      },
+      {
+        "id": "worker_end",
+        "type_used": "semantic.async_value_end",
+        "display_name": "Worker End",
+        "description": "Ends one reusable worker invocation.",
+        "requires": [
+          {
+            "type": "async.value",
+            "cardinality": "exactly_one",
+            "display_name": "Async Value"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "worker_start",
+        "to": "side_value"
+      },
+      {
+        "from": "side_value",
+        "to": "worker_end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "async.value",
+        "cardinality": "exactly_one",
+        "display_name": "Async Value"
+      }
+    ]
+  }
+}

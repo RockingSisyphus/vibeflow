@@ -1,0 +1,118 @@
+{
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.x",
+        "display_name": "X",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Fans x out into two arithmetic branches."
+      },
+      {
+        "id": "add_one",
+        "type_used": "sandbox.fanout_add",
+        "display_name": "Add one",
+        "description": "Computes x + 1 on the upper branch.",
+        "requires": [
+          {
+            "type": "sandbox.x",
+            "cardinality": "exactly_one",
+            "display_name": "X"
+          }
+        ],
+        "provides": [
+          {
+            "key": "added_branch",
+            "type": "sandbox.fanout.added",
+            "display_name": "Added branch"
+          }
+        ]
+      },
+      {
+        "id": "subtract_one",
+        "type_used": "sandbox.fanout_subtract",
+        "display_name": "Subtract one",
+        "description": "Computes x - 1 on the lower branch.",
+        "requires": [
+          {
+            "type": "sandbox.x",
+            "cardinality": "exactly_one",
+            "display_name": "X"
+          }
+        ],
+        "provides": [
+          {
+            "key": "subtracted_branch",
+            "type": "sandbox.fanout.subtracted",
+            "display_name": "Subtracted branch"
+          }
+        ]
+      },
+      {
+        "id": "join",
+        "type_used": "sandbox.fanout_join",
+        "display_name": "Join both branches",
+        "description": "Waits for both arithmetic branches.",
+        "join_policy": "all",
+        "requires": [
+          {
+            "type": "sandbox.fanout.added",
+            "cardinality": "exactly_one",
+            "display_name": "Added branch"
+          },
+          {
+            "type": "sandbox.fanout.subtracted",
+            "cardinality": "exactly_one",
+            "display_name": "Subtracted branch"
+          }
+        ],
+        "provides": [
+          {
+            "key": "added",
+            "type": "sandbox.fanout.added.output",
+            "display_name": "Added"
+          },
+          {
+            "key": "subtracted",
+            "type": "sandbox.fanout.subtracted.output",
+            "display_name": "Subtracted"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Ends after both joined outputs are available."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "add_one"},
+      {"from": "start", "to": "subtract_one"},
+      {"from": "add_one", "to": "join"},
+      {"from": "subtract_one", "to": "join"},
+      {"from": "join", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.fanout.added.output",
+        "cardinality": "exactly_one",
+        "display_name": "Added",
+        "as": "added"
+      },
+      {
+        "type": "sandbox.fanout.subtracted.output",
+        "cardinality": "exactly_one",
+        "display_name": "Subtracted",
+        "as": "subtracted"
+      }
+    ]
+  }
+}

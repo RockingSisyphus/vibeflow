@@ -1,0 +1,85 @@
+{
+  "nodeset_imports": [
+    {
+      "path": "nodesets/arithmetic.jsonc"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.x",
+        "display_name": "X",
+        "required": true
+      },
+      {
+        "key": "a",
+        "type": "sandbox.addend",
+        "display_name": "Addend",
+        "required": true
+      },
+      {
+        "key": "b",
+        "type": "sandbox.subtrahend",
+        "display_name": "Subtrahend",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts the reusable arithmetic nodeset workflow."
+      },
+      {
+        "id": "arithmetic",
+        "type_used": "sandbox.arithmetic_nodeset",
+        "display_name": "Run arithmetic nodeset",
+        "description": "Computes (x + a) - b inside a nested block.",
+        "requires": [
+          {
+            "type": "sandbox.x",
+            "cardinality": "exactly_one",
+            "display_name": "X"
+          },
+          {
+            "type": "sandbox.addend",
+            "cardinality": "exactly_one",
+            "display_name": "Addend"
+          },
+          {
+            "type": "sandbox.subtrahend",
+            "cardinality": "exactly_one",
+            "display_name": "Subtrahend"
+          }
+        ],
+        "provides": [
+          {
+            "key": "result",
+            "type": "sandbox.math.result",
+            "display_name": "Result"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Ends after the nodeset result is available."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "arithmetic"},
+      {"from": "arithmetic", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.math.result",
+        "cardinality": "exactly_one",
+        "display_name": "Result",
+        "as": "result"
+      }
+    ]
+  }
+}

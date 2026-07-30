@@ -5,7 +5,10 @@ This directory contains current user documentation, maintainer documentation, an
 ## Start Here
 
 - `../README.md`: project overview and release-package workflow.
-- `developer_guide.md`: how to build business nodes, base_lib helpers, plugins, nodesets, and JSONC configs.
+- `developer_guide.md`: shared workflow/config rules and the detailed Python Runtime
+  path (registry, Python node/base_lib/plugin, execution and reports).
+- `js_aot_build.md`: current JS/TS descriptors, sync/async Workflow ABI, Port, Capability/Host Extension injection, and Web/Node AOT build profiles.
+  Its end-to-end fixture is `examples/typescript_sandbox`.
 - Config node/resource visual metadata (`display_name`, `description`, `style`, `similar_to` where applicable), symbol-table nodeset parsing and forward references, explicit-edge mainline analysis / data bypass / async edge semantics, first-class loop nodes, safe OR join / `join_policy`, SVG color rules and native-text label enhancement, actionable and aggregated health/quality `details`, config parse tracing, and nested runtime trace fields are documented in `developer_guide.md` and `kernel_development_guide.md`.
 - `kernel_target_vision.md`: target vision and current public architecture principles.
 - `kernel_development_guide.md`: checks and workflow for maintaining VibeFlow itself.
@@ -14,18 +17,31 @@ This directory contains current user documentation, maintainer documentation, an
 
 - `kernel_target_vision.md` records long-lived product invariants and architecture-review principles. It should describe what must remain true, not implementation history.
 - `kernel_development_guide.md` is the maintainer contract for VibeFlow itself, including CLI orchestration, failure semantics, regression coverage, and repository checks.
-- `developer_guide.md` is the shared user guide. It is also the source copied into the release package as `kernel/docs/10_Kernel能力与项目开发指南.md`; edit the source once rather than patching generated output.
+- `developer_guide.md` is the shared entry guide and detailed Python Runtime guide.
+  It is also the source copied into the release package as
+  `kernel/docs/10_Kernel能力与项目开发指南.md`; edit the source once rather
+  than patching generated output.
+- `js_aot_build.md` is the JS/TS AOT guide copied into the release package as `kernel/docs/11_JS_TS与Web_AOT构建指南.md`.
 - `../distribution/kernel_development_pack/docs/` contains topic-specific source documents for release-package users. The build places them under `kernel/docs/`.
 - `../distribution/kernel_development_pack/project_template/AGENTS.md` is the additional high-salience instruction set for AI agents. It carries operational prohibitions and review gates, while the human README should stay concise.
 - `../README.md` and `../README.en.md` provide the repository overview and a short two-path quick start for greenfield and existing projects.
 
 All current user- and AI-facing layers must agree that existing workflows are edited in place, formal review uses the VibeFlow `review` command and fails closed, Mermaid CLI/mmdc is an internal implementation detail, and human approval requires an explicit later message when requested. They must also use the public name “CLI 让渡模式 / `delegate-cli`”, keep `run` and `review` responsibilities unchanged, and describe the same derived effect-scope matrix (`none`, `terminal`, `python_io`, `trusted`) without reverting to the obsolete claim that `flow_kind` never authorizes IO or that `external=True` is not a purity bypass.
 
+They must also keep the two public development paths distinct: Python Runtime
+resources use `project/registry.py`, while JS/TS AOT resources use static
+`descriptors` plus the project-owned `javascript` toolchain and build to
+standalone ESM/Web artifacts. A distribution-facing rule must not reject
+`descriptors` or `javascript` merely because the bundled starter project is
+Python-based.
+
 ## Current Design
 
 - `kernel_target_vision.md`: target vision and core architecture principles.
-- `developer_guide.md`: current user-facing node/config/nodeset/plugin/base_lib guide.
+- `developer_guide.md`: current shared workflow/config and Python Runtime guide.
+- `js_aot_build.md`: current JavaScript/TypeScript and AOT build guide.
 - `kernel_development_guide.md`: current maintainer workflow.
+- `15_长期工作流与原生IO改造计划.md`: implemented design record for sync/async entry modes, unbounded loop/Port semantics, and JS/TS Host Extensions.
 
 ## Maintainers
 

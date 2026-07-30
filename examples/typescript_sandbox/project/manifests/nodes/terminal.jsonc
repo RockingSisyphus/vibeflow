@@ -1,0 +1,29 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.terminal",
+  "display_name": "Sandbox terminal",
+  "category": "sandbox",
+  "description": "Side-effect-free workflow start or end terminal.",
+  "version": "1.0.0",
+  "flow_kind": "terminal",
+  "contract": {
+    "requires": [],
+    "provides": [],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {}
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/terminal.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": []
+}

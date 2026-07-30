@@ -1,0 +1,8 @@
+{
+  "kind": "data_schema",
+  "type_key": "clock.now.result",
+  "representation": "json",
+  "schema": {
+    "type": "integer"
+  }
+}

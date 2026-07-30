@@ -40,6 +40,56 @@ class DataRequirement:
 
 
 @dataclass(frozen=True)
+class PipelineInputSpec:
+    """A public workflow input.
+
+    ``required=None`` is intentionally retained for legacy Python workflows.
+    AOT targets must reject that ambiguous state before emitting code.
+    """
+
+    key: str
+    type: str
+    display_name: str = field(default="", compare=False)
+    required: bool | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"key": self.key, "type": self.type}
+        if self.display_name:
+            payload["display_name"] = self.display_name
+        if self.required is not None:
+            payload["required"] = self.required
+        return payload
+
+    def to_provider(self) -> DataProvider:
+        return DataProvider(self.key, self.type, self.display_name)
+
+
+@dataclass(frozen=True)
+class PipelineOutputSpec:
+    """A public workflow output while preserving the internal type contract."""
+
+    type: str
+    cardinality: str
+    display_name: str = field(default="", compare=False)
+    alias: str = field(default="", compare=False)
+
+    @property
+    def public_name(self) -> str:
+        return self.alias or self.type
+
+    def to_dict(self) -> dict[str, str]:
+        payload = {"type": self.type, "cardinality": self.cardinality}
+        if self.display_name:
+            payload["display_name"] = self.display_name
+        if self.alias:
+            payload["as"] = self.alias
+        return payload
+
+    def to_requirement(self) -> DataRequirement:
+        return DataRequirement(self.type, self.cardinality, self.display_name)
+
+
+@dataclass(frozen=True)
 class DataEnvelope:
     key: str
     type: str
@@ -123,6 +173,27 @@ def parse_data_requirements(value: Any, *, field: str) -> tuple[DataRequirement,
     return requirements
 
 
+def parse_pipeline_inputs(value: Any, *, field: str) -> tuple[PipelineInputSpec, ...]:
+    if value in (None, ()):
+        return ()
+    if isinstance(value, str) or not isinstance(value, (list, tuple)):
+        raise ValueError(f"{field} must be a list of pipeline input objects")
+    inputs = tuple(_parse_pipeline_input(item, field=f"{field}[{index}]") for index, item in enumerate(value))
+    _assert_unique((item.key for item in inputs), field=f"{field}.key")
+    return inputs
+
+
+def parse_pipeline_outputs(value: Any, *, field: str) -> tuple[PipelineOutputSpec, ...]:
+    if value in (None, ()):
+        return ()
+    if isinstance(value, str) or not isinstance(value, (list, tuple)):
+        raise ValueError(f"{field} must be a list of pipeline output objects")
+    outputs = tuple(_parse_pipeline_output(item, field=f"{field}[{index}]") for index, item in enumerate(value))
+    _assert_unique((item.type for item in outputs), field=f"{field}.type")
+    _assert_unique((item.public_name for item in outputs), field=f"{field}.as")
+    return outputs
+
+
 def provider_keys(providers: Iterable[DataProvider]) -> tuple[str, ...]:
     return tuple(provider.key for provider in providers)
 
@@ -141,6 +212,14 @@ def providers_to_dicts(providers: Iterable[DataProvider]) -> list[dict[str, str]
 
 def requirements_to_dicts(requirements: Iterable[DataRequirement]) -> list[dict[str, str]]:
     return [requirement.to_dict() for requirement in requirements]
+
+
+def pipeline_inputs_to_dicts(inputs: Iterable[PipelineInputSpec]) -> list[dict[str, Any]]:
+    return [item.to_dict() for item in inputs]
+
+
+def pipeline_outputs_to_dicts(outputs: Iterable[PipelineOutputSpec]) -> list[dict[str, str]]:
+    return [item.to_dict() for item in outputs]
 
 
 def _parse_provider(item: Any, *, field: str) -> DataProvider:
@@ -169,6 +248,45 @@ def _parse_requirement(item: Any, *, field: str) -> DataRequirement:
         raise ValueError(f"{field}.cardinality must be one of {sorted(CARDINALITIES)}")
     display_name = _required_text(item.get("display_name"), field=f"{field}.display_name")
     return DataRequirement(type=data_type, cardinality=cardinality, display_name=display_name)
+
+
+def _parse_pipeline_input(item: Any, *, field: str) -> PipelineInputSpec:
+    if not isinstance(item, Mapping):
+        raise ValueError(f"{field} must be an object with key and type")
+    allowed = {"key", "type", "display_name", "required"}
+    extra = sorted(str(key) for key in item if str(key) not in allowed)
+    if extra:
+        raise ValueError(f"{field} contains unknown fields: {extra}")
+    key = _required_text(item.get("key"), field=f"{field}.key")
+    data_type = _required_text(item.get("type"), field=f"{field}.type")
+    display_name = _required_text(item.get("display_name"), field=f"{field}.display_name")
+    required = item.get("required")
+    if required is not None and not isinstance(required, bool):
+        raise ValueError(f"{field}.required must be a boolean")
+    return PipelineInputSpec(key=key, type=data_type, display_name=display_name, required=required)
+
+
+def _parse_pipeline_output(item: Any, *, field: str) -> PipelineOutputSpec:
+    if not isinstance(item, Mapping):
+        raise ValueError(f"{field} must be an object with type and cardinality")
+    allowed = {"type", "cardinality", "display_name", "as"}
+    extra = sorted(str(key) for key in item if str(key) not in allowed)
+    if extra:
+        raise ValueError(f"{field} contains unknown fields: {extra}")
+    data_type = _required_text(item.get("type"), field=f"{field}.type")
+    cardinality = _required_text(item.get("cardinality"), field=f"{field}.cardinality")
+    if cardinality not in CARDINALITIES:
+        raise ValueError(f"{field}.cardinality must be one of {sorted(CARDINALITIES)}")
+    display_name = _required_text(item.get("display_name"), field=f"{field}.display_name")
+    alias = str(item.get("as", "") or "").strip()
+    if "as" in item and not alias:
+        raise ValueError(f"{field}.as must be a non-empty string")
+    return PipelineOutputSpec(
+        type=data_type,
+        cardinality=cardinality,
+        display_name=display_name,
+        alias=alias,
+    )
 
 
 def _required_text(value: Any, *, field: str) -> str:

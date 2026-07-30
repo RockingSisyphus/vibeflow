@@ -1,6 +1,28 @@
 {
   "registry": "registry.py:build_node_registry",
   "quality_enabled": true,
+  "descriptors": {
+    "nodes": [
+      "manifests/nodes"
+    ],
+    "base_lib": [
+      "manifests/base_lib"
+    ],
+    "data_schemas": [
+      "manifests/data"
+    ],
+    "capabilities": [
+      "manifests/capabilities"
+    ],
+    "host_extensions": [
+      "manifests/host_extensions"
+    ]
+  },
+  "javascript": {
+    "package_root": ".",
+    "external_packages": [],
+    "host_extensions": []
+  },
   "runtime": {
     "async_max_workers": 4,
     "async_flush_timeout": null,

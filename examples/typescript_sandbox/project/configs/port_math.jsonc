@@ -1,0 +1,77 @@
+{
+  "pipeline": {
+    "entry_mode": "async",
+    "nodes": [
+      {
+        "id": "receive",
+        "type_used": "vibeflow.io",
+        "display_name": "Receive number",
+        "description": "Waits for one number from the fake sandbox host.",
+        "provides": [
+          {
+            "key": "number",
+            "type": "sandbox.number",
+            "display_name": "Received number"
+          }
+        ],
+        "io": {
+          "operation": "receive",
+          "port": "sandbox.math.in"
+        }
+      },
+      {
+        "id": "calculate",
+        "type_used": "sandbox.math",
+        "display_name": "Affine calculation",
+        "description": "Combines a TS node and TS base_lib into x * 3 + 2.",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Received number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "result",
+            "type": "sandbox.math.result",
+            "display_name": "Calculated result"
+          }
+        ],
+        "config": {
+          "scale": 3,
+          "offset": 2
+        }
+      },
+      {
+        "id": "send",
+        "type_used": "vibeflow.io",
+        "display_name": "Send result",
+        "description": "Submits the calculated value to the fake sandbox host.",
+        "requires": [
+          {
+            "type": "sandbox.math.result",
+            "cardinality": "exactly_one",
+            "display_name": "Calculated result"
+          }
+        ],
+        "io": {
+          "operation": "send",
+          "port": "sandbox.math.out"
+        }
+      }
+    ],
+    "edges": [
+      {"from": "receive", "to": "calculate"},
+      {"from": "calculate", "to": "send"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.math.result",
+        "cardinality": "exactly_one",
+        "display_name": "Calculated result",
+        "as": "result"
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "kind": "capability",
+  "id": "sandbox.audit",
+  "targets": ["browser", "node"],
+  "display_name": "Audit sink",
+  "description": "A host-supplied generic sink used to observe detached cleanup.",
+  "operations": {
+    "record": {
+      "input_type": "sandbox.audit.request",
+      "output_type": "sandbox.audit.result",
+      "completion": "suspend"
+    }
+  }
+}

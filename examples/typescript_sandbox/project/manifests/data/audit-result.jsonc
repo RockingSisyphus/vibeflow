@@ -1,0 +1,17 @@
+{
+  "kind": "data_schema",
+  "type_key": "sandbox.audit.result",
+  "representation": "json",
+  "display_name": "Audit result",
+  "description": "Acknowledgement returned by a generic audit host.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "accepted": {
+        "type": "boolean"
+      }
+    },
+    "required": ["accepted"],
+    "additionalProperties": false
+  }
+}
