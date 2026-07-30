@@ -71,6 +71,7 @@ def handle_export_graph(args, *, export_kind: str) -> int:
         text = export_mermaid(
             graph,
             compiled=compiled,
+            registry=registry,
             expand_nodesets=bool(args.expand_nodesets),
             show_contract=not bool(args.hide_contract),
             show_semantics=not bool(args.hide_semantics),
@@ -279,6 +280,7 @@ def _export_svg(args, *, graph, compiled, registry, resources) -> int:
         mermaid_text = export_mermaid(
             graph,
             compiled=compiled,
+            registry=registry,
             expand_nodesets=bool(args.expand_nodesets),
             show_contract=not bool(args.hide_contract),
             show_semantics=not bool(args.hide_semantics),

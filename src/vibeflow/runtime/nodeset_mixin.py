@@ -8,7 +8,10 @@ from vibeflow.runtime.errors import DelegateCliExit, PipelineRuntimeError
 from vibeflow.runtime.helpers import elapsed_ms
 from vibeflow.runtime.trace import RuntimeTrace
 from vibeflow.runtime.types import _NestedRuntimeFailure
-from vibeflow.runtime.values import _nodeset_inputs_to_initial, _result_value
+from vibeflow.runtime.values import (
+    _nodeset_inputs_to_initial,
+    _public_result_value,
+)
 from vibeflow.runtime.summaries import summarize_mapping
 
 class RuntimeNodesetMixin:
@@ -77,15 +80,25 @@ class RuntimeNodesetMixin:
             runtime._trace_sink = previous_sink
             runtime._trace_path_prefix = previous_prefix
         outputs = {}
+        output_specs = {
+            output.type: output
+            for output in frame.subplan.graph.outputs
+        }
         for provider in frame.provides:
+            output_spec = output_specs.get(provider.type)
+            result_key = (
+                output_spec.public_name
+                if output_spec is not None
+                else provider.type
+            )
             try:
-                nested_value = nested_result.get(provider.type)
+                nested_value = nested_result.get(result_key)
             except KeyError as exc:
                 raise PipelineRuntimeError(
                     f"nodeset instance '{frame.id}' provides type '{provider.type}' "
                     f"for key '{provider.key}', but the nodeset body did not produce it"
                 ) from exc
-            outputs[provider.key] = _result_value(nested_value)
+            outputs[provider.key] = _public_result_value(nested_value)
         return outputs, runtime.trace
 
     def _execute_nodeset_block(self, node_name: str, inputs: object) -> Mapping[str, object]:

@@ -5,8 +5,8 @@ from typing import Any
 
 from vibeflow.data_contract import provider_keys
 from vibeflow.graph_config.algorithms import strongly_connected_components
-from vibeflow.graph_config import EdgeSpec, GraphConfig, LOOP_NODE_TYPES, NodeSpec, STATUS_PLANNED
-from vibeflow.node import FLOW_KIND_DECISION, FLOW_KIND_PREDEFINED
+from vibeflow.graph_config import EdgeSpec, GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, NodeSpec, STATUS_PLANNED
+from vibeflow.node import FLOW_KIND_DECISION, FLOW_KIND_IO, FLOW_KIND_PREDEFINED
 from vibeflow.plugin import PluginRegistry
 
 
@@ -24,6 +24,19 @@ class CompiledGraph:
     async_edges: tuple[EdgeSpec, ...] = ()
     schedule_edges: tuple[EdgeSpec, ...] = ()
     transfer_edges: tuple[EdgeSpec, ...] = ()
+    edge_roles_resolved: bool = False
+
+    @property
+    def resolved_schedule_edges(self) -> tuple[EdgeSpec, ...]:
+        if self.edge_roles_resolved:
+            return self.schedule_edges
+        return self.effective_edges
+
+    @property
+    def resolved_transfer_edges(self) -> tuple[EdgeSpec, ...]:
+        if self.edge_roles_resolved:
+            return self.transfer_edges
+        return self.effective_edges
 
 
 @dataclass
@@ -42,21 +55,46 @@ class GraphCompiler:
         graph: GraphConfig,
         *,
         registry: Any | None = None,
+        catalog: Any | None = None,
         known_nodesets: set[str] | None = None,
         plugin_registry: PluginRegistry | None = None,
         owner: str = "pipeline",
     ) -> CompiledGraph:
+        if registry is not None and catalog is not None:
+            raise GraphCompileError("compile accepts either registry or catalog, not both")
+        type_source = catalog if catalog is not None else registry
         _call_compiler_plugins(plugin_registry, "before_compile", graph)
         nodes_by_name = {node.id: node for node in graph.nodes}
-        _validate_no_explicit_cycles(nodes_by_name, graph.edges, owner=owner)
-        _validate_node_types(graph.nodes, registry=registry, nodesets=known_nodesets or set(graph.nodesets))
+        _validate_node_types(graph.nodes, registry=type_source, nodesets=known_nodesets or set(graph.nodesets))
         providers = _collect_providers(graph.nodes, input_keys=set(provider_keys(graph.inputs)))
         consumers = _collect_consumers(graph.nodes)
         effective_edges = _merge_edges(graph.edges)
-        flow_kinds = _node_flow_kinds(nodes_by_name, registry=registry, nodesets=known_nodesets or set(graph.nodesets))
+        flow_kinds = _node_flow_kinds(nodes_by_name, registry=type_source, nodesets=known_nodesets or set(graph.nodesets))
         from vibeflow.graph_config.mainline import analyze_mainline
 
         mainline = analyze_mainline(graph, effective_edges, flow_kinds, owner=owner)
+        _validate_effective_edge_roles(
+            effective_edges,
+            schedule_edges=mainline.schedule_edges,
+            transfer_edges=mainline.transfer_edges,
+        )
+        _validate_async_result_routes(
+            graph.nodes,
+            effective_edges=effective_edges,
+            schedule_edges=mainline.schedule_edges,
+        )
+        _validate_no_explicit_cycles(
+            nodes_by_name,
+            mainline.schedule_edges,
+            owner=owner,
+            role="schedule",
+        )
+        _validate_no_explicit_cycles(
+            nodes_by_name,
+            mainline.transfer_edges,
+            owner=owner,
+            role="transfer",
+        )
         _validate_routing_edge_conditions(graph.edges, flow_kinds=flow_kinds)
         compiled = CompiledGraph(
             order=tuple(node.id for node in graph.nodes),
@@ -71,6 +109,7 @@ class GraphCompiler:
             async_edges=mainline.async_edges,
             schedule_edges=mainline.schedule_edges,
             transfer_edges=mainline.transfer_edges,
+            edge_roles_resolved=True,
         )
         _call_compiler_plugins(plugin_registry, "after_compile", graph, compiled)
         return compiled
@@ -94,7 +133,7 @@ def _validate_node_types(nodes: tuple[NodeSpec, ...], *, registry: Any | None, n
     if registry is not None:
         for type_key in nodesets:
             try:
-                registry.get(type_key)
+                _require_registered_type(registry, type_key)
             except Exception:
                 continue
             raise GraphCompileError(
@@ -109,10 +148,12 @@ def _validate_node_types(nodes: tuple[NodeSpec, ...], *, registry: Any | None, n
             continue
         if node.type_used in LOOP_NODE_TYPES:
             continue
+        if node.type_used == IO_NODE_TYPE:
+            continue
         if node.type_used in nodesets:
             continue
         try:
-            registry.get(node.type_used)
+            _require_registered_type(registry, node.type_used)
         except Exception as exc:
             raise GraphCompileError(f"node '{node.id}' has unknown type_used '{node.type_used}'") from exc
 
@@ -155,7 +196,90 @@ def _merge_edge_into(merged: dict[tuple[str, str], EdgeSpec], edge: EdgeSpec) ->
     if existing is None:
         merged[edge.pair] = edge
         return
-    merged[edge.pair] = EdgeSpec(edge.source, edge.target, existing.when or edge.when)
+    merged[edge.pair] = EdgeSpec(
+        edge.source,
+        edge.target,
+        existing.when or edge.when,
+        _merge_edge_role(existing.schedule, edge.schedule, edge=edge, role="schedule"),
+        _merge_edge_role(existing.transfer, edge.transfer, edge=edge, role="transfer"),
+    )
+
+
+def _merge_edge_role(
+    existing: bool | None,
+    incoming: bool | None,
+    *,
+    edge: EdgeSpec,
+    role: str,
+) -> bool | None:
+    if existing is None:
+        return incoming
+    if incoming is None or incoming == existing:
+        return existing
+    raise GraphCompileError(
+        (
+            f"duplicate edge {edge.source}->{edge.target} declares conflicting "
+            f"{role} roles"
+        ),
+        "GRAPH.EDGE.ROLE_CONFLICT",
+    )
+
+
+def _validate_effective_edge_roles(
+    edges: tuple[EdgeSpec, ...],
+    *,
+    schedule_edges: tuple[EdgeSpec, ...],
+    transfer_edges: tuple[EdgeSpec, ...],
+) -> None:
+    schedule_pairs = {edge.pair for edge in schedule_edges}
+    transfer_pairs = {edge.pair for edge in transfer_edges}
+    for edge in edges:
+        if edge.pair in schedule_pairs or edge.pair in transfer_pairs:
+            continue
+        raise GraphCompileError(
+            (
+                f"edge {edge.source}->{edge.target} must schedule, transfer, "
+                "or both after role inference"
+            ),
+            "GRAPH.EDGE.NO_ROLE",
+            details={
+                "source": edge.source,
+                "target": edge.target,
+                "schedule": False,
+                "transfer": False,
+            },
+        )
+
+
+def _validate_async_result_routes(
+    nodes: tuple[NodeSpec, ...],
+    *,
+    effective_edges: tuple[EdgeSpec, ...],
+    schedule_edges: tuple[EdgeSpec, ...],
+) -> None:
+    outgoing_sources = {edge.source for edge in effective_edges}
+    scheduled_sources = {edge.source for edge in schedule_edges}
+    for node in nodes:
+        if node.async_mode != "result_key":
+            continue
+        if node.id not in outgoing_sources or node.id in scheduled_sources:
+            continue
+        raise GraphCompileError(
+            (
+                f"async result_key node '{node.id}' has no scheduled outgoing "
+                "edge to join its result"
+            ),
+            "GRAPH.ASYNC.RESULT_UNJOINABLE",
+            details={
+                "node": node.id,
+                "async": node.async_mode,
+                "result_key": node.result_key,
+                "suggestion": (
+                    "add a schedule edge to a result consumer or use "
+                    "async='detached' for side work"
+                ),
+            },
+        )
 
 
 def explicit_flow_cycles(nodes_by_name: dict[str, NodeSpec], edges: tuple[EdgeSpec, ...], *, owner: str = "pipeline") -> tuple[dict[str, object], ...]:
@@ -176,21 +300,46 @@ def explicit_flow_cycles(nodes_by_name: dict[str, NodeSpec], edges: tuple[EdgeSp
     return tuple(cycles)
 
 
-def _validate_no_explicit_cycles(nodes_by_name: dict[str, NodeSpec], edges: tuple[EdgeSpec, ...], *, owner: str) -> None:
+def _validate_no_explicit_cycles(
+    nodes_by_name: dict[str, NodeSpec],
+    edges: tuple[EdgeSpec, ...],
+    *,
+    owner: str,
+    role: str,
+) -> None:
     cycles = explicit_flow_cycles(nodes_by_name, edges, owner=owner)
     if not cycles:
         return
     first = cycles[0]
     members = [str(item) for item in first.get("members", ())]
+    if role == "transfer":
+        message = (
+            "explicit data transfer cycle is forbidden in ordinary graph: "
+            + " -> ".join(members)
+            + "; use vibeflow.loop.while carry for iterative data"
+        )
+        rule_id = "GRAPH.DATA.CYCLE.FORBIDDEN"
+    else:
+        message = (
+            "explicit flow cycle is forbidden in ordinary graph: "
+            + " -> ".join(members)
+            + "; use vibeflow.loop.while for loops"
+        )
+        rule_id = "GRAPH.CYCLE.FORBIDDEN"
     raise GraphCompileError(
-        "explicit flow cycle is forbidden in ordinary graph: " + " -> ".join(members) + "; use vibeflow.loop.while for loops",
-        "GRAPH.CYCLE.FORBIDDEN",
+        message,
+        rule_id,
         details={
             "owner": owner,
+            "edge_role": role,
             "members": list(first.get("members", ())),
             "edges": list(first.get("edges", ())),
             "cycles": list(cycles),
-            "suggestion": "Replace ordinary edge cycles with a vibeflow.loop.while node whose body is a nodeset.",
+            "suggestion": (
+                "Replace ordinary data cycles with vibeflow.loop.while carry."
+                if role == "transfer"
+                else "Replace ordinary edge cycles with a vibeflow.loop.while node whose body is a nodeset."
+            ),
         },
     )
 
@@ -215,13 +364,32 @@ def _node_flow_kinds(nodes_by_name: dict[str, NodeSpec], *, registry: Any | None
         if spec.type_used in LOOP_NODE_TYPES:
             kinds[name] = FLOW_KIND_PREDEFINED
             continue
+        if spec.type_used == IO_NODE_TYPE:
+            kinds[name] = FLOW_KIND_IO
+            continue
         if spec.type_used in nodesets:
             kinds[name] = FLOW_KIND_PREDEFINED
             continue
         if registry is None:
             kinds[name] = ""
             continue
-        node_cls = registry.get(spec.type_used)
-        info = getattr(node_cls, "NODE_INFO", None)
-        kinds[name] = str(getattr(info, "flow_kind", ""))
+        registered = _require_registered_type(registry, spec.type_used)
+        direct = str(getattr(registered, "flow_kind", "") or "")
+        info = getattr(registered, "NODE_INFO", None)
+        kinds[name] = direct or str(getattr(info, "flow_kind", ""))
     return kinds
+
+
+def _require_registered_type(source: Any, type_key: str) -> Any:
+    """Resolve a type from either the legacy Python registry or a descriptor catalog."""
+
+    require = getattr(source, "require", None)
+    if callable(require):
+        return require(type_key)
+    get = getattr(source, "get", None)
+    if not callable(get):
+        raise KeyError(type_key)
+    value = get(type_key)
+    if value is None:
+        raise KeyError(type_key)
+    return value

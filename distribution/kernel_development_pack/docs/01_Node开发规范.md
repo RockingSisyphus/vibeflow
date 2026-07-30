@@ -104,7 +104,7 @@ class AddNode:
 NODE_INFO = NodeInfo(..., flow_kind="process", external=True)
 ```
 
-`external=True` 是“实现由第三方或外部维护”的最高优先级信任边界，使有效 `effect_scope=trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 purity/IO 绕过；不要为了让内部代码通过检查而滥用。它不改变流程图形状，不代表 decision，也不会让 cycle 合法化；契约、拓扑、输出 key、`flow_kind` 和 trace 仍然被检查。
+`external=True` 是“实现由第三方或外部维护”的最高优先级信任边界，使有效 `effect_scope=trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 purity/IO 绕过；不要为了让内部代码通过检查而滥用。它不改变 `flow_kind` 形状，不代表 decision，也不会让 cycle 合法化；审查图只在原形状上叠加 `[EXTERNAL]` 标题和 `7px` non-scaling 粗边框。契约、拓扑、输出 key、`flow_kind` 和 trace 仍然被检查。
 
 ## 必填契约
 

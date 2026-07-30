@@ -1,0 +1,18 @@
+{
+  "descriptors": {
+    "nodes": [
+      "manifests/nodes",
+      "negative/manifests/nodes"
+    ],
+    "base_lib": ["manifests/base_lib"],
+    "data_schemas": ["manifests/data"],
+    "capabilities": ["manifests/capabilities"],
+    "host_extensions": ["manifests/host_extensions"]
+  },
+  "javascript": {
+    "package_root": ".",
+    "external_packages": [],
+    "host_extensions": ["sandbox.math_host"]
+  },
+  "quality_enabled": false
+}

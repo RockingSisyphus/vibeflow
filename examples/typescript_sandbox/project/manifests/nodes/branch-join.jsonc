@@ -1,0 +1,46 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.branch_join",
+  "display_name": "Branch join",
+  "category": "sandbox",
+  "description": "Consumes the one active branch message.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.branch.message",
+        "cardinality": "exactly_one",
+        "display_name": "Selected branch message"
+      }
+    ],
+    "provides": [
+      {
+        "key": "message",
+        "type": "sandbox.branch.output",
+        "display_name": "Message"
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {
+      "message": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/branch_join.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": []
+}

@@ -1,0 +1,45 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.edge_consume",
+  "display_name": "Edge consume",
+  "category": "sandbox",
+  "description": "Doubles the one payload delivered by the transfer-only edge.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.fanout.added",
+        "cardinality": "exactly_one",
+        "display_name": "Transferred payload"
+      }
+    ],
+    "provides": [
+      {
+        "key": "result",
+        "type": "sandbox.math.result",
+        "display_name": "Result"
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {
+      "result": {
+        "type": "number"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/edge_consume.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": []
+}

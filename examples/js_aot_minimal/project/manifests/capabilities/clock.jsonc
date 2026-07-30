@@ -1,0 +1,12 @@
+{
+  "kind": "capability",
+  "id": "example.clock",
+  "targets": ["browser", "node"],
+  "operations": {
+    "now": {
+      "input_type": "clock.now.request",
+      "output_type": "clock.now.result",
+      "completion": "suspend"
+    }
+  }
+}

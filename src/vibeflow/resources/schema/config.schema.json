@@ -7,6 +7,7 @@
     "pipeline": { "$ref": "#/$defs/pipeline" },
     "nodes": { "$ref": "#/$defs/nodes" },
     "edges": { "$ref": "#/$defs/edges" },
+    "entry_mode": { "enum": ["sync", "async"] },
     "max_steps": { "type": "integer", "minimum": 1 },
     "nodeset_imports": {
       "type": "array",
@@ -117,14 +118,37 @@
       },
       "additionalProperties": false
     },
+    "pipelineInput": {
+      "type": "object",
+      "required": ["key", "type", "display_name"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "display_name": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "pipelineOutput": {
+      "type": "object",
+      "required": ["type", "cardinality", "display_name"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "cardinality": { "enum": ["exactly_one", "optional_one", "all"] },
+        "display_name": { "type": "string", "minLength": 1 },
+        "as": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
     "pipeline": {
       "type": "object",
       "required": ["nodes"],
       "properties": {
-        "inputs": { "type": "array", "items": { "$ref": "#/$defs/dataProvider" } },
-        "outputs": { "type": "array", "items": { "$ref": "#/$defs/dataRequirement" } },
+        "inputs": { "type": "array", "items": { "$ref": "#/$defs/pipelineInput" } },
+        "outputs": { "type": "array", "items": { "$ref": "#/$defs/pipelineOutput" } },
         "nodes": { "$ref": "#/$defs/nodes" },
         "edges": { "$ref": "#/$defs/edges" },
+        "entry_mode": { "enum": ["sync", "async"], "default": "sync" },
         "max_steps": { "type": "integer", "minimum": 1 }
       }
     },
@@ -146,6 +170,7 @@
           "similar_to": { "$ref": "#/$defs/nodeSimilarity" },
           "join_policy": { "enum": ["safe_any", "any_active", "all"] },
           "loop": { "$ref": "#/$defs/loopSpec" },
+          "io": { "$ref": "#/$defs/ioSpec" },
           "requires": { "type": "array", "items": { "$ref": "#/$defs/dataRequirement" } },
           "provides": { "type": "array", "items": { "$ref": "#/$defs/dataProvider" } },
           "config": { "type": "object" },
@@ -194,13 +219,15 @@
     "loopSpec": {
       "type": "object",
       "required": ["body"],
-      "oneOf": [
-        { "required": ["stop_after"], "not": { "required": ["stop_when"] } },
-        { "required": ["stop_when"], "not": { "required": ["stop_after"] } }
-      ],
       "properties": {
         "body": { "type": "string", "minLength": 1 },
-        "max_iterations": { "type": "integer", "minimum": 1 },
+        "max_iterations": {
+          "anyOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "null" }
+          ],
+          "default": 1000
+        },
         "stop_after": { "type": "integer", "minimum": 1 },
         "stop_when": {
           "type": "object",
@@ -252,6 +279,15 @@
       },
       "additionalProperties": false
     },
+    "ioSpec": {
+      "type": "object",
+      "required": ["operation"],
+      "properties": {
+        "operation": { "enum": ["receive", "send"] },
+        "port": { "type": "string", "minLength": 1, "default": "default" }
+      },
+      "additionalProperties": false
+    },
     "scopedConfig": {
       "type": "object",
       "properties": {
@@ -294,7 +330,16 @@
             "properties": {
               "from": { "type": "string", "minLength": 1 },
               "to": { "type": "string", "minLength": 1 },
-              "when": { "type": "string" }
+              "when": { "type": "string" },
+              "schedule": { "type": "boolean" },
+              "transfer": { "type": "boolean" }
+            },
+            "not": {
+              "required": ["schedule", "transfer"],
+              "properties": {
+                "schedule": { "const": false },
+                "transfer": { "const": false }
+              }
             }
           }
         ]

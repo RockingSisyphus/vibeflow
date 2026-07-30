@@ -138,6 +138,7 @@ workspace 模式下，node registry 按 `roots` 顺序加载，但 Python node �
 {
   "global_config": {},
   "pipeline": {
+    "entry_mode": "sync",
     "inputs": [],
     "max_steps": 1000,
     "nodes": [],
@@ -156,6 +157,8 @@ workspace 模式下，node registry 按 `roots` 顺序加载，但 Python node �
 ```
 
 推荐长期项目使用标准结构。
+
+`pipeline.entry_mode` 允许 `sync | async`，缺省 `sync`。它主要决定 JS AOT 的公共入口：同步构建导出直接返回值的 `runWorkflow()`，异步构建导出 `runWorkflowAsync()`。需要 suspend Node/Capability、deferred/result_key、detached 或原生 `receive` 的 JS workflow 必须显式写 `async`，VibeFlow 不会自动升级入口。Python `runtime.run()` 保持阻塞返回和旧线程池兼容行为。
 
 无 workspace 配置时，旧的单 project 模式仍兼容在 pipeline config 顶层用 inline `module` / `class` 声明 `base_lib`、`plugins` 和 `policy`。新项目不建议继续使用 inline 资源写法；推荐在同目录或上级目录的 `registry.py` 注册可用资源，并在 config 中用 id 引用。
 
@@ -247,9 +250,9 @@ nodeset 也可以声明自己的 `global_config`。外部 nodeset JSONC 文件�
 
 `similar_to.node` 必须指向同一 pipeline 或同一 nodeset 内已存在的 node，不能指向自己；`relationship` 只允许 `variant` 或 `copy`；`reason` 必须非空。它只用于有意重复实现的健康检查豁免：A 指向 B、B 指向 A，或 A/B 共同指向同一个 base 时，会跳过对应 `GRAPH.SMELL.DUPLICATE_LOGIC` pair；未声明覆盖的重复 pair 仍会 warning。这个字段不改变编译、运行、拓扑、契约或 Mermaid 连边。
 
-Mermaid/SVG label 默认以可读性优先，使用纯文本分区展示：节点首行是 `display_name`，缺省时回退到注册类 `NODE_INFO.display_name` 或 `id`；随后显示 `id:`、`type_used:`，nodeset/loop 还会显示 `type_key:` / `body:`，再用 `---------- meta ----------`、`---------- status ----------`、`---------- nodeset ----------` 等分区展示说明。`requires/provides` 不再塞进节点内；数据契约显示在连边 label 上，先显示 contract `display_name`，再显示 id/key/type 信息。长说明会确定性换行并在必要时截断。SVG 渲染使用更大的 node spacing、rank spacing、wrapping width 和 diagram padding，并在保持 `htmlLabels=false` 的前提下增强原生 SVG 文本：标题加粗、字段名前缀加粗、字段行左对齐、分区行加粗弱化。普通图和展开审查图都按可读优先生成。
+Mermaid/SVG label 默认以可读性优先，使用纯文本分区展示：节点首行是 `display_name`，缺省时回退到注册类 `NODE_INFO.display_name` 或 `id`；external implemented node 的首行增加 `[EXTERNAL]`；随后显示 `id:`、`type_used:`，nodeset/loop 还会显示 `type_key:` / `body:`。所有异步调用显示 `async:`，`result_key` 模式同时显示 `result_key:`，再用 `---------- meta ----------`、`---------- status ----------`、`---------- nodeset ----------` 等分区展示说明。`requires/provides` 不再塞进节点内；数据契约显示在连边 label 上，先显示 contract `display_name`，再显示 id/key/type 信息。长说明会确定性换行并在必要时截断。SVG 渲染使用更大的 node spacing、rank spacing、wrapping width 和 diagram padding，并在保持 `htmlLabels=false` 的前提下增强原生 SVG 文本：标题加粗，包含 `external:`、`async:`、`result_key:` 在内的字段名前缀加粗，字段行左对齐，分区行加粗弱化。普通图和展开审查图都按可读优先生成。
 
-自定义 `style` 会作为节点级样式覆盖系统 class 的 fill/stroke/text 颜色，包括 health error/warning、planned node、document、nodeset、loop、external dependency 等节点；节点形状、finding 注释和 planned 虚线等非颜色语义仍保留。自定义色仍不能使用 VibeFlow 系统保留色。
+自定义 `style` 会作为节点级样式覆盖系统 class 的 fill/stroke/text 颜色，包括 health error/warning、planned node、document、nodeset、loop、external dependency 等节点；节点形状、finding 注释、planned 虚线和 external 粗边框等非颜色语义仍保留。自定义色仍不能使用 VibeFlow 系统保留色。
 
 系统颜色是保留语义色，不能作为自定义 `style.fill`、`style.stroke` 或 `style.text` 使用；大小写不敏感。使用时 schema 会报 `CONFIG.SCHEMA.NODE_STYLE_RESERVED_COLOR`。
 
@@ -264,6 +267,8 @@ Mermaid/SVG label 默认以可读性优先，使用纯文本分区展示：节�
 | external dependency | `#e0f2fe` | `#0284c7` | `#0c4a6e` |
 | document node | `#f0fdf4` | `#16a34a` | `#14532d` |
 | nodeset node | `#ede9fe` | `#7c3aed` | `#3b0764` |
+
+implemented Python node 的 `NodeInfo.external=True` 会在原有 `flow_kind` 形状与颜色语义之上叠加 `externalBoundary`：标题确定性增加 `[EXTERNAL]`，节点保留 `external: true` 字段，并使用 `stroke-width:7px,vector-effect:non-scaling-stroke`。health 状态或调用点自定义 `style.stroke` 可以改变边框颜色，但不能取消粗边框。
 
 ## 严格 key/type 与 inbox 数据流
 
@@ -537,6 +542,12 @@ Health 会在显式 edge 中推断三类边：
 - `data_bypass`：显式旁路数据边，source 和 target 已经由同步主线连接；只投递数据，不触发 target。Mermaid/SVG 中虚线。
 - `async`：连接到 `async: "detached"` 或 `async: "result_key"` node / nodeset 调用的边；不进入同步主线。
 
+需要显式分离控制和数据时，对象 edge 可以写
+`{"from":"a","to":"b","schedule":false}` 表示只传数据，或写
+`{"from":"a","to":"b","transfer":false}` 表示只调度。省略的角色继续按
+mainline/data-bypass 规则推断；两者不能同时为 `false`。join/readiness 只看
+schedule edge，数据 inbox 只看 transfer edge。
+
 普通同步节点应处于从 start 到 end 的主线或 decision 主线变体中。非 decision 同步 fan-out 只有在分支通过 `join_policy: "all"` 明确汇合、被识别为 data bypass，或分支目标显式 async 时才是合法语义。否则会产生：
 
 - `GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT`
@@ -589,10 +600,13 @@ loop node 像普通 node 一样声明 `requires/provides`，并额外写顶层 `
 
 `carry` 把上一轮 body output 写回下一轮 body input；`collect` 把每轮 body output 追加成 list；`outputs` 决定 loop node 最终返回哪些 key。batch/epoch/遍历语义不要写成 `items` 或 `epochs`，而是在 body nodeset 内用 index/counter/batch selector 节点表达，并通过 `carry` 写回下一轮状态。
 
-退出条件必须二选一：
+退出条件可以不写、写一个或同时写两个：
 
-- `stop_after`：固定执行 N 轮，必须是 `>= 1` 的整数，且不能大于 `max_iterations`。
+- `stop_after`：固定执行 N 轮，必须是 `>= 1` 的整数。
 - `stop_when`：从 body output 或 loop state 读取 bool，例如 `{"from": "loop.done", "equals": true}`；缺失或非 bool 会在运行时报明确错误。
+- 同时声明时按 OR，任一条件先满足就退出。
+
+`max_iterations` 省略时默认 1000；正整数表示上限，写 `null` 表示无次数上限。`null` 且不写 stop 是显式永久循环，合法但会产生 warning。VibeFlow 不会强制 timeout、yield、取消路径或退出条件。有限 loop 没有 stop 时精确执行 `max_iterations` 轮并正常返回；有限 loop 有 stop 但上限耗尽时仍报超限错误。
 
 固定轮数循环：
 
@@ -617,11 +631,35 @@ loop node 像普通 node 一样声明 `requires/provides`，并额外写顶层 `
 }
 ```
 
-`vibeflow.loop.for_each`、`loop.items`、`loop.epochs`、`loop.until` 已移除。`max_iterations` 是 loop 的硬上限，超过会抛 runtime error。顶层 `runtime.step_count` 仍只统计顶层 node；包含 loop body 的总步数看 `runtime.total_step_count`，完整顺序看 `runtime.qualified_exec_order`。
+`vibeflow.loop.for_each`、`loop.items`、`loop.epochs`、`loop.until` 已移除。正整数 `max_iterations` 是 loop 的硬上限；`null` 则明确没有次数上限。顶层 `runtime.step_count` 仍只统计顶层 node；包含 loop body 的总步数看 `runtime.total_step_count`，完整顺序看 `runtime.qualified_exec_order`。
 
 `execution="block"` 和 `execution="compiled"` 会优先执行结构化 `LoopBlock`。loop body 可以包含同步 nested nodeset、嵌套 while、普通 DAG fan-out/merge 和现有 async helper 支持的节点。`execution="block"` 是严格模式，不能生成 block 时会在启动阶段报出 block compile reason；`execution="compiled"` 是性能模式，不能生成 block 的区域会回退到 plan runtime。
 
 Mermaid/SVG 中 while loop 使用独立 trapezoid (`trap-b`) 形状和默认 `loopNode` 系统样式，label 会显示 `body:`、`stop:`、`max:`。`loopNode` 默认颜色属于系统保留色，不允许作为自定义 `style` 颜色；如需改 loop 颜色，应写其他非保留 hex 色。
+
+## 原生 `vibeflow.io` 与 Port
+
+`vibeflow.io` 是内核节点，不需要在 Python registry 或 JS node descriptor 中注册：
+
+```jsonc
+{
+  "id": "receive",
+  "type_used": "vibeflow.io",
+  "provides": [{"key": "request", "type": "app.request"}],
+  "io": {"operation": "receive", "port": "requests"}
+}
+```
+
+```jsonc
+{
+  "id": "send",
+  "type_used": "vibeflow.io",
+  "requires": [{"type": "app.response", "cardinality": "exactly_one"}],
+  "io": {"operation": "send", "port": "responses"}
+}
+```
+
+`receive` 必须零输入、一个输出；JS 中固定为 suspend，只能用于异步入口。`send` 必须一个 `exactly_one` 输入、零输出；它表示提交到宿主队列后立即完成。需要远端回执时定义项目自己的 suspend Capability，不能改变核心 send 的完成语义。Python 宿主通过 `PipelineRuntime` 或 `run_checked` 的 `capabilities` 参数提供同步阻塞的 `vibeflow.port.receive/send`；JS 宿主通过 workflow options 或 Host Extension 提供。
 
 ## join_policy 与 safe OR join
 

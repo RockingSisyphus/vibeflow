@@ -1,0 +1,8 @@
+{
+  "roots": [
+    {
+      "id": "js-demo",
+      "path": "project"
+    }
+  ]
+}

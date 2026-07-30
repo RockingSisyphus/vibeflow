@@ -1,0 +1,50 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.override_join",
+  "display_name": "Join override siblings",
+  "category": "sandbox",
+  "description": "Waits for the overridden and default sibling results.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.math.result",
+        "cardinality": "exactly_one",
+        "display_name": "Overridden result"
+      },
+      {
+        "type": "sandbox.override.default",
+        "cardinality": "exactly_one",
+        "display_name": "Default result"
+      }
+    ],
+    "provides": [
+      {
+        "key": "joined_result",
+        "type": "sandbox.override.joined",
+        "display_name": "Joined overridden result"
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {
+      "joined_result": {
+        "type": "number"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/override_join.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": []
+}

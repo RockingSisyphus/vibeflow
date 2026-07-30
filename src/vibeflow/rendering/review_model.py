@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Mapping
 
-from vibeflow.graph_config import GraphConfig, LOOP_NODE_TYPES, LoopSpec, NodeSpec, NodesetSpec, STATUS_IMPLEMENTED, STATUS_PLANNED
+from vibeflow.graph_config import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, LoopSpec, NodeSpec, NodesetSpec, STATUS_IMPLEMENTED, STATUS_PLANNED
 from vibeflow.node import EFFECT_SCOPE_NONE, effective_effect_scope
 
 if TYPE_CHECKING:
@@ -18,7 +18,11 @@ EDGE_ROLE_ORDER = ("mainline", "data_bypass", "async", "schedule", "transfer")
 def loop_field_schema() -> dict[str, object]:
     return {
         "body": {"type": "string", "description": "Nodeset type_key executed once per iteration."},
-        "max_iterations": {"type": "integer", "minimum": 1, "default": LoopSpec().max_iterations},
+        "max_iterations": {
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "default": LoopSpec().max_iterations,
+        },
         "stop_after": {"type": "integer", "minimum": 1},
         "stop_when": {
             "type": "object",
@@ -97,6 +101,8 @@ def node_review_effect_scope(graph: GraphConfig, node: NodeSpec, registry: NodeR
 
     if node.status == STATUS_PLANNED or node.type_used in LOOP_NODE_TYPES or invocation_for_node(graph, node) is not None:
         return EFFECT_SCOPE_NONE
+    if node.type_used == IO_NODE_TYPE:
+        return "terminal"
     node_cls = registry_node_class(registry, node.type_used)
     return effective_effect_scope(getattr(node_cls, "NODE_INFO", None)) if node_cls is not None else EFFECT_SCOPE_NONE
 
@@ -126,6 +132,15 @@ def node_review_metadata(graph: GraphConfig, node: NodeSpec, registry: NodeRegis
         or str(getattr(nodeset, "description", "") or "")
         or str(getattr(info, "description", "") or "")
     )
+    if node.type_used == IO_NODE_TYPE:
+        display_name = node.metadata.display_name or (
+            "Receive from Port"
+            if node.io.operation == "receive"
+            else "Send to Port"
+        )
+        description = node.metadata.description or (
+            f"{node.io.operation} on host port '{node.io.port}'"
+        )
     return {
         "display_name": display_name,
         "description": description,

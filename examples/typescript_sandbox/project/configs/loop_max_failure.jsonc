@@ -1,0 +1,85 @@
+{
+  "nodeset_imports": [
+    {
+      "path": "nodesets/loop_until_body.jsonc"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.loop.value",
+        "display_name": "Loop value",
+        "required": true
+      }
+    ],
+    "max_steps": 20,
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts a loop that cannot converge before its bound."
+      },
+      {
+        "id": "loop",
+        "type_used": "vibeflow.loop.while",
+        "display_name": "Bounded failing loop",
+        "description": "Requires three increments but permits only two.",
+        "requires": [
+          {
+            "type": "sandbox.loop.value",
+            "cardinality": "exactly_one",
+            "display_name": "Loop value"
+          }
+        ],
+        "provides": [
+          {
+            "key": "result",
+            "type": "sandbox.loop.result",
+            "display_name": "Loop result"
+          }
+        ],
+        "loop": {
+          "body": "sandbox.loop_until_body",
+          "max_iterations": 2,
+          "stop_when": {
+            "from": "done",
+            "equals": true
+          },
+          "carry": [
+            {
+              "from": "sandbox.loop.value",
+              "as": "sandbox.loop.value",
+              "update": "next"
+            }
+          ],
+          "outputs": [
+            {
+              "from": "sandbox.loop.value",
+              "as": "result"
+            }
+          ]
+        }
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Must not run after the loop exceeds its bound."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "loop"},
+      {"from": "loop", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.loop.result",
+        "cardinality": "exactly_one",
+        "display_name": "Loop result",
+        "as": "result"
+      }
+    ]
+  }
+}

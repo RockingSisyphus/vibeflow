@@ -1,0 +1,113 @@
+"""JavaScript/TypeScript ahead-of-time workflow generation.
+
+This package is intentionally separate from the Python runtime.  Its public
+entrypoints consume the language-neutral portable plan and produce ordinary
+ES modules that carry their own finite workflow runtime.
+"""
+
+from vibeflow.aot.builder import (
+    BUILD_MANIFEST_FORMAT,
+    WEB_APP_MARKER,
+    AotBuildError,
+    BuildRequest,
+    BuildResult,
+    build_aot,
+)
+from vibeflow.aot.emitter import EmittedWorkflow, emit_workflow_module
+from vibeflow.aot.model import (
+    ABI_VERSION,
+    AotPlanError,
+    CapabilityOperation,
+    CapabilityRequirement,
+    CapabilitySpec,
+    COMPLETIONS,
+    ConditionSpec,
+    ENTRY_MODES,
+    EXECUTORS,
+    ImplementationSpec,
+    InputSpec,
+    LoopCarry,
+    LoopCollect,
+    LoopOutput,
+    LoopSpec,
+    NodeSpec,
+    OutputSpec,
+    ProviderSpec,
+    RequirementSpec,
+    RouteSpec,
+    SCHEDULES,
+    TaskSpec,
+    WorkflowSpec,
+    normalize_workflow_plan,
+)
+from vibeflow.aot.project_build import (
+    PreparedProjectBuild,
+    ProjectBuildError,
+    ProjectBuildRequest,
+    ProjectBuildResult,
+    build_project_aot,
+    prepare_project_build,
+)
+from vibeflow.aot.schema import (
+    JAVASCRIPT_SAFE_INTEGER_MAX,
+    JavascriptJsonValueError,
+    PortableSchemaError,
+    validate_javascript_json_value,
+    validate_portable_json_schema,
+)
+from vibeflow.aot.toolchain import (
+    AotToolchainError,
+    DriverBuildResult,
+    ToolchainInfo,
+    probe_toolchain,
+)
+
+__all__ = [
+    "ABI_VERSION",
+    "BUILD_MANIFEST_FORMAT",
+    "WEB_APP_MARKER",
+    "AotBuildError",
+    "AotPlanError",
+    "AotToolchainError",
+    "BuildRequest",
+    "BuildResult",
+    "CapabilityOperation",
+    "CapabilityRequirement",
+    "CapabilitySpec",
+    "COMPLETIONS",
+    "ConditionSpec",
+    "ENTRY_MODES",
+    "EXECUTORS",
+    "DriverBuildResult",
+    "EmittedWorkflow",
+    "ImplementationSpec",
+    "InputSpec",
+    "JAVASCRIPT_SAFE_INTEGER_MAX",
+    "JavascriptJsonValueError",
+    "LoopCarry",
+    "LoopCollect",
+    "LoopOutput",
+    "LoopSpec",
+    "NodeSpec",
+    "OutputSpec",
+    "PreparedProjectBuild",
+    "ProjectBuildError",
+    "ProjectBuildRequest",
+    "ProjectBuildResult",
+    "ProviderSpec",
+    "PortableSchemaError",
+    "RequirementSpec",
+    "RouteSpec",
+    "SCHEDULES",
+    "TaskSpec",
+    "ToolchainInfo",
+    "WorkflowSpec",
+    "build_aot",
+    "build_project_aot",
+    "emit_workflow_module",
+    "normalize_workflow_plan",
+    "prepare_project_build",
+    "probe_toolchain",
+    "validate_javascript_json_value",
+    "validate_portable_json_schema",
+]

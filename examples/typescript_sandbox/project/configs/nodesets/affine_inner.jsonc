@@ -1,0 +1,79 @@
+{
+  "type_key": "sandbox.affine_inner",
+  "display_name": "Inner affine nodeset",
+  "description": "Applies a configurable affine transform in an inner block.",
+  "requires": [
+    {
+      "type": "sandbox.number",
+      "cardinality": "exactly_one",
+      "display_name": "Number"
+    }
+  ],
+  "provides": [
+    {
+      "key": "result",
+      "type": "sandbox.math.result",
+      "display_name": "Result"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Inner start",
+        "description": "Starts the inner configurable calculation."
+      },
+      {
+        "id": "math",
+        "type_used": "sandbox.math",
+        "display_name": "Affine transform",
+        "description": "Uses defaults unless a qualified call-site override is supplied.",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "result",
+            "type": "sandbox.math.result",
+            "display_name": "Result"
+          }
+        ],
+        "config": {
+          "scale": 2,
+          "offset": 1
+        }
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "Inner end",
+        "description": "Ends the inner configurable calculation."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "math"},
+      {"from": "math", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.math.result",
+        "cardinality": "exactly_one",
+        "display_name": "Result",
+        "as": "result"
+      }
+    ]
+  }
+}

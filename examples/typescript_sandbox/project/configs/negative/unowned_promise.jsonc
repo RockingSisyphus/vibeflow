@@ -1,0 +1,59 @@
+{
+  "pipeline": {
+    "entry_mode": "async",
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts the unowned Promise fixture."
+      },
+      {
+        "id": "invalid",
+        "type_used": "sandbox.invalid.unowned_promise",
+        "display_name": "Unowned Promise",
+        "description": "Must fail because Promise work is discarded instead of awaited or assigned to a TaskPlan.",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "result",
+            "type": "sandbox.math.result",
+            "display_name": "Result"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Ends the unowned Promise fixture."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "invalid"},
+      {"from": "invalid", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.math.result",
+        "cardinality": "exactly_one",
+        "display_name": "Result",
+        "as": "result"
+      }
+    ]
+  }
+}

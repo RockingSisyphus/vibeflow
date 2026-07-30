@@ -1,0 +1,58 @@
+{
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts the isolated undeclared base_lib fixture."
+      },
+      {
+        "id": "invalid",
+        "type_used": "sandbox.invalid.undeclared_base_lib",
+        "display_name": "Undeclared base_lib import",
+        "description": "Must fail because the imported base_lib is not in the node descriptor allowlist.",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "result",
+            "type": "sandbox.math.result",
+            "display_name": "Result"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Ends the isolated undeclared base_lib fixture."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "invalid"},
+      {"from": "invalid", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.math.result",
+        "cardinality": "exactly_one",
+        "display_name": "Result",
+        "as": "result"
+      }
+    ]
+  }
+}

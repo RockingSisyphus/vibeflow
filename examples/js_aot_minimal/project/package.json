@@ -1,0 +1,10 @@
+{
+  "name": "vibeflow-js-aot-minimal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "esbuild": "0.28.1",
+    "typescript": "7.0.2"
+  }
+}

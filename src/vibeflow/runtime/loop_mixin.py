@@ -71,16 +71,32 @@ class RuntimeLoopMixin:
         spec = frame.loop_spec
         values = _initial_loop_values(inputs, spec.carry)
         runtime = self._nodeset_runtime(frame)
-        for iteration in range(spec.max_iterations):
+        iteration = 0
+        while (
+            spec.max_iterations is None
+            or iteration < spec.max_iterations
+        ):
             initial = _loop_body_initial(values, spec.carry)
             iteration_path = (frame.name, f"iter_{iteration}")
             result = self._run_loop_body_iteration(frame, runtime, initial, iteration_path, iteration)
-            _update_loop_values(values, result, spec.carry, spec.collect)
+            _update_loop_values(
+                values,
+                result,
+                spec.carry,
+                spec.collect,
+                frame.subplan.graph.outputs,
+            )
             iteration_count = iteration + 1
             values["loop.iterations"] = iteration_count
             if _loop_should_stop(frame, values, iteration_count):
                 return _loop_outputs(frame, values)
-        raise PipelineRuntimeError(f"loop node '{frame.name}' exceeded max_iterations={spec.max_iterations}")
+            iteration += 1
+        if not spec.stop_after and not spec.stop_when.source:
+            return _loop_outputs(frame, values)
+        raise PipelineRuntimeError(
+            f"loop node '{frame.name}' exceeded "
+            f"max_iterations={spec.max_iterations}"
+        )
 
     def _run_loop_body_iteration(
         self,

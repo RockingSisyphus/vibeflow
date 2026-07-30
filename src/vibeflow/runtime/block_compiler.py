@@ -243,19 +243,20 @@ def _generated_graph_block_source(name: str, nodes: tuple[str, ...], instrumenta
             "            outputs = runtime._run_compiled_frame(frame, state)",
             "            last_node = current",
             "            steps += 1",
-            "            if runtime._is_end_terminal(current):",
-            "                runtime.trace.stop_reason = 'completed'",
-            "                return finish(current)",
             "            runtime._clear_conditional_outgoing(current, state)",
             "            active_edges = runtime._activated_edges(current, outputs, state)",
             "            active_pairs = {edge.pair for edge in active_edges}",
             "            for edge in active_edges:",
             "                runtime._activate_edge(edge, state)",
             "                runtime._deliver_outputs(edge, outputs, state)",
-            "                if edge.target not in queued:",
-            "                    ready.append(edge.target)",
-            "                    queued.add(edge.target)",
+            "            for target in runtime._scheduled_targets(current, active_edges):",
+            "                if target not in queued:",
+            "                    ready.append(target)",
+            "                    queued.add(target)",
             "            runtime._deliver_transfer_only_edges(current, outputs, state, active_pairs)",
+            "            if runtime._is_end_terminal(current):",
+            "                runtime.trace.stop_reason = 'completed'",
+            "                return finish(current)",
             "        runtime.trace.stop_reason = 'max_steps'",
             "        raise PipelineRuntimeError(f'pipeline exceeded max_steps={runtime._plan.max_steps}')",
             "    except Exception as exc:",
@@ -309,7 +310,10 @@ def _graph_block_compilable(plan: "ExecutionPlan") -> bool:
     if not plan.order:
         return False
     nodes_by_name = {node.name: node for node in plan.graph.nodes}
-    if explicit_flow_cycles(nodes_by_name, plan.graph.edges):
+    if explicit_flow_cycles(
+        nodes_by_name,
+        plan.compiled.resolved_schedule_edges,
+    ):
         return False
     for name in plan.order:
         frame = plan.frames[name]
@@ -377,7 +381,10 @@ def _graph_block_reason(plan: "ExecutionPlan") -> str:
     if not plan.order:
         return "empty_graph"
     nodes_by_name = {node.name: node for node in plan.graph.nodes}
-    cycles = explicit_flow_cycles(nodes_by_name, plan.graph.edges)
+    cycles = explicit_flow_cycles(
+        nodes_by_name,
+        plan.compiled.resolved_schedule_edges,
+    )
     if cycles:
         return "explicit_flow_cycle"
     for name in plan.order:

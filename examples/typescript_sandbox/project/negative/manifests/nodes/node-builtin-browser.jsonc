@@ -1,0 +1,45 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.invalid.node_builtin_browser",
+  "display_name": "Invalid browser Node builtin",
+  "category": "sandbox-negative",
+  "description": "Intentionally imports node:fs for a browser target.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.number",
+        "cardinality": "exactly_one",
+        "display_name": "Number"
+      }
+    ],
+    "provides": [
+      {
+        "key": "result",
+        "type": "sandbox.math.result",
+        "display_name": "Result"
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {
+      "result": {
+        "type": "number"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser"],
+      "source": {
+        "kind": "file",
+        "ref": "negative/nodes/node_builtin_browser.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": []
+}

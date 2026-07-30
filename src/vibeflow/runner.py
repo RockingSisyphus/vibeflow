@@ -50,6 +50,7 @@ def run_checked(
     run_root: str | Path | None = None,
     run_id: str | None = None,
     runtime_options: object | None = None,
+    capabilities: Mapping[str, object] | None = None,
     delegate_cli: bool = False,
 ) -> CheckedRunResult:
     path = Path(config_path)
@@ -105,6 +106,7 @@ def run_checked(
     _refuse_on_health_failure(health, run_dir, actual_run_id)
     context = _execute_runtime(
         graph, registry, plugin_registry, initial, run_dir, effective_runtime_options, resources,
+        capabilities=capabilities,
         delegate_cli=delegate_cli,
     )
     _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
@@ -372,6 +374,7 @@ def _execute_runtime(
     runtime_options: object | None,
     resources: ConfigResources,
     *,
+    capabilities: Mapping[str, object] | None = None,
     delegate_cli: bool = False,
 ):
     from vibeflow.runtime import PipelineRuntime
@@ -383,6 +386,7 @@ def _execute_runtime(
         run_dir=run_dir,
         global_config=resources.global_config,
         runtime_options=runtime_options,
+        capabilities=capabilities,
         delegate_cli=delegate_cli,
     )
     try:

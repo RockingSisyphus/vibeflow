@@ -1,0 +1,53 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.route",
+  "display_name": "Sign router",
+  "category": "sandbox",
+  "description": "Forwards a number and emits a boolean branch key.",
+  "version": "1.0.0",
+  "flow_kind": "decision",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.x",
+        "cardinality": "exactly_one",
+        "display_name": "X"
+      }
+    ],
+    "provides": [
+      {
+        "key": "forwarded",
+        "type": "sandbox.branch.forwarded",
+        "display_name": "Forwarded number"
+      },
+      {
+        "key": "positive",
+        "type": "sandbox.branch.positive",
+        "display_name": "Non-negative branch"
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {
+      "forwarded": {
+        "type": "number"
+      },
+      "positive": {
+        "type": "boolean"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/route.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": ["sandbox.math"],
+  "capabilities": []
+}

@@ -45,6 +45,13 @@ class FinalValueEndNode:
     def run_pure(self, inputs, params):
         return {}
 
+class ReviewJoinEndNode:
+    NODE_INFO = NodeInfo(type_key='sandbox.review_join_end', display_name='Review Join End', category='sandbox', description='Terminates the review fixture after the external result and every repeated worker result have joined.', version='0.1.0', flow_kind='terminal')
+    CONTRACT = NodeContract(requires=(REQ('value.final'), REQ('worker.a'), REQ('worker.b'), REQ('worker.c'), REQ('worker.d')), input_semantics={'value.final': ('external result',), 'worker.a': ('first repeated worker result',), 'worker.b': ('second repeated worker result',), 'worker.c': ('third repeated worker result',), 'worker.d': ('fourth repeated worker result',)}, examples=({'inputs': {'value.final': {'key': 'value.final', 'type': 'value.final', 'value': 15, 'source_node': 'example'}, 'worker.a': {'key': 'worker.a', 'type': 'worker.a', 'value': 42, 'source_node': 'example'}, 'worker.b': {'key': 'worker.b', 'type': 'worker.b', 'value': 101, 'source_node': 'example'}, 'worker.c': {'key': 'worker.c', 'type': 'worker.c', 'value': 202, 'source_node': 'example'}, 'worker.d': {'key': 'worker.d', 'type': 'worker.d', 'value': 42, 'source_node': 'example'}}, 'params': {}},))
+
+    def run_pure(self, inputs, params):
+        return {}
+
 class OutValueEndNode:
     NODE_INFO = NodeInfo(type_key='sandbox.out_value_end', display_name='计算结果结束', category='sandbox', description='当子流程或普通计算已经产出 value.out 后结束，用来验证 nodeset 内部也必须拥有清晰的开始和结束。', version='0.1.0', flow_kind='terminal')
     CONTRACT = NodeContract(requires=(REQ('value.out'),), input_semantics={'value.out': ('output numeric value',)}, examples=({'inputs': {'value.out': {'key': 'value.out', 'type': 'value.out', 'value': 1, 'source_node': 'example'}}, 'params': {}},))

@@ -24,6 +24,114 @@ PYTHONPATH=src python3 -m vibeflow quality-check --path .
 
 阅读 `quality-check` 结果时，先看每条 finding 的 `object_type:object_id` 和 source location，再看 `details`。文本输出会打印紧凑 `details:` 行；JSON 输出保留完整结构。重复函数、依赖环、双向依赖、跨目录/内部模块 import 等 warning 会在 details 中列出具体函数、import site、source/target module 和建议 public entry，优先改这些位置。
 
+## 可移植计划与 JS/TS AOT 维护边界
+
+跨语言链路以 `vibeflow.portable` 中的不可变、语言无关计划为边界：
+
+```text
+GraphConfig + CompiledGraph / ExecutionPlan
+  -> WorkflowPlan
+     -> BlockPlan
+        -> NodeCallPlan + RoutePlan + ConditionPlan + TaskPlan
+  -> JS/TS AOT 规范化与静态 JavaScript emitter
+  -> 普通 ESM / Web 构建产物
+```
+
+维护这条链路时必须保持：
+
+- `WorkflowPlan` / `BlockPlan` 只保存冻结的 JSON 值、稳定 ID、契约、路由、block 引用和 `SourceRef`，不得保存 Python class、callable、实例或生成后的 Python/JavaScript 源码。
+- 现有 Python runtime 仍使用 `ExecutionPlan`；其 `to_workflow_plan()` 是兼容投影。不要把“已经有可移植计划”描述成“Python runtime 已经改由 emitter 执行”，也不要复制一套与 Python 调度语义分叉的 AOT 图解释器。
+- node、`base_lib`、data schema、Capability 和 Host Extension 使用静态 JSONC descriptor 建模。已有 Python registry 通过兼容层转成 descriptor；静态 descriptor 与 Python 注册同时存在时必须做一致性检查。
+- JavaScript emitter 根据 `entry_mode` 输出同步 `runWorkflow()` 或异步 `runWorkflowAsync()`，不是把原始流程图或通用 graph walker 搬进目标环境。生成模块被 import 时不得执行业务 workflow 或启动扩展。
+- Capability descriptor 只定义依赖契约。实现由宿主在每次调用时注入或由 Host Extension 提供；调用状态、trace、任务和 Capability wrapper 不得保存在可变模块级业务状态中。
+- `completion`、`schedule`、`executor` 必须分开建模；同步 JS 计划不得包含 suspend/deferred/detached。TypeScript 源码审计负责拒绝声明不实和未归属 Promise，不增加运行时 thenable 兜底。
+- `max_iterations: null`、组合 stop 和无 stop 永久 loop 是公开语义；`vibeflow.io` 是内核节点，不应要求 Python registry 或 JS node descriptor。
+- Capability 的声明、Schema 检查和 import 审计不是安全沙箱。重试、回滚、并发安全和真实副作用仍由宿主实现负责。
+- TypeScript Compiler API 负责类型与源码依赖检查，esbuild 负责 bundling。不要把 bundler 专属结构泄漏进 `WorkflowPlan`、descriptor 或公开 Workflow ABI。
+
+当前 JS/TS AOT 支持范围、descriptor 字段、Workflow ABI 和构建 profile 以 `docs/js_aot_build.md` 为准；`docs/14_JS_TS节点与Web_AOT构建计划.md` 是设计记录，不能作为当前 API 的事实来源。
+
+## JS/TS AOT 验证
+
+修改 portable plan、descriptor loader/catalog、AOT Schema、emitter、构建器、Node 工具链驱动或其 package resources 时，至少运行相关单元测试：
+
+```bash
+PYTHONPATH=src python -m pytest -q \
+  tests/unit/test_aot_core.py \
+  tests/unit/test_strict_typescript_sandbox.py \
+  tests/unit/test/strict_aot_*.py
+```
+
+最小示例用于快速验证一条真实 descriptor → TypeScript → ESM 链路、三个 profile、Node 执行和确定性构建：
+
+```bash
+npm ci --prefix examples/js_aot_minimal/project
+PYTHONPATH=src python examples/js_aot_minimal/run_e2e.py --skip-browser
+```
+
+完整 TypeScript 沙箱覆盖 node/`base_lib` 数学组合、数据传递、schedule/transfer edge、分支与合流、nodeset、嵌套 override、有界/无界 loop、同步/异步 ABI、Port、Promise node、Capability、取消、trace、detached 清理、completion mismatch、隐藏 Promise、稳定错误码、非法 import、source map、确定性发布和三个 profile：
+
+```bash
+npm ci --prefix examples/typescript_sandbox/project
+npm ci --prefix tools/mermaid-renderer
+PYTHONPATH=src python examples/typescript_sandbox/run_all.py \
+  --puppeteer-root tools/mermaid-renderer
+```
+
+只在没有可用 Chromium/Puppeteer 时使用 `--skip-browser`。发布验收和 CI 不应跳过 browser 测试，因为 `web-app` 的“只注册入口、不自动调用 workflow”契约需要在真实浏览器中验证。
+
+AOT 改动的最低验收还包括：
+
+- Python integration sandbox 继续通过，证明原有 Python 项目和 `ExecutionPlan` 兼容链没有回归。
+- `esm-module`、`single-esm`、`web-app` 均由项目锁定的 TypeScript/esbuild 构建；VibeFlow 不替项目安装依赖或运行第三方 package scripts。
+- 重复调用、并发调用、预取消和执行中取消互不污染；缺失 Capability 在任何 node 执行前失败。
+- `single-esm` 没有隐式 companion JavaScript chunk，source map 能定位到原始 node 和 `base_lib`。
+- 同一输入、配置和 lockfile 的构建产物保持确定；失败构建不得发布半成品。
+
+## Wheel 与分发包验证
+
+AOT 的 `.mjs` 驱动和 runtime helper 是 Python package resources。修改打包配置、资源读取、CLI build 入口或发布模板时，不能只在源码树的 `PYTHONPATH=src` 环境中测试。
+
+先构建 wheel，并在隔离虚拟环境中确认资源和 CLI：
+
+```bash
+python -m pip install build
+VF_WHEEL_ROOT="$(mktemp -d)"
+python -m build --wheel --outdir "$VF_WHEEL_ROOT/dist"
+VF_WHEEL="$(find "$VF_WHEEL_ROOT/dist" -maxdepth 1 -name 'vibeflow-*.whl' -print -quit)"
+python -m venv "$VF_WHEEL_ROOT/venv"
+"$VF_WHEEL_ROOT/venv/bin/python" -m pip install "$VF_WHEEL"
+"$VF_WHEEL_ROOT/venv/bin/python" -c \
+  'from importlib.resources import files; root = files("vibeflow").joinpath("aot/resources"); assert root.joinpath("toolchain_driver.mjs").is_file(); assert root.joinpath("runtime_helpers.mjs").is_file()'
+"$VF_WHEEL_ROOT/venv/bin/vibeflow" --help
+```
+
+再通过根目录构建脚本生成临时分发包，并使用分发包自己的 `run.py` 和压缩内核执行真实 AOT smoke test：
+
+```bash
+VF_DIST_ROOT="$(mktemp -d)"
+python build_distribution.py --output "$VF_DIST_ROOT/distribution"
+python "$VF_DIST_ROOT/distribution/run.py" build \
+  --workspace examples/js_aot_minimal/vibeflow_config.jsonc \
+  --config examples/js_aot_minimal/project/configs/greeting.jsonc \
+  --target node \
+  --profile single-esm \
+  --out-dir "$VF_DIST_ROOT/aot"
+VF_ENTRY="$VF_DIST_ROOT/aot/index.js" node --input-type=module --eval '
+  const {pathToFileURL} = await import("node:url");
+  const workflow = await import(pathToFileURL(process.env.VF_ENTRY).href);
+  const value = await workflow.runWorkflowAsync(
+    {name: "  Release Smoke "},
+    {capabilities: {"example.clock": {now: async () => 123}}},
+  );
+  if (value.greeting !== "Hello, Release Smoke! (123)") {
+    throw new Error(JSON.stringify(value));
+  }
+'
+```
+
+临时 smoke test 通过后，正式更新仓库根目录的分发产物时运行 `python build_distribution.py`。不要手工编辑生成的 `vibeflow_distribution/`：用户文档源位于 `distribution/kernel_development_pack/docs/` 和 `docs/js_aot_build.md`，项目模板源位于 `distribution/kernel_development_pack/project_template/`，内核源位于 `src/vibeflow/`；构建脚本负责复制、封装并重写 `kernel/MANIFEST.sha256`。
+
 ## `review` 编排契约
 
 正式架构审核由统一命令编排，发布包入口和内核入口分别是：
@@ -133,3 +241,5 @@ PYTHONPATH=src python3 -m vibeflow quality-check --path . --check-side-effects
 - 不应重新添加只服务本仓库的 `quality-check --self` 分支；仓库专用排除项应通过通用路径扫描规则表达。
 - 示例、文档和测试变更也需要经过最终自检，避免维护性 warning 被带入主线。
 - 修改审核链路时应优先复用 architecture、workspace validate 和 canonical renderer 的公开内部能力；不要复制一套平行解析、验证或 Mermaid 渲染实现。
+- 修改跨语言语义时应先更新 portable plan 和共同 conformance fixture，再更新具体 emitter；不要只在 JavaScript 模板里修补语义。
+- 修改用户可见的 JS/TS 配置、ABI、错误码或构建行为时，应同步更新 `docs/js_aot_build.md`、相关示例和分发包测试；修改维护流程或长期边界时，再分别更新本文和 `docs/kernel_target_vision.md`。

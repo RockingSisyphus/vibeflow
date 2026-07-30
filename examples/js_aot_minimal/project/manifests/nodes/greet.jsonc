@@ -1,0 +1,57 @@
+{
+  "kind": "node",
+  "type_key": "example.greet",
+  "display_name": "Build greeting",
+  "category": "example",
+  "description": "Builds a greeting from a name and an injected clock.",
+  "version": "1.0.0",
+  "flow_kind": "terminal",
+  "contract": {
+    "requires": [
+      {
+        "type": "name.text",
+        "cardinality": "exactly_one",
+        "display_name": "Name"
+      }
+    ],
+    "provides": [
+      {
+        "key": "greeting",
+        "type": "greeting.text",
+        "display_name": "Greeting"
+      }
+    ],
+    "params_schema": {
+      "prefix": {
+        "type": "string"
+      }
+    },
+    "params_defaults": {
+      "prefix": "Hello"
+    },
+    "output_schema": {
+      "greeting": {
+        "type": "string"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "completion": "suspend",
+      "source": {
+        "kind": "file",
+        "ref": "nodes/greet.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": ["example.text"],
+  "capabilities": [
+    {
+      "id": "example.clock",
+      "operations": ["now"]
+    }
+  ]
+}

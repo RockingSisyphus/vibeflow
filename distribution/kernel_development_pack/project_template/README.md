@@ -1,6 +1,6 @@
 # VibeFlow 可复制开发包
 
-版本：0.6.0
+版本：0.7.0
 
 <!-- VIBEFLOW_DISTRIBUTION_GENERATED_AT -->
 
@@ -13,7 +13,22 @@
 
 修改后用 `python run.py review` 完成正式架构审核。任务判定、`复用 / 修改 / 删除 / 新增`清单和人类批准门见 `AGENTS.md`。
 
-业务 node、base_lib 和 plugin 分别放在 `project/nodes/`、`project/base_lib/` 和 `project/plugins/`，并在 `project/registry.py` 注册。每个 root 的 `vibeflow_project.jsonc` 声明 registry、quality、可选 runtime 参数和架构文档映射；根目录 `vibeflow_config.jsonc` 声明 workspace roots。
+VibeFlow 提供两条开发路径：
+
+- **Python Runtime**：Python node、base_lib 和 plugin 分别放在
+  `project/nodes/`、`project/base_lib/` 和 `project/plugins/`，并在
+  `project/registry.py` 注册；使用 `run`、`review` 和 `delegate-cli`。
+- **JavaScript/TypeScript AOT**：JS/TS node 与 base_lib 放在
+  `project/nodes/`、`project/base_lib/`，Host Extension 放在
+  `project/host_extensions/`，五类 JSONC descriptor 放在
+  `project/manifests/{nodes,base_lib,data,capabilities,host_extensions}/`，可选 Web 模板和应用
+  入口放在 `project/web/`；使用 `build` 生成普通 ESM 或网页。构建产物运行时
+  不需要 Python，也不需要 VibeFlow Runtime。
+
+根目录 `vibeflow_config.jsonc` 声明 workspace roots。每个 root 的
+`vibeflow_project.jsonc` 可按路径声明 Python `registry` 和 Runtime 选项，
+或声明 JS/TS `descriptors` 与 `javascript` 工具链；二者都可使用 quality 和
+架构文档配置。
 
 常用命令：
 
@@ -23,6 +38,7 @@ python run.py architecture --config project/configs/main.jsonc --output project/
 python run.py review --config project/configs/main.jsonc --output reports/graph.expanded.svg
 python run.py validate --config project/configs/main.jsonc
 python run.py run --config project/configs/main.jsonc --run-root runs
+python run.py build --config project/configs/<js-workflow>.jsonc --target browser --profile esm-module --out-dir dist
 python run.py delegate-cli --config project/configs/main.jsonc -- --input data.yaml --verbose
 python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
 python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
@@ -32,13 +48,33 @@ python run.py quality --path project
 python run.py verify-kernel
 ```
 
+JS/TS AOT 项目需要在 `project/vibeflow_project.jsonc` 的 `descriptors`
+字段登记 node、base_lib、Data Schema、Capability 和 Host Extension descriptor，并用
+`javascript.package_root` 指向本地 `package.json`、lockfile 和
+`node_modules`。项目自行安装并锁定 Node.js、TypeScript 与 esbuild；
+VibeFlow 不会执行 `npm install` 或第三方 package scripts。完整 descriptor、
+Node/Workflow ABI、同步/异步入口、Port、Capability、Host Extension、三种 profile 与 `web-app` 入口规则见
+`kernel/docs/11_JS_TS与Web_AOT构建指南.md`。分发包还提供可直接检查数学运算、
+数据传递、nodeset、loop、同步/异步 ABI、Port 和非法依赖的
+`examples/typescript_sandbox/`。基础验证运行：
+
+```powershell
+npm ci --prefix examples/typescript_sandbox/project
+python examples/typescript_sandbox/run_all.py --skip-browser
+```
+
+如需浏览器用例，再运行
+`npm ci --prefix kernel/tools/mermaid-renderer`，然后去掉
+`--skip-browser`。沙箱会直接从 `kernel/vibeflow-kernel.zip` 导入内核；分发
+构建不会安装依赖，`node_modules/`、`reports/` 和 `runs/` 不进入分发包。
+
 默认项目把 `project/configs/main.jsonc` 登记到 `project/ARCHITECTURE.jsonc`。这是带固定“生成且不可执行”头注释的单文件架构审查文档，不是 workflow config；AI 和开发者应先用它理解入口流程、nodeset 调用、节点职责、数据契约、资源和配置来源。架构变更必须落到真实 workflow config、相关 nodeset、registry metadata/config schema 或资源声明中。正式 `review` 会自动重新生成登记文档、执行正式 validate，并且只在 canonical expanded SVG 结构检查通过后发布 SVG；失败时不得用 mmdc、手写 SVG 或旧产物补位。
 
 CLI 让渡模式 / `delegate-cli` 用于把 workflow 当成普通业务 CLI。首个 `--` 可选地分隔 core 与业务参数；让渡 token 以 `cli.argv` 进入图，图以唯一 `cli.exit_code` 返回非 bool 整数 `0..255`。业务使用真实 stdin/stdout/stderr，VibeFlow 诊断只写当次 run 的 `vibeflow.log`。授权 `SystemExit(None)` 返回 0，合法整数原样返回；框架/未授权退出错误返回 1，已知 core 参数的 argparse 错误返回 2。详细终端/IO/授权规则见 `kernel/docs/07_启动命令与报告.md`。`run` 与 `review` 的原职责不变。
 
 副作用权限由内核派生：普通 implemented node 和 planned `python_stub` 是 `none`；`flow_kind=io` 是 `terminal`；`document` / `data_store` 是 `python_io`；任意 `external=True` node 和 plugin 是最高优先级 `trusted`。图形 `flow_kind=terminal` 仍是 `none`。effectful / external node 的 examples 只检查结构，不执行。
 
-## 读取真实运行结果
+## 读取 Python Runtime 真实运行结果
 
 自定义 adapter 或启动器调用 `run_workspace_checked(...)` / `run_checked(...)` 后，应从返回的 `CheckedRunResult.context` 读取真实 envelope：
 
@@ -48,7 +84,21 @@ value = result.context.get("response.value")["value"]
 
 `input_summary.json`、`output_summary.json` 和 trace 只保存脱敏摘要。其中的 `"scalar": true` 只表示原值是标量，不是业务布尔值 `True`，也无法区分 `True` 和 `False`。不要解析 `output_summary.json` 作为业务输出，也不要对摘要字典做 `bool(...)`。
 
-配置文件分两层：根目录 `vibeflow_config.jsonc` 只声明 workspace roots 和全局 policy；每个 root 的 `vibeflow_project.jsonc` 声明 registry、quality、可选 runtime 参数和 `architecture.documents`。可用的 node/base_lib/plugin 都在同一个 `project/registry.py` 里注册；每个 workflow config 用 id 声明本流程实际使用哪些 base_lib/plugin。单项目模板默认是：
+JS/TS AOT 不使用 `CheckedRunResult`：`entry_mode` 缺省 `sync`，宿主调用
+直接返回值的 `runWorkflow(inputs, options)`；显式异步 workflow 调用
+`await runWorkflowAsync(inputs, options)`。成功结果都是生成类型声明中定义的
+普通业务对象，同步失败直接抛错，异步失败 reject。单纯 import 不会自动执行
+workflow 或 Host Extension；Capability、trace 和 `AbortSignal` 通过每次调用
+的 `options` 注入，或由显式 `createWorkflowHost()` 管理。
+
+配置文件分两层：根目录 `vibeflow_config.jsonc` 只声明 workspace roots 和全局
+policy。Python Runtime root 的 `vibeflow_project.jsonc` 声明 registry、quality、
+可选 runtime 参数和 `architecture.documents`；可用的 Python
+node/base_lib/plugin 在 `project/registry.py` 注册，每个 workflow config 用
+id 声明本流程实际使用哪些 base_lib/plugin。JS/TS AOT root 改用
+`descriptors` 声明静态资源目录、用 `javascript` 声明工具链根和 external
+packages；它不要求为了构建 JS/TS node 而创建 Python registry。单项目模板
+默认是：
 
 ```jsonc
 {
@@ -71,7 +121,18 @@ value = result.context.get("response.value")["value"]
 }
 ```
 
-每个 root 下都需要自己的 `vibeflow_project.jsonc`。`registry` 相对所属 root 目录解析；`runtime.async_max_workers` 控制该 root 内每个 Runtime 自有线程池的并发数（默认 4），`runtime.async_flush_timeout` 控制 detached task 的收尾等待时间，`runtime.nodeset_max_depth` 控制普通 nodeset 与 loop body 的最大静态嵌套深度（默认 4）。`architecture.documents` 用 root-relative `workflow` / `document` 登记需要强制保持新鲜的架构文档。`build_base_lib_registry()` / `build_plugin_registry()` 中的 module 或文件路径也按该 root 解析。`quality.structure` 使用 warning/error 双阈值治理 root 代码布局，默认允许最多 120 个 `.py`，但单个代码目录超过 16 个 `.py` 会失败，用来推动 `nodes/`、`base_lib/`、`plugins/` 按功能拆分。pipeline config 不再声明 `policy`，但必须声明本 workflow 实际使用的资源：
+每个 root 下都需要自己的 `vibeflow_project.jsonc`。Python `registry` 和 AOT
+descriptor/source 路径都相对所属 root 解析。`runtime.async_max_workers` 控制
+该 root 内每个 Python Runtime 自有线程池的并发数（默认 4），
+`runtime.async_flush_timeout` 控制 detached task 的收尾等待时间，
+`runtime.nodeset_max_depth` 控制普通 nodeset 与 loop body 的最大静态嵌套深度
+（默认 4）。`architecture.documents` 用 root-relative `workflow` /
+`document` 登记需要强制保持新鲜的架构文档。Python
+`build_base_lib_registry()` / `build_plugin_registry()` 中的 module 或文件路径
+也按该 root 解析。`quality.structure` 使用 warning/error 双阈值治理 Python
+root 代码布局，默认允许最多 120 个 `.py`，但单个代码目录超过 16 个 `.py`
+会失败，用来推动 `nodes/`、`base_lib/`、`plugins/` 按功能拆分。Python
+pipeline config 不再声明 `policy`，但必须声明本 workflow 实际使用的资源：
 
 ```jsonc
 {
@@ -91,11 +152,11 @@ value = result.context.get("response.value")["value"]
 }
 ```
 
-`run` 会在 `runs/<run_id>/` 自动写出快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`。VibeFlow 命令内部使用 bundled Mermaid CLI 渲染 SVG；Mermaid CLI/mmdc 是实现细节，不是公开审核入口。普通单项 `svg` 命令保留图形导出/诊断参数，正式架构审核则使用参数固定的 `review`。
+`run` 会在 `runs/<run_id>/` 自动写出快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`。external implemented node 在原有形状上使用 `[EXTERNAL]` 标题和 `7px` non-scaling 粗边框。expanded SVG 只在同一父图内合并调用种类和 `type_key` 都相同的直接 nodeset 详情，父图调用点和连边不删除，不同父图分别展开。VibeFlow 命令内部使用 bundled Mermaid CLI 渲染 SVG；Mermaid CLI/mmdc 是实现细节，不是公开审核入口。普通单项 `svg` 命令保留图形导出/诊断参数，正式架构审核则使用参数固定的 `review`。
 
 `run` 还会在当次运行目录写出预期的 `architecture.jsonc` 供审计，但不会替你覆盖 root 中登记的 `project/ARCHITECTURE.jsonc`。
 
-注意：`python run.py mermaid --expand-nodesets --output reports/graph.expanded.mmd` 只导出 Mermaid 源码，供调试源码使用。不要把 `graph.expanded.mmd` 直接交给 Mermaid CLI/mmdc 转成 SVG；正式审核使用 `python run.py review --config ... --output ...`。
+注意：`python run.py mermaid --expand-nodesets --output reports/graph.expanded.mmd` 只导出 Mermaid 源码，供调试源码使用，仍按调用点展开且不做局部详情去重。不要把 `graph.expanded.mmd` 直接交给 Mermaid CLI/mmdc 转成 SVG；正式审核使用 `python run.py review --config ... --output ...`。
 
 如果要使用 `svg`，确保项目根目录存在 `kernel/tools/mermaid-renderer/`，并先执行：
 

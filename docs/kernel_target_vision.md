@@ -2,7 +2,7 @@
 
 ## 设计初衷
 
-VibeFlow（包名 `vibeflow`）服务于人机协同开发，尤其是大量依赖 LLM 编写、修改和维护代码的项目。它的目标不是让程序更容易随意扩展，而是把架构纪律变成可执行的硬约束。
+VibeFlow（包名 `vibeflow`）服务于人机协同开发，尤其是大量依赖 LLM 编写、修改和维护代码的项目。它把架构纪律转化为可执行的硬约束。
 
 LLM 长期参与开发时最容易出现的问题：
 
@@ -15,13 +15,13 @@ VibeFlow 要把这些风险前移到配置、契约、编译、健康检查和�
 
 ## 核心目标
 
-VibeFlow 是可迁移、可复用的严格标准流程图内核。业务开发者只写小型 node、纯 `base_lib` helper、必要插件和 JSONC 拓扑配置。
+VibeFlow 是可迁移、可复用的严格标准流程图内核。业务开发者只写小型 node、纯 `base_lib` helper、必要插件和 JSONC 拓扑配置。内核应先把同一份工作流编译成语言无关计划，再由目标后端执行或生成普通程序；目标环境不需要理解原始 VibeFlow 配置。
 
 核心原则：
 
 - node 必须足够小。
 - 普通 node 默认必须是无业务 IO 的纯函数；需要真实副作用时必须用可审计的 `flow_kind` / `external` 分类取得对应 `effect_scope`。
-- node 之间不允许 Python 层面的导入、调用或隐式耦合。
+- node 之间不允许通过 Python 或 JavaScript/TypeScript 源码直接导入、调用或形成隐式耦合。
 - 程序控制流只能由 config 中显式 `pipeline.edges` 声明。
 - `requires` / `provides` 是严格 key/type 数据契约，不是控制流推导来源。
 - 每个 node 必须声明标准流程图 `flow_kind`。
@@ -32,14 +32,19 @@ VibeFlow 是可迁移、可复用的严格标准流程图内核。业务开发�
 
 ## 术语
 
-- `node`：原子业务单元，通过 `run_pure(inputs, params) -> outputs` 执行；普通 node 为纯函数，显式 effect scope 可开放受控外部能力。
+- `node`：原子业务单元；Python 实现使用 `run_pure(inputs, params) -> outputs`，JS/TS AOT 实现导出 `run(inputs, params, context) -> outputs | Promise<outputs>`。普通 node 为纯函数，显式外部边界可开放受控能力。
 - `flow_kind`：标准流程图角色，决定 node 的架构语义和图形形状。
 - `effect_scope`：内核从 `flow_kind`、`external` 和实现类别确定的副作用检查档位；不是 config 中可自由声明的字段。
 - `nodeset`：由多个 node 或其他 nodeset 组成的复合拓扑单元。
 - `pipeline`：最终可运行拓扑，由 JSONC 配置声明 node、nodeset 和显式 flow edge。
 - `key`：Context / run result 中的唯一数据地址，用于输出 mapping、trace 和 provenance。
 - `type`：可重复的逻辑数据类型，下游按 `type` 消费，运行时通过 envelope 暴露实际来源 key。
-- `base_lib`：受控纯函数基础库，可被 node 依赖，但必须接受健康检查。
+- `base_lib`：受控纯函数基础库，可按 target 提供 Python 或 JS/TS 实现并被 node 显式依赖，但必须接受健康检查和依赖图检查。
+- `descriptor`：node、`base_lib`、data schema 或 Capability 的静态 JSONC 资源描述；记录稳定 ID、契约、实现位置和 target，不通过执行 JS/TS 业务模块发现元数据。
+- `WorkflowPlan`：语言无关的完整工作流计划；只保存可移植值、契约、block 和 source reference，不持有 Python 对象或可执行源码。
+- `BlockPlan`：`WorkflowPlan` 中一个 workflow、nodeset 或 loop 的有限执行块，包含 `NodeCallPlan`、`RoutePlan`、标准化条件和输入输出。
+- `Capability`：宿主按单次 workflow 调用注入的通用能力契约；它不是具体宿主 adapter，也不是安全沙箱。
+- `emitter`：把可移植计划变成目标语言程序的后端。JavaScript emitter 生成 workflow 专用的静态 ESM 控制流。
 - `policy`：治理规则集合，决定哪些限制硬失败、哪些限制可降级。
 - `plugin`：扩展 policy、compile 或 runtime 的机制，不能隐式绕过绝对规则。
 
@@ -60,7 +65,7 @@ VibeFlow 是可迁移、可复用的严格标准流程图内核。业务开发�
 | `document` | 文档生成或文档结构 |
 | `preparation` | 准备 / 初始化 |
 
-`external_dependency` 不是流程图类型。第三方库或外部维护代码用 `NodeInfo.external=True` 标记；它不会改变图形形状、不会让 cycle 合法化，也不会自动成为 decision。
+`external_dependency` 不是流程图类型。第三方库或外部维护代码用 `NodeInfo.external=True` 标记；它不会改变 `flow_kind` 图形形状、不会让 cycle 合法化，也不会自动成为 decision。审查图会在原形状上叠加 `[EXTERNAL]` 标题前缀和 `7px` non-scaling 粗边框，使信任边界一眼可见。
 
 `flow_kind` 同时参与确定实现可用的 `effect_scope`，因此不能再把它描述成“只影响图形、不影响 IO 能力”。内核采用固定映射：
 
@@ -73,7 +78,7 @@ VibeFlow 是可迁移、可复用的严格标准流程图内核。业务开发�
 | plugin | `trusted` | 信任边界 |
 | planned `python_stub` | `none` | 无业务 IO |
 
-图形 `flow_kind=terminal` 与权限档位 `effect_scope=terminal` 没有对应关系：start/end 节点仍是 `none`；只有 `flow_kind=io` 取得 `terminal` 档位。`external=True` 不改变图形、decision、cycle、契约或 trace 规则，但会把实现检查切换到最高优先级 `trusted`，因此它确实是显式的 purity/IO 信任绕过，必须只用于真正外部维护或已审计实现。
+图形 `flow_kind=terminal` 与权限档位 `effect_scope=terminal` 没有对应关系：start/end 节点仍是 `none`；只有 `flow_kind=io` 取得 `terminal` 档位。`external=True` 不改变 `flow_kind` 形状、decision、cycle、契约或 trace 规则，只叠加明确的 external 视觉标识；它会把实现检查切换到最高优先级 `trusted`，因此确实是显式的 purity/IO 信任绕过，必须只用于真正外部维护或已审计实现。
 
 ## Node 元数据目标
 
@@ -100,7 +105,8 @@ NodeInfo(
 - decision route / `when` 规则
 - runtime trace
 
-但跳过普通 node 的源码质量、复杂度、导入链和副作用限制等对外部实现不合理的检查。其有效 `effect_scope` 是 `trusted`；这不是“安全”的同义词，而是项目明确承担信任责任。
+外部实现跳过普通 node 的源码质量、复杂度、导入链和副作用检查，其有效
+`effect_scope` 为 `trusted`，表示项目承担该实现的信任责任。
 
 ## 显式 Flow Edge
 
@@ -161,6 +167,48 @@ NodeInfo(
 ```
 
 运行时不提供跨多跳全局黑板读取。入口输入只进入入口节点 inbox；node 输出会作为 envelope 沿实际激活的直接 outgoing edge 投递给下游。`exactly_one` / `optional_one` / `all` 由下游 require 的 `cardinality` 约束，最终 run result 只保留 `pipeline.outputs` 声明的 envelope 和 runtime 元数据。
+
+## 语言无关计划、Descriptor 与 AOT
+
+跨语言实现必须共享同一个语义边界：
+
+```text
+workflow config + registry / descriptor
+  -> graph compile 与 contract 校验
+  -> WorkflowPlan
+     -> BlockPlan(workflow / nodeset / loop)
+  -> Python 兼容执行链或目标语言 emitter
+```
+
+`WorkflowPlan` / `BlockPlan` 必须是确定、不可变、可序列化的中间表示。它们可以包含稳定 ID、JSON 值、输入输出、cardinality、路由、标准化条件、合流、`completion`/`schedule`/`executor`、TaskPlan、有限或永久 loop、IO、block 引用和 `SourceRef`，但不能包含 Python class、callable、实例、任意 Python 对象或 emitter 已生成的源码。bundler、HTML 模板和 package manager 也不属于这层模型。
+
+当前已经落地的基线是：
+
+- `vibeflow.portable` 可以从 `GraphConfig` + `CompiledGraph` 构建 `WorkflowPlan`，也可以把现有 Python `ExecutionPlan` 投影成不携带 Python binding 的计划。
+- 静态 catalog 可以加载 node、`base_lib`、data schema、Capability 和 JS/TS Host Extension descriptor；已有 Python registry 通过兼容层生成 descriptor，并在静态描述同时存在时做一致性检查。
+- JS/TS AOT 从可移植计划和 descriptor 选择 target 实现，经过 TypeScript 类型/依赖检查和 bundling，输出 `esm-module`、`single-esm` 或 `web-app`。
+- JavaScript emitter 按 `entry_mode` 生成流程专用的同步 `runWorkflow()` 或异步 `runWorkflowAsync()`，产物不读取原始 workflow，也不需要 Python 或浏览器端 VibeFlow runtime。
+- 每次调用独立持有输入、trace、错误、异步任务、取消状态和 Capability wrapper；模块 import 不自动运行 workflow 或 Host Extension。
+
+现有 Python Runtime 仍以 `ExecutionPlan` 执行；投影为 `WorkflowPlan` 不改变该事实。Python build-time policy/compiler plugin 也只服务 Python。新增跨后端能力时，先在 portable plan 和 conformance fixture 中定义共同语义，再实现目标 emitter。
+
+Descriptor 是资源和依赖事实来源，不是另一份可执行拓扑。静态读取必须无业务副作用；node 只能导入 workflow 启用的 `base_lib`，不能导入另一个 node；`base_lib` 不能反向依赖 node、runtime、plugin、registry 或 Capability bridge。JS/TS 的 source audit 与 bundling 后依赖图复核共同防止 alias、barrel 和 symlink 绕过边界。
+
+## Host Capability 与 Extension 边界
+
+Capability 用来把工作流逻辑与浏览器、Node、桌面容器或其他宿主能力分开。VibeFlow core 只定义稳定 ID、operation、completion、target 和输入输出 Schema，不提供具体业务宿主实现，也不保存全局宿主对象。节点必须在 descriptor 中声明所需 Capability 和 operation，宿主则在每次 workflow 调用时注入实现，或由显式启用的 Host Extension 提供。
+
+JS/TS AOT 当前应保证：
+
+- 构建期验证 Capability 描述、node 声明、operation 和 Schema 引用。
+- 调用开始、任何 node 执行前检查本次调用所需实现是否齐全。
+- operation 输入输出按 Schema 校验，异步调用获得本次 invocation 的 `AbortSignal`。
+- 每个 node 只看到自己声明的 Capability；`base_lib` 不得访问 Capability。
+- 连续调用和并发调用不共享可变 Capability wrapper 或业务状态。
+
+Capability 是通用 ABI 和可审计依赖边界。可信性、幂等性、回滚和并发安全由具体宿主实现负责。
+
+Host Extension 是 JS/TS AOT 的宿主生命周期边界。目标环境源码可注册或注销事件、提供 Capability 并维护本 host 的队列；VibeFlow 检查 descriptor、依赖、target 和 import，并由 `createWorkflowHost()` 显式 start/stop。
 
 ## Planned Architecture
 

@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import Mapping
 
 from vibeflow.compiler import GraphCompiler, GraphCompileError
-from vibeflow.graph_config import GraphConfig, LOOP_NODE_TYPES, STATUS_PLANNED
+from vibeflow.graph_config import (
+    GraphConfig,
+    IO_NODE_TYPE,
+    LOOP_NODE_TYPES,
+    STATUS_PLANNED,
+)
 from vibeflow.graph_config.nodeset_dependencies import (
     analyze_nodeset_dependencies,
     nodeset_dependency_cycles,
@@ -115,7 +120,7 @@ def _validate_node_types_in_scope(nodes, nodesets, *, registry: NodeRegistry, ow
     for node in nodes:
         if node.status == STATUS_PLANNED:
             continue
-        if node.type_used in LOOP_NODE_TYPES:
+        if node.type_used in LOOP_NODE_TYPES or node.type_used == IO_NODE_TYPE:
             continue
         if node.type_used in nodesets:
             continue

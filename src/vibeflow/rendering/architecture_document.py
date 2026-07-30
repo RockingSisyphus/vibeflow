@@ -6,7 +6,7 @@ from typing import Mapping
 
 from vibeflow.compiler import CompiledGraph
 from vibeflow.data_contract import providers_to_dicts, requirements_to_dicts
-from vibeflow.graph_config import GraphConfig, LOOP_NODE_TYPES, LoopSpec, NodeSpec, STATUS_PLANNED
+from vibeflow.graph_config import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, LoopSpec, NodeSpec, STATUS_PLANNED
 from vibeflow.graph_config.planned_behavior import effective_planned_behavior
 from vibeflow.node import EFFECT_SCOPE_NONE, EFFECT_SCOPE_TRUSTED, effective_effect_scope
 from vibeflow.rendering.helpers import compile_for_render
@@ -117,6 +117,7 @@ def _graph_body_document(
         "inputs": providers_to_dicts(graph.inputs),
         "outputs": requirements_to_dicts(graph.outputs),
         "max_steps": graph.max_steps,
+        "entry_mode": graph.entry_mode,
         "nodes": [_node_document(graph, compiled, node, registry=registry) for node in graph.nodes],
         "edges": [_edge_document(graph, compiled, edge) for edge in compiled.effective_edges],
     }
@@ -157,6 +158,7 @@ def _node_document(
         "join_policy": node.join_policy,
         "async": async_config,
         "loop": node.loop.to_dict() or None,
+        "io": node.io.to_dict() or None,
         "invokes": invokes,
         "config": {
             "call": _config_declaration(node.params, source=source),
@@ -209,6 +211,8 @@ def _node_type_document(
 ) -> dict[str, object]:
     if type_key in LOOP_NODE_TYPES:
         return _loop_node_type_document(type_key, roots=roots)
+    if type_key == IO_NODE_TYPE:
+        return _io_node_type_document(type_key)
     has_implemented_occurrence = any(node.status != STATUS_PLANNED for _, node in occurrences)
     node_cls = registry_node_class(registry, type_key) if has_implemented_occurrence else None
     if node_cls is None:
@@ -250,7 +254,7 @@ def _loop_node_type_document(type_key: str, *, roots: Mapping[str, str]) -> dict
         "info": {
             "display_name": "While Loop",
             "category": "control_flow",
-            "description": "Repeats one nodeset body with explicit termination, carried state, collected values, and exposed outputs.",
+            "description": "Repeats one nodeset body with optional termination, carried state, collected values, and exposed outputs; an unbounded loop is valid when max_iterations is null.",
             "version": "",
             "flow_kind": "predefined",
             "effect_scope": EFFECT_SCOPE_NONE,
@@ -280,7 +284,56 @@ def _loop_node_type_document(type_key: str, *, roots: Mapping[str, str]) -> dict
                 "stop_when.equals": True,
                 "collect[].mode": "all",
             },
-            "schema": {"node_field": "loop", "termination": "exactly_one_of(stop_after, stop_when)", "fields": field_schema},
+            "schema": {
+                "node_field": "loop",
+                "termination": "stop_after_or_stop_when_or_neither",
+                "combined_stop": "OR",
+                "fields": field_schema,
+            },
+        },
+    }
+
+
+def _io_node_type_document(type_key: str) -> dict[str, object]:
+    return {
+        "type_key": type_key,
+        "source": {
+            "kind": "kernel",
+            "runtime": {
+                "python": "vibeflow.runtime.node_mixin.RuntimeNodeMixin._run_io_node",
+                "javascript": "VibeFlow AOT static io emitter",
+            },
+        },
+        "info": {
+            "display_name": "VibeFlow Port IO",
+            "category": "io",
+            "description": (
+                "Receives from or sends to a host-provided vibeflow.port "
+                "Capability."
+            ),
+            "flow_kind": "io",
+            "effect_scope": "terminal",
+            "purity": "host_io",
+            "external": False,
+        },
+        "contract": {
+            "receive": {
+                "requires": 0,
+                "provides": 1,
+                "completion": "suspend",
+            },
+            "send": {
+                "requires": "one exactly_one",
+                "provides": 0,
+                "completion": "immediate",
+            },
+        },
+        "config": {
+            "schema": {
+                "node_field": "io",
+                "operations": ["receive", "send"],
+                "capability": "vibeflow.port",
+            }
         },
     }
 

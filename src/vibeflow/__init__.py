@@ -5,7 +5,26 @@ from vibeflow.architecture_report import build_architecture_report
 from vibeflow.config.loader import ConfigDocument, ConfigLoadError, load_config_document, strip_jsonc_comments
 from vibeflow.compiler import CompiledGraph, GraphCompileError, GraphCompiler
 from vibeflow.config.resources import BaseLibInfo, BaseLibRegistry, BaseLibResource, ConfigResources, PluginInfo, PluginResource, PluginResourceRegistry, load_config_resources
-from vibeflow.data_contract import DataEnvelope, DataProvider, DataRequirement, RunResult
+from vibeflow.data_contract import DataEnvelope, DataProvider, DataRequirement, PipelineInputSpec, PipelineOutputSpec, RunResult
+from vibeflow.descriptors import (
+    BaseLibCatalog,
+    BaseLibDescriptor,
+    CapabilityCatalog,
+    CapabilityDescriptor,
+    DataSchemaDescriptor,
+    DescriptorCatalogs,
+    DescriptorLoadError,
+    ImplementationDescriptor,
+    NodeCatalog,
+    NodeContractDescriptor,
+    NodeDescriptor,
+    SchemaRegistry,
+    SourceLocator,
+    adapt_base_lib_registry,
+    adapt_node_registry,
+    load_descriptor_catalogs,
+    load_project_descriptor_catalogs,
+)
 from vibeflow.runtime.block_compiler import explain_block_compilation
 from vibeflow.runtime.planning import CompiledBlock, ExecutionPlan, NodeFrame, build_execution_plan
 from vibeflow.graph_config import EdgeSpec, GraphConfig, NodeSpec, NodesetSpec, parse_graph_config
@@ -37,6 +56,7 @@ from vibeflow.registry import NodeRegistry, NodeRegistryError
 from vibeflow.resources import schema_text
 from vibeflow.runtime import PipelineRuntime, PipelineRuntimeError
 from vibeflow.runtime.options import HookPlan, RuntimeOptions
+from vibeflow.portable import BlockPlan, ConditionPlan, NodeCallPlan, PortablePlanError, RoutePlan, WorkflowPlan, build_workflow_plan
 from vibeflow.runner import CheckedRunError, CheckedRunResult, run_checked
 from vibeflow.workspace import (
     ArchitectureDocumentSpec,
@@ -57,6 +77,32 @@ from vibeflow.workspace import (
 
 __all__ = [
     "ArchitectureDocumentSpec",
+    "BaseLibCatalog",
+    "BaseLibDescriptor",
+    "BlockPlan",
+    "CapabilityCatalog",
+    "CapabilityDescriptor",
+    "ConditionPlan",
+    "DataSchemaDescriptor",
+    "DescriptorCatalogs",
+    "DescriptorLoadError",
+    "ImplementationDescriptor",
+    "NodeCatalog",
+    "NodeCallPlan",
+    "NodeContractDescriptor",
+    "NodeDescriptor",
+    "PipelineInputSpec",
+    "PipelineOutputSpec",
+    "PortablePlanError",
+    "RoutePlan",
+    "SchemaRegistry",
+    "SourceLocator",
+    "WorkflowPlan",
+    "adapt_base_lib_registry",
+    "adapt_node_registry",
+    "build_workflow_plan",
+    "load_descriptor_catalogs",
+    "load_project_descriptor_catalogs",
     "CompiledGraph",
     "CompiledBlock",
     "ConfigDocument",

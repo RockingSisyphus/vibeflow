@@ -1,0 +1,46 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.positive",
+  "display_name": "Positive branch",
+  "category": "sandbox",
+  "description": "Formats the selected non-negative branch value.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.branch.forwarded",
+        "cardinality": "exactly_one",
+        "display_name": "Forwarded number"
+      }
+    ],
+    "provides": [
+      {
+        "key": "positive_message",
+        "type": "sandbox.branch.message",
+        "display_name": "Positive message"
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {
+      "positive_message": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/positive.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": []
+}

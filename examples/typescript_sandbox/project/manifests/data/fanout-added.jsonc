@@ -1,0 +1,8 @@
+{
+  "kind": "data_schema",
+  "type_key": "sandbox.fanout.added",
+  "representation": "json",
+  "schema": {
+    "type": "number"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "kind": "capability",
+  "id": "sandbox.storage",
+  "targets": ["browser", "node"],
+  "operations": {
+    "read": {
+      "input_type": "sandbox.storage.read.request",
+      "output_type": "sandbox.storage.read.result",
+      "completion": "suspend"
+    }
+  }
+}

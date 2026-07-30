@@ -71,15 +71,51 @@ def analyze_mainline(graph: GraphConfig, edges: Sequence[EdgeSpec], flow_kinds: 
     async_edges = tuple(edge for edge in all_edges if edge.source in async_nodes or edge.target in async_nodes)
     sync_edges = tuple(edge for edge in all_edges if edge.source not in async_nodes and edge.target not in async_nodes)
 
-    data_bypass_edges = tuple(
+    inferred_data_bypass_edges = tuple(
         edge
         for edge in sync_edges
         if _is_data_bypass_candidate(edge, sync_edges, flow_kinds)
     )
-    data_bypass_pairs = {edge.pair for edge in data_bypass_edges}
-    mainline_edges = tuple(edge for edge in sync_edges if edge.pair not in data_bypass_pairs)
-    schedule_edges = (*mainline_edges, *async_edges)
-    transfer_edges = all_edges
+    inferred_data_bypass_pairs = {
+        edge.pair for edge in inferred_data_bypass_edges
+    }
+    inferred_schedule_pairs = {
+        edge.pair
+        for edge in all_edges
+        if edge in async_edges or edge.pair not in inferred_data_bypass_pairs
+    }
+    scheduled_sync_edges = tuple(
+        edge
+        for edge in sync_edges
+        if (
+            edge.schedule
+            if edge.schedule is not None
+            else edge.pair in inferred_schedule_pairs
+        )
+    )
+    scheduled_async_edges = tuple(
+        edge
+        for edge in async_edges
+        if (
+            edge.schedule
+            if edge.schedule is not None
+            else edge.pair in inferred_schedule_pairs
+        )
+    )
+    schedule_edges = (*scheduled_sync_edges, *scheduled_async_edges)
+    transfer_edges = tuple(
+        edge
+        for edge in all_edges
+        if (edge.transfer if edge.transfer is not None else True)
+    )
+    schedule_pairs = {edge.pair for edge in schedule_edges}
+    transfer_pairs = {edge.pair for edge in transfer_edges}
+    mainline_edges = scheduled_sync_edges
+    data_bypass_edges = tuple(
+        edge
+        for edge in sync_edges
+        if edge.pair not in schedule_pairs and edge.pair in transfer_pairs
+    )
     mainline_nodes = tuple(
         node.name
         for node in graph.nodes
@@ -319,10 +355,14 @@ def _finding(
     return MainlineFinding(rule_id=rule_id, source=edge.source, target=edge.target, message=why_invalid, details=details)
 
 
-def _edge_summary(edge: EdgeSpec) -> dict[str, str]:
-    payload = {"from": edge.source, "to": edge.target}
+def _edge_summary(edge: EdgeSpec) -> dict[str, object]:
+    payload: dict[str, object] = {"from": edge.source, "to": edge.target}
     if edge.when:
         payload["when"] = edge.when
+    if edge.schedule is not None:
+        payload["schedule"] = edge.schedule
+    if edge.transfer is not None:
+        payload["transfer"] = edge.transfer
     return payload
 
 

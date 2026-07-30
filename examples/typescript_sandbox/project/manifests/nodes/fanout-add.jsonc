@@ -1,0 +1,45 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.fanout_add",
+  "display_name": "Fanout add",
+  "category": "sandbox",
+  "description": "Adds one on the fanout's upper branch.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.x",
+        "cardinality": "exactly_one",
+        "display_name": "X"
+      }
+    ],
+    "provides": [
+      {
+        "key": "added_branch",
+        "type": "sandbox.fanout.added",
+        "display_name": "Added branch"
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {
+      "added_branch": {
+        "type": "number"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/fanout_add.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": ["sandbox.math"],
+  "capabilities": []
+}

@@ -1,0 +1,18 @@
+{
+  "kind": "base_lib",
+  "id": "example.text",
+  "display_name": "Text helpers",
+  "description": "Pure text normalization helpers.",
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "base_lib/text.ts"
+      }
+    }
+  ],
+  "dependencies": [],
+  "external_packages": []
+}

@@ -90,6 +90,7 @@ python run.py architecture --config project/configs/main.jsonc --output project/
 python run.py review --config project/configs/main.jsonc --output reports/graph.expanded.svg
 python run.py validate --config project/configs/main.jsonc
 python run.py run --config project/configs/main.jsonc --run-root runs
+python run.py build --workspace vibeflow_config.jsonc --config project/configs/<js-workflow>.jsonc --target browser --profile esm-module --out-dir dist
 python run.py delegate-cli --config project/configs/main.jsonc -- --input data.yaml --verbose
 python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
 python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
@@ -106,9 +107,9 @@ CLI delegation mode / `delegate-cli` exposes a workflow as an ordinary business 
 
 The same root config can set `runtime.async_max_workers` (default 4), `runtime.async_flush_timeout` (default `null`), and `runtime.nodeset_max_depth` (default 4). Each Runtime owns its thread pool; ordinary nodeset calls and `loop.body` share the static depth limit, while loop iteration count does not increase it. Worker count and nodeset depth have no CLI flags.
 
-The `svg` command internally passes an expanded render config to the bundled Mermaid CLI. Mermaid CLI/mmdc is a kernel implementation detail, not a public review entry point. Normal graphs default to `maxTextSize=200000`; `--expand-nodesets` defaults to `maxTextSize=500000`. Very large graphs can override this with `--mermaid-max-text-size` and `--mermaid-max-edges`.
-Expanded SVG exports always use the deterministic `review-columns` composer: the main pipeline stays on the left, followed by plugins, base_lib, and expanded nodesets in top-level call order. Nodeset details use a recursive detail-panel layout: leaf nodesets render horizontally; parents with child nodesets keep collapsed call-sites and original edges, with direct child nodesets stacked to the right in call order.
-`graph.expanded.mmd` is a Mermaid source debug artifact only. Do not render it directly with Mermaid CLI/mmdc. Formal architecture review must use `run.py review`; `run.py svg --expand-nodesets` remains a single-artifact export or diagnostic entry point.
+The `svg` command internally passes an expanded render config to the bundled Mermaid CLI. Mermaid CLI/mmdc is a kernel implementation detail, not a public review entry point. Normal graphs default to `maxTextSize=200000`; `--expand-nodesets` defaults to `maxTextSize=500000`. Very large graphs can override this with `--mermaid-max-text-size` and `--mermaid-max-edges`. An implemented Python node with `external=True` keeps its `flow_kind` shape, gains a deterministic `[EXTERNAL]` title prefix, and receives a `7px` non-scaling boundary. Health or custom styles may override the boundary color, but cannot remove its width.
+Expanded SVG exports always use the deterministic `review-columns` composer: the main pipeline stays on the left, followed by the workflow's plugins, base_lib, and expanded nodesets. Nodeset details use a recursive detail-panel layout: leaf nodesets render horizontally, while parents retain every collapsed call-site and original edge. Within each parent pipeline or nodeset, direct calls retain first-occurrence order; repeated calls with the same invocation kind and `type_key` share one detail panel whose title summarizes the call count, call IDs, and compact differences. Ordinary nodeset calls and loop bodies never merge, and the same definition still expands separately under different parents.
+`graph.expanded.mmd` is a Mermaid source debug artifact only. It remains expanded per call-site and does not use the local detail deduplication described above. Do not render it directly with Mermaid CLI/mmdc. Formal architecture review must use `run.py review`; `run.py svg --expand-nodesets` remains a single-artifact export or diagnostic entry point.
 SVG rendering does not require Google Chrome to be preinstalled. After a normal `npm install`, VibeFlow first uses Puppeteer's installed/cached browser. `/snap/bin/chromium` is skipped because it commonly fails under Puppeteer/mermaid-cli with profile-lock launch errors.
 
 ## AI Development Workflow 🛠️
@@ -164,6 +165,12 @@ Program control flow comes only from `pipeline.edges` in JSONC config.
 
 `requires` / `provides` are data contracts, not hidden control-flow inference. This keeps multi-round AI edits from creating implicit paths and invisible dependencies.
 
+Health classifies explicit edges as synchronous mainline, data bypass, or
+async. When control and data must be separated explicitly, an object edge may
+set `schedule: false` (transfer only) or `transfer: false` (schedule only).
+Omitted roles retain the existing inference, and both roles cannot be false.
+Join/readiness uses schedule edges; node inbox delivery uses transfer edges.
+
 Data contracts use strict structured fields: `provides` declares a unique `key` and logical `type`, while `requires` consumes by `type` plus `cardinality`. Runtime passes envelopes through node inboxes and edge payloads; nodes cannot read early upstream outputs through a multi-hop global Context, and final results keep only `pipeline.outputs`.
 
 ### Small Nodes And Explicit Effects
@@ -206,6 +213,7 @@ Humans can review the system shape, and AI tools get a clearer project map.
 
 - `docs/kernel_target_vision.md`: vision.
 - `docs/developer_guide.md`: user development guide.
+- [JavaScript/TypeScript node and Web AOT build guide](docs/js_aot_build.md).
 - `docs/kernel_development_guide.md`: VibeFlow maintenance guide.
 - `docs/strict_flowchart_kernel_redesign.md`, `docs/11_*.md`, `docs/12_*.md`, `docs/13_*.md`: historical design records and staged plans, not the current public API.
 - `distribution/kernel_development_pack/`: release package template.

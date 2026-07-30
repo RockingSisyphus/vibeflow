@@ -1,0 +1,108 @@
+{
+  "type_key": "sandbox.loop_until_body",
+  "display_name": "Loop until body",
+  "description": "Increments the loop carry and reports whether it reached the target.",
+  "requires": [
+    {
+      "type": "sandbox.loop.value",
+      "cardinality": "exactly_one",
+      "display_name": "Loop value"
+    }
+  ],
+  "provides": [
+    {
+      "key": "next",
+      "type": "sandbox.loop.next",
+      "display_name": "Next value"
+    },
+    {
+      "key": "done",
+      "type": "sandbox.loop.done",
+      "display_name": "Done"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "sandbox.loop.value",
+        "type": "sandbox.loop.value",
+        "display_name": "Loop value",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Loop body start",
+        "description": "Starts one stop-when loop iteration."
+      },
+      {
+        "id": "increment",
+        "type_used": "sandbox.loop_increment",
+        "display_name": "Increment",
+        "description": "Adds one to the carried loop value.",
+        "requires": [
+          {
+            "type": "sandbox.loop.value",
+            "cardinality": "exactly_one",
+            "display_name": "Loop value"
+          }
+        ],
+        "provides": [
+          {
+            "key": "next",
+            "type": "sandbox.loop.next",
+            "display_name": "Next value"
+          }
+        ]
+      },
+      {
+        "id": "done",
+        "type_used": "sandbox.loop_done",
+        "display_name": "Check target",
+        "description": "Stops once the incremented value reaches four.",
+        "requires": [
+          {
+            "type": "sandbox.loop.next",
+            "cardinality": "exactly_one",
+            "display_name": "Next value"
+          }
+        ],
+        "provides": [
+          {
+            "key": "done",
+            "type": "sandbox.loop.done",
+            "display_name": "Done"
+          }
+        ],
+        "target": 4
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "Loop body end",
+        "description": "Ends after the next value and stop condition are available."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "increment"},
+      {"from": "increment", "to": "done"},
+      {"from": "done", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.loop.next",
+        "cardinality": "exactly_one",
+        "display_name": "Next value",
+        "as": "next"
+      },
+      {
+        "type": "sandbox.loop.done",
+        "cardinality": "exactly_one",
+        "display_name": "Done",
+        "as": "done"
+      }
+    ]
+  }
+}

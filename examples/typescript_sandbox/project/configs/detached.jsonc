@@ -1,0 +1,74 @@
+{
+  "pipeline": {
+    "entry_mode": "async",
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts a main calculation and detached audit task."
+      },
+      {
+        "id": "audit",
+        "type_used": "sandbox.detached_audit",
+        "display_name": "Audit asynchronously",
+        "description": "Runs independently but is cleaned up before the call returns.",
+        "async": "detached",
+        "config": {
+          "label": "detached-complete"
+        }
+      },
+      {
+        "id": "calculate",
+        "type_used": "sandbox.math",
+        "display_name": "Preserve input",
+        "description": "Keeps a synchronous business result on the main path.",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "result",
+            "type": "sandbox.math.result",
+            "display_name": "Result"
+          }
+        ],
+        "config": {
+          "scale": 1,
+          "offset": 0
+        }
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Ends after the main calculation is available."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "audit"},
+      {"from": "start", "to": "calculate"},
+      {"from": "calculate", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.math.result",
+        "cardinality": "exactly_one",
+        "display_name": "Result",
+        "as": "result"
+      }
+    ]
+  }
+}

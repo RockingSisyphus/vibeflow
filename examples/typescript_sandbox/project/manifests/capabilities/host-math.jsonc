@@ -1,0 +1,12 @@
+{
+  "kind": "capability",
+  "id": "sandbox.host_math",
+  "targets": ["browser", "node"],
+  "operations": {
+    "double": {
+      "input_type": "sandbox.number",
+      "output_type": "sandbox.math.result",
+      "completion": "immediate"
+    }
+  }
+}

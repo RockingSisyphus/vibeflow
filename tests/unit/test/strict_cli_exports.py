@@ -1,6 +1,22 @@
 from tests.unit.strict_support import *
 
 
+class CliExternalNode:
+    NODE_INFO = NodeInfo(
+        type_key="test.cli_external",
+        display_name="CLI External",
+        category="test",
+        description="Exercises workspace registry metadata during CLI export.",
+        version="0.1.0",
+        flow_kind="process",
+        external=True,
+    )
+    CONTRACT = NodeContract()
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
 def _write_export_config(path: Path) -> None:
     path.write_text(
         json.dumps(
@@ -220,6 +236,60 @@ def test_cli_export_svg_collapsed_default_uses_default_renderer(tmp_path, monkey
     assert code == 0
     assert calls and calls[0].startswith("flowchart TD")
     assert output_path.read_text(encoding="utf-8") == "<svg>default</svg>"
+
+
+def test_cli_workspace_mermaid_and_collapsed_svg_keep_external_registry_metadata(tmp_path, monkeypatch, capsys) -> None:
+    import vibeflow.cli.export as export_module
+    import vibeflow.rendering.mermaid.render as mermaid_render_module
+
+    registry = NodeRegistry()
+    register_node(registry, "test.cli_external", CliExternalNode)
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [_node_call("external", "test.cli_external", "Calls an external implementation.")],
+                "edges": [],
+            }
+        }
+    )
+    compiled = GraphCompiler().compile(graph, registry=registry)
+    monkeypatch.setattr(
+        export_module,
+        "_workspace_graph_or_report",
+        lambda args, validate_health=False: (graph, compiled, registry, None),
+    )
+
+    workspace_path = tmp_path / "vibeflow_config.jsonc"
+    config_path = tmp_path / "workflow.jsonc"
+    assert cli_main(["export-mermaid", "--workspace", str(workspace_path), "--config", str(config_path)]) == 0
+    mermaid = capsys.readouterr().out
+    assert "[EXTERNAL] External" in mermaid
+    assert "class external externalDependency;" in mermaid
+    assert "class external externalBoundary;" in mermaid
+    assert "external: true" in mermaid
+
+    rendered: list[str] = []
+
+    def fake_default_svg(mermaid_text, output, **kwargs):
+        rendered.append(mermaid_text)
+        Path(output).write_text("<svg>external</svg>", encoding="utf-8")
+
+    monkeypatch.setattr(mermaid_render_module, "render_mermaid_svg", fake_default_svg)
+    output_path = tmp_path / "graph.svg"
+    assert cli_main(
+        [
+            "export-svg",
+            "--workspace",
+            str(workspace_path),
+            "--config",
+            str(config_path),
+            "--output",
+            str(output_path),
+        ]
+    ) == 0
+    assert rendered
+    assert "[EXTERNAL] External" in rendered[0]
+    assert "class external externalBoundary;" in rendered[0]
 
 
 def test_ascii_flowchart_distinguishes_standard_shapes() -> None:

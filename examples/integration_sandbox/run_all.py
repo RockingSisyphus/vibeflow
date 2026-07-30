@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,6 +39,7 @@ DELEGATE_CONFIG_PATH = CONFIG_DIR / "pass_delegate_cli.jsonc"
 DELEGATE_INPUT_PATH = PROJECT_DIR / "data" / "delegate_input.yaml"
 NUMERIC_PATHLIB_CONFIG_PATH = CONFIG_DIR / "pass_delegate_cli_numeric_pathlib.jsonc"
 NUMERIC_STREAMS_CONFIG_PATH = CONFIG_DIR / "pass_delegate_cli_numeric_streams.jsonc"
+EXTERNAL_DEDUP_REVIEW_CONFIG_PATH = CONFIG_DIR / "review_external_nodeset_dedup.jsonc"
 
 
 class SandboxBatch:
@@ -90,11 +92,32 @@ COMPILED_SOURCE_FAST_FORBIDDEN = ("_run_node(",)
 
 
 VALID_RUN_CASES = [
-    {"name": "linear", "config": "pass_linear.jsonc", "initial": {}, "expected_status": {"PASS", "CONCERNS"}, "expected_outputs": {"value.final": 14}},
+    {
+        "name": "linear",
+        "config": "pass_linear.jsonc",
+        "initial": {},
+        "expected_status": {"PASS", "CONCERNS"},
+        "expected_outputs": {"value.final": 14},
+        "expected_portable_execution": {
+            "start": ["immediate", "inline", "current"],
+            "seed": ["immediate", "inline", "current"],
+            "add": ["immediate", "inline", "current"],
+            "multiply": ["immediate", "inline", "current"],
+            "end": ["immediate", "inline", "current"],
+        },
+        "expected_portable_tasks": [],
+    },
     {"name": "free_nodes", "config": "pass_free_nodes.jsonc", "initial": {}, "expected_status": {"PASS", "CONCERNS"}},
     {"name": "nodeset_simple", "config": "pass_nodeset_simple.jsonc", "initial": {"value.in": 1}, "expected_outputs": {"value.out": 6}},
     {"name": "nodeset_nested", "config": "pass_nodeset_nested.jsonc", "initial": {"value.in": 1}, "expected_outputs": {"value.final": 11}},
     {"name": "io_data_store", "config": "pass_io_data_store.jsonc", "initial": {"io.result": 20}},
+    {
+        "name": "port_math",
+        "config": "pass_port_math.jsonc",
+        "initial": {},
+        "port_math": True,
+        "expected_outputs": {"value.final": 21},
+    },
     {"name": "plugins", "config": "pass_plugins.jsonc", "initial": {"io.result": 20}},
     {"name": "comprehensive_flowchart", "config": "pass_comprehensive_flowchart.jsonc", "initial": {"value.in": 3}, "expected_outputs": {"io.output": "final=13;request=13"}},
     {
@@ -681,6 +704,18 @@ VALID_RUN_CASES = [
         "expected_outputs": {"value.out": 12},
         "expected_trace_kind_counts": {"async_result": 1, "async_result_join": 1},
         "expected_runtime_exec_order": ["start", "seed", "add", "end"],
+        "expected_portable_execution": {
+            "seed": ["immediate", "deferred", "thread"],
+            "add": ["immediate", "inline", "current"],
+        },
+        "expected_portable_tasks": [
+            {
+                "node_id": "seed",
+                "schedule": "deferred",
+                "executor": "thread",
+                "result_key": "value.in",
+            }
+        ],
     },
     {
         "name": "semantic_async_result_key_unconsumed",
@@ -743,6 +778,18 @@ VALID_RUN_CASES = [
         "expected_outputs": {"value.out": 10},
         "expected_trace_kind_counts": {"async_detached": 1, "async_detached_done": 1},
         "expected_runtime_exec_order": ["start", "seed", "metrics", "add", "end"],
+        "expected_portable_execution": {
+            "metrics": ["immediate", "detached", "thread"],
+            "seed": ["immediate", "inline", "current"],
+        },
+        "expected_portable_tasks": [
+            {
+                "node_id": "metrics",
+                "schedule": "detached",
+                "executor": "thread",
+                "result_key": "",
+            }
+        ],
     },
     {
         "name": "mainline_async_nodeset_side_task",
@@ -826,6 +873,11 @@ INVALID_CASES = [
     {"kind": "base_lib", "expect": "BASE_LIB.BANNED_IMPORT"},
     {"kind": "base_lib_chain", "expect_length_gt": 4},
     {"kind": "config", "config": "fail_schema_bad_edge.jsonc", "expect": "CONFIG.SCHEMA.EDGE_PAIR"},
+    {
+        "kind": "config",
+        "config": "fail_async_result_key_missing.jsonc",
+        "expect": "CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY",
+    },
     {"kind": "run", "config": "fail_unknown_node.jsonc", "expect": "NODE.TYPE.UNKNOWN"},
     {"kind": "config", "config": "fail_removed_loop_registration.jsonc", "expect": "CONFIG.LOOPS.REMOVED"},
     {"kind": "run", "config": "fail_nodeset_key_leak.jsonc", "expect": "NODESET.PROVIDES.UNKNOWN_KEY"},
@@ -864,7 +916,14 @@ def main() -> int:
     try:
         _prepare_environment()
         _reset_outputs()
-        results = [*_run_review_cases(), *_run_delegate_cli_cases(), *_run_valid_cases(), *_run_invalid_cases()]
+        results = [
+            *_run_review_cases(),
+            *_run_delegate_cli_cases(),
+            *_run_execution_model_cases(),
+            *_run_valid_cases(),
+            *_run_invalid_cases(),
+        ]
+        results.append(_run_published_diagram_audit_case(results))
         _write_reports(results)
     except EnvironmentError as exc:
         print(f"ENVIRONMENT ERROR: {exc}")
@@ -922,6 +981,7 @@ def _reset_outputs() -> None:
 def _run_review_cases() -> list[CaseResult]:
     cases = (
         ("review:registered_expanded", _run_registered_review_case),
+        ("review:external_nodeset_dedup_visual", _run_external_nodeset_dedup_review_case),
         ("review:unregistered_fail_closed", _run_unregistered_review_case),
     )
     results: list[CaseResult] = []
@@ -932,6 +992,108 @@ def _run_review_cases() -> list[CaseResult]:
             result = CaseResult(name, "FAIL", str(exc))
         results.append(result)
     return results
+
+
+def _run_published_diagram_audit_case(results: list[CaseResult]) -> CaseResult:
+    name = "audit:published_diagrams_health_gated"
+    try:
+        return _audit_published_diagrams(results)
+    except Exception as exc:
+        return CaseResult(name, "FAIL", str(exc))
+
+
+def _audit_published_diagrams(results: list[CaseResult]) -> CaseResult:
+    from vibeflow import is_mermaid_svg_renderer_available
+
+    valid_names = {str(case["name"]) for case in VALID_RUN_CASES}
+    success_run_names = {
+        *valid_names,
+        "delegate_cli",
+        "delegate_cli_numeric_pathlib",
+        "delegate_cli_numeric_streams",
+    }
+    success_run_svgs: set[Path] = set()
+    for run_name in sorted(success_run_names):
+        run_dir = RUN_ROOT / run_name
+        health_path = run_dir / "health_report.json"
+        if not health_path.is_file():
+            raise AssertionError(f"successful diagram run is missing health_report.json: {run_name}")
+        health = json.loads(health_path.read_text(encoding="utf-8"))
+        if health.get("status") not in {"PASS", "CONCERNS"} or health.get("errors"):
+            raise AssertionError(
+                f"successful diagram run has invalid health: {run_name} "
+                f"status={health.get('status')!r} errors={health.get('errors')!r}"
+            )
+        svg_path = run_dir / "graph.svg"
+        if is_mermaid_svg_renderer_available():
+            if not svg_path.is_file():
+                raise AssertionError(f"successful diagram run is missing graph.svg: {run_name}")
+            success_run_svgs.add(svg_path)
+
+    expected_error_run_names = {
+        f"expected_fail_{Path(str(case['config'])).stem}"
+        for case in INVALID_CASES
+        if case["kind"] == "run"
+    }
+    expected_error_run_names.update(
+        f"expected_runtime_fail_{Path(str(case['config'])).stem}"
+        for case in INVALID_CASES
+        if case["kind"] == "runtime_run"
+    )
+    actual_run_svgs = set(RUN_ROOT.glob("*/graph.svg"))
+    allowed_error_run_svgs = {RUN_ROOT / run_name / "graph.svg" for run_name in expected_error_run_names}
+    unexpected_run_svgs = actual_run_svgs - success_run_svgs - allowed_error_run_svgs
+    if unexpected_run_svgs:
+        raise AssertionError(
+            "run SVGs are not owned by a health-gated success or an explicit error-path case: "
+            f"{sorted(str(path.relative_to(SANDBOX_DIR)) for path in unexpected_run_svgs)}"
+        )
+
+    expected_report_svgs: set[Path] = {
+        REVIEW_DIR / "pass_nodeset_nested.expanded.svg",
+        REVIEW_DIR / "external_nodeset_dedup.expanded.svg",
+    }
+    if is_mermaid_svg_renderer_available():
+        for run_name in valid_names:
+            expected_report_svgs.add(SVG_DIR / f"{run_name}.svg")
+            expected_report_svgs.add(SVG_DIR / f"{run_name}.expanded.svg")
+    actual_report_svgs = set(REPORT_DIR.rglob("*.svg"))
+    if actual_report_svgs != expected_report_svgs:
+        raise AssertionError(
+            "published report SVG set does not match health-gated producers: "
+            f"unexpected={sorted(str(path.relative_to(SANDBOX_DIR)) for path in actual_report_svgs - expected_report_svgs)}, "
+            f"missing={sorted(str(path.relative_to(SANDBOX_DIR)) for path in expected_report_svgs - actual_report_svgs)}"
+        )
+
+    result_by_name = {result.name: result for result in results}
+    registered_review = result_by_name.get("review:registered_expanded")
+    registered_payload = registered_review.payload if registered_review is not None else None
+    if not isinstance(registered_payload, dict) or registered_payload.get("status") not in {"PASS", "CONCERNS"}:
+        raise AssertionError("registered review SVG does not have a successful validation result")
+    external_review = result_by_name.get("review:external_nodeset_dedup_visual")
+    external_payload = external_review.payload if external_review is not None else None
+    if not isinstance(external_payload, dict) or external_payload.get("health") != "PASS":
+        raise AssertionError("external/dedup review SVG does not have a strict PASS validation result")
+
+    for svg_path in sorted((*expected_report_svgs, *success_run_svgs)):
+        try:
+            root = ET.parse(svg_path).getroot()
+        except ET.ParseError as exc:
+            raise AssertionError(f"published success SVG is not valid XML: {svg_path}") from exc
+        if _xml_local_name(root.tag) != "svg":
+            raise AssertionError(f"published success diagram root is not svg: {svg_path}")
+
+    excluded_error_svgs = actual_run_svgs & allowed_error_run_svgs
+    return CaseResult(
+        "audit:published_diagrams_health_gated",
+        "PASS",
+        payload={
+            "report_svgs": len(actual_report_svgs),
+            "successful_run_svgs": len(success_run_svgs),
+            "health_gated_success_runs": len(success_run_names),
+            "explicit_error_path_svgs_excluded": len(excluded_error_svgs),
+        },
+    )
 
 
 def _run_delegate_cli_cases() -> list[CaseResult]:
@@ -1354,12 +1516,115 @@ def _run_unregistered_review_case() -> CaseResult:
     )
 
 
+def _run_external_nodeset_dedup_review_case() -> CaseResult:
+    output_path = REVIEW_DIR / "external_nodeset_dedup.expanded.svg"
+    output_path.unlink(missing_ok=True)
+
+    validation = _run_validate_cli(EXTERNAL_DEDUP_REVIEW_CONFIG_PATH)
+    if validation.returncode != 0 or validation.stdout.strip() != "PASS":
+        raise AssertionError(
+            "review fixture must pass health validation before SVG export: "
+            f"returncode={validation.returncode}, stdout={validation.stdout!r}, stderr={validation.stderr!r}"
+        )
+
+    completed = _run_export_svg_cli(EXTERNAL_DEDUP_REVIEW_CONFIG_PATH, output_path)
+    if completed.returncode != 0:
+        raise AssertionError(
+            f"expanded SVG export returned {completed.returncode}: "
+            f"stdout={completed.stdout!r}, stderr={completed.stderr!r}"
+        )
+    root = ET.parse(output_path).getroot()
+    if root.attrib.get("aria-roledescription") != "flowchart-review-columns":
+        raise AssertionError("expanded SVG is missing the canonical review-columns marker")
+
+    svg_text = output_path.read_text(encoding="utf-8")
+    for marker in ("stroke-width:7px", "vector-effect:non-scaling-stroke"):
+        if marker not in svg_text:
+            raise AssertionError(f"expanded SVG is missing external boundary marker {marker!r}")
+
+    external_nodes = [
+        element
+        for element in root.iter()
+        if _xml_local_name(element.tag) == "g"
+        and "externalBoundary" in element.attrib.get("class", "").split()
+    ]
+    if len(external_nodes) != 1:
+        raise AssertionError(f"expected one externalBoundary node, got {len(external_nodes)}")
+    external_classes = set(external_nodes[0].attrib.get("class", "").split())
+    if "externalDependency" not in external_classes:
+        raise AssertionError(f"external node lost its color class: {sorted(external_classes)}")
+
+    text_elements = [
+        " ".join("".join(element.itertext()).split())
+        for element in root.iter()
+        if _xml_local_name(element.tag) == "text"
+    ]
+    visible_text = " ".join(text_elements)
+    for marker in (
+        "[EXTERNAL] External Boost",
+        "external: true",
+        "body: visual.reusable_worker",
+        "id: worker_a",
+        "id: worker_b",
+        "id: worker_c",
+        "id: worker_d",
+        "id: end",
+    ):
+        if marker not in visible_text:
+            raise AssertionError(f"expanded SVG is missing visible marker {marker!r}")
+
+    svg_ids = {element.attrib["id"] for element in root.iter() if "id" in element.attrib}
+    for worker_id in ("worker_a", "worker_b", "worker_c", "worker_d"):
+        expected_suffix = f"L_{worker_id}_n_end_0"
+        if not any(svg_id.endswith(expected_suffix) for svg_id in svg_ids):
+            raise AssertionError(f"expanded SVG is missing {worker_id}->end edge {expected_suffix!r}")
+
+    review_titles = [
+        " ".join("".join(element.itertext()).split())
+        for element in root.iter()
+        if _xml_local_name(element.tag) == "text"
+        and "review-title" in element.attrib.get("class", "").split()
+    ]
+    grouped_titles = [title for title in review_titles if "type_key: visual.reusable_worker" in title]
+    if len(grouped_titles) != 1:
+        raise AssertionError(f"expected one locally deduplicated worker detail, got {grouped_titles!r}")
+    grouped_title = grouped_titles[0]
+    for marker in (
+        "calls: 4",
+        "worker_a",
+        "worker_b{node_configs=1}",
+        "worker_c{node_configs=1}",
+        "+1",
+    ):
+        if marker not in grouped_title:
+            raise AssertionError(f"grouped detail title is missing {marker!r}: {grouped_title!r}")
+    if "101" in grouped_title or "202" in grouped_title:
+        raise AssertionError(f"grouped detail title leaked config values: {grouped_title!r}")
+
+    fragments = [
+        element
+        for element in root.iter()
+        if _xml_local_name(element.tag) == "g"
+        and "review-inline-fragment" in element.attrib.get("class", "").split()
+    ]
+    if len(fragments) != 2:
+        raise AssertionError(f"expected main graph plus one deduplicated detail fragment, got {len(fragments)}")
+
+    return CaseResult(
+        "review:external_nodeset_dedup_visual",
+        "PASS",
+        payload={
+            "health": validation.stdout.strip(),
+            "svg": str(output_path.relative_to(SANDBOX_DIR)),
+            "external_nodes": len(external_nodes),
+            "worker_calls": 4,
+            "worker_detail_fragments": len(grouped_titles),
+            "svg_fragments": len(fragments),
+        },
+    )
+
+
 def _run_review_cli(config_path: Path, output_path: Path) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
-    environment = os.environ.copy()
-    python_paths = [str(KERNEL_DIR), str(PROJECT_DIR)]
-    if environment.get("PYTHONPATH"):
-        python_paths.append(environment["PYTHONPATH"])
-    environment["PYTHONPATH"] = os.pathsep.join(python_paths)
     completed = subprocess.run(
         [
             sys.executable,
@@ -1374,7 +1639,7 @@ def _run_review_cli(config_path: Path, output_path: Path) -> tuple[subprocess.Co
             str(output_path),
         ],
         cwd=SANDBOX_DIR,
-        env=environment,
+        env=_sandbox_cli_environment(),
         capture_output=True,
         text=True,
         check=False,
@@ -1390,6 +1655,58 @@ def _run_review_cli(config_path: Path, output_path: Path) -> tuple[subprocess.Co
     return completed, payload
 
 
+def _run_export_svg_cli(config_path: Path, output_path: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "vibeflow",
+            "export-svg",
+            "--workspace",
+            str(WORKSPACE_PATH),
+            "--config",
+            str(config_path),
+            "--expand-nodesets",
+            "--output",
+            str(output_path),
+        ],
+        cwd=SANDBOX_DIR,
+        env=_sandbox_cli_environment(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _run_validate_cli(config_path: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "vibeflow",
+            "validate",
+            "--workspace",
+            str(WORKSPACE_PATH),
+            "--config",
+            str(config_path),
+        ],
+        cwd=SANDBOX_DIR,
+        env=_sandbox_cli_environment(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _sandbox_cli_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    python_paths = [str(KERNEL_DIR), str(PROJECT_DIR)]
+    if environment.get("PYTHONPATH"):
+        python_paths.append(environment["PYTHONPATH"])
+    environment["PYTHONPATH"] = os.pathsep.join(python_paths)
+    return environment
+
+
 def _xml_local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
@@ -1403,6 +1720,305 @@ def _run_valid_cases() -> list[CaseResult]:
             result = CaseResult(f"valid:{case['name']}", "FAIL", str(exc))
         results.append(result)
     return results
+
+
+def _run_execution_model_cases() -> list[CaseResult]:
+    cases = (
+        (
+            "execution:python-sync-vs-result-key-thread",
+            _run_python_sync_async_thread_case,
+        ),
+        (
+            "execution:python-thread-pool-boundaries",
+            _run_python_thread_pool_boundary_case,
+        ),
+    )
+    results: list[CaseResult] = []
+    for name, runner in cases:
+        try:
+            result = runner()
+        except Exception as exc:
+            result = CaseResult(name, "FAIL", str(exc))
+        results.append(result)
+    return results
+
+
+def _thread_probe_graph(*, async_mode: bool):
+    from vibeflow import parse_graph_config
+
+    probe: dict[str, Any] = {
+        "id": "probe",
+        "type_used": "sandbox.thread_probe",
+        "display_name": "Thread probe",
+        "description": "Reports the Python thread used to execute this node.",
+        "provides": [
+            {
+                "key": "thread.name",
+                "type": "thread.name",
+                "display_name": "Thread name",
+            }
+        ],
+    }
+    if async_mode:
+        probe.update(
+            {
+                "async": "result_key",
+                "result_key": "thread.name",
+            }
+        )
+    return parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {
+                        "id": "start",
+                        "type_used": "sandbox.thread_start",
+                        "display_name": "Thread probe start",
+                        "description": "Starts the thread execution fixture.",
+                    },
+                    probe,
+                    {
+                        "id": "end",
+                        "type_used": "sandbox.thread_end",
+                        "display_name": "Thread probe end",
+                        "description": "Joins the thread probe result.",
+                        "requires": [
+                            {
+                                "type": "thread.name",
+                                "cardinality": "exactly_one",
+                                "display_name": "Thread name",
+                            }
+                        ],
+                        "provides": [
+                            {
+                                "key": "thread.result",
+                                "type": "thread.result",
+                                "display_name": "Thread result",
+                            }
+                        ],
+                    },
+                ],
+                "edges": [
+                    {"from": "start", "to": "probe"},
+                    {"from": "probe", "to": "end"},
+                ],
+                "outputs": [
+                    {
+                        "type": "thread.result",
+                        "cardinality": "exactly_one",
+                        "display_name": "Thread result",
+                    }
+                ],
+            }
+        }
+    )
+
+
+def _thread_probe_registry():
+    from vibeflow import (
+        DataProvider,
+        DataRequirement,
+        NodeContract,
+        NodeInfo,
+        NodeRegistry,
+    )
+
+    class ThreadProbeNode:
+        NODE_INFO = NodeInfo(
+            type_key="sandbox.thread_probe",
+            display_name="Thread probe",
+            category="sandbox",
+            description="Reports the current Python thread.",
+            version="0.1.0",
+            flow_kind="process",
+        )
+        CONTRACT = NodeContract(
+            provides=(DataProvider("thread.name", "thread.name"),),
+            output_schema={"thread.name": {"type": "string"}},
+        )
+
+        def run_pure(self, inputs, params):
+            del inputs, params
+            return {"thread.name": threading.current_thread().name}
+
+    class ThreadStartNode:
+        NODE_INFO = NodeInfo(
+            type_key="sandbox.thread_start",
+            display_name="Thread probe start",
+            category="sandbox",
+            description="Starts the thread execution fixture.",
+            version="0.1.0",
+            flow_kind="terminal",
+        )
+        CONTRACT = NodeContract()
+
+        def run_pure(self, inputs, params):
+            del inputs, params
+            return {}
+
+    class ThreadEndNode:
+        NODE_INFO = NodeInfo(
+            type_key="sandbox.thread_end",
+            display_name="Thread probe end",
+            category="sandbox",
+            description="Ends after joining a thread probe result.",
+            version="0.1.0",
+            flow_kind="terminal",
+        )
+        CONTRACT = NodeContract(
+            requires=(DataRequirement("thread.name", "exactly_one"),),
+            provides=(DataProvider("thread.result", "thread.result"),),
+            output_schema={"thread.result": {"type": "string"}},
+        )
+
+        def run_pure(self, inputs, params):
+            del params
+            return {"thread.result": inputs["thread.name"]["value"]}
+
+    registry = NodeRegistry()
+    registry.register(
+        "sandbox.thread_start",
+        ThreadStartNode,
+        config_schema={},
+        config_defaults={},
+    )
+    registry.register(
+        "sandbox.thread_probe",
+        ThreadProbeNode,
+        config_schema={},
+        config_defaults={},
+    )
+    registry.register(
+        "sandbox.thread_end",
+        ThreadEndNode,
+        config_schema={},
+        config_defaults={},
+    )
+    return registry
+
+
+def _run_python_sync_async_thread_case() -> CaseResult:
+    from vibeflow import PipelineRuntime, RuntimeOptions
+
+    registry = _thread_probe_registry()
+    main_thread = threading.current_thread().name
+    sync_context = PipelineRuntime(
+        _thread_probe_graph(async_mode=False),
+        registry=registry,
+        runtime_options=RuntimeOptions(trace="full"),
+    ).run({})
+    async_context = PipelineRuntime(
+        _thread_probe_graph(async_mode=True),
+        registry=registry,
+        runtime_options=RuntimeOptions(trace="full", async_max_workers=2),
+    ).run({})
+    sync_thread = _context_value(sync_context, "thread.result")
+    async_thread = _context_value(async_context, "thread.result")
+    if sync_thread != main_thread:
+        raise AssertionError(
+            f"sync node ran on {sync_thread!r}, expected {main_thread!r}"
+        )
+    if async_thread == main_thread:
+        raise AssertionError(
+            "result_key node did not leave the current Python thread"
+        )
+    if async_context.get("runtime.stop_reason") != "completed":
+        raise AssertionError(async_context.to_dict())
+    return CaseResult(
+        "execution:python-sync-vs-result-key-thread",
+        "PASS",
+        payload={
+            "main_thread": main_thread,
+            "sync_thread": sync_thread,
+            "async_thread": async_thread,
+            "runtime_run_blocked_until_join": True,
+        },
+    )
+
+
+def _run_python_thread_pool_boundary_case() -> CaseResult:
+    from vibeflow import PipelineRuntime, RuntimeOptions
+
+    registry = _thread_probe_registry()
+    graph = _thread_probe_graph(async_mode=False)
+    concurrent_runtime = PipelineRuntime(
+        graph,
+        registry=registry,
+        runtime_options=RuntimeOptions(async_max_workers=3),
+    )
+    barrier = threading.Barrier(4)
+
+    def concurrent_task() -> str:
+        barrier.wait(timeout=2)
+        return threading.current_thread().name
+
+    try:
+        executor = concurrent_runtime._executor_for_async()
+        futures = [executor.submit(concurrent_task) for _ in range(3)]
+        barrier.wait(timeout=2)
+        worker_names = [future.result(timeout=2) for future in futures]
+    finally:
+        concurrent_runtime._shutdown_executor()
+    if len(set(worker_names)) != 3:
+        raise AssertionError(
+            f"expected three concurrent workers, got {worker_names!r}"
+        )
+
+    queued_runtime = PipelineRuntime(
+        graph,
+        registry=registry,
+        runtime_options=RuntimeOptions(async_max_workers=1),
+    )
+    blocker_started = threading.Event()
+    release_blocker = threading.Event()
+    queued_started = threading.Event()
+
+    def blocker() -> str:
+        blocker_started.set()
+        if not release_blocker.wait(timeout=2):
+            raise TimeoutError("worker release timed out")
+        return "blocker"
+
+    def queued() -> str:
+        queued_started.set()
+        return "queued"
+
+    try:
+        executor = queued_runtime._executor_for_async()
+        blocker_future = executor.submit(blocker)
+        if not blocker_started.wait(timeout=2):
+            raise AssertionError("single worker did not start")
+        queued_future = executor.submit(queued)
+        if queued_started.wait(timeout=0.05):
+            raise AssertionError("queued task ignored async_max_workers=1")
+        release_blocker.set()
+        if blocker_future.result(timeout=2) != "blocker":
+            raise AssertionError("blocker returned an unexpected result")
+        if queued_future.result(timeout=2) != "queued":
+            raise AssertionError("queued task returned an unexpected result")
+    finally:
+        release_blocker.set()
+        queued_runtime._shutdown_executor()
+
+    rejected: list[object] = []
+    for value in (0, -1, True, 1.5):
+        try:
+            RuntimeOptions(async_max_workers=value)
+        except ValueError:
+            rejected.append(value)
+        else:
+            raise AssertionError(
+                f"invalid async_max_workers was accepted: {value!r}"
+            )
+    return CaseResult(
+        "execution:python-thread-pool-boundaries",
+        "PASS",
+        payload={
+            "concurrent_workers": worker_names,
+            "single_worker_queued": True,
+            "invalid_worker_limits_rejected": rejected,
+        },
+    )
 
 
 def _run_valid_case(case: dict[str, Any]) -> CaseResult:
@@ -1475,6 +2091,21 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     initial = case["initial_factory"]() if "initial_factory" in case else case.get("initial", {})
     hook_marker = REPORT_DIR / "plugin_hooks.jsonl"
     hook_count_before = len(hook_marker.read_text(encoding="utf-8").splitlines()) if hook_marker.exists() else 0
+    capabilities = None
+    sent_port_values: list[dict[str, Any]] = []
+    if case.get("port_math"):
+        capabilities = {
+            "vibeflow.port": {
+                "receive": lambda request: {
+                    "value": 5
+                    if request["port"] == "sandbox.math.in"
+                    else 0
+                },
+                "send": lambda request: sent_port_values.append(
+                    dict(request)
+                ),
+            }
+        }
     run_result = run_checked(
         config_path,
         registry=node_registry,
@@ -1483,6 +2114,7 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         run_root=RUN_ROOT,
         run_id=name,
         runtime_options=runtime_options,
+        capabilities=capabilities,
     )
     _assert_artifacts(run_result.run_dir)
     _assert_run_mermaid(case, run_result.run_dir)
@@ -1490,6 +2122,12 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         actual = _context_value(run_result.context, str(key))
         if actual != expected:
             raise AssertionError(f"{key} expected {expected!r}, got {actual!r}")
+    if case.get("port_math") and sent_port_values != [
+        {"port": "sandbox.math.out", "value": 21}
+    ]:
+        raise AssertionError(
+            f"port math send expected 21, got {sent_port_values!r}"
+        )
     for key in case.get("expected_absent_outputs", ()):
         if run_result.context.exists(str(key)):
             raise AssertionError(f"{key} should be absent, got {run_result.context.get(str(key))!r}")
@@ -1638,6 +2276,41 @@ def _mapping_contains(actual: Any, expected: Any) -> bool:
 
 
 def _assert_execution_plan(case: dict[str, Any], plan) -> None:
+    if (
+        "expected_portable_execution" in case
+        or "expected_portable_tasks" in case
+    ):
+        portable = plan.to_workflow_plan(
+            workflow_id=f"sandbox.{case['name']}"
+        )
+        block = portable.block(portable.entry_block)
+        nodes = {node.id: node for node in block.nodes}
+        for node_id, expected in dict(
+            case.get("expected_portable_execution", {})
+        ).items():
+            node = nodes[str(node_id)]
+            actual = [node.completion, node.schedule, node.executor]
+            if actual != list(expected):
+                raise AssertionError(
+                    f"portable execution {node_id} expected "
+                    f"{list(expected)!r}, got {actual!r}"
+                )
+        actual_tasks = [
+            {
+                "node_id": task.node_id,
+                "schedule": task.schedule,
+                "executor": task.executor,
+                "result_key": task.result_key,
+            }
+            for task in block.tasks
+        ]
+        if "expected_portable_tasks" in case:
+            expected_tasks = list(case["expected_portable_tasks"])
+            if actual_tasks != expected_tasks:
+                raise AssertionError(
+                    f"portable tasks expected {expected_tasks!r}, "
+                    f"got {actual_tasks!r}"
+                )
     for node_name, expected_params in dict(case.get("expected_plan_params", {})).items():
         params = plan.frame(str(node_name)).params
         for key, expected in expected_params.items():

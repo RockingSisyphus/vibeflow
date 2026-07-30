@@ -99,6 +99,7 @@ python run.py architecture --config project/configs/main.jsonc --output project/
 python run.py review --config project/configs/main.jsonc --output reports/graph.expanded.svg
 python run.py validate --config project/configs/main.jsonc
 python run.py run --config project/configs/main.jsonc --run-root runs
+python run.py build --workspace vibeflow_config.jsonc --config project/configs/<js-workflow>.jsonc --target browser --profile esm-module --out-dir dist
 python run.py delegate-cli --config project/configs/main.jsonc -- --input data.yaml --verbose
 python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
 python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
@@ -115,9 +116,9 @@ CLI 让渡模式 / `delegate-cli` 用于面向最终用户的普通业务 CLI。
 
 同一份 root 配置还可设置 `runtime.async_max_workers`（默认 4）、`runtime.async_flush_timeout`（默认 `null`）和 `runtime.nodeset_max_depth`（默认 4）。线程数控制每个 Runtime 的独立线程池；普通 nodeset 与 `loop.body` 共用深度限制，循环迭代次数不累计。线程数和深度不提供 CLI 参数。
 
-`run` 会在 `runs/<run_id>/` 自动写出当次 `architecture.jsonc`、快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`；它不会覆盖 root 中登记的文档。`svg` 命令内部会为 bundled Mermaid CLI 传入放大的渲染配置；Mermaid CLI/mmdc 是内核实现细节，不是公开的审核入口。普通图默认 `maxTextSize=200000`，`--expand-nodesets` 默认 `maxTextSize=500000`。
-展开 SVG 会固定使用确定性的 `review-columns` composer：主流程保持在左侧，右侧依次展示当前 workflow 实际启用的 plugins/base_lib 和按顶层调用顺序排列的展开 nodeset。nodeset 详情使用递归 detail-panel：叶子 nodeset 横向展示；包含子 nodeset 的父图保持 collapsed call-site 和原始连边，右侧按调用顺序纵向展示直接子 nodeset。审查图默认把单个片段显示宽度限制为 `3200px`，可用 `--review-fragment-max-width` 调整。
-`graph.expanded.mmd` 只是 Mermaid 源码调试产物，不要直接用 Mermaid CLI/mmdc 转成 SVG。正式架构审核必须使用 `run.py review`；`run.py svg --expand-nodesets` 只保留为单项导出或诊断入口。
+`run` 会在 `runs/<run_id>/` 自动写出当次 `architecture.jsonc`、快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`；它不会覆盖 root 中登记的文档。`svg` 命令内部会为 bundled Mermaid CLI 传入放大的渲染配置；Mermaid CLI/mmdc 是内核实现细节，不是公开的审核入口。普通图默认 `maxTextSize=200000`，`--expand-nodesets` 默认 `maxTextSize=500000`。implemented Python node 设置 `external=True` 后仍保留其 `flow_kind` 形状，标题增加 `[EXTERNAL]`，并叠加 `7px` non-scaling 粗边框；health 或自定义颜色可以覆盖边框颜色，但不能取消粗边框。
+展开 SVG 会固定使用确定性的 `review-columns` composer：主流程保持在左侧，右侧依次展示当前 workflow 实际启用的 plugins/base_lib 和展开 nodeset。nodeset 详情使用递归 detail-panel：叶子 nodeset 横向展示；包含子 nodeset 的父图保持全部 collapsed call-site 和原始连边。每个父 pipeline/nodeset 内，直接调用按首次出现顺序排列；调用种类与 `type_key` 都相同的重复调用只共享一份右侧详情，并在标题中汇总调用次数、调用 ID 和紧凑差异摘要。普通 nodeset 调用与 loop body 不混合；同一定义在不同父上下文仍分别展开。审查图默认把单个片段显示宽度限制为 `3200px`，可用 `--review-fragment-max-width` 调整。
+`graph.expanded.mmd` 只是 Mermaid 源码调试产物，仍按每个调用点展开，不应用上述局部详情去重；不要直接用 Mermaid CLI/mmdc 转成 SVG。正式架构审核必须使用 `run.py review`；`run.py svg --expand-nodesets` 只保留为单项导出或诊断入口。
 SVG 渲染不要求系统预装 Google Chrome；正常 `npm install` 后会优先使用 Puppeteer 自己安装/缓存的浏览器。`/snap/bin/chromium` 会被跳过，因为它在 Puppeteer/mermaid-cli 下常见 profile lock 启动失败。
 在发布包中首次使用 SVG 前，到 `kernel/tools/mermaid-renderer/` 执行 `npm install`。发布包不内置 `.gitignore`，项目可以自行决定是否忽略 `kernel/tools/mermaid-renderer/node_modules/`、`runs/`、`reports/` 等产物。
 
@@ -176,6 +177,8 @@ VibeFlow 的核心是一个严格的流程图运行时：普通 node 负责局�
 
 Health 会在显式 edge 中推断同步主线、data bypass 和 async 相关边：主线 edge 负责调度并在 SVG/Mermaid 加粗，data bypass 只投递数据不触发目标并显示虚线，async edge 连接显式 async node/nodeset。
 
+需要明确拆开控制与数据时，对象形式 edge 可写 `schedule: false`（只传数据）或 `transfer: false`（只调度）。省略字段继续使用原有推断；两个字段不能同时为 `false`。运行时 join/readiness 只看 schedule，数据 inbox 只看 transfer。
+
 配置调用点使用 `id` 和 `type_used`：`type_used` 指向 Python node 的 `NodeInfo.type_key`、独立 nodeset JSONC 的 `type_key` 或系统类型。数据契约使用严格结构化写法：`provides` 声明唯一 `key`、逻辑 `type` 和 `display_name`，`requires` 按 `type`、`cardinality` 和 `display_name` 消费。运行时通过 node inbox / edge payload 传递 envelope，不支持跨多跳从全局 Context 偷读早期输出；最终结果只保留 `pipeline.outputs` 声明的内容。
 
 ### 小 node 和显式副作用
@@ -219,6 +222,7 @@ VibeFlow 会在运行前检查：
 
 - `docs/kernel_target_vision.md`：目标愿景。
 - `docs/developer_guide.md`：使用者开发指南。
+- [JavaScript/TypeScript 节点与 Web AOT 构建指南](docs/js_aot_build.md)。
 - `docs/kernel_development_guide.md`：VibeFlow 自身维护指南。
 - `docs/strict_flowchart_kernel_redesign.md`、`docs/11_*.md`、`docs/12_*.md`、`docs/13_*.md`：历史设计记录和阶段计划，不作为当前公开接口规范。
 - `distribution/kernel_development_pack/`：发布包模板。

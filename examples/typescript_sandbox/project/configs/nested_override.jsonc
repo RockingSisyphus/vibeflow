@@ -1,0 +1,86 @@
+{
+  "nodeset_imports": [
+    {
+      "path": "nodesets/affine_inner.jsonc"
+    },
+    {
+      "path": "nodesets/affine_inner_default.jsonc"
+    },
+    {
+      "path": "nodesets/affine_outer.jsonc"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts the nested override workflow."
+      },
+      {
+        "id": "outer",
+        "type_used": "sandbox.affine_outer",
+        "display_name": "Run nested transform",
+        "description": "Overrides only the qualified inner math node.",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "joined_result",
+            "type": "sandbox.override.joined",
+            "display_name": "Overridden result"
+          },
+          {
+            "key": "default_result",
+            "type": "sandbox.override.default",
+            "display_name": "Default result"
+          }
+        ],
+        "node_configs": {
+          "inner.math": {
+            "scale": 3,
+            "offset": 4
+          }
+        }
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Ends after the nested transform."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "outer"},
+      {"from": "outer", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.override.joined",
+        "cardinality": "exactly_one",
+        "display_name": "Overridden result",
+        "as": "result"
+      },
+      {
+        "type": "sandbox.override.default",
+        "cardinality": "exactly_one",
+        "display_name": "Default result",
+        "as": "defaultResult"
+      }
+    ]
+  }
+}

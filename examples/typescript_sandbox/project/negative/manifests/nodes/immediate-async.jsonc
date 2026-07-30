@@ -1,0 +1,46 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.invalid.immediate_async",
+  "display_name": "Invalid immediate async implementation",
+  "category": "sandbox-negative",
+  "description": "Declares immediate completion but exports an async function.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.number",
+        "cardinality": "exactly_one",
+        "display_name": "Number"
+      }
+    ],
+    "provides": [
+      {
+        "key": "result",
+        "type": "sandbox.math.result",
+        "display_name": "Result"
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {
+      "result": {
+        "type": "number"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "completion": "immediate",
+      "source": {
+        "kind": "file",
+        "ref": "negative/nodes/immediate_async.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": []
+}

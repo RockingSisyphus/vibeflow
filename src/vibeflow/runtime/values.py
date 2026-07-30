@@ -55,9 +55,22 @@ def _loop_body_initial(values: Mapping[str, object], carry: tuple[object, ...]) 
         initial[target] = values[target]
     return initial
 
-def _update_loop_values(values: dict[str, object], result: RunResult, carry: tuple[object, ...], collect: tuple[object, ...]) -> None:
+def _update_loop_values(
+    values: dict[str, object],
+    result: RunResult,
+    carry: tuple[object, ...],
+    collect: tuple[object, ...],
+    pipeline_outputs: tuple[object, ...] = (),
+) -> None:
     for key, item in _iter_result_envelopes(result.to_dict(), prefix=""):
         values[key] = _result_value(item)
+    for output in pipeline_outputs:
+        public_name = str(getattr(output, "public_name"))
+        if not result.exists(public_name):
+            continue
+        value = _public_result_value(result.get(public_name))
+        values[public_name] = value
+        values[str(getattr(output, "type"))] = value
     for entry in carry:
         update = str(getattr(entry, "update"))
         target = str(getattr(entry, "target"))
@@ -85,17 +98,20 @@ def _loop_outputs(frame: object, values: Mapping[str, object]) -> dict[str, obje
 
 def _loop_should_stop(frame: NodeFrame, values: Mapping[str, object], iteration_count: int) -> bool:
     spec = frame.loop_spec
-    if spec.stop_after:
-        return iteration_count >= spec.stop_after
+    stop_after = bool(
+        spec.stop_after and iteration_count >= spec.stop_after
+    )
     source = spec.stop_when.source
     if not source:
-        raise PipelineRuntimeError(f"loop node '{frame.name}' has no stop_after or stop_when")
+        return stop_after
+    if stop_after:
+        return True
     if source not in values:
         raise PipelineRuntimeError(f"loop stop_when source '{source}' is not available from body outputs or loop state")
     value = values[source]
     if not isinstance(value, bool):
         raise PipelineRuntimeError(f"loop stop_when source '{source}' must be boolean, got {type(value).__name__}")
-    return value == spec.stop_when.equals
+    return stop_after or value == spec.stop_when.equals
 
 def _iter_input_items(inputs: Mapping[str, object]):
     for value in inputs.values():
@@ -125,3 +141,9 @@ def _result_value(item: object) -> object:
     if isinstance(item, Mapping) and {"key", "type", "value", "source_node"} <= set(item):
         return item.get("value")
     return item
+
+
+def _public_result_value(item: object) -> object:
+    if isinstance(item, list):
+        return [_result_value(value) for value in item]
+    return _result_value(item)

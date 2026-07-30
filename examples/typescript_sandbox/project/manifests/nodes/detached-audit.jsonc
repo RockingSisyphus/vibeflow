@@ -1,0 +1,42 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.detached_audit",
+  "display_name": "Detached audit",
+  "category": "sandbox",
+  "description": "Runs a host-supplied audit operation as a detached task.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [],
+    "provides": [],
+    "params_schema": {
+      "label": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "params_defaults": {
+      "label": "sandbox"
+    },
+    "output_schema": {}
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "completion": "suspend",
+      "source": {
+        "kind": "file",
+        "ref": "nodes/detached_audit.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": [
+    {
+      "id": "sandbox.audit",
+      "operations": ["record"]
+    }
+  ]
+}

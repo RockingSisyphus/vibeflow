@@ -1,0 +1,121 @@
+{
+  "nodeset_imports": [
+    {
+      "path": "nodesets/loop_until_body.jsonc"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.loop.value",
+        "display_name": "Loop value",
+        "required": true
+      }
+    ],
+    "max_steps": 20,
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts the stop-when loop workflow."
+      },
+      {
+        "id": "loop",
+        "type_used": "vibeflow.loop.while",
+        "display_name": "Increment until four",
+        "description": "Carries and collects values until the body reports done.",
+        "requires": [
+          {
+            "type": "sandbox.loop.value",
+            "cardinality": "exactly_one",
+            "display_name": "Loop value"
+          }
+        ],
+        "provides": [
+          {
+            "key": "result",
+            "type": "sandbox.loop.result",
+            "display_name": "Loop result"
+          },
+          {
+            "key": "history",
+            "type": "sandbox.loop.history",
+            "display_name": "Loop history"
+          },
+          {
+            "key": "iterations",
+            "type": "sandbox.loop.iterations",
+            "display_name": "Iterations"
+          }
+        ],
+        "loop": {
+          "body": "sandbox.loop_until_body",
+          "max_iterations": 5,
+          "stop_when": {
+            "from": "done",
+            "equals": true
+          },
+          "carry": [
+            {
+              "from": "sandbox.loop.value",
+              "as": "sandbox.loop.value",
+              "update": "next"
+            }
+          ],
+          "collect": [
+            {
+              "from": "next",
+              "as": "history"
+            }
+          ],
+          "outputs": [
+            {
+              "from": "sandbox.loop.value",
+              "as": "result"
+            },
+            {
+              "from": "history",
+              "as": "history"
+            },
+            {
+              "from": "loop.iterations",
+              "as": "iterations"
+            }
+          ]
+        }
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Ends after the loop reaches its target."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "loop"},
+      {"from": "loop", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.loop.result",
+        "cardinality": "exactly_one",
+        "display_name": "Loop result",
+        "as": "result"
+      },
+      {
+        "type": "sandbox.loop.history",
+        "cardinality": "exactly_one",
+        "display_name": "Loop history",
+        "as": "history"
+      },
+      {
+        "type": "sandbox.loop.iterations",
+        "cardinality": "exactly_one",
+        "display_name": "Iterations",
+        "as": "iterations"
+      }
+    ]
+  }
+}

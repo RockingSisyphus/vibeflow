@@ -9,6 +9,7 @@ from vibeflow.data_contract import providers_to_dicts, requirements_to_dicts
 from vibeflow.rendering.helpers import compile_for_render, node_flow_kind, node_is_external, nodeset_for_node
 
 from vibeflow.rendering.mermaid.labels import (
+    _async_semantic_lines,
     _comment_text,
     _edge_contract_text,
     _edge_style,
@@ -191,12 +192,15 @@ class _MermaidRenderer:
             node_id = _safe_id(f"{prefix}{node.id}")
             nodeset = nodeset_for_node(graph, node)
             if nodeset is None:
+                is_external = self._node_is_external(node)
                 flow_kind = node_flow_kind(node, compiled) or FLOW_KIND_PROCESS
-                preferred_class = self._preferred_class_for_node(node, flow_kind=flow_kind)
+                preferred_class = self._preferred_class_for_node(flow_kind=flow_kind, is_external=is_external)
                 class_name = self._class_for_node(node_id, preferred_class=preferred_class, planned=node.status == STATUS_PLANNED)
-                lines.append(f"{indent}{_node_shape(node_id, self._node_label(node, graph), flow_kind)}")
+                lines.append(f"{indent}{_node_shape(node_id, self._node_label(node, graph, is_external=is_external), flow_kind)}")
                 if class_name:
                     lines.append(f"{indent}class {node_id} {class_name};")
+                if is_external:
+                    lines.append(f"{indent}class {node_id} externalBoundary;")
                 self._render_custom_node_style(lines, node, node_id, indent=indent)
                 continue
             flow_kind = node_flow_kind(node, compiled) or nodeset.flow_kind
@@ -333,8 +337,8 @@ class _MermaidRenderer:
             return "plannedNode"
         return preferred_class or "defaultNode"
 
-    def _preferred_class_for_node(self, node: NodeSpec, *, flow_kind: str) -> str:
-        if self._node_is_external(node):
+    def _preferred_class_for_node(self, *, flow_kind: str, is_external: bool) -> str:
+        if is_external:
             return "externalDependency"
         if flow_kind == FLOW_KIND_DOCUMENT:
             return "documentNode"
@@ -374,8 +378,8 @@ class _MermaidRenderer:
             return tuple(dict.fromkeys(targets))
         return ()
 
-    def _node_label(self, node: NodeSpec, graph: GraphConfig) -> str:
-        sections: list[list[str]] = [[self._node_title(node)], [f"id: {node.id}", f"type_used: {node.type_used}"]]
+    def _node_label(self, node: NodeSpec, graph: GraphConfig, *, is_external: bool) -> str:
+        sections: list[list[str]] = [[self._node_title(node, is_external=is_external)], [f"id: {node.id}", f"type_used: {node.type_used}"]]
         source_lines = _source_lines(graph.root_id, graph.root_path, graph.source_path)
         if source_lines:
             sections.append([_section_label("source"), *source_lines])
@@ -385,7 +389,7 @@ class _MermaidRenderer:
                 planned_lines.append(f"stub: {node.planned_behavior.stub_module}")
             sections.append(planned_lines)
         if self.show_semantics:
-            semantic_lines = self._node_semantic_lines(node)
+            semantic_lines = self._node_semantic_lines(node, is_external=is_external)
             if semantic_lines:
                 sections.append([_section_label("meta"), *semantic_lines])
         return _join_label_sections(sections)
@@ -407,7 +411,7 @@ class _MermaidRenderer:
                 planned_lines.append(f"stub: {behavior.stub_module}")
             sections.append(planned_lines)
         if self.show_semantics:
-            call_lines = _node_metadata_lines(node)
+            call_lines = (*_node_metadata_lines(node), *_async_semantic_lines(node))
             if call_lines:
                 sections.append([_section_label("call"), *call_lines])
             sections.append(
@@ -430,18 +434,20 @@ class _MermaidRenderer:
         if source_lines:
             sections.append([_section_label("source"), *source_lines])
         spec = node.loop
-        loop_lines = [_section_label("loop"), f"body: {nodeset.type_key}", f"stop: {_loop_stop_text(spec)}", f"max: {spec.max_iterations}"]
+        maximum = "unbounded" if spec.max_iterations is None else spec.max_iterations
+        loop_lines = [_section_label("loop"), f"body: {nodeset.type_key}", f"stop: {_loop_stop_text(spec)}", f"max: {maximum}"]
         sections.append(loop_lines)
         if self.show_semantics:
-            call_lines = _node_metadata_lines(node)
+            call_lines = (*_node_metadata_lines(node), *_async_semantic_lines(node))
             if call_lines:
                 sections.append([_section_label("meta"), *call_lines])
         return _join_label_sections(sections)
 
-    def _node_title(self, node: NodeSpec) -> str:
+    def _node_title(self, node: NodeSpec, *, is_external: bool) -> str:
+        title = ""
         if node.metadata.display_name:
-            return node.metadata.display_name
-        if self.registry is not None and node.status != STATUS_PLANNED:
+            title = node.metadata.display_name
+        elif self.registry is not None and node.status != STATUS_PLANNED:
             try:
                 node_cls = self.registry.get(node.type_used)
             except Exception:
@@ -449,8 +455,11 @@ class _MermaidRenderer:
             info = getattr(node_cls, "NODE_INFO", None) if node_cls is not None else None
             display_name = str(getattr(info, "display_name", "")).strip() if info is not None else ""
             if display_name:
-                return display_name
-        return node.id
+                title = display_name
+        title = title or node.id
+        if is_external and not title.startswith("[EXTERNAL]"):
+            return f"[EXTERNAL] {title}"
+        return title
 
     def _edge_label(self, graph: GraphConfig, edge: object) -> str:
         when = str(getattr(edge, "when", "")).strip()
@@ -462,7 +471,7 @@ class _MermaidRenderer:
             sections.append([_section_label("data"), f"data: {data_text}"])
         return _join_label_sections(sections)
 
-    def _node_semantic_lines(self, node: NodeSpec) -> tuple[str, ...]:
+    def _node_semantic_lines(self, node: NodeSpec, *, is_external: bool) -> tuple[str, ...]:
         lines = list(_node_metadata_lines(node))
         if self.registry is not None and node.status != STATUS_PLANNED:
             try:
@@ -479,6 +488,7 @@ class _MermaidRenderer:
                     text = str(value).strip()
                     if text:
                         lines.append(f"{label}: {text}")
-            if info is not None and getattr(info, "external", False):
-                lines.append("external: true")
+        lines.extend(_async_semantic_lines(node))
+        if is_external:
+            lines.append("external: true")
         return tuple(lines)

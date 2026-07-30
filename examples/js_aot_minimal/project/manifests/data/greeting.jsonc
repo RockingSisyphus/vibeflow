@@ -1,0 +1,8 @@
+{
+  "kind": "data_schema",
+  "type_key": "greeting.text",
+  "representation": "json",
+  "schema": {
+    "type": "string"
+  }
+}

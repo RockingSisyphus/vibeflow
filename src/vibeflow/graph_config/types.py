@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from vibeflow.data_contract import DataProvider, DataRequirement
+from vibeflow.data_contract import DataProvider, DataRequirement, PipelineInputSpec, PipelineOutputSpec
 from vibeflow.node import FLOW_KIND_PREDEFINED
 from vibeflow.graph_config.planned_behavior import PlannedBehavior, blocking_planned_behavior
 
@@ -17,6 +17,11 @@ JOIN_POLICY_ALL = "all"
 JOIN_POLICIES = frozenset({JOIN_POLICY_SAFE_ANY, JOIN_POLICY_ANY_ACTIVE, JOIN_POLICY_ALL})
 LOOP_WHILE_TYPE = "vibeflow.loop.while"
 LOOP_NODE_TYPES = frozenset({LOOP_WHILE_TYPE})
+IO_NODE_TYPE = "vibeflow.io"
+IO_OPERATIONS = frozenset({"receive", "send"})
+ENTRY_MODE_SYNC = "sync"
+ENTRY_MODE_ASYNC = "async"
+ENTRY_MODES = frozenset({ENTRY_MODE_SYNC, ENTRY_MODE_ASYNC})
 
 @dataclass(frozen=True)
 class NodeMetadata:
@@ -92,7 +97,7 @@ class LoopStopWhenSpec:
 @dataclass(frozen=True)
 class LoopSpec:
     body: str = ""
-    max_iterations: int = 1000
+    max_iterations: int | None = 1000
     stop_after: int = 0
     stop_when: LoopStopWhenSpec = field(default_factory=LoopStopWhenSpec)
     carry: tuple[LoopCarrySpec, ...] = ()
@@ -118,6 +123,20 @@ class LoopSpec:
             payload["outputs"] = [item.to_dict() for item in self.outputs]
         return payload
 
+
+@dataclass(frozen=True)
+class IoSpec:
+    operation: str = ""
+    port: str = "default"
+
+    def to_dict(self) -> dict[str, str]:
+        if not self.operation:
+            return {}
+        return {
+            "operation": self.operation,
+            "port": self.port,
+        }
+
 @dataclass(frozen=True)
 class NodeSpec:
     id: str
@@ -130,6 +149,7 @@ class NodeSpec:
     similar_to: NodeSimilarity = field(default_factory=NodeSimilarity)
     join_policy: str = JOIN_POLICY_SAFE_ANY
     loop: LoopSpec = field(default_factory=LoopSpec)
+    io: IoSpec = field(default_factory=IoSpec)
     node_config_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
     allow_config_override: bool = False
     status: str = STATUS_IMPLEMENTED
@@ -151,6 +171,8 @@ class EdgeSpec:
     source: str
     target: str
     when: str = ""
+    schedule: bool | None = None
+    transfer: bool | None = None
 
     @property
     def pair(self) -> tuple[str, str]:
@@ -185,9 +207,10 @@ class GraphConfig:
     nodes: tuple[NodeSpec, ...]
     edges: tuple[EdgeSpec, ...] = ()
     nodesets: dict[str, NodesetSpec] = field(default_factory=dict)
-    inputs: tuple[DataProvider, ...] = ()
-    outputs: tuple[DataRequirement, ...] = ()
+    inputs: tuple[PipelineInputSpec, ...] = ()
+    outputs: tuple[PipelineOutputSpec, ...] = ()
     max_steps: int = 1000
+    entry_mode: str = ENTRY_MODE_SYNC
     project_root: str = ""
     root_id: str = ""
     root_path: str = ""

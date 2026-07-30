@@ -8,7 +8,11 @@ from typing import TYPE_CHECKING, Any, Mapping
 
 from vibeflow.health.types import HealthFinding, HealthReport
 from vibeflow.purity.types import PurityPolicy
-from vibeflow.graph_config import LOOP_NODE_TYPES, STATUS_PLANNED
+from vibeflow.graph_config import (
+    IO_NODE_TYPE,
+    LOOP_NODE_TYPES,
+    STATUS_PLANNED,
+)
 from vibeflow.health.flow import append_data_contract_warnings, append_flowchart_health, append_join_policy_health
 from vibeflow.health.planned import append_planned_findings
 from vibeflow.health.report import _build_health_report
@@ -127,7 +131,7 @@ def _validate_graph_nodes(
             state.node_similarities[spec.id] = spec.similar_to.to_dict()
         if spec.status == STATUS_PLANNED:
             continue
-        if spec.type_used in LOOP_NODE_TYPES:
+        if spec.type_used in LOOP_NODE_TYPES or spec.type_used == IO_NODE_TYPE:
             continue
         if spec.type_used in graph.nodesets:
             continue

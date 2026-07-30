@@ -18,18 +18,116 @@ class RuntimeNodeMixin:
         state.last_inputs[frame.name] = inputs
         state.inboxes[frame.name] = []
         if frame.async_mode:
-            return self._run_async_node(frame, inputs)
-        if frame.is_planned_stub:
-            return self._run_planned_stub_node(frame, inputs)
-        if frame.is_loop:
+            outputs = self._run_async_node(frame, inputs)
+        elif frame.is_io:
+            outputs = self._run_io_node(frame, inputs)
+        elif frame.is_planned_stub:
+            outputs = self._run_planned_stub_node(frame, inputs)
+        elif frame.is_loop:
             if loop_block(self._plan, frame.name) is not None:
-                return self._run_loop_block_node(frame, inputs)
-            return self._run_loop_node(frame, inputs)
-        if frame.is_nodeset:
+                outputs = self._run_loop_block_node(frame, inputs)
+            else:
+                outputs = self._run_loop_node(frame, inputs)
+        elif frame.is_nodeset:
             if nodeset_block(self._plan, frame.name) is not None:
-                return self._run_nodeset_block_node(frame, inputs)
-            return self._run_nodeset_node(frame, inputs)
-        return self._run_pure_node(frame, inputs)
+                outputs = self._run_nodeset_block_node(frame, inputs)
+            else:
+                outputs = self._run_nodeset_node(frame, inputs)
+        else:
+            outputs = self._run_pure_node(frame, inputs)
+        self._record_node_output_candidates(frame.name, outputs, state)
+        return outputs
+
+    def _run_io_node(
+        self,
+        frame: NodeFrame,
+        inputs: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        operation = frame.io_spec.operation
+        capability = self._capabilities.get("vibeflow.port")
+        if not isinstance(capability, Mapping):
+            raise PipelineRuntimeError(
+                "vibeflow.io requires capability 'vibeflow.port'"
+            )
+        callable_operation = capability.get(operation)
+        if not callable(callable_operation):
+            raise PipelineRuntimeError(
+                f"vibeflow.port is missing operation '{operation}'"
+            )
+        self._call_runtime_plugins(
+            "before_node",
+            frame.name,
+            frame.node_type,
+            summarize_mapping(inputs),
+        )
+        try:
+            if operation == "receive":
+                result = callable_operation(
+                    {"port": frame.io_spec.port}
+                )
+                if not isinstance(result, Mapping) or "value" not in result:
+                    raise PipelineRuntimeError(
+                        "vibeflow.port.receive must return a mapping with value"
+                    )
+                outputs: Mapping[str, object] = {
+                    frame.provides[0].key: result["value"]
+                }
+            elif operation == "send":
+                raw = next(iter(inputs.values()))
+                if isinstance(raw, list):
+                    raw = raw[0]
+                value = (
+                    raw.get("value")
+                    if isinstance(raw, Mapping) and "value" in raw
+                    else getattr(raw, "value", raw)
+                )
+                result = callable_operation(
+                    {"port": frame.io_spec.port, "value": value}
+                )
+                if result is not None:
+                    raise PipelineRuntimeError(
+                        "vibeflow.port.send must return None"
+                    )
+                outputs = {}
+            else:
+                raise PipelineRuntimeError(
+                    f"unsupported vibeflow.io operation '{operation}'"
+                )
+            validated = self._validate_outputs(
+                frame,
+                outputs,
+                subject="vibeflow.io",
+            )
+            self._mark_node_run(frame.name)
+            self._record_runtime_event(
+                f"io_{operation}",
+                frame.name,
+                frame.node_type,
+                input_summary=summarize_mapping(inputs),
+                output_summary=summarize_mapping(validated),
+                details={"port": frame.io_spec.port},
+            )
+            self._call_runtime_plugins(
+                "after_node",
+                frame.name,
+                frame.node_type,
+                summarize_mapping(validated),
+            )
+            return validated
+        except Exception as exc:
+            self._record_runtime_event(
+                "node_failed",
+                frame.name,
+                frame.node_type,
+                failure=str(exc),
+            )
+            self._call_runtime_plugins(
+                "node_failed",
+                frame.name,
+                frame.node_type,
+                str(exc),
+            )
+            raise
 
     def _run_planned_stub_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
         started = time.perf_counter()

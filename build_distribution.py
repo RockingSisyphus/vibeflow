@@ -13,8 +13,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 DEFAULT_OUTPUT = ROOT / "vibeflow_distribution"
 ROOT_README_GENERATED_AT_MARKER = "<!-- VIBEFLOW_DISTRIBUTION_GENERATED_AT -->"
+TYPESCRIPT_SANDBOX_RELATIVE = Path("examples/typescript_sandbox")
 EXTRA_DOCS = (
     ("developer_guide.md", "10_Kernel能力与项目开发指南.md"),
+    ("js_aot_build.md", "11_JS_TS与Web_AOT构建指南.md"),
+    (
+        "14_JS_TS节点与Web_AOT构建计划.md",
+        "14_JS_TS节点与Web_AOT构建计划.md",
+    ),
+    (
+        "15_长期工作流与原生IO改造计划.md",
+        "15_长期工作流与原生IO改造计划.md",
+    ),
 )
 STANDARD_PROJECT_DIRS = (
     "project/nodes",
@@ -22,6 +32,12 @@ STANDARD_PROJECT_DIRS = (
     "project/plugins",
     "project/configs",
     "project/configs/nodesets",
+    "project/manifests/nodes",
+    "project/manifests/base_lib",
+    "project/manifests/data",
+    "project/manifests/capabilities",
+    "project/manifests/host_extensions",
+    "project/host_extensions",
     "project/stubs",
 )
 MANIFEST_RELATIVE = Path("kernel/MANIFEST.sha256")
@@ -37,8 +53,13 @@ PROTECTED_FILES = (
 PROTECTED_DIRS = (
     "kernel/docs",
     "kernel/vibeflow",
+    TYPESCRIPT_SANDBOX_RELATIVE.as_posix(),
 )
 CORE_SELF_CHECK_STRUCTURE_ARGS = (
+    "--warn-lines",
+    "450",
+    "--max-lines",
+    "600",
     "--enable-structure-limits",
     "--warn-root-code-files",
     "150",
@@ -59,7 +80,7 @@ CORE_SELF_CHECK_STRUCTURE_ARGS = (
     "--warn-child-code-dirs-per-dir",
     "6",
     "--max-child-code-dirs-per-dir",
-    "10",
+    "16",
     "--warn-root-level-code-files",
     "110",
     "--max-root-level-code-files",
@@ -95,6 +116,10 @@ def build_distribution(output: Path, *, replace: bool = True, run_self_check: bo
     _copy_mermaid_renderer_config(output)
     _copy_third_party_notices(output)
     _copy_extra_docs(output / "kernel" / "docs")
+    _copy_tree(
+        ROOT / TYPESCRIPT_SANDBOX_RELATIVE,
+        output / TYPESCRIPT_SANDBOX_RELATIVE,
+    )
     _write_kernel_archive(ROOT / "src" / "vibeflow", output / KERNEL_ZIP_RELATIVE)
     _ensure_standard_project_dirs(output)
     _write_root_readme(output)

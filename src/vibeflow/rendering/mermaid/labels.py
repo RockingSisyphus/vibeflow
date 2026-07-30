@@ -45,6 +45,14 @@ def _node_metadata_lines(node: NodeSpec) -> tuple[str, ...]:
         lines.append(f"desc: {metadata.description}")
     return tuple(lines)
 
+def _async_semantic_lines(node: NodeSpec) -> tuple[str, ...]:
+    if not node.async_mode:
+        return ()
+    lines = [f"async: {node.async_mode}"]
+    if node.result_key:
+        lines.append(f"result_key: {node.result_key}")
+    return tuple(lines)
+
 def _source_lines(root_id: object = "", root_path: object = "", source_path: object = "") -> tuple[str, ...]:
     lines: list[str] = []
     root_id_text = str(root_id or "").strip()
@@ -63,14 +71,15 @@ def _display_source_path(source_path: str, root_path: str) -> str:
 
 def _loop_stop_text(spec: object) -> str:
     stop_after = int(getattr(spec, "stop_after", 0) or 0)
-    if stop_after:
-        return f"stop_after: {stop_after}"
     stop_when = getattr(spec, "stop_when", None)
     source = str(getattr(stop_when, "source", "")).strip() if stop_when is not None else ""
+    parts: list[str] = []
+    if stop_after:
+        parts.append(f"stop_after: {stop_after}")
     if source:
         equals = str(getattr(stop_when, "equals", True)).lower()
-        return f"stop_when: {source} == {equals}"
-    return "unset"
+        parts.append(f"stop_when: {source} == {equals}")
+    return " OR ".join(parts) if parts else "none (permanent)"
 
 def _section_label(name: str) -> str:
     border = "-" * _SECTION_SEPARATOR_WIDTH

@@ -1,0 +1,59 @@
+{
+  "pipeline": {
+    "entry_mode": "sync",
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts the invalid sync/suspend fixture."
+      },
+      {
+        "id": "invalid",
+        "type_used": "sandbox.async_double",
+        "display_name": "Suspending node in sync workflow",
+        "description": "Must fail because a sync entry cannot contain a suspending node.",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "doubled",
+            "type": "sandbox.async.value",
+            "display_name": "Doubled value"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Would end the invalid fixture."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "invalid"},
+      {"from": "invalid", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.async.value",
+        "cardinality": "exactly_one",
+        "display_name": "Doubled value",
+        "as": "doubled"
+      }
+    ]
+  }
+}

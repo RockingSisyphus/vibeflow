@@ -11,11 +11,11 @@ def append_data_contract_warnings(graph, compiled, state, *, owner: str = "pipel
     nodes_by_name = {node.name: node for node in graph.nodes}
     incoming = {node.name: [] for node in graph.nodes}
     outgoing = {node.name: [] for node in graph.nodes}
-    for edge in compiled.effective_edges:
+    for edge in compiled.resolved_transfer_edges:
         incoming.setdefault(edge.target, []).append(edge.source)
         outgoing.setdefault(edge.source, []).append(edge.target)
     condition_keys_by_source: dict[str, set[str]] = {node.name: set() for node in graph.nodes}
-    for edge in compiled.effective_edges:
+    for edge in compiled.resolved_transfer_edges:
         parsed = _parse_when(edge.when)
         if parsed is not None:
             condition_keys_by_source.setdefault(edge.source, set()).add(parsed[0])
@@ -37,8 +37,8 @@ def _append_runtime_requirement_findings(graph, compiled, nodes_by_name, state, 
     an initial-input node.
     """
 
-    schedule_edges = tuple(getattr(compiled, "schedule_edges", ()) or compiled.effective_edges)
-    transfer_edges = tuple(getattr(compiled, "transfer_edges", ()) or compiled.effective_edges)
+    schedule_edges = tuple(compiled.resolved_schedule_edges)
+    transfer_edges = tuple(compiled.resolved_transfer_edges)
     schedule_incoming = _edges_by_target(schedule_edges, nodes_by_name)
     transfer_incoming = _edges_by_target(transfer_edges, nodes_by_name)
     input_types = {item.type for item in graph.inputs}

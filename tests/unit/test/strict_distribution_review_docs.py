@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from importlib import resources
+import json
 import re
 import shutil
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
+import zipfile
 
 import pytest
 
@@ -98,6 +101,25 @@ def test_distribution_copies_review_docs_and_preserves_customizable_root_guides(
     assert (
         built_distribution / "kernel" / "docs" / "10_Kernel能力与项目开发指南.md"
     ).read_bytes() == (REPOSITORY_ROOT / "docs" / "developer_guide.md").read_bytes()
+    assert (
+        built_distribution / "kernel" / "docs" / "11_JS_TS与Web_AOT构建指南.md"
+    ).read_bytes() == (REPOSITORY_ROOT / "docs" / "js_aot_build.md").read_bytes()
+    assert (
+        built_distribution
+        / "kernel"
+        / "docs"
+        / "14_JS_TS节点与Web_AOT构建计划.md"
+    ).read_bytes() == (
+        REPOSITORY_ROOT / "docs" / "14_JS_TS节点与Web_AOT构建计划.md"
+    ).read_bytes()
+    assert (
+        built_distribution
+        / "kernel"
+        / "docs"
+        / "15_长期工作流与原生IO改造计划.md"
+    ).read_bytes() == (
+        REPOSITORY_ROOT / "docs" / "15_长期工作流与原生IO改造计划.md"
+    ).read_bytes()
 
     manifest_lines = (
         built_distribution / "kernel" / "MANIFEST.sha256"
@@ -112,6 +134,13 @@ def test_distribution_copies_review_docs_and_preserves_customizable_root_guides(
         for path in PUBLISHED_DOCS_ROOT.glob("*.md")
     }
     all_published_docs.add("kernel/docs/10_Kernel能力与项目开发指南.md")
+    all_published_docs.update(
+        {
+            "kernel/docs/11_JS_TS与Web_AOT构建指南.md",
+            "kernel/docs/14_JS_TS节点与Web_AOT构建计划.md",
+            "kernel/docs/15_长期工作流与原生IO改造计划.md",
+        }
+    )
     assert all_published_docs <= manifest_paths
     assert "AGENTS.md" not in manifest_paths
     assert "README.md" not in manifest_paths
@@ -149,6 +178,159 @@ def test_built_distribution_template_is_canonical_and_validates(
         check=False,
     )
     assert validation.returncode == 0, validation.stderr or validation.stdout
+
+
+def test_distribution_publishes_aot_driver_as_package_resource(
+    built_distribution: Path,
+) -> None:
+    package_data = tomllib.loads(
+        (REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )["tool"]["setuptools"]["package-data"]["vibeflow"]
+    assert "aot/resources/*.mjs" in package_data
+
+    packaged_driver = resources.files("vibeflow.aot.resources").joinpath(
+        "toolchain_driver.mjs"
+    )
+    assert packaged_driver.is_file()
+    driver_bytes = packaged_driver.read_bytes()
+    assert driver_bytes
+
+    archive_path = built_distribution / "kernel" / "vibeflow-kernel.zip"
+    with zipfile.ZipFile(archive_path) as archive:
+        archived_driver = "vibeflow/aot/resources/toolchain_driver.mjs"
+        assert archived_driver in archive.namelist()
+        assert archive.read(archived_driver) == driver_bytes
+
+
+def test_distribution_template_declares_js_resources_without_installing_dependencies(
+    built_distribution: Path,
+) -> None:
+    project = built_distribution / "project"
+    config = json.loads(
+        (project / "vibeflow_project.jsonc").read_text(encoding="utf-8")
+    )
+    assert config["descriptors"] == {
+        "nodes": ["manifests/nodes"],
+        "base_lib": ["manifests/base_lib"],
+        "data_schemas": ["manifests/data"],
+        "capabilities": ["manifests/capabilities"],
+        "host_extensions": ["manifests/host_extensions"],
+    }
+    assert config["javascript"] == {
+        "package_root": ".",
+        "external_packages": [],
+        "host_extensions": [],
+    }
+    for relative in (
+        "manifests/nodes",
+        "manifests/base_lib",
+        "manifests/data",
+        "manifests/capabilities",
+        "manifests/host_extensions",
+        "host_extensions",
+    ):
+        assert (project / relative).is_dir()
+    assert not (project / "package.json").exists()
+    assert not (project / "node_modules").exists()
+    template_readme = (built_distribution / "README.md").read_text(
+        encoding="utf-8"
+    )
+    assert "project/configs/<js-workflow>.jsonc" in template_readme
+    assert (
+        "python run.py build --config project/configs/main.jsonc"
+        not in template_readme
+    )
+
+
+def test_distribution_publishes_runnable_typescript_sandbox_without_generated_files(
+    built_distribution: Path,
+) -> None:
+    source = REPOSITORY_ROOT / "examples" / "typescript_sandbox"
+    published = built_distribution / "examples" / "typescript_sandbox"
+    expected_files = {
+        path.relative_to(source).as_posix()
+        for path in source.rglob("*")
+        if path.is_file()
+        and not {
+            "__pycache__",
+            ".pytest_cache",
+            "runs",
+            "reports",
+            "node_modules",
+        }.intersection(path.relative_to(source).parts)
+        and not path.name.endswith(".pyc")
+    }
+    actual_files = {
+        path.relative_to(published).as_posix()
+        for path in published.rglob("*")
+        if path.is_file()
+    }
+    assert actual_files == expected_files
+    assert (published / "project" / "package.json").is_file()
+    assert (published / "project" / "package-lock.json").is_file()
+    for excluded in ("node_modules", "reports", "runs", "__pycache__"):
+        assert not any(path.name == excluded for path in published.rglob("*"))
+
+    manifest_paths = {
+        line.split("  ", 1)[1]
+        for line in (
+            built_distribution / "kernel" / "MANIFEST.sha256"
+        ).read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
+    assert {
+        f"examples/typescript_sandbox/{relative}"
+        for relative in actual_files
+    } <= manifest_paths
+    published_aot_guide = (
+        built_distribution
+        / "kernel"
+        / "docs"
+        / "11_JS_TS与Web_AOT构建指南.md"
+    ).read_text(encoding="utf-8")
+    assert "kernel/vibeflow-kernel.zip" in published_aot_guide
+    assert (
+        "python examples/typescript_sandbox/run_all.py --skip-browser"
+        in published_aot_guide
+    )
+
+    kernel_probe = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-c",
+            (
+                "import sys; sys.path.insert(0, sys.argv[1]); "
+                "import sandbox_support, vibeflow; print(vibeflow.__file__)"
+            ),
+            str(published),
+        ],
+        cwd=built_distribution,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    assert kernel_probe.returncode == 0, kernel_probe.stderr
+    assert str(
+        built_distribution / "kernel" / "vibeflow-kernel.zip"
+    ) in kernel_probe.stdout
+
+    help_result = subprocess.run(
+        [
+            sys.executable,
+            "-s",
+            str(published / "run_all.py"),
+            "--help",
+        ],
+        cwd=built_distribution,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    assert help_result.returncode == 0, help_result.stderr or help_result.stdout
+    assert "--skip-browser" in help_result.stdout
 
 
 def test_developer_published_and_ai_guides_share_the_review_protocol(

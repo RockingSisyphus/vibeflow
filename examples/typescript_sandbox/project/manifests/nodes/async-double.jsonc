@@ -1,0 +1,46 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.async_double",
+  "display_name": "Async double",
+  "category": "sandbox",
+  "description": "Doubles a number through a Promise-returning TS node.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "sandbox.number",
+        "cardinality": "exactly_one",
+        "display_name": "Number"
+      }
+    ],
+    "provides": [
+      {
+        "key": "doubled",
+        "type": "sandbox.async.value",
+        "display_name": "Doubled value"
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {
+      "doubled": {
+        "type": "number"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "completion": "suspend",
+      "source": {
+        "kind": "file",
+        "ref": "nodes/async_double.ts",
+        "export": "run"
+      }
+    }
+  ],
+  "base_libs": [],
+  "capabilities": []
+}

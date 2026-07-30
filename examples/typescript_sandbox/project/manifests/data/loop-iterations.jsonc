@@ -1,0 +1,9 @@
+{
+  "kind": "data_schema",
+  "type_key": "sandbox.loop.iterations",
+  "representation": "json",
+  "schema": {
+    "type": "integer",
+    "minimum": 0
+  }
+}

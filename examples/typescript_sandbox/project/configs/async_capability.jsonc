@@ -1,0 +1,96 @@
+{
+  "pipeline": {
+    "entry_mode": "async",
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      },
+      {
+        "key": "key",
+        "type": "sandbox.storage.key",
+        "display_name": "Storage key",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts the async and Capability workflow."
+      },
+      {
+        "id": "double",
+        "type_used": "sandbox.async_double",
+        "display_name": "Double asynchronously",
+        "description": "Doubles x through a Promise-returning node.",
+        "async": "result_key",
+        "result_key": "doubled",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "doubled",
+            "type": "sandbox.async.value",
+            "display_name": "Doubled value"
+          }
+        ]
+      },
+      {
+        "id": "read",
+        "type_used": "sandbox.storage_read",
+        "display_name": "Read storage",
+        "description": "Reads from the per-run injected storage Capability.",
+        "requires": [
+          {
+            "type": "sandbox.storage.key",
+            "cardinality": "exactly_one",
+            "display_name": "Storage key"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value",
+            "type": "sandbox.storage.value",
+            "display_name": "Stored value"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Ends after the asynchronous and Capability results are available.",
+        "join_policy": "all"
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "double"},
+      {"from": "start", "to": "read"},
+      {"from": "double", "to": "end"},
+      {"from": "read", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.async.value",
+        "cardinality": "exactly_one",
+        "display_name": "Doubled value",
+        "as": "doubled"
+      },
+      {
+        "type": "sandbox.storage.value",
+        "cardinality": "exactly_one",
+        "display_name": "Stored value",
+        "as": "value"
+      }
+    ]
+  }
+}

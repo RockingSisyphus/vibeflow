@@ -51,6 +51,7 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
         global_config: Mapping[str, Any] | None = None,
         runtime_options: RuntimeOptions | Mapping[str, object] | None = None,
         delegate_cli: bool = False,
+        capabilities: Mapping[str, object] | None = None,
     ) -> None:
         self.runtime_options = normalize_runtime_options(runtime_options)
         self.delegate_cli = bool(delegate_cli)
@@ -83,6 +84,7 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
         self._run_dir = Path(run_dir) if run_dir is not None else Path("runs") / "vibeflow"
         self._trace_sink: RuntimeTraceSink | None = None
         self._trace_path_prefix: tuple[str, ...] = ()
+        self._capabilities = dict(capabilities or {})
 
     def _assert_planned_runtime_allowed(self, graph: GraphConfig) -> None:
         if not has_planned(graph):
@@ -119,6 +121,7 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
         runtime._trace_path_prefix = parent._trace_path_prefix
         runtime.runtime_options = parent.runtime_options
         runtime.delegate_cli = parent.delegate_cli
+        runtime._capabilities = parent._capabilities
         return runtime
 
     def run(self, initial: Mapping[str, Any] | None = None) -> RunResult:
@@ -128,10 +131,12 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
             self._trace_sink = RuntimeTraceSink(self._trace_file_path())
             self._trace_sink.open()
         self._reset_run_state()
-        state = self._new_state(initial or {})
+        initial_values = initial or {}
+        state = self._new_state(initial_values)
         try:
+            self._validate_public_inputs(initial_values)
             self._record_run_boundary("run_start")
-            self._call_runtime_plugins("before_run", dict(initial or {}))
+            self._call_runtime_plugins("before_run", dict(initial_values))
             if self.runtime_options.execution == "compiled":
                 run_compiled_steps(self, state)
             elif self.runtime_options.execution == "block":
@@ -194,6 +199,31 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
                 self._trace_sink = None
             self._shutdown_executor()
         return state.result
+
+    def _validate_public_inputs(self, initial: Mapping[str, Any]) -> None:
+        """Apply the strict public-input ABI only to fully explicit contracts.
+
+        A pipeline whose inputs all declare ``required: true|false`` uses the
+        same closed input contract as JS AOT.  Any omitted ``required`` keeps
+        the whole legacy Python pipeline permissive during migration.
+        """
+
+        if not self.graph.inputs or any(
+            input_spec.required is None
+            for input_spec in self.graph.inputs
+        ):
+            return
+        known_keys = {input_spec.key for input_spec in self.graph.inputs}
+        for key in initial:
+            if key not in known_keys:
+                raise PipelineRuntimeError(
+                    f"unknown workflow input '{key}'"
+                )
+        for input_spec in self.graph.inputs:
+            if input_spec.required and input_spec.key not in initial:
+                raise PipelineRuntimeError(
+                    f"required workflow input '{input_spec.key}' is missing"
+                )
 
     def _record_runtime_failure(
         self,
@@ -266,19 +296,20 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
                 continue
             outputs = self._run_node(node_name, state)
             self.trace.step_count += 1
-            if self._is_end_terminal(node_name):
-                self.trace.stop_reason = "completed"
-                return
             self._clear_conditional_outgoing(node_name, state)
             active_edges = self._activated_edges(node_name, outputs, state)
             active_pairs = {edge.pair for edge in active_edges}
             for edge in active_edges:
                 self._activate_edge(edge, state)
                 self._deliver_outputs(edge, outputs, state)
-                if edge.target not in queued:
-                    ready.append(edge.target)
-                    queued.add(edge.target)
+            for target in self._scheduled_targets(node_name, active_edges):
+                if target not in queued:
+                    ready.append(target)
+                    queued.add(target)
             self._deliver_transfer_only_edges(node_name, outputs, state, active_pairs)
+            if self._is_end_terminal(node_name):
+                self.trace.stop_reason = "completed"
+                return
         self.trace.stop_reason = "max_steps"
         raise PipelineRuntimeError(f"pipeline exceeded max_steps={self._plan.max_steps}")
 
@@ -308,19 +339,21 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
                 outputs = self._run_node(node_name, state)
                 last_node = node_name
                 self.trace.step_count += 1
+                self._clear_conditional_outgoing(node_name, state)
+                active = self._activated_edges(node_name, outputs, state)
+                active_pairs = {edge.pair for edge in active}
+                for edge in active:
+                    self._activate_edge(edge, state)
+                    self._deliver_outputs(edge, outputs, state)
+                self._deliver_transfer_only_edges(node_name, outputs, state, active_pairs)
                 if self._is_end_terminal(node_name):
                     self.trace.stop_reason = "completed"
                     self._record_runtime_event("block_exit", block_name, "block", output_summary=summarize_mapping(outputs), elapsed_ms=elapsed_ms(started))
                     self._call_runtime_plugins("after_block", block_name, block_nodes)
                     return last_node, outputs
-                self._clear_conditional_outgoing(node_name, state)
-                active = self._activated_edges(node_name, outputs, state)
                 if len(active) != 1:
                     raise PipelineRuntimeError(f"block execution requires exactly one active edge from '{node_name}'")
                 edge = active[0]
-                self._activate_edge(edge, state)
-                self._deliver_outputs(edge, outputs, state)
-                self._deliver_transfer_only_edges(node_name, outputs, state, {edge.pair})
                 node_name = edge.target
             self.trace.stop_reason = "max_steps"
             raise PipelineRuntimeError(f"pipeline exceeded max_steps={self._plan.max_steps}")
@@ -366,7 +399,10 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
         if frame.join_policy == JOIN_POLICY_ALL:
             return all(edge.pair in state.active_edges for edge in frame.incoming)
         if frame.join_policy == JOIN_POLICY_ANY_ACTIVE:
-            return True
+            return any(edge.pair in state.active_edges for edge in frame.incoming)
+        conditional_edges = [edge for edge in frame.incoming if edge.when]
+        if conditional_edges and len(conditional_edges) == len(frame.incoming):
+            return any(edge.pair in state.active_edges for edge in conditional_edges)
         control_edges = [edge for edge in frame.incoming if edge.when and not self._edge_source_satisfies_requirement(edge, frame)]
         if control_edges:
             return any(edge.pair in state.active_edges for edge in control_edges)
@@ -411,20 +447,27 @@ class PipelineRuntime(RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, R
         state.last_inputs[node_name] = inputs
         state.inboxes[node_name] = []
         if frame.async_mode:
-            return self._run_async_node(frame, inputs)
-        if frame.is_planned_stub:
-            return self._run_planned_stub_node(frame, inputs)
-        if frame.is_loop:
+            outputs = self._run_async_node(frame, inputs)
+        elif frame.is_io:
+            outputs = self._run_io_node(frame, inputs)
+        elif frame.is_planned_stub:
+            outputs = self._run_planned_stub_node(frame, inputs)
+        elif frame.is_loop:
             if self.runtime_options.execution == "block":
-                return self._run_loop_block_node(frame, inputs)
-            if self.runtime_options.execution == "compiled" and loop_block(self._plan, frame.name) is not None:
-                return self._run_loop_block_node(frame, inputs)
-            return self._run_loop_node(frame, inputs)
-        if frame.is_nodeset:
+                outputs = self._run_loop_block_node(frame, inputs)
+            elif self.runtime_options.execution == "compiled" and loop_block(self._plan, frame.name) is not None:
+                outputs = self._run_loop_block_node(frame, inputs)
+            else:
+                outputs = self._run_loop_node(frame, inputs)
+        elif frame.is_nodeset:
             if self.runtime_options.execution == "compiled" and nodeset_block(self._plan, frame.name) is not None:
-                return self._run_nodeset_block_node(frame, inputs)
-            return self._run_nodeset_node(frame, inputs)
-        return self._run_pure_node(frame, inputs)
+                outputs = self._run_nodeset_block_node(frame, inputs)
+            else:
+                outputs = self._run_nodeset_node(frame, inputs)
+        else:
+            outputs = self._run_pure_node(frame, inputs)
+        self._record_node_output_candidates(node_name, outputs, state)
+        return outputs
 
     def _resolve_inputs(self, frame: NodeFrame, state: _RuntimeState) -> dict[str, object]:
         inputs: dict[str, object] = {}

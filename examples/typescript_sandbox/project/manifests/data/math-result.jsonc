@@ -1,0 +1,8 @@
+{
+  "kind": "data_schema",
+  "type_key": "sandbox.math.result",
+  "representation": "json",
+  "schema": {
+    "type": "number"
+  }
+}

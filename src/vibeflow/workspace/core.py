@@ -16,6 +16,10 @@ from vibeflow.plugin import PluginRegistry, load_plugins_from_config
 from vibeflow.registry import NodeRegistrationInfo, NodeRegistry
 from vibeflow.workspace.policy import resolve_workspace_effective_policy
 from vibeflow.workspace.project_architecture import project_architecture_documents
+from vibeflow.workspace.project_options import (
+    project_descriptor_paths,
+    project_javascript_options,
+)
 from vibeflow.workspace.types import PROJECT_CONFIG_NAME, WorkspaceConfig, WorkspaceConfigError, WorkspaceEnvironment, WorkspaceResourceRegistries, WorkspaceRoot
 
 
@@ -175,7 +179,17 @@ def _load_project_config(path: Path, *, root_path: Path) -> Mapping[str, Any]:
     except ConfigLoadError as exc:
         raise WorkspaceConfigError(exc.rule_id, exc.message, exc.source_location, exc.failure_layer) from exc
     data = document.data
-    unknown = set(data) - {"registry", "quality_enabled", "quality", "runtime", "architecture", "base_lib", "plugins"}
+    unknown = set(data) - {
+        "registry",
+        "quality_enabled",
+        "quality",
+        "runtime",
+        "architecture",
+        "base_lib",
+        "plugins",
+        "descriptors",
+        "javascript",
+    }
     if unknown:
         raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.UNKNOWN_FIELD", f"project config contains unknown fields: {sorted(unknown)}", {"path": str(path)})
     if "registry" in data and not isinstance(data["registry"], str):
@@ -184,6 +198,8 @@ def _load_project_config(path: Path, *, root_path: Path) -> Mapping[str, Any]:
         raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.QUALITY", "project config quality_enabled must be a boolean", {"path": str(path)})
     _project_quality_structure(data, path)
     _project_runtime_options(data, path)
+    project_descriptor_paths(data, path)
+    project_javascript_options(data, path)
     project_architecture_documents(data, root_path=root_path, path=path)
     return data
 
