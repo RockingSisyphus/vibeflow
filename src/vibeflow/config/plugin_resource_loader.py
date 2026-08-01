@@ -85,10 +85,12 @@ def _registered_plugin_resource(spec: Mapping[str, object], item: object, *, reg
 
 def _overlay_plugin_metadata(resource: PluginResource, spec: Mapping[str, object]) -> PluginResource:
     metadata = _resource_metadata(spec)
+    status = str(spec.get("status", resource.status)).strip() or resource.status
     return replace(
         resource,
         name=str(spec.get("name", resource.name)).strip() or resource.name,
         plugin_type=str(spec.get("type", resource.plugin_type)).strip() or resource.plugin_type,
+        status=status if status in STATUSES else resource.status,
         class_name=str(spec.get("class", spec.get("factory", resource.class_name))).strip() or resource.class_name,
         display_name=metadata["display_name"] or resource.display_name,
         category=metadata["category"] or resource.category,

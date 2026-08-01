@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -26,6 +26,7 @@ from vibeflow.aot.project_resources import (
 )
 from vibeflow.compiler import CompiledGraph, GraphCompiler
 from vibeflow.config.loader import load_workspace_config_document
+from vibeflow.config.resources import host_extension_resources
 from vibeflow.descriptors import (
     BaseLibCatalog,
     DescriptorCatalogs,
@@ -92,7 +93,10 @@ class PreparedProjectBuild:
     used_base_libs: tuple[str, ...]
     used_capabilities: tuple[str, ...]
     used_host_extensions: tuple[str, ...]
+    declared_host_extensions: tuple[Mapping[str, Any], ...]
+    planned_host_extensions: tuple[str, ...]
     host_extensions: tuple[Mapping[str, Any], ...]
+    warnings: tuple[Mapping[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -255,11 +259,36 @@ def prepare_project_build(request: ProjectBuildRequest) -> PreparedProjectBuild:
         implementations=state.implementations,
     )
     javascript = _javascript_options(root)
+    uses_legacy_host_extensions = (
+        "host_extensions" not in document.data
+        and bool(javascript["host_extensions"])
+    )
+    declared_host_extensions = _declared_host_extensions(
+        document.data,
+        legacy_ids=tuple(javascript["host_extensions"]),
+        catalog=catalogs.host_extensions,
+    )
+    implemented_host_extensions = tuple(
+        item.id
+        for item in declared_host_extensions
+        if item.status == "implemented"
+    )
+    planned_host_extensions = frozenset(
+        item.id
+        for item in declared_host_extensions
+        if item.status == "planned"
+    )
     host_extensions = _host_extension_closure(
-        tuple(javascript["host_extensions"]),
+        implemented_host_extensions,
         catalogs=catalogs,
         target=request.target,
         project_root=root.path,
+        configurations={
+            item.id: dict(item.config)
+            for item in declared_host_extensions
+            if item.status == "implemented"
+        },
+        planned=planned_host_extensions,
     )
     package_root = _safe_project_path(
         root.path,
@@ -303,7 +332,25 @@ def prepare_project_build(request: ProjectBuildRequest) -> PreparedProjectBuild:
         used_host_extensions=tuple(
             str(item["id"]) for item in host_extensions
         ),
+        declared_host_extensions=tuple(
+            item.to_dict() for item in declared_host_extensions
+        ),
+        planned_host_extensions=tuple(sorted(planned_host_extensions)),
         host_extensions=host_extensions,
+        warnings=(
+            (
+                {
+                    "code": "VF_AOT_HOST_EXTENSION_LEGACY_SELECTION",
+                    "message": (
+                        "javascript.host_extensions is deprecated; select "
+                        "host extensions in the workflow-level "
+                        "host_extensions list"
+                    ),
+                },
+            )
+            if uses_legacy_host_extensions
+            else ()
+        ),
     )
 
 
@@ -330,6 +377,75 @@ def build_project_aot(request: ProjectBuildRequest) -> ProjectBuildResult:
         )
     )
     return ProjectBuildResult(prepared=prepared, build=result)
+
+
+def _declared_host_extensions(
+    config: Mapping[str, Any],
+    *,
+    legacy_ids: tuple[str, ...],
+    catalog: object,
+):
+    if "host_extensions" not in config:
+        config = {
+            **config,
+            "host_extensions": list(legacy_ids),
+        }
+    findings: list[object] = []
+    resources = host_extension_resources(config, findings=findings)
+    errors = [
+        finding
+        for finding in findings
+        if str(getattr(finding, "severity", "error")) == "error"
+    ]
+    if errors:
+        first = errors[0]
+        raise ProjectBuildError(
+            "VF_AOT_HOST_EXTENSION_CONFIG",
+            (
+                f"{getattr(first, 'rule_id', 'HOST_EXTENSION.CONFIG')}: "
+                f"{getattr(first, 'message', str(first))}"
+            ),
+        )
+    resolved = []
+    for resource in resources:
+        descriptor = catalog.get(resource.id)
+        if descriptor is None:
+            resolved.append(resource)
+            continue
+        contract = {
+            "targets": tuple(descriptor.targets),
+            "provides": tuple(descriptor.provides),
+            "dependencies": tuple(descriptor.dependencies),
+        }
+        for field, expected in contract.items():
+            declared = tuple(getattr(resource, field))
+            if (
+                field in resource.declared_contract_fields
+                and declared != expected
+            ):
+                raise ProjectBuildError(
+                    "VF_AOT_HOST_EXTENSION_CONFIG",
+                    (
+                        f"host_extension '{resource.id}' {field} "
+                        "must match its registered descriptor"
+                    ),
+                )
+        resolved.append(
+            replace(
+                resource,
+                display_name=(
+                    resource.display_name or descriptor.display_name
+                ),
+                description=(
+                    resource.description or descriptor.description
+                ),
+                version=resource.version or descriptor.version,
+                targets=contract["targets"],
+                provides=contract["provides"],
+                dependencies=contract["dependencies"],
+            )
+        )
+    return tuple(resolved)
 
 
 def _merged_node_catalog(

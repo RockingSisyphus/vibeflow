@@ -280,7 +280,8 @@ def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nod
     assert 'subgraph __vibeflow_layout_base_lib["base_lib"]' in mermaid
     assert "Review Policy" in mermaid
     assert "desc: Checks graph policy." in mermaid
-    assert "Future Policy" not in mermaid
+    assert "Future Policy" in mermaid
+    assert "class resource_plugins_1 plannedResource;" in mermaid
     assert "Contracts" in mermaid
     assert "desc: Shared contract helpers." in mermaid
     assert "---------- resource ----------" in mermaid

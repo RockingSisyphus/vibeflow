@@ -162,6 +162,139 @@ def test_architecture_document_is_deterministic_and_keeps_planned_and_unused_bod
     assert loop_type["contract"]["params_schema"]["node_field"] == "loop"
 
 
+def test_architecture_and_mermaid_keep_implemented_and_planned_host_extensions(
+    tmp_path,
+) -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call(
+                        "start",
+                        "test.start",
+                        "Starts the Host Extension review fixture.",
+                    )
+                ]
+            }
+        },
+        project_root=tmp_path,
+        root_id="app",
+        root_path=tmp_path,
+        source_path=tmp_path / "configs" / "main.jsonc",
+    )
+    resources = {
+        "host_extensions": [
+            {
+                "id": "app.browser_host",
+                "status": "implemented",
+                "display_name": "Browser Host",
+                "category": "host",
+                "description": "Connects the workflow to a browser host.",
+                "version": "1.0.0",
+                "targets": ["browser"],
+                "provides": ["app.port"],
+                "dependencies": [],
+                "config_keys": ["channel"],
+                "root_id": "app",
+                "root_path": str(tmp_path),
+                "source_path": str(
+                    tmp_path
+                    / "manifests"
+                    / "host_extensions"
+                    / "browser-host.jsonc"
+                ),
+            },
+            {
+                "id": "app.future_host",
+                "status": "planned",
+                "display_name": "Future Host",
+                "category": "host",
+                "description": "Records a planned host integration.",
+                "version": "0.1.0",
+                "targets": ["node"],
+                "provides": ["app.future_port"],
+                "dependencies": ["app.browser_host"],
+                "config_keys": ["mode"],
+                "root_id": "app",
+                "root_path": str(tmp_path),
+                "source_path": str(tmp_path / "configs" / "main.jsonc"),
+            },
+        ]
+    }
+
+    payload = build_architecture_document(
+        graph,
+        registry=_registry(),
+        resources=resources,
+    )
+
+    assert payload["resources"]["host_extensions"] == [
+        {
+            "effect_scope": "trusted",
+            "targets": ["browser"],
+            "provides": ["app.port"],
+            "dependencies": [],
+            "config_keys": ["channel"],
+            "id": "app.browser_host",
+            "status": "implemented",
+            "display_name": "Browser Host",
+            "category": "host",
+            "description": "Connects the workflow to a browser host.",
+            "version": "1.0.0",
+            "source": {
+                "root_id": "app",
+                "path": "manifests/host_extensions/browser-host.jsonc",
+            },
+        },
+        {
+            "effect_scope": "trusted",
+            "targets": ["node"],
+            "provides": ["app.future_port"],
+            "dependencies": ["app.browser_host"],
+            "config_keys": ["mode"],
+            "id": "app.future_host",
+            "status": "planned",
+            "display_name": "Future Host",
+            "category": "host",
+            "description": "Records a planned host integration.",
+            "version": "0.1.0",
+            "source": {"root_id": "app", "path": "configs/main.jsonc"},
+        },
+    ]
+
+    mermaid = export_mermaid(
+        graph,
+        registry=_registry(),
+        resources=resources,
+    )
+    assert "resource_host_extensions" in mermaid
+    assert "Browser Host" in mermaid
+    assert "Future Host" in mermaid
+    assert "type: host_extension" in mermaid
+    assert "targets: browser" in mermaid
+    assert "provides: app.future_port" in mermaid
+    assert "dependencies: app.browser_host" in mermaid
+    assert "class resource_host_extensions_0 hostExtensionResource;" in mermaid
+    assert "class resource_host_extensions_1 plannedResource;" in mermaid
+
+    review_mermaid = export_mermaid(
+        graph,
+        registry=_registry(),
+        resources=resources,
+        mermaid_layout="review-columns",
+    )
+    assert (
+        'subgraph __vibeflow_layout_host_extensions["host_extensions"]'
+        in review_mermaid
+    )
+    assert "Browser Host" in review_mermaid
+    assert "Future Host" in review_mermaid
+    assert (
+        "class resource_host_extensions_1 plannedResource;"
+        in review_mermaid
+    )
+
+
 def test_architecture_and_mermaid_share_edge_contract_roles_and_loop_resource_roots(tmp_path) -> None:
     graph = parse_graph_config(
         {

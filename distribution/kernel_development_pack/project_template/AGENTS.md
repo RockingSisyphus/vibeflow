@@ -68,7 +68,19 @@
 - `vibeflow.io.receive` 是 suspend，只能进入异步 JS workflow；
   `vibeflow.io.send` 是 immediate。需要回执时声明单独的 suspend Capability operation。
 - Python Runtime 路径由 `project/registry.py` 声明可用 node、base_lib 和 plugin；base_lib/plugin 的 `register(...)` 必须写 `display_name` 和 `description`。workflow config 只用 `base_lib.modules[].id` 和 `plugins[].id` 引用本流程实际使用的资源，不要把未使用资源写进 config。
+- 已登记 Python plugin 可在 workflow `plugins[]` 中标为
+  `status: "planned"`；它只进入 Architecture JSON 和图形审查，不加载实现或
+  执行 hook。实现后保留同一 ID 并切换为 `implemented`。
 - JS/TS AOT 路径由 `descriptors.nodes`、`descriptors.base_lib`、`descriptors.data_schemas`、`descriptors.capabilities` 和 `descriptors.host_extensions` 指向的 JSONC 文件声明资源；每个 descriptor 文件只描述一个资源。node 不得直接导入另一个 node，base_lib、Capability 和 Host Extension 依赖必须显式声明。
+- `descriptors.host_extensions` 只登记 project 可用扩展；当前 workflow 顶层
+  `host_extensions` 才选择实际资源。使用项支持字符串 ID，或带
+  `status: implemented | planned`、`enabled`、`config/settings`、显示元数据、
+  `targets`、`provides` 和 `dependencies` 的对象。新配置不要使用兼容字段
+  `javascript.host_extensions`。
+- planned Host Extension 要进入 Architecture JSON 和 Mermaid/SVG，但不能
+  进入 bundle、生命周期或 Capability provider；implemented 扩展不能依赖
+  planned 扩展。implemented 项的 config 会为每个 host 深拷贝并递归冻结为
+  `context.config`。扩展工厂必须同步返回实例；`start()` / `stop()` 可异步。
 - `vibeflow_project.jsonc` 的 Python Runtime 配置可包含 `registry`、`quality_enabled`、`quality`、可选 `runtime` 和 `architecture.documents`；JS/TS AOT 配置还可包含 `descriptors` 与 `javascript`。不要删除或禁止这些 AOT 字段。`runtime.async_max_workers` 控制每个 Python Runtime 自有线程池并发数（默认 4），`runtime.async_flush_timeout` 控制 detached task 收尾等待（默认 `null`，可设非负秒数），`runtime.nodeset_max_depth` 控制普通 nodeset 与 `loop.body` 的最大静态嵌套深度（默认 4）。
 - `project/ARCHITECTURE.jsonc` 是由真实 workflow、nodeset、registry 和资源配置确定性生成的单文件审查视图。在判断、解释或修改项目架构前，必须优先阅读它来了解入口流程、调用层级、节点职责、数据契约和配置来源。不要手工编辑它，也不要把它当成可执行 config；要改变项目架构，必须修改 `project/configs/*.jsonc` 中的真实 workflow config 或其导入的相关 nodeset JSONC，必要时再修改 registry metadata/config schema。单独的 `python run.py architecture ...` 只用于缺失文档的预读修复或单项诊断；正式审核必须使用会自动更新文档的 `python run.py review ...`。
 - 节点自定义颜色只能写在 `style.fill`、`style.stroke`、`style.text` 中，颜色必须是 `#RRGGBB`，且不得使用 VibeFlow 系统保留色。合法自定义色会覆盖节点默认/系统 class 的 fill/stroke/text 颜色，但不会取消 external node 的 `7px` non-scaling 粗边框。
@@ -133,7 +145,7 @@ Python Runtime 如需内核公开 API，只通过 `from vibeflow import ...` 使
 3. planned node 必须声明 `id`、`display_name`、`description` 和 `flow_kind`；planned nodeset 必须声明 `type_key`、`display_name`、`description`、`requires` 和 `provides`。它可以无 body 占位，也可以用 planned nodes/edges 细化；默认 `planned_behavior` 是 `blocking`。
 4. 执行 `python run.py review --config project/configs/main.jsonc --output reports/graph.expanded.svg` 生成正式审核产物。该命令会更新登记架构文档，无需先用多条命令手工拼接审核流程。
 5. 告知人类审核员查看 `project/ARCHITECTURE.jsonc` 和 `reports/graph.expanded.svg`。用户要求审核门时，等待后续明确批准，不在当前轮实现待审部分。
-6. 获得明确批准后才逐层实现 planned 内容。Python Runtime node 声明 `NODE_INFO`、`CONTRACT` 和 `run_pure(inputs, params)`，并在 `project/registry.py` 注册；JS/TS AOT node 导出 descriptor 指定的 `run(inputs, params, context)`，并登记 node/data/base_lib/Capability descriptor。
+6. 获得明确批准后才逐层实现 planned 内容。Python Runtime node 声明 `NODE_INFO`、`CONTRACT` 和 `run_pure(inputs, params)`，并在 `project/registry.py` 注册；JS/TS AOT node 导出 descriptor 指定的 `run(inputs, params, context)`，并登记 node/data/base_lib/Capability descriptor。实现 planned Host Extension 时登记同一 ID 的 descriptor 和源码，再把 workflow 使用项切换为 `implemented`。
 7. 真正实现 nodeset 时补齐 `requires`、`provides`、`pipeline.nodes` 和 `pipeline.edges`，移除该 nodeset 的 `status: "planned"`。只有所有子 node/nodeset 都 implemented 时，父 nodeset 才能变成 implemented；保留 planned child 时按其 behavior 接受 warning/error。
 8. 细化可以继续嵌套，但默认不得超过 4 层 nodeset/loop body；确有需要时在所属 root 的 `runtime.nodeset_max_depth` 中明确提高上限。
 9. 训练或批处理循环先把单轮 body 抽成 nodeset，再用 `vibeflow.loop.while` 调用；跨轮状态用 `loop.carry`，指标列表用 `loop.collect`，固定轮数用 `loop.stop_after`，条件退出用 bool `loop.stop_when`。

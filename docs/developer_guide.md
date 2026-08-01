@@ -7,6 +7,12 @@
 
 两条路径共享 JSONC workflow、显式 `pipeline.edges`、contract、分支、合流、nodeset、有限/永久 loop 和 `vibeflow.io` 等可移植流程语义，但实现登记、宿主能力和公共输出 ABI 不相同。不要让 JS/TS node 通过 Python registry 注册，也不要把 Python Runtime plugin 当作 AOT 宿主接口；AOT 的宿主交互使用每次调用注入的 Capability，长期宿主接线使用 JS/TS Host Extension。
 
+JS/TS project 的 `descriptors.host_extensions` 只登记可用扩展；每个 workflow
+在顶层 `host_extensions` 中按 ID 选择实际扩展。使用项支持
+`implemented | planned`、`enabled`、`config/settings` 和审查元数据。planned
+扩展会进入架构审查，但不会打包、启动或提供 Capability。项目级
+`javascript.host_extensions` 只为旧配置提供默认值，workflow 字段优先。
+
 ## 入口模式、长期 Loop 与原生 Port
 
 `pipeline.entry_mode` 为 `sync | async`，缺省 `sync`。同步 JS 构建只能使用立即完成、内联调度的实现；需要 Promise、deferred/result_key、detached 或 `vibeflow.io.receive` 时必须显式选择 `async`。Python `runtime.run()` 继续阻塞返回，旧 `async: result_key|detached` 线程池语义保持兼容。
@@ -291,7 +297,10 @@ implemented Python node 的 `NodeInfo.external=True` 会在原有 `flow_kind` �
 - `global_config` 中和 node config schema 同名的键还会覆盖 node 的实际 params；其他键只通过 `_global` 传递。
 - 推荐写成 `{"config": {...}, "allow_config_override": false}`。无论 `allow_config_override` 是否为 `true`，同名键都会覆盖局部 config；当它为 `false` 且发生覆盖时，健康检查给 warning。
 - `base_lib` 和 `plugins` 是当前 workflow 实际使用的资源引用，不进入主流程拓扑、execution plan 或 flow health 的孤儿/可达性检查。Mermaid/SVG 只画这份 effective resources；root registry 中可用但未引用的资源只在 health report 的 `available_resources` 中记录。
-- implemented plugin 必须提供 `PLUGIN_INFO`；只有当前 config 按 id 引用的 plugin 会加载、注册和执行 hook。planned 资源用 planned node/nodeset 表达，不写进 resource registry。
+- implemented plugin 必须提供 `PLUGIN_INFO`；只有当前 config 按 id 引用的
+  implemented plugin 会加载、注册和执行 hook。已登记 plugin 可在
+  `plugins[]` 中标为 `planned` 进入 Architecture JSON 和图形审查，但不加载
+  实现或执行 hook。
 - `plugins[].config` 和 `plugins[].settings` 都可传插件设置，值必须是对象；插件实例会收到 `plugin.config`，如果实现了 `configure(config)` 会在加载时被调用。
 - `requires/provides` 不会自动生成控制流或诊断边；没有显式 edge，就没有图上的边。Mermaid/SVG 只会在已有连边上显示能由 `provides.type` 匹配到下游 `requires.type` 的数据契约。
 - 每个可执行 pipeline 和 nodeset 内部 pipeline 都要有 `terminal` start/end。
@@ -684,7 +693,11 @@ plugin 可扩展治理规则，但不能绕过绝对规则。支持类型：
 - `compiler`
 - `runtime`
 
-`project/registry.py` 声明可用 plugin；config 中只有显式按 id 引用的插件会启用。implemented plugin 必须暴露 `PLUGIN_INFO`；审查图资源元数据来自 `PluginResourceRegistry.register(...)`。planned plugin 不进入 resource registry，需要计划占位时用 planned node/nodeset。
+`project/registry.py` 声明可用 plugin；config 中只有显式按 id 引用且状态为
+implemented 的插件会启用。implemented plugin 必须暴露 `PLUGIN_INFO`；审查图
+资源元数据来自 `PluginResourceRegistry.register(...)`。已登记 plugin 可在
+workflow 使用项中标为 planned；它作为资源进入架构审查，但不会注册到 active
+`PluginRegistry` 或执行 hook。
 
 所有 plugin 使用 `effect_scope=trusted`：它们可以执行 Python IO，并由项目承担信任责任；runtime plugin 也可以在 `delegate-cli` 中发出授权 `SystemExit`。这不会允许 plugin 绕过契约、拓扑、输出或不可降级的治理规则。
 

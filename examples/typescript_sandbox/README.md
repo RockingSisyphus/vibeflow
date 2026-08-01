@@ -33,10 +33,15 @@ Positive workflows:
   through a fake `sandbox.audit` Capability;
 - `project/configs/port_math.jsonc` verifies the async
   `receive → TypeScript math node/base_lib → send` Port chain;
-- `project/configs/host_extension.jsonc` uses a separately enabled
-  `sandbox.math_host` descriptor to verify import/create side-effect freedom,
-  explicit start/stop, idempotent stop, Capability injection, and manifest
-  packaging;
+- `project/configs/host_extension.jsonc` selects the implemented
+  `sandbox.math_host` at workflow scope and carries an unbundled planned Host
+  Extension for architecture review. The runnable case verifies import/create
+  side-effect freedom, explicit start/stop, idempotent stop, Capability
+  injection, instance config, and manifest packaging;
+- `project/configs/permanent_port_host.jsonc` combines an asynchronous Host
+  Extension with an unbounded loop and the
+  `receive → TypeScript math node/base_lib → send` Port path. The runner stops
+  the host while the next receive is pending and verifies `VF_ABORTED` cleanup;
 - `project/configs/runtime_node_failure.jsonc` and
   `project/configs/runtime_output_failure.jsonc` exercise the stable error ABI
   for node exceptions and output Schema failures.

@@ -20,8 +20,7 @@
   },
   "javascript": {
     "package_root": ".",
-    "external_packages": [],
-    "host_extensions": []
+    "external_packages": []
   },
   "runtime": {
     "async_max_workers": 4,

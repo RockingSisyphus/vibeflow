@@ -382,7 +382,8 @@ def _resources_document(
     base_lib = payload.get("base_lib", {})
     modules = base_lib.get("modules", ()) if isinstance(base_lib, Mapping) else ()
     plugins = payload.get("plugins", ())
-    return {
+    host_extensions = payload.get("host_extensions", ())
+    document = {
         "base_lib": [
             _resource_document(item, kind="base_lib", roots=roots)
             for item in sorted(modules, key=lambda item: (str(item.get("module", "")), str(item.get("id", ""))))
@@ -394,6 +395,17 @@ def _resources_document(
             if isinstance(item, Mapping)
         ],
     }
+    rendered_host_extensions = [
+            _resource_document(item, kind="host_extension", roots=roots)
+            for item in sorted(
+                host_extensions,
+                key=lambda item: str(item.get("id", "")),
+            )
+            if isinstance(item, Mapping)
+    ]
+    if rendered_host_extensions:
+        document["host_extensions"] = rendered_host_extensions
+    return document
 
 
 def _resource_document(item: Mapping[str, object], *, kind: str, roots: Mapping[str, str]) -> dict[str, object]:
@@ -412,6 +424,31 @@ def _resource_document(item: Mapping[str, object], *, kind: str, roots: Mapping[
     }
     if kind == "base_lib":
         return {"module": str(item.get("module", "") or ""), **common}
+    if kind == "host_extension":
+        return {
+            "effect_scope": EFFECT_SCOPE_TRUSTED,
+            "targets": sorted(
+                str(value)
+                for value in item.get("targets", ())
+                if isinstance(value, str)
+            ),
+            "provides": sorted(
+                str(value)
+                for value in item.get("provides", ())
+                if isinstance(value, str)
+            ),
+            "dependencies": sorted(
+                str(value)
+                for value in item.get("dependencies", ())
+                if isinstance(value, str)
+            ),
+            "config_keys": sorted(
+                str(key)
+                for key in item.get("config_keys", ())
+                if isinstance(key, str)
+            ),
+            **common,
+        }
     return {
         "name": str(item.get("name", "") or ""),
         "type": str(item.get("type", info_map.get("type", "")) or ""),

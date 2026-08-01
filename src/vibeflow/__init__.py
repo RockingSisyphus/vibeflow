@@ -4,7 +4,7 @@ from vibeflow.base_lib import BaseLibDependencySummary, BaseLibFinding, BaseLibM
 from vibeflow.architecture_report import build_architecture_report
 from vibeflow.config.loader import ConfigDocument, ConfigLoadError, load_config_document, strip_jsonc_comments
 from vibeflow.compiler import CompiledGraph, GraphCompileError, GraphCompiler
-from vibeflow.config.resources import BaseLibInfo, BaseLibRegistry, BaseLibResource, ConfigResources, PluginInfo, PluginResource, PluginResourceRegistry, load_config_resources
+from vibeflow.config.resources import BaseLibInfo, BaseLibRegistry, BaseLibResource, ConfigResources, HostExtensionResource, PluginInfo, PluginResource, PluginResourceRegistry, load_config_resources
 from vibeflow.data_contract import DataEnvelope, DataProvider, DataRequirement, PipelineInputSpec, PipelineOutputSpec, RunResult
 from vibeflow.descriptors import (
     BaseLibCatalog,
@@ -121,6 +121,7 @@ __all__ = [
     "build_execution_plan",
     "CompilerPlugin",
     "ConfigResources",
+    "HostExtensionResource",
     "DataEnvelope",
     "DataProvider",
     "DataRequirement",

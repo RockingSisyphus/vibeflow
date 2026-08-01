@@ -69,6 +69,7 @@ def load_workspace_resources(workspace: WorkspaceConfig) -> tuple[dict[str, Work
     base_lib_paths: list[str] = []
     base_libs: list[object] = []
     plugins: list[object] = []
+    host_extensions: list[object] = []
     registries: dict[str, WorkspaceResourceRegistries] = {}
     for root in workspace.roots:
         base_registry, plugin_registry, has_base_registry, has_plugin_registry, registry_findings = _load_root_resource_registries(root)
@@ -80,9 +81,17 @@ def load_workspace_resources(workspace: WorkspaceConfig) -> tuple[dict[str, Work
         base_lib_paths.extend(root_base_paths)
         base_libs.extend(_with_resource_source((*base_registry.resources(), *legacy_resources.base_libs), root=root))
         plugins.extend(_with_resource_source((*plugin_registry.resources(), *legacy_resources.plugins), root=root))
+        host_extensions.extend(
+            _with_resource_source(legacy_resources.host_extensions, root=root)
+        )
     return (
         registries,
-        ConfigResources(base_lib_paths=tuple(dict.fromkeys(base_lib_paths)), base_libs=tuple(base_libs), plugins=tuple(plugins)),
+        ConfigResources(
+            base_lib_paths=tuple(dict.fromkeys(base_lib_paths)),
+            base_libs=tuple(base_libs),
+            plugins=tuple(plugins),
+            host_extensions=tuple(host_extensions),
+        ),
         tuple(findings),
     )
 

@@ -63,8 +63,7 @@ project/
   },
   "javascript": {
     "package_root": ".",
-    "external_packages": [],
-    "host_extensions": ["example.browser_host"]
+    "external_packages": []
   }
 }
 ```
@@ -72,6 +71,12 @@ project/
 路径相对于 VibeFlow project root。每个目录会递归读取 `*.jsonc`；每个文件只能描述一个资源。配置过但不存在的目录、越出 project root 的路径和符号链接都会使构建失败。
 
 `javascript.package_root` 是包含 `package.json`、lockfile 和项目本地 `node_modules` 的目录。`external_packages` 中的包不会进入 bundle，而是保留给下游 bundler 或实际宿主解析。
+
+`descriptors.host_extensions` 只登记当前 project 可用的 Host Extension
+descriptor。具体 workflow 在自己的顶层 `host_extensions` 中选择实际使用的
+扩展；没有被当前 workflow 引用的扩展不会进入构建。旧项目仍可用
+`javascript.host_extensions` 提供默认选择，但这是兼容字段；只要 workflow
+显式写了 `host_extensions`，即使值是空列表，也会完全覆盖该默认值。
 
 ## 3. 五类 JSONC descriptor
 
@@ -275,6 +280,61 @@ Host Extension 是 JS/TS AOT 的宿主接线资源，不是普通流程 node，�
 扩展工厂返回 `{ capabilities?, start(), stop() }`。VibeFlow 会静态检查 target、依赖、Capability 和 import 边界，将源码打入 AOT 产物，并生成显式的 `createWorkflowHost()`。每个 host 拥有独立的 extension instance；`start()` 按依赖顺序执行，`stop()` 反向、幂等执行，部分启动失败时会清理已启动扩展。import、创建 host 和 `web-app` 本身都不会自动 start。
 
 普通 node 不得注册长期监听器；这类宿主事件接线应放在 Host Extension 中。Host Extension 不能导入 node、`base_lib` 私有实现、Python runtime/plugin 或业务 registry，也不能绕过 workflow 的 Capability 契约。
+
+### 3.6 在 workflow 中使用 Host Extension
+
+顶层 `host_extensions` 接受字符串 ID 或对象：
+
+```jsonc
+{
+  "host_extensions": [
+    "example.browser_host",
+    {
+      "id": "example.configured_host",
+      "status": "implemented",
+      "enabled": true,
+      "config": {"channel": "primary"}
+    },
+    {
+      "id": "example.future_host",
+      "status": "planned",
+      "display_name": "Future Host",
+      "description": "Connects a future host environment.",
+      "category": "host",
+      "version": "0.1.0",
+      "targets": ["browser"],
+      "provides": ["example.clock"],
+      "dependencies": []
+    }
+  ],
+  "pipeline": {
+    "entry_mode": "sync",
+    "nodes": []
+  }
+}
+```
+
+字符串等价于 `{"id": "...", "status": "implemented"}`。对象支持：
+
+- `id`：稳定资源 ID；
+- `status`：`implemented | planned`，缺省 `implemented`；
+- `enabled`：`false` 时忽略该项；
+- `config` / `settings`：扩展实例配置，两者均要求对象；
+- `display_name`、`description`、`category`、`version`：审查元数据；
+- `targets`、`provides`、`dependencies`：资源契约。
+
+implemented 扩展必须能从 `descriptors.host_extensions` 登记的 catalog 中解析。
+workflow 若填写 `targets`、`provides` 或 `dependencies`，内容必须与 descriptor
+一致。构建只解析、检查和打包 implemented 扩展及其 implemented 依赖；其
+`config` 会为每个 host 深拷贝、递归冻结后作为 `context.config` 传给
+`createHostExtension(context)`。工厂本身必须同步返回实例；`async` 工厂或
+Promise 返回类型会在构建期失败，但实例的 `start()` / `stop()` 可以异步。
+
+planned 扩展可以暂时没有 descriptor 或源码，但应填写足够的显示信息和资源
+契约，以便 Architecture JSON、Mermaid 和 SVG 审查。它不会被打包，不会创建
+实例或执行 `start()`/`stop()`，也不算作已经提供 Capability。implemented
+扩展不能依赖 planned 扩展；这种依赖在 AOT 构建期失败。把资源实现后，登记
+descriptor 并将 workflow 中同一 ID 的 `status` 改为 `implemented`。
 
 ## 4. Node 调用 ABI
 
@@ -505,6 +565,10 @@ try {
 ```
 
 异步 workflow 的 host handle 对应提供 `runWorkflowAsync()`。Host 自动合并扩展提供的 Capability；底层 `runWorkflow()`/`runWorkflowAsync()` 仍可被直接调用并手工注入 fake 或真实 Capability。
+
+扩展工厂收到的 context 至少包含扩展 ID、冻结的 workflow 配置、该 host 的
+`AbortSignal` 和对应工作流入口。配置来自 workflow 顶层
+`host_extensions[].config`（或 `settings`），不是项目级全局可变状态。
 
 ### 原生 Port 与长期 workflow
 

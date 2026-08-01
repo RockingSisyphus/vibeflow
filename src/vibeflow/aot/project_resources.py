@@ -189,14 +189,25 @@ def host_extension_closure(
     catalogs: DescriptorCatalogs,
     target: str,
     project_root: Path,
+    configurations: Mapping[str, Mapping[str, Any]] | None = None,
+    planned: frozenset[str] = frozenset(),
 ) -> tuple[Mapping[str, Any], ...]:
     ordered: list[Mapping[str, Any]] = []
     complete: set[str] = set()
     active: list[str] = []
+    extension_config = configurations or {}
 
     def visit(extension_id: str) -> None:
         if extension_id in complete:
             return
+        if extension_id in planned:
+            raise ProjectBuildError(
+                "VF_AOT_HOST_EXTENSION_PLANNED_DEPENDENCY",
+                (
+                    f"implemented host_extension depends on planned "
+                    f"host_extension '{extension_id}'"
+                ),
+            )
         if extension_id in active:
             start = active.index(extension_id)
             cycle = " -> ".join((*active[start:], extension_id))
@@ -269,6 +280,7 @@ def host_extension_closure(
                 "export": mapping["export"],
                 "dependencies": list(descriptor.dependencies),
                 "provides": list(descriptor.provides),
+                "config": dict(extension_config.get(descriptor.id, {})),
                 "external_packages": list(
                     descriptor.external_packages
                 ),
@@ -505,6 +517,26 @@ def import_policy(
                 owner["completion"] = str(
                     selected.get("completion", "immediate")
                 )
+        elif kind == "host_extension":
+            selected = next(
+                (
+                    extension
+                    for extension in host_extensions
+                    if str(extension.get("id", "")) == resource_id
+                    and Path(
+                        str(extension.get("module", ""))
+                    ).resolve() == path
+                ),
+                None,
+            )
+            if selected is not None:
+                owner["export"] = str(
+                    selected.get("export", "createHostExtension")
+                )
+                # host_extension_closure rejects any descriptor whose factory
+                # is not declared immediate. Carry that contract into the
+                # TypeScript policy so the source implementation is verified.
+                owner["completion"] = "immediate"
         owners.append(owner)
     return {
         "owners": owners,

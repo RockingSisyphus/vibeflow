@@ -156,7 +156,8 @@ class Plugin:
     assert "resource_plugins" in output
     assert "Config Policy" in output
     assert "desc: Config-level policy declaration." in output
-    assert "future_policy" not in output
+    assert "future_policy" in output
+    assert "class resource_plugins_1 plannedResource;" in output
 
 
 def test_cli_export_svg_reads_jsonc(tmp_path, capsys) -> None:

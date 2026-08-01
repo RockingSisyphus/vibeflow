@@ -68,6 +68,12 @@ python examples/typescript_sandbox/run_all.py --skip-browser
 `--skip-browser`。沙箱会直接从 `kernel/vibeflow-kernel.zip` 导入内核；分发
 构建不会安装依赖，`node_modules/`、`reports/` 和 `runs/` 不进入分发包。
 
+`descriptors.host_extensions` 只登记 project 可用扩展；每个 workflow 在顶层
+`host_extensions` 中选择实际使用的 ID。字符串表示 implemented 扩展，对象还
+可写 `status`、`enabled`、`config/settings` 和审查元数据。planned 扩展进入
+Architecture JSON 与 Mermaid/SVG，但不会打包、启动或提供 Capability。
+项目级 `javascript.host_extensions` 只用于兼容没有 workflow 字段的旧配置。
+
 默认项目把 `project/configs/main.jsonc` 登记到 `project/ARCHITECTURE.jsonc`。这是带固定“生成且不可执行”头注释的单文件架构审查文档，不是 workflow config；AI 和开发者应先用它理解入口流程、nodeset 调用、节点职责、数据契约、资源和配置来源。架构变更必须落到真实 workflow config、相关 nodeset、registry metadata/config schema 或资源声明中。正式 `review` 会自动重新生成登记文档、执行正式 validate，并且只在 canonical expanded SVG 结构检查通过后发布 SVG；失败时不得用 mmdc、手写 SVG 或旧产物补位。
 
 CLI 让渡模式 / `delegate-cli` 用于把 workflow 当成普通业务 CLI。首个 `--` 可选地分隔 core 与业务参数；让渡 token 以 `cli.argv` 进入图，图以唯一 `cli.exit_code` 返回非 bool 整数 `0..255`。业务使用真实 stdin/stdout/stderr，VibeFlow 诊断只写当次 run 的 `vibeflow.log`。授权 `SystemExit(None)` 返回 0，合法整数原样返回；框架/未授权退出错误返回 1，已知 core 参数的 argparse 错误返回 2。详细终端/IO/授权规则见 `kernel/docs/07_启动命令与报告.md`。`run` 与 `review` 的原职责不变。

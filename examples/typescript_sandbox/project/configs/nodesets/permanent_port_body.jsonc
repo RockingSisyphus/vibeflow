@@ -1,0 +1,75 @@
+{
+  "type_key": "sandbox.permanent_port_body",
+  "display_name": "Permanent Port iteration",
+  "description": "Receives one value, applies TypeScript math, and sends the result.",
+  "requires": [],
+  "provides": [],
+  "pipeline": {
+    "entry_mode": "async",
+    "nodes": [
+      {
+        "id": "receive",
+        "type_used": "vibeflow.io",
+        "display_name": "Receive number",
+        "description": "Waits for the next number from the sandbox Port.",
+        "provides": [
+          {
+            "key": "number",
+            "type": "sandbox.number",
+            "display_name": "Received number"
+          }
+        ],
+        "io": {
+          "operation": "receive",
+          "port": "sandbox.permanent.in"
+        }
+      },
+      {
+        "id": "calculate",
+        "type_used": "sandbox.math",
+        "display_name": "Calculate result",
+        "description": "Applies x * 3 + 2 through the TypeScript math base_lib.",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Received number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "result",
+            "type": "sandbox.math.result",
+            "display_name": "Calculated result"
+          }
+        ],
+        "config": {
+          "scale": 3,
+          "offset": 2
+        }
+      },
+      {
+        "id": "send",
+        "type_used": "vibeflow.io",
+        "display_name": "Send result",
+        "description": "Submits the calculated result to the sandbox Port.",
+        "requires": [
+          {
+            "type": "sandbox.math.result",
+            "cardinality": "exactly_one",
+            "display_name": "Calculated result"
+          }
+        ],
+        "io": {
+          "operation": "send",
+          "port": "sandbox.permanent.out"
+        }
+      }
+    ],
+    "edges": [
+      {"from": "receive", "to": "calculate"},
+      {"from": "calculate", "to": "send"}
+    ],
+    "outputs": []
+  }
+}

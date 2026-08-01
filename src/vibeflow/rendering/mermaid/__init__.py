@@ -120,9 +120,30 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
     if graph.root_id or graph.root_path or graph.source_path:
         payload["graph_source"] = {"root_id": graph.root_id, "root_path": graph.root_path, "source_path": graph.source_path}
     resource_payload = _resources_payload(resources)
+    if _resource_payload_has_planned(resource_payload):
+        payload["production_ready"] = False
     if resource_payload:
         payload["resources"] = resource_payload
     return payload
+
+
+def _resource_payload_has_planned(
+    payload: Mapping[str, object],
+) -> bool:
+    groups: list[object] = [
+        payload.get("plugins", ()),
+        payload.get("host_extensions", ()),
+    ]
+    base_lib = payload.get("base_lib", {})
+    if isinstance(base_lib, Mapping):
+        groups.append(base_lib.get("modules", ()))
+    return any(
+        isinstance(item, Mapping)
+        and str(item.get("status", "implemented")) == STATUS_PLANNED
+        for group in groups
+        if isinstance(group, list)
+        for item in group
+    )
 
 
 class _MermaidRenderer:
@@ -277,6 +298,20 @@ class _MermaidRenderer:
             child_shape="hex",
             resources=plugins,
             label_kind="plugin",
+            indent=indent,
+        )
+        host_extensions = _mapping_items(
+            payload.get("host_extensions", ())
+        )
+        self._render_resource_group(
+            lines,
+            root_id="resource_host_extensions",
+            root_label="host_extensions",
+            root_class="hostExtensionResource",
+            child_class="hostExtensionResource",
+            child_shape="hex",
+            resources=host_extensions,
+            label_kind="host_extension",
             indent=indent,
         )
 

@@ -11,8 +11,7 @@
   },
   "javascript": {
     "package_root": ".",
-    "external_packages": [],
-    "host_extensions": ["sandbox.math_host"]
+    "external_packages": []
   },
   "quality_enabled": false
 }

@@ -2532,3 +2532,176 @@ def test_real_typescript_rejects_class_definition_side_effects(
     assert "VF_IMPORT_SIDE_EFFECT" in {
         diagnostic.get("code") for diagnostic in caught.value.diagnostics
     }
+
+
+def _host_extension_build_request(
+    project: Path,
+    *,
+    factory_source: str,
+    entry_mode: str = "sync",
+    target: str = "node",
+    profile: str = "single-esm",
+) -> BuildRequest:
+    node = project / "node.ts"
+    extension = project / "host-extension.ts"
+    node.write_text("export function run() { return {}; }\n", encoding="utf-8")
+    extension.write_text(factory_source, encoding="utf-8")
+    plan = _empty_real_plan(node)
+    plan["entry_mode"] = entry_mode
+    html_template = None
+    app_entry = None
+    if profile == "web-app":
+        html_template = project / "index.template.html"
+        html_template.write_text(
+            "<!doctype html><body><!-- VIBEFLOW_APP_ENTRY --></body>\n",
+            encoding="utf-8",
+        )
+        app_entry = project / "app.ts"
+        app_entry.write_text(
+            'import { createWorkflowHost } from "@vibeflow/workflow";\n'
+            "void createWorkflowHost;\n",
+            encoding="utf-8",
+        )
+    return BuildRequest(
+        plan=plan,
+        project_root=project,
+        package_root=project,
+        out_dir=project / "dist",
+        target=target,
+        profile=profile,
+        host_extensions=(
+            {
+                "id": "test.host",
+                "module": str(extension),
+                "export": "createHostExtension",
+                "dependencies": [],
+                "provides": [],
+            },
+        ),
+        import_policy={
+            "owners": [
+                {
+                    "path": str(node),
+                    "kind": "node",
+                    "id": "test.run",
+                    "export": "run",
+                    "completion": "immediate",
+                },
+                {
+                    "path": str(extension),
+                    "kind": "host_extension",
+                    "id": "test.host",
+                    "export": "createHostExtension",
+                    "completion": "immediate",
+                },
+            ],
+            "host_extension_dependencies": {"test.host": []},
+        },
+        html_template=html_template,
+        app_entry=app_entry,
+    )
+
+
+@pytest.mark.parametrize(
+    "factory_source",
+    [
+        (
+            "export async function createHostExtension() {\n"
+            "  return { start() {}, stop() {} };\n"
+            "}\n"
+        ),
+        (
+            "export function createHostExtension() {\n"
+            "  return Promise.resolve({ start() {}, stop() {} });\n"
+            "}\n"
+        ),
+    ],
+)
+def test_real_typescript_rejects_async_host_extension_factory(
+    tmp_path: Path,
+    factory_source: str,
+) -> None:
+    project = _real_toolchain_project(tmp_path)
+
+    with pytest.raises(AotBuildError) as caught:
+        build_aot(
+            _host_extension_build_request(
+                project,
+                factory_source=factory_source,
+            )
+        )
+
+    assert "VF_COMPLETION_IMMEDIATE_PROMISE" in {
+        diagnostic.get("code") for diagnostic in caught.value.diagnostics
+    }
+    assert any(
+        "host_extension 'test.host' factory" in str(
+            diagnostic.get("message", "")
+        )
+        for diagnostic in caught.value.diagnostics
+    )
+
+
+def test_real_typescript_allows_async_host_extension_start_and_stop(
+    tmp_path: Path,
+) -> None:
+    project = _real_toolchain_project(tmp_path)
+
+    result = build_aot(
+        _host_extension_build_request(
+            project,
+            factory_source=(
+                "export function createHostExtension() {\n"
+                "  return {\n"
+                "    async start() { await Promise.resolve(); },\n"
+                "    stop() { return Promise.resolve(); },\n"
+                "  };\n"
+                "}\n"
+            ),
+        )
+    )
+
+    assert result.entry.is_file()
+
+
+@pytest.mark.parametrize(
+    ("target", "profile"),
+    [
+        ("node", "esm-module"),
+        ("node", "single-esm"),
+        ("browser", "esm-module"),
+        ("browser", "single-esm"),
+        ("browser", "web-app"),
+    ],
+)
+def test_real_typescript_builds_async_workflow_host_in_all_profiles(
+    tmp_path: Path,
+    target: str,
+    profile: str,
+) -> None:
+    project = _real_toolchain_project(tmp_path)
+
+    result = build_aot(
+        _host_extension_build_request(
+            project,
+            factory_source=(
+                "export function createHostExtension() {\n"
+                "  return { start() {}, stop() {} };\n"
+                "}\n"
+            ),
+            entry_mode="async",
+            target=target,
+            profile=profile,
+        )
+    )
+
+    assert result.entry.is_file()
+    declaration_files = [
+        result.out_dir / name
+        for name in result.files
+        if name.endswith(".d.ts")
+    ]
+    assert len(declaration_files) == 1
+    declaration = declaration_files[0].read_text(encoding="utf-8")
+    assert "runWorkflowAsync(" in declaration
+    assert "): Promise<WorkflowOutputs>;" in declaration

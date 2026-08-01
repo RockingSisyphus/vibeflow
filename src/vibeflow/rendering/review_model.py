@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Mapping
 
-from vibeflow.graph_config import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, LoopSpec, NodeSpec, NodesetSpec, STATUS_IMPLEMENTED, STATUS_PLANNED
+from vibeflow.graph_config import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, LoopSpec, NodeSpec, NodesetSpec, STATUS_PLANNED
 from vibeflow.node import EFFECT_SCOPE_NONE, effective_effect_scope
 
 if TYPE_CHECKING:
@@ -195,6 +195,10 @@ def rendered_resources_payload(resources: object | None, graph: GraphConfig | No
         return {}
     root_ids = graph_root_ids(graph)
     plugins = _rendered_resource_items(mapping_items(payload.get("plugins", ())), root_ids=root_ids)
+    host_extensions = _rendered_resource_items(
+        mapping_items(payload.get("host_extensions", ())),
+        root_ids=root_ids,
+    )
     base_lib_payload = payload.get("base_lib", {})
     modules = _rendered_resource_items(
         mapping_items(base_lib_payload.get("modules", ()) if isinstance(base_lib_payload, Mapping) else ()),
@@ -205,6 +209,8 @@ def rendered_resources_payload(resources: object | None, graph: GraphConfig | No
         result["base_lib"] = {"modules": list(modules)}
     if plugins:
         result["plugins"] = list(plugins)
+    if host_extensions:
+        result["host_extensions"] = list(host_extensions)
     return result
 
 
@@ -307,8 +313,5 @@ def _rendered_resource_items(
 
 
 def _resource_is_rendered(resource: Mapping[str, object], *, root_ids: frozenset[str]) -> bool:
-    status = str(resource.get("status", STATUS_IMPLEMENTED)).strip() or STATUS_IMPLEMENTED
-    if status != STATUS_IMPLEMENTED:
-        return False
     root_id = str(resource.get("root_id", "")).strip()
     return not root_ids or not root_id or root_id in root_ids

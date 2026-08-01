@@ -358,8 +358,9 @@ export function useCapability(inputs, _params, context) {
     )
     extension_a.write_text(
         """
-export function createHostExtension() {
+export function createHostExtension(context) {
   globalThis.__calls.push("create:a");
+  globalThis.__calls.push(`config:a:${context.config.label}`);
   return {
     capabilities: {
       "test.math": { double(value) { return value * 2; } },
@@ -450,6 +451,7 @@ export function createHostExtension() {
                 "export": "createHostExtension",
                 "provides": ["test.math"],
                 "dependencies": [],
+                "config": {"label": "primary"},
             },
             {
                 "id": "test.b",
@@ -485,10 +487,11 @@ console.log(JSON.stringify({
 
     assert result == {
         "afterImport": [],
-        "afterCreate": ["create:a", "create:b"],
+        "afterCreate": ["create:a", "config:a:primary", "create:b"],
         "answer": {"answer": 14},
         "calls": [
             "create:a",
+            "config:a:primary",
             "create:b",
             "start:a",
             "start:b",
@@ -496,6 +499,77 @@ console.log(JSON.stringify({
             "stop:a",
         ],
         "started": False,
+    }
+
+
+def test_async_host_extension_invocation_is_awaitable(
+    tmp_path: Path,
+) -> None:
+    node_module = tmp_path / "node.mjs"
+    extension = tmp_path / "extension.mjs"
+    node_module.write_text(
+        "export function run() { return {}; }\n",
+        encoding="utf-8",
+    )
+    extension.write_text(
+        """
+export function createHostExtension() {
+  return { start() {}, stop() {} };
+}
+""",
+        encoding="utf-8",
+    )
+    plan = _empty_sync_plan(node_module)
+    plan["entry_mode"] = "async"
+    emitted = emit_workflow_module(
+        plan,
+        host_extensions=(
+            {
+                "id": "test.async",
+                "module": str(extension),
+                "export": "createHostExtension",
+                "provides": [],
+                "dependencies": [],
+            },
+        ),
+    )
+    assert "async function invoke(inputs, rawOptions = {})" in emitted.source
+    workflow = tmp_path / "async-host-workflow.mjs"
+    workflow.write_text(emitted.source, encoding="utf-8")
+
+    result = _run_module(
+        workflow,
+        """
+const host = workflow.createWorkflowHost();
+const rejectedBeforeStart = host.runWorkflowAsync({});
+let beforeStartCode = null;
+try {
+  await rejectedBeforeStart;
+} catch (error) {
+  beforeStartCode = error.code;
+}
+await host.start();
+const invocation = host.runWorkflowAsync({});
+const answer = await invocation;
+await host.stop();
+console.log(JSON.stringify({
+  beforeStartWasPromise: rejectedBeforeStart instanceof Promise,
+  beforeStartCode,
+  invocationWasPromise: invocation instanceof Promise,
+  answer,
+  hasSync: "runWorkflow" in host,
+  hasAsync: "runWorkflowAsync" in host,
+}));
+""",
+    )
+
+    assert result == {
+        "beforeStartWasPromise": True,
+        "beforeStartCode": "VF_HOST_NOT_STARTED",
+        "invocationWasPromise": True,
+        "answer": {},
+        "hasSync": False,
+        "hasAsync": True,
     }
 
 
@@ -508,9 +582,19 @@ def test_host_extension_instances_are_isolated(tmp_path: Path) -> None:
     )
     extension.write_text(
         """
-export function createHostExtension() {
+export function createHostExtension(context) {
   const id = (globalThis.__nextHostId = (globalThis.__nextHostId || 0) + 1);
+  globalThis.__configs = globalThis.__configs || [];
+  globalThis.__configs.push(context.config);
   globalThis.__calls.push(`create:${id}`);
+  globalThis.__calls.push(
+    `config:${id}:${Object.isFrozen(context.config)}:${Object.isFrozen(context.config.nested)}`
+  );
+  try {
+    context.config.nested.count += 1;
+  } catch {
+    globalThis.__calls.push(`mutation-blocked:${id}`);
+  }
   return {
     start() { globalThis.__calls.push(`start:${id}`); },
     stop() { globalThis.__calls.push(`stop:${id}`); },
@@ -528,6 +612,7 @@ export function createHostExtension() {
                 "export": "createHostExtension",
                 "provides": [],
                 "dependencies": [],
+                "config": {"nested": {"count": 1}},
             },
         ),
     )
@@ -543,19 +628,33 @@ await first.start();
 await second.start();
 await first.stop();
 await second.stop();
-console.log(JSON.stringify({ calls: globalThis.__calls }));
+console.log(JSON.stringify({
+  calls: globalThis.__calls,
+  separateTopLevel: globalThis.__configs[0] !== globalThis.__configs[1],
+  separateNested: (
+    globalThis.__configs[0].nested !== globalThis.__configs[1].nested
+  ),
+  counts: globalThis.__configs.map((config) => config.nested.count),
+}));
 """,
     )
 
     assert result == {
         "calls": [
             "create:1",
+            "config:1:true:true",
+            "mutation-blocked:1",
             "create:2",
+            "config:2:true:true",
+            "mutation-blocked:2",
             "start:1",
             "start:2",
             "stop:1",
             "stop:2",
-        ]
+        ],
+        "separateTopLevel": True,
+        "separateNested": True,
+        "counts": [1, 1],
     }
 
 

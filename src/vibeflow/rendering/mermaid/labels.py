@@ -114,15 +114,24 @@ def _resource_label(resource: Mapping[str, object], *, kind: str, show_semantics
     info_map = info if isinstance(info, Mapping) else {}
     module = str(resource.get("module", "")).strip()
     name = str(resource.get("name", "")).strip()
+    stable_id = str(resource.get("id", "")).strip()
     class_name = str(resource.get("class", "")).strip()
     status = str(resource.get("status", "implemented")).strip() or "implemented"
-    display_name = _resource_value(resource, info_map, "display_name") or name or module or class_name
+    display_name = (
+        _resource_value(resource, info_map, "display_name")
+        or name
+        or stable_id
+        or module
+        or class_name
+    )
     identity_lines: list[str] = []
-    resource_id_text = name or module or class_name
+    resource_id_text = stable_id or name or module or class_name
     if resource_id_text:
         identity_lines.append(f"id: {resource_id_text}")
     if kind == "base_lib":
         identity_lines.append("type: base_lib")
+    elif kind == "host_extension":
+        identity_lines.append("type: host_extension")
     else:
         plugin_type = str(resource.get("type", info_map.get("type", ""))).strip()
         if plugin_type:
@@ -159,7 +168,21 @@ def _resource_label(resource: Mapping[str, object], *, kind: str, show_semantics
             meta_lines.append(f"version: {version}")
         if description:
             meta_lines.append(f"desc: {description}")
-        if kind == "plugin" and isinstance(config_keys, list) and config_keys:
+        if kind == "host_extension":
+            for field in ("targets", "provides", "dependencies"):
+                values = resource.get(field, ())
+                if isinstance(values, (list, tuple)) and values:
+                    meta_lines.append(
+                        f"{field}: "
+                        + ", ".join(
+                            str(item) for item in values if str(item)
+                        )
+                    )
+        if (
+            kind in {"plugin", "host_extension"}
+            and isinstance(config_keys, list)
+            and config_keys
+        ):
             meta_lines.append("config: " + ", ".join(str(key) for key in config_keys))
         if meta_lines:
             sections.append([_section_label("meta"), *meta_lines])

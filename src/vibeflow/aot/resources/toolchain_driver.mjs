@@ -884,44 +884,84 @@ function implementationDeclaration(ts, sourceFile, exportName) {
   return null;
 }
 
-function callableReturnTypeText(ts, checker, declaration) {
+function callableReturnType(ts, checker, declaration) {
   try {
     const location = declaration.name || declaration;
     const type = checker.getTypeAtLocation(location);
     const signatures = checker.getSignaturesOfType(type, ts.SignatureKind.Call);
     const signature = signatures[0];
-    if (!signature) return "";
+    if (!signature) return { type: null, text: "" };
     const returnType = typeof checker.getReturnTypeOfSignature === "function"
       ? checker.getReturnTypeOfSignature(signature)
       : signature.getReturnType();
-    return checker.typeToString(returnType);
+    return { type: returnType, text: checker.typeToString(returnType) };
   } catch {
-    return declaration.type?.getText?.() || "";
+    return {
+      type: null,
+      text: declaration.type?.getText?.() || "",
+    };
   }
 }
 
 function promiseLikeTypeText(value) {
-  return /\b(?:Promise|PromiseLike)\s*</.test(value)
-    || value === "Promise<unknown>"
-    || value === "PromiseLike<unknown>";
+  const alternatives = String(value || "")
+    .split("|")
+    .map((item) => item.trim().replace(/^\((.*)\)$/s, "$1").trim());
+  return alternatives.some(
+    (item) => /^(?:Promise|PromiseLike)\s*</.test(item),
+  );
+}
+
+function promiseLikeType(ts, checker, type, fallbackText = "") {
+  if (type) {
+    const members = Array.isArray(type.types) ? type.types : [];
+    if (members.length
+        && members.some((member) => promiseLikeType(ts, checker, member))) {
+      return true;
+    }
+    try {
+      if (typeof checker.getPromisedTypeOfPromise === "function"
+          && checker.getPromisedTypeOfPromise(type)) {
+        return true;
+      }
+    } catch {
+      // Structural thenable detection and the textual fallback remain.
+    }
+    try {
+      if (checker.getPropertyOfType(type, "then")) return true;
+    } catch {
+      // The textual fallback supports TypeScript API variants that do not
+      // expose property lookup for this type.
+    }
+  }
+  return promiseLikeTypeText(fallbackText);
 }
 
 function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
-  if (!owner || owner.kind !== "node") return [];
+  if (!owner || !["node", "host_extension"].includes(owner.kind)) return [];
   const declaration = implementationDeclaration(ts, sourceFile, owner.export);
   if (!declaration) return [];
   const findings = [];
   const completion = owner.completion || "immediate";
+  const subject = owner.kind === "host_extension"
+    ? `host_extension '${owner.id}' factory`
+    : `node '${owner.id}'`;
   const declaredAsync = hasModifier(ts, declaration, ts.SyntaxKind.AsyncKeyword);
-  const returnType = callableReturnTypeText(ts, checker, declaration);
-  const returnsPromise = promiseLikeTypeText(returnType);
+  const callableReturn = callableReturnType(ts, checker, declaration);
+  const returnType = callableReturn.text;
+  const returnsPromise = promiseLikeType(
+    ts,
+    checker,
+    callableReturn.type,
+    returnType,
+  );
   if (completion === "immediate" && (declaredAsync || returnsPromise)) {
     findings.push(importFinding(
       sourceFile,
       declaration,
       "VF_COMPLETION_IMMEDIATE_PROMISE",
-      `node '${owner.id}' declares immediate completion but '${owner.export}' is async or returns ${returnType || "a Promise"}`,
+      `${subject} declares immediate completion but '${owner.export}' is async or returns ${returnType || "a Promise"}`,
     ));
   }
   if (completion === "suspend" && !declaredAsync && !returnsPromise) {
@@ -929,9 +969,13 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
       sourceFile,
       declaration,
       "VF_COMPLETION_SUSPEND_NON_PROMISE",
-      `node '${owner.id}' declares suspend completion but '${owner.export}' does not return a Promise`,
+      `${subject} declares suspend completion but '${owner.export}' does not return a Promise`,
     ));
   }
+  // A host extension's factory must be immediate, but its returned start/stop
+  // methods may suspend. The descriptor check above is therefore the complete
+  // factory audit; Promise ownership rules below remain specific to nodes.
+  if (owner.kind === "host_extension") return findings;
 
   function callName(node) {
     if (!ts.isCallExpression(node)) return "";
@@ -952,8 +996,12 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
     if (ts.isVoidExpression(node)) {
       let discardedPromise = false;
       try {
-        discardedPromise = promiseLikeTypeText(
-          checker.typeToString(checker.getTypeAtLocation(node.expression)),
+        const expressionType = checker.getTypeAtLocation(node.expression);
+        discardedPromise = promiseLikeType(
+          ts,
+          checker,
+          expressionType,
+          checker.typeToString(expressionType),
         );
       } catch {
         // A plain `void value` remains legal when the checker cannot prove
@@ -972,8 +1020,12 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
       const name = callName(node);
       let callReturnsPromise = false;
       try {
-        callReturnsPromise = promiseLikeTypeText(
-          checker.typeToString(checker.getTypeAtLocation(node)),
+        const callType = checker.getTypeAtLocation(node);
+        callReturnsPromise = promiseLikeType(
+          ts,
+          checker,
+          callType,
+          checker.typeToString(callType),
         );
       } catch {
         // The syntax checks below remain authoritative when a checker cannot

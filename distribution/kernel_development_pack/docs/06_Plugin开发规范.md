@@ -31,6 +31,16 @@ def build_plugin_registry() -> PluginResourceRegistry:
         description="Runtime hook used by selected workflows.",
         version="0.1.0",
     )
+    registry.register(
+        "future_policy",
+        module="plugins.future_policy",
+        class_name="FuturePolicy",
+        plugin_type="policy",
+        display_name="Future Policy",
+        category="policy",
+        description="Planned policy checks.",
+        version="0.1.0",
+    )
     return registry
 ```
 
@@ -45,6 +55,11 @@ workflow config 再按 id 启用本流程实际使用的插件：
     },
     {
       "id": "runtime_hook"
+    },
+    {
+      "id": "future_policy",
+      "status": "planned",
+      "config": {"mode": "review"}
     }
   ]
 }
@@ -63,6 +78,7 @@ config 字段说明：
 - `id`：必须引用当前 root `build_plugin_registry()` 中已注册的插件。
 - `priority`：数字越小越先执行。
 - `enabled`：设为 `false` 时跳过。
+- `status`：`implemented | planned`，缺省 `implemented`。
 - `config` / `settings`：传给插件的设置对象。
 - `conflict`：重复插件名时可设为 `replace`。
 - `name`：可覆盖插件实例的 `name`。
@@ -72,7 +88,13 @@ config 字段说明：
 
 `module` 既可以是模块名，也可以是 `.py` 文件路径。写成路径时，相对 registry 所属 root 目录解析。模板里通常写 `plugins.policy` 或 `plugins/policy.py`。
 
-implemented plugin 必须暴露 `PLUGIN_INFO`，用于实现自检和 inspect 信息。审查图里的资源名称、类别、版本和说明来自 `build_plugin_registry().register(...)`。未在当前 workflow config 中引用的 registered plugin 不会加载、不会注册到 active `PluginRegistry`，也不会执行任何 policy/compiler/runtime hook。planned plugin 不进入 resource registry；需要计划占位时，用 planned node 或 planned nodeset 表达。
+implemented plugin 必须暴露 `PLUGIN_INFO`，用于实现自检和 inspect 信息。审查图里的资源名称、类别、版本和说明来自 `build_plugin_registry().register(...)`。未在当前 workflow config 中引用的 registered plugin 不会加载、不会注册到 active `PluginRegistry`，也不会执行任何 policy/compiler/runtime hook。workflow 可以把已登记 plugin 标为 `planned`；它会作为 planned resource 进入 Architecture JSON 和 Mermaid/SVG，使项目不再 production-ready，但不会加载实现、注册 active plugin 或执行 hook。实现完成后保留同一 ID 并把使用项改为 `implemented`。
+
+JS/TS Host Extension 使用同样的“项目登记可用资源、workflow 显式引用、
+planned 只参加审查”模式，但不是 Python plugin。它由
+`descriptors.host_extensions` 登记并由 workflow 顶层 `host_extensions`
+选择；具体 descriptor、配置和生命周期规则见
+`11_JS_TS与Web_AOT构建指南.md`。
 
 旧 inline `module` / `class` 写法短期兼容，但在 registry-backed config 中会产生 legacy warning；新项目不要使用。
 

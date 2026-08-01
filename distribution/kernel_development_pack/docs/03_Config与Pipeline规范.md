@@ -164,7 +164,11 @@ workspace 模式下，node registry 按 `roots` 顺序加载，但 Python node �
 
 ## 顶层资源声明
 
-`global_config` 是 pipeline config 的运行参数元数据。`base_lib`、`plugins` 是当前 workflow 实际使用的资源引用；它们不会进入 `GraphConfig.nodes`、execution plan、`effective_edges` 或孤儿节点/可达性等 flow health 检查。Mermaid/SVG 会把当前 workflow 的 effective resources 画成独立资源区；root registry 中可用但未引用的资源只会出现在健康报告的 `available_resources`，不会出现在审查图中。
+`global_config` 是 pipeline config 的运行参数元数据。`base_lib`、`plugins` 和
+`host_extensions` 是当前 workflow 实际使用的资源引用；它们不会进入
+`GraphConfig.nodes`、execution plan、`effective_edges` 或孤儿节点/可达性等
+flow health 检查。Mermaid/SVG 会把当前 workflow 的 effective resources
+画成独立资源区；root 中可用但未引用的资源不会出现在审查图中。
 
 ```jsonc
 {
@@ -180,6 +184,22 @@ workspace 模式下，node registry 按 `roots` 顺序加载，但 Python node �
       "config": {"level": "strict"}
     }
   ],
+  "host_extensions": [
+    {
+      "id": "browser_host",
+      "status": "implemented",
+      "config": {"channel": "primary"}
+    },
+    {
+      "id": "future_host",
+      "status": "planned",
+      "display_name": "Future Host",
+      "description": "Connects a future host environment.",
+      "targets": ["browser"],
+      "provides": ["project.port"],
+      "dependencies": []
+    }
+  ],
   "pipeline": {"nodes": []}
 }
 ```
@@ -190,9 +210,24 @@ workspace 模式下，node registry 按 `roots` 顺序加载，但 Python node �
 - `base_lib.modules` 在 registry-backed config 中写 id 引用；未在当前 root `build_base_lib_registry()` 注册的 id 会报 `CONFIG.RESOURCE.UNKNOWN_BASE_LIB`。
 - `plugins[]` 在 registry-backed config 中写 id 引用；未在当前 root `build_plugin_registry()` 注册的 id 会报 plugin config error。
 - `plugins[].config` 和 `plugins[].settings` 都可传插件设置，值必须是对象；插件实例会收到 `plugin.config`，如果实现了 `configure(config)` 会在加载时被调用。
+- `plugins[].status` 支持 `implemented | planned`。planned plugin 出现在资源
+  审查中并使配置不再 production-ready，但不会加载实现或执行 hook。
 - base_lib/plugin 的 `display_name`、`description`、`category`、`version` 来自 registry；源码中的 `BASE_LIB_INFO` / `PLUGIN_INFO` 仍用于实现自检和补充 inspect 信息。
+- `host_extensions[]` 只用于 JS/TS AOT。字符串项等价于 implemented ID；对象
+  支持 `id`、`status: implemented | planned`、`enabled`、
+  `config/settings`、显示元数据、`targets`、`provides` 和 `dependencies`。
+- `descriptors.host_extensions` 在 project 配置中登记可用 descriptor；
+  workflow 顶层 `host_extensions` 选择本流程实际使用的扩展。implemented
+  扩展必须解析到登记 descriptor；配置会为每个 host 深拷贝并递归冻结为
+  `context.config`。`createHostExtension()` 必须同步返回实例，`start()` /
+  `stop()` 可异步。旧 `javascript.host_extensions` 仅在 workflow
+  未声明该字段时提供兼容默认值。
+- planned Host Extension 可暂时没有 descriptor 或源码，会进入 Architecture
+  JSON 和 Mermaid/SVG，但不会打包、启动或提供 Capability。implemented
+  扩展不能依赖 planned 扩展。
 - 旧 inline `module` / `class` 写法短期兼容，但在 registry-backed config 中会产生 `CONFIG.SMELL.LEGACY_INLINE_RESOURCE` warning；新模板和新项目不要使用。
-- planned 资源不进入 resource registry；需要规划占位时，写 planned node 或 planned nodeset。
+- Python base_lib/plugin 的规划仍使用相应资源规则；不要把 Host Extension 的
+  descriptor/AOT 生命周期写成 Python registry/plugin。
 
 只有当前 workflow config 通过 id 引用的 implemented base_lib 模块会进入 base_lib allowlist。某个 base_lib 即使已在 root registry 注册为可用，只要当前 config 没引用，implemented node 导入它仍会被健康检查拒绝。
 

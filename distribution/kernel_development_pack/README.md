@@ -69,10 +69,17 @@ quality、可选 runtime 和 `architecture.documents`，由
 Python/VibeFlow Runtime 的 ESM 或 Web 产物。完整 AOT 规则见
 `docs/11_JS_TS与Web_AOT构建指南.md`。
 
+Host Extension descriptor 路径只登记 project 可用资源。当前 workflow 在顶层
+`host_extensions` 中选择实际使用的 ID，也可以把尚未实现的扩展标为
+`planned` 进入 Architecture JSON 和图形审查。planned 扩展不会打包、启动或
+提供 Capability。项目级 `javascript.host_extensions` 是旧配置兼容默认值，
+新配置应使用 workflow 字段。
+
 登记的 `ARCHITECTURE.jsonc` 是从真实 workflow、nodeset 和资源配置确定性生成
 的单文件审查视图，AI 应优先读它理解项目；改变架构时修改真实 source，再重新
 生成，而不是手工编辑架构文档。Python workflow 按 id 启用当前使用的
-base_lib/plugin；AOT build 只纳入当前流程实际使用的 descriptor 依赖闭包。
+base_lib/plugin；JS/TS workflow 按 id 启用当前使用的 Host Extension；AOT
+build 只纳入当前流程实际使用的 implemented descriptor 依赖闭包。
 Python 普通 node 无 IO，需要真实副作用时使用语义正确的 `io` /
 `document` / `data_store` 或显式 trusted 边界；JS/TS node 的宿主能力必须在
 descriptor 中声明，并由同步 `runWorkflow()`、异步 `runWorkflowAsync()` 调用方或 Host Extension 注入。两条路径都不能把控制流

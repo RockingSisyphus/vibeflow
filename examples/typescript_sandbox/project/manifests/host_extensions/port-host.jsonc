@@ -1,0 +1,19 @@
+{
+  "kind": "host_extension",
+  "id": "sandbox.port_host",
+  "targets": ["browser", "node"],
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "host_extensions/port_host.ts",
+        "export": "createHostExtension"
+      }
+    }
+  ],
+  "provides": ["vibeflow.port"],
+  "dependencies": [],
+  "external_packages": []
+}

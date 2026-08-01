@@ -282,6 +282,7 @@ def _host_extension_source(
                 str(item)
                 for item in extension.get("provides", ())
             ],
+            "config": dict(extension.get("config", {})),
             "factory_index": index,
         }
         for index, extension in enumerate(host_extensions)
@@ -291,6 +292,7 @@ def _host_extension_source(
         if workflow.entry_mode == "sync"
         else "runWorkflowAsync"
     )
+    invoke_async = "" if workflow.entry_mode == "sync" else "async "
     invocation = (
         """
     try {
@@ -344,6 +346,20 @@ function __vfLinkedSignal(signals) {{
   }};
 }}
 
+function __vfFrozenHostConfig(value) {{
+  if (Array.isArray(value)) {{
+    return Object.freeze(value.map((item) => __vfFrozenHostConfig(item)));
+  }}
+  if (value && typeof value === "object") {{
+    const copy = {{}};
+    for (const [key, item] of Object.entries(value)) {{
+      copy[key] = __vfFrozenHostConfig(item);
+    }}
+    return Object.freeze(copy);
+  }}
+  return value;
+}}
+
 export function createWorkflowHost(options = {{}}) {{
   if (!options || typeof options !== "object" || Array.isArray(options)) {{
     throw __vfHostFailure(
@@ -376,7 +392,7 @@ export function createWorkflowHost(options = {{}}) {{
     return merged;
   }}
 
-  function invoke(inputs, rawOptions = {{}}) {{
+  {invoke_async}function invoke(inputs, rawOptions = {{}}) {{
     if (!started || stopPromise) {{
       throw __vfHostFailure(
         "VF_HOST_NOT_STARTED",
@@ -400,6 +416,7 @@ export function createWorkflowHost(options = {{}}) {{
     try {{
       instance = factory(Object.freeze({{
         extensionId: descriptor.id,
+        config: __vfFrozenHostConfig(descriptor.config),
         signal: controller.signal,
         {entry_name}: invoke,
       }}));

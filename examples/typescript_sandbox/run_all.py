@@ -19,7 +19,6 @@ from sandbox_support import (
     execute_cases,
     expect_build_failure,
     run_browser,
-    run_node,
     skip_case,
     validate_environment,
     write_report,
@@ -40,6 +39,7 @@ from declaration_cases import (
     typecheck_declarations,
     typecheck_optional_declarations,
 )
+from host_extension_cases import host_extension_case, permanent_port_host_case
 from runtime_cases import (
     async_capability_case,
     branch_case,
@@ -233,55 +233,6 @@ def _web_profile_case(cache: BuildCache) -> dict[str, Any]:
     return {"files": list(result.files)}
 
 
-def _host_extension_case(cache: BuildCache) -> dict[str, Any]:
-    result = build_project_aot(
-        ProjectBuildRequest(
-            workspace=PROJECT_ROOT.parent / "vibeflow_host_config.jsonc",
-            config=CONFIG_ROOT / "host_extension.jsonc",
-            out_dir=cache.root / "host_extension",
-            target="node",
-            profile="single-esm",
-        )
-    )
-    payload = run_node(
-        result.entry,
-        """
-const afterImport = [...globalThis.__vibeflowSandboxHostCalls];
-const host = workflow.createWorkflowHost();
-const afterCreate = [...globalThis.__vibeflowSandboxHostCalls];
-await host.start();
-const answer = host.runWorkflow({ x: 8 });
-await host.stop();
-await host.stop();
-assert(answer.result === 16, JSON.stringify(answer));
-assert(JSON.stringify(afterImport) === "[]", JSON.stringify(afterImport));
-assert(
-  JSON.stringify(globalThis.__vibeflowSandboxHostCalls) ===
-    '["create","start","stop"]',
-  JSON.stringify(globalThis.__vibeflowSandboxHostCalls),
-);
-process.stdout.write(JSON.stringify({
-  answer,
-  afterImport,
-  afterCreate,
-  calls: globalThis.__vibeflowSandboxHostCalls,
-}));
-""",
-        before_import="globalThis.__vibeflowSandboxHostCalls = [];",
-    )
-    manifest = json.loads(
-        (result.out_dir / "vibeflow-build.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    assert_equal(
-        manifest["host_extensions"],
-        ["sandbox.math_host"],
-        label="host extension manifest",
-    )
-    return payload
-
-
 def _atomic_failure_case(cache: BuildCache) -> dict[str, Any]:
     valid = cache.build("atomic_target", "linear.jsonc")
     before = {
@@ -407,7 +358,9 @@ def main() -> int:
                 cache, key="linear_single", profile="single-esm"
             )),
             ("profile:web-app", lambda: _web_profile_case(cache)),
-            ("host-extension:lifecycle-and-capability", lambda: _host_extension_case(cache)),
+            ("host-extension:lifecycle-and-capability", lambda: host_extension_case(cache)),
+            ("host-extension:async-permanent-port-cleanup",
+             lambda: permanent_port_host_case(cache)),
             (
                 "execution:sync-async-taskplan-metadata",
                 lambda: execution_model_case(
