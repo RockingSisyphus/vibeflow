@@ -9,6 +9,10 @@ This guide is for people changing the VibeFlow framework itself. If you are usin
 - Keep `WorkflowPlan` and `BlockPlan` language-neutral and deterministic. They may contain frozen JSON values, contracts, routes, block references, and source references, but never Python classes, callables, arbitrary objects, or emitted source code.
 - Treat the existing Python `ExecutionPlan` as a compatibility execution path. Its portable projection does not mean the Python runtime has already been replaced by an emitter.
 - Keep node, `base_lib`, data-schema, Capability, and Host Extension descriptors statically readable. When a static descriptor and legacy Python registration coexist, they must agree.
+- Treat `descriptors.host_extensions` as the availability catalog and workflow
+  `host_extensions` as the active resource list. Planned Host Extensions belong
+  in architecture output, never in bundles or lifecycle execution; the legacy
+  `javascript.host_extensions` list is only a compatibility default.
 - Keep generated JavaScript modules side-effect-free on import. Per-run state, traces, tasks, cancellation, and Capability wrappers must not leak through mutable module-level business state.
 - Keep Capability implementations invocation-scoped and host-owned. A Capability contract or import audit is an explicit dependency boundary, not a security sandbox.
 - Keep implemented `flow_kind` semantics owned by registered framework metadata, not duplicated in runnable config.

@@ -384,8 +384,12 @@ def _render_fragment(
 
 def _resource_mermaid(root_label: str, resources: tuple[Mapping[str, object], ...], *, kind: str) -> str:
     root_id = f"resource_{root_label}"
-    child_shape = "hex" if kind == "plugin" else "fr-rect"
-    child_class = "pluginResource" if kind == "plugin" else "baseLibResource"
+    child_shape = "fr-rect" if kind == "base_lib" else "hex"
+    child_class = {
+        "base_lib": "baseLibResource",
+        "plugin": "pluginResource",
+        "host_extension": "hostExtensionResource",
+    }.get(kind, "pluginResource")
     lines = [
         "flowchart LR",
         *(f"  {line}" for line in mermaid_class_def_lines(MERMAID_RESOURCE_CLASS_ORDER)),

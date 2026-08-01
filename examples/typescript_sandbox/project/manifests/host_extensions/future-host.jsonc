@@ -1,0 +1,22 @@
+{
+  "kind": "host_extension",
+  "id": "sandbox.future_host",
+  "targets": ["node"],
+  "display_name": "Future Sandbox Host",
+  "description": "Represents a future host connection for architecture review.",
+  "version": "0.1.0",
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["node"],
+      "source": {
+        "kind": "file",
+        "ref": "host_extensions/future_host.ts",
+        "export": "createHostExtension"
+      }
+    }
+  ],
+  "provides": ["sandbox.future_port"],
+  "dependencies": [],
+  "external_packages": []
+}

@@ -7,13 +7,24 @@ from typing import Any, Mapping
 from vibeflow.cli.reports import config_load_error_report, dedupe_findings, fail_report
 from vibeflow.compiler import GraphCompiler, GraphCompileError
 from vibeflow.config.loader import ConfigLoadError, load_workspace_config_document
-from vibeflow.config.resources import ConfigResources, config_base_lib_policy, load_config_resources
+from vibeflow.config.resources import (
+    ConfigResources,
+    HostExtensionResource,
+    config_base_lib_policy,
+    load_config_resources,
+    resolve_host_extension_resources,
+)
 from vibeflow.config.schema import collect_config_schema_findings
+from vibeflow.descriptors import (
+    DescriptorLoadError,
+    load_project_descriptor_catalogs,
+)
 from vibeflow.graph_config import GraphConfigError, parse_graph_config
 from vibeflow.health.types import HealthFinding, HealthReport
 from vibeflow.policy import EffectivePolicy, default_effective_policy
 from vibeflow.plugin import load_plugins_from_config
 from vibeflow.workspace.policy import resolve_workspace_effective_policy
+from vibeflow.workspace.project_options import project_javascript_options
 from vibeflow.runner import CheckedRunError, CheckedRunResult
 from vibeflow.run_directory import validate_run_id
 from vibeflow.runtime.options import RuntimeOptions, runtime_options as normalize_runtime_options
@@ -211,6 +222,10 @@ def _validate_prepared_workspace_graph(
     info["resources"] = resources.to_dict()
     info["effective_resources"] = resources.to_dict()
     info["available_resources"] = env.available_resources.to_dict()
+    info["production_ready"] = (
+        bool(info.get("production_ready", True))
+        and not resources.has_planned
+    )
     info["workspace"] = _workspace_info(workspace)
     info["explicit_edges"] = [edge.pair for edge in compiled.explicit_edges]
     info["data_edges"] = [edge.pair for edge in compiled.data_edges]
@@ -320,10 +335,80 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
         plugin_resource_registry=root_registries.plugins if root_registries and root_registries.has_plugin_registry else None,
         base_lib_paths=root_registries.base_lib_paths if root_registries else (str(root.path),),
     )
+    if "host_extensions" not in document.data:
+        javascript = project_javascript_options(
+            root.project_config,
+            root.config_path,
+        )
+        legacy_extension_ids = tuple(
+            javascript.get("host_extensions", ())
+        )
+        if legacy_extension_ids:
+            resources = replace(
+                resources,
+                host_extensions=tuple(
+                    HostExtensionResource(
+                        id=str(extension_id),
+                        root_id=root.id,
+                        root_path=str(root.path),
+                        source_path=str(root.config_path),
+                    )
+                    for extension_id in legacy_extension_ids
+                ),
+            )
+            preflight_findings.append(
+                workspace_finding(
+                    "CONFIG.SMELL.LEGACY_HOST_EXTENSION_SELECTION",
+                    (
+                        "javascript.host_extensions is deprecated; select "
+                        "host extensions in the workflow-level "
+                        "host_extensions list"
+                    ),
+                    root=root,
+                    source_path=root.config_path,
+                    object_id="javascript.host_extensions",
+                    failure_layer="host_extension",
+                    severity="warning",
+                )
+            )
+    if resources.host_extensions:
+        try:
+            descriptor_catalogs = load_project_descriptor_catalogs(
+                root.path,
+                project_config=root.config_path,
+            )
+        except DescriptorLoadError as exc:
+            preflight_findings.append(
+                workspace_finding(
+                    exc.code,
+                    exc.message,
+                    root=root,
+                    source_path=Path(exc.path or root.config_path),
+                    object_id="descriptors",
+                    failure_layer="descriptor",
+                )
+            )
+        else:
+            resolved_extensions, extension_findings = (
+                resolve_host_extension_resources(
+                    resources.host_extensions,
+                    catalog=descriptor_catalogs.host_extensions,
+                )
+            )
+            resources = replace(
+                resources,
+                host_extensions=resolved_extensions,
+            )
+            resource_findings = (*resource_findings, *extension_findings)
     resources = replace(
         resources,
         base_libs=_with_effective_resource_source(resources.base_libs, root=root, source_path=config_path),
         plugins=_with_effective_resource_source(resources.plugins, root=root, source_path=config_path),
+        host_extensions=_with_effective_resource_source(
+            resources.host_extensions,
+            root=root,
+            source_path=config_path,
+        ),
     )
     preflight_findings.extend(annotate_findings(resource_findings, root=root, source_path=config_path))
     policy_result = resolve_workspace_effective_policy(

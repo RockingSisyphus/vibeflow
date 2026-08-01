@@ -682,6 +682,165 @@ class Plugin:
     assert "base_lib.math_tools" in report.effective_policy["base_lib"]["allowed_modules"]
 
 
+def test_workspace_review_uses_legacy_project_host_extension_selection_until_workflow_overrides(
+    tmp_path,
+) -> None:
+    from vibeflow.rendering.architecture_document import (
+        build_architecture_document,
+    )
+
+    workspace_path, project_root, framework_root = _workspace_fixture(
+        tmp_path
+    )
+    _write_registry(
+        project_root,
+        [("test.start", "StartNode", {}, {})],
+    )
+    _write_registry(framework_root, [])
+    _write_project_config(project_root)
+    _write_project_config(framework_root)
+
+    extension_source = project_root / "src" / "legacy_host.ts"
+    extension_source.parent.mkdir()
+    extension_source.write_text(
+        (
+            "export function createHostExtension() {\n"
+            "  return { start() {}, stop() {} };\n"
+            "}\n"
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = (
+        project_root
+        / "manifests"
+        / "host_extensions"
+        / "legacy_host.jsonc"
+    )
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "kind": "host_extension",
+                "id": "demo.legacy_host",
+                "display_name": "Legacy Browser Host",
+                "description": "Connects a legacy project selection.",
+                "version": "1.0.0",
+                "targets": ["browser"],
+                "implementations": [
+                    {
+                        "language": "typescript",
+                        "targets": ["browser"],
+                        "source": {
+                            "kind": "file",
+                            "ref": "src/legacy_host.ts",
+                            "export": "createHostExtension",
+                        },
+                    }
+                ],
+                "provides": ["demo.port"],
+                "dependencies": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    project_config_path = project_root / "vibeflow_project.jsonc"
+    project_config = json.loads(
+        project_config_path.read_text(encoding="utf-8")
+    )
+    project_config["descriptors"] = {
+        "host_extensions": ["manifests/host_extensions"]
+    }
+    project_config["javascript"] = {
+        "package_root": ".",
+        "external_packages": [],
+        "host_extensions": ["demo.legacy_host"],
+    }
+    project_config_path.write_text(
+        json.dumps(project_config),
+        encoding="utf-8",
+    )
+
+    config_path = project_root / "configs" / "main.jsonc"
+    config_path.parent.mkdir()
+    config_path.write_text(
+        json.dumps(
+            {
+                "pipeline": {
+                    "nodes": [
+                        _node_call(
+                            "start",
+                            "test.start",
+                            "Starts the legacy Host Extension fixture.",
+                        )
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    workspace = load_workspace_config(workspace_path)
+    report = validate_workspace_config_path(
+        config_path,
+        workspace=workspace,
+    )
+
+    assert report.status == "CONCERNS"
+    assert [
+        item["id"]
+        for item in report.info["effective_resources"]["host_extensions"]
+    ] == ["demo.legacy_host"]
+    legacy_warning = next(
+        finding
+        for finding in report.warnings
+        if finding.rule_id
+        == "CONFIG.SMELL.LEGACY_HOST_EXTENSION_SELECTION"
+    )
+    assert legacy_warning.source_path == str(project_config_path)
+
+    graph, compiled, registry, resources, error = (
+        load_workspace_graph_for_export(
+            config_path,
+            workspace=workspace,
+        )
+    )
+    assert error is None
+    architecture = build_architecture_document(
+        graph,
+        compiled=compiled,
+        registry=registry,
+        resources=resources,
+    )
+    assert architecture["resources"]["host_extensions"][0]["id"] == (
+        "demo.legacy_host"
+    )
+    mermaid = export_mermaid(
+        graph,
+        compiled=compiled,
+        registry=registry,
+        resources=resources,
+    )
+    assert "Legacy Browser Host" in mermaid
+
+    workflow = json.loads(config_path.read_text(encoding="utf-8"))
+    workflow["host_extensions"] = []
+    config_path.write_text(json.dumps(workflow), encoding="utf-8")
+
+    overridden_report = validate_workspace_config_path(
+        config_path,
+        workspace=workspace,
+    )
+    assert (
+        overridden_report.info["effective_resources"]["host_extensions"]
+        == []
+    )
+    assert not any(
+        finding.rule_id
+        == "CONFIG.SMELL.LEGACY_HOST_EXTENSION_SELECTION"
+        for finding in overridden_report.warnings
+    )
+
+
 def test_workspace_mermaid_hides_resources_from_unused_roots(tmp_path) -> None:
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
     _write_registry(project_root, [("test.start", "StartNode", {}, {}), ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}), ("test.in_end", "InEndNode", {}, {})])

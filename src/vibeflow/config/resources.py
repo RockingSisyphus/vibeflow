@@ -9,6 +9,11 @@ from typing import Any, Iterator, Mapping
 
 from vibeflow.graph_config import STATUS_IMPLEMENTED, STATUS_PLANNED
 from vibeflow.config.resource_helpers import _finding, _module_search_path, _resolve_paths
+from vibeflow.config.host_extension_resources import (
+    HostExtensionResource,
+    host_extension_resources,
+    resolve_host_extension_resources,
+)
 from vibeflow.health.types import HealthFinding
 from vibeflow.node import EFFECT_SCOPE_TRUSTED
 
@@ -126,13 +131,35 @@ class ConfigResources:
     base_lib_paths: tuple[str, ...] = ()
     base_libs: tuple[BaseLibResource, ...] = ()
     plugins: tuple[PluginResource, ...] = ()
+    host_extensions: tuple[HostExtensionResource, ...] = ()
 
     @property
     def implemented_base_lib_modules(self) -> tuple[str, ...]:
         return tuple(item.module for item in self.base_libs if item.status == STATUS_IMPLEMENTED and item.module)
 
+    @property
+    def has_planned(self) -> bool:
+        return any(
+            item.status == STATUS_PLANNED
+            for item in (
+                *self.base_libs,
+                *self.plugins,
+                *self.host_extensions,
+            )
+        )
+
     def to_dict(self) -> dict[str, object]:
-        return {"global_config": dict(self.global_config), "base_lib": {"paths": list(self.base_lib_paths), "modules": [item.to_dict() for item in self.base_libs]}, "plugins": [item.to_dict() for item in self.plugins]}
+        return {
+            "global_config": dict(self.global_config),
+            "base_lib": {
+                "paths": list(self.base_lib_paths),
+                "modules": [item.to_dict() for item in self.base_libs],
+            },
+            "plugins": [item.to_dict() for item in self.plugins],
+            "host_extensions": [
+                item.to_dict() for item in self.host_extensions
+            ],
+        }
 
 
 from vibeflow.config.resource_registry_types import BaseLibRegistry, PluginResourceRegistry
@@ -159,12 +186,14 @@ def load_config_resources(
     from vibeflow.config.plugin_resource_loader import plugin_resources
 
     plugins = plugin_resources(config, plugin_registry=plugin_registry, plugin_resource_registry=plugin_resource_registry, findings=findings)
+    host_extensions = host_extension_resources(config, findings=findings)
     return (
         ConfigResources(
             global_config=global_config,
             base_lib_paths=base_lib_paths,
             base_libs=tuple(base_libs),
             plugins=tuple(plugins),
+            host_extensions=tuple(host_extensions),
         ),
         tuple(findings),
     )

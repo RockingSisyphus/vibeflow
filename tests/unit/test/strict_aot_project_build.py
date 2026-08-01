@@ -298,6 +298,54 @@ def _request(tmp_path: Path, **changes: object) -> ProjectBuildRequest:
     return ProjectBuildRequest(**values)
 
 
+def _add_host_extension(
+    project: Path,
+    extension_id: str,
+    *,
+    dependencies: list[str] | None = None,
+    provides: list[str] | None = None,
+) -> None:
+    safe_name = extension_id.replace(".", "-")
+    source = project / f"src/{safe_name}.ts"
+    source.write_text(
+        """
+export function createHostExtension(context) {
+  globalThis.__hostConfig = context.config;
+  return { start() {}, stop() {} };
+}
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    _write(
+        project / f"manifests/host_extensions/{safe_name}.jsonc",
+        {
+            "kind": "host_extension",
+            "id": extension_id,
+            "targets": ["browser", "node"],
+            "implementations": [
+                {
+                    "language": "typescript",
+                    "targets": ["browser", "node"],
+                    "source": {
+                        "kind": "file",
+                        "ref": f"src/{safe_name}.ts",
+                        "export": "createHostExtension",
+                    },
+                }
+            ],
+            "provides": provides or [],
+            "dependencies": dependencies or [],
+        },
+    )
+    project_config = project / "vibeflow_project.jsonc"
+    raw = json.loads(project_config.read_text(encoding="utf-8"))
+    raw["descriptors"]["host_extensions"] = [
+        "manifests/host_extensions"
+    ]
+    _write(project_config, raw)
+
+
 def test_prepare_project_build_loads_static_js_only_nested_project(
     tmp_path: Path,
 ) -> None:
@@ -345,6 +393,158 @@ def test_prepare_project_build_loads_static_js_only_nested_project(
     composite = next(node for node in emitted_plan.nodes if node.id == "group")
     assert composite.subplan is not None
     assert composite.subplan.nodes[0].params["delta"] == 7
+
+
+def test_workflow_host_extensions_support_planned_and_instance_config(
+    tmp_path: Path,
+) -> None:
+    request = _request(tmp_path)
+    project = Path(request.config).parent
+    _add_host_extension(
+        project,
+        "demo.browser_host",
+        provides=["demo.storage"],
+    )
+    _add_host_extension(
+        project,
+        "demo.future_host",
+        provides=["demo.storage"],
+    )
+    raw = json.loads(Path(request.config).read_text(encoding="utf-8"))
+    raw["host_extensions"] = [
+        {
+            "id": "demo.browser_host",
+            "status": "implemented",
+            "config": {"channel": "primary"},
+        },
+        {
+            "id": "demo.future_host",
+            "status": "planned",
+            "display_name": "Future Host",
+            "description": "Planned host connection.",
+        },
+    ]
+    _write(Path(request.config), raw)
+
+    prepared = prepare_project_build(request)
+
+    assert prepared.used_host_extensions == ("demo.browser_host",)
+    assert prepared.planned_host_extensions == ("demo.future_host",)
+    assert [item["status"] for item in prepared.declared_host_extensions] == [
+        "implemented",
+        "planned",
+    ]
+    assert prepared.host_extensions[0]["config"] == {
+        "channel": "primary"
+    }
+    assert all(
+        item["id"] != "demo.future_host"
+        for item in prepared.host_extensions
+    )
+    host_owner = next(
+        owner
+        for owner in prepared.import_policy["owners"]
+        if owner["kind"] == "host_extension"
+    )
+    assert host_owner["id"] == "demo.browser_host"
+    assert host_owner["export"] == "createHostExtension"
+    assert host_owner["completion"] == "immediate"
+
+
+def test_workflow_host_extensions_override_legacy_project_selection(
+    tmp_path: Path,
+) -> None:
+    request = _request(tmp_path)
+    project = Path(request.config).parent
+    _add_host_extension(project, "demo.legacy_host")
+    project_config = project / "vibeflow_project.jsonc"
+    project_raw = json.loads(project_config.read_text(encoding="utf-8"))
+    project_raw["javascript"]["host_extensions"] = ["demo.legacy_host"]
+    _write(project_config, project_raw)
+
+    legacy = prepare_project_build(request)
+    assert legacy.used_host_extensions == ("demo.legacy_host",)
+    assert legacy.warnings[0]["code"] == (
+        "VF_AOT_HOST_EXTENSION_LEGACY_SELECTION"
+    )
+
+    workflow_raw = json.loads(
+        Path(request.config).read_text(encoding="utf-8")
+    )
+    workflow_raw["host_extensions"] = []
+    _write(Path(request.config), workflow_raw)
+
+    workflow_override = prepare_project_build(request)
+    assert workflow_override.used_host_extensions == ()
+    assert workflow_override.warnings == ()
+
+
+def test_implemented_host_extension_cannot_depend_on_planned_extension(
+    tmp_path: Path,
+) -> None:
+    request = _request(tmp_path)
+    project = Path(request.config).parent
+    _add_host_extension(
+        project,
+        "demo.active_host",
+        dependencies=["demo.future_host"],
+    )
+    _add_host_extension(project, "demo.future_host")
+    raw = json.loads(Path(request.config).read_text(encoding="utf-8"))
+    raw["host_extensions"] = [
+        {"id": "demo.active_host"},
+        {"id": "demo.future_host", "status": "planned"},
+    ]
+    _write(Path(request.config), raw)
+
+    with pytest.raises(ProjectBuildError) as captured:
+        prepare_project_build(request)
+
+    assert (
+        captured.value.code
+        == "VF_AOT_HOST_EXTENSION_PLANNED_DEPENDENCY"
+    )
+
+
+def test_host_extension_explicit_empty_contract_must_match_descriptor(
+    tmp_path: Path,
+) -> None:
+    request = _request(tmp_path)
+    project = Path(request.config).parent
+    _add_host_extension(
+        project,
+        "demo.browser_host",
+        provides=["demo.storage"],
+    )
+    raw = json.loads(Path(request.config).read_text(encoding="utf-8"))
+    raw["host_extensions"] = [
+        {
+            "id": "demo.browser_host",
+            "provides": [],
+        }
+    ]
+    _write(Path(request.config), raw)
+
+    with pytest.raises(ProjectBuildError) as captured:
+        prepare_project_build(request)
+
+    assert captured.value.code == "VF_AOT_HOST_EXTENSION_CONFIG"
+    assert "provides must match" in captured.value.message
+
+
+def test_host_extension_null_selection_is_not_an_empty_override(
+    tmp_path: Path,
+) -> None:
+    request = _request(tmp_path)
+    raw = json.loads(Path(request.config).read_text(encoding="utf-8"))
+    raw["host_extensions"] = None
+    _write(Path(request.config), raw)
+
+    with pytest.raises(ProjectBuildError) as captured:
+        prepare_project_build(request)
+
+    assert captured.value.code == "VF_AOT_HOST_EXTENSION_CONFIG"
+    assert "must be a list" in captured.value.message
 
 
 def test_prepare_project_build_merges_optional_python_metadata(

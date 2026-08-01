@@ -1,4 +1,22 @@
 {
+  "host_extensions": [
+    {
+      "id": "sandbox.math_host",
+      "status": "implemented",
+      "config": {"channel": "sandbox"}
+    },
+    {
+      "id": "sandbox.future_host",
+      "status": "planned",
+      "display_name": "Future Sandbox Host",
+      "description": "Represents a future host connection for architecture review.",
+      "category": "host",
+      "version": "0.1.0",
+      "targets": ["node"],
+      "provides": ["sandbox.future_port"],
+      "dependencies": []
+    }
+  ],
   "pipeline": {
     "entry_mode": "sync",
     "inputs": [

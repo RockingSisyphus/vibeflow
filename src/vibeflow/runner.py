@@ -266,6 +266,10 @@ def _validate_run_health(
     info = dict(health.info)
     info["nodeset_imports"] = [dict(item) for item in nodeset_imports]
     info["resources"] = resources.to_dict()
+    info["production_ready"] = (
+        bool(info.get("production_ready", True))
+        and not resources.has_planned
+    )
     warnings = (*preflight_warnings, *health.warnings)
     status = "CONCERNS" if health.status == "PASS" and warnings else health.status
     report = replace(

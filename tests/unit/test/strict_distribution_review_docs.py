@@ -219,7 +219,6 @@ def test_distribution_template_declares_js_resources_without_installing_dependen
     assert config["javascript"] == {
         "package_root": ".",
         "external_packages": [],
-        "host_extensions": [],
     }
     for relative in (
         "manifests/nodes",

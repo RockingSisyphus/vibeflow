@@ -46,6 +46,37 @@ def test_config_resource_schema_rejects_invalid_status_and_plugin_config() -> No
         )
     }
 
+    host_findings = collect_config_schema_findings(
+        {
+            "host_extensions": [
+                {
+                    "id": "demo.host",
+                    "status": "future",
+                    "enabled": "yes",
+                    "config": [],
+                    "targets": "browser",
+                },
+                "demo.host",
+            ],
+            "pipeline": _seed_only_pipeline(),
+        }
+    )
+    host_rule_ids = {finding.rule_id for finding in host_findings}
+    assert "CONFIG.SCHEMA.RESOURCE_STATUS" in host_rule_ids
+    assert "CONFIG.SCHEMA.HOST_EXTENSION_ENABLED" in host_rule_ids
+    assert "CONFIG.SCHEMA.HOST_EXTENSION_CONFIG" in host_rule_ids
+    assert "CONFIG.SCHEMA.HOST_EXTENSION_STRING_LIST" in host_rule_ids
+    assert "CONFIG.SCHEMA.HOST_EXTENSION_DUPLICATE" in host_rule_ids
+    assert "CONFIG.SCHEMA.HOST_EXTENSIONS_LIST" in {
+        finding.rule_id
+        for finding in collect_config_schema_findings(
+            {
+                "host_extensions": None,
+                "pipeline": _seed_only_pipeline(),
+            }
+        )
+    }
+
     flag_findings = collect_config_schema_findings(
         {
             "global_config": {"config": {"delta": 1}, "allow_config_override": "no"},
@@ -174,6 +205,7 @@ class RuntimePlugin:
     assert [item["status"] for item in resources["base_lib"]["modules"]] == ["implemented", "planned"]
     assert [item["status"] for item in resources["plugins"]] == ["implemented", "planned"]
     assert {item["effect_scope"] for item in resources["plugins"]} == {"trusted"}
+    assert result.health.info["production_ready"] is False
     assert result.health.info["plugins"]["plugins"] == [
         {
             "name": "configured_runtime",
@@ -189,14 +221,16 @@ class RuntimePlugin:
         {"from": "start", "to": "global", "when": ""},
         {"from": "global", "to": "end", "when": ""},
     ]
+    assert graph_payload["production_ready"] is False
     mermaid = (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
     assert "resource_base_lib" in mermaid
     assert "Math Tools Resource" in mermaid
     assert "Configured Runtime Resource" in mermaid
     assert "desc: Configured runtime hook resource." in mermaid
-    assert "Future Tools" not in mermaid
-    assert "base_lib.future_tools" not in mermaid
-    assert "future_runtime_plugin" not in mermaid
+    assert "Future Tools" in mermaid
+    assert "base_lib.future_tools" in mermaid
+    assert "future_runtime_plugin" in mermaid
+    assert mermaid.count("plannedResource") >= 2
     assert not any(finding.rule_id == "GRAPH.FLOW.ORPHAN_NODE" for finding in (*result.health.errors, *result.health.warnings))
     assert not any(finding.rule_id.startswith("BASE_LIB.") for finding in (*result.health.errors, *result.health.warnings))
     assert not any(finding.rule_id.startswith("CONFIG.SMELL.MISSING_") for finding in result.health.warnings)
@@ -227,6 +261,185 @@ def test_config_resource_metadata_missing_fields_warn_without_blocking(tmp_path)
     report = validate_config_path(config_path)
     assert report.status == "CONCERNS"
     assert {finding.rule_id for finding in report.warnings} >= rule_ids
+
+
+def test_host_extension_resources_keep_workflow_status_and_config() -> None:
+    from vibeflow.config.resources import load_config_resources
+
+    resources, findings = load_config_resources(
+        {
+            "host_extensions": [
+                {
+                    "id": "demo.active_host",
+                    "config": {"channel": "primary"},
+                    "targets": ["browser"],
+                    "provides": ["demo.port"],
+                },
+                {
+                    "id": "demo.future_host",
+                    "status": "planned",
+                    "display_name": "Future Host",
+                    "description": "Planned host boundary.",
+                    "dependencies": ["demo.active_host"],
+                },
+                {
+                    "id": "demo.disabled_host",
+                    "enabled": False,
+                },
+            ],
+            "pipeline": _seed_only_pipeline(),
+        },
+        base_path=Path("."),
+    )
+
+    assert not [
+        finding for finding in findings if finding.severity == "error"
+    ]
+    payload = resources.to_dict()["host_extensions"]
+    assert [item["id"] for item in payload] == [
+        "demo.active_host",
+        "demo.future_host",
+    ]
+    assert [item["status"] for item in payload] == [
+        "implemented",
+        "planned",
+    ]
+    assert payload[0]["config_keys"] == ["channel"]
+    assert payload[1]["dependencies"] == ["demo.active_host"]
+    assert resources.host_extensions[0].declared_contract_fields == {
+        "targets",
+        "provides",
+    }
+
+
+def test_host_extension_resources_resolve_registered_descriptor_metadata(
+    tmp_path,
+) -> None:
+    from vibeflow.config.resources import (
+        HostExtensionResource,
+        resolve_host_extension_resources,
+    )
+    from vibeflow.descriptors import (
+        HostExtensionCatalog,
+        parse_descriptor_manifest,
+    )
+
+    catalog = HostExtensionCatalog()
+    catalog.register(
+        parse_descriptor_manifest(
+            {
+                "kind": "host_extension",
+                "id": "demo.host",
+                "display_name": "Registered Host",
+                "description": "Registered host boundary.",
+                "version": "1.0.0",
+                "targets": ["browser"],
+                "implementations": [
+                    {
+                        "language": "typescript",
+                        "targets": ["browser"],
+                        "source": {
+                            "kind": "file",
+                            "ref": "host.ts",
+                            "export": "createHostExtension",
+                        },
+                    }
+                ],
+                "provides": ["demo.port"],
+                "dependencies": [],
+            }
+        ),
+        source=tmp_path / "manifests/host.jsonc",
+    )
+
+    resolved, findings = resolve_host_extension_resources(
+        (
+            HostExtensionResource(id="demo.host"),
+            HostExtensionResource(
+                id="demo.future",
+                status="planned",
+                display_name="Future Host",
+            ),
+        ),
+        catalog=catalog,
+    )
+
+    assert findings == ()
+    assert resolved[0].display_name == "Registered Host"
+    assert resolved[0].targets == ("browser",)
+    assert resolved[0].provides == ("demo.port",)
+    assert resolved[0].source_path.endswith(
+        "manifests/host.jsonc"
+    )
+    assert resolved[1].status == "planned"
+
+    _, invalid_findings = resolve_host_extension_resources(
+        (
+            HostExtensionResource(id="demo.unknown"),
+            HostExtensionResource(
+                id="demo.host",
+                targets=("node",),
+                declared_contract_fields=frozenset({"targets"}),
+            ),
+            HostExtensionResource(
+                id="demo.host",
+                provides=(),
+                declared_contract_fields=frozenset({"provides"}),
+            ),
+        ),
+        catalog=catalog,
+    )
+    assert {finding.rule_id for finding in invalid_findings} == {
+        "CONFIG.RESOURCE.UNKNOWN_HOST_EXTENSION",
+        "CONFIG.RESOURCE.HOST_EXTENSION_CONTRACT",
+    }
+
+
+def test_registered_plugin_reference_preserves_planned_status(tmp_path) -> None:
+    from vibeflow import PluginResourceRegistry
+    from vibeflow.config.resources import load_config_resources
+
+    registry = PluginResourceRegistry()
+    registry.register(
+        "future_policy",
+        module="project.plugins.future_policy",
+        class_name="FuturePolicy",
+        plugin_type="policy",
+        display_name="Future Policy",
+        description="Planned policy plugin.",
+    )
+
+    resources, findings = load_config_resources(
+        {
+            "plugins": [
+                {
+                    "id": "future_policy",
+                    "status": "planned",
+                    "config": {"mode": "review"},
+                }
+            ]
+        },
+        base_path=tmp_path,
+        plugin_resource_registry=registry,
+    )
+
+    assert findings == ()
+    assert resources.to_dict()["plugins"] == [
+        {
+            "id": "future_policy",
+            "name": "future_policy",
+            "type": "policy",
+            "status": "planned",
+            "module": "project.plugins.future_policy",
+            "class": "FuturePolicy",
+            "display_name": "Future Policy",
+            "category": "",
+            "description": "Planned policy plugin.",
+            "version": "",
+            "config_keys": ["mode"],
+            "effect_scope": "trusted",
+        }
+    ]
 
 
 def test_global_config_overrides_node_params_and_warns_when_not_allowed(tmp_path) -> None:

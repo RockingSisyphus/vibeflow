@@ -27,6 +27,7 @@ SYSTEM_STYLE_COLORS: Mapping[str, StyleColors] = {
     "plannedNode": StyleColors(fill="#fef08a", stroke="#ca8a04", text="#713f12", extra="stroke-width:3px,stroke-dasharray: 6 3"),
     "baseLibResource": StyleColors(fill="#ecfdf5", stroke="#059669", text="#064e3b"),
     "pluginResource": StyleColors(fill="#eff6ff", stroke="#2563eb", text="#1e3a8a"),
+    "hostExtensionResource": StyleColors(fill="#f5f3ff", stroke="#7c3aed", text="#3b0764"),
     "plannedResource": StyleColors(fill="#fef08a", stroke="#ca8a04", text="#713f12", extra="stroke-width:3px,stroke-dasharray: 6 3"),
 }
 
@@ -46,9 +47,15 @@ MERMAID_MAIN_CLASS_ORDER = (
     "plannedNode",
     "baseLibResource",
     "pluginResource",
+    "hostExtensionResource",
     "plannedResource",
 )
-MERMAID_RESOURCE_CLASS_ORDER = ("baseLibResource", "pluginResource", "plannedResource")
+MERMAID_RESOURCE_CLASS_ORDER = (
+    "baseLibResource",
+    "pluginResource",
+    "hostExtensionResource",
+    "plannedResource",
+)
 
 RESERVED_SYSTEM_COLORS = frozenset(
     color.lower()

@@ -44,6 +44,11 @@ GraphConfig + CompiledGraph / ExecutionPlan
 - node、`base_lib`、data schema、Capability 和 Host Extension 使用静态 JSONC descriptor 建模。已有 Python registry 通过兼容层转成 descriptor；静态 descriptor 与 Python 注册同时存在时必须做一致性检查。
 - JavaScript emitter 根据 `entry_mode` 输出同步 `runWorkflow()` 或异步 `runWorkflowAsync()`，不是把原始流程图或通用 graph walker 搬进目标环境。生成模块被 import 时不得执行业务 workflow 或启动扩展。
 - Capability descriptor 只定义依赖契约。实现由宿主在每次调用时注入或由 Host Extension 提供；调用状态、trace、任务和 Capability wrapper 不得保存在可变模块级业务状态中。
+- `descriptors.host_extensions` 登记 project 可用扩展，workflow 顶层
+  `host_extensions` 选择本流程实际使用的资源。implemented 扩展解析、检查并
+  打包；planned 扩展只进入 Architecture JSON 和图形审查，不参与生命周期或
+  Capability 提供。旧 `javascript.host_extensions` 仅作为没有 workflow 字段时
+  的兼容默认值。
 - `completion`、`schedule`、`executor` 必须分开建模；同步 JS 计划不得包含 suspend/deferred/detached。TypeScript 源码审计负责拒绝声明不实和未归属 Promise，不增加运行时 thenable 兜底。
 - `max_iterations: null`、组合 stop 和无 stop 永久 loop 是公开语义；`vibeflow.io` 是内核节点，不应要求 Python registry 或 JS node descriptor。
 - Capability 的声明、Schema 检查和 import 审计不是安全沙箱。重试、回滚、并发安全和真实副作用仍由宿主实现负责。

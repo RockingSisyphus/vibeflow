@@ -99,6 +99,11 @@ def handle_build(args: argparse.Namespace) -> int:
         "files": list(result.files),
         "toolchain": result.build.toolchain.to_dict(),
     }
+    warnings = tuple(getattr(result.prepared, "warnings", ()) or ())
+    if warnings:
+        payload["warnings"] = [
+            dict(item) for item in warnings
+        ]
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 

@@ -208,7 +208,7 @@ JS/TS AOT 当前应保证：
 
 Capability 是通用 ABI 和可审计依赖边界。可信性、幂等性、回滚和并发安全由具体宿主实现负责。
 
-Host Extension 是 JS/TS AOT 的宿主生命周期边界。目标环境源码可注册或注销事件、提供 Capability 并维护本 host 的队列；VibeFlow 检查 descriptor、依赖、target 和 import，并由 `createWorkflowHost()` 显式 start/stop。
+Host Extension 是 JS/TS AOT 的宿主生命周期边界。目标环境源码可注册或注销事件、提供 Capability 并维护本 host 的队列；VibeFlow 检查 descriptor、依赖、target 和 import，并由 `createWorkflowHost()` 显式 start/stop。Project descriptor catalog 登记可用扩展，workflow 按 ID 选择实际资源；planned 扩展进入架构审查但不进入构建或生命周期。
 
 ## Planned Architecture
 

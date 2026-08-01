@@ -45,6 +45,8 @@ def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFin
         _validate_base_lib_resources(config["base_lib"], findings)
     if "plugins" in config:
         _validate_plugins(config["plugins"], findings)
+    if "host_extensions" in config:
+        _validate_host_extensions(config["host_extensions"], findings)
     if "policy" in config:
         _validate_policy(config["policy"], "policy", findings, rule_source="config.inline_policy")
     return tuple(findings)
@@ -326,6 +328,109 @@ def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
         if "settings" in item and not isinstance(item["settings"], Mapping):
             findings.append(_error("CONFIG.SCHEMA.PLUGIN_CONFIG", f"{prefix}.settings must be an object", f"{prefix}.settings"))
         _validate_resource_metadata_strings(item, prefix, findings)
+
+
+def _validate_host_extensions(
+    value: Any,
+    findings: list[HealthFinding],
+) -> None:
+    if not isinstance(value, list):
+        findings.append(
+            _error(
+                "CONFIG.SCHEMA.HOST_EXTENSIONS_LIST",
+                "host_extensions must be a list",
+                "host_extensions",
+            )
+        )
+        return
+    seen: set[str] = set()
+    for index, item in enumerate(value):
+        prefix = f"host_extensions[{index}]"
+        active = True
+        if isinstance(item, str):
+            extension_id = item.strip()
+            if not extension_id:
+                findings.append(
+                    _error(
+                        "CONFIG.SCHEMA.HOST_EXTENSION_ID",
+                        f"{prefix} must be a non-empty host_extension id",
+                        prefix,
+                    )
+                )
+                continue
+        elif isinstance(item, Mapping):
+            extension_id = str(
+                item.get("id", item.get("name", ""))
+            ).strip()
+            if not extension_id:
+                findings.append(
+                    _error(
+                        "CONFIG.SCHEMA.HOST_EXTENSION_ID",
+                        f"{prefix}.id must be a non-empty string",
+                        f"{prefix}.id",
+                    )
+                )
+            status = (
+                str(item.get("status", "implemented")).strip()
+                or "implemented"
+            )
+            if status not in STATUSES:
+                findings.append(
+                    _error(
+                        "CONFIG.SCHEMA.RESOURCE_STATUS",
+                        (
+                            f"{prefix}.status must be implemented "
+                            "or planned"
+                        ),
+                        f"{prefix}.status",
+                    )
+                )
+            if "enabled" in item and not isinstance(item["enabled"], bool):
+                findings.append(
+                    _error(
+                        "CONFIG.SCHEMA.HOST_EXTENSION_ENABLED",
+                        f"{prefix}.enabled must be a boolean",
+                        f"{prefix}.enabled",
+                    )
+                )
+            active = item.get("enabled", True) is not False
+            for field in ("config", "settings"):
+                if field in item and not isinstance(item[field], Mapping):
+                    findings.append(
+                        _error(
+                            "CONFIG.SCHEMA.HOST_EXTENSION_CONFIG",
+                            f"{prefix}.{field} must be an object",
+                            f"{prefix}.{field}",
+                        )
+                    )
+            for field in ("targets", "provides", "dependencies"):
+                if field in item:
+                    _validate_string_list(
+                        item[field],
+                        f"{prefix}.{field}",
+                        findings,
+                        "CONFIG.SCHEMA.HOST_EXTENSION_STRING_LIST",
+                    )
+            _validate_resource_metadata_strings(item, prefix, findings)
+        else:
+            findings.append(
+                _error(
+                    "CONFIG.SCHEMA.HOST_EXTENSION_OBJECT",
+                    f"{prefix} must be a string or object",
+                    prefix,
+                )
+            )
+            continue
+        if active and extension_id and extension_id in seen:
+            findings.append(
+                _error(
+                    "CONFIG.SCHEMA.HOST_EXTENSION_DUPLICATE",
+                    f"duplicate host_extension id: {extension_id}",
+                    prefix,
+                )
+            )
+        if active and extension_id:
+            seen.add(extension_id)
 
 
 def _validate_base_lib_resources(value: Any, findings: list[HealthFinding]) -> None:
