@@ -1,79 +1,79 @@
 # VibeFlow 可复制开发包
 
-版本：0.9.0
+版本：0.10.0
 
-<!-- VIBEFLOW_DISTRIBUTION_GENERATED_AT -->
-
-这个目录可以整体复制到其他位置作为新项目起点。它包含本地 kernel、内核文档、AI 开发提示词和可运行的示例项目骨架。
+这个目录可以整体复制到其他位置作为新项目起点。它包含一个通用 kernel、内核文档、AI 开发提示词，以及相互隔离的 Python 和 JavaScript 示例 root。`DISTRIBUTION.json` 记录版本、root 和内核 hash。
 
 开始开发前，AI 和开发者都应先阅读 `AGENTS.md`，并按任务类型工作：
 
 - 新建项目（greenfield）可以从粗粒度 planned 流程开始。
-- 修改已有项目（existing）先读 `project/ARCHITECTURE.jsonc`，沿 source 定位真实 workflow config 及其导入 nodeset，然后原位修改。不为审核新建平行 config，不用概念图替代真实 config。
+- 修改已有项目（existing）先读 `python_project/ARCHITECTURE.jsonc`，沿 source 定位真实 workflow config 及其导入 nodeset，然后原位修改。不为审核新建平行 config，不用概念图替代真实 config。
 
 修改后用 `python run.py review` 完成正式架构审核。任务判定、`复用 / 修改 / 删除 / 新增`清单和人类批准门见 `AGENTS.md`。
 
 VibeFlow 提供两条开发路径：
 
 - **Python Runtime**：Python node、base_lib 和 plugin 分别放在
-  `project/nodes/`、`project/base_lib/` 和 `project/plugins/`，并在
-  `project/registry.py` 注册；使用 `run`、`review` 和 `delegate-cli`。
+  `python_project/nodes/`、`python_project/base_lib/` 和 `python_project/plugins/`，并在
+  `python_project/registry.py` 注册；使用 `run`、`review` 和 `delegate-cli`。
 - **JavaScript/TypeScript AOT**：JS/TS node 与 base_lib 放在
-  `project/nodes/`、`project/base_lib/`，Plugin 与 Host Extension 放在
-  `project/plugins/`、`project/host_extensions/`，六类 JSONC descriptor 放在
-  `project/manifests/{nodes,base_lib,data,capabilities,plugins,host_extensions}/`，可选 Web 模板和应用
-  入口放在 `project/web/`；使用 `build` 生成普通 ESM 或网页。构建产物运行时
+  `javascript_project/nodes/`、`javascript_project/base_lib/`，Plugin 与 Host Extension 放在
+  `javascript_project/plugins/`、`javascript_project/host_extensions/`，六类 JSONC descriptor 放在
+  `javascript_project/manifests/{nodes,base_lib,data,capabilities,plugins,host_extensions}/`，可选 Web 模板和应用
+  入口放在 `javascript_project/web/`；使用 `build` 生成普通 ESM 或网页。构建产物运行时
   不需要 Python，也不需要 VibeFlow Runtime。
 
 正式 Target 名是 `javascript`；TypeScript 是该 Target 支持的实现语言。
 
-根目录 `vibeflow_config.jsonc` 声明 workspace roots。每个 root 的
-`vibeflow_project.jsonc` 可按路径声明 Python `registry` 和 Runtime 选项，
-或声明 JS/TS `descriptors` 与 `javascript` 工具链；二者都可使用 quality 和
-架构文档配置。
+根目录 `vibeflow_config.jsonc` 声明两个 workspace roots。每个 root 的
+`vibeflow_project.jsonc` 用必填 `project_target` 选择 `python` 或 `javascript`；
+Python root 声明 Registry/Runtime，JavaScript root 声明 descriptor/工具链。单次
+workflow 和 nodeset import 不跨 Target。
 
 常用命令：
 
 ```powershell
-python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc
-python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc --check
-python run.py review --config project/configs/main.jsonc --output reports/graph.expanded.svg
-python run.py validate --config project/configs/main.jsonc
-python run.py run --config project/configs/main.jsonc --run-root runs
-python run.py build --config project/configs/<js-workflow>.jsonc --target browser --profile esm-module --out-dir dist
-python run.py delegate-cli --config project/configs/main.jsonc -- --input data.yaml --verbose
-python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
-python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
-python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
-python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg
-python run.py quality --path project
+python run.py architecture --config python_project/configs/main.jsonc --output python_project/ARCHITECTURE.jsonc
+python run.py architecture --config python_project/configs/main.jsonc --output python_project/ARCHITECTURE.jsonc --check
+python run.py review --config python_project/configs/main.jsonc --output reports/graph.expanded.svg
+python run.py validate --config python_project/configs/main.jsonc
+python run.py run --config python_project/configs/main.jsonc --run-root runs
+python run.py review --config javascript_project/configs/linear.jsonc --output reports/javascript.svg
+python run.py build --config javascript_project/configs/linear.jsonc --target node --profile single-esm --out-dir output/node
+python run.py build --config javascript_project/configs/linear.jsonc --target browser --profile web-app --html javascript_project/web/index.template.html --app-entry javascript_project/web/app.ts --out-dir output/web
+python run.py delegate-cli --config python_project/configs/main.jsonc -- --input data.yaml --verbose
+python run.py mermaid --config python_project/configs/main.jsonc --output reports/graph.mmd
+python run.py ascii --config python_project/configs/main.jsonc --output reports/graph.txt
+python run.py svg --config python_project/configs/main.jsonc --output reports/graph.svg
+python run.py svg --config python_project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg
+python run.py quality --path python_project
 python run.py verify-kernel
 ```
 
-JS/TS AOT 项目需要在 `project/vibeflow_project.jsonc` 的 `descriptors`
+JS/TS AOT 项目需要在 `javascript_project/vibeflow_project.jsonc` 的 `descriptors`
 字段登记 node、base_lib、Data Schema、Capability、Plugin 和 Host Extension descriptor，并用
 `javascript.package_root` 指向本地 `package.json`、lockfile 和
 `node_modules`。项目自行安装并锁定 Node.js、TypeScript 与 esbuild；
 VibeFlow 不会执行 `npm install` 或第三方 package scripts。完整 descriptor、
 Node/Workflow ABI、`vibeflow.plugin.v1`、同步/异步入口、Port、Capability、Host Extension、三种 profile 与 `web-app` 入口规则见
-`kernel/docs/11_JS_TS与Web_AOT构建指南.md`。分发包还提供可直接检查数学运算、
-数据传递、nodeset、loop、同步/异步 ABI、Plugin、Port、Host Extension 和非法依赖的
-`sandbox/javascript/integration/`。基础验证运行：
+`kernel/docs/11_JS_TS与Web_AOT构建指南.md`。`javascript_project/` 本身是可直接
+validate、review 和 build 的数学示例，包含登记的 `ARCHITECTURE.jsonc`、TS Node、
+base_lib、Plugin、Capability 和 Host Extension。包内另有
+`configs/browser_permanent_port_host.jsonc`，用于验证真实浏览器中的无界 loop、
+Port、Host 实例隔离和取消。完整的语义与反例 Sandbox 只保留在 VibeFlow 源码仓库，
+不复制进正式分发包。
 
-```powershell
-python sandbox/javascript/integration/run_all.py --skip-browser
-```
-
-浏览器环境可用时去掉 `--skip-browser`。沙箱会直接从
-`kernel/vibeflow-kernel.zip` 导入内核，并在临时目录安装锁定的工具链和
-Puppeteer；分发目录中不会生成 `node_modules`。
+workflow 不声明 Browser/Node 平台。`validate`、`review` 和 `quality` 关注
+VibeFlow 图与架构契约；每次 `build --target` 选择本次构建的实现并调用
+esbuild。完整 TypeScript 类型、lint、平台 API 兼容性和业务结果由项目自己的
+工具与真实宿主测试负责。
 
 `descriptors.plugins` 与 `descriptors.host_extensions` 只登记 project 可用资源；
 每个 workflow 在顶层 `plugins` / `host_extensions` 中选择实际使用项。Planned
 资源进入 Architecture JSON 与 Mermaid/SVG，但不解析源码、不执行、不打包，也
 不提供 Capability；implemented 资源不能依赖 planned 资源。
 
-默认项目把 `project/configs/main.jsonc` 登记到 `project/ARCHITECTURE.jsonc`。这是带固定“生成且不可执行”头注释的单文件架构审查文档，不是 workflow config；AI 和开发者应先用它理解入口流程、nodeset 调用、节点职责、数据契约、资源和配置来源。架构变更必须落到真实 workflow config、相关 nodeset、registry metadata/config schema 或资源声明中。正式 `review` 会自动重新生成登记文档、执行正式 validate，并且只在 canonical expanded SVG 结构检查通过后发布 SVG；失败时不得用 mmdc、手写 SVG 或旧产物补位。
+默认项目把 `python_project/configs/main.jsonc` 登记到 `python_project/ARCHITECTURE.jsonc`。这是带固定“生成且不可执行”头注释的单文件架构审查文档，不是 workflow config；AI 和开发者应先用它理解入口流程、nodeset 调用、节点职责、数据契约、资源和配置来源。架构变更必须落到真实 workflow config、相关 nodeset、registry metadata/config schema 或资源声明中。正式 `review` 会自动重新生成登记文档、执行正式 validate，并且只在 canonical expanded SVG 结构检查通过后发布 SVG；失败时不得用 mmdc、手写 SVG 或旧产物补位。
 
 CLI 让渡模式 / `delegate-cli` 用于把 workflow 当成普通业务 CLI。首个 `--` 可选地分隔 core 与业务参数；让渡 token 以 `cli.argv` 进入图，图以唯一 `cli.exit_code` 返回非 bool 整数 `0..255`。业务使用真实 stdin/stdout/stderr，VibeFlow 诊断只写当次 run 的 `vibeflow.log`。授权 `SystemExit(None)` 返回 0，合法整数原样返回；框架/未授权退出错误返回 1，已知 core 参数的 argparse 错误返回 2。详细终端/IO/授权规则见 `kernel/docs/07_启动命令与报告.md`。`run` 与 `review` 的原职责不变。
 
@@ -99,29 +99,17 @@ workflow 或 Host Extension；Capability、trace 和 `AbortSignal` 通过每次�
 配置文件分两层：根目录 `vibeflow_config.jsonc` 只声明 workspace roots 和全局
 policy。Python Runtime root 的 `vibeflow_project.jsonc` 声明 registry、quality、
 可选 runtime 参数和 `architecture.documents`；可用的 Python
-node/base_lib/plugin 在 `project/registry.py` 注册，每个 workflow config 用
+node/base_lib/plugin 在 `python_project/registry.py` 注册，每个 workflow config 用
 id 声明本流程实际使用哪些 base_lib/plugin。JS/TS AOT root 改用
 `descriptors` 声明静态资源目录、用 `javascript` 声明工具链根和 external
-packages；JavaScript Target 直接使用 descriptor，无需 Python registry。单项目模板
-默认是：
+packages；JavaScript Target 直接使用 descriptor，无需 Python registry。分发包默认是：
 
 ```jsonc
 {
   "policy": {},
   "roots": [
-    {"id": "project", "path": "project"}
-  ]
-}
-```
-
-多 root 仓库可以改成：
-
-```jsonc
-{
-  "policy": {},
-  "roots": [
-    {"id": "training_project", "path": "training_project"},
-    {"id": "project", "path": "project"}
+    {"id": "python-project", "path": "python_project"},
+    {"id": "javascript-project", "path": "javascript_project"}
   ]
 }
 ```
@@ -159,7 +147,7 @@ pipeline config 不再声明 `policy`，但必须声明本 workflow 实际使用
 
 `run` 会在 `runs/<run_id>/` 自动写出快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`。external implemented node 在原有形状上使用 `[EXTERNAL]` 标题和 `7px` non-scaling 粗边框。expanded SVG 只在同一父图内合并调用种类和 `type_key` 都相同的直接 nodeset 详情，父图调用点和连边不删除，不同父图分别展开。VibeFlow 命令内部使用 bundled Mermaid CLI 渲染 SVG；Mermaid CLI/mmdc 是实现细节，不是公开审核入口。普通单项 `svg` 命令保留图形导出/诊断参数，正式架构审核则使用参数固定的 `review`。
 
-`run` 还会在当次运行目录写出预期的 `architecture.jsonc` 供审计，但不会替你覆盖 root 中登记的 `project/ARCHITECTURE.jsonc`。
+`run` 还会在当次运行目录写出预期的 `architecture.jsonc` 供审计，但不会替你覆盖 root 中登记的 `python_project/ARCHITECTURE.jsonc`。
 
 注意：`python run.py mermaid --expand-nodesets --output reports/graph.expanded.mmd` 只导出 Mermaid 源码，供调试源码使用，仍按调用点展开且不做局部详情去重。不要把 `graph.expanded.mmd` 直接交给 Mermaid CLI/mmdc 转成 SVG；正式审核使用 `python run.py review --config ... --output ...`。
 
@@ -186,6 +174,6 @@ cd ../../..
 terminal start -> process seed -> process add -> io output -> terminal end
 ```
 
-可复用 nodeset 放在 `project/configs/nodesets/` 的独立 JSONC 文件中，根对象声明 `type_key`；主 config 通过 `nodeset_imports` 导入，并在调用点把该 `type_key` 写进 `type_used`。
+可复用 nodeset 放在 `python_project/configs/nodesets/` 的独立 JSONC 文件中，根对象声明 `type_key`；主 config 通过 `nodeset_imports` 导入，并在调用点把该 `type_key` 写进 `type_used`。
 
 implemented nodeset 必须包含完整 pipeline。planned nodeset 可以只保留契约占位，也可以带 planned body 逐步细化；body 会出现在 `ARCHITECTURE.jsonc` 和展开图中并参与适用的静态检查，但不会按 implemented body 执行。`python_stub` planned nodeset 始终作为单个 stub 执行。

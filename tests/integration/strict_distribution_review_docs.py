@@ -12,7 +12,7 @@ import zipfile
 
 import pytest
 
-from distribution.build import ROOT_README_GENERATED_AT_MARKER, build_distribution
+from distribution.build import build_distribution
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -85,14 +85,7 @@ def test_distribution_copies_review_docs_and_preserves_customizable_root_guides(
     version_line = f"版本：{project_version}"
     assert source_readme.splitlines().count(version_line) == 1
     assert rendered_readme.splitlines().count(version_line) == 1
-    generated_at_lines = [
-        line for line in rendered_readme.splitlines() if line.startswith("生成时间：")
-    ]
-    assert len(generated_at_lines) == 1
-    assert rendered_readme == source_readme.replace(
-        ROOT_README_GENERATED_AT_MARKER,
-        generated_at_lines[0],
-    )
+    assert rendered_readme == source_readme
 
     for name in REVIEW_DOC_NAMES:
         assert (built_distribution / "kernel" / "docs" / name).read_bytes() == (
@@ -104,22 +97,10 @@ def test_distribution_copies_review_docs_and_preserves_customizable_root_guides(
     assert (
         built_distribution / "kernel" / "docs" / "11_JS_TS与Web_AOT构建指南.md"
     ).read_bytes() == (REPOSITORY_ROOT / "docs" / "js_aot_build.md").read_bytes()
-    assert (
-        built_distribution
-        / "kernel"
-        / "docs"
-        / "14_JS_TS节点与Web_AOT构建计划.md"
-    ).read_bytes() == (
-        REPOSITORY_ROOT / "docs" / "14_JS_TS节点与Web_AOT构建计划.md"
-    ).read_bytes()
-    assert (
-        built_distribution
-        / "kernel"
-        / "docs"
-        / "15_长期工作流与原生IO改造计划.md"
-    ).read_bytes() == (
-        REPOSITORY_ROOT / "docs" / "15_长期工作流与原生IO改造计划.md"
-    ).read_bytes()
+    assert not any(
+        path.name.startswith(("14_", "15_"))
+        for path in (built_distribution / "kernel" / "docs").glob("*.md")
+    )
 
     manifest_lines = (
         built_distribution / "kernel" / "MANIFEST.sha256"
@@ -134,13 +115,7 @@ def test_distribution_copies_review_docs_and_preserves_customizable_root_guides(
         for path in PUBLISHED_DOCS_ROOT.glob("*.md")
     }
     all_published_docs.add("kernel/docs/10_Kernel能力与项目开发指南.md")
-    all_published_docs.update(
-        {
-            "kernel/docs/11_JS_TS与Web_AOT构建指南.md",
-            "kernel/docs/14_JS_TS节点与Web_AOT构建计划.md",
-            "kernel/docs/15_长期工作流与原生IO改造计划.md",
-        }
-    )
+    all_published_docs.add("kernel/docs/11_JS_TS与Web_AOT构建指南.md")
     assert all_published_docs <= manifest_paths
     assert "AGENTS.md" not in manifest_paths
     assert "README.md" not in manifest_paths
@@ -169,7 +144,7 @@ def test_built_distribution_template_is_canonical_and_validates(
             "run.py",
             "validate",
             "--config",
-            "project/configs/main.jsonc",
+            "python_project/configs/main.jsonc",
         ],
         cwd=built_distribution,
         text=True,
@@ -250,13 +225,23 @@ def test_published_guides_are_project_neutral_and_use_public_import_surfaces(
     )
 
 
-def test_distribution_template_declares_js_resources_without_installing_dependencies(
+def test_distribution_template_has_isolated_python_and_javascript_roots(
     built_distribution: Path,
 ) -> None:
-    project = built_distribution / "project"
-    config = json.loads(
-        (project / "vibeflow_project.jsonc").read_text(encoding="utf-8")
+    python_project = built_distribution / "python_project"
+    javascript_project = built_distribution / "javascript_project"
+    python_config = json.loads(
+        (python_project / "vibeflow_project.jsonc").read_text(encoding="utf-8")
     )
+    assert python_config["project_target"] == "python"
+    assert "registry" in python_config
+    assert "descriptors" not in python_config
+    assert "javascript" not in python_config
+
+    config = json.loads(
+        (javascript_project / "vibeflow_project.jsonc").read_text(encoding="utf-8")
+    )
+    assert config["project_target"] == "javascript"
     assert config["descriptors"] == {
         "nodes": ["manifests/nodes"],
         "base_lib": ["manifests/base_lib"],
@@ -278,48 +263,42 @@ def test_distribution_template_declares_js_resources_without_installing_dependen
         "manifests/plugins",
         "host_extensions",
     ):
-        assert (project / relative).is_dir()
-    assert not (project / "package.json").exists()
-    assert not (project / "node_modules").exists()
+        assert (javascript_project / relative).is_dir()
+    assert (javascript_project / "package.json").is_file()
+    assert (javascript_project / "package-lock.json").is_file()
+    package = json.loads(
+        (javascript_project / "package.json").read_text(encoding="utf-8")
+    )
+    assert package["name"] == "vibeflow-javascript-example"
+    assert "imports" not in package
+    assert not (javascript_project / "node_modules").exists()
+    assert not (javascript_project / "negative").exists()
+    assert not any(
+        path.name.startswith(("invalid_", "negative_"))
+        for path in (javascript_project / "configs").glob("*.jsonc")
+    )
     template_readme = (built_distribution / "README.md").read_text(
         encoding="utf-8"
     )
-    assert "project/configs/<js-workflow>.jsonc" in template_readme
-    assert (
-        "python run.py build --config project/configs/main.jsonc"
-        not in template_readme
-    )
+    assert "javascript_project/configs/linear.jsonc" in template_readme
+    assert "python run.py build --config python_project/" not in template_readme
 
 
-def test_distribution_publishes_runnable_typescript_sandbox_without_generated_files(
+def test_distribution_uses_the_two_example_roots_without_repository_sandbox(
     built_distribution: Path,
 ) -> None:
-    source = REPOSITORY_ROOT / "sandbox" / "javascript" / "integration"
-    published = built_distribution / "sandbox" / "javascript" / "integration"
-    expected_files = {
-        path.relative_to(source).as_posix()
-        for path in source.rglob("*")
-        if path.is_file()
-        and not {
-            "__pycache__",
-            ".pytest_cache",
-            ".artifacts",
-            "runs",
-            "reports",
-            "node_modules",
-        }.intersection(path.relative_to(source).parts)
-        and not path.name.endswith(".pyc")
-    }
-    actual_files = {
-        path.relative_to(published).as_posix()
-        for path in published.rglob("*")
-        if path.is_file()
-    }
-    assert actual_files == expected_files
-    assert (published / "project" / "package.json").is_file()
-    assert (published / "project" / "package-lock.json").is_file()
-    for excluded in ("node_modules", "reports", "runs", "__pycache__"):
-        assert not any(path.name == excluded for path in published.rglob("*"))
+    assert not (built_distribution / "sandbox").exists()
+    assert (built_distribution / "python_project/configs/main.jsonc").is_file()
+    assert (
+        built_distribution / "javascript_project/configs/linear.jsonc"
+    ).is_file()
+    assert (
+        built_distribution
+        / "javascript_project/configs/browser_permanent_port_host.jsonc"
+    ).is_file()
+    assert (
+        built_distribution / "javascript_project/ARCHITECTURE.jsonc"
+    ).is_file()
 
     manifest_paths = {
         line.split("  ", 1)[1]
@@ -328,59 +307,37 @@ def test_distribution_publishes_runnable_typescript_sandbox_without_generated_fi
         ).read_text(encoding="utf-8").splitlines()
         if line.strip()
     }
-    assert {
-        f"sandbox/javascript/integration/{relative}"
-        for relative in actual_files
-    } <= manifest_paths
+    assert not any(path.startswith("sandbox/") for path in manifest_paths)
+
     published_aot_guide = (
         built_distribution
         / "kernel"
         / "docs"
         / "11_JS_TS与Web_AOT构建指南.md"
     ).read_text(encoding="utf-8")
-    assert "kernel/vibeflow-kernel.zip" in published_aot_guide
-    assert (
-        "python sandbox/javascript/integration/run_all.py --skip-browser"
-        in published_aot_guide
-    )
+    assert "javascript_project/" in published_aot_guide
+    assert "不复制整套源码仓库 Sandbox" in published_aot_guide
 
-    kernel_probe = subprocess.run(
-        [
-            sys.executable,
-            "-I",
-            "-c",
-            (
-                "import sys; sys.path.insert(0, sys.argv[1]); "
-                "import sandbox_support, vibeflow; print(vibeflow.__file__)"
-            ),
-            str(published),
-        ],
-        cwd=built_distribution,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    assert kernel_probe.returncode == 0, kernel_probe.stderr
-    assert str(
-        built_distribution / "kernel" / "vibeflow-kernel.zip"
-    ) in kernel_probe.stdout
 
-    help_result = subprocess.run(
-        [
-            sys.executable,
-            "-s",
-            str(published / "run_all.py"),
-            "--help",
-        ],
-        cwd=built_distribution,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
+def test_javascript_guide_recommends_project_owned_quality_tools(
+    built_distribution: Path,
+) -> None:
+    source = (REPOSITORY_ROOT / "docs/js_aot_build.md").read_text(
+        encoding="utf-8"
     )
-    assert help_result.returncode == 0, help_result.stderr or help_result.stdout
-    assert "--skip-browser" in help_result.stdout
+    published = (
+        built_distribution
+        / "kernel/docs/11_JS_TS与Web_AOT构建指南.md"
+    ).read_text(encoding="utf-8")
+    for command in (
+        "npx tsc --noEmit",
+        "npx eslint .",
+        "npx vitest run",
+        "npx playwright test",
+    ):
+        assert command in source
+        assert command in published
+    assert "不会自动运行" in source
 
 
 def test_developer_published_and_ai_guides_share_the_review_protocol(

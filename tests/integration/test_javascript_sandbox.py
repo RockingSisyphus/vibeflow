@@ -85,7 +85,6 @@ def test_typescript_sandbox_positive_projects_prepare_real_aot_plans(
         "undeclared_base_lib.jsonc",
         "dynamic_import.jsonc",
         "runtime_import.jsonc",
-        "node_builtin_browser.jsonc",
     ],
 )
 def test_typescript_sandbox_negative_projects_prepare_for_import_audit(
@@ -109,6 +108,30 @@ def test_typescript_sandbox_negative_projects_prepare_for_import_audit(
     assert all(
         input_spec["required"] is True
         for input_spec in prepared.payload["inputs"]
+    )
+
+
+@pytest.mark.parametrize(
+    "config_name",
+    ["node_builtin_browser.jsonc", "indirect_node_builtin.jsonc"],
+)
+def test_platform_module_failures_are_deferred_to_esbuild(
+    tmp_path: Path,
+    config_name: str,
+) -> None:
+    prepared = prepare_project_build(
+        ProjectBuildRequest(
+            workspace=WORKSPACE_PATH,
+            config=PROJECT_ROOT / "configs/negative" / config_name,
+            out_dir=tmp_path / config_name,
+            target="browser",
+            profile="single-esm",
+        )
+    )
+
+    assert prepared.used_node_types == (
+        f"sandbox.invalid.{Path(config_name).stem}",
+        "sandbox.terminal",
     )
 
 

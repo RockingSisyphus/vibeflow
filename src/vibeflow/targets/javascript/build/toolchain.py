@@ -54,10 +54,29 @@ class ToolchainInfo:
 
 
 @dataclass(frozen=True)
+class AuditToolchainInfo:
+    """The platform-neutral parser toolchain used outside AOT builds."""
+
+    node: str
+    typescript: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "node": self.node,
+            "typescript": self.typescript,
+        }
+
+
+@dataclass(frozen=True)
 class DriverBuildResult:
     toolchain: ToolchainInfo
     outputs: tuple[str, ...]
     inputs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DriverAuditResult:
+    toolchain: AuditToolchainInfo
 
 
 def probe_toolchain(
@@ -129,6 +148,46 @@ def run_build_driver(
         outputs=tuple(sorted(str(item) for item in build.get("outputs", ()))),
         inputs=tuple(sorted(str(item) for item in build.get("inputs", ()))),
     )
+
+
+def run_audit_driver(
+    request: Mapping[str, Any],
+    *,
+    package_root: str | Path,
+    node_command: str = "node",
+) -> DriverAuditResult:
+    """Run only VibeFlow ownership/completion audits, without bundling.
+
+    The audit intentionally ignores ordinary TypeScript semantic diagnostics
+    and runtime-platform API compatibility.  Those belong to project-selected
+    language tools and tests rather than the VibeFlow architecture contract.
+    """
+
+    root = _validated_package_root(package_root)
+    payload = _run_driver(
+        {
+            **dict(request),
+            "command": "audit",
+            "packageRoot": str(root),
+            "target": "neutral",
+            "profile": "",
+            "contractCheckFiles": [],
+        },
+        node_command=node_command,
+    )
+    probe = payload.get("probe")
+    audit = payload.get("audit")
+    if not isinstance(probe, Mapping) or not isinstance(audit, Mapping):
+        raise AotToolchainError(
+            "VF_PROTOCOL",
+            "toolchain driver returned an incomplete audit result",
+        )
+    info = AuditToolchainInfo(
+        node=str(probe.get("node", "")),
+        typescript=str(probe.get("typescript", "")),
+    )
+    _validate_audit_versions(info)
+    return DriverAuditResult(toolchain=info)
 
 
 def _validated_package_root(value: str | Path) -> Path:
@@ -348,6 +407,21 @@ def _validate_versions(info: ToolchainInfo) -> None:
         )
 
 
+def _validate_audit_versions(info: AuditToolchainInfo) -> None:
+    node = _version_tuple(info.node, subject="Node.js")
+    typescript = _version_tuple(info.typescript, subject="TypeScript")
+    if node < NODE_MINIMUM:
+        raise AotToolchainError(
+            "VF_TOOLCHAIN_VERSION",
+            f"Node.js >=22.12 is required, found {info.node}",
+        )
+    if not TYPESCRIPT_MINIMUM <= typescript < TYPESCRIPT_MAXIMUM:
+        raise AotToolchainError(
+            "VF_TOOLCHAIN_VERSION",
+            f"TypeScript >=7 <8 is required, found {info.typescript}",
+        )
+
+
 def _version_tuple(value: str, *, subject: str) -> tuple[int, int, int]:
     match = re.match(r"^v?(\d+)\.(\d+)(?:\.(\d+))?", str(value).strip())
     if match is None:
@@ -364,8 +438,11 @@ def _version_tuple(value: str, *, subject: str) -> tuple[int, int, int]:
 
 __all__ = [
     "AotToolchainError",
+    "AuditToolchainInfo",
+    "DriverAuditResult",
     "DriverBuildResult",
     "ToolchainInfo",
     "probe_toolchain",
+    "run_audit_driver",
     "run_build_driver",
 ]

@@ -16,6 +16,12 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.dont_write_bytecode = True
+if str(ROOT) not in sys.path:
+    # ``python tools/verify_project.py`` puts only ``tools/`` on sys.path.
+    # The full gate also reuses repository-owned Sandbox test helpers, which
+    # are deliberately not packaged in the wheel.
+    sys.path.insert(0, str(ROOT))
 PYTHON = sys.executable
 TEST_GROUPS = (
     "tests/core",
@@ -127,8 +133,28 @@ def _javascript_minimal(_scratch: Path) -> None:
     _run((PYTHON, "sandbox/javascript/minimal/run_e2e.py"))
 
 
-def _javascript_integration(_scratch: Path) -> None:
-    _run((PYTHON, "sandbox/javascript/integration/run_all.py"))
+def _puppeteer_root(scratch: Path) -> Path:
+    root = scratch / "puppeteer"
+    if (root / "node_modules/puppeteer").is_dir():
+        return root
+    root.mkdir(parents=True, exist_ok=True)
+    for name in ("package.json", "package-lock.json"):
+        shutil.copy2(ROOT / "tools/mermaid-renderer" / name, root / name)
+    _run(("npm", "ci"), cwd=root)
+    if not (root / "node_modules/puppeteer").is_dir():
+        raise VerificationError("Puppeteer was not installed by the renderer lockfile")
+    return root
+
+
+def _javascript_integration(scratch: Path) -> None:
+    _run(
+        (
+            PYTHON,
+            "sandbox/javascript/integration/run_all.py",
+            "--puppeteer-root",
+            _puppeteer_root(scratch),
+        )
+    )
 
 
 def _venv_python(root: Path) -> Path:
@@ -167,6 +193,29 @@ class EndNode:
     )
     def run_pure(self, inputs, params):
         return {}
+""".strip() + "\n"
+
+_PYTHON_ISOLATION_REGISTRY = """
+from vibeflow.targets.python.project import NodeRegistry
+
+from isolation_nodes import EndNode, SeedNode, StartNode
+
+
+def build_node_registry():
+    registry = NodeRegistry()
+    registry.register(
+        "isolation.start", StartNode, config_schema={}, config_defaults={}
+    )
+    registry.register(
+        "isolation.seed",
+        SeedNode,
+        config_schema={"value": {"type": "number"}},
+        config_defaults={"value": 7},
+    )
+    registry.register(
+        "isolation.end", EndNode, config_schema={}, config_defaults={}
+    )
+    return registry
 """.strip() + "\n"
 
 
@@ -237,8 +286,8 @@ def _python_cli_isolation_probe() -> str:
             )
         )
         + f"NODE_SOURCE = {_PYTHON_ISOLATION_NODES!r}\n"
+        + f"REGISTRY_SOURCE = {_PYTHON_ISOLATION_REGISTRY!r}\n"
         + r'''
-import importlib.util
 import json
 import os
 from pathlib import Path
@@ -246,28 +295,18 @@ import sys
 
 root = Path(os.environ["VF_ISOLATION_PYTHON_ROOT"])
 root.mkdir(parents=True, exist_ok=True)
+project_config = root / "vibeflow_project.jsonc"
+project_config.write_text(json.dumps({
+    "project_target": "python",
+    "registry": "registry.py:build_node_registry",
+}), encoding="utf-8")
+workspace = root / "vibeflow_config.jsonc"
+workspace.write_text(json.dumps({
+    "roots": [{"id": "python-isolation", "path": "."}],
+}), encoding="utf-8")
 node_path = root / "isolation_nodes.py"
 node_path.write_text(NODE_SOURCE, encoding="utf-8")
-spec = importlib.util.spec_from_file_location("isolation_nodes", node_path)
-assert spec is not None and spec.loader is not None
-module = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = module
-spec.loader.exec_module(module)
-
-from vibeflow.targets.python.project import GLOBAL_NODE_REGISTRY
-
-GLOBAL_NODE_REGISTRY.register(
-    "isolation.start", module.StartNode, config_schema={}, config_defaults={}
-)
-GLOBAL_NODE_REGISTRY.register(
-    "isolation.seed",
-    module.SeedNode,
-    config_schema={"value": {"type": "number"}},
-    config_defaults={"value": 7},
-)
-GLOBAL_NODE_REGISTRY.register(
-    "isolation.end", module.EndNode, config_schema={}, config_defaults={}
-)
+(root / "registry.py").write_text(REGISTRY_SOURCE, encoding="utf-8")
 
 config = root / "workflow.jsonc"
 config.write_text(json.dumps({
@@ -286,6 +325,7 @@ from vibeflow.tooling.application.cli import main
 
 status = main([
     "run",
+    "--workspace", str(workspace),
     "--config", str(config),
     "--run-root", str(root / "runs"),
     "--run-id", "wheel-target-isolation",
@@ -407,43 +447,151 @@ def _wheel_smoke(scratch: Path) -> None:
 
 def _distribution_smoke(scratch: Path) -> None:
     output = scratch / "distribution"
+    archive_dir = scratch / "archives"
     _run(
-        (PYTHON, "distribution/build.py", "--output", output),
+        (
+            PYTHON,
+            "distribution/build.py",
+            "--output-dir",
+            output,
+            "--archive-dir",
+            archive_dir,
+        ),
         overrides={"PYTHONPATH": None},
     )
     launcher = output / "run.py"
     _run((PYTHON, launcher, "verify-kernel"), overrides={"PYTHONPATH": None})
 
-    packaged_fixture = output / "sandbox" / "javascript" / "integration"
-    fixture = scratch / "distribution-sandbox-runtime"
-    shutil.copytree(
-        packaged_fixture,
-        fixture,
-        ignore=shutil.ignore_patterns(
-            "node_modules",
-            "__pycache__",
-            "*.pyc",
-            "*.pyo",
-            ".artifacts",
+    workspace = output / "vibeflow_config.jsonc"
+    python_config = output / "python_project/configs/main.jsonc"
+    _run(
+        (
+            PYTHON,
+            launcher,
+            "validate",
+            "--workspace",
+            workspace,
+            "--config",
+            python_config,
         ),
+        overrides={"PYTHONPATH": None},
     )
-    _run(("npm", "ci"), cwd=fixture / "project", overrides={"PYTHONPATH": None})
-    aot_output = scratch / "distribution-aot"
+    _run(
+        (
+            PYTHON,
+            launcher,
+            "run",
+            "--workspace",
+            workspace,
+            "--config",
+            python_config,
+            "--run-root",
+            scratch / "distribution-python-runs",
+        ),
+        overrides={"PYTHONPATH": None},
+    )
+
+    javascript_project = output / "javascript_project"
+    javascript_config = javascript_project / "configs/linear.jsonc"
+    _run(("npm", "ci"), cwd=javascript_project, overrides={"PYTHONPATH": None})
+    _run(
+        (
+            PYTHON,
+            launcher,
+            "validate",
+            "--workspace",
+            workspace,
+            "--config",
+            javascript_config,
+        ),
+        overrides={"PYTHONPATH": None},
+    )
+
+    javascript_architecture = javascript_project / "ARCHITECTURE.jsonc"
+    javascript_review = scratch / "distribution-javascript-review.svg"
+    review_pair: tuple[bytes, bytes] | None = None
+    for _ in range(2):
+        _run(
+            (
+                PYTHON,
+                launcher,
+                "review",
+                "--workspace",
+                workspace,
+                "--config",
+                javascript_config,
+                "--output",
+                javascript_review,
+            ),
+            overrides={"PYTHONPATH": None},
+        )
+        current_pair = (
+            javascript_architecture.read_bytes(),
+            javascript_review.read_bytes(),
+        )
+        if review_pair is not None and current_pair != review_pair:
+            raise VerificationError(
+                "JavaScript Architecture/review is not deterministic"
+            )
+        review_pair = current_pair
+    _run(
+        (
+            PYTHON,
+            launcher,
+            "quality-check",
+            "--workspace",
+            workspace,
+            "--path",
+            javascript_project,
+            "--json",
+        ),
+        overrides={"PYTHONPATH": None},
+    )
+
+    esm_output = scratch / "distribution-aot-esm"
+    single_output = scratch / "distribution-aot-single"
+    web_output = scratch / "distribution-aot-web"
+    for profile, target, out_dir in (
+        ("esm-module", "node", esm_output),
+        ("single-esm", "node", single_output),
+    ):
+        _run(
+            (
+                PYTHON,
+                launcher,
+                "build",
+                "--workspace",
+                workspace,
+                "--config",
+                javascript_config,
+                "--target",
+                target,
+                "--profile",
+                profile,
+                "--out-dir",
+                out_dir,
+            ),
+            overrides={"PYTHONPATH": None},
+        )
     _run(
         (
             PYTHON,
             launcher,
             "build",
             "--workspace",
-            fixture / "vibeflow_config.jsonc",
+            workspace,
             "--config",
-            fixture / "project/configs/linear.jsonc",
+            javascript_config,
             "--target",
-            "node",
+            "browser",
             "--profile",
-            "single-esm",
+            "web-app",
+            "--html",
+            javascript_project / "web/index.template.html",
+            "--app-entry",
+            javascript_project / "web/app.ts",
             "--out-dir",
-            aot_output,
+            web_output,
         ),
         overrides={"PYTHONPATH": None},
     )
@@ -458,9 +606,87 @@ process.stdout.write(JSON.stringify(result));
         ("node", "--input-type=module", "--eval", script),
         overrides={
             "PYTHONPATH": None,
-            "VF_ENTRY": str(aot_output / "index.js"),
+            "VF_ENTRY": str(single_output / "index.js"),
         },
     )
+
+    browser_host_output = scratch / "distribution-browser-long-host"
+    _run(
+        (
+            PYTHON,
+            launcher,
+            "build",
+            "--workspace",
+            workspace,
+            "--config",
+            javascript_project / "configs/browser_permanent_port_host.jsonc",
+            "--target",
+            "browser",
+            "--profile",
+            "web-app",
+            "--html",
+            javascript_project / "web/browser_host.template.html",
+            "--app-entry",
+            javascript_project / "web/browser_host_app.ts",
+            "--out-dir",
+            browser_host_output,
+        ),
+        overrides={"PYTHONPATH": None},
+    )
+    from sandbox.javascript.integration.sandbox_support import (
+        run_browser_long_host,
+    )
+
+    browser_payload = run_browser_long_host(
+        browser_host_output,
+        puppeteer_root=_puppeteer_root(scratch),
+        module_entry=None,
+    )
+    if browser_payload.get("failureCodes") != ["VF_ABORTED", "VF_ABORTED"]:
+        raise VerificationError(
+            f"distributed long Host cancellation failed: {browser_payload}"
+        )
+    if browser_payload.get("firstOutputs") != [14, 23]:
+        raise VerificationError(
+            f"distributed long Host output failed: {browser_payload}"
+        )
+
+    archives = tuple(archive_dir.glob("vibeflow-distribution-*.zip"))
+    if len(archives) != 1:
+        raise VerificationError(f"expected one distribution archive, found {archives}")
+    extracted = scratch / "distribution-extracted"
+    shutil.unpack_archive(archives[0], extracted)
+    extracted_root = extracted / "vibeflow-distribution"
+    extracted_launcher = extracted_root / "run.py"
+    _run(
+        (PYTHON, extracted_launcher, "verify-kernel"),
+        overrides={"PYTHONPATH": None},
+    )
+    _run(
+        (
+            PYTHON,
+            extracted_launcher,
+            "validate",
+            "--workspace",
+            extracted_root / "vibeflow_config.jsonc",
+            "--config",
+            extracted_root / "python_project/configs/main.jsonc",
+        ),
+        overrides={"PYTHONPATH": None},
+    )
+
+
+def _cleanup_generated_artifacts(_scratch: Path) -> None:
+    """Remove only artifacts produced by earlier full-gate steps.
+
+    The repository quality profile intentionally rejects caches and generated
+    output.  Some subprocesses exercised by pytest create Python caches even
+    when the parent gate disables bytecode generation, so the release smoke
+    must cross the same explicit cleanup boundary used by contributors before
+    it asks the distribution builder to self-check the source tree.
+    """
+
+    _run((PYTHON, "tools/clean_workspace.py", "--apply"))
 
 
 def _clean_tree_check(_scratch: Path) -> None:
@@ -496,6 +722,7 @@ def _steps(*, full: bool) -> tuple[Step, ...]:
         Step("javascript-minimal", _javascript_minimal),
         Step("javascript-integration", _javascript_integration),
         Step("wheel-isolation", _wheel_smoke),
+        Step("generated-artifact-cleanup", _cleanup_generated_artifacts),
         Step("distribution", _distribution_smoke),
         Step("repository-quality-final", _repository_quality),
         Step("clean-tree", _clean_tree_check),

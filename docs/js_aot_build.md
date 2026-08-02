@@ -2,9 +2,9 @@
 
 VibeFlow 可以把同一份 workflow 编译为普通 JavaScript ESM。生成物在运行时不需要 Python，也不需要浏览器或 Node.js 安装 VibeFlow。同步 workflow 导出 `runWorkflow()`，显式异步 workflow 导出 `runWorkflowAsync()`。
 
-正式 Target 名是 `javascript`；TypeScript 是该 Target 支持并在构建期检查的实现语言。VibeFlow 0.9.0 只提供 `vibeflow.targets.javascript.frontend`、`.quality`、`.build` 以及 CLI 入口，不提供旧 AOT 模块路径，也不依赖 Python Target。
+正式 Target 名是 `javascript`；TypeScript 是该 Target 支持的实现语言。VibeFlow 0.10.0 提供 `vibeflow.targets.javascript.frontend`、`.quality`、`.build` 以及 CLI 入口，不提供旧 AOT 模块路径，也不依赖 Python Target。
 
-本文描述当前已经实现的公开配置、节点 ABI、Workflow ABI 和构建命令。早期方案和取舍记录见 [JavaScript/TypeScript 节点与跨运行时 AOT 构建设计记录](14_JS_TS节点与Web_AOT构建计划.md)，实际使用应以本文和 CLI 为准。
+本文描述当前公开配置、节点 ABI、Workflow ABI 和构建命令。
 
 可运行的完整工程见源码仓库中的
 [`sandbox/javascript/minimal`](https://github.com/RockingSisyphus/vibeflow/tree/main/sandbox/javascript/minimal)。
@@ -59,6 +59,7 @@ project/
 
 ```jsonc
 {
+  "project_target": "javascript",
   "descriptors": {
     "nodes": ["manifests/nodes"],
     "base_lib": ["manifests/base_lib"],
@@ -75,6 +76,10 @@ project/
 ```
 
 路径相对于 VibeFlow project root。每个目录会递归读取 `*.jsonc`；每个文件只能描述一个资源。配置过但不存在的目录、越出 project root 的路径和符号链接都会使构建失败。
+
+`project_target` 必填。JavaScript root 不能配置 Python Registry 或 RuntimeOptions，也不能通过 nodeset import 引用 Python root。workflow 不声明 Browser/Node 平台集合；每次 `build --target browser|node` 只选择本次产物所需的实现。
+
+`validate` 检查 workflow、descriptor 和 VibeFlow 架构边界，`review` 展示实际配置，`quality-check` 检查职责与依赖。三者都不判断项目是否支持某个平台。平台实现闭包只在 `build --target` 时解析。
 
 `javascript.package_root` 是包含 `package.json`、lockfile 和项目本地 `node_modules` 的目录。`external_packages` 中的包不会进入 bundle，而是保留给下游 bundler 或实际宿主解析。
 
@@ -203,7 +208,10 @@ project/
 - alias、barrel、symlink 不能绕过资源归属和依赖规则；
 - node 和 `base_lib` 的模块顶层不得保留可变业务状态，也不得修改内建对象、
   prototype 或使用带 `g`/`y` 状态的模块级正则；
-- browser target 不允许未经适配的 Node API，node target 不允许未经适配的 DOM 全局。
+
+上述检查只确认 VibeFlow 的资源所有权与执行语义。DOM、Node builtin
+或其他平台 API 是否可用由项目自己的类型检查、测试和真实宿主验证；
+只有 esbuild 无法解析源码或依赖时，它才会作为构建错误返回。
 
 HTML 不是 node 或 `base_lib` 的实现语言，只能作为 `web-app` 的页面模板。
 
@@ -801,7 +809,7 @@ python run.py build \
 - `--html <template>` 和 `--app-entry <entry.ts>`：`web-app` 必需；
 - `--replace`：替换已有且带有效 `vibeflow-build.json` 的构建目录。
 
-默认不会覆盖已存在的输出目录。构建先写入同级临时目录，类型、依赖、bundle 和产物检查全部成功后再原子发布；失败不会破坏旧产物。`--replace` 前会核对 manifest 的完整结构、entry、每个文件的 SHA-256，并拒绝符号链接、被修改的文件、未登记文件或目录。替换已有非空目录时使用 Linux `renameat2(RENAME_EXCHANGE)` 做单次原子交换；平台或文件系统不支持时会保留旧产物并明确失败，不降级成存在短暂空窗的两次 rename。
+默认不会覆盖已存在的输出目录。构建先写入同级临时目录，VibeFlow 契约、依赖闭包、bundle 和产物检查全部成功后再原子发布；失败不会破坏旧产物。`--replace` 前会核对 manifest 的完整结构、entry、每个文件的 SHA-256，并拒绝符号链接、被修改的文件、未登记文件或目录。替换已有非空目录时使用 Linux `renameat2(RENAME_EXCHANGE)` 做单次原子交换；平台或文件系统不支持时会保留旧产物并明确失败，不降级成存在短暂空窗的两次 rename。
 
 `vibeflow-build.json` 记录 target、profile、Workflow ABI、`vibeflow.plugin.v1`、implemented/planned Plugin、`entry_mode`、Host Extension、计划 hash、Node/TypeScript/esbuild 版本、lockfile hash、external package 和所有产物 hash。相同输入、配置和 lockfile 用于确定性构建。
 
@@ -832,8 +840,25 @@ python run.py build \
 - 不自动执行 `npm install`、`npm ci`、`pnpm install` 或 `yarn install`；
 - 不运行第三方 package scripts；
 - 只解析项目本地 TypeScript 和 esbuild；
-- 使用 TypeScript Compiler API 做严格类型与依赖检查，esbuild 只负责 bundling；
+- 只使用 TypeScript Compiler API 读取 VibeFlow ABI、`completion` 和 Promise 所有权所需的事实；
+- 不运行完整 `tsc --noEmit`、ESLint、项目测试或第三方 package scripts；
+- 让 esbuild 负责转译、模块解析和 bundling，无法生成有效 bundle 时直接返回其错误；
 - 把实际版本和 lockfile hash 写入 manifest。
+
+项目应在自己的 CI 中按需运行 `tsc --noEmit`、ESLint、Vitest 和 Playwright。普通 TypeScript 类型错误、代码风格、DOM/Node API 兼容性和业务结果不属于 VibeFlow 的架构审核职责。
+
+一个最小的项目级检查阶段可以写成：
+
+```bash
+npx tsc --noEmit
+npx eslint .
+npx vitest run
+npx playwright test
+```
+
+这些命令由项目自己的 CI 显式维护。VibeFlow 的 `validate`、`review`、
+`quality-check` 和 `build` 不会代替项目执行它们，也不会自动运行
+`package.json` 中的 scripts。
 
 ## 10. 当前限制
 
@@ -841,18 +866,18 @@ JS/Web AOT 只接受可静态检查、可移植的流程：
 
 - 不会把 Python node 自动翻译成 JavaScript；
 - `python_stub`、delegate-cli、任意 Python 对象和 Python Plugin 实现不能进入 JS target；JS/TS Plugin 必须使用当前 Target 的 descriptor 与 `vibeflow.plugin.v1`；
-- workflow 使用的普通 node 和 `base_lib` 必须有唯一的 target-compatible JS/TS 实现；
+- workflow 使用的普通 node 和 `base_lib` 必须有唯一的、与本次 `build --target` 匹配的 JS/TS 实现；
 - node 参数、输入输出和 Capability 边界必须是 JSON 可表达的数据；
-- 不支持的动态 import、target API、worker、WASM、资源模式或递归 nodeset 会在构建期失败；
+- 绕过流程图的动态 import、未归属后台任务、worker/WASM/资源模式或递归 nodeset会在构建期失败；
 - Web Worker executor 尚未实现；JS TaskPlan 首版使用 event loop；
 - VibeFlow 只生成通用 Capability/Host Extension ABI 和核心 Port 契约，不内置任何具体宿主接线。
 
-遇到不支持的功能时，构建应直接失败并指出资源或流程位置，而不是生成只能在运行时才报错的半成品。
+构建只因违反 VibeFlow 契约、缺少所选 target 实现，或 esbuild 无法生成完整产物而失败。普通语言、平台和业务问题由项目工具与真实运行测试负责。
 
 ## 11. JavaScript Target 集成 Sandbox
 
-源码仓库和官方分发包都包含 `sandbox/javascript/integration/`。这个 TypeScript
-Sandbox 是一组经过真实 descriptor、JSONC workflow、
+源码仓库包含 `sandbox/javascript/integration/`。这个 TypeScript Sandbox
+是一组经过真实 descriptor、JSONC workflow、
 TypeScript Compiler API 和 esbuild 的端到端用例。它用
 `node + base_lib` 表达 `(x + a) - b`，并独立覆盖并行 `all` 合流、条件
 `any_active` 合流、nodeset、有界/无界 loop、Promise node、Plugin、Capability，以及
@@ -866,18 +891,8 @@ PYTHONPATH=src python sandbox/javascript/integration/run_all.py \
   --puppeteer-root tools/mermaid-renderer
 ```
 
-从分发包根目录运行时，入口会自动从
-`kernel/vibeflow-kernel.zip` 导入 VibeFlow，不需要源码树或额外安装 Python
-包。分发构建保留 `package.json` 和 lockfile，但不会复制 `node_modules`；
-Sandbox 运行器会在临时项目副本中安装依赖：
-
-```bash
-python sandbox/javascript/integration/run_all.py --skip-browser
-```
-
-如果要运行分发包中的真实浏览器用例，再执行
-`npm ci --prefix kernel/tools/mermaid-renderer`，然后去掉 `--skip-browser`。
-如果本机尚未安装 Puppeteer，可保留 `--skip-browser`，只运行 Node 与构建检查。
+正式分发包只保留可立即开发的 `python_project/` 和
+`javascript_project/` 两个示例 root，不复制整套源码仓库 Sandbox。
 
 完整运行还会验证：
 
@@ -898,8 +913,8 @@ python sandbox/javascript/integration/run_all.py --skip-browser
 - `esm-module`、`single-esm`、`web-app` 的文件集合与启动行为；
 - 严格 TypeScript 项目可直接消费生成的 `.d.ts`；
 - source map、构建清单、锁文件记录、字节确定性和失败发布保护；
-- node 跨 node、未声明 `base_lib`、动态 import、未登记本地 helper 及
-  browser Node API 会在构建期被拒绝。
+- node 跨 node、未声明 `base_lib`、动态 import、未登记本地 helper 等绕过
+  流程图的依赖会在构建期被拒绝；DOM/Node API 兼容性不由 VibeFlow 维护黑名单。
 - immediate/suspend 与 Promise 源码不一致会在构建期被拒绝。
 
 运行器默认将项目副本、依赖、构建和报告写入临时目录。只有显式传入

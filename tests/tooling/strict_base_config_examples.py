@@ -79,7 +79,7 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
             path = case_dir / rel_path
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(source, encoding="utf-8")
-        args = ["quality-check", "--path", str(case_dir), "--json", *case.get("args", [])]
+        args = ["quality-check", "--path", str(case_dir), "--project-target", "python", "--json", *case.get("args", [])]
         code = cli_main(args)
         assert code in {0, 1}
         payload = json.loads(capsys.readouterr().out)
@@ -594,9 +594,9 @@ def test_cli_quality_check_json_and_text_outputs(tmp_path, capsys) -> None:
         encoding="utf-8",
     )
 
-    json_code = cli_main(["quality-check", "--path", str(tmp_path), "--json", "--check-side-effects"])
+    json_code = cli_main(["quality-check", "--path", str(tmp_path), "--project-target", "python", "--json", "--check-side-effects"])
     json_payload = json.loads(capsys.readouterr().out)
-    text_code = cli_main(["quality-check", "--path", str(tmp_path), "--check-side-effects"])
+    text_code = cli_main(["quality-check", "--path", str(tmp_path), "--project-target", "python", "--check-side-effects"])
     text_output = capsys.readouterr().out
 
     assert json_code == 0
@@ -616,11 +616,11 @@ def test_cli_quality_check_json_and_text_outputs(tmp_path, capsys) -> None:
 def test_cli_quality_structure_limits_are_explicit_for_path_scans(tmp_path, capsys) -> None:
     (tmp_path / "helper.py").write_text("VALUE = 1\n", encoding="utf-8")
 
-    assert cli_main(["quality-check", "--path", str(tmp_path), "--json"]) == 0
+    assert cli_main(["quality-check", "--path", str(tmp_path), "--project-target", "python", "--json"]) == 0
     default_payload = json.loads(capsys.readouterr().out)
     assert default_payload["errors"] == []
     assert default_payload["warnings"] == []
 
-    assert cli_main(["quality-check", "--path", str(tmp_path), "--json", "--enable-structure-limits"]) == 0
+    assert cli_main(["quality-check", "--path", str(tmp_path), "--project-target", "python", "--json", "--enable-structure-limits"]) == 0
     enabled_payload = json.loads(capsys.readouterr().out)
     assert [finding["rule_id"] for finding in enabled_payload["warnings"]] == ["QUALITY.STRUCTURE.ROOT_LEVEL_CODE_FILE"]

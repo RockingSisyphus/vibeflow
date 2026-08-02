@@ -30,7 +30,7 @@ base_lib 应保持：
 - 依赖链不要过长。
 - 函数短小、分支少、嵌套浅。
 
-每个 root 的 `project/registry.py` 可以用 `build_base_lib_registry()` 声明该 root 下可用的 base_lib：
+每个 root 的 `python_project/registry.py` 可以用 `build_base_lib_registry()` 声明该 root 下可用的 base_lib：
 
 ```python
 from vibeflow.targets.python.project import BaseLibRegistry

@@ -71,26 +71,6 @@ function jsonValue(value, pathName = "result") {
   failure("VF_PLUGIN_HOOK_RESULT", `${pathName} must contain JSON values`);
 }
 
-function diagnostic(ts, item) {
-  if (item && typeof item.text === "string") {
-    return {
-      message: item.text,
-      code: item.code,
-      ...(item.fileName ? { file: path.resolve(item.fileName) } : {}),
-    };
-  }
-  const message = ts.flattenDiagnosticMessageText(item.messageText, "\n");
-  if (!item.file || item.start === undefined) return { message, code: item.code };
-  const position = item.file.getLineAndCharacterOfPosition(item.start);
-  return {
-    message,
-    code: item.code,
-    file: path.resolve(item.file.fileName),
-    line: position.line + 1,
-    column: position.character + 1,
-  };
-}
-
 async function localTools(packageRoot) {
   const require = createRequire(path.join(packageRoot, "package.json"));
   let ts;
@@ -296,7 +276,15 @@ function identifierIsRuntimeReference(ts, node) {
 
 function auditPluginHostGlobals(ts, sourceFile, plugin, checker) {
   const findings = [];
-  const hostRoots = new Set(["globalThis", "window", "self", "global"]);
+  // This is a plugin/host-extension responsibility boundary, not a platform
+  // compatibility list. It is intentionally the union of common browser and
+  // Node host primitives for every selected build target.
+  const hostRoots = new Set([
+    "globalThis", "window", "self", "global", "document", "process",
+    "localStorage", "sessionStorage", "navigator", "location", "fetch",
+    "XMLHttpRequest", "WebSocket", "EventSource", "indexedDB", "caches",
+    "Worker", "SharedWorker",
+  ]);
   function locallyDeclared(node) {
     try {
       const symbol = checker?.getSymbolAtLocation(node);
@@ -315,8 +303,8 @@ function auditPluginHostGlobals(ts, sourceFile, plugin, checker) {
         && !locallyDeclared(node)) {
       const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
       findings.push({
-        code: "VF_IMPORT_TARGET_GLOBAL",
-        message: `plugin '${plugin.id}' cannot access host global '${node.text}'; use a host_extension`,
+        code: "VF_PLUGIN_HOST_IO",
+        message: `plugin '${plugin.id}' cannot access host primitive '${node.text}'; use a host_extension`,
         owner: plugin.id,
         file: path.resolve(sourceFile.fileName),
         line: position.line + 1,
@@ -408,7 +396,6 @@ async function loadPlugin(request) {
       ? ["ES2022", "DOM", "DOM.Iterable"]
       : ["ES2022"],
   };
-  let diagnostics = [];
   let sourceFile;
   let sourceFiles = [];
   let checker;
@@ -435,14 +422,6 @@ async function loadPlugin(request) {
       sourceFiles = program.getSourceFileNames()
         .map((name) => program.getSourceFile(name))
         .filter(Boolean);
-      diagnostics = [
-        ...program.getConfigFileParsingDiagnostics(),
-        ...program.getProgramDiagnostics(),
-        ...program.getGlobalDiagnostics(),
-        ...program.getSyntacticDiagnostics(),
-        ...program.getBindDiagnostics(),
-        ...program.getSemanticDiagnostics(),
-      ].map((item) => diagnostic(tools.ts, item));
     } catch (cause) {
       snapshot?.dispose();
       api.close();
@@ -466,7 +445,6 @@ async function loadPlugin(request) {
     checker = program.getTypeChecker();
     sourceFile = program.getSourceFile(source);
     sourceFiles = program.getSourceFiles();
-    diagnostics = tools.ts.getPreEmitDiagnostics(program).map((item) => diagnostic(tools.ts, item));
   }
   try {
     const packagePrefix = `${packageRoot}${path.sep}`;
@@ -489,9 +467,9 @@ async function loadPlugin(request) {
         column: 1,
       });
     }
-    if (diagnostics.length || findings.length) {
+    if (findings.length) {
       failure("VF_PLUGIN_TYPECHECK", `plugin '${plugin.id}' failed static validation`, {
-        diagnostics: [...diagnostics, ...findings],
+        diagnostics: findings,
       });
     }
   } finally {

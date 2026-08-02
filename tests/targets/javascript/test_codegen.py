@@ -23,13 +23,13 @@ RESOURCE_SHA256 = {
         "20b4ee4f6a69c6dcdbde0d72a4b5a4edb1d01015b3a39e1f70b37ad814201ddf"
     ),
     "plugin_worker.mjs": (
-        "fcb6caa794c137aee9eabb3a45d643b6ad0d28dfd4f9a976ee08e1a6c8504d28"
+        "4a2e92555a7b761517ad141e0cf5068af01e4fde8b56751fcae7ce2bed2e918f"
     ),
     "runtime_helpers.mjs": (
         "ea5692cc46b40f8b1f04ace8e8068684e311cb5019e13e4338a96d837a1b3cde"
     ),
     "toolchain_driver.mjs": (
-        "0b07b1a4c71b89fedf766a80ae5ce8da5599efa8ad47cd3166e5d60208203e4a"
+        "ffe86e7fde3438415a3c4a9626d8807d4029cf79143e6f35823f6fa4493c1f16"
     ),
 }
 

@@ -188,6 +188,7 @@ def _write_plugin_workspace(
     (project / "vibeflow_project.jsonc").write_text(
         json.dumps(
             {
+                "project_target": "python",
                 "registry": "registry.py:build_node_registry",
                 "quality_enabled": False,
                 "descriptors": {"plugins": ["manifests/plugins"]},

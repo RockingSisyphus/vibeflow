@@ -2,7 +2,7 @@
 
 本文档面向维护 VibeFlow（包名 `vibeflow`）自身的开发者，不是面向业务项目编写 node、nodeset 或 plugin 的使用者指南。
 
-VibeFlow 0.9.0 使用分层 API。根包不导出业务对象，维护代码只使用 `vibeflow.core`、`vibeflow.block_compiler`、`vibeflow.targets.*` 和 `vibeflow.tooling.*` 的所属层入口。
+VibeFlow 0.10.0 使用分层 API。根包不导出业务对象，维护代码只使用 `vibeflow.core`、`vibeflow.block_compiler`、`vibeflow.targets.*` 和 `vibeflow.tooling.*` 的所属层入口。
 
 ## 基本验证流程
 
@@ -12,7 +12,7 @@ VibeFlow 0.9.0 使用分层 API。根包不导出业务对象，维护代码只�
 python tools/verify_project.py --full
 ```
 
-完整门禁依次执行独立仓库自检、各层 pytest、两个 Target 的 Sandbox、Python/JavaScript conformance、Node/browser 与三种 AOT profile、wheel 隔离安装和临时分发包 smoke test。门禁只使用临时目录，不覆盖正式分发包。
+完整门禁依次执行独立仓库自检、各层 pytest、两个 Target 的 Sandbox、Python/JavaScript conformance、Node/browser 与三种 AOT profile、wheel 隔离安装和临时分发包 smoke test。构建和运行产物写入临时目录；进入分发验证前，门禁会通过精确清理器删除自己产生的 cache。它不会覆盖正式分发包。
 
 需要定位分层问题时，直接运行独立自检 profile：
 
@@ -67,11 +67,11 @@ Tooling 标准化项目数据
 - `completion`、`schedule`、`executor` 必须分开建模；同步 JS 计划不得包含 suspend/deferred/detached。TypeScript 源码审计负责拒绝声明不实和未归属 Promise，不增加运行时 thenable 兜底。
 - `max_iterations: null`、组合 stop 和无 stop 永久 loop 是公开语义；`vibeflow.io` 是内核节点，不应要求 Python registry 或 JS node descriptor。
 - Capability 的声明、Schema 检查和 import 审计不是安全沙箱。重试、回滚、并发安全和真实副作用仍由宿主实现负责。
-- TypeScript Compiler API 负责类型与源码依赖检查，esbuild 负责 bundling。不要把 bundler 专属结构泄漏进 `WorkflowPlan`、descriptor 或公开 Workflow ABI。
+- TypeScript Compiler API 只提取 VibeFlow ABI、`completion`、Promise 所有权和架构依赖事实；esbuild 负责转译、模块解析和 bundling。完整类型检查、lint、平台 API 兼容性和业务测试属于项目工具。不要把 bundler 专属结构泄漏进 `WorkflowPlan`、descriptor 或公开 Workflow ABI。
 
 配置模型和判定规则位于 `core/config/`，供文件加载使用的 JSON Schema 资源位于 `tooling/project/schema/`；JS 构建脚本与 runtime helper 位于 `targets/javascript/resources/`。wheel 和分发测试直接检查这些正式路径。
 
-当前 JS/TS AOT 支持范围、descriptor 字段、Workflow ABI 和构建 profile 以 `docs/js_aot_build.md` 为准；`docs/14_JS_TS节点与Web_AOT构建计划.md` 是设计记录，不能作为当前 API 的事实来源。
+当前 JS/TS AOT 支持范围、descriptor 字段、Workflow ABI 和构建 profile 以 `docs/js_aot_build.md` 为准。
 
 ## JS/TS AOT 验证
 
@@ -92,7 +92,7 @@ PYTHONPATH=src python sandbox/javascript/minimal/run_e2e.py --skip-browser
 
 JavaScript integration Sandbox 覆盖 node/`base_lib` 数学组合、数据传递、schedule/transfer edge、分支与合流、nodeset、嵌套 override、有界/无界 loop、同步/异步 ABI、Port、Promise node、Capability、取消、trace、detached 清理、completion mismatch、隐藏 Promise、稳定错误码、非法 import、source map、确定性发布和三个 profile：
 
-0.9 还覆盖 `vibeflow.plugin.v1` 的 Policy/Compiler/Runtime hook 顺序、依赖闭包、Planned 不绑定实现、同步/异步 completion、构建清单，以及 Host Extension 的真实浏览器 start/stop、Port、取消、双 host 隔离和无 import 副作用。
+集成沙箱还覆盖 `vibeflow.plugin.v1` 的 Policy/Compiler/Runtime hook 顺序、依赖闭包、Planned 不绑定实现、同步/异步 completion、构建清单，以及 Host Extension 的真实浏览器 start/stop、Port、取消、双 host 隔离和无 import 副作用。
 
 ```bash
 npm ci --prefix tools/mermaid-renderer
@@ -142,27 +142,25 @@ PY
 
 ```bash
 VF_DIST_ROOT="$(mktemp -d)"
-python distribution/build.py --output "$VF_DIST_ROOT/distribution"
-python "$VF_DIST_ROOT/distribution/run.py" build \
-  --workspace sandbox/javascript/minimal/vibeflow_config.jsonc \
-  --config sandbox/javascript/minimal/project/configs/greeting.jsonc \
+python distribution/build.py \
+  --output-dir "$VF_DIST_ROOT/vibeflow-distribution" \
+  --archive-dir "$VF_DIST_ROOT/archive"
+python "$VF_DIST_ROOT/vibeflow-distribution/run.py" build \
+  --config javascript_project/configs/linear.jsonc \
   --target node \
   --profile single-esm \
   --out-dir "$VF_DIST_ROOT/aot"
 VF_ENTRY="$VF_DIST_ROOT/aot/index.js" node --input-type=module --eval '
   const {pathToFileURL} = await import("node:url");
   const workflow = await import(pathToFileURL(process.env.VF_ENTRY).href);
-  const value = await workflow.runWorkflowAsync(
-    {name: "  Release Smoke "},
-    {capabilities: {"example.clock": {now: async () => 123}}},
-  );
-  if (value.greeting !== "Hello, Release Smoke! (123)") {
+  const value = workflow.runWorkflow({x: 10, a: 8, b: 3});
+  if (value.result !== 15) {
     throw new Error(JSON.stringify(value));
   }
 '
 ```
 
-临时 smoke test 通过后，运行 `python distribution/build.py --output <目标目录>` 生成分发包。不要手工编辑生成物：用户文档源位于 `distribution/kernel_development_pack/docs/` 和 `docs/js_aot_build.md`，项目模板源位于 `distribution/kernel_development_pack/project_template/`，内核源位于 `src/vibeflow/`；构建脚本负责复制、封装并重写 `kernel/MANIFEST.sha256`。
+临时 smoke test 通过后，运行 `python distribution/build.py` 同时发布 `dist/vibeflow-distribution/` 和版本化 `archive/*.zip`。不要手工编辑生成物：用户文档源位于 `distribution/kernel_development_pack/docs/` 和 `docs/js_aot_build.md`，项目模板源位于 `distribution/kernel_development_pack/project_template/`，内核源位于 `src/vibeflow/`；构建脚本负责双 root 模板、内核归档、manifest、`DISTRIBUTION.json` 和确定性外层 ZIP。
 
 ## `review` 编排契约
 

@@ -1,6 +1,6 @@
 # VibeFlow 目标愿景
 
-> 当前版本：0.9.0。0.9 使用分层公共 API，并强制隔离 Python 与 JavaScript Target 及其 Application closure。
+> 当前版本：0.10.0。每个 project root 显式选择 Python 或 JavaScript Target；两个 Target 及其 Application closure 保持完全隔离。
 
 ## 设计初衷
 
@@ -45,7 +45,7 @@ tooling → targets/python ──────┐
 - Block Compiler 把 `ValidatedWorkflow` 编译为唯一公共 `WorkflowPlan` / `BlockPlan` IR。
 - Python 与 JavaScript Target 分别保存语言实现、运行或生成逻辑，彼此不依赖；JavaScript Target 的 `build` 子层拥有 Node 工具链协议和 AOT 发布实现。
 - Tooling 负责项目文件、CLI、Target-specific Application 编排和架构表现；中立 Tooling 不依赖 Target。
-- 0.9 只公开分层 API；根包不重导出业务对象，旧模块路径不再是公共接口。
+- 根包不重导出业务对象，旧模块路径不再是公共接口。
 
 `PythonBindingPlan` 保存 callable、有效参数和插件；`JavascriptBindingPlan` 保存 JS/TS 源码、Schema、base_lib、Plugin、Capability、Host Extension 和 import policy。语言对象不能进入公共 IR。
 
@@ -208,7 +208,7 @@ Tooling 加载 workflow config + registry / descriptor
 - `compile_core(CoreCompileRequest)` 只用内存数据生成 `CoreCompilation` 与 `ValidatedWorkflow`；`compile_workflow(ValidatedWorkflow, ImplementationFacts)` 生成公共计划。
 - `PythonBindingPlan` 与 `JavascriptBindingPlan` 把语言实现放在公共计划之外。Python `ExecutionPlan` 只属于 Python Runtime，JavaScript 内部模型不构成第二套公共 IR。
 - 静态 catalog 可以加载 node、`base_lib`、data schema、Capability、Plugin 和 JS/TS Host Extension descriptor；Python Target 把 registry 转成同类资源事实，并在静态描述同时存在时检查一致性。
-- JS/TS AOT 从 `WorkflowPlan + JavascriptBindingPlan` 选择 target 实现，经过 TypeScript 类型/依赖检查和 bundling，输出 `esm-module`、`single-esm` 或 `web-app`。
+- JS/TS AOT 从 `WorkflowPlan + JavascriptBindingPlan` 按本次 `build --target browser|node` 选择实现，检查 VibeFlow ABI 与依赖边界并完成 bundling，输出 `esm-module`、`single-esm` 或 `web-app`。workflow 不声明平台集合；普通类型、代码规范和平台 API 兼容性由项目工具负责。
 - JavaScript emitter 按 `entry_mode` 生成流程专用的同步 `runWorkflow()` 或异步 `runWorkflowAsync()`，产物不读取原始 workflow，也不需要 Python 或浏览器端 VibeFlow runtime。
 - 每次调用独立持有输入、trace、错误、异步任务、取消状态和 Capability wrapper；模块 import 不自动运行 workflow 或 Host Extension。
 

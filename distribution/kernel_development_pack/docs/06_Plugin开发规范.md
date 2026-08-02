@@ -6,7 +6,7 @@ Python Plugin 使用 `effect_scope=trusted`，可以执行 Python IO，并由当
 
 ## Python Target：注册和启用
 
-每个 root 的 `project/registry.py` 可以用 `build_plugin_registry()` 声明可用插件：
+每个 root 的 `python_project/registry.py` 可以用 `build_plugin_registry()` 声明可用插件：
 
 ```python
 from vibeflow.targets.python.project import PluginResourceRegistry

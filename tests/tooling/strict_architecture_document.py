@@ -125,7 +125,14 @@ def test_architecture_document_is_deterministic_and_keeps_planned_and_unused_bod
     assert '"format_version"' not in first
     assert '"generated"' not in first
     assert '"executable"' not in first
-    assert list(payload) == ["workflow", "nodesets", "node_types", "resources"]
+    assert list(payload) == [
+        "project_target",
+        "workflow",
+        "nodesets",
+        "node_types",
+        "resources",
+    ]
+    assert payload["project_target"] == "python"
     assert payload["workflow"]["source"] == {"root_id": "app", "path": "configs/main.jsonc"}
     assert payload["nodesets"]["design.with_body"]["body"]["nodes"][0]["id"] == "planned_step"
     assert payload["nodesets"]["design.empty"]["body"] is None

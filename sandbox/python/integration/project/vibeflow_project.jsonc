@@ -1,4 +1,5 @@
 {
+  "project_target": "python",
   "registry": "registry.py:build_node_registry",
   "quality_enabled": false,
   "architecture": {

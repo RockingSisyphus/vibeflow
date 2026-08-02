@@ -69,37 +69,55 @@ You do not need to understand the full kernel source first. Treat the release pa
 ## Typical Release Package Layout 📦
 
 ```text
-project/
+AGENTS.md         # project rules for AI tools
+README.md         # project guide
+run.py            # project entrypoint
+DISTRIBUTION.json # release version, roots, and kernel hash
+kernel/
+  vibeflow-kernel.zip
+  MANIFEST.sha256
+  README.md
+  docs/
+  tools/
+python_project/
   ARCHITECTURE.jsonc # generated single-file architecture review view
   nodes/          # business nodes
   base_lib/       # pure helper functions
   plugins/        # optional policy/runtime plugins
   configs/        # JSONC flow configs
   registry.py     # node registration
-kernel/
-  vibeflow/       # VibeFlow kernel copy, usually not edited
-AGENTS.md         # project rules for AI tools
-run.py            # project entrypoint
+javascript_project/
+  ARCHITECTURE.jsonc
+  configs/
+  nodes/
+  base_lib/
+  plugins/
+  host_extensions/
+  manifests/
+  web/
+  package.json
+  package-lock.json
+runs/
+reports/
 ```
 
 Common commands:
 
 ```bash
-python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc
-python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc --check
-python run.py review --config project/configs/main.jsonc --output reports/graph.expanded.svg
-python run.py validate --config project/configs/main.jsonc
-python run.py run --config project/configs/main.jsonc --run-root runs
-python run.py build --workspace vibeflow_config.jsonc --config project/configs/<js-workflow>.jsonc --target browser --profile esm-module --out-dir dist
-python run.py delegate-cli --config project/configs/main.jsonc -- --input data.yaml --verbose
-python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
-python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
-python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
-python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg
-python run.py quality --path project
+python run.py architecture --config python_project/configs/main.jsonc --output python_project/ARCHITECTURE.jsonc
+python run.py review --config python_project/configs/main.jsonc --output reports/graph.expanded.svg
+python run.py validate --config python_project/configs/main.jsonc
+python run.py run --config python_project/configs/main.jsonc --run-root runs
+python run.py delegate-cli --config python_project/configs/main.jsonc -- --input data.yaml --verbose
+python run.py review --config javascript_project/configs/linear.jsonc --output reports/javascript.svg
+python run.py build --config javascript_project/configs/linear.jsonc --target node --profile single-esm --out-dir output/node
+python run.py build --config javascript_project/configs/linear.jsonc --target browser --profile web-app --html javascript_project/web/index.template.html --app-entry javascript_project/web/app.ts --out-dir output/web
+python run.py quality --path python_project
 ```
 
-Each root can register workflow/document pairs under `architecture.documents` in `vibeflow_project.jsonc`. Fixed comments mark the generated document as non-executable; mutable-looking status properties are deliberately absent. AI should read it first to understand the project architecture. To change that architecture, edit the real workflow config or relevant nodesets, update registry metadata/config schema when needed, and regenerate the document; never edit the generated document itself. Workspace validation and execution reject a registered document that is missing, stale, or manually reformatted, with source locations and a repair command.
+Each root must select exactly one language backend with `project_target: "python" | "javascript"` in `vibeflow_project.jsonc`. A workspace may contain both root types, but one workflow cannot mix Targets. Browser and Node are not workflow declarations; JavaScript users select the required output with each `build --target` call.
+
+Each root can register workflow/document pairs under `architecture.documents`. Fixed comments mark the generated document as non-executable; mutable-looking status properties are deliberately absent. AI should read it first to understand the project architecture. To change that architecture, edit the real workflow config or relevant nodesets, update registry metadata/config schema when needed, and regenerate the document; never edit the generated document itself. Workspace validation and execution reject a registered document that is missing, stale, or manually reformatted, with source locations and a repair command.
 
 `review` is the formal architecture-review entry point. It checks registration and the existing graph, refreshes and verifies the canonical `ARCHITECTURE.jsonc`, runs workspace validation, then generates and checks an expanded `review-columns` SVG. If any stage fails, it does not substitute an old SVG, a hand-written diagram, or a direct mmdc render, and it does not publish the failed artifact to the target path. `PASS` or `CONCERNS` only means that machine review completed; when the task says “implement after review,” explicit human approval in a later message is still required.
 
@@ -215,7 +233,6 @@ Humans can review the system shape, and AI tools get a clearer project map.
 - `docs/developer_guide.md`: user development guide.
 - [JavaScript/TypeScript node and Web AOT build guide](docs/js_aot_build.md).
 - `docs/kernel_development_guide.md`: VibeFlow maintenance guide.
-- `docs/strict_flowchart_kernel_redesign.md`, `docs/11_*.md`, `docs/12_*.md`, `docs/13_*.md`: historical design records and staged plans, not the current public API.
 - `distribution/kernel_development_pack/`: release package template.
 
 ## License 📄

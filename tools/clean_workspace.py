@@ -19,11 +19,10 @@ from typing import Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 PROTECTED_TREES = frozenset({".git", "references"})
-PROTECTED_ROOTS = frozenset({"distribution"})
+PROTECTED_ROOTS = frozenset({"archive", "dist", "distribution"})
 EXACT_ARTIFACTS = (
     ".pytest_cache",
     "build",
-    "dist",
     "output",
     "reports",
     "review_artifacts",
@@ -151,7 +150,7 @@ def _contains_only_generated_content(directory: Path) -> bool:
     return True
 
 
-def discover_targets() -> tuple[CleanupTarget, ...]:
+def discover_targets(*, include_release: bool = False) -> tuple[CleanupTarget, ...]:
     found: dict[Path, str] = {}
     for relative in EXACT_ARTIFACTS:
         candidate = ROOT / relative
@@ -205,6 +204,10 @@ def discover_targets() -> tuple[CleanupTarget, ...]:
     for candidate in ROOT.iterdir():
         if candidate.is_file() and candidate.suffix.lower() == ".zip":
             found[candidate] = "release"
+    if include_release:
+        latest_release = ROOT / "dist" / "vibeflow-distribution"
+        if latest_release.exists() or latest_release.is_symlink():
+            found[latest_release] = "current-release"
     # Keep only highest-level targets so deletion plans stay short and stable.
     ordered = sorted(found, key=lambda item: (len(item.parts), str(item)))
     selected: list[CleanupTarget] = []
@@ -252,13 +255,24 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="remove validated artifacts; the default only prints the plan",
     )
+    parser.add_argument(
+        "--include-release",
+        action="store_true",
+        help=(
+            "include the current dist/vibeflow-distribution release; "
+            "versioned archive files are always protected"
+        ),
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        targets = validate_targets(discover_targets(), tracked=_tracked_paths())
+        targets = validate_targets(
+            discover_targets(include_release=args.include_release),
+            tracked=_tracked_paths(),
+        )
     except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         print(f"cleanup refused: {exc}")
         return 2

@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 from typing import Callable, Iterator
+from urllib.parse import unquote
 
 from .application_scan import (
     javascript_application_findings,
@@ -57,7 +58,6 @@ _GENERATED_ROOT_NAMES = frozenset(
     {
         ".pytest_cache",
         "build",
-        "dist",
         "output",
         "reports",
         "review_artifacts",
@@ -65,6 +65,109 @@ _GENERATED_ROOT_NAMES = frozenset(
         "tmp",
         "vibeflow_distribution",
     }
+)
+
+_DOCUMENTATION_ROOTS = (
+    "README.md",
+    "README.en.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "THIRD_PARTY_NOTICES.md",
+    ".github",
+    "docs",
+    "distribution/kernel_development_pack",
+    "quality/README.md",
+    "sandbox",
+)
+
+_REMOVED_DOCUMENT_TOKENS = (
+    "11_训练性能导向内核改进计划.md",
+    "12_CompiledBlock完整代码生成计划.md",
+    "13_CompiledBlock分阶段实施计划.md",
+    "14_JS_TS节点与Web_AOT构建计划.md",
+    "15_长期工作流与原生IO改造计划.md",
+    "16_语言无关内核与多Target分层架构目标.md",
+    "strict_flowchart_kernel_redesign.md",
+)
+
+_STALE_DOCUMENT_TOKENS = {
+    "0.9.0": "Replace the obsolete public release version with 0.10.0.",
+    "vibeflow.runtime": "Use the owning 0.10 layered API instead of the removed runtime facade.",
+    "vibeflow.aot": "Use vibeflow.targets.javascript instead of the removed AOT facade.",
+    "vibeflow.portable": "Use vibeflow.block_compiler instead of the removed portable facade.",
+    "examples/": "Use the canonical sandbox/ path.",
+    "vibeflow_distribution/": "Use dist/vibeflow-distribution/ for the current release directory.",
+}
+
+_MARKDOWN_LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+
+_DOCUMENT_COMMAND_PATTERNS = (
+    (
+        "distribution launcher",
+        re.compile(r"\bpython(?:3)?\s+run\.py\s+([a-z][a-z0-9-]*)"),
+        frozenset(
+            {
+                "architecture",
+                "ascii",
+                "build",
+                "delegate-cli",
+                "export-architecture",
+                "export-ascii",
+                "export-mermaid",
+                "export-svg",
+                "inspect-config",
+                "inspect-node",
+                "mermaid",
+                "quality",
+                "quality-check",
+                "review",
+                "run",
+                "svg",
+                "validate",
+                "verify-kernel",
+            }
+        ),
+    ),
+    (
+        "module CLI",
+        re.compile(r"\bpython(?:3)?\s+-m\s+vibeflow\s+([a-z][a-z0-9-]*)"),
+        frozenset(
+            {
+                "build",
+                "delegate-cli",
+                "export-architecture",
+                "export-ascii",
+                "export-mermaid",
+                "export-svg",
+                "inspect-config",
+                "inspect-node",
+                "quality-check",
+                "review",
+                "run",
+                "validate",
+            }
+        ),
+    ),
+    (
+        "installed CLI",
+        re.compile(r"(?<!-m )(?<![-\w.])vibeflow\s+([a-z][a-z0-9-]*)"),
+        frozenset(
+            {
+                "build",
+                "delegate-cli",
+                "export-architecture",
+                "export-ascii",
+                "export-mermaid",
+                "export-svg",
+                "inspect-config",
+                "inspect-node",
+                "quality-check",
+                "review",
+                "run",
+                "validate",
+            }
+        ),
+    ),
 )
 
 _GENERATED_ANYWHERE_NAMES = frozenset(
@@ -220,7 +323,7 @@ def _iter_source_python(root: Path) -> Iterator[Path]:
 
 
 def _generated_paths(root: Path) -> Iterator[Path]:
-    ignored_roots = {".git", "references"}
+    ignored_roots = {".git", "archive", "dist", "references"}
     for current, directories, files in os.walk(root, followlinks=False):
         current_path = Path(current)
         relative_parts = current_path.relative_to(root).parts
@@ -250,6 +353,122 @@ def _generated_paths(root: Path) -> Iterator[Path]:
         for name in files:
             if name.endswith((".pyc", ".pyo")):
                 yield current_path / name
+
+
+def _iter_documentation_files(root: Path) -> Iterator[Path]:
+    """Yield maintained Markdown without traversing generated releases."""
+
+    seen: set[Path] = set()
+    for relative in _DOCUMENTATION_ROOTS:
+        candidate = root / relative
+        if candidate.is_file() and candidate.suffix.lower() == ".md":
+            resolved = candidate.resolve()
+            if resolved not in seen:
+                seen.add(resolved)
+                yield candidate
+            continue
+        if not candidate.is_dir():
+            continue
+        for path in sorted(candidate.rglob("*.md")):
+            if any(
+                part in _GENERATED_ANYWHERE_NAMES
+                or part in _SANDBOX_GENERATED_NAMES
+                for part in path.relative_to(root).parts
+            ):
+                continue
+            resolved = path.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            yield path
+
+
+def _markdown_link_target(raw: str) -> str:
+    target = raw.strip()
+    if target.startswith("<") and ">" in target:
+        target = target[1 : target.index(">")]
+    elif " " in target:
+        # Markdown permits an optional quoted title after the destination.
+        target = target.split(None, 1)[0]
+    return unquote(target.split("#", 1)[0].split("?", 1)[0]).strip()
+
+
+def _documentation_findings(root: Path) -> list[Finding]:
+    findings: list[Finding] = []
+    for path in _iter_documentation_files(root):
+        source = path.read_text(encoding="utf-8")
+        lines = source.splitlines()
+        for line_number, line in enumerate(lines, start=1):
+            for match in _MARKDOWN_LINK_RE.finditer(line):
+                target = _markdown_link_target(match.group(1))
+                if not target or target.startswith(
+                    ("#", "http://", "https://", "mailto:", "data:")
+                ):
+                    continue
+                destination = Path(target)
+                if not destination.is_absolute():
+                    destination = path.parent / destination
+                if destination.exists():
+                    continue
+                findings.append(
+                    _finding(
+                        "DOCUMENT_LINK_MISSING",
+                        root,
+                        path,
+                        f"Markdown link target does not exist: {target!r}.",
+                        "Update the link to a maintained local document or remove it.",
+                        line=line_number,
+                        details={"target": target},
+                    )
+                )
+        for token in _REMOVED_DOCUMENT_TOKENS:
+            if token not in source:
+                continue
+            line_number = source[: source.index(token)].count("\n") + 1
+            findings.append(
+                _finding(
+                    "REMOVED_DOCUMENT_REFERENCE",
+                    root,
+                    path,
+                    f"Documentation still references removed historical plan {token!r}.",
+                    "Link to the maintained topic guide instead of a completed plan.",
+                    line=line_number,
+                    details={"token": token},
+                )
+            )
+        for token, fix in _STALE_DOCUMENT_TOKENS.items():
+            if token not in source:
+                continue
+            line_number = source[: source.index(token)].count("\n") + 1
+            findings.append(
+                _finding(
+                    "STALE_DOCUMENTATION",
+                    root,
+                    path,
+                    f"Documentation contains obsolete token {token!r}.",
+                    fix,
+                    line=line_number,
+                    details={"token": token},
+                )
+            )
+        for command_kind, pattern, allowed_commands in _DOCUMENT_COMMAND_PATTERNS:
+            for match in pattern.finditer(source):
+                command = match.group(1)
+                if command in allowed_commands:
+                    continue
+                line_number = source[: match.start(1)].count("\n") + 1
+                findings.append(
+                    _finding(
+                        "STALE_DOCUMENT_COMMAND",
+                        root,
+                        path,
+                        f"Documentation uses unknown {command_kind} command {command!r}.",
+                        "Replace it with a command exposed by the current 0.10 CLI or remove the example.",
+                        line=line_number,
+                        details={"command": command, "kind": command_kind},
+                    )
+                )
+    return findings
 
 
 def check_base(root: Path, *, node_executable: str | None = None) -> list[Finding]:
@@ -394,6 +613,7 @@ def check_base(root: Path, *, node_executable: str | None = None) -> list[Findin
     graph = build_import_graph(root)
     findings.extend(scan_layer(root, "tooling", graph=graph))
     findings.extend(neutral_tooling_findings(root, graph))
+    findings.extend(_documentation_findings(root))
     return findings
 
 

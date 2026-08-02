@@ -27,7 +27,7 @@ from vibeflow.targets.javascript.frontend.bindings import (
 PLUGIN_ERROR_CODES = {
     "PLUGIN.SELECTION.UNKNOWN": "VF_AOT_PLUGIN_UNKNOWN",
     "PLUGIN.SELECTION.DEPENDENCY": "VF_AOT_PLUGIN_UNKNOWN",
-    "PLUGIN.SELECTION.TARGET": "VF_AOT_PLUGIN_TARGET",
+    "PLUGIN.SELECTION.TARGET": "VF_AOT_TARGET_IMPLEMENTATION_MISSING",
     "PLUGIN.SELECTION.CONTRACT": "VF_AOT_PLUGIN_CONFIG",
     "PLUGIN.SELECTION.CONFIG_SCHEMA": "VF_AOT_PLUGIN_CONFIG",
     "PLUGIN.SELECTION.TYPE": "VF_AOT_PLUGIN_KIND",
@@ -190,7 +190,7 @@ def parse_javascript_plugin_descriptor(
         raise
     except DescriptorModelError as exc:
         code = (
-            "VF_AOT_PLUGIN_TARGET"
+            "VF_AOT_CONTRACT_INVALID"
             if "target" in str(exc)
             else "VF_AOT_PLUGIN_CONFIG"
             if "config" in str(exc) or "priority" in str(exc)
@@ -366,7 +366,7 @@ def _binding_from_resolved(
     assert implementation is not None
     if implementation.language not in {"javascript", "typescript"}:
         raise JavascriptPluginError(
-            "VF_AOT_PLUGIN_TARGET",
+            "VF_AOT_TARGET_IMPLEMENTATION_MISSING",
             f"plugin '{resolved.id}' has no JavaScript implementation for '{target}'",
             resolved.id,
         )

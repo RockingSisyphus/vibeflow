@@ -201,7 +201,7 @@ node 自身只声明 `CONTRACT.params_schema`，注册时必须提供真实可�
 
 ## 常见健康报告和修法
 
-- `NODE.TYPE.UNKNOWN`：config 中的 `type_used` 没有在 `project/registry.py` 注册，也没有匹配已导入 nodeset `type_key` 或系统类型；检查 registry key / nodeset `type_key` 是否拼错。
+- `NODE.TYPE.UNKNOWN`：config 中的 `type_used` 没有在 `python_project/registry.py` 注册，也没有匹配已导入 nodeset `type_key` 或系统类型；检查 registry key / nodeset `type_key` 是否拼错。
 - `NODE.METADATA.*`：`NODE_INFO` 字段缺失、为空或 `flow_kind` 非法；补全 `NodeInfo`。
 - `NODE.CONTRACT.*`：`CONTRACT` 缺字段、key 重复、语义或 schema 覆盖不完整；修 `NodeContract`。
 - `NODE.PURITY.*`：node 有副作用、动态导入、跨 node 调用或源码形态不合规；拆到更小纯函数，必要时移到 `base_lib/`。

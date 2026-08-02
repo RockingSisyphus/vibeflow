@@ -18,6 +18,7 @@
             "type": "object",
             "required": ["path"],
             "properties": {
+              "root": { "type": "string", "minLength": 1 },
               "path": { "type": "string", "minLength": 1 }
             },
             "additionalProperties": false
@@ -92,6 +93,49 @@
               { "required": ["path"] },
               { "required": ["name"], "properties": { "status": { "const": "planned" } } }
             ]
+          }
+        ]
+      }
+    },
+    "host_extensions": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          { "type": "string", "minLength": 1 },
+          {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "name": { "type": "string", "minLength": 1 },
+              "status": { "enum": ["planned", "implemented"] },
+              "enabled": { "type": "boolean" },
+              "display_name": { "type": "string" },
+              "category": { "type": "string" },
+              "description": { "type": "string" },
+              "version": { "type": "string" },
+              "targets": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "uniqueItems": true
+              },
+              "provides": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "uniqueItems": true
+              },
+              "dependencies": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "uniqueItems": true
+              },
+              "config": { "type": "object" },
+              "settings": { "type": "object" }
+            },
+            "anyOf": [
+              { "required": ["id"] },
+              { "required": ["name"] }
+            ],
+            "additionalProperties": false
           }
         ]
       }

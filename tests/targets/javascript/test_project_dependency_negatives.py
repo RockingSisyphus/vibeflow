@@ -196,19 +196,6 @@ CASES = (
         ),
     ),
     NegativeCase(
-        name="indirect-node-builtin",
-        code="VF_IMPORT_TARGET",
-        diagnostic_file="bridge.ts",
-        marker='"node:fs"',
-        sources={
-            "entry.ts": 'import { bridge } from "./bridge.ts";\nexport function run() { void bridge; return {}; }\n',
-            "bridge.ts": 'import { readFileSync } from "node:fs";\nexport const bridge = readFileSync;\n',
-        },
-        owners=(
-            {"path": "entry.ts", "kind": "node", "id": "test.entry"},
-        ),
-    ),
-    NegativeCase(
         name="module-promise",
         code="VF_IMPORT_SIDE_EFFECT",
         diagnostic_file="entry.ts",

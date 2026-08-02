@@ -37,6 +37,7 @@ def _write_review_workspace(
         encoding="utf-8",
     )
     project_config: dict[str, object] = {
+        "project_target": "python",
         "registry": "registry.py:build_node_registry",
         "quality_enabled": False,
     }

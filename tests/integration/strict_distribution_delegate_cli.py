@@ -134,7 +134,7 @@ def test_built_distribution_preserves_delegate_cli_passthrough_rules(
     original = [
         "delegate-cli",
         "--config",
-        "project/configs/main.jsonc",
+        "python_project/configs/main.jsonc",
         "--",
         "--workspace",
         "business-workspace",
@@ -153,7 +153,7 @@ def test_built_distribution_preserves_delegate_cli_passthrough_rules(
         "--workspace",
         str(built_workspace),
         "--config",
-        "project/configs/main.jsonc",
+        "python_project/configs/main.jsonc",
         "--",
         "--workspace",
         "business-workspace",
@@ -163,12 +163,207 @@ def test_built_distribution_preserves_delegate_cli_passthrough_rules(
     ]
 
 
+def test_built_run_keeps_javascript_roots_out_of_lazy_python_imports(
+    tmp_path: Path,
+) -> None:
+    distribution = tmp_path / "distribution"
+    build_distribution(distribution, run_self_check=False)
+    python_project = tmp_path / "python-project"
+    javascript_project = tmp_path / "javascript-project"
+    nodes = python_project / "nodes"
+    nodes.mkdir(parents=True)
+    javascript_project.mkdir()
+    (nodes / "__init__.py").write_text("", encoding="utf-8")
+    (python_project / "lazy_helper.py").write_text("VALUE = 13\n", encoding="utf-8")
+    (javascript_project / "lazy_helper.py").write_text(
+        'raise RuntimeError("javascript root leaked into Python imports")\n',
+        encoding="utf-8",
+    )
+    (javascript_project / "vibeflow_project.jsonc").write_text(
+        json.dumps(
+            {
+                "project_target": "javascript",
+                "quality_enabled": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (python_project / "vibeflow_project.jsonc").write_text(
+        json.dumps(
+            {
+                "project_target": "python",
+                "registry": "registry.py:build_node_registry",
+                "quality_enabled": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (python_project / "registry.py").write_text(
+        textwrap.dedent(
+            """
+            from vibeflow.targets.python.project import NodeRegistry
+            from nodes.lazy_nodes import EndNode, LazyNode, StartNode
+
+            def build_node_registry():
+                registry = NodeRegistry()
+                registry.register("lazy.start", StartNode, config_schema={}, config_defaults={})
+                registry.register("lazy.value", LazyNode, config_schema={}, config_defaults={})
+                registry.register("lazy.end", EndNode, config_schema={}, config_defaults={})
+                return registry
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+    (nodes / "lazy_nodes.py").write_text(
+        textwrap.dedent(
+            """
+            from vibeflow.core import DataProvider
+            from vibeflow.targets.python.project import NodeContract, NodeInfo
+
+            class StartNode:
+                NODE_INFO = NodeInfo(
+                    "lazy.start", "Start", "test",
+                    "Starts the lazy import workflow.", "0.1.0", "terminal",
+                )
+                CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}},))
+                def run_pure(self, inputs, params):
+                    return {}
+
+            class LazyNode:
+                NODE_INFO = NodeInfo(
+                    "lazy.value", "Lazy Value", "test",
+                    "Imports a workspace-local helper during execution.",
+                    "0.1.0", "process",
+                )
+                CONTRACT = NodeContract(
+                    provides=(DataProvider("response.value", "response.value"),),
+                    output_semantics={"response.value": ("lazy value",)},
+                    output_schema={"response.value": {"type": "integer"}},
+                )
+                def run_pure(self, inputs, params):
+                    import lazy_helper
+                    return {"response.value": lazy_helper.VALUE}
+
+            class EndNode:
+                NODE_INFO = NodeInfo(
+                    "lazy.end", "End", "test",
+                    "Ends the lazy import workflow.", "0.1.0", "terminal",
+                )
+                CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}},))
+                def run_pure(self, inputs, params):
+                    return {}
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+
+    config_path = python_project / "main.jsonc"
+    config_path.write_text(
+        json.dumps(
+            {
+                "pipeline": {
+                    "nodes": [
+                        {
+                            "id": "start",
+                            "type_used": "lazy.start",
+                            "display_name": "Start",
+                            "description": "Starts the lazy import workflow.",
+                        },
+                        {
+                            "id": "lazy",
+                            "type_used": "lazy.value",
+                            "display_name": "Lazy Value",
+                            "description": "Imports the Python root helper lazily.",
+                            "provides": [
+                                {
+                                    "key": "response.value",
+                                    "type": "response.value",
+                                    "display_name": "Response Value",
+                                }
+                            ],
+                        },
+                        {
+                            "id": "end",
+                            "type_used": "lazy.end",
+                            "display_name": "End",
+                            "description": "Ends the lazy import workflow.",
+                            "similar_to": {
+                                "node": "start",
+                                "relationship": "copy",
+                                "reason": "The terminal nodes intentionally share their empty implementation.",
+                            },
+                        },
+                    ],
+                    "edges": [["start", "lazy"], ["lazy", "end"]],
+                    "outputs": [
+                        {
+                            "type": "response.value",
+                            "cardinality": "exactly_one",
+                            "display_name": "Response Value",
+                        }
+                    ],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    workspace_path = tmp_path / "lazy-workspace.jsonc"
+    workspace_path.write_text(
+        json.dumps(
+            {
+                "policy": {},
+                "roots": [
+                    {"id": "javascript-project", "path": str(javascript_project)},
+                    {"id": "python-project", "path": str(python_project)},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    environment = os.environ.copy()
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    environment.pop("PYTHONPATH", None)
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            str(distribution / "run.py"),
+            "run",
+            "--workspace",
+            str(workspace_path),
+            "--config",
+            str(config_path),
+            "--run-root",
+            str(tmp_path / "runs"),
+            "--run-id",
+            "lazy-python-import",
+        ],
+        cwd=distribution,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+    assert json.loads(completed.stdout)["status"] in {"PASS", "CONCERNS"}
+    runtime_trace = (
+        tmp_path / "runs" / "lazy-python-import" / "runtime_trace.jsonl"
+    ).read_text(encoding="utf-8")
+    assert '"node": "lazy"' in runtime_trace
+    assert "javascript root leaked into Python imports" not in (
+        completed.stdout + completed.stderr
+    )
+
+
 def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_core_trace(
     tmp_path: Path,
 ) -> None:
     distribution = tmp_path / "distribution"
     build_distribution(distribution, run_self_check=False)
-    (distribution / "project" / "lazy_helper.py").write_text("CODE = 7\n", encoding="utf-8")
+    (distribution / "python_project" / "lazy_helper.py").write_text("CODE = 7\n", encoding="utf-8")
 
     custom = tmp_path / "custom"
     project = custom / "project"
@@ -188,6 +383,7 @@ def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_co
     (project / "vibeflow_project.jsonc").write_text(
         json.dumps(
             {
+                "project_target": "python",
                 "registry": "registry.py:build_node_registry",
                 "quality_enabled": False,
             }
@@ -308,4 +504,4 @@ def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_co
     assert completed.stderr == ""
     log = (run_root / "custom-workspace" / "vibeflow.log").read_text(encoding="utf-8")
     assert "[vibeflow config]" in log
-    assert str(distribution / "project" / "lazy_helper.py") not in completed.stdout
+    assert str(distribution / "python_project" / "lazy_helper.py") not in completed.stdout

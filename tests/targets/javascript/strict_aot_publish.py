@@ -26,6 +26,7 @@ def _artifact(path: Path, marker: str) -> None:
     manifest = {
         "format": FORMAT,
         "abi_version": "vibeflow.workflow.v2",
+        "project_target": "javascript",
         "workflow_id": "publish-test",
         "entry_mode": "sync",
         "target": "node",

@@ -88,19 +88,23 @@ dependencies and build outputs are removed on exit. Pass `--keep-artifacts` to
 retain the copied project, toolchain, browser driver, builds and report under
 `sandbox/javascript/integration/.artifacts/`.
 
-The official VibeFlow distribution also contains this sandbox under
-`sandbox/javascript/integration/`. Its runner automatically imports the colocated
+The official VibeFlow distribution contains a curated JavaScript example root
+under `javascript_project/`; the repository-only integration sandbox is not
+copied into the release.  The example root imports the colocated
 `kernel/vibeflow-kernel.zip`, so it does not need a source checkout or an
 installed Python package:
 
 ```bash
-cd <vibeflow_distribution>
-python sandbox/javascript/integration/run_all.py
+cd <release>/vibeflow-distribution
+python run.py validate --config javascript_project/configs/linear.jsonc
+python run.py build --config javascript_project/configs/linear.jsonc \
+  --target node --profile single-esm --out-dir output/javascript
 ```
 
-The distribution builder includes the renderer lockfiles, and the runner
-installs them in its temporary workspace. No `node_modules` directory is
-created inside the distribution.
+The complete 65-case integration runner, including its browser installation,
+remains in this source repository.  The release example keeps its own locked
+TypeScript/esbuild toolchain and does not share dependencies with the Python
+example root.
 
 The default runner and CI gate require the Puppeteer browser cases and do not
 skip them. Use `--skip-browser` only for an explicitly reduced local run when

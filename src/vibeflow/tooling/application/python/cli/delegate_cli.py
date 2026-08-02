@@ -172,6 +172,8 @@ def _workspace_import_paths(workspace: object) -> Iterator[None]:
     inserted: list[str] = []
     roots = tuple(getattr(workspace, "roots", ()) or ())
     for root in reversed(roots):
+        if getattr(root, "project_target", "python") != "python":
+            continue
         value = str(getattr(root, "path", "") or "")
         if value and value not in sys.path:
             sys.path.insert(0, value)

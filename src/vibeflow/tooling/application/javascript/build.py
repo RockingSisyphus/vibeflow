@@ -36,7 +36,9 @@ from vibeflow.tooling.project.config_loader import load_workspace_config_documen
 from vibeflow.tooling.project.host_extensions import host_extension_resources
 from vibeflow.core.descriptors import DescriptorCatalogs
 from vibeflow.targets.javascript.frontend.facts import (
+    JavascriptImplementationFactsError,
     implementation_facts_from_catalog,
+    validate_javascript_descriptor_catalogs,
 )
 from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
 from vibeflow.core.flow import GraphConfig
@@ -166,6 +168,12 @@ def prepare_project_build(
             "VF_AOT_CONFIG_ROOT",
             f"config is not under a workspace root: {config_path}",
         )
+    if root.project_target != "javascript":
+        raise ProjectBuildError(
+            "VF_AOT_PROJECT_TARGET",
+            "JavaScript AOT build requires project_target 'javascript'; "
+            f"root {root.id!r} declares {root.project_target!r}",
+        )
     if not config_path.is_file():
         raise ProjectBuildError(
             "VF_AOT_CONFIG",
@@ -176,6 +184,10 @@ def prepare_project_build(
         root.path,
         project_config=root.config_path,
     )
+    try:
+        validate_javascript_descriptor_catalogs(catalogs)
+    except JavascriptImplementationFactsError as exc:
+        raise ProjectBuildError(exc.code, exc.message) from exc
     node_catalog = catalogs.nodes
     base_lib_catalog = catalogs.base_libs
     implementation_facts = implementation_facts_from_catalog(

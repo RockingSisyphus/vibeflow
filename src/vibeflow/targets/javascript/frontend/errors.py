@@ -22,6 +22,7 @@ class ProjectBuildError(RuntimeError):
     code: str
     message: str
     node_path: tuple[str, ...] = ()
+    diagnostics: tuple[Mapping[str, Any], ...] = ()
 
     def __str__(self) -> str:
         location = ".".join(self.node_path)

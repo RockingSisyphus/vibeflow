@@ -2,7 +2,7 @@
 
 This guide is for people changing the VibeFlow framework. Project authors should start with `docs/developer_guide.md` or `docs/js_aot_build.md`.
 
-VibeFlow 0.9.0 uses the layered API introduced by 0.8 and makes the Python and JavaScript Target application closures independent. Use the layered packages directly; do not add root-level business exports or restore removed `aot`, `runtime`, `portable`, `config`, `health`, `purity`, `devtools`, `rendering`, or `workspace` APIs.
+VibeFlow 0.10.0 uses independent Python and JavaScript Target application closures. Every project root declares exactly one `project_target`; do not introduce cross-Target workflow execution or imports. Use the layered packages directly; do not add root-level business exports or restore removed `aot`, `runtime`, `portable`, `config`, `health`, `purity`, `devtools`, `rendering`, or `workspace` APIs.
 
 ## Architecture rules
 
@@ -95,7 +95,9 @@ The cleaner only removes known generated files. It never handles `.git/`, `refer
 Build a temporary distribution first, then rebuild the formal package after the full gate passes:
 
 ```bash
-python distribution/build.py --output /tmp/vibeflow-distribution-smoke
+python distribution/build.py \
+  --output-dir /tmp/vibeflow-distribution-smoke \
+  --archive-dir /tmp/vibeflow-distribution-archives
 ```
 
 Do not edit generated distribution output. Change `distribution/kernel_development_pack/`, `docs/` or `src/vibeflow/`, then rebuild.
@@ -105,7 +107,7 @@ Do not edit generated distribution output. Change `distribution/kernel_developme
 - User-visible Python behavior belongs in `docs/developer_guide.md`.
 - JavaScript Target descriptors, ABI and AOT profiles belong in `docs/js_aot_build.md`.
 - Framework maintenance belongs in `docs/kernel_development_guide.md`.
-- Long-lived architecture belongs in `docs/kernel_target_vision.md` and `docs/16_语言无关内核与多Target分层架构目标.md`.
+- Long-lived architecture belongs in `docs/kernel_target_vision.md`.
 - Distribution-facing documents are source files under `distribution/kernel_development_pack/`.
 - Keep runnable claims synchronized with `sandbox/`.
 - Historical plans can explain design decisions but do not define the current public API.

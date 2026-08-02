@@ -201,6 +201,32 @@ def node_contract_check(
     return "\n".join([*imports, *lines, *checks, ""])
 
 
+def runtime_plugin_contract_check(bindings: object) -> str:
+    """Generate the narrow static ABI check required for runtime plugins."""
+
+    plugins = tuple(getattr(bindings, "runtime_plugins", ()) or ())
+    imports: list[str] = []
+    checks: list[str] = [
+        ABORT_SIGNAL_DECLARATION.rstrip(),
+        "type Json = null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json };",
+        "type Context = Readonly<{ abiVersion: 'vibeflow.plugin.v1'; pluginId: string; pluginType: 'runtime'; target: 'node' | 'browser'; workflowId: string; config: Readonly<Record<string, Json>>; signal: VibeFlowAbortSignal }> ;",
+        "type RuntimePlugin = Readonly<Record<string, unknown>>;",
+        "type Factory = (context: Context) => RuntimePlugin;",
+    ]
+    for index, plugin in enumerate(plugins):
+        namespace = f"__vf_runtime_plugin_contract_{index}"
+        module = str(getattr(plugin, "module", ""))
+        exported = str(getattr(plugin, "export", "createPlugin"))
+        imports.append(f"import * as {namespace} from {json.dumps(module)};")
+        checks.extend(
+            [
+                f"const __vf_runtime_factory_{index}: Factory = {namespace}[{json.dumps(exported)}];",
+                f"void __vf_runtime_factory_{index};",
+            ]
+        )
+    return "\n".join([*imports, *checks, ""])
+
+
 def _implementation_metadata(value: object) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
 
@@ -392,4 +418,8 @@ def _node_implementation(
     return default_module, default_export
 
 
-__all__ = ["node_contract_check", "validate_schema_subset"]
+__all__ = [
+    "node_contract_check",
+    "runtime_plugin_contract_check",
+    "validate_schema_subset",
+]

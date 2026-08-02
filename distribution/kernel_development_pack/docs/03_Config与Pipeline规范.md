@@ -28,10 +28,11 @@ my_project/
 }
 ```
 
-每个 root 默认读取自己的 `vibeflow_project.jsonc`，声明该 root 的 registry、quality 和可选 runtime 参数。可用的 node/base_lib/plugin 都在该 root 的 `registry.py` 中声明：
+每个 root 默认读取自己的 `vibeflow_project.jsonc`，并必须用 `project_target` 选择 `python` 或 `javascript`。Python root 声明 Registry、quality 和可选 Runtime；JavaScript root 声明静态 descriptor 与工具链。Target 专属字段不得混用，nodeset import 不得跨 Target。Python 示例：
 
 ```jsonc
 {
+  "project_target": "python",
   "registry": "registry.py:build_node_registry",
   "quality_enabled": true,
   "runtime": {
@@ -521,7 +522,7 @@ nodeset dependency 默认最多 4 层：顶层 pipeline 记为 0，第一次进�
 大型项目应放心按 `NODESET.SMELL.TOO_WIDE` 建议拆成更多小 nodeset。parser 按符号表解析每个 nodeset 一次，不依赖前缀重解析；如果怀疑配置读取或解析慢，可临时运行：
 
 ```bash
-VIBEFLOW_CONFIG_TRACE=1 python run.py validate --config project/configs/main.jsonc
+VIBEFLOW_CONFIG_TRACE=1 python run.py validate --config python_project/configs/main.jsonc
 ```
 
 trace 会输出 import 文件、展开后的 nodeset 数、每个 nodeset 解析耗时、引用到的 nodeset 和总耗时。
@@ -816,14 +817,14 @@ planned node / planned nodeset 可选 `planned_behavior`：
 ```jsonc
 {"planned_behavior": "blocking"}
 {"planned_behavior": "transparent"}
-{"planned_behavior": {"kind": "python_stub", "stub_module": "project/stubs/runtime_control_stub.py"}}
+{"planned_behavior": {"kind": "python_stub", "stub_module": "python_project/stubs/runtime_control_stub.py"}}
 ```
 
 - 默认 `blocking`：保持传统 planned 行为，不参与主流程健康检查的连通性判断。
 - `transparent`：仍产生 planned warning，但参与 start/end、reachability、orphan 等 flow health，适合设计期连接前后 implemented 节点。
 - `python_stub`：仍产生 planned warning，并额外产生 `GRAPH.PLANNED.PYTHON_STUB_DEV_ONLY`；参与 flow health。只有运行命令显式加 `--allow-planned-stub` 时才可执行，且始终使用 `effect_scope=none`。
 - `blocking` 和 `transparent` 永远不可执行；含 planned/python_stub 的配置不能视为 production ready。
-- `stub_module` 必须是主项目相对路径，且落在 `project/stubs/*.py`。stub 文件必须暴露 `run_stub(inputs, params)`，不能做文件、网络、进程、线程、动态 import 等高风险操作。
+- `stub_module` 必须是主项目相对路径，且落在 `python_project/stubs/*.py`。stub 文件必须暴露 `run_stub(inputs, params)`，不能做文件、网络、进程、线程、动态 import 等高风险操作。
 - `run_stub` 只收到该节点声明的 `requires` 输入和合并后的 params；返回值必须是 mapping，key 必须严格等于该节点 `provides`。
 - planned nodeset 若使用 `python_stub`，会按单个 stub 节点执行，不展开内部 pipeline；调用节点的 `requires/provides` 必须与 nodeset 声明匹配。
 - planned nodeset 可以省略 `pipeline` 作为粗粒度占位，也可以带由 planned nodes/edges 构成的 body 逐步细化。body 会进入架构 JSONC、展开 Mermaid/SVG，以及适用的 dependency、recursion、depth 和 planned-descendant 检查，但不会因此按 implemented body 执行。

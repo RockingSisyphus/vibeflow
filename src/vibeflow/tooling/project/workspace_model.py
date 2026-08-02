@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Literal, Mapping
 
 from vibeflow.core.quality import QualityStructureLimits
 from vibeflow.tooling.project.architecture_types import (
@@ -17,6 +17,8 @@ from vibeflow.tooling.project.paths import is_relative_to
 WORKSPACE_CONFIG_NAME = "vibeflow_config.jsonc"
 PROJECT_CONFIG_NAME = "vibeflow_project.jsonc"
 WORKSPACE_FORBIDDEN_CONFIG_FIELDS = frozenset({"policy"})
+PROJECT_TARGETS = frozenset({"python", "javascript"})
+ProjectTarget = Literal["python", "javascript"]
 
 
 @dataclass(frozen=True)
@@ -25,6 +27,7 @@ class WorkspaceRoot:
     path: Path
     config_path: Path
     project_config: Mapping[str, Any]
+    project_target: ProjectTarget
     registry_ref: str = ""
     quality_enabled: bool = True
     quality_structure: QualityStructureLimits = field(
@@ -74,6 +77,8 @@ class WorkspaceConfig:
 
 __all__ = [
     "PROJECT_CONFIG_NAME",
+    "PROJECT_TARGETS",
+    "ProjectTarget",
     "WORKSPACE_CONFIG_NAME",
     "WORKSPACE_FORBIDDEN_CONFIG_FIELDS",
     "WorkspaceConfig",

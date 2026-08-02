@@ -2167,7 +2167,7 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     import subprocess
     import sys
 
-    from distribution.build import ROOT_README_GENERATED_AT_MARKER, build_distribution
+    from distribution.build import build_distribution
 
     def verify(output_path: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -2212,15 +2212,9 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
 
     source_readme = source_guides[0].read_text(encoding="utf-8")
     generated_readme = (output / "README.md").read_text(encoding="utf-8")
-    generated_at_line = next(
-        line for line in generated_readme.splitlines() if line.startswith("生成时间：")
-    )
-    assert generated_readme == source_readme.replace(
-        ROOT_README_GENERATED_AT_MARKER,
-        generated_at_line,
-    )
+    assert generated_readme == source_readme
     for required in (
-        "project/ARCHITECTURE.jsonc",
+        "python_project/ARCHITECTURE.jsonc",
         "真实 workflow config",
         "相关 nodeset",
         "runtime.async_max_workers",
@@ -2242,7 +2236,7 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
         assert required in generated_agents
 
     template_config = json.loads(
-        (output / "project" / "configs" / "main.jsonc").read_text(encoding="utf-8")
+        (output / "python_project" / "configs" / "main.jsonc").read_text(encoding="utf-8")
     )
     template_nodes = {
         node["id"]: node for node in template_config["pipeline"]["nodes"]
@@ -2314,10 +2308,9 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     assert "kernel/vibeflow/unpacked.py" in result.stderr
 
 
-def test_distribution_build_honors_source_date_epoch(tmp_path, monkeypatch) -> None:
-    from distribution.build import ROOT_README_GENERATED_AT_MARKER, build_distribution
+def test_distribution_build_is_deterministic_without_wall_clock_metadata(tmp_path) -> None:
+    from distribution.build import build_distribution
 
-    monkeypatch.setenv("SOURCE_DATE_EPOCH", "1783784063")
     first = tmp_path / "first"
     second = tmp_path / "second"
     build_distribution(first, run_self_check=False)
@@ -2334,7 +2327,6 @@ def test_distribution_build_honors_source_date_epoch(tmp_path, monkeypatch) -> N
         if path.is_file()
     }
     assert first_files == second_files
-    generated_line = "生成时间：2026-07-11 15:34:23 UTC"
     source_readme = (
         Path(__file__).resolve().parents[3]
         / "distribution"
@@ -2342,10 +2334,7 @@ def test_distribution_build_honors_source_date_epoch(tmp_path, monkeypatch) -> N
         / "project_template"
         / "README.md"
     ).read_text(encoding="utf-8")
-    assert (first / "README.md").read_text(encoding="utf-8") == source_readme.replace(
-        ROOT_README_GENERATED_AT_MARKER,
-        generated_line,
-    )
+    assert (first / "README.md").read_text(encoding="utf-8") == source_readme
 
 
 def test_distribution_build_normalizes_portable_modes_deterministically(tmp_path) -> None:

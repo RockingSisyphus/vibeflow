@@ -9,6 +9,18 @@ _EXPORTS = {
         "vibeflow.tooling.project.workspace_model",
         "WorkspaceConfig",
     ),
+    "WorkspaceRoot": (
+        "vibeflow.tooling.project.workspace_model",
+        "WorkspaceRoot",
+    ),
+    "ProjectTarget": (
+        "vibeflow.tooling.project.workspace_model",
+        "ProjectTarget",
+    ),
+    "PROJECT_TARGETS": (
+        "vibeflow.tooling.project.workspace_model",
+        "PROJECT_TARGETS",
+    ),
     "WorkspaceConfigError": (
         "vibeflow.tooling.project.architecture_types",
         "WorkspaceConfigError",
@@ -16,6 +28,18 @@ _EXPORTS = {
     "load_workspace_config": (
         "vibeflow.tooling.project.workspace_loader",
         "load_workspace_config",
+    ),
+    "load_project_workspace": (
+        "vibeflow.tooling.project.workspace_loader",
+        "load_project_workspace",
+    ),
+    "find_project_config": (
+        "vibeflow.tooling.project.workspace_loader",
+        "find_project_config",
+    ),
+    "load_project_target": (
+        "vibeflow.tooling.project.workspace_loader",
+        "load_project_target",
     ),
 }
 

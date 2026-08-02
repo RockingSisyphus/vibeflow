@@ -9,6 +9,7 @@ __pycache__/
 .env.*.local
 /build/
 /dist/
+/archive/
 topology_kernel_distribution/
 vibeflow_distribution/
 *.egg-info/

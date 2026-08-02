@@ -39,6 +39,7 @@ def build_architecture_document(
     actual_compiled = compile_for_render(graph, compiled, registry)
     roots = _root_paths(graph)
     return {
+        "project_target": "python",
         "workflow": _workflow_document(graph, actual_compiled, registry=registry, resources=resources),
         "nodesets": _nodesets_document(graph, registry=registry),
         "node_types": _node_types_document(graph, registry=registry, roots=roots),
@@ -297,7 +298,10 @@ def _io_node_type_document(type_key: str) -> dict[str, object]:
         "source": {
             "kind": "kernel",
             "runtime": {
-                "python": "vibeflow.runtime.node_mixin.RuntimeNodeMixin._run_io_node",
+                "python": (
+                    "vibeflow.targets.python.runtime.node_mixin."
+                    "RuntimeNodeMixin._run_io_node"
+                ),
                 "javascript": "VibeFlow AOT static io emitter",
             },
         },

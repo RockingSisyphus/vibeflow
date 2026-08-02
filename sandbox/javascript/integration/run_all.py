@@ -351,7 +351,7 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
         "undeclared_base_lib": "VF_IMPORT_BASE_LIB",
         "dynamic_import": "VF_IMPORT_DYNAMIC",
         "runtime_import": "VF_IMPORT_OWNER",
-        "node_builtin_browser": "VF_IMPORT_TARGET",
+        "node_builtin_browser": "VF_ESBUILD",
         "immediate_async": "VF_COMPLETION_IMMEDIATE_PROMISE",
         "suspend_sync": "VF_COMPLETION_SUSPEND_NON_PROMISE",
         "unowned_promise": "VF_PROMISE_UNOWNED",
@@ -364,7 +364,10 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
         "undeclared_external": "VF_IMPORT_EXTERNAL",
         "package_root_escape": "VF_IMPORT_PACKAGE_ROOT",
         "dynamic_code": "VF_IMPORT_DYNAMIC_CODE",
-        "indirect_node_builtin": "VF_IMPORT_TARGET",
+        # The helper itself is outside the declared Node/base_lib ownership
+        # closure, so VibeFlow rejects that architectural violation before
+        # esbuild reaches the platform-specific node:fs import.
+        "indirect_node_builtin": "VF_IMPORT_OWNER",
         "module_promise": "VF_IMPORT_SIDE_EFFECT",
         "discarded_promise": "VF_PROMISE_UNOWNED",
         "long_lived_listener": "VF_NODE_LONG_LIVED_LISTENER",
@@ -412,12 +415,6 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
             "node",
             "negative/nodes/dynamic_code.ts",
             "eval",
-        ),
-        "indirect_node_builtin": (
-            "sandbox.invalid.indirect_node_builtin",
-            "node",
-            "negative/helpers/node_builtin_bridge.ts",
-            '"node:fs"',
         ),
         "module_promise": (
             "sandbox.invalid.module_promise",
