@@ -1,92 +1,110 @@
 # Contributing to VibeFlow
 
-This guide is for people changing the VibeFlow framework itself. If you are using VibeFlow to build a business project, start with `docs/developer_guide.md` instead.
+This guide is for people changing the VibeFlow framework. Project authors should start with `docs/developer_guide.md` or `docs/js_aot_build.md`.
 
-## Framework Ground Rules
+VibeFlow 0.8.0 is a breaking API release. Use the layered packages directly; do not add root-level business exports or restore removed `aot`, `runtime`, `portable`, `config`, `health`, `purity`, `devtools`, `rendering`, or `workspace` APIs.
 
-- Do not reintroduce removed public concepts such as `boundary`, `pipeline.loops`, `max_iterations`, edge `max_executions`, or edge `loop`.
-- Keep `pipeline.edges` as the only source of executable control flow. `requires` and `provides` are strict key/type data contracts for inbox resolution, not scheduler edges.
-- Keep `WorkflowPlan` and `BlockPlan` language-neutral and deterministic. They may contain frozen JSON values, contracts, routes, block references, and source references, but never Python classes, callables, arbitrary objects, or emitted source code.
-- Treat the existing Python `ExecutionPlan` as a compatibility execution path. Its portable projection does not mean the Python runtime has already been replaced by an emitter.
-- Keep node, `base_lib`, data-schema, Capability, and Host Extension descriptors statically readable. When a static descriptor and legacy Python registration coexist, they must agree.
-- Treat `descriptors.host_extensions` as the availability catalog and workflow
-  `host_extensions` as the active resource list. Planned Host Extensions belong
-  in architecture output, never in bundles or lifecycle execution; the legacy
-  `javascript.host_extensions` list is only a compatibility default.
-- Keep generated JavaScript modules side-effect-free on import. Per-run state, traces, tasks, cancellation, and Capability wrappers must not leak through mutable module-level business state.
-- Keep Capability implementations invocation-scoped and host-owned. A Capability contract or import audit is an explicit dependency boundary, not a security sandbox.
-- Keep implemented `flow_kind` semantics owned by registered framework metadata, not duplicated in runnable config.
-- Keep planned architecture non-runnable. Design-time placeholders may be visualized and warned about, but must not execute.
-- Keep framework rules explainable through stable health findings: `rule_id`, severity, object identity, failure layer, details, and suggested fix type.
-- Prefer policy/plugin extension points for project-specific semantics. Put only general framework invariants in core hard errors.
+## Architecture rules
 
-## Development Setup
+The dependency direction is:
 
-Use Python 3.11 or newer.
+```text
+tooling → targets/python ──────┐
+        → targets/javascript ─├─→ block_compiler → core
+```
+
+- Core is language-neutral and pure in memory. It cannot read files or the environment, start processes, dynamically import code, or depend on a Target or Tooling.
+- Block Compiler depends only on Core. `WorkflowPlan` and `BlockPlan` contain frozen data, contracts, routes, IDs and source references, never callables, plugins or generated source.
+- Python and JavaScript Targets never import one another.
+- Tooling owns file loading, CLI orchestration and presentation. Language analysis belongs to its Target; language-neutral decisions belong to Core.
+- `pipeline.edges` defines executable control flow. `requires` and `provides` define data contracts.
+- Planned resources remain non-runnable and visible in architecture output.
+- Generated JavaScript modules have no import-time business side effects. Invocation state, traces, tasks, cancellation and Capability wrappers are isolated per call or host instance.
+- General framework invariants belong in Core. Project-specific behavior belongs in a Node, base_lib, Capability, Python Plugin or JavaScript Host Extension.
+
+Stable import families are:
+
+```python
+from vibeflow.core import ...
+from vibeflow.core.quality import ...
+from vibeflow.block_compiler import ...
+from vibeflow.targets.python.project import ...
+from vibeflow.targets.python.runtime import ...
+from vibeflow.targets.python.quality import ...
+from vibeflow.targets.javascript.frontend import ...
+from vibeflow.targets.javascript.build import ...
+from vibeflow.targets.javascript.quality import ...
+from vibeflow.tooling.project import ...
+from vibeflow.tooling.application import ...
+from vibeflow.tooling.presentation import ...
+```
+
+## Development setup
+
+Use Python 3.11 or newer:
 
 ```bash
 python -m pip install -e .
 ```
 
-## Required Checks
+## Validation
 
-Run these before opening a pull request:
-
-```bash
-python -m compileall -q src tests examples
-python -m pytest -q
-PYTHONPATH=src python examples/integration_sandbox/run_all.py
-PYTHONPATH=src python -m vibeflow quality-check --path .
-```
-
-If you touch side-effect scanning or purity checks, also run:
+Run the full project gate before opening a pull request:
 
 ```bash
-PYTHONPATH=src python -m vibeflow quality-check --path . --check-side-effects
+python tools/verify_project.py --full
 ```
 
-If you touch the portable plan, descriptors, JS emitter, AOT builder, TypeScript dependency checks, runtime helpers, or AOT package resources, also run:
+It runs the independent repository self-check, tests for every layer, both integration Sandboxes, Python/JavaScript conformance, Node/browser AOT profiles, wheel isolation and a temporary distribution smoke test.
+
+For a focused check, run one independent quality profile:
 
 ```bash
-npm ci --prefix examples/js_aot_minimal/project
-npm ci --prefix examples/typescript_sandbox/project
-npm ci --prefix tools/mermaid-renderer
-PYTHONPATH=src python examples/js_aot_minimal/run_e2e.py \
-  --puppeteer-root tools/mermaid-renderer
-PYTHONPATH=src python examples/typescript_sandbox/run_all.py \
-  --puppeteer-root tools/mermaid-renderer
+python quality/run.py --profile base
+python quality/run.py --profile core
+python quality/run.py --profile block-compiler
+python quality/run.py --profile python-target
+python quality/run.py --profile javascript-target
+python quality/run.py --profile all
 ```
 
-The minimal example is the quick real-project smoke test. The TypeScript sandbox is the broader conformance and stability suite: node/`base_lib` arithmetic, data transfer, edge roles, branches and joins, nodesets, loops, sync/async ABI, Port, per-run Capabilities, cancellation, trace/error behavior, completion mismatch, illegal imports, source maps, deterministic publication, and all shipped profiles. Do not use `--skip-browser` for release acceptance.
+The `quality/` project is self-contained, does not import VibeFlow and is not included in the wheel. `python -m vibeflow quality-check` is a different tool: it checks user projects through Tooling file scanning, Target fact extraction and Core Quality evaluation.
 
-For packaging, CLI-build, embedded `.mjs` resource, or distribution-template changes, reproduce the release boundaries as CI does:
+The runnable suites are organized by Target:
 
 ```bash
-python -m build
-# Install the wheel into an isolated virtual environment and verify:
-#   importlib.resources files for aot/resources/toolchain_driver.mjs
-#   importlib.resources files for aot/resources/runtime_helpers.mjs
-#   vibeflow --help
-
-python build_distribution.py --output /tmp/vibeflow-distribution-smoke
-python /tmp/vibeflow-distribution-smoke/run.py build \
-  --workspace examples/js_aot_minimal/vibeflow_config.jsonc \
-  --config examples/js_aot_minimal/project/configs/greeting.jsonc \
-  --target node \
-  --profile single-esm \
-  --out-dir /tmp/vibeflow-distribution-aot
-# Import /tmp/vibeflow-distribution-aot/index.js with Node and call
-# runWorkflow() with a fake example.clock Capability.
+PYTHONPATH=src python sandbox/python/integration/run_all.py
+PYTHONPATH=src python sandbox/javascript/minimal/run_e2e.py --skip-browser
+PYTHONPATH=src python sandbox/javascript/integration/run_all.py --skip-browser
 ```
 
-Use a fresh temporary output path for the smoke test. After it passes, `python build_distribution.py` rebuilds the repository-root distribution. Never hand-edit generated `vibeflow_distribution/`; change its source template, documentation, or `src/vibeflow` package and rebuild it.
+Release acceptance must also run the JavaScript integration Sandbox with its real browser dependency; `tools/verify_project.py --full` handles the complete setup.
+
+## Generated files and distribution
+
+Preview workspace cleanup before applying it:
+
+```bash
+python tools/clean_workspace.py
+python tools/clean_workspace.py --apply
+```
+
+The cleaner only removes known generated files. It never handles `.git/`, `references/` or the `distribution/` source templates.
+
+Build a temporary distribution first, then rebuild the formal package after the full gate passes:
+
+```bash
+python distribution/build.py --output /tmp/vibeflow-distribution-smoke
+```
+
+Do not edit generated distribution output. Change `distribution/kernel_development_pack/`, `docs/` or `src/vibeflow/`, then rebuild.
 
 ## Documentation
 
-- Keep `docs/kernel_target_vision.md` aligned with the long-term architecture and explicitly label compatibility paths or not-yet-shipped directions.
-- Put Python project usage guidance in `docs/developer_guide.md`.
-- Put shipped JS/TS descriptor, node ABI, Workflow ABI, Port, Capability, Host Extension, and build-profile guidance in `docs/js_aot_build.md`; this file is copied into the distribution as `kernel/docs/11_JS_TS与Web_AOT构建指南.md`.
-- Put maintainer workflow, validation-matrix, wheel, and distribution instructions in `docs/kernel_development_guide.md`.
-- Treat `distribution/kernel_development_pack/docs/` and `distribution/kernel_development_pack/project_template/` as source files for release users. Rebuild the distribution after changing them.
-- Keep runnable claims synchronized with `examples/js_aot_minimal` and `examples/typescript_sandbox`.
-- Historical design records may stay in `docs/`, but should not be treated as current API.
+- User-visible Python behavior belongs in `docs/developer_guide.md`.
+- JavaScript Target descriptors, ABI and AOT profiles belong in `docs/js_aot_build.md`.
+- Framework maintenance belongs in `docs/kernel_development_guide.md`.
+- Long-lived architecture belongs in `docs/kernel_target_vision.md` and `docs/16_语言无关内核与多Target分层架构目标.md`.
+- Distribution-facing documents are source files under `distribution/kernel_development_pack/`.
+- Keep runnable claims synchronized with `sandbox/`.
+- Historical plans can explain design decisions but do not define the current public API.

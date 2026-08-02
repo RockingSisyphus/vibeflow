@@ -1,0 +1,129 @@
+from __future__ import annotations
+
+from vibeflow.core import DataProvider, DataRequirement
+from vibeflow.targets.python.project import NodeContract, NodeInfo
+
+
+def _provider(key: str) -> DataProvider:
+    return DataProvider(key, key)
+
+
+def _requirement(data_type: str) -> DataRequirement:
+    return DataRequirement(data_type, "exactly_one")
+
+
+class MissingInfoNode:
+    CONTRACT = NodeContract(
+        provides=(_provider("bad.out"),),
+        output_semantics={"bad.out": ("bad output",)},
+        output_schema={"bad.out": {"type": "number"}},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"bad.out": 1}
+
+
+class InfoWrongTypeNode:
+    NODE_INFO = {"type_key": "bad.info_type"}
+    CONTRACT = NodeContract(
+        provides=(_provider("bad.out"),),
+        output_semantics={"bad.out": ("bad output",)},
+        output_schema={"bad.out": {"type": "number"}},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"bad.out": 1}
+
+
+class EmptyTypeKeyNode:
+    NODE_INFO = NodeInfo(
+        type_key="",
+        display_name="Bad",
+        category="bad",
+        description="Bad node with empty type key.",
+        version="0.1.0",
+        flow_kind="process",
+    )
+    CONTRACT = NodeContract(
+        provides=(_provider("bad.out"),),
+        output_semantics={"bad.out": ("bad output",)},
+        output_schema={"bad.out": {"type": "number"}},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"bad.out": 1}
+
+
+class NonPureNode:
+    NODE_INFO = NodeInfo(
+        type_key="bad.non_pure",
+        display_name="Bad",
+        category="bad",
+        description="Bad node with non-pure metadata.",
+        version="0.1.0",
+        flow_kind="process",
+        purity="impure",
+    )
+    CONTRACT = NodeContract(
+        provides=(_provider("bad.out"),),
+        output_semantics={"bad.out": ("bad output",)},
+        output_schema={"bad.out": {"type": "number"}},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"bad.out": 1}
+
+
+class MissingContractNode:
+    NODE_INFO = NodeInfo(
+        type_key="bad.missing_contract",
+        display_name="Bad",
+        category="bad",
+        description="Bad node without contract.",
+        version="0.1.0",
+        flow_kind="process",
+    )
+
+    def run_pure(self, inputs, params):
+        return {"bad.out": 1}
+
+
+class DuplicateKeysNode:
+    NODE_INFO = NodeInfo(
+        type_key="bad.duplicate_keys",
+        display_name="Bad",
+        category="bad",
+        description="Bad node with duplicate contract keys.",
+        version="0.1.0",
+        flow_kind="process",
+    )
+    CONTRACT = NodeContract(
+        requires=(_requirement("bad.in"), _requirement("bad.in")),
+        provides=(_provider("bad.out"),),
+        input_semantics={"bad.in": ("bad input",)},
+        output_semantics={"bad.out": ("bad output",)},
+        output_schema={"bad.out": {"type": "number"}},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"bad.out": inputs["bad.in"]}
+
+
+class MissingSemanticsNode:
+    NODE_INFO = NodeInfo(
+        type_key="bad.missing_semantics",
+        display_name="Bad",
+        category="bad",
+        description="Bad node with missing semantics.",
+        version="0.1.0",
+        flow_kind="process",
+    )
+    CONTRACT = NodeContract(
+        requires=(_requirement("bad.in"),),
+        provides=(_provider("bad.out"),),
+        output_semantics={"bad.out": ("bad output",)},
+        output_schema={"bad.out": {"type": "number"}},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"bad.out": inputs["bad.in"]}

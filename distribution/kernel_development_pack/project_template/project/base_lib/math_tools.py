@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from vibeflow import BaseLibInfo
+from vibeflow.targets.python.project import BaseLibInfo
 
 
 BASE_LIB_INFO = BaseLibInfo(

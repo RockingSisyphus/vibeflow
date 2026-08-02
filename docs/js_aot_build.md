@@ -2,13 +2,15 @@
 
 VibeFlow 可以把同一份 workflow 编译为普通 JavaScript ESM。生成物在运行时不需要 Python，也不需要浏览器或 Node.js 安装 VibeFlow。同步 workflow 导出 `runWorkflow()`，显式异步 workflow 导出 `runWorkflowAsync()`。
 
+正式 Target 名是 `javascript`；TypeScript 是该 Target 支持并在构建期检查的实现语言。VibeFlow 0.8.0 只提供 `vibeflow.targets.javascript.frontend`、`.quality`、`.build` 以及 CLI 入口，不提供旧 AOT 模块路径。
+
 本文描述当前已经实现的公开配置、节点 ABI、Workflow ABI 和构建命令。早期方案和取舍记录见 [JavaScript/TypeScript 节点与跨运行时 AOT 构建设计记录](14_JS_TS节点与Web_AOT构建计划.md)，实际使用应以本文和 CLI 为准。
 
 可运行的完整工程见源码仓库中的
-[`examples/js_aot_minimal`](https://github.com/RockingSisyphus/vibeflow/tree/main/examples/js_aot_minimal)。
+[`sandbox/javascript/minimal`](https://github.com/RockingSisyphus/vibeflow/tree/main/sandbox/javascript/minimal)。
 需要检查真实 TypeScript node、`base_lib`、分支/合流、nodeset、有限循环、
 同步/异步入口、Capability、Port、调用隔离、取消、构建 profile 和非法依赖时，可运行
-[`examples/typescript_sandbox`](https://github.com/RockingSisyphus/vibeflow/tree/main/examples/typescript_sandbox)。
+[`sandbox/javascript/integration`](https://github.com/RockingSisyphus/vibeflow/tree/main/sandbox/javascript/integration)。
 
 ## 1. 适用范围
 
@@ -74,9 +76,8 @@ project/
 
 `descriptors.host_extensions` 只登记当前 project 可用的 Host Extension
 descriptor。具体 workflow 在自己的顶层 `host_extensions` 中选择实际使用的
-扩展；没有被当前 workflow 引用的扩展不会进入构建。旧项目仍可用
-`javascript.host_extensions` 提供默认选择，但这是兼容字段；只要 workflow
-显式写了 `host_extensions`，即使值是空列表，也会完全覆盖该默认值。
+扩展；没有被当前 workflow 引用的扩展不会进入构建。空列表表示当前 workflow
+不启用 Host Extension。
 
 ## 3. 五类 JSONC descriptor
 
@@ -465,7 +466,7 @@ console.log(result.greeting);
 
 ## 6. 顶层 Workflow ABI
 
-JS AOT 使用 `vibeflow.workflow.v2`。`entry_mode` 缺省为 `sync`，两种模式导出不同入口，不保留旧的 Promise 兼容入口：
+JS AOT 使用 `vibeflow.workflow.v2`。`entry_mode` 缺省为 `sync`，构建产物只导出匹配当前模式的入口：
 
 ```ts
 export type WorkflowTraceMode = "off" | "boundary" | "full";
@@ -755,38 +756,35 @@ JS/Web AOT 只接受可静态检查、可移植的流程：
 
 遇到不支持的功能时，构建应直接失败并指出资源或流程位置，而不是生成只能在运行时才报错的半成品。
 
-## 11. TypeScript 集成沙箱
+## 11. JavaScript Target 集成 Sandbox
 
-源码仓库和官方分发包都包含 `examples/typescript_sandbox/`。这个 TypeScript
-沙箱不是单节点演示，而是一组经过真实 descriptor、JSONC workflow、
+源码仓库和官方分发包都包含 `sandbox/javascript/integration/`。这个 TypeScript
+Sandbox 是一组经过真实 descriptor、JSONC workflow、
 TypeScript Compiler API 和 esbuild 的端到端用例。它用
 `node + base_lib` 表达 `(x + a) - b`，并独立覆盖并行 `all` 合流、条件
 `any_active` 合流、nodeset、有界/无界 loop、Promise node、Capability，以及
 `receive → 数学 node/base_lib → send` 的 Port 链路。
 
-从源码仓库根目录安装项目锁定的工具链和浏览器测试依赖，再运行全部用例：
+从源码仓库根目录安装浏览器测试依赖，再运行全部用例。Sandbox 会在临时项目副本中执行 `npm ci`：
 
 ```bash
-npm ci --prefix examples/typescript_sandbox/project
 npm ci --prefix tools/mermaid-renderer
-PYTHONPATH=src python examples/typescript_sandbox/run_all.py \
+PYTHONPATH=src python sandbox/javascript/integration/run_all.py \
   --puppeteer-root tools/mermaid-renderer
 ```
 
 从分发包根目录运行时，入口会自动从
 `kernel/vibeflow-kernel.zip` 导入 VibeFlow，不需要源码树或额外安装 Python
-包。分发构建保留 `package.json` 和 lockfile，但不会复制 `node_modules`，
-也不会自动执行 npm：
+包。分发构建保留 `package.json` 和 lockfile，但不会复制 `node_modules`；
+Sandbox 运行器会在临时项目副本中安装依赖：
 
 ```bash
-npm ci --prefix examples/typescript_sandbox/project
-python examples/typescript_sandbox/run_all.py --skip-browser
+python sandbox/javascript/integration/run_all.py --skip-browser
 ```
 
 如果要运行分发包中的真实浏览器用例，再执行
 `npm ci --prefix kernel/tools/mermaid-renderer`，然后去掉 `--skip-browser`。
-已有预填充 npm cache 时可以给上述 `npm ci` 增加 `--offline`。如果本机尚未
-安装 Puppeteer，可保留 `--skip-browser`，只运行 Node 与构建检查。
+如果本机尚未安装 Puppeteer，可保留 `--skip-browser`，只运行 Node 与构建检查。
 
 完整运行还会验证：
 
@@ -807,5 +805,6 @@ python examples/typescript_sandbox/run_all.py --skip-browser
   browser Node API 会在构建期被拒绝。
 - immediate/suspend 与 Promise 源码不一致会在构建期被拒绝。
 
-运行结果写入 `examples/typescript_sandbox/reports/summary.json` 和
-`summary.md`；构建目录使用临时目录，不会把测试 bundle 留在源码树中。
+运行器默认将项目副本、依赖、构建和报告写入临时目录。只有显式传入
+`--keep-artifacts` 时，结果才保留在
+`sandbox/javascript/integration/.artifacts/`。

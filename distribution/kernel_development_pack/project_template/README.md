@@ -1,6 +1,6 @@
 # VibeFlow 可复制开发包
 
-版本：0.7.0
+版本：0.8.0
 
 <!-- VIBEFLOW_DISTRIBUTION_GENERATED_AT -->
 
@@ -24,6 +24,8 @@ VibeFlow 提供两条开发路径：
   `project/manifests/{nodes,base_lib,data,capabilities,host_extensions}/`，可选 Web 模板和应用
   入口放在 `project/web/`；使用 `build` 生成普通 ESM 或网页。构建产物运行时
   不需要 Python，也不需要 VibeFlow Runtime。
+
+正式 Target 名是 `javascript`；TypeScript 是该 Target 支持的实现语言。
 
 根目录 `vibeflow_config.jsonc` 声明 workspace roots。每个 root 的
 `vibeflow_project.jsonc` 可按路径声明 Python `registry` 和 Runtime 选项，
@@ -56,23 +58,20 @@ VibeFlow 不会执行 `npm install` 或第三方 package scripts。完整 descri
 Node/Workflow ABI、同步/异步入口、Port、Capability、Host Extension、三种 profile 与 `web-app` 入口规则见
 `kernel/docs/11_JS_TS与Web_AOT构建指南.md`。分发包还提供可直接检查数学运算、
 数据传递、nodeset、loop、同步/异步 ABI、Port 和非法依赖的
-`examples/typescript_sandbox/`。基础验证运行：
+`sandbox/javascript/integration/`。基础验证运行：
 
 ```powershell
-npm ci --prefix examples/typescript_sandbox/project
-python examples/typescript_sandbox/run_all.py --skip-browser
+python sandbox/javascript/integration/run_all.py --skip-browser
 ```
 
-如需浏览器用例，再运行
-`npm ci --prefix kernel/tools/mermaid-renderer`，然后去掉
-`--skip-browser`。沙箱会直接从 `kernel/vibeflow-kernel.zip` 导入内核；分发
-构建不会安装依赖，`node_modules/`、`reports/` 和 `runs/` 不进入分发包。
+浏览器环境可用时去掉 `--skip-browser`。沙箱会直接从
+`kernel/vibeflow-kernel.zip` 导入内核，并在临时目录安装锁定的工具链和
+Puppeteer；分发目录中不会生成 `node_modules`。
 
 `descriptors.host_extensions` 只登记 project 可用扩展；每个 workflow 在顶层
 `host_extensions` 中选择实际使用的 ID。字符串表示 implemented 扩展，对象还
 可写 `status`、`enabled`、`config/settings` 和审查元数据。planned 扩展进入
 Architecture JSON 与 Mermaid/SVG，但不会打包、启动或提供 Capability。
-项目级 `javascript.host_extensions` 只用于兼容没有 workflow 字段的旧配置。
 
 默认项目把 `project/configs/main.jsonc` 登记到 `project/ARCHITECTURE.jsonc`。这是带固定“生成且不可执行”头注释的单文件架构审查文档，不是 workflow config；AI 和开发者应先用它理解入口流程、nodeset 调用、节点职责、数据契约、资源和配置来源。架构变更必须落到真实 workflow config、相关 nodeset、registry metadata/config schema 或资源声明中。正式 `review` 会自动重新生成登记文档、执行正式 validate，并且只在 canonical expanded SVG 结构检查通过后发布 SVG；失败时不得用 mmdc、手写 SVG 或旧产物补位。
 
@@ -103,7 +102,7 @@ policy。Python Runtime root 的 `vibeflow_project.jsonc` 声明 registry、qual
 node/base_lib/plugin 在 `project/registry.py` 注册，每个 workflow config 用
 id 声明本流程实际使用哪些 base_lib/plugin。JS/TS AOT root 改用
 `descriptors` 声明静态资源目录、用 `javascript` 声明工具链根和 external
-packages；它不要求为了构建 JS/TS node 而创建 Python registry。单项目模板
+packages；JavaScript Target 直接使用 descriptor，无需 Python registry。单项目模板
 默认是：
 
 ```jsonc
@@ -121,7 +120,7 @@ packages；它不要求为了构建 JS/TS node 而创建 Python registry。单�
 {
   "policy": {},
   "roots": [
-    {"id": "vibetrain", "path": "vibetrain"},
+    {"id": "training_project", "path": "training_project"},
     {"id": "project", "path": "project"}
   ]
 }
@@ -153,7 +152,7 @@ pipeline config 不再声明 `policy`，但必须声明本 workflow 实际使用
 ```jsonc
 {
   "nodeset_imports": [
-    {"root": "vibetrain", "path": "configs/nodesets/train_step.jsonc"}
+    {"root": "training_project", "path": "configs/nodesets/train_step.jsonc"}
   ]
 }
 ```
@@ -174,7 +173,12 @@ cd ../../..
 
 不要求系统预装 Google Chrome。正常执行 `npm install` 后，Puppeteer 会安装并使用自己的浏览器缓存；如果该缓存不可用，VibeFlow 会再尝试非 snap 的系统 Chrome/Chromium。`/snap/bin/chromium` 会被跳过，因为它在 Puppeteer/mermaid-cli 下常见 profile lock 启动失败。
 
-`kernel/docs/`、`kernel/tools/` 和 `kernel/THIRD_PARTY_NOTICES.md` 是随内核分发的只读参考材料；根目录 `README.md`、`AGENTS.md` 和项目自己的说明可以按项目定制。分发包不内置 `.gitignore`，建议项目自行忽略 `kernel/tools/mermaid-renderer/node_modules/`、`runs/`、`reports/`、`__pycache__/` 和 `*.pyc`。
+`kernel/docs/`、`kernel/tools/`、`kernel/LICENSE` 和
+`kernel/THIRD_PARTY_NOTICES.md` 是随内核分发的只读参考材料；根目录
+`README.md`、`AGENTS.md` 和项目自己的说明可以按项目定制。分发包不内置
+`.gitignore`，建议项目自行忽略
+`kernel/tools/mermaid-renderer/node_modules/`、`runs/`、`reports/`、
+`__pycache__/` 和 `*.pyc`。
 
 模板中的最小 flow 是：
 

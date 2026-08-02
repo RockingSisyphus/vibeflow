@@ -1,6 +1,8 @@
 # CompiledBlock 完整代码生成计划
 
-本文记录 `execution="compiled"` 的最终实现目标：它不应只是当前的 linear block fast path，而应名副其实地把可编译 graph 区域编译成 Python execution block。
+> 状态：历史设计记录。0.8 中 CompiledBlock 属于 `vibeflow.targets.python.runtime`，语言无关 `BlockPlan` 属于 `vibeflow.block_compiler`。
+
+本文记录 `execution="compiled"` 的最终实现目标：把可编译 graph 区域编译成完整的 Python execution block。
 
 ## 目标语义
 
@@ -223,10 +225,10 @@ integration sandbox：
 验证命令：
 
 ```bash
-python3 -m compileall -q src tests examples distribution/kernel_development_pack/project_template/run.py
+python3 -m compileall -q src tests sandbox distribution/kernel_development_pack/project_template/run.py
 PYTHONPATH=src python3 -m pytest tests/unit/test/strict_runtime.py tests/unit/test/strict_mermaid_cli.py -q
 PYTHONPATH=src python3 -m pytest tests/unit -q
-PYTHONPATH=src python3 examples/integration_sandbox/run_all.py
+PYTHONPATH=src python3 sandbox/python/integration/run_all.py
 PYTHONPATH=src python3 -m vibeflow quality-check --path .
 git diff --check
 ```

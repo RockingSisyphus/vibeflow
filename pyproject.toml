@@ -4,26 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vibeflow"
-version = "0.7.0"
-description = "Executable flowchart guardrails for vibe coding and AI-assisted development"
+version = "0.8.0"
+description = "Language-neutral workflow architecture, validation, and multi-target compilation"
 requires-python = ">=3.11"
-license = { file = "LICENSE" }
-classifiers = [
-    "License :: OSI Approved :: GNU Affero General Public License v3",
-]
+license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
 dependencies = []
 
 [project.scripts]
-vibeflow = "vibeflow.cli:main"
-topology-kernel = "vibeflow.cli:main"
+vibeflow = "vibeflow.tooling.application.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
 vibeflow = [
-    "aot/resources/*.mjs",
-    "resources/schema/*.schema.json",
+    "targets/javascript/resources/*.mjs",
+    "tooling/project/schema/*.schema.json",
 ]
 
 [tool.pytest.ini_options]

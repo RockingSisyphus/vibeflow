@@ -1,5 +1,7 @@
 # VibeFlow Strict Flowchart Redesign
 
+> Status: historical design record. VibeFlow 0.8 keeps first-class bounded or unbounded loop nodes; current behavior is documented in `developer_guide.md` and `js_aot_build.md`.
+
 This document records the target redesign for VibeFlow (`vibeflow`) as a strict
 standard-flowchart runtime for human-AI collaborative development.
 

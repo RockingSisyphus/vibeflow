@@ -346,7 +346,7 @@
         "class": "AddNode",
         "root_id": "project",
         "path": "nodes/math_nodes.py",
-        "line": 35
+        "line": 36
       },
       "info": {
         "display_name": "Semantic Add",
@@ -412,7 +412,7 @@
         "class": "EndNode",
         "root_id": "project",
         "path": "nodes/math_nodes.py",
-        "line": 21
+        "line": 22
       },
       "info": {
         "display_name": "End",
@@ -446,7 +446,7 @@
         "class": "OutputNode",
         "root_id": "project",
         "path": "nodes/math_nodes.py",
-        "line": 42
+        "line": 43
       },
       "info": {
         "display_name": "Output",
@@ -502,7 +502,7 @@
         "class": "SeedNode",
         "root_id": "project",
         "path": "nodes/math_nodes.py",
-        "line": 28
+        "line": 29
       },
       "info": {
         "display_name": "Seed",
@@ -559,7 +559,7 @@
         "class": "StartNode",
         "root_id": "project",
         "path": "nodes/math_nodes.py",
-        "line": 14
+        "line": 15
       },
       "info": {
         "display_name": "Start",

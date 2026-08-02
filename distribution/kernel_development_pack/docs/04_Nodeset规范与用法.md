@@ -133,7 +133,7 @@ nodeset 是独立 JSONC 实现文件，作用类似 Python node 的 `.py` 文件
   "nodeset_imports": [
     {"path": "math/demo_add_one.jsonc"},
     {"path": "reporting/summary.jsonc"},
-    {"root": "vibetrain", "path": "configs/nodesets/train_step.jsonc"}
+    {"root": "training_project", "path": "configs/nodesets/train_step.jsonc"}
   ],
   "type_key": "demo.pipeline_part",
   "display_name": "Pipeline Part",

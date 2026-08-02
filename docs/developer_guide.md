@@ -1,21 +1,38 @@
 # VibeFlow 使用者开发引导
 
-本文面向使用 VibeFlow（包名 `vibeflow`）编写业务 node、nodeset、plugin、base_lib 和 JSONC config 的开发者。VibeFlow 目前有两条公开开发路径：
+本文面向使用 VibeFlow（包名 `vibeflow`）编写业务 node、nodeset、plugin、base_lib 和 JSONC config 的开发者。VibeFlow 0.8.0 是破坏性 API 版本：Python 代码直接从所属分层包导入，不再从根包导入业务对象。VibeFlow 有两条开发路径：
 
 - **Python Runtime**：Python node、base_lib 和 plugin 通过 `project/registry.py` 注册，由 VibeFlow Runtime 校验并执行；本文主体详细说明这条路径。
 - **JavaScript/TypeScript AOT**：JS/TS node、base_lib、数据 Schema、Capability 和 Host Extension 通过 `project/manifests/` 下的 JSONC descriptor 登记，由 `build` 命令生成独立 ESM 或 Web 应用；生成物运行时不需要 Python 或 VibeFlow Runtime。默认同步入口导出 `runWorkflow()`，显式异步入口导出 `runWorkflowAsync()`。完整格式、工具链和三个 profile 在源码仓库见 `docs/js_aot_build.md`，在分发包见 `kernel/docs/11_JS_TS与Web_AOT构建指南.md`。
 
 两条路径共享 JSONC workflow、显式 `pipeline.edges`、contract、分支、合流、nodeset、有限/永久 loop 和 `vibeflow.io` 等可移植流程语义，但实现登记、宿主能力和公共输出 ABI 不相同。不要让 JS/TS node 通过 Python registry 注册，也不要把 Python Runtime plugin 当作 AOT 宿主接口；AOT 的宿主交互使用每次调用注入的 Capability，长期宿主接线使用 JS/TS Host Extension。
 
+Python 项目常用导入来自以下稳定入口：
+
+```python
+from vibeflow.core import DataProvider, DataRequirement
+from vibeflow.targets.python.project import (
+    BaseLibInfo,
+    BaseLibRegistry,
+    NodeContract,
+    NodeInfo,
+    NodeRegistry,
+    PluginInfo,
+)
+from vibeflow.targets.python.quality import HealthFinding
+from vibeflow.targets.python.runtime import PipelineRuntime, RuntimeOptions
+from vibeflow.tooling.application import run_checked, run_workspace_checked
+from vibeflow.tooling.project import load_workspace_config
+```
+
 JS/TS project 的 `descriptors.host_extensions` 只登记可用扩展；每个 workflow
 在顶层 `host_extensions` 中按 ID 选择实际扩展。使用项支持
 `implemented | planned`、`enabled`、`config/settings` 和审查元数据。planned
-扩展会进入架构审查，但不会打包、启动或提供 Capability。项目级
-`javascript.host_extensions` 只为旧配置提供默认值，workflow 字段优先。
+扩展会进入架构审查，但不会打包、启动或提供 Capability。
 
 ## 入口模式、长期 Loop 与原生 Port
 
-`pipeline.entry_mode` 为 `sync | async`，缺省 `sync`。同步 JS 构建只能使用立即完成、内联调度的实现；需要 Promise、deferred/result_key、detached 或 `vibeflow.io.receive` 时必须显式选择 `async`。Python `runtime.run()` 继续阻塞返回，旧 `async: result_key|detached` 线程池语义保持兼容。
+`pipeline.entry_mode` 为 `sync | async`，缺省 `sync`。同步 JS 构建只能使用立即完成、内联调度的实现；需要 Promise、deferred/result_key、detached 或 `vibeflow.io.receive` 时必须显式选择 `async`。Python `runtime.run()` 阻塞返回；`async: result_key|detached` 由 Python Target 的线程执行器处理。
 
 `vibeflow.loop.while.loop.max_iterations` 省略时默认 1000，写 `null` 表示无次数上限。stop 可以不写、单独写或同时写；`stop_after` 与 `stop_when` 同时存在时按 OR。`null` 且没有 stop 是合法永久循环，只产生 warning，不会被内核偷偷添加 timeout、yield 或退出条件。
 
@@ -112,7 +129,7 @@ NodeInfo(..., flow_kind="process", external=True)
 允许示例：
 
 ```python
-from vibeflow import BaseLibInfo
+from vibeflow.targets.python.project import BaseLibInfo
 
 BASE_LIB_INFO = BaseLibInfo(
     module="base_lib.math_tools",
@@ -131,7 +148,7 @@ def add(left: float, right: float) -> float:
 `project/registry.py` 声明可用 base_lib：
 
 ```python
-from vibeflow import BaseLibRegistry
+from vibeflow.targets.python.project import BaseLibRegistry
 
 def build_base_lib_registry() -> BaseLibRegistry:
     registry = BaseLibRegistry()
@@ -174,9 +191,8 @@ workflow 启用的 `base_lib`；详细依赖边界见 JS/TS AOT 指南。
 
 JS/Web AOT 还要求每个 `pipeline.inputs[]` 显式声明
 `required: true | false`，并允许 pipeline output 使用 `as` 别名；它的
-`runWorkflow()` 返回普通业务值，不暴露内部 envelope。旧 Python Runtime
-配置缺少 `required` 时继续沿用现有兼容行为。不要把两种公共输出 ABI 混为
-一谈。
+`runWorkflow()` 返回普通业务值，不暴露内部 envelope。Python Runtime
+配置缺少 `required` 时使用 Python Target 默认值。两种路径的公共输出 ABI 不同。
 
 ### config node 可视化元数据
 
@@ -316,8 +332,8 @@ Health 只基于用户写在 `pipeline.edges` 里的显式 edge 推断同步主�
 - async edge：连接到 `async: "detached"` 或 `async: "result_key"` 的 node / nodeset 调用；不进入同步主线。
 
 对象形式 edge 可用 `schedule: false` 显式声明 transfer-only，或用
-`transfer: false` 声明 schedule-only。未写的角色仍由上述规则推断，以兼容
-已有配置；`schedule` 与 `transfer` 不能同时为 `false`。`join_policy`、
+`transfer: false` 声明 schedule-only。未写的角色由上述规则推断；
+`schedule` 与 `transfer` 不能同时为 `false`。`join_policy`、
 readiness 和条件激活只计算 schedule edge，数据可达性和 inbox 投递只计算
 transfer edge。
 
@@ -527,7 +543,8 @@ value = result.context.get("value.out")["value"]
 可选执行和 trace：
 
 ```python
-from vibeflow import RuntimeOptions, run_checked
+from vibeflow.targets.python.runtime import RuntimeOptions
+from vibeflow.tooling.application import run_checked
 
 run_checked(..., runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
 ```
@@ -576,7 +593,7 @@ Python registry 或 JS/TS descriptor。修改前建立`复用 / 修改 / 删除 
 未列出的 id、edge、hook 和调用层级默认保持。只在真实 source 上原位修改；
 不得为审核新建平行 config，不得用概念图或手写 Mermaid/SVG 替代原项目。
 
-trace 兼容两层视图：`runtime.exec_order`、`runtime.node_runs`、`runtime.edge_executions`、`runtime.step_count` 仍表示顶层 pipeline；嵌套 nodeset/loop 的完整顺序看 `runtime.qualified_exec_order`、`runtime.qualified_node_runs`、`runtime.qualified_edge_executions` 和 `runtime.total_step_count`。完整事件不再保存在 `RunResult.runtime.events` 或 runtime hook 参数中；读取完整事件请逐行读取 `runtime_trace.jsonl`。`RunResult` 和 `after_run(state, trace)` / `run_failed(state, trace, message)` 中的 `trace` 只包含 summary、`event_count`、`trace_path` 和 `events_streamed=true`。事件中同时有机器可读 `path` 数组和人类可读 `qualified_node`，例如 `["outer", "inner", "add"]` / `outer.inner.add`。
+trace 提供顶层和嵌套两层视图：`runtime.exec_order`、`runtime.node_runs`、`runtime.edge_executions`、`runtime.step_count` 表示顶层 pipeline；嵌套 nodeset/loop 的完整顺序看 `runtime.qualified_exec_order`、`runtime.qualified_node_runs`、`runtime.qualified_edge_executions` 和 `runtime.total_step_count`。完整事件写入 `runtime_trace.jsonl`。`RunResult` 和 `after_run(state, trace)` / `run_failed(state, trace, message)` 中的 `trace` 只包含 summary、`event_count`、`trace_path` 和 `events_streamed=true`。事件中同时有机器可读 `path` 数组和人类可读 `qualified_node`，例如 `["outer", "inner", "add"]` / `outer.inner.add`。
 
 异步 side task 只通过 config 显式开启：
 
@@ -632,7 +649,7 @@ vibeflow delegate-cli --workspace vibeflow_config.jsonc --config project/configs
 
 让渡参数的业务值是 `list[str]`，通过 `cli.argv` envelope 进入图。最终必须只有一个 provider 同时使用 `key="cli.exit_code"`、`type="cli.exit_code"`；其值必须是非 bool 的 `int` 且处于 `0..255`。业务参数应由 `flow_kind=io` node 使用 `argparse` 等终端能力解析；不要从全局 `sys.argv` 偷读 core 参数。
 
-stdin/stdout/stderr 是真实进程标准流。`delegate-cli` 不捕获、不重放、不改写，也不补 JSON 或换行，所以 `print`、`input`、`argparse` 和流式输出表现得像普通 Python CLI。VibeFlow 自身的启动、core 兼容提示、失败阶段、artifact 路径和最终退出码写入 `<run-root>/<run-id>/vibeflow.log`；日志不记录 argv 原文或业务标准流。只有运行目录无法创建时，才向 stderr 写最小诊断并返回 1。
+stdin/stdout/stderr 是真实进程标准流。`delegate-cli` 不捕获、不重放、不改写，也不补 JSON 或换行，所以 `print`、`input`、`argparse` 和流式输出表现得像普通 Python CLI。VibeFlow 自身的启动、core 版本提示、失败阶段、artifact 路径和最终退出码写入 `<run-root>/<run-id>/vibeflow.log`；日志不记录 argv 原文或业务标准流。只有运行目录无法创建时，才向 stderr 写最小诊断并返回 1。
 
 退出规则：
 
@@ -725,7 +742,7 @@ def _register_fulltext_nodes(registry):
     registry.register("fulltext.plan_provider_routes", PlanProviderRoutesNode, config_schema={}, config_defaults={})
 ```
 
-如果 `_register_fulltext_nodes()` 注册了 `literature.*`，内核会给 `REGISTRY.SMELL.NAMESPACE_MISMATCH` warning。迁移期可以保留 warning，但长期应把注册移动到对应分组函数，或用项目 plugin 明确例外。
+注册函数的职责名应与其中的 namespace 一致。例如 `_register_text_nodes()` 只注册 `text.*`；跨 namespace 注册会产生 `REGISTRY.SMELL.NAMESPACE_MISMATCH` warning，应移动到对应分组函数或由项目 Plugin 声明例外。
 
 ## 图形输出
 

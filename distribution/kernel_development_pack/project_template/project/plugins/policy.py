@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from vibeflow import PluginInfo
+from vibeflow.targets.python.project import PluginInfo
 
 
 class PolicyPlugin:
