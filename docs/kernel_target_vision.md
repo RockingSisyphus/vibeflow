@@ -1,6 +1,6 @@
 # VibeFlow 目标愿景
 
-> 当前版本：0.10.0。每个 project root 显式选择 Python 或 JavaScript Target；两个 Target 及其 Application closure 保持完全隔离。
+> 当前版本：0.10.1。每个 project root 显式选择 Python 或 JavaScript Target；两个 Target 及其 Application closure 保持完全隔离。
 
 ## 设计初衷
 

@@ -1,6 +1,6 @@
 # VibeFlow 文档索引
 
-VibeFlow 0.10.0 使用一个语言无关 Core、一个公共 Block Compiler，以及彼此隔离的 Python 和 JavaScript Target。每个 workspace root 必须用 `project_target` 明确选择一种 Target；单次 workflow 不混用两种语言实现。
+VibeFlow 0.10.1 使用一个语言无关 Core、一个公共 Block Compiler，以及彼此隔离的 Python 和 JavaScript Target。每个 workspace root 必须用 `project_target` 明确选择一种 Target；单次 workflow 不混用两种语言实现。
 
 ## 当前规范
 
@@ -25,7 +25,7 @@ python tools/verify_project.py --full
 python distribution/build.py
 ```
 
-正式目录写入 `../dist/vibeflow-distribution/`，确定性归档写入 `../archive/vibeflow-distribution-0.10.0.zip`。临时验证可使用 `--output-dir` 和 `--archive-dir`。
+正式目录写入 `../dist/vibeflow-distribution/`，确定性归档写入 `../archive/vibeflow-distribution-0.10.1.zip`。临时验证可使用 `--output-dir` 和 `--archive-dir`。
 
 ## 两种质量检查
 

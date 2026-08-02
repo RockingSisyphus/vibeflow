@@ -1,6 +1,6 @@
 # VibeFlow 可复制开发包
 
-版本：0.10.0
+版本：0.10.1
 
 这个目录可以整体复制到其他位置作为新项目起点。它包含一个通用 kernel、内核文档、AI 开发提示词，以及相互隔离的 Python 和 JavaScript 示例 root。`DISTRIBUTION.json` 记录版本、root 和内核 hash。
 

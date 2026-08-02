@@ -2,7 +2,7 @@
 
 VibeFlow 可以把同一份 workflow 编译为普通 JavaScript ESM。生成物在运行时不需要 Python，也不需要浏览器或 Node.js 安装 VibeFlow。同步 workflow 导出 `runWorkflow()`，显式异步 workflow 导出 `runWorkflowAsync()`。
 
-正式 Target 名是 `javascript`；TypeScript 是该 Target 支持的实现语言。VibeFlow 0.10.0 提供 `vibeflow.targets.javascript.frontend`、`.quality`、`.build` 以及 CLI 入口，不提供旧 AOT 模块路径，也不依赖 Python Target。
+正式 Target 名是 `javascript`；TypeScript 是该 Target 支持的实现语言。VibeFlow 0.10.1 提供 `vibeflow.targets.javascript.frontend`、`.quality`、`.build` 以及 CLI 入口，不提供旧 AOT 模块路径，也不依赖 Python Target。
 
 本文描述当前公开配置、节点 ABI、Workflow ABI 和构建命令。
 

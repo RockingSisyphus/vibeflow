@@ -306,7 +306,7 @@ def load():
     def test_base_checks_document_links_and_stale_release_text(self) -> None:
         self.fixture.write(
             "docs/guide.md",
-            "VibeFlow 0.9.0 used [a missing guide](missing.md).\n",
+            "VibeFlow 0.10.0 used [a missing guide](missing.md).\n",
         )
         findings = run_profile(self.fixture.root, "base").findings
         self.assertEqual(
