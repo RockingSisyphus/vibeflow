@@ -20,6 +20,8 @@ from vibeflow.tooling.project.project_config_options import (
 )
 from vibeflow.tooling.project.workspace_model import (
     PROJECT_CONFIG_NAME,
+    PROJECT_TARGETS,
+    ProjectTarget,
     WorkspaceConfig,
     WorkspaceRoot,
 )
@@ -47,6 +49,63 @@ def load_workspace_config(path: str | Path) -> WorkspaceConfig:
         policy=data.get("policy", {}),
         roots=tuple(roots),
     )
+
+
+def load_project_workspace(path: str | Path) -> WorkspaceConfig:
+    """Load one project root as an in-memory workspace.
+
+    This supports project-scoped read-only commands when no surrounding
+    ``vibeflow_config.jsonc`` exists.  No synthetic workspace file is written;
+    the returned model simply gives the normal loaders the same root metadata.
+    """
+
+    project_path = Path(path).expanduser().resolve()
+    config_path = (
+        project_path
+        if project_path.name == PROJECT_CONFIG_NAME and project_path.is_file()
+        else find_project_config(project_path)
+    )
+    if config_path is None:
+        raise WorkspaceConfigError(
+            "WORKSPACE.PROJECT_CONFIG.MISSING",
+            f"cannot find {PROJECT_CONFIG_NAME} above {project_path}",
+            {"path": str(project_path)},
+        )
+    root_path = config_path.parent.resolve()
+    root = _workspace_root_from_project_config(
+        "project",
+        root_path=root_path,
+        config_path=config_path,
+    )
+    return WorkspaceConfig(
+        path=config_path,
+        root=root_path,
+        policy={},
+        roots=(root,),
+    )
+
+
+def find_project_config(path: str | Path) -> Path | None:
+    """Return the nearest canonical project config without loading a Target."""
+
+    candidate = Path(path).expanduser().resolve()
+    start = candidate if candidate.is_dir() else candidate.parent
+    for directory in (start, *start.parents):
+        config_path = directory / PROJECT_CONFIG_NAME
+        if config_path.is_file():
+            return config_path
+    return None
+
+
+def load_project_target(path: str | Path) -> ProjectTarget:
+    """Load and validate one project config, returning its declared Target."""
+
+    config_path = Path(path).expanduser().resolve()
+    project_config = _load_project_config(
+        config_path,
+        root_path=config_path.parent,
+    )
+    return _project_target(project_config, config_path)
 
 
 def _workspace_roots(
@@ -128,12 +187,26 @@ def _workspace_root_from_item(
             f"project config does not exist: {config_path}",
             {"path": str(config_path)},
         )
+    return _workspace_root_from_project_config(
+        root_id,
+        root_path=root_path,
+        config_path=config_path,
+    )
+
+
+def _workspace_root_from_project_config(
+    root_id: str,
+    *,
+    root_path: Path,
+    config_path: Path,
+) -> WorkspaceRoot:
     project_config = _load_project_config(config_path, root_path=root_path)
     return WorkspaceRoot(
         id=root_id,
         path=root_path,
         config_path=config_path,
         project_config=project_config,
+        project_target=_project_target(project_config, config_path),
         registry_ref=str(project_config.get("registry", "")).strip(),
         quality_enabled=bool(project_config.get("quality_enabled", True)),
         quality_structure=_project_quality_structure(
@@ -165,6 +238,7 @@ def _load_project_config(
         ) from exc
     data = document.data
     unknown = set(data) - {
+        "project_target",
         "registry",
         "quality_enabled",
         "quality",
@@ -181,6 +255,8 @@ def _load_project_config(
             f"project config contains unknown fields: {sorted(unknown)}",
             {"path": str(path)},
         )
+    target = _project_target(data, path)
+    _validate_project_target_fields(data, target=target, path=path)
     if "registry" in data and not isinstance(data["registry"], str):
         raise WorkspaceConfigError(
             "WORKSPACE.PROJECT_CONFIG.REGISTRY",
@@ -202,6 +278,63 @@ def _load_project_config(
     project_javascript_options(data, path)
     project_architecture_documents(data, root_path=root_path, path=path)
     return data
+
+
+def _project_target(
+    data: Mapping[str, Any],
+    path: Path,
+) -> ProjectTarget:
+    if "project_target" not in data:
+        raise WorkspaceConfigError(
+            "WORKSPACE.PROJECT_TARGET.MISSING",
+            "project config requires project_target: 'python' or 'javascript'",
+            {"path": str(path), "field": "project_target"},
+        )
+    value = data.get("project_target")
+    if not isinstance(value, str) or value not in PROJECT_TARGETS:
+        raise WorkspaceConfigError(
+            "WORKSPACE.PROJECT_TARGET.INVALID",
+            "project config project_target must be exactly 'python' or 'javascript'",
+            {
+                "path": str(path),
+                "field": "project_target",
+                "value": value,
+            },
+        )
+    return value
+
+
+def _validate_project_target_fields(
+    data: Mapping[str, Any],
+    *,
+    target: ProjectTarget,
+    path: Path,
+) -> None:
+    conflicts: list[str] = []
+    if target == "python":
+        if "javascript" in data:
+            conflicts.append("javascript")
+        descriptors = data.get("descriptors")
+        if isinstance(descriptors, Mapping) and "host_extensions" in descriptors:
+            conflicts.append("descriptors.host_extensions")
+    else:
+        conflicts.extend(
+            field
+            for field in ("registry", "runtime", "base_lib", "plugins")
+            if field in data
+        )
+    if not conflicts:
+        return
+    raise WorkspaceConfigError(
+        "WORKSPACE.PROJECT_TARGET.FIELD_CONFLICT",
+        f"project_target {target!r} does not allow fields: {sorted(conflicts)}",
+        {
+            "path": str(path),
+            "field": conflicts[0],
+            "fields": sorted(conflicts),
+            "project_target": target,
+        },
+    )
 
 
 def _project_runtime_options(
@@ -396,4 +529,9 @@ def _resolve_workspace_relative(value: str, *, base: Path) -> Path:
     return path.resolve()
 
 
-__all__ = ["load_workspace_config"]
+__all__ = [
+    "find_project_config",
+    "load_project_workspace",
+    "load_project_target",
+    "load_workspace_config",
+]

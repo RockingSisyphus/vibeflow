@@ -1,4 +1,5 @@
 {
+  "project_target": "javascript",
   "descriptors": {
     "nodes": ["manifests/nodes"],
     "base_lib": ["manifests/base_lib"],

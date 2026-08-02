@@ -159,8 +159,6 @@ def _illegal_import_message(
         return f"host_extension cannot import {imported.destination_kind} source"
     if imported.destination_kind in {"base_lib", "host_extension"} and not imported.declared:
         return f"{imported.destination_kind} dependency is not declared"
-    if owner.target == "browser" and imported.destination_kind == "node_builtin":
-        return "browser implementation cannot import an unadapted Node builtin"
     return ""
 
 

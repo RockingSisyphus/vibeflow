@@ -1,65 +1,45 @@
 # VibeFlow 文档索引
 
-VibeFlow 0.9.0 继续使用分层公共 API，并把 Core、Block Compiler、Python Target、JavaScript Target 与 Target-neutral Tooling 的依赖边界纳入仓库门禁。根包不提供业务对象或旧模块门面；代码示例以当前文档为准。
+VibeFlow 0.10.0 使用一个语言无关 Core、一个公共 Block Compiler，以及彼此隔离的 Python 和 JavaScript Target。每个 workspace root 必须用 `project_target` 明确选择一种 Target；单次 workflow 不混用两种语言实现。
 
-## 当前文档
+## 当前规范
 
-- `developer_guide.md`：共享 workflow/config 语义与 Python Target 使用方法。
-- `js_aot_build.md`：JavaScript Target 的 JS/TS descriptor、`vibeflow.plugin.v1`、同步/异步 ABI、Capability、Host Extension、Port 和三种 AOT profile。
-- `kernel_target_vision.md`：长期产品目标与架构原则。
-- `16_语言无关内核与多Target分层架构目标.md`：Core、Block Compiler、两个 Target、Tooling、质量系统与 Sandbox 的当前分层。
-- `kernel_development_guide.md`：维护、测试、质量自检、wheel 和分发流程。
+- `developer_guide.md`：共享 workflow/config 语义、Python Runtime 和用户项目质量检查。
+- `js_aot_build.md`：JavaScript/TypeScript descriptor、Plugin、Capability、Host Extension、Port 与 AOT 构建。
+- `kernel_target_vision.md`：产品目标、分层、公共 IR 和 Target 边界。
+- `kernel_development_guide.md`：内核维护、测试、wheel 与分发流程。
 
-正式 Target 名是 `python` 和 `javascript`；TypeScript 是 JavaScript Target 支持的实现语言。端到端用例位于：
-
-- `../sandbox/python/minimal/`
-- `../sandbox/python/integration/`
-- `../sandbox/javascript/minimal/`
-- `../sandbox/javascript/integration/`
+正式 Target 名是 `python` 和 `javascript`；TypeScript 是 JavaScript Target 的实现语言。Browser/Node 是单次 JS 构建目标，不是 workflow 声明。端到端用例位于 `../sandbox/python/` 和 `../sandbox/javascript/`。
 
 ## 分发文档
 
 - `../distribution/kernel_development_pack/docs/`：进入分发包的主题文档源。
-- `../distribution/kernel_development_pack/project_template/README.md`：分发项目的人类入口。
-- `../distribution/kernel_development_pack/project_template/AGENTS.md`：供 AI 开发者使用的高优先级约束。
-- `developer_guide.md` 和 `js_aot_build.md` 也会复制到分发内核文档中。
+- `../distribution/kernel_development_pack/project_template/README.md`：分发包的人类入口。
+- `../distribution/kernel_development_pack/project_template/AGENTS.md`：分发包的 AI 高优先级约束。
+- `developer_guide.md` 和 `js_aot_build.md` 会复制到分发包的 `kernel/docs/`。
 
-修改源文档后运行完整门禁，再重建分发包：
+完整门禁和正式发布：
 
 ```bash
 python tools/verify_project.py --full
-python distribution/build.py --output /tmp/vibeflow-distribution
+python distribution/build.py
 ```
 
-## 质量系统
+正式目录写入 `../dist/vibeflow-distribution/`，确定性归档写入 `../archive/vibeflow-distribution-0.10.0.zip`。临时验证可使用 `--output-dir` 和 `--archive-dir`。
 
-`python -m vibeflow quality-check` 检查用户项目。Core Quality 拥有语言无关规则；Tooling 只负责读取文件和输出报告，Python 或 JavaScript Target 只提取本语言事实。
+## 两种质量检查
 
-根目录 `quality/` 是完全独立的 VibeFlow 仓库自检器，不进入 wheel，也不导入 VibeFlow：
+`python -m vibeflow quality-check` 检查用户项目的架构质量。Core Quality 判定语言无关事实，Target 提取本语言事实，Tooling 读取文件并输出报告。它不替代 TypeScript、ESLint 或业务测试。
+
+根目录 `quality/` 是不进入 wheel 的仓库自检器：
 
 ```bash
-python quality/run.py --profile base
-python quality/run.py --profile core
-python quality/run.py --profile block-compiler
-python quality/run.py --profile python-target
-python quality/run.py --profile javascript-target
 python quality/run.py --profile all
 ```
 
-工作区清理器默认只预览：
+它检查目录、依赖方向、Target 隔离、过期文档引用和发布源。工作区清理器默认只预览：
 
 ```bash
 python tools/clean_workspace.py
 python tools/clean_workspace.py --apply
 ```
-
-## 设计记录
-
-- `strict_flowchart_kernel_redesign.md`：严格流程图内核设计记录。
-- `11_训练性能导向内核改进计划.md`：训练与运行性能改造记录。
-- `12_CompiledBlock完整代码生成计划.md`：CompiledBlock 代码生成设计记录。
-- `13_CompiledBlock分阶段实施计划.md`：CompiledBlock 分阶段实现记录。
-- `14_JS_TS节点与Web_AOT构建计划.md`：JavaScript/TypeScript AOT 设计记录。
-- `15_长期工作流与原生IO改造计划.md`：同步/异步入口、永久 loop、Port 与 Host Extension 设计记录。
-
-历史记录解释设计来源，不定义 0.9 公共 API。

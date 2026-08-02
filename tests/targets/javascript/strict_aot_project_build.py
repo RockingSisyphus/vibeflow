@@ -14,7 +14,14 @@ from vibeflow.tooling.application.javascript.build import (
     build_project_aot,
     prepare_project_build,
 )
+from vibeflow.tooling.application.javascript.audit import (
+    JavascriptAuditRequest,
+    audit_javascript_project,
+    render_architecture,
+    render_review_svg,
+)
 from vibeflow.targets.javascript.build.toolchain import ToolchainInfo
+from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
 
 
 def _write(path: Path, payload: object) -> None:
@@ -268,6 +275,7 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
     _write(
         project / "vibeflow_project.jsonc",
         {
+            "project_target": "javascript",
             "descriptors": {
                 "nodes": ["manifests/nodes"],
                 "base_lib": ["manifests/base_lib"],
@@ -344,6 +352,75 @@ export function createHostExtension(context) {
         "manifests/host_extensions"
     ]
     _write(project_config, raw)
+
+
+def _add_unselected_plugin(project: Path) -> Path:
+    source = project / "src/unused-plugin.ts"
+    source.write_text(
+        "export function createPlugin() { return {}; }\n",
+        encoding="utf-8",
+    )
+    manifest = project / "manifests/plugins/unused.jsonc"
+    _write(
+        manifest,
+        {
+            "kind": "plugin",
+            "id": "demo.unused",
+            "type": "runtime",
+            "targets": ["browser", "node"],
+            "implementations": [
+                {
+                    "language": "typescript",
+                    "targets": ["browser", "node"],
+                    "source": {
+                        "kind": "file",
+                        "ref": "src/unused-plugin.ts",
+                        "export": "createPlugin",
+                    },
+                }
+            ],
+            "config": {"schema": {}, "defaults": {}},
+        },
+    )
+    project_config = project / "vibeflow_project.jsonc"
+    raw = json.loads(project_config.read_text(encoding="utf-8"))
+    raw["descriptors"]["plugins"] = ["manifests/plugins"]
+    _write(project_config, raw)
+    return manifest
+
+
+@pytest.mark.parametrize(
+    "resource_kind",
+    ("node", "base_lib", "plugin"),
+)
+def test_javascript_root_rejects_foreign_implementation_languages_even_when_unused(
+    tmp_path: Path,
+    resource_kind: str,
+) -> None:
+    request = _request(tmp_path)
+    project = Path(request.config).parent
+    if resource_kind == "node":
+        manifest = project / "manifests/nodes/add.jsonc"
+    elif resource_kind == "base_lib":
+        manifest = project / "manifests/base_lib/core.jsonc"
+    elif resource_kind == "plugin":
+        manifest = _add_unselected_plugin(project)
+    else:
+        raise AssertionError(resource_kind)
+
+    raw = json.loads(manifest.read_text(encoding="utf-8"))
+    raw["implementations"][0]["language"] = "python"
+    raw["implementations"][0]["targets"] = ["python"]
+    if resource_kind == "plugin":
+        raw["targets"] = ["python"]
+    _write(manifest, raw)
+
+    with pytest.raises(ProjectBuildError) as captured:
+        prepare_project_build(request)
+
+    assert captured.value.code == "VF_AOT_CONTRACT_INVALID"
+    assert resource_kind in captured.value.message
+    assert "foreign implementation languages: ['python']" in captured.value.message
 
 
 def test_prepare_project_build_loads_static_js_only_nested_project(
@@ -623,7 +700,7 @@ def test_host_extension_null_selection_is_not_an_empty_override(
     assert "must be a list" in captured.value.message
 
 
-def test_prepare_project_build_ignores_python_registry_metadata(
+def test_prepare_project_build_rejects_python_registry_metadata(
     tmp_path: Path,
 ) -> None:
     request = _request(tmp_path)
@@ -643,15 +720,11 @@ def test_prepare_project_build_ignores_python_registry_metadata(
     raw["registry"] = "registry.py:build_registry"
     _write(project_config, raw)
 
-    prepared = prepare_project_build(request)
+    with pytest.raises(WorkspaceConfigError) as invalid:
+        prepare_project_build(request)
 
-    assert {
-        item.language
-        for item in prepared.catalogs.nodes.require(
-            "demo.add"
-        ).implementations
-    } == {"typescript"}
-    assert prepared.implementation_by_type["demo.add"]["language"] == "typescript"
+    assert invalid.value.rule_id == "WORKSPACE.PROJECT_TARGET.FIELD_CONFLICT"
+    assert invalid.value.source_location["field"] == "registry"
 
 
 def test_prepare_project_build_rejects_ambiguous_input_requiredness(
@@ -680,7 +753,7 @@ def test_prepare_project_build_checks_graph_call_contract(
     with pytest.raises(ProjectBuildError) as captured:
         prepare_project_build(request)
 
-    assert captured.value.code == "VF_AOT_CONTRACT"
+    assert captured.value.code == "VF_AOT_CONTRACT_INVALID"
     assert captured.value.node_path == ("group", "add")
 
 
@@ -713,7 +786,122 @@ def test_prepare_project_build_requires_schema_and_target_implementation(
                 }
             )
         )
-    assert captured.value.code == "VF_AOT_IMPLEMENTATION_TARGET"
+    assert captured.value.code == "VF_AOT_TARGET_IMPLEMENTATION_MISSING"
+
+
+def test_target_neutral_audit_does_not_require_a_shared_platform(
+    tmp_path: Path,
+) -> None:
+    request = _request(tmp_path)
+    project = Path(request.config).parent
+    add_manifest = project / "manifests/nodes/add.jsonc"
+    start_manifest = project / "manifests/nodes/start.jsonc"
+    add = json.loads(add_manifest.read_text(encoding="utf-8"))
+    start = json.loads(start_manifest.read_text(encoding="utf-8"))
+    add["implementations"][0]["targets"] = ["node"]
+    start["implementations"][0]["targets"] = ["browser"]
+    _write(add_manifest, add)
+    _write(start_manifest, start)
+
+    audited = audit_javascript_project(
+        JavascriptAuditRequest(
+            workspace=request.workspace,
+            config=request.config,
+            audit_sources=False,
+        )
+    )
+
+    implementations = audited.architecture["node_types"]
+    assert implementations["demo.add"]["implementations"][0]["targets"] == [
+        "node"
+    ]
+    assert implementations["demo.start"]["implementations"][0][
+        "targets"
+    ] == ["browser"]
+
+
+def test_target_neutral_audit_never_loads_planned_plugin_or_host_source(
+    tmp_path: Path,
+) -> None:
+    request = _request(tmp_path)
+    project = Path(request.config).parent
+    _add_host_extension(project, "demo.future_host")
+    (project / "src/demo-future_host.ts").unlink()
+    _write(
+        project / "manifests/plugins/future.jsonc",
+        {
+            "kind": "plugin",
+            "id": "demo.future_plugin",
+            "type": "runtime",
+            "targets": ["browser", "node"],
+            "implementations": [
+                {
+                    "language": "typescript",
+                    "targets": ["browser", "node"],
+                    "source": {
+                        "kind": "file",
+                        "ref": "src/does-not-exist.ts",
+                        "export": "createPlugin",
+                    },
+                }
+            ],
+            "dependencies": [],
+            "external_packages": [],
+            "config": {"schema": {}, "defaults": {}},
+        },
+    )
+    project_config = project / "vibeflow_project.jsonc"
+    project_data = json.loads(project_config.read_text(encoding="utf-8"))
+    project_data["descriptors"]["plugins"] = ["manifests/plugins"]
+    _write(project_config, project_data)
+    workflow = json.loads(Path(request.config).read_text(encoding="utf-8"))
+    workflow["plugins"] = [
+        {"id": "demo.future_plugin", "status": "planned"}
+    ]
+    workflow["host_extensions"] = [
+        {"id": "demo.future_host", "status": "planned"}
+    ]
+    _write(Path(request.config), workflow)
+
+    audited = audit_javascript_project(
+        JavascriptAuditRequest(
+            workspace=request.workspace,
+            config=request.config,
+            audit_sources=False,
+            audit_registered_resources=True,
+        )
+    )
+
+    assert all("does-not-exist" not in item for item in audited.source_files)
+    assert all("future_host" not in item for item in audited.source_files)
+
+
+def test_target_neutral_architecture_is_location_independent(
+    tmp_path: Path,
+) -> None:
+    left = _request(tmp_path / "left")
+    right = _request(tmp_path / "right")
+    left_result = audit_javascript_project(
+        JavascriptAuditRequest(
+            workspace=left.workspace,
+            config=left.config,
+            audit_sources=False,
+        )
+    )
+    right_result = audit_javascript_project(
+        JavascriptAuditRequest(
+            workspace=right.workspace,
+            config=right.config,
+            audit_sources=False,
+        )
+    )
+
+    assert render_architecture(left_result) == render_architecture(right_result)
+    assert render_review_svg(left_result) == render_review_svg(right_result)
+    assert left_result.architecture["workflow"]["source"] == {
+        "root_id": "demo",
+        "path": "workflow.jsonc",
+    }
 
 
 @pytest.mark.parametrize(
@@ -771,7 +959,7 @@ def test_prepare_project_build_rejects_unaudited_source_kinds(
     assert "only accepts audited project files" in captured.value.message
 
 
-def test_prepare_project_build_does_not_load_python_plugins(
+def test_prepare_project_build_rejects_python_plugin_fields(
     tmp_path: Path,
 ) -> None:
     request = _request(tmp_path)
@@ -790,9 +978,11 @@ def test_prepare_project_build_does_not_load_python_plugins(
     ]
     _write(project_config, raw)
 
-    prepared = prepare_project_build(request)
+    with pytest.raises(WorkspaceConfigError) as invalid:
+        prepare_project_build(request)
 
-    assert prepared.implementation_by_type["demo.add"]["language"] == "typescript"
+    assert invalid.value.rule_id == "WORKSPACE.PROJECT_TARGET.FIELD_CONFLICT"
+    assert invalid.value.source_location["field"] == "plugins"
 
 
 def test_build_project_aot_forwards_prepared_request(

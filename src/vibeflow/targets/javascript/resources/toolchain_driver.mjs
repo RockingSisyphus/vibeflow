@@ -1,18 +1,10 @@
-import { createRequire } from "node:module";
+import { createRequire, isBuiltin } from "node:module";
 import { existsSync, realpathSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
-
-const NODE_BUILTINS = new Set([
-  "assert", "async_hooks", "buffer", "child_process", "cluster", "console",
-  "constants", "crypto", "dgram", "diagnostics_channel", "dns", "domain",
-  "events", "fs", "http", "http2", "https", "module", "net", "os", "path",
-  "perf_hooks", "process", "punycode", "querystring", "readline", "repl",
-  "stream", "string_decoder", "sys", "timers", "tls", "trace_events", "tty",
-  "url", "util", "v8", "vm", "wasi", "worker_threads", "zlib",
-]);
 
 function fail(code, message, details = {}) {
   const error = new Error(message);
@@ -43,11 +35,11 @@ function isStringLiteralLike(ts, node) {
     );
 }
 
-async function packageTools(packageRoot) {
+async function packageTools(packageRoot, { requireEsbuild = true } = {}) {
   const packageJson = path.join(packageRoot, "package.json");
   const require = createRequire(packageJson);
   let typescript;
-  let esbuild;
+  let esbuild = null;
   try {
     const version = require("typescript");
     if (typeof version.createProgram === "function") {
@@ -72,13 +64,15 @@ async function packageTools(packageRoot) {
       cause: String(cause),
     });
   }
-  try {
-    esbuild = require("esbuild");
-  } catch (cause) {
-    fail("VF_TOOLCHAIN_MISSING", "project-local package 'esbuild' cannot be resolved", {
-      packageRoot,
-      cause: String(cause),
-    });
+  if (requireEsbuild) {
+    try {
+      esbuild = require("esbuild");
+    } catch (cause) {
+      fail("VF_TOOLCHAIN_MISSING", "project-local package 'esbuild' cannot be resolved", {
+        packageRoot,
+        cause: String(cause),
+      });
+    }
   }
   return { typescript, esbuild };
 }
@@ -193,28 +187,10 @@ function auditSingleEsmConstraints(ts, sourceFile) {
   return findings;
 }
 
-function auditParsedSource(ts, sourceFile, target, profile) {
+function auditParsedSource(ts, sourceFile, profile) {
   const findings = [];
-  function checkSpecifier(node, specifier) {
-    if (target !== "browser") return;
-    const root = specifier.startsWith("node:")
-      ? specifier.slice(5).split("/")[0]
-      : specifier.split("/")[0];
-    if (specifier.startsWith("node:") || NODE_BUILTINS.has(root)) {
-      findings.push(importFinding(
-        sourceFile,
-        node,
-        "VF_IMPORT_TARGET",
-        `browser target cannot import Node builtin '${specifier}'`,
-      ));
-    }
-  }
   function visit(node) {
-    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
-      if (node.moduleSpecifier && isStringLiteralLike(ts, node.moduleSpecifier)) {
-        checkSpecifier(node.moduleSpecifier, node.moduleSpecifier.text);
-      }
-    } else if (ts.isCallExpression(node)) {
+    if (ts.isCallExpression(node)) {
       const dynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
       const requireCall = ts.isIdentifier(node.expression) && node.expression.text === "require";
       const dynamicCodeCall = ts.isIdentifier(node.expression)
@@ -238,8 +214,6 @@ function auditParsedSource(ts, sourceFile, target, profile) {
             "VF_IMPORT_DYNAMIC",
             `${dynamicImport ? "dynamic import" : "require"} must use a static string literal`,
           ));
-        } else {
-          checkSpecifier(argument, argument.text);
         }
       }
       if (dynamicCodeCall || stringTimer) {
@@ -293,74 +267,6 @@ function auditParsedSource(ts, sourceFile, target, profile) {
   if (profile === "single-esm") {
     findings.push(...auditSingleEsmConstraints(ts, sourceFile));
   }
-  return findings;
-}
-
-function auditSource(ts, fileName, source, target) {
-  const findings = [];
-  const scriptKind = /\.(?:tsx|mts|cts)$/i.test(fileName)
-    ? ts.ScriptKind.TSX
-    : /\.(?:ts)$/i.test(fileName)
-      ? ts.ScriptKind.TS
-      : ts.ScriptKind.JS;
-  const sourceFile = ts.createSourceFile(
-    fileName,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    scriptKind,
-  );
-  const browserBlocked = new Set([
-    "assert", "buffer", "child_process", "cluster", "crypto", "dgram", "dns",
-    "events", "fs", "http", "https", "module", "net", "os", "path",
-    "perf_hooks", "process", "readline", "stream", "string_decoder",
-    "timers", "tls", "tty", "url", "util", "v8", "vm", "worker_threads", "zlib",
-  ]);
-
-  function checkSpecifier(node, specifier) {
-    if (target !== "browser") return;
-    const root = specifier.startsWith("node:")
-      ? specifier.slice(5).split("/")[0]
-      : specifier.split("/")[0];
-    if (specifier.startsWith("node:") || browserBlocked.has(root)) {
-      const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
-      findings.push({
-        code: "VF_IMPORT_TARGET",
-        message: `browser target cannot import Node builtin '${specifier}'`,
-        file: path.resolve(fileName),
-        line: position.line + 1,
-        column: position.character + 1,
-      });
-    }
-  }
-
-  function visit(node) {
-    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
-      if (node.moduleSpecifier && isStringLiteralLike(ts, node.moduleSpecifier)) {
-        checkSpecifier(node.moduleSpecifier, node.moduleSpecifier.text);
-      }
-    } else if (ts.isCallExpression(node)) {
-      const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
-      const isRequire = ts.isIdentifier(node.expression) && node.expression.text === "require";
-      if (isDynamicImport || isRequire) {
-        const argument = node.arguments[0];
-        if (!argument || !isStringLiteralLike(ts, argument)) {
-          const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
-          findings.push({
-            code: "VF_IMPORT_DYNAMIC",
-            message: `${isDynamicImport ? "dynamic import" : "require"} must use a static string literal`,
-            file: path.resolve(fileName),
-            line: position.line + 1,
-            column: position.character + 1,
-          });
-        } else {
-          checkSpecifier(argument, argument.text);
-        }
-      }
-    }
-    visitChildren(ts, node, visit);
-  }
-  visit(sourceFile);
   return findings;
 }
 
@@ -559,15 +465,10 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
   const findings = [];
   for (const imported of importSpecifiers(ts, sourceFile)) {
     const specifier = imported.value;
-    if (sourceOwner.kind === "base_lib" && isNodeBuiltinSpecifier(specifier)) {
-      findings.push(importFinding(
-        sourceFile,
-        imported.node,
-        "VF_BASE_LIB_HOST_IO",
-        `base_lib '${sourceOwner.id}' cannot import Node builtin '${specifier}'; use a Capability`,
-      ));
-      continue;
-    }
+    // Explicit Node builtin imports are platform facts.  esbuild decides
+    // whether the selected build target can resolve them; they do not affect
+    // VibeFlow ownership between nodes/base_lib/plugins/extensions.
+    if (isBuiltin(specifier)) continue;
     const bare = !specifier.startsWith(".") && !path.isAbsolute(specifier);
     const resolvedFileName = resolvedImportFile(
       ts,
@@ -706,13 +607,6 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
     }
   }
   return findings;
-}
-
-function isNodeBuiltinSpecifier(specifier) {
-  const root = specifier.startsWith("node:")
-    ? specifier.slice(5).split("/")[0]
-    : specifier.split("/")[0];
-  return specifier.startsWith("node:") || NODE_BUILTINS.has(root);
 }
 
 function unwrapExpression(ts, node) {
@@ -906,7 +800,7 @@ function importDeclarationHasRuntimeBindings(ts, statement) {
 function auditTopLevelPurity(ts, sourceFile, policy) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (!owner
-      || !["node", "base_lib", "host_extension", "plugin"].includes(owner.kind)) return [];
+      || !["node", "base_lib", "host_extension", "plugin", "source"].includes(owner.kind)) return [];
   const findings = [];
   if (hasDecorator(ts, sourceFile)) {
     findings.push(importFinding(
@@ -1282,7 +1176,7 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
 function auditModuleRegExpState(ts, sourceFile, policy) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (!owner
-      || !["node", "base_lib", "host_extension", "plugin"].includes(owner.kind)) return [];
+      || !["node", "base_lib", "host_extension", "plugin", "source"].includes(owner.kind)) return [];
   const findings = [];
 
   function isFunctionBoundary(node) {
@@ -1335,7 +1229,7 @@ function auditModuleRegExpState(ts, sourceFile, policy) {
 function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (!owner
-      || !["node", "base_lib", "host_extension", "plugin"].includes(owner.kind)) return [];
+      || !["node", "base_lib", "host_extension", "plugin", "source"].includes(owner.kind)) return [];
   const moduleBindings = new Set();
   const aliases = new Set();
   const builtinPrototypeAliases = new Set();
@@ -1645,16 +1539,15 @@ function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
   return findings;
 }
 
-function auditBaseLibHostIo(ts, sourceFile, checker, project, policy, target) {
+function auditBaseLibHostIo(ts, sourceFile, checker, project, policy) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (!owner || owner.kind !== "base_lib") return [];
-  const targetGlobals = target === "browser"
-    ? new Set([
-      "fetch", "XMLHttpRequest", "WebSocket", "EventSource", "document",
-      "window", "self", "globalThis", "localStorage", "sessionStorage",
-      "indexedDB", "caches", "navigator", "location",
-    ])
-    : new Set(["process", "global", "globalThis", "fetch", "WebSocket"]);
+  const targetGlobals = new Set([
+    "fetch", "XMLHttpRequest", "WebSocket", "EventSource", "document",
+    "window", "self", "global", "globalThis", "localStorage",
+    "sessionStorage", "indexedDB", "caches", "navigator", "location",
+    "process",
+  ]);
   const nondeterministicGlobals = new Set([
     "Date",
     "performance",
@@ -1663,6 +1556,10 @@ function auditBaseLibHostIo(ts, sourceFile, checker, project, policy, target) {
     "process",
   ]);
   const mathGlobals = new Set(["Math"]);
+  const hostIoModules = new Set([
+    "child_process", "cluster", "dgram", "dns", "fs", "http", "https",
+    "net", "tls", "worker_threads",
+  ]);
   const findings = [];
 
   function hasLocalImplementation(node) {
@@ -1721,6 +1618,21 @@ function auditBaseLibHostIo(ts, sourceFile, checker, project, policy, target) {
     ));
   }
 
+  for (const imported of importSpecifiers(ts, sourceFile)) {
+    const moduleName = imported.value.startsWith("node:")
+      ? imported.value.slice("node:".length)
+      : imported.value;
+    const rootName = moduleName.split("/", 1)[0];
+    if (hostIoModules.has(rootName)) {
+      findings.push(importFinding(
+        sourceFile,
+        imported.node,
+        "VF_BASE_LIB_HOST_IO",
+        `base_lib '${owner.id}' cannot import host IO module '${imported.value}'; use a Capability from a node`,
+      ));
+    }
+  }
+
   function visit(node) {
     if (ts.isIdentifier(node) && identifierIsReference(ts, node)) {
       if (isUnshadowedGlobal(node, targetGlobals)) {
@@ -1738,6 +1650,115 @@ function auditBaseLibHostIo(ts, sourceFile, checker, project, policy, target) {
             reportNondeterminism(member, "Math[computed]");
           }
         }
+      }
+    }
+    visitChildren(ts, node, visit);
+  }
+  visit(sourceFile);
+  return findings;
+}
+
+function auditPluginHostIo(ts, sourceFile, checker, project, policy) {
+  const owner = ownerFor(ts, sourceFile.fileName, policy);
+  if (!owner || owner.kind !== "plugin") return [];
+  const blocked = new Set([
+    "globalThis", "window", "self", "global", "document", "process",
+    "localStorage", "sessionStorage", "navigator", "location", "fetch",
+    "XMLHttpRequest", "WebSocket", "EventSource", "indexedDB", "caches",
+    "Worker", "SharedWorker",
+  ]);
+  const findings = [];
+  function locallyDeclared(node) {
+    const symbol = checker.getSymbolAtLocation(node);
+    return symbolDeclarationNodes(symbol, project).some((declaration) => {
+      const file = declaration.getSourceFile();
+      return !file.isDeclarationFile
+        && normalizedRealPath(ts, file.fileName)
+          === normalizedRealPath(ts, sourceFile.fileName);
+    });
+  }
+  function visit(node) {
+    if (ts.isIdentifier(node)
+        && blocked.has(node.text)
+        && identifierIsReference(ts, node)
+        && !locallyDeclared(node)) {
+      findings.push(importFinding(
+        sourceFile,
+        node,
+        "VF_PLUGIN_HOST_IO",
+        `plugin '${owner.id}' cannot access host primitive '${node.text}'; use a host_extension`,
+      ));
+    }
+    visitChildren(ts, node, visit);
+  }
+  visit(sourceFile);
+  return findings;
+}
+
+function auditUnclassifiedHiddenWork(ts, sourceFile, checker, policy) {
+  const owner = ownerFor(ts, sourceFile.fileName, policy);
+  if (!owner || owner.kind !== "source") return [];
+  const findings = [];
+  function callName(node) {
+    if (!ts.isCallExpression(node)) return "";
+    if (ts.isIdentifier(node.expression)) return node.expression.text;
+    if (ts.isPropertyAccessExpression(node.expression)) {
+      return node.expression.name.text;
+    }
+    return "";
+  }
+  function visit(node) {
+    if (ts.isCallExpression(node)) {
+      const name = callName(node);
+      if (new Set([
+        "addEventListener", "eventOn", "on", "once", "setInterval",
+        "setTimeout",
+      ]).has(name)) {
+        findings.push(importFinding(
+          sourceFile,
+          node,
+          "VF_SOURCE_LISTENER_UNOWNED",
+          `source '${owner.id}' registers a long-lived listener or timer without a host_extension owner`,
+        ));
+      }
+      let returnsPromise = false;
+      try {
+        const type = checker.getTypeAtLocation(node);
+        returnsPromise = promiseLikeType(
+          ts,
+          checker,
+          type,
+          checker.typeToString(type),
+        );
+      } catch {
+        // Syntax-based Promise chain checks remain available below.
+      }
+      const discardedChain = ts.isPropertyAccessExpression(node.expression)
+        && new Set(["then", "catch", "finally"]).has(node.expression.name.text)
+        && ts.isExpressionStatement(node.parent);
+      if ((returnsPromise && ts.isExpressionStatement(node.parent))
+          || discardedChain) {
+        findings.push(importFinding(
+          sourceFile,
+          node,
+          "VF_PROMISE_UNOWNED",
+          `source '${owner.id}' discards Promise work without a workflow or TaskPlan owner`,
+        ));
+      }
+    }
+    if (ts.isVoidExpression(node)) {
+      try {
+        const type = checker.getTypeAtLocation(node.expression);
+        if (promiseLikeType(ts, checker, type, checker.typeToString(type))) {
+          findings.push(importFinding(
+            sourceFile,
+            node,
+            "VF_PROMISE_UNOWNED",
+            `source '${owner.id}' discards Promise work with void`,
+          ));
+        }
+      } catch {
+        // A plain void remains legal when Promise ownership is not provable.
       }
     }
     visitChildren(ts, node, visit);
@@ -1765,156 +1786,12 @@ function identifierIsReference(ts, node) {
   return true;
 }
 
-function auditTargetGlobals(ts, sourceFile, checker, project, target) {
-  const blocked = target === "browser"
-    ? new Set([
-      "process", "Buffer", "global", "require", "module", "__dirname",
-      "__filename",
-    ])
-    : new Set([
-      "document", "window", "self", "localStorage", "sessionStorage",
-      "navigator", "location", "fetch", "XMLHttpRequest", "WebSocket",
-      "EventSource", "indexedDB", "caches", "Worker", "SharedWorker",
-    ]);
-  const hostRoots = new Set(["globalThis", "window", "self", "global"]);
-  const hostAliases = new Set();
-  const findings = [];
-
-  function symbolHasLocalImplementation(symbol) {
-    return symbolDeclarationNodes(symbol, project).some(
-      (declaration) => {
-        const declarationFile = declaration.getSourceFile();
-        return !declarationFile.isDeclarationFile
-          && !declarationFile.fileName.includes(`${path.sep}node_modules${path.sep}`);
-      },
-    );
-  }
-
-  function unshadowedHostRoot(node) {
-    if (!ts.isIdentifier(node) || !hostRoots.has(node.text)) return false;
-    return !symbolHasLocalImplementation(checker.getSymbolAtLocation(node));
-  }
-
-  function propertyName(node) {
-    if (ts.isPropertyAccessExpression(node)) return node.name.text;
-    if (!ts.isElementAccessExpression(node)) return null;
-    const argument = unwrapExpression(ts, node.argumentExpression);
-    return argument && isStringLiteralLike(ts, argument) ? argument.text : null;
-  }
-
-  function isHostObject(node) {
-    const value = unwrapExpression(ts, node);
-    if (!value) return false;
-    if (unshadowedHostRoot(value)) return true;
-    if (ts.isIdentifier(value)) {
-      return hostAliases.has(checker.getSymbolAtLocation(value));
-    }
-    if (ts.isPropertyAccessExpression(value) || ts.isElementAccessExpression(value)) {
-      const name = propertyName(value);
-      return Boolean(name && hostRoots.has(name) && isHostObject(value.expression));
-    }
-    return false;
-  }
-
-  let changed = true;
-  while (changed) {
-    changed = false;
-    function collectAliases(node) {
-      if ((ts.isVariableDeclaration(node)
-          || isKind(ts, node, "isParameter", "isParameterDeclaration", "Parameter"))
-          && ts.isIdentifier(node.name)
-          && node.initializer
-          && isHostObject(node.initializer)) {
-        const symbol = checker.getSymbolAtLocation(node.name);
-        if (symbol && !hostAliases.has(symbol)) {
-          hostAliases.add(symbol);
-          changed = true;
-        }
-      }
-      visitChildren(ts, node, collectAliases);
-    }
-    collectAliases(sourceFile);
-  }
-
-  function report(node, name) {
-    findings.push(importFinding(
-      sourceFile,
-      node,
-      "VF_IMPORT_TARGET_GLOBAL",
-      `${target} target cannot use host global '${name}' without an adapter`,
-    ));
-  }
-
-  function outerRuntimeExpression(node) {
-    let current = node;
-    while (current.parent && unwrapExpression(ts, current.parent) === current) {
-      current = current.parent;
-    }
-    return current;
-  }
-
-  function isStaticMemberBase(node) {
-    const outer = outerRuntimeExpression(node);
-    const parent = outer.parent;
-    if (!parent
-        || (!ts.isPropertyAccessExpression(parent)
-          && !ts.isElementAccessExpression(parent))) return false;
-    return unwrapExpression(ts, parent.expression) === unwrapExpression(ts, outer);
-  }
-
-  function inspectBindingPattern(node, initializer) {
-    if (!ts.isObjectBindingPattern(node) || !isHostObject(initializer)) return;
-    for (const element of node.elements) {
-      if (element.dotDotDotToken) {
-        report(element, "<computed>");
-        continue;
-      }
-      const rawName = element.propertyName || element.name;
-      const name = ts.isIdentifier(rawName) || isStringLiteralLike(ts, rawName)
-        ? rawName.text
-        : null;
-      if (name === null) report(element, "<computed>");
-      else if (blocked.has(name)) report(element, name);
-    }
-  }
-
-  function visit(node) {
-    if (ts.isIdentifier(node)
-        && identifierIsReference(ts, node)
-        && (unshadowedHostRoot(node)
-          || hostAliases.has(checker.getSymbolAtLocation(node)))
-        && !isStaticMemberBase(node)) {
-      report(node, "<host-object-escape>");
-    }
-    if (ts.isIdentifier(node) && blocked.has(node.text) && identifierIsReference(ts, node)) {
-      const symbol = checker.getSymbolAtLocation(node);
-      if (!symbolHasLocalImplementation(symbol)) report(node, node.text);
-    }
-    if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
-        && isHostObject(node.expression)) {
-      const name = propertyName(node);
-      if (name === null) report(node, "<computed>");
-      else if (blocked.has(name)) report(node, name);
-    }
-    if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
-        && isHostObject(node)
-        && !isStaticMemberBase(node)) {
-      report(node, "<host-object-escape>");
-    }
-    if ((ts.isVariableDeclaration(node)
-        || isKind(ts, node, "isParameter", "isParameterDeclaration", "Parameter"))
-        && node.initializer) {
-      inspectBindingPattern(node.name, node.initializer);
-    }
-    visitChildren(ts, node, visit);
-  }
-  visit(sourceFile);
-  return findings;
-}
-
-async function typecheck(ts, request, extraFiles = [], checkDiagnostics = true) {
+async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = true) {
   const files = [...new Set([...(request.typecheckFiles || []), ...extraFiles])]
     .map((item) => path.resolve(item));
+  const contractFiles = new Set(
+    (request.contractCheckFiles || []).map((item) => path.resolve(item)),
+  );
   const findings = [];
   const jsonCompilerOptions = {
     allowJs: true,
@@ -1930,9 +1807,14 @@ async function typecheck(ts, request, extraFiles = [], checkDiagnostics = true) 
     moduleResolution: "Bundler",
     resolveJsonModule: true,
     allowImportingTsExtensions: true,
-    lib: request.target === "browser"
-      ? ["ES2022", "DOM", "DOM.Iterable"]
-      : ["ES2022"],
+    // A target-neutral quality pass needs type facts from both common host
+    // families so ownership checks can prove that browser-only calls such as
+    // fetch() return Promise values.  These libraries are facts for the
+    // VibeFlow ownership analysis only: ordinary TypeScript diagnostics are
+    // still restricted to generated ABI contract files below.
+    lib: request.target === "node"
+      ? ["ES2022"]
+      : ["ES2022", "DOM", "DOM.Iterable"],
   };
   let program;
   let checker;
@@ -1940,10 +1822,18 @@ async function typecheck(ts, request, extraFiles = [], checkDiagnostics = true) 
   let sourceFiles;
   let diagnostics = [];
   let dispose = () => {};
+  let temporaryConfigRoot = null;
   if (ts.__native) {
+    const configDirectory = request.workflowEntry
+      ? path.dirname(request.workflowEntry)
+      : (temporaryConfigRoot = await mkdtemp(
+          path.join(os.tmpdir(), "vibeflow-audit-ts-"),
+        ));
     const configPath = path.join(
-      path.dirname(request.workflowEntry),
-      checkDiagnostics ? "tsconfig.vibeflow.json" : "tsconfig.vibeflow-closure.json",
+      configDirectory,
+      checkDiagnostics
+        ? "tsconfig.vibeflow.json"
+        : "tsconfig.vibeflow-closure.json",
     );
     await writeFile(configPath, JSON.stringify({
       compilerOptions: jsonCompilerOptions,
@@ -1961,20 +1851,24 @@ async function typecheck(ts, request, extraFiles = [], checkDiagnostics = true) 
         .map((fileName) => program.getSourceFile(fileName))
         .filter(Boolean);
       if (checkDiagnostics) {
-        diagnostics = [
-          ...program.getConfigFileParsingDiagnostics(),
-          ...program.getProgramDiagnostics(),
-          ...program.getGlobalDiagnostics(),
-          ...program.getSyntacticDiagnostics(),
-          ...program.getBindDiagnostics(),
-          ...program.getSemanticDiagnostics(),
-        ].map((item) => diagnosticText(ts, item));
+        diagnostics = sourceFiles
+          .filter((item) => contractFiles.has(path.resolve(item.fileName)))
+          .flatMap((item) => [
+            ...program.getSyntacticDiagnostics(item.fileName),
+            ...program.getBindDiagnostics(item.fileName),
+            ...program.getSemanticDiagnostics(item.fileName),
+          ])
+          .map((item) => diagnosticText(ts, item));
       }
     } catch (cause) {
       try {
         snapshot?.dispose();
       } finally {
         api.close();
+        if (temporaryConfigRoot) {
+          await rm(temporaryConfigRoot, { recursive: true, force: true });
+          temporaryConfigRoot = null;
+        }
       }
       throw cause;
     }
@@ -1991,15 +1885,18 @@ async function typecheck(ts, request, extraFiles = [], checkDiagnostics = true) 
       target: ts.ScriptTarget.ES2022,
       module: ts.ModuleKind.ESNext,
       moduleResolution: ts.ModuleResolutionKind.Bundler,
-      lib: request.target === "browser"
-        ? ["lib.es2022.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"]
-        : ["lib.es2022.d.ts"],
+      lib: request.target === "node"
+        ? ["lib.es2022.d.ts"]
+        : ["lib.es2022.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"],
     };
     program = ts.createProgram({ rootNames: files, options: compilerOptions });
     checker = program.getTypeChecker();
     sourceFiles = program.getSourceFiles();
     diagnostics = checkDiagnostics
-      ? ts.getPreEmitDiagnostics(program).map((item) => diagnosticText(ts, item))
+      ? sourceFiles
+        .filter((item) => contractFiles.has(path.resolve(item.fileName)))
+        .flatMap((item) => ts.getPreEmitDiagnostics(program, item))
+        .map((item) => diagnosticText(ts, item))
       : [];
   }
   const policy = normalizeImportPolicy(
@@ -2019,12 +1916,7 @@ async function typecheck(ts, request, extraFiles = [], checkDiagnostics = true) 
       if (sourceFile.isDeclarationFile) continue;
       const owned = ownerFor(ts, sourceFile.fileName, policy);
       if (!owned && !rootFiles.has(path.resolve(sourceFile.fileName))) continue;
-      findings.push(...auditParsedSource(
-        ts,
-        sourceFile,
-        request.target,
-        request.profile,
-      ));
+      findings.push(...auditParsedSource(ts, sourceFile, request.profile));
       findings.push(...auditImportOwnership(ts, sourceFile, checker, project, policy));
       findings.push(...auditTopLevelPurity(ts, sourceFile, policy));
       findings.push(...auditCompletionAndPromiseOwnership(
@@ -2041,17 +1933,25 @@ async function typecheck(ts, request, extraFiles = [], checkDiagnostics = true) 
         project,
         policy,
       ));
-      const sourceOwner = ownerFor(ts, sourceFile.fileName, policy);
-      if (sourceOwner?.kind !== "host_extension") {
-        findings.push(...auditTargetGlobals(ts, sourceFile, checker, project, request.target));
-      }
       findings.push(...auditBaseLibHostIo(
         ts,
         sourceFile,
         checker,
         project,
         policy,
-        request.target,
+      ));
+      findings.push(...auditPluginHostIo(
+        ts,
+        sourceFile,
+        checker,
+        project,
+        policy,
+      ));
+      findings.push(...auditUnclassifiedHiddenWork(
+        ts,
+        sourceFile,
+        checker,
+        policy,
       ));
     }
     if (findings.length) {
@@ -2074,11 +1974,22 @@ async function typecheck(ts, request, extraFiles = [], checkDiagnostics = true) 
         diagnostics: diagnosticsWithOwners,
       });
     }
-    if (diagnostics.length) {
-      fail("VF_TYPESCRIPT", "TypeScript validation failed", { diagnostics });
+    const contractDiagnostics = diagnostics.filter(
+      (item) => item.file && contractFiles.has(path.resolve(item.file)),
+    );
+    if (contractDiagnostics.length) {
+      fail("VF_TYPESCRIPT", "VibeFlow TypeScript ABI validation failed", {
+        diagnostics: contractDiagnostics,
+      });
     }
   } finally {
-    dispose();
+    try {
+      dispose();
+    } finally {
+      if (temporaryConfigRoot) {
+        await rm(temporaryConfigRoot, { recursive: true, force: true });
+      }
+    }
   }
 }
 
@@ -2108,8 +2019,24 @@ function workflowVirtualPlugin(workflowEntry) {
   };
 }
 
+function esbuildDiagnostics(cause) {
+  const messages = Array.isArray(cause?.errors) ? cause.errors : [];
+  return messages.map((item) => {
+    const location = item?.location || {};
+    return {
+      code: "ESBUILD",
+      message: String(item?.text || cause?.message || "esbuild failed"),
+      ...(location.file ? { file: path.resolve(location.file) } : {}),
+      ...(Number.isInteger(location.line) ? { line: location.line } : {}),
+      ...(Number.isInteger(location.column)
+        ? { column: location.column + 1 }
+        : {}),
+    };
+  });
+}
+
 async function build(request, tools) {
-  await typecheck(tools.typescript, request);
+  await auditContracts(tools.typescript, request);
   const profile = request.profile;
   const common = {
     absWorkingDir: path.resolve(request.packageRoot),
@@ -2129,38 +2056,47 @@ async function build(request, tools) {
     plugins: [workflowVirtualPlugin(request.workflowEntry)],
   };
   let result;
-  if (profile === "esm-module") {
-    const entryKey = request.entryName.replace(/\.js$/i, "");
-    result = await tools.esbuild.build({
-      ...common,
-      entryPoints: { [entryKey]: VIRTUAL_WORKFLOW_SPECIFIER },
-      outdir: request.outDir,
-      entryNames: "[name]",
-      chunkNames: "chunks/[name]-[hash]",
-      splitting: true,
+  try {
+    if (profile === "esm-module") {
+      const entryKey = request.entryName.replace(/\.js$/i, "");
+      result = await tools.esbuild.build({
+        ...common,
+        entryPoints: { [entryKey]: VIRTUAL_WORKFLOW_SPECIFIER },
+        outdir: request.outDir,
+        entryNames: "[name]",
+        chunkNames: "chunks/[name]-[hash]",
+        splitting: true,
+      });
+    } else if (profile === "single-esm") {
+      result = await tools.esbuild.build({
+        ...common,
+        entryPoints: [VIRTUAL_WORKFLOW_SPECIFIER],
+        outfile: path.join(request.outDir, request.entryName),
+        splitting: false,
+      });
+    } else if (profile === "web-app") {
+      result = await tools.esbuild.build({
+        ...common,
+        entryPoints: [request.appEntry],
+        outfile: path.join(request.outDir, request.entryName),
+        splitting: false,
+      });
+    } else {
+      fail("VF_BUILD_PROFILE", `unsupported build profile '${profile}'`);
+    }
+  } catch (cause) {
+    if (typeof cause?.code === "string" && cause.code.startsWith("VF_")) {
+      throw cause;
+    }
+    fail("VF_ESBUILD", "esbuild could not produce the selected target", {
+      diagnostics: esbuildDiagnostics(cause),
     });
-  } else if (profile === "single-esm") {
-    result = await tools.esbuild.build({
-      ...common,
-      entryPoints: [VIRTUAL_WORKFLOW_SPECIFIER],
-      outfile: path.join(request.outDir, request.entryName),
-      splitting: false,
-    });
-  } else if (profile === "web-app") {
-    result = await tools.esbuild.build({
-      ...common,
-      entryPoints: [request.appEntry],
-      outfile: path.join(request.outDir, request.entryName),
-      splitting: false,
-    });
-  } else {
-    fail("VF_BUILD_PROFILE", `unsupported build profile '${profile}'`);
   }
   const closureFiles = Object.keys(result.metafile?.inputs || {})
     .map((item) => path.isAbsolute(item) ? item : path.resolve(request.packageRoot, item))
     .filter((item) => !item.startsWith("<")
       && !item.includes(`${path.sep}${VIRTUAL_WORKFLOW_NAMESPACE}:`));
-  await typecheck(tools.typescript, request, closureFiles, false);
+  await auditContracts(tools.typescript, request, closureFiles, false);
   return {
     outputs: Object.keys(result.metafile?.outputs || {}).sort(),
     inputs: Object.keys(result.metafile?.inputs || {}).sort(),
@@ -2174,15 +2110,23 @@ async function main() {
   const requestPath = path.resolve(process.argv[2]);
   const request = JSON.parse(await readFile(requestPath, "utf8"));
   const packageRoot = path.resolve(request.packageRoot);
-  const tools = await packageTools(packageRoot);
+  const tools = await packageTools(packageRoot, {
+    requireEsbuild: request.command !== "audit",
+  });
   const probe = {
     node: process.versions.node,
     typescript: String(tools.typescript.version || ""),
-    esbuild: String(tools.esbuild.version || ""),
+    ...(tools.esbuild
+      ? { esbuild: String(tools.esbuild.version || "") }
+      : {}),
   };
   if (request.command === "probe") return { ok: true, probe };
   if (request.command === "build") {
     return { ok: true, probe, build: await build(request, tools) };
+  }
+  if (request.command === "audit") {
+    await auditContracts(tools.typescript, request, [], false);
+    return { ok: true, probe, audit: { checked: true } };
   }
   fail("VF_PROTOCOL", `unknown driver command '${String(request.command)}'`);
 }

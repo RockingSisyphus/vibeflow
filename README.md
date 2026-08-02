@@ -72,6 +72,7 @@ VibeFlow 面向发布包使用。
 AGENTS.md         # 给 AI 的项目规则，可按项目定制
 README.md        # 项目说明，可按项目定制
 run.py            # 项目入口
+DISTRIBUTION.json # 版本、两个 root 与内核 hash
 kernel/
   vibeflow-kernel.zip
   MANIFEST.sha256
@@ -80,13 +81,24 @@ kernel/
   tools/
     mermaid-renderer/
   THIRD_PARTY_NOTICES.md
-project/
+python_project/
   ARCHITECTURE.jsonc # 由真实 source 生成的单文件架构审查视图
   nodes/          # 业务 node
   base_lib/       # 纯函数 helper
   plugins/        # 可选策略和运行插件
   configs/        # JSONC 流程配置
   registry.py     # 注册 node/base_lib/plugin 可用资源
+javascript_project/
+  ARCHITECTURE.jsonc
+  configs/
+  nodes/
+  base_lib/
+  plugins/
+  host_extensions/
+  manifests/
+  web/
+  package.json
+  package-lock.json
 runs/
 reports/
 ```
@@ -94,21 +106,20 @@ reports/
 常用命令形态：
 
 ```bash
-python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc
-python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc --check
-python run.py review --config project/configs/main.jsonc --output reports/graph.expanded.svg
-python run.py validate --config project/configs/main.jsonc
-python run.py run --config project/configs/main.jsonc --run-root runs
-python run.py build --workspace vibeflow_config.jsonc --config project/configs/<js-workflow>.jsonc --target browser --profile esm-module --out-dir dist
-python run.py delegate-cli --config project/configs/main.jsonc -- --input data.yaml --verbose
-python run.py mermaid --config project/configs/main.jsonc --output reports/graph.mmd
-python run.py ascii --config project/configs/main.jsonc --output reports/graph.txt
-python run.py svg --config project/configs/main.jsonc --output reports/graph.svg
-python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg
-python run.py quality --path project
+python run.py architecture --config python_project/configs/main.jsonc --output python_project/ARCHITECTURE.jsonc
+python run.py review --config python_project/configs/main.jsonc --output reports/graph.expanded.svg
+python run.py validate --config python_project/configs/main.jsonc
+python run.py run --config python_project/configs/main.jsonc --run-root runs
+python run.py delegate-cli --config python_project/configs/main.jsonc -- --input data.yaml --verbose
+python run.py review --config javascript_project/configs/linear.jsonc --output reports/javascript.svg
+python run.py build --config javascript_project/configs/linear.jsonc --target node --profile single-esm --out-dir output/node
+python run.py build --config javascript_project/configs/linear.jsonc --target browser --profile web-app --html javascript_project/web/index.template.html --app-entry javascript_project/web/app.ts --out-dir output/web
+python run.py quality --path python_project
 ```
 
-每个 root 可以在 `vibeflow_project.jsonc` 的 `architecture.documents` 中登记 workflow 与架构文档。生成文件用固定注释明确标记为 generated、non-executable，不用可手改的状态属性伪装；AI 应优先读文档理解项目架构。要改变架构，应修改真实 workflow config 或相关 nodeset，必要时再修改 registry metadata/config schema，然后重新生成；不要手工编辑架构文档。已登记文档缺失、陈旧或被手工改写时，`validate` / `run` 会拒绝继续并给出源文件位置与修复命令。
+每个 root 的 `vibeflow_project.jsonc` 必须用 `project_target: "python" | "javascript"` 选择一种语言后端。一个 workspace 可以同时放多个 root，但单次 workflow 不混用两个 Target。Browser/Node 不是 workflow 声明；JavaScript 用户在每次 `build --target` 时选择所需产物。
+
+每个 root 可以在 `architecture.documents` 中登记 workflow 与架构文档。生成文件用固定注释明确标记为 generated、non-executable，不用可手改的状态属性伪装；AI 应优先读文档理解项目架构。要改变架构，应修改真实 workflow config 或相关 nodeset，必要时再修改 registry metadata/config schema，然后重新生成；不要手工编辑架构文档。已登记文档缺失、陈旧或被手工改写时，`validate` / `run` 会拒绝继续并给出源文件位置与修复命令。
 
 `review` 是正式架构审核入口：它检查登记关系和现有图、更新并复核 canonical `ARCHITECTURE.jsonc`、执行 workspace validate，再生成并检查 expanded `review-columns` SVG。任一步失败都不会用旧 SVG、手写图或直接调用 mmdc 补位，也不会把失败产物发布到目标路径。`PASS` 或 `CONCERNS` 只表示机器审核完成；如果任务约定“审核后再实现”，仍需等待人类在后续消息中明确批准。
 
@@ -224,7 +235,6 @@ VibeFlow 会在运行前检查：
 - `docs/developer_guide.md`：使用者开发指南。
 - [JavaScript/TypeScript 节点与 Web AOT 构建指南](docs/js_aot_build.md)。
 - `docs/kernel_development_guide.md`：VibeFlow 自身维护指南。
-- `docs/strict_flowchart_kernel_redesign.md`、`docs/11_*.md`、`docs/12_*.md`、`docs/13_*.md`：历史设计记录和阶段计划，不作为当前公开接口规范。
 - `distribution/kernel_development_pack/`：发布包模板。
 
 ## 许可证 📄

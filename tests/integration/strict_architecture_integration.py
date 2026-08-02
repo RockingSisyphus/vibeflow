@@ -35,6 +35,7 @@ def _write_architecture_workspace(
         encoding="utf-8",
     )
     project_config: dict[str, object] = {
+        "project_target": "python",
         "registry": "registry.py:build_node_registry",
         "quality_enabled": False,
     }
@@ -139,6 +140,7 @@ def test_architecture_cli_stdout_contains_canonical_document(tmp_path, capsys) -
     assert code == 0
     assert output.startswith(ARCHITECTURE_DOCUMENT_HEADER + "{")
     assert list(json.loads(output.removeprefix(ARCHITECTURE_DOCUMENT_HEADER))) == [
+        "project_target",
         "workflow",
         "nodesets",
         "node_types",
@@ -449,6 +451,7 @@ def test_workspace_run_writes_canonical_architecture_artifact(tmp_path) -> None:
     assert artifact.startswith(ARCHITECTURE_DOCUMENT_HEADER + "{")
     assert artifact == document_path.read_text(encoding="utf-8")
     assert list(load_raw_config_document(artifact_path).data) == [
+        "project_target",
         "workflow",
         "nodesets",
         "node_types",

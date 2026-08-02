@@ -69,7 +69,7 @@ def _provider_specs(values: list[str] | None) -> list[dict[str, str]]:
 
 
 def cli_main(args):
-    from vibeflow.tooling.application.cli import main
+    from vibeflow.tooling.application.python.cli import main
 
     return main(args)
 

@@ -18,6 +18,7 @@ _MANIFEST_KEYS = frozenset(
     {
         "format",
         "abi_version",
+        "project_target",
         "workflow_id",
         "entry_mode",
         "target",
@@ -93,6 +94,8 @@ def validate_owned_build_directory(
             "refusing to replace a directory not owned by this VibeFlow AOT format",
         )
     _require_text(manifest, "abi_version")
+    if manifest.get("project_target") != "javascript":
+        _invalid_manifest("project_target must be 'javascript'")
     _require_text(manifest, "workflow_id")
     if "plugin_abi_version" in manifest:
         if manifest.get("plugin_abi_version") != "vibeflow.plugin.v1":

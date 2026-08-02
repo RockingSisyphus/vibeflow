@@ -10,6 +10,10 @@ from typing import Any, Mapping
 from vibeflow.tooling.project.document_kinds import (
     is_architecture_document_text,
 )
+from vibeflow.tooling.project.workspace_model import (
+    PROJECT_CONFIG_NAME,
+    PROJECT_TARGETS,
+)
 
 @dataclass(frozen=True)
 class ConfigDocument:
@@ -39,6 +43,13 @@ class ConfigLoadError(ValueError):
                 self.source_location,
             ),
         )
+
+
+@dataclass(frozen=True)
+class _ProjectTargetLocation:
+    target: str
+    root_path: Path
+    config_path: Path
 
 
 def load_config_document(path: Path) -> ConfigDocument:
@@ -181,6 +192,13 @@ def _expand_nodeset_imports(
     import_records: list[Mapping[str, Any]] = []
     for index, item in enumerate(imports):
         import_path, import_root = _parse_nodeset_import(item, path=path, index=index, workspace=workspace)
+        _validate_nodeset_import_target(
+            source_path=path,
+            import_path=import_path,
+            import_root=import_root,
+            workspace=workspace,
+            index=index,
+        )
         document = _load_config_document(import_path, import_stack=import_stack, cache=cache, workspace=workspace, expand_nodeset_imports=True)
         selected = _nodeset_definitions_from_document(document.data, import_path)
         selected = _nodesets_with_source(selected, path=import_path, root=import_root)
@@ -247,6 +265,140 @@ def _workspace_root_for_path(workspace: object | None, path: Path) -> object | N
     if not callable(method):
         return None
     return method(path)
+
+
+def _validate_nodeset_import_target(
+    *,
+    source_path: Path,
+    import_path: Path,
+    import_root: object | None,
+    workspace: object | None,
+    index: int,
+) -> None:
+    source_root = _workspace_root_for_path(workspace, source_path)
+    actual_import_root = _workspace_root_for_path(workspace, import_path)
+    source_location = _nearest_project_target(source_path)
+    imported_location = _nearest_project_target(import_path)
+    source_target = str(getattr(source_root, "project_target", "")) or (
+        source_location.target if source_location is not None else ""
+    )
+    imported_owner_root = actual_import_root if workspace is not None else import_root
+    imported_target = str(
+        getattr(imported_owner_root, "project_target", "")
+    ) or (imported_location.target if imported_location is not None else "")
+
+    # A workspace import which resolves outside every declared root must not
+    # become a target-isolation escape hatch.  Use the imported project's own
+    # metadata when it exists; otherwise reject the unowned import because its
+    # Target cannot be established.
+    if workspace is not None and actual_import_root is None:
+        if imported_location is None:
+            raise ConfigLoadError(
+                rule_id="WORKSPACE.NODESET.OUTSIDE_ROOT",
+                message=(
+                    f"nodeset_imports[{index}] is outside every workspace root "
+                    "and has no owning project_target"
+                ),
+                failure_layer="workspace",
+                source_location={
+                    "path": str(source_path),
+                    "field": f"nodeset_imports[{index}]",
+                    "import_path": str(import_path),
+                },
+            )
+    if not source_target or not imported_target or source_target == imported_target:
+        return
+
+    source_root_id = str(getattr(source_root, "id", ""))
+    imported_root_id = str(getattr(imported_owner_root, "id", ""))
+    source_owner = (
+        f"root {source_root_id!r}"
+        if source_root_id
+        else f"project {str(source_location.root_path)!r}"
+        if source_location is not None
+        else "project"
+    )
+    imported_owner = (
+        f"root {imported_root_id!r}"
+        if imported_root_id
+        else f"project {str(imported_location.root_path)!r}"
+        if imported_location is not None
+        else "project"
+    )
+    raise ConfigLoadError(
+        rule_id="WORKSPACE.NODESET.TARGET_MISMATCH",
+        message=(
+            f"nodeset_imports[{index}] crosses project targets: "
+            f"{source_target!r} {source_owner} cannot import "
+            f"{imported_target!r} {imported_owner}"
+        ),
+        failure_layer="workspace",
+        source_location={
+            "path": str(source_path),
+            "field": f"nodeset_imports[{index}]",
+            "source_root_id": source_root_id,
+            "source_target": source_target,
+            "import_root_id": imported_root_id,
+            "import_target": imported_target,
+            "import_path": str(import_path),
+            **(
+                {"source_project_config": str(source_location.config_path)}
+                if source_location is not None
+                else {}
+            ),
+            **(
+                {"import_project_config": str(imported_location.config_path)}
+                if imported_location is not None
+                else {}
+            ),
+        },
+    )
+
+
+def _nearest_project_target(path: Path) -> _ProjectTargetLocation | None:
+    """Read the nearest project Target without requiring a workspace model."""
+
+    resolved = path.resolve()
+    start = resolved if resolved.is_dir() else resolved.parent
+    for directory in (start, *start.parents):
+        config_path = directory / PROJECT_CONFIG_NAME
+        if not config_path.is_file():
+            continue
+        document = load_raw_config_document(config_path)
+        value = document.data.get("project_target")
+        if value is None:
+            raise ConfigLoadError(
+                rule_id="WORKSPACE.PROJECT_TARGET.MISSING",
+                message=(
+                    "project config requires project_target: "
+                    "'python' or 'javascript'"
+                ),
+                failure_layer="workspace",
+                source_location={
+                    "path": str(config_path),
+                    "field": "project_target",
+                },
+            )
+        if not isinstance(value, str) or value not in PROJECT_TARGETS:
+            raise ConfigLoadError(
+                rule_id="WORKSPACE.PROJECT_TARGET.INVALID",
+                message=(
+                    "project config project_target must be exactly "
+                    "'python' or 'javascript'"
+                ),
+                failure_layer="workspace",
+                source_location={
+                    "path": str(config_path),
+                    "field": "project_target",
+                    "value": value,
+                },
+            )
+        return _ProjectTargetLocation(
+            target=value,
+            root_path=directory,
+            config_path=config_path,
+        )
+    return None
 
 
 def _root_record(root: object) -> dict[str, object]:

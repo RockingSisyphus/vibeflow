@@ -2,8 +2,12 @@
   "policy": {},
   "roots": [
     {
-      "id": "project",
-      "path": "project"
+      "id": "python-project",
+      "path": "python_project"
+    },
+    {
+      "id": "javascript-project",
+      "path": "javascript_project"
     }
   ]
 }

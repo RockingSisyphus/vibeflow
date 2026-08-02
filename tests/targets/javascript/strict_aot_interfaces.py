@@ -144,6 +144,7 @@ def test_workspace_project_config_accepts_descriptor_and_javascript_sections(tmp
     (project / "vibeflow_project.jsonc").write_text(
         json.dumps(
             {
+                "project_target": "javascript",
                 "descriptors": {
                     "nodes": ["manifests/nodes"],
                     "base_lib": ["manifests/base_lib"],
@@ -172,7 +173,12 @@ def test_workspace_project_config_rejects_invalid_javascript_shape(tmp_path) -> 
     project = tmp_path / "project"
     project.mkdir()
     (project / "vibeflow_project.jsonc").write_text(
-        json.dumps({"javascript": {"package_root": ".", "external_packages": "bad"}}),
+        json.dumps(
+            {
+                "project_target": "javascript",
+                "javascript": {"package_root": ".", "external_packages": "bad"},
+            }
+        ),
         encoding="utf-8",
     )
     workspace_path = tmp_path / "vibeflow_config.jsonc"

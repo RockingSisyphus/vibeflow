@@ -1,5 +1,7 @@
 from tests.fixtures.support.strict_support import *
 
+from importlib import resources
+
 from vibeflow.tooling.application.python.workspace_service import (
     load_workspace_graph_for_export,
     run_workspace_checked,
@@ -13,6 +15,36 @@ from vibeflow.tooling.application.python.project.core import (
 from vibeflow.tooling.application.python.project.project_options import _workspace_runtime_options
 from vibeflow.tooling.application.python.project.quality import scan_workspace_code_quality
 from vibeflow.tooling.application.python.project.types import ArchitectureDocumentSpec, WorkspaceConfigError
+from vibeflow.tooling.project.config_loader import load_workspace_config_document
+
+
+def test_published_config_schema_matches_cross_root_and_host_extension_syntax() -> None:
+    schema = json.loads(
+        resources.files("vibeflow")
+        .joinpath("tooling/project/schema/config.schema.json")
+        .read_text(encoding="utf-8")
+    )
+    properties = schema["properties"]
+    import_object = properties["nodeset_imports"]["items"]["anyOf"][1]
+
+    assert import_object["required"] == ["path"]
+    assert import_object["properties"]["root"] == {
+        "type": "string",
+        "minLength": 1,
+    }
+    host_object = properties["host_extensions"]["items"]["anyOf"][1]
+    assert host_object["properties"]["status"]["enum"] == [
+        "planned",
+        "implemented",
+    ]
+    assert {
+        "id",
+        "enabled",
+        "config",
+        "targets",
+        "provides",
+        "dependencies",
+    } <= set(host_object["properties"])
 
 
 def test_workspace_cross_root_nodeset_validate_run_and_export(tmp_path) -> None:
@@ -108,11 +140,175 @@ def test_workspace_rejects_duplicate_root_ids_and_unknown_top_level_fields(tmp_p
     assert unknown.value.rule_id == "WORKSPACE.UNKNOWN_FIELD"
 
 
+def test_workspace_requires_an_explicit_valid_project_target(tmp_path) -> None:
+    workspace_path, project_root, _ = _workspace_fixture(
+        tmp_path,
+        write_workspace=False,
+    )
+    project_config = project_root / "vibeflow_project.jsonc"
+    workspace_path.write_text(
+        json.dumps({"roots": [{"id": "project", "path": "project"}]}),
+        encoding="utf-8",
+    )
+
+    project_config.write_text("{}", encoding="utf-8")
+    with pytest.raises(WorkspaceConfigError) as missing:
+        load_workspace_config(workspace_path)
+    assert missing.value.rule_id == "WORKSPACE.PROJECT_TARGET.MISSING"
+    assert missing.value.source_location["field"] == "project_target"
+
+    for value in (None, "", "typescript", "Python", 1):
+        project_config.write_text(
+            json.dumps({"project_target": value}),
+            encoding="utf-8",
+        )
+        with pytest.raises(WorkspaceConfigError) as invalid:
+            load_workspace_config(workspace_path)
+        assert invalid.value.rule_id == "WORKSPACE.PROJECT_TARGET.INVALID"
+        assert invalid.value.source_location["value"] == value
+
+
+@pytest.mark.parametrize(
+    ("payload", "fields"),
+    [
+        (
+            {
+                "project_target": "python",
+                "registry": "registry.py:build_node_registry",
+                "javascript": {"package_root": "."},
+            },
+            ["javascript"],
+        ),
+        (
+            {
+                "project_target": "python",
+                "registry": "registry.py:build_node_registry",
+                "descriptors": {
+                    "host_extensions": ["manifests/host_extensions"]
+                },
+            },
+            ["descriptors.host_extensions"],
+        ),
+        (
+            {
+                "project_target": "javascript",
+                "registry": "registry.py:build_node_registry",
+                "runtime": {},
+                "base_lib": {},
+                "plugins": [],
+            },
+            ["base_lib", "plugins", "registry", "runtime"],
+        ),
+    ],
+)
+def test_workspace_rejects_project_target_field_conflicts(
+    tmp_path,
+    payload,
+    fields,
+) -> None:
+    workspace_path, project_root, _ = _workspace_fixture(
+        tmp_path,
+        write_workspace=False,
+    )
+    (project_root / "vibeflow_project.jsonc").write_text(
+        json.dumps(payload),
+        encoding="utf-8",
+    )
+    workspace_path.write_text(
+        json.dumps({"roots": [{"id": "project", "path": "project"}]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(WorkspaceConfigError) as conflict:
+        load_workspace_config(workspace_path)
+
+    assert conflict.value.rule_id == "WORKSPACE.PROJECT_TARGET.FIELD_CONFLICT"
+    assert conflict.value.source_location["fields"] == fields
+
+
+def test_workspace_root_exposes_project_target_and_rejects_cross_target_nodeset(
+    tmp_path,
+) -> None:
+    workspace_path, python_root, javascript_root = _workspace_fixture(
+        tmp_path,
+        write_workspace=False,
+    )
+    _write_project_config(python_root)
+    (javascript_root / "vibeflow_project.jsonc").write_text(
+        json.dumps(
+            {
+                "project_target": "javascript",
+                "descriptors": {},
+                "javascript": {"package_root": "."},
+            }
+        ),
+        encoding="utf-8",
+    )
+    nodeset_path = javascript_root / "foreign.jsonc"
+    nodeset_path.write_text(
+        json.dumps(
+            {
+                "type_key": "foreign.group",
+                "display_name": "Foreign Group",
+                "description": "Belongs to another Target.",
+                "requires": [],
+                "provides": [],
+                "pipeline": {
+                    "nodes": [
+                        _node_call("start", "foreign.start", "Starts foreign flow.")
+                    ]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    workflow_path = python_root / "main.jsonc"
+    workflow_path.write_text(
+        json.dumps(
+            {
+                "nodeset_imports": [
+                    {"root": "framework", "path": "foreign.jsonc"}
+                ],
+                "pipeline": {
+                    "nodes": [_node_call("start", "test.start", "Starts flow.")]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    workspace_path.write_text(
+        json.dumps(
+            {
+                "roots": [
+                    {"id": "project", "path": "project"},
+                    {"id": "framework", "path": "framework"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    workspace = load_workspace_config(workspace_path)
+
+    assert workspace.root_by_id("project").project_target == "python"
+    assert workspace.root_by_id("framework").project_target == "javascript"
+    with pytest.raises(ConfigLoadError) as mismatch:
+        load_workspace_config_document(workflow_path, workspace=workspace)
+    assert mismatch.value.rule_id == "WORKSPACE.NODESET.TARGET_MISMATCH"
+    assert mismatch.value.source_location["source_target"] == "python"
+    assert mismatch.value.source_location["import_target"] == "javascript"
+
+
 def test_workspace_project_config_override_and_missing_project_config(tmp_path) -> None:
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path, write_workspace=False)
     _write_project_config(framework_root)
     (project_root / "custom_project_config.jsonc").write_text(
-        json.dumps({"registry": "registry.py:build_node_registry", "quality_enabled": False}),
+        json.dumps(
+            {
+                "project_target": "python",
+                "registry": "registry.py:build_node_registry",
+                "quality_enabled": False,
+            }
+        ),
         encoding="utf-8",
     )
     workspace_path.write_text(
@@ -451,6 +647,7 @@ def test_workspace_project_quality_structure_config_validation(tmp_path) -> None
     (project_root / "vibeflow_project.jsonc").write_text(
         json.dumps(
             {
+                "project_target": "python",
                 "registry": "registry.py:build_node_registry",
                 "quality_enabled": True,
                 "quality": {"structure": {"warn_code_files_per_dir": 2, "max_code_files_per_dir": 3}},
@@ -471,6 +668,7 @@ def test_workspace_project_quality_structure_config_validation(tmp_path) -> None
     (project_root / "vibeflow_project.jsonc").write_text(
         json.dumps(
             {
+                "project_target": "python",
                 "registry": "registry.py:build_node_registry",
                 "quality": {"structure": {"warn_code_files_per_dir": 5, "max_code_files_per_dir": 3}},
             }
@@ -502,7 +700,13 @@ def test_workspace_registry_import_and_factory_errors_are_explicit(tmp_path) -> 
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path, write_workspace=False)
     _write_project_config(framework_root)
     (project_root / "vibeflow_project.jsonc").write_text(
-        json.dumps({"registry": "missing_registry.py:build_node_registry", "quality_enabled": True}),
+        json.dumps(
+            {
+                "project_target": "python",
+                "registry": "missing_registry.py:build_node_registry",
+                "quality_enabled": True,
+            }
+        ),
         encoding="utf-8",
     )
     workspace_path.write_text(json.dumps({"roots": [{"id": "project", "path": "project"}]}), encoding="utf-8")
@@ -513,7 +717,13 @@ def test_workspace_registry_import_and_factory_errors_are_explicit(tmp_path) -> 
 
     (project_root / "registry.py").write_text("def not_registry():\n    return None\n", encoding="utf-8")
     (project_root / "vibeflow_project.jsonc").write_text(
-        json.dumps({"registry": "registry.py:build_node_registry", "quality_enabled": True}),
+        json.dumps(
+            {
+                "project_target": "python",
+                "registry": "registry.py:build_node_registry",
+                "quality_enabled": True,
+            }
+        ),
         encoding="utf-8",
     )
     with pytest.raises(WorkspaceConfigError) as missing_factory:
@@ -588,6 +798,7 @@ def test_workspace_quality_role_imports_use_declared_base_lib_paths_and_modules(
     (project_root / "vibeflow_project.jsonc").write_text(
         json.dumps(
             {
+                "project_target": "python",
                 "registry": "registry.py:build_node_registry",
                 "quality_enabled": True,
                 "base_lib": {
@@ -683,7 +894,7 @@ class Plugin:
     assert "base_lib.math_tools" in report.effective_policy["base_lib"]["allowed_modules"]
 
 
-def test_workspace_review_uses_legacy_project_host_extension_selection_until_workflow_overrides(
+def test_python_workspace_rejects_javascript_host_extension_fields(
     tmp_path,
 ) -> None:
     from vibeflow.tooling.application.python.presentation.architecture_document import (
@@ -780,66 +991,15 @@ def test_workspace_review_uses_legacy_project_host_extension_selection_until_wor
         encoding="utf-8",
     )
 
-    workspace = load_workspace_config(workspace_path)
-    report = validate_workspace_config_path(
-        config_path,
-        workspace=workspace,
-    )
+    with pytest.raises(WorkspaceConfigError) as invalid:
+        load_workspace_config(workspace_path)
 
-    assert report.status == "CONCERNS"
-    assert [
-        item["id"]
-        for item in report.info["effective_resources"]["host_extensions"]
-    ] == ["demo.legacy_host"]
-    legacy_warning = next(
-        finding
-        for finding in report.warnings
-        if finding.rule_id
-        == "CONFIG.SMELL.LEGACY_HOST_EXTENSION_SELECTION"
-    )
-    assert legacy_warning.source_path == str(project_config_path)
-
-    graph, compiled, registry, resources, error = (
-        load_workspace_graph_for_export(
-            config_path,
-            workspace=workspace,
-        )
-    )
-    assert error is None
-    architecture = build_architecture_document(
-        graph,
-        compiled=compiled,
-        registry=registry,
-        resources=resources,
-    )
-    assert architecture["resources"]["host_extensions"][0]["id"] == (
-        "demo.legacy_host"
-    )
-    mermaid = export_mermaid(
-        graph,
-        compiled=compiled,
-        registry=registry,
-        resources=resources,
-    )
-    assert "Legacy Browser Host" in mermaid
-
-    workflow = json.loads(config_path.read_text(encoding="utf-8"))
-    workflow["host_extensions"] = []
-    config_path.write_text(json.dumps(workflow), encoding="utf-8")
-
-    overridden_report = validate_workspace_config_path(
-        config_path,
-        workspace=workspace,
-    )
-    assert (
-        overridden_report.info["effective_resources"]["host_extensions"]
-        == []
-    )
-    assert not any(
-        finding.rule_id
-        == "CONFIG.SMELL.LEGACY_HOST_EXTENSION_SELECTION"
-        for finding in overridden_report.warnings
-    )
+    assert invalid.value.rule_id == "WORKSPACE.PROJECT_TARGET.FIELD_CONFLICT"
+    assert invalid.value.source_location["project_target"] == "python"
+    assert invalid.value.source_location["fields"] == [
+        "descriptors.host_extensions",
+        "javascript",
+    ]
 
 
 def test_workspace_mermaid_hides_resources_from_unused_roots(tmp_path) -> None:
@@ -1108,6 +1268,7 @@ def _workspace_fixture(tmp_path: Path, *, write_workspace: bool = True) -> tuple
 def _write_project_config(root: Path, *, quality_enabled: bool = True, runtime: dict[str, object] | None = None) -> None:
     root.mkdir(parents=True, exist_ok=True)
     payload = {
+        "project_target": "python",
         "registry": "registry.py:build_node_registry",
         "quality_enabled": quality_enabled,
         "base_lib": {"paths": [], "modules": []},

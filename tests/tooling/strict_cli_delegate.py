@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from vibeflow.tooling.application.cli import main
+from vibeflow.tooling.application.python.cli import main
 from vibeflow.tooling.application.python.cli.delegate_cli import extract_delegate_cli_exit_code, validate_delegate_cli_graph_contract
 from vibeflow.core.contracts import DataEnvelope, DataProvider, DataRequirement, RunResult
 from vibeflow.core import HealthReport

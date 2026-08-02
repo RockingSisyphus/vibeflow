@@ -10,6 +10,7 @@ from typing import Any, Mapping
 from vibeflow.block_compiler.model import WorkflowPlan
 from vibeflow.targets.javascript.frontend.build_contracts import (
     node_contract_check as _node_contract_check,
+    runtime_plugin_contract_check as _runtime_plugin_contract_check,
     validate_schema_subset as _validate_schema_subset,
 )
 from vibeflow.targets.javascript.build.build_support import (
@@ -173,6 +174,15 @@ def build_aot(request: BuildRequest) -> BuildResult:
         _node_contract_check(workflow, implementations),
         encoding="utf-8",
     )
+    plugin_contract_check: Path | None = None
+    if request.javascript_bindings is not None and (
+        request.javascript_bindings.runtime_plugins
+    ):
+        plugin_contract_check = source_dir / "runtime-plugin-contract-check.ts"
+        plugin_contract_check.write_text(
+            _runtime_plugin_contract_check(request.javascript_bindings),
+            encoding="utf-8",
+        )
     ambient_module: Path | None = None
     if profile == "web-app":
         ambient_module = source_dir / "vibeflow-workflow.d.ts"
@@ -193,7 +203,20 @@ def build_aot(request: BuildRequest) -> BuildResult:
             "external": sorted(set(request.external_packages)),
             "typecheckFiles": [
                 str(contract_check),
+                *(
+                    [str(plugin_contract_check)]
+                    if plugin_contract_check is not None
+                    else []
+                ),
                 *(str(item) for item in request.audit_sources),
+            ],
+            "contractCheckFiles": [
+                str(contract_check),
+                *(
+                    [str(plugin_contract_check)]
+                    if plugin_contract_check is not None
+                    else []
+                ),
             ],
             "importPolicy": _driver_import_policy(
                 import_policy,

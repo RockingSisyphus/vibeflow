@@ -262,6 +262,16 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
     root = workspace.root_for_path(config_path)
     if root is None:
         return _workspace_error_report("WORKSPACE.CONFIG.OUTSIDE_ROOT", f"config is not under any workspace root: {config_path}", config_path, env.effective_policy)
+    if root.project_target != "python":
+        return _workspace_error_report(
+            "CLI.PROJECT_TARGET.MISMATCH",
+            (
+                "Python Application requires project_target='python'; "
+                f"root {root.id!r} declares {root.project_target!r}"
+            ),
+            config_path,
+            env.effective_policy,
+        )
     try:
         document = load_workspace_config_document(config_path, workspace=workspace)
     except ConfigLoadError as exc:

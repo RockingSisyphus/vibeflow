@@ -21,6 +21,7 @@ from vibeflow.core.descriptors import (
     CapabilityOperationDescriptor,
     DescriptorCatalogs,
     HostExtensionDescriptor,
+    ImplementationDescriptor,
     NodeCatalog,
     NodeDescriptor,
 )
@@ -223,10 +224,10 @@ def host_extension_closure(
             )
         if target not in descriptor.targets:
             raise ProjectBuildError(
-                "VF_AOT_HOST_EXTENSION_TARGET",
+                "VF_AOT_TARGET_IMPLEMENTATION_MISSING",
                 (
-                    f"host_extension '{extension_id}' does not support "
-                    f"target '{target}'"
+                    f"host_extension '{extension_id}' has no implementation "
+                    f"for target '{target}'"
                 ),
             )
         active.append(extension_id)
@@ -561,6 +562,192 @@ def import_policy(
     }
 
 
+def target_neutral_import_policy(
+    *,
+    catalogs: DescriptorCatalogs,
+    project_root: Path,
+    allowed_external: set[str],
+    node_ids: frozenset[str] | None = None,
+    host_extension_ids: frozenset[str] = frozenset(),
+    plugin_ids: frozenset[str] = frozenset(),
+) -> tuple[dict[str, Any], tuple[str, ...]]:
+    """Describe a JS/TS source closure without selecting a platform.
+
+    ``node_ids=None`` selects the complete registered node/base-lib catalog for
+    project quality.  A concrete set selects only the workflow's implemented
+    node types plus their transitive base-lib dependencies for validate/review.
+    """
+
+    owners_by_path: dict[Path, dict[str, Any]] = {}
+
+    def add_implementation(
+        implementation: ImplementationDescriptor,
+        *,
+        kind: str,
+        resource_id: str,
+        default_export: str,
+    ) -> None:
+        if implementation.language not in {"javascript", "typescript"}:
+            return
+        if implementation.source.kind != "file":
+            raise ProjectBuildError(
+                "VF_AOT_CONTRACT_INVALID",
+                (
+                    f"{kind} '{resource_id}' uses non-file JavaScript source "
+                    f"kind '{implementation.source.kind}'"
+                ),
+            )
+        source = safe_project_path(
+            project_root,
+            implementation.source.ref,
+            subject=f"{kind} '{resource_id}' source",
+            require_file=True,
+        )
+        owner = {
+            "path": str(source),
+            "kind": kind,
+            "id": resource_id,
+            "export": implementation.source.export or default_export,
+            "completion": implementation.completion,
+        }
+        previous = owners_by_path.get(source)
+        if previous is not None and (
+            previous["kind"],
+            previous["id"],
+            previous["export"],
+            previous["completion"],
+        ) != (
+            owner["kind"],
+            owner["id"],
+            owner["export"],
+            owner["completion"],
+        ):
+            raise ProjectBuildError(
+                "VF_AOT_IMPORT_OWNER",
+                (
+                    f"source '{source}' has incompatible VibeFlow owners or "
+                    "contracts"
+                ),
+            )
+        owners_by_path[source] = owner
+
+    selected_nodes = tuple(
+        descriptor
+        for descriptor in catalogs.nodes
+        if node_ids is None or descriptor.type_key in node_ids
+    )
+    selected_base_lib_ids: set[str]
+    if node_ids is None:
+        selected_base_lib_ids = {
+            descriptor.id for descriptor in catalogs.base_libs
+        }
+    else:
+        selected_base_lib_ids = set()
+        visiting: list[str] = []
+
+        def visit_base_lib(resource_id: str) -> None:
+            if resource_id in selected_base_lib_ids:
+                return
+            if resource_id in visiting:
+                start = visiting.index(resource_id)
+                cycle = " -> ".join((*visiting[start:], resource_id))
+                raise ProjectBuildError(
+                    "VF_AOT_BASE_LIB_CYCLE",
+                    f"base_lib dependency cycle: {cycle}",
+                )
+            descriptor = catalogs.base_libs.get(resource_id)
+            if descriptor is None:
+                raise ProjectBuildError(
+                    "VF_AOT_BASE_LIB_UNKNOWN",
+                    f"unknown required base_lib '{resource_id}'",
+                )
+            visiting.append(resource_id)
+            for dependency in descriptor.dependencies:
+                visit_base_lib(dependency)
+            visiting.pop()
+            selected_base_lib_ids.add(resource_id)
+
+        for descriptor in selected_nodes:
+            for resource_id in descriptor.base_libs:
+                visit_base_lib(resource_id)
+
+    selected_base_libs = tuple(
+        descriptor
+        for descriptor in catalogs.base_libs
+        if descriptor.id in selected_base_lib_ids
+    )
+
+    for descriptor in selected_nodes:
+        for implementation in descriptor.implementations:
+            add_implementation(
+                implementation,
+                kind="node",
+                resource_id=descriptor.type_key,
+                default_export="run",
+            )
+    for descriptor in selected_base_libs:
+        allowed_external.update(descriptor.external_packages)
+        for implementation in descriptor.implementations:
+            add_implementation(
+                implementation,
+                kind="base_lib",
+                resource_id=descriptor.id,
+                default_export="",
+            )
+    for descriptor in catalogs.host_extensions:
+        if descriptor.id not in host_extension_ids:
+            continue
+        allowed_external.update(descriptor.external_packages)
+        for implementation in descriptor.implementations:
+            add_implementation(
+                implementation,
+                kind="host_extension",
+                resource_id=descriptor.id,
+                default_export="createHostExtension",
+            )
+    for descriptor in catalogs.plugins:
+        if descriptor.id not in plugin_ids:
+            continue
+        allowed_external.update(descriptor.external_packages)
+        for implementation in descriptor.implementations:
+            add_implementation(
+                implementation,
+                kind="plugin",
+                resource_id=descriptor.id,
+                default_export="createPlugin",
+            )
+
+    owners = [
+        owners_by_path[path]
+        for path in sorted(owners_by_path, key=lambda item: item.as_posix())
+    ]
+    return (
+        {
+            "owners": owners,
+            "node_base_libs": {
+                descriptor.type_key: list(descriptor.base_libs)
+                for descriptor in selected_nodes
+            },
+            "base_lib_dependencies": {
+                descriptor.id: list(descriptor.dependencies)
+                for descriptor in selected_base_libs
+            },
+            "host_extension_dependencies": {
+                descriptor.id: list(descriptor.dependencies)
+                for descriptor in catalogs.host_extensions
+                if descriptor.id in host_extension_ids
+            },
+            "plugin_dependencies": {
+                descriptor.id: list(descriptor.dependencies)
+                for descriptor in catalogs.plugins
+                if descriptor.id in plugin_ids
+            },
+            "allowed_external_packages": sorted(allowed_external),
+        },
+        tuple(str(item["path"]) for item in owners),
+    )
+
+
 __all__ = [
     "base_lib_closure",
     "enriched_payload",
@@ -568,5 +755,6 @@ __all__ = [
     "host_extension_closure",
     "required_capabilities",
     "schemas_for_types",
+    "target_neutral_import_policy",
     "used_schema_types",
 ]

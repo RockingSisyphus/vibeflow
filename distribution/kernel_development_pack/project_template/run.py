@@ -9,15 +9,15 @@ ROOT = Path(__file__).resolve().parent
 KERNEL_ROOT = ROOT / "kernel"
 MANIFEST_PATH = KERNEL_ROOT / "MANIFEST.sha256"
 KERNEL_ARCHIVE_PATH = KERNEL_ROOT / "vibeflow-kernel.zip"
-# Treat unpacked kernel sources and shipped kernel docs as protected so AI work stays focused on project/.
+# Treat unpacked kernel sources and shipped kernel docs as protected so AI work stays focused on project roots.
 PROTECTED_DIRS = (
     "kernel/docs",
     "kernel/vibeflow",
-    "sandbox/javascript/integration",
 )
 PROTECTED_PREFIXES = tuple(f"{path}/" for path in PROTECTED_DIRS)
 PROTECTED_FILES = {
     "run.py",
+    "DISTRIBUTION.json",
     "kernel/README.md",
     "kernel/LICENSE",
     "kernel/vibeflow-kernel.zip",
@@ -27,7 +27,6 @@ PROTECTED_FILES = {
 }
 GENERATED_PREFIXES = (
     "kernel/tools/mermaid-renderer/node_modules/",
-    "sandbox/javascript/integration/.artifacts/",
 )
 
 
@@ -143,8 +142,8 @@ def _run_integrity_check() -> None:
 
 
 _run_integrity_check()
-sys.path.insert(0, str(KERNEL_ARCHIVE_PATH))
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(KERNEL_ARCHIVE_PATH))
 
 from vibeflow.tooling.application.cli import main as kernel_cli_main  # noqa: E402
 
@@ -208,12 +207,14 @@ def _prepare_workspace_import_paths(args: list[str]) -> None:
     if workspace_path is None or not workspace_path.is_file():
         return
     try:
-        from vibeflow.tooling.project.core import load_workspace_config
+        from vibeflow.tooling.project.workspace_loader import load_workspace_config
 
         workspace = load_workspace_config(workspace_path)
     except Exception:
         return
     for root in reversed(workspace.roots):
+        if root.project_target != "python":
+            continue
         value = str(root.path)
         if value not in sys.path:
             sys.path.insert(0, value)

@@ -1452,6 +1452,7 @@ def test_build_profiles_are_atomic_and_manifest_is_deterministic(
     assert second.manifest.read_bytes() == first_manifest
     manifest = json.loads(second.manifest.read_text(encoding="utf-8"))
     assert manifest["format"] == "vibeflow.aot-build.v1"
+    assert manifest["project_target"] == "javascript"
     assert "timestamp" not in manifest
     assert manifest["profile"] == profile
     assert second.entry.is_file()
@@ -1880,7 +1881,7 @@ console.log(JSON.stringify(value));
     assert value == {"answer": 4}
 
 
-def test_real_typescript_never_allows_base_lib_node_builtins(
+def test_real_typescript_rejects_base_lib_host_io_module(
     tmp_path: Path,
 ) -> None:
     project = _real_toolchain_project(tmp_path)
@@ -1923,6 +1924,87 @@ def test_real_typescript_never_allows_base_lib_node_builtins(
         )
     assert "VF_BASE_LIB_HOST_IO" in {
         diagnostic.get("code") for diagnostic in caught.value.diagnostics
+    }
+
+
+def test_real_typescript_allows_pure_node_builtin_for_node_target(
+    tmp_path: Path,
+) -> None:
+    project = _real_toolchain_project(tmp_path)
+    module = project / "node.ts"
+    base_lib = project / "base.ts"
+    module.write_text(
+        'import { normalize } from "./base.ts";\n'
+        "export function run() { void normalize('a', 'b'); return {}; }\n",
+        encoding="utf-8",
+    )
+    base_lib.write_text(
+        'import { join } from "node:path";\n'
+        "export function normalize(a: string, b: string) { return join(a, b); }\n",
+        encoding="utf-8",
+    )
+
+    built = build_aot(
+        BuildRequest(
+            plan=_empty_real_plan(module),
+            project_root=project,
+            package_root=project,
+            out_dir=project / "dist",
+            target="node",
+            profile="single-esm",
+            import_policy={
+                "owners": [
+                    {"path": str(module), "kind": "node", "id": "test.run"},
+                    {
+                        "path": str(base_lib),
+                        "kind": "base_lib",
+                        "id": "test.base",
+                    },
+                ],
+                "node_base_libs": {"test.run": ["test.base"]},
+                "base_lib_dependencies": {"test.base": []},
+            },
+        )
+    )
+
+    assert built.entry.is_file()
+
+
+def test_browser_platform_module_failure_is_reported_by_esbuild(
+    tmp_path: Path,
+) -> None:
+    project = _real_toolchain_project(tmp_path)
+    module = project / "node.ts"
+    module.write_text(
+        'import { join } from "node:path";\n'
+        "export function run() { void join('a', 'b'); return {}; }\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(AotBuildError) as caught:
+        build_aot(
+            BuildRequest(
+                plan=_empty_real_plan(module),
+                project_root=project,
+                package_root=project,
+                out_dir=project / "dist",
+                target="browser",
+                profile="single-esm",
+                import_policy={
+                    "owners": [
+                        {
+                            "path": str(module),
+                            "kind": "node",
+                            "id": "test.run",
+                        }
+                    ]
+                },
+            )
+        )
+
+    assert caught.value.code == "VF_ESBUILD"
+    assert "ESBUILD" in {
+        item.get("code") for item in caught.value.diagnostics
     }
 
 
@@ -2079,7 +2161,7 @@ def test_real_typescript_node_context_has_portable_abort_signal(
         ),
     ],
 )
-def test_real_typescript_rejects_target_globals_through_host_object(
+def test_real_typescript_leaves_platform_globals_to_project_tools(
     tmp_path: Path,
     target: str,
     body: str,
@@ -2087,28 +2169,103 @@ def test_real_typescript_rejects_target_globals_through_host_object(
     project = _real_toolchain_project(tmp_path)
     module = project / "node.ts"
     module.write_text(
-        f"export function run() {{ {body} }}\n",
+        f"export function run() {{ void (() => {{ {body} }})(); return {{}}; }}\n",
         encoding="utf-8",
     )
+    built = build_aot(
+        BuildRequest(
+            plan=_empty_real_plan(module),
+            project_root=project,
+            package_root=project,
+            out_dir=project / "dist",
+            target=target,
+            profile="single-esm",
+            import_policy={
+                "owners": [
+                    {"path": str(module), "kind": "node", "id": "test.run"}
+                ]
+            },
+        )
+    )
+    assert built.entry.is_file()
+
+
+def test_real_typescript_ordinary_type_error_is_not_a_vibeflow_error(
+    tmp_path: Path,
+) -> None:
+    project = _real_toolchain_project(tmp_path)
+    module = project / "node.ts"
+    module.write_text(
+        "const projectOwnedTypeError: string = 42;\n"
+        "export function run() { void projectOwnedTypeError; return {}; }\n",
+        encoding="utf-8",
+    )
+
+    built = build_aot(
+        BuildRequest(
+            plan=_empty_real_plan(module),
+            project_root=project,
+            package_root=project,
+            out_dir=project / "dist",
+            target="node",
+            profile="single-esm",
+            import_policy={
+                "owners": [
+                    {"path": str(module), "kind": "node", "id": "test.run"}
+                ]
+            },
+        )
+    )
+
+    assert built.entry.is_file()
+
+
+def test_real_typescript_still_rejects_vibeflow_node_abi_mismatch(
+    tmp_path: Path,
+) -> None:
+    project = _real_toolchain_project(tmp_path)
+    module = project / "node.ts"
+    module.write_text(
+        "export function run() { return { result: 'not-a-number' }; }\n",
+        encoding="utf-8",
+    )
+    plan = _empty_real_plan(module)
+    plan["outputs"] = [
+        {"type": "answer", "cardinality": "exactly_one", "as": "answer"}
+    ]
+    plan["schemas"] = {"answer": {"type": "number"}}
+    plan["nodes"][0]["provides"] = [
+        {"key": "result", "type": "answer"}
+    ]
+
     with pytest.raises(AotBuildError) as caught:
         build_aot(
             BuildRequest(
-                plan=_empty_real_plan(module),
+                plan=plan,
                 project_root=project,
                 package_root=project,
                 out_dir=project / "dist",
-                target=target,
+                target="node",
                 profile="single-esm",
                 import_policy={
                     "owners": [
-                        {"path": str(module), "kind": "node", "id": "test.run"}
+                        {
+                            "path": str(module),
+                            "kind": "node",
+                            "id": "test.run",
+                        }
                     ]
                 },
             )
         )
-    assert "VF_IMPORT_TARGET_GLOBAL" in {
-        diagnostic.get("code") for diagnostic in caught.value.diagnostics
-    }
+
+    assert caught.value.code == "VF_TYPESCRIPT"
+    assert caught.value.diagnostics
+    assert all(
+        Path(str(item["file"])).name == "node-contract-check.ts"
+        for item in caught.value.diagnostics
+        if item.get("file")
+    )
 
 
 @pytest.mark.parametrize(

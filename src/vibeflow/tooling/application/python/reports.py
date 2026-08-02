@@ -230,6 +230,7 @@ def _workspace_info(workspace: WorkspaceConfig) -> dict[str, object]:
                 "id": root.id,
                 "path": str(root.path),
                 "config": str(root.config_path),
+                "project_target": root.project_target,
                 "quality_enabled": root.quality_enabled,
             }
             for root in workspace.roots

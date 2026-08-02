@@ -51,6 +51,25 @@ class CleanerDiscoveryTests(unittest.TestCase):
         self.assertIn(".agents", subjects)
         self.assertIn("old-release.zip", subjects)
 
+    def test_formal_release_is_opt_in_and_archive_is_never_discovered(self) -> None:
+        self.mkdir("dist/vibeflow-distribution/kernel")
+        archive = self.mkdir("archive")
+        (archive / "vibeflow-distribution-0.10.0.zip").write_bytes(b"zip")
+        with mock.patch.object(clean_workspace, "ROOT", self.root):
+            default_targets = clean_workspace.discover_targets()
+            release_targets = clean_workspace.discover_targets(include_release=True)
+        self.assertNotIn(
+            "dist/vibeflow-distribution",
+            {item.path.relative_to(self.root).as_posix() for item in default_targets},
+        )
+        self.assertIn(
+            "dist/vibeflow-distribution",
+            {item.path.relative_to(self.root).as_posix() for item in release_targets},
+        )
+        self.assertFalse(
+            any("archive" in item.path.relative_to(self.root).parts for item in release_targets)
+        )
+
     def test_prunes_protected_and_nonempty_metadata_directories(self) -> None:
         self.mkdir(".git/cache/__pycache__")
         self.mkdir("references/cache/__pycache__")

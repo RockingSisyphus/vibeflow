@@ -1,11 +1,25 @@
 # VibeFlow 使用者开发引导
 
-本文面向使用 VibeFlow（包名 `vibeflow`）编写业务 node、nodeset、plugin、base_lib 和 JSONC config 的开发者。VibeFlow 0.9.0 使用分层 API：Python 代码直接从所属包导入，不从根包导入业务对象。VibeFlow 有两条开发路径：
+本文面向使用 VibeFlow（包名 `vibeflow`）编写业务 node、nodeset、plugin、base_lib 和 JSONC config 的开发者。VibeFlow 0.10.0 使用分层 API：Python 代码直接从所属包导入，不从根包导入业务对象。每个 workspace root 必须在 `vibeflow_project.jsonc` 中声明且只声明一个 Target：
+
+```jsonc
+{"project_target": "python"}
+```
+
+或：
+
+```jsonc
+{"project_target": "javascript"}
+```
+
+缺失、未知值或同时配置另一 Target 的实现入口都会失败。一个 workspace 可以包含多个不同 Target 的 root，但单次 workflow、nodeset import 和资源闭包不能跨 Target。VibeFlow 有两条开发路径：
 
 - **Python Runtime**：Python node、base_lib 和 plugin 通过 `project/registry.py` 注册，由 VibeFlow Runtime 校验并执行；本文主体详细说明这条路径。
 - **JavaScript/TypeScript AOT**：JS/TS node、base_lib、Plugin、数据 Schema、Capability 和 Host Extension 通过 `project/manifests/` 下的 JSONC descriptor 登记，由 `build` 命令生成独立 ESM 或 Web 应用；生成物运行时不需要 Python 或 VibeFlow Runtime。默认同步入口导出 `runWorkflow()`，显式异步入口导出 `runWorkflowAsync()`。完整格式、工具链和三个 profile 在源码仓库见 `docs/js_aot_build.md`，在分发包见 `kernel/docs/11_JS_TS与Web_AOT构建指南.md`。
 
 两条路径共享 JSONC workflow、显式 `pipeline.edges`、contract、分支、合流、nodeset、有限/永久 loop 和 `vibeflow.io` 等可移植流程语义，但实现登记、宿主能力和公共输出 ABI 不相同。两个 Target 及其 Application closure 完全隔离：JS/TS 资源不用 Python registry，Python 资源也不进入 AOT。AOT 的宿主交互使用逐调用 Capability，长期接线使用 Host Extension。
+
+`validate` 检查配置、图、契约和 VibeFlow 架构边界；`review` 展示该配置实际表达的架构；`quality-check` 检查职责、依赖方向和隐藏执行。它们不判断 JavaScript 项目是否支持 Browser 或 Node。只有 `build --target browser|node` 为本次构建选择适用实现并调用 esbuild。完整 TypeScript 类型、代码风格、平台 API 兼容性和业务结果由项目自己的 `tsc`、ESLint、测试框架和真实宿主负责。
 
 Python 项目常用导入来自以下稳定入口：
 

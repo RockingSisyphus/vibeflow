@@ -5,8 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from vibeflow.tooling.application.javascript.build import ProjectBuildError
-from vibeflow.tooling.application.javascript.cli import build_parser
-from vibeflow.tooling.application.cli import main
+from vibeflow.tooling.application.javascript.cli import build_parser, main
 
 
 def test_build_parser_exposes_the_three_aot_profiles() -> None:

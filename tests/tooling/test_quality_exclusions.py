@@ -88,6 +88,8 @@ def test_quality_cli_accepts_repeated_top_level_exclusions(
     code = cli_main(
         [
             "quality-check",
+            "--project-target",
+            "python",
             "--path",
             str(tmp_path),
             "--json",
@@ -131,6 +133,8 @@ def test_quality_cli_exact_paths_exclude_files_and_directories_only_at_root(
     code = cli_main(
         [
             "quality-check",
+            "--project-target",
+            "python",
             "--path",
             str(tmp_path),
             "--json",

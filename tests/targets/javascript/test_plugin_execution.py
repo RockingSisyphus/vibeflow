@@ -404,7 +404,7 @@ export function createPlugin() {
   };
 }
 """,
-            "VF_IMPORT_TARGET_GLOBAL",
+            "VF_PLUGIN_HOST_IO",
         ),
     ),
 )
@@ -717,7 +717,7 @@ export function createPlugin() {
   };
 }
 """,
-            "VF_IMPORT_TARGET_GLOBAL",
+            "VF_PLUGIN_HOST_IO",
         ),
     ),
 )

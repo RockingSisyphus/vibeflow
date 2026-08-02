@@ -71,6 +71,8 @@ def build_workspace_node_registry(workspace: WorkspaceConfig) -> NodeRegistry:
     registry = NodeRegistry()
     sources: dict[str, dict[str, object]] = {}
     for root in workspace.roots:
+        if root.project_target != "python":
+            continue
         if not root.registry_ref:
             continue
         root_registry = _load_root_registry(root)
@@ -86,6 +88,8 @@ def load_workspace_resources(workspace: WorkspaceConfig) -> tuple[dict[str, Work
     host_extensions: list[object] = []
     registries: dict[str, WorkspaceResourceRegistries] = {}
     for root in workspace.roots:
+        if root.project_target != "python":
+            continue
         base_registry, plugin_registry, has_base_registry, has_plugin_registry, registry_findings = _load_root_resource_registries(root)
         findings.extend(annotate_findings(registry_findings, root=root, source_path=root.config_path))
         legacy_resources, resource_findings = load_config_resources(root.project_config, base_path=root.path)
@@ -188,6 +192,7 @@ def _workspace_root_from_item(root_id: str, item: Mapping[str, Any], *, workspac
         path=root_path,
         config_path=config_path,
         project_config=project_config,
+        project_target=str(project_config["project_target"]),
         registry_ref=str(project_config.get("registry", "")).strip(),
         quality_enabled=bool(project_config.get("quality_enabled", True)),
         quality_structure=_project_quality_structure(project_config, config_path),
@@ -203,6 +208,7 @@ def _load_project_config(path: Path, *, root_path: Path) -> Mapping[str, Any]:
         raise WorkspaceConfigError(exc.rule_id, exc.message, exc.source_location, exc.failure_layer) from exc
     data = document.data
     unknown = set(data) - {
+        "project_target",
         "registry",
         "quality_enabled",
         "quality",

@@ -8,6 +8,12 @@ def add_quality_parser(subparsers) -> None:
     quality = subparsers.add_parser("quality-check", help="run standalone Python code quality checks")
     quality.add_argument("--workspace", required=False, help="workspace vibeflow_config.jsonc path")
     quality.add_argument("--path", required=False, default=None, help="project directory or Python file to inspect")
+    quality.add_argument(
+        "--project-target",
+        choices=("python", "javascript"),
+        default=None,
+        help=argparse.SUPPRESS,
+    )
     quality.add_argument("--json", action="store_true", help="emit full quality report JSON")
     quality.add_argument("--check-side-effects", action="store_true", help="also warn about side-effect capable imports and calls")
     quality.add_argument("--max-lines", type=int, default=500, help="maximum Python file lines before error")

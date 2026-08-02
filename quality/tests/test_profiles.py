@@ -293,10 +293,75 @@ def load():
 
     def test_base_finds_syntax_and_generated_content(self) -> None:
         self.fixture.write("src/vibeflow/core/broken.py", "def broken(:\n")
-        (self.fixture.root / "dist").mkdir()
+        (self.fixture.root / "output").mkdir()
         codes = self.codes("base")
         self.assertIn("PY_SYNTAX", codes)
         self.assertIn("GENERATED_ARTIFACT", codes)
+
+    def test_base_allows_formal_release_directories(self) -> None:
+        (self.fixture.root / "dist/vibeflow-distribution").mkdir(parents=True)
+        (self.fixture.root / "archive").mkdir()
+        self.assertNotIn("GENERATED_ARTIFACT", self.codes("base"))
+
+    def test_base_checks_document_links_and_stale_release_text(self) -> None:
+        self.fixture.write(
+            "docs/guide.md",
+            "VibeFlow 0.9.0 used [a missing guide](missing.md).\n",
+        )
+        findings = run_profile(self.fixture.root, "base").findings
+        self.assertEqual(
+            {
+                item.code
+                for item in findings
+                if item.subject_id == "docs/guide.md"
+            },
+            {"DOCUMENT_LINK_MISSING", "STALE_DOCUMENTATION"},
+        )
+
+    def test_base_checks_document_image_links(self) -> None:
+        self.fixture.write(
+            "README.md",
+            "![missing architecture](docs/assets/missing.svg)\n",
+        )
+
+        self.assertIn("DOCUMENT_LINK_MISSING", self.codes("base"))
+
+    def test_base_checks_english_readme(self) -> None:
+        self.fixture.write(
+            "README.en.md",
+            "See [missing guide](docs/missing.md).\n",
+        )
+
+        self.assertIn("DOCUMENT_LINK_MISSING", self.codes("base"))
+
+    def test_base_rejects_removed_plan_references(self) -> None:
+        self.fixture.write(
+            "docs/guide.md",
+            "See 15_长期工作流与原生IO改造计划.md for details.\n",
+        )
+        self.assertIn("REMOVED_DOCUMENT_REFERENCE", self.codes("base"))
+
+    def test_base_rejects_obsolete_documented_commands(self) -> None:
+        self.fixture.write(
+            "docs/guide.md",
+            "python run.py compile-old --config project/configs/main.jsonc\n",
+        )
+        findings = [
+            item
+            for item in run_profile(self.fixture.root, "base").findings
+            if item.code == "STALE_DOCUMENT_COMMAND"
+        ]
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].details["command"], "compile-old")
+
+    def test_base_accepts_current_launcher_and_module_commands(self) -> None:
+        self.fixture.write(
+            "docs/guide.md",
+            "python run.py architecture --config project/configs/main.jsonc\n"
+            "PYTHONPATH=src python -m vibeflow build --target node\n"
+            "vibeflow quality-check --path project\n",
+        )
+        self.assertNotIn("STALE_DOCUMENT_COMMAND", self.codes("base"))
 
     def test_base_finds_nested_sandbox_artifacts(self) -> None:
         (self.fixture.root / "sandbox/python/integration/.artifacts").mkdir(
@@ -367,7 +432,7 @@ def load():
     @unittest.skipUnless(shutil.which("node"), "Node.js is required for all profile")
     def test_all_aggregates_base_and_layer_findings(self) -> None:
         self.fixture.write("src/vibeflow/core/wrong.py", "import os\n")
-        (self.fixture.root / "dist").mkdir()
+        (self.fixture.root / "output").mkdir()
         codes = self.codes("all")
         self.assertIn("CORE_IO_IMPORT", codes)
         self.assertIn("GENERATED_ARTIFACT", codes)

@@ -37,6 +37,8 @@ def scan_workspace_code_quality(
     longest: tuple[str, ...] = ()
     roots_payload: list[dict[str, object]] = []
     for root in workspace.roots:
+        if root.project_target != "python":
+            continue
         if not root.quality_enabled:
             continue
         report = scan_code_quality(
@@ -47,7 +49,15 @@ def scan_workspace_code_quality(
             excluded_dirs=excluded_dirs,
             check_side_effects=check_side_effects,
         )
-        roots_payload.append({"id": root.id, "path": str(root.path), "files": len(report.files), "status": report.status})
+        roots_payload.append(
+            {
+                "id": root.id,
+                "path": str(root.path),
+                "project_target": root.project_target,
+                "files": len(report.files),
+                "status": report.status,
+            }
+        )
         files.extend(_prefix_quality_files(report.files, root=root))
         findings.extend(_prefix_quality_findings(report.findings, root=root))
         dependency_graph.update(_prefix_dependency_graph(report.dependency_graph, root=root))

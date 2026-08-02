@@ -260,7 +260,7 @@ def _check_contract(
         mismatches.append("provides")
     if mismatches:
         raise ProjectBuildError(
-            "VF_AOT_CONTRACT",
+            "VF_AOT_CONTRACT_INVALID",
             (
                 f"graph call does not match {subject}: "
                 f"{', '.join(mismatches)}"
@@ -282,7 +282,7 @@ def select_implementation(
         if target in item.targets
         and item.language in {"javascript", "typescript"}
     ]
-    if len(selected) != 1:
+    if not selected:
         available = sorted(
             {
                 target_name
@@ -291,10 +291,19 @@ def select_implementation(
             }
         )
         raise ProjectBuildError(
-            "VF_AOT_IMPLEMENTATION_TARGET",
+            "VF_AOT_TARGET_IMPLEMENTATION_MISSING",
             (
-                f"{subject} requires exactly one JS/TS implementation for "
+                f"{subject} has no JS/TS implementation for "
                 f"target '{target}'; available targets: {available}"
+            ),
+            path,
+        )
+    if len(selected) > 1:
+        raise ProjectBuildError(
+            "VF_AOT_CONTRACT_INVALID",
+            (
+                f"{subject} declares more than one JS/TS implementation for "
+                f"target '{target}'"
             ),
             path,
         )

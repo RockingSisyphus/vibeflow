@@ -6,7 +6,7 @@ nodeset 是独立 JSONC 实现文件，作用类似 Python node 的 `.py` 文件
 
 ## 最小 implemented nodeset 文件
 
-`project/configs/nodesets/demo_add_one.jsonc`：
+`python_project/configs/nodesets/demo_add_one.jsonc`：
 
 ```jsonc
 {
@@ -246,7 +246,7 @@ nodeset 也可以声明内部 `global_config`；调用点 `config` 会覆盖 nod
 如果怀疑 config 读取或 nodeset 解析慢，可开启解析 trace：
 
 ```bash
-VIBEFLOW_CONFIG_TRACE=1 python run.py validate --config project/configs/main.jsonc
+VIBEFLOW_CONFIG_TRACE=1 python run.py validate --config python_project/configs/main.jsonc
 ```
 
 trace 会输出 import 文件、展开后的 nodeset 数、每个 nodeset 解析耗时、依赖边和总耗时。

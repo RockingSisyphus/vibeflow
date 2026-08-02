@@ -569,6 +569,7 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
     assert {
         "format": manifest["format"],
         "abi_version": manifest["abi_version"],
+        "project_target": manifest["project_target"],
         "workflow_id": manifest["workflow_id"],
         "entry_mode": manifest["entry_mode"],
         "target": manifest["target"],
@@ -580,6 +581,7 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
     } == {
         "format": "vibeflow.aot-build.v1",
         "abi_version": "vibeflow.workflow.v2",
+        "project_target": "javascript",
         "workflow_id": "test.workflow",
         "entry_mode": "sync",
         "target": expected["target"],
