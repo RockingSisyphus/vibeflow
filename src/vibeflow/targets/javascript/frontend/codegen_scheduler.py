@@ -13,6 +13,11 @@ from vibeflow.targets.javascript.frontend.codegen_common import (
 class SchedulerCodegenMixin:
     def _emit_scheduler(self, code: WorkflowCode) -> str:
         workflow = code.workflow
+        hook = (
+            "await invokeRuntimeHookAsync"
+            if workflow.entry_mode == "async"
+            else "invokeRuntimeHookSync"
+        )
         incoming: dict[str, list[Any]] = {
             node.id: [] for node in workflow.nodes
         }
@@ -33,6 +38,10 @@ class SchedulerCodegenMixin:
                 f"function {code.function_name}(initial, root, path) {{"
             ),
             "  try {",
+            (
+                f"    {hook}(root, \"beforeBlock\", {{ "
+                "blockPath: formatBlockPath(path), path: [...path] });"
+            ),
             (
                 f"    const state = createStaticState("
                 f"{code.metadata_name}, initial, root, path);"
@@ -86,9 +95,22 @@ class SchedulerCodegenMixin:
                 "    }",
                 "    abandonPending(state);",
                 "    const publicOutputs = finalizeOutputs(state);",
+                (
+                    f"    {hook}(root, \"afterBlock\", {{ "
+                    "blockPath: formatBlockPath(path), path: [...path] });"
+                ),
                 "    return { publicOutputs, candidates: state.candidates, completed };",
                 "  } catch (cause) {",
-                f"    throw ensureErrorLocation(cause, {code.metadata_name}, path);",
+                (
+                    f"    const failure = ensureErrorLocation(cause, "
+                    f"{code.metadata_name}, path);"
+                ),
+                (
+                    f"    {hook}(root, \"blockFailed\", {{ "
+                    "blockPath: formatBlockPath(path), path: [...path], "
+                    "code: failure.code, message: failure.message }, true);"
+                ),
+                "    throw failure;",
                 "  }",
                 "}",
             ]
@@ -101,6 +123,11 @@ class SchedulerCodegenMixin:
         node: EmissionNode,
         incoming: list[Any],
     ) -> list[str]:
+        hook = (
+            "await invokeRuntimeHookAsync"
+            if code.workflow.entry_mode == "async"
+            else "invokeRuntimeHookSync"
+        )
         lines = [f"        case {js(node.id)}: {{"]
         node_by_id = {item.id: item for item in code.workflow.nodes}
         if code.workflow.entry_mode == "async":
@@ -122,6 +149,11 @@ class SchedulerCodegenMixin:
                     f"            const inputs = prepareStaticNode("
                     f"{code.node_names[node.id]}, state);"
                 ),
+                (
+                    f"            {hook}(state.root, \"beforeNode\", {{ "
+                    f"nodeId: {js(node.id)}, nodePath: nodePath(state, {js(node.id)}), "
+                    f"blockPath: formatBlockPath(state.path), type: {js(node.type_used)} }});"
+                ),
                 "            let outputs;",
                 "            let deferred = false;",
             ]
@@ -133,6 +165,12 @@ class SchedulerCodegenMixin:
                 (
                     f"            const targets = {code.activate_names[node.id]}("
                     "outputs, inputs, state, deferred);"
+                ),
+                (
+                    f"            {hook}(state.root, \"afterNode\", {{ "
+                    f"nodeId: {js(node.id)}, nodePath: nodePath(state, {js(node.id)}), "
+                    f"blockPath: formatBlockPath(state.path), type: {js(node.type_used)}, "
+                    "outputKeys: Object.keys(outputs || {}).sort() });"
                 ),
             ]
         )
@@ -156,9 +194,16 @@ class SchedulerCodegenMixin:
             [
                 "          } catch (cause) {",
                 (
-                    f"            throw ensureErrorLocation("
+                    f"            const failure = ensureErrorLocation("
                     f"cause, {code.metadata_name}, path, {js(node.id)});"
                 ),
+                (
+                    f"            {hook}(state.root, \"nodeFailed\", {{ "
+                    f"nodeId: {js(node.id)}, nodePath: nodePath(state, {js(node.id)}), "
+                    "blockPath: formatBlockPath(state.path), "
+                    "code: failure.code, message: failure.message }, true);"
+                ),
+                "            throw failure;",
                 "          }",
                 "          break;",
                 "        }",
@@ -278,6 +323,7 @@ class SchedulerCodegenMixin:
                     "            emitTrace(state.root, \"async_result\", {",
                     f"              nodeId: {js(node.id)},",
                     f"              nodePath: nodePath(state, {js(node.id)}),",
+                    "              blockPath: formatBlockPath(state.path),",
                     f"              resultKey: {js(node.result_key)},",
                     "            });",
                 ]
@@ -293,6 +339,7 @@ class SchedulerCodegenMixin:
                     "            const detachedItem = {",
                     f"              node: {code.node_names[node.id]},",
                     f"              nodePath: nodePath(state, {js(node.id)}),",
+                    "              blockPath: formatBlockPath(state.path),",
                     "              workflow: state.workflow,",
                     "              promise: pending,",
                     "            };",
@@ -302,6 +349,7 @@ class SchedulerCodegenMixin:
                     "              emitTrace(state.root, \"async_detached_done\", {",
                     f"                nodeId: {js(node.id)},",
                     f"                nodePath: nodePath(state, {js(node.id)}),",
+                    "                blockPath: formatBlockPath(state.path),",
                     "              });",
                     "            }, (cause) => {",
                     "              state.root.detached.delete(detachedItem);",
@@ -310,7 +358,8 @@ class SchedulerCodegenMixin:
                     '                "VF_NODE_FAILED",',
                     f"                {js(f'detached node {node.id!r} failed')},",
                     "                state.workflow,",
-                    f"                {{ nodePath: nodePath(state, {js(node.id)}), cause }},",
+                    f"                {{ nodePath: nodePath(state, {js(node.id)}), "
+                    "blockPath: formatBlockPath(state.path), cause },",
                     "              );",
                     "            });",
                     "            outputs = dictionary();",
@@ -318,6 +367,7 @@ class SchedulerCodegenMixin:
                     "            emitTrace(state.root, \"async_detached\", {",
                     f"              nodeId: {js(node.id)},",
                     f"              nodePath: nodePath(state, {js(node.id)}),",
+                    "              blockPath: formatBlockPath(state.path),",
                     "            });",
                 ]
             )

@@ -35,17 +35,17 @@ from vibeflow.targets.python.runtime.planning import (
     NodeFrame,
     build_execution_plan,
 )
-from vibeflow.tooling.application.runner import CheckedRunError, run_checked
-from vibeflow.tooling.presentation.ascii_flowchart import export_ascii_flowchart
-from vibeflow.tooling.presentation.mermaid import export_mermaid
-from vibeflow.tooling.presentation.mermaid.render import (
+from vibeflow.tooling.application.python.runner import CheckedRunError, run_checked
+from vibeflow.tooling.application.python.presentation.ascii_flowchart import export_ascii_flowchart
+from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
+from vibeflow.tooling.application.python.presentation.mermaid.render import (
     is_mermaid_svg_renderer_available,
     render_mermaid_svg,
 )
 from vibeflow.tooling.project.config_loader import ConfigLoadError, load_config_document
 from vibeflow.tooling.project.config_schema import collect_config_schema_findings
-from vibeflow.tooling.project.effective_policy import resolve_effective_policy
-from vibeflow.tooling.project.quality_scan import scan_code_quality
+from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
+from vibeflow.tooling.application.python.project.quality_scan import scan_code_quality
 from vibeflow.tooling.project.schema_resources import schema_text
 
 from .strict_support_boundaries import *

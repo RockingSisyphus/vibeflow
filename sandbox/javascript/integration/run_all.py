@@ -39,6 +39,18 @@ def _prepare_runtime_workspace() -> Path:
             "node_modules", "__pycache__", "*.pyc", ".artifacts", "reports"
         ),
     )
+    shutil.copy2(_SOURCE_SANDBOX_ROOT / "outside.ts", runtime_root / "outside.ts")
+    symlink_specs = json.loads(
+        (
+            runtime_root
+            / "project/negative/symlinks.json"
+        ).read_text(encoding="utf-8")
+    )
+    for spec in symlink_specs:
+        link = runtime_root / "project" / str(spec["path"])
+        target = runtime_root / "project" / str(spec["target"])
+        link.parent.mkdir(parents=True, exist_ok=True)
+        link.symlink_to(target)
     for name in ("vibeflow_config.jsonc", "vibeflow_host_config.jsonc"):
         shutil.copy2(_SOURCE_SANDBOX_ROOT / name, runtime_root / name)
     try:
@@ -77,7 +89,7 @@ from sandbox_support import (
     write_report,
 )
 from vibeflow.targets.javascript.frontend.errors import AotBuildError
-from vibeflow.tooling.application.javascript_build import (
+from vibeflow.tooling.application.javascript.build import (
     ProjectBuildError,
     ProjectBuildRequest,
     build_project_aot,
@@ -88,6 +100,7 @@ from advanced_cases import (
     edge_role_case,
     execution_model_case,
     loop_max_error_case,
+    nested_async_case,
     nested_override_case,
     runtime_error_case,
 )
@@ -96,7 +109,17 @@ from declaration_cases import (
     typecheck_declarations,
     typecheck_optional_declarations,
 )
-from host_extension_cases import host_extension_case, permanent_port_host_case
+from host_extension_cases import (
+    browser_permanent_port_host_case,
+    host_extension_case,
+    permanent_port_host_case,
+)
+from plugin_cases import (
+    build_plugin_hook_case,
+    plugin_manifest_case,
+    runtime_plugin_concurrent_isolation_case,
+    runtime_plugin_repeat_case,
+)
 from runtime_cases import (
     async_capability_case,
     branch_case,
@@ -334,23 +357,153 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
         "unowned_promise": "VF_PROMISE_UNOWNED",
         "suspend_in_sync": "VF_ENTRY_MODE_SUSPEND_IN_SYNC",
         "task_in_sync": "VF_ENTRY_MODE_TASK_IN_SYNC",
+        "barrel_import": "VF_IMPORT_NODE_TO_NODE",
+        "alias_import": "VF_IMPORT_NODE_TO_NODE",
+        "symlink_import": "VF_IMPORT_NODE_TO_NODE",
+        "base_lib_reverse": "VF_IMPORT_LAYER",
+        "undeclared_external": "VF_IMPORT_EXTERNAL",
+        "package_root_escape": "VF_IMPORT_PACKAGE_ROOT",
+        "dynamic_code": "VF_IMPORT_DYNAMIC_CODE",
+        "indirect_node_builtin": "VF_IMPORT_TARGET",
+        "module_promise": "VF_IMPORT_SIDE_EFFECT",
+        "discarded_promise": "VF_PROMISE_UNOWNED",
+        "long_lived_listener": "VF_NODE_LONG_LIVED_LISTENER",
+        "global_state": "VF_MODULE_STATE",
+    }
+    precise = {
+        "barrel_import": (
+            "sandbox.invalid.barrel_import",
+            "node",
+            "negative/barrels/math.ts",
+            '"../../nodes/math.ts"',
+        ),
+        "alias_import": (
+            "sandbox.invalid.alias_import",
+            "node",
+            "negative/nodes/alias_import.ts",
+            '"#forbidden-node"',
+        ),
+        "symlink_import": (
+            "sandbox.invalid.symlink_import",
+            "node",
+            "negative/nodes/symlink_import.ts",
+            '"../links/math.ts"',
+        ),
+        "base_lib_reverse": (
+            "sandbox.negative.reverse",
+            "base_lib",
+            "negative/base_lib/reverse.ts",
+            '"../../nodes/math.ts"',
+        ),
+        "undeclared_external": (
+            "sandbox.invalid.undeclared_external",
+            "node",
+            "negative/nodes/undeclared_external.ts",
+            '"typescript"',
+        ),
+        "package_root_escape": (
+            "sandbox.invalid.package_root_escape",
+            "node",
+            "negative/nodes/package_root_escape.ts",
+            '"../../../outside.ts"',
+        ),
+        "dynamic_code": (
+            "sandbox.invalid.dynamic_code",
+            "node",
+            "negative/nodes/dynamic_code.ts",
+            "eval",
+        ),
+        "indirect_node_builtin": (
+            "sandbox.invalid.indirect_node_builtin",
+            "node",
+            "negative/helpers/node_builtin_bridge.ts",
+            '"node:fs"',
+        ),
+        "module_promise": (
+            "sandbox.invalid.module_promise",
+            "node",
+            "negative/nodes/module_promise.ts",
+            "const ready",
+        ),
+        "discarded_promise": (
+            "sandbox.invalid.discarded_promise",
+            "node",
+            "negative/nodes/discarded_promise.ts",
+            "void Promise",
+        ),
+        "long_lived_listener": (
+            "sandbox.invalid.long_lived_listener",
+            "node",
+            "negative/nodes/long_lived_listener.ts",
+            "addEventListener",
+        ),
+        "global_state": (
+            "sandbox.invalid.global_state",
+            "node",
+            "negative/nodes/global_state.ts",
+            "count +=",
+        ),
     }
     cases: list[tuple[str, Any]] = []
     for name, code in expected.items():
+        precise_expectation = precise.get(name)
+        expected_location = (
+            _source_marker_location(
+                PROJECT_ROOT / precise_expectation[2],
+                precise_expectation[3],
+            )
+            if precise_expectation is not None
+            else None
+        )
         cases.append(
             (
                 f"reject:{name}",
-                lambda name=name, code=code: expect_build_failure(
+                lambda name=name,
+                code=code,
+                precise_expectation=precise_expectation,
+                expected_location=expected_location: expect_build_failure(
                     lambda: cache.build(
                         f"negative_{name}",
                         f"negative/{name}.jsonc",
                         target="browser",
                     ),
                     expected_code=code,
+                    expected_owner_id=(
+                        precise_expectation[0]
+                        if precise_expectation is not None
+                        else None
+                    ),
+                    expected_owner_kind=(
+                        precise_expectation[1]
+                        if precise_expectation is not None
+                        else None
+                    ),
+                    expected_file=(
+                        PROJECT_ROOT / precise_expectation[2]
+                        if precise_expectation is not None
+                        else None
+                    ),
+                    expected_line=(
+                        expected_location[0]
+                        if expected_location is not None
+                        else None
+                    ),
+                    expected_column=(
+                        expected_location[1]
+                        if expected_location is not None
+                        else None
+                    ),
                 ),
             )
         )
     return cases
+
+
+def _source_marker_location(path: Path, marker: str) -> tuple[int, int]:
+    source = path.read_text(encoding="utf-8")
+    offset = source.index(marker)
+    previous_newline = source.rfind("\n", 0, offset)
+    return source.count("\n", 0, offset) + 1, offset - previous_newline
 
 
 def main() -> int:
@@ -422,12 +575,16 @@ def main() -> int:
         nested_override = lambda: cache.build(
             "nested_override", "nested_override.jsonc"
         )
+        nested_async = lambda: cache.build(
+            "nested_async", "nested_async.jsonc"
+        )
         runtime_node_failure = lambda: cache.build(
             "runtime_node_failure", "runtime_node_failure.jsonc"
         )
         runtime_output_failure = lambda: cache.build(
             "runtime_output_failure", "runtime_output_failure.jsonc"
         )
+        plugins = lambda: cache.build("plugins", "plugins.jsonc")
         cases: list[tuple[str, Any]] = [
             ("profile:esm-module", lambda: _manifest_case(
                 cache, key="linear_module", profile="esm-module"
@@ -439,6 +596,19 @@ def main() -> int:
             ("host-extension:lifecycle-and-capability", lambda: host_extension_case(cache)),
             ("host-extension:async-permanent-port-cleanup",
              lambda: permanent_port_host_case(cache)),
+            ("plugin:manifest-and-planned", lambda: plugin_manifest_case(
+                plugins()
+            )),
+            ("plugin:policy-compiler-hooks", lambda: build_plugin_hook_case(
+                plugins()
+            )),
+            ("plugin:runtime-repeat", lambda: runtime_plugin_repeat_case(
+                plugins()
+            )),
+            (
+                "plugin:runtime-concurrent-isolation",
+                lambda: runtime_plugin_concurrent_isolation_case(plugins()),
+            ),
             (
                 "execution:sync-async-taskplan-metadata",
                 lambda: execution_model_case(
@@ -472,6 +642,9 @@ def main() -> int:
             ("nodeset:nested-math", lambda: nodeset_case(nodeset().entry)),
             ("nodeset:nested-qualified-override", lambda: nested_override_case(
                 nested_override().entry
+            )),
+            ("nodeset:nested-deferred-detached", lambda: nested_async_case(
+                nested_async()
             )),
             ("loop:bounded-carry", lambda: loop_case(loop().entry)),
             ("loop:stop-when-carry-collect", lambda: loop_stop_when_case(
@@ -517,28 +690,53 @@ def main() -> int:
             )),
         ]
         if not args.skip_browser:
-            cases.append(
-                (
-                    "browser:no-auto-start",
-                    lambda: run_browser(
-                        cache.build(
-                            "linear_web",
-                            "linear.jsonc",
-                            target="browser",
-                            profile="web-app",
-                            html_template=PROJECT_ROOT / "web/index.template.html",
-                            app_entry=PROJECT_ROOT / "web/app.ts",
-                        ).out_dir,
-                        puppeteer_root=puppeteer_root,
-                        expected="15",
+            cases.extend(
+                [
+                    (
+                        "browser:no-auto-start",
+                        lambda: run_browser(
+                            cache.build(
+                                "linear_web",
+                                "linear.jsonc",
+                                target="browser",
+                                profile="web-app",
+                                html_template=(
+                                    PROJECT_ROOT / "web/index.template.html"
+                                ),
+                                app_entry=PROJECT_ROOT / "web/app.ts",
+                            ).out_dir,
+                            puppeteer_root=puppeteer_root,
+                            expected="15",
+                        ),
                     ),
-                )
+                    (
+                        "browser:permanent-host-web-app",
+                        lambda: browser_permanent_port_host_case(
+                            cache,
+                            puppeteer_root=puppeteer_root,
+                            profile="web-app",
+                        ),
+                    ),
+                    (
+                        "browser:permanent-host-esm-module",
+                        lambda: browser_permanent_port_host_case(
+                            cache,
+                            puppeteer_root=puppeteer_root,
+                            profile="esm-module",
+                        ),
+                    ),
+                ]
             )
         else:
-            cases.append(
+            cases.extend(
                 (
-                    "browser:no-auto-start",
+                    name,
                     lambda: skip_case("disabled with --skip-browser"),
+                )
+                for name in (
+                    "browser:no-auto-start",
+                    "browser:permanent-host-web-app",
+                    "browser:permanent-host-esm-module",
                 )
             )
         cases.append(

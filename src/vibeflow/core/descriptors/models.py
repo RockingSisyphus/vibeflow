@@ -485,6 +485,7 @@ from vibeflow.core.descriptors._resource_models import (  # noqa: E402
     CapabilityOperationDescriptor,
     DataSchemaDescriptor,
     HostExtensionDescriptor,
+    PluginDescriptor,
 )
 
 CapabilityOperation = CapabilityOperationDescriptor

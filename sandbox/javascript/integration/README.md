@@ -17,6 +17,9 @@ Positive workflows:
   nodeset;
 - `project/configs/nested_override.jsonc` applies a qualified config override
   to one of two sibling nested `math` nodes and proves it does not leak;
+- `project/configs/nested_async.jsonc` nests two nodesets around a deferred
+  result and a detached task, then verifies qualified task paths, cleanup
+  timeout location, and successful reuse after cleanup failure;
 - `project/configs/loop.jsonc` carries a number through a bounded three-step
   while loop;
 - `project/configs/loop_stop_when.jsonc` stops from body data and collects each
@@ -42,17 +45,25 @@ Positive workflows:
   Extension with an unbounded loop and the
   `receive → TypeScript math node/base_lib → send` Port path. The runner stops
   the host while the next receive is pending and verifies `VF_ABORTED` cleanup;
+- `project/configs/browser_permanent_port_host.jsonc` runs that permanent Port
+  topology in a real headless browser for both `web-app` and `esm-module`.
+  Browser `window.message` inputs are routed into two isolated Host instances;
+  the primary instance processes two values, reaches its third pending
+  `receive`, and is cancelled by idempotent `stop()` with `VF_ABORTED`. The
+  cases also reject import/create side effects and any `unhandledrejection`;
 - `project/configs/runtime_node_failure.jsonc` and
   `project/configs/runtime_output_failure.jsonc` exercise the stable error ABI
   for node exceptions and output Schema failures.
 
 The negative configs under `project/configs/negative/` each select one isolated
-invalid node or workflow. They cover direct
-node-to-node import, undeclared base_lib import, non-static dynamic import,
-runtime/local helper import, browser use of a Node builtin, and both directions
-of an immediate/suspend completion mismatch. They also reject a valid
-suspending node or a deferred TaskPlan placed inside a synchronous workflow,
-and reject discarded/unowned Promise work.
+invalid node or workflow. In addition to direct dependency violations, they
+exercise barrel, package alias and symlink paths, base_lib reverse imports,
+undeclared external packages, package-root escapes and indirect Node builtins.
+The source audit rejects dynamic code, module-level or discarded Promise work,
+long-lived node listeners and mutable module state, with stable diagnostic
+codes, owners and source locations. Completion mismatches, a suspending node or
+a deferred TaskPlan inside a synchronous workflow remain covered as separate
+execution-model failures.
 
 The runner also verifies that the default synchronous ABI returns a plain,
 non-thenable value immediately, while the explicit `runWorkflowAsync` ABI
@@ -91,7 +102,9 @@ The distribution builder includes the renderer lockfiles, and the runner
 installs them in its temporary workspace. No `node_modules` directory is
 created inside the distribution.
 
-Use `--skip-browser` when Puppeteer is unavailable. The runner builds the
+The default runner and CI gate require the Puppeteer browser cases and do not
+skip them. Use `--skip-browser` only for an explicitly reduced local run when
+Puppeteer is unavailable. The runner builds the
 positive and negative fixtures through VibeFlow's normal build API. The
 `web-app` fixture only registers a button handler; importing its generated
 module does not auto-run `runWorkflow()`. Reports are temporary by default;

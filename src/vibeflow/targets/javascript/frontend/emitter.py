@@ -43,6 +43,7 @@ class EmittedWorkflow:
     implementation_modules: tuple[str, ...]
     implementation_bindings: tuple[tuple[str, str], ...]
     host_extensions: tuple[str, ...] = ()
+    runtime_plugins: tuple[str, ...] = ()
 
 
 def emit_workflow_module(
@@ -69,6 +70,7 @@ def emit_workflow_module(
             str(key): implementation_override(value)
             for key, value in raw_overrides.items()
         }
+        runtime_plugins: tuple[Mapping[str, Any], ...] = ()
     else:
         if not isinstance(plan, WorkflowPlan):
             raise TypeError(
@@ -79,6 +81,10 @@ def emit_workflow_module(
         overrides = {}
         host_extensions = tuple(
             item.to_value() for item in javascript_bindings.host_extensions
+        )
+        runtime_plugins = tuple(
+            _plugin_binding_value(item)
+            for item in getattr(javascript_bindings, "runtime_plugins", ())
         )
     serializable = legacy_emission_payload(workflow)
     bindings: dict[tuple[str, str], str] = {}
@@ -104,6 +110,10 @@ def emit_workflow_module(
         host_extensions,
     )
     import_lines.extend(host_imports)
+    plugin_imports, plugin_factories = _runtime_plugin_imports(
+        runtime_plugins,
+    )
+    import_lines.extend(plugin_imports)
     canonical_plan = json.dumps(
         serializable,
         ensure_ascii=False,
@@ -116,6 +126,28 @@ def emit_workflow_module(
         payload=serializable,
         binding_expressions=binding_expressions,
     ).emit()
+    plugin_descriptors = [
+        {
+            "id": str(plugin.get("id", "")),
+            "target": str(plugin.get("target", "")),
+            "config": dict(plugin.get("config", {})),
+            "completion": str(plugin.get("completion", "immediate")),
+            "factory_index": index,
+        }
+        for index, plugin in enumerate(runtime_plugins)
+    ]
+    plugin_source = (
+        "const __vfRuntimePluginDescriptors = "
+        + json.dumps(
+            plugin_descriptors,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + ";\nconst __vfRuntimePluginFactories = ["
+        + ", ".join(plugin_factories)
+        + "];"
+    )
     if workflow.entry_mode == "sync":
         public_entry = (
             "export function runWorkflow(inputs, options) {\n"
@@ -131,6 +163,7 @@ def emit_workflow_module(
     source_parts = [
         "\n".join(import_lines),
         RUNTIME_SOURCE,
+        plugin_source,
         static_source,
         public_entry,
         (
@@ -157,6 +190,9 @@ def emit_workflow_module(
         implementation_bindings=tuple(bindings),
         host_extensions=tuple(
             str(item.get("id", "")) for item in host_extensions
+        ),
+        runtime_plugins=tuple(
+            str(item.get("id", "")) for item in runtime_plugins
         ),
     )
 
@@ -288,6 +324,52 @@ def _host_extension_imports(
             or "createHostExtension"
         )
         namespace = f"__vf_host_module_{index}"
+        lines.append(
+            f"import * as {namespace} from "
+            f"{json.dumps(module, ensure_ascii=False)};"
+        )
+        factories.append(
+            f"{namespace}[{json.dumps(exported, ensure_ascii=False)}]"
+        )
+    return lines, factories
+
+
+def _plugin_binding_value(value: object) -> Mapping[str, Any]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        payload = to_dict()
+        if isinstance(payload, Mapping):
+            return dict(payload)
+    to_value = getattr(value, "to_value", None)
+    if callable(to_value):
+        payload = to_value()
+        if isinstance(payload, Mapping):
+            return dict(payload)
+    raise TypeError("runtime plugin bindings must be serializable mappings")
+
+
+def _runtime_plugin_imports(
+    runtime_plugins: tuple[Mapping[str, Any], ...],
+) -> tuple[list[str], list[str]]:
+    lines: list[str] = []
+    factories: list[str] = []
+    for index, plugin in enumerate(runtime_plugins):
+        module_value = plugin.get("module", "")
+        exported = str(plugin.get("export", "createPlugin") or "createPlugin")
+        if not module_value:
+            implementation = plugin.get("implementation")
+            if isinstance(implementation, Mapping):
+                module_value = implementation.get(
+                    "module",
+                    implementation.get("ref", ""),
+                )
+                exported = str(
+                    implementation.get("export", exported) or exported
+                )
+        module = module_specifier(str(module_value))
+        namespace = f"__vf_runtime_plugin_module_{index}"
         lines.append(
             f"import * as {namespace} from "
             f"{json.dumps(module, ensure_ascii=False)};"

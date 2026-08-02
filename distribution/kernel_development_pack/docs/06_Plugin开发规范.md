@@ -1,8 +1,10 @@
 # 06. Plugin 开发规范
 
-插件用于扩展策略、编译和运行 hook。所有 plugin 都使用 `effect_scope=trusted`：可以执行 Python IO，并由当前 workflow 项目承担信任责任。这不允许插件绕过契约、拓扑或内核硬规则；如果插件放宽策略，必须按内核要求声明 relaxation。
+Plugin 用于扩展策略、编译和单次运行 hook，类型固定为 `policy`、`compiler`、`runtime`。Core 只处理 descriptor、selection、依赖和 Planned 状态；Python 与 JavaScript Target 分别绑定自己的实现，不能跨 Target 复用语言对象。
 
-## 注册和启用插件
+Python Plugin 使用 `effect_scope=trusted`，可以执行 Python IO，并由当前 workflow 项目承担信任责任。JS/TS Plugin 使用 `vibeflow.plugin.v1` 和静态 import/Promise 审计。两者都不能绕过契约、拓扑或内核硬规则。
+
+## Python Target：注册和启用
 
 每个 root 的 `project/registry.py` 可以用 `build_plugin_registry()` 声明可用插件：
 
@@ -90,10 +92,75 @@ config 字段说明：
 
 implemented plugin 必须暴露 `PLUGIN_INFO`，用于实现自检和 inspect 信息。审查图里的资源名称、类别、版本和说明来自 `build_plugin_registry().register(...)`。未在当前 workflow config 中引用的 registered plugin 不会加载、不会注册到 active `PluginRegistry`，也不会执行任何 policy/compiler/runtime hook。workflow 可以把已登记 plugin 标为 `planned`；它会作为 planned resource 进入 Architecture JSON 和 Mermaid/SVG，使项目不再 production-ready，但不会加载实现、注册 active plugin 或执行 hook。实现完成后保留同一 ID 并把使用项改为 `implemented`。
 
-JS/TS Host Extension 使用同样的“项目登记可用资源、workflow 显式引用、
-planned 只参加审查”模式，但不是 Python plugin。它由
-`descriptors.host_extensions` 登记并由 workflow 顶层 `host_extensions`
-选择；具体 descriptor、配置和生命周期规则见
+## JavaScript Target：descriptor 与 `vibeflow.plugin.v1`
+
+JS/TS Plugin 在 `vibeflow_project.jsonc` 的 `descriptors.plugins` 中登记，在
+workflow 顶层 `plugins` 中按 ID 选择。Descriptor 示例：
+
+```jsonc
+{
+  "kind": "plugin",
+  "id": "project.runtime_audit",
+  "type": "runtime",
+  "targets": ["browser", "node"],
+  "priority": 30,
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "completion": "immediate",
+      "source": {
+        "kind": "file",
+        "ref": "plugins/runtime_audit.ts",
+        "export": "createPlugin"
+      }
+    }
+  ],
+  "dependencies": [],
+  "external_packages": [],
+  "config": {"schema": {"type": "object"}, "defaults": {}}
+}
+```
+
+实现统一导出同步工厂：
+
+```ts
+export function createPlugin(context: Readonly<{
+  abiVersion: "vibeflow.plugin.v1";
+  pluginId: string;
+  pluginType: "policy" | "compiler" | "runtime";
+  target: "browser" | "node";
+  workflowId: string;
+  config: Readonly<Record<string, unknown>>;
+  signal: AbortSignal;
+}>) {
+  return {
+    beforeRun() {},
+    afterRun() {},
+    dispose() {},
+  };
+}
+```
+
+- Policy Plugin 使用 `extendPolicy`、`validateNode`、`validateGraph`、`validateNodeset`。
+- Compiler Plugin 使用 `beforeCompile`、`afterCompile`、`validateCompiledGraph`。
+- Runtime Plugin 使用 run/node/nodeset/block 前后与失败 hook，以及 `dispose`。
+- Policy/Compiler Plugin 在 AOT 构建期执行且必须 immediate；Runtime Plugin 按 invocation 创建并释放，suspend hook 只能进入异步 workflow。
+- Plugin 只能导入自身、声明的 Plugin 依赖与 external package，不能导入 node、`base_lib`、Host Extension、runtime、registry 或 Capability bridge。
+- Runtime Plugin 不得注册长期 listener/timer 或丢弃 Promise。需要跨 workflow 调用的宿主生命周期时使用 Host Extension。
+
+planned Plugin 可以没有 descriptor 或源码，只进入 Architecture JSON 与图形审查；
+它不绑定实现、不执行、不打包。implemented Plugin 不能依赖 planned Plugin。
+
+## Plugin 与 Host Extension 的分工
+
+Policy/Compiler Plugin 在构建期检查，Runtime Plugin 只覆盖一次 workflow 调用。
+Host Extension 则由 `createWorkflowHost()` 创建，负责跨多次调用的 `start()` /
+`stop()`、宿主事件接线和 Capability provider。Host Extension 不是 Plugin，
+Runtime Plugin 也不能代替 Host Extension。
+
+Host Extension 由 `descriptors.host_extensions` 登记并由 workflow 顶层
+`host_extensions` 选择；具体 descriptor、配置和生命周期规则见
 `11_JS_TS与Web_AOT构建指南.md`。
 
 workflow 通过 registry ID 引用 plugin，不内联 `module` / `class`。
@@ -104,7 +171,7 @@ workflow 通过 registry ID 引用 plugin，不内联 `module` / `class`。
 - 如果插件实现了 `configure(config)`，内核会在注册前调用。
 - `config` 和 `settings` 只能写对象。
 
-## PolicyPlugin
+## Python PolicyPlugin
 
 ```python
 from vibeflow.targets.python.project import PluginInfo
@@ -169,7 +236,7 @@ class PolicyPlugin:
 
 Policy plugin 也可以追加健康 finding，例如项目级命名规范、领域语义检查、特殊 nodeset 宽度限制等。
 
-## CompilerPlugin
+## Python CompilerPlugin
 
 ```python
 from vibeflow.targets.python.project import PluginInfo
@@ -196,7 +263,7 @@ Compiler plugin 可观察或追加编译期检查，但不能把非法 graph 改
 
 如果 compiler plugin 抛异常，编译失败，健康报告会显示 `GRAPH.COMPILE` 相关错误。
 
-## RuntimePlugin
+## Python RuntimePlugin
 
 ```python
 from vibeflow.targets.python.project import PluginInfo
@@ -247,7 +314,7 @@ Runtime plugin 适合记录观测数据、附加 trace、统计耗时或上报�
 
 这些 hook 是否执行受 `RuntimeOptions` 和 CLI runtime flags 控制，例如 `--node-hooks/--no-node-hooks`。
 
-## Finding plugin
+## Python Finding Plugin
 
 policy 插件也可以提供额外健康检查 hook，例如：
 

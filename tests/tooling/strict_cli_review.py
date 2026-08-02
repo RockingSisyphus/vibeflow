@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from tests.fixtures.support.strict_support import _seed_add_pipeline, cli_main
-from vibeflow.tooling.presentation.architecture_document import ARCHITECTURE_DOCUMENT_HEADER
+from vibeflow.tooling.application.python.presentation.architecture_document import ARCHITECTURE_DOCUMENT_HEADER
 
 
 _CANONICAL_SVG = (
@@ -82,7 +82,7 @@ def _review_args(workspace_path: Path, workflow_path: Path, output_path: Path) -
 
 
 def _install_fake_renderer(monkeypatch, *, svg_text: str = _CANONICAL_SVG) -> list[dict[str, object]]:
-    import vibeflow.tooling.presentation.mermaid.review_svg as review_svg_module
+    import vibeflow.tooling.application.python.presentation.mermaid.review_svg as review_svg_module
 
     calls: list[dict[str, object]] = []
 
@@ -106,7 +106,7 @@ def test_review_refreshes_architecture_validates_and_atomically_publishes_svg(
     monkeypatch,
     capsys,
 ) -> None:
-    from vibeflow.tooling.presentation.mermaid.render import (
+    from vibeflow.tooling.application.python.presentation.mermaid.render import (
         EXPANDED_MERMAID_MAX_EDGES,
         EXPANDED_MERMAID_MAX_TEXT_SIZE,
     )
@@ -156,7 +156,7 @@ def test_review_rejects_unregistered_workflow_without_rendering(tmp_path, monkey
     def fail_renderer(*args, **kwargs):
         raise AssertionError("unregistered workflow must not render")
 
-    monkeypatch.setattr("vibeflow.tooling.application.cli.review._render_canonical_review_svg", fail_renderer)
+    monkeypatch.setattr("vibeflow.tooling.application.python.cli.review._render_canonical_review_svg", fail_renderer)
     code = cli_main(_review_args(workspace_path, workflow_path, output_path))
     payload = json.loads(capsys.readouterr().out)
 
@@ -188,7 +188,7 @@ def test_review_rejects_output_that_would_overwrite_a_source(
     def fail_renderer(*args, **kwargs):
         raise AssertionError("conflicting output must be rejected before rendering")
 
-    monkeypatch.setattr("vibeflow.tooling.application.cli.review._render_canonical_review_svg", fail_renderer)
+    monkeypatch.setattr("vibeflow.tooling.application.python.cli.review._render_canonical_review_svg", fail_renderer)
     code = cli_main(_review_args(workspace_path, workflow_path, protected[conflict]))
     payload = json.loads(capsys.readouterr().out)
 
@@ -240,7 +240,7 @@ def test_review_preflight_failure_does_not_touch_architecture_or_render(tmp_path
     def fail_renderer(*args, **kwargs):
         raise AssertionError("failed preflight must not render")
 
-    monkeypatch.setattr("vibeflow.tooling.application.cli.review._render_canonical_review_svg", fail_renderer)
+    monkeypatch.setattr("vibeflow.tooling.application.python.cli.review._render_canonical_review_svg", fail_renderer)
     code = cli_main(_review_args(workspace_path, workflow_path, output_path))
     payload = json.loads(capsys.readouterr().out)
 
@@ -277,7 +277,7 @@ def test_review_stage_exception_is_json_failure_without_publishing(
     rule_id,
     architecture_is_refreshed,
 ) -> None:
-    import vibeflow.tooling.application.workspace_service as workspace_module
+    import vibeflow.tooling.application.python.workspace_service as workspace_module
 
     workspace_path, workflow_path, architecture_path, output_path = _write_review_workspace(tmp_path)
     architecture_before = b"architecture-before-stage-exception"
@@ -293,7 +293,7 @@ def test_review_stage_exception_is_json_failure_without_publishing(
         raise AssertionError("failed review stage must not render")
 
     monkeypatch.setattr(workspace_module, helper, raise_stage_error)
-    monkeypatch.setattr("vibeflow.tooling.application.cli.review._render_canonical_review_svg", fail_renderer)
+    monkeypatch.setattr("vibeflow.tooling.application.python.cli.review._render_canonical_review_svg", fail_renderer)
     code = cli_main(_review_args(workspace_path, workflow_path, output_path))
     payload = json.loads(capsys.readouterr().out)
 
@@ -338,7 +338,7 @@ def test_review_render_failure_preserves_existing_svg_and_writes_one_json_object
     def fail_renderer(*args, **kwargs):
         raise RuntimeError("renderer unavailable")
 
-    monkeypatch.setattr("vibeflow.tooling.application.cli.review._render_canonical_review_svg", fail_renderer)
+    monkeypatch.setattr("vibeflow.tooling.application.python.cli.review._render_canonical_review_svg", fail_renderer)
     code = cli_main(_review_args(workspace_path, workflow_path, output_path))
     stdout = capsys.readouterr().out
     payload = json.loads(stdout)

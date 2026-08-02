@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import json
 from pathlib import Path
 
@@ -7,14 +8,13 @@ import pytest
 
 from vibeflow.targets.javascript.build.builder import BuildResult
 from vibeflow.targets.javascript.frontend.model import normalize_workflow_plan
-from vibeflow.tooling.application.javascript_build import (
+from vibeflow.tooling.application.javascript.build import (
     ProjectBuildError,
     ProjectBuildRequest,
     build_project_aot,
     prepare_project_build,
 )
 from vibeflow.targets.javascript.build.toolchain import ToolchainInfo
-from vibeflow.targets.python.project.plugins import PluginRegistry
 
 
 def _write(path: Path, payload: object) -> None:
@@ -425,6 +425,47 @@ def test_prepare_project_build_loads_static_js_only_nested_project(
     assert composite.subplan.nodes[0].params["delta"] == 7
 
 
+def test_prepare_project_build_exposes_target_owned_compile_hook_seam(
+    tmp_path: Path,
+) -> None:
+    request = _request(tmp_path)
+    observed: list[tuple[str, ...]] = []
+
+    def before_compile(graph, catalogs):
+        observed.append(catalogs.nodes.available())
+        return graph
+
+    prepared = prepare_project_build(
+        request,
+        before_compile_hooks=(before_compile,),
+    )
+
+    assert observed == [("demo.add", "demo.start")]
+    assert prepared.declared_plugins == ()
+    assert prepared.planned_plugins == ()
+    assert prepared.plugin_bindings == ()
+
+
+def test_prepare_project_build_never_imports_python_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _request(tmp_path)
+    original_import = builtins.__import__
+
+    def guarded_import(name: str, *args, **kwargs):
+        if name == "vibeflow.targets.python" or name.startswith(
+            "vibeflow.targets.python."
+        ):
+            raise AssertionError(f"unexpected Python Target import: {name}")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+    prepared = prepare_project_build(request)
+
+    assert prepared.used_node_types == ("demo.add", "demo.start")
+
+
 def test_workflow_host_extensions_support_planned_and_instance_config(
     tmp_path: Path,
 ) -> None:
@@ -582,7 +623,7 @@ def test_host_extension_null_selection_is_not_an_empty_override(
     assert "must be a list" in captured.value.message
 
 
-def test_prepare_project_build_merges_optional_python_metadata(
+def test_prepare_project_build_ignores_python_registry_metadata(
     tmp_path: Path,
 ) -> None:
     request = _request(tmp_path)
@@ -590,33 +631,9 @@ def test_prepare_project_build_merges_optional_python_metadata(
     (project / "registry.py").write_text(
         "\n".join(
             (
-                "from vibeflow.core.contracts import DataProvider, DataRequirement",
-                "from vibeflow.targets.python.project.node import NodeContract, NodeInfo",
-                "from vibeflow.targets.python.project.registry import NodeRegistry",
-                "",
-                "class AddNode:",
-                "    NODE_INFO = NodeInfo(",
-                "        'demo.add', 'Add', 'demo',",
-                "        'Adds a configured value.', '1.0.0', 'terminal',",
-                "    )",
-                "    CONTRACT = NodeContract(",
-                "        requires=(DataRequirement('value.in', 'exactly_one'),),",
-                "        provides=(DataProvider('value.out', 'value.out'),),",
-                "        params_schema={'delta': {'type': 'number'}},",
-                "        output_schema={'value.out': {'type': 'number'}},",
-                "    )",
-                "    def run_pure(self, inputs, params):",
-                "        return {'value.out': params['delta']}",
-                "",
+                "raise AssertionError('JS AOT must not import Python registry.py')",
                 "def build_registry():",
-                "    registry = NodeRegistry()",
-                "    registry.register(",
-                "        'demo.add', AddNode,",
-                "        config_schema={'delta': {'type': 'number'}},",
-                "        config_defaults={'delta': 1},",
-                "    )",
-                "    return registry",
-                "",
+                "    raise AssertionError('JS AOT must not build a Python registry')",
             )
         ),
         encoding="utf-8",
@@ -633,7 +650,7 @@ def test_prepare_project_build_merges_optional_python_metadata(
         for item in prepared.catalogs.nodes.require(
             "demo.add"
         ).implementations
-    } == {"python", "typescript"}
+    } == {"typescript"}
     assert prepared.implementation_by_type["demo.add"]["language"] == "typescript"
 
 
@@ -754,30 +771,28 @@ def test_prepare_project_build_rejects_unaudited_source_kinds(
     assert "only accepts audited project files" in captured.value.message
 
 
-def test_prepare_project_build_rejects_python_runtime_plugin(
+def test_prepare_project_build_does_not_load_python_plugins(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     request = _request(tmp_path)
-    registry = PluginRegistry()
-
-    class RuntimePlugin:
-        pass
-
-    registry.register(
-        RuntimePlugin(),
-        plugin_type="runtime",
-        name="python-runtime",
+    project = Path(request.config).parent
+    (project / "python_plugin.py").write_text(
+        "raise AssertionError('JS AOT must not import Python plugins')\n",
+        encoding="utf-8",
     )
-    monkeypatch.setattr(
-        "vibeflow.tooling.application.javascript_build._project_plugins",
-        lambda _root, _registries: registry,
-    )
+    project_config = project / "vibeflow_project.jsonc"
+    raw = json.loads(project_config.read_text(encoding="utf-8"))
+    raw["plugins"] = [
+        {
+            "module": "python_plugin.py",
+            "type": "runtime",
+        }
+    ]
+    _write(project_config, raw)
 
-    with pytest.raises(ProjectBuildError) as captured:
-        prepare_project_build(request)
+    prepared = prepare_project_build(request)
 
-    assert captured.value.code == "VF_AOT_RUNTIME_PLUGIN"
+    assert prepared.implementation_by_type["demo.add"]["language"] == "typescript"
 
 
 def test_build_project_aot_forwards_prepared_request(
@@ -811,7 +826,7 @@ def test_build_project_aot_forwards_prepared_request(
         captured.append(build_request)
         return fake
 
-    monkeypatch.setattr("vibeflow.tooling.application.javascript_build.build_aot", fake_build)
+    monkeypatch.setattr("vibeflow.tooling.application.javascript.build.build_aot", fake_build)
     result = build_project_aot(request)
 
     assert result.entry == fake.entry

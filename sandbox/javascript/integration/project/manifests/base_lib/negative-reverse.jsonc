@@ -1,0 +1,18 @@
+{
+  "kind": "base_lib",
+  "id": "sandbox.negative.reverse",
+  "display_name": "Invalid reverse dependency helper",
+  "description": "Negative fixture that imports a Node implementation.",
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "negative/base_lib/reverse.ts"
+      }
+    }
+  ],
+  "dependencies": [],
+  "external_packages": []
+}

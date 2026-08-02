@@ -12,6 +12,9 @@ FLOW_KIND_DATA_STORE = "data_store"
 FLOW_KIND_DOCUMENT = "document"
 FLOW_KIND_PREPARATION = "preparation"
 
+EFFECT_SCOPE_NONE = "none"
+EFFECT_SCOPE_TRUSTED = "trusted"
+
 FLOW_KINDS = frozenset(
     {
         FLOW_KIND_TERMINAL,
@@ -27,6 +30,8 @@ FLOW_KINDS = frozenset(
 
 
 __all__ = [
+    "EFFECT_SCOPE_NONE",
+    "EFFECT_SCOPE_TRUSTED",
     "FLOW_KINDS",
     "FLOW_KIND_DATA_STORE",
     "FLOW_KIND_DECISION",

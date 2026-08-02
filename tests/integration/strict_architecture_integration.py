@@ -7,12 +7,12 @@ from pathlib import Path
 from tests.fixtures.support.strict_support import _nodeset_config, _seed_add_pipeline, _seed_only_pipeline, cli_main
 
 from vibeflow.tooling.project.config_loader import load_raw_config_document
-from vibeflow.tooling.presentation.architecture_document import ARCHITECTURE_DOCUMENT_HEADER
-from vibeflow.tooling.application.workspace_service import (
+from vibeflow.tooling.application.python.presentation.architecture_document import ARCHITECTURE_DOCUMENT_HEADER
+from vibeflow.tooling.application.python.workspace_service import (
     run_workspace_checked,
     validate_workspace_config_path,
 )
-from vibeflow.tooling.project.core import load_workspace_config
+from vibeflow.tooling.application.python.project.core import load_workspace_config
 
 
 def _write_architecture_workspace(

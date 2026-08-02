@@ -13,6 +13,7 @@ from vibeflow.core.descriptors.catalogs import (
     DescriptorCatalogs as CoreDescriptorCatalogs,
     HostExtensionCatalog,
     NodeCatalog,
+    PluginCatalog,
     SchemaRegistry,
 )
 
@@ -37,5 +38,6 @@ __all__ = [
     "DescriptorCatalogs",
     "HostExtensionCatalog",
     "NodeCatalog",
+    "PluginCatalog",
     "SchemaRegistry",
 ]

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from vibeflow.tooling.application.javascript_build import (
+from vibeflow.tooling.application.javascript.build import (
     ProjectBuildRequest,
     prepare_project_build,
 )

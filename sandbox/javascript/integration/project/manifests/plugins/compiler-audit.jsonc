@@ -1,0 +1,18 @@
+{
+  "kind": "plugin",
+  "id": "sandbox.compiler_audit",
+  "type": "compiler",
+  "targets": ["browser", "node"],
+  "priority": 20,
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "plugins/compiler_audit.ts",
+        "export": "createPlugin"
+      }
+    }
+  ]
+}

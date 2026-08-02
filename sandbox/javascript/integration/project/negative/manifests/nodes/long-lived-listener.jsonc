@@ -1,0 +1,23 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.invalid.long_lived_listener",
+  "display_name": "Invalid long-lived listener",
+  "category": "sandbox-negative",
+  "description": "Registers a long-lived host listener from a normal node.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [{"type": "sandbox.number", "cardinality": "exactly_one", "display_name": "Number"}],
+    "provides": [{"key": "result", "type": "sandbox.math.result", "display_name": "Result"}],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {"result": {"type": "number"}}
+  },
+  "implementations": [{
+    "language": "typescript",
+    "targets": ["browser"],
+    "source": {"kind": "file", "ref": "negative/nodes/long_lived_listener.ts", "export": "run"}
+  }],
+  "base_libs": [],
+  "capabilities": []
+}

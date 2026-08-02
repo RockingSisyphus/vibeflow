@@ -13,7 +13,7 @@ from tests.targets.javascript.strict_aot_project_build import _request, _write
 from tests.targets.javascript.test_aot_core import _fake_driver
 from vibeflow.targets.javascript.build import BuildRequest, build_aot
 from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
-from vibeflow.tooling.application.javascript_build import (
+from vibeflow.tooling.application.javascript.build import (
     ProjectBuildRequest,
     prepare_project_build,
 )

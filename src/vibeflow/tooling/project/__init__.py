@@ -5,17 +5,16 @@ from __future__ import annotations
 from importlib import import_module
 
 _EXPORTS = {
-    "WorkspaceConfig": ("vibeflow.tooling.project.types", "WorkspaceConfig"),
+    "WorkspaceConfig": (
+        "vibeflow.tooling.project.workspace_model",
+        "WorkspaceConfig",
+    ),
     "WorkspaceConfigError": (
         "vibeflow.tooling.project.architecture_types",
         "WorkspaceConfigError",
     ),
-    "collect_python_workflow_quality_facts": (
-        "vibeflow.tooling.project.python_quality",
-        "collect_python_workflow_quality_facts",
-    ),
     "load_workspace_config": (
-        "vibeflow.tooling.project.core",
+        "vibeflow.tooling.project.workspace_loader",
         "load_workspace_config",
     ),
 }

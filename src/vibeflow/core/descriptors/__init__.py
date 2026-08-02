@@ -8,6 +8,7 @@ from vibeflow.core.descriptors.catalogs import (
     DescriptorCatalogs,
     HostExtensionCatalog,
     NodeCatalog,
+    PluginCatalog,
     SchemaRegistry,
 )
 from vibeflow.core.descriptors.models import (
@@ -28,7 +29,18 @@ from vibeflow.core.descriptors.models import (
     ImplementationDescriptor,
     NodeContractDescriptor,
     NodeDescriptor,
+    PluginDescriptor,
     SourceLocator,
+)
+from vibeflow.core.descriptors._resource_models import PLUGIN_TYPES
+from vibeflow.core.descriptors.plugin_selection import (
+    PluginResolution,
+    PluginReviewRecord,
+    PluginSelection,
+    PluginSelectionError,
+    ResolvedPluginSelection,
+    review_plugin_selections,
+    resolve_plugin_selections,
 )
 
 __all__ = [
@@ -56,6 +68,16 @@ __all__ = [
     "NodeCatalog",
     "NodeContractDescriptor",
     "NodeDescriptor",
+    "PLUGIN_TYPES",
+    "PluginCatalog",
+    "PluginDescriptor",
+    "PluginResolution",
+    "PluginReviewRecord",
+    "PluginSelection",
+    "PluginSelectionError",
+    "ResolvedPluginSelection",
     "SchemaRegistry",
     "SourceLocator",
+    "review_plugin_selections",
+    "resolve_plugin_selections",
 ]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Mapping
 
@@ -14,6 +14,9 @@ from vibeflow.core.descriptors.models import (
     _thaw_json,
     _validate_implementation_coverage,
 )
+
+
+PLUGIN_TYPES = frozenset({"policy", "compiler", "runtime"})
 
 
 @dataclass(frozen=True)
@@ -385,4 +388,137 @@ class HostExtensionDescriptor:
             "provides": list(self.provides),
             "dependencies": list(self.dependencies),
             "external_packages": list(self.external_packages),
+        }
+
+
+@dataclass(frozen=True)
+class PluginDescriptor:
+    """Language-neutral metadata for one plugin implementation family.
+
+    The descriptor contains only frozen values and source locators.  Loading a
+    module, constructing a plugin, or retaining a Target-specific object is a
+    Target responsibility.
+    """
+
+    id: str
+    plugin_type: str
+    targets: tuple[str, ...]
+    implementations: tuple[ImplementationDescriptor, ...]
+    dependencies: tuple[str, ...] = ()
+    external_packages: tuple[str, ...] = ()
+    config_schema: Mapping[str, Any] = field(default_factory=dict)
+    config_defaults: Mapping[str, Any] = field(default_factory=dict)
+    priority: int = 100
+    display_name: str = ""
+    category: str = ""
+    description: str = ""
+    version: str = ""
+
+    def __post_init__(self) -> None:
+        plugin_id = _required_text(self.id, field_name="plugin.id")
+        plugin_type = _required_text(
+            self.plugin_type,
+            field_name="plugin.type",
+        ).lower()
+        if plugin_type not in PLUGIN_TYPES:
+            raise DescriptorModelError(
+                f"plugin.type must be one of {sorted(PLUGIN_TYPES)}"
+            )
+        targets = _string_tuple(self.targets, field_name="plugin.targets")
+        if not targets:
+            raise DescriptorModelError("plugin.targets cannot be empty")
+        unknown_targets = sorted(set(targets) - {"python", "node", "browser"})
+        if unknown_targets:
+            raise DescriptorModelError(
+                "plugin.targets contains unsupported targets: "
+                f"{unknown_targets}"
+            )
+        implementations = tuple(self.implementations)
+        if not implementations:
+            raise DescriptorModelError(
+                "plugin.implementations cannot be empty"
+            )
+        if not all(
+            isinstance(item, ImplementationDescriptor)
+            for item in implementations
+        ):
+            raise DescriptorModelError(
+                "plugin.implementations must contain "
+                "ImplementationDescriptor values"
+            )
+        _validate_implementation_coverage(
+            implementations,
+            field_name="plugin.implementations",
+        )
+        implementation_targets = {
+            target
+            for implementation in implementations
+            for target in implementation.targets
+        }
+        if set(targets) != implementation_targets:
+            raise DescriptorModelError(
+                "plugin.targets must exactly match implementation target coverage"
+            )
+        dependencies = _string_tuple(
+            self.dependencies,
+            field_name="plugin.dependencies",
+        )
+        if plugin_id in dependencies:
+            raise DescriptorModelError("plugin cannot depend on itself")
+        if isinstance(self.priority, bool) or not isinstance(self.priority, int):
+            raise DescriptorModelError("plugin.priority must be an integer")
+        object.__setattr__(self, "id", plugin_id)
+        object.__setattr__(self, "plugin_type", plugin_type)
+        object.__setattr__(self, "targets", targets)
+        object.__setattr__(self, "implementations", implementations)
+        object.__setattr__(self, "dependencies", dependencies)
+        object.__setattr__(
+            self,
+            "external_packages",
+            _string_tuple(
+                self.external_packages,
+                field_name="plugin.external_packages",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "config_schema",
+            _freeze_mapping(
+                self.config_schema,
+                field_name="plugin.config_schema",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "config_defaults",
+            _freeze_mapping(
+                self.config_defaults,
+                field_name="plugin.config_defaults",
+            ),
+        )
+        object.__setattr__(self, "display_name", str(self.display_name or "").strip())
+        object.__setattr__(self, "category", str(self.category or "").strip())
+        object.__setattr__(self, "description", str(self.description or "").strip())
+        object.__setattr__(self, "version", str(self.version or "").strip())
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "kind": "plugin",
+            "id": self.id,
+            "type": self.plugin_type,
+            "targets": list(self.targets),
+            "display_name": self.display_name,
+            "category": self.category,
+            "description": self.description,
+            "version": self.version,
+            "priority": self.priority,
+            "implementations": [
+                item.to_dict() for item in self.implementations
+            ],
+            "dependencies": list(self.dependencies),
+            "external_packages": list(self.external_packages),
+            "config": {
+                "schema": _thaw_json(self.config_schema),
+                "defaults": _thaw_json(self.config_defaults),
+            },
         }

@@ -5,6 +5,8 @@ from types import MappingProxyType
 from typing import Any, Mapping, Protocol
 
 from vibeflow.core.constants import (
+    EFFECT_SCOPE_NONE,
+    EFFECT_SCOPE_TRUSTED,
     FLOW_KINDS,
     FLOW_KIND_DATA_STORE,
     FLOW_KIND_DECISION,
@@ -17,10 +19,8 @@ from vibeflow.core.constants import (
 )
 from vibeflow.core.contracts import DataProvider, DataRequirement
 
-EFFECT_SCOPE_NONE = "none"
 EFFECT_SCOPE_TERMINAL = "terminal"
 EFFECT_SCOPE_PYTHON_IO = "python_io"
-EFFECT_SCOPE_TRUSTED = "trusted"
 
 # Effect authorization is derived from semantic node metadata.  ``purity`` is
 # retained as a compatibility field, but is deliberately not an authorization

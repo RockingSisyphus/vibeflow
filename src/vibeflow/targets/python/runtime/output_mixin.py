@@ -10,6 +10,10 @@ from vibeflow.targets.python.runtime.values import _store_output
 
 class RuntimeOutputMixin:
     def _deliver_transfer_only_edges(self, node_name: str, outputs: Mapping[str, object], state: _RuntimeState, scheduled_pairs: set[tuple[str, str]]) -> None:
+        # Deferred result-key tasks have not produced transferable values yet.
+        # Their routes and data are delivered once the task is joined.
+        if node_name in self._async_results:
+            return
         values = self._condition_values(node_name, outputs, state)
         for edge in self._frames[node_name].transfer_outgoing:
             if edge.pair in scheduled_pairs:

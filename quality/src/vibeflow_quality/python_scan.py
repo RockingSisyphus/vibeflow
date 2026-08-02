@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import ast
+from collections import deque
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 import importlib.util
 from pathlib import Path
 import sys
@@ -97,6 +100,52 @@ CORE_FORBIDDEN_METHODS = frozenset(
 )
 
 
+@dataclass(frozen=True, slots=True)
+class ImportEdge:
+    """One statically discoverable import between Python modules."""
+
+    source: str
+    target: str
+    raw_target: str
+    source_path: str
+    line: int
+    column: int
+    kind: str
+
+
+@dataclass(frozen=True, slots=True)
+class ModuleRecord:
+    """Parsed source and import facts for one repository module."""
+
+    name: str
+    path: Path
+    tree: ast.Module | None
+    parse_findings: tuple[Finding, ...]
+    imports: tuple[ImportEdge, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ImportGraph:
+    """Complete, source-only import graph for ``src/vibeflow``."""
+
+    modules: Mapping[str, ModuleRecord]
+
+    def neighbors(self, module: str) -> tuple[str, ...]:
+        record = self.modules.get(module)
+        if record is None:
+            return ()
+        return tuple(sorted({edge.target for edge in record.imports}))
+
+    def edge(self, source: str, target: str) -> ImportEdge | None:
+        record = self.modules.get(source)
+        if record is None:
+            return None
+        matches = [edge for edge in record.imports if edge.target == target]
+        if not matches:
+            return None
+        return min(matches, key=_edge_sort_key)
+
+
 def repository_path(path: Path, root: Path) -> str:
     try:
         return path.resolve().relative_to(root.resolve()).as_posix()
@@ -168,6 +217,80 @@ def parse_python(path: Path, root: Path) -> tuple[ast.Module | None, list[Findin
         ]
 
 
+def build_import_graph(root: Path) -> ImportGraph:
+    """Parse every owned module without importing the package under test.
+
+    The graph deliberately includes imports nested in functions and
+    ``TYPE_CHECKING`` branches.  It also records statically known calls to
+    ``importlib.import_module`` and ``__import__``.
+    """
+
+    source_root = root / "src"
+    package_root = source_root / "vibeflow"
+    parsed: dict[str, tuple[Path, ast.Module | None, tuple[Finding, ...]]] = {}
+    for path in iter_python_files(package_root):
+        name = module_name(path, source_root)
+        tree, findings = parse_python(path, root)
+        parsed[name] = (path, tree, tuple(findings))
+    known_modules = frozenset(parsed)
+    records: dict[str, ModuleRecord] = {}
+    for name, (path, tree, findings) in sorted(parsed.items()):
+        imports = (
+            _collect_import_edges(
+                module=name,
+                path=path,
+                root=root,
+                tree=tree,
+                known_modules=known_modules,
+            )
+            if tree is not None
+            else ()
+        )
+        records[name] = ModuleRecord(
+            name=name,
+            path=path,
+            tree=tree,
+            parse_findings=findings,
+            imports=imports,
+        )
+    return ImportGraph(records)
+
+
+def shortest_import_path(
+    graph: ImportGraph,
+    start: str,
+    forbidden: Callable[[str], bool],
+    *,
+    minimum_edges: int = 1,
+    stop_at: Callable[[str], bool] | None = None,
+) -> tuple[str, ...] | None:
+    """Return a deterministic shortest path from ``start`` to a violation."""
+
+    if start not in graph.modules:
+        return None
+    queue: deque[tuple[str, tuple[str, ...]]] = deque([(start, (start,))])
+    visited = {start}
+    while queue:
+        current, path = queue.popleft()
+        for target in graph.neighbors(current):
+            candidate = (*path, target)
+            edge_count = len(candidate) - 1
+            if forbidden(target):
+                if edge_count >= minimum_edges:
+                    return candidate
+                # A direct forbidden dependency is already reported by the
+                # layer scan.  Do not traverse through the forbidden layer.
+                continue
+            if target in visited:
+                continue
+            visited.add(target)
+            if stop_at is not None and stop_at(target):
+                continue
+            if target in graph.modules:
+                queue.append((target, candidate))
+    return None
+
+
 def _call_name(node: ast.Call) -> str:
     parts: list[str] = []
     cursor: ast.AST = node.func
@@ -179,27 +302,187 @@ def _call_name(node: ast.Call) -> str:
     return ".".join(reversed(parts))
 
 
-def _import_findings(
+def _edge_sort_key(edge: ImportEdge) -> tuple[object, ...]:
+    return (
+        edge.target,
+        edge.source_path,
+        edge.line,
+        edge.column,
+        edge.kind,
+        edge.raw_target,
+    )
+
+
+def _collect_import_edges(
     *,
-    layer: str,
     module: str,
     path: Path,
     root: Path,
     tree: ast.Module,
-) -> list[Finding]:
-    findings: list[Finding] = []
-    imports: list[tuple[str, int, int]] = []
+    known_modules: frozenset[str],
+) -> tuple[ImportEdge, ...]:
+    relative = repository_path(path, root)
+    importlib_aliases = {"importlib"}
+    import_module_aliases: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            imports.extend(
-                (alias.name, node.lineno, node.col_offset) for alias in node.names
-            )
+            for alias in node.names:
+                if alias.name == "importlib":
+                    importlib_aliases.add(alias.asname or alias.name)
+        elif isinstance(node, ast.ImportFrom) and node.module == "importlib":
+            for alias in node.names:
+                if alias.name == "import_module":
+                    import_module_aliases.add(alias.asname or alias.name)
+
+    edges: list[ImportEdge] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                edges.append(
+                    _import_edge(
+                        source=module,
+                        target=alias.name,
+                        raw_target=alias.name,
+                        source_path=relative,
+                        node=node,
+                        kind="import",
+                    )
+                )
         elif isinstance(node, ast.ImportFrom):
-            imports.append(
-                (imported_module(node, module, path), node.lineno, node.col_offset)
+            base = imported_module(node, module, path)
+            if not base:
+                continue
+            for alias in node.names:
+                candidate = (
+                    f"{base}.{alias.name}"
+                    if alias.name != "*"
+                    else base
+                )
+                target = candidate if candidate in known_modules else base
+                edges.append(
+                    _import_edge(
+                        source=module,
+                        target=target,
+                        raw_target=base,
+                        source_path=relative,
+                        node=node,
+                        kind="from",
+                    )
+                )
+        elif isinstance(node, ast.Call):
+            raw_target = _dynamic_import_target(
+                node,
+                importlib_aliases=importlib_aliases,
+                import_module_aliases=import_module_aliases,
             )
-    relative = repository_path(path, root)
-    for target, line, column in imports:
+            if raw_target is None:
+                continue
+            target = _resolve_dynamic_target(raw_target, node)
+            edges.append(
+                _import_edge(
+                    source=module,
+                    target=target,
+                    raw_target=raw_target,
+                    source_path=relative,
+                    node=node,
+                    kind="dynamic",
+                )
+            )
+    unique = {
+        (
+            edge.source,
+            edge.target,
+            edge.source_path,
+            edge.line,
+            edge.column,
+            edge.kind,
+        ): edge
+        for edge in edges
+    }
+    return tuple(sorted(unique.values(), key=_edge_sort_key))
+
+
+def _import_edge(
+    *,
+    source: str,
+    target: str,
+    raw_target: str,
+    source_path: str,
+    node: ast.AST,
+    kind: str,
+) -> ImportEdge:
+    return ImportEdge(
+        source=source,
+        target=target,
+        raw_target=raw_target,
+        source_path=source_path,
+        line=getattr(node, "lineno", 1),
+        column=getattr(node, "col_offset", 0),
+        kind=kind,
+    )
+
+
+def _dynamic_import_target(
+    node: ast.Call,
+    *,
+    importlib_aliases: set[str],
+    import_module_aliases: set[str],
+) -> str | None:
+    name = _call_name(node)
+    import_module_names = {
+        *(f"{alias}.import_module" for alias in importlib_aliases),
+        *import_module_aliases,
+    }
+    if name not in import_module_names and name != "__import__":
+        return None
+    value: ast.AST | None = node.args[0] if node.args else None
+    if value is None:
+        for keyword in node.keywords:
+            if keyword.arg in {"name", "module"}:
+                value = keyword.value
+                break
+    return _static_string(value)
+
+
+def _resolve_dynamic_target(raw_target: str, node: ast.Call) -> str:
+    if not raw_target.startswith("."):
+        return raw_target
+    package: str | None = None
+    if len(node.args) > 1:
+        package = _static_string(node.args[1])
+    if package is None:
+        for keyword in node.keywords:
+            if keyword.arg == "package":
+                package = _static_string(keyword.value)
+                break
+    if package is None:
+        return raw_target
+    try:
+        return importlib.util.resolve_name(raw_target, package)
+    except (ImportError, ValueError):
+        return "<invalid-relative-import>"
+
+
+def _static_string(node: ast.AST | None) -> str | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left = _static_string(node.left)
+        right = _static_string(node.right)
+        if left is not None and right is not None:
+            return left + right
+    return None
+
+
+def _import_findings(
+    *,
+    layer: str,
+    module: str,
+    imports: tuple[ImportEdge, ...],
+) -> list[Finding]:
+    findings: list[Finding] = []
+    for edge in imports:
+        target = edge.target
         destination = target_layer(target)
         message: str | None = None
         if destination is not None and destination not in ALLOWED_LAYERS[layer]:
@@ -216,10 +499,19 @@ def _import_findings(
                     severity="error",
                     subject_type="python_module",
                     subject_id=module,
-                    source_location=SourceLocation(relative, line, column),
+                    source_location=SourceLocation(
+                        edge.source_path,
+                        edge.line,
+                        edge.column,
+                    ),
                     message=f"{message}: imported {target!r}.",
                     suggested_fix="Move the dependency to its owning layer or pass plain data across the boundary.",
-                    details={"source_layer": layer, "target": target},
+                    details={
+                        "source_layer": layer,
+                        "target": target,
+                        "import_kind": edge.kind,
+                        "raw_target": edge.raw_target,
+                    },
                 )
             )
     return findings
@@ -370,23 +662,32 @@ def _subboundary_findings(
     return findings
 
 
-def scan_layer(root: Path, layer: str) -> list[Finding]:
+def scan_layer(
+    root: Path,
+    layer: str,
+    *,
+    graph: ImportGraph | None = None,
+) -> list[Finding]:
     source_root = root / "src"
     directory = source_root / "vibeflow" / LAYER_PATHS[layer]
+    active_graph = graph or build_import_graph(root)
     findings: list[Finding] = []
-    for path in iter_python_files(directory):
-        tree, parse_findings = parse_python(path, root)
-        findings.extend(parse_findings)
+    for record in sorted(active_graph.modules.values(), key=lambda item: item.name):
+        path = record.path
+        try:
+            path.relative_to(directory)
+        except ValueError:
+            continue
+        findings.extend(record.parse_findings)
+        tree = record.tree
         if tree is None:
             continue
-        module = module_name(path, source_root)
+        module = record.name
         findings.extend(
             _import_findings(
                 layer=layer,
                 module=module,
-                path=path,
-                root=root,
-                tree=tree,
+                imports=record.imports,
             )
         )
         if layer == "core":
@@ -404,10 +705,16 @@ def scan_layer(root: Path, layer: str) -> list[Finding]:
 
 
 __all__ = [
+    "ImportEdge",
+    "ImportGraph",
     "LAYER_MODULES",
     "LAYER_PATHS",
+    "ModuleRecord",
+    "build_import_graph",
     "iter_python_files",
     "parse_python",
     "repository_path",
     "scan_layer",
+    "shortest_import_path",
+    "target_layer",
 ]

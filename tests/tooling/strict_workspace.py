@@ -1,18 +1,18 @@
 from tests.fixtures.support.strict_support import *
 
-from vibeflow.tooling.application.workspace_service import (
+from vibeflow.tooling.application.python.workspace_service import (
     load_workspace_graph_for_export,
     run_workspace_checked,
     validate_workspace_config_path,
 )
-from vibeflow.tooling.project.core import (
+from vibeflow.tooling.application.python.project.core import (
     build_workspace_environment,
     build_workspace_node_registry,
     load_workspace_config,
 )
-from vibeflow.tooling.project.project_options import _workspace_runtime_options
-from vibeflow.tooling.project.quality import scan_workspace_code_quality
-from vibeflow.tooling.project.types import ArchitectureDocumentSpec, WorkspaceConfigError
+from vibeflow.tooling.application.python.project.project_options import _workspace_runtime_options
+from vibeflow.tooling.application.python.project.quality import scan_workspace_code_quality
+from vibeflow.tooling.application.python.project.types import ArchitectureDocumentSpec, WorkspaceConfigError
 
 
 def test_workspace_cross_root_nodeset_validate_run_and_export(tmp_path) -> None:
@@ -178,7 +178,7 @@ def test_workspace_project_runtime_config_and_override_precedence(tmp_path) -> N
 
 
 def test_run_workspace_checked_uses_one_effective_root_runtime_options_object(tmp_path, monkeypatch) -> None:
-    import vibeflow.tooling.application.runner as runner_module
+    import vibeflow.tooling.application.python.runner as runner_module
 
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
     _write_project_config(framework_root, runtime={"async_max_workers": 2})
@@ -686,7 +686,7 @@ class Plugin:
 def test_workspace_review_uses_legacy_project_host_extension_selection_until_workflow_overrides(
     tmp_path,
 ) -> None:
-    from vibeflow.tooling.presentation.architecture_document import (
+    from vibeflow.tooling.application.python.presentation.architecture_document import (
         build_architecture_document,
     )
 

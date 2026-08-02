@@ -46,7 +46,7 @@ def test_graph_health_reports_node_metrics_duplicate_logic_and_confusing_node_na
     assert duplicate["details"]["fingerprint"]
     assert duplicate["details"]["duplicate_group"] == ["DuplicateOne", "duplicate_two"]
     assert "similar_to" in duplicate["details"]["suppression_hint"]
-    from vibeflow.tooling.application.reports import format_finding_text
+    from vibeflow.tooling.application.python.reports import format_finding_text
 
     text = format_finding_text(next(warning for warning in report.warnings if warning.rule_id == "GRAPH.SMELL.DUPLICATE_LOGIC"))
     assert "\n  details:" in text
@@ -360,7 +360,7 @@ def test_health_report_aggregates_duplicate_findings_but_not_different_direct_so
     assert duplicate.details["suppressed_duplicates"] == 1
     assert len(simulated_missing) == 2
 
-    from vibeflow.tooling.application.reports import format_finding_text
+    from vibeflow.tooling.application.python.reports import format_finding_text
 
     text = format_finding_text(duplicate)
     assert '"aggregated":true' in text

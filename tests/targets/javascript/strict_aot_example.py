@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vibeflow.tooling.application.javascript_build import (
+from vibeflow.tooling.application.javascript.build import (
     ProjectBuildRequest,
     prepare_project_build,
 )

@@ -9,7 +9,7 @@ from vibeflow.targets.python.project.compiler import GraphCompiler
 from vibeflow.core import GraphConfigError
 from vibeflow.core.descriptors import NodeCatalog, NodeContractDescriptor, NodeDescriptor
 from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
-from vibeflow.tooling.project.core import load_workspace_config
+from vibeflow.tooling.application.python.project.core import load_workspace_config
 from vibeflow.tooling.project.graph_config import parse_graph_config
 
 

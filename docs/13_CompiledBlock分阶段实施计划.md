@@ -1,6 +1,6 @@
 # CompiledBlock 分阶段实施计划
 
-> 状态：历史设计记录。0.8 中 Python 编译执行实现位于 `vibeflow.targets.python.runtime`；本文中的阶段路径不作为当前公共 API。
+> 状态：历史设计记录。0.9 中 Python 编译执行实现位于 `vibeflow.targets.python.runtime`；本文中的阶段路径不作为当前公共 API。
 
 本文是 `12_CompiledBlock完整代码生成计划.md` 的落地拆分方案。目标是把 `execution="compiled"` 从当前的线性 block fast path，逐步实现为真正的 Python execution block，同时控制每一版的验证范围和回归风险。
 

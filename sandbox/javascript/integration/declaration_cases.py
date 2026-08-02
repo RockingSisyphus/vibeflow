@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import tempfile
 
-from vibeflow.tooling.application.javascript_build import ProjectBuildResult
+from vibeflow.tooling.application.javascript.build import ProjectBuildResult
 
 from sandbox_support import PROJECT_ROOT
 

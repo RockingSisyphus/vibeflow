@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -21,7 +22,18 @@ from vibeflow.targets.javascript.frontend.model import AotPlanError, WorkflowSpe
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 REAL_TOOLCHAIN_ROOT = (
-    REPOSITORY_ROOT / "sandbox" / "javascript" / "minimal" / "project"
+    Path(
+        os.environ.get(
+            "VIBEFLOW_TEST_TOOLCHAIN_ROOT",
+            str(
+                REPOSITORY_ROOT
+                / "sandbox"
+                / "javascript"
+                / "minimal"
+                / "project"
+            ),
+        )
+    ).resolve()
 )
 
 

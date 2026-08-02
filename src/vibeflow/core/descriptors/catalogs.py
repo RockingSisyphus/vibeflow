@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Generic, Iterable, Iterator, TypeVar
 
 from vibeflow.core.descriptors.models import (
@@ -9,6 +9,7 @@ from vibeflow.core.descriptors.models import (
     DataSchemaDescriptor,
     HostExtensionDescriptor,
     NodeDescriptor,
+    PluginDescriptor,
 )
 
 
@@ -19,6 +20,7 @@ DescriptorT = TypeVar(
     DataSchemaDescriptor,
     CapabilityDescriptor,
     HostExtensionDescriptor,
+    PluginDescriptor,
 )
 
 
@@ -155,6 +157,11 @@ class HostExtensionCatalog(_DescriptorCatalog[HostExtensionDescriptor]):
     descriptor_type = HostExtensionDescriptor
 
 
+class PluginCatalog(_DescriptorCatalog[PluginDescriptor]):
+    descriptor_label = "plugin"
+    descriptor_type = PluginDescriptor
+
+
 @dataclass(frozen=True)
 class DescriptorCatalogs:
     nodes: NodeCatalog
@@ -162,6 +169,7 @@ class DescriptorCatalogs:
     schemas: SchemaRegistry
     capabilities: CapabilityCatalog
     host_extensions: HostExtensionCatalog
+    plugins: PluginCatalog = field(default_factory=PluginCatalog)
     @classmethod
     def empty(cls) -> DescriptorCatalogs:
         return cls(
@@ -170,6 +178,7 @@ class DescriptorCatalogs:
             schemas=SchemaRegistry(),
             capabilities=CapabilityCatalog(),
             host_extensions=HostExtensionCatalog(),
+            plugins=PluginCatalog(),
         )
 
     def to_dict(self) -> dict[str, object]:
@@ -179,6 +188,7 @@ class DescriptorCatalogs:
             "data_schemas": self.schemas.to_dict(),
             "capabilities": self.capabilities.to_dict(),
             "host_extensions": self.host_extensions.to_dict(),
+            "plugins": self.plugins.to_dict(),
         }
 
     @property

@@ -7,6 +7,10 @@ from pathlib import Path
 import time
 from typing import Any, Mapping
 
+from vibeflow.tooling.project.document_kinds import (
+    is_architecture_document_text,
+)
+
 @dataclass(frozen=True)
 class ConfigDocument:
     path: Path
@@ -121,12 +125,7 @@ def _load_config_document(
 
 
 def _is_architecture_document(text: str) -> bool:
-    from vibeflow.tooling.presentation.architecture_document import (
-        ARCHITECTURE_DOCUMENT_HEADER,
-    )
-
-    header = "\n".join(text.splitlines()[:4])
-    return text.startswith(ARCHITECTURE_DOCUMENT_HEADER) or "NON-EXECUTABLE ARCHITECTURE REVIEW DOCUMENT." in header
+    return is_architecture_document_text(text)
 
 
 def _is_architecture_document_payload(data: Mapping[str, Any]) -> bool:
@@ -360,7 +359,7 @@ def strip_jsonc_comments(text: str, *, path: Path | None = None) -> str:
 def _trace_config_load(message: str) -> None:
     if str(os.environ.get("VIBEFLOW_CONFIG_TRACE", "")).lower() not in {"1", "true", "yes", "on"}:
         return
-    from vibeflow.tooling.application.diagnostics import emit_core_diagnostic
+    from vibeflow.tooling.project.diagnostic_sink import emit_core_diagnostic
 
     emit_core_diagnostic(f"[vibeflow config] {message}")
 

@@ -31,7 +31,7 @@ def _find_repository_root(start: Path) -> Path:
 REPOSITORY_ROOT = _find_repository_root(SOURCE_SANDBOX_ROOT)
 sys.path.insert(0, str(REPOSITORY_ROOT / "src"))
 
-from vibeflow.tooling.application.javascript_build import (  # noqa: E402
+from vibeflow.tooling.application.javascript.build import (  # noqa: E402
     ProjectBuildRequest,
     build_project_aot,
 )

@@ -1,0 +1,24 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.invalid.discarded_promise",
+  "display_name": "Invalid discarded Promise",
+  "category": "sandbox-negative",
+  "description": "Starts Promise work that is not owned by the workflow call or a TaskPlan.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [{"type": "sandbox.number", "cardinality": "exactly_one", "display_name": "Number"}],
+    "provides": [{"key": "result", "type": "sandbox.math.result", "display_name": "Result"}],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {"result": {"type": "number"}}
+  },
+  "implementations": [{
+    "language": "typescript",
+    "targets": ["browser", "node"],
+    "completion": "suspend",
+    "source": {"kind": "file", "ref": "negative/nodes/discarded_promise.ts", "export": "run"}
+  }],
+  "base_libs": [],
+  "capabilities": []
+}

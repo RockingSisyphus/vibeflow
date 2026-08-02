@@ -24,7 +24,7 @@ def test_importing_project_tooling_does_not_load_removed_aot_package() -> None:
             "-c",
             """
 import sys
-import vibeflow.tooling.application.javascript_build
+import vibeflow.tooling.application.javascript.build
 loaded = sorted(
     name for name in sys.modules
     if name == "vibeflow.aot" or name.startswith("vibeflow.aot.")

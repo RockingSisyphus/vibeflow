@@ -30,6 +30,9 @@ _MANIFEST_KEYS = frozenset(
         "files",
     }
 )
+_OPTIONAL_MANIFEST_KEYS = frozenset(
+    {"plugin_abi_version", "plugins"}
+)
 _TOOLCHAIN_KEYS = frozenset(
     {"node", "typescript", "esbuild", "lock_sha256", "lock_files"}
 )
@@ -72,7 +75,14 @@ def validate_owned_build_directory(
             "VF_BUILD_REPLACE",
             "VibeFlow AOT manifest must be a JSON object",
         )
-    if set(manifest) != _MANIFEST_KEYS:
+    manifest_keys = set(manifest)
+    if (
+        not _MANIFEST_KEYS.issubset(manifest_keys)
+        or not manifest_keys.issubset(
+            _MANIFEST_KEYS | _OPTIONAL_MANIFEST_KEYS
+        )
+        or (("plugins" in manifest) != ("plugin_abi_version" in manifest))
+    ):
         raise AotPublishError(
             "VF_BUILD_REPLACE",
             "VibeFlow AOT manifest fields do not match the current format",
@@ -84,6 +94,10 @@ def validate_owned_build_directory(
         )
     _require_text(manifest, "abi_version")
     _require_text(manifest, "workflow_id")
+    if "plugin_abi_version" in manifest:
+        if manifest.get("plugin_abi_version") != "vibeflow.plugin.v1":
+            _invalid_manifest("plugin_abi_version is invalid")
+        _validate_plugins(manifest.get("plugins"))
     if manifest.get("entry_mode") not in {"sync", "async"}:
         _invalid_manifest("entry_mode must be 'sync' or 'async'")
     if manifest.get("target") not in {"browser", "node"}:
@@ -173,6 +187,50 @@ def validate_owned_build_directory(
                 f"refusing to replace a modified AOT file: {name}",
             )
     return manifest
+
+
+def _validate_plugins(value: Any) -> None:
+    if not isinstance(value, Mapping) or set(value) != {
+        "active",
+        "annotations",
+        "declared",
+        "planned",
+        "relaxations",
+    }:
+        _invalid_manifest("plugins must contain the canonical plugin fields")
+    for field in (
+        "active",
+        "annotations",
+        "declared",
+        "planned",
+        "relaxations",
+    ):
+        if not isinstance(value.get(field), list):
+            _invalid_manifest(f"plugins.{field} must be a list")
+    for field in ("active", "declared"):
+        for item in value[field]:
+            if not isinstance(item, Mapping):
+                _invalid_manifest(f"plugins.{field} entries must be objects")
+            plugin_id = item.get("id")
+            config_hash = item.get("config_hash")
+            if not isinstance(plugin_id, str) or not plugin_id:
+                _invalid_manifest(f"plugins.{field} plugin id is invalid")
+            if (
+                not isinstance(config_hash, str)
+                or not _SHA256_RE.fullmatch(config_hash)
+            ):
+                _invalid_manifest(
+                    f"plugins.{field} config_hash is invalid"
+                )
+            if item.get("status") == "implemented":
+                source_hash = item.get("source_hash")
+                if (
+                    not isinstance(source_hash, str)
+                    or not _SHA256_RE.fullmatch(source_hash)
+                ):
+                    _invalid_manifest(
+                        f"plugins.{field} source_hash is invalid"
+                    )
 
 
 def atomic_publish_directory(

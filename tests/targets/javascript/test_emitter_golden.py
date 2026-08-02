@@ -232,48 +232,48 @@ def _emission_cases() -> dict[str, tuple[dict[str, object], tuple[dict, ...]]]:
 # semantic plan.  Update them only after reviewing an intentional ABI change.
 EMISSION_GOLDENS = {
     "sync": (
-        "4f30ad4c35aeffa75a10258bc39f144053f49c8b5cc7fa34143e5a0ae92bd089",
-        "24299780f5a1f05b13b53447ffd7072e10191f1428360f8fde4ce8c011962940",
+        "db4efe92715e7487d0c43ed3c18fd751dabed1cebcd60946c1376c373ef3d859",
+        "dd0f3dc4d13cf8c3d29cdbfca7fc91afb0110d0ca1427d85b1e7c72e2c67c83c",
         "647cc1392cf87d016ad27e19beff02d6d069ccda1e4c92aee20b29961c55d125",
     ),
     "async": (
-        "7e7f2191bf23f5bce90b838fdb9a35591de08a78821006f5dbce5d430cc146ae",
-        "3c0898f48986c79e778ce8e848e5c37f840b99824e451bb120b0f5bbfb7884ca",
+        "5994b3ddeb92a687e7aae0c1006699b868bd69775434b722472f455d71467da7",
+        "d0586ad8be6682d31a6db68ac9d6b0695b7642c1e3840feee6dc560e41840c77",
         "6c8130e53e36301ca4681efc508589012d2f1395605d4f68e979b45f4636bc0d",
     ),
     "nested_nodeset": (
-        "e5cc6b0dc5465773b515e1ed946a1487f2e9c544d2c2139aa13fd3e4540b5fd2",
-        "24299780f5a1f05b13b53447ffd7072e10191f1428360f8fde4ce8c011962940",
+        "0d2cedeeeeb2962c7e3d93677813c84f4e8e102106495b64feba49d300ad784e",
+        "dd0f3dc4d13cf8c3d29cdbfca7fc91afb0110d0ca1427d85b1e7c72e2c67c83c",
         "1890c50bbdbe71dd80e2d4e955a272e291dd53a20fd770639104601c570d117f",
     ),
     "bounded_loop": (
-        "fc105e1f84135bed3c3e1892ca9f099a5e991df2cacec6b7f28bce9293858047",
-        "24299780f5a1f05b13b53447ffd7072e10191f1428360f8fde4ce8c011962940",
+        "f7038af61285d77f524692dfac611c7b2d5ba8ec4dd628a19ac337b33627ab0c",
+        "dd0f3dc4d13cf8c3d29cdbfca7fc91afb0110d0ca1427d85b1e7c72e2c67c83c",
         "1edb9e76ca6269131b74403b50c0ab2cc2d39376ef31b20d95a4ac27705694b5",
     ),
     "unbounded_loop": (
-        "bc7ae26cdac1ad67d36127628ced54cec3375846d921f9a52048e17c28eb0fdf",
-        "24299780f5a1f05b13b53447ffd7072e10191f1428360f8fde4ce8c011962940",
+        "2e757f2abb9c00a770319892172a973d0db62159eafa43b9d65af33e1edb07ec",
+        "dd0f3dc4d13cf8c3d29cdbfca7fc91afb0110d0ca1427d85b1e7c72e2c67c83c",
         "8b57e73e80d4f7b8ef8e29db7150407805ae481b42591c28b5419b53cae19792",
     ),
     "deferred": (
-        "e0550b361157042fc168e9a0f5ef24e4cb644338257ab5d74f98568b194029f7",
-        "3c0898f48986c79e778ce8e848e5c37f840b99824e451bb120b0f5bbfb7884ca",
+        "16a8725269c2d74fccfa6e39be1a68c137116fa41c5159f30eab686415a5157e",
+        "d0586ad8be6682d31a6db68ac9d6b0695b7642c1e3840feee6dc560e41840c77",
         "f20b53bd8a256a618467ec6b1afcbd02e391543b270740992b6eeb3a92e723a8",
     ),
     "detached": (
-        "fd51d8243bc10379e0a53f8b962fd8b5497e53a59a8856d63fa7abb00caa3a9d",
-        "2ab6f096b9086e821e5b29ca726def9ff292a658533e5f24e46308842f0b64f1",
+        "f42ec0bbab2f9b2e702eaebd8ed69a6480a3f9dc9bcad5c753f4f0142fc1ffc4",
+        "34f0265fc5a4ba8a200b257332b4d7370c39712c2e62ebdbd07403444e0c59d7",
         "7c966aceb1938e165458a653735babad706a2f264715f79a8be389bf3bfe577e",
     ),
     "port": (
-        "036c45d6d861ec5a94053b24ff50227d062ab5a45f719aba9a463157146cf054",
-        "30977a4dadc4085054afa603a12bc4a768ae6edc49b87d9910e8489e5e4ec1c1",
+        "af59e5ee0f4bef6b3ba3285f7ae235302cd7963a05d607d9b77dcdef6cabd683",
+        "09d1eeaa26188ad47fde7a222b5ecef7dfaf0ff05cf3c5a952e4a914defa3ca5",
         "b0e5cc9456776a74ac0de29b68c3fa92d4051326f745676fa29a919a3b36c815",
     ),
     "host_extension": (
-        "faf54ae22c1e8857645c7fa90489a40c31ef8c9fbd5cb8b783720aee56872d2d",
-        "5ffcc25c9b599a137faf213f60e7438afb27c37d69b18c3eb7032f403ef2da49",
+        "9c7c09f0ae0b6d7f95629fdc7a6673a4dc7b397ae9042a39be730828976a8cf7",
+        "9a007aa76be0f7b1b45216b8f479dac7ce383296b940071e3c99647695597e31",
         "647cc1392cf87d016ad27e19beff02d6d069ccda1e4c92aee20b29961c55d125",
     ),
 }
@@ -673,8 +673,9 @@ def test_importing_emitted_module_does_not_run_workflow_or_host_extension(
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout) == {
         "events": [],
-        "exports": [
-            "VIBEFLOW_WORKFLOW_ABI",
+            "exports": [
+                "VIBEFLOW_PLUGIN_ABI",
+                "VIBEFLOW_WORKFLOW_ABI",
             "VibeFlowWorkflowError",
             "createWorkflowHost",
             "runWorkflow",

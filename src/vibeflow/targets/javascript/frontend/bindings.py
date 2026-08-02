@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from dataclasses import dataclass, field
+import hashlib
 import json
 from pathlib import Path
 from typing import Mapping, Sequence
@@ -18,6 +19,154 @@ from vibeflow.targets.javascript.frontend.model_types import (
     SCHEDULES,
     CapabilityRequirement,
 )
+
+
+PLUGIN_TYPES = frozenset({"policy", "compiler", "runtime"})
+PLUGIN_STATUSES = frozenset({"implemented", "planned"})
+
+
+@dataclass(frozen=True)
+class JavascriptPluginBinding:
+    """Frozen JavaScript plugin factory facts beside the portable plan."""
+
+    id: str
+    plugin_type: str
+    status: str
+    target: str
+    implementation: SourceRef | None = None
+    config: Mapping[str, object] | PortableObject = field(default_factory=dict)
+    completion: str = "immediate"
+    priority: int = 100
+    dependencies: tuple[str, ...] = ()
+    external_packages: tuple[str, ...] = ()
+    language: str = ""
+    source_hash: str = ""
+    config_hash: str = ""
+
+    def __post_init__(self) -> None:
+        plugin_id = _required_text(self.id, "plugin id")
+        plugin_type = str(self.plugin_type or "").strip().lower()
+        status = str(self.status or "").strip().lower()
+        if plugin_type not in PLUGIN_TYPES and not (
+            status == "planned" and not plugin_type
+        ):
+            raise ValueError(f"plugin type must be one of {sorted(PLUGIN_TYPES)}")
+        if status not in PLUGIN_STATUSES:
+            raise ValueError(
+                f"plugin status must be one of {sorted(PLUGIN_STATUSES)}"
+            )
+        target = str(self.target or "").strip().lower()
+        if target not in {"node", "browser"}:
+            raise ValueError("plugin target must be node or browser")
+        if status == "implemented" and not isinstance(
+            self.implementation,
+            SourceRef,
+        ):
+            raise TypeError("implemented plugin requires a SourceRef")
+        if (
+            status == "implemented"
+            and isinstance(self.implementation, SourceRef)
+            and not self.implementation.export.strip()
+        ):
+            raise ValueError("implemented plugin requires a factory export")
+        if status == "planned" and self.implementation is not None:
+            raise ValueError("planned plugin cannot bind an implementation")
+        config = _portable_object(self.config, "plugin config")
+        if self.completion not in COMPLETIONS:
+            raise ValueError(f"completion must be one of {sorted(COMPLETIONS)}")
+        if plugin_type in {"policy", "compiler"} and self.completion != "immediate":
+            raise ValueError(
+                f"{plugin_type} plugin factory must use immediate completion"
+            )
+        if isinstance(self.priority, bool) or not isinstance(self.priority, int):
+            raise TypeError("plugin priority must be an integer")
+        language = str(self.language or "").strip().lower()
+        language = {"js": "javascript", "ts": "typescript"}.get(
+            language,
+            language,
+        )
+        if status == "implemented" and language not in {
+            "javascript",
+            "typescript",
+        }:
+            raise ValueError(
+                "implemented JavaScript plugin language must be javascript or typescript"
+            )
+        if status == "planned" and language:
+            raise ValueError("planned plugin cannot bind an implementation language")
+        source_hash = _content_hash(self.source_hash, "source_hash")
+        if status == "planned" and source_hash:
+            raise ValueError("planned plugin cannot bind a source hash")
+        canonical_config = json.dumps(
+            config.to_value(),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        expected_config_hash = hashlib.sha256(
+            canonical_config.encode("utf-8")
+        ).hexdigest()
+        config_hash = _content_hash(self.config_hash, "config_hash")
+        if config_hash and config_hash != expected_config_hash:
+            raise ValueError("config_hash does not match plugin config")
+        object.__setattr__(self, "id", plugin_id)
+        object.__setattr__(self, "plugin_type", plugin_type)
+        object.__setattr__(self, "status", status)
+        object.__setattr__(self, "target", target)
+        object.__setattr__(self, "config", config)
+        object.__setattr__(
+            self,
+            "dependencies",
+            _unique_text_tuple(self.dependencies, "plugin dependencies"),
+        )
+        object.__setattr__(
+            self,
+            "external_packages",
+            _unique_text_tuple(
+                self.external_packages,
+                "plugin external_packages",
+            ),
+        )
+        object.__setattr__(self, "language", language)
+        object.__setattr__(self, "source_hash", source_hash)
+        object.__setattr__(self, "config_hash", expected_config_hash)
+
+    @property
+    def module(self) -> str:
+        return self.implementation.ref if self.implementation is not None else ""
+
+    @property
+    def export(self) -> str:
+        return self.implementation.export if self.implementation is not None else ""
+
+    def to_dict(self) -> dict[str, object]:
+        payload: dict[str, object] = {
+            "id": self.id,
+            "status": self.status,
+            "target": self.target,
+            "config": self.config.to_value(),
+            "priority": self.priority,
+            "dependencies": list(self.dependencies),
+            "external_packages": list(self.external_packages),
+            "config_hash": self.config_hash,
+        }
+        if self.plugin_type:
+            payload["type"] = self.plugin_type
+        if self.implementation is not None:
+            payload.update(
+                {
+                    "module": self.module,
+                    "export": self.export,
+                    "completion": self.completion,
+                    "language": self.language,
+                    "source_hash": self.source_hash,
+                }
+            )
+        return payload
+
+    def to_value(self) -> dict[str, object]:
+        return self.to_dict()
 
 
 @dataclass(frozen=True)
@@ -120,6 +269,7 @@ class JavascriptBindingPlan:
     base_libs: Mapping[str, object] | PortableObject = field(default_factory=dict)
     capabilities: Mapping[str, object] | PortableObject = field(default_factory=dict)
     host_extensions: tuple[Mapping[str, object] | PortableObject, ...] = ()
+    runtime_plugins: tuple[JavascriptPluginBinding, ...] = ()
     import_policy: Mapping[str, object] | PortableObject = field(default_factory=dict)
     schema_member_orders: tuple[JavascriptSchemaMemberOrder, ...] = ()
 
@@ -144,6 +294,28 @@ class JavascriptBindingPlan:
                 for index, value in enumerate(self.host_extensions)
             ),
         )
+        runtime_plugins = tuple(self.runtime_plugins)
+        if not all(
+            isinstance(item, JavascriptPluginBinding)
+            for item in runtime_plugins
+        ):
+            raise TypeError(
+                "runtime_plugins must contain JavascriptPluginBinding values"
+            )
+        invalid_runtime = [
+            item.id
+            for item in runtime_plugins
+            if item.plugin_type != "runtime" or item.status != "implemented"
+        ]
+        if invalid_runtime:
+            raise ValueError(
+                "runtime_plugins must contain active runtime bindings: "
+                f"{invalid_runtime}"
+            )
+        plugin_ids = tuple(item.id for item in runtime_plugins)
+        if len(set(plugin_ids)) != len(plugin_ids):
+            raise ValueError("runtime plugin ids must be unique")
+        object.__setattr__(self, "runtime_plugins", runtime_plugins)
         orders = tuple(self.schema_member_orders)
         if not all(isinstance(item, JavascriptSchemaMemberOrder) for item in orders):
             raise TypeError(
@@ -171,6 +343,7 @@ class JavascriptBindingPlan:
             "base_libs": self.base_libs.to_value(),
             "capabilities": self.capabilities.to_value(),
             "host_extensions": [item.to_value() for item in self.host_extensions],
+            "runtime_plugins": [item.to_dict() for item in self.runtime_plugins],
             "import_policy": self.import_policy.to_value(),
             "schema_member_orders": [
                 item.to_dict() for item in self.schema_member_orders
@@ -197,6 +370,7 @@ def build_javascript_binding_plan(
     base_libs: Mapping[str, object] | None = None,
     capabilities: Mapping[str, object] | None = None,
     host_extensions: Sequence[Mapping[str, object]] = (),
+    runtime_plugins: Sequence[JavascriptPluginBinding] = (),
     import_policy: Mapping[str, object] | None = None,
 ) -> JavascriptBindingPlan:
     """Build a JavaScript sidecar from plain, in-memory Target facts."""
@@ -256,6 +430,7 @@ def build_javascript_binding_plan(
         base_libs=base_libs or {},
         capabilities=capabilities or {},
         host_extensions=tuple(host_extensions),
+        runtime_plugins=tuple(runtime_plugins),
         import_policy=import_policy or {},
         schema_member_orders=tuple(schema_orders),
     )
@@ -269,6 +444,16 @@ def _mapping_fact(
     if not isinstance(value, Mapping):
         raise TypeError(f"implementation {key} must be a mapping")
     return value
+
+
+def _content_hash(value: object, field_name: str) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized and (
+        len(normalized) != 64
+        or any(character not in "0123456789abcdef" for character in normalized)
+    ):
+        raise ValueError(f"{field_name} must be an SHA-256 hex digest")
+    return normalized
 
 
 def _base_lib_ids(
@@ -445,5 +630,10 @@ def _unique_text_tuple(value: object, label: str) -> tuple[str, ...]:
     return normalized
 
 
-__all__ = ["JavascriptBindingPlan", "JavascriptCallBinding",
-           "JavascriptSchemaMemberOrder", "build_javascript_binding_plan"]
+__all__ = [
+    "JavascriptBindingPlan",
+    "JavascriptCallBinding",
+    "JavascriptPluginBinding",
+    "JavascriptSchemaMemberOrder",
+    "build_javascript_binding_plan",
+]

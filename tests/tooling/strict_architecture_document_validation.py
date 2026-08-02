@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-from vibeflow.tooling.presentation.architecture_validation import architecture_regenerate_command, check_architecture_document
+from vibeflow.tooling.application.python.presentation.architecture_validation import architecture_regenerate_command, check_architecture_document
 from vibeflow.tooling.project.config_loader import ConfigLoadError, load_config_document, load_raw_config_document
-from vibeflow.tooling.presentation.architecture_document import ARCHITECTURE_DOCUMENT_HEADER
+from vibeflow.tooling.application.python.presentation.architecture_document import ARCHITECTURE_DOCUMENT_HEADER
 
 
 def _expected(payload: dict[str, object]) -> str:

@@ -30,6 +30,7 @@ from vibeflow.core.descriptors.models import (
     ImplementationDescriptor,
     NodeContractDescriptor,
     NodeDescriptor,
+    PluginDescriptor,
     SourceLocator,
 )
 from vibeflow.core.config.node import normalize_node_config_spec
@@ -45,6 +46,7 @@ def parse_descriptor_manifest(
     | DataSchemaDescriptor
     | CapabilityDescriptor
     | HostExtensionDescriptor
+    | PluginDescriptor
 ):
     """Parse one already-decoded manifest object."""
 
@@ -64,6 +66,7 @@ def parse_descriptor_manifest(
         "data_schema": _parse_data_schema,
         "capability": _parse_capability,
         "host_extension": _parse_host_extension,
+        "plugin": _parse_plugin,
     }
     try:
         selected = parser[kind]
@@ -246,6 +249,7 @@ def _parse_implementations(
     value: object,
     *,
     field: str,
+    default_export: str | None = None,
 ) -> tuple[ImplementationDescriptor, ...]:
     items = _object_list(value, field=field)
     implementations: list[ImplementationDescriptor] = []
@@ -287,7 +291,7 @@ def _parse_implementations(
                     export=_nullable_string(
                         source.get("export"),
                         field=f"{item_field}.source.export",
-                    ),
+                    ) or default_export,
                 ),
                 completion=_optional_string(
                     item.get("completion")
@@ -495,3 +499,64 @@ def _parse_host_extension(
         ),
     )
 
+
+def _parse_plugin(data: Mapping[str, Any]) -> PluginDescriptor:
+    _check_fields(
+        data,
+        allowed={
+            "kind",
+            "id",
+            "type",
+            "targets",
+            "display_name",
+            "category",
+            "description",
+            "version",
+            "priority",
+            "implementations",
+            "dependencies",
+            "external_packages",
+            "config",
+        },
+        field="plugin",
+    )
+    config = _mapping_or_empty(data.get("config"), field="plugin.config")
+    _check_fields(
+        config,
+        allowed={"schema", "defaults"},
+        field="plugin.config",
+    )
+    raw_priority = data.get("priority", 100)
+    if isinstance(raw_priority, bool) or not isinstance(raw_priority, int):
+        raise DescriptorModelError("plugin.priority must be an integer")
+    return PluginDescriptor(
+        id=_required_string(data.get("id"), field="plugin.id"),
+        plugin_type=_required_string(data.get("type"), field="plugin.type"),
+        targets=_string_list(data.get("targets"), field="plugin.targets"),
+        display_name=_optional_string(data.get("display_name")),
+        category=_optional_string(data.get("category")),
+        description=_optional_string(data.get("description")),
+        version=_optional_string(data.get("version")),
+        priority=raw_priority,
+        implementations=_parse_implementations(
+            data.get("implementations"),
+            field="plugin.implementations",
+            default_export="createPlugin",
+        ),
+        dependencies=_string_list(
+            data.get("dependencies", ()),
+            field="plugin.dependencies",
+        ),
+        external_packages=_string_list(
+            data.get("external_packages", ()),
+            field="plugin.external_packages",
+        ),
+        config_schema=_mapping_or_empty(
+            config.get("schema"),
+            field="plugin.config.schema",
+        ),
+        config_defaults=_mapping_or_empty(
+            config.get("defaults"),
+            field="plugin.config.defaults",
+        ),
+    )

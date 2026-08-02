@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from vibeflow.tooling.project.resource_registries import BaseLibRegistry
+from vibeflow.tooling.application.python.project.resource_registries import BaseLibRegistry
 from vibeflow.core.contracts import DataProvider
 from vibeflow.core.descriptors import (
     JSON_SCHEMA_2020_12,

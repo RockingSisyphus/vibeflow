@@ -1,11 +1,11 @@
 # VibeFlow 使用者开发引导
 
-本文面向使用 VibeFlow（包名 `vibeflow`）编写业务 node、nodeset、plugin、base_lib 和 JSONC config 的开发者。VibeFlow 0.8.0 是破坏性 API 版本：Python 代码直接从所属分层包导入，不再从根包导入业务对象。VibeFlow 有两条开发路径：
+本文面向使用 VibeFlow（包名 `vibeflow`）编写业务 node、nodeset、plugin、base_lib 和 JSONC config 的开发者。VibeFlow 0.9.0 使用分层 API：Python 代码直接从所属包导入，不从根包导入业务对象。VibeFlow 有两条开发路径：
 
 - **Python Runtime**：Python node、base_lib 和 plugin 通过 `project/registry.py` 注册，由 VibeFlow Runtime 校验并执行；本文主体详细说明这条路径。
-- **JavaScript/TypeScript AOT**：JS/TS node、base_lib、数据 Schema、Capability 和 Host Extension 通过 `project/manifests/` 下的 JSONC descriptor 登记，由 `build` 命令生成独立 ESM 或 Web 应用；生成物运行时不需要 Python 或 VibeFlow Runtime。默认同步入口导出 `runWorkflow()`，显式异步入口导出 `runWorkflowAsync()`。完整格式、工具链和三个 profile 在源码仓库见 `docs/js_aot_build.md`，在分发包见 `kernel/docs/11_JS_TS与Web_AOT构建指南.md`。
+- **JavaScript/TypeScript AOT**：JS/TS node、base_lib、Plugin、数据 Schema、Capability 和 Host Extension 通过 `project/manifests/` 下的 JSONC descriptor 登记，由 `build` 命令生成独立 ESM 或 Web 应用；生成物运行时不需要 Python 或 VibeFlow Runtime。默认同步入口导出 `runWorkflow()`，显式异步入口导出 `runWorkflowAsync()`。完整格式、工具链和三个 profile 在源码仓库见 `docs/js_aot_build.md`，在分发包见 `kernel/docs/11_JS_TS与Web_AOT构建指南.md`。
 
-两条路径共享 JSONC workflow、显式 `pipeline.edges`、contract、分支、合流、nodeset、有限/永久 loop 和 `vibeflow.io` 等可移植流程语义，但实现登记、宿主能力和公共输出 ABI 不相同。不要让 JS/TS node 通过 Python registry 注册，也不要把 Python Runtime plugin 当作 AOT 宿主接口；AOT 的宿主交互使用每次调用注入的 Capability，长期宿主接线使用 JS/TS Host Extension。
+两条路径共享 JSONC workflow、显式 `pipeline.edges`、contract、分支、合流、nodeset、有限/永久 loop 和 `vibeflow.io` 等可移植流程语义，但实现登记、宿主能力和公共输出 ABI 不相同。两个 Target 及其 Application closure 完全隔离：JS/TS 资源不用 Python registry，Python 资源也不进入 AOT。AOT 的宿主交互使用逐调用 Capability，长期接线使用 Host Extension。
 
 Python 项目常用导入来自以下稳定入口：
 
@@ -21,7 +21,7 @@ from vibeflow.targets.python.project import (
 )
 from vibeflow.targets.python.quality import HealthFinding
 from vibeflow.targets.python.runtime import PipelineRuntime, RuntimeOptions
-from vibeflow.tooling.application import run_checked, run_workspace_checked
+from vibeflow.tooling.application.python import run_checked, run_workspace_checked
 from vibeflow.tooling.project import load_workspace_config
 ```
 
@@ -544,7 +544,7 @@ value = result.context.get("value.out")["value"]
 
 ```python
 from vibeflow.targets.python.runtime import RuntimeOptions
-from vibeflow.tooling.application import run_checked
+from vibeflow.tooling.application.python import run_checked
 
 run_checked(..., runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
 ```
@@ -732,6 +732,17 @@ workflow 使用项中标为 planned；它作为资源进入架构审查，但不
 ```
 
 若 plugin 放宽可降级规则，必须声明作用域、原因和来源。项目级语义规则适合通过 policy plugin 增加。
+
+## JavaScript/TypeScript Plugin
+
+JavaScript Target 同样支持 `policy`、`compiler`、`runtime` 三类 Plugin。它们通过 `descriptors.plugins` 登记，在 workflow 顶层 `plugins` 按 ID 选择，源码统一导出同步工厂 `createPlugin(context)`，ABI 常量为 `vibeflow.plugin.v1`。
+
+- Policy/Compiler Plugin 在 AOT 构建期执行，只能追加 finding、annotation 或合规 relaxation，不能改写 graph 或关闭 Core 硬错误。
+- Runtime Plugin 为每次 workflow 调用创建独立实例，围绕 run/node/nodeset/block 执行 hook，最后调用 `dispose()`。同步入口只允许 immediate Plugin；suspend Runtime Plugin 只能进入异步入口。
+- Runtime Plugin 不注册长期监听器、定时器或未归属 Promise。需要跨多次调用保持宿主事件接线或提供 Capability 时使用 Host Extension。
+- Planned Plugin 只进入 Architecture JSON 和图形审查，不解析源码、不执行、不打包。implemented Plugin 不能依赖 planned Plugin。
+
+完整 descriptor、工厂签名、Hook 与 Host Extension 分工见 `js_aot_build.md`。
 
 ## Python Runtime Registry
 

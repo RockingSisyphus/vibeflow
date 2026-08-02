@@ -2,7 +2,7 @@
 
 本文档面向维护 VibeFlow（包名 `vibeflow`）自身的开发者，不是面向业务项目编写 node、nodeset 或 plugin 的使用者指南。
 
-VibeFlow 0.8.0 是破坏性 API 版本。根包不导出业务对象，维护代码只使用 `vibeflow.core`、`vibeflow.block_compiler`、`vibeflow.targets.*` 和 `vibeflow.tooling.*` 的所属层入口。
+VibeFlow 0.9.0 使用分层 API。根包不导出业务对象，维护代码只使用 `vibeflow.core`、`vibeflow.block_compiler`、`vibeflow.targets.*` 和 `vibeflow.tooling.*` 的所属层入口。
 
 ## 基本验证流程
 
@@ -51,17 +51,19 @@ Tooling 标准化项目数据
 维护规则：
 
 - `WorkflowPlan` / `BlockPlan` 只保存冻结的 JSON 值、稳定 ID、契约、路由、block 引用和 `SourceRef`，不得保存 Python class、callable、实例或生成后的 Python/JavaScript 源码。
-- `PythonBindingPlan` 保存 callable、有效参数和插件引用；`JavascriptBindingPlan` 保存 JS/TS 源码、Schema、base_lib、Capability、Host Extension 和 import policy。两者都不能进入公共 IR。
+- `PythonBindingPlan` 保存 callable、有效参数和插件引用；`JavascriptBindingPlan` 保存 JS/TS 源码、Schema、base_lib、Plugin、Capability、Host Extension 和 import policy。两者都不能进入公共 IR。
 - Python Runtime 支持 `ExecutionPlan` 与 plan/block/compiled 三种模式；这些对象属于 Python Target，不进入公共 IR。
 - JavaScript emitter 以 `WorkflowPlan + JavascriptBindingPlan` 为语义来源。
 - Core 和 Block Compiler 不得做文件、环境、动态 import、subprocess 或语言实现操作；两个 Target 不得互相 import。
-- node、`base_lib`、data schema、Capability 和 Host Extension 使用静态 JSONC descriptor 建模。静态 descriptor 与 Python 注册同时存在时必须一致。
+- node、`base_lib`、data schema、Capability、Plugin 和 Host Extension 使用静态 JSONC descriptor 建模。静态 descriptor 与 Python 注册同时存在时必须一致。
 - JavaScript emitter 根据 `entry_mode` 输出同步 `runWorkflow()` 或异步 `runWorkflowAsync()`，不是把原始流程图或通用 graph walker 搬进目标环境。生成模块被 import 时不得执行业务 workflow 或启动扩展。
 - Capability descriptor 只定义依赖契约。实现由宿主在每次调用时注入或由 Host Extension 提供；调用状态、trace、任务和 Capability wrapper 不得保存在可变模块级业务状态中。
 - `descriptors.host_extensions` 登记 project 可用扩展，workflow 顶层
   `host_extensions` 选择本流程实际使用的资源。implemented 扩展解析、检查并
   打包；planned 扩展只进入 Architecture JSON 和图形审查，不参与生命周期或
   Capability 提供。
+- Plugin 的 Core descriptor/selection 是普通冻结数据。Python 与 JavaScript Target 分别绑定实现；JS/TS 使用 `vibeflow.plugin.v1` 的 `createPlugin(context)`。Policy/Compiler Plugin 在构建期运行，Runtime Plugin 按 invocation 创建和释放，Host Extension 按 host 生命周期 start/stop。三者不得互相代替。
+- Planned Plugin 与 Planned Host Extension 只进入审查，不加载源码、不绑定实现、不执行或打包；implemented 资源不能依赖 planned 资源。
 - `completion`、`schedule`、`executor` 必须分开建模；同步 JS 计划不得包含 suspend/deferred/detached。TypeScript 源码审计负责拒绝声明不实和未归属 Promise，不增加运行时 thenable 兜底。
 - `max_iterations: null`、组合 stop 和无 stop 永久 loop 是公开语义；`vibeflow.io` 是内核节点，不应要求 Python registry 或 JS node descriptor。
 - Capability 的声明、Schema 检查和 import 审计不是安全沙箱。重试、回滚、并发安全和真实副作用仍由宿主实现负责。
@@ -89,6 +91,8 @@ PYTHONPATH=src python sandbox/javascript/minimal/run_e2e.py --skip-browser
 ```
 
 JavaScript integration Sandbox 覆盖 node/`base_lib` 数学组合、数据传递、schedule/transfer edge、分支与合流、nodeset、嵌套 override、有界/无界 loop、同步/异步 ABI、Port、Promise node、Capability、取消、trace、detached 清理、completion mismatch、隐藏 Promise、稳定错误码、非法 import、source map、确定性发布和三个 profile：
+
+0.9 还覆盖 `vibeflow.plugin.v1` 的 Policy/Compiler/Runtime hook 顺序、依赖闭包、Planned 不绑定实现、同步/异步 completion、构建清单，以及 Host Extension 的真实浏览器 start/stop、Port、取消、双 host 隔离和无 import 副作用。
 
 ```bash
 npm ci --prefix tools/mermaid-renderer
@@ -274,7 +278,7 @@ PYTHONPATH=src python -m vibeflow quality-check --path <project>
 ## 维护边界
 
 - VibeFlow 仓库自身使用独立 `quality/` profiles，不通过用户项目入口添加仓库特例。
-- 修改审核链路时复用 Core inspection、workspace validation 和 `tooling.presentation`，不复制解析或渲染链。
+- 修改 Python 审核链路时复用 Core inspection、workspace validation 和 `tooling.application.python.presentation`，不复制解析或渲染链。
 - 修改跨语言语义时先更新 Core、Block Compiler 和 conformance fixture，再更新具体 Target。
 - 修改用户可见的 JS/TS 配置、ABI、错误码或构建行为时，同步更新 `docs/js_aot_build.md`、JavaScript Sandbox 和分发测试。
 - 完成验证后运行 `python tools/clean_workspace.py`。只有预览结果准确时才运行 `--apply`；清理器不处理 `.git/`、`references/` 或 `distribution/` 源模板。

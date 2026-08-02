@@ -6,11 +6,11 @@ from pathlib import Path
 import pytest
 
 from vibeflow.tooling.application.cli import main
-from vibeflow.tooling.application.cli.delegate_cli import extract_delegate_cli_exit_code, validate_delegate_cli_graph_contract
+from vibeflow.tooling.application.python.cli.delegate_cli import extract_delegate_cli_exit_code, validate_delegate_cli_graph_contract
 from vibeflow.core.contracts import DataEnvelope, DataProvider, DataRequirement, RunResult
 from vibeflow.core import HealthReport
-from vibeflow.tooling.application.diagnostics import emit_core_diagnostic
-from vibeflow.tooling.application.runner import CheckedRunResult
+from vibeflow.tooling.application.python.diagnostics import emit_core_diagnostic
+from vibeflow.tooling.application.python.runner import CheckedRunResult
 from vibeflow.tooling.project.graph_config import parse_graph_config
 from vibeflow.targets.python.project.node import NodeContract, NodeInfo
 from vibeflow.targets.python.project.plugins import PluginRegistry
@@ -21,7 +21,10 @@ from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
 
 @pytest.fixture(autouse=True)
 def _stub_delegate_workspace_loader(monkeypatch):
-    monkeypatch.setattr("vibeflow.tooling.application.cli._load_workspace_for_cli", lambda path: object())
+    monkeypatch.setattr(
+        "vibeflow.tooling.application.python.cli._load_workspace_for_cli",
+        lambda path: object(),
+    )
 
 
 class _StartNode:
@@ -500,7 +503,7 @@ def test_delegate_cli_forwards_unknown_prefix_and_raw_suffix(monkeypatch, tmp_pa
         emit_core_diagnostic("config trace")
         return _result(run_dir, 7)
 
-    monkeypatch.setattr("vibeflow.tooling.application.workspace_service.run_workspace_checked", fake_run_workspace_checked)
+    monkeypatch.setattr("vibeflow.tooling.application.python.workspace_service.run_workspace_checked", fake_run_workspace_checked)
     status = main(
         [
             "delegate-cli",
@@ -554,7 +557,7 @@ def test_delegate_cli_omitted_separator_preserves_argv_and_does_not_read_stdin(
         return _result(run_dir, 0)
 
     monkeypatch.setattr(sys, "stdin", UnreadableStdin())
-    monkeypatch.setattr("vibeflow.tooling.application.workspace_service.run_workspace_checked", fake_run_workspace_checked)
+    monkeypatch.setattr("vibeflow.tooling.application.python.workspace_service.run_workspace_checked", fake_run_workspace_checked)
 
     status = main(
         [
@@ -599,7 +602,7 @@ def test_delegate_cli_returns_valid_graph_exit_values_unchanged(monkeypatch, tmp
         assert run_dir.is_dir()
         return _result(run_dir, value)
 
-    monkeypatch.setattr("vibeflow.tooling.application.workspace_service.run_workspace_checked", fake_run_workspace_checked)
+    monkeypatch.setattr("vibeflow.tooling.application.python.workspace_service.run_workspace_checked", fake_run_workspace_checked)
 
     status = main(
         [
@@ -630,7 +633,7 @@ def test_delegate_cli_rejects_invalid_graph_exit_values(monkeypatch, tmp_path, c
         assert run_dir.is_dir()
         return _result(run_dir, value)
 
-    monkeypatch.setattr("vibeflow.tooling.application.workspace_service.run_workspace_checked", fake_run_workspace_checked)
+    monkeypatch.setattr("vibeflow.tooling.application.python.workspace_service.run_workspace_checked", fake_run_workspace_checked)
     status = main(
         [
             "delegate-cli",
@@ -657,7 +660,7 @@ def test_delegate_cli_runtime_failure_is_logged_without_core_console(monkeypatch
         assert run_dir.is_dir()
         raise RuntimeError("secret business payload")
 
-    monkeypatch.setattr("vibeflow.tooling.application.workspace_service.run_workspace_checked", fake_run_workspace_checked)
+    monkeypatch.setattr("vibeflow.tooling.application.python.workspace_service.run_workspace_checked", fake_run_workspace_checked)
     status = main(
         [
             "delegate-cli",
@@ -692,7 +695,7 @@ def test_delegate_cli_routes_async_core_diagnostics_to_run_log(monkeypatch, tmp_
         ).run(kwargs["initial"])
         return CheckedRunResult(kwargs["run_id"], run_dir, HealthReport(status="PASS"), context)
 
-    monkeypatch.setattr("vibeflow.tooling.application.workspace_service.run_workspace_checked", run_async_graph)
+    monkeypatch.setattr("vibeflow.tooling.application.python.workspace_service.run_workspace_checked", run_async_graph)
 
     status = main(
         [
@@ -784,7 +787,7 @@ def test_delegate_cli_treats_runtime_option_abbreviation_as_business_argv(
         captured.update(kwargs)
         return _result(Path(kwargs["_prepared_run_dir"]), 0)
 
-    monkeypatch.setattr("vibeflow.tooling.application.workspace_service.run_workspace_checked", fake_run_workspace_checked)
+    monkeypatch.setattr("vibeflow.tooling.application.python.workspace_service.run_workspace_checked", fake_run_workspace_checked)
 
     status = main(
         [
@@ -891,7 +894,7 @@ def test_delegate_cli_allows_business_policy_after_separator(monkeypatch, tmp_pa
         captured.update(kwargs)
         return _result(Path(kwargs["_prepared_run_dir"]), 0)
 
-    monkeypatch.setattr("vibeflow.tooling.application.workspace_service.run_workspace_checked", fake_run_workspace_checked)
+    monkeypatch.setattr("vibeflow.tooling.application.python.workspace_service.run_workspace_checked", fake_run_workspace_checked)
 
     status = main(
         [
@@ -918,7 +921,7 @@ def test_delegate_cli_log_escapes_run_and_config_path_line_breaks(monkeypatch, t
     def fake_run_workspace_checked(config_path, **kwargs):
         return _result(Path(kwargs["_prepared_run_dir"]), 0)
 
-    monkeypatch.setattr("vibeflow.tooling.application.workspace_service.run_workspace_checked", fake_run_workspace_checked)
+    monkeypatch.setattr("vibeflow.tooling.application.python.workspace_service.run_workspace_checked", fake_run_workspace_checked)
     run_root = tmp_path / "runs\r\nroot"
     run_id = "run\r\nid"
     config = "project/config\r\nmain.jsonc"
@@ -947,7 +950,7 @@ def test_delegate_cli_log_escapes_run_and_config_path_line_breaks(monkeypatch, t
 
 
 def test_delegate_cli_run_directory_race_does_not_overwrite_foreign_log(monkeypatch, tmp_path, capsys) -> None:
-    from vibeflow.tooling.application.runner import _prepare_run_dir as original_prepare_run_dir
+    from vibeflow.tooling.application.python.runner import _prepare_run_dir as original_prepare_run_dir
 
     def race_for_run_directory(run_root, run_id):
         run_dir = Path(run_root) / run_id
@@ -955,7 +958,7 @@ def test_delegate_cli_run_directory_race_does_not_overwrite_foreign_log(monkeypa
         (run_dir / "vibeflow.log").write_text("OTHER-RUN\n", encoding="utf-8")
         return original_prepare_run_dir(run_root, run_id)
 
-    monkeypatch.setattr("vibeflow.tooling.application.runner._prepare_run_dir", race_for_run_directory)
+    monkeypatch.setattr("vibeflow.tooling.application.python.runner._prepare_run_dir", race_for_run_directory)
 
     status = main(
         [
@@ -989,7 +992,7 @@ def test_delegate_cli_run_directory_ownership_survives_business_chdir(monkeypatc
         monkeypatch.chdir(destination)
         return _result(run_dir, 0)
 
-    monkeypatch.setattr("vibeflow.tooling.application.workspace_service.run_workspace_checked", fake_run_workspace_checked)
+    monkeypatch.setattr("vibeflow.tooling.application.python.workspace_service.run_workspace_checked", fake_run_workspace_checked)
 
     status = main(
         [

@@ -9,7 +9,7 @@ from vibeflow.targets.python.project.node import (
     EFFECT_SCOPE_TRUSTED,
     effective_effect_scope,
 )
-from vibeflow.tooling.presentation.architecture_document import build_architecture_document
+from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document
 from vibeflow.targets.python.project.policy import EffectivePolicy, apply_policy_to_findings
 from vibeflow.targets.python.quality.source_analysis.effects import call_violation
 from vibeflow.targets.python.quality.source_analysis.types import _SourceInfo

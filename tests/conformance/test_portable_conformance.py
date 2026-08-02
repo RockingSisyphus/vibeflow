@@ -254,6 +254,21 @@ class _DoubleNode:
         return {"answer": inputs["number"]["value"] * 2}
 
 
+class _AsyncDoubleNode:
+    NODE_INFO = NodeInfo(
+        "fixture.async_double",
+        "Async double",
+        "conformance",
+        "Doubles a number through a deferred nested task.",
+        "1",
+        "process",
+    )
+    CONTRACT = _DoubleNode.CONTRACT
+
+    def run_pure(self, inputs, params):
+        return {"answer": inputs["number"]["value"] * 2}
+
+
 class _IncrementNode:
     NODE_INFO = NodeInfo(
         "fixture.increment",
@@ -292,6 +307,32 @@ class _IncrementUntilNode:
 
     def run_pure(self, inputs, params):
         value = inputs["loop.current"]["value"] + 1
+        return {
+            "loop.next": value,
+            "loop.done": value >= params["target"],
+        }
+
+
+class _AdvanceOuterNode:
+    NODE_INFO = NodeInfo(
+        "fixture.advance_outer",
+        "Advance outer loop",
+        "conformance",
+        "Maps an inner-loop result into the outer carry and stop values.",
+        "1",
+        "process",
+    )
+    CONTRACT = NodeContract(
+        requires=(DataRequirement("inner.final", "exactly_one"),),
+        provides=(
+            DataProvider("loop.next", "loop.next"),
+            DataProvider("loop.done", "loop.done"),
+        ),
+        params_schema={"target": {"type": "number"}},
+    )
+
+    def run_pure(self, inputs, params):
+        value = inputs["inner.final"]["value"] + 1
         return {
             "loop.next": value,
             "loop.done": value >= params["target"],
@@ -368,11 +409,22 @@ export function rightItem() { return { right: 2 }; }
 export function double(inputs) {
   return { answer: inputs.number.value * 2 };
 }
+export async function asyncDouble(inputs) {
+  await Promise.resolve();
+  return { answer: inputs.number.value * 2 };
+}
 export function increment(inputs) {
   return { "loop.next": inputs["loop.current"].value + 1 };
 }
 export function incrementUntil(inputs, params) {
   const value = inputs["loop.current"].value + 1;
+  return {
+    "loop.next": value,
+    "loop.done": value >= params.target,
+  };
+}
+export function advanceOuter(inputs, params) {
+  const value = inputs["inner.final"].value + 1;
   return {
     "loop.next": value,
     "loop.done": value >= params.target,
@@ -405,8 +457,10 @@ JAVASCRIPT_EXPORTS = {
     "fixture.left_item": "leftItem",
     "fixture.right_item": "rightItem",
     "fixture.double": "double",
+    "fixture.async_double": "asyncDouble",
     "fixture.increment": "increment",
     "fixture.increment_until": "incrementUntil",
+    "fixture.advance_outer": "advanceOuter",
     "fixture.fail": "fail",
     "fixture.detached_audit": "detachedAudit",
     "fixture.double_flow": "unusedComposite",
@@ -441,6 +495,12 @@ def _registry() -> NodeRegistry:
         config_schema={"target": {"type": "number"}},
         config_defaults={"target": 3},
     )
+    registry.register(
+        "fixture.advance_outer",
+        _AdvanceOuterNode,
+        config_schema={"target": {"type": "number"}},
+        config_defaults={"target": 3},
+    )
     for type_key, node in (
         ("fixture.route", _RouteNode),
         ("fixture.async_route", _AsyncRouteNode),
@@ -452,6 +512,7 @@ def _registry() -> NodeRegistry:
         ("fixture.left_item", _LeftItemNode),
         ("fixture.right_item", _RightItemNode),
         ("fixture.double", _DoubleNode),
+        ("fixture.async_double", _AsyncDoubleNode),
         ("fixture.increment", _IncrementNode),
         ("fixture.fail", _FailNode),
         ("fixture.detached_audit", _DetachedAuditNode),
@@ -1102,6 +1163,51 @@ def test_python_result_key_async_node_rechecks_conditional_routes(
     assert result.get("selected")["value"] == 15
 
 
+@pytest.mark.parametrize("execution", ["plan", "block", "compiled"])
+def test_python_result_key_activates_unconditional_route_once(
+    tmp_path: Path,
+    execution: str,
+) -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "entry_mode": "async",
+                "inputs": [_pipeline_input("number")],
+                "nodes": [
+                    _node("start", "fixture.terminal"),
+                    _node(
+                        "calculate",
+                        "fixture.async_double",
+                        requires=[_requirement("number")],
+                        provides=[_provider("answer")],
+                        **{
+                            "async": "result_key",
+                            "result_key": "answer",
+                        },
+                    ),
+                    _node("end", "fixture.terminal"),
+                ],
+                "edges": [
+                    _edge("start", "calculate"),
+                    _edge("calculate", "end"),
+                ],
+                "outputs": [_pipeline_output("answer")],
+            }
+        }
+    )
+
+    runtime = PipelineRuntime(
+        graph,
+        registry=_registry(),
+        run_dir=tmp_path / execution,
+        runtime_options=RuntimeOptions(execution=execution, trace="full"),
+    )
+    result = runtime.run({"number": 3})
+
+    assert result.get("answer")["value"] == 6
+    assert runtime.trace.edge_executions["calculate->end"] == 1
+
+
 def test_portable_conformance_result_key_async_conditional_route(
     tmp_path: Path,
 ) -> None:
@@ -1322,6 +1428,185 @@ def test_portable_conformance_nested_nodeset(tmp_path: Path) -> None:
     assert dict(result.python.node_runs)["composite.double"] == 1
 
 
+def test_portable_conformance_nested_nodeset_deferred_result_key(
+    tmp_path: Path,
+) -> None:
+    document = {
+        "nodesets": [
+            {
+                "type_key": "fixture.async_double_flow",
+                "display_name": "Async double flow",
+                "description": "A nested flow with one deferred result task.",
+                "requires": [_requirement("number")],
+                "provides": [_provider("answer")],
+                "pipeline": {
+                    "inputs": [_pipeline_input("number")],
+                    "nodes": [
+                        _node("start", "fixture.terminal"),
+                        _node(
+                            "calculate",
+                            "fixture.async_double",
+                            requires=[_requirement("number")],
+                            provides=[_provider("answer")],
+                            **{
+                                "async": "result_key",
+                                "result_key": "answer",
+                            },
+                        ),
+                        _node("end", "fixture.terminal"),
+                    ],
+                    "edges": [
+                        _edge("start", "calculate"),
+                        _edge("calculate", "end"),
+                    ],
+                    "outputs": [_pipeline_output("answer")],
+                },
+            }
+        ],
+        "pipeline": {
+            "entry_mode": "async",
+            "inputs": [_pipeline_input("number")],
+            "nodes": [
+                _node("start", "fixture.terminal"),
+                _node(
+                    "composite",
+                    "fixture.async_double_flow",
+                    requires=[_requirement("number")],
+                    provides=[_provider("answer")],
+                ),
+                _node("end", "fixture.terminal"),
+            ],
+            "edges": [
+                _edge("start", "composite"),
+                _edge("composite", "end"),
+            ],
+            "outputs": [_pipeline_output("answer", alias="doubled")],
+        },
+    }
+    exports = {
+        **JAVASCRIPT_EXPORTS,
+        "fixture.async_double_flow": "unusedComposite",
+    }
+    case = PortableConformanceCase(
+        name="conformance.nodeset_deferred",
+        document=document,
+        inputs={"number": 6},
+        registry=_registry(),
+        javascript_source=JAVASCRIPT_SOURCE,
+        javascript_exports=exports,
+    )
+
+    result = run_portable_conformance(case, work_dir=tmp_path)
+
+    _assert_success(result, {"doubled": 12})
+    assert result.python.task_events == (
+        ("async_result", "composite.calculate"),
+        ("async_result_join", "composite.calculate"),
+    )
+    child = next(
+        block
+        for block in result.portable_plan["blocks"]
+        if block["path"] == ["composite"]
+    )
+    assert child["tasks"] == [
+        {
+            "id": "block:/composite:task:calculate",
+            "node_id": "calculate",
+            "schedule": "deferred",
+            "executor": "thread",
+            "result_key": "answer",
+        }
+    ]
+
+
+def test_portable_conformance_nested_nodeset_detached_cleanup(
+    tmp_path: Path,
+) -> None:
+    document = {
+        "nodesets": [
+            {
+                "type_key": "fixture.detached_flow",
+                "display_name": "Detached flow",
+                "description": "A nested flow with invocation-owned side work.",
+                "requires": [],
+                "provides": [_provider("left", "item")],
+                "pipeline": {
+                    "nodes": [
+                        _node("start", "fixture.terminal"),
+                        _node(
+                            "audit",
+                            "fixture.detached_audit",
+                            **{"async": "detached"},
+                        ),
+                        _node(
+                            "value",
+                            "fixture.left_item",
+                            provides=[_provider("left", "item")],
+                        ),
+                        _node("end", "fixture.terminal"),
+                    ],
+                    "edges": [
+                        _edge("start", "audit"),
+                        _edge("start", "value"),
+                        _edge("value", "end"),
+                    ],
+                    "outputs": [_pipeline_output("item")],
+                },
+            }
+        ],
+        "pipeline": {
+            "entry_mode": "async",
+            "nodes": [
+                _node("start", "fixture.terminal"),
+                _node(
+                    "composite",
+                    "fixture.detached_flow",
+                    provides=[_provider("left", "item")],
+                ),
+                _node("end", "fixture.terminal"),
+            ],
+            "edges": [
+                _edge("start", "composite"),
+                _edge("composite", "end"),
+            ],
+            "outputs": [_pipeline_output("item", alias="value")],
+        },
+    }
+    exports = {
+        **JAVASCRIPT_EXPORTS,
+        "fixture.detached_flow": "unusedComposite",
+    }
+    case = PortableConformanceCase(
+        name="conformance.nodeset_detached",
+        document=document,
+        inputs={},
+        registry=_registry(),
+        javascript_source=JAVASCRIPT_SOURCE,
+        javascript_exports=exports,
+    )
+
+    result = run_portable_conformance(case, work_dir=tmp_path)
+
+    _assert_success(result, {"value": 1})
+    assert result.python.task_events == (
+        ("async_detached", "composite.audit"),
+        ("async_detached_done", "composite.audit"),
+    )
+    child = next(
+        block
+        for block in result.portable_plan["blocks"]
+        if block["path"] == ["composite"]
+    )
+    assert child["tasks"] == [
+        {
+            "id": "block:/composite:task:audit",
+            "node_id": "audit",
+            "schedule": "detached",
+            "executor": "thread",
+        }
+    ]
+
+
 def test_portable_conformance_nested_nodeset_all_output(
     tmp_path: Path,
 ) -> None:
@@ -1517,6 +1802,280 @@ def test_portable_conformance_bounded_loop(tmp_path: Path) -> None:
     node_runs = dict(result.python.node_runs)
     assert node_runs["loop.iter_0.increment"] == 1
     assert node_runs["loop.iter_2.increment"] == 1
+
+
+def test_portable_conformance_loop_body_contains_nested_nodeset(
+    tmp_path: Path,
+) -> None:
+    document = {
+        "nodesets": [
+            {
+                "type_key": "fixture.increment_flow",
+                "display_name": "Nested increment",
+                "description": "Performs one increment in a nested nodeset.",
+                "requires": [_requirement("loop.current")],
+                "provides": [_provider("loop.next")],
+                "pipeline": {
+                    "inputs": [_pipeline_input("loop.current")],
+                    "nodes": [
+                        _node("start", "fixture.terminal"),
+                        _node(
+                            "increment",
+                            "fixture.increment",
+                            requires=[_requirement("loop.current")],
+                            provides=[_provider("loop.next")],
+                        ),
+                        _node("end", "fixture.terminal"),
+                    ],
+                    "edges": [
+                        _edge("start", "increment"),
+                        _edge("increment", "end"),
+                    ],
+                    "outputs": [_pipeline_output("loop.next")],
+                },
+            },
+            {
+                "type_key": "fixture.nested_loop_body",
+                "display_name": "Nested nodeset loop body",
+                "description": "Delegates each iteration to another nodeset.",
+                "requires": [_requirement("loop.current")],
+                "provides": [_provider("loop.next")],
+                "pipeline": {
+                    "inputs": [_pipeline_input("loop.current")],
+                    "nodes": [
+                        _node("start", "fixture.terminal"),
+                        _node(
+                            "calculate",
+                            "fixture.increment_flow",
+                            requires=[_requirement("loop.current")],
+                            provides=[_provider("loop.next")],
+                        ),
+                        _node("end", "fixture.terminal"),
+                    ],
+                    "edges": [
+                        _edge("start", "calculate"),
+                        _edge("calculate", "end"),
+                    ],
+                    "outputs": [_pipeline_output("loop.next")],
+                },
+            },
+        ],
+        "pipeline": {
+            "inputs": [_pipeline_input("loop.current")],
+            "nodes": [
+                _node("start", "fixture.terminal"),
+                _node(
+                    "loop",
+                    "vibeflow.loop.while",
+                    requires=[_requirement("loop.current")],
+                    provides=[_provider("loop.final")],
+                    loop={
+                        "body": "fixture.nested_loop_body",
+                        "max_iterations": 4,
+                        "stop_after": 3,
+                        "carry": [
+                            {
+                                "from": "loop.current",
+                                "as": "loop.current",
+                                "update": "loop.next",
+                            }
+                        ],
+                        "outputs": [
+                            {"from": "loop.current", "as": "loop.final"}
+                        ],
+                    },
+                ),
+                _node("end", "fixture.terminal"),
+            ],
+            "edges": [_edge("start", "loop"), _edge("loop", "end")],
+            "outputs": [_pipeline_output("loop.final", alias="final")],
+        },
+    }
+    exports = {
+        **JAVASCRIPT_EXPORTS,
+        "fixture.increment_flow": "unusedComposite",
+        "fixture.nested_loop_body": "unusedComposite",
+    }
+    result = run_portable_conformance(
+        PortableConformanceCase(
+            name="conformance.loop_nested_nodeset",
+            document=document,
+            inputs={"loop.current": 2},
+            registry=_registry(),
+            javascript_source=JAVASCRIPT_SOURCE,
+            javascript_exports=exports,
+        ),
+        work_dir=tmp_path,
+    )
+
+    _assert_success(result, {"final": 5})
+    node_runs = dict(result.python.node_runs)
+    assert node_runs["loop.iter_0.calculate.increment"] == 1
+    assert node_runs["loop.iter_2.calculate.increment"] == 1
+
+
+def test_portable_conformance_nested_loops_carry_collect_and_stop(
+    tmp_path: Path,
+) -> None:
+    document = {
+        "nodesets": [
+            {
+                "type_key": "fixture.inner_loop_body",
+                "display_name": "Inner loop body",
+                "description": "Advances the inner loop once.",
+                "requires": [_requirement("loop.current")],
+                "provides": [_provider("loop.next")],
+                "pipeline": {
+                    "inputs": [_pipeline_input("loop.current")],
+                    "nodes": [
+                        _node("start", "fixture.terminal"),
+                        _node(
+                            "increment",
+                            "fixture.increment",
+                            requires=[_requirement("loop.current")],
+                            provides=[_provider("loop.next")],
+                        ),
+                        _node("end", "fixture.terminal"),
+                    ],
+                    "edges": [
+                        _edge("start", "increment"),
+                        _edge("increment", "end"),
+                    ],
+                    "outputs": [_pipeline_output("loop.next")],
+                },
+            },
+            {
+                "type_key": "fixture.outer_loop_body",
+                "display_name": "Outer loop body",
+                "description": "Runs a two-step inner loop and checks stop.",
+                "requires": [_requirement("loop.current")],
+                "provides": [
+                    _provider("loop.next"),
+                    _provider("loop.done"),
+                ],
+                "pipeline": {
+                    "inputs": [_pipeline_input("loop.current")],
+                    "nodes": [
+                        _node("start", "fixture.terminal"),
+                        _node(
+                            "inner",
+                            "vibeflow.loop.while",
+                            requires=[_requirement("loop.current")],
+                            provides=[_provider("inner.final")],
+                            loop={
+                                "body": "fixture.inner_loop_body",
+                                "max_iterations": 2,
+                                "stop_after": 2,
+                                "carry": [
+                                    {
+                                        "from": "loop.current",
+                                        "as": "loop.current",
+                                        "update": "loop.next",
+                                    }
+                                ],
+                                "outputs": [
+                                    {
+                                        "from": "loop.current",
+                                        "as": "inner.final",
+                                    }
+                                ],
+                            },
+                        ),
+                        _node(
+                            "check",
+                            "fixture.advance_outer",
+                            requires=[_requirement("inner.final")],
+                            provides=[
+                                _provider("loop.next"),
+                                _provider("loop.done"),
+                            ],
+                            config={"target": 6},
+                        ),
+                        _node("end", "fixture.terminal"),
+                    ],
+                    "edges": [
+                        _edge("start", "inner"),
+                        _edge("inner", "check"),
+                        _edge("check", "end"),
+                    ],
+                    "outputs": [
+                        _pipeline_output("loop.next"),
+                        _pipeline_output("loop.done"),
+                    ],
+                },
+            },
+        ],
+        "pipeline": {
+            "inputs": [_pipeline_input("loop.current")],
+            "nodes": [
+                _node("start", "fixture.terminal"),
+                _node(
+                    "outer",
+                    "vibeflow.loop.while",
+                    requires=[_requirement("loop.current")],
+                    provides=[
+                        _provider("loop.final"),
+                        _provider("loop.history"),
+                        _provider("loop.iterations"),
+                    ],
+                    loop={
+                        "body": "fixture.outer_loop_body",
+                        "max_iterations": 5,
+                        "stop_when": {"from": "loop.done", "equals": True},
+                        "carry": [
+                            {
+                                "from": "loop.current",
+                                "as": "loop.current",
+                                "update": "loop.next",
+                            }
+                        ],
+                        "collect": [
+                            {"from": "loop.next", "as": "loop.history"}
+                        ],
+                        "outputs": [
+                            {"from": "loop.current", "as": "loop.final"},
+                            {"from": "loop.history", "as": "loop.history"},
+                            {
+                                "from": "loop.iterations",
+                                "as": "loop.iterations",
+                            },
+                        ],
+                    },
+                ),
+                _node("end", "fixture.terminal"),
+            ],
+            "edges": [_edge("start", "outer"), _edge("outer", "end")],
+            "outputs": [
+                _pipeline_output("loop.final", alias="final"),
+                _pipeline_output("loop.history", alias="history"),
+                _pipeline_output("loop.iterations", alias="iterations"),
+            ],
+        },
+    }
+    exports = {
+        **JAVASCRIPT_EXPORTS,
+        "fixture.inner_loop_body": "unusedComposite",
+        "fixture.outer_loop_body": "unusedComposite",
+    }
+    result = run_portable_conformance(
+        PortableConformanceCase(
+            name="conformance.nested_loops",
+            document=document,
+            inputs={"loop.current": 0},
+            registry=_registry(),
+            javascript_source=JAVASCRIPT_SOURCE,
+            javascript_exports=exports,
+        ),
+        work_dir=tmp_path,
+    )
+
+    _assert_success(
+        result,
+        {"final": 6, "history": [3, 6], "iterations": 2},
+    )
+    node_runs = dict(result.python.node_runs)
+    assert node_runs["outer.iter_0.inner.iter_1.increment"] == 1
+    assert node_runs["outer.iter_1.inner.iter_1.increment"] == 1
 
 
 def test_portable_conformance_stop_when_loop_with_carry_and_collect(

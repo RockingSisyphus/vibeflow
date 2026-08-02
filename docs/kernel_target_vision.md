@@ -1,6 +1,6 @@
 # VibeFlow 目标愿景
 
-> 当前版本：0.8.0。0.8 使用分层公共 API，不保留根级业务导出或旧模块门面。
+> 当前版本：0.9.0。0.9 使用分层公共 API，并强制隔离 Python 与 JavaScript Target 及其 Application closure。
 
 ## 设计初衷
 
@@ -44,10 +44,10 @@ tooling → targets/python ──────┐
 - Core 只处理内存中的语言无关模型、契约、图算法和 finding。
 - Block Compiler 把 `ValidatedWorkflow` 编译为唯一公共 `WorkflowPlan` / `BlockPlan` IR。
 - Python 与 JavaScript Target 分别保存语言实现、运行或生成逻辑，彼此不依赖；JavaScript Target 的 `build` 子层拥有 Node 工具链协议和 AOT 发布实现。
-- Tooling 负责项目文件、CLI、跨层编排和架构表现。
-- 0.8 只公开分层 API；根包不重导出业务对象，旧模块路径不再是公共接口。
+- Tooling 负责项目文件、CLI、Target-specific Application 编排和架构表现；中立 Tooling 不依赖 Target。
+- 0.9 只公开分层 API；根包不重导出业务对象，旧模块路径不再是公共接口。
 
-`PythonBindingPlan` 保存 callable、有效参数和插件；`JavascriptBindingPlan` 保存 JS/TS 源码、Schema、base_lib、Capability、Host Extension 和 import policy。语言对象不能进入公共 IR。
+`PythonBindingPlan` 保存 callable、有效参数和插件；`JavascriptBindingPlan` 保存 JS/TS 源码、Schema、base_lib、Plugin、Capability、Host Extension 和 import policy。语言对象不能进入公共 IR。
 
 ## 术语
 
@@ -59,13 +59,13 @@ tooling → targets/python ──────┐
 - `key`：Context / run result 中的唯一数据地址，用于输出 mapping、trace 和 provenance。
 - `type`：可重复的逻辑数据类型，下游按 `type` 消费，运行时通过 envelope 暴露实际来源 key。
 - `base_lib`：受控纯函数基础库，可按 target 提供 Python 或 JS/TS 实现并被 node 显式依赖，但必须接受健康检查和依赖图检查。
-- `descriptor`：node、`base_lib`、data schema 或 Capability 的静态 JSONC 资源描述；记录稳定 ID、契约、实现位置和 target，不通过执行 JS/TS 业务模块发现元数据。
+- `descriptor`：node、`base_lib`、data schema、Capability、Plugin 或 Host Extension 的静态 JSONC 资源描述；记录稳定 ID、契约、实现位置和 target，不通过执行 JS/TS 业务模块发现元数据。
 - `WorkflowPlan`：语言无关的完整工作流计划；只保存可移植值、契约、block 和 source reference，不持有 Python 对象或可执行源码。
 - `BlockPlan`：`WorkflowPlan` 中一个 workflow、nodeset 或 loop 的有限执行块，包含 `NodeCallPlan`、`RoutePlan`、标准化条件和输入输出。
 - `Capability`：宿主按单次 workflow 调用注入的通用能力契约；它不是具体宿主 adapter，也不是安全沙箱。
 - `emitter`：把可移植计划变成目标语言程序的后端。JavaScript emitter 生成 workflow 专用的静态 ESM 控制流。
 - `policy`：治理规则集合，决定哪些限制硬失败、哪些限制可降级。
-- `plugin`：扩展 policy、compile 或 runtime 的机制，不能隐式绕过绝对规则。
+- `plugin`：扩展 policy、compile 或 runtime hook 的机制；JS/TS 使用 `vibeflow.plugin.v1`，不能隐式绕过绝对规则或承担长期宿主生命周期。
 
 旧 `boundary` 公共模型已移除。外部输入、输出、数据存储请求、文档产物等必须通过标准 `flow_kind` 节点和显式契约表达。
 
@@ -207,12 +207,12 @@ Tooling 加载 workflow config + registry / descriptor
 
 - `compile_core(CoreCompileRequest)` 只用内存数据生成 `CoreCompilation` 与 `ValidatedWorkflow`；`compile_workflow(ValidatedWorkflow, ImplementationFacts)` 生成公共计划。
 - `PythonBindingPlan` 与 `JavascriptBindingPlan` 把语言实现放在公共计划之外。Python `ExecutionPlan` 只属于 Python Runtime，JavaScript 内部模型不构成第二套公共 IR。
-- 静态 catalog 可以加载 node、`base_lib`、data schema、Capability 和 JS/TS Host Extension descriptor；Python Target 把 registry 转成同类资源事实，并在静态描述同时存在时检查一致性。
+- 静态 catalog 可以加载 node、`base_lib`、data schema、Capability、Plugin 和 JS/TS Host Extension descriptor；Python Target 把 registry 转成同类资源事实，并在静态描述同时存在时检查一致性。
 - JS/TS AOT 从 `WorkflowPlan + JavascriptBindingPlan` 选择 target 实现，经过 TypeScript 类型/依赖检查和 bundling，输出 `esm-module`、`single-esm` 或 `web-app`。
 - JavaScript emitter 按 `entry_mode` 生成流程专用的同步 `runWorkflow()` 或异步 `runWorkflowAsync()`，产物不读取原始 workflow，也不需要 Python 或浏览器端 VibeFlow runtime。
 - 每次调用独立持有输入、trace、错误、异步任务、取消状态和 Capability wrapper；模块 import 不自动运行 workflow 或 Host Extension。
 
-Python Runtime 支持 `ExecutionPlan` 及 plan/block/compiled 三种模式；Python build-time policy/compiler plugin 也只服务 Python。新增跨后端能力时，先在 Core、Block Compiler 和共同 conformance fixture 中定义语义，再实现各 Target。
+Python Runtime 支持 `ExecutionPlan` 及 plan/block/compiled 三种模式。Python 与 JavaScript 的 Plugin 实现分别留在所属 Target；新增跨后端能力时，先在 Core、Block Compiler 和共同 conformance fixture 中定义语义，再实现各 Target。
 
 Descriptor 是资源和依赖事实来源，不是另一份可执行拓扑。静态读取必须无业务副作用；node 只能导入 workflow 启用的 `base_lib`，不能导入另一个 node；`base_lib` 不能反向依赖 node、runtime、plugin、registry 或 Capability bridge。JS/TS 的 source audit 与 bundling 后依赖图复核共同防止 alias、barrel 和 symlink 绕过边界。
 
@@ -231,6 +231,8 @@ JS/TS AOT 当前应保证：
 Capability 是通用 ABI 和可审计依赖边界。可信性、幂等性、回滚和并发安全由具体宿主实现负责。
 
 Host Extension 是 JS/TS AOT 的宿主生命周期边界。目标环境源码可注册或注销事件、提供 Capability 并维护本 host 的队列；VibeFlow 检查 descriptor、依赖、target 和 import，并由 `createWorkflowHost()` 显式 start/stop。Project descriptor catalog 登记可用扩展，workflow 按 ID 选择实际资源；planned 扩展进入架构审查但不进入构建或生命周期。
+
+Plugin 与 Host Extension 的生命周期不同：Policy/Compiler Plugin 在构建期检查图和编译结果，Runtime Plugin 随每次 workflow 调用创建并释放；Host Extension 随 host 创建，可跨多次 workflow 调用保持事件接线和 Capability provider。Runtime Plugin 不注册长期监听器，Host Extension 不充当图内 node hook。
 
 ## Planned Architecture
 
@@ -303,13 +305,15 @@ python run.py delegate-cli --config project/configs/main.jsonc -- --input data.y
 
 ## 插件目标
 
-插件类型：
+Plugin descriptor 的 `type` 固定为：
 
-- `PolicyPlugin`
-- `CompilerPlugin`
-- `RuntimePlugin`
+- `policy`
+- `compiler`
+- `runtime`
 
-插件可以增加治理规则、收紧策略、追加健康检查或记录 runtime 事件。插件实现使用 `effect_scope=trusted`，可以执行 Python IO，并由启用它的项目承担信任责任；这不允许 plugin 篡改契约、拓扑或不可降级的治理结论。runtime plugin 还可以在 CLI 让渡模式 / `delegate-cli` 中发出授权 `SystemExit`。
+Core 只解析 Plugin descriptor、selection、依赖闭包和 Planned 状态。Python Target 绑定 Python class；JavaScript Target 绑定导出 `createPlugin(context)` 的 JS/TS 源码，并使用 ABI `vibeflow.plugin.v1`。Policy/Compiler Plugin 可以追加 finding、annotation 或受审计 relaxation，但不能改写 graph 或关闭不可降级错误。Runtime Plugin 只观察一次调用中的 run/node/nodeset/block 生命周期；同步 workflow 只接受 immediate hook，异步 workflow 才可使用 suspend hook。
+
+Planned Plugin 可以暂时没有 descriptor 或源码，只进入架构审查，不加载、不执行、不打包。implemented Plugin 不能依赖 Planned Plugin。JS/TS Runtime Plugin 不得注册长期监听器、定时器或丢弃 Promise；这类宿主生命周期工作属于 Host Extension。
 
 ## 图形输出目标
 

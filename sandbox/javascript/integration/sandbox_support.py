@@ -71,13 +71,13 @@ def _activate_vibeflow_kernel() -> None:
 
 _activate_vibeflow_kernel()
 
-from vibeflow.tooling.application.javascript_build import (  # noqa: E402
+from vibeflow.tooling.application.javascript.build import (  # noqa: E402
     ProjectBuildRequest,
     ProjectBuildResult,
     build_project_aot,
 )
 from vibeflow.targets.javascript.frontend.errors import AotBuildError  # noqa: E402
-from vibeflow.tooling.application.javascript_build import ProjectBuildError  # noqa: E402
+from vibeflow.tooling.application.javascript.build import ProjectBuildError  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -237,6 +237,241 @@ try {{
         thread.join(timeout=5)
 
 
+def run_browser_long_host(
+    web_dir: Path,
+    *,
+    puppeteer_root: Path,
+    module_entry: str | None,
+) -> dict[str, Any]:
+    """Exercise a permanent Host/Port workflow in a real browser page."""
+
+    handler = partial(_QuietHandler, directory=str(web_dir))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    url = f"http://127.0.0.1:{server.server_port}/index.html"
+    script = f"""
+import puppeteer from "puppeteer";
+const browser = await puppeteer.launch({{
+  headless: true,
+  args: ["--no-sandbox", "--disable-setuid-sandbox"],
+}});
+try {{
+  const page = await browser.newPage();
+  const pageErrors = [];
+  page.on("pageerror", error => pageErrors.push(error.message));
+  await page.goto({json.dumps(url)}, {{ waitUntil: "networkidle0" }});
+  const payload = await page.evaluate(async moduleEntry => {{
+    const state = globalThis.__vibeflowBrowserHarness;
+    const assert = (condition, message) => {{
+      if (!condition) throw new Error(message);
+    }};
+    const delay = milliseconds => new Promise(
+      resolve => setTimeout(resolve, milliseconds),
+    );
+    const waitUntil = async (predicate, label, timeout = 5000) => {{
+      const deadline = performance.now() + timeout;
+      while (!predicate()) {{
+        if (performance.now() >= deadline) {{
+          throw new Error(`timed out waiting for ${{label}}`);
+        }}
+        await delay(10);
+      }}
+    }};
+    const messages = kind => state.messages.filter(
+      item => item && item.kind === kind,
+    );
+
+    assert(state.messages.length === 0, "page import produced host messages");
+    const resolvedWorkflow = moduleEntry
+      ? await import(new URL(moduleEntry, location.href).href)
+      : await new Promise(resolve => {{
+          document.dispatchEvent(new CustomEvent(
+            "vibeflow-sandbox-request-workflow",
+            {{ detail: {{ resolve }} }},
+          ));
+        }});
+    assert(
+      typeof resolvedWorkflow?.createWorkflowHost === "function",
+      "workflow host factory is unavailable",
+    );
+    const afterImport = [...state.messages];
+    assert(afterImport.length === 0, "module import started host work");
+
+    const first = resolvedWorkflow.createWorkflowHost();
+    const second = resolvedWorkflow.createWorkflowHost();
+    const afterCreate = [...state.messages];
+    assert(afterCreate.length === 0, "createWorkflowHost registered active work");
+
+    window.postMessage({{
+      kind: "vibeflow-sandbox-input",
+      hostId: 1,
+      value: 999,
+    }}, "*");
+    await waitUntil(
+      () => messages("vibeflow-sandbox-input").length === 1,
+      "pre-start message delivery",
+    );
+
+    await first.start();
+    await waitUntil(
+      () => messages("vibeflow-sandbox-lifecycle").filter(
+        item => item.phase === "start",
+      ).length === 1,
+      "first Host Extension start",
+    );
+    window.postMessage({{
+      kind: "vibeflow-sandbox-bind",
+      hostId: 1,
+    }}, "*");
+    await waitUntil(
+      () => messages("vibeflow-sandbox-bound").some(item => item.hostId === 1),
+      "first Host Extension binding",
+    );
+
+    await second.start();
+    await waitUntil(
+      () => messages("vibeflow-sandbox-lifecycle").filter(
+        item => item.phase === "start",
+      ).length === 2,
+      "second Host Extension start",
+    );
+    window.postMessage({{
+      kind: "vibeflow-sandbox-bind",
+      hostId: 2,
+    }}, "*");
+    await waitUntil(
+      () => messages("vibeflow-sandbox-bound").some(item => item.hostId === 2),
+      "second Host Extension binding",
+    );
+
+    for (const [hostId, value] of [[1, 4], [1, 7], [2, 10]]) {{
+      window.postMessage({{
+        kind: "vibeflow-sandbox-input",
+        hostId,
+        value,
+      }}, "*");
+    }}
+    await waitUntil(
+      () => messages("vibeflow-sandbox-input").length === 4,
+      "queued browser inputs",
+    );
+
+    const firstInvocation = first.runWorkflowAsync({{}});
+    const secondInvocation = second.runWorkflowAsync({{}});
+    const observe = invocation => invocation.then(
+      () => "completed",
+      error => error?.code ?? String(error),
+    );
+    const firstObserved = observe(firstInvocation);
+    const secondObserved = observe(secondInvocation);
+
+    await waitUntil(() => {{
+      const outputs = messages("vibeflow-sandbox-output");
+      const waiting = messages("vibeflow-sandbox-waiting");
+      return (
+        outputs.length === 3
+        && waiting.some(item => item.hostId === 1 && item.receiveCount === 3)
+        && waiting.some(item => item.hostId === 2 && item.receiveCount === 2)
+      );
+    }}, "Port outputs and pending receives");
+
+    const outputsBeforeStop = messages("vibeflow-sandbox-output");
+    const firstOutputs = outputsBeforeStop
+      .filter(item => item.hostId === 1)
+      .map(item => item.value);
+    const secondOutputs = outputsBeforeStop
+      .filter(item => item.hostId === 2)
+      .map(item => item.value);
+    assert(
+      JSON.stringify(firstOutputs) === "[14,23]",
+      `first host outputs leaked or changed: ${{JSON.stringify(firstOutputs)}}`,
+    );
+    assert(
+      JSON.stringify(secondOutputs) === "[32]",
+      `second host outputs leaked or changed: ${{JSON.stringify(secondOutputs)}}`,
+    );
+
+    await Promise.all([first.stop(), second.stop()]);
+    const failureCodes = await Promise.all([firstObserved, secondObserved]);
+    await Promise.all([first.stop(), second.stop()]);
+    await waitUntil(
+      () => messages("vibeflow-sandbox-lifecycle").filter(
+        item => item.phase === "stop",
+      ).length === 2,
+      "idempotent Host Extension stops",
+    );
+    await delay(50);
+
+    assert(
+      JSON.stringify(failureCodes) === '["VF_ABORTED","VF_ABORTED"]',
+      `unexpected cancellation codes: ${{JSON.stringify(failureCodes)}}`,
+    );
+    assert(!first.started && !second.started, "stopped host reports started");
+    assert(first.signal.aborted && second.signal.aborted, "host signal not aborted");
+    assert(
+      messages("vibeflow-sandbox-output").length === 3,
+      "stop produced an additional output",
+    );
+    assert(
+      state.unhandledRejections.length === 0,
+      `unhandled rejections: ${{JSON.stringify(state.unhandledRejections)}}`,
+    );
+    const lifecycle = messages("vibeflow-sandbox-lifecycle");
+    assert(
+      lifecycle.filter(item => item.phase === "start").length === 2,
+      "Host Extension started more than once",
+    );
+    assert(
+      lifecycle.filter(item => item.phase === "stop").length === 2,
+      "Host Extension stopped more than once",
+    );
+    return {{
+      afterImport,
+      afterCreate,
+      failureCodes,
+      firstOutputs,
+      secondOutputs,
+      waiting: messages("vibeflow-sandbox-waiting").map(item => ({{
+        hostId: item.hostId,
+        receiveCount: item.receiveCount,
+      }})),
+      lifecycle: lifecycle.map(item => ({{
+        hostId: item.hostId,
+        phase: item.phase,
+      }})),
+      unhandledRejections: state.unhandledRejections,
+    }};
+  }}, {json.dumps(module_entry)});
+  if (pageErrors.length > 0) {{
+    throw new Error(`browser page errors: ${{JSON.stringify(pageErrors)}}`);
+  }}
+  process.stdout.write(JSON.stringify({{ ...payload, pageErrors }}));
+}} finally {{
+  await browser.close();
+}}
+"""
+    try:
+        completed = subprocess.run(
+            ["node", "--input-type=module", "--eval", script],
+            cwd=puppeteer_root,
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=90,
+        )
+        if completed.returncode != 0:
+            raise AssertionError(
+                completed.stderr.strip() or completed.stdout.strip()
+            )
+        return json.loads(completed.stdout)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def assert_equal(actual: Any, expected: Any, *, label: str) -> None:
     if actual != expected:
         raise AssertionError(f"{label}: expected {expected!r}, got {actual!r}")
@@ -277,6 +512,11 @@ def expect_build_failure(
     builder: Callable[[], ProjectBuildResult],
     *,
     expected_code: str,
+    expected_owner_id: str | None = None,
+    expected_owner_kind: str | None = None,
+    expected_file: Path | None = None,
+    expected_line: int | None = None,
+    expected_column: int | None = None,
 ) -> dict[str, Any]:
     try:
         builder()
@@ -286,7 +526,74 @@ def expect_build_failure(
             raise AssertionError(
                 f"expected {expected_code}, got {sorted(codes)}: {exc}"
             ) from exc
-        return {"code": expected_code, "diagnostics": sorted(codes)}
+        matching = [
+            item
+            for item in getattr(exc, "diagnostics", ())
+            if isinstance(item, dict) and item.get("code") == expected_code
+        ]
+        if any(
+            value is not None
+            for value in (
+                expected_owner_id,
+                expected_owner_kind,
+                expected_file,
+                expected_line,
+                expected_column,
+            )
+        ):
+            if not matching:
+                raise AssertionError(
+                    f"{expected_code} did not include a structured diagnostic"
+                ) from exc
+            diagnostic = matching[0]
+            owner = diagnostic.get("owner")
+            if expected_owner_id is not None:
+                if not isinstance(owner, dict) or owner.get("id") != expected_owner_id:
+                    raise AssertionError(
+                        f"{expected_code} owner id: expected {expected_owner_id!r}, "
+                        f"got {owner!r}"
+                    ) from exc
+            if expected_owner_kind is not None:
+                if not isinstance(owner, dict) or owner.get("kind") != expected_owner_kind:
+                    raise AssertionError(
+                        f"{expected_code} owner kind: expected {expected_owner_kind!r}, "
+                        f"got {owner!r}"
+                    ) from exc
+            if expected_file is not None:
+                actual_file = diagnostic.get("file")
+                actual_resolved = (
+                    Path(actual_file).resolve()
+                    if isinstance(actual_file, str)
+                    else None
+                )
+                if actual_resolved != expected_file.resolve():
+                    raise AssertionError(
+                        f"{expected_code} file: expected {expected_file.resolve()}, "
+                        f"got {actual_file!r}"
+                    ) from exc
+            if expected_line is not None and diagnostic.get("line") != expected_line:
+                raise AssertionError(
+                    f"{expected_code} line: expected {expected_line}, "
+                    f"got {diagnostic.get('line')!r}"
+                ) from exc
+            if expected_column is not None and diagnostic.get("column") != expected_column:
+                raise AssertionError(
+                    f"{expected_code} column: expected {expected_column}, "
+                    f"got {diagnostic.get('column')!r}"
+                ) from exc
+        return {
+            "code": expected_code,
+            "diagnostics": sorted(codes),
+            "location": (
+                {
+                    "file": matching[0].get("file"),
+                    "line": matching[0].get("line"),
+                    "column": matching[0].get("column"),
+                }
+                if matching
+                else None
+            ),
+        }
     raise AssertionError(f"build unexpectedly succeeded; wanted {expected_code}")
 
 
@@ -427,6 +734,7 @@ __all__ = [
     "expect_build_failure",
     "prepare_temporary_puppeteer",
     "run_browser",
+    "run_browser_long_host",
     "run_node",
     "skip_case",
     "validate_environment",

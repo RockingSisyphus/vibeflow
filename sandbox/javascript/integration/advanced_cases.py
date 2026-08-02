@@ -174,6 +174,116 @@ process.stdout.write(JSON.stringify({
     }
 
 
+def nested_async_case(result: Any) -> Any:
+    payload = result.prepared.payload
+    inner = next(
+        block
+        for block in payload["blocks"]
+        if block.get("path") == ["outer", "inner"]
+    )
+    if inner["tasks"] != [
+        {
+            "id": "block:/outer/inner:task:double",
+            "node_id": "double",
+            "schedule": "deferred",
+            "executor": "event_loop",
+            "result_key": "doubled",
+        },
+        {
+            "id": "block:/outer/inner:task:audit",
+            "node_id": "audit",
+            "schedule": "detached",
+            "executor": "event_loop",
+        },
+    ]:
+        raise AssertionError(inner["tasks"])
+
+    runtime = run_node(
+        result.entry,
+        """
+const trace = [];
+const value = await workflow.runWorkflowAsync(
+  { x: 7 },
+  {
+    trace: "full",
+    onTrace: event => trace.push(event),
+    capabilities: {
+      "sandbox.audit": {
+        record: async request => {
+          assert(request.label === "nested-async", JSON.stringify(request));
+          return { accepted: true };
+        },
+      },
+    },
+  },
+);
+assert(value.doubled === 14, JSON.stringify(value));
+const taskEvents = trace
+  .filter(event => [
+    "async_result",
+    "async_result_join",
+    "async_detached",
+    "async_detached_done",
+  ].includes(event.kind))
+  .map(event => ({
+    kind: event.kind,
+    nodePath: event.nodePath,
+    blockPath: event.blockPath,
+  }));
+for (const event of taskEvents) {
+  assert(
+    event.nodePath === "outer.inner.double"
+      || event.nodePath === "outer.inner.audit",
+    JSON.stringify(taskEvents),
+  );
+  assert(event.blockPath === "/outer/inner", JSON.stringify(taskEvents));
+}
+let timeout;
+try {
+  await workflow.runWorkflowAsync(
+    { x: 3 },
+    {
+      detachedTimeoutMs: 5,
+      capabilities: {
+        "sandbox.audit": { record: () => new Promise(() => {}) },
+      },
+    },
+  );
+} catch (error) {
+  timeout = {
+    code: error.code,
+    nodePath: error.nodePath,
+    blockPath: error.blockPath,
+  };
+}
+assert(timeout.code === "VF_ASYNC_FLUSH_TIMEOUT", JSON.stringify(timeout));
+assert(timeout.nodePath === "outer.inner.audit", JSON.stringify(timeout));
+assert(timeout.blockPath === "/outer/inner", JSON.stringify(timeout));
+const recovered = await workflow.runWorkflowAsync(
+  { x: 4 },
+  {
+    capabilities: {
+      "sandbox.audit": {
+        record: async () => ({ accepted: true }),
+      },
+    },
+  },
+);
+assert(recovered.doubled === 8, JSON.stringify(recovered));
+process.stdout.write(JSON.stringify({
+  value,
+  taskEvents,
+  timeout,
+  recovered,
+}));
+""",
+    )
+    return {
+        "tasks": inner["tasks"],
+        "runtime": runtime,
+    }
+
+
 def edge_role_case(result: Any) -> Any:
     entry_block = result.prepared.plan.block(
         result.prepared.plan.entry_block

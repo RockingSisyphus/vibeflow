@@ -8,7 +8,7 @@ from vibeflow.core.quality import (
     QualityStructureLimits,
     QualityThresholds,
 )
-from vibeflow.tooling.project.quality_scan import (
+from vibeflow.tooling.application.python.project.quality_scan import (
     DEFAULT_EXCLUDED_DIRS,
     scan_code_quality,
 )

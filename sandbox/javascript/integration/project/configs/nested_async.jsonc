@@ -1,0 +1,63 @@
+{
+  "nodeset_imports": [
+    {"path": "nodesets/nested_async_inner.jsonc"},
+    {"path": "nodesets/nested_async_outer.jsonc"}
+  ],
+  "pipeline": {
+    "entry_mode": "async",
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts the nested async workflow."
+      },
+      {
+        "id": "outer",
+        "type_used": "sandbox.nested_async_outer",
+        "display_name": "Run nested async blocks",
+        "description": "Runs the two-level deferred and detached test graph.",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "doubled",
+            "type": "sandbox.async.value",
+            "display_name": "Doubled value"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Ends after the nested result is available."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "outer"},
+      {"from": "outer", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.async.value",
+        "cardinality": "exactly_one",
+        "display_name": "Doubled value",
+        "as": "doubled"
+      }
+    ]
+  }
+}

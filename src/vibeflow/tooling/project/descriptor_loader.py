@@ -15,6 +15,7 @@ from vibeflow.tooling.project.descriptor_catalogs import (
     DescriptorCatalogs,
     HostExtensionCatalog,
     NodeCatalog,
+    PluginCatalog,
     SchemaRegistry,
 )
 from vibeflow.core.descriptors.models import (
@@ -24,6 +25,7 @@ from vibeflow.core.descriptors.models import (
     DescriptorModelError,
     HostExtensionDescriptor,
     NodeDescriptor,
+    PluginDescriptor,
 )
 from vibeflow.core.config.node import NodeConfigError
 
@@ -34,6 +36,7 @@ _CONFIG_KEYS = (
     "data_schemas",
     "capabilities",
     "host_extensions",
+    "plugins",
 )
 _MANIFEST_KINDS = {
     "nodes": "node",
@@ -41,6 +44,7 @@ _MANIFEST_KINDS = {
     "data_schemas": "data_schema",
     "capabilities": "capability",
     "host_extensions": "host_extension",
+    "plugins": "plugin",
 }
 
 
@@ -134,12 +138,14 @@ def load_descriptor_catalogs(
     schemas = SchemaRegistry()
     capabilities = CapabilityCatalog()
     host_extensions = HostExtensionCatalog()
+    plugins = PluginCatalog()
     catalogs = {
         "nodes": nodes,
         "base_lib": base_libs,
         "data_schemas": schemas,
         "capabilities": capabilities,
         "host_extensions": host_extensions,
+        "plugins": plugins,
     }
     parsed_files: set[Path] = set()
     source_files: list[Path] = []
@@ -192,6 +198,7 @@ def load_descriptor_catalogs(
         schemas=schemas,
         capabilities=capabilities,
         host_extensions=host_extensions,
+        plugins=plugins,
         source_files=tuple(source_files),
     )
 
@@ -206,6 +213,7 @@ def parse_descriptor_manifest(
     | DataSchemaDescriptor
     | CapabilityDescriptor
     | HostExtensionDescriptor
+    | PluginDescriptor
 ):
     """Parse one already-decoded manifest object."""
 
@@ -223,6 +231,7 @@ def _load_manifest(
     | DataSchemaDescriptor
     | CapabilityDescriptor
     | HostExtensionDescriptor
+    | PluginDescriptor
 ):
     try:
         document = load_raw_config_document(path)

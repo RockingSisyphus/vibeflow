@@ -6,11 +6,11 @@ from importlib import import_module
 
 
 _EXPORTS = {
-    "CheckedRunError": ("vibeflow.tooling.application.runner", "CheckedRunError"),
-    "CheckedRunResult": ("vibeflow.tooling.application.runner", "CheckedRunResult"),
-    "run_checked": ("vibeflow.tooling.application.runner", "run_checked"),
+    "CheckedRunError": ("vibeflow.tooling.application.python.runner", "CheckedRunError"),
+    "CheckedRunResult": ("vibeflow.tooling.application.python.runner", "CheckedRunResult"),
+    "run_checked": ("vibeflow.tooling.application.python.runner", "run_checked"),
     "run_workspace_checked": (
-        "vibeflow.tooling.application.workspace_service",
+        "vibeflow.tooling.application.python.workspace_service",
         "run_workspace_checked",
     ),
 }
