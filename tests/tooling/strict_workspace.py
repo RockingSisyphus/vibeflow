@@ -1187,6 +1187,30 @@ def test_cli_workspace_validate_and_quality_default_roots(tmp_path, capsys) -> N
     assert {finding["root_id"] for finding in quality_payload["errors"] + quality_payload["warnings"]} == {"project"}
 
 
+def test_cli_workspace_quality_text_uses_root_relative_locations(tmp_path, capsys) -> None:
+    workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
+    _write_project_config(project_root, quality_enabled=True)
+    _write_project_config(framework_root, quality_enabled=False)
+    (project_root / "too_long.py").write_text("x = 1\ny = 2\n", encoding="utf-8")
+
+    assert cli_main(
+        [
+            "quality-check",
+            "--workspace",
+            str(workspace_path),
+            "--max-lines",
+            "1",
+            "--warn-lines",
+            "1",
+        ]
+    ) == 1
+
+    output = capsys.readouterr().out
+    assert "file:project/too_long.py [project/too_long.py:1]" in output
+    assert f"project/{project_root.resolve()}" not in output
+    assert "project//" not in output
+
+
 def test_cli_workspace_quality_config_error_text_output(tmp_path, capsys) -> None:
     missing_workspace = tmp_path / "missing" / "vibeflow_config.jsonc"
 

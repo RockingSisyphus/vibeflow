@@ -2,7 +2,7 @@
 
 本文档面向维护 VibeFlow（包名 `vibeflow`）自身的开发者，不是面向业务项目编写 node、nodeset 或 plugin 的使用者指南。
 
-VibeFlow 0.10.0 使用分层 API。根包不导出业务对象，维护代码只使用 `vibeflow.core`、`vibeflow.block_compiler`、`vibeflow.targets.*` 和 `vibeflow.tooling.*` 的所属层入口。
+VibeFlow 0.10.1 使用分层 API。根包不导出业务对象，维护代码只使用 `vibeflow.core`、`vibeflow.block_compiler`、`vibeflow.targets.*` 和 `vibeflow.tooling.*` 的所属层入口。
 
 ## 基本验证流程
 

@@ -93,12 +93,28 @@ def _prefix_quality_findings(findings: tuple[QualityFinding, ...], *, root: Work
         location = dict(finding.source_location)
         raw_path = str(location.get("path", "")).strip()
         source_path = str((root.path / raw_path).resolve()) if raw_path and not Path(raw_path).is_absolute() else (raw_path or str(root.path))
-        location["path"] = f"{root.id}/{raw_path}" if raw_path else raw_path
+        location["path"] = _workspace_display_path(raw_path, root=root)
         object_id = finding.object_id
         if finding.object_type in {"file", "function"} and not object_id.startswith(f"{root.id}/"):
             object_id = f"{root.id}/{object_id}"
         out.append(replace(finding, object_id=object_id, source_location=location, root_id=root.id, root_path=str(root.path), source_path=source_path))
     return tuple(out)
+
+
+def _workspace_display_path(raw_path: str, *, root: WorkspaceRoot) -> str:
+    """Return a root-qualified display path without prefixing an absolute path."""
+
+    if not raw_path:
+        return ""
+    path = Path(raw_path)
+    if path.is_absolute():
+        try:
+            relative = path.resolve().relative_to(root.path.resolve()).as_posix()
+        except ValueError:
+            return path.as_posix()
+    else:
+        relative = path.as_posix()
+    return f"{root.id}/{relative}"
 
 
 def _structure_limits_for_root(

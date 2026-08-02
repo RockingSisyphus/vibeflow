@@ -1,6 +1,6 @@
 # VibeFlow 使用者开发引导
 
-本文面向使用 VibeFlow（包名 `vibeflow`）编写业务 node、nodeset、plugin、base_lib 和 JSONC config 的开发者。VibeFlow 0.10.0 使用分层 API：Python 代码直接从所属包导入，不从根包导入业务对象。每个 workspace root 必须在 `vibeflow_project.jsonc` 中声明且只声明一个 Target：
+本文面向使用 VibeFlow（包名 `vibeflow`）编写业务 node、nodeset、plugin、base_lib 和 JSONC config 的开发者。VibeFlow 0.10.1 使用分层 API：Python 代码直接从所属包导入，不从根包导入业务对象。每个 workspace root 必须在 `vibeflow_project.jsonc` 中声明且只声明一个 Target：
 
 ```jsonc
 {"project_target": "python"}

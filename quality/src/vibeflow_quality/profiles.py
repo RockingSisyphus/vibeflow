@@ -91,7 +91,8 @@ _REMOVED_DOCUMENT_TOKENS = (
 )
 
 _STALE_DOCUMENT_TOKENS = {
-    "0.9.0": "Replace the obsolete public release version with 0.10.0.",
+    "0.9.0": "Replace the obsolete public release version with 0.10.1.",
+    "0.10.0": "Replace the obsolete public release version with 0.10.1.",
     "vibeflow.runtime": "Use the owning 0.10 layered API instead of the removed runtime facade.",
     "vibeflow.aot": "Use vibeflow.targets.javascript instead of the removed AOT facade.",
     "vibeflow.portable": "Use vibeflow.block_compiler instead of the removed portable facade.",

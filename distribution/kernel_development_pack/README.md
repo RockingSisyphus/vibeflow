@@ -1,6 +1,6 @@
 # VibeFlow 分发开发包
 
-本模板对应 VibeFlow 0.10.0。发布物包含一个通用内核和两个彼此独立的示例 root：
+本模板对应 VibeFlow 0.10.1。发布物包含一个通用内核和两个彼此独立的示例 root：
 
 ```text
 vibeflow-distribution/
@@ -26,7 +26,7 @@ python distribution/build.py
 
 ```text
 dist/vibeflow-distribution/
-archive/vibeflow-distribution-0.10.0.zip
+archive/vibeflow-distribution-0.10.1.zip
 ```
 
 临时验证可指定：

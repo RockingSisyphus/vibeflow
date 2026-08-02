@@ -1,6 +1,6 @@
 # VibeFlow AI 开发指引
 
-本目录是一个可复制的 VibeFlow 0.10.0 项目开发包，内置 `kernel/vibeflow-kernel.zip` 作为运行和校验内核。0.10 使用分层 API，不提供根级业务导出，并隔离 Python 与 JavaScript Target。AI 默认按本文开发业务程序。
+本目录是一个可复制的 VibeFlow 0.10.1 项目开发包，内置 `kernel/vibeflow-kernel.zip` 作为运行和校验内核。0.10 使用分层 API，不提供根级业务导出，并隔离 Python 与 JavaScript Target。AI 默认按本文开发业务程序。
 
 ## 先选择开发路径
 

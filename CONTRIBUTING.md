@@ -2,7 +2,7 @@
 
 This guide is for people changing the VibeFlow framework. Project authors should start with `docs/developer_guide.md` or `docs/js_aot_build.md`.
 
-VibeFlow 0.10.0 uses independent Python and JavaScript Target application closures. Every project root declares exactly one `project_target`; do not introduce cross-Target workflow execution or imports. Use the layered packages directly; do not add root-level business exports or restore removed `aot`, `runtime`, `portable`, `config`, `health`, `purity`, `devtools`, `rendering`, or `workspace` APIs.
+VibeFlow 0.10.1 uses independent Python and JavaScript Target application closures. Every project root declares exactly one `project_target`; do not introduce cross-Target workflow execution or imports. Use the layered packages directly; do not add root-level business exports or restore removed `aot`, `runtime`, `portable`, `config`, `health`, `purity`, `devtools`, `rendering`, or `workspace` APIs.
 
 ## Architecture rules
 
