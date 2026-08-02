@@ -6,7 +6,8 @@
     ],
     "base_lib": ["manifests/base_lib"],
     "data_schemas": ["manifests/data"],
-    "capabilities": ["manifests/capabilities"]
+    "capabilities": ["manifests/capabilities"],
+    "plugins": ["manifests/plugins"]
   },
   "javascript": {
     "package_root": ".",

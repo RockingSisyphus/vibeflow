@@ -1,8 +1,8 @@
 # VibeFlow 分发开发包
 
-本模板对应 VibeFlow 0.8.0。0.8 是破坏性 API 版本，Python 业务对象按 `vibeflow.core`、`vibeflow.targets.*` 和 `vibeflow.tooling.*` 分层导入。
+本模板对应 VibeFlow 0.9.0。Python 业务对象按 `vibeflow.core`、`vibeflow.targets.*` 和 `vibeflow.tooling.*` 分层导入；Python 与 JavaScript Target 及其 Application closure 完全隔离。
 
-这个目录是给“使用内核开发业务程序的人或 AI”看的分发材料。它不解释内核内部实现，只说明如何把程序拆成标准流程图 node、纯 `base_lib`、可选 plugin/Capability/Host Extension 和 JSONC 配置，再走 Python Runtime 或 JavaScript/TypeScript AOT 两条公开路径。Python 普通 node 的真实 IO 受派生 effect scope 约束；JS/TS AOT 的宿主交互通过逐调用注入的 Capability 或显式 Host Extension 建模。
+这个目录是给“使用内核开发业务程序的人或 AI”看的分发材料。它说明如何把程序拆成标准流程图 node、纯 `base_lib`、可选 Plugin/Capability/Host Extension 和 JSONC 配置，再走 Python Runtime 或 JavaScript/TypeScript AOT 两条公开路径。Python 普通 node 的真实 IO 受派生 effect scope 约束；JS/TS 使用 `vibeflow.plugin.v1` 扩展 hook，宿主交互通过逐调用 Capability 或 Host Extension 建模。
 
 正式 Target 名是 `python` 与 `javascript`；TypeScript 是 JavaScript Target 支持的实现语言。
 
@@ -46,6 +46,7 @@ my_project/
       base_lib/
       data/
       capabilities/
+      plugins/
       host_extensions/
     host_extensions/
     web/
@@ -68,7 +69,7 @@ my_project/
 policy。Python Runtime root 在 `vibeflow_project.jsonc` 声明 `registry`、
 quality、可选 runtime 和 `architecture.documents`，由
 `project/registry.py` 登记 Python node/base_lib/plugin；JS/TS AOT root 则用
-`descriptors` 登记 node、base_lib、Data Schema、Capability 和 Host Extension，用
+`descriptors` 登记 node、base_lib、Data Schema、Capability、Plugin 和 Host Extension，用
 `javascript` 指向项目自行安装并锁定的 Node.js、TypeScript 与 esbuild
 工具链。`descriptors` 和 `javascript` 是合法项目字段，不应被 Python 模板规则
 删除。两条路径共享显式 `pipeline.edges`、contract、nodeset、有限/永久 loop 和原生 Port 等
@@ -78,15 +79,15 @@ Python/VibeFlow Runtime 的 ESM 或 Web 产物。完整 AOT 规则见
 
 `python run.py quality --path project` 是内置用户项目质量检查：Tooling 读取文件，对应 Target 提取语言事实，Core Quality 统一判定，Tooling 输出报告。仓库维护者使用的独立 `quality/` profiles 不进入分发包。
 
-Host Extension descriptor 路径只登记 project 可用资源。当前 workflow 在顶层
-`host_extensions` 中选择实际使用的 ID，也可以把尚未实现的扩展标为
-`planned` 进入 Architecture JSON 和图形审查。planned 扩展不会打包、启动或
-提供 Capability。
+Plugin 与 Host Extension descriptor 路径只登记 project 可用资源。当前 workflow
+在顶层 `plugins` / `host_extensions` 中选择实际使用的 ID。Planned 项进入
+Architecture JSON 和图形审查，但不解析源码、不执行、不打包，也不提供
+Capability；implemented 资源不能依赖 planned 资源。
 
 登记的 `ARCHITECTURE.jsonc` 是从真实 workflow、nodeset 和资源配置确定性生成
 的单文件审查视图，AI 应优先读它理解项目；改变架构时修改真实 source，再重新
 生成，而不是手工编辑架构文档。Python workflow 按 id 启用当前使用的
-base_lib/plugin；JS/TS workflow 按 id 启用当前使用的 Host Extension；AOT
+base_lib/plugin；JS/TS workflow 按 id 启用当前使用的 Plugin 与 Host Extension；AOT
 build 只纳入当前流程实际使用的 implemented descriptor 依赖闭包。
 Python 普通 node 无 IO，需要真实副作用时使用语义正确的 `io` /
 `document` / `data_store` 或显式 trusted 边界；JS/TS node 的宿主能力必须在
@@ -112,7 +113,7 @@ python run.py svg --config project/configs/main.jsonc --expand-nodesets --output
 implemented nodeset 必须包含完整 pipeline。planned nodeset 可以无 body 占位，也可以带 body 逐步细化；body 会进入架构 JSONC 与展开图及适用静态检查，但仍不可按 implemented body 执行，`python_stub` 仍是单个 stub。
 
 分发包中的 `sandbox/javascript/integration/` 用简单数学 node 与 TS `base_lib`
-组合验证数据传递、分支/合流、nodeset、loop、同步/异步 ABI、Port、Capability、调用隔离、
+组合验证数据传递、分支/合流、nodeset、loop、同步/异步 ABI、`vibeflow.plugin.v1`、Port、Capability、Host Extension、调用隔离、
 构建 profile 和非法依赖。分发后可运行：
 
 ```powershell

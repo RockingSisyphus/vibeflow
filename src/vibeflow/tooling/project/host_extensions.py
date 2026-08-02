@@ -4,9 +4,9 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Mapping
 
 from vibeflow.tooling.project.resource_helpers import _finding
+from vibeflow.core.constants import EFFECT_SCOPE_TRUSTED
 from vibeflow.core.flow import STATUS_IMPLEMENTED, STATUS_PLANNED
 from vibeflow.core.findings import HealthFinding
-from vibeflow.targets.python.project.node import EFFECT_SCOPE_TRUSTED
 
 
 STATUSES = frozenset({STATUS_IMPLEMENTED, STATUS_PLANNED})

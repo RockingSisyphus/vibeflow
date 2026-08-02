@@ -746,7 +746,7 @@ VALID_RUN_CASES = [
             "current_node": "end",
             "edge_executions": {
                 "start->slow_async": 1,
-                "slow_async->add_pair": 2,
+                "slow_async->add_pair": 1,
                 "start->add_pair": 1,
                 "start->compare": 1,
                 "add_pair->scale": 1,
@@ -771,7 +771,7 @@ VALID_RUN_CASES = [
         "expected_runtime_exec_order": ["start", "seed", "add", "end"],
         "expected_trace_summary": {
             "current_node": "end",
-            "edge_executions": {"start->seed": 1, "seed->add": 2},
+            "edge_executions": {"start->seed": 1, "seed->add": 1},
             "exec_order": ["start", "seed", "add", "end"],
             "node_runs": {"start": 1, "seed": 1, "add": 1, "end": 1},
             "step_count": 4,
@@ -1102,7 +1102,7 @@ def _run_published_diagram_audit_case(results: list[CaseResult]) -> CaseResult:
 
 
 def _audit_published_diagrams(results: list[CaseResult]) -> CaseResult:
-    from vibeflow.tooling.presentation.mermaid.render import (
+    from vibeflow.tooling.application.python.presentation.mermaid.render import (
         is_mermaid_svg_renderer_available,
     )
 
@@ -2139,21 +2139,21 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     from vibeflow.targets.python.quality.workflow import validate_graph_health
     from vibeflow.targets.python.runtime.options import RuntimeOptions
     from vibeflow.targets.python.runtime.planning import build_execution_plan
-    from vibeflow.tooling.application.runner import run_checked
-    from vibeflow.tooling.presentation.ascii_flowchart import export_ascii_flowchart
-    from vibeflow.tooling.presentation.mermaid import export_mermaid
-    from vibeflow.tooling.presentation.mermaid.render import (
+    from vibeflow.tooling.application.python.runner import run_checked
+    from vibeflow.tooling.application.python.presentation.ascii_flowchart import export_ascii_flowchart
+    from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
+    from vibeflow.tooling.application.python.presentation.mermaid.render import (
         is_mermaid_svg_renderer_available,
         render_mermaid_svg,
     )
     from vibeflow.tooling.project.config_loader import load_config_document
     from vibeflow.tooling.project.config_schema import collect_config_schema_findings
-    from vibeflow.tooling.project.effective_policy import resolve_effective_policy
+    from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
     from vibeflow.tooling.project.graph_config import parse_graph_config
-    from vibeflow.tooling.project.resource_registries import (
+    from vibeflow.tooling.application.python.project.resource_registries import (
         discover_config_resource_registry_context,
     )
-    from vibeflow.tooling.project.resources import load_config_resources
+    from vibeflow.tooling.application.python.project.resources import load_config_resources
 
     from registry import build_node_registry
 
@@ -2528,7 +2528,7 @@ def _assert_ascii_contains(name: str, collapsed: str, expanded: str) -> None:
 
 
 def _assert_artifacts(run_dir: Path) -> None:
-    from vibeflow.tooling.presentation.mermaid.render import (
+    from vibeflow.tooling.application.python.presentation.mermaid.render import (
         is_mermaid_svg_renderer_available,
     )
 
@@ -2665,7 +2665,9 @@ def _health_invalid_node(case: dict[str, Any]) -> CaseResult:
     from vibeflow.targets.python.project import NodeRegistry
     from vibeflow.targets.python.quality.source_analysis import PurityPolicy
     from vibeflow.targets.python.quality.workflow import validate_graph_health
-    from vibeflow.tooling.project import collect_python_workflow_quality_facts
+    from vibeflow.tooling.application.python.project.python_quality import (
+        collect_python_workflow_quality_facts,
+    )
 
     cls = _load_class(PROJECT_DIR / str(case["module"]), str(case["class"]))
     registry = NodeRegistry()
@@ -2708,7 +2710,7 @@ def _bad_base_lib_report():
 
 
 def _invalid_config(case: dict[str, Any]) -> CaseResult:
-    from vibeflow.tooling.application.cli.config import validate_config_path
+    from vibeflow.tooling.application.python.cli.config import validate_config_path
 
     report = validate_config_path(CONFIG_DIR / str(case["config"]), policy_path=POLICY_PATH)
     if report.status not in {"FAIL", "ERROR"}:
@@ -2721,12 +2723,12 @@ def _concern_config(case: dict[str, Any]) -> CaseResult:
     from registry import build_node_registry
     from vibeflow.targets.python.quality.workflow import validate_graph_health
     from vibeflow.tooling.project.config_loader import load_config_document
-    from vibeflow.tooling.project.effective_policy import resolve_effective_policy
+    from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
     from vibeflow.tooling.project.graph_config import parse_graph_config
-    from vibeflow.tooling.project.resource_registries import (
+    from vibeflow.tooling.application.python.project.resource_registries import (
         discover_config_resource_registry_context,
     )
-    from vibeflow.tooling.project.resources import load_config_resources
+    from vibeflow.tooling.application.python.project.resources import load_config_resources
     from vibeflow.targets.python.project import load_plugins_from_config
 
     config_path = CONFIG_DIR / str(case["config"])
@@ -2775,7 +2777,7 @@ def _concern_config(case: dict[str, Any]) -> CaseResult:
 def _invalid_run(case: dict[str, Any]) -> CaseResult:
     from registry import build_node_registry
     from vibeflow.targets.python.runtime.options import RuntimeOptions
-    from vibeflow.tooling.application.runner import CheckedRunError, run_checked
+    from vibeflow.tooling.application.python.runner import CheckedRunError, run_checked
 
     try:
         runtime_options = RuntimeOptions(**case["runtime_options"]) if "runtime_options" in case else None
@@ -2805,7 +2807,7 @@ def _invalid_run(case: dict[str, Any]) -> CaseResult:
 def _invalid_runtime_run(case: dict[str, Any]) -> CaseResult:
     from registry import build_node_registry
     from vibeflow.targets.python.runtime.options import RuntimeOptions
-    from vibeflow.tooling.application.runner import run_checked
+    from vibeflow.tooling.application.python.runner import run_checked
 
     runtime_options = RuntimeOptions(**case["runtime_options"]) if "runtime_options" in case else None
     initial = case["initial_factory"]() if "initial_factory" in case else case.get("initial", {})

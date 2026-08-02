@@ -1,0 +1,75 @@
+{
+  "type_key": "sandbox.nested_async_outer",
+  "display_name": "Nested async outer block",
+  "description": "Wraps the async inner block to verify deep task paths.",
+  "requires": [
+    {
+      "type": "sandbox.number",
+      "cardinality": "exactly_one",
+      "display_name": "Number"
+    }
+  ],
+  "provides": [
+    {
+      "key": "doubled",
+      "type": "sandbox.async.value",
+      "display_name": "Doubled value"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Outer start",
+        "description": "Starts the outer nested block."
+      },
+      {
+        "id": "inner",
+        "type_used": "sandbox.nested_async_inner",
+        "display_name": "Run async inner block",
+        "description": "Runs deferred and detached work one level deeper.",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "doubled",
+            "type": "sandbox.async.value",
+            "display_name": "Doubled value"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "Outer end",
+        "description": "Ends after the inner result is available."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "inner"},
+      {"from": "inner", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.async.value",
+        "cardinality": "exactly_one",
+        "display_name": "Doubled value",
+        "as": "doubled"
+      }
+    ]
+  }
+}

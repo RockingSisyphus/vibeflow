@@ -237,8 +237,8 @@ class RuntimePlugin:
 
 
 def test_config_resource_metadata_missing_fields_warn_without_blocking(tmp_path) -> None:
-    from vibeflow.tooling.project.resources import load_config_resources
-    from vibeflow.tooling.application.cli.config import validate_config_path
+    from vibeflow.tooling.application.python.project.resources import load_config_resources
+    from vibeflow.tooling.application.python.cli.config import validate_config_path
 
     config = {
         "base_lib": {"modules": [{"module": "base_lib.future_tools", "status": "planned"}]},
@@ -264,7 +264,7 @@ def test_config_resource_metadata_missing_fields_warn_without_blocking(tmp_path)
 
 
 def test_host_extension_resources_keep_workflow_status_and_config() -> None:
-    from vibeflow.tooling.project.resources import load_config_resources
+    from vibeflow.tooling.application.python.project.resources import load_config_resources
 
     resources, findings = load_config_resources(
         {
@@ -315,7 +315,7 @@ def test_host_extension_resources_keep_workflow_status_and_config() -> None:
 def test_host_extension_resources_resolve_registered_descriptor_metadata(
     tmp_path,
 ) -> None:
-    from vibeflow.tooling.project.resources import (
+    from vibeflow.tooling.application.python.project.resources import (
         HostExtensionResource,
         resolve_host_extension_resources,
     )
@@ -395,7 +395,7 @@ def test_host_extension_resources_resolve_registered_descriptor_metadata(
 
 def test_registered_plugin_reference_preserves_planned_status(tmp_path) -> None:
     from vibeflow.targets.python.project import PluginResourceRegistry
-    from vibeflow.tooling.project.resources import load_config_resources
+    from vibeflow.tooling.application.python.project.resources import load_config_resources
 
     registry = PluginResourceRegistry()
     registry.register(

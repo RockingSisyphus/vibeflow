@@ -62,6 +62,8 @@ class BuildRequest:
     app_entry: str | Path | None = None
     node_command: str = "node"
     javascript_bindings: JavascriptBindingPlan | None = None
+    plugin_manifest: Mapping[str, Any] = field(default_factory=dict)
+    audit_sources: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -189,7 +191,10 @@ def build_aot(request: BuildRequest) -> BuildResult:
             "entryName": entry_name,
             "sourcemap": sourcemap,
             "external": sorted(set(request.external_packages)),
-            "typecheckFiles": [str(contract_check)],
+            "typecheckFiles": [
+                str(contract_check),
+                *(str(item) for item in request.audit_sources),
+            ],
             "importPolicy": _driver_import_policy(
                 import_policy,
                 external_packages=request.external_packages,
@@ -227,6 +232,7 @@ def build_aot(request: BuildRequest) -> BuildResult:
             entry_name=entry_name,
             external_packages=request.external_packages,
             staging=staging,
+            plugin_manifest=request.plugin_manifest,
         )
         manifest_path = staging / "vibeflow-build.json"
         manifest_path.write_text(

@@ -1,6 +1,6 @@
 # VibeFlow 语言无关内核与多 Target 分层架构
 
-> 状态：VibeFlow 0.8 已落实本分层。0.8.0 是破坏性 API 版本，只提供下文列出的分层导入路径。
+> 状态：VibeFlow 0.9.0 使用下文的分层导入路径，并以静态依赖门禁保证两个 Target 及其 Application closure 完全隔离。
 
 ## 编译链
 
@@ -38,9 +38,11 @@ src/vibeflow/
 │       ├── build/          # emitter、Node 工具链与发布
 │       └── resources/      # AOT 构建资源
 └── tooling/
-    ├── application/         # CLI、runner 与跨层编排
-    ├── project/             # JSONC、workspace、路径与文件加载
-    └── presentation/        # Architecture、ASCII、Mermaid、SVG 与 review
+    ├── application/
+    │   ├── python/      # Python CLI、runner、project 与 presentation
+    │   └── javascript/  # JavaScript AOT 工程编排与 CLI
+    ├── project/             # JSONC、workspace、路径与文件加载
+    └── __init__.py          # 不引入 Target 的轻量命名空间
 ```
 
 正式 Target 名是 `javascript`；TypeScript 是该 Target 支持的实现语言。
@@ -99,19 +101,20 @@ from vibeflow.targets.javascript.quality import validate_javascript_quality
 from vibeflow.targets.javascript.build import BuildRequest, build_aot
 ```
 
-`JavascriptBindingPlan` 保存 JS/TS 源码、Schema、base_lib、Capability、Host Extension 和 import policy。Emitter 使用 `WorkflowPlan + JavascriptBindingPlan` 生成 `vibeflow.workflow.v2` ESM。
+`JavascriptBindingPlan` 保存 JS/TS 源码、Schema、base_lib、Capability、Plugin、Host Extension 和 import policy。Emitter 使用 `WorkflowPlan + JavascriptBindingPlan` 生成 `vibeflow.workflow.v2` ESM；JS/TS Plugin 使用 `vibeflow.plugin.v1`。
 
-两个 Target 不能互相导入。
+两个 Target 不能直接或经 Tooling 间接导入。Python Application closure 只能到达 Python Target，JavaScript Application closure 只能到达 JavaScript Target；中立 Tooling 不依赖任一 Target。
 
 ## Tooling
 
 Tooling 只处理外部接线和表现层：
 
 - `tooling.project` 读取 JSONC、workspace、descriptor 和路径；
-- `tooling.application` 编排 Core、Target、runner、CLI 和报告；
-- `tooling.presentation` 生成 Architecture、ASCII、Mermaid、SVG 和 review 产物。
+- `tooling.application.python` 编排 Python Target，并拥有 Python 项目扫描、CLI、runner 和 architecture presentation；
+- `tooling.application.javascript` 编排 JavaScript Target 的 AOT 工程与 CLI；
+- `tooling.project` 是两个 Application 可共享的中立文件接线，不引入任一 Target。
 
-项目质量检查也遵循分层链路：
+用户项目质量检查是 Core 能力，文件接线遵循分层链路：
 
 ```text
 Tooling 扫描文件和 workspace
@@ -134,11 +137,12 @@ tooling ────────────────────────
 - Core 不依赖 Block Compiler、Target 或 Tooling；
 - Block Compiler 只依赖 Core；
 - Target 只依赖自身、Block Compiler 和 Core；
-- Tooling 可以编排各层，底层不得反向依赖 Tooling；
+- Target-specific Application 只能编排自己的 Target；其他 Tooling 保持 Target-neutral，底层不得反向依赖 Tooling；
+- Python 与 JavaScript 的 Application dependency closure 不得相交；
 - JavaScript `frontend/quality` 不启动 subprocess，`build` 才能调用 Node 工具链；
 - Python `quality` 不遍历文件，`project` 才能执行受控动态 import。
 
-0.8 删除根级业务导出和 `aot`、`runtime`、`portable`、`config`、`health`、`purity`、`devtools`、`rendering`、`workspace` 等旧 API 路径。项目应直接使用所属层的稳定入口。
+0.9 不恢复根级业务导出，也不恢复 `aot`、`runtime`、`portable`、`config`、`health`、`purity`、`devtools`、`rendering`、`workspace` 等旧 API 路径。项目应直接使用所属层的稳定入口。
 
 ## Sandbox 与验证
 
@@ -175,6 +179,14 @@ python tools/clean_workspace.py --apply
 
 清理器只处理明确列出的生成物；`references/`、`distribution/` 源模板和 `.git/` 永不在清理范围内。
 
+## Plugin、Planned 与 Host Extension
+
+Core 用冻结 descriptor 和 selection 统一描述 `policy`、`compiler`、`runtime` 三类 Plugin；各 Target 只绑定自己的实现。JS/TS 实现导出 `createPlugin(context)`，ABI 常量为 `vibeflow.plugin.v1`：Policy/Compiler Plugin 在 AOT 构建期执行检查，Runtime Plugin 在每次 workflow 调用内执行 hook 并释放。它们不能注册长期监听器或提供宿主生命周期。
+
+Host Extension 是 JavaScript Target 的宿主生命周期资源。它由 `createWorkflowHost()` 创建，负责 `start()` / `stop()`、长期事件接线和 Capability provider；它不是 Plugin，也不进入单次 workflow 的 runtime hook 链。
+
+Plugin 与 Host Extension 均可在 workflow 中标为 `planned`。Planned 项只进入架构文档和图形审查，不解析源码、不绑定实现、不执行 hook、不打包，也不提供 Capability。implemented 资源不能依赖 planned 资源。
+
 ## 扩展边界
 
-新增语言时实现新的 Target 和 Tooling 接线，复用 Core 与 Block Compiler。Python Plugin 和 JavaScript Host Extension 保持各自职责；通用语义不得复制到某个 Target。
+新增语言时实现新的 Target 与专属 Application 接线，复用 Core 与 Block Compiler。Plugin hook 与 Host Extension 生命周期保持分工；通用语义不得复制到某个 Target。

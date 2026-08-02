@@ -1405,7 +1405,7 @@ def test_pipeline_runtime_rejects_depth_five_and_allows_explicit_override() -> N
 
 
 def test_checked_run_and_validate_use_effective_nodeset_max_depth(tmp_path) -> None:
-    from vibeflow.tooling.application.cli.config import validate_config_path
+    from vibeflow.tooling.application.python.cli.config import validate_config_path
 
     config_path = tmp_path / "depth.jsonc"
     _write_config_file(config_path, _runtime_nodeset_depth_config(5))
@@ -2006,7 +2006,10 @@ def test_runtime_trace_preserves_nested_failure_path() -> None:
 
 def test_cli_train_profile_sets_async_flush_timeout_and_allows_override() -> None:
     import argparse
-    from vibeflow.tooling.application.cli import _add_runtime_options, _runtime_options_from_args
+    from vibeflow.tooling.application.python.cli import (
+        _add_runtime_options,
+        _runtime_options_from_args,
+    )
 
     parser = argparse.ArgumentParser()
     _add_runtime_options(parser)
@@ -2049,7 +2052,7 @@ def test_cli_run_rejects_unsafe_run_id_before_creating_run(tmp_path, capsys, run
     ["", ".", "..", "../escape", "nested/id", "nested\\id", "/absolute", "nul\x00id"],
 )
 def test_checked_run_rejects_unsafe_programmatic_run_id_without_writing(tmp_path, run_id) -> None:
-    from vibeflow.tooling.application.run_directory import InvalidRunIdError
+    from vibeflow.tooling.application.python.run_directory import InvalidRunIdError
 
     run_root = tmp_path / "runs"
 

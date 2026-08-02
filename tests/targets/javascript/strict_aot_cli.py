@@ -4,8 +4,9 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from vibeflow.tooling.application.javascript_build import ProjectBuildError
-from vibeflow.tooling.application.cli import build_parser, main
+from vibeflow.tooling.application.javascript.build import ProjectBuildError
+from vibeflow.tooling.application.javascript.cli import build_parser
+from vibeflow.tooling.application.cli import main
 
 
 def test_build_parser_exposes_the_three_aot_profiles() -> None:
@@ -58,7 +59,7 @@ def test_build_cli_prints_one_machine_readable_success_object(
     )
 
     monkeypatch.setattr(
-        "vibeflow.tooling.application.javascript_build.build_project_aot",
+        "vibeflow.tooling.application.javascript.build.build_project_aot",
         lambda request: result,
     )
 
@@ -96,7 +97,7 @@ def test_build_cli_preserves_stable_error_codes(
             "JS AOT inputs must declare required",
         )
 
-    monkeypatch.setattr("vibeflow.tooling.application.javascript_build.build_project_aot", fail)
+    monkeypatch.setattr("vibeflow.tooling.application.javascript.build.build_project_aot", fail)
 
     status = main(
         [

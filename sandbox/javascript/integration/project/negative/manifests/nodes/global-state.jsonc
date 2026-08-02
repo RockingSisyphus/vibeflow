@@ -1,0 +1,23 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.invalid.global_state",
+  "display_name": "Invalid global state",
+  "category": "sandbox-negative",
+  "description": "Mutates module-level state from a node implementation.",
+  "version": "1.0.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [{"type": "sandbox.number", "cardinality": "exactly_one", "display_name": "Number"}],
+    "provides": [{"key": "result", "type": "sandbox.math.result", "display_name": "Result"}],
+    "params_schema": {},
+    "params_defaults": {},
+    "output_schema": {"result": {"type": "number"}}
+  },
+  "implementations": [{
+    "language": "typescript",
+    "targets": ["browser", "node"],
+    "source": {"kind": "file", "ref": "negative/nodes/global_state.ts", "export": "run"}
+  }],
+  "base_libs": [],
+  "capabilities": []
+}

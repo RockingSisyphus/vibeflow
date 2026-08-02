@@ -2,7 +2,7 @@
 
 本文记录 VibeFlow 面向 JavaScript、TypeScript、浏览器和 Node.js 的通用扩展方案。
 
-> 状态：设计已在 0.8 的 JavaScript Target 中落实。本文记录方案形成过程，不定义当前公开接口；配置、ABI、构建命令和限制以 [JavaScript/TypeScript 节点与 Web AOT 构建指南](js_aot_build.md) 为准。
+> 状态：基础设计已在 JavaScript Target 中落实。0.9 的 Plugin 与 Target 隔离以 [JavaScript/TypeScript 节点与 Web AOT 构建指南](js_aot_build.md) 为准；本文只记录方案形成过程。
 
 VibeFlow 将从主要管理 Python 程序的框架，扩展为能够管理多语言节点、检查统一流程，并为不同运行目标生成普通程序的流程编译框架。
 
@@ -422,7 +422,7 @@ Worker 硬中止、事务回滚或只有 Python runtime 才具备的语义，可
 - 完善 Host Extension 的依赖、打包和生命周期管理。
 - 评估 `single-html`、Worker 隔离和 TS plugin。
 
-## 0.8 公共边界
+## 当前公共边界
 
 必须保持：
 

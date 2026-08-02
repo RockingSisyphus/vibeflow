@@ -14,6 +14,9 @@
     "capabilities": [
       "manifests/capabilities"
     ],
+    "plugins": [
+      "manifests/plugins"
+    ],
     "host_extensions": [
       "manifests/host_extensions"
     ]

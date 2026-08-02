@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "imports": {
+    "#forbidden-node": "./nodes/math.ts"
+  },
   "devDependencies": {
     "esbuild": "0.28.1",
     "typescript": "7.0.2"

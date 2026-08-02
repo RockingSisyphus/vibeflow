@@ -1,6 +1,6 @@
 # VibeFlow 可复制开发包
 
-版本：0.8.0
+版本：0.9.0
 
 <!-- VIBEFLOW_DISTRIBUTION_GENERATED_AT -->
 
@@ -19,9 +19,9 @@ VibeFlow 提供两条开发路径：
   `project/nodes/`、`project/base_lib/` 和 `project/plugins/`，并在
   `project/registry.py` 注册；使用 `run`、`review` 和 `delegate-cli`。
 - **JavaScript/TypeScript AOT**：JS/TS node 与 base_lib 放在
-  `project/nodes/`、`project/base_lib/`，Host Extension 放在
-  `project/host_extensions/`，五类 JSONC descriptor 放在
-  `project/manifests/{nodes,base_lib,data,capabilities,host_extensions}/`，可选 Web 模板和应用
+  `project/nodes/`、`project/base_lib/`，Plugin 与 Host Extension 放在
+  `project/plugins/`、`project/host_extensions/`，六类 JSONC descriptor 放在
+  `project/manifests/{nodes,base_lib,data,capabilities,plugins,host_extensions}/`，可选 Web 模板和应用
   入口放在 `project/web/`；使用 `build` 生成普通 ESM 或网页。构建产物运行时
   不需要 Python，也不需要 VibeFlow Runtime。
 
@@ -51,13 +51,13 @@ python run.py verify-kernel
 ```
 
 JS/TS AOT 项目需要在 `project/vibeflow_project.jsonc` 的 `descriptors`
-字段登记 node、base_lib、Data Schema、Capability 和 Host Extension descriptor，并用
+字段登记 node、base_lib、Data Schema、Capability、Plugin 和 Host Extension descriptor，并用
 `javascript.package_root` 指向本地 `package.json`、lockfile 和
 `node_modules`。项目自行安装并锁定 Node.js、TypeScript 与 esbuild；
 VibeFlow 不会执行 `npm install` 或第三方 package scripts。完整 descriptor、
-Node/Workflow ABI、同步/异步入口、Port、Capability、Host Extension、三种 profile 与 `web-app` 入口规则见
+Node/Workflow ABI、`vibeflow.plugin.v1`、同步/异步入口、Port、Capability、Host Extension、三种 profile 与 `web-app` 入口规则见
 `kernel/docs/11_JS_TS与Web_AOT构建指南.md`。分发包还提供可直接检查数学运算、
-数据传递、nodeset、loop、同步/异步 ABI、Port 和非法依赖的
+数据传递、nodeset、loop、同步/异步 ABI、Plugin、Port、Host Extension 和非法依赖的
 `sandbox/javascript/integration/`。基础验证运行：
 
 ```powershell
@@ -68,10 +68,10 @@ python sandbox/javascript/integration/run_all.py --skip-browser
 `kernel/vibeflow-kernel.zip` 导入内核，并在临时目录安装锁定的工具链和
 Puppeteer；分发目录中不会生成 `node_modules`。
 
-`descriptors.host_extensions` 只登记 project 可用扩展；每个 workflow 在顶层
-`host_extensions` 中选择实际使用的 ID。字符串表示 implemented 扩展，对象还
-可写 `status`、`enabled`、`config/settings` 和审查元数据。planned 扩展进入
-Architecture JSON 与 Mermaid/SVG，但不会打包、启动或提供 Capability。
+`descriptors.plugins` 与 `descriptors.host_extensions` 只登记 project 可用资源；
+每个 workflow 在顶层 `plugins` / `host_extensions` 中选择实际使用项。Planned
+资源进入 Architecture JSON 与 Mermaid/SVG，但不解析源码、不执行、不打包，也
+不提供 Capability；implemented 资源不能依赖 planned 资源。
 
 默认项目把 `project/configs/main.jsonc` 登记到 `project/ARCHITECTURE.jsonc`。这是带固定“生成且不可执行”头注释的单文件架构审查文档，不是 workflow config；AI 和开发者应先用它理解入口流程、nodeset 调用、节点职责、数据契约、资源和配置来源。架构变更必须落到真实 workflow config、相关 nodeset、registry metadata/config schema 或资源声明中。正式 `review` 会自动重新生成登记文档、执行正式 validate，并且只在 canonical expanded SVG 结构检查通过后发布 SVG；失败时不得用 mmdc、手写 SVG 或旧产物补位。
 

@@ -363,6 +363,13 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         return frame.is_terminal
 
     def _activated_edges(self, node_name: str, outputs: Mapping[str, object], state: _RuntimeState) -> tuple[EdgeSpec, ...]:
+        # A result-key task has only been scheduled at this point; its
+        # outgoing routes become active when ``_join_async_source`` resolves
+        # the task and supplies the real outputs.  Activating unconditional
+        # routes here records them twice and exposes a route before its result
+        # exists.
+        if node_name in self._async_results:
+            return ()
         active = []
         values = self._condition_values(node_name, outputs, state)
         for edge in self._frames[node_name].outgoing:

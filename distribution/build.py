@@ -36,6 +36,7 @@ STANDARD_PROJECT_DIRS = (
     "project/manifests/data",
     "project/manifests/capabilities",
     "project/manifests/host_extensions",
+    "project/manifests/plugins",
     "project/host_extensions",
     "project/stubs",
 )

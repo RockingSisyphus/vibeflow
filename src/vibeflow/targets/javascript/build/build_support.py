@@ -263,6 +263,16 @@ def driver_import_policy(
                 or {}
             ).items()
         },
+        "pluginDependencies": {
+            str(key): [str(item) for item in value]
+            for key, value in (
+                policy.get(
+                    "plugin_dependencies",
+                    policy.get("pluginDependencies", {}),
+                )
+                or {}
+            ).items()
+        },
         "allowedExternalPackages": sorted(allowed),
     }
 
@@ -315,14 +325,16 @@ def build_manifest(
     entry_name: str,
     external_packages: tuple[str, ...],
     staging: Path,
+    plugin_manifest: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     files = {}
     for path in sorted(item for item in staging.rglob("*") if item.is_file()):
         relative = path.relative_to(staging).as_posix()
         files[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
-    return {
+    manifest = {
         "format": BUILD_MANIFEST_FORMAT,
         "abi_version": workflow.abi_version,
+        "plugin_abi_version": "vibeflow.plugin.v1",
         "workflow_id": workflow.workflow_id,
         "entry_mode": workflow.entry_mode,
         "target": target,
@@ -334,6 +346,28 @@ def build_manifest(
         "host_extensions": list(emitted.host_extensions),
         "files": files,
     }
+    if plugin_manifest:
+        manifest["plugins"] = _plain_json_value(plugin_manifest)
+    else:
+        manifest["plugins"] = {
+            "active": [],
+            "annotations": [],
+            "declared": [],
+            "planned": [],
+            "relaxations": [],
+        }
+    return manifest
+
+
+def _plain_json_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): _plain_json_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (tuple, list)):
+        return [_plain_json_value(item) for item in value]
+    return value
 
 
 def validate_existing_target(out_dir: Path, *, replace: bool) -> None:

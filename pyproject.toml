@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vibeflow"
-version = "0.8.0"
+version = "0.9.0"
 description = "Language-neutral workflow architecture, validation, and multi-target compilation"
 requires-python = ">=3.11"
 license = "AGPL-3.0-only"
@@ -20,6 +20,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 vibeflow = [
     "targets/javascript/resources/*.mjs",
+    "targets/javascript/resources/*.d.ts",
     "tooling/project/schema/*.schema.json",
 ]
 

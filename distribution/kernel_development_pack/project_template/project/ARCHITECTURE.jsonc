@@ -608,8 +608,9 @@
         "name": "project_policy",
         "type": "policy",
         "effect_scope": "trusted",
-        "module": "plugins.policy",
-        "class": "PolicyPlugin",
+        "targets": [],
+        "dependencies": [],
+        "config": {},
         "config_keys": [],
         "id": "project_policy",
         "status": "implemented",
@@ -620,7 +621,9 @@
         "source": {
           "root_id": "project",
           "path": "configs/main.jsonc"
-        }
+        },
+        "module": "plugins.policy",
+        "class": "PolicyPlugin"
       }
     ]
   }

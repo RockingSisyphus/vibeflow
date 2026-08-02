@@ -1,0 +1,6 @@
+[
+  {
+    "path": "negative/links/math.ts",
+    "target": "nodes/math.ts"
+  }
+]

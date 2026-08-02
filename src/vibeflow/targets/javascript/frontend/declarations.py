@@ -90,6 +90,7 @@ def declarations(
             "}",
             "",
             "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v2\";",
+            "export const VIBEFLOW_PLUGIN_ABI: \"vibeflow.plugin.v1\";",
             _entry_declaration(workflow),
     ]
     if has_host_extensions:

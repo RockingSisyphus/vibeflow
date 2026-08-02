@@ -1,0 +1,88 @@
+{
+  "type_key": "sandbox.nested_async_inner",
+  "display_name": "Nested async inner block",
+  "description": "Combines one deferred calculation with one detached audit task.",
+  "requires": [
+    {
+      "type": "sandbox.number",
+      "cardinality": "exactly_one",
+      "display_name": "Number"
+    }
+  ],
+  "provides": [
+    {
+      "key": "doubled",
+      "type": "sandbox.async.value",
+      "display_name": "Doubled value"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Inner start",
+        "description": "Starts both nested tasks."
+      },
+      {
+        "id": "double",
+        "type_used": "sandbox.async_double",
+        "display_name": "Deferred double",
+        "description": "Resolves the nested business result.",
+        "async": "result_key",
+        "result_key": "doubled",
+        "requires": [
+          {
+            "type": "sandbox.number",
+            "cardinality": "exactly_one",
+            "display_name": "Number"
+          }
+        ],
+        "provides": [
+          {
+            "key": "doubled",
+            "type": "sandbox.async.value",
+            "display_name": "Doubled value"
+          }
+        ]
+      },
+      {
+        "id": "audit",
+        "type_used": "sandbox.detached_audit",
+        "display_name": "Detached nested audit",
+        "description": "Exercises invocation-owned detached cleanup.",
+        "async": "detached",
+        "config": {
+          "label": "nested-async"
+        }
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "Inner end",
+        "description": "Ends after the deferred result is joined."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "double"},
+      {"from": "start", "to": "audit"},
+      {"from": "double", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.async.value",
+        "cardinality": "exactly_one",
+        "display_name": "Doubled value",
+        "as": "doubled"
+      }
+    ]
+  }
+}

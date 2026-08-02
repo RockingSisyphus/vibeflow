@@ -102,9 +102,20 @@ def _pytest(scratch: Path) -> None:
         paths = (ROOT / "tests",)
     work_root = scratch / "pytest-work"
     work_root.mkdir(parents=True, exist_ok=True)
+    toolchain_root = scratch / "pytest-javascript-toolchain"
+    toolchain_root.mkdir(parents=True, exist_ok=True)
+    for name in ("package.json", "package-lock.json"):
+        shutil.copy2(
+            ROOT / "sandbox/javascript/minimal/project" / name,
+            toolchain_root / name,
+        )
+    _run(("npm", "ci"), cwd=toolchain_root)
     _run(
         (PYTHON, "-m", "pytest", "-q", "-p", "no:cacheprovider", *paths),
         cwd=work_root,
+        overrides={
+            "VIBEFLOW_TEST_TOOLCHAIN_ROOT": str(toolchain_root),
+        },
     )
 
 
@@ -123,6 +134,173 @@ def _javascript_integration(_scratch: Path) -> None:
 def _venv_python(root: Path) -> Path:
     relative = Path("Scripts/python.exe") if os.name == "nt" else Path("bin/python")
     return root / relative
+
+
+_PYTHON_ISOLATION_NODES = """
+from vibeflow.core import DataProvider, DataRequirement
+from vibeflow.targets.python.project import NodeContract, NodeInfo
+
+class StartNode:
+    NODE_INFO = NodeInfo("isolation.start", "Start", "isolation", "Starts the isolation workflow.", "1.0.0", "terminal")
+    CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}},))
+    def run_pure(self, inputs, params):
+        return {}
+
+class SeedNode:
+    NODE_INFO = NodeInfo("isolation.seed", "Seed", "isolation", "Produces the isolation result.", "1.0.0", "process")
+    CONTRACT = NodeContract(
+        provides=(DataProvider(key="value.out", type="value.out"),),
+        output_semantics={"value.out": ("isolation result",)},
+        params_schema={"value": {"type": "number"}},
+        output_schema={"value.out": {"type": "number"}},
+        examples=({"inputs": {}, "params": {"value": 7}},),
+    )
+    def run_pure(self, inputs, params):
+        return {"value.out": params["value"]}
+
+class EndNode:
+    NODE_INFO = NodeInfo("isolation.end", "End", "isolation", "Consumes the isolation result.", "1.0.0", "terminal")
+    CONTRACT = NodeContract(
+        requires=(DataRequirement(type="value.out", cardinality="exactly_one"),),
+        input_semantics={"value.out": ("isolation result",)},
+        examples=({"inputs": {"value.out": {"key": "value.out", "type": "value.out", "value": 7, "source_node": "seed"}}, "params": {}},),
+    )
+    def run_pure(self, inputs, params):
+        return {}
+""".strip() + "\n"
+
+
+def _blocked_import_finder_source(prefixes: tuple[str, ...]) -> str:
+    return f"""
+import importlib.abc
+import sys
+
+BLOCKED_PREFIXES = {prefixes!r}
+
+class BlockedTargetFinder(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if any(
+            fullname == prefix or fullname.startswith(prefix + ".")
+            for prefix in BLOCKED_PREFIXES
+        ):
+            raise ModuleNotFoundError(
+                f"target isolation blocked {{fullname}}",
+                name=fullname,
+            )
+        return None
+
+sys.meta_path.insert(0, BlockedTargetFinder())
+"""
+
+
+def _javascript_cli_isolation_probe() -> str:
+    return _blocked_import_finder_source(
+        (
+            "vibeflow.targets.python",
+            "vibeflow.tooling.application.python",
+        )
+    ) + """
+import os
+from pathlib import Path
+import sys
+
+from vibeflow.tooling.application.cli import main
+
+out_dir = Path(os.environ["VF_ISOLATION_JS_OUT"])
+status = main([
+    "build",
+    "--workspace", os.environ["VF_ISOLATION_JS_WORKSPACE"],
+    "--config", os.environ["VF_ISOLATION_JS_CONFIG"],
+    "--target", "node",
+    "--profile", "single-esm",
+    "--out-dir", str(out_dir),
+])
+assert status == 0, status
+assert (out_dir / "index.js").is_file()
+assert (out_dir / "vibeflow-build.json").is_file()
+assert not [
+    name for name in sys.modules
+    if any(
+        name == prefix or name.startswith(prefix + ".")
+        for prefix in BLOCKED_PREFIXES
+    )
+]
+"""
+
+
+def _python_cli_isolation_probe() -> str:
+    return (
+        _blocked_import_finder_source(
+            (
+                "vibeflow.targets.javascript",
+                "vibeflow.tooling.application.javascript",
+            )
+        )
+        + f"NODE_SOURCE = {_PYTHON_ISOLATION_NODES!r}\n"
+        + r'''
+import importlib.util
+import json
+import os
+from pathlib import Path
+import sys
+
+root = Path(os.environ["VF_ISOLATION_PYTHON_ROOT"])
+root.mkdir(parents=True, exist_ok=True)
+node_path = root / "isolation_nodes.py"
+node_path.write_text(NODE_SOURCE, encoding="utf-8")
+spec = importlib.util.spec_from_file_location("isolation_nodes", node_path)
+assert spec is not None and spec.loader is not None
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+
+from vibeflow.targets.python.project import GLOBAL_NODE_REGISTRY
+
+GLOBAL_NODE_REGISTRY.register(
+    "isolation.start", module.StartNode, config_schema={}, config_defaults={}
+)
+GLOBAL_NODE_REGISTRY.register(
+    "isolation.seed",
+    module.SeedNode,
+    config_schema={"value": {"type": "number"}},
+    config_defaults={"value": 7},
+)
+GLOBAL_NODE_REGISTRY.register(
+    "isolation.end", module.EndNode, config_schema={}, config_defaults={}
+)
+
+config = root / "workflow.jsonc"
+config.write_text(json.dumps({
+    "pipeline": {
+        "nodes": [
+            {"id": "start", "type_used": "isolation.start", "display_name": "Start", "description": "Starts the isolation workflow."},
+            {"id": "seed", "type_used": "isolation.seed", "display_name": "Seed", "description": "Produces the isolation result.", "provides": [{"key": "value.out", "type": "value.out", "display_name": "Result"}], "value": 7},
+            {"id": "end", "type_used": "isolation.end", "display_name": "End", "description": "Consumes the isolation result.", "requires": [{"type": "value.out", "cardinality": "exactly_one", "display_name": "Result"}]},
+        ],
+        "edges": [["start", "seed"], ["seed", "end"]],
+        "outputs": [{"type": "value.out", "cardinality": "exactly_one", "display_name": "Result"}],
+    }
+}), encoding="utf-8")
+
+from vibeflow.tooling.application.cli import main
+
+status = main([
+    "run",
+    "--config", str(config),
+    "--run-root", str(root / "runs"),
+    "--run-id", "wheel-target-isolation",
+])
+assert status == 0, status
+assert (root / "runs/wheel-target-isolation/output_summary.json").is_file()
+assert not [
+    name for name in sys.modules
+    if any(
+        name == prefix or name.startswith(prefix + ".")
+        for prefix in BLOCKED_PREFIXES
+    )
+]
+'''
+    )
 
 
 def _wheel_smoke(scratch: Path) -> None:
@@ -170,7 +348,7 @@ def _wheel_smoke(scratch: Path) -> None:
             "root = files('vibeflow')",
             "for name in ('config.schema.json', 'health_report.schema.json', 'node.schema.json', 'nodeset.schema.json', 'policy.schema.json'):",
             "    assert root.joinpath('tooling/project/schema', name).is_file()",
-            "for name in ('runtime_helpers.mjs', 'toolchain_driver.mjs'):",
+            "for name in ('runtime_helpers.mjs', 'toolchain_driver.mjs', 'plugin_worker.mjs', 'plugin_abi.d.ts'):",
             "    assert root.joinpath('targets/javascript/resources', name).is_file()",
             "for removed in ('aot', 'runtime', 'portable', 'config', 'health', 'purity', 'devtools', 'rendering', 'workspace'):",
             "    assert not root.joinpath(removed).is_dir(), removed",
@@ -178,6 +356,53 @@ def _wheel_smoke(scratch: Path) -> None:
     )
     _run((isolated, "-c", probe), overrides={"PYTHONPATH": None})
     _run((isolated, "-m", "vibeflow", "--help"), overrides={"PYTHONPATH": None})
+
+    javascript_fixture = scratch / "wheel-isolation-javascript"
+    javascript_project = javascript_fixture / "project"
+    shutil.copytree(
+        ROOT / "sandbox/javascript/minimal/project",
+        javascript_project,
+        ignore=shutil.ignore_patterns(
+            "node_modules", "__pycache__", "*.pyc", "*.pyo", ".artifacts"
+        ),
+    )
+    shutil.copy2(
+        ROOT / "sandbox/javascript/minimal/vibeflow_config.jsonc",
+        javascript_fixture,
+    )
+    prepared_toolchain = scratch / "pytest-javascript-toolchain/node_modules"
+    if prepared_toolchain.is_dir():
+        (javascript_project / "node_modules").symlink_to(
+            prepared_toolchain,
+            target_is_directory=True,
+        )
+    else:
+        _run(("npm", "ci"), cwd=javascript_project, overrides={"PYTHONPATH": None})
+    _run(
+        (isolated, "-c", _javascript_cli_isolation_probe()),
+        cwd=javascript_fixture,
+        overrides={
+            "PYTHONPATH": None,
+            "VF_ISOLATION_JS_WORKSPACE": str(
+                javascript_fixture / "vibeflow_config.jsonc"
+            ),
+            "VF_ISOLATION_JS_CONFIG": str(
+                javascript_project / "configs/greeting.jsonc"
+            ),
+            "VF_ISOLATION_JS_OUT": str(
+                scratch / "wheel-isolation-javascript-output"
+            ),
+        },
+    )
+    _run(
+        (isolated, "-c", _python_cli_isolation_probe()),
+        overrides={
+            "PYTHONPATH": None,
+            "VF_ISOLATION_PYTHON_ROOT": str(
+                scratch / "wheel-isolation-python"
+            ),
+        },
+    )
 
 
 def _distribution_smoke(scratch: Path) -> None:

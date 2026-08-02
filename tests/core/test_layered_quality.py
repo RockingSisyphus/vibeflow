@@ -20,7 +20,7 @@ from vibeflow.targets.javascript.quality import (
     validate_javascript_quality,
 )
 from vibeflow.targets.python.quality import PythonSource, analyze_python_source
-from vibeflow.tooling.project.quality_scan import scan_code_quality
+from vibeflow.tooling.application.python.project.quality_scan import scan_code_quality
 
 
 def test_health_and_source_quality_share_plain_finding_base() -> None:

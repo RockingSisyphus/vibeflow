@@ -263,6 +263,7 @@ def test_distribution_template_declares_js_resources_without_installing_dependen
         "data_schemas": ["manifests/data"],
         "capabilities": ["manifests/capabilities"],
         "host_extensions": ["manifests/host_extensions"],
+        "plugins": ["manifests/plugins"],
     }
     assert config["javascript"] == {
         "package_root": ".",
@@ -274,6 +275,7 @@ def test_distribution_template_declares_js_resources_without_installing_dependen
         "manifests/data",
         "manifests/capabilities",
         "manifests/host_extensions",
+        "manifests/plugins",
         "host_extensions",
     ):
         assert (project / relative).is_dir()

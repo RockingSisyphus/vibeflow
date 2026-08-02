@@ -1,6 +1,6 @@
 # CompiledBlock 完整代码生成计划
 
-> 状态：历史设计记录。0.8 中 CompiledBlock 属于 `vibeflow.targets.python.runtime`，语言无关 `BlockPlan` 属于 `vibeflow.block_compiler`。
+> 状态：历史设计记录。0.9 中 CompiledBlock 属于 `vibeflow.targets.python.runtime`，语言无关 `BlockPlan` 属于 `vibeflow.block_compiler`。
 
 本文记录 `execution="compiled"` 的最终实现目标：把可编译 graph 区域编译成完整的 Python execution block。
 

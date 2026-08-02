@@ -174,6 +174,11 @@ class NodeCodegenMixin:
         assert node.subplan is not None
         child = code.children[node.id]
         is_async = code.workflow.entry_mode == "async"
+        hook = (
+            "await invokeRuntimeHookAsync"
+            if is_async
+            else "invokeRuntimeHookSync"
+        )
         mappings: list[dict[str, str]] = []
         mismatch: tuple[str, int] | None = None
         for provider in node.provides:
@@ -192,6 +197,12 @@ class NodeCodegenMixin:
             (
                 f"{'async ' if is_async else ''}"
                 f"function {code.execute_names[node.id]}(inputs, state) {{"
+            ),
+            "  try {",
+            (
+                f"  {hook}(state.root, \"beforeNodeset\", {{ "
+                f"nodeId: {js(node.id)}, nodePath: nodePath(state, {js(node.id)}), "
+                "blockPath: formatBlockPath(state.path) });"
             ),
             "  emitTrace(state.root, \"nodeset_enter\", {",
             f"    nodeId: {js(node.id)},",
@@ -212,6 +223,19 @@ class NodeCodegenMixin:
                     "    state.workflow,",
                     f"    {{ nodePath: nodePath(state, {js(node.id)}) }},",
                     "  );",
+                    "  } catch (cause) {",
+                    (
+                        f"    const failure = ensureErrorLocation(cause, "
+                        f"state.workflow, state.path, {js(node.id)});"
+                    ),
+                    (
+                        f"    {hook}(state.root, \"nodesetFailed\", {{ "
+                        f"nodeId: {js(node.id)}, nodePath: nodePath(state, {js(node.id)}), "
+                        "blockPath: formatBlockPath(state.path), "
+                        "code: failure.code, message: failure.message }, true);"
+                    ),
+                    "    throw failure;",
+                    "  }",
                     "}",
                 ]
             )
@@ -249,7 +273,25 @@ class NodeCodegenMixin:
                 f"    nodeId: {js(node.id)},",
                 f"    nodePath: nodePath(state, {js(node.id)}),",
                 "  }, true);",
+                (
+                    f"  {hook}(state.root, \"afterNodeset\", {{ "
+                    f"nodeId: {js(node.id)}, nodePath: nodePath(state, {js(node.id)}), "
+                    "blockPath: formatBlockPath(state.path) });"
+                ),
                 "  return outputs;",
+                "  } catch (cause) {",
+                (
+                    f"    const failure = ensureErrorLocation(cause, "
+                    f"state.workflow, state.path, {js(node.id)});"
+                ),
+                (
+                    f"    {hook}(state.root, \"nodesetFailed\", {{ "
+                    f"nodeId: {js(node.id)}, nodePath: nodePath(state, {js(node.id)}), "
+                    "blockPath: formatBlockPath(state.path), "
+                    "code: failure.code, message: failure.message }, true);"
+                ),
+                "    throw failure;",
+                "  }",
                 "}",
             ]
         )

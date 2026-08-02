@@ -63,6 +63,8 @@ class StaticWorkflowEmitter(
             "  __vfCapabilityDescriptors,\n"
             "  __vfCapabilityRequirements,\n"
             "  __vfSchemaCatalog,\n"
+            "  __vfRuntimePluginDescriptors,\n"
+            "  __vfRuntimePluginFactories,\n"
             f"  {root.function_name},\n"
             ");"
         )

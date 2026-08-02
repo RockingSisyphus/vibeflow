@@ -364,7 +364,7 @@ function auditSource(ts, fileName, source, target) {
   return findings;
 }
 
-function normalizeImportPolicy(raw) {
+function normalizeImportPolicy(raw, packageRoot) {
   const policy = raw && typeof raw === "object" ? raw : {};
   const owners = Array.isArray(policy.owners)
     ? policy.owners
@@ -381,6 +381,8 @@ function normalizeImportPolicy(raw) {
     : [];
   return {
     owners,
+    packageRoot: normalizedRealPath({ sys: null }, packageRoot),
+    derivedOwners: new Map(),
     nodeBaseLibs: policy.nodeBaseLibs && typeof policy.nodeBaseLibs === "object"
       ? policy.nodeBaseLibs : {},
     baseLibDependencies: policy.baseLibDependencies && typeof policy.baseLibDependencies === "object"
@@ -389,6 +391,10 @@ function normalizeImportPolicy(raw) {
       policy.hostExtensionDependencies
       && typeof policy.hostExtensionDependencies === "object"
         ? policy.hostExtensionDependencies : {},
+    pluginDependencies:
+      policy.pluginDependencies
+      && typeof policy.pluginDependencies === "object"
+        ? policy.pluginDependencies : {},
     allowedExternalPackages: new Set(
       Array.isArray(policy.allowedExternalPackages)
         ? policy.allowedExternalPackages.map(String)
@@ -407,7 +413,7 @@ function normalizedRealPath(ts, value) {
   }
 }
 
-function ownerFor(ts, fileName, policy) {
+function directOwnerFor(ts, fileName, policy) {
   const candidate = normalizedRealPath(ts, fileName);
   for (const owner of policy.owners) {
     const ownerPath = normalizedRealPath(ts, owner.path);
@@ -416,6 +422,12 @@ function ownerFor(ts, fileName, policy) {
     }
   }
   return null;
+}
+
+function ownerFor(ts, fileName, policy) {
+  const direct = directOwnerFor(ts, fileName, policy);
+  if (direct) return direct;
+  return policy.derivedOwners.get(normalizedRealPath(ts, fileName)) || null;
 }
 
 function packageName(specifier) {
@@ -493,10 +505,57 @@ function fallbackResolveSpecifier(specifier, sourceFileName) {
   return candidates.find((item) => existsSync(item)) || "";
 }
 
+function resolvedImportFile(ts, checker, project, imported, sourceFileName) {
+  const symbol = checker.getSymbolAtLocation(imported.node);
+  const declaration = symbolDeclarationNodes(symbol, project)[0];
+  return declaration?.getSourceFile?.().fileName
+    || fallbackResolveSpecifier(imported.value, sourceFileName);
+}
+
+function deriveTransitiveOwners(ts, sourceFiles, checker, project, policy) {
+  const available = new Map(
+    sourceFiles
+      .filter((sourceFile) => !sourceFile.isDeclarationFile)
+      .map((sourceFile) => [
+        normalizedRealPath(ts, sourceFile.fileName),
+        sourceFile,
+      ]),
+  );
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [sourcePath, sourceFile] of available) {
+      const sourceOwner = directOwnerFor(ts, sourcePath, policy)
+        || policy.derivedOwners.get(sourcePath);
+      if (!sourceOwner) continue;
+      for (const imported of importSpecifiers(ts, sourceFile)) {
+        const resolved = resolvedImportFile(
+          ts,
+          checker,
+          project,
+          imported,
+          sourceFile.fileName,
+        );
+        if (!resolved) continue;
+        const destinationPath = normalizedRealPath(ts, resolved);
+        if (!available.has(destinationPath)
+            || directOwnerFor(ts, destinationPath, policy)
+            || policy.derivedOwners.has(destinationPath)) continue;
+        policy.derivedOwners.set(destinationPath, sourceOwner);
+        changed = true;
+      }
+    }
+  }
+}
+
+function isWithinPath(root, candidate) {
+  return candidate === root || candidate.startsWith(`${root}${path.sep}`);
+}
+
 function auditImportOwnership(ts, sourceFile, checker, project, policy) {
   const sourceOwner = ownerFor(ts, sourceFile.fileName, policy);
   if (!sourceOwner
-      || !["node", "base_lib", "host_extension"].includes(sourceOwner.kind)) return [];
+      || !["node", "base_lib", "host_extension", "plugin"].includes(sourceOwner.kind)) return [];
   const findings = [];
   for (const imported of importSpecifiers(ts, sourceFile)) {
     const specifier = imported.value;
@@ -510,10 +569,13 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
       continue;
     }
     const bare = !specifier.startsWith(".") && !path.isAbsolute(specifier);
-    const symbol = checker.getSymbolAtLocation(imported.node);
-    const declaration = symbolDeclarationNodes(symbol, project)[0];
-    const resolvedFileName = declaration?.getSourceFile?.().fileName
-      || fallbackResolveSpecifier(specifier, sourceFile.fileName);
+    const resolvedFileName = resolvedImportFile(
+      ts,
+      checker,
+      project,
+      imported,
+      sourceFile.fileName,
+    );
     if (!resolvedFileName) {
       if (bare && policy.allowedExternalPackages.has(packageName(specifier))) continue;
       findings.push(importFinding(
@@ -537,7 +599,16 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
       }
       continue;
     }
-    const destination = ownerFor(ts, resolvedFile, policy);
+    if (!isWithinPath(policy.packageRoot, resolvedFile)) {
+      findings.push(importFinding(
+        sourceFile,
+        imported.node,
+        "VF_IMPORT_PACKAGE_ROOT",
+        `${sourceOwner.kind} '${sourceOwner.id}' imports source outside package_root: '${resolvedFile}'`,
+      ));
+      continue;
+    }
+    const destination = directOwnerFor(ts, resolvedFile, policy);
     if (!destination) {
       findings.push(importFinding(
         sourceFile,
@@ -610,6 +681,25 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
             imported.node,
             "VF_IMPORT_HOST_EXTENSION",
             `host_extension '${sourceOwner.id}' imports undeclared host_extension dependency '${destination.id}'`,
+          ));
+        }
+      }
+    } else if (sourceOwner.kind === "plugin") {
+      if (destination.kind !== "plugin") {
+        findings.push(importFinding(
+          sourceFile,
+          imported.node,
+          "VF_PLUGIN_IMPORT_POLICY",
+          `plugin '${sourceOwner.id}' cannot import ${destination.kind} '${destination.id}'`,
+        ));
+      } else if (destination.id !== sourceOwner.id) {
+        const allowed = new Set(policy.pluginDependencies[sourceOwner.id] || []);
+        if (!allowed.has(destination.id)) {
+          findings.push(importFinding(
+            sourceFile,
+            imported.node,
+            "VF_PLUGIN_IMPORT_POLICY",
+            `plugin '${sourceOwner.id}' imports undeclared plugin dependency '${destination.id}'`,
           ));
         }
       }
@@ -816,7 +906,7 @@ function importDeclarationHasRuntimeBindings(ts, statement) {
 function auditTopLevelPurity(ts, sourceFile, policy) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (!owner
-      || !["node", "base_lib", "host_extension"].includes(owner.kind)) return [];
+      || !["node", "base_lib", "host_extension", "plugin"].includes(owner.kind)) return [];
   const findings = [];
   if (hasDecorator(ts, sourceFile)) {
     findings.push(importFinding(
@@ -939,14 +1029,16 @@ function promiseLikeType(ts, checker, type, fallbackText = "") {
 
 function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
-  if (!owner || !["node", "host_extension"].includes(owner.kind)) return [];
+  if (!owner || !["node", "host_extension", "plugin"].includes(owner.kind)) return [];
   const declaration = implementationDeclaration(ts, sourceFile, owner.export);
   if (!declaration) return [];
   const findings = [];
   const completion = owner.completion || "immediate";
   const subject = owner.kind === "host_extension"
     ? `host_extension '${owner.id}' factory`
-    : `node '${owner.id}'`;
+    : owner.kind === "plugin"
+      ? `plugin '${owner.id}' factory`
+      : `node '${owner.id}'`;
   const declaredAsync = hasModifier(ts, declaration, ts.SyntaxKind.AsyncKeyword);
   const callableReturn = callableReturnType(ts, checker, declaration);
   const returnType = callableReturn.text;
@@ -964,7 +1056,8 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
       `${subject} declares immediate completion but '${owner.export}' is async or returns ${returnType || "a Promise"}`,
     ));
   }
-  if (completion === "suspend" && !declaredAsync && !returnsPromise) {
+  if (owner.kind !== "plugin"
+      && completion === "suspend" && !declaredAsync && !returnsPromise) {
     findings.push(importFinding(
       sourceFile,
       declaration,
@@ -976,6 +1069,93 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
   // methods may suspend. The descriptor check above is therefore the complete
   // factory audit; Promise ownership rules below remain specific to nodes.
   if (owner.kind === "host_extension") return findings;
+  if (owner.kind === "plugin") {
+    if (declaredAsync || returnsPromise) {
+      findings.push(importFinding(
+        sourceFile,
+        declaration,
+        "VF_PLUGIN_FACTORY",
+        `plugin '${owner.id}' createPlugin factory must be synchronous`,
+      ));
+    }
+    function pluginVisit(node) {
+      if (node !== declaration
+          && (ts.isFunctionDeclaration(node)
+            || ts.isFunctionExpression(node)
+            || ts.isArrowFunction(node)
+            || ts.isMethodDeclaration(node))) {
+        const asyncHook = hasModifier(ts, node, ts.SyntaxKind.AsyncKeyword);
+        const hookReturn = callableReturnType(ts, checker, node);
+        const hookReturnsPromise = promiseLikeType(
+          ts,
+          checker,
+          hookReturn.type,
+          hookReturn.text,
+        );
+        if (completion === "immediate" && (asyncHook || hookReturnsPromise)) {
+          findings.push(importFinding(
+            sourceFile,
+            node,
+            "VF_COMPLETION_IMMEDIATE_PROMISE",
+            `immediate plugin '${owner.id}' cannot declare Promise-returning hooks`,
+          ));
+        }
+      }
+      if (ts.isCallExpression(node)) {
+        const expression = node.expression;
+        const name = ts.isIdentifier(expression)
+          ? expression.text
+          : ts.isPropertyAccessExpression(expression)
+            ? expression.name.text
+            : "";
+        if (new Set([
+          "addEventListener", "eventOn", "on", "once", "setInterval", "setTimeout",
+        ]).has(name)) {
+          findings.push(importFinding(
+            sourceFile,
+            node,
+            "VF_PLUGIN_LONG_LIVED_LISTENER",
+            `runtime plugin '${owner.id}' cannot register long-lived listeners or timers; use a host_extension`,
+          ));
+        }
+        const promiseChain = ts.isPropertyAccessExpression(expression)
+          && new Set(["then", "catch", "finally"]).has(expression.name.text);
+        if (promiseChain && ts.isExpressionStatement(node.parent)) {
+          findings.push(importFinding(
+            sourceFile,
+            node,
+            "VF_PLUGIN_PROMISE_UNOWNED",
+            `plugin '${owner.id}' cannot discard Promise work`,
+          ));
+        }
+      }
+      if (ts.isVoidExpression(node)) {
+        let discardedPromise = false;
+        try {
+          const expressionType = checker.getTypeAtLocation(node.expression);
+          discardedPromise = promiseLikeType(
+            ts,
+            checker,
+            expressionType,
+            checker.typeToString(expressionType),
+          );
+        } catch {
+          // Retain syntax-based checks when the checker cannot prove the type.
+        }
+        if (discardedPromise) {
+          findings.push(importFinding(
+            sourceFile,
+            node,
+            "VF_PLUGIN_PROMISE_UNOWNED",
+            `plugin '${owner.id}' cannot discard Promise work with void`,
+          ));
+        }
+      }
+      visitChildren(ts, node, pluginVisit);
+    }
+    pluginVisit(declaration);
+    return findings;
+  }
 
   function callName(node) {
     if (!ts.isCallExpression(node)) return "";
@@ -1102,7 +1282,7 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
 function auditModuleRegExpState(ts, sourceFile, policy) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (!owner
-      || !["node", "base_lib", "host_extension"].includes(owner.kind)) return [];
+      || !["node", "base_lib", "host_extension", "plugin"].includes(owner.kind)) return [];
   const findings = [];
 
   function isFunctionBoundary(node) {
@@ -1155,7 +1335,7 @@ function auditModuleRegExpState(ts, sourceFile, policy) {
 function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (!owner
-      || !["node", "base_lib", "host_extension"].includes(owner.kind)) return [];
+      || !["node", "base_lib", "host_extension", "plugin"].includes(owner.kind)) return [];
   const moduleBindings = new Set();
   const aliases = new Set();
   const builtinPrototypeAliases = new Set();
@@ -1822,7 +2002,17 @@ async function typecheck(ts, request, extraFiles = [], checkDiagnostics = true) 
       ? ts.getPreEmitDiagnostics(program).map((item) => diagnosticText(ts, item))
       : [];
   }
-  const policy = normalizeImportPolicy(request.importPolicy);
+  const policy = normalizeImportPolicy(
+    request.importPolicy,
+    request.packageRoot,
+  );
+  deriveTransitiveOwners(
+    ts,
+    sourceFiles,
+    checker,
+    project,
+    policy,
+  );
   const rootFiles = new Set(files.map((item) => path.resolve(item)));
   try {
     for (const sourceFile of sourceFiles) {
@@ -1865,7 +2055,24 @@ async function typecheck(ts, request, extraFiles = [], checkDiagnostics = true) 
       ));
     }
     if (findings.length) {
-      fail("VF_IMPORT_POLICY", "JavaScript/TypeScript import policy failed", { diagnostics: findings });
+      const diagnosticsWithOwners = findings.map((finding) => {
+        const owner = finding.file
+          ? ownerFor(ts, finding.file, policy)
+          : null;
+        return owner
+          ? {
+              ...finding,
+              owner: {
+                id: owner.id,
+                kind: owner.kind,
+                path: path.resolve(owner.path),
+              },
+            }
+          : finding;
+      });
+      fail("VF_IMPORT_POLICY", "JavaScript/TypeScript import policy failed", {
+        diagnostics: diagnosticsWithOwners,
+      });
     }
     if (diagnostics.length) {
       fail("VF_TYPESCRIPT", "TypeScript validation failed", { diagnostics });

@@ -2,14 +2,14 @@
 
 VibeFlow 可以把同一份 workflow 编译为普通 JavaScript ESM。生成物在运行时不需要 Python，也不需要浏览器或 Node.js 安装 VibeFlow。同步 workflow 导出 `runWorkflow()`，显式异步 workflow 导出 `runWorkflowAsync()`。
 
-正式 Target 名是 `javascript`；TypeScript 是该 Target 支持并在构建期检查的实现语言。VibeFlow 0.8.0 只提供 `vibeflow.targets.javascript.frontend`、`.quality`、`.build` 以及 CLI 入口，不提供旧 AOT 模块路径。
+正式 Target 名是 `javascript`；TypeScript 是该 Target 支持并在构建期检查的实现语言。VibeFlow 0.9.0 只提供 `vibeflow.targets.javascript.frontend`、`.quality`、`.build` 以及 CLI 入口，不提供旧 AOT 模块路径，也不依赖 Python Target。
 
 本文描述当前已经实现的公开配置、节点 ABI、Workflow ABI 和构建命令。早期方案和取舍记录见 [JavaScript/TypeScript 节点与跨运行时 AOT 构建设计记录](14_JS_TS节点与Web_AOT构建计划.md)，实际使用应以本文和 CLI 为准。
 
 可运行的完整工程见源码仓库中的
 [`sandbox/javascript/minimal`](https://github.com/RockingSisyphus/vibeflow/tree/main/sandbox/javascript/minimal)。
 需要检查真实 TypeScript node、`base_lib`、分支/合流、nodeset、有限循环、
-同步/异步入口、Capability、Port、调用隔离、取消、构建 profile 和非法依赖时，可运行
+同步/异步入口、Plugin、Capability、Host Extension、Port、调用隔离、取消、构建 profile 和非法依赖时，可运行
 [`sandbox/javascript/integration`](https://github.com/RockingSisyphus/vibeflow/tree/main/sandbox/javascript/integration)。
 
 ## 1. 适用范围
@@ -18,6 +18,7 @@ VibeFlow 可以把同一份 workflow 编译为普通 JavaScript ESM。生成物�
 
 - JavaScript 和 TypeScript node；
 - JavaScript 和 TypeScript `base_lib`；
+- `vibeflow.plugin.v1` Policy、Compiler 和 Runtime Plugin；
 - `browser` 和 `node` target；
 - `esm-module`、`single-esm` 和 `web-app` profile；
 - 顶层输入输出 Schema、Capability 注入、Host Extension、trace、取消和调用级异步任务清理；
@@ -47,12 +48,14 @@ project/
 │   ├── base_lib/
 │   ├── data/
 │   ├── capabilities/
+│   ├── plugins/
 │   └── host_extensions/
+├── plugins/
 ├── host_extensions/
 └── web/
 ```
 
-在 `project/vibeflow_project.jsonc` 中登记五类 descriptor 和项目自己的 JavaScript 工具链：
+在 `project/vibeflow_project.jsonc` 中登记六类 descriptor 和项目自己的 JavaScript 工具链：
 
 ```jsonc
 {
@@ -61,6 +64,7 @@ project/
     "base_lib": ["manifests/base_lib"],
     "data_schemas": ["manifests/data"],
     "capabilities": ["manifests/capabilities"],
+    "plugins": ["manifests/plugins"],
     "host_extensions": ["manifests/host_extensions"]
   },
   "javascript": {
@@ -74,12 +78,11 @@ project/
 
 `javascript.package_root` 是包含 `package.json`、lockfile 和项目本地 `node_modules` 的目录。`external_packages` 中的包不会进入 bundle，而是保留给下游 bundler 或实际宿主解析。
 
-`descriptors.host_extensions` 只登记当前 project 可用的 Host Extension
-descriptor。具体 workflow 在自己的顶层 `host_extensions` 中选择实际使用的
-扩展；没有被当前 workflow 引用的扩展不会进入构建。空列表表示当前 workflow
-不启用 Host Extension。
+`descriptors.plugins` 与 `descriptors.host_extensions` 只登记当前 project 可用的资源。
+具体 workflow 分别在顶层 `plugins` 与 `host_extensions` 中选择实际使用项；未被
+当前 workflow 引用的实现不会进入构建，空列表表示不启用该类资源。
 
-## 3. 五类 JSONC descriptor
+## 3. 六类 JSONC descriptor
 
 ### 3.1 Node descriptor
 
@@ -252,9 +255,99 @@ Data Schema 用于：
 
 Capability descriptor 只定义契约。`completion` 缺省为 `immediate`；需要等待 Promise 的 operation 必须声明 `suspend`，而且只能用于异步 workflow。VibeFlow 不提供宿主实现，也不保存模块级宿主对象；实现由宿主在每次调用 workflow 时注入，或由显式启用的 Host Extension 提供。
 
-### 3.5 Host Extension descriptor
+### 3.5 Plugin descriptor 与 `vibeflow.plugin.v1`
 
-Host Extension 是 JS/TS AOT 的宿主接线资源，不是普通流程 node，也不同于 Python `RuntimePlugin`：
+Plugin 扩展构建或单次 workflow 调用的 hook，不承担长期宿主生命周期：
+
+```jsonc
+{
+  "kind": "plugin",
+  "id": "example.runtime_audit",
+  "type": "runtime",
+  "targets": ["browser", "node"],
+  "priority": 30,
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "completion": "immediate",
+      "source": {
+        "kind": "file",
+        "ref": "plugins/runtime_audit.ts",
+        "export": "createPlugin"
+      }
+    }
+  ],
+  "dependencies": [],
+  "external_packages": [],
+  "config": {
+    "schema": {"type": "object"},
+    "defaults": {}
+  }
+}
+```
+
+`type` 固定为 `policy | compiler | runtime`。JS/TS 实现统一导出同步工厂：
+
+```ts
+export function createPlugin(context: Readonly<{
+  abiVersion: "vibeflow.plugin.v1";
+  pluginId: string;
+  pluginType: "policy" | "compiler" | "runtime";
+  target: "browser" | "node";
+  workflowId: string;
+  config: Readonly<Record<string, unknown>>;
+  signal: AbortSignal;
+}>) {
+  return {
+    beforeRun() {},
+    afterRun() {},
+    dispose() {},
+  };
+}
+```
+
+Policy Plugin 可实现 `extendPolicy`、`validateNode`、`validateGraph`、
+`validateNodeset`；Compiler Plugin 可实现 `beforeCompile`、`afterCompile`、
+`validateCompiledGraph`。它们在 AOT 构建期运行，只能返回 finding、annotation
+或合规 relaxation，不能修改 graph 或关闭 Core 硬错误，工厂和 hook 都必须
+immediate。
+
+Runtime Plugin 可实现 `beforeRun`、`afterRun`、`runFailed`、node/nodeset/block
+前后与失败 hook，以及 `dispose`。每次 workflow 调用创建独立实例并在调用结束
+释放；同步 workflow 只允许 immediate Plugin，suspend Runtime Plugin 只能用于
+`entry_mode: "async"`。工厂始终同步返回实例。
+
+Plugin 只能导入自身或 descriptor 中声明的 Plugin 依赖和 external package；不能
+导入 node、`base_lib`、Host Extension、runtime、registry 或 Capability bridge。
+Runtime Plugin 不能注册长期 listener/timer，也不能丢弃 Promise；这类工作属于
+Host Extension。
+
+workflow 顶层按 ID 选择 Plugin：
+
+```jsonc
+{
+  "plugins": [
+    {"id": "example.runtime_audit", "config": {"mode": "strict"}},
+    {
+      "id": "example.future_policy",
+      "status": "planned",
+      "type": "policy",
+      "targets": ["browser"]
+    }
+  ]
+}
+```
+
+字符串等价于 implemented ID。implemented Plugin 必须解析到
+`descriptors.plugins` 中的 descriptor，其依赖按依赖优先的确定顺序加入构建。
+planned Plugin 可以没有 descriptor 或源码，只进入 Architecture JSON、Mermaid
+和 SVG；它不绑定实现、不执行 hook、不打包。implemented Plugin 不能依赖
+planned Plugin。
+
+### 3.6 Host Extension descriptor
+
+Host Extension 是 JS/TS AOT 的宿主接线资源，不是普通流程 node，也不同于 `vibeflow.plugin.v1` Runtime Plugin：
 
 ```jsonc
 {
@@ -280,9 +373,9 @@ Host Extension 是 JS/TS AOT 的宿主接线资源，不是普通流程 node，�
 
 扩展工厂返回 `{ capabilities?, start(), stop() }`。VibeFlow 会静态检查 target、依赖、Capability 和 import 边界，将源码打入 AOT 产物，并生成显式的 `createWorkflowHost()`。每个 host 拥有独立的 extension instance；`start()` 按依赖顺序执行，`stop()` 反向、幂等执行，部分启动失败时会清理已启动扩展。import、创建 host 和 `web-app` 本身都不会自动 start。
 
-普通 node 不得注册长期监听器；这类宿主事件接线应放在 Host Extension 中。Host Extension 不能导入 node、`base_lib` 私有实现、Python runtime/plugin 或业务 registry，也不能绕过 workflow 的 Capability 契约。
+普通 node 和 Runtime Plugin 不得注册长期监听器；这类宿主事件接线应放在 Host Extension 中。Host Extension 不能导入 node、`base_lib` 私有实现、Plugin、Python runtime 或业务 registry，也不能绕过 workflow 的 Capability 契约。
 
-### 3.6 在 workflow 中使用 Host Extension
+### 3.7 在 workflow 中使用 Host Extension
 
 顶层 `host_extensions` 接受字符串 ID 或对象：
 
@@ -617,10 +710,10 @@ yield、取消路径或退出条件。完整 trace 仍流式交给 `onTrace`，�
 | Profile | Target | 主要产物 | 用途 |
 | --- | --- | --- | --- |
 | `esm-module` | `browser` / `node` | `workflow.js`、`.d.ts`、source map、manifest，可带内部 chunk | 交给 Vite、Webpack、esbuild 或其他应用继续打包 |
-| `single-esm` | `browser` / `node` | `index.js`、`.d.ts`、source map、manifest | 本地 workflow、node、`base_lib` 和非 external 依赖合并为一个运行时 JS 文件 |
+| `single-esm` | `browser` / `node` | `index.js`、`.d.ts`、source map、manifest | 本地 workflow、node、`base_lib`、Runtime Plugin 和非 external 依赖合并为一个运行时 JS 文件 |
 | `web-app` | 仅 `browser` | `index.html`、`index.js`、`.d.ts`、source map、manifest | 使用用户 HTML 模板和应用入口生成普通网页 |
 
-三种 profile 都不会自动调用 workflow，也不会自动启动 Host Extension。
+三种 profile 都不会自动调用 workflow、创建 Runtime Plugin 或启动 Host Extension。
 
 本节的 `python run.py build` 是生成发行包中的命令前缀。在已安装 VibeFlow
 的环境中可替换为 `vibeflow build`；在源码仓库中可使用
@@ -710,7 +803,7 @@ python run.py build \
 
 默认不会覆盖已存在的输出目录。构建先写入同级临时目录，类型、依赖、bundle 和产物检查全部成功后再原子发布；失败不会破坏旧产物。`--replace` 前会核对 manifest 的完整结构、entry、每个文件的 SHA-256，并拒绝符号链接、被修改的文件、未登记文件或目录。替换已有非空目录时使用 Linux `renameat2(RENAME_EXCHANGE)` 做单次原子交换；平台或文件系统不支持时会保留旧产物并明确失败，不降级成存在短暂空窗的两次 rename。
 
-`vibeflow-build.json` 记录 target、profile、Workflow ABI、`entry_mode`、Host Extension、计划 hash、Node/TypeScript/esbuild 版本、lockfile hash、external package 和所有产物 hash。相同输入、配置和 lockfile 用于确定性构建。
+`vibeflow-build.json` 记录 target、profile、Workflow ABI、`vibeflow.plugin.v1`、implemented/planned Plugin、`entry_mode`、Host Extension、计划 hash、Node/TypeScript/esbuild 版本、lockfile hash、external package 和所有产物 hash。相同输入、配置和 lockfile 用于确定性构建。
 
 ## 9. 工具链要求
 
@@ -747,7 +840,7 @@ python run.py build \
 JS/Web AOT 只接受可静态检查、可移植的流程：
 
 - 不会把 Python node 自动翻译成 JavaScript；
-- `python_stub`、delegate-cli、任意 Python 对象和 Python Runtime Plugin 不能进入 JS target；
+- `python_stub`、delegate-cli、任意 Python 对象和 Python Plugin 实现不能进入 JS target；JS/TS Plugin 必须使用当前 Target 的 descriptor 与 `vibeflow.plugin.v1`；
 - workflow 使用的普通 node 和 `base_lib` 必须有唯一的 target-compatible JS/TS 实现；
 - node 参数、输入输出和 Capability 边界必须是 JSON 可表达的数据；
 - 不支持的动态 import、target API、worker、WASM、资源模式或递归 nodeset 会在构建期失败；
@@ -762,7 +855,7 @@ JS/Web AOT 只接受可静态检查、可移植的流程：
 Sandbox 是一组经过真实 descriptor、JSONC workflow、
 TypeScript Compiler API 和 esbuild 的端到端用例。它用
 `node + base_lib` 表达 `(x + a) - b`，并独立覆盖并行 `all` 合流、条件
-`any_active` 合流、nodeset、有界/无界 loop、Promise node、Capability，以及
+`any_active` 合流、nodeset、有界/无界 loop、Promise node、Plugin、Capability，以及
 `receive → 数学 node/base_lib → send` 的 Port 链路。
 
 从源码仓库根目录安装浏览器测试依赖，再运行全部用例。Sandbox 会在临时项目副本中执行 `npm ci`：
@@ -789,6 +882,10 @@ python sandbox/javascript/integration/run_all.py --skip-browser
 完整运行还会验证：
 
 - 模块 import 不自动执行业务；
+- Policy/Compiler/Runtime Plugin 的 hook 顺序、依赖闭包、配置冻结、调用隔离和错误码；
+- planned Plugin 不解析或绑定源码，implemented Plugin 不依赖 planned Plugin；
+- Plugin factory/completion、长期 listener、未归属 Promise 和非法跨资源 import 在构建期失败；
+- 真实浏览器中的 Host Extension import/create 无副作用，两个 host 实例隔离，`stop()` 幂等且能取消等待 Port 的永久 workflow；
 - 默认入口同步返回，显式异步入口只导出 `runWorkflowAsync`；
 - 连续调用、并发调用、trace 和 Capability 状态互相隔离；
 - 输入错误、缺失 Capability、预取消和执行中取消使用稳定错误码；

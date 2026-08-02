@@ -10,8 +10,19 @@ import shutil
 import subprocess
 from typing import Callable, Iterator
 
+from .application_scan import (
+    javascript_application_findings,
+    neutral_tooling_findings,
+    python_application_findings,
+)
 from .models import Finding, Report, SourceLocation, make_report
-from .python_scan import iter_python_files, parse_python, repository_path, scan_layer
+from .python_scan import (
+    build_import_graph,
+    iter_python_files,
+    parse_python,
+    repository_path,
+    scan_layer,
+)
 
 
 PROFILE_NAMES = (
@@ -115,8 +126,12 @@ _REQUIRED_DIRECTORIES = (
     "src/vibeflow/targets/javascript/build",
     "src/vibeflow/targets/javascript/resources",
     "src/vibeflow/tooling/application",
+    "src/vibeflow/tooling/application/cli",
+    "src/vibeflow/tooling/application/javascript",
+    "src/vibeflow/tooling/application/python",
+    "src/vibeflow/tooling/application/python/project",
+    "src/vibeflow/tooling/application/python/presentation",
     "src/vibeflow/tooling/project",
-    "src/vibeflow/tooling/presentation",
     "tests/core",
     "tests/block_compiler",
     "tests/targets",
@@ -131,6 +146,34 @@ _REQUIRED_DIRECTORIES = (
 
 _LEGACY_REPOSITORY_PATHS = (
     "examples",
+    "src/vibeflow/tooling/application/cli/build_command.py",
+    "src/vibeflow/tooling/application/cli/config.py",
+    "src/vibeflow/tooling/application/cli/delegate_cli.py",
+    "src/vibeflow/tooling/application/cli/export.py",
+    "src/vibeflow/tooling/application/cli/node.py",
+    "src/vibeflow/tooling/application/cli/quality.py",
+    "src/vibeflow/tooling/application/cli/reports.py",
+    "src/vibeflow/tooling/application/cli/review.py",
+    "src/vibeflow/tooling/application/delegate_contract.py",
+    "src/vibeflow/tooling/application/diagnostics.py",
+    "src/vibeflow/tooling/application/javascript_build.py",
+    "src/vibeflow/tooling/application/quality_output.py",
+    "src/vibeflow/tooling/application/reports.py",
+    "src/vibeflow/tooling/application/run_directory.py",
+    "src/vibeflow/tooling/application/runner.py",
+    "src/vibeflow/tooling/application/workspace_service.py",
+    "src/vibeflow/tooling/presentation",
+    "src/vibeflow/tooling/project/core.py",
+    "src/vibeflow/tooling/project/effective_policy.py",
+    "src/vibeflow/tooling/project/plugin_resources.py",
+    "src/vibeflow/tooling/project/policy.py",
+    "src/vibeflow/tooling/project/project_options.py",
+    "src/vibeflow/tooling/project/python_quality.py",
+    "src/vibeflow/tooling/project/quality.py",
+    "src/vibeflow/tooling/project/quality_scan.py",
+    "src/vibeflow/tooling/project/resource_registries.py",
+    "src/vibeflow/tooling/project/resources.py",
+    "src/vibeflow/tooling/project/types.py",
     "tests/unit",
     "tests/support",
     "build_distribution.py",
@@ -345,11 +388,12 @@ def check_base(root: Path, *, node_executable: str | None = None) -> list[Findin
                 "Remove it with the repository cleanup command; rebuild only in a temporary output directory.",
             )
         )
-    # Tooling is the outer orchestration layer.  It may depend on every owned
-    # layer, but it must still avoid removed/unowned ``vibeflow.*`` modules.
-    # Keep this check in the standalone project so the repository never relies
-    # on the package under test to validate its own import boundary.
-    findings.extend(scan_layer(root, "tooling"))
+    # Target-specific application entry points are checked with their Target.
+    # Every other Tooling/CLI module must remain target-neutral, including
+    # dependencies reached through other neutral helpers.
+    graph = build_import_graph(root)
+    findings.extend(scan_layer(root, "tooling", graph=graph))
+    findings.extend(neutral_tooling_findings(root, graph))
     return findings
 
 
@@ -430,28 +474,37 @@ def _check_mjs(root: Path, node_executable: str | None) -> list[Finding]:
 
 def check_core(root: Path, *, node_executable: str | None = None) -> list[Finding]:
     del node_executable
-    return scan_layer(root, "core")
+    graph = build_import_graph(root)
+    return scan_layer(root, "core", graph=graph)
 
 
 def check_block_compiler(
     root: Path, *, node_executable: str | None = None
 ) -> list[Finding]:
     del node_executable
-    return scan_layer(root, "block-compiler")
+    graph = build_import_graph(root)
+    return scan_layer(root, "block-compiler", graph=graph)
 
 
 def check_python_target(
     root: Path, *, node_executable: str | None = None
 ) -> list[Finding]:
     del node_executable
-    return scan_layer(root, "python-target")
+    graph = build_import_graph(root)
+    return (
+        scan_layer(root, "python-target", graph=graph)
+        + python_application_findings(root, graph)
+    )
 
 
 def check_javascript_target(
     root: Path, *, node_executable: str | None = None
 ) -> list[Finding]:
-    return scan_layer(root, "javascript-target") + _check_mjs(
-        root, node_executable
+    graph = build_import_graph(root)
+    return (
+        scan_layer(root, "javascript-target", graph=graph)
+        + javascript_application_findings(root, graph)
+        + _check_mjs(root, node_executable)
     )
 
 

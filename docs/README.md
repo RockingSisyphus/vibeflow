@@ -1,11 +1,11 @@
 # VibeFlow 文档索引
 
-VibeFlow 0.8.0 将公开 Python API 调整为分层路径。0.8 不保留根级业务导出或旧模块门面；代码示例以当前文档为准。
+VibeFlow 0.9.0 继续使用分层公共 API，并把 Core、Block Compiler、Python Target、JavaScript Target 与 Target-neutral Tooling 的依赖边界纳入仓库门禁。根包不提供业务对象或旧模块门面；代码示例以当前文档为准。
 
 ## 当前文档
 
 - `developer_guide.md`：共享 workflow/config 语义与 Python Target 使用方法。
-- `js_aot_build.md`：JavaScript Target 的 JS/TS descriptor、同步/异步 ABI、Capability、Host Extension、Port 和三种 AOT profile。
+- `js_aot_build.md`：JavaScript Target 的 JS/TS descriptor、`vibeflow.plugin.v1`、同步/异步 ABI、Capability、Host Extension、Port 和三种 AOT profile。
 - `kernel_target_vision.md`：长期产品目标与架构原则。
 - `16_语言无关内核与多Target分层架构目标.md`：Core、Block Compiler、两个 Target、Tooling、质量系统与 Sandbox 的当前分层。
 - `kernel_development_guide.md`：维护、测试、质量自检、wheel 和分发流程。
@@ -33,7 +33,7 @@ python distribution/build.py --output /tmp/vibeflow-distribution
 
 ## 质量系统
 
-`python -m vibeflow quality-check` 检查用户项目。Tooling 读取文件，Python 或 JavaScript Target 提取语言事实，Core Quality 统一判定，Tooling 输出 text/JSON 报告。
+`python -m vibeflow quality-check` 检查用户项目。Core Quality 拥有语言无关规则；Tooling 只负责读取文件和输出报告，Python 或 JavaScript Target 只提取本语言事实。
 
 根目录 `quality/` 是完全独立的 VibeFlow 仓库自检器，不进入 wheel，也不导入 VibeFlow：
 
@@ -62,4 +62,4 @@ python tools/clean_workspace.py --apply
 - `14_JS_TS节点与Web_AOT构建计划.md`：JavaScript/TypeScript AOT 设计记录。
 - `15_长期工作流与原生IO改造计划.md`：同步/异步入口、永久 loop、Port 与 Host Extension 设计记录。
 
-历史记录解释设计来源，不定义 0.8 公共 API。
+历史记录解释设计来源，不定义 0.9 公共 API。

@@ -164,7 +164,9 @@ workspace 模式下，node registry 按 `roots` 顺序加载，但 Python node �
 
 `pipeline.entry_mode` 允许 `sync | async`，缺省 `sync`。它决定 JS AOT 的公共入口：同步构建导出直接返回值的 `runWorkflow()`，异步构建导出 `runWorkflowAsync()`。需要 suspend Node/Capability、deferred/result_key、detached 或原生 `receive` 的 JS workflow 必须显式写 `async`。Python `runtime.run()` 阻塞返回，异步任务由 Python Target 的线程执行器处理。
 
-Python 项目在 `registry.py` 注册可用 base_lib 和 plugin，workflow config 通过 ID 引用。`policy` 放在 workspace 配置中；workflow 不内联 `module` / `class`。
+Python 项目在 `registry.py` 注册可用 base_lib 和 Plugin；JS/TS 项目在
+`descriptors.plugins` 登记 `vibeflow.plugin.v1` 实现。两条路径都由 workflow
+顶层 `plugins` 按 ID 选择，不内联语言实现。
 
 ## 顶层资源声明
 
@@ -212,10 +214,11 @@ flow health 检查。Mermaid/SVG 会把当前 workflow 的 effective resources
 - `global_config` 中和 node config schema 同名的键会覆盖 node 的实际 params；其他键只通过 `_global` 传递。
 - 推荐写成 `{"config": {...}, "allow_config_override": false}`。无论 `allow_config_override` 是否为 `true`，同名键都会覆盖局部 config；当它为 `false` 且发生覆盖时，健康检查给 warning。
 - `base_lib.modules` 在 registry-backed config 中写 id 引用；未在当前 root `build_base_lib_registry()` 注册的 id 会报 `CONFIG.RESOURCE.UNKNOWN_BASE_LIB`。
-- `plugins[]` 在 registry-backed config 中写 id 引用；未在当前 root `build_plugin_registry()` 注册的 id 会报 plugin config error。
-- `plugins[].config` 和 `plugins[].settings` 都可传插件设置，值必须是对象；插件实例会收到 `plugin.config`，如果实现了 `configure(config)` 会在加载时被调用。
-- `plugins[].status` 支持 `implemented | planned`。planned plugin 出现在资源
-  审查中并使配置不再 production-ready，但不会加载实现或执行 hook。
+- `plugins[]` 写资源 ID。Python implemented 项必须在当前 root `build_plugin_registry()` 注册；JS/TS implemented 项必须解析到 `descriptors.plugins` 中的 descriptor。
+- `plugins[].config` 和 `plugins[].settings` 都可传设置，值必须是对象。Python 实例收到 `plugin.config`，JS/TS `createPlugin(context)` 收到冻结的 `context.config`。
+- `plugins[].status` 支持 `implemented | planned`。planned Plugin 出现在资源
+  审查中并使配置不再 production-ready，但不会解析源码、绑定实现、执行 hook
+  或进入 AOT bundle；implemented Plugin 不能依赖 planned Plugin。
 - base_lib/plugin 的 `display_name`、`description`、`category`、`version` 来自 registry；源码中的 `BASE_LIB_INFO` / `PLUGIN_INFO` 仍用于实现自检和补充 inspect 信息。
 - `host_extensions[]` 只用于 JS/TS AOT。字符串项等价于 implemented ID；对象
   支持 `id`、`status: implemented | planned`、`enabled`、
@@ -228,9 +231,9 @@ flow health 检查。Mermaid/SVG 会把当前 workflow 的 effective resources
 - planned Host Extension 可暂时没有 descriptor 或源码，会进入 Architecture
   JSON 和 Mermaid/SVG，但不会打包、启动或提供 Capability。implemented
   扩展不能依赖 planned 扩展。
-- Python base_lib 和 plugin 通过 registry ID 引用，不在 workflow 中内联 `module` / `class`。
-- Python base_lib/plugin 的规划仍使用相应资源规则；不要把 Host Extension 的
-  descriptor/AOT 生命周期写成 Python registry/plugin。
+- Python base_lib 和 Plugin 通过 registry ID 引用；JS/TS Plugin 通过 descriptor ID 引用。workflow 不内联 `module` / `class` / `source.ref`。
+- Runtime Plugin 只覆盖单次 workflow 调用；Host Extension 才负责跨调用的
+  start/stop、宿主 listener 和 Capability provider。不要混用两种生命周期。
 
 只有当前 workflow config 通过 id 引用的 implemented base_lib 模块会进入 base_lib allowlist。某个 base_lib 即使已在 root registry 注册为可用，只要当前 config 没引用，implemented node 导入它仍会被健康检查拒绝。
 

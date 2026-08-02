@@ -1,11 +1,11 @@
 # VibeFlow AI 开发指引
 
-本目录是一个可复制的 VibeFlow 0.8.0 项目开发包，内置 `kernel/vibeflow-kernel.zip` 作为运行和校验内核。0.8 使用分层 Python API，不提供根级业务导出。AI 默认按本文开发业务程序。
+本目录是一个可复制的 VibeFlow 0.9.0 项目开发包，内置 `kernel/vibeflow-kernel.zip` 作为运行和校验内核。0.9 使用分层 API，不提供根级业务导出，并隔离 Python 与 JavaScript Target。AI 默认按本文开发业务程序。
 
 ## 先选择开发路径
 
 - **Python Runtime**：Python node、base_lib 和 plugin 放在 `project/nodes/`、`project/base_lib/`、`project/plugins/`，通过 `project/registry.py` 注册；使用 `validate`、`run`、`review` 或 `delegate-cli`。
-- **JavaScript Target AOT**：以 JavaScript 或 TypeScript 编写 node、base_lib 与 Host Extension，源码放在 `project/nodes/`、`project/base_lib/`、`project/host_extensions/`，其 node、base_lib、数据 Schema、Capability 和 Host Extension descriptor 放在 `project/manifests/`；可选页面模板和应用入口放在 `project/web/`。使用 `build --target browser|node --profile esm-module|single-esm|web-app` 生成不依赖 Python/VibeFlow Runtime 的产物。
+- **JavaScript Target AOT**：以 JavaScript 或 TypeScript 编写 node、base_lib、Plugin 与 Host Extension，源码放在 `project/nodes/`、`project/base_lib/`、`project/plugins/`、`project/host_extensions/`，其 node、base_lib、数据 Schema、Capability、Plugin 和 Host Extension descriptor 放在 `project/manifests/`；可选页面模板和应用入口放在 `project/web/`。使用 `build --target browser|node --profile esm-module|single-esm|web-app` 生成不依赖 Python/VibeFlow Runtime 的产物。
 - JS/TS AOT 项目在 `project/vibeflow_project.jsonc` 使用合法的 `descriptors` 和 `javascript` 字段；`javascript.package_root` 指向项目自行安装并锁定的 Node.js、TypeScript 和 esbuild 工具链。VibeFlow 不执行 `npm install`，也不运行第三方 package scripts。
 - 两条路径共享 workflow、显式 edge、contract、分支、合流、nodeset、有限/永久 loop 和原生 Port 等可移植语义，但实现登记和宿主 ABI 不同。Python 使用 registry/Runtime；JS/TS 使用 descriptor/AOT，并通过 `runWorkflow()`、`runWorkflowAsync()` 或 Host Extension 注入宿主能力。
 
@@ -73,7 +73,9 @@
 - 已登记 Python plugin 可在 workflow `plugins[]` 中标为
   `status: "planned"`；它只进入 Architecture JSON 和图形审查，不加载实现或
   执行 hook。实现后保留同一 ID 并切换为 `implemented`。
-- JS/TS AOT 路径由 `descriptors.nodes`、`descriptors.base_lib`、`descriptors.data_schemas`、`descriptors.capabilities` 和 `descriptors.host_extensions` 指向的 JSONC 文件声明资源；每个 descriptor 文件只描述一个资源。node 不得直接导入另一个 node，base_lib、Capability 和 Host Extension 依赖必须显式声明。
+- JS/TS AOT 路径由 `descriptors.nodes`、`descriptors.base_lib`、`descriptors.data_schemas`、`descriptors.capabilities`、`descriptors.plugins` 和 `descriptors.host_extensions` 指向的 JSONC 文件声明资源；每个 descriptor 文件只描述一个资源。node 不得直接导入另一个 node，base_lib、Plugin、Capability 和 Host Extension 依赖必须显式声明。
+- JS/TS Plugin 使用 `vibeflow.plugin.v1` 并导出同步 `createPlugin(context)`。Policy/Compiler Plugin 在构建期检查；Runtime Plugin 随每次 workflow 调用创建和释放。Runtime Plugin 不得注册长期 listener/timer 或丢弃 Promise；跨调用宿主生命周期与 Capability provider 属于 Host Extension。
+- `plugins[]` 和 `host_extensions[]` 都支持 `status: implemented | planned`。planned 项只进入 Architecture JSON 与图形审查，不解析源码、不执行、不打包，也不提供 Capability；implemented 项不能依赖 planned 项。
 - `descriptors.host_extensions` 只登记 project 可用扩展；当前 workflow 顶层
   `host_extensions` 才选择实际资源。使用项支持字符串 ID，或带
   `status: implemented | planned`、`enabled`、`config/settings`、显示元数据、
@@ -130,14 +132,14 @@
 - 编写 plugin 前，读 `kernel/docs/06_Plugin开发规范.md`。
 - 运行、导出报告或定位产物前，读 `kernel/docs/07_启动命令与报告.md`。
 - 不确定约束时，读 `kernel/docs/08_给AI开发者的约束清单.md`。
-- 编写 JS/TS node、descriptor、Capability、`web-app` 入口或配置项目 Node 工具链前，读 `kernel/docs/11_JS_TS与Web_AOT构建指南.md`；不要按 Python registry/plugin 规则猜测 AOT 接口。
+- 编写 JS/TS node、Plugin、descriptor、Capability、Host Extension、`web-app` 入口或配置项目 Node 工具链前，读 `kernel/docs/11_JS_TS与Web_AOT构建指南.md`；不要按 Python registry 规则猜测 AOT 接口。
 - 需要端到端验证 AOT 核心语义时，读
   `sandbox/javascript/integration/README.md`；分发环境运行
   `python sandbox/javascript/integration/run_all.py --skip-browser`。运行器会在
   临时目录安装锁定的工具链；浏览器环境可用时去掉 `--skip-browser`，运行器
   同样在临时目录安装 Puppeteer。
 
-Python Runtime 使用 0.8 分层入口：通用 contract 从 `vibeflow.core` 导入；Node、Registry、base_lib 和 Plugin 从 `vibeflow.targets.python.project` 导入；健康检查从 `vibeflow.targets.python.quality` 导入；执行器从 `vibeflow.targets.python.runtime` 导入；项目加载和运行编排从 `vibeflow.tooling.project` / `vibeflow.tooling.application` 导入。JS/TS AOT 宿主只依赖构建产物导出的 `runWorkflow()` / `runWorkflowAsync()` / `createWorkflowHost()` 和生成的类型声明。不要依赖根级业务导出、旧模块路径或私有函数。
+Python Runtime 使用 0.9 分层入口：通用 contract 从 `vibeflow.core` 导入；Node、Registry、base_lib 和 Plugin 从 `vibeflow.targets.python.project` 导入；健康检查从 `vibeflow.targets.python.quality` 导入；执行器从 `vibeflow.targets.python.runtime` 导入；项目加载和运行编排从所属 Application 边界导入。JS/TS AOT 宿主只依赖构建产物导出的 `runWorkflow()` / `runWorkflowAsync()` / `createWorkflowHost()` 和生成的类型声明。不要跨 Target 导入，也不要依赖根级业务导出、旧模块路径或私有函数。
 
 ## 推荐开发流程
 
@@ -146,7 +148,7 @@ Python Runtime 使用 0.8 分层入口：通用 contract 从 `vibeflow.core` 导
 3. planned node 必须声明 `id`、`display_name`、`description` 和 `flow_kind`；planned nodeset 必须声明 `type_key`、`display_name`、`description`、`requires` 和 `provides`。它可以无 body 占位，也可以用 planned nodes/edges 细化；默认 `planned_behavior` 是 `blocking`。
 4. 执行 `python run.py review --config project/configs/main.jsonc --output reports/graph.expanded.svg` 生成正式审核产物。该命令会更新登记架构文档，无需先用多条命令手工拼接审核流程。
 5. 告知人类审核员查看 `project/ARCHITECTURE.jsonc` 和 `reports/graph.expanded.svg`。用户要求审核门时，等待后续明确批准，不在当前轮实现待审部分。
-6. 获得明确批准后才逐层实现 planned 内容。Python Runtime node 声明 `NODE_INFO`、`CONTRACT` 和 `run_pure(inputs, params)`，并在 `project/registry.py` 注册；JS/TS AOT node 导出 descriptor 指定的 `run(inputs, params, context)`，并登记 node/data/base_lib/Capability descriptor。实现 planned Host Extension 时登记同一 ID 的 descriptor 和源码，再把 workflow 使用项切换为 `implemented`。
+6. 获得明确批准后才逐层实现 planned 内容。Python Runtime node 声明 `NODE_INFO`、`CONTRACT` 和 `run_pure(inputs, params)`，并在 `project/registry.py` 注册；JS/TS AOT node 导出 descriptor 指定的 `run(inputs, params, context)`，并登记 node/data/base_lib/Capability descriptor。实现 planned Plugin 或 Host Extension 时登记同一 ID 的 descriptor 和源码，再把 workflow 使用项切换为 `implemented`。
 7. 真正实现 nodeset 时补齐 `requires`、`provides`、`pipeline.nodes` 和 `pipeline.edges`，移除该 nodeset 的 `status: "planned"`。只有所有子 node/nodeset 都 implemented 时，父 nodeset 才能变成 implemented；保留 planned child 时按其 behavior 接受 warning/error。
 8. 细化可以继续嵌套，但默认不得超过 4 层 nodeset/loop body；确有需要时在所属 root 的 `runtime.nodeset_max_depth` 中明确提高上限。
 9. 训练或批处理循环先把单轮 body 抽成 nodeset，再用 `vibeflow.loop.while` 调用；跨轮状态用 `loop.carry`，指标列表用 `loop.collect`，固定轮数用 `loop.stop_after`，条件退出用 bool `loop.stop_when`。

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VibeFlow browser Host sandbox</title>
+  </head>
+  <body>
+    <main id="fixture">Browser Host lifecycle fixture</main>
+    <script>
+      globalThis.__vibeflowBrowserHarness = {
+        messages: [],
+        unhandledRejections: [],
+      };
+      window.addEventListener("message", event => {
+        globalThis.__vibeflowBrowserHarness.messages.push(event.data);
+      });
+      window.addEventListener("unhandledrejection", event => {
+        globalThis.__vibeflowBrowserHarness.unhandledRejections.push({
+          code: event.reason?.code ?? null,
+          message: String(event.reason?.message ?? event.reason),
+        });
+      });
+    </script>
+    <!-- VIBEFLOW_APP_ENTRY -->
+  </body>
+</html>

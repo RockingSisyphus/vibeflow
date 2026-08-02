@@ -1,0 +1,29 @@
+{
+  "kind": "plugin",
+  "id": "sandbox.policy_audit",
+  "type": "policy",
+  "targets": ["browser", "node"],
+  "priority": 10,
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": ["browser", "node"],
+      "source": {
+        "kind": "file",
+        "ref": "plugins/policy_audit.ts",
+        "export": "createPlugin"
+      }
+    }
+  ],
+  "config": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "expectedNodes": {"type": "integer", "minimum": 1}
+      },
+      "required": ["expectedNodes"],
+      "additionalProperties": false
+    },
+    "defaults": {"expectedNodes": 4}
+  }
+}

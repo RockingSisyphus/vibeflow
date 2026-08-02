@@ -9,7 +9,7 @@ from typing import Any, Mapping
 
 from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, NodeSpec
 from vibeflow.core.config.graph import parse_graph_config_data
-from vibeflow.tooling.application.diagnostics import emit_core_diagnostic
+from vibeflow.tooling.project.diagnostic_sink import emit_core_diagnostic
 
 
 def parse_graph_config(

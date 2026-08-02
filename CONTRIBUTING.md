@@ -2,7 +2,7 @@
 
 This guide is for people changing the VibeFlow framework. Project authors should start with `docs/developer_guide.md` or `docs/js_aot_build.md`.
 
-VibeFlow 0.8.0 is a breaking API release. Use the layered packages directly; do not add root-level business exports or restore removed `aot`, `runtime`, `portable`, `config`, `health`, `purity`, `devtools`, `rendering`, or `workspace` APIs.
+VibeFlow 0.9.0 uses the layered API introduced by 0.8 and makes the Python and JavaScript Target application closures independent. Use the layered packages directly; do not add root-level business exports or restore removed `aot`, `runtime`, `portable`, `config`, `health`, `purity`, `devtools`, `rendering`, or `workspace` APIs.
 
 ## Architecture rules
 
@@ -20,7 +20,7 @@ tooling → targets/python ──────┐
 - `pipeline.edges` defines executable control flow. `requires` and `provides` define data contracts.
 - Planned resources remain non-runnable and visible in architecture output.
 - Generated JavaScript modules have no import-time business side effects. Invocation state, traces, tasks, cancellation and Capability wrappers are isolated per call or host instance.
-- General framework invariants belong in Core. Project-specific behavior belongs in a Node, base_lib, Capability, Python Plugin or JavaScript Host Extension.
+- General framework invariants belong in Core. Project-specific behavior belongs in a Node, base_lib, Capability, Target-owned Plugin or JavaScript Host Extension. JS/TS Policy, Compiler and Runtime Plugins use `vibeflow.plugin.v1`; Host Extension remains the separate long-lived host lifecycle boundary.
 
 Stable import families are:
 
@@ -35,8 +35,9 @@ from vibeflow.targets.javascript.frontend import ...
 from vibeflow.targets.javascript.build import ...
 from vibeflow.targets.javascript.quality import ...
 from vibeflow.tooling.project import ...
-from vibeflow.tooling.application import ...
-from vibeflow.tooling.presentation import ...
+from vibeflow.tooling.application.python import ...
+from vibeflow.tooling.application.javascript import ...
+from vibeflow.tooling.application.python.presentation import ...
 ```
 
 ## Development setup
