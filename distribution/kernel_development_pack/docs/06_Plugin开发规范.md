@@ -7,7 +7,7 @@
 每个 root 的 `project/registry.py` 可以用 `build_plugin_registry()` 声明可用插件：
 
 ```python
-from vibeflow import PluginResourceRegistry
+from vibeflow.targets.python.project import PluginResourceRegistry
 
 def build_plugin_registry() -> PluginResourceRegistry:
     registry = PluginResourceRegistry()
@@ -96,7 +96,7 @@ planned 只参加审查”模式，但不是 Python plugin。它由
 选择；具体 descriptor、配置和生命周期规则见
 `11_JS_TS与Web_AOT构建指南.md`。
 
-旧 inline `module` / `class` 写法短期兼容，但在 registry-backed config 中会产生 legacy warning；新项目不要使用。
+workflow 通过 registry ID 引用 plugin，不内联 `module` / `class`。
 
 插件设置传递规则：
 
@@ -107,7 +107,7 @@ planned 只参加审查”模式，但不是 Python plugin。它由
 ## PolicyPlugin
 
 ```python
-from vibeflow import PluginInfo
+from vibeflow.targets.python.project import PluginInfo
 
 
 class PolicyPlugin:
@@ -131,7 +131,7 @@ class PolicyPlugin:
 示例：
 
 ```python
-from vibeflow import PluginInfo
+from vibeflow.targets.python.project import PluginInfo
 
 
 class PolicyPlugin:
@@ -172,7 +172,7 @@ Policy plugin 也可以追加健康 finding，例如项目级命名规范、领�
 ## CompilerPlugin
 
 ```python
-from vibeflow import PluginInfo
+from vibeflow.targets.python.project import PluginInfo
 
 
 class CompilerPlugin:
@@ -199,7 +199,7 @@ Compiler plugin 可观察或追加编译期检查，但不能把非法 graph 改
 ## RuntimePlugin
 
 ```python
-from vibeflow import PluginInfo
+from vibeflow.targets.python.project import PluginInfo
 
 
 class RuntimePlugin:
@@ -252,7 +252,8 @@ Runtime plugin 适合记录观测数据、附加 trace、统计耗时或上报�
 policy 插件也可以提供额外健康检查 hook，例如：
 
 ```python
-from vibeflow import HealthFinding, PluginInfo
+from vibeflow.targets.python.project import PluginInfo
+from vibeflow.targets.python.quality import HealthFinding
 
 
 class ProjectFindingPlugin:

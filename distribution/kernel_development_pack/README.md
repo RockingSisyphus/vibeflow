@@ -1,11 +1,17 @@
 # VibeFlow 分发开发包
 
+本模板对应 VibeFlow 0.8.0。0.8 是破坏性 API 版本，Python 业务对象按 `vibeflow.core`、`vibeflow.targets.*` 和 `vibeflow.tooling.*` 分层导入。
+
 这个目录是给“使用内核开发业务程序的人或 AI”看的分发材料。它不解释内核内部实现，只说明如何把程序拆成标准流程图 node、纯 `base_lib`、可选 plugin/Capability/Host Extension 和 JSONC 配置，再走 Python Runtime 或 JavaScript/TypeScript AOT 两条公开路径。Python 普通 node 的真实 IO 受派生 effect scope 约束；JS/TS AOT 的宿主交互通过逐调用注入的 Capability 或显式 Host Extension 建模。
+
+正式 Target 名是 `python` 与 `javascript`；TypeScript 是 JavaScript Target 支持的实现语言。
 
 推荐分发方式：
 
-1. 在仓库根目录运行 `python build_distribution.py`。
-2. 复制生成的 `vibeflow_distribution/` 作为新项目骨架。
+1. 在仓库根目录运行
+   `python distribution/build.py --output ../vibeflow-distribution`。
+2. 构建器没有默认输出目录；它先在目标目录旁完成临时构建与校验，再发布为
+   指定目录。该目录就是可复制的新项目骨架。
 3. Python Runtime 项目开发 `project/nodes/`、`project/base_lib/`、
    `project/plugins/`、`project/registry.py` 和 workflow；JS/TS AOT 项目开发
    `project/nodes/`、`project/base_lib/`、`project/manifests/`、可选
@@ -24,6 +30,7 @@ my_project/
     vibeflow-kernel.zip
     MANIFEST.sha256
     README.md
+    LICENSE
     docs/
     tools/
       mermaid-renderer/
@@ -69,11 +76,12 @@ quality、可选 runtime 和 `architecture.documents`，由
 Python/VibeFlow Runtime 的 ESM 或 Web 产物。完整 AOT 规则见
 `docs/11_JS_TS与Web_AOT构建指南.md`。
 
+`python run.py quality --path project` 是内置用户项目质量检查：Tooling 读取文件，对应 Target 提取语言事实，Core Quality 统一判定，Tooling 输出报告。仓库维护者使用的独立 `quality/` profiles 不进入分发包。
+
 Host Extension descriptor 路径只登记 project 可用资源。当前 workflow 在顶层
 `host_extensions` 中选择实际使用的 ID，也可以把尚未实现的扩展标为
 `planned` 进入 Architecture JSON 和图形审查。planned 扩展不会打包、启动或
-提供 Capability。项目级 `javascript.host_extensions` 是旧配置兼容默认值，
-新配置应使用 workflow 字段。
+提供 Capability。
 
 登记的 `ARCHITECTURE.jsonc` 是从真实 workflow、nodeset 和资源配置确定性生成
 的单文件审查视图，AI 应优先读它理解项目；改变架构时修改真实 source，再重新
@@ -103,18 +111,17 @@ python run.py svg --config project/configs/main.jsonc --expand-nodesets --output
 
 implemented nodeset 必须包含完整 pipeline。planned nodeset 可以无 body 占位，也可以带 body 逐步细化；body 会进入架构 JSONC 与展开图及适用静态检查，但仍不可按 implemented body 执行，`python_stub` 仍是单个 stub。
 
-分发包中的 `examples/typescript_sandbox/` 用简单数学 node 与 TS `base_lib`
+分发包中的 `sandbox/javascript/integration/` 用简单数学 node 与 TS `base_lib`
 组合验证数据传递、分支/合流、nodeset、loop、同步/异步 ABI、Port、Capability、调用隔离、
 构建 profile 和非法依赖。分发后可运行：
 
 ```powershell
-npm ci --prefix examples/typescript_sandbox/project
-python examples/typescript_sandbox/run_all.py --skip-browser
+python sandbox/javascript/integration/run_all.py --skip-browser
 ```
 
-浏览器用例还需执行 `npm ci --prefix kernel/tools/mermaid-renderer`，再去掉
-`--skip-browser`。沙箱从 `kernel/vibeflow-kernel.zip` 导入内核；分发构建
-不会安装依赖，`node_modules/`、`reports/` 和 `runs/` 均不进入分发包。
+浏览器环境可用时去掉 `--skip-browser`。沙箱从
+`kernel/vibeflow-kernel.zip` 导入内核，并在临时目录安装锁定的工具链和
+Puppeteer；分发目录中不会生成 `node_modules`。
 
 CLI 让渡模式 / `delegate-cli` 把原序业务 token 作为 `cli.argv` 传入 workflow，并从唯一 `cli.exit_code` 取非 bool 整数 `0..255`。首个 `--` 可选地分隔 core/业务参数；业务直接使用真实 stdin/stdout/stderr，VibeFlow 诊断只写当次 run 的 `vibeflow.log`。授权 `SystemExit(None)` 返回 0，合法整数原样返回；框架/未授权退出错误返回 1，已知 core 参数的 argparse 错误返回 2。详细 effect scope 与授权位置见 `docs/01_Node开发规范.md`、`docs/05_BaseLib与外部依赖规范.md` 和 `docs/07_启动命令与报告.md`。`run` 与 `review` 职责不变。
 

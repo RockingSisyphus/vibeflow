@@ -1,0 +1,81 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from types import MappingProxyType
+from typing import Any, Mapping, Protocol
+
+from vibeflow.core.constants import (
+    FLOW_KINDS,
+    FLOW_KIND_DATA_STORE,
+    FLOW_KIND_DECISION,
+    FLOW_KIND_DOCUMENT,
+    FLOW_KIND_IO,
+    FLOW_KIND_PREDEFINED,
+    FLOW_KIND_PREPARATION,
+    FLOW_KIND_PROCESS,
+    FLOW_KIND_TERMINAL,
+)
+from vibeflow.core.contracts import DataProvider, DataRequirement
+
+EFFECT_SCOPE_NONE = "none"
+EFFECT_SCOPE_TERMINAL = "terminal"
+EFFECT_SCOPE_PYTHON_IO = "python_io"
+EFFECT_SCOPE_TRUSTED = "trusted"
+
+# Effect authorization is derived from semantic node metadata.  ``purity`` is
+# retained as a compatibility field, but is deliberately not an authorization
+# input so projects cannot create two conflicting sources of truth.
+_EFFECT_SCOPE_BY_FLOW_KIND: Mapping[str, str] = MappingProxyType(
+    {
+        FLOW_KIND_TERMINAL: EFFECT_SCOPE_NONE,
+        FLOW_KIND_PROCESS: EFFECT_SCOPE_NONE,
+        FLOW_KIND_DECISION: EFFECT_SCOPE_NONE,
+        FLOW_KIND_IO: EFFECT_SCOPE_TERMINAL,
+        FLOW_KIND_PREDEFINED: EFFECT_SCOPE_NONE,
+        FLOW_KIND_DATA_STORE: EFFECT_SCOPE_PYTHON_IO,
+        FLOW_KIND_DOCUMENT: EFFECT_SCOPE_PYTHON_IO,
+        FLOW_KIND_PREPARATION: EFFECT_SCOPE_NONE,
+    }
+)
+
+
+def effective_effect_scope(info: NodeInfo | None) -> str:
+    """Derive the sole fail-closed effect authorization from NodeInfo."""
+
+    if getattr(info, "external", False) is True:
+        return EFFECT_SCOPE_TRUSTED
+    flow_kind = str(getattr(info, "flow_kind", "") or "")
+    return _EFFECT_SCOPE_BY_FLOW_KIND.get(flow_kind, EFFECT_SCOPE_NONE)
+
+
+@dataclass(frozen=True)
+class NodeInfo:
+    type_key: str
+    display_name: str
+    category: str
+    description: str
+    version: str
+    flow_kind: str
+    purity: str = "pure"
+    author: str | None = None
+    tags: tuple[str, ...] = ()
+    external: bool = False
+
+
+@dataclass(frozen=True)
+class NodeContract:
+    requires: tuple[DataRequirement, ...] = ()
+    provides: tuple[DataProvider, ...] = ()
+    input_semantics: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    output_semantics: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    params_schema: Mapping[str, Any] = field(default_factory=dict)
+    output_schema: Mapping[str, Any] = field(default_factory=dict)
+    examples: tuple[Mapping[str, Any], ...] = ()
+
+
+class PureNode(Protocol):
+    NODE_INFO: NodeInfo
+    CONTRACT: NodeContract
+
+    def run_pure(self, inputs: Mapping[str, Any], params: Mapping[str, Any]) -> Mapping[str, Any]:
+        ...

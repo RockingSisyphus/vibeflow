@@ -1,0 +1,1 @@
+"""Block compiler tests."""

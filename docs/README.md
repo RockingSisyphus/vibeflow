@@ -1,59 +1,65 @@
-# VibeFlow Documentation Index
+# VibeFlow 文档索引
 
-This directory contains current user documentation, maintainer documentation, and historical design records. The release package also carries topic-specific user docs and a separate AI instruction file; these artifacts have different responsibilities and must stay semantically aligned. Start with the current docs unless you are researching why a design changed.
+VibeFlow 0.8.0 将公开 Python API 调整为分层路径。0.8 不保留根级业务导出或旧模块门面；代码示例以当前文档为准。
 
-## Start Here
+## 当前文档
 
-- `../README.md`: project overview and release-package workflow.
-- `developer_guide.md`: shared workflow/config rules and the detailed Python Runtime
-  path (registry, Python node/base_lib/plugin, execution and reports).
-- `js_aot_build.md`: current JS/TS descriptors, sync/async Workflow ABI, Port, Capability/Host Extension injection, and Web/Node AOT build profiles.
-  Its end-to-end fixture is `examples/typescript_sandbox`.
-- Config node/resource visual metadata (`display_name`, `description`, `style`, `similar_to` where applicable), symbol-table nodeset parsing and forward references, explicit-edge mainline analysis / data bypass / async edge semantics, first-class loop nodes, safe OR join / `join_policy`, SVG color rules and native-text label enhancement, actionable and aggregated health/quality `details`, config parse tracing, and nested runtime trace fields are documented in `developer_guide.md` and `kernel_development_guide.md`.
-- `kernel_target_vision.md`: target vision and current public architecture principles.
-- `kernel_development_guide.md`: checks and workflow for maintaining VibeFlow itself.
+- `developer_guide.md`：共享 workflow/config 语义与 Python Target 使用方法。
+- `js_aot_build.md`：JavaScript Target 的 JS/TS descriptor、同步/异步 ABI、Capability、Host Extension、Port 和三种 AOT profile。
+- `kernel_target_vision.md`：长期产品目标与架构原则。
+- `16_语言无关内核与多Target分层架构目标.md`：Core、Block Compiler、两个 Target、Tooling、质量系统与 Sandbox 的当前分层。
+- `kernel_development_guide.md`：维护、测试、质量自检、wheel 和分发流程。
 
-## Documentation Responsibilities
+正式 Target 名是 `python` 和 `javascript`；TypeScript 是 JavaScript Target 支持的实现语言。端到端用例位于：
 
-- `kernel_target_vision.md` records long-lived product invariants and architecture-review principles. It should describe what must remain true, not implementation history.
-- `kernel_development_guide.md` is the maintainer contract for VibeFlow itself, including CLI orchestration, failure semantics, regression coverage, and repository checks.
-- `developer_guide.md` is the shared entry guide and detailed Python Runtime guide.
-  It is also the source copied into the release package as
-  `kernel/docs/10_Kernel能力与项目开发指南.md`; edit the source once rather
-  than patching generated output.
-- `js_aot_build.md` is the JS/TS AOT guide copied into the release package as `kernel/docs/11_JS_TS与Web_AOT构建指南.md`.
-- `../distribution/kernel_development_pack/docs/` contains topic-specific source documents for release-package users. The build places them under `kernel/docs/`.
-- `../distribution/kernel_development_pack/project_template/AGENTS.md` is the additional high-salience instruction set for AI agents. It carries operational prohibitions and review gates, while the human README should stay concise.
-- `../README.md` and `../README.en.md` provide the repository overview and a short two-path quick start for greenfield and existing projects.
+- `../sandbox/python/minimal/`
+- `../sandbox/python/integration/`
+- `../sandbox/javascript/minimal/`
+- `../sandbox/javascript/integration/`
 
-All current user- and AI-facing layers must agree that existing workflows are edited in place, formal review uses the VibeFlow `review` command and fails closed, Mermaid CLI/mmdc is an internal implementation detail, and human approval requires an explicit later message when requested. They must also use the public name “CLI 让渡模式 / `delegate-cli`”, keep `run` and `review` responsibilities unchanged, and describe the same derived effect-scope matrix (`none`, `terminal`, `python_io`, `trusted`) without reverting to the obsolete claim that `flow_kind` never authorizes IO or that `external=True` is not a purity bypass.
+## 分发文档
 
-They must also keep the two public development paths distinct: Python Runtime
-resources use `project/registry.py`, while JS/TS AOT resources use static
-`descriptors` plus the project-owned `javascript` toolchain and build to
-standalone ESM/Web artifacts. A distribution-facing rule must not reject
-`descriptors` or `javascript` merely because the bundled starter project is
-Python-based.
+- `../distribution/kernel_development_pack/docs/`：进入分发包的主题文档源。
+- `../distribution/kernel_development_pack/project_template/README.md`：分发项目的人类入口。
+- `../distribution/kernel_development_pack/project_template/AGENTS.md`：供 AI 开发者使用的高优先级约束。
+- `developer_guide.md` 和 `js_aot_build.md` 也会复制到分发内核文档中。
 
-## Current Design
+修改源文档后运行完整门禁，再重建分发包：
 
-- `kernel_target_vision.md`: target vision and core architecture principles.
-- `developer_guide.md`: current shared workflow/config and Python Runtime guide.
-- `js_aot_build.md`: current JavaScript/TypeScript and AOT build guide.
-- `kernel_development_guide.md`: current maintainer workflow.
-- `15_长期工作流与原生IO改造计划.md`: implemented design record for sync/async entry modes, unbounded loop/Port semantics, and JS/TS Host Extensions.
+```bash
+python tools/verify_project.py --full
+python distribution/build.py --output /tmp/vibeflow-distribution
+```
 
-## Maintainers
+## 质量系统
 
-- `kernel_development_guide.md`: checks and workflow for maintaining VibeFlow itself.
+`python -m vibeflow quality-check` 检查用户项目。Tooling 读取文件，Python 或 JavaScript Target 提取语言事实，Core Quality 统一判定，Tooling 输出 text/JSON 报告。
 
-## Research References
+根目录 `quality/` 是完全独立的 VibeFlow 仓库自检器，不进入 wheel，也不导入 VibeFlow：
 
-- `14_AI辅助软件开发架构护栏参考论文.md`: 2024–2026 literature on coding-agent maintainability, architecture erosion, executable specifications, software-architecture benchmarks, and structural guardrails relevant to VibeFlow.
+```bash
+python quality/run.py --profile base
+python quality/run.py --profile core
+python quality/run.py --profile block-compiler
+python quality/run.py --profile python-target
+python quality/run.py --profile javascript-target
+python quality/run.py --profile all
+```
 
-## Design Records And Historical Notes
+工作区清理器默认只预览：
 
-- `strict_flowchart_kernel_redesign.md`: design record for the strict flowchart redesign.
-- `11_训练性能导向内核改进计划.md`: historical/completed runtime-performance roadmap. Some Context wording predates the current inbox result model and should not be treated as public config API.
-- `12_CompiledBlock完整代码生成计划.md`: historical compiled-block implementation plan.
-- `13_CompiledBlock分阶段实施计划.md`: historical staged compiled-block plan.
+```bash
+python tools/clean_workspace.py
+python tools/clean_workspace.py --apply
+```
+
+## 设计记录
+
+- `strict_flowchart_kernel_redesign.md`：严格流程图内核设计记录。
+- `11_训练性能导向内核改进计划.md`：训练与运行性能改造记录。
+- `12_CompiledBlock完整代码生成计划.md`：CompiledBlock 代码生成设计记录。
+- `13_CompiledBlock分阶段实施计划.md`：CompiledBlock 分阶段实现记录。
+- `14_JS_TS节点与Web_AOT构建计划.md`：JavaScript/TypeScript AOT 设计记录。
+- `15_长期工作流与原生IO改造计划.md`：同步/异步入口、永久 loop、Port 与 Host Extension 设计记录。
+
+历史记录解释设计来源，不定义 0.8 公共 API。

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from base_lib.math_tools import add
-from vibeflow import DataProvider, DataRequirement, NodeContract, NodeInfo
+from vibeflow.core import DataProvider, DataRequirement
+from vibeflow.targets.python.project import NodeContract, NodeInfo
 
 def REQ(data_type: str, cardinality: str='exactly_one') -> DataRequirement:
     return DataRequirement(type=data_type, cardinality=cardinality)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from vibeflow.cli import main
+from vibeflow.tooling.application.cli import main
 
 
 if __name__ == "__main__":

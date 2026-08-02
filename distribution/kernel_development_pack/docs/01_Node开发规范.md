@@ -7,7 +7,8 @@ Node 是业务逻辑的最小执行单元。普通 node 必须是纯函数对象
 ```python
 from __future__ import annotations
 
-from vibeflow import DataProvider, DataRequirement, NodeContract, NodeInfo
+from vibeflow.core import DataProvider, DataRequirement
+from vibeflow.targets.python.project import NodeContract, NodeInfo
 from base_lib.math_tools import add
 
 
@@ -86,7 +87,7 @@ class AddNode:
 
 `run_pure(inputs, params)` 是稳定 node ABI 的方法名，不单独证明实现无副作用；真正的 IO 检查边界以派生 `effect_scope` 为准。
 
-`purity` 为了 ABI 兼容仍默认是 `"pure"`，不要改成其他值。它不会覆盖派生的 `effect_scope`，也不能用来申请副作用能力。
+`purity` 固定为 `"pure"`。副作用能力只由派生的 `effect_scope` 决定。
 
 可选字段：
 

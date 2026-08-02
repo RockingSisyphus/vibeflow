@@ -7,7 +7,7 @@
 合法示例：
 
 ```python
-from vibeflow import BaseLibInfo
+from vibeflow.targets.python.project import BaseLibInfo
 
 BASE_LIB_INFO = BaseLibInfo(
     module="base_lib.math_tools",
@@ -33,7 +33,7 @@ base_lib 应保持：
 每个 root 的 `project/registry.py` 可以用 `build_base_lib_registry()` 声明该 root 下可用的 base_lib：
 
 ```python
-from vibeflow import BaseLibRegistry
+from vibeflow.targets.python.project import BaseLibRegistry
 
 def build_base_lib_registry() -> BaseLibRegistry:
     registry = BaseLibRegistry()
@@ -119,7 +119,7 @@ terminal start -> io input -> process... -> io output -> terminal end
 `data_store` node 用于执行或编排数据存储语义：
 
 ```python
-from vibeflow import DataProvider, DataRequirement
+from vibeflow.core import DataProvider, DataRequirement
 
 NODE_INFO = NodeInfo(..., flow_kind="data_store")
 CONTRACT = NodeContract(

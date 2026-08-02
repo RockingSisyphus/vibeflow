@@ -1,12 +1,14 @@
 # CompiledBlock 分阶段实施计划
 
+> 状态：历史设计记录。0.8 中 Python 编译执行实现位于 `vibeflow.targets.python.runtime`；本文中的阶段路径不作为当前公共 API。
+
 本文是 `12_CompiledBlock完整代码生成计划.md` 的落地拆分方案。目标是把 `execution="compiled"` 从当前的线性 block fast path，逐步实现为真正的 Python execution block，同时控制每一版的验证范围和回归风险。
 
 建议分 4 版完成。
 
 ## V1：generated linear block
 
-目标不是扩展控制流能力，而是先把当前线性 compiled fast path 从手写循环迁移到 `block_compiler.py` 生成 callable。
+V1 先把线性 compiled fast path 从手写循环迁移为 `block_compiler.py` 生成的 callable。
 
 交付内容：
 
@@ -69,9 +71,9 @@
 - block hook 开关仍按 `RuntimeOptions` 生效。
 - compiled failure trace 和 runtime summary 能定位失败 node。
 
-## V4：train preset、兼容和最终验收
+## V4：train preset 与最终验收
 
-目标是把完整 compiled block 接入默认训练路径，并完成兼容收尾。
+目标是把完整 compiled block 接入默认训练路径，并完成最终验收。
 
 交付内容：
 
@@ -90,8 +92,8 @@ RuntimeOptions(
 
 - 将 `distribution/kernel_development_pack/project_template/run.py --runtime-profile train` 同步改为相同默认值。
 - 显式 `--execution plan` 仍可覆盖 train preset。
-- 保留公开兼容入口：
-  - `vibeflow.CompiledBlock`
+- 保留 Python Target 执行入口：
+  - `vibeflow.targets.python.runtime.CompiledBlock`
   - `ExecutionPlan.blocks`
   - `ExecutionPlan.block_for()`
 - 新增 integration sandbox 覆盖：
@@ -103,10 +105,10 @@ RuntimeOptions(
 最终验证命令：
 
 ```bash
-python3 -m compileall -q src tests examples distribution/kernel_development_pack/project_template/run.py
+python3 -m compileall -q src tests sandbox distribution/kernel_development_pack/project_template/run.py
 PYTHONPATH=src python3 -m pytest tests/unit/test/strict_runtime.py tests/unit/test/strict_mermaid_cli.py -q
 PYTHONPATH=src python3 -m pytest tests/unit -q
-PYTHONPATH=src python3 examples/integration_sandbox/run_all.py
+PYTHONPATH=src python3 sandbox/python/integration/run_all.py
 PYTHONPATH=src python3 -m vibeflow quality-check --path .
 git diff --check
 ```

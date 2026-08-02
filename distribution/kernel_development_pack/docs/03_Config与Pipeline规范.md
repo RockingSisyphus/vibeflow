@@ -9,7 +9,7 @@
 ```text
 my_project/
   vibeflow_config.jsonc
-  vibetrain/
+  training_project/
     vibeflow_project.jsonc
   project/
     vibeflow_project.jsonc
@@ -22,7 +22,7 @@ my_project/
 {
   "policy": {},
   "roots": [
-    {"id": "vibetrain", "path": "vibetrain"},
+    {"id": "training_project", "path": "training_project"},
     {"id": "project", "path": "project"}
   ]
 }
@@ -92,7 +92,11 @@ my_project/
 同一个 `registry.py` 可以提供三个工厂：
 
 ```python
-from vibeflow import BaseLibRegistry, NodeRegistry, PluginResourceRegistry
+from vibeflow.targets.python.project import (
+    BaseLibRegistry,
+    NodeRegistry,
+    PluginResourceRegistry,
+)
 
 def build_node_registry() -> NodeRegistry:
     ...
@@ -127,7 +131,7 @@ def build_plugin_registry() -> PluginResourceRegistry:
 root 条目可以用 `config` 覆盖 project 配置文件名：
 
 ```jsonc
-{"id": "framework", "path": "vibetrain", "config": "custom_project_config.jsonc"}
+{"id": "framework", "path": "training_project", "config": "custom_project_config.jsonc"}
 ```
 
 workspace 模式下，node registry 按 `roots` 顺序加载，但 Python node 的 `type_key`、nodeset 的 `type_key` 共享同一个全局命名空间，不能重复。`registry.py`、base_lib module 和 plugin module/path 都相对其所属 root 目录解析。pipeline config 不再声明 `policy`；全局 policy 放根目录 `vibeflow_config.jsonc`。pipeline config 必须声明本 workflow 实际使用的 base_lib/plugin id，未引用的可用资源不会加载、不会执行、也不会出现在审查图中。
@@ -148,7 +152,7 @@ workspace 模式下，node registry 按 `roots` 顺序加载，但 Python node �
 }
 ```
 
-也兼容简写：
+也接受简写：
 
 ```jsonc
 {
@@ -158,9 +162,9 @@ workspace 模式下，node registry 按 `roots` 顺序加载，但 Python node �
 
 推荐长期项目使用标准结构。
 
-`pipeline.entry_mode` 允许 `sync | async`，缺省 `sync`。它主要决定 JS AOT 的公共入口：同步构建导出直接返回值的 `runWorkflow()`，异步构建导出 `runWorkflowAsync()`。需要 suspend Node/Capability、deferred/result_key、detached 或原生 `receive` 的 JS workflow 必须显式写 `async`，VibeFlow 不会自动升级入口。Python `runtime.run()` 保持阻塞返回和旧线程池兼容行为。
+`pipeline.entry_mode` 允许 `sync | async`，缺省 `sync`。它决定 JS AOT 的公共入口：同步构建导出直接返回值的 `runWorkflow()`，异步构建导出 `runWorkflowAsync()`。需要 suspend Node/Capability、deferred/result_key、detached 或原生 `receive` 的 JS workflow 必须显式写 `async`。Python `runtime.run()` 阻塞返回，异步任务由 Python Target 的线程执行器处理。
 
-无 workspace 配置时，旧的单 project 模式仍兼容在 pipeline config 顶层用 inline `module` / `class` 声明 `base_lib`、`plugins` 和 `policy`。新项目不建议继续使用 inline 资源写法；推荐在同目录或上级目录的 `registry.py` 注册可用资源，并在 config 中用 id 引用。
+Python 项目在 `registry.py` 注册可用 base_lib 和 plugin，workflow config 通过 ID 引用。`policy` 放在 workspace 配置中；workflow 不内联 `module` / `class`。
 
 ## 顶层资源声明
 
@@ -220,12 +224,11 @@ flow health 检查。Mermaid/SVG 会把当前 workflow 的 effective resources
   workflow 顶层 `host_extensions` 选择本流程实际使用的扩展。implemented
   扩展必须解析到登记 descriptor；配置会为每个 host 深拷贝并递归冻结为
   `context.config`。`createHostExtension()` 必须同步返回实例，`start()` /
-  `stop()` 可异步。旧 `javascript.host_extensions` 仅在 workflow
-  未声明该字段时提供兼容默认值。
+  `stop()` 可异步。
 - planned Host Extension 可暂时没有 descriptor 或源码，会进入 Architecture
   JSON 和 Mermaid/SVG，但不会打包、启动或提供 Capability。implemented
   扩展不能依赖 planned 扩展。
-- 旧 inline `module` / `class` 写法短期兼容，但在 registry-backed config 中会产生 `CONFIG.SMELL.LEGACY_INLINE_RESOURCE` warning；新模板和新项目不要使用。
+- Python base_lib 和 plugin 通过 registry ID 引用，不在 workflow 中内联 `module` / `class`。
 - Python base_lib/plugin 的规划仍使用相应资源规则；不要把 Host Extension 的
   descriptor/AOT 生命周期写成 Python registry/plugin。
 
@@ -372,7 +375,8 @@ implemented Python node 的 `NodeInfo.external=True` 会在原有 `flow_kind` �
 对应的 `io` node 从 envelope 取出业务 `argv`，再交给普通 `argparse`；不要直接读取全局 `sys.argv`：
 
 ```python
-from vibeflow import DataProvider, DataRequirement, NodeContract, NodeInfo
+from vibeflow.core import DataProvider, DataRequirement
+from vibeflow.targets.python.project import NodeContract, NodeInfo
 
 
 class ParseCliNode:
@@ -482,7 +486,7 @@ terminal start -> io input -> process... -> io output -> terminal end
 - `when` 只支持小表达式：`key == 'value'`、`key != 'value'`、`flag == true`、`flag == false`。字符串可以用单引号或双引号；布尔值必须小写 `true` / `false`。
 - 从 `decision` 出发的 edge 必须写 `when`。
 
-edge 只能连接当前 pipeline 内已经声明的 node。对象形式也兼容 `source` / `target` 字段名：
+edge 只能连接当前 pipeline 内已经声明的 node。对象形式也接受 `source` / `target` 字段名：
 
 ```jsonc
 {"source": "route", "target": "end", "when": "flow.route == 'done'"}
@@ -496,7 +500,7 @@ nodeset 必须放在独立 JSONC 文件中，根对象使用 `type_key` 定义�
 {
   "nodeset_imports": [
     {"path": "nodesets/demo_add_one.jsonc"},
-    {"root": "vibetrain", "path": "configs/nodesets/train_step.jsonc"}
+    {"root": "training_project", "path": "configs/nodesets/train_step.jsonc"}
   ]
 }
 ```
@@ -509,7 +513,7 @@ VibeFlow 会先为所有导入的 nodeset 建立符号表，再解析各 nodeset
 
 nodeset 调用和 `loop.body` 都构成 nodeset dependency。直接或间接递归会报 `NODESET.RECURSION`；不要用 nodeset 互相调用或 loop body 自引用来表达循环，真实循环只能由 `vibeflow.loop.while` 这个节点的执行语义承担。
 
-nodeset dependency 默认最多 4 层：顶层 pipeline 记为 0，第一次进入普通 nodeset 或 `loop.body` 记为 1，之后每次进入 body 增加 1。循环迭代不会重复增加层级。内核会检查所有已加载定义，包括未使用与 planned nodeset；超过所属 root 的 `runtime.nodeset_max_depth` 会报 `NODESET.NESTING.DEPTH_EXCEEDED`。需要兼容更深的既有结构时，应在所属 root 显式提高该值，而不是在 workflow config 或 CLI 中绕过。
+nodeset dependency 默认最多 4 层：顶层 pipeline 记为 0，第一次进入普通 nodeset 或 `loop.body` 记为 1，之后每次进入 body 增加 1。循环迭代不会重复增加层级。内核会检查所有已加载定义，包括未使用与 planned nodeset；超过所属 root 的 `runtime.nodeset_max_depth` 会报 `NODESET.NESTING.DEPTH_EXCEEDED`。确需更深结构时，在所属 root 显式提高该值。
 
 大型项目应放心按 `NODESET.SMELL.TOO_WIDE` 建议拆成更多小 nodeset。parser 按符号表解析每个 nodeset 一次，不依赖前缀重解析；如果怀疑配置读取或解析慢，可临时运行：
 
@@ -854,7 +858,7 @@ planned node / planned nodeset 可选 `planned_behavior`：
 
 CLI 中 `--runtime-profile train` 会自动启用偏训练场景的选项：`trace="boundary"`、`execution="compiled"`、run/block hooks 开启、node/nodeset hooks 关闭、async flush timeout 为 30 秒。`--runtime-profile debug` 会启用完整 trace 和所有 hook。
 
-诊断 trace 保留兼容字段和嵌套字段两套视图：`runtime.exec_order`、`runtime.node_runs`、`runtime.edge_executions`、`runtime.step_count` 仍只描述顶层 pipeline；嵌套 nodeset/loop 的完整顺序看 `runtime.qualified_exec_order`、`runtime.qualified_node_runs`、`runtime.qualified_edge_executions` 和 `runtime.total_step_count`。完整事件流只写入 `runtime_trace.jsonl`，`RunResult.runtime.*` 和 runtime hook 的 `trace` 参数只包含 summary、`event_count`、`trace_path` 和 `events_streamed=true`，不包含 `events` 列表。每个 trace event 都带 `path` 数组、`qualified_node` 和 `depth`，例如 `["outer_call", "inner_call", "add"]` / `outer_call.inner_call.add`。机器读取应优先用 `path`，不要解析 dotted 字符串。
+诊断 trace 提供顶层和嵌套两套视图：`runtime.exec_order`、`runtime.node_runs`、`runtime.edge_executions`、`runtime.step_count` 只描述顶层 pipeline；嵌套 nodeset/loop 的完整顺序看 `runtime.qualified_exec_order`、`runtime.qualified_node_runs`、`runtime.qualified_edge_executions` 和 `runtime.total_step_count`。完整事件流只写入 `runtime_trace.jsonl`，`RunResult.runtime.*` 和 runtime hook 的 `trace` 参数只包含 summary、`event_count`、`trace_path` 和 `events_streamed=true`，不包含 `events` 列表。每个 trace event 都带 `path` 数组、`qualified_node` 和 `depth`，例如 `["outer_call", "inner_call", "add"]` / `outer_call.inner_call.add`。机器读取应优先用 `path`，不要解析 dotted 字符串。
 
 ## 已移除字段
 

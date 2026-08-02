@@ -1,11 +1,11 @@
 # VibeFlow AI 开发指引
 
-本目录是一个可复制的业务项目开发包，内置 `kernel/vibeflow-kernel.zip` 作为运行和校验内核。AI 默认应按本文开发业务程序。
+本目录是一个可复制的 VibeFlow 0.8.0 项目开发包，内置 `kernel/vibeflow-kernel.zip` 作为运行和校验内核。0.8 使用分层 Python API，不提供根级业务导出。AI 默认按本文开发业务程序。
 
 ## 先选择开发路径
 
 - **Python Runtime**：Python node、base_lib 和 plugin 放在 `project/nodes/`、`project/base_lib/`、`project/plugins/`，通过 `project/registry.py` 注册；使用 `validate`、`run`、`review` 或 `delegate-cli`。
-- **JavaScript/TypeScript AOT**：JS/TS node、base_lib 与 Host Extension 源码放在 `project/nodes/`、`project/base_lib/`、`project/host_extensions/`，其 node、base_lib、数据 Schema、Capability 和 Host Extension descriptor 放在 `project/manifests/`；可选页面模板和应用入口放在 `project/web/`。使用 `build --target browser|node --profile esm-module|single-esm|web-app` 生成不依赖 Python/VibeFlow Runtime 的产物。
+- **JavaScript Target AOT**：以 JavaScript 或 TypeScript 编写 node、base_lib 与 Host Extension，源码放在 `project/nodes/`、`project/base_lib/`、`project/host_extensions/`，其 node、base_lib、数据 Schema、Capability 和 Host Extension descriptor 放在 `project/manifests/`；可选页面模板和应用入口放在 `project/web/`。使用 `build --target browser|node --profile esm-module|single-esm|web-app` 生成不依赖 Python/VibeFlow Runtime 的产物。
 - JS/TS AOT 项目在 `project/vibeflow_project.jsonc` 使用合法的 `descriptors` 和 `javascript` 字段；`javascript.package_root` 指向项目自行安装并锁定的 Node.js、TypeScript 和 esbuild 工具链。VibeFlow 不执行 `npm install`，也不运行第三方 package scripts。
 - 两条路径共享 workflow、显式 edge、contract、分支、合流、nodeset、有限/永久 loop 和原生 Port 等可移植语义，但实现登记和宿主 ABI 不同。Python 使用 registry/Runtime；JS/TS 使用 descriptor/AOT，并通过 `runWorkflow()`、`runWorkflowAsync()` 或 Host Extension 注入宿主能力。
 
@@ -33,7 +33,9 @@
 - 不要解包、修改或重建 `kernel/vibeflow-kernel.zip`。
 - 不要修改 `kernel/`、`run.py` 或 `kernel/MANIFEST.sha256`；这些文件由分发包构建脚本生成和校验。
 - 不要为了理解内核而读取或展开 `kernel/vibeflow-kernel.zip`；开发业务程序时只读 `kernel/docs/`、`project/` 和本文件。
-- `kernel/docs/`、`kernel/tools/` 和 `kernel/THIRD_PARTY_NOTICES.md` 是随内核分发的只读参考材料；根目录 `README.md`、`AGENTS.md` 和项目自己的说明可由项目维护者定制。
+- `kernel/docs/`、`kernel/tools/`、`kernel/LICENSE` 和
+  `kernel/THIRD_PARTY_NOTICES.md` 是随内核分发的只读参考材料；根目录
+  `README.md`、`AGENTS.md` 和项目自己的说明可由项目维护者定制。
 - 分发包不内置 `.gitignore`；如果项目需要 Git 忽略规则，由项目自行添加，常见忽略项包括 `kernel/tools/mermaid-renderer/node_modules/`、`runs/`、`reports/`、`__pycache__/` 和 `*.pyc`。
 - 如果内核报错或警告，优先修改 `project/` 下的业务代码、registry、descriptor 或 JSONC 配置来满足内核要求；不要 patch 内核来绕过检查。
 - 如果完整性检查失败，不要通过修改 manifest 或 `run.py` 绕过；应从可信来源重新生成或恢复分发包。
@@ -54,8 +56,8 @@
 - `requires`、`provides`、`pipeline.inputs`、`pipeline.outputs` 的每个对象都必须写非空 `display_name`。图上 contract label 先显示 `display_name`，再显示 id/key/type。
 - JS/TS AOT 的每个 `pipeline.inputs[]` 还必须显式写
   `required: true | false`，output 可用 `as` 声明公共字段名；生成的
-  同步 `runWorkflow()` 或异步 `runWorkflowAsync()` 返回普通业务值，不暴露内部 envelope。旧 Python Runtime
-  配置缺少 `required` 时保持现有兼容行为。
+  同步 `runWorkflow()` 或异步 `runWorkflowAsync()` 返回普通业务值，不暴露内部 envelope。Python Runtime
+  配置缺少 `required` 时使用 Python Target 默认值。
 - `pipeline.entry_mode` 缺省为 `sync`。同步 JS workflow 只接受
   `completion: immediate + schedule: inline + executor: current`；suspend、
   deferred/result_key 和 detached 必须使用 `entry_mode: async`，VibeFlow 不自动升级入口。
@@ -75,8 +77,7 @@
 - `descriptors.host_extensions` 只登记 project 可用扩展；当前 workflow 顶层
   `host_extensions` 才选择实际资源。使用项支持字符串 ID，或带
   `status: implemented | planned`、`enabled`、`config/settings`、显示元数据、
-  `targets`、`provides` 和 `dependencies` 的对象。新配置不要使用兼容字段
-  `javascript.host_extensions`。
+  `targets`、`provides` 和 `dependencies` 的对象。
 - planned Host Extension 要进入 Architecture JSON 和 Mermaid/SVG，但不能
   进入 bundle、生命周期或 Capability provider；implemented 扩展不能依赖
   planned 扩展。implemented 项的 config 会为每个 host 深拷贝并递归冻结为
@@ -131,12 +132,12 @@
 - 不确定约束时，读 `kernel/docs/08_给AI开发者的约束清单.md`。
 - 编写 JS/TS node、descriptor、Capability、`web-app` 入口或配置项目 Node 工具链前，读 `kernel/docs/11_JS_TS与Web_AOT构建指南.md`；不要按 Python registry/plugin 规则猜测 AOT 接口。
 - 需要端到端验证 AOT 核心语义时，读
-  `examples/typescript_sandbox/README.md`；分发环境先运行
-  `npm ci --prefix examples/typescript_sandbox/project`，再运行
-  `python examples/typescript_sandbox/run_all.py --skip-browser`。构建分发包不会
-  安装这些依赖。
+  `sandbox/javascript/integration/README.md`；分发环境运行
+  `python sandbox/javascript/integration/run_all.py --skip-browser`。运行器会在
+  临时目录安装锁定的工具链；浏览器环境可用时去掉 `--skip-browser`，运行器
+  同样在临时目录安装 Puppeteer。
 
-Python Runtime 如需内核公开 API，只通过 `from vibeflow import ...` 使用，例如 `NodeInfo`、`NodeContract`、`NodeRegistry`、`HealthFinding`、`RuntimeOptions`、`CheckedRunResult`、`run_checked`、`run_workspace_checked`。JS/TS AOT 宿主只依赖构建产物导出的 `runWorkflow()` / `runWorkflowAsync()` / `createWorkflowHost()` 和生成的类型声明。两条路径都不要依赖未在文档中说明的内部模块或私有函数。
+Python Runtime 使用 0.8 分层入口：通用 contract 从 `vibeflow.core` 导入；Node、Registry、base_lib 和 Plugin 从 `vibeflow.targets.python.project` 导入；健康检查从 `vibeflow.targets.python.quality` 导入；执行器从 `vibeflow.targets.python.runtime` 导入；项目加载和运行编排从 `vibeflow.tooling.project` / `vibeflow.tooling.application` 导入。JS/TS AOT 宿主只依赖构建产物导出的 `runWorkflow()` / `runWorkflowAsync()` / `createWorkflowHost()` 和生成的类型声明。不要依赖根级业务导出、旧模块路径或私有函数。
 
 ## 推荐开发流程
 
@@ -166,7 +167,7 @@ Python Runtime 如需内核公开 API，只通过 `from vibeflow import ...` 使
 - 导出展开 nodeset 的 Mermaid 源码：`python run.py mermaid --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.mmd`。这个文件只用于调试源码，仍按调用点展开，不应用 expanded SVG 的父图内局部详情去重；不要直接用 Mermaid CLI/mmdc 转成 SVG。
 - 导出 SVG：`python run.py svg --config project/configs/main.jsonc --output reports/graph.svg`
 - 导出展开 nodeset 的详细审查 SVG：`python run.py svg --config project/configs/main.jsonc --expand-nodesets --output reports/graph.expanded.svg`。同一父图内调用种类和 `type_key` 都相同的直接调用共享一份详情，父图调用点/连边保留，不同父图分别展开。
-- 质量检查业务代码：`python run.py quality --path project`
+- 质量检查业务代码：`python run.py quality --path project`。该入口由 Tooling 扫描文件、Target 提取语言事实、Core Quality 统一判定；不要绕过入口分别调用内部扫描器。
 
 ## 判断标准
 

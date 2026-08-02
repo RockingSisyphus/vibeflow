@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from vibeflow import BaseLibRegistry, NodeRegistry, PluginResourceRegistry
+from vibeflow.targets.python.project import BaseLibRegistry, NodeRegistry, PluginResourceRegistry
 
 from nodes.math_nodes import AddNode, EndNode, OutputNode, SeedNode, StartNode
 

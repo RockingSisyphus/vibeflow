@@ -2,7 +2,7 @@
 
 本文记录 VibeFlow 面向 JavaScript、TypeScript、浏览器和 Node.js 的通用扩展方案。
 
-> 本文是方案形成过程中的设计记录，不作为当前公开接口规范。已经实现的配置、ABI、构建命令和限制请以 [JavaScript/TypeScript 节点与 Web AOT 构建指南](js_aot_build.md) 为准。
+> 状态：设计已在 0.8 的 JavaScript Target 中落实。本文记录方案形成过程，不定义当前公开接口；配置、ABI、构建命令和限制以 [JavaScript/TypeScript 节点与 Web AOT 构建指南](js_aot_build.md) 为准。
 
 VibeFlow 将从主要管理 Python 程序的框架，扩展为能够管理多语言节点、检查统一流程，并为不同运行目标生成普通程序的流程编译框架。
 
@@ -129,7 +129,7 @@ node 示例：
 }
 ```
 
-现有 Python `NODE_INFO`、`CONTRACT` 和节点类继续可用，由兼容适配层转换成统一 descriptor，避免破坏旧项目。
+Python Target 将 `NODE_INFO`、`CONTRACT` 和 registry 事实转换成统一 descriptor；同时存在静态 descriptor 时必须一致。
 
 不能把逻辑数据类型名称直接当作 TypeScript 类型。只有存在 value schema 时，才能生成具体的 TypeScript value type；缺少 schema 时必须生成 `unknown`。如果首版要求完整强类型 `.d.ts`，应先增加通用 data schema registry 或 pipeline boundary schema。
 
@@ -203,7 +203,7 @@ JS/TS node 需要共享纯 helper、不可变常量、领域类型和验证器�
 规则如下：
 
 - workflow 启用逻辑 `base_lib id`，而不是随意启用磁盘路径。
-- 构建时根据 target 选择唯一兼容实现；缺失或歧义时构建失败。
+- 构建时根据 target 选择唯一匹配实现；缺失或歧义时构建失败。
 - node 只能导入当前 workflow 已启用的 `base_lib`。
 - `base_lib` 可以依赖其他 `base_lib`，但跨资源依赖必须显式声明。
 - 构建只打包 workflow 直接启用的资源及其已声明传递依赖。
@@ -213,7 +213,7 @@ JS/TS node 需要共享纯 helper、不可变常量、领域类型和验证器�
 - `import type` 和运行时依赖分别记录和检查。
 - browser target 不允许 Node-only API，node target 不允许未适配的 DOM API。
 
-现有 Python `module=` 注册形式继续通过兼容适配器工作。新 descriptor 的元数据应静态读取，不应通过执行 JS/TS 业务模块获取。
+Python Target 负责把 registry 资源转换成 descriptor 事实。JS/TS descriptor 元数据必须静态读取，不执行业务模块。
 
 共享 schema 不能成为第二套 workflow contract。`requires` / `provides` 和 data schema registry 仍是契约真源，TS `base_lib` 只能提供与其一致的类型、验证器和纯 helper。
 
@@ -237,7 +237,7 @@ BlockPlanner
 - 生成语言无关的 `BlockPlan`。
 - 在构建期拒绝目标 emitter 尚不支持的流程结构。
 
-`PythonBlockEmitter` 保持现有 Python compiled execution 的能力和兼容性。
+`PythonBlockEmitter` 负责 Python Target 的 compiled execution。
 
 `JavaScriptBlockEmitter` 把 `BlockPlan` 直接生成普通 JavaScript，例如函数调用、`if/else`、有限循环和 `await`。它应生成多个可定位的 block 函数，而不是一个难以调试的巨大函数。
 
@@ -385,8 +385,8 @@ Worker 硬中止、事务回滚或只有 Python runtime 才具备的语义，可
 
 - 定义语言无关的 node、`base_lib` 和 data schema descriptor。
 - 区分 language、target 和 profile。
-- 为现有 Python node、`BaseLibRegistry` 和 `module=` 注册增加兼容适配器。
-- 保证旧项目和现有 Python API、测试保持不变。
+- 由 Python Target 把 node、`BaseLibRegistry` 和 registry 资源转换成统一事实。
+- 用 Python Target 测试固定现有执行语义。
 
 ### V2：抽出语言无关的 BlockPlan
 
@@ -422,12 +422,11 @@ Worker 硬中止、事务回滚或只有 Python runtime 才具备的语义，可
 - 完善 Host Extension 的依赖、打包和生命周期管理。
 - 评估 `single-html`、Worker 隔离和 TS plugin。
 
-## 兼容与边界
+## 0.8 公共边界
 
 必须保持：
 
-- 现有 Python node、`base_lib` 和项目不需要迁移即可继续运行。
-- Python runtime、ABI 和 compiled execution 的公开兼容入口不被无故破坏。
+- Python Runtime 与 JavaScript AOT 使用同一公共工作流语义。
 - Python 与 JS emitter 对共同支持的流程语义保持一致。
 - 构建产物可以脱离 Python 和 VibeFlow 安装环境运行。
 - 生成代码和 source map 能定位回 workflow、block、node 和 `base_lib`。
@@ -444,11 +443,11 @@ Worker 硬中止、事务回滚或只有 Python runtime 才具备的语义，可
 
 ## 验收标准
 
-### Python 兼容
+### Python Target
 
-- 现有 Python 项目的 API 和测试继续通过。
-- 现有 Python node 和 `base_lib` 注册方式继续有效。
-- Python compiled execution 的现有行为不变。
+- Python Target 的 node、base_lib、Plugin 和 Runtime 测试全部通过。
+- registry 事实与静态 descriptor 一致。
+- Python compiled execution 保持既定语义。
 
 ### Workflow 调用 ABI
 
@@ -475,7 +474,7 @@ Worker 硬中止、事务回滚或只有 Python runtime 才具备的语义，可
 
 - 同一逻辑 `base_lib` 的 Python/TS 实现能按 target 正确选择。
 - target 不匹配或存在多个歧义实现时构建失败。
-- node 导入已启用的兼容 `base_lib` 时成功。
+- node 导入已启用的 `base_lib` 时成功。
 - 导入未启用的 `base_lib` 或直接导入其他 node 时失败。
 - 已声明的传递 `base_lib` 依赖会被检查和打包，未声明依赖失败。
 - `base_lib` 反向导入 node、plugin、runtime、registry 或 host bridge 时失败。

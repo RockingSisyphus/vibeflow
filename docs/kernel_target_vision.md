@@ -1,5 +1,7 @@
 # VibeFlow 目标愿景
 
+> 当前版本：0.8.0。0.8 使用分层公共 API，不保留根级业务导出或旧模块门面。
+
 ## 设计初衷
 
 VibeFlow（包名 `vibeflow`）服务于人机协同开发，尤其是大量依赖 LLM 编写、修改和维护代码的项目。它把架构纪律转化为可执行的硬约束。
@@ -29,6 +31,23 @@ VibeFlow 是可迁移、可复用的严格标准流程图内核。业务开发�
 - 普通 graph 必须无环；循环必须用一等 loop node 表达。
 - 健康检查必须能解释违反规则的原因和修复方向。
 - 已登记 workflow 默认在真实 config 和 nodeset source 上原位演进；审核视图不能成为平行 source of truth。
+
+## 实现分层
+
+VibeFlow 的实现遵守固定依赖方向：
+
+```text
+tooling → targets/python ──────┐
+        → targets/javascript ─┴→ block_compiler → core
+```
+
+- Core 只处理内存中的语言无关模型、契约、图算法和 finding。
+- Block Compiler 把 `ValidatedWorkflow` 编译为唯一公共 `WorkflowPlan` / `BlockPlan` IR。
+- Python 与 JavaScript Target 分别保存语言实现、运行或生成逻辑，彼此不依赖；JavaScript Target 的 `build` 子层拥有 Node 工具链协议和 AOT 发布实现。
+- Tooling 负责项目文件、CLI、跨层编排和架构表现。
+- 0.8 只公开分层 API；根包不重导出业务对象，旧模块路径不再是公共接口。
+
+`PythonBindingPlan` 保存 callable、有效参数和插件；`JavascriptBindingPlan` 保存 JS/TS 源码、Schema、base_lib、Capability、Host Extension 和 import policy。语言对象不能进入公共 IR。
 
 ## 术语
 
@@ -173,24 +192,27 @@ NodeInfo(
 跨语言实现必须共享同一个语义边界：
 
 ```text
-workflow config + registry / descriptor
-  -> graph compile 与 contract 校验
-  -> WorkflowPlan
-     -> BlockPlan(workflow / nodeset / loop)
-  -> Python 兼容执行链或目标语言 emitter
+Tooling 加载 workflow config + registry / descriptor
+  -> Core compile 与 contract 校验
+  -> ValidatedWorkflow
+  -> Block Compiler
+  -> WorkflowPlan + BlockPlan(workflow / nodeset / loop)
+  -> Target BindingPlan
+  -> Python Runtime 或 JavaScript emitter
 ```
 
 `WorkflowPlan` / `BlockPlan` 必须是确定、不可变、可序列化的中间表示。它们可以包含稳定 ID、JSON 值、输入输出、cardinality、路由、标准化条件、合流、`completion`/`schedule`/`executor`、TaskPlan、有限或永久 loop、IO、block 引用和 `SourceRef`，但不能包含 Python class、callable、实例、任意 Python 对象或 emitter 已生成的源码。bundler、HTML 模板和 package manager 也不属于这层模型。
 
-当前已经落地的基线是：
+当前实现是：
 
-- `vibeflow.portable` 可以从 `GraphConfig` + `CompiledGraph` 构建 `WorkflowPlan`，也可以把现有 Python `ExecutionPlan` 投影成不携带 Python binding 的计划。
-- 静态 catalog 可以加载 node、`base_lib`、data schema、Capability 和 JS/TS Host Extension descriptor；已有 Python registry 通过兼容层生成 descriptor，并在静态描述同时存在时做一致性检查。
-- JS/TS AOT 从可移植计划和 descriptor 选择 target 实现，经过 TypeScript 类型/依赖检查和 bundling，输出 `esm-module`、`single-esm` 或 `web-app`。
+- `compile_core(CoreCompileRequest)` 只用内存数据生成 `CoreCompilation` 与 `ValidatedWorkflow`；`compile_workflow(ValidatedWorkflow, ImplementationFacts)` 生成公共计划。
+- `PythonBindingPlan` 与 `JavascriptBindingPlan` 把语言实现放在公共计划之外。Python `ExecutionPlan` 只属于 Python Runtime，JavaScript 内部模型不构成第二套公共 IR。
+- 静态 catalog 可以加载 node、`base_lib`、data schema、Capability 和 JS/TS Host Extension descriptor；Python Target 把 registry 转成同类资源事实，并在静态描述同时存在时检查一致性。
+- JS/TS AOT 从 `WorkflowPlan + JavascriptBindingPlan` 选择 target 实现，经过 TypeScript 类型/依赖检查和 bundling，输出 `esm-module`、`single-esm` 或 `web-app`。
 - JavaScript emitter 按 `entry_mode` 生成流程专用的同步 `runWorkflow()` 或异步 `runWorkflowAsync()`，产物不读取原始 workflow，也不需要 Python 或浏览器端 VibeFlow runtime。
 - 每次调用独立持有输入、trace、错误、异步任务、取消状态和 Capability wrapper；模块 import 不自动运行 workflow 或 Host Extension。
 
-现有 Python Runtime 仍以 `ExecutionPlan` 执行；投影为 `WorkflowPlan` 不改变该事实。Python build-time policy/compiler plugin 也只服务 Python。新增跨后端能力时，先在 portable plan 和 conformance fixture 中定义共同语义，再实现目标 emitter。
+Python Runtime 支持 `ExecutionPlan` 及 plan/block/compiled 三种模式；Python build-time policy/compiler plugin 也只服务 Python。新增跨后端能力时，先在 Core、Block Compiler 和共同 conformance fixture 中定义语义，再实现各 Target。
 
 Descriptor 是资源和依赖事实来源，不是另一份可执行拓扑。静态读取必须无业务副作用；node 只能导入 workflow 启用的 `base_lib`，不能导入另一个 node；`base_lib` 不能反向依赖 node、runtime、plugin、registry 或 Capability bridge。JS/TS 的 source audit 与 bundling 后依赖图复核共同防止 alias、barrel 和 symlink 绕过边界。
 
@@ -273,7 +295,7 @@ python run.py delegate-cli --config project/configs/main.jsonc -- --input data.y
 
 首个 `--` 之前由 VibeFlow 消费已知 core 参数，未知 token 保持顺序进入业务参数；首个 `--` 之后全部原样让渡。分隔符可省略。让渡后的 `list[str]` 通过唯一入口类型 `cli.argv` 注入，图必须以 `exactly_one` 输出要求产生唯一 `cli.exit_code`，其最终 provider 的 key/type 都是 `cli.exit_code`，值必须是非 bool 的 `int` 且处于 `0..255`。
 
-业务 stdin/stdout/stderr 是真实进程标准流：内核不捕获、不重写，也不补 JSON 或换行。VibeFlow 自身的启动、兼容提示、失败阶段、artifact 路径和最终退出码写入每个新运行目录的 `vibeflow.log`，不得写入业务标准流，也不得记录 argv 原文。只有运行目录无法创建时，才允许向 stderr 写最小诊断并返回 1。
+业务 stdin/stdout/stderr 是真实进程标准流：内核不捕获、不重写，也不补 JSON 或换行。VibeFlow 自身的启动、版本提示、失败阶段、artifact 路径和最终退出码写入每个新运行目录的 `vibeflow.log`，不得写入业务标准流，也不得记录 argv 原文。只有运行目录无法创建时，才允许向 stderr 写最小诊断并返回 1。
 
 正常业务退出和获授权代码抛出的 `SystemExit` 可返回 `0..255`。只有 `io`、`document`、`data_store` node 或 runtime plugin 可以授权退出；`SystemExit(None)` 视为 0，合法整数原样返回，其他值、越界值以及未授权 `SystemExit` 都是框架错误并返回 1。argparse 层缺少 `--config` 或已知 core 参数值非法时写 stderr、返回 2 且不创建 run；health、runtime、CLI contract 或非法 `SystemExit` 失败返回 1，详细 VibeFlow 诊断只写 `vibeflow.log`。
 
