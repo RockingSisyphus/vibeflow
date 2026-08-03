@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import PurePath
 from typing import Mapping, Sequence
 
@@ -11,6 +12,7 @@ from vibeflow.block_compiler.model import (
     ConditionPlan,
     DataProviderPlan,
     DataRequirementPlan,
+    ExecutionLockPlan,
     LoopCarryPlan,
     LoopCollectPlan,
     LoopOutputPlan,
@@ -32,6 +34,12 @@ from vibeflow.core.flow import (
     GraphConfig,
     LoopSpec,
     NodeSpec,
+    STATUS_PLANNED,
+)
+from vibeflow.core.constants import (
+    EFFECT_SCOPE_GLOBAL_STATE,
+    EFFECT_SCOPE_NONE,
+    FLOW_KIND_GLOBAL_STATE,
 )
 from vibeflow.core.models import (
     ImplementationFacts,
@@ -121,7 +129,17 @@ def compile_graph_plan(
         compile_nested=compile_nested,
     )
     root_id = _block_id(())
-    state.add_graph_block(graph, compiled, path=(), kind="workflow", loop=None, active_nodesets=())
+    state.add_graph_block(
+        graph,
+        compiled,
+        path=(),
+        kind="workflow",
+        loop=None,
+        active_nodesets=(),
+        inherited_lock_key="",
+    )
+    root_block = state.blocks[0]
+    _validate_protected_async_plan(tuple(state.blocks))
     return WorkflowPlan(
         abi_version=WORKFLOW_ABI_VERSION,
         workflow_id=_workflow_id(graph, workflow_id),
@@ -132,6 +150,12 @@ def compile_graph_plan(
         blocks=tuple(state.blocks),
         max_steps=graph.max_steps,
         entry_mode=graph.entry_mode,
+        execution_lock=_execution_lock_plan(
+            graph.execution_lock,
+            scope="root",
+        ),
+        contains_global_state=root_block.contains_global_state,
+        root_exclusive=root_block.root_exclusive,
     )
 
 
@@ -175,29 +199,75 @@ class _PlannerState:
         kind: str,
         loop: LoopPlan | None,
         active_nodesets: tuple[str, ...],
-    ) -> None:
-        children: list[tuple[GraphConfig, CompiledGraph, tuple[str, ...], str, LoopPlan | None, tuple[str, ...]]] = []
+        inherited_lock_key: str,
+    ) -> bool:
+        block_scope = "root" if not path else "block"
+        block_lock = _execution_lock_plan(
+            graph.execution_lock,
+            scope=block_scope,
+        )
+        active_lock_key = _nested_lock_key(
+            inherited_lock_key,
+            block_lock.key if block_lock is not None else "",
+            subject=f"block {_block_id(path)}",
+        )
+        children: list[
+            tuple[
+                int,
+                GraphConfig,
+                CompiledGraph,
+                tuple[str, ...],
+                str,
+                LoopPlan | None,
+                tuple[str, ...],
+                str,
+            ]
+        ] = []
         nodes: list[NodeCallPlan] = []
         for spec in graph.nodes:
             is_loop = spec.type_used in LOOP_NODE_TYPES
             is_nodeset = spec.type_used in graph.nodesets and not is_loop
             nodeset = graph.nodesets.get(spec.loop.body if is_loop else spec.type_used) if (is_loop or is_nodeset) else None
             behavior = effective_planned_behavior(spec, nodeset)
-            has_child = nodeset is not None and behavior.kind != "python_stub"
+            planned_invocation = (
+                spec.status == STATUS_PLANNED
+                or getattr(nodeset, "status", "implemented") == STATUS_PLANNED
+            )
+            # A planned nodeset is an architecture/review declaration, not an
+            # executable subtree. Its children must not influence Target
+            # feature gates or root execution-domain facts.
+            has_child = (
+                nodeset is not None
+                and not planned_invocation
+                and behavior.kind != "python_stub"
+            )
             child_path = (*path, spec.id)
             child_block = _block_id(child_path) if has_child else ""
-            nodes.append(
-                self._graph_node(
-                    spec,
-                    compiled=compiled,
-                    nodeset=nodeset,
-                    is_loop=is_loop,
-                    is_nodeset=is_nodeset,
-                    child_block=child_block,
-                    planned_behavior=behavior.kind,
-                    call_path=child_path,
-                )
+            node_index = len(nodes)
+            node_plan = self._graph_node(
+                spec,
+                compiled=compiled,
+                nodeset=nodeset,
+                is_loop=is_loop,
+                is_nodeset=is_nodeset,
+                child_block=child_block,
+                planned_behavior=behavior.kind,
+                call_path=child_path,
             )
+            node_lock_key = (
+                node_plan.execution_lock.key
+                if (
+                    node_plan.execution_lock is not None
+                    and node_plan.status != STATUS_PLANNED
+                )
+                else ""
+            )
+            child_lock_key = _nested_lock_key(
+                active_lock_key,
+                node_lock_key,
+                subject=f"node {'.'.join(child_path)}",
+            )
+            nodes.append(node_plan)
             if not has_child or nodeset is None:
                 continue
             if nodeset.type_key in active_nodesets:
@@ -220,24 +290,73 @@ class _PlannerState:
             child_loop = _loop_plan(spec.loop) if is_loop else None
             children.append(
                 (
+                    node_index,
                     nodeset.graph,
                     child_compiled,
                     child_path,
                     child_kind,
                     child_loop,
                     (*active_nodesets, nodeset.type_key),
+                    child_lock_key,
                 )
             )
-        self.blocks.append(_block(graph, compiled, path=path, kind=kind, loop=loop, nodes=tuple(nodes)))
-        for child_graph, child_compiled, child_path, child_kind, child_loop, child_active in children:
-            self.add_graph_block(
+        block_index = len(self.blocks)
+        self.blocks.append(
+            _block(
+                graph,
+                compiled,
+                path=path,
+                kind=kind,
+                loop=loop,
+                nodes=tuple(nodes),
+                execution_lock=block_lock,
+            )
+        )
+        for (
+            node_index,
+            child_graph,
+            child_compiled,
+            child_path,
+            child_kind,
+            child_loop,
+            child_active,
+            child_lock_key,
+        ) in children:
+            child_contains_global_state = self.add_graph_block(
                 child_graph,
                 child_compiled,
                 path=child_path,
                 kind=child_kind,
                 loop=child_loop,
                 active_nodesets=child_active,
+                inherited_lock_key=child_lock_key,
             )
+            if child_contains_global_state:
+                nodes[node_index] = replace(
+                    nodes[node_index],
+                    contains_global_state=True,
+                )
+        contains_global_state = any(
+            node.contains_global_state for node in nodes
+        )
+        self.blocks[block_index] = _block(
+            graph,
+            compiled,
+            path=path,
+            kind=kind,
+            loop=loop,
+            nodes=tuple(nodes),
+            execution_lock=block_lock,
+            contains_global_state=contains_global_state,
+            root_exclusive=(
+                not path
+                and (
+                    contains_global_state
+                    or graph.execution_lock is not None
+                )
+            ),
+        )
+        return contains_global_state
 
     def _graph_node(
         self,
@@ -254,7 +373,21 @@ class _PlannerState:
         exports = tuple(getattr(nodeset, "provides", ())) if nodeset is not None else ()
         nodeset_type_key = str(getattr(nodeset, "type_key", ""))
         flow_kind = compiled.flow_kinds.get(spec.id, spec.flow_kind)
+        status = (
+            STATUS_PLANNED
+            if spec.status == STATUS_PLANNED
+            or getattr(nodeset, "status", "implemented") == STATUS_PLANNED
+            else spec.status
+        )
         completion, schedule, executor = self._execution_semantics(spec)
+        effect_scope = compiled.effect_scopes.get(
+            spec.id,
+            (
+                EFFECT_SCOPE_GLOBAL_STATE
+                if flow_kind == FLOW_KIND_GLOBAL_STATE
+                else EFFECT_SCOPE_NONE
+            ),
+        )
         return NodeCallPlan(
             id=spec.id,
             type_used=spec.type_used,
@@ -271,7 +404,7 @@ class _PlannerState:
             ),
             flow_kind=flow_kind,
             join_policy=spec.join_policy,
-            status=spec.status,
+            status=status,
             planned_behavior=planned_behavior,
             async_mode=spec.async_mode,
             result_key=spec.result_key,
@@ -292,6 +425,15 @@ class _PlannerState:
             executor=executor,
             io_operation=spec.io.operation,
             io_port=spec.io.port if spec.io.operation else "",
+            effect_scope=effect_scope,
+            execution_lock=_execution_lock_plan(
+                spec.execution_lock,
+                scope="node",
+            ),
+            contains_global_state=(
+                status != STATUS_PLANNED
+                and flow_kind == FLOW_KIND_GLOBAL_STATE
+            ),
         )
 
     def _source(self, type_used: str) -> SourceRef:
@@ -325,6 +467,9 @@ def _block(
     kind: str,
     loop: LoopPlan | None,
     nodes: tuple[NodeCallPlan, ...],
+    execution_lock: ExecutionLockPlan | None = None,
+    contains_global_state: bool = False,
+    root_exclusive: bool = False,
 ) -> BlockPlan:
     routes = _routes(compiled)
     incoming = {route.target for route in routes if route.schedule}
@@ -357,6 +502,16 @@ def _block(
             if node.schedule != "inline"
         ),
         loop=loop,
+        execution_lock=(
+            execution_lock
+            if execution_lock is not None
+            else _execution_lock_plan(
+                graph.execution_lock,
+                scope="root" if not path else "block",
+            )
+        ),
+        contains_global_state=contains_global_state,
+        root_exclusive=root_exclusive,
     )
 
 
@@ -412,6 +567,124 @@ def _schedule(async_mode: str) -> str:
 
 def _executor(async_mode: str) -> str:
     return "thread" if async_mode else "current"
+
+
+def _execution_lock_plan(
+    spec: object | None,
+    *,
+    scope: str,
+) -> ExecutionLockPlan | None:
+    if spec is None:
+        return None
+    return ExecutionLockPlan(
+        key=str(getattr(spec, "key", "")),
+        scope=scope,
+    )
+
+
+def _nested_lock_key(parent: str, child: str, *, subject: str) -> str:
+    if parent and child and parent != child:
+        raise PortablePlanError(
+            f"{subject} nests execution_lock key '{child}' inside "
+            f"incompatible key '{parent}'; nested locks must reuse one key"
+        )
+    return child or parent
+
+
+def _validate_protected_async_plan(
+    blocks: tuple[BlockPlan, ...],
+) -> None:
+    if not blocks:
+        return
+    root_protected = (
+        blocks[0].contains_global_state
+        or blocks[0].execution_lock is not None
+    )
+    blocks_by_path = {block.path: block for block in blocks}
+    for block in blocks:
+        block_protected = root_protected or _block_has_protected_ancestor(
+            block,
+            blocks_by_path=blocks_by_path,
+        )
+        for node in block.nodes:
+            if node.status == STATUS_PLANNED:
+                continue
+            protected = block_protected or node.execution_lock is not None
+            if not protected or not node.async_mode:
+                continue
+            if node.async_mode == "detached":
+                raise PortablePlanError(
+                    f"protected block '{block.id}' cannot detach node "
+                    f"'{node.id}' while global_state or execution_lock is active"
+                )
+            if (
+                node.async_mode == "result_key"
+                and not _plan_has_static_result_consumer(block, node)
+            ):
+                raise PortablePlanError(
+                    f"protected block '{block.id}' async result_key node "
+                    f"'{node.id}' has no statically provable scheduled "
+                    "consumer path"
+                )
+
+
+def _block_has_protected_ancestor(
+    block: BlockPlan,
+    *,
+    blocks_by_path: Mapping[tuple[str, ...], BlockPlan],
+) -> bool:
+    if block.execution_lock is not None:
+        return True
+    for length in range(1, len(block.path) + 1):
+        parent_path = block.path[: length - 1]
+        parent = blocks_by_path.get(parent_path)
+        if parent is None:
+            continue
+        if parent.execution_lock is not None:
+            return True
+        try:
+            invocation = parent.node(block.path[length - 1])
+        except KeyError:
+            continue
+        if invocation.execution_lock is not None:
+            return True
+    return False
+
+
+def _plan_has_static_result_consumer(
+    block: BlockPlan,
+    source: NodeCallPlan,
+) -> bool:
+    result_provider = next(
+        (item for item in source.provides if item.key == source.result_key),
+        None,
+    )
+    if result_provider is None:
+        return False
+    adjacency: dict[str, set[str]] = {}
+    for route in block.routes:
+        if route.schedule and route.condition is None:
+            adjacency.setdefault(route.source, set()).add(route.target)
+    nodes_by_id = {node.id: node for node in block.nodes}
+    pending = list(sorted(adjacency.get(source.id, ())))
+    seen: set[str] = set()
+    while pending:
+        node_id = pending.pop(0)
+        if node_id in seen:
+            continue
+        seen.add(node_id)
+        candidate = nodes_by_id.get(node_id)
+        if candidate is not None and any(
+            requirement.type == result_provider.type
+            for requirement in candidate.requires
+        ):
+            return True
+        pending.extend(
+            target
+            for target in sorted(adjacency.get(node_id, ()))
+            if target not in seen
+        )
+    return False
 
 
 def _sources_from_facts(

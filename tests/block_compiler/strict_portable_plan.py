@@ -41,6 +41,21 @@ class _StepNode:
         return {"value.next": 1, "loop.done": True}
 
 
+class _GlobalStateNode:
+    NODE_INFO = NodeInfo(
+        "test.global_state",
+        "Global State",
+        "test",
+        "Changes audited ambient state.",
+        "1",
+        "global_state",
+    )
+    CONTRACT = NodeContract()
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
 def _registry() -> NodeRegistry:
     registry = NodeRegistry()
     registry.register("test.terminal", _TerminalNode, config_schema={}, config_defaults={})
@@ -49,6 +64,12 @@ def _registry() -> NodeRegistry:
         _StepNode,
         config_schema={"delta": {"type": "number"}},
         config_defaults={"delta": 1},
+    )
+    registry.register(
+        "test.global_state",
+        _GlobalStateNode,
+        config_schema={},
+        config_defaults={},
     )
     return registry
 
@@ -199,6 +220,53 @@ def test_execution_plan_adapter_is_frozen_serializable_and_preserves_nested_loop
     assert not _contains_python_binding(payload)
     with pytest.raises(FrozenInstanceError):
         plan.max_steps = 1
+
+
+def test_python_execution_plan_adapter_preserves_global_state_and_locks() -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "execution_lock": {"key": "trainer"},
+                "nodes": [
+                    {"id": "start", "type_used": "test.terminal"},
+                    {
+                        "id": "state",
+                        "type_used": "test.global_state",
+                        "execution_lock": {"key": "trainer"},
+                    },
+                    {"id": "end", "type_used": "test.terminal"},
+                ],
+                "edges": [["start", "state"], ["state", "end"]],
+            }
+        }
+    )
+    registry = _registry()
+    compiled = GraphCompiler().compile(graph, registry=registry)
+    execution_plan = build_execution_plan(
+        graph,
+        compiled,
+        registry=registry,
+    )
+
+    plan = execution_plan.to_workflow_plan()
+    root = plan.block(plan.entry_block)
+    state = root.node("state")
+
+    assert plan.abi_version == "vibeflow.workflow.v3"
+    assert plan.contains_global_state is True
+    assert plan.root_exclusive is True
+    assert plan.execution_lock.to_dict() == {
+        "key": "trainer",
+        "scope": "root",
+    }
+    assert root.contains_global_state is True
+    assert root.root_exclusive is True
+    assert state.effect_scope == "global_state"
+    assert state.contains_global_state is True
+    assert state.execution_lock.to_dict() == {
+        "key": "trainer",
+        "scope": "node",
+    }
 
 
 def test_graph_adapter_normalizes_routes_and_marks_legacy_input_requiredness_unknown() -> None:

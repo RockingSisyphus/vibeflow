@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from vibeflow.core.algorithms import strongly_connected_components
 from vibeflow.core.constants import (
+    EFFECT_SCOPE_GLOBAL_STATE,
+    EFFECT_SCOPE_NONE,
     FLOW_KIND_DECISION,
+    FLOW_KIND_GLOBAL_STATE,
     FLOW_KIND_IO,
     FLOW_KIND_PREDEFINED,
+    TARGET_FEATURE_EXECUTION_LOCKS,
+    TARGET_FEATURE_GLOBAL_STATE,
 )
 from vibeflow.core.contracts import provider_keys
 from vibeflow.core.flow import (
@@ -15,6 +20,7 @@ from vibeflow.core.flow import (
     EdgeSpec,
     GraphConfig,
     NodeSpec,
+    NodesetSpec,
 )
 from vibeflow.core.mainline import analyze_mainline
 from vibeflow.core.models import (
@@ -35,6 +41,9 @@ class CompiledGraph:
     providers: dict[str, str]
     consumers: dict[str, tuple[str, ...]]
     flow_kinds: dict[str, str]
+    effect_scopes: dict[str, str] = field(default_factory=dict)
+    contains_global_state: bool = False
+    root_exclusive: bool = False
     mainline_edges: tuple[EdgeSpec, ...] = ()
     data_bypass_edges: tuple[EdgeSpec, ...] = ()
     async_edges: tuple[EdgeSpec, ...] = ()
@@ -101,15 +110,44 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
         nodesets=nodesets,
     )
     providers = _collect_providers(
-        graph.nodes,
+        graph,
         input_keys=set(provider_keys(graph.inputs)),
     )
-    consumers = _collect_consumers(graph.nodes)
+    consumers = _collect_consumers(graph)
     effective_edges = _merge_edges(graph.edges)
     flow_kinds = _node_flow_kinds(
         nodes_by_name,
         implementations=implementations,
         nodesets=nodesets,
+    )
+    effect_scopes = {
+        node_id: (
+            EFFECT_SCOPE_GLOBAL_STATE
+            if flow_kind == FLOW_KIND_GLOBAL_STATE
+            else EFFECT_SCOPE_NONE
+        )
+        for node_id, flow_kind in flow_kinds.items()
+    }
+    implemented_global_state_nodes = _implemented_global_state_paths(
+        graph,
+        implementations=implementations,
+        known_nodesets=nodesets,
+    )
+    implemented_execution_lock_nodes = _implemented_execution_lock_paths(
+        graph,
+        known_nodesets=nodesets,
+    )
+    contains_global_state = bool(implemented_global_state_nodes)
+    _validate_execution_lock_nesting(
+        graph,
+        known_nodesets=nodesets,
+        owner=request.owner,
+    )
+    _validate_target_features(
+        graph,
+        target_features=request.target_features,
+        implemented_global_state_nodes=implemented_global_state_nodes,
+        implemented_execution_lock_nodes=implemented_execution_lock_nodes,
     )
     mainline = analyze_mainline(
         graph,
@@ -123,9 +161,19 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
         transfer_edges=mainline.transfer_edges,
     )
     _validate_async_result_routes(
-        graph.nodes,
+        graph,
         effective_edges=effective_edges,
         schedule_edges=mainline.schedule_edges,
+    )
+    _validate_protected_async_scope(
+        graph,
+        schedule_edges=mainline.schedule_edges,
+        protect_entire_graph=(
+            contains_global_state or graph.execution_lock is not None
+        ),
+        owner=request.owner,
+        implementations=implementations,
+        known_nodesets=nodesets,
     )
     _validate_no_explicit_cycles(
         nodes_by_name,
@@ -148,6 +196,11 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
         providers=providers,
         consumers=consumers,
         flow_kinds=flow_kinds,
+        effect_scopes=effect_scopes,
+        contains_global_state=contains_global_state,
+        root_exclusive=(
+            contains_global_state or graph.execution_lock is not None
+        ),
         mainline_edges=mainline.mainline_edges,
         data_bypass_edges=mainline.data_bypass_edges,
         async_edges=mainline.async_edges,
@@ -164,6 +217,49 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
         compiled_graph=compiled,
         findings=tuple(mainline.findings),
     )
+
+
+def _validate_target_features(
+    graph: GraphConfig,
+    *,
+    target_features: TargetFeatureSet,
+    implemented_global_state_nodes: frozenset[str],
+    implemented_execution_lock_nodes: frozenset[str],
+) -> None:
+    if (
+        implemented_global_state_nodes
+        and not target_features.supports(TARGET_FEATURE_GLOBAL_STATE)
+    ):
+        raise GraphCompileError(
+            (
+                f"target '{target_features.target}' does not support feature "
+                f"'{TARGET_FEATURE_GLOBAL_STATE}' required by implemented "
+                "global_state nodes"
+            ),
+            "TARGET.FEATURE.UNSUPPORTED",
+            details={
+                "target": target_features.target,
+                "feature": TARGET_FEATURE_GLOBAL_STATE,
+                "nodes": sorted(implemented_global_state_nodes),
+            },
+        )
+    if (
+        (graph.execution_lock is not None or implemented_execution_lock_nodes)
+        and not target_features.supports(TARGET_FEATURE_EXECUTION_LOCKS)
+    ):
+        raise GraphCompileError(
+            (
+                f"target '{target_features.target}' does not support feature "
+                f"'{TARGET_FEATURE_EXECUTION_LOCKS}' required by execution_lock"
+            ),
+            "TARGET.FEATURE.UNSUPPORTED",
+            details={
+                "target": target_features.target,
+                "feature": TARGET_FEATURE_EXECUTION_LOCKS,
+                "root": graph.execution_lock is not None,
+                "nodes": sorted(implemented_execution_lock_nodes),
+            },
+        )
 
 
 def _validate_node_types(
@@ -198,11 +294,15 @@ def _validate_node_types(
             )
 
 
-def _collect_providers(nodes: tuple[NodeSpec, ...], *, input_keys: set[str] | None = None) -> dict[str, str]:
+def _collect_providers(
+    graph: GraphConfig,
+    *,
+    input_keys: set[str] | None = None,
+) -> dict[str, str]:
     input_keys = input_keys or set()
     providers: dict[str, str] = {}
-    for node in nodes:
-        if node.status == STATUS_PLANNED:
+    for node in graph.nodes:
+        if not _node_is_executable(node, graph):
             continue
         for provider_spec in node.provides:
             key = provider_spec.key
@@ -214,10 +314,10 @@ def _collect_providers(nodes: tuple[NodeSpec, ...], *, input_keys: set[str] | No
     return providers
 
 
-def _collect_consumers(nodes: tuple[NodeSpec, ...]) -> dict[str, tuple[str, ...]]:
+def _collect_consumers(graph: GraphConfig) -> dict[str, tuple[str, ...]]:
     consumers: dict[str, list[str]] = {}
-    for node in nodes:
-        if node.status == STATUS_PLANNED:
+    for node in graph.nodes:
+        if not _node_is_executable(node, graph):
             continue
         for requirement in node.requires:
             consumers.setdefault(requirement.type, []).append(node.id)
@@ -292,14 +392,16 @@ def _validate_effective_edge_roles(
 
 
 def _validate_async_result_routes(
-    nodes: tuple[NodeSpec, ...],
+    graph: GraphConfig,
     *,
     effective_edges: tuple[EdgeSpec, ...],
     schedule_edges: tuple[EdgeSpec, ...],
 ) -> None:
     outgoing_sources = {edge.source for edge in effective_edges}
     scheduled_sources = {edge.source for edge in schedule_edges}
-    for node in nodes:
+    for node in graph.nodes:
+        if not _node_is_executable(node, graph):
+            continue
         if node.async_mode != "result_key":
             continue
         if node.id not in outgoing_sources or node.id in scheduled_sources:
@@ -320,6 +422,144 @@ def _validate_async_result_routes(
                 ),
             },
         )
+
+
+def _validate_protected_async_scope(
+    graph: GraphConfig,
+    *,
+    schedule_edges: tuple[EdgeSpec, ...],
+    protect_entire_graph: bool,
+    owner: str,
+    implementations: ImplementationFacts,
+    known_nodesets: set[str],
+    nodeset_registry: dict[str, NodesetSpec] | None = None,
+    active_nodesets: frozenset[str] = frozenset(),
+) -> None:
+    local_registry = dict(nodeset_registry or {})
+    local_registry.update(graph.nodesets)
+    available_nodesets = set(known_nodesets) | set(local_registry)
+    protected = {
+        node.id
+        for node in graph.nodes
+        if protect_entire_graph or node.execution_lock is not None
+    }
+    for node in graph.nodes:
+        if not _node_is_executable(
+            node,
+            graph,
+            nodeset_registry=local_registry,
+        ):
+            continue
+        if (
+            node.id in protected
+            and node.async_mode == "detached"
+        ):
+            raise GraphCompileError(
+                (
+                    f"{owner} is protected by global_state or execution_lock; "
+                    f"node '{node.id}' cannot use async='detached'"
+                ),
+                "GRAPH.EXECUTION_LOCK.DETACHED_FORBIDDEN",
+                details={
+                    "owner": owner,
+                    "node": node.id,
+                    "async": node.async_mode,
+                },
+            )
+        if (
+            node.id in protected
+            and node.async_mode == "result_key"
+            and not _has_static_result_consumer(
+                graph,
+                node,
+                schedule_edges=schedule_edges,
+            )
+        ):
+            raise GraphCompileError(
+                (
+                    f"{owner} is protected by global_state or execution_lock; "
+                    f"async result_key node '{node.id}' has no statically "
+                    "provable scheduled consumer path"
+                ),
+                "GRAPH.EXECUTION_LOCK.RESULT_UNJOINABLE",
+                details={
+                    "owner": owner,
+                    "node": node.id,
+                    "async": node.async_mode,
+                    "result_key": node.result_key,
+                },
+            )
+        target = _executed_nodeset_target(node, local_registry)
+        if not target or target in active_nodesets:
+            continue
+        nodeset = local_registry.get(target)
+        if nodeset is None or nodeset.status == STATUS_PLANNED:
+            continue
+        child_graph = nodeset.graph
+        child_effective_edges = _merge_edges(child_graph.edges)
+        child_flow_kinds = _node_flow_kinds(
+            {child.id: child for child in child_graph.nodes},
+            implementations=implementations,
+            nodesets=available_nodesets,
+        )
+        child_mainline = analyze_mainline(
+            child_graph,
+            child_effective_edges,
+            child_flow_kinds,
+            owner=f"{owner}.{node.id}",
+        )
+        _validate_protected_async_scope(
+            child_graph,
+            schedule_edges=child_mainline.schedule_edges,
+            protect_entire_graph=(
+                protect_entire_graph
+                or node.execution_lock is not None
+                or child_graph.execution_lock is not None
+            ),
+            owner=f"{owner}.{node.id}",
+            implementations=implementations,
+            known_nodesets=available_nodesets,
+            nodeset_registry=local_registry,
+            active_nodesets=active_nodesets | {target},
+        )
+
+
+def _has_static_result_consumer(
+    graph: GraphConfig,
+    source: NodeSpec,
+    *,
+    schedule_edges: tuple[EdgeSpec, ...],
+) -> bool:
+    result_provider = next(
+        (item for item in source.provides if item.key == source.result_key),
+        None,
+    )
+    if result_provider is None:
+        return False
+    adjacency: dict[str, set[str]] = {}
+    for edge in schedule_edges:
+        if not edge.when:
+            adjacency.setdefault(edge.source, set()).add(edge.target)
+    nodes_by_id = {node.id: node for node in graph.nodes}
+    pending = list(sorted(adjacency.get(source.id, ())))
+    seen: set[str] = set()
+    while pending:
+        node_id = pending.pop(0)
+        if node_id in seen:
+            continue
+        seen.add(node_id)
+        candidate = nodes_by_id.get(node_id)
+        if candidate is not None and any(
+            requirement.type == result_provider.type
+            for requirement in candidate.requires
+        ):
+            return True
+        pending.extend(
+            target
+            for target in sorted(adjacency.get(node_id, ()))
+            if target not in seen
+        )
+    return False
 
 
 def explicit_flow_cycles(nodes_by_name: dict[str, NodeSpec], edges: tuple[EdgeSpec, ...], *, owner: str = "pipeline") -> tuple[dict[str, object], ...]:
@@ -421,6 +661,242 @@ def _node_flow_kinds(
             continue
         kinds[name] = implementation.flow_kind
     return kinds
+
+
+def _implemented_global_state_paths(
+    graph: GraphConfig,
+    *,
+    implementations: ImplementationFacts,
+    known_nodesets: set[str],
+) -> frozenset[str]:
+    """Return qualified executable global-state nodes across nested blocks.
+
+    Planned call sites and planned nodeset definitions are architecture-only,
+    so their complete descendant trees are excluded from execution facts.
+    The active-definition guard keeps malformed recursive nodeset graphs from
+    recursing forever; the normal dependency validation still reports cycles.
+    """
+
+    return frozenset(
+        _collect_implemented_global_state_paths(
+            graph,
+            implementations=implementations,
+            known_nodesets=known_nodesets,
+            nodeset_registry=graph.nodesets,
+            path=(),
+            active_nodesets=frozenset(),
+        )
+    )
+
+
+def _collect_implemented_global_state_paths(
+    graph: GraphConfig,
+    *,
+    implementations: ImplementationFacts,
+    known_nodesets: set[str],
+    nodeset_registry: dict[str, NodesetSpec],
+    path: tuple[str, ...],
+    active_nodesets: frozenset[str],
+) -> set[str]:
+    local_registry = dict(nodeset_registry)
+    local_registry.update(graph.nodesets)
+    available_nodesets = set(known_nodesets) | set(local_registry)
+    flow_kinds = _node_flow_kinds(
+        {node.id: node for node in graph.nodes},
+        implementations=implementations,
+        nodesets=available_nodesets,
+    )
+    found: set[str] = set()
+    for node in graph.nodes:
+        if not _node_is_executable(
+            node,
+            graph,
+            nodeset_registry=local_registry,
+        ):
+            continue
+        node_path = (*path, node.id)
+        if flow_kinds.get(node.id) == FLOW_KIND_GLOBAL_STATE:
+            found.add(".".join(node_path))
+        target = _executed_nodeset_target(node, local_registry)
+        if not target or target in active_nodesets:
+            continue
+        nodeset = local_registry.get(target)
+        if nodeset is None or nodeset.status == STATUS_PLANNED:
+            continue
+        found.update(
+            _collect_implemented_global_state_paths(
+                nodeset.graph,
+                implementations=implementations,
+                known_nodesets=available_nodesets,
+                nodeset_registry=local_registry,
+                path=node_path,
+                active_nodesets=active_nodesets | {target},
+            )
+        )
+    return found
+
+
+def _implemented_execution_lock_paths(
+    graph: GraphConfig,
+    *,
+    known_nodesets: set[str],
+) -> frozenset[str]:
+    return frozenset(
+        _collect_implemented_execution_lock_paths(
+            graph,
+            known_nodesets=known_nodesets,
+            nodeset_registry=graph.nodesets,
+            path=(),
+            active_nodesets=frozenset(),
+        )
+    )
+
+
+def _validate_execution_lock_nesting(
+    graph: GraphConfig,
+    *,
+    known_nodesets: set[str],
+    owner: str,
+    inherited_key: str = "",
+    nodeset_registry: dict[str, NodesetSpec] | None = None,
+    path: tuple[str, ...] = (),
+    active_nodesets: frozenset[str] = frozenset(),
+) -> None:
+    """Require nested lock scopes to reuse their active ancestor key."""
+
+    local_registry = dict(nodeset_registry or {})
+    local_registry.update(graph.nodesets)
+    available_nodesets = set(known_nodesets) | set(local_registry)
+    graph_key = graph.execution_lock.key if graph.execution_lock is not None else ""
+    active_key = _nested_execution_lock_key(
+        inherited_key,
+        graph_key,
+        subject=(owner if not path else f"block '{'.'.join(path)}'"),
+    )
+    for node in graph.nodes:
+        if not _node_is_executable(
+            node,
+            graph,
+            nodeset_registry=local_registry,
+        ):
+            continue
+        node_path = (*path, node.id)
+        node_key = (
+            node.execution_lock.key if node.execution_lock is not None else ""
+        )
+        nested_key = _nested_execution_lock_key(
+            active_key,
+            node_key,
+            subject=f"node '{'.'.join(node_path)}'",
+        )
+        target = _executed_nodeset_target(node, local_registry)
+        if not target or target in active_nodesets:
+            continue
+        nodeset = local_registry.get(target)
+        if nodeset is None or nodeset.status == STATUS_PLANNED:
+            continue
+        _validate_execution_lock_nesting(
+            nodeset.graph,
+            known_nodesets=available_nodesets,
+            owner=owner,
+            inherited_key=nested_key,
+            nodeset_registry=local_registry,
+            path=node_path,
+            active_nodesets=active_nodesets | {target},
+        )
+
+
+def _nested_execution_lock_key(
+    current: str,
+    requested: str,
+    *,
+    subject: str,
+) -> str:
+    if current and requested and current != requested:
+        raise GraphCompileError(
+            (
+                f"{subject} nests execution_lock key '{requested}' inside "
+                f"incompatible key '{current}'; nested locks must reuse one key"
+            ),
+            "GRAPH.EXECUTION_LOCK.NESTED_KEY_CONFLICT",
+            details={
+                "subject": subject,
+                "parent_key": current,
+                "child_key": requested,
+            },
+        )
+    return requested or current
+
+
+def _collect_implemented_execution_lock_paths(
+    graph: GraphConfig,
+    *,
+    known_nodesets: set[str],
+    nodeset_registry: dict[str, NodesetSpec],
+    path: tuple[str, ...],
+    active_nodesets: frozenset[str],
+) -> set[str]:
+    local_registry = dict(nodeset_registry)
+    local_registry.update(graph.nodesets)
+    available_nodesets = set(known_nodesets) | set(local_registry)
+    found: set[str] = set()
+    for node in graph.nodes:
+        if not _node_is_executable(
+            node,
+            graph,
+            nodeset_registry=local_registry,
+        ):
+            continue
+        node_path = (*path, node.id)
+        qualified_node = ".".join(node_path)
+        if node.execution_lock is not None:
+            found.add(qualified_node)
+        target = _executed_nodeset_target(node, local_registry)
+        if not target or target in active_nodesets:
+            continue
+        nodeset = local_registry.get(target)
+        if nodeset is None or nodeset.status == STATUS_PLANNED:
+            continue
+        if nodeset.graph.execution_lock is not None:
+            found.add(qualified_node)
+        found.update(
+            _collect_implemented_execution_lock_paths(
+                nodeset.graph,
+                known_nodesets=available_nodesets,
+                nodeset_registry=local_registry,
+                path=node_path,
+                active_nodesets=active_nodesets | {target},
+            )
+        )
+    return found
+
+
+def _executed_nodeset_target(
+    node: NodeSpec,
+    nodeset_registry: dict[str, NodesetSpec],
+) -> str:
+    if node.type_used in nodeset_registry:
+        return node.type_used
+    if node.type_used in LOOP_NODE_TYPES:
+        return node.loop.body
+    return ""
+
+
+def _node_is_executable(
+    node: NodeSpec,
+    graph: GraphConfig,
+    *,
+    nodeset_registry: dict[str, NodesetSpec] | None = None,
+) -> bool:
+    if node.status == STATUS_PLANNED:
+        return False
+    local_registry = dict(nodeset_registry or {})
+    local_registry.update(graph.nodesets)
+    target = _executed_nodeset_target(node, local_registry)
+    if not target:
+        return True
+    nodeset = local_registry.get(target)
+    return nodeset is None or nodeset.status != STATUS_PLANNED
 
 
 __all__ = [

@@ -9,7 +9,7 @@
     "display_name": { "type": "string", "minLength": 1 },
     "description": { "type": "string", "minLength": 1 },
     "status": { "enum": ["planned", "implemented"] },
-    "flow_kind": { "enum": ["terminal", "process", "decision", "io", "predefined", "data_store", "document", "preparation"] },
+    "flow_kind": { "enum": ["terminal", "process", "decision", "io", "predefined", "data_store", "document", "preparation", "global_state"] },
     "planned_behavior": {
       "oneOf": [
         { "enum": ["blocking", "transparent"] },

@@ -15,6 +15,29 @@
         "description": "Runs start."
       },
       {
+        "execution_lock": {
+          "key": "sandbox.runtime.mode"
+        },
+        "requires": [
+          {
+            "type": "value.in",
+            "cardinality": "exactly_one",
+            "display_name": "Value In"
+          }
+        ],
+        "provides": [
+          {
+            "key": "value.in.runtime",
+            "type": "value.in",
+            "display_name": "Value In Runtime"
+          }
+        ],
+        "id": "runtime_mode",
+        "type_used": "sandbox.configure_runtime_mode",
+        "display_name": "Runtime Mode",
+        "description": "Configures audited process-local ambient state."
+      },
+      {
         "requires": [
           {
             "type": "value.in",
@@ -214,6 +237,10 @@
       },
       {
         "from": "input",
+        "to": "runtime_mode"
+      },
+      {
+        "from": "runtime_mode",
         "to": "prepare"
       },
       {

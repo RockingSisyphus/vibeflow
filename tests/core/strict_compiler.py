@@ -1,6 +1,7 @@
 from tests.fixtures.support.strict_support import *
 
 import time
+from xml.etree import ElementTree
 
 
 class RouteNode:
@@ -39,6 +40,33 @@ class ExternalVisualNode:
 
     def run_pure(self, inputs, params):
         return {}
+
+
+class GlobalVisualNode:
+    NODE_INFO = NodeInfo(
+        type_key="test.global_visual",
+        display_name="Global Visual",
+        category="test",
+        description="Exercises global-state cloud styling.",
+        version="0.1.0",
+        flow_kind="global_state",
+    )
+    CONTRACT = NodeContract()
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
+class ExternalGlobalVisualNode(GlobalVisualNode):
+    NODE_INFO = NodeInfo(
+        type_key="test.external_global_visual",
+        display_name="External Global Visual",
+        category="test",
+        description="Exercises external boundaries on a cloud shape.",
+        version="0.1.0",
+        flow_kind="global_state",
+        external=True,
+    )
 
 
 def test_compiler_merges_duplicate_explicit_edges_with_when() -> None:
@@ -1373,6 +1401,182 @@ def test_planned_nodes_compile_without_registry_and_render_as_architecture() -> 
     assert "---------- status ----------" in text
     assert "planned" in text
     assert "class a plannedNode;" in text
+
+
+def test_global_state_uses_cloud_shape_and_keeps_visual_styles(tmp_path) -> None:
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call(
+                        "runtime_state",
+                        "future.runtime_state",
+                        "Declares a future ambient-state operation.",
+                        status="planned",
+                        flow_kind="global_state",
+                        style={
+                            "fill": "#ddeeff",
+                            "stroke": "#224466",
+                            "text": "#112233",
+                        },
+                    ),
+                    _node_call(
+                        "normal_process",
+                        "future.normal_process",
+                        "Provides a rectangular geometry control.",
+                        status="planned",
+                        flow_kind="process",
+                    ),
+                ],
+                "edges": [{"from": "runtime_state", "to": "normal_process"}],
+            }
+        }
+    )
+
+    mermaid = export_mermaid(graph)
+
+    assert 'runtime_state@{ shape: cloud, label: "Runtime State' in mermaid
+    assert "effect_scope: global_state" in mermaid
+    assert "class runtime_state plannedNode;" in mermaid
+    assert "class runtime_state vibeflowCloudNode;" in mermaid
+    assert (
+        "style runtime_state fill:#ddeeff,stroke:#224466,color:#112233;"
+        in mermaid
+    )
+
+    if not is_mermaid_svg_renderer_available():
+        pytest.skip("Mermaid SVG renderer is not installed")
+    svg_path = tmp_path / "global-state.svg"
+    render_mermaid_svg(mermaid, svg_path)
+    svg = svg_path.read_text(encoding="utf-8")
+    assert "runtime_state" in svg
+    document = ElementTree.parse(svg_path)
+    groups = {
+        group.attrib.get("id", ""): group
+        for group in document.getroot().iter()
+        if group.tag.endswith("}g")
+    }
+    cloud = next(
+        group for identifier, group in groups.items()
+        if "runtime_state" in identifier
+    )
+    process = next(
+        group for identifier, group in groups.items()
+        if "normal_process" in identifier
+    )
+    assert any(child.tag.endswith("}path") for child in cloud)
+    assert not any(child.tag.endswith("}rect") for child in cloud)
+    assert any(child.tag.endswith("}rect") for child in process)
+    cloud_label = next(
+        child
+        for child in list(cloud)
+        if child.tag.endswith("}g") and "label" in child.attrib.get("class", "").split()
+    )
+    assert cloud_label.attrib["transform"].startswith("translate(0, ")
+
+
+def test_global_state_cloud_survives_health_external_and_custom_styles(
+    tmp_path,
+) -> None:
+    registry = _registry()
+    register_node(registry, "test.global_visual", GlobalVisualNode)
+    register_node(
+        registry,
+        "test.external_global_visual",
+        ExternalGlobalVisualNode,
+    )
+    graph = parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    _node_call(
+                        "warning_cloud",
+                        "test.global_visual",
+                        "Keeps cloud geometry under a health warning.",
+                    ),
+                    _node_call(
+                        "error_external_cloud",
+                        "test.external_global_visual",
+                        "Keeps cloud geometry under error and external styles.",
+                    ),
+                    _node_call(
+                        "custom_cloud",
+                        "test.global_visual",
+                        "Keeps cloud geometry under custom colors.",
+                        style={
+                            "fill": "#ddeeff",
+                            "stroke": "#224466",
+                            "text": "#112233",
+                        },
+                    ),
+                ]
+            }
+        }
+    )
+    report = HealthReport(
+        status="FAIL",
+        errors=(
+            HealthFinding(
+                rule_id="TEST.ERROR",
+                severity="error",
+                object_type="node",
+                object_id="error_external_cloud",
+                message="fixture error",
+            ),
+        ),
+        warnings=(
+            HealthFinding(
+                rule_id="TEST.WARNING",
+                severity="warning",
+                object_type="node",
+                object_id="warning_cloud",
+                message="fixture warning",
+            ),
+        ),
+    )
+
+    mermaid = export_mermaid(
+        graph,
+        registry=registry,
+        health_report=report,
+    )
+
+    for node_id in (
+        "warning_cloud",
+        "error_external_cloud",
+        "custom_cloud",
+    ):
+        assert f"{node_id}@{{ shape: cloud" in mermaid
+    assert "class warning_cloud healthWarning;" in mermaid
+    assert "class error_external_cloud healthError;" in mermaid
+    assert "class error_external_cloud externalBoundary;" in mermaid
+    assert (
+        "style custom_cloud fill:#ddeeff,stroke:#224466,color:#112233;"
+        in mermaid
+    )
+
+    if not is_mermaid_svg_renderer_available():
+        pytest.skip("Mermaid SVG renderer is not installed")
+    svg_path = tmp_path / "global-state-combinations.svg"
+    render_mermaid_svg(mermaid, svg_path)
+    document = ElementTree.parse(svg_path)
+    node_groups = [
+        group
+        for group in document.getroot().iter()
+        if group.tag.endswith("}g")
+        and any(
+            node_id in group.attrib.get("id", "")
+            for node_id in (
+                "warning_cloud",
+                "error_external_cloud",
+                "custom_cloud",
+            )
+        )
+    ]
+    assert len(node_groups) == 3
+    for group in node_groups:
+        assert any(child.tag.endswith("}path") for child in group)
+        assert not any(child.tag.endswith("}rect") for child in group)
 
 
 def test_implemented_node_cannot_declare_config_flow_kind() -> None:

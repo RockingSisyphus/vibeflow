@@ -35,6 +35,8 @@ AI 仍然负责写业务代码，但它必须按流程图开发：每个节点�
 
 ![VibeFlow comprehensive flowchart](docs/assets/comprehensive_flowchart.svg)
 
+示例中的云形节点表示语言无关的 `global_state` 语义，并显示其派生 effect scope 与命名 execution lock；对应的正式导出 Mermaid 源码见 [comprehensive_flowchart.mmd](docs/assets/comprehensive_flowchart.mmd)。
+
 ## 适合谁 👥
 
 - 使用 OpenCode、Codex、Claude Code 等 vibe coding 工具长期开发项目的人。

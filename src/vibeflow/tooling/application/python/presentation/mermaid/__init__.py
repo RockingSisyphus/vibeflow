@@ -7,6 +7,7 @@ from typing import Any, Mapping
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
 from vibeflow.tooling.application.python.presentation.helpers import compile_for_render, node_flow_kind, node_is_external, nodeset_for_node
+from vibeflow.tooling.application.python.presentation.review_model import node_review_effect_scope
 
 from vibeflow.tooling.application.python.presentation.mermaid.labels import (
     _async_semantic_lines,
@@ -32,7 +33,7 @@ from vibeflow.tooling.application.python.presentation.mermaid.labels import (
     _source_lines,
 )
 from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, NodeSpec, NodesetSpec, STATUS_PLANNED
-from vibeflow.core.constants import FLOW_KIND_DATA_STORE, FLOW_KIND_DECISION, FLOW_KIND_DOCUMENT, FLOW_KIND_IO, FLOW_KIND_PREDEFINED, FLOW_KIND_PREPARATION, FLOW_KIND_PROCESS, FLOW_KIND_TERMINAL
+from vibeflow.core.constants import EFFECT_SCOPE_GLOBAL_STATE, EFFECT_SCOPE_NONE, FLOW_KIND_DATA_STORE, FLOW_KIND_DECISION, FLOW_KIND_DOCUMENT, FLOW_KIND_GLOBAL_STATE, FLOW_KIND_IO, FLOW_KIND_PREDEFINED, FLOW_KIND_PREPARATION, FLOW_KIND_PROCESS, FLOW_KIND_TERMINAL
 from vibeflow.core.planned import effective_planned_behavior, planned_behavior_label
 from vibeflow.targets.python.runtime.helpers import has_planned, planned_items
 from vibeflow.tooling.application.python.presentation.style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
@@ -45,6 +46,7 @@ MERMAID_LAYOUT_DEFAULT = "default"
 MERMAID_LAYOUT_REVIEW_COLUMNS = "review-columns"
 _MERMAID_LAYOUTS = {MERMAID_LAYOUT_DEFAULT, MERMAID_LAYOUT_REVIEW_COLUMNS}
 _SECTION_SEPARATOR_WIDTH = 10
+_MERMAID_CLOUD_NODE_CLASS = "vibeflowCloudNode"
 
 
 def export_mermaid(
@@ -85,6 +87,12 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
                 "status": node.status,
                 "planned_behavior": node.planned_behavior.to_dict(),
                 "flow_kind": node_flow_kind(node, compiled),
+                "effect_scope": compiled.effect_scopes.get(node.id, EFFECT_SCOPE_NONE),
+                "execution_lock": (
+                    node.execution_lock.to_dict()
+                    if node.execution_lock is not None
+                    else None
+                ),
                 "metadata": node.metadata.to_dict(),
                 "style": node.style.to_dict(),
                 "similar_to": node.similar_to.to_dict(),
@@ -116,6 +124,13 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
         ],
         "planned": [dict(item) for item in planned_items(graph)],
         "production_ready": not has_planned(graph),
+        "execution_lock": (
+            graph.execution_lock.to_dict()
+            if graph.execution_lock is not None
+            else None
+        ),
+        "contains_global_state": compiled.contains_global_state,
+        "root_exclusive": compiled.root_exclusive,
     }
     if graph.root_id or graph.root_path or graph.source_path:
         payload["graph_source"] = {"root_id": graph.root_id, "root_path": graph.root_path, "source_path": graph.source_path}
@@ -220,6 +235,8 @@ class _MermaidRenderer:
                 lines.append(f"{indent}{_node_shape(node_id, self._node_label(node, graph, is_external=is_external), flow_kind)}")
                 if class_name:
                     lines.append(f"{indent}class {node_id} {class_name};")
+                if flow_kind == FLOW_KIND_GLOBAL_STATE:
+                    lines.append(f"{indent}class {node_id} {_MERMAID_CLOUD_NODE_CLASS};")
                 if is_external:
                     lines.append(f"{indent}class {node_id} externalBoundary;")
                 self._render_custom_node_style(lines, node, node_id, indent=indent)
@@ -231,6 +248,8 @@ class _MermaidRenderer:
             lines.append(f"{indent}{_node_shape(node_id, label, flow_kind, shape='trap-b' if is_loop else '')}")
             if class_name:
                 lines.append(f"{indent}class {node_id} {class_name};")
+            if flow_kind == FLOW_KIND_GLOBAL_STATE:
+                lines.append(f"{indent}class {node_id} {_MERMAID_CLOUD_NODE_CLASS};")
             self._render_custom_node_style(lines, node, node_id, indent=indent)
             if not should_expand:
                 continue
@@ -424,7 +443,7 @@ class _MermaidRenderer:
                 planned_lines.append(f"stub: {node.planned_behavior.stub_module}")
             sections.append(planned_lines)
         if self.show_semantics:
-            semantic_lines = self._node_semantic_lines(node, is_external=is_external)
+            semantic_lines = self._node_semantic_lines(node, graph, is_external=is_external)
             if semantic_lines:
                 sections.append([_section_label("meta"), *semantic_lines])
         return _join_label_sections(sections)
@@ -446,7 +465,11 @@ class _MermaidRenderer:
                 planned_lines.append(f"stub: {behavior.stub_module}")
             sections.append(planned_lines)
         if self.show_semantics:
-            call_lines = (*_node_metadata_lines(node), *_async_semantic_lines(node))
+            call_lines = (
+                *_node_metadata_lines(node),
+                *_async_semantic_lines(node),
+                *_execution_lock_lines(node),
+            )
             if call_lines:
                 sections.append([_section_label("call"), *call_lines])
             sections.append(
@@ -473,7 +496,11 @@ class _MermaidRenderer:
         loop_lines = [_section_label("loop"), f"body: {nodeset.type_key}", f"stop: {_loop_stop_text(spec)}", f"max: {maximum}"]
         sections.append(loop_lines)
         if self.show_semantics:
-            call_lines = (*_node_metadata_lines(node), *_async_semantic_lines(node))
+            call_lines = (
+                *_node_metadata_lines(node),
+                *_async_semantic_lines(node),
+                *_execution_lock_lines(node),
+            )
             if call_lines:
                 sections.append([_section_label("meta"), *call_lines])
         return _join_label_sections(sections)
@@ -506,7 +533,7 @@ class _MermaidRenderer:
             sections.append([_section_label("data"), f"data: {data_text}"])
         return _join_label_sections(sections)
 
-    def _node_semantic_lines(self, node: NodeSpec, *, is_external: bool) -> tuple[str, ...]:
+    def _node_semantic_lines(self, node: NodeSpec, graph: GraphConfig, *, is_external: bool) -> tuple[str, ...]:
         lines = list(_node_metadata_lines(node))
         if self.registry is not None and node.status != STATUS_PLANNED:
             try:
@@ -524,6 +551,20 @@ class _MermaidRenderer:
                     if text:
                         lines.append(f"{label}: {text}")
         lines.extend(_async_semantic_lines(node))
+        effect_scope = (
+            EFFECT_SCOPE_GLOBAL_STATE
+            if node.flow_kind == FLOW_KIND_GLOBAL_STATE
+            else node_review_effect_scope(graph, node, self.registry)
+        )
+        if effect_scope != EFFECT_SCOPE_NONE:
+            lines.append(f"effect_scope: {effect_scope}")
+        lines.extend(_execution_lock_lines(node))
         if is_external:
             lines.append("external: true")
         return tuple(lines)
+
+
+def _execution_lock_lines(node: NodeSpec) -> tuple[str, ...]:
+    if node.execution_lock is None:
+        return ()
+    return (f"execution_lock: {node.execution_lock.key}",)

@@ -35,6 +35,8 @@ This SVG was exported from a complete integration sandbox example. Throughout AI
 
 ![VibeFlow comprehensive flowchart](docs/assets/comprehensive_flowchart.svg)
 
+The cloud-shaped node demonstrates the language-neutral `global_state` semantic together with its derived effect scope and named execution lock. The formally exported Mermaid source is [comprehensive_flowchart.mmd](docs/assets/comprehensive_flowchart.mmd).
+
 ## Who It Is For 👥
 
 - Developers using OpenCode, Codex, Claude Code, or other vibe coding tools for long-running projects.

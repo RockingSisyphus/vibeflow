@@ -102,6 +102,42 @@ def test_config_resource_schema_rejects_invalid_status_and_plugin_config() -> No
     assert "CONFIG.SCHEMA.GLOBAL_CONFIG_VALUES" in nodeset_flag_rule_ids
 
 
+def test_config_schema_validates_pipeline_and_node_execution_locks() -> None:
+    valid = collect_config_schema_findings(
+        {
+            "pipeline": {
+                **_seed_only_pipeline(),
+                "execution_lock": {"key": "trainer"},
+            }
+        }
+    )
+    assert not {
+        finding.rule_id
+        for finding in valid
+        if "EXECUTION_LOCK" in finding.rule_id
+    }
+
+    invalid = collect_config_schema_findings(
+        {
+            "pipeline": {
+                **_seed_only_pipeline(),
+                "execution_lock": {"key": "vibeflow.internal", "mode": "x"},
+                "nodes": [
+                    {
+                        "id": "seed",
+                        "type_used": "test.seed",
+                        "execution_lock": {"key": ""},
+                    }
+                ],
+            }
+        }
+    )
+    rule_ids = {finding.rule_id for finding in invalid}
+    assert "CONFIG.SCHEMA.EXECUTION_LOCK_FIELD" in rule_ids
+    assert "CONFIG.SCHEMA.EXECUTION_LOCK_RESERVED" in rule_ids
+    assert "CONFIG.SCHEMA.EXECUTION_LOCK_KEY" in rule_ids
+
+
 def test_config_resources_global_config_plugins_base_lib_and_mermaid(tmp_path) -> None:
     _write_base_lib_info_module(tmp_path, "math_tools")
     (tmp_path / "base_lib" / "future_tools.py").write_text(

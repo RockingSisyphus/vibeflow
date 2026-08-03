@@ -1004,7 +1004,14 @@ def test_runtime_options_boundary_trace_records_only_boundaries() -> None:
     context = runtime.run({})
 
     assert context.get("value.in")["value"] == 1
-    assert [event["kind"] for event in _runtime_trace_events_from_context(context)] == ["run_start", "type_resolve", "run_end"]
+    assert [event["kind"] for event in _runtime_trace_events_from_context(context)] == [
+        "lock_wait",
+        "lock_acquired",
+        "run_start",
+        "type_resolve",
+        "run_end",
+        "lock_released",
+    ]
     assert runtime.trace.exec_order == ["start", "seed", "end"]
     assert runtime.trace.current_node == "end"
 
@@ -1043,7 +1050,7 @@ def test_runtime_options_compiled_executes_linear_block(monkeypatch) -> None:
     assert context.get("value.out")["value"] == 5
     assert list(context.get("runtime.exec_order")) == ["start", "seed", "add", "end"]
     assert context.get("runtime.edge_executions") == {"start->seed": 1, "seed->add": 1, "add->end": 1}
-    assert [event["kind"] for event in _runtime_trace_events_from_context(context)] == ["run_start", "block_enter", "type_resolve", "type_resolve", "block_exit", "run_end"]
+    assert [event["kind"] for event in _runtime_trace_events_from_context(context)] == ["lock_wait", "lock_acquired", "run_start", "block_enter", "type_resolve", "type_resolve", "block_exit", "run_end", "lock_released"]
 
 
 def test_runtime_options_compiled_runs_generated_block_when_node_hooks_enabled(monkeypatch) -> None:
@@ -1068,7 +1075,7 @@ def test_runtime_options_compiled_runs_generated_block_when_node_hooks_enabled(m
     ).run({})
 
     assert context.get("value.out")["value"] == 5
-    assert [event["kind"] for event in _runtime_trace_events_from_context(context)] == ["run_start", "block_enter", "type_resolve", "type_resolve", "block_exit", "run_end"]
+    assert [event["kind"] for event in _runtime_trace_events_from_context(context)] == ["lock_wait", "lock_acquired", "run_start", "block_enter", "type_resolve", "type_resolve", "block_exit", "run_end", "lock_released"]
     assert calls == [
         ("before", "start"),
         ("after", "start"),
@@ -1091,7 +1098,7 @@ def test_runtime_options_compiled_full_trace_records_node_events(monkeypatch) ->
     assert context.get("value.out")["value"] == 5
     events = _runtime_trace_events_from_context(context)
     event_kinds = [event["kind"] for event in events]
-    assert event_kinds == ["block_enter", "node", "node", "type_resolve", "node", "type_resolve", "node", "block_exit"]
+    assert event_kinds == ["lock_wait", "lock_acquired", "block_enter", "node", "node", "type_resolve", "node", "type_resolve", "node", "block_exit", "lock_released"]
     assert [event["node"] for event in events if event["kind"] == "node"] == ["start", "seed", "add", "end"]
     assert not context.exists("runtime.events")
     assert context.get("runtime.event_count") == len(events)
@@ -1119,8 +1126,8 @@ def test_runtime_options_compiled_failure_records_node_and_block_failed() -> Non
 
     assert runtime.trace.current_node == "bad"
     events = [line for line in _runtime_trace_lines(Path(runtime.trace.trace_path)) if line["kind"] != "runtime_summary"]
-    assert [event["kind"] for event in events] == ["run_start", "block_enter", "node_failed", "block_failed"]
-    assert "boom" in events[2]["failure"]
+    assert [event["kind"] for event in events] == ["lock_wait", "lock_acquired", "run_start", "block_enter", "node_failed", "block_failed", "lock_released"]
+    assert "boom" in events[4]["failure"]
 
 
 def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
@@ -2153,12 +2160,20 @@ def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, ca
     for name in ("compiled_graph.json", "health_report.json", "graph.txt", "graph.mmd", "runtime_trace.jsonl", "output_summary.json"):
         assert (run_dir / name).exists()
     trace_kinds = [json.loads(line)["kind"] for line in (run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
-    assert trace_kinds == ["run_start", "block_enter", "type_resolve", "block_exit", "run_end", "runtime_summary"]
+    assert trace_kinds == ["lock_wait", "lock_acquired", "run_start", "block_enter", "type_resolve", "block_exit", "run_end", "lock_released", "runtime_summary"]
     assert plan_code == 0
     assert plan_payload["status"] in {"PASS", "CONCERNS"}
     plan_run_dir = Path(plan_payload["run_dir"])
     plan_trace_kinds = [json.loads(line)["kind"] for line in (plan_run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
-    assert plan_trace_kinds == ["run_start", "type_resolve", "run_end", "runtime_summary"]
+    assert plan_trace_kinds == [
+        "lock_wait",
+        "lock_acquired",
+        "run_start",
+        "type_resolve",
+        "run_end",
+        "lock_released",
+        "runtime_summary",
+    ]
     if is_mermaid_svg_renderer_available():
         assert (run_dir / "graph.svg").exists()
 

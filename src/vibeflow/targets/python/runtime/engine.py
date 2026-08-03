@@ -28,12 +28,13 @@ from vibeflow.targets.python.runtime.node_mixin import RuntimeNodeMixin
 from vibeflow.targets.python.runtime.nodeset_mixin import RuntimeNodesetMixin
 from vibeflow.targets.python.runtime.output_mixin import RuntimeOutputMixin
 from vibeflow.targets.python.runtime.trace_mixin import RuntimeTraceMixin
+from vibeflow.targets.python.runtime.execution_lock_mixin import RuntimeExecutionLockMixin
 from vibeflow.targets.python.runtime.support.contract_mixin import RuntimeContractMixin
 from vibeflow.targets.python.runtime.types import _RuntimeState
 from vibeflow.targets.python.runtime.summaries import summarize_mapping
 
 
-class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, RuntimeAsyncMixin, RuntimeOutputMixin, RuntimeTraceMixin):
+class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, RuntimeAsyncMixin, RuntimeOutputMixin, RuntimeTraceMixin, RuntimeExecutionLockMixin):
     def __init__(
         self,
         graph: GraphConfig,
@@ -81,6 +82,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         self._trace_sink: RuntimeTraceSink | None = None
         self._trace_path_prefix: tuple[str, ...] = ()
         self._capabilities = dict(capabilities or {})
+        self._reset_execution_lock_state()
 
     def _assert_planned_runtime_allowed(self, graph: GraphConfig) -> None:
         if not has_planned(graph):
@@ -118,6 +120,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         runtime.runtime_options = parent.runtime_options
         runtime.delegate_cli = parent.delegate_cli
         runtime._capabilities = parent._capabilities
+        runtime._reset_execution_lock_state()
         return runtime
 
     def run(self, initial: Mapping[str, Any] | None = None) -> RunResult:
@@ -129,7 +132,10 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         self._reset_run_state()
         initial_values = initial or {}
         state = self._new_state(initial_values)
+        lease_started = False
         try:
+            self._begin_execution_lease()
+            lease_started = True
             self._validate_public_inputs(initial_values)
             self._record_run_boundary("run_start")
             self._call_runtime_plugins("before_run", dict(initial_values))
@@ -144,6 +150,11 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
             else:
                 self._abandon_async_results()
             self._flush_detached()
+            # A protected result must have been consumed through its declared
+            # join before a successful root can publish outputs or success
+            # hooks. This also closes conservative static-analysis gaps such
+            # as an early terminal path abandoning a result task.
+            self._drain_protected_tasks(fail_on_unjoined=True)
             self.trace.stop_reason = self.trace.stop_reason or "completed"
             self._finalize_pipeline_outputs(state)
             self._record_run_boundary("run_end")
@@ -177,11 +188,11 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
                 ).to_input(),
             )
             self._write_trace(state.result)
-        except Exception as exc:
+        except BaseException as exc:
             self._abandon_async_results()
             try:
                 self._flush_detached(exit_in_progress=True)
-            except Exception:
+            except BaseException:
                 # The original framework failure remains authoritative. Detached
                 # failures are already represented by their runtime events, and
                 # a later business exit must never replace the original error.
@@ -189,17 +200,51 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
             self._record_runtime_failure(state, exc)
             raise
         finally:
-            if owns_trace_sink and self._trace_sink is not None:
-                self._trace_sink.write_summary(self.trace)
-                self._trace_sink.close()
-                self._trace_sink = None
-            self._shutdown_executor()
+            root_scope_protected = self._execution_scope_is_protected()
+            has_protected_futures = bool(self._protected_futures)
+            try:
+                if has_protected_futures:
+                    self._drain_protected_tasks()
+            finally:
+                try:
+                    self._shutdown_executor(
+                        force_wait=root_scope_protected
+                    )
+                finally:
+                    try:
+                        try:
+                            # A protected worker can begin after the main scheduler
+                            # has already entered failure handling. Re-check only
+                            # after every managed task is drained, while the lease is
+                            # still held, so that late ambient-state changes are not
+                            # silently omitted from the trace.
+                            if self.trace.exception:
+                                self._record_global_state_change_warning(
+                                    self.trace.exception
+                                )
+                        finally:
+                            # Observability is not allowed to own the lock
+                            # lifecycle. Even if recording the state-change warning
+                            # fails, every acquired domain and its ContextVars must
+                            # still be released/reset before this run can escape.
+                            if lease_started:
+                                self._end_execution_lease()
+                                # The release event is part of the public runtime trace.
+                                # Refresh the returned trace metadata only after the
+                                # lease has actually been released so event_count and
+                                # streamed events describe the same completed run.
+                                self._write_trace(state.result)
+                    finally:
+                        if owns_trace_sink and self._trace_sink is not None:
+                            self._trace_sink.write_summary(self.trace)
+                            self._trace_sink.close()
+                            self._trace_sink = None
         return state.result
 
     def _record_runtime_failure(
         self,
         state: _RuntimeState,
-        exc: Exception,
+        exc: BaseException,
         *,
         force_node_failed: bool = False,
     ) -> None:
@@ -208,8 +253,36 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         else:
             self.trace.stop_reason = self.trace.stop_reason or "node_failed"
         self.trace.exception = str(exc)
+        self._record_global_state_change_warning(str(exc))
         self._write_trace(state.result)
         self._call_runtime_plugins("run_failed", state.result.to_dict(), self.trace.to_dict(), str(exc))
+
+    def _record_global_state_change_warning(self, failure: str) -> None:
+        lease = self._lease
+        changed_nodes = (
+            list(lease.global_state_nodes)
+            if lease is not None
+            else list(self._global_state_nodes)
+        )
+        if changed_nodes and (
+            lease is None or not lease.state_change_reported
+        ):
+            self._record_runtime_event(
+                "global_state_may_have_changed",
+                (
+                    self._global_state_nodes[-1]
+                    if self._global_state_nodes
+                    else changed_nodes[-1]
+                ),
+                "global_state",
+                failure=failure,
+                details={
+                    **self._lease_details(),
+                    "nodes": changed_nodes,
+                },
+            )
+            if lease is not None:
+                lease.state_change_reported = True
 
     def _reset_run_state(self) -> None:
         self.trace = RuntimeTrace(trace_path=str(self._trace_file_path()))
@@ -218,6 +291,9 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         self._detached = []
         self._detached_timeout = False
         self._abandoned_async_results = False
+        self._protected_futures = []
+        self._global_state_started = False
+        self._global_state_nodes = []
 
     def _trace_file_path(self) -> Path:
         if self._trace_sink is not None:
@@ -396,24 +472,26 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         state.inboxes[node_name] = []
         if frame.async_mode:
             outputs = self._run_async_node(frame, inputs)
-        elif frame.is_io:
-            outputs = self._run_io_node(frame, inputs)
-        elif frame.is_planned_stub:
-            outputs = self._run_planned_stub_node(frame, inputs)
-        elif frame.is_loop:
-            if self.runtime_options.execution == "block":
-                outputs = self._run_loop_block_node(frame, inputs)
-            elif self.runtime_options.execution == "compiled" and loop_block(self._plan, frame.name) is not None:
-                outputs = self._run_loop_block_node(frame, inputs)
-            else:
-                outputs = self._run_loop_node(frame, inputs)
-        elif frame.is_nodeset:
-            if self.runtime_options.execution == "compiled" and nodeset_block(self._plan, frame.name) is not None:
-                outputs = self._run_nodeset_block_node(frame, inputs)
-            else:
-                outputs = self._run_nodeset_node(frame, inputs)
         else:
-            outputs = self._run_pure_node(frame, inputs)
+            with self._frame_execution_scope(frame):
+                if frame.is_io:
+                    outputs = self._run_io_node(frame, inputs)
+                elif frame.is_planned_stub:
+                    outputs = self._run_planned_stub_node(frame, inputs)
+                elif frame.is_loop:
+                    if self.runtime_options.execution == "block":
+                        outputs = self._run_loop_block_node(frame, inputs)
+                    elif self.runtime_options.execution == "compiled" and loop_block(self._plan, frame.name) is not None:
+                        outputs = self._run_loop_block_node(frame, inputs)
+                    else:
+                        outputs = self._run_loop_node(frame, inputs)
+                elif frame.is_nodeset:
+                    if self.runtime_options.execution == "compiled" and nodeset_block(self._plan, frame.name) is not None:
+                        outputs = self._run_nodeset_block_node(frame, inputs)
+                    else:
+                        outputs = self._run_nodeset_node(frame, inputs)
+                else:
+                    outputs = self._run_pure_node(frame, inputs)
         self._record_node_output_candidates(node_name, outputs, state)
         return outputs
 

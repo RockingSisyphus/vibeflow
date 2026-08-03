@@ -12,7 +12,7 @@ from vibeflow.core.contracts import (
     provider_keys,
 )
 from vibeflow.core.flow import (
-    EdgeSpec, GraphConfig, GraphConfigError, JOIN_POLICIES, JOIN_POLICY_SAFE_ANY, JOIN_POLICY_ALL, JOIN_POLICY_ANY_ACTIVE,
+    EdgeSpec, ExecutionLockSpec, GraphConfig, GraphConfigError, JOIN_POLICIES, JOIN_POLICY_SAFE_ANY, JOIN_POLICY_ALL, JOIN_POLICY_ANY_ACTIVE,
     ENTRY_MODES, ENTRY_MODE_SYNC,
     IO_NODE_TYPE, IO_OPERATIONS, IoSpec, LOOP_NODE_TYPES, LOOP_WHILE_TYPE, LoopCarrySpec, LoopCollectSpec, LoopOutputSpec, LoopSpec, LoopStopWhenSpec,
     NodeMetadata, NodeSimilarity, NodeSpec, NodeStyle, NodesetSpec, SIMILAR_TO_RELATIONSHIPS, STATUSES, STATUS_IMPLEMENTED, STATUS_PLANNED,
@@ -99,6 +99,10 @@ def _parse_graph_body(
         raw.get("entry_mode", ENTRY_MODE_SYNC),
         field=f"{field}.entry_mode",
     )
+    execution_lock = _parse_execution_lock(
+        raw.get("execution_lock"),
+        field=f"{field}.execution_lock",
+    )
 
     for edge in edges:
         if edge.source not in names or edge.target not in names:
@@ -115,6 +119,7 @@ def _parse_graph_body(
         root_id=root_id,
         root_path=root_path,
         source_path=source_path,
+        execution_lock=execution_lock,
     )
 
 
@@ -167,7 +172,11 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         async_mode=async_mode,
         field=f"pipeline.nodes[{index}].io",
     )
-    reserved = {"id", "type_used", "requires", "provides", "config", "node_configs", "allow_config_override", "override_child_config", "status", "flow_kind", "planned_behavior", "async", "result_key", "display_name", "description", "style", "similar_to", "join_policy", "loop", "io"}
+    execution_lock = _parse_execution_lock(
+        item.get("execution_lock"),
+        field=f"pipeline.nodes[{index}].execution_lock",
+    )
+    reserved = {"id", "type_used", "requires", "provides", "config", "node_configs", "allow_config_override", "override_child_config", "status", "flow_kind", "planned_behavior", "async", "result_key", "execution_lock", "display_name", "description", "style", "similar_to", "join_policy", "loop", "io"}
     return NodeSpec(
         id=node_id,
         type_used=type_used,
@@ -187,6 +196,7 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         planned_behavior=planned_behavior,
         async_mode=async_mode,
         result_key=result_key,
+        execution_lock=execution_lock,
     )
 
 
@@ -356,6 +366,25 @@ def _parse_bool(value: Any, *, field: str) -> bool:
     if isinstance(value, bool):
         return value
     raise GraphConfigError(f"{field} must be a boolean")
+
+
+def _parse_execution_lock(value: Any, *, field: str) -> ExecutionLockSpec | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise GraphConfigError(f"{field} must be an object")
+    unknown = sorted(set(str(key) for key in value) - {"key"})
+    if unknown:
+        raise GraphConfigError(f"{field} contains unsupported keys: {unknown}")
+    key = value.get("key")
+    if not isinstance(key, str) or not key.strip():
+        raise GraphConfigError(f"{field}.key must be a non-empty string")
+    normalized = key.strip()
+    if normalized.startswith("vibeflow."):
+        raise GraphConfigError(
+            f"{field}.key uses reserved prefix 'vibeflow.'"
+        )
+    return ExecutionLockSpec(normalized)
 
 
 def _parse_mapping(value: Any, *, field: str) -> dict[str, Any]:

@@ -77,7 +77,13 @@ esbuild。完整 TypeScript 类型、lint、平台 API 兼容性和业务结果�
 
 CLI 让渡模式 / `delegate-cli` 用于把 workflow 当成普通业务 CLI。首个 `--` 可选地分隔 core 与业务参数；让渡 token 以 `cli.argv` 进入图，图以唯一 `cli.exit_code` 返回非 bool 整数 `0..255`。业务使用真实 stdin/stdout/stderr，VibeFlow 诊断只写当次 run 的 `vibeflow.log`。授权 `SystemExit(None)` 返回 0，合法整数原样返回；框架/未授权退出错误返回 1，已知 core 参数的 argparse 错误返回 2。详细终端/IO/授权规则见 `kernel/docs/07_启动命令与报告.md`。`run` 与 `review` 的原职责不变。
 
-副作用权限由内核派生：普通 implemented node 和 planned `python_stub` 是 `none`；`flow_kind=io` 是 `terminal`；`document` / `data_store` 是 `python_io`；任意 `external=True` node 和 plugin 是最高优先级 `trusted`。图形 `flow_kind=terminal` 仍是 `none`。effectful / external node 的 examples 只检查结构，不执行。
+副作用权限由内核派生：普通 implemented node 和 planned `python_stub` 是 `none`；`flow_kind=io` 是 `terminal`；`document` / `data_store` 是 `python_io`；`flow_kind=global_state` 是 `global_state`；任意 `external=True` node 和 plugin 是最高优先级 `trusted`。图形 `flow_kind=terminal` 仍是 `none`。effectful / external node 的 examples 只检查结构，不执行。
+
+`global_state` 是语言无关的 Core 语义，不是一个 `vibeflow.global_state` 系统 node；项目继续自行实现并注册自己的 node。它只额外允许 Target execution domain 内的易失 ambient state，Python Target 将该域实现为当前解释器进程。文件、环境变量、网络、数据库、终端、subprocess、线程/进程创建、动态代码、动态 import 和直接 FFI 仍不允许。普通对象继续经 envelope / contract 按引用传递，不会因为 `global_state` 获得另一套对象通道或 Provider。
+
+含 implemented `global_state` 的 Python root run 会自动使用进程级 shared/exclusive execution lease：普通 run 可彼此并发，global-state run 独占同一域。需要串行化其他业务资源时，可在 `pipeline.execution_lock` 或 `pipeline.nodes[].execution_lock` 写 `{"key": "project.resource"}`；锁只协调执行，不增加权限。key 必须静态非空，`vibeflow.` 前缀保留；同一 lease 嵌套同 key 可重入，嵌套不同 key 会失败。锁覆盖 hooks、嵌套 block 和受保护异步收尾；保护范围内禁止 detached，`result_key` 必须有可证明的 join 路径。
+
+global-state 修改默认持久且非事务；成功、失败或取消后都不自动恢复或 rollback。需要临时修改时，在同一个 node 内用 `try/finally` 恢复。公共计划 ABI 是 `vibeflow.workflow.v3`，旧 v2 计划需从源 config 重新生成。JavaScript Target v1 可以在 Architecture/Mermaid/SVG 中展示 planned global-state/lock，但会拒绝 implemented 执行。图中 `global_state` 固定使用 Mermaid `cloud` 形状并显示 effect scope / execution lock，不显示 Provider 权限；boundary/full trace 会记录 lock wait/acquire/release，失败风险以 `global_state_may_have_changed` 提示。
 
 ## 读取 Python Runtime 真实运行结果
 
@@ -145,7 +151,7 @@ pipeline config 不再声明 `policy`，但必须声明本 workflow 实际使用
 }
 ```
 
-`run` 会在 `runs/<run_id>/` 自动写出快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`。external implemented node 在原有形状上使用 `[EXTERNAL]` 标题和 `7px` non-scaling 粗边框。expanded SVG 只在同一父图内合并调用种类和 `type_key` 都相同的直接 nodeset 详情，父图调用点和连边不删除，不同父图分别展开。VibeFlow 命令内部使用 bundled Mermaid CLI 渲染 SVG；Mermaid CLI/mmdc 是实现细节，不是公开审核入口。普通单项 `svg` 命令保留图形导出/诊断参数，正式架构审核则使用参数固定的 `review`。
+`run` 会在 `runs/<run_id>/` 自动写出快速图 `graph.svg` 和详细审查图 `graph.expanded.svg`。external implemented node 在原有形状上使用 `[EXTERNAL]` 标题和 `7px` non-scaling 粗边框；`global_state` 在所有图形模式中保持 `cloud` 形状。expanded SVG 只在同一父图内合并调用种类和 `type_key` 都相同的直接 nodeset 详情，父图调用点和连边不删除，不同父图分别展开。VibeFlow 命令内部使用 bundled Mermaid CLI 渲染 SVG；Mermaid CLI/mmdc 是实现细节，不是公开审核入口。普通单项 `svg` 命令保留图形导出/诊断参数，正式架构审核则使用参数固定的 `review`。
 
 `run` 还会在当次运行目录写出预期的 `architecture.jsonc` 供审计，但不会替你覆盖 root 中登记的 `python_project/ARCHITECTURE.jsonc`。
 

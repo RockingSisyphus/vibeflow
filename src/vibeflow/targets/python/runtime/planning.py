@@ -6,9 +6,20 @@ from typing import Any, Mapping
 from vibeflow.targets.python.runtime.block_compiler import CompiledBlock, compile_blocks
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.contracts import DataProvider, DataRequirement, provider_keys, requirement_types
-from vibeflow.core.flow import EdgeSpec, GraphConfig, IO_NODE_TYPE, IoSpec, LOOP_NODE_TYPES, LoopSpec, NodeSpec
+from vibeflow.core.flow import (
+    EdgeSpec,
+    GraphConfig,
+    IO_NODE_TYPE,
+    IoSpec,
+    LOOP_NODE_TYPES,
+    LoopSpec,
+    NodeSpec,
+    STATUS_IMPLEMENTED,
+    STATUS_PLANNED,
+)
 from vibeflow.core.nodeset_dependencies import nodeset_depth_violations
-from vibeflow.core.constants import FLOW_KIND_PREDEFINED
+from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE, FLOW_KIND_PREDEFINED
+from vibeflow.core.flow import ExecutionLockSpec
 from vibeflow.targets.python.project.node import PureNode
 from vibeflow.targets.python.project.bindings import PythonBindingPlan
 from vibeflow.core.planned import (
@@ -48,6 +59,7 @@ class NodeFrame:
     flow_kind: str
     is_terminal: bool
     is_nodeset: bool
+    status: str = STATUS_IMPLEMENTED
     transfer_incoming: tuple[EdgeSpec, ...] = ()
     transfer_outgoing: tuple[EdgeSpec, ...] = ()
     is_loop: bool = False
@@ -59,6 +71,7 @@ class NodeFrame:
     io_spec: IoSpec = field(default_factory=IoSpec)
     async_mode: str = ""
     result_key: str = ""
+    execution_lock: ExecutionLockSpec | None = None
     subplan: "ExecutionPlan | None" = None
     planned_behavior: PlannedBehavior = field(default_factory=blocking_planned_behavior)
     planned_stub_module: str = ""
@@ -80,6 +93,10 @@ class NodeFrame:
     @property
     def is_planned_stub(self) -> bool:
         return self.planned_behavior.kind == PLANNED_BEHAVIOR_PYTHON_STUB
+
+    @property
+    def is_planned(self) -> bool:
+        return self.status == STATUS_PLANNED
 
     @property
     def require_types(self) -> tuple[str, ...]:
@@ -109,6 +126,8 @@ class ExecutionPlan:
     compiled_block_by_entry: Mapping[str, CompiledBlock] | None = None
     compiled_node_to_block: Mapping[str, CompiledBlock] | None = None
     python_bindings: PythonBindingPlan = field(default_factory=lambda: PythonBindingPlan(block_id="block:/"))
+    contains_global_state: bool = False
+    contains_execution_locks: bool = False
 
     def frame(self, name: str) -> NodeFrame:
         return self.frames[name]
@@ -201,7 +220,11 @@ def build_execution_plan(
         order=order,
         max_steps=graph.max_steps,
         python_bindings=python_bindings,
+        contains_global_state=_frames_contain_global_state(frames),
+        contains_execution_locks=_frames_contain_execution_locks(frames)
+        or graph.execution_lock is not None,
     )
+    _validate_execution_lock_scopes(plan)
     blocks = compile_blocks(plan, runtime_options=runtime_options)
     block_by_entry = {block.entry: block for block in blocks}
     node_to_block = {node: block for block in blocks for node in block.nodes}
@@ -217,6 +240,8 @@ def build_execution_plan(
         compiled_blocks=blocks,
         compiled_block_by_entry=block_by_entry,
         compiled_node_to_block=node_to_block,
+        contains_global_state=plan.contains_global_state,
+        contains_execution_locks=plan.contains_execution_locks,
     )
 
 
@@ -241,9 +266,19 @@ def _frame_for(
     is_io = spec.type_used == IO_NODE_TYPE
     is_nodeset = spec.type_used in graph.nodesets and not is_loop
     nodeset_type_key = spec.type_used if is_nodeset else ""
-    nodeset = graph.nodesets.get(nodeset_type_key) if is_nodeset else None
+    nodeset = (
+        graph.nodesets.get(spec.loop.body)
+        if is_loop
+        else graph.nodesets.get(nodeset_type_key) if is_nodeset else None
+    )
     flow_kind = compiled.flow_kinds.get(spec.id, "")
     planned_behavior = effective_planned_behavior(spec, nodeset)
+    frame_status = (
+        STATUS_PLANNED
+        if spec.status == STATUS_PLANNED
+        or getattr(nodeset, "status", STATUS_IMPLEMENTED) == STATUS_PLANNED
+        else STATUS_IMPLEMENTED
+    )
     if planned_behavior.kind == PLANNED_BEHAVIOR_PYTHON_STUB:
         return _planned_stub_frame(
             spec,
@@ -258,6 +293,7 @@ def _frame_for(
             behavior=planned_behavior,
             overrides=overrides,
             global_scope=global_scope,
+            status=frame_status,
         )
     if is_loop:
         nodeset = graph.nodesets[spec.loop.body]
@@ -280,6 +316,7 @@ def _frame_for(
             flow_kind=flow_kind or FLOW_KIND_PREDEFINED,
             is_terminal=False,
             is_nodeset=False,
+            status=frame_status,
             is_loop=True,
             join_policy=spec.join_policy,
             nodeset_type_key=nodeset.type_key,
@@ -287,6 +324,7 @@ def _frame_for(
             loop_spec=spec.loop,
             async_mode=spec.async_mode,
             result_key=spec.result_key,
+            execution_lock=spec.execution_lock,
             subplan=build_execution_plan(
                 nodeset.graph,
                 subcompiled,
@@ -319,11 +357,13 @@ def _frame_for(
             flow_kind=flow_kind or FLOW_KIND_PREDEFINED,
             is_terminal=False,
             is_nodeset=True,
+            status=frame_status,
             join_policy=spec.join_policy,
             nodeset_type_key=nodeset_type_key,
             exports=nodeset.provides,
             async_mode=spec.async_mode,
             result_key=spec.result_key,
+            execution_lock=spec.execution_lock,
             subplan=build_execution_plan(
                 nodeset.graph,
                 subcompiled,
@@ -350,9 +390,11 @@ def _frame_for(
             flow_kind=flow_kind,
             is_terminal=True,
             is_nodeset=False,
+            status=frame_status,
             is_io=True,
             join_policy=spec.join_policy,
             io_spec=spec.io,
+            execution_lock=spec.execution_lock,
         )
     node_cls = registry.get(spec.type_used)
     node = node_cls()
@@ -373,9 +415,11 @@ def _frame_for(
         flow_kind=flow_kind,
         is_terminal=flow_kind == "terminal",
         is_nodeset=False,
+        status=frame_status,
         join_policy=spec.join_policy,
         async_mode=spec.async_mode,
         result_key=spec.result_key,
+        execution_lock=spec.execution_lock,
     )
 
 
@@ -393,6 +437,7 @@ def _planned_stub_frame(
     behavior: PlannedBehavior,
     overrides: Mapping[str, Mapping[str, Any]],
     global_scope: ConfigScope,
+    status: str,
 ) -> NodeFrame:
     params = {**dict(spec.params), **dict(global_scope.values), **dict(overrides.get(spec.id, {}))}
     stub_path = ""
@@ -419,16 +464,130 @@ def _planned_stub_frame(
         flow_kind=flow_kind,
         is_terminal=flow_kind == "terminal",
         is_nodeset=nodeset is not None,
+        status=status,
         join_policy=spec.join_policy,
         nodeset_type_key=nodeset_type_key,
         exports=exports,
         async_mode=spec.async_mode,
         result_key=spec.result_key,
+        execution_lock=spec.execution_lock,
         planned_behavior=behavior,
         planned_stub_module=behavior.stub_module,
         planned_stub_path=stub_path,
         planned_stub_hash=stub_hash,
     )
+
+
+def _frames_contain_global_state(frames: Mapping[str, NodeFrame]) -> bool:
+    return any(
+        not frame.is_planned
+        and (
+            frame.flow_kind == FLOW_KIND_GLOBAL_STATE
+            or (
+                frame.subplan is not None
+                and frame.subplan.contains_global_state
+            )
+        )
+        for frame in frames.values()
+    )
+
+
+def _frames_contain_execution_locks(frames: Mapping[str, NodeFrame]) -> bool:
+    return any(
+        not frame.is_planned
+        and (
+            frame.execution_lock is not None
+            or (
+                frame.subplan is not None
+                and frame.subplan.contains_execution_locks
+            )
+        )
+        for frame in frames.values()
+    )
+
+
+def _validate_execution_lock_scopes(
+    plan: ExecutionPlan,
+    *,
+    inherited_key: str = "",
+    protected: bool = False,
+) -> None:
+    root_key = plan.graph.execution_lock.key if plan.graph.execution_lock else ""
+    active_key = _nested_lock_key(inherited_key, root_key, subject="pipeline")
+    root_protected = protected or bool(root_key) or plan.contains_global_state
+    for frame in plan.frames.values():
+        frame_key = (
+            frame.execution_lock.key
+            if frame.execution_lock is not None and not frame.is_planned
+            else ""
+        )
+        nested_key = _nested_lock_key(
+            active_key,
+            frame_key,
+            subject=f"node '{frame.name}'",
+        )
+        frame_protected = root_protected or bool(frame_key)
+        if frame_protected and frame.async_mode == "detached":
+            raise PipelineRuntimeError(
+                f"protected execution scope cannot contain detached node '{frame.name}'"
+            )
+        if (
+            frame_protected
+            and frame.async_mode == "result_key"
+            and not _frame_has_static_result_consumer(plan, frame)
+        ):
+            raise PipelineRuntimeError(
+                f"protected execution scope cannot contain unjoined result_key node '{frame.name}'"
+            )
+        if frame.subplan is not None:
+            _validate_execution_lock_scopes(
+                frame.subplan,
+                inherited_key=nested_key,
+                protected=frame_protected,
+            )
+
+
+def _frame_has_static_result_consumer(
+    plan: ExecutionPlan,
+    source: NodeFrame,
+) -> bool:
+    provider = next(
+        (item for item in source.provides if item.key == source.result_key),
+        None,
+    )
+    if provider is None:
+        return False
+    pending = [
+        edge.target for edge in source.outgoing if not edge.when
+    ]
+    seen: set[str] = set()
+    while pending:
+        node_name = pending.pop(0)
+        if node_name in seen:
+            continue
+        seen.add(node_name)
+        candidate = plan.frames.get(node_name)
+        if candidate is None:
+            continue
+        if any(item.type == provider.type for item in candidate.requires):
+            return True
+        pending.extend(
+            edge.target
+            for edge in candidate.outgoing
+            if not edge.when and edge.target not in seen
+        )
+    return False
+
+
+def _nested_lock_key(current: str, requested: str, *, subject: str) -> str:
+    if not requested:
+        return current
+    if current and current != requested:
+        raise PipelineRuntimeError(
+            f"{subject} cannot acquire execution lock '{requested}' while "
+            f"'{current}' is held"
+        )
+    return requested
 
 
 def _compile_nodeset(graph: GraphConfig, *, registry: NodeRegistry, owner: str) -> CompiledGraph:

@@ -7,6 +7,10 @@ from typing import TYPE_CHECKING, Mapping
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.flow import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, LoopSpec, NodeSpec, NodesetSpec, STATUS_PLANNED
 from vibeflow.targets.python.project.node import EFFECT_SCOPE_NONE, effective_effect_scope
+from vibeflow.core.constants import (
+    EFFECT_SCOPE_GLOBAL_STATE,
+    FLOW_KIND_GLOBAL_STATE,
+)
 
 if TYPE_CHECKING:
     from vibeflow.targets.python.project.registry import NodeRegistry
@@ -99,7 +103,13 @@ def node_flow_kind(node: NodeSpec, compiled: CompiledGraph) -> str:
 def node_review_effect_scope(graph: GraphConfig, node: NodeSpec, registry: NodeRegistry | None) -> str:
     """Return a review-safe scope; planned and composite calls never gain effects."""
 
-    if node.status == STATUS_PLANNED or node.type_used in LOOP_NODE_TYPES or invocation_for_node(graph, node) is not None:
+    if node.status == STATUS_PLANNED:
+        return (
+            EFFECT_SCOPE_GLOBAL_STATE
+            if node.flow_kind == FLOW_KIND_GLOBAL_STATE
+            else EFFECT_SCOPE_NONE
+        )
+    if node.type_used in LOOP_NODE_TYPES or invocation_for_node(graph, node) is not None:
         return EFFECT_SCOPE_NONE
     if node.type_used == IO_NODE_TYPE:
         return "terminal"

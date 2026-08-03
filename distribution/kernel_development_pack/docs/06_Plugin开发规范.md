@@ -2,7 +2,7 @@
 
 Plugin 用于扩展策略、编译和单次运行 hook，类型固定为 `policy`、`compiler`、`runtime`。Core 只处理 descriptor、selection、依赖和 Planned 状态；Python 与 JavaScript Target 分别绑定自己的实现，不能跨 Target 复用语言对象。
 
-Python Plugin 使用 `effect_scope=trusted`，可以执行 Python IO，并由当前 workflow 项目承担信任责任。JS/TS Plugin 使用 `vibeflow.plugin.v1` 和静态 import/Promise 审计。两者都不能绕过契约、拓扑或内核硬规则。
+Python Plugin 使用 `effect_scope=trusted`，可以执行 Python IO，并由当前 workflow 项目承担信任责任。JS/TS Plugin 使用 `vibeflow.plugin.v1` 和静态 import/Promise 审计。两者都不能绕过契约、拓扑或内核硬规则，也不能授予、替代或降级 `global_state` / execution-lock 语义。
 
 ## Python Target：注册和启用
 
@@ -313,6 +313,12 @@ Runtime plugin 适合记录观测数据、附加 trace、统计耗时或上报�
 `after_run` / `run_failed` 收到的 `trace_dict` 是运行摘要，包含 `event_count`、`trace_path` 和 `events_streamed=true`；完整事件流请从 `runtime_trace.jsonl` 逐行读取，不要读取 `trace_dict["events"]`。
 
 这些 hook 是否执行受 `RuntimeOptions` 和 CLI runtime flags 控制，例如 `--node-hooks/--no-node-hooks`。
+
+## Plugin 与 global_state / execution lock
+
+Plugin 是显式 `trusted` callback 边界，不是权限 Provider。Policy Plugin 不能把普通 node 改成 global-state scope，Compiler Plugin 不能删除 `contains_global_state` 或 lock plan，Runtime Plugin 也不能用 hook、布尔变量或手写锁替代 Architecture 中的显式并发语义。项目需要修改运行域的易失 ambient state 时，仍应实现 `flow_kind="global_state"` node；需要串行化业务资源时，仍应在 pipeline 或调用点声明静态 `execution_lock`。锁只协调执行，不增加 plugin 或 node 的副作用权限。
+
+含 implemented global-state 的 Python root run 会在 `before_run` 之前取得独占 execution lease，并在成功/失败 hook 和受保护异步收尾结束后释放。因此 runtime hook 在该 lease 内执行，但这只是生命周期保护，不会把 plugin 变成 global-state node，也不代表框架会自动恢复已改变的进程态。
 
 ## Python Finding Plugin
 

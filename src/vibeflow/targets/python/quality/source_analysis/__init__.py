@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass
 from typing import Any, Mapping
 
 from vibeflow.core.contracts import DataProvider, DataRequirement
 from vibeflow.targets.python.project.node import EFFECT_SCOPE_NONE, EFFECT_SCOPE_TRUSTED, NodeContract, NodeInfo, PureNode, effective_effect_scope
+from vibeflow.targets.python.quality.source_analysis.ast_rules import import_aliases_from_node, imported_module_roots
 from vibeflow.targets.python.quality.source_analysis.helpers import _dedupe_violations, _violation
 from vibeflow.targets.python.quality.source_analysis.metrics import _ComplexityCounter, _analyze_internal_call_chain
 from vibeflow.targets.python.quality.source_analysis.source import _parse_source, _source_info
@@ -32,6 +34,9 @@ class _ClassVisitorContext:
     known_node_modules: tuple[str, ...]
     known_node_class_names: tuple[str, ...]
     effect_scope: str
+    module_aliases: dict[str, str]
+    imported_roots: set[str]
+    module_state_names: set[str]
 
 
 def validate_node_class(
@@ -71,7 +76,19 @@ def validate_node_class(
     if isinstance(info, NodeInfo) and isinstance(contract, NodeContract) and _contract_items_valid(contract):
         violations.extend(_validate_architecture_smells(info, contract, source=source, metrics=metrics))
 
-    visitor_context = _ClassVisitorContext(class_tree, contract, policy, source, known_node_modules, known_node_class_names, effect_scope)
+    module_aliases, imported_roots, module_state_names = _module_import_context(source)
+    visitor_context = _ClassVisitorContext(
+        class_tree,
+        contract,
+        policy,
+        source,
+        known_node_modules,
+        known_node_class_names,
+        effect_scope,
+        module_aliases,
+        imported_roots,
+        module_state_names,
+    )
     _append_class_visitor_violations(visitor_context, violations)
 
     if scan_module:
@@ -113,9 +130,45 @@ def _append_class_visitor_violations(context: _ClassVisitorContext, violations: 
         known_node_class_names=context.known_node_class_names,
         line_offset=context.source.class_start_line - 1,
         effect_scope=context.effect_scope,
+        initial_aliases=context.module_aliases,
+        imported_roots=context.imported_roots,
+        module_state_names=context.module_state_names,
     )
     visitor.visit(context.class_tree)
     violations.extend(visitor.violations)
+
+
+def _module_import_context(source) -> tuple[dict[str, str], set[str], set[str]]:
+    if not source.module_text:
+        return {}, set(), set()
+    module_tree = _parse_source(source.module_text, source=source)
+    if not isinstance(module_tree, ast.Module):
+        return {}, set(), set()
+    aliases: dict[str, str] = {}
+    roots: set[str] = set()
+    state_names: set[str] = set()
+    for statement in module_tree.body:
+        if isinstance(statement, (ast.Import, ast.ImportFrom)):
+            aliases.update(import_aliases_from_node(statement))
+            roots.update(imported_module_roots(statement))
+        elif isinstance(statement, ast.Assign):
+            for target in statement.targets:
+                state_names.update(_bound_names(target))
+        elif isinstance(statement, ast.AnnAssign):
+            state_names.update(_bound_names(statement.target))
+    state_names.difference_update({"BASE_LIB_INFO", "CONTRACT", "NODE_INFO", "PLUGIN_INFO"})
+    return aliases, roots, state_names
+
+
+def _bound_names(target: ast.AST) -> set[str]:
+    if isinstance(target, ast.Name):
+        return {target.id}
+    if isinstance(target, (ast.List, ast.Tuple)):
+        names: set[str] = set()
+        for item in target.elts:
+            names.update(_bound_names(item))
+        return names
+    return set()
 
 
 def _contract_items_valid(contract: NodeContract) -> bool:

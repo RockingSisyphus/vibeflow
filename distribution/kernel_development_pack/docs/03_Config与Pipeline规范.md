@@ -165,6 +165,8 @@ workspace 模式下，node registry 按 `roots` 顺序加载，但 Python node �
 
 `pipeline.entry_mode` 允许 `sync | async`，缺省 `sync`。它决定 JS AOT 的公共入口：同步构建导出直接返回值的 `runWorkflow()`，异步构建导出 `runWorkflowAsync()`。需要 suspend Node/Capability、deferred/result_key、detached 或原生 `receive` 的 JS workflow 必须显式写 `async`。Python `runtime.run()` 阻塞返回，异步任务由 Python Target 的线程执行器处理。
 
+Core 编译产物的公共 ABI 是 `vibeflow.workflow.v3`，包含节点 `effect_scope`、workflow/block/node 的 `execution_lock`、`contains_global_state` 与适用层级的 `root_exclusive`。旧 `vibeflow.workflow.v2` 计划不会按缺省字段静默升级，必须从真实 workflow config 重新生成。
+
 Python 项目在 `registry.py` 注册可用 base_lib 和 Plugin；JS/TS 项目在
 `descriptors.plugins` 登记 `vibeflow.plugin.v1` 实现。两条路径都由 workflow
 顶层 `plugins` 按 ID 选择，不内联语言实现。
@@ -271,6 +273,7 @@ nodeset 也可以声明自己的 `global_config`。外部 nodeset JSONC 文件�
 - `type_used`：本次调用使用的实现类型键，可以是 Python node 的 `NodeInfo.type_key`、独立 nodeset 文件的 `type_key`，或系统类型如 `vibeflow.loop.while`。
 - `status`：可选，`implemented` 或 `planned`，默认 `implemented`。
 - `flow_kind`：只允许 planned node 使用；implemented node 的 flow_kind 来自 registry 中的 `NODE_INFO`。它与 `external` 一起决定派生的 `effect_scope`，不能在调用点自由改写。
+- `execution_lock`：可选的 Core 命名执行锁，格式为 `{"key": "project.resource"}`；保护该 node 调用，调用 nodeset/loop 时保护完整子 block。它是架构元数据，不进入 `params`，也不授予副作用权限。
 - `display_name`：本次调用的易读名，用于 Mermaid/SVG label。调用点没写会产生 `GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME` warning。
 - `description`：本次调用的说明，用于 Mermaid/SVG label。调用点没写会产生 `GRAPH.SMELL.MISSING_NODE_DESCRIPTION` warning。
 - `style`：可选可视化颜色对象，只允许 `fill`、`stroke`、`text` 三个 `#RRGGBB` hex 颜色。
@@ -292,7 +295,7 @@ nodeset 也可以声明自己的 `global_config`。外部 nodeset JSONC 文件�
 
 `similar_to.node` 必须指向同一 pipeline 或同一 nodeset 内已存在的 node，不能指向自己；`relationship` 只允许 `variant` 或 `copy`；`reason` 必须非空。它只用于有意重复实现的健康检查豁免：A 指向 B、B 指向 A，或 A/B 共同指向同一个 base 时，会跳过对应 `GRAPH.SMELL.DUPLICATE_LOGIC` pair；未声明覆盖的重复 pair 仍会 warning。这个字段不改变编译、运行、拓扑、契约或 Mermaid 连边。
 
-Mermaid/SVG label 默认以可读性优先，使用纯文本分区展示：节点首行是 `display_name`，缺省时回退到注册类 `NODE_INFO.display_name` 或 `id`；external implemented node 的首行增加 `[EXTERNAL]`；随后显示 `id:`、`type_used:`，nodeset/loop 还会显示 `type_key:` / `body:`。所有异步调用显示 `async:`，`result_key` 模式同时显示 `result_key:`，再用 `---------- meta ----------`、`---------- status ----------`、`---------- nodeset ----------` 等分区展示说明。`requires/provides` 不再塞进节点内；数据契约显示在连边 label 上，先显示 contract `display_name`，再显示 id/key/type 信息。长说明会确定性换行并在必要时截断。SVG 渲染使用更大的 node spacing、rank spacing、wrapping width 和 diagram padding，并在保持 `htmlLabels=false` 的前提下增强原生 SVG 文本：标题加粗，包含 `external:`、`async:`、`result_key:` 在内的字段名前缀加粗，字段行左对齐，分区行加粗弱化。普通图和展开审查图都按可读优先生成。
+Mermaid/SVG label 默认以可读性优先，使用纯文本分区展示：节点首行是 `display_name`，缺省时回退到注册类 `NODE_INFO.display_name` 或 `id`；external implemented node 的首行增加 `[EXTERNAL]`；随后显示 `id:`、`type_used:`，nodeset/loop 还会显示 `type_key:` / `body:`。`global_state` 使用 Mermaid `cloud` 形状，并显示 `effect_scope:` 与适用的 `execution_lock:`，不显示 Provider 权限。所有异步调用显示 `async:`，`result_key` 模式同时显示 `result_key:`，再用 `---------- meta ----------`、`---------- status ----------`、`---------- nodeset ----------` 等分区展示说明。`requires/provides` 不再塞进节点内；数据契约显示在连边 label 上，先显示 contract `display_name`，再显示 id/key/type 信息。长说明会确定性换行并在必要时截断。SVG 渲染使用更大的 node spacing、rank spacing、wrapping width 和 diagram padding，并在保持 `htmlLabels=false` 的前提下增强原生 SVG 文本：标题加粗，包含 `external:`、`effect_scope:`、`execution_lock:`、`async:`、`result_key:` 在内的字段名前缀加粗，字段行左对齐，分区行加粗弱化。普通图和展开审查图都按可读优先生成。
 
 自定义 `style` 会作为节点级样式覆盖系统 class 的 fill/stroke/text 颜色，包括 health error/warning、planned node、document、nodeset、loop、external dependency 等节点；节点形状、finding 注释、planned 虚线和 external 粗边框等非颜色语义仍保留。自定义色仍不能使用 VibeFlow 系统保留色。
 
@@ -830,6 +833,38 @@ planned node / planned nodeset 可选 `planned_behavior`：
 - planned nodeset 可以省略 `pipeline` 作为粗粒度占位，也可以带由 planned nodes/edges 构成的 body 逐步细化。body 会进入架构 JSONC、展开 Mermaid/SVG，以及适用的 dependency、recursion、depth 和 planned-descendant 检查，但不会因此按 implemented body 执行。
 - implemented nodeset 必须包含完整、可校验且可执行的内部 `pipeline`；不能把 planned body 仅通过修改 `status` 冒充实现。
 
+## global_state 与 execution_lock
+
+`flow_kind=global_state` 是语言无关的 Core 语义，并派生 `effect_scope=global_state`；它表示 node 有意访问或修改 Target execution domain 中不经 envelope 流转的易失 ambient state。它不是系统 node，也不增加 Provider、隐式黑板或另一套对象通道。Python Target 把 execution domain 实现为当前解释器进程；普通 Python 对象仍通过 `requires` / `provides` 在 envelope 中按引用传递。
+
+含 implemented global-state 的 root plan 会递归标记 `contains_global_state=true` / `root_exclusive=true`。Python Runtime 在任何 node 或 hook 前进入进程级 global-state 执行域：普通 root 以 shared 模式进入，global-state root 以 exclusive 模式进入。lease 由嵌套 nodeset、loop 和受管理线程继承，一直覆盖成功/失败 hooks 和受保护异步收尾，保护任务真正结束后才释放。global-state 修改是持久、非事务的；成功、失败或取消后都不 snapshot、rollback 或自动恢复，临时修改必须在同一 node 内使用 `try/finally`。
+
+需要为其他业务资源建立架构可见的串行语义时，使用公开 `ExecutionLockSpec`：
+
+```jsonc
+{
+  "pipeline": {
+    "execution_lock": {"key": "project.resource"},
+    "nodes": []
+  }
+}
+
+{
+  "id": "update_resource",
+  "type_used": "demo.update_resource",
+  "display_name": "Update Resource",
+  "description": "Updates one named in-process resource.",
+  "execution_lock": {"key": "project.resource"}
+}
+```
+
+- key 必须是静态非空字符串，`vibeflow.` 前缀保留给系统。v1 只有 exclusive 模式，每个 scope 最多一个显式 key。
+- `pipeline.execution_lock` 保护整个 root run；`pipeline.nodes[].execution_lock` 保护该调用，nodeset/loop 调用点上的锁自然覆盖完整子 block。execution lock 不授予任何 effect 权限。
+- 已持有一个用户 key 时，嵌套 scope 只能复用同 key；同 key 按同一 lease 可重入，不同 key 嵌套会编译失败。互不嵌套的不同 sibling key 可并行。
+- planned global-state 或 planned 调用上的 lock 只进入 Architecture/review，不取得权限、不加锁、不参与 `contains_global_state`。JavaScript Target v1 会正确展示它们，但对 implemented global-state/lock 以 `TARGET.FEATURE.UNSUPPORTED` 拒绝执行。
+- 任何 global-state 或显式锁保护的 scope 都禁止 `async: "detached"`；`async: "result_key"` 只有在编译期能证明存在无条件 scheduled consumer path、结果必会 join 时才合法。Runtime 在异常/取消路径也会 fail-safe drain 已启动的受保护 future。
+- Architecture JSON 显示 `effect_scope`、`execution_lock`、`contains_global_state` / `root_exclusive`。Mermaid/SVG 中 global-state 固定使用 `cloud`；boundary/full trace 记录 `lock_wait → lock_acquired → run/hook/task events → lock_released`，global-state 已开始后失败则追加 `global_state_may_have_changed`。该事件只是风险提示，不代表状态已恢复。
+
 ## async node
 
 异步是显式配置能力，不会自动并行普通节点：
@@ -859,6 +894,7 @@ planned node / planned nodeset 可选 `planned_behavior`：
 - `result_key`：下游直接 edge 上的节点按 `type` require 该异步结果时 join，结果写入 `result_key` 对应的 provider key。
 - runtime 不自动 merge async context；共享对象的线程安全由业务对象负责。
 - 复杂后台工作可以通过 `type_used` 调用 nodeset `type_key`，并在该调用点设置 `async`；nodeset 内部仍按自己的显式 edges 和契约运行。
+- 上述普通异步语义不放宽 global-state / execution-lock 保护范围的 no-detach / must-join 限制。
 
 CLI 中 `--runtime-profile train` 会自动启用偏训练场景的选项：`trace="boundary"`、`execution="compiled"`、run/block hooks 开启、node/nodeset hooks 关闭、async flush timeout 为 30 秒。`--runtime-profile debug` 会启用完整 trace 和所有 hook。
 

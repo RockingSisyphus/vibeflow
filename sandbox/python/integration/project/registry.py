@@ -4,6 +4,7 @@ from vibeflow.targets.python.project import BaseLibRegistry, NodeRegistry, Plugi
 
 from nodes.legal_comprehensive_nodes import (
     AuditStoreNode,
+    ConfigureRuntimeModeNode,
     CoreComputeNode,
     ExternalBoostNode,
     LoopBackNode,
@@ -14,6 +15,10 @@ from nodes.legal_comprehensive_nodes import (
     RouteDecisionNode,
 )
 from nodes.legal_external_nodes import EffectRequestNode, IoResultAddNode, IoResultInputNode
+from nodes.legal_global_state_nodes import (
+    GlobalStateFailureNode,
+    GlobalStateProbeNode,
+)
 from nodes.legal_delegate_cli_nodes import (
     DelegateArgvNode,
     DelegateBusinessNode,
@@ -138,6 +143,9 @@ def build_node_registry() -> NodeRegistry:
     registry.register("sandbox.io_result_add", IoResultAddNode, config_schema={"delta": {"type": "number"}}, config_defaults={"delta": 1})
     registry.register("sandbox.io_result_input", IoResultInputNode, config_schema={"delta": {"type": "number"}}, config_defaults={"delta": 1})
     registry.register("sandbox.prepare_value", PrepareValueNode, config_schema={"offset": {"type": "number"}}, config_defaults={"offset": 0})
+    registry.register("sandbox.configure_runtime_mode", ConfigureRuntimeModeNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.global_state_probe", GlobalStateProbeNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.global_state_failure", GlobalStateFailureNode, config_schema={}, config_defaults={})
     registry.register("sandbox.core_compute", CoreComputeNode, config_schema={"factor": {"type": "number"}}, config_defaults={"factor": 2})
     registry.register("sandbox.route_decision", RouteDecisionNode, config_schema={"threshold": {"type": "number"}}, config_defaults={"threshold": 10})
     registry.register("sandbox.loop_back", LoopBackNode, config_schema={}, config_defaults={})

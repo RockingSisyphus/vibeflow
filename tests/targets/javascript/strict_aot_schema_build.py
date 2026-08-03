@@ -12,7 +12,7 @@ from vibeflow.targets.javascript.frontend.model import AotPlanError
 
 def _plan(schema: object) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v2",
+        "abi_version": "vibeflow.workflow.v3",
         "workflow_id": "schema-fail-closed",
         "schemas": {"value.in": schema},
         "inputs": [

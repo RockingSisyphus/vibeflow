@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import ast
 
-from vibeflow.targets.python.project.node import EFFECT_SCOPE_PYTHON_IO, EFFECT_SCOPE_TERMINAL
-from vibeflow.targets.python.quality.source_analysis.ast_rules import is_banned_import, path_effect_call_name, qualified_call_name
+from vibeflow.targets.python.project.node import EFFECT_SCOPE_GLOBAL_STATE, EFFECT_SCOPE_PYTHON_IO, EFFECT_SCOPE_TERMINAL
+from vibeflow.targets.python.quality.source_analysis.ast_rules import (
+    is_banned_import,
+    path_effect_call_name,
+    qualified_call_name,
+    qualified_reference_name,
+)
 from vibeflow.targets.python.quality.source_analysis.helpers import _call_name, _matches_prefix
 from vibeflow.targets.python.quality.source_analysis.types import BANNED_ATTR_CALLS, BANNED_CALL_NAMES, BANNED_IMPORT_ROOTS, PurityPolicy
 
@@ -19,6 +24,51 @@ DYNAMIC_CODE_CALLS = frozenset(
         "exec",
         "builtins.exec",
         "importlib.import_module",
+        "importlib.reload",
+        "runpy.run_module",
+        "runpy.run_path",
+    }
+)
+DYNAMIC_NAMESPACE_CALLS = frozenset({"builtins.globals", "builtins.locals", "globals", "locals"})
+SENSITIVE_REFLECTION_ROOTS = frozenset(
+    {
+        "builtins",
+        "cffi",
+        "ctypes",
+        "importlib",
+        "os",
+        "socket",
+        "subprocess",
+    }
+)
+HARD_FORBIDDEN_IMPORT_ROOTS = frozenset({"_ctypes", "cffi", "ctypes"})
+HARD_FFI_CALLS = frozenset(
+    {
+        "cffi.FFI",
+        "ctypes.CDLL",
+        "ctypes.LibraryLoader",
+        "ctypes.OleDLL",
+        "ctypes.PyDLL",
+        "ctypes.WinDLL",
+        "numpy.ctypeslib.load_library",
+        "torch.classes.load_library",
+        "torch.ops.load_library",
+        "torch.utils.cpp_extension.load",
+        "torch.utils.cpp_extension.load_inline",
+    }
+)
+HARD_FFI_LEAVES = frozenset({"CDLL", "LoadLibrary", "OleDLL", "PyDLL", "WinDLL", "dlopen"})
+CALLBACK_INJECTION_CALLS = frozenset(
+    {
+        "atexit.register",
+        "atexit.unregister",
+        "signal.signal",
+        "sys.addaudithook",
+        "sys.set_asyncgen_hooks",
+        "sys.setprofile",
+        "sys.settrace",
+        "threading.setprofile",
+        "threading.settrace",
     }
 )
 ARGPARSE_FILETYPE_CALLS = frozenset({"argparse.FileType"})
@@ -62,6 +112,7 @@ PYTHON_IO_IMPORT_ROOTS = frozenset(
         "ftplib",
         "logging",
         "pty",
+        "posix",
         "smtplib",
         "tempfile",
         "webbrowser",
@@ -70,6 +121,120 @@ PYTHON_IO_IMPORT_ROOTS = frozenset(
 )
 PYTHON_IO_IMPORT_MODULES = frozenset({"http.client", "http.server"})
 PYTHON_IO_CALL_PREFIXES = ("http.client.", "http.server.", "io.open", "pty.")
+COMMON_LIBRARY_IO_CALLS = frozenset(
+    {
+        "PIL.Image.open",
+        "joblib.dump",
+        "joblib.load",
+        "numpy.fromfile",
+        "numpy.load",
+        "numpy.loadtxt",
+        "numpy.memmap",
+        "numpy.save",
+        "numpy.savetxt",
+        "numpy.savez",
+        "numpy.savez_compressed",
+        "pickle.dump",
+        "pickle.load",
+        "scipy.io.loadmat",
+        "scipy.io.savemat",
+        "soundfile.read",
+        "soundfile.write",
+        "torch.hub.download_url_to_file",
+        "torch.hub.load",
+        "torch.jit.load",
+        "torch.jit.save",
+        "torch.load",
+        "torch.save",
+    }
+)
+THREAD_PROCESS_CALLS = frozenset(
+    {
+        "_thread.start_new_thread",
+        "asyncio.to_thread",
+        "concurrent.futures.ProcessPoolExecutor",
+        "concurrent.futures.ThreadPoolExecutor",
+        "multiprocessing.Pool",
+        "multiprocessing.Process",
+        "os.fork",
+        "os.forkpty",
+        "os.posix_spawn",
+        "os.posix_spawnp",
+        "threading.Thread",
+    }
+)
+AMBIENT_STATE_LEAVES = frozenset(
+    {
+        "autocast",
+        "detect_anomaly",
+        "filterwarnings",
+        "flags",
+        "freeze",
+        "inference_mode",
+        "no_grad",
+        "simplefilter",
+        "unfreeze",
+    }
+)
+AMBIENT_STATE_PREFIXES = (
+    "clear_",
+    "disable",
+    "empty_",
+    "enable",
+    "manual_seed",
+    "reset",
+    "seed",
+    "set",
+    "use_",
+)
+AMBIENT_CONTAINER_NAMES = frozenset(
+    {
+        "cache",
+        "caches",
+        "config",
+        "filters",
+        "flags",
+        "hooks",
+        "options",
+        "registries",
+        "registry",
+        "settings",
+        "state",
+    }
+)
+AMBIENT_MUTATING_METHODS = frozenset(
+    {
+        "add",
+        "append",
+        "clear",
+        "discard",
+        "extend",
+        "insert",
+        "pop",
+        "popitem",
+        "remove",
+        "register",
+        "setdefault",
+        "sort",
+        "update",
+        "unregister",
+    }
+)
+FORBIDDEN_AMBIENT_STATE_PREFIXES = (
+    "builtins.",
+    "os.environ",
+    "sys.meta_path",
+    "sys.modules",
+    "sys.path",
+    "sys.path_hooks",
+)
+HARD_PROCESS_STATE_PREFIXES = (
+    "os.environ",
+    "sys.meta_path",
+    "sys.modules",
+    "sys.path",
+    "sys.path_hooks",
+)
 IO_METHOD_NAMES = frozenset(
     {
         "close",
@@ -104,6 +269,8 @@ def import_violation_code(module: str, *, effect_scope: str, policy: PurityPolic
     """Return an absolute effect code or a legacy policy import code."""
 
     root = module.split(".", 1)[0]
+    if root in HARD_FORBIDDEN_IMPORT_ROOTS:
+        return "effect_import"
     if module == "urllib.parse" or module.startswith("urllib.parse."):
         return "banned_import" if _policy_bans_import(module, policy) else ""
     if root in PYTHON_IO_IMPORT_ROOTS or any(
@@ -118,14 +285,32 @@ def import_violation_code(module: str, *, effect_scope: str, policy: PurityPolic
     return "banned_import" if _policy_bans_import(module, policy) else ""
 
 
-def call_violation(node: ast.Call, *, aliases: dict[str, str], effect_scope: str) -> tuple[str, str]:
+def call_violation(
+    node: ast.Call,
+    *,
+    aliases: dict[str, str],
+    effect_scope: str,
+    imported_roots: set[str] | frozenset[str] = frozenset(),
+    module_state_names: set[str] | frozenset[str] = frozenset(),
+    local_names: set[str] | frozenset[str] = frozenset(),
+) -> tuple[str, str]:
     """Return ``(code, name)`` for a denied call, keeping non-effect rules stable."""
 
     name = qualified_call_name(node.func, aliases)
     raw_name = _call_name(node.func)
     candidate = name or raw_name
-    if candidate in DYNAMIC_CODE_CALLS or raw_name in DYNAMIC_CODE_CALLS:
+    if candidate in DYNAMIC_CODE_CALLS or raw_name in DYNAMIC_CODE_CALLS or candidate in DYNAMIC_NAMESPACE_CALLS:
         return "banned_call", candidate
+    dynamic_reflection = _dynamic_reflection_call_name(node, aliases, imported_roots)
+    if dynamic_reflection:
+        return "banned_call", dynamic_reflection
+    leaf = candidate.rsplit(".", 1)[-1]
+    if candidate in HARD_FFI_CALLS or raw_name in HARD_FFI_CALLS or leaf in HARD_FFI_LEAVES:
+        return "effect_call", candidate
+    if candidate in CALLBACK_INJECTION_CALLS or raw_name in CALLBACK_INJECTION_CALLS:
+        return "effect_call", candidate
+    if any(candidate == prefix or candidate.startswith(f"{prefix}.") for prefix in HARD_PROCESS_STATE_PREFIXES):
+        return "effect_call", candidate
     if candidate in HARD_PROCESS_TERMINATION_CALLS or raw_name in HARD_PROCESS_TERMINATION_CALLS:
         return "effect_call", candidate
     if is_system_exit_call(candidate, raw_name):
@@ -135,6 +320,17 @@ def call_violation(node: ast.Call, *, aliases: dict[str, str], effect_scope: str
     argparse_violation = _argparse_violation(node, candidate, raw_name)
     if argparse_violation:
         return "effect_call", argparse_violation
+    ambient_state = ambient_state_call_name(
+        node,
+        aliases=aliases,
+        imported_roots=imported_roots,
+        module_state_names=module_state_names,
+        local_names=local_names,
+    )
+    if ambient_state:
+        if effect_scope == EFFECT_SCOPE_GLOBAL_STATE:
+            return "", ""
+        return "effect_call", ambient_state
     if effect_scope == EFFECT_SCOPE_PYTHON_IO:
         return "", ""
     if candidate == "urllib.parse" or candidate.startswith("urllib.parse."):
@@ -147,10 +343,71 @@ def call_violation(node: ast.Call, *, aliases: dict[str, str], effect_scope: str
     if path_effect:
         return "effect_call", path_effect
     root = candidate.split(".", 1)[0]
-    leaf = candidate.rsplit(".", 1)[-1]
     if _is_python_io_call(candidate, raw_name, root, leaf):
         return "effect_call", candidate
     return "", ""
+
+
+def ambient_state_call_name(
+    node: ast.Call,
+    *,
+    aliases: dict[str, str],
+    imported_roots: set[str] | frozenset[str] = frozenset(),
+    module_state_names: set[str] | frozenset[str] = frozenset(),
+    local_names: set[str] | frozenset[str] = frozenset(),
+) -> str:
+    raw_root = _call_name(node.func).split(".", 1)[0]
+    if raw_root in local_names and raw_root not in aliases:
+        return ""
+    candidate = qualified_call_name(node.func, aliases) or _call_name(node.func)
+    root = candidate.split(".", 1)[0]
+    if root not in imported_roots and root not in module_state_names:
+        return ""
+    base = (
+        qualified_reference_name(node.func.value, aliases)
+        if isinstance(node.func, ast.Attribute)
+        else candidate.rsplit(".", 1)[0]
+    )
+    if not base or ambient_assignment_is_forbidden(base):
+        return ""
+    leaf = candidate.rsplit(".", 1)[-1]
+    if (
+        leaf in AMBIENT_STATE_LEAVES
+        or leaf.startswith(AMBIENT_STATE_PREFIXES)
+    ):
+        return candidate
+    if leaf in AMBIENT_MUTATING_METHODS and (
+        root in module_state_names or _looks_like_ambient_container(base)
+    ):
+        return candidate
+    return ""
+
+
+def _looks_like_ambient_container(name: str) -> bool:
+    leaf = name.rsplit(".", 1)[-1].lower()
+    return leaf in AMBIENT_CONTAINER_NAMES or leaf.endswith(
+        ("_cache", "_config", "_flags", "_options", "_registry", "_state")
+    )
+
+
+def ambient_assignment_is_forbidden(name: str) -> bool:
+    return any(name == prefix.rstrip(".") or name.startswith(prefix) for prefix in FORBIDDEN_AMBIENT_STATE_PREFIXES)
+
+
+def dynamic_namespace_reference(
+    node: ast.Subscript,
+    *,
+    aliases: dict[str, str],
+    imported_roots: set[str] | frozenset[str] = frozenset(),
+) -> str:
+    if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+        return ""
+    base = qualified_reference_name(node.value, aliases)
+    normalized = base[: -len(".__dict__")] if base.endswith(".__dict__") else base
+    root = normalized.split(".", 1)[0]
+    if root in SENSITIVE_REFLECTION_ROOTS or root in imported_roots:
+        return base
+    return ""
 
 
 def is_terminal_call(name: str) -> bool:
@@ -243,6 +500,9 @@ def _is_python_io_call(candidate: str, raw_name: str, root: str, leaf: str) -> b
         or _matches_prefix(candidate, BANNED_ATTR_CALLS)
         or candidate in PROCESS_CONTROL_CALLS
         or root in PYTHON_IO_IMPORT_ROOTS
+        or candidate in COMMON_LIBRARY_IO_CALLS
+        or candidate in THREAD_PROCESS_CALLS
+        or candidate.startswith("transformers.") and candidate.endswith(".from_pretrained")
         or leaf in IO_METHOD_NAMES
         or any(candidate == prefix.rstrip(".") or candidate.startswith(prefix) for prefix in PYTHON_IO_CALL_PREFIXES)
     )
@@ -263,8 +523,26 @@ def _argparse_violation(node: ast.Call, candidate: str, raw_name: str) -> str:
     return ""
 
 
+def _dynamic_reflection_call_name(
+    node: ast.Call,
+    aliases: dict[str, str],
+    imported_roots: set[str] | frozenset[str],
+) -> str:
+    function = qualified_call_name(node.func, aliases)
+    if function not in {"getattr", "builtins.getattr"} or len(node.args) < 2:
+        return ""
+    if isinstance(node.args[1], ast.Constant) and isinstance(node.args[1].value, str):
+        return ""
+    base = qualified_reference_name(node.args[0], aliases)
+    root = base.split(".", 1)[0]
+    return f"getattr({base}, <dynamic>)" if root in SENSITIVE_REFLECTION_ROOTS or root in imported_roots else ""
+
+
 __all__ = [
+    "ambient_assignment_is_forbidden",
+    "ambient_state_call_name",
     "call_violation",
+    "dynamic_namespace_reference",
     "from_import_effect_is_forbidden",
     "import_violation_code",
     "process_argv_import_is_forbidden",

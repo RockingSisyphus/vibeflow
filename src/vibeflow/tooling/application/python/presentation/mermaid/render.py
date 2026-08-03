@@ -181,6 +181,14 @@ def _raise_on_error_svg(path: Path) -> None:
 
 
 _SVG_NS = "http://www.w3.org/2000/svg"
+_MERMAID_CLOUD_NODE_CLASS = "vibeflowCloudNode"
+_TRANSLATE_RE = re.compile(
+    r"^\s*translate\(\s*"
+    r"(?P<x>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
+    r"(?:\s*,\s*|\s+)"
+    r"(?P<y>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
+    r"\s*\)\s*$"
+)
 _FIELD_PREFIXES = frozenset(
     {
         "id:",
@@ -204,6 +212,8 @@ _FIELD_PREFIXES = frozenset(
         "external:",
         "async:",
         "result_key:",
+        "effect_scope:",
+        "execution_lock:",
     }
 )
 
@@ -215,7 +225,10 @@ def _enhance_svg_labels(path: Path) -> None:
         root = tree.getroot()
         changed = False
         for label_group in (*_node_groups(root), *_edge_label_groups(root)):
-            label_left = _label_left_x(label_group) if "node" in _class_tokens(label_group) else None
+            is_node = "node" in _class_tokens(label_group)
+            if is_node and _center_native_cloud_label(label_group):
+                changed = True
+            label_left = _label_left_x(label_group) if is_node else None
             for text in _label_texts(label_group):
                 rows = [child for child in list(text) if _tag(child) == "tspan" and "row" in _class_tokens(child)]
                 if not rows:
@@ -270,6 +283,33 @@ def _label_left_x(node: ET.Element) -> float | None:
         except ValueError:
             return None
     return None
+
+
+def _center_native_cloud_label(node: ET.Element) -> bool:
+    if _MERMAID_CLOUD_NODE_CLASS not in _class_tokens(node):
+        return False
+    label = next(
+        (
+            child
+            for child in list(node)
+            if _tag(child) == "g" and "label" in _class_tokens(child)
+        ),
+        None,
+    )
+    if label is None:
+        return False
+    match = _TRANSLATE_RE.fullmatch(label.get("transform", ""))
+    if match is None:
+        return False
+    try:
+        x = float(match.group("x"))
+        y = float(match.group("y"))
+    except ValueError:
+        return False
+    if abs(x) < 1e-9:
+        return False
+    label.set("transform", f"translate(0, {_format_svg_number(y)})")
+    return True
 
 
 def _style_row(row: ET.Element, *, weight: str, fill: str = "", font_size: str = "") -> None:

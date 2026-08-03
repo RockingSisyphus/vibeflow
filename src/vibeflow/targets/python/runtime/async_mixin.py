@@ -38,9 +38,26 @@ class RuntimeAsyncMixin:
     def _run_async_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
         if frame.async_mode == "result_key" and frame.result_key not in frame.provide_keys:
             raise PipelineRuntimeError(f"async node '{frame.name}' result_key must be declared in provides")
-        self._call_runtime_plugins("before_node", frame.name, frame.node_type, summarize_mapping(inputs))
+        execution_lock_active = (
+            frame.execution_lock is not None and not frame.is_planned
+        )
+        if not execution_lock_active:
+            # Preserve the established hook contract for ordinary async work:
+            # before_node runs synchronously before submit. Only a call-site
+            # execution lock needs its hooks moved into the worker's critical
+            # section.
+            self._call_runtime_plugins(
+                "before_node",
+                frame.name,
+                frame.node_type,
+                summarize_mapping(inputs),
+            )
         context = copy_context()
         future = self._executor_for_async().submit(context.run, self._execute_async_outputs, frame, inputs)
+        self._track_protected_future(
+            future,
+            force=execution_lock_active,
+        )
         self._mark_node_run(frame.name)
         if frame.async_mode == "detached":
             self._detached.append((frame, future))
@@ -51,24 +68,77 @@ class RuntimeAsyncMixin:
         return {}
 
     def _execute_async_outputs(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
-        try:
-            if frame.is_planned_stub:
-                return self._execute_planned_stub_outputs(frame, inputs)
-            if frame.is_nodeset:
-                outputs, child_trace = self._run_nodeset_outputs_with_trace(frame, inputs, cached=False)
-                return _AsyncOutputs(outputs=outputs, child_trace=child_trace)
-            return self._execute_pure_outputs(frame, inputs)
-        except SystemExit as exc:
-            if not self.delegate_cli:
-                raise PipelineRuntimeError(
-                    f"node '{frame.name}' attempted SystemExit outside delegate CLI mode"
-                ) from exc
-            if frame.is_planned_stub or frame.flow_kind not in {"io", "document", "data_store"}:
-                subject = "planned python_stub node" if frame.is_planned_stub else "node"
-                raise PipelineRuntimeError(
-                    f"{subject} '{frame.name}' with flow_kind '{frame.flow_kind}' cannot control delegate CLI exit"
-                ) from exc
-            raise normalize_delegate_cli_system_exit(exc, source=frame.name) from exc
+        with self._frame_execution_scope(frame):
+            worker_scoped_hooks = (
+                frame.execution_lock is not None and not frame.is_planned
+            )
+            if worker_scoped_hooks:
+                self._call_runtime_plugins(
+                    "before_node",
+                    frame.name,
+                    frame.node_type,
+                    summarize_mapping(inputs),
+                )
+            try:
+                if frame.is_planned_stub:
+                    value: Mapping[str, object] | _AsyncOutputs = (
+                        self._execute_planned_stub_outputs(frame, inputs)
+                    )
+                elif frame.is_nodeset:
+                    outputs, child_trace = self._run_nodeset_outputs_with_trace(
+                        frame,
+                        inputs,
+                        cached=False,
+                    )
+                    value = _AsyncOutputs(
+                        outputs=outputs,
+                        child_trace=child_trace,
+                    )
+                else:
+                    value = self._execute_pure_outputs(frame, inputs)
+            except SystemExit as exc:
+                if not self.delegate_cli:
+                    failure = PipelineRuntimeError(
+                        f"node '{frame.name}' attempted SystemExit outside delegate CLI mode"
+                    )
+                elif frame.is_planned_stub or frame.flow_kind not in {"io", "document", "data_store"}:
+                    subject = "planned python_stub node" if frame.is_planned_stub else "node"
+                    failure = PipelineRuntimeError(
+                        f"{subject} '{frame.name}' with flow_kind '{frame.flow_kind}' cannot control delegate CLI exit"
+                    )
+                else:
+                    raise normalize_delegate_cli_system_exit(
+                        exc,
+                        source=frame.name,
+                    ) from exc
+                if worker_scoped_hooks:
+                    self._call_runtime_plugins(
+                        "node_failed",
+                        frame.name,
+                        frame.node_type,
+                        str(failure),
+                    )
+                raise failure from exc
+            except BaseException as exc:
+                if worker_scoped_hooks:
+                    self._call_runtime_plugins(
+                        "node_failed",
+                        frame.name,
+                        frame.node_type,
+                        str(exc),
+                    )
+                raise
+            if worker_scoped_hooks:
+                outputs_for_hook = (
+                    value.outputs if isinstance(value, _AsyncOutputs) else value
+                )
+                self._call_runtime_plugins(
+                    "after_node",
+                    frame.name,
+                    frame.node_type,
+                    summarize_mapping(outputs_for_hook),
+                )
+            return value
 
     def _executor_for_async(self) -> ThreadPoolExecutor:
         if self._executor is None:
@@ -105,14 +175,28 @@ class RuntimeAsyncMixin:
         except _NestedRuntimeFailure as exc:
             self._merge_child_trace(frame, exc.child_trace)
             self._record_runtime_event("node_failed", frame.name, frame.node_type, failure=str(exc))
-            self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(exc))
+            if frame.execution_lock is None or frame.is_planned:
+                self._call_runtime_plugins(
+                    "node_failed",
+                    frame.name,
+                    frame.node_type,
+                    str(exc),
+                )
             if exc.__cause__ is not None:
                 raise exc.__cause__ from exc
             raise
         except Exception as exc:
             self._record_runtime_event("node_failed", frame.name, frame.node_type, failure=str(exc))
-            self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(exc))
+            if frame.execution_lock is None or frame.is_planned:
+                self._call_runtime_plugins(
+                    "node_failed",
+                    frame.name,
+                    frame.node_type,
+                    str(exc),
+                )
             raise
+        finally:
+            self._untrack_protected_future(future)
         self._record_node_output_candidates(frame.name, outputs, state)
         self._clear_conditional_outgoing(frame.name, state)
         active_edges = self._activated_edges(frame.name, outputs, state)
@@ -121,7 +205,13 @@ class RuntimeAsyncMixin:
             self._activate_edge(edge, state)
             self._deliver_outputs(edge, outputs, state)
         self._deliver_transfer_only_edges(frame.name, outputs, state, active_pairs)
-        self._call_runtime_plugins("after_node", frame.name, frame.node_type, summarize_mapping(outputs))
+        if frame.execution_lock is None or frame.is_planned:
+            self._call_runtime_plugins(
+                "after_node",
+                frame.name,
+                frame.node_type,
+                summarize_mapping(outputs),
+            )
         self._record_runtime_event("async_result_join", frame.name, frame.node_type, output_summary=summarize_mapping(outputs))
 
     def _abandon_async_results(self) -> None:
@@ -179,6 +269,9 @@ class RuntimeAsyncMixin:
                         }
                     },
                 )
+            finally:
+                if future.done():
+                    self._untrack_protected_future(future)
         self._raise_delegate_async_outcomes(
             business_exits,
             failures,
@@ -231,7 +324,11 @@ class RuntimeAsyncMixin:
                 if self.delegate_cli:
                     failures.append(exc)
                 continue
-            self._record_runtime_event("async_detached_done", frame.name, frame.node_type, output_summary=summarize_mapping(outputs))
+            else:
+                self._record_runtime_event("async_detached_done", frame.name, frame.node_type, output_summary=summarize_mapping(outputs))
+            finally:
+                if future.done():
+                    self._untrack_protected_future(future)
         self._raise_delegate_async_outcomes(
             business_exits,
             failures,
@@ -256,9 +353,12 @@ class RuntimeAsyncMixin:
         if business_exits:
             raise business_exits[0]
 
-    def _shutdown_executor(self) -> None:
+    def _shutdown_executor(self, *, force_wait: bool = False) -> None:
         if self._executor is not None:
-            nonblocking = self._detached_timeout or self._abandoned_async_results
+            nonblocking = (
+                not force_wait
+                and (self._detached_timeout or self._abandoned_async_results)
+            )
             self._executor.shutdown(wait=not nonblocking, cancel_futures=nonblocking)
             self._executor = None
 

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import ast
 
-from vibeflow.targets.python.quality.source_analysis.ast_rules import name_targets
+from vibeflow.targets.python.project.node import EFFECT_SCOPE_GLOBAL_STATE
+from vibeflow.targets.python.quality.source_analysis.ast_rules import name_targets, qualified_reference_name
+from vibeflow.targets.python.quality.source_analysis.effects import ambient_assignment_is_forbidden
 from vibeflow.targets.python.quality.source_analysis.helpers import _dict_literal_keys, _literal_subscript_key
 from vibeflow.targets.python.quality.source_analysis.types import MUTATING_METHODS
 
@@ -185,6 +187,37 @@ class _NodeDataTrackingMixin:
     def _check_assignment_target(self, target: ast.AST, node: ast.AST) -> None:
         if self._target_mutates_node_input(target):
             self._add("input_mutation", "node must not mutate inputs", node, suggested_fix_type="fix_node")
+        if not isinstance(target, (ast.Attribute, ast.Subscript)):
+            return
+        value = target.value
+        aliases = getattr(self, "_import_aliases", {})
+        imported_roots = getattr(self, "_imported_module_roots", set())
+        module_state_names = getattr(self, "_module_state_names", set())
+        local_names = getattr(self, "_current_local_names", set())
+        import_names = getattr(self, "_current_import_names", set())
+        name = qualified_reference_name(value, aliases)
+        root = name.split(".", 1)[0]
+        raw_root = _reference_root_name(value)
+        locally_owned = raw_root in local_names and raw_root not in import_names
+        if name and not locally_owned and (
+            root in imported_roots or root in module_state_names
+        ):
+            if ambient_assignment_is_forbidden(name):
+                self._add(
+                    "effect_call",
+                    f"node must not mutate forbidden process state: {name}",
+                    node,
+                    suggested_fix_type="move_to_boundary",
+                )
+                return
+            if getattr(self, "effect_scope", "") != EFFECT_SCOPE_GLOBAL_STATE:
+                self._add(
+                    "global_state",
+                    f"node must not mutate ambient module state: {name}",
+                    node,
+                    suggested_fix_type="move_to_boundary",
+                )
+            return
         if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id != "self":
             self._add("monkey_patch", "assigning to external object attributes is forbidden", node, suggested_fix_type="fix_node")
 
@@ -200,3 +233,9 @@ class _NodeDataTrackingMixin:
         if isinstance(value, ast.Name) and value.id in self._output_dicts:
             return set(self._output_dicts[value.id]), False
         return None, True
+
+
+def _reference_root_name(node: ast.AST) -> str:
+    while isinstance(node, (ast.Attribute, ast.Subscript)):
+        node = node.value
+    return node.id if isinstance(node, ast.Name) else ""

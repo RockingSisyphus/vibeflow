@@ -58,7 +58,7 @@ def _assert_review_protocol(layer: str, text: str) -> None:
         or "not a public review entry" in lowered
     ), layer
     assert "flow_kind" in text, layer
-    for scope in ("none", "terminal", "python_io", "trusted"):
+    for scope in ("none", "terminal", "python_io", "global_state", "trusted"):
         assert scope in lowered, (layer, scope)
     assert "effect_scope" in text, layer
     assert "flow_kind=io" in text or "flow_kind = io" in lowered, layer
@@ -67,6 +67,44 @@ def _assert_review_protocol(layer: str, text: str) -> None:
     assert "delegate-cli" in lowered, layer
     assert "cli.argv" in text and "cli.exit_code" in text, layer
     assert "vibeflow.log" in text, layer
+
+
+def _assert_global_state_protocol(layer: str, text: str) -> None:
+    lowered = text.lower()
+    for marker in (
+        "flow_kind=global_state",
+        "effect_scope=global_state",
+        "execution_lock",
+        "shared",
+        "exclusive",
+        "try/finally",
+        "detached",
+        "result_key",
+        "vibeflow.workflow.v3",
+        "vibeflow.workflow.v2",
+        "target.feature.unsupported",
+        "cloud",
+        "lock_wait",
+        "lock_acquired",
+        "lock_released",
+        "global_state_may_have_changed",
+    ):
+        assert marker in lowered, (layer, marker)
+    assert "execution domain" in lowered or "执行域" in text, layer
+    assert "pipeline.execution_lock" in text, layer
+    assert (
+        "pipeline.nodes[].execution_lock" in text
+        or ("调用点" in text and "execution_lock" in text)
+    ), layer
+    assert "vibeflow." in text and "保留" in text, layer
+    assert "Provider" in text, layer
+    assert "文件" in text and "环境变量" in text, layer
+    assert "subprocess" in lowered and "动态 import" in text and "ffi" in lowered, layer
+    assert re.search(r"(?:不|不会|都不).{0,48}自动恢复", text), layer
+    assert "rollback" in lowered, layer
+    assert re.search(r"(?:不授予|不增加|不提供|不取得).{0,24}权限", text), layer
+    assert "禁止" in text and "detached" in lowered, layer
+    assert "join" in lowered, layer
 
 
 def test_distribution_copies_review_docs_and_preserves_customizable_root_guides(
@@ -376,6 +414,81 @@ def test_developer_published_and_ai_guides_share_the_review_protocol(
         ("published AI guidance", published_ai_layer),
     ):
         _assert_review_protocol(layer, text)
+
+
+def test_developer_published_and_ai_guides_share_the_global_state_protocol(
+    built_distribution: Path,
+) -> None:
+    development_layer = _read_combined(
+        (
+            REPOSITORY_ROOT / "README.md",
+            REPOSITORY_ROOT / "README.en.md",
+            REPOSITORY_ROOT / "docs" / "kernel_target_vision.md",
+            REPOSITORY_ROOT / "docs" / "kernel_development_guide.md",
+            REPOSITORY_ROOT / "docs" / "developer_guide.md",
+            REPOSITORY_ROOT / "docs" / "js_aot_build.md",
+        )
+    )
+    source_user_layer = _read_combined(
+        (
+            TEMPLATE_ROOT / "README.md",
+            *(sorted(PUBLISHED_DOCS_ROOT.glob("*.md"))),
+            REPOSITORY_ROOT / "docs" / "developer_guide.md",
+            REPOSITORY_ROOT / "docs" / "js_aot_build.md",
+        )
+    )
+    built_user_layer = _read_combined(
+        (
+            built_distribution / "README.md",
+            *(sorted((built_distribution / "kernel" / "docs").glob("*.md"))),
+        )
+    )
+    for layer, text in (
+        ("VibeFlow development documentation", development_layer),
+        ("distribution source user documentation", source_user_layer),
+        ("built distribution user documentation", built_user_layer),
+    ):
+        _assert_global_state_protocol(layer, text)
+
+    prompt_paths = (
+        TEMPLATE_ROOT / "AGENTS.md",
+        PUBLISHED_DOCS_ROOT / "08_给AI开发者的约束清单.md",
+        built_distribution / "AGENTS.md",
+        built_distribution / "kernel" / "docs" / "08_给AI开发者的约束清单.md",
+    )
+    for prompt_path in prompt_paths:
+        _assert_global_state_protocol(
+            f"AI prompt {prompt_path}",
+            prompt_path.read_text(encoding="utf-8"),
+        )
+
+
+def test_built_distribution_architecture_exposes_execution_lock_facts(
+    built_distribution: Path,
+) -> None:
+    for architecture_path in (
+        built_distribution / "python_project" / "ARCHITECTURE.jsonc",
+        built_distribution / "javascript_project" / "ARCHITECTURE.jsonc",
+    ):
+        text = architecture_path.read_text(encoding="utf-8")
+        for marker in (
+            '"effect_scope"',
+            '"execution_lock"',
+            '"contains_global_state"',
+            '"root_exclusive"',
+        ):
+            assert marker in text, (architecture_path, marker)
+
+    javascript_guide = (
+        built_distribution
+        / "kernel"
+        / "docs"
+        / "11_JS_TS与Web_AOT构建指南.md"
+    ).read_text(encoding="utf-8")
+    assert 'implemented `flow_kind="global_state"`' in javascript_guide
+    assert "TARGET.FEATURE.UNSUPPORTED" in javascript_guide
+    assert "vibeflow.workflow.v3" in javascript_guide
+    assert "vibeflow.workflow.v2" in javascript_guide
 
 
 def test_review_docs_reject_old_public_renderer_and_io_permission_wording(

@@ -26,7 +26,7 @@ RESOURCE_SHA256 = {
         "4a2e92555a7b761517ad141e0cf5068af01e4fde8b56751fcae7ce2bed2e918f"
     ),
     "runtime_helpers.mjs": (
-        "ea5692cc46b40f8b1f04ace8e8068684e311cb5019e13e4338a96d837a1b3cde"
+        "7f179eff72d15665727208f414bcbb9e6a213842e3b8aa6179a0f02fdfcc5483"
     ),
     "toolchain_driver.mjs": (
         "ffe86e7fde3438415a3c4a9626d8807d4029cf79143e6f35823f6fa4493c1f16"

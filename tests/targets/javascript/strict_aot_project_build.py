@@ -3,6 +3,7 @@ from __future__ import annotations
 import builtins
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -18,8 +19,11 @@ from vibeflow.tooling.application.javascript.audit import (
     JavascriptAuditRequest,
     audit_javascript_project,
     render_architecture,
+    render_mermaid,
     render_review_svg,
 )
+from vibeflow.core.compiler import CompiledGraph
+from vibeflow.core.flow import GraphConfig, NodeSpec, STATUS_PLANNED
 from vibeflow.targets.javascript.build.toolchain import ToolchainInfo
 from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
 
@@ -902,6 +906,47 @@ def test_target_neutral_architecture_is_location_independent(
         "root_id": "demo",
         "path": "workflow.jsonc",
     }
+
+
+def test_javascript_planned_global_state_renders_as_cloud_path() -> None:
+    graph = GraphConfig(
+        nodes=(
+            NodeSpec(
+                id="runtime_state",
+                type_used="future.runtime_state",
+                status=STATUS_PLANNED,
+                flow_kind="global_state",
+            ),
+            NodeSpec(
+                id="ordinary",
+                type_used="future.ordinary",
+                status=STATUS_PLANNED,
+                flow_kind="process",
+            ),
+        )
+    )
+    compiled = CompiledGraph(
+        order=("runtime_state", "ordinary"),
+        explicit_edges=(),
+        data_edges=(),
+        effective_edges=(),
+        providers={},
+        consumers={},
+        flow_kinds={
+            "runtime_state": "global_state",
+            "ordinary": "process",
+        },
+    )
+    result = SimpleNamespace(graph=graph, compiled=compiled)
+
+    mermaid = render_mermaid(result)
+    svg = render_review_svg(result)
+
+    assert 'runtime_state@{ shape: cloud, label: "runtime_state' in mermaid
+    assert 'data-node="runtime_state" data-flow-kind="global_state"' in svg
+    assert '<path class="global-state-cloud"' in svg
+    assert 'data-node="ordinary" data-flow-kind="process"' in svg
+    assert '<rect ' in svg
 
 
 @pytest.mark.parametrize(

@@ -80,7 +80,7 @@ nodeset 是独立 JSONC 实现文件，作用类似 Python node 的 `.py` 文件
 - 所有 nodeset 根对象都必须写 `type_key`、`display_name`、`description`、`requires` 和 `provides`；implemented nodeset 还必须写完整 `pipeline`。
 - `requires`、`provides`、`pipeline.inputs`、`pipeline.outputs` 都必须使用对象契约，并写非空 `display_name`。
 - `name`、`category`、`version`、`purity`、`exports` 已从 nodeset 模型中移除，出现即为 schema/config error。
-- nodeset 内部允许 `io`、`data_store`、`document`、`external=True` 等节点；可读性通过展开 SVG 审查，不再要求 nodeset 纯函数属性。
+- nodeset 内部允许 `io`、`data_store`、`document`、`global_state`、`external=True` 等节点；可读性通过展开 SVG 审查，不再要求 nodeset 纯函数属性。这不会放宽各 effect scope 的能力边界。
 - nodeset 对外输出只看根对象 `provides`。运行时会从内部 pipeline result 中按 `provides[].type` 取值，再写入调用点的 `provides[].key`。
 
 ## Nodeset 内部的数据与运行时门禁
@@ -90,6 +90,14 @@ nodeset 是独立 JSONC 实现文件，作用类似 Python node 的 `.py` 文件
 - 修改图后必须消除 `GRAPH.DATA.RUNTIME_REQUIREMENT_UNREACHABLE`、`GRAPH.DATA.NO_PAYLOAD_BYPASS`、`GRAPH.JOIN.ALL_DEPENDS_ON_TRANSFER_ONLY`、`GRAPH.JOIN.ALL_BRANCHES_MUTUALLY_EXCLUSIVE` 和 `GRAPH.JOIN.REDUNDANT_ALL`；按 finding 中的 schedule/transfer incoming、候选 provider、decision 分支条件和修复建议改真实数据流。
 - 如果使用 tagged value，tag 必须是规范的精确字面量，value 必须是匹配的 Python 原生类型，不得缩写 tag 或把整数保留为字符串。
 - `validate` 和 `quality` 只是静态门禁。每个入口还要执行最小 runtime probe，检查结果 key 和原生类型、`runtime.stop_reason` 等于 `completed`，以及 `runtime.qualified_exec_order` 真实经过预期的内部路径。
+
+## Nodeset / loop 中的 global_state 与 execution lock
+
+Core 会穿过普通 nodeset、嵌套 nodeset 和 `loop.body` 递归传播 implemented `global_state`。只要任一真实可执行后代包含该语义，root Architecture/WorkflowPlan 就显示 `contains_global_state=true` / `root_exclusive=true`，Python root run 在调度任何 node 或 hook 前以 exclusive 模式取得进程级 execution lease。普通 root 以 shared 模式进入同一域。planned global-state 及 planned body 只用于 Architecture/Mermaid/SVG 审查，不触发权限、锁或 `contains_global_state`。
+
+在 nodeset 或 loop 调用点配置 `"execution_lock": {"key": "project.resource"}` 时，该锁保护整个子 block，不是只保护进入动作。嵌套 nodeset/loop 和受管理线程继承同一 lease；同一用户 key 可重入，已持有一个用户 key 时再请求不同 key 会编译失败。互不嵌套的不同 sibling key 仍可并行；锁不授予任何副作用权限。
+
+受 global-state 或显式锁保护的 nodeset/loop 禁止 detached；`result_key` 只有能静态证明存在无条件 scheduled consumer path、结果必会 join 时才合法。成功/失败 hook 和已启动的受保护 future 收尾完成后 lease 才释放。global-state 修改不会因为退出 nodeset/loop 而自动恢复或 rollback；需要临时修改时，在同一 global-state node 内使用 `try/finally`。展开图中 global-state 仍使用 Mermaid `cloud` 形状，并显示 effect scope / execution lock。
 
 ## 在主 config 中导入和调用
 

@@ -24,6 +24,8 @@ VibeFlow 可以把同一份 workflow 编译为普通 JavaScript ESM。生成物�
 - 顶层输入输出 Schema、Capability 注入、Host Extension、trace、取消和调用级异步任务清理；
 - 条件、合流、nodeset、有限或永久循环、原生 Port 及其他可移植的 VibeFlow 执行语义。
 
+JavaScript Target v1 明确不支持 implemented `flow_kind="global_state"`，也不支持 implemented pipeline、node 或 nodeset 的 `execution_lock`。这两个名称属于语言无关 Core 语义，但当前 JS `TargetFeatureSet` 不声明 `global_state` / `execution_locks`；验证或构建可执行计划时统一以 `TARGET.FEATURE.UNSUPPORTED` 失败。planned `global_state` 与 planned call 上的 lock 声明可以作为 Architecture/review 信息，但不取得权限、不加锁，也不会成为 JS 可执行内容。
+
 AOT 是构建过程，不是把 VibeFlow 解释器搬进浏览器。emitter 会把每个
 workflow、nodeset 和 loop 展开成具体函数，把节点调用、路由、条件和合流
 写成该流程专用的静态控制流；产物只保留 ABI、Schema、错误、trace、取消和
@@ -567,7 +569,7 @@ console.log(result.greeting);
 
 ## 6. 顶层 Workflow ABI
 
-JS AOT 使用 `vibeflow.workflow.v2`。`entry_mode` 缺省为 `sync`，构建产物只导出匹配当前模式的入口：
+JS AOT 使用 `vibeflow.workflow.v3`；`vibeflow.workflow.v2` 会被显式拒绝，不按缺省字段静默升级。公共 v3 IR 可以携带 node `effect_scope`，以及 workflow/block/node 的 `execution_lock`、`contains_global_state` 和适用层级的 `root_exclusive`，但 JavaScript Target v1 只接受不要求 global-state 或 execution-lock feature 的可执行计划。`entry_mode` 缺省为 `sync`，构建产物只导出匹配当前模式的入口：
 
 ```ts
 export type WorkflowTraceMode = "off" | "boundary" | "full";
@@ -603,6 +605,8 @@ export function runWorkflowAsync(
 - `AbortSignal` 在调用前取消时阻止所有 node，在执行中取消时停止后续调度，并传给异步 Capability；
 - 取消是协作式的，不能强制终止忽略 signal 的 Promise 或同步死循环；
 - detached 任务属于发起它的异步调用，入口会在返回前等待并清理；超出 `detachedTimeoutMs` 会 reject。
+
+这里的“每次调用独立”是 JS 生成程序的 invocation 隔离，不是进程级 execution lease，也不承诺隔离第三方库的模块全局状态。需要传递普通 model/cache 对象时使用显式输入输出；需要宿主能力时使用 Capability；需要跨调用的宿主生命周期接线时使用 Host Extension。不要用模块全局变量模拟 `global_state`，也不要把 `execution_lock` 降级成无效注解。
 
 默认 trace 模式是 `boundary`，默认 detached 清理超时为 5000 ms。`onTrace` 抛错时，workflow 会以 trace sink 错误 reject。
 
@@ -865,12 +869,15 @@ npx playwright test
 JS/Web AOT 只接受可静态检查、可移植的流程：
 
 - 不会把 Python node 自动翻译成 JavaScript；
+- implemented `flow_kind=global_state`、`effect_scope=global_state`、`contains_global_state=true` 和任何非空 `execution_lock` 均以 `TARGET.FEATURE.UNSUPPORTED` 拒绝；JS v1 不实现 process-wide execution lease、锁 trace 或自动 global-state 互斥；
 - `python_stub`、delegate-cli、任意 Python 对象和 Python Plugin 实现不能进入 JS target；JS/TS Plugin 必须使用当前 Target 的 descriptor 与 `vibeflow.plugin.v1`；
 - workflow 使用的普通 node 和 `base_lib` 必须有唯一的、与本次 `build --target` 匹配的 JS/TS 实现；
 - node 参数、输入输出和 Capability 边界必须是 JSON 可表达的数据；
 - 绕过流程图的动态 import、未归属后台任务、worker/WASM/资源模式或递归 nodeset会在构建期失败；
 - Web Worker executor 尚未实现；JS TaskPlan 首版使用 event loop；
 - VibeFlow 只生成通用 Capability/Host Extension ABI 和核心 Port 契约，不内置任何具体宿主接线。
+
+Capability 与 Host Extension 不能自动替代 `global_state` 或 `execution_lock`：前者是显式宿主依赖，后者是 Core 的并发语义。若未来 JS Target 实现这些 feature，必须先遵守同一 WorkflowPlan v3 字段、Target feature gating、lease 生命周期和 trace 契约，不能只放宽 frontend parser。
 
 构建只因违反 VibeFlow 契约、缺少所选 target 实现，或 esbuild 无法生成完整产物而失败。普通语言、平台和业务问题由项目工具与真实运行测试负责。
 

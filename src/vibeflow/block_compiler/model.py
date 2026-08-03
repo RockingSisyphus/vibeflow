@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping, TypeAlias
 
 
-WORKFLOW_ABI_VERSION = "vibeflow.workflow.v2"
+WORKFLOW_ABI_VERSION = "vibeflow.workflow.v3"
 _CARDINALITIES = frozenset({"exactly_one", "optional_one", "all"})
 _BLOCK_KINDS = frozenset({"workflow", "nodeset", "loop"})
 _CONDITION_OPERATORS = frozenset({"==", "!="})
@@ -16,6 +16,7 @@ _ENTRY_MODES = frozenset({"sync", "async"})
 _COMPLETIONS = frozenset({"immediate", "suspend"})
 _SCHEDULES = frozenset({"inline", "deferred", "detached"})
 _EXECUTORS = frozenset({"current", "event_loop", "thread"})
+_EXECUTION_LOCK_SCOPES = frozenset({"root", "block", "node"})
 
 JsonScalar: TypeAlias = None | bool | int | float | str
 
@@ -82,6 +83,30 @@ class SourceRef:
 
     def to_dict(self) -> dict[str, str]:
         return {"kind": self.kind, "ref": self.ref, "export": self.export}
+
+
+@dataclass(frozen=True)
+class ExecutionLockPlan:
+    key: str
+    scope: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.key, str) or not self.key.strip():
+            raise PortablePlanError("execution lock key must be non-empty")
+        normalized = self.key.strip()
+        if normalized.startswith("vibeflow."):
+            raise PortablePlanError(
+                "execution lock key uses reserved prefix 'vibeflow.'"
+            )
+        if self.scope not in _EXECUTION_LOCK_SCOPES:
+            raise PortablePlanError(
+                "execution lock scope must be one of "
+                f"{sorted(_EXECUTION_LOCK_SCOPES)}"
+            )
+        object.__setattr__(self, "key", normalized)
+
+    def to_dict(self) -> dict[str, str]:
+        return {"key": self.key, "scope": self.scope}
 
 
 @dataclass(frozen=True)
@@ -296,6 +321,9 @@ class NodeCallPlan:
     executor: str = "current"
     io_operation: str = ""
     io_port: str = ""
+    effect_scope: str = "none"
+    execution_lock: ExecutionLockPlan | None = None
+    contains_global_state: bool = False
 
     def __post_init__(self) -> None:
         if self.completion not in _COMPLETIONS:
@@ -309,6 +337,18 @@ class NodeCallPlan:
         if self.executor not in _EXECUTORS:
             raise PortablePlanError(
                 f"node executor must be one of {sorted(_EXECUTORS)}"
+            )
+        if not isinstance(self.effect_scope, str) or not self.effect_scope:
+            raise PortablePlanError("node effect_scope must be non-empty")
+        if self.execution_lock is not None and not isinstance(
+            self.execution_lock, ExecutionLockPlan
+        ):
+            raise PortablePlanError(
+                "node execution_lock must be an ExecutionLockPlan or null"
+            )
+        if not isinstance(self.contains_global_state, bool):
+            raise PortablePlanError(
+                "node contains_global_state must be a boolean"
             )
 
     def to_dict(self) -> dict[str, object]:
@@ -340,6 +380,13 @@ class NodeCallPlan:
             "executor": self.executor,
             "io_operation": self.io_operation,
             "io_port": self.io_port,
+            "effect_scope": self.effect_scope,
+            "execution_lock": (
+                self.execution_lock.to_dict()
+                if self.execution_lock is not None
+                else None
+            ),
+            "contains_global_state": self.contains_global_state,
         }
 
 
@@ -399,10 +446,25 @@ class BlockPlan:
     max_steps: int
     tasks: tuple[TaskPlan, ...] = ()
     loop: LoopPlan | None = None
+    execution_lock: ExecutionLockPlan | None = None
+    contains_global_state: bool = False
+    root_exclusive: bool = False
 
     def __post_init__(self) -> None:
         if self.kind not in _BLOCK_KINDS:
             raise PortablePlanError(f"block kind must be one of {sorted(_BLOCK_KINDS)}")
+        if self.execution_lock is not None and not isinstance(
+            self.execution_lock, ExecutionLockPlan
+        ):
+            raise PortablePlanError(
+                "block execution_lock must be an ExecutionLockPlan or null"
+            )
+        if not isinstance(self.contains_global_state, bool):
+            raise PortablePlanError(
+                "block contains_global_state must be a boolean"
+            )
+        if not isinstance(self.root_exclusive, bool):
+            raise PortablePlanError("block root_exclusive must be a boolean")
 
     def node(self, node_id: str) -> NodeCallPlan:
         for node in self.nodes:
@@ -426,6 +488,13 @@ class BlockPlan:
             "max_steps": self.max_steps,
             "tasks": [item.to_dict() for item in self.tasks],
             "loop": self.loop.to_dict() if self.loop is not None else None,
+            "execution_lock": (
+                self.execution_lock.to_dict()
+                if self.execution_lock is not None
+                else None
+            ),
+            "contains_global_state": self.contains_global_state,
+            "root_exclusive": self.root_exclusive,
         }
 
 
@@ -440,11 +509,33 @@ class WorkflowPlan:
     blocks: tuple[BlockPlan, ...]
     max_steps: int
     entry_mode: str = "sync"
+    execution_lock: ExecutionLockPlan | None = None
+    contains_global_state: bool = False
+    root_exclusive: bool = False
 
     def __post_init__(self) -> None:
+        if self.abi_version != WORKFLOW_ABI_VERSION:
+            raise PortablePlanError(
+                f"workflow ABI must be '{WORKFLOW_ABI_VERSION}', got "
+                f"'{self.abi_version}'"
+            )
         if self.entry_mode not in _ENTRY_MODES:
             raise PortablePlanError(
                 f"workflow entry_mode must be one of {sorted(_ENTRY_MODES)}"
+            )
+        if self.execution_lock is not None and not isinstance(
+            self.execution_lock, ExecutionLockPlan
+        ):
+            raise PortablePlanError(
+                "workflow execution_lock must be an ExecutionLockPlan or null"
+            )
+        if not isinstance(self.contains_global_state, bool):
+            raise PortablePlanError(
+                "workflow contains_global_state must be a boolean"
+            )
+        if not isinstance(self.root_exclusive, bool):
+            raise PortablePlanError(
+                "workflow root_exclusive must be a boolean"
             )
 
     def block(self, block_id: str) -> BlockPlan:
@@ -464,6 +555,13 @@ class WorkflowPlan:
             "blocks": [item.to_dict() for item in self.blocks],
             "max_steps": self.max_steps,
             "entry_mode": self.entry_mode,
+            "execution_lock": (
+                self.execution_lock.to_dict()
+                if self.execution_lock is not None
+                else None
+            ),
+            "contains_global_state": self.contains_global_state,
+            "root_exclusive": self.root_exclusive,
         }
 
     def to_json(self) -> str:

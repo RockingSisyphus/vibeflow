@@ -71,14 +71,16 @@ class AddNode:
 | `data_store` | 数据存储交互 |
 | `document` | 文档、文件或外部资源交互 |
 | `preparation` | 准备 / 初始化 |
+| `global_state` | Target execution domain 内的易失 ambient state |
 
 `flow_kind` 与 `external` 一起决定内核派生的 `effect_scope`：
 
 | 实现分类 | effect_scope | 允许能力 |
 | --- | --- | --- |
-| 其他普通 implemented（即非 `io` / `document` / `data_store`，且 `external=False`） | `none` | 无业务 IO |
+| 其他普通 implemented（即非 `io` / `document` / `data_store` / `global_state`，且 `external=False`） | `none` | 无业务 IO |
 | `flow_kind=io` | `terminal` | stdin/stdout/stderr、`print`、`input`、`argparse` |
 | `flow_kind=document` / `data_store` | `python_io` | 文件、环境、网络、数据库、subprocess、终端 |
+| `flow_kind=global_state` 且 `external=False` | `global_state` | 仅 Target execution domain 内的易失 ambient state |
 | 任意 `flow_kind` + `external=True` | `trusted` | 最高优先级信任边界 |
 | plugin | `trusted` | 信任边界 |
 | planned `python_stub` | `none` | 无业务 IO |
@@ -107,6 +109,26 @@ NODE_INFO = NodeInfo(..., flow_kind="process", external=True)
 
 `external=True` 是“实现由第三方或外部维护”的最高优先级信任边界，使有效 `effect_scope=trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 purity/IO 绕过；不要为了让内部代码通过检查而滥用。它不改变 `flow_kind` 形状，不代表 decision，也不会让 cycle 合法化；审查图只在原形状上叠加 `[EXTERNAL]` 标题和 `7px` non-scaling 粗边框。契约、拓扑、输出 key、`flow_kind` 和 trace 仍然被检查。
 
+## global_state node
+
+`global_state` 是 Core 的语言无关流程语义，不是名为 `vibeflow.global_state` 的系统 node。项目仍自行实现、注册普通 node：
+
+```python
+NODE_INFO = NodeInfo(
+    ...,
+    flow_kind="global_state",
+    external=False,
+)
+```
+
+Target 定义自己的 execution domain。Python Target 将其实现为当前解释器进程，并只额外允许修改进程内易失 ambient state，例如 RNG、运行时默认选项、backend flag、全局 cache 或 registry。它不继承 `terminal` 或 `python_io`：文件、环境变量、网络、数据库、终端、subprocess、线程/进程创建、`eval` / `exec` / `compile`、动态 import、`ctypes` / `cffi`、动态库载入和任意直接 FFI 仍禁止。
+
+项目源码、本地 helper 与可解析的静态 import chain 都会在执行前接受 AST preflight，加载后继续现有质量与副作用检查。静态导入第三方计算库本身不要求 `external=True`；只有运行时 callback、外部实现引用或无法审计的边界继续使用 `external=True`。Core 和审计规则不按具体第三方库名称维护白名单。
+
+普通 Python 对象仍作为 envelope value 按引用流转，并通过 `requires` / `provides` 暴露输入输出；`global_state` 不新增隐式黑板、对象通道或 Provider 权限。其 `CONTRACT.examples` 只检查结构，不执行。
+
+global-state 修改默认持久且非事务。成功、失败或取消后，VibeFlow 都不 snapshot、rollback 或自动恢复。若修改只应临时生效，必须在同一个 node 内用 `try/finally` 保存并恢复原值；不能依赖可能未执行的后续 node。Architecture/Mermaid/SVG 将它固定显示为 `cloud`，并展示派生 effect scope 与适用 execution lock，不展示 Provider 信息。
+
 ## 必填契约
 
 `CONTRACT` 必须是 `NodeContract` 实例。
@@ -121,7 +143,7 @@ NODE_INFO = NodeInfo(..., flow_kind="process", external=True)
 
 `requires` 不允许重复 type；`provides` 不允许重复 key。旧的字符串契约不再支持。
 
-`effect_scope=none` 的普通 node 会执行 examples 以验证最小样例。`terminal` / `python_io` 或 `external=True` node 的 examples 可能触发真实副作用，内核只检查其结构，不执行。
+`effect_scope=none` 的普通 node 会执行 examples 以验证最小样例。`terminal` / `python_io` / `global_state` 或 `external=True` node 的 examples 可能触发真实副作用，内核只检查其结构，不执行。
 
 `examples` 只写：
 
@@ -188,8 +210,10 @@ Runtime 允许输出任意 Python 对象，并按引用传给下游；不要求�
 - `playwright` / `selenium`
 - `eval` / `exec` / `compile` / `__import__`
 - `importlib.import_module`
+- `_thread` / `threading` / `concurrent.futures` / `multiprocessing`
+- `ctypes` / `cffi` / 动态库载入或直接 FFI
 
-`effect_scope=terminal` 只额外开放真实 stdin/stdout/stderr、`print`、`input` 和 `argparse`，不开放文件、环境、网络、数据库或 subprocess。`python_io` 可以使用这些 Python IO 能力。`trusted` 跳过这组实现限制，由项目承担信任责任。
+`effect_scope=terminal` 只额外开放真实 stdin/stdout/stderr、`print`、`input` 和 `argparse`，不开放文件、环境、网络、数据库或 subprocess。`python_io` 可以使用这些 Python IO 能力。`global_state` 只开放当前进程的易失 ambient state，不开放上述 IO、并发创建、动态代码、动态 import 或 FFI。`trusted` 跳过这组实现限制，由项目承担信任责任。
 
 node 不能导入其他 node，不能直接调用其他 node，不能读取其他 node 的 `NODE_INFO` 或 `CONTRACT`。
 

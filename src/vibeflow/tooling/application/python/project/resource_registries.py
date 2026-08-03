@@ -9,6 +9,7 @@ from typing import Any, Mapping
 from vibeflow.tooling.project.resource_helpers import _finding
 from vibeflow.tooling.application.python.project.resources import BaseLibRegistry, ConfigResources, PluginResourceRegistry
 from vibeflow.core.findings import HealthFinding
+from vibeflow.tooling.application.python.project.source_preflight import preflight_python_import_tree
 
 
 @dataclass(frozen=True)
@@ -87,6 +88,7 @@ def _find_registry_file(start: Path) -> Path | None:
 
 
 def _import_resource_registry_file(path: Path):
+    preflight_python_import_tree(path, project_root=path.parent)
     module_name = f"_vibeflow_resource_registry_{abs(hash(path.resolve()))}"
     parent = str(path.parent.resolve())
     inserted = parent not in sys.path

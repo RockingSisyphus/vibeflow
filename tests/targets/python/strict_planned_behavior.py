@@ -148,6 +148,65 @@ def run_stub(inputs, params):
     assert stub_event["details"]["output_keys"] == ["value.out"]
 
 
+def test_planned_global_state_stub_is_visible_without_execution_privileges(
+    tmp_path,
+) -> None:
+    _stub_project(
+        tmp_path,
+        """
+def run_stub(inputs, params):
+    return {"value.out": inputs["value.in"]["value"]}
+""",
+    )
+    config = _planned_stub_config()
+    stub = config["pipeline"]["nodes"][1]
+    stub["flow_kind"] = "global_state"
+    stub["execution_lock"] = {"key": "project.planned"}
+    graph = parse_graph_config(config, project_root=tmp_path)
+    runtime = PipelineRuntime(
+        graph,
+        registry=_registry(),
+        run_dir=tmp_path / "planned-global",
+        runtime_options=RuntimeOptions(allow_planned_stub=True),
+    )
+
+    assert runtime._plan.contains_global_state is False
+    assert runtime._plan.contains_execution_locks is False
+    portable = runtime._plan.to_workflow_plan()
+    planned = portable.block(portable.entry_block).node("stub")
+    assert portable.contains_global_state is False
+    assert portable.root_exclusive is False
+    assert planned.status == "planned"
+    assert planned.flow_kind == "global_state"
+    assert planned.contains_global_state is False
+    assert planned.execution_lock.key == "project.planned"
+
+    result = runtime.run({"value.in": 5})
+    events = [
+        json.loads(line)
+        for line in Path(result.get("runtime.trace_path"))
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if line
+    ]
+    assert not any(
+        event["kind"].startswith("global_state_")
+        for event in events
+    )
+    assert not any(
+        event.get("details", {}).get("key") == "project.planned"
+        for event in events
+    )
+    global_acquired = next(
+        event
+        for event in events
+        if event["kind"] == "lock_acquired"
+        and event.get("details", {}).get("key")
+        == "vibeflow.runtime.global_state"
+    )
+    assert global_acquired["details"]["mode"] == "shared"
+
+
 def test_python_stub_default_run_refuses_and_allow_flag_is_behavior_strict(tmp_path) -> None:
     config_path, _ = _stub_project(
         tmp_path,

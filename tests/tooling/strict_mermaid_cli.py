@@ -1,3 +1,5 @@
+from xml.etree import ElementTree
+
 from tests.fixtures.support.strict_support import *
 
 
@@ -119,6 +121,52 @@ def test_mermaid_svg_label_enhancement_styles_native_text_without_touching_edges
     edge_text = text[text.index('<g class="edgeLabel"') :]
     assert 'font-weight="normal">id:</tspan>' in edge_text
     assert 'font-weight="700">id:</tspan>' not in edge_text
+
+
+def test_mermaid_svg_label_enhancement_recenters_native_cloud_text(tmp_path) -> None:
+    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
+
+    svg = tmp_path / "cloud.svg"
+    svg.write_text(
+        """
+<svg xmlns="http://www.w3.org/2000/svg">
+  <g class="node defaultNode vibeflowCloudNode">
+    <path class="basic label-container" transform="translate(-120, -80)"/>
+    <g class="label" transform="translate(-110.5, -72.25)">
+      <text><tspan class="text-outer-tspan row" x="0"><tspan>Global State</tspan></tspan></text>
+    </g>
+  </g>
+  <g class="node defaultNode">
+    <rect class="basic label-container" x="-80" width="160"/>
+    <g class="label" transform="translate(-12, -20)">
+      <text><tspan class="text-outer-tspan row" x="0"><tspan>Ordinary</tspan></tspan></text>
+    </g>
+  </g>
+</svg>
+""".strip(),
+        encoding="utf-8",
+    )
+
+    mermaid_render._enhance_svg_labels(svg)
+    root = ElementTree.parse(svg).getroot()
+    nodes = [
+        group
+        for group in root.iter()
+        if group.tag.endswith("}g") and "node" in group.attrib.get("class", "").split()
+    ]
+    cloud_label = next(
+        child
+        for child in list(nodes[0])
+        if child.tag.endswith("}g") and "label" in child.attrib.get("class", "").split()
+    )
+    ordinary_label = next(
+        child
+        for child in list(nodes[1])
+        if child.tag.endswith("}g") and "label" in child.attrib.get("class", "").split()
+    )
+
+    assert cloud_label.attrib["transform"] == "translate(0, -72.25)"
+    assert ordinary_label.attrib["transform"] == "translate(-12, -20)"
 
 
 def test_mermaid_renderer_finds_distribution_kernel_tool_path(tmp_path, monkeypatch) -> None:
