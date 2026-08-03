@@ -26,7 +26,8 @@ node_modules/
 htmlcov/
 .coverage
 coverage.xml
-references/
+/references/*
+!/references/README.md
 
 # Local build, test, document-rendering, and release artifacts.
 /tmp/
