@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 
-ABI_VERSION = "vibeflow.workflow.v2"
+ABI_VERSION = "vibeflow.workflow.v3"
 CARDINALITIES = frozenset({"exactly_one", "optional_one", "all"})
 JOIN_POLICIES = frozenset({"safe_any", "any_active", "all"})
 ASYNC_MODES = frozenset({"", "result_key", "detached"})

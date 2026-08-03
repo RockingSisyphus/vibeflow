@@ -7,6 +7,7 @@ from typing import Mapping
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
 from vibeflow.core.flow import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, LoopSpec, NodeSpec, STATUS_PLANNED
+from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE
 from vibeflow.core.planned import effective_planned_behavior
 from vibeflow.targets.python.project.node import EFFECT_SCOPE_NONE, EFFECT_SCOPE_TRUSTED, effective_effect_scope
 from vibeflow.tooling.application.python.presentation.helpers import compile_for_render
@@ -111,11 +112,25 @@ def _graph_body_document(
     *,
     registry: object | None,
 ) -> dict[str, object]:
+    contains_global_state = _graph_contains_global_state(
+        graph,
+        compiled,
+        registry=registry,
+    )
     return {
         "inputs": providers_to_dicts(graph.inputs),
         "outputs": requirements_to_dicts(graph.outputs),
         "max_steps": graph.max_steps,
         "entry_mode": graph.entry_mode,
+        "execution_lock": (
+            _execution_lock_payload(graph.execution_lock, scope="root")
+            if graph.execution_lock is not None
+            else None
+        ),
+        "contains_global_state": contains_global_state,
+        "root_exclusive": (
+            contains_global_state or graph.execution_lock is not None
+        ),
         "nodes": [_node_document(graph, compiled, node, registry=registry) for node in graph.nodes],
         "edges": [_edge_document(graph, compiled, edge) for edge in compiled.effective_edges],
     }
@@ -142,6 +157,30 @@ def _node_document(
             "target": invocation.target,
             "target_status": invocation.nodeset.status,
         }
+    contains_global_state = (
+        node.status != STATUS_PLANNED
+        and node_flow_kind(node, compiled) == FLOW_KIND_GLOBAL_STATE
+    )
+    if (
+        not planned
+        and invocation is not None
+        and invocation.nodeset.status != STATUS_PLANNED
+    ):
+        try:
+            child_compiled = compile_for_render(
+                invocation.nodeset.graph,
+                None,
+                registry,
+            )
+        except Exception:
+            child_compiled = None
+        if child_compiled is not None:
+            contains_global_state = _graph_contains_global_state(
+                invocation.nodeset.graph,
+                child_compiled,
+                registry=registry,
+                visiting=(invocation.target,),
+            )
     return {
         "id": node.id,
         "type_used": node.type_used,
@@ -149,6 +188,12 @@ def _node_document(
         "role": node_review_metadata(graph, node, registry),
         "flow_kind": node_flow_kind(node, compiled),
         "effect_scope": node_review_effect_scope(graph, node, registry),
+        "execution_lock": (
+            _execution_lock_payload(node.execution_lock, scope="node")
+            if node.execution_lock is not None
+            else None
+        ),
+        "contains_global_state": contains_global_state,
         "status": node.status,
         "planned_behavior": effective_planned_behavior(node, target).to_dict() if planned else None,
         "requires": requirements_to_dicts(node.requires),
@@ -164,6 +209,45 @@ def _node_document(
             "allow_config_override": node.allow_config_override,
         },
     }
+
+
+def _execution_lock_payload(lock: object, *, scope: str) -> dict[str, str]:
+    return {"key": str(getattr(lock, "key", "")), "scope": scope}
+
+
+def _graph_contains_global_state(
+    graph: GraphConfig,
+    compiled: CompiledGraph,
+    *,
+    registry: object | None,
+    visiting: tuple[str, ...] = (),
+) -> bool:
+    for node in graph.nodes:
+        if node.status == STATUS_PLANNED:
+            continue
+        if node_flow_kind(node, compiled) == FLOW_KIND_GLOBAL_STATE:
+            return True
+        invocation = invocation_for_node(graph, node)
+        if invocation is None or invocation.nodeset.status == STATUS_PLANNED:
+            continue
+        if invocation.target in visiting:
+            continue
+        try:
+            child_compiled = compile_for_render(
+                invocation.nodeset.graph,
+                None,
+                registry,
+            )
+        except Exception:
+            continue
+        if _graph_contains_global_state(
+            invocation.nodeset.graph,
+            child_compiled,
+            registry=registry,
+            visiting=(*visiting, invocation.target),
+        ):
+            return True
+    return False
 
 
 def _edge_document(graph: GraphConfig, compiled: CompiledGraph, edge: object) -> dict[str, object]:

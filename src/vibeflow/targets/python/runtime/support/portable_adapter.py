@@ -8,6 +8,7 @@ from vibeflow.block_compiler.compiler import (
     _block,
     _block_id,
     _executor,
+    _execution_lock_plan,
     _graph_source,
     _loop_plan,
     _normalize_source_map,
@@ -99,6 +100,15 @@ def workflow_plan_from_execution_plan(
         blocks=tuple(adapter.blocks),
         max_steps=execution_plan.max_steps,
         entry_mode=graph.entry_mode,
+        execution_lock=_execution_lock_plan(
+            graph.execution_lock,
+            scope="root",
+        ),
+        contains_global_state=execution_plan.contains_global_state,
+        root_exclusive=(
+            execution_plan.contains_global_state
+            or graph.execution_lock is not None
+        ),
     )
 
 
@@ -127,10 +137,12 @@ class _ExecutionPlanAdapter:
             frame = execution_plan.frames[spec.id]
             child_path = (*path, spec.id)
             child_block = (
-                _block_id(child_path) if frame.subplan is not None else ""
+                _block_id(child_path)
+                if frame.subplan is not None and not frame.is_planned
+                else ""
             )
             nodes.append(self._node(spec, frame, child_block=child_block))
-            if frame.subplan is not None:
+            if frame.subplan is not None and not frame.is_planned:
                 child_kind = "loop" if frame.is_loop else "nodeset"
                 child_loop = _loop_plan(spec.loop) if frame.is_loop else None
                 children.append(
@@ -144,6 +156,18 @@ class _ExecutionPlanAdapter:
                 kind=kind,
                 loop=loop,
                 nodes=tuple(nodes),
+                execution_lock=_execution_lock_plan(
+                    graph.execution_lock,
+                    scope="root" if not path else "block",
+                ),
+                contains_global_state=execution_plan.contains_global_state,
+                root_exclusive=(
+                    not path
+                    and (
+                        execution_plan.contains_global_state
+                        or graph.execution_lock is not None
+                    )
+                ),
             )
         )
         for subplan, child_path, child_kind, child_loop in children:
@@ -184,7 +208,7 @@ class _ExecutionPlanAdapter:
             ),
             flow_kind=frame.flow_kind,
             join_policy=frame.join_policy,
-            status=spec.status,
+            status=frame.status,
             planned_behavior=frame.planned_behavior.kind,
             async_mode=frame.async_mode,
             result_key=frame.result_key,
@@ -204,7 +228,26 @@ class _ExecutionPlanAdapter:
             ),
             io_operation=spec.io.operation,
             io_port=spec.io.port if spec.io.operation else "",
+            effect_scope=execution_plan_effect_scope(frame),
+            execution_lock=_execution_lock_plan(
+                frame.execution_lock,
+                scope="node",
+            ),
+            contains_global_state=(
+                not frame.is_planned
+                and (
+                    frame.flow_kind == "global_state"
+                    or (
+                        frame.subplan is not None
+                        and frame.subplan.contains_global_state
+                    )
+                )
+            ),
         )
+
+
+def execution_plan_effect_scope(frame: Any) -> str:
+    return "global_state" if frame.flow_kind == "global_state" else "none"
 
 
 __all__ = ["build_workflow_plan", "workflow_plan_from_execution_plan"]

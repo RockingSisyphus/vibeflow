@@ -7,6 +7,7 @@ from vibeflow.tooling.project.schema_common import (
     _non_empty_string,
     _provider_keys,
     _validate_node_configs,
+    _validate_execution_lock,
     _validate_positive_int,
     _validate_provider_list,
     _validate_requirement_list,
@@ -35,6 +36,12 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
     _validate_node_join_policy(value, prefix, findings)
     _validate_node_loop(value, prefix, findings)
     _validate_node_io(value, prefix, findings)
+    if "execution_lock" in value:
+        _validate_execution_lock(
+            value["execution_lock"],
+            f"{prefix}.execution_lock",
+            findings,
+        )
 
 def _validate_node_identity(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
     if "name" in value:
@@ -369,4 +376,3 @@ def _validate_planned_behavior(value: Mapping[str, Any], prefix: str, findings: 
     path_error = validate_stub_module_ref(str(stub_module))
     if path_error:
         findings.append(_error("GRAPH.PLANNED.STUB_MODULE", f"{prefix}.planned_behavior.stub_module {path_error}", f"{prefix}.planned_behavior.stub_module"))
-

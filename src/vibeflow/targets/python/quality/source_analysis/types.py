@@ -5,7 +5,12 @@ from typing import Mapping
 
 
 BANNED_IMPORT_ROOTS = {
+    "_ctypes",
+    "_thread",
     "boto3",
+    "cffi",
+    "concurrent",
+    "ctypes",
     "dotenv",
     "httpx",
     "importlib",

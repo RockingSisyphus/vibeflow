@@ -19,22 +19,24 @@ class RuntimeNodeMixin:
         state.inboxes[frame.name] = []
         if frame.async_mode:
             outputs = self._run_async_node(frame, inputs)
-        elif frame.is_io:
-            outputs = self._run_io_node(frame, inputs)
-        elif frame.is_planned_stub:
-            outputs = self._run_planned_stub_node(frame, inputs)
-        elif frame.is_loop:
-            if loop_block(self._plan, frame.name) is not None:
-                outputs = self._run_loop_block_node(frame, inputs)
-            else:
-                outputs = self._run_loop_node(frame, inputs)
-        elif frame.is_nodeset:
-            if nodeset_block(self._plan, frame.name) is not None:
-                outputs = self._run_nodeset_block_node(frame, inputs)
-            else:
-                outputs = self._run_nodeset_node(frame, inputs)
         else:
-            outputs = self._run_pure_node(frame, inputs)
+            with self._frame_execution_scope(frame):
+                if frame.is_io:
+                    outputs = self._run_io_node(frame, inputs)
+                elif frame.is_planned_stub:
+                    outputs = self._run_planned_stub_node(frame, inputs)
+                elif frame.is_loop:
+                    if loop_block(self._plan, frame.name) is not None:
+                        outputs = self._run_loop_block_node(frame, inputs)
+                    else:
+                        outputs = self._run_loop_node(frame, inputs)
+                elif frame.is_nodeset:
+                    if nodeset_block(self._plan, frame.name) is not None:
+                        outputs = self._run_nodeset_block_node(frame, inputs)
+                    else:
+                        outputs = self._run_nodeset_node(frame, inputs)
+                else:
+                    outputs = self._run_pure_node(frame, inputs)
         self._record_node_output_candidates(frame.name, outputs, state)
         return outputs
 

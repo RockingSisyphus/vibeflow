@@ -1,8 +1,20 @@
 from __future__ import annotations
 
 from vibeflow.core.compiler import CompiledGraph
+from vibeflow.core.constants import (
+    EFFECT_SCOPE_GLOBAL_STATE,
+    EFFECT_SCOPE_NONE,
+    FLOW_KIND_GLOBAL_STATE,
+)
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
-from vibeflow.core.flow import EdgeSpec, GraphConfig
+from vibeflow.core.flow import (
+    LOOP_NODE_TYPES,
+    EdgeSpec,
+    GraphConfig,
+    NodeSpec,
+    NodesetSpec,
+    STATUS_PLANNED,
+)
 
 
 def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | None = None) -> dict[str, object]:
@@ -13,6 +25,17 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
     affected = {node: _reachable(node, adjacency) for node in nodes}
     degrees = {node: len(adjacency.get(node, ())) + len(incoming.get(node, ())) for node in nodes}
     threshold = max(4, len(nodes) // 2)
+    declared_global_state = _declared_global_state_by_node(graph)
+    contains_global_state = (
+        compiled.contains_global_state
+        if compiled is not None
+        else any(declared_global_state.values())
+    )
+    root_exclusive = (
+        compiled.root_exclusive
+        if compiled is not None
+        else contains_global_state or graph.execution_lock is not None
+    )
 
     return {
         "summary": {
@@ -21,7 +44,16 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
             "explicit_edges": len(graph.edges),
             "data_edges": len(compiled.data_edges) if compiled is not None else 0,
             "reported_edges": len(edges),
+            "contains_global_state": contains_global_state,
+            "root_exclusive": root_exclusive,
         },
+        "execution_lock": (
+            _execution_lock_payload(graph.execution_lock, scope="root")
+            if graph.execution_lock is not None
+            else None
+        ),
+        "contains_global_state": contains_global_state,
+        "root_exclusive": root_exclusive,
         "entry_nodes": [node for node in nodes if not incoming.get(node)],
         "terminal_nodes": [node for node in nodes if not adjacency.get(node)],
         "god_nodes": [
@@ -33,7 +65,21 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
             {
                 "id": node.id,
                 "type_used": node.type_used,
-                "flow_kind": node.flow_kind,
+                "flow_kind": _effective_flow_kind(node, compiled),
+                "effect_scope": _effective_effect_scope(node, compiled),
+                "execution_lock": (
+                    _execution_lock_payload(node.execution_lock, scope="node")
+                    if node.execution_lock is not None
+                    else None
+                ),
+                "contains_global_state": (
+                    node.status != STATUS_PLANNED
+                    and (
+                        _effective_flow_kind(node, compiled)
+                        == FLOW_KIND_GLOBAL_STATE
+                        or declared_global_state.get(node.id, False)
+                    )
+                ),
                 "requires": requirements_to_dicts(node.requires),
                 "provides": providers_to_dicts(node.provides),
                 "incoming": sorted(incoming.get(node.id, ())),
@@ -43,6 +89,87 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
             for node in graph.nodes
         ],
     }
+
+
+def _execution_lock_payload(lock: object, *, scope: str) -> dict[str, str]:
+    return {"key": str(getattr(lock, "key", "")), "scope": scope}
+
+
+def _effective_flow_kind(node: object, compiled: CompiledGraph | None) -> str:
+    node_id = str(getattr(node, "id", ""))
+    if compiled is not None:
+        return compiled.flow_kinds.get(
+            node_id,
+            str(getattr(node, "flow_kind", "")),
+        )
+    return str(getattr(node, "flow_kind", ""))
+
+
+def _effective_effect_scope(
+    node: object,
+    compiled: CompiledGraph | None,
+) -> str:
+    node_id = str(getattr(node, "id", ""))
+    if compiled is not None and node_id in compiled.effect_scopes:
+        return compiled.effect_scopes[node_id]
+    return (
+        EFFECT_SCOPE_GLOBAL_STATE
+        if _effective_flow_kind(node, compiled) == FLOW_KIND_GLOBAL_STATE
+        else EFFECT_SCOPE_NONE
+    )
+
+
+def _declared_global_state_by_node(graph: GraphConfig) -> dict[str, bool]:
+    return {
+        node.id: _node_declares_global_state(
+            node,
+            graph=graph,
+            nodeset_registry=graph.nodesets,
+            active_nodesets=frozenset(),
+        )
+        for node in graph.nodes
+    }
+
+
+def _node_declares_global_state(
+    node: NodeSpec,
+    *,
+    graph: GraphConfig,
+    nodeset_registry: dict[str, NodesetSpec],
+    active_nodesets: frozenset[str],
+) -> bool:
+    if node.status == STATUS_PLANNED:
+        return False
+    if node.flow_kind == FLOW_KIND_GLOBAL_STATE:
+        return True
+    local_registry = dict(nodeset_registry)
+    local_registry.update(graph.nodesets)
+    target = _declared_nodeset_target(node, local_registry)
+    if not target or target in active_nodesets:
+        return False
+    nodeset = local_registry.get(target)
+    if nodeset is None or nodeset.status == STATUS_PLANNED:
+        return False
+    return any(
+        _node_declares_global_state(
+            child,
+            graph=nodeset.graph,
+            nodeset_registry=local_registry,
+            active_nodesets=active_nodesets | {target},
+        )
+        for child in nodeset.graph.nodes
+    )
+
+
+def _declared_nodeset_target(
+    node: NodeSpec,
+    nodeset_registry: dict[str, NodesetSpec],
+) -> str:
+    if node.type_used in nodeset_registry:
+        return node.type_used
+    if node.type_used in LOOP_NODE_TYPES:
+        return node.loop.body
+    return ""
 
 
 def _adjacency(graph: GraphConfig, edges: tuple[EdgeSpec, ...]) -> dict[str, set[str]]:
@@ -69,4 +196,3 @@ def _reachable(start: str, adjacency: dict[str, set[str]]) -> list[str]:
         seen.add(node)
         stack.extend(adjacency.get(node, ()))
     return sorted(seen)
-

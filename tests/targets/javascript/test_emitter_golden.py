@@ -123,7 +123,7 @@ def _deferred_plan() -> dict[str, object]:
 
 def _detached_plan() -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v2",
+        "abi_version": "vibeflow.workflow.v3",
         "workflow_id": "baseline.detached",
         "entry_mode": "async",
         "inputs": [],
@@ -170,7 +170,7 @@ def _port_plan() -> dict[str, object]:
     )
     send["type_used"] = "vibeflow.io"
     return {
-        "abi_version": "vibeflow.workflow.v2",
+        "abi_version": "vibeflow.workflow.v3",
         "workflow_id": "baseline.port",
         "entry_mode": "async",
         "inputs": [],
@@ -232,54 +232,54 @@ def _emission_cases() -> dict[str, tuple[dict[str, object], tuple[dict, ...]]]:
 # semantic plan.  Update them only after reviewing an intentional ABI change.
 EMISSION_GOLDENS = {
     "sync": (
-        "db4efe92715e7487d0c43ed3c18fd751dabed1cebcd60946c1376c373ef3d859",
-        "dd0f3dc4d13cf8c3d29cdbfca7fc91afb0110d0ca1427d85b1e7c72e2c67c83c",
-        "647cc1392cf87d016ad27e19beff02d6d069ccda1e4c92aee20b29961c55d125",
+        "906fb8154488083141db695258c540b345b5132a9dcf14d84a015666dd1a2e4e",
+        "ab3a75891469ecfcb5037b77be2636af468d18118764070b4f014efa431e6340",
+        "f0ed73610ace12d891243ca3d53fcf49fbf652798f7545bd88de567972267f7a",
     ),
     "async": (
-        "5994b3ddeb92a687e7aae0c1006699b868bd69775434b722472f455d71467da7",
-        "d0586ad8be6682d31a6db68ac9d6b0695b7642c1e3840feee6dc560e41840c77",
-        "6c8130e53e36301ca4681efc508589012d2f1395605d4f68e979b45f4636bc0d",
+        "36f10b3005ff50443b68c3b3df2a3743db7f7ad525a4b2ccbc67c6f360b526fd",
+        "a402e0deda0ed9b4ecc91db4d667a84ddb7aed3af75bd9a50b6879694451e662",
+        "c2b95d35fc70e911cc64be1f6bbec9b0c2d5f123dc0d51dbe0773d08026b9da3",
     ),
     "nested_nodeset": (
-        "0d2cedeeeeb2962c7e3d93677813c84f4e8e102106495b64feba49d300ad784e",
-        "dd0f3dc4d13cf8c3d29cdbfca7fc91afb0110d0ca1427d85b1e7c72e2c67c83c",
-        "1890c50bbdbe71dd80e2d4e955a272e291dd53a20fd770639104601c570d117f",
+        "a1d5400d83667a5c480b6257d225745801098ab5bb9356677c6b67eca7b06906",
+        "ab3a75891469ecfcb5037b77be2636af468d18118764070b4f014efa431e6340",
+        "8cfa9c10e7c1b2e24c23e5fe59838d4a7c6c4c556106121ea072f0a368c82d0b",
     ),
     "bounded_loop": (
-        "f7038af61285d77f524692dfac611c7b2d5ba8ec4dd628a19ac337b33627ab0c",
-        "dd0f3dc4d13cf8c3d29cdbfca7fc91afb0110d0ca1427d85b1e7c72e2c67c83c",
-        "1edb9e76ca6269131b74403b50c0ab2cc2d39376ef31b20d95a4ac27705694b5",
+        "5abdc52e28dbe1f9b720d133fbfcc3179f77c64cbee00d1c6badbb9a5c2a7687",
+        "ab3a75891469ecfcb5037b77be2636af468d18118764070b4f014efa431e6340",
+        "14cca6c29c95d54bdf98d779a7aae13f88fe7fbd0e4ef818551a57028ac91ee5",
     ),
     "unbounded_loop": (
-        "2e757f2abb9c00a770319892172a973d0db62159eafa43b9d65af33e1edb07ec",
-        "dd0f3dc4d13cf8c3d29cdbfca7fc91afb0110d0ca1427d85b1e7c72e2c67c83c",
-        "8b57e73e80d4f7b8ef8e29db7150407805ae481b42591c28b5419b53cae19792",
+        "85a2016d220fc018c54f03d8bce045e532605f928703e33b638d52e5ad8ec7ea",
+        "ab3a75891469ecfcb5037b77be2636af468d18118764070b4f014efa431e6340",
+        "b528be31ff1a655d0b6e571d7f5ca5ba12e53648a45b1cd274253e65c22e63cc",
     ),
     "deferred": (
-        "16a8725269c2d74fccfa6e39be1a68c137116fa41c5159f30eab686415a5157e",
-        "d0586ad8be6682d31a6db68ac9d6b0695b7642c1e3840feee6dc560e41840c77",
-        "f20b53bd8a256a618467ec6b1afcbd02e391543b270740992b6eeb3a92e723a8",
+        "fe9033b33f1b798a0d68e5a2dc6ef25ee3eea2c1fcf260ba0509941b536c363e",
+        "a402e0deda0ed9b4ecc91db4d667a84ddb7aed3af75bd9a50b6879694451e662",
+        "34e071c537a2bb8cbeeeca9385ea78659fbb403d562bc9548f24b8a355c5ff90",
     ),
     "detached": (
-        "f42ec0bbab2f9b2e702eaebd8ed69a6480a3f9dc9bcad5c753f4f0142fc1ffc4",
-        "34f0265fc5a4ba8a200b257332b4d7370c39712c2e62ebdbd07403444e0c59d7",
-        "7c966aceb1938e165458a653735babad706a2f264715f79a8be389bf3bfe577e",
+        "616fa8aff8506004efdb0526251fa3f8565db814d40c6c2563b6c6a9c64bf23b",
+        "07a27d9336a4e0ccf124144db8b12550ee01fd5889ffb1a3148e24551b661ccc",
+        "cf64439196be7621e79f8540b201c202d300faaa8642ef97507f77959a730c98",
     ),
     "port": (
-        "af59e5ee0f4bef6b3ba3285f7ae235302cd7963a05d607d9b77dcdef6cabd683",
-        "09d1eeaa26188ad47fde7a222b5ecef7dfaf0ff05cf3c5a952e4a914defa3ca5",
-        "b0e5cc9456776a74ac0de29b68c3fa92d4051326f745676fa29a919a3b36c815",
+        "2077343caefecac93452eeeb8b2c0776cf4e2e5f263611408a385acd503b97af",
+        "a1cccb3a05bcece2621a750df1e99dd53c724813b87adbcfd5ce9292ca7ffa19",
+        "1d659bf5ecb782bc18add9ac096a9eb2dc2ab7c9767bbb205ecc68aa3f039b5a",
     ),
     "host_extension": (
-        "9c7c09f0ae0b6d7f95629fdc7a6673a4dc7b397ae9042a39be730828976a8cf7",
-        "9a007aa76be0f7b1b45216b8f479dac7ce383296b940071e3c99647695597e31",
-        "647cc1392cf87d016ad27e19beff02d6d069ccda1e4c92aee20b29961c55d125",
+        "d2f370641c76c6dba6eb0ab498b99add61b7d0abad677d77083b7415f0bb0e85",
+        "2d330af2d05e50919fa822eccda2de2a7904b38019c8880046bc16763a7dbcf4",
+        "f0ed73610ace12d891243ca3d53fcf49fbf652798f7545bd88de567972267f7a",
     ),
 }
 
 NORMALIZED_WORKFLOW_SHA256 = (
-    "b91f35ba85fd628128c3f1c8072fc8897f38084b3c175773ca46585b617f4587"
+    "f46a9e213cdf7fb01d7347bd75d492e3a53f3b0b744f6e2cd0e5c975c78e9203"
 )
 
 
@@ -580,7 +580,7 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
         "files": sorted(manifest["files"]),
     } == {
         "format": "vibeflow.aot-build.v1",
-        "abi_version": "vibeflow.workflow.v2",
+        "abi_version": "vibeflow.workflow.v3",
         "project_target": "javascript",
         "workflow_id": "test.workflow",
         "entry_mode": "sync",

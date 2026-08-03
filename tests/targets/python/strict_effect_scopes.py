@@ -1,8 +1,10 @@
 import ast
+import random
 
 from tests.fixtures.support.strict_support import *
 
 from vibeflow.targets.python.project.node import (
+    EFFECT_SCOPE_GLOBAL_STATE,
     EFFECT_SCOPE_NONE,
     EFFECT_SCOPE_PYTHON_IO,
     EFFECT_SCOPE_TERMINAL,
@@ -11,9 +13,15 @@ from vibeflow.targets.python.project.node import (
 )
 from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document
 from vibeflow.targets.python.project.policy import EffectivePolicy, apply_policy_to_findings
-from vibeflow.targets.python.quality.source_analysis.effects import call_violation
+from vibeflow.targets.python.quality.source_analysis.effects import call_violation, import_violation_code
+from vibeflow.targets.python.quality.source_analysis.preflight import (
+    PythonSourceFact,
+    PythonSourcePreflightError,
+    preflight_python_source_facts,
+)
 from vibeflow.targets.python.quality.source_analysis.types import _SourceInfo
 from vibeflow.targets.python.quality.source_analysis.validators import _validate_examples
+from vibeflow.tooling.application.python.project.source_preflight import preflight_python_import_tree
 
 
 @pytest.fixture(autouse=True)
@@ -134,6 +142,24 @@ class PolicyCannotElevateNode:
         return {}
 
 
+class GlobalStateExampleRaisesNode:
+    NODE_INFO = NodeInfo(
+        "test.global_state_raises",
+        "Global State Raises",
+        "test",
+        "Mutates audited ambient process state.",
+        "0.1.0",
+        "global_state",
+    )
+    CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}},))
+
+    def run_pure(self, inputs, params):
+        global GLOBAL_STATE_EXAMPLE_VALUE
+        GLOBAL_STATE_EXAMPLE_VALUE = 1
+        random.seed(7)
+        raise RuntimeError("global-state examples must not execute")
+
+
 def _info_source(flow_kind: str, *, external: bool = False) -> str:
     external_line = "\n        external=True," if external else ""
     return VALID_NODE_INFO.replace('flow_kind="process",', f'flow_kind="{flow_kind}",{external_line}')
@@ -155,7 +181,184 @@ def test_effect_scope_mapping_preserves_pure_node_abi() -> None:
     assert effective_effect_scope(NodeInfo("demo.process", "Process", "demo", "Trusted process.", "1.0.0", "process", external=True)) == EFFECT_SCOPE_TRUSTED
     assert effective_effect_scope(NodeInfo("demo.external_io", "IO", "demo", "Trusted IO.", "1.0.0", "io", external=True)) == EFFECT_SCOPE_TRUSTED
     assert effective_effect_scope(NodeInfo("demo.external_document", "Document", "demo", "Trusted document.", "1.0.0", "document", external=True)) == EFFECT_SCOPE_TRUSTED
+    assert effective_effect_scope(NodeInfo("demo.global", "Global", "demo", "Ambient state.", "1.0.0", "global_state")) == EFFECT_SCOPE_GLOBAL_STATE
     assert effective_effect_scope(object()) == EFFECT_SCOPE_NONE
+
+
+def test_static_compute_imports_do_not_require_external() -> None:
+    policy = PurityPolicy(max_source_lines=1000)
+
+    for module in ("numpy", "scipy", "torch", "transformers"):
+        assert import_violation_code(module, effect_scope=EFFECT_SCOPE_NONE, policy=policy) == ""
+        assert import_violation_code(module, effect_scope=EFFECT_SCOPE_GLOBAL_STATE, policy=policy) == ""
+
+
+@pytest.mark.parametrize(
+    "run_body",
+    [
+        '        import random\n        random.seed(7)\n        return {"demo.out": 1}',
+        '        import random\n        seed = random.seed\n        seed(7)\n        return {"demo.out": 1}',
+        '        import torch\n        torch.manual_seed(7)\n        return {"demo.out": 1}',
+        '        import torch\n        with torch.no_grad():\n            value = 1\n        return {"demo.out": value}',
+        '        import sys\n        sys.setrecursionlimit(1000)\n        return {"demo.out": 1}',
+        '        import torch\n        torch.backends.cudnn.benchmark = True\n        return {"demo.out": 1}',
+    ],
+)
+def test_none_scope_rejects_ambient_state_mutation(tmp_path, capsys, run_body) -> None:
+    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(run_body=run_body))
+
+    assert code == 1
+    assert {"effect_call", "global_state"} & _legacy_codes(payload)
+
+
+def test_global_state_scope_allows_only_audited_ambient_mutation(tmp_path, capsys) -> None:
+    source = _valid_node_source(
+        info=_info_source("global_state"),
+        run_body="""
+        global GLOBAL_STATE_TEST_CACHE
+        import random
+        import sys
+        import torch
+        GLOBAL_STATE_TEST_CACHE = {}
+        random.seed(7)
+        sys.setrecursionlimit(1000)
+        torch.manual_seed(7)
+        with torch.no_grad():
+            pass
+        torch.set_default_dtype(torch.float64)
+        torch.backends.cudnn.benchmark = True
+        return {"demo.out": 1}
+""".rstrip(),
+    )
+
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+
+    assert code == 0
+    assert payload["node"]["metadata"]["effect_scope"] == EFFECT_SCOPE_GLOBAL_STATE
+
+
+def test_vendor_neutral_ambient_call_classification(tmp_path, capsys) -> None:
+    run_body = """
+        import acme_runtime
+        set_mode = acme_runtime.set_backend_mode
+        set_mode("fast")
+        acme_runtime.seed(7)
+        acme_runtime.reset()
+        return {"demo.out": 1}
+""".rstrip()
+
+    ordinary_code, ordinary_payload = _inspect_node_source(
+        tmp_path / "ordinary",
+        capsys,
+        _valid_node_source(run_body=run_body),
+    )
+    global_code, global_payload = _inspect_node_source(
+        tmp_path / "global",
+        capsys,
+        _valid_node_source(info=_info_source("global_state"), run_body=run_body),
+    )
+
+    assert ordinary_code == 1
+    assert "effect_call" in _legacy_codes(ordinary_payload)
+    assert global_code == 0
+    assert global_payload["node"]["metadata"]["effect_scope"] == EFFECT_SCOPE_GLOBAL_STATE
+
+
+def test_none_scope_rejects_module_cache_mutation_without_global_statement(tmp_path, capsys) -> None:
+    source = "CACHE: dict\nREGISTRY: dict\n\n" + _valid_node_source(
+        run_body="""
+        CACHE.update({"ready": True})
+        REGISTRY["active"] = True
+        return {"demo.out": 1}
+""".rstrip(),
+    )
+
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+
+    assert code == 1
+    assert {"effect_call", "global_state"} <= _legacy_codes(payload)
+
+
+def test_global_state_scope_allows_module_cache_mutation_without_global_statement(tmp_path, capsys) -> None:
+    source = "CACHE = {}\nREGISTRY = {}\n\n" + _valid_node_source(
+        info=_info_source("global_state"),
+        run_body="""
+        CACHE.update({"ready": True})
+        REGISTRY["active"] = True
+        return {"demo.out": 1}
+""".rstrip(),
+    )
+
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+
+    assert code == 0
+    assert payload["node"]["metadata"]["effect_scope"] == EFFECT_SCOPE_GLOBAL_STATE
+
+
+def test_local_container_mutation_is_not_treated_as_ambient_state(tmp_path, capsys) -> None:
+    source = _valid_node_source(
+        run_body="""
+        cache = {}
+        cache.update({"ready": True})
+        registry = {}
+        registry["active"] = True
+        values = []
+        values.append(1)
+        return {"demo.out": len(values)}
+""".rstrip(),
+    )
+
+    code, _payload = _inspect_node_source(tmp_path, capsys, source)
+
+    assert code == 0
+
+
+@pytest.mark.parametrize(
+    "run_body",
+    [
+        '        op = open\n        op("artifact.txt", "w")\n        return {"demo.out": 1}',
+        '        op = open\n        if False:\n            op = len\n        op("artifact.txt", "w")\n        return {"demo.out": 1}',
+        '        import builtins\n        op = getattr(builtins, "open")\n        op("artifact.txt", "w")\n        return {"demo.out": 1}',
+        '        import builtins\n        builtins.__dict__["eval"]("1 + 1")\n        return {"demo.out": 1}',
+        '        import builtins\n        builtins.__dict__.get("open")("artifact.txt", "w")\n        return {"demo.out": 1}',
+        '        name = "open"\n        getattr(__builtins__, name)("artifact.txt", "w")\n        return {"demo.out": 1}',
+        '        import builtins\n        name = "eval"\n        builtins.__dict__[name]("1 + 1")\n        return {"demo.out": 1}',
+        '        import importlib as loader_module\n        loader = getattr(loader_module, "import_module")\n        loader("json")\n        return {"demo.out": 1}',
+        '        import torch\n        save = torch.save\n        save(1, "artifact.txt")\n        return {"demo.out": 1}',
+        '        import numpy as np\n        save = np.save\n        save("artifact.txt", [1])\n        return {"demo.out": 1}',
+        '        import concurrent.futures as futures\n        futures.ThreadPoolExecutor()\n        return {"demo.out": 1}',
+        '        from _thread import start_new_thread as spawn\n        spawn(lambda: None, ())\n        return {"demo.out": 1}',
+        '        import ctypes as ffi\n        ffi.CDLL(None)\n        return {"demo.out": 1}',
+        '        from cffi import FFI\n        FFI()\n        return {"demo.out": 1}',
+        '        from transformers import AutoModel\n        AutoModel.from_pretrained("remote/model")\n        return {"demo.out": 1}',
+        '        import torch\n        torch.utils.cpp_extension.load(name="unsafe", sources=[])\n        return {"demo.out": 1}',
+        '        import torch\n        torch.classes.load_library("artifact.so")\n        return {"demo.out": 1}',
+        '        import posix\n        posix.system("command")\n        return {"demo.out": 1}',
+    ],
+)
+def test_non_trusted_scopes_reject_common_alias_reflection_thread_and_ffi_bypasses(
+    tmp_path,
+    capsys,
+    run_body,
+) -> None:
+    source = _valid_node_source(info=_info_source("global_state"), run_body=run_body)
+
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+
+    assert code == 1
+    assert {"banned_call", "effect_call", "effect_import"} & _legacy_codes(payload)
+
+
+def test_global_state_rejects_forbidden_import_path_mutation(tmp_path, capsys) -> None:
+    source = _valid_node_source(
+        info=_info_source("global_state"),
+        run_body='        import sys\n        sys.path.append("dynamic")\n        return {"demo.out": 1}',
+    )
+
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+
+    assert code == 1
+    assert "effect_call" in _legacy_codes(payload)
 
 
 @pytest.mark.parametrize(
@@ -490,6 +693,7 @@ def test_python_scope_allows_python_io_but_keeps_dynamic_code_gate(tmp_path, cap
 def test_effectful_and_trusted_examples_validate_without_execution() -> None:
     assert validate_node_class(IoExampleRaisesNode, policy=PurityPolicy(max_source_lines=1000)) == []
     assert validate_node_class(ExternalExampleRaisesNode, policy=PurityPolicy(max_source_lines=1, max_functions=0)) == []
+    assert validate_node_class(GlobalStateExampleRaisesNode, policy=PurityPolicy(max_source_lines=1000)) == []
 
     pure = validate_node_class(PureExampleRaisesNode, policy=PurityPolicy(max_source_lines=1000))
     assert any(item.code == "example_failed" for item in pure)
@@ -501,6 +705,206 @@ def test_effectful_and_trusted_examples_validate_without_execution() -> None:
     params_gap = validate_node_class(IoExampleParamsGapNode, policy=PurityPolicy(max_source_lines=1000))
     assert any(item.details.get("undeclared_params") == ["undeclared"] for item in params_gap)
     assert not any(item.code == "example_failed" for item in params_gap)
+
+
+def test_inspect_preflight_blocks_top_level_effect_before_module_execution(tmp_path, capsys) -> None:
+    source = 'open("artifact.txt", "w").write("x")\n\n' + _valid_node_source(
+        info=_info_source("global_state")
+    )
+
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+
+    assert code == 1
+    assert not (tmp_path / "artifact.txt").exists()
+    messages = "\n".join(item["message"] for item in payload["health"]["errors"])
+    assert "before source validation" in messages
+
+
+def test_inspect_preflight_walks_local_import_chain_before_execution(tmp_path, capsys) -> None:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    artifact = tmp_path / "chain-artifact.txt"
+    (tmp_path / "helper.py").write_text(
+        'open("chain-artifact.txt", "w").write("x")\n',
+        encoding="utf-8",
+    )
+    source = "import helper\n\n" + _valid_node_source(info=_info_source("global_state"))
+
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+
+    assert code == 1
+    assert not artifact.exists()
+    messages = "\n".join(item["message"] for item in payload["health"]["errors"])
+    assert "helper.py" in messages
+
+
+def test_inspect_preflight_audits_local_helper_function_bodies(tmp_path, capsys) -> None:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "helper.py").write_text(
+        """
+def read_environment():
+    import os
+    return os.getenv("HOME")
+""".strip(),
+        encoding="utf-8",
+    )
+    source = "import helper\n\n" + _valid_node_source(info=_info_source("global_state"))
+
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+
+    assert code == 1
+    messages = "\n".join(item["message"] for item in payload["health"]["errors"])
+    assert "local helper quality violation" in messages
+    assert "helper.py" in messages
+
+
+def test_preflight_quality_audits_plain_source_facts() -> None:
+    entry_source = """
+from vibeflow.targets.python.project import NodeInfo
+import helper
+
+class DemoNode:
+    NODE_INFO = NodeInfo(
+        "demo.state",
+        "State",
+        "demo",
+        "Updates process state.",
+        "0.1.0",
+        "global_state",
+    )
+""".strip()
+    facts = (
+        PythonSourceFact(
+            source_id="entry",
+            path="memory:entry.py",
+            source=entry_source,
+            import_time_dependencies=("helper",),
+        ),
+        PythonSourceFact(
+            source_id="helper",
+            path="memory:helper.py",
+            source='open("artifact.txt", "w")',
+        ),
+    )
+
+    with pytest.raises(PythonSourcePreflightError) as exc_info:
+        preflight_python_source_facts("entry", facts)
+
+    assert any(finding.path == "memory:helper.py" for finding in exc_info.value.findings)
+
+
+def test_preflight_allows_proven_declarative_metadata_helper(tmp_path) -> None:
+    module_path = tmp_path / "declarative_metadata.py"
+    module_path.write_text(
+        """
+from vibeflow.targets.python.project import NodeContract, NodeInfo
+
+def ENV(data_type, value):
+    return {"key": data_type, "type": data_type, "value": value, "source_node": "example"}
+
+class DemoNode:
+    NODE_INFO = NodeInfo("demo.state", "State", "demo", "Updates state.", "0.1.0", "global_state")
+    CONTRACT = NodeContract(
+        examples=({"inputs": {"runtime.bundle": ENV("runtime.bundle", {})}, "params": {}},),
+    )
+""".strip(),
+        encoding="utf-8",
+    )
+
+    preflight_python_import_tree(module_path, project_root=tmp_path)
+
+
+def test_preflight_does_not_trust_shadowed_metadata_constructor(tmp_path, capsys) -> None:
+    source = _valid_node_source(info=_info_source("global_state")).replace(
+        "class DemoNode:",
+        """
+def NodeInfo(*args, **kwargs):
+    open("artifact.txt", "w").write("x")
+    raise RuntimeError("must not execute")
+
+class DemoNode:
+""".strip(),
+    )
+
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+
+    assert code == 1
+    assert not (tmp_path / "artifact.txt").exists()
+    messages = "\n".join(item["message"] for item in payload["health"]["errors"])
+    assert "before source validation" in messages
+
+
+@pytest.mark.parametrize(
+    "class_prefix",
+    [
+        """
+def deco(value):
+    open("artifact.txt", "w").write("x")
+    return value
+
+@deco
+""",
+        """
+class Meta(type):
+    def __new__(cls, name, bases, namespace):
+        open("artifact.txt", "w").write("x")
+        return super().__new__(cls, name, bases, namespace)
+
+class DemoNode(metaclass=Meta):
+""",
+        """
+class Base:
+    def __init_subclass__(cls):
+        open("artifact.txt", "w").write("x")
+
+class DemoNode(Base):
+""",
+    ],
+)
+def test_preflight_blocks_implicit_class_execution(tmp_path, capsys, class_prefix) -> None:
+    source = _valid_node_source(info=_info_source("global_state"))
+    if "class DemoNode" in class_prefix:
+        source = source.replace("class DemoNode:", class_prefix.strip())
+    else:
+        source = source.replace("class DemoNode:", class_prefix.strip() + "\nclass DemoNode:")
+
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+
+    assert code == 1
+    assert not (tmp_path / "artifact.txt").exists()
+    messages = "\n".join(item["message"] for item in payload["health"]["errors"])
+    assert "before source validation" in messages
+
+
+def test_preflight_rejects_class_scope_metadata_constructor_shadow(tmp_path, capsys) -> None:
+    source = _valid_node_source(info=_info_source("global_state")).replace(
+        "class DemoNode:\n",
+        "class DemoNode:\n    NodeInfo = open\n",
+    )
+
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+
+    assert code == 1
+    assert not (tmp_path / "artifact.txt").exists()
+    messages = "\n".join(item["message"] for item in payload["health"]["errors"])
+    assert "before source validation" in messages
+
+
+def test_preflight_rejects_metadata_helper_callable_parameter_shadow(tmp_path, capsys) -> None:
+    source = _valid_node_source(info=_info_source("global_state"))
+    source = source.replace(
+        "class DemoNode:",
+        "def WRAP(NodeInfo, *args):\n    return NodeInfo(*args)\n\n\nclass DemoNode:",
+    ).replace(
+        'examples=({"inputs": {}, "params": {}},),',
+        'examples=(WRAP(open, "artifact.txt", "w"),),',
+    )
+
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
+
+    assert code == 1
+    assert not (tmp_path / "artifact.txt").exists()
+    messages = "\n".join(item["message"] for item in payload["health"]["errors"])
+    assert "before source validation" in messages
 
 
 def test_pure_example_system_exit_becomes_example_failed() -> None:

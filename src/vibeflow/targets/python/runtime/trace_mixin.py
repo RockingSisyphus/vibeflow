@@ -73,7 +73,7 @@ class RuntimeTraceMixin:
     ) -> None:
         if self.runtime_options.trace == "off":
             return
-        if self.runtime_options.trace == "boundary" and kind not in {"run_start", "run_end", "business_exit", "nodeset_enter", "nodeset_exit", "nodeset_failed", "loop_enter", "loop_exit", "loop_block_enter", "loop_block_exit", "loop_failed", "node_failed", "planned_stub", "async_result_abandoned", "async_detached_failed", "async_detached_timeout", "block_enter", "block_exit", "block_failed", "type_resolve"}:
+        if self.runtime_options.trace == "boundary" and kind not in {"run_start", "run_end", "business_exit", "nodeset_enter", "nodeset_exit", "nodeset_failed", "loop_enter", "loop_exit", "loop_block_enter", "loop_block_exit", "loop_failed", "node_failed", "planned_stub", "async_result_abandoned", "async_detached_failed", "async_detached_timeout", "block_enter", "block_exit", "block_failed", "type_resolve", "lock_wait", "lock_acquired", "lock_released", "global_state_enter", "global_state_exit", "global_state_may_have_changed"}:
             return
         event: dict[str, object] = {"kind": kind, "node": node_name, "type": node_type}
         if input_summary is not None:

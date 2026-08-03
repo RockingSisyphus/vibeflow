@@ -50,7 +50,7 @@ const workflow = await import(pathToFileURL({json.dumps(str(path))}).href);
 
 def _empty_sync_plan(node_module: Path) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v2",
+        "abi_version": "vibeflow.workflow.v3",
         "workflow_id": "test.host-lifecycle",
         "entry_mode": "sync",
         "inputs": [],
@@ -190,7 +190,7 @@ export function double(inputs) {
         encoding="utf-8",
     )
     plan = {
-        "abi_version": "vibeflow.workflow.v2",
+        "abi_version": "vibeflow.workflow.v3",
         "workflow_id": "test.port",
         "entry_mode": "async",
         "inputs": [],
@@ -385,7 +385,7 @@ export function createHostExtension() {
         encoding="utf-8",
     )
     plan = {
-        "abi_version": "vibeflow.workflow.v2",
+        "abi_version": "vibeflow.workflow.v3",
         "workflow_id": "test.host",
         "entry_mode": "sync",
         "inputs": [

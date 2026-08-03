@@ -12,6 +12,10 @@ from vibeflow.core.findings import HealthFinding
 from vibeflow.targets.python.project.plugin_loader import load_plugins_from_config
 from vibeflow.targets.python.project.plugins import PluginRegistry
 from vibeflow.targets.python.project.registry import NodeRegistrationInfo, NodeRegistry
+from vibeflow.tooling.application.python.project.source_preflight import (
+    preflight_python_import_tree,
+    resolve_local_module_path,
+)
 from vibeflow.core.quality import QualityStructureLimits
 from vibeflow.tooling.project.config_loader import (
     ConfigLoadError,
@@ -446,6 +450,7 @@ def _import_registry_module(module_ref: str, *, root: WorkspaceRoot):
     candidate = (root.path / module_ref).resolve()
     if module_ref.endswith(".py") or candidate.exists():
         path = Path(module_ref).resolve() if Path(module_ref).is_absolute() else candidate
+        preflight_python_import_tree(path, project_root=root.path)
         module_name = f"_vibeflow_workspace_registry_{abs(hash((str(root.path), str(path))))}"
         spec = importlib.util.spec_from_file_location(module_name, path)
         if spec is None or spec.loader is None:
@@ -454,6 +459,9 @@ def _import_registry_module(module_ref: str, *, root: WorkspaceRoot):
         sys.modules[module_name] = module
         spec.loader.exec_module(module)
         return module
+    local_path = resolve_local_module_path(module_ref, project_root=root.path)
+    if local_path is not None:
+        preflight_python_import_tree(local_path, project_root=root.path)
     return importlib.import_module(module_ref)
 
 

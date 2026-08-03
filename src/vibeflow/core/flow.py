@@ -23,6 +23,27 @@ ENTRY_MODE_SYNC = "sync"
 ENTRY_MODE_ASYNC = "async"
 ENTRY_MODES = frozenset({ENTRY_MODE_SYNC, ENTRY_MODE_ASYNC})
 
+
+@dataclass(frozen=True)
+class ExecutionLockSpec:
+    """User-visible declaration for one Target execution-domain lock."""
+
+    key: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.key, str) or not self.key.strip():
+            raise ValueError("execution lock key must be a non-empty string")
+        normalized = self.key.strip()
+        if normalized.startswith("vibeflow."):
+            raise ValueError(
+                "execution lock key uses reserved prefix 'vibeflow.'"
+            )
+        object.__setattr__(self, "key", normalized)
+
+    def to_dict(self) -> dict[str, str]:
+        return {"key": self.key}
+
+
 @dataclass(frozen=True)
 class NodeMetadata:
     display_name: str = ""
@@ -157,6 +178,15 @@ class NodeSpec:
     planned_behavior: PlannedBehavior = field(default_factory=blocking_planned_behavior)
     async_mode: str = ""
     result_key: str = ""
+    execution_lock: ExecutionLockSpec | None = None
+
+    def __post_init__(self) -> None:
+        if self.execution_lock is not None and not isinstance(
+            self.execution_lock, ExecutionLockSpec
+        ):
+            raise ValueError(
+                "node execution_lock must be an ExecutionLockSpec or None"
+            )
 
     @property
     def name(self) -> str:
@@ -215,6 +245,15 @@ class GraphConfig:
     root_id: str = ""
     root_path: str = ""
     source_path: str = ""
+    execution_lock: ExecutionLockSpec | None = None
+
+    def __post_init__(self) -> None:
+        if self.execution_lock is not None and not isinstance(
+            self.execution_lock, ExecutionLockSpec
+        ):
+            raise ValueError(
+                "graph execution_lock must be an ExecutionLockSpec or None"
+            )
 
 @dataclass
 class GraphConfigError(ValueError):
@@ -222,4 +261,3 @@ class GraphConfigError(ValueError):
 
     def __str__(self) -> str:
         return f"Graph config error: {self.detail}"
-

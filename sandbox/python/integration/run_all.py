@@ -10,7 +10,9 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -136,6 +138,33 @@ VALID_RUN_CASES = [
     },
     {"name": "plugins", "config": "pass_plugins.jsonc", "initial": {"io.result": 20}},
     {"name": "comprehensive_flowchart", "config": "pass_comprehensive_flowchart.jsonc", "initial": {"value.in": 3}, "expected_outputs": {"io.output": "final=13;request=13"}},
+    {
+        "name": "global_state_execution_lock",
+        "config": "pass_global_state_execution_lock.jsonc",
+        "initial": {},
+        "expected_outputs": {"value.out": 1},
+        "expected_mermaid_contains": (
+            "state@{ shape: cloud",
+            "effect_scope: global_state",
+            "execution_lock: sandbox.global-state.serial",
+        ),
+        "expected_run_mermaid_contains": (
+            "state@{ shape: cloud",
+            "effect_scope: global_state",
+            "execution_lock: sandbox.global-state.serial",
+        ),
+        "expected_trace_kind_counts": {
+            "lock_wait": 3,
+            "lock_acquired": 3,
+            "lock_released": 3,
+            "global_state_enter": 1,
+            "global_state_exit": 1,
+        },
+        "reset_global_state_probe": True,
+        "expected_workflow_global_state": True,
+        "expected_svg_cloud_nodes": ("state",),
+        "expected_global_state_trace": True,
+    },
     {
         "name": "training_object_flow",
         "config": "pass_training_object_flow.jsonc",
@@ -959,6 +988,7 @@ def _run_sandbox(work_root: Path) -> int:
             *_run_review_cases(),
             *_run_delegate_cli_cases(),
             *_run_execution_model_cases(),
+            *_run_global_state_cases(),
             *_run_valid_cases(),
             *_run_invalid_cases(),
         ]
@@ -1859,6 +1889,392 @@ def _run_execution_model_cases() -> list[CaseResult]:
     return results
 
 
+def _run_global_state_cases() -> list[CaseResult]:
+    cases = (
+        (
+            "global-state:forbidden-effect-audit",
+            _run_global_state_forbidden_effect_audit,
+        ),
+        (
+            "global-state:protected-async-compile",
+            _run_global_state_protected_async_compile_case,
+        ),
+        (
+            "global-state:normal-global-lock-contention",
+            _run_global_state_lock_contention_case,
+        ),
+        (
+            "global-state:failure-releases-lock",
+            _run_global_state_failure_release_case,
+        ),
+    )
+    results: list[CaseResult] = []
+    for name, runner in cases:
+        try:
+            result = runner()
+        except Exception as exc:
+            result = CaseResult(name, "FAIL", str(exc))
+        results.append(result)
+    return results
+
+
+def _run_global_state_forbidden_effect_audit() -> CaseResult:
+    from illegal_nodes.global_state_effect_cases import (
+        GlobalStateCffiNode,
+        GlobalStateDynamicImportNode,
+        GlobalStateEnvironmentNode,
+        GlobalStateEvalNode,
+        GlobalStateFfiNode,
+        GlobalStateFileNode,
+        GlobalStateNetworkNode,
+        GlobalStateSubprocessNode,
+        GlobalStateThreadNode,
+    )
+    from vibeflow.targets.python.quality.source_analysis import (
+        PurityPolicy,
+        validate_node_class,
+    )
+
+    cases = {
+        "file": GlobalStateFileNode,
+        "environment": GlobalStateEnvironmentNode,
+        "network": GlobalStateNetworkNode,
+        "subprocess": GlobalStateSubprocessNode,
+        "thread": GlobalStateThreadNode,
+        "eval": GlobalStateEvalNode,
+        "dynamic_import": GlobalStateDynamicImportNode,
+        "ffi": GlobalStateFfiNode,
+        "cffi": GlobalStateCffiNode,
+    }
+    policy = PurityPolicy(max_source_lines=500, warn_source_lines=None)
+    rules: dict[str, list[str]] = {}
+    accepted_rules = {
+        "NODE.EFFECT.IMPORT_FORBIDDEN",
+        "NODE.EFFECT.CALL_FORBIDDEN",
+        "NODE.PURITY.BANNED_CALL",
+    }
+    for category, cls in cases.items():
+        findings = validate_node_class(
+            cls,
+            policy=policy,
+            expected_type=cls.NODE_INFO.type_key,
+            scan_module=False,
+        )
+        errors = [
+            finding.rule_id
+            for finding in findings
+            if finding.severity == "error"
+        ]
+        if not errors or not (set(errors) & accepted_rules):
+            raise AssertionError(
+                f"global_state unexpectedly allowed {category}: {errors!r}"
+            )
+        rules[category] = errors
+    return CaseResult(
+        "global-state:forbidden-effect-audit",
+        "PASS",
+        payload={"rejected": rules},
+    )
+
+
+def _run_global_state_protected_async_compile_case() -> CaseResult:
+    from vibeflow.targets.python.project import GraphCompileError, GraphCompiler
+    from vibeflow.tooling.project.graph_config import parse_graph_config
+
+    from registry import build_node_registry
+
+    state = {
+        "id": "state",
+        "type_used": "sandbox.global_state_probe",
+        "display_name": "State",
+        "description": "Declares process-local ambient state.",
+        "provides": [
+            {
+                "key": "value.out",
+                "type": "value.out",
+                "display_name": "Value Out",
+            }
+        ],
+    }
+    cases = (
+        (
+            "GRAPH.EXECUTION_LOCK.DETACHED_FORBIDDEN",
+            {
+                "id": "side",
+                "type_used": "sandbox.constant",
+                "display_name": "Side",
+                "description": "Attempts to escape the protected root.",
+                "provides": [
+                    {
+                        "key": "value.in",
+                        "type": "value.in",
+                        "display_name": "Value In",
+                    }
+                ],
+                "async": "detached",
+            },
+            {"owner": "pipeline", "node": "side", "async": "detached"},
+        ),
+        (
+            "GRAPH.EXECUTION_LOCK.RESULT_UNJOINABLE",
+            {
+                "id": "future",
+                "type_used": "sandbox.constant",
+                "display_name": "Future",
+                "description": "Has no statically provable consumer path.",
+                "provides": [
+                    {
+                        "key": "value.in",
+                        "type": "value.in",
+                        "display_name": "Value In",
+                    }
+                ],
+                "async": "result_key",
+                "result_key": "value.in",
+            },
+            {
+                "owner": "pipeline",
+                "node": "future",
+                "async": "result_key",
+                "result_key": "value.in",
+            },
+        ),
+    )
+    rejected: list[str] = []
+    for expected_rule, async_node, expected_details in cases:
+        graph = parse_graph_config(
+            {"pipeline": {"nodes": [dict(state), async_node]}}
+        )
+        try:
+            GraphCompiler().compile(graph, registry=build_node_registry())
+        except GraphCompileError as exc:
+            if exc.rule_id != expected_rule:
+                raise AssertionError(
+                    f"expected {expected_rule}, got {exc.rule_id}: {exc}"
+                ) from exc
+            if exc.details != expected_details:
+                raise AssertionError(
+                    f"{expected_rule} details expected {expected_details!r}, "
+                    f"got {exc.details!r}"
+                ) from exc
+            rejected.append(exc.rule_id)
+        else:
+            raise AssertionError(
+                f"protected async case was accepted: {expected_rule}"
+            )
+    return CaseResult(
+        "global-state:protected-async-compile",
+        "PASS",
+        payload={"rejected": rejected},
+    )
+
+
+def _global_state_runtime_graph(
+    node_type: str,
+    *,
+    root_lock: str = "",
+):
+    from vibeflow.tooling.project.graph_config import parse_graph_config
+
+    pipeline: dict[str, Any] = {
+        "nodes": [
+            {
+                "id": "start",
+                "type_used": "sandbox.start",
+                "display_name": "Start",
+                "description": "Starts the lock probe.",
+            },
+            {
+                "id": "work",
+                "type_used": node_type,
+                "display_name": "Work",
+                "description": "Runs the lock probe.",
+                **(
+                    {
+                        "provides": [
+                            {
+                                "key": "value.out",
+                                "type": "value.out",
+                                "display_name": "Value Out",
+                            }
+                        ]
+                    }
+                    if node_type == "sandbox.global_state_probe"
+                    else {}
+                ),
+            },
+            {
+                "id": "end",
+                "type_used": "sandbox.start",
+                "display_name": "End",
+                "description": "Ends the lock probe.",
+            },
+        ],
+        "edges": [
+            {"from": "start", "to": "work"},
+            {"from": "work", "to": "end"},
+        ],
+    }
+    if root_lock:
+        pipeline["execution_lock"] = {"key": root_lock}
+    return parse_graph_config({"pipeline": pipeline})
+
+
+def _normal_runtime_graph():
+    from vibeflow.tooling.project.graph_config import parse_graph_config
+
+    return parse_graph_config(
+        {
+            "pipeline": {
+                "nodes": [
+                    {
+                        "id": "start",
+                        "type_used": "sandbox.start",
+                        "display_name": "Start",
+                        "description": "Starts the normal root.",
+                    },
+                    {
+                        "id": "end",
+                        "type_used": "sandbox.start",
+                        "display_name": "End",
+                        "description": "Ends the normal root.",
+                    },
+                ],
+                "edges": [{"from": "start", "to": "end"}],
+            }
+        }
+    )
+
+
+def _run_global_state_lock_contention_case() -> CaseResult:
+    from vibeflow.targets.python.project import PluginRegistry
+    from vibeflow.targets.python.runtime.engine import PipelineRuntime
+
+    from registry import build_node_registry
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    class HoldNormalRoot:
+        name = "hold-normal-root"
+
+        def before_run(self, initial):
+            del initial
+            entered.set()
+            if not release.wait(timeout=5):
+                raise RuntimeError("timed out waiting to release normal root")
+
+    plugins = PluginRegistry()
+    plugins.register(HoldNormalRoot(), plugin_type="runtime")
+    registry = build_node_registry()
+    normal_dir = RUN_ROOT / "global-state-normal-reader"
+    global_dir = RUN_ROOT / "global-state-waiting-writer"
+    normal = PipelineRuntime(
+        _normal_runtime_graph(),
+        registry=registry,
+        plugin_registry=plugins,
+        run_dir=normal_dir,
+    )
+    global_runtime = PipelineRuntime(
+        _global_state_runtime_graph("sandbox.global_state_probe"),
+        registry=registry,
+        run_dir=global_dir,
+    )
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        normal_future = executor.submit(normal.run)
+        if not entered.wait(timeout=2):
+            raise AssertionError("normal root never entered its protected hook")
+        global_future = executor.submit(global_runtime.run)
+        trace_path = global_dir / "runtime_trace.jsonl"
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            if trace_path.is_file() and '"lock_wait"' in trace_path.read_text(
+                encoding="utf-8"
+            ):
+                break
+            time.sleep(0.01)
+        else:
+            release.set()
+            raise AssertionError("global-state root never reached lock_wait")
+        if global_future.done():
+            release.set()
+            raise AssertionError(
+                "global-state root completed while a normal root held shared access"
+            )
+        release.set()
+        normal_future.result(timeout=3)
+        global_future.result(timeout=3)
+    events = _runtime_trace_lines(global_dir)
+    waited = [
+        float(event.get("details", {}).get("wait_ms", 0))
+        for event in events
+        if event["kind"] == "lock_acquired"
+        and event.get("details", {}).get("key")
+        == "vibeflow.runtime.global_state"
+    ]
+    if len(waited) != 1 or waited[0] <= 0:
+        raise AssertionError(
+            f"global-state root did not record a positive lock wait: {waited!r}"
+        )
+    return CaseResult(
+        "global-state:normal-global-lock-contention",
+        "PASS",
+        payload={"exclusive_wait_ms": waited[0]},
+    )
+
+
+def _run_global_state_failure_release_case() -> CaseResult:
+    from vibeflow.targets.python.runtime.engine import PipelineRuntime
+
+    from registry import build_node_registry
+
+    lock_key = "sandbox.global-state.failure"
+    registry = build_node_registry()
+    failure_dir = RUN_ROOT / "global-state-failure"
+    failing = PipelineRuntime(
+        _global_state_runtime_graph(
+            "sandbox.global_state_failure",
+            root_lock=lock_key,
+        ),
+        registry=registry,
+        run_dir=failure_dir,
+    )
+    try:
+        failing.run()
+    except RuntimeError as exc:
+        if "sandbox global-state failure" not in str(exc):
+            raise
+    else:
+        raise AssertionError("global-state failure probe unexpectedly succeeded")
+    events = _runtime_trace_lines(failure_dir)
+    kinds = [event["kind"] for event in events]
+    if "global_state_may_have_changed" not in kinds:
+        raise AssertionError("failed global-state run omitted state-change warning")
+    warning = kinds.index("global_state_may_have_changed")
+    release_positions = [
+        index for index, kind in enumerate(kinds) if kind == "lock_released"
+    ]
+    if not release_positions or warning >= min(release_positions):
+        raise AssertionError(
+            f"state-change warning must precede lock release: {kinds!r}"
+        )
+    recovered = PipelineRuntime(
+        _global_state_runtime_graph(
+            "sandbox.global_state_probe",
+            root_lock=lock_key,
+        ),
+        registry=registry,
+        run_dir=RUN_ROOT / "global-state-recovered",
+    )
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        executor.submit(recovered.run).result(timeout=3)
+    return CaseResult(
+        "global-state:failure-releases-lock",
+        "PASS",
+        payload={"warning_before_release": True, "lock_reused": True},
+    )
+
+
 def _thread_probe_graph(*, async_mode: bool):
     from vibeflow.tooling.project.graph_config import parse_graph_config
 
@@ -2141,6 +2557,9 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     from vibeflow.targets.python.runtime.planning import build_execution_plan
     from vibeflow.tooling.application.python.runner import run_checked
     from vibeflow.tooling.application.python.presentation.ascii_flowchart import export_ascii_flowchart
+    from vibeflow.tooling.application.python.presentation.architecture_document import (
+        build_architecture_document,
+    )
     from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
     from vibeflow.tooling.application.python.presentation.mermaid.render import (
         is_mermaid_svg_renderer_available,
@@ -2158,6 +2577,10 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     from registry import build_node_registry
 
     name = str(case["name"])
+    if case.get("reset_global_state_probe"):
+        from nodes import legal_global_state_nodes
+
+        legal_global_state_nodes.reset_global_state_probe()
     config_path = CONFIG_DIR / str(case["config"])
     document = load_config_document(config_path)
     schema_findings = collect_config_schema_findings(document.data)
@@ -2188,6 +2611,14 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     runtime_options = RuntimeOptions(**case["runtime_options"]) if "runtime_options" in case else None
     plan = build_execution_plan(graph, compiled, registry=node_registry, runtime_options=runtime_options, global_config=resources.global_config)
     _assert_execution_plan(case, plan)
+    if case.get("expected_workflow_global_state"):
+        architecture = build_architecture_document(
+            graph,
+            compiled=compiled,
+            registry=node_registry,
+            resources=resources,
+        )
+        _assert_global_state_architecture(architecture)
     block_source_paths = _write_compiled_block_sources(name, plan)
     _assert_compiled_block_sources(case, plan, block_source_paths)
     health = validate_graph_health(
@@ -2216,6 +2647,7 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         render_mermaid_svg(collapsed, collapsed_svg)
         render_mermaid_svg(expanded, SVG_DIR / f"{name}.expanded.svg", max_text_size=500_000, max_edges=5_000)
         _assert_svg_text_contains(case, collapsed_svg)
+        _assert_svg_cloud_nodes(case, collapsed_svg)
     initial = case["initial_factory"]() if "initial_factory" in case else case.get("initial", {})
     hook_marker = REPORT_DIR / "plugin_hooks.jsonl"
     hook_count_before = len(hook_marker.read_text(encoding="utf-8").splitlines()) if hook_marker.exists() else 0
@@ -2250,6 +2682,18 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         actual = _context_value(run_result.context, str(key))
         if actual != expected:
             raise AssertionError(f"{key} expected {expected!r}, got {actual!r}")
+    if case.get("reset_global_state_probe"):
+        from nodes import legal_global_state_nodes
+
+        if legal_global_state_nodes.GLOBAL_STATE_VALUE != "configured":
+            raise AssertionError(
+                "global-state probe did not persist its process-local state"
+            )
+        if legal_global_state_nodes.GLOBAL_STATE_RUNS != 1:
+            raise AssertionError(
+                "global-state structural examples must not execute; expected "
+                f"one runtime call, got {legal_global_state_nodes.GLOBAL_STATE_RUNS}"
+            )
     if case.get("port_math") and sent_port_values != [
         {"port": "sandbox.math.out", "value": 21}
     ]:
@@ -2314,6 +2758,8 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         actual = list(run_result.context.get("runtime.exec_order"))
         if actual != case["expected_runtime_exec_order"]:
             raise AssertionError(f"runtime exec_order expected {case['expected_runtime_exec_order']!r}, got {actual!r}")
+    if case.get("expected_global_state_trace"):
+        _assert_global_state_trace(run_result.run_dir)
     if "expected_hook_delta_present" in case or "expected_hook_delta_absent" in case:
         delta_lines = hook_marker.read_text(encoding="utf-8").splitlines()[hook_count_before:] if hook_marker.exists() else []
         delta_hooks = {json.loads(line)["hook"] for line in delta_lines}
@@ -2384,9 +2830,127 @@ def _assert_svg_text_contains(case: dict[str, Any], path: Path) -> None:
         raise AssertionError(f"SVG {path.name} missing visible text {missing!r}")
 
 
+def _assert_svg_cloud_nodes(case: dict[str, Any], path: Path) -> None:
+    expected = tuple(str(item) for item in case.get("expected_svg_cloud_nodes", ()))
+    if not expected:
+        return
+    document = ET.parse(path)
+    groups = [
+        element
+        for element in document.getroot().iter()
+        if _xml_local_name(element.tag) == "g"
+    ]
+    for node_id in expected:
+        matches = [
+            group
+            for group in groups
+            if node_id in group.attrib.get("id", "")
+        ]
+        if not matches:
+            raise AssertionError(
+                f"SVG {path.name} has no geometry group for {node_id!r}"
+            )
+        cloud = next(
+            (
+                group
+                for group in matches
+                if any(_xml_local_name(child.tag) == "path" for child in group)
+            ),
+            None,
+        )
+        if cloud is None:
+            raise AssertionError(
+                f"SVG {path.name} node {node_id!r} is missing cloud path geometry"
+            )
+        if any(_xml_local_name(child.tag) == "rect" for child in cloud):
+            raise AssertionError(
+                f"SVG {path.name} node {node_id!r} regressed to rect geometry"
+            )
+
+
+def _assert_global_state_architecture(architecture: dict[str, Any]) -> None:
+    workflow = architecture["workflow"]
+    if workflow.get("contains_global_state") is not True:
+        raise AssertionError("Architecture did not propagate contains_global_state")
+    if workflow.get("root_exclusive") is not True:
+        raise AssertionError("Architecture did not mark the root exclusive")
+    if workflow.get("execution_lock") != {
+        "key": "sandbox.global-state.serial",
+        "scope": "root",
+    }:
+        raise AssertionError(
+            "Architecture root execution lock is missing or malformed: "
+            f"{workflow.get('execution_lock')!r}"
+        )
+    nodes = {item["id"]: item for item in workflow["nodes"]}
+    state = nodes["state"]
+    expected = {
+        "flow_kind": "global_state",
+        "effect_scope": "global_state",
+        "contains_global_state": True,
+        "execution_lock": {
+            "key": "sandbox.global-state.serial",
+            "scope": "node",
+        },
+    }
+    actual = {key: state.get(key) for key in expected}
+    if actual != expected:
+        raise AssertionError(
+            f"Architecture global-state metadata expected {expected!r}, got {actual!r}"
+        )
+
+
+def _assert_global_state_trace(run_dir: Path) -> None:
+    events = _runtime_trace_lines(run_dir)
+    kinds = [str(event["kind"]) for event in events]
+    required_order = (
+        "lock_wait",
+        "lock_acquired",
+        "global_state_enter",
+        "global_state_exit",
+        "lock_released",
+    )
+    positions = [kinds.index(kind) for kind in required_order]
+    if positions != sorted(positions):
+        raise AssertionError(
+            f"global-state lock/transition trace order is invalid: {kinds!r}"
+        )
+    acquisitions = [
+        event["details"]
+        for event in events
+        if event["kind"] == "lock_acquired"
+    ]
+    automatic = [
+        item
+        for item in acquisitions
+        if item.get("key") == "vibeflow.runtime.global_state"
+    ]
+    named = [
+        item
+        for item in acquisitions
+        if item.get("key") == "sandbox.global-state.serial"
+    ]
+    if len(automatic) != 1 or automatic[0].get("mode") != "exclusive":
+        raise AssertionError(
+            f"automatic global-state domain acquisition is invalid: {automatic!r}"
+        )
+    if len(named) != 2 or [item.get("reentrant") for item in named] != [False, True]:
+        raise AssertionError(
+            f"named root/node lock reentrancy is invalid: {named!r}"
+        )
+    run_ids = {str(item.get("run_id", "")) for item in acquisitions}
+    if len(run_ids) != 1 or "" in run_ids:
+        raise AssertionError(f"lock trace does not preserve one run ID: {run_ids!r}")
+    if any(float(item.get("wait_ms", -1)) < 0 for item in acquisitions):
+        raise AssertionError(f"lock trace has a negative wait duration: {acquisitions!r}")
+
+
 def _comparable_trace_kinds(actual: list[str], expected: list[str]) -> tuple[list[str], list[str]]:
     actual_compare = list(actual)
     expected_compare = list(expected)
+    lock_kinds = {"lock_wait", "lock_acquired", "lock_released"}
+    if not (lock_kinds & set(expected_compare)):
+        actual_compare = [kind for kind in actual_compare if kind not in lock_kinds]
     if "type_resolve" not in expected_compare:
         actual_compare = [kind for kind in actual_compare if kind != "type_resolve"]
     if not ({"block_enter", "block_exit"} & set(actual_compare)):
@@ -2407,6 +2971,7 @@ def _assert_execution_plan(case: dict[str, Any], plan) -> None:
     if (
         "expected_portable_execution" in case
         or "expected_portable_tasks" in case
+        or case.get("expected_workflow_global_state")
     ):
         portable = plan.to_workflow_plan(
             workflow_id=f"sandbox.{case['name']}"
@@ -2438,6 +3003,36 @@ def _assert_execution_plan(case: dict[str, Any], plan) -> None:
                 raise AssertionError(
                     f"portable tasks expected {expected_tasks!r}, "
                     f"got {actual_tasks!r}"
+                )
+        if case.get("expected_workflow_global_state"):
+            if portable.abi_version != "vibeflow.workflow.v3":
+                raise AssertionError(
+                    f"expected WorkflowPlan v3, got {portable.abi_version!r}"
+                )
+            if portable.contains_global_state is not True:
+                raise AssertionError("WorkflowPlan did not propagate global state")
+            if portable.root_exclusive is not True:
+                raise AssertionError("WorkflowPlan did not mark the root exclusive")
+            if portable.execution_lock is None or portable.execution_lock.to_dict() != {
+                "key": "sandbox.global-state.serial",
+                "scope": "root",
+            }:
+                raise AssertionError(
+                    f"WorkflowPlan root lock is invalid: {portable.execution_lock!r}"
+                )
+            state = block.node("state")
+            if state.effect_scope != "global_state":
+                raise AssertionError(
+                    f"WorkflowPlan state effect scope is {state.effect_scope!r}"
+                )
+            if state.contains_global_state is not True:
+                raise AssertionError("WorkflowPlan state does not declare global state")
+            if state.execution_lock is None or state.execution_lock.to_dict() != {
+                "key": "sandbox.global-state.serial",
+                "scope": "node",
+            }:
+                raise AssertionError(
+                    f"WorkflowPlan state lock is invalid: {state.execution_lock!r}"
                 )
     for node_name, expected_params in dict(case.get("expected_plan_params", {})).items():
         params = plan.frame(str(node_name)).params

@@ -76,14 +76,16 @@ def run_pure(self, inputs, params):
 - `data_store`
 - `document`
 - `preparation`
+- `global_state`
 
 `flow_kind` 不只是图形标签，它与 `external` 一起决定内核派生的副作用检查档位 `effect_scope`：
 
 | 实现分类 | effect_scope | 能力 |
 | --- | --- | --- |
-| 其他普通 implemented node（即非 `io` / `document` / `data_store`，且 `external=False`） | `none` | 无业务 IO |
+| 其他普通 implemented node（即非 `io` / `document` / `data_store` / `global_state`，且 `external=False`） | `none` | 无业务 IO |
 | `flow_kind=io` | `terminal` | 真实 stdin/stdout/stderr、`print`、`input`、`argparse` |
 | `flow_kind=document` / `data_store` | `python_io` | 文件、环境、网络、数据库、subprocess、终端 |
+| `flow_kind=global_state` 且 `external=False` | `global_state` | 仅当前 Python 进程的易失 ambient state |
 | 任意 `flow_kind` + `external=True` | `trusted` | 最高优先级信任边界 |
 | plugin | `trusted` | 信任边界 |
 | planned `python_stub` | `none` | 无业务 IO |
@@ -112,18 +114,62 @@ NODE_INFO = NodeInfo(
 - node 不导入其他 node，不调用其他 node。
 - node 输出 key 必须是 `CONTRACT.provides` 中声明的 `DataProvider.key` 字符串字面量。
 - `run_pure(inputs, params)` 收到的是 envelope，不是裸值。`exactly_one` 输入形如 `inputs["value.in"] == {"key": "...", "type": "value.in", "value": ..., "source_node": "..."}`，业务值在 `["value"]`。
-- node 不修改 `inputs`；如果训练类场景确实需要共享对象原地更新，应让这个行为成为显式业务语义，并通过输出 key 暴露更新后的引用。
+- 普通 node 不修改 `inputs` 容器；model、optimizer 等训练对象仍作为 envelope value 按引用流转。若既有 node 语义会原地更新对象，也必须通过声明过的输出 key 暴露该引用，不需要、也不能借 `global_state` 取得另一套对象通道。
 - 简单 wrapper node 可以只取输入、调用纯 helper/base_lib 函数、返回固定输出；VibeFlow 会识别这种标准形态，避免误报 duplicate logic。
+
+### `global_state` node 与安全边界
+
+项目自己实现并注册 `global_state` node；不存在需要调用的 `vibeflow.global_state` 系统 node。一个典型声明是：
+
+```python
+NODE_INFO = NodeInfo(
+    type_key="project.configure_runtime",
+    display_name="Configure Runtime",
+    category="runtime",
+    description="Configure process-local runtime state.",
+    version="0.1.0",
+    flow_kind="global_state",
+    external=False,
+)
+
+CONTRACT = NodeContract()
+```
+
+`effect_scope=global_state` 只比普通受审计 node 多一项能力：修改当前 Python 进程的易失 ambient state，例如 Python/module/native-library 的 RNG、默认 dtype、grad mode、backend flag、全局 cache 或 registry。它仍禁止文件、环境变量、网络、数据库、终端、subprocess、线程/进程创建、`eval` / `exec` / `compile`、动态 import、`ctypes` / `cffi` 和任意 FFI。项目源码、本地 helper 与静态 import chain 都接受完整检查；静态导入第三方计算库本身不要求 `external=True`。任意运行时 callback、外部 model 引用或无法审计的实现仍应设为 `external=True`，由项目承担 `trusted` 信任边界。
+
+这是一套架构约束与合作式静态审计，不是 Python 安全沙箱。VibeFlow 会拒绝源码中可识别的直接越权操作，但不承诺证明任意第三方或 native 函数内部没有隐藏的文件、网络或其他副作用；无法检查到实现内部时必须使用 `external=True` 明确信任边界。
+
+model、optimizer、scheduler、DataLoader 等普通 Python 对象不属于 ambient state，继续通过既有 envelope / contract 以引用传递；创建、更新和输出这些对象仍遵守现有 `requires` / `provides` 与输出 key 规则。`global_state` 不新增 Capability、Provider、隐式黑板或另一套对象数据通道。
+
+global-state 修改默认是持久、非事务的。无论 run 成功、失败还是取消，VibeFlow 都不 snapshot、rollback 或自动恢复 Python 进程态。若一个操作只需临时修改默认 dtype、RNG 或 backend flag 并要求可靠恢复，应在同一个 `global_state` node 内用 `try/finally` 保存和恢复原值；不要依赖框架或可能因失败、取消而尚未执行的后续 node：
+
+```python
+RUNTIME_MODE = "default"
+
+
+def run_pure(self, inputs, params):
+    del inputs
+    global RUNTIME_MODE
+    previous = RUNTIME_MODE
+    try:
+        RUNTIME_MODE = params["mode"]
+        # 在这里完成需要临时运行时设置的受审计操作。
+        return {}
+    finally:
+        RUNTIME_MODE = previous
+```
+
+失败 trace 中的 `global_state_may_have_changed` 是风险提示，不是恢复动作。
 
 ## Python 外部依赖 Node
 
-如果 node 只是包装第三方库或外部维护代码，设置：
+如果 node 会执行运行时注入的任意 callback、调用无法审计的外部 model 实现，或其实现本身由项目外部维护且不能进入完整检查，设置：
 
 ```python
 NodeInfo(..., flow_kind="process", external=True)
 ```
 
-`external=True` 是“实现由第三方或外部维护”的最高优先级信任边界，令有效 `effect_scope=trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 purity/IO 绕过；只能在项目愿意信任并审计该实现时使用。它仍不会跳过：
+静态导入第三方计算库并调用可审计的固定 API，本身不要求 `external=True`；代码仍按实际 `flow_kind` 的 effect scope 检查。`external=True` 是“实现或运行时行为无法由项目静态审计”的最高优先级信任边界，令有效 `effect_scope=trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 purity/IO 绕过；只能在项目愿意信任并审计该实现时使用。它仍不会跳过：
 
 - 元数据检查。
 - 契约检查。
@@ -134,7 +180,7 @@ NodeInfo(..., flow_kind="process", external=True)
 
 如果外部依赖承担路由逻辑，仍应声明 `flow_kind="decision"`，并提供 route-like output。
 
-普通纯 node 的 `CONTRACT.examples` 会被执行以验证最小样例；`terminal` / `python_io` scope 或 `external=True` 的 node 可能触发真实副作用，其 examples 只做结构校验，不在健康检查中执行。
+普通纯 node 的 `CONTRACT.examples` 会被执行以验证最小样例；`terminal` / `python_io` / `global_state` scope 或 `external=True` 的 node 可能触发真实副作用，其 examples 只做结构校验，不在健康检查中执行。
 
 ## Python Base Lib
 
@@ -637,6 +683,46 @@ trace 提供顶层和嵌套两层视图：`runtime.exec_order`、`runtime.node_r
 - runtime 不自动 merge async context；共享对象线程安全由业务对象负责。
 - 复杂后台工作可以把调用节点写成 nodeset `type_used` 并在该调用点设置 `async`；nodeset 内部仍按自己的显式 edges 和契约运行。
 
+### `execution_lock` 与 execution lease
+
+`global_state` 会自动取得进程级 ambient-state 执行域，不需要在 config 重复声明锁。需要把其他不可并发的业务调用按名字串行化时，可在 pipeline 或具体调用点配置公开的 `ExecutionLockSpec`：
+
+```jsonc
+{
+  "pipeline": {
+    "execution_lock": {"key": "training-runtime"},
+    "nodes": [
+      {
+        "id": "configure_backend",
+        "type_used": "training.configure_backend"
+      }
+    ]
+  }
+}
+```
+
+若只需保护一个调用点，在该 `pipeline.nodes[]` 对象上写同样的字段：
+
+```jsonc
+{
+  "id": "configure_backend",
+  "type_used": "training.configure_backend",
+  "execution_lock": {"key": "training-runtime"}
+}
+```
+
+配置对象当前只有一个非空字符串字段 `key`，首尾空白会被规范化；`vibeflow.` 前缀保留给内核，项目不能使用。scope 不由用户填写：pipeline 声明编译为 root/block scope，调用点声明编译为 node scope。显式锁只限制相同 key 的并发执行，不改变 `flow_kind`、`effect_scope`、contract 或可用 IO 权限。
+
+每个 Python root run 从开始前建立一个 execution lease。普通 run 以 shared 模式进入 ambient-state 域；只要根 workflow、任意递归 nodeset 或 loop 含 implemented `global_state`，根 run 就在调度任何 node 前以 exclusive 模式进入同一域。锁一直持有到成功/失败 hooks、受保护的异步任务和 executor 收尾全部结束，再释放。这样普通 run 不会在 global-state run 中途读取或改写同一进程态。
+
+嵌套 nodeset、loop 和 VibeFlow 管理的线程继承同一 lease，重入按 lease id 而不是线程 id 判定；同一命名 key 可重入。已经持有一个用户 key 的嵌套作用域若再请求不同 key 会在编译或启动时失败，避免不一致锁顺序导致死锁。顶层 pipeline 锁覆盖整个 run；node 锁只覆盖该调用，但 runtime 仍会在 root lease 释放前收尽受保护任务。
+
+受保护作用域的异步规则是 fail closed：禁止 `async: "detached"`；`async: "result_key"` 只有在编译期能证明存在无条件 scheduled consumer path、结果必会 join 时才允许。含 `global_state` 的根作用域、带 pipeline 锁的 block，以及带调用点锁的 node/nodeset 都适用。runtime 还会在失败和取消路径等待已经启动的受保护 future，防止任务逃出 lease；这不是超时或强杀保证，因此此类任务仍必须可结束。
+
+`trace="boundary"` 和 `trace="full"` 会记录 `lock_wait`、`lock_acquired`、`lock_released`、`global_state_enter`、`global_state_exit`。如果 global-state node 已开始后 run 失败，还会记录 `global_state_may_have_changed` 及涉及的 qualified node，提醒状态可能已持久改变。`wait_ms`、lease、domain、scope、mode 和 reentrant 等锁事实位于事件 details；trace 不保存真实全局状态值。
+
+公共 `WorkflowPlan` ABI 是 `vibeflow.workflow.v3`，会携带 `effect_scope`、`execution_lock`、`contains_global_state` 和 `root_exclusive`，供 Target 在执行前决定能力和锁。planned `global_state` 或 lock 声明只用于 Architecture/review，不取得权限或锁。JavaScript Target v1 不支持 implemented `global_state` 或 implemented execution lock，会以 `TARGET.FEATURE.UNSUPPORTED` 拒绝；不要把它们替换为 JS 模块全局变量。JS 中应继续使用显式输入输出、Capability 或 Host Extension。
+
 ## Python Runtime CLI 让渡模式 / delegate-cli
 
 需要让最终用户把 VibeFlow 项目当成普通命令行程序时，使用：
@@ -801,13 +887,13 @@ vibeflow export-svg --config workflow.jsonc --expand-nodesets --output graph.exp
 
 正式运行也会写出 `graph.mmd`、`graph.txt`、快速图 `graph.svg`、详细审查图 `graph.expanded.svg` 和当次预期的 `architecture.jsonc`；运行产物不会覆盖 root 中登记的文档。
 
-Mermaid/SVG 节点 label 使用纯文本分区展示：首行是 `display_name`，缺省时回退到注册类 `NODE_INFO.display_name` 或 `id`；external implemented node 的首行增加 `[EXTERNAL]`；随后显示 `id:`、`type_used:`，nodeset/loop 还会显示 `type_key:` / `body:`。所有异步调用显示 `async:`，`result_key` 模式同时显示 `result_key:`，再用 `---------- meta ----------`、`---------- status ----------`、`---------- nodeset ----------` 等分区展示说明。`requires/provides` 不再塞进节点内；数据契约显示在连边 label 上，优先显示 contract `display_name`，再显示 id/key/type 信息。
+Mermaid/SVG 节点 label 使用纯文本分区展示：首行是 `display_name`，缺省时回退到注册类 `NODE_INFO.display_name` 或 `id`；external implemented node 的首行增加 `[EXTERNAL]`；随后显示 `id:`、`type_used:`，nodeset/loop 还会显示 `type_key:` / `body:`。`global_state` 使用 cloud 形状，并显示派生的 `effect_scope:` 与适用的 `execution_lock:`；图中不展示任何 Provider 权限信息。所有异步调用显示 `async:`，`result_key` 模式同时显示 `result_key:`，再用 `---------- meta ----------`、`---------- status ----------`、`---------- nodeset ----------` 等分区展示说明。`requires/provides` 不再塞进节点内；数据契约显示在连边 label 上，优先显示 contract `display_name`，再显示 id/key/type 信息。
 
 Mermaid/SVG 只画显式 edge。主线 edge 会加粗；data bypass edge 用虚线；async 相关 edge 保持 async 语义，不会被误标成同步主线。旧版本根据 `requires/provides` 自动派生的理论 data edge 不再画出。
 
 架构 JSONC 与 Mermaid 共用 nodeset/loop 调用识别、编译边角色、contract 匹配、metadata fallback、资源筛选和 source path 语义；SVG 继续消费 Mermaid。planned nodeset 有 body 时会出现在 JSONC 和展开图中，无 body 时则明确保留空占位。
 
-SVG 渲染保持 `htmlLabels=false`，但会在 VibeFlow 内部调用 bundled Mermaid CLI 后对原生 SVG 文本做增强：标题加粗，包含 `external:`、`async:`、`result_key:` 在内的字段名前缀加粗，字段行左对齐，分区行加粗并弱化颜色。Mermaid CLI/mmdc 是内部实现，不是公开审核入口。plugin/base_lib 资源列使用同样的 label 规则，且只展示当前 workflow config 实际引用的资源；资源元数据来自 `project/registry.py` 的 resource registry。
+SVG 渲染保持 `htmlLabels=false`，但会在 VibeFlow 内部调用 bundled Mermaid CLI 后对原生 SVG 文本做增强：标题加粗，包含 `external:`、`effect_scope:`、`execution_lock:`、`async:`、`result_key:` 在内的字段名前缀加粗，字段行左对齐，分区行加粗并弱化颜色。Mermaid CLI/mmdc 是内部实现，不是公开审核入口。plugin/base_lib 资源列使用同样的 label 规则，且只展示当前 workflow config 实际引用的资源；资源元数据来自 `project/registry.py` 的 resource registry。
 
 `export-svg` 会向 Mermaid CLI 传入渲染配置。普通图默认 `maxTextSize=200000`、`maxEdges=2000`；展开 nodeset 时默认 `maxTextSize=500000`、`maxEdges=5000`。如仍遇到 Mermaid 限制，可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
 展开 nodeset 的 SVG 固定使用确定性 `review-columns` composer：最外层主流程在左侧纵向展示，当前 workflow 实际启用的 plugins/base_lib 分列展示，展开的 nodeset 放到右侧。nodeset 内部使用递归 detail-panel 布局：无直接子 nodeset 时横向展示；有直接子 nodeset 时父图保持全部 collapsed call-site 和原始连边。每个父 `GraphConfig` 只对直接调用做局部分组，键为 `(invocation.kind, type_key)`，并保持首次出现顺序；同组调用共享一个详情 fragment，其多调用标题显示总数、前三个调用 ID、剩余 `+N`，以及 async 模式、`result_key`、call config 数量和 `node_configs` 数量的紧凑摘要，不输出配置值。普通 nodeset 与 loop body 不混合，不同 `type_key` 不合并，同一定义在不同父上下文分别展开；`similar_to` 语义不变。审查图单个片段显示宽度默认上限为 `3200px`，可用 `--review-fragment-max-width` 覆盖。

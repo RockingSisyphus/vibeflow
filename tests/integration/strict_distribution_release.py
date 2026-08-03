@@ -78,6 +78,40 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
     assert '"project_target": "javascript"' in architecture
     assert str(first.directory) not in architecture
 
+    published_guidance = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (
+            first.directory / "README.md",
+            first.directory / "AGENTS.md",
+            first.directory / "kernel/docs/01_Node开发规范.md",
+            first.directory / "kernel/docs/03_Config与Pipeline规范.md",
+            first.directory / "kernel/docs/07_启动命令与报告.md",
+            first.directory / "kernel/docs/08_给AI开发者的约束清单.md",
+            first.directory / "kernel/docs/10_Kernel能力与项目开发指南.md",
+            first.directory / "kernel/docs/11_JS_TS与Web_AOT构建指南.md",
+        )
+    )
+    for marker in (
+        "flow_kind=global_state",
+        "effect_scope=global_state",
+        "execution_lock",
+        "vibeflow.workflow.v3",
+        "vibeflow.workflow.v2",
+        "TARGET.FEATURE.UNSUPPORTED",
+        "global_state_may_have_changed",
+        "cloud",
+    ):
+        assert marker in published_guidance
+
+    with zipfile.ZipFile(first.directory / "kernel/vibeflow-kernel.zip") as kernel:
+        constants = kernel.read("vibeflow/core/constants.py")
+        flow = kernel.read("vibeflow/core/flow.py")
+        workflow_model = kernel.read("vibeflow/block_compiler/model.py")
+    assert b'FLOW_KIND_GLOBAL_STATE = "global_state"' in constants
+    assert b'EFFECT_SCOPE_GLOBAL_STATE = "global_state"' in constants
+    assert b"class ExecutionLockSpec" in flow
+    assert b'WORKFLOW_ABI_VERSION = "vibeflow.workflow.v3"' in workflow_model
+
     with zipfile.ZipFile(first.archive) as archive:
         names = archive.namelist()
         assert names[0] == "vibeflow-distribution/"
@@ -85,6 +119,20 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
             "vibeflow-distribution"
         }
         assert all(info.date_time == (1980, 1, 1, 0, 0, 0) for info in archive.infolist())
+        archived_agents = archive.read("vibeflow-distribution/AGENTS.md").decode(
+            "utf-8"
+        )
+        archived_config_guide = archive.read(
+            "vibeflow-distribution/kernel/docs/03_Config与Pipeline规范.md"
+        ).decode("utf-8")
+        for marker in (
+            "flow_kind=global_state",
+            "execution_lock",
+            "vibeflow.workflow.v3",
+            "cloud",
+        ):
+            assert marker in archived_agents
+            assert marker in archived_config_guide
 
     extracted = tmp_path / "extracted"
     with zipfile.ZipFile(first.archive) as archive:

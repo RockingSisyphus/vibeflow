@@ -5,6 +5,50 @@ from typing import Any, Mapping
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.quality.workflow_rules.schema_findings import schema_finding
 
+
+def _validate_execution_lock(
+    value: Any,
+    prefix: str,
+    findings: list[HealthFinding],
+) -> None:
+    if not isinstance(value, Mapping):
+        findings.append(
+            _error(
+                "CONFIG.SCHEMA.EXECUTION_LOCK_OBJECT",
+                f"{prefix} must be an object",
+                prefix,
+            )
+        )
+        return
+    unknown = sorted(set(str(key) for key in value) - {"key"})
+    if unknown:
+        findings.append(
+            _error(
+                "CONFIG.SCHEMA.EXECUTION_LOCK_FIELD",
+                f"{prefix} contains unsupported keys: {unknown}",
+                prefix,
+            )
+        )
+    key = value.get("key")
+    if not _non_empty_string(key):
+        findings.append(
+            _error(
+                "CONFIG.SCHEMA.EXECUTION_LOCK_KEY",
+                f"{prefix}.key must be a non-empty string",
+                f"{prefix}.key",
+            )
+        )
+        return
+    if str(key).strip().startswith("vibeflow."):
+        findings.append(
+            _error(
+                "CONFIG.SCHEMA.EXECUTION_LOCK_RESERVED",
+                f"{prefix}.key uses reserved prefix 'vibeflow.'",
+                f"{prefix}.key",
+            )
+        )
+
+
 def _validate_node_configs(value: Any, prefix: str, findings: list[HealthFinding]) -> None:
     if not isinstance(value, Mapping):
         findings.append(_error("CONFIG.SCHEMA.NODE_CONFIGS_OBJECT", f"{prefix} must be an object", prefix))
@@ -125,4 +169,3 @@ def _warning(
         rule_source=rule_source,
         severity="warning",
     )
-

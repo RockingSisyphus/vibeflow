@@ -1,0 +1,65 @@
+flowchart TD
+  classDef defaultNode fill:#ECECFF,stroke:#9370DB,color:#333333;
+  classDef healthError fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+  classDef healthWarning fill:#fef3c7,stroke:#d97706,color:#78350f;
+  classDef externalDependency fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
+  classDef externalBoundary stroke-width:7px,vector-effect:non-scaling-stroke;
+  classDef documentNode fill:#f0fdf4,stroke:#16a34a,color:#14532d;
+  classDef nodesetNode fill:#ede9fe,stroke:#7c3aed,color:#3b0764;
+  classDef loopNode fill:#f0fdfa,stroke:#0f766e,color:#134e4a;
+  classDef plannedNode fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;
+  classDef baseLibResource fill:#ecfdf5,stroke:#059669,color:#064e3b;
+  classDef pluginResource fill:#eff6ff,stroke:#2563eb,color:#1e3a8a;
+  classDef hostExtensionResource fill:#f5f3ff,stroke:#7c3aed,color:#3b0764;
+  classDef plannedResource fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;
+  start@{ shape: stadium, label: "Start\n\nid: start\ntype_used: sandbox.start\n\n---------- source ----------\nroot: project\npath: configs/pass_comprehensive_flowchart.jsonc\n\n---------- meta ----------\ndesc: Runs start." }
+  class start defaultNode;
+  runtime_mode@{ shape: cloud, label: "Runtime Mode\n\nid: runtime_mode\ntype_used: sandbox.configure_runtime_mode\n\n---------- source ----------\nroot: project\npath: configs/pass_comprehensive_flowchart.jsonc\n\n---------- meta ----------\ndesc: Configures audited process-local ambient state.\neffect_scope: global_state\nexecution_lock: sandbox.runtime.mode" }
+  class runtime_mode defaultNode;
+  input@{ shape: lean-r, label: "Input\n\nid: input\ntype_used: sandbox.value_input\n\n---------- source ----------\nroot: project\npath: configs/pass_comprehensive_flowchart.jsonc\n\n---------- meta ----------\ndesc: Runs input.\neffect_scope: terminal" }
+  class input defaultNode;
+  prepare@{ shape: hex, label: "Prepare\n\nid: prepare\ntype_used: sandbox.prepare_value\n\n---------- source ----------\nroot: project\npath: configs/pass_comprehensive_flowchart.jsonc\n\n---------- meta ----------\ndesc: Runs prepare." }
+  class prepare defaultNode;
+  core@{ shape: fr-rect, label: "Core\n\nid: core\ntype_used: comprehensive.core\n\n---------- source ----------\nroot: project\npath: configs/nodesets/pass_comprehensive_flowchart/comp\n      rehensive_core.jsonc\n\n---------- call ----------\ndesc: Runs core.\n\n---------- nodeset ----------\ntype_key: comprehensive.core\ndesc: 这是综合流程图中的预定义过程节点，用来验证 nodeset\n      在折叠视图和展开视图中都能保留契约、中文说明、内部开始结束节点以及显式边关系。" }
+  class core nodesetNode;
+  route@{ shape: diam, label: "Route\n\nid: route\ntype_used: sandbox.route_decision\n\n---------- source ----------\nroot: project\npath: configs/pass_comprehensive_flowchart.jsonc\n\n---------- meta ----------\ndesc: Runs route." }
+  class route defaultNode;
+  external@{ shape: rect, label: "[EXTERNAL] External\n\nid: external\ntype_used: sandbox.external_boost\n\n---------- source ----------\nroot: project\npath: configs/pass_comprehensive_flowchart.jsonc\n\n---------- meta ----------\ndesc: Runs external.\neffect_scope: trusted\nexternal: true" }
+  class external externalDependency;
+  class external externalBoundary;
+  store@{ shape: cyl, label: "Store\n\nid: store\ntype_used: sandbox.audit_store\n\n---------- source ----------\nroot: project\npath: configs/pass_comprehensive_flowchart.jsonc\n\n---------- meta ----------\ndesc: Runs store.\neffect_scope: python_io" }
+  class store defaultNode;
+  document@{ shape: doc, label: "Document\n\nid: document\ntype_used: sandbox.report_document\n\n---------- source ----------\nroot: project\npath: configs/pass_comprehensive_flowchart.jsonc\n\n---------- meta ----------\ndesc: Runs document.\neffect_scope: python_io" }
+  class document documentNode;
+  output@{ shape: lean-r, label: "Output\n\nid: output\ntype_used: sandbox.report_output\n\n---------- source ----------\nroot: project\npath: configs/pass_comprehensive_flowchart.jsonc\n\n---------- meta ----------\ndesc: Runs output.\neffect_scope: terminal" }
+  class output defaultNode;
+  n_end@{ shape: stadium, label: "End\n\nid: end\ntype_used: sandbox.report_end\n\n---------- source ----------\nroot: project\npath: configs/pass_comprehensive_flowchart.jsonc\n\n---------- meta ----------\ndesc: Runs end." }
+  class n_end defaultNode;
+  again_end@{ shape: stadium, label: "Again Branch End\n\nid: again_end\ntype_used: sandbox.start\n\n---------- source ----------\nroot: project\npath: configs/pass_comprehensive_flowchart.jsonc\n\n---------- meta ----------\ndesc: Terminates the inactive again branch in the\n      acyclic comprehensive fixture." }
+  class again_end defaultNode;
+  start --> input
+  linkStyle 0 stroke-width:4px;
+  input -->|"---------- data ----------\ndata: Value In Input (id: value.in.input -> value.in)"| runtime_mode
+  linkStyle 1 stroke-width:4px;
+  runtime_mode -->|"---------- data ----------\ndata: Value In Runtime (id: value.in.runtime ->\n      value.in)"| prepare
+  linkStyle 2 stroke-width:4px;
+  prepare -->|"---------- data ----------\ndata: Value Prepared (id: value.prepared)"| core
+  linkStyle 3 stroke-width:4px;
+  core -->|"---------- data ----------\ndata: Value Out (id: value.out)"| route
+  linkStyle 4 stroke-width:4px;
+  core -->|"---------- data ----------\ndata: Value Out (id: value.out)"| external
+  linkStyle 5 stroke-dasharray:6 4,stroke-width:2px;
+  route -->|"---------- when ----------\nwhen: flow.route == 'external'\n\n---------- data ----------\ndata: Flow Route (id: flow.route)"| external
+  linkStyle 6 stroke-width:4px;
+  route -->|"---------- when ----------\nwhen: flow.route == 'again'"| again_end
+  linkStyle 7 stroke-width:4px;
+  external -->|"---------- data ----------\ndata: Value Final (id: value.final)"| store
+  linkStyle 8 stroke-width:4px;
+  external -->|"---------- data ----------\ndata: Value Final (id: value.final)"| document
+  linkStyle 9 stroke-dasharray:6 4,stroke-width:2px;
+  store -->|"---------- data ----------\ndata: Effects Request (id: effects.request)"| document
+  linkStyle 10 stroke-width:4px;
+  document -->|"---------- data ----------\ndata: Document Report (id: document.report)"| output
+  linkStyle 11 stroke-width:4px;
+  output -->|"---------- data ----------\ndata: Io Output (id: io.output)"| n_end
+  linkStyle 12 stroke-width:4px;

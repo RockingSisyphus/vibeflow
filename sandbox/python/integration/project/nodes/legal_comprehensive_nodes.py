@@ -18,6 +18,29 @@ class PrepareValueNode:
     def run_pure(self, inputs, params):
         return {'value.prepared': VALUE(inputs, 'value.in') + params.get('offset', 0)}
 
+class ConfigureRuntimeModeNode:
+    NODE_INFO = NodeInfo(
+        type_key='sandbox.configure_runtime_mode',
+        display_name='配置进程运行模式',
+        category='sandbox',
+        description='修改一个仅存在于当前 execution domain 的模块运行标记；示例不依赖任何第三方工具，用来展示受审计的 global_state 节点和自动根独占锁。',
+        version='0.1.0',
+        flow_kind='global_state',
+    )
+    CONTRACT = NodeContract(
+        requires=(REQ('value.in'),),
+        provides=(PROV('value.in.runtime', 'value.in'),),
+        input_semantics={'value.in': ('沿 envelope 流转的普通业务值；它不是 ambient state。',)},
+        output_semantics={'value.in.runtime': ('原样传给下一节点的业务值。',)},
+        output_schema={'value.in.runtime': {'type': 'number'}},
+        examples=({'inputs': {'value.in': {'key': 'value.in', 'type': 'value.in', 'value': 3, 'source_node': 'example'}}, 'params': {}},),
+    )
+
+    def run_pure(self, inputs, params):
+        global COMPREHENSIVE_RUNTIME_MODE
+        COMPREHENSIVE_RUNTIME_MODE = 'configured'
+        return {'value.in.runtime': VALUE(inputs, 'value.in')}
+
 class CoreComputeNode:
     NODE_INFO = NodeInfo(type_key='sandbox.core_compute', display_name='核心业务计算', category='sandbox', description='在预定义子流程中执行主要计算逻辑；综合示例把它放进 nodeset，验证预定义过程节点与内部流程图的一致性。', version='0.1.0', flow_kind='process')
     CONTRACT = NodeContract(requires=(REQ('value.prepared'),), provides=(PROV('value.out'),), input_semantics={'value.prepared': ('准备阶段输出的数值，已经满足核心计算的输入前置条件。',)}, output_semantics={'value.out': ('核心计算得到的中间业务结果，后续会进入决策节点判断是否继续循环。',)}, params_schema={'factor': {'type': 'number', 'description': '核心计算使用的乘数，用于放大准备态数值。'}}, output_schema={'value.out': {'type': 'number'}}, examples=({'inputs': {'value.prepared': {'key': 'value.prepared', 'type': 'value.prepared', 'value': 4, 'source_node': 'example'}}, 'params': {'factor': 2}},))

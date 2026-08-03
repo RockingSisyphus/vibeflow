@@ -293,6 +293,80 @@ def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nod
     assert mermaid.index("__vibeflow_layout_plugins") < mermaid.index("__vibeflow_layout_base_lib")
     assert mermaid.index("__vibeflow_layout_base_lib") < mermaid.index("__vibeflow_layout_nodesets")
 
+
+def test_global_state_cloud_is_shared_by_expanded_and_review_fragments(
+    tmp_path,
+) -> None:
+    if not is_mermaid_svg_renderer_available():
+        pytest.skip("Mermaid SVG renderer is not installed")
+    from vibeflow.tooling.application.python.presentation.mermaid.review_svg import (
+        render_review_columns_svg,
+    )
+
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                {
+                    "type_key": "state.inner",
+                    "display_name": "State Inner",
+                    "description": "Contains a planned ambient-state step.",
+                    "requires": [],
+                    "provides": [],
+                    "pipeline": {
+                        "nodes": [
+                            _node_call(
+                                "ambient",
+                                "future.ambient",
+                                "Shows the global-state cloud in a fragment.",
+                                status="planned",
+                                flow_kind="global_state",
+                            )
+                        ]
+                    },
+                }
+            ],
+            "pipeline": {
+                "nodes": [
+                    _node_call(
+                        "composite",
+                        "state.inner",
+                        "Calls the state fragment.",
+                    )
+                ]
+            },
+        }
+    )
+
+    expanded = export_mermaid(graph, expand_nodesets=True)
+    review = export_mermaid(
+        graph,
+        expand_nodesets=True,
+        mermaid_layout="review-columns",
+    )
+
+    assert "composite__ambient@{ shape: cloud" in expanded
+    assert "__vibeflow_layout_nodesets__composite__ambient@{ shape: cloud" in review
+
+    output = tmp_path / "global-state-review.svg"
+    render_review_columns_svg(
+        graph,
+        GraphCompiler().compile(graph),
+        output,
+        expand_nodesets=True,
+    )
+    root = ET.parse(output).getroot()
+    ambient_groups = [
+        element
+        for element in root.iter()
+        if element.tag.endswith("}g")
+        and "ambient" in element.attrib.get("id", "")
+        and "node" in element.attrib.get("class", "").split()
+    ]
+    assert ambient_groups
+    for group in ambient_groups:
+        assert any(child.tag.endswith("}path") for child in group)
+        assert not any(child.tag.endswith("}rect") for child in group)
+
 def test_review_columns_svg_composer_places_columns_left_to_right(tmp_path) -> None:
     if not is_mermaid_svg_renderer_available():
         pytest.skip("Mermaid SVG renderer is not installed")

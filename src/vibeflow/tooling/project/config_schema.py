@@ -5,6 +5,7 @@ from typing import Any, Mapping
 from vibeflow.tooling.project.schema_common import (
     _error,
     _non_empty_string,
+    _validate_execution_lock,
     _validate_positive_int,
     _validate_provider_list,
     _validate_requirement_list,
@@ -64,6 +65,12 @@ def collect_policy_schema_findings(
 
 
 def _validate_pipeline(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
+    if "execution_lock" in value:
+        _validate_execution_lock(
+            value["execution_lock"],
+            f"{prefix}.execution_lock",
+            findings,
+        )
     if "entry_mode" in value and value["entry_mode"] not in ENTRY_MODES:
         findings.append(
             _error(

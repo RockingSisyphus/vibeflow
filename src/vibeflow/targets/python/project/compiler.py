@@ -21,7 +21,15 @@ from vibeflow.core.flow import (
     STATUS_PLANNED,
     GraphConfig,
 )
-from vibeflow.core.models import ImplementationFact, ImplementationFacts
+from vibeflow.core.constants import (
+    TARGET_FEATURE_EXECUTION_LOCKS,
+    TARGET_FEATURE_GLOBAL_STATE,
+)
+from vibeflow.core.models import (
+    ImplementationFact,
+    ImplementationFacts,
+    TargetFeatureSet,
+)
 
 
 class CompilerPluginRegistry(Protocol):
@@ -62,6 +70,15 @@ class GraphCompiler:
         compiled = CoreGraphCompiler().compile(
             graph,
             implementation_facts=implementation_facts,
+            target_features=TargetFeatureSet(
+                target="python",
+                features=frozenset(
+                    {
+                        TARGET_FEATURE_EXECUTION_LOCKS,
+                        TARGET_FEATURE_GLOBAL_STATE,
+                    }
+                ),
+            ),
             known_nodesets=nodesets,
             owner=owner,
         )

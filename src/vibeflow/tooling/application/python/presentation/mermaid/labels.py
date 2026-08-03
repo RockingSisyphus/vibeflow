@@ -13,15 +13,8 @@ from vibeflow.tooling.application.python.presentation.review_model import (
     resources_payload,
 )
 from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec
-from vibeflow.core.constants import (
-    FLOW_KIND_DATA_STORE,
-    FLOW_KIND_DECISION,
-    FLOW_KIND_DOCUMENT,
-    FLOW_KIND_IO,
-    FLOW_KIND_PREDEFINED,
-    FLOW_KIND_PREPARATION,
-    FLOW_KIND_PROCESS,
-    FLOW_KIND_TERMINAL,
+from vibeflow.tooling.application.mermaid_shapes import (
+    mermaid_shape_for_flow_kind,
 )
 
 _SECTION_SEPARATOR_WIDTH = 10
@@ -87,17 +80,7 @@ def _section_label(name: str) -> str:
 
 def _node_shape(node_id: str, label: str, flow_kind: object, *, shape: str = "") -> str:
     escaped = _escape_label(label)
-    kind = str(flow_kind)
-    actual_shape = shape or {
-        FLOW_KIND_TERMINAL: "stadium",
-        FLOW_KIND_PROCESS: "rect",
-        FLOW_KIND_DECISION: "diam",
-        FLOW_KIND_IO: "lean-r",
-        FLOW_KIND_PREDEFINED: "fr-rect",
-        FLOW_KIND_DATA_STORE: "cyl",
-        FLOW_KIND_DOCUMENT: "doc",
-        FLOW_KIND_PREPARATION: "hex",
-    }.get(kind, "rect")
+    actual_shape = shape or mermaid_shape_for_flow_kind(flow_kind)
     return f'{node_id}@{{ shape: {actual_shape}, label: "{escaped}" }}'
 
 def _resources_payload(resources: object | None) -> Mapping[str, object]:

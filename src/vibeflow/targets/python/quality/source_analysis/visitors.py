@@ -5,13 +5,18 @@ import ast
 from vibeflow.targets.python.quality.source_analysis.ast_rules import (
     import_aliases,
     import_aliases_from_node,
+    imported_module_roots,
     import_modules,
     module_statement_kind,
+    qualified_reference_name,
+    record_assignment_aliases,
 )
 from vibeflow.core.contracts import provider_keys
-from vibeflow.targets.python.project.node import EFFECT_SCOPE_NONE, NodeContract
+from vibeflow.targets.python.project.node import EFFECT_SCOPE_GLOBAL_STATE, EFFECT_SCOPE_NONE, NodeContract
 from vibeflow.targets.python.quality.source_analysis.effects import (
+    ambient_assignment_is_forbidden,
     call_violation,
+    dynamic_namespace_reference,
     from_import_effect_is_forbidden,
     import_violation_code,
     process_argv_import_is_forbidden,
@@ -44,6 +49,161 @@ from vibeflow.targets.python.quality.source_analysis.input_tracking import (
 from vibeflow.targets.python.quality.source_analysis.types import MUTATING_METHODS, PurityPolicy, PurityViolation, _SourceInfo
 
 
+def _bound_names(target: ast.AST) -> set[str]:
+    if isinstance(target, ast.Name):
+        return {target.id}
+    if isinstance(target, (ast.List, ast.Tuple)):
+        names: set[str] = set()
+        for item in target.elts:
+            names.update(_bound_names(item))
+        return names
+    return set()
+
+
+def _function_bindings(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> tuple[set[str], set[str]]:
+    names = {
+        argument.arg
+        for argument in (
+            *node.args.posonlyargs,
+            *node.args.args,
+            *node.args.kwonlyargs,
+        )
+    }
+    if node.args.vararg is not None:
+        names.add(node.args.vararg.arg)
+    if node.args.kwarg is not None:
+        names.add(node.args.kwarg.arg)
+    collector = _FunctionBindingCollector()
+    for statement in node.body:
+        collector.visit(statement)
+    names.update(collector.names)
+    names.difference_update(collector.global_names)
+    names.difference_update(collector.nonlocal_names)
+    return names, collector.import_names
+
+
+class _FunctionBindingCollector(ast.NodeVisitor):
+    def __init__(self) -> None:
+        self.names: set[str] = set()
+        self.import_names: set[str] = set()
+        self.global_names: set[str] = set()
+        self.nonlocal_names: set[str] = set()
+
+    def visit_Name(self, node: ast.Name) -> None:
+        if isinstance(node.ctx, ast.Store):
+            self.names.add(node.id)
+
+    def visit_Import(self, node: ast.Import) -> None:
+        bound = {alias.asname or alias.name.split(".", 1)[0] for alias in node.names}
+        self.names.update(bound)
+        self.import_names.update(bound)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        bound = {alias.asname or alias.name for alias in node.names if alias.name != "*"}
+        self.names.update(bound)
+        self.import_names.update(bound)
+
+    def visit_Global(self, node: ast.Global) -> None:
+        self.global_names.update(node.names)
+
+    def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
+        self.nonlocal_names.update(node.names)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self.names.add(node.name)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self.names.add(node.name)
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        self.names.add(node.name)
+
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        return
+
+
+def _is_literal_process_state(node: ast.AST | None) -> bool:
+    if isinstance(node, ast.Constant):
+        return True
+    if isinstance(node, (ast.List, ast.Set, ast.Tuple)):
+        return all(_is_literal_process_state(item) for item in node.elts)
+    if isinstance(node, ast.Dict):
+        return all(
+            (key is None or _is_literal_process_state(key))
+            and _is_literal_process_state(value)
+            for key, value in zip(node.keys, node.values, strict=True)
+        )
+    return node is None
+
+
+def _visit_if_with_conservative_aliases(visitor, node: ast.If) -> None:
+    visitor.visit(node.test)
+    if isinstance(node.test, ast.Constant):
+        branch = node.body if bool(node.test.value) else node.orelse
+        for statement in branch:
+            visitor.visit(statement)
+        return
+
+    before = dict(visitor._import_aliases)
+    for statement in node.body:
+        visitor.visit(statement)
+    body_aliases = dict(visitor._import_aliases)
+
+    visitor._import_aliases = dict(before)
+    for statement in node.orelse:
+        visitor.visit(statement)
+    else_aliases = dict(visitor._import_aliases)
+    visitor._import_aliases = _merge_branch_aliases(
+        visitor,
+        before,
+        body_aliases,
+        else_aliases,
+    )
+
+
+def _merge_branch_aliases(visitor, *branches: dict[str, str]) -> dict[str, str]:
+    merged: dict[str, str] = {}
+    keys = set().union(*(branch.keys() for branch in branches))
+    for key in keys:
+        candidates = tuple(
+            dict.fromkeys(
+                branch[key]
+                for branch in branches
+                if key in branch
+            )
+        )
+        forbidden = tuple(
+            candidate
+            for candidate in candidates
+            if _alias_call_is_forbidden(visitor, candidate)
+        )
+        if forbidden:
+            merged[key] = forbidden[0]
+        elif len(candidates) == 1:
+            merged[key] = candidates[0]
+    return merged
+
+
+def _alias_call_is_forbidden(visitor, candidate: str) -> bool:
+    try:
+        expression = ast.parse(f"{candidate}()", mode="eval").body
+    except SyntaxError:
+        return False
+    if not isinstance(expression, ast.Call):
+        return False
+    violation_code, _ = call_violation(
+        expression,
+        aliases={},
+        effect_scope=visitor.effect_scope,
+        imported_roots=visitor._imported_module_roots,
+        module_state_names=visitor._module_state_names,
+        local_names=visitor._current_local_names - visitor._current_import_names,
+    )
+    return bool(violation_code)
+
+
 class _PurityImportVisitor(ast.NodeVisitor):
     def visit_Import(self, node: ast.Import) -> None:
         self._record_import_aliases(node)
@@ -73,6 +233,9 @@ class _PurityImportVisitor(ast.NodeVisitor):
         aliases = getattr(self, "_import_aliases", None)
         if isinstance(aliases, dict):
             aliases.update(import_aliases_from_node(node))
+        roots = getattr(self, "_imported_module_roots", None)
+        if isinstance(roots, set):
+            roots.update(imported_module_roots(node))
 
 
 class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
@@ -86,6 +249,9 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
         known_node_class_names: tuple[str, ...],
         line_offset: int,
         effect_scope: str = EFFECT_SCOPE_NONE,
+        initial_aliases: dict[str, str] | None = None,
+        imported_roots: set[str] | None = None,
+        module_state_names: set[str] | None = None,
     ) -> None:
         self.policy = policy
         self.source = source
@@ -98,10 +264,20 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
         self._input_aliases: set[str] = set()
         self._output_dicts: dict[str, set[str]] = {}
         self._current_function = ""
-        self._import_aliases: dict[str, str] = {"Path": "pathlib.Path"}
+        self._import_aliases: dict[str, str] = {
+            "Path": "pathlib.Path",
+            **dict(initial_aliases or {}),
+        }
+        self._imported_module_roots: set[str] = set(imported_roots or ())
+        self._module_state_names: set[str] = set(module_state_names or ())
+        self._current_local_names: set[str] = set()
+        self._current_import_names: set[str] = set()
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         self._import_aliases.update(import_aliases(node))
+        for child in ast.walk(node):
+            if isinstance(child, (ast.Import, ast.ImportFrom)):
+                self._imported_module_roots.update(imported_module_roots(child))
         for stmt in node.body:
             if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 self.visit(stmt)
@@ -115,21 +291,35 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         previous = self._current_function
+        previous_aliases = dict(self._import_aliases)
+        previous_locals = self._current_local_names
+        previous_imports = self._current_import_names
         self._current_function = node.name
+        self._current_local_names, self._current_import_names = _function_bindings(node)
+        for name in self._current_local_names:
+            self._import_aliases.pop(name, None)
         if node.name == "run_pure":
             for child in ast.walk(node):
                 if isinstance(child, (ast.Yield, ast.YieldFrom)):
                     self._add("generator_run_pure", "run_pure must not yield values", child, suggested_fix_type="fix_contract")
         self.generic_visit(node)
         self._current_function = previous
+        self._current_local_names = previous_locals
+        self._current_import_names = previous_imports
+        self._import_aliases = previous_aliases
 
     def visit_Global(self, node: ast.Global) -> None:
+        if self.effect_scope == EFFECT_SCOPE_GLOBAL_STATE:
+            return
         self._add("global_state", "global mutation is forbidden", node, suggested_fix_type="move_to_boundary")
 
     def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
+        if self.effect_scope == EFFECT_SCOPE_GLOBAL_STATE:
+            return
         self._add("global_state", "nonlocal mutation is forbidden", node, suggested_fix_type="move_to_boundary")
 
     def visit_Assign(self, node: ast.Assign) -> None:
+        record_assignment_aliases(node, self._import_aliases)
         self._track_input_alias(node)
         self._track_output_literal(node)
         self._track_output_key_assignment(node)
@@ -140,6 +330,7 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        record_assignment_aliases(node, self._import_aliases)
         if _assigns_resource_field(node):
             self._add("resource_field", "node must not hold Context, boundary, session, browser, client, driver, cursor, or engine", node)
         self._check_assignment_target(node.target, node)
@@ -150,14 +341,17 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
                 self._input_aliases.discard(node.target.id)
         self.generic_visit(node)
 
+    def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
+        record_assignment_aliases(node, self._import_aliases)
+        self.generic_visit(node)
+
     def visit_AugAssign(self, node: ast.AugAssign) -> None:
         self._check_assignment_target(node.target, node)
         self.generic_visit(node)
 
     def visit_Delete(self, node: ast.Delete) -> None:
         for target in node.targets:
-            if self._target_mutates_node_input(target):
-                self._add("input_mutation", "node must not delete values from inputs", node, suggested_fix_type="fix_node")
+            self._check_assignment_target(target, node)
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
@@ -178,6 +372,9 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
                 suggested_fix_type="fix_config",
             )
         self.generic_visit(node)
+
+    def visit_If(self, node: ast.If) -> None:
+        _visit_if_with_conservative_aliases(self, node)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         root = _root_name(node)
@@ -216,6 +413,18 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
         self.generic_visit(node)
 
     def visit_Subscript(self, node: ast.Subscript) -> None:
+        dynamic_reference = dynamic_namespace_reference(
+            node,
+            aliases=self._import_aliases,
+            imported_roots=self._imported_module_roots,
+        )
+        if dynamic_reference:
+            self._add(
+                "banned_call",
+                f"dynamic module namespace lookup is forbidden: {dynamic_reference}",
+                node,
+                suggested_fix_type="move_to_boundary",
+            )
         if isinstance(node.value, ast.Name) and node.value.id == "params":
             key = _literal_subscript_key(node)
             if key and key != "_global" and self.contract is not None and key not in self.contract.params_schema:
@@ -242,7 +451,14 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
 
     def _check_banned_call(self, name: str, node: ast.Call) -> None:
         del name  # qualified aliases and scope are handled by the shared gate.
-        violation_code, forbidden = call_violation(node, aliases=self._import_aliases, effect_scope=self.effect_scope)
+        violation_code, forbidden = call_violation(
+            node,
+            aliases=self._import_aliases,
+            effect_scope=self.effect_scope,
+            imported_roots=self._imported_module_roots,
+            module_state_names=self._module_state_names - self._current_local_names,
+            local_names=self._current_local_names - self._current_import_names,
+        )
         if violation_code:
             self._add(violation_code, f"banned call: {forbidden}", node, suggested_fix_type="move_to_boundary")
 
@@ -287,6 +503,7 @@ class ModulePurityVisitor(_PurityImportVisitor):
         known_node_modules: tuple[str, ...],
         known_node_class_names: tuple[str, ...],
         effect_scope: str = EFFECT_SCOPE_NONE,
+        audit_all_definitions: bool = False,
     ) -> None:
         self.policy = policy
         self.source = source
@@ -294,32 +511,65 @@ class ModulePurityVisitor(_PurityImportVisitor):
         self.known_node_modules = set(known_node_modules)
         self.known_node_class_names = set(known_node_class_names)
         self.effect_scope = effect_scope
+        self.audit_all_definitions = audit_all_definitions
         self.violations: list[PurityViolation] = []
         self._import_aliases: dict[str, str] = {"Path": "pathlib.Path"}
+        self._imported_module_roots: set[str] = set()
+        self._module_state_names: set[str] = set()
         self._helper_input_parameters: dict[str, set[str]] = {}
         self._current_input_aliases: set[str] = set()
+        self._current_local_names: set[str] = set()
+        self._current_import_names: set[str] = set()
 
     def visit_Module(self, node: ast.Module) -> None:
         for stmt in node.body:
             if isinstance(stmt, (ast.Import, ast.ImportFrom)):
                 self._import_aliases.update(import_aliases_from_node(stmt))
+                self._imported_module_roots.update(imported_module_roots(stmt))
+            elif isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    self._module_state_names.update(_bound_names(target))
+            elif isinstance(stmt, ast.AnnAssign):
+                self._module_state_names.update(_bound_names(stmt.target))
+        self._module_state_names.difference_update(
+            {"BASE_LIB_INFO", "CONTRACT", "NODE_INFO", "PLUGIN_INFO"}
+        )
         self._helper_input_parameters = _trace_helper_input_parameters(node, self.node_class_name)
-        reachable_helpers = _reachable_module_helpers(node, self.node_class_name)
+        reachable_helpers = (
+            {
+                statement.name
+                for statement in node.body
+                if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef))
+            }
+            if self.audit_all_definitions
+            else _reachable_module_helpers(node, self.node_class_name)
+        )
         for stmt in node.body:
             self._visit_module_statement(stmt, reachable_helpers=reachable_helpers)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         previous = self._current_input_aliases
+        previous_aliases = dict(self._import_aliases)
+        previous_locals = self._current_local_names
+        previous_imports = self._current_import_names
         self._current_input_aliases = set(self._helper_input_parameters.get(node.name, ()))
+        self._current_local_names, self._current_import_names = _function_bindings(node)
+        for name in self._current_local_names:
+            self._import_aliases.pop(name, None)
         self.generic_visit(node)
         self._current_input_aliases = previous
+        self._current_local_names = previous_locals
+        self._current_import_names = previous_imports
+        self._import_aliases = previous_aliases
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         self.visit_FunctionDef(node)  # type: ignore[arg-type]
 
     def visit_Assign(self, node: ast.Assign) -> None:
+        record_assignment_aliases(node, self._import_aliases)
         for target in node.targets:
             self._check_helper_input_assignment(target, node)
+            self._check_ambient_assignment(target, node)
         aliases_input = self._is_helper_input_reference(node.value)
         for target in node.targets:
             if isinstance(target, ast.Name):
@@ -330,7 +580,9 @@ class ModulePurityVisitor(_PurityImportVisitor):
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        record_assignment_aliases(node, self._import_aliases)
         self._check_helper_input_assignment(node.target, node)
+        self._check_ambient_assignment(node.target, node)
         if isinstance(node.target, ast.Name):
             if node.value is not None and self._is_helper_input_reference(node.value):
                 self._current_input_aliases.add(node.target.id)
@@ -338,22 +590,34 @@ class ModulePurityVisitor(_PurityImportVisitor):
                 self._current_input_aliases.discard(node.target.id)
         self.generic_visit(node)
 
+    def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
+        record_assignment_aliases(node, self._import_aliases)
+        self.generic_visit(node)
+
     def visit_AugAssign(self, node: ast.AugAssign) -> None:
         self._check_helper_input_assignment(node.target, node)
+        self._check_ambient_assignment(node.target, node)
         self.generic_visit(node)
 
     def visit_Delete(self, node: ast.Delete) -> None:
         for target in node.targets:
             if self._helper_target_mutates_input(target):
                 self._add("input_mutation", "module helper must not delete values from inputs", node, suggested_fix_type="fix_node")
+            self._check_ambient_assignment(target, node)
         self.generic_visit(node)
+
+    def visit_If(self, node: ast.If) -> None:
+        _visit_if_with_conservative_aliases(self, node)
 
     def _visit_module_statement(self, stmt: ast.stmt, *, reachable_helpers: set[str]) -> None:
         kind = module_statement_kind(stmt)
         if kind == "import":
             self.visit(stmt)
         elif isinstance(stmt, ast.ClassDef):
-            self._record_module_class(stmt)
+            if self.audit_all_definitions:
+                self.generic_visit(stmt)
+            else:
+                self._record_module_class(stmt)
         elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)) and stmt.name in reachable_helpers:
             self.visit(stmt)
         elif kind == "assignment":
@@ -362,7 +626,14 @@ class ModulePurityVisitor(_PurityImportVisitor):
             self._add("module_side_effect", "node module top level may only contain imports, definitions, immutable constants, and docstrings", stmt, suggested_fix_type="move_to_boundary")
 
     def visit_Call(self, node: ast.Call) -> None:
-        violation_code, forbidden = call_violation(node, aliases=self._import_aliases, effect_scope=self.effect_scope)
+        violation_code, forbidden = call_violation(
+            node,
+            aliases=self._import_aliases,
+            effect_scope=self.effect_scope,
+            imported_roots=self._imported_module_roots,
+            module_state_names=self._module_state_names - self._current_local_names,
+            local_names=self._current_local_names - self._current_import_names,
+        )
         if violation_code:
             self._add(violation_code, f"banned call in module helper: {forbidden}", node, suggested_fix_type="move_to_boundary")
         name = _call_name(node.func)
@@ -388,6 +659,21 @@ class ModulePurityVisitor(_PurityImportVisitor):
             self._add("effect_call", f"banned terminal stream access in module helper: {terminal_reference}", node, suggested_fix_type="move_to_boundary")
         self.generic_visit(node)
 
+    def visit_Subscript(self, node: ast.Subscript) -> None:
+        dynamic_reference = dynamic_namespace_reference(
+            node,
+            aliases=self._import_aliases,
+            imported_roots=self._imported_module_roots,
+        )
+        if dynamic_reference:
+            self._add(
+                "banned_call",
+                f"dynamic module namespace lookup is forbidden in module helper: {dynamic_reference}",
+                node,
+                suggested_fix_type="move_to_boundary",
+            )
+        self.generic_visit(node)
+
     def visit_Raise(self, node: ast.Raise) -> None:
         if not isinstance(node.exc, ast.Call):
             reference = system_exit_reference(node.exc, self._import_aliases)
@@ -396,9 +682,13 @@ class ModulePurityVisitor(_PurityImportVisitor):
         self.generic_visit(node)
 
     def visit_Global(self, node: ast.Global) -> None:
+        if self.effect_scope == EFFECT_SCOPE_GLOBAL_STATE:
+            return
         self._add("global_state", "global mutation is forbidden in module helper", node, suggested_fix_type="move_to_boundary")
 
     def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
+        if self.effect_scope == EFFECT_SCOPE_GLOBAL_STATE:
+            return
         self._add("global_state", "nonlocal mutation is forbidden in module helper", node, suggested_fix_type="move_to_boundary")
 
     def _check_import(self, module: str, node: ast.AST) -> None:
@@ -417,12 +707,44 @@ class ModulePurityVisitor(_PurityImportVisitor):
             self.known_node_class_names.add(node.name)
 
     def _check_module_assignment(self, node: ast.Assign | ast.AnnAssign) -> None:
-        if not _module_assignment_is_allowed(node):
+        if not _module_assignment_is_allowed(node) and not (
+            self.effect_scope == EFFECT_SCOPE_GLOBAL_STATE
+            and _is_literal_process_state(node.value)
+        ):
             self._add("module_global_state", "module-level mutable state or side-effect construction is forbidden", node, suggested_fix_type="move_to_boundary")
 
     def _check_helper_input_assignment(self, target: ast.AST, node: ast.AST) -> None:
         if self._helper_target_mutates_input(target):
             self._add("input_mutation", "module helper must not mutate inputs", node, suggested_fix_type="fix_node")
+
+    def _check_ambient_assignment(self, target: ast.AST, node: ast.AST) -> None:
+        if not isinstance(target, (ast.Attribute, ast.Subscript)):
+            return
+        value = target.value
+        name = qualified_reference_name(value, self._import_aliases)
+        root = name.split(".", 1)[0]
+        if not name or (
+            root in self._current_local_names
+            and root not in self._current_import_names
+        ):
+            return
+        if root not in self._imported_module_roots and root not in self._module_state_names:
+            return
+        if ambient_assignment_is_forbidden(name):
+            self._add(
+                "effect_call",
+                f"module helper must not mutate forbidden process state: {name}",
+                node,
+                suggested_fix_type="move_to_boundary",
+            )
+            return
+        if self.effect_scope != EFFECT_SCOPE_GLOBAL_STATE:
+            self._add(
+                "global_state",
+                f"module helper must not mutate ambient module state: {name}",
+                node,
+                suggested_fix_type="move_to_boundary",
+            )
 
     def _helper_target_mutates_input(self, target: ast.AST) -> bool:
         return isinstance(target, (ast.Subscript, ast.Attribute)) and self._is_helper_input_reference(target.value)

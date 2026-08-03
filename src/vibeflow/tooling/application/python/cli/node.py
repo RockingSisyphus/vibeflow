@@ -13,6 +13,10 @@ from vibeflow.core.findings import HealthFinding, HealthReport
 from vibeflow.targets.python.project.node import NodeContract, NodeInfo, PureNode, effective_effect_scope
 from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
 from vibeflow.targets.python.quality.source_analysis import collect_node_metrics, validate_node_class
+from vibeflow.targets.python.quality.source_analysis.preflight import (
+    PythonSourcePreflightError,
+)
+from vibeflow.tooling.application.python.project.source_preflight import preflight_python_import_tree
 
 
 def inspect_node_payload(
@@ -33,6 +37,29 @@ def inspect_node_payload(
         return {"health": report.to_dict()}, 1
     try:
         node_cls = load_node_class(module_path, node_type=node_type, class_name=class_name)
+    except PythonSourcePreflightError as exc:
+        finding = exc.findings[0]
+        report = HealthReport(
+            status="ERROR",
+            errors=(
+                HealthFinding(
+                    rule_id="NODE.INSPECT.LOAD_ERROR",
+                    severity="error",
+                    object_type="node",
+                    object_id=node_type,
+                    source_location={
+                        "path": finding.path,
+                        "line": finding.line,
+                        "column": finding.column,
+                    },
+                    failure_layer="source",
+                    message=str(exc),
+                    suggested_fix_type="fix_node",
+                    details={"legacy_code": finding.legacy_code},
+                ),
+            ),
+        )
+        return {"health": report.to_dict()}, 1
     except (OSError, ImportError, AttributeError, TypeError, ValueError) as exc:
         report = error_report("NODE.INSPECT.LOAD_ERROR", str(exc), "node", node_type, "schema")
         return {"health": report.to_dict()}, 1
@@ -66,6 +93,7 @@ def inspect_node_payload(
 def load_node_class(module_path: Path, *, node_type: str, class_name: str | None) -> type[PureNode]:
     if not module_path.exists():
         raise OSError(f"module file does not exist: {module_path}")
+    preflight_python_import_tree(module_path, project_root=module_path.parent)
     module_name = f"_vibeflow_inspect_{abs(hash(module_path.resolve()))}"
     spec = importlib.util.spec_from_file_location(module_name, module_path)
     if spec is None or spec.loader is None:

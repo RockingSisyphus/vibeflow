@@ -38,7 +38,7 @@ def _nested_result_plan(
     schedule: str = "result_key",
 ) -> dict[str, object]:
     leaf = {
-        "abi_version": "vibeflow.workflow.v2",
+        "abi_version": "vibeflow.workflow.v3",
         "workflow_id": "nested.leaf",
         "entry_mode": "async",
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -71,7 +71,7 @@ def _nested_result_plan(
         "max_steps": 10,
     }
     outer = {
-        "abi_version": "vibeflow.workflow.v2",
+        "abi_version": "vibeflow.workflow.v3",
         "workflow_id": "nested.outer",
         "entry_mode": "async",
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -123,7 +123,7 @@ def _nested_result_plan(
 
 def _nested_detached_plan() -> dict[str, object]:
     leaf = {
-        "abi_version": "vibeflow.workflow.v2",
+        "abi_version": "vibeflow.workflow.v3",
         "workflow_id": "nested.detached.leaf",
         "entry_mode": "async",
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -183,7 +183,7 @@ def _nested_detached_plan() -> dict[str, object]:
 
 def _nested_max_steps_plan() -> dict[str, object]:
     leaf = {
-        "abi_version": "vibeflow.workflow.v2",
+        "abi_version": "vibeflow.workflow.v3",
         "workflow_id": "nested.steps.leaf",
         "entry_mode": "async",
         "inputs": [],
@@ -200,7 +200,7 @@ def _nested_max_steps_plan() -> dict[str, object]:
         "max_steps": 3,
     }
     outer = {
-        "abi_version": "vibeflow.workflow.v2",
+        "abi_version": "vibeflow.workflow.v3",
         "workflow_id": "nested.steps.outer",
         "entry_mode": "async",
         "inputs": [],
@@ -224,7 +224,7 @@ def _nested_max_steps_plan() -> dict[str, object]:
         "max_steps": 10,
     }
     return {
-        "abi_version": "vibeflow.workflow.v2",
+        "abi_version": "vibeflow.workflow.v3",
         "workflow_id": "nested.steps",
         "entry_mode": "async",
         "inputs": [],

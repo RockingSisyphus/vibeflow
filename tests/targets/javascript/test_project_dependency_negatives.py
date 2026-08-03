@@ -62,7 +62,7 @@ def _project(tmp_path: Path) -> Path:
 
 def _plan(entry: Path, *, entry_mode: str, completion: str) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v2",
+        "abi_version": "vibeflow.workflow.v3",
         "workflow_id": "test.project-negative",
         "entry_mode": entry_mode,
         "inputs": [],

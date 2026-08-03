@@ -54,6 +54,7 @@ def parse_workflow(
     workflow_type: type[WorkflowSpec] = WorkflowSpec,
 ) -> WorkflowSpec:
     raw = as_mapping(value, field_name="workflow plan")
+    _reject_unsupported_target_features(raw, field_name="workflow plan")
     if raw.get("entry_block") and raw.get("blocks") is not None:
         raw = workflow_mapping_from_blocks(raw)
     workflow_id = required_text(
@@ -171,6 +172,64 @@ def parse_workflow(
     )
     validate_workflow(plan)
     return plan
+
+
+def _reject_unsupported_target_features(
+    raw: Mapping[str, Any],
+    *,
+    field_name: str,
+) -> None:
+    if bool(raw.get("contains_global_state", False)):
+        _unsupported_target_feature("global_state", field_name=field_name)
+    if raw.get("execution_lock") is not None:
+        _unsupported_target_feature("execution_locks", field_name=field_name)
+    for index, block_value in enumerate(
+        sequence(raw.get("blocks", ()), field_name=f"{field_name}.blocks")
+    ):
+        block = as_mapping(
+            block_value,
+            field_name=f"{field_name}.blocks[{index}]",
+        )
+        _reject_unsupported_target_features(
+            block,
+            field_name=f"{field_name}.blocks[{index}]",
+        )
+    for index, node_value in enumerate(
+        sequence(raw.get("nodes", ()), field_name=f"{field_name}.nodes")
+    ):
+        node = as_mapping(
+            node_value,
+            field_name=f"{field_name}.nodes[{index}]",
+        )
+        node_field = f"{field_name}.nodes[{index}]"
+        status = str(node.get("status", "implemented") or "implemented")
+        if status != "planned" and node.get("execution_lock") is not None:
+            _unsupported_target_feature(
+                "execution_locks",
+                field_name=node_field,
+            )
+        if status != "planned" and (
+            str(node.get("flow_kind", "") or "") == "global_state"
+            or str(node.get("effect_scope", "") or "") == "global_state"
+            or bool(node.get("contains_global_state", False))
+        ):
+            _unsupported_target_feature(
+                "global_state",
+                field_name=node_field,
+            )
+        child = node.get("subplan", node.get("children"))
+        if isinstance(child, Mapping):
+            _reject_unsupported_target_features(
+                child,
+                field_name=f"{node_field}.subplan",
+            )
+
+
+def _unsupported_target_feature(feature: str, *, field_name: str) -> None:
+    raise AotPlanError(
+        f"JavaScript target does not support feature '{feature}' at {field_name}",
+        code="TARGET.FEATURE.UNSUPPORTED",
+    )
 
 
 def _parse_input(

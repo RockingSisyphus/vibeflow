@@ -24,6 +24,7 @@ from vibeflow.core.flow import (
     STATUS_PLANNED,
     GraphConfig,
 )
+from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE
 from vibeflow.core.inspection import build_architecture_report
 from vibeflow.targets.javascript.build.project_graph import (
     require_explicit_inputs,
@@ -60,6 +61,9 @@ from vibeflow.tooling.project.host_extensions import host_extension_resources
 from vibeflow.tooling.project.plugin_review import load_plugin_review_resources
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
 from vibeflow.tooling.project.workspace_model import WorkspaceConfig, WorkspaceRoot
+from vibeflow.tooling.application.mermaid_shapes import (
+    mermaid_shape_for_flow_kind,
+)
 
 
 @dataclass(frozen=True)
@@ -318,7 +322,14 @@ def render_mermaid(result: JavascriptAuditResult) -> str:
     lines = ["flowchart TD"]
     for node in result.graph.nodes:
         label = f"{node.id}\\n{node.type_used}".replace('"', "'")
-        lines.append(f'  {node.id}["{label}"]')
+        flow_kind = result.compiled.flow_kinds.get(node.id, node.flow_kind)
+        if flow_kind == FLOW_KIND_GLOBAL_STATE:
+            shape = mermaid_shape_for_flow_kind(flow_kind)
+            lines.append(
+                f'  {node.id}@{{ shape: {shape}, label: "{label}" }}'
+            )
+        else:
+            lines.append(f'  {node.id}["{label}"]')
     for edge in result.compiled.effective_edges:
         condition = f"|{edge.when}|" if edge.when else ""
         lines.append(f"  {edge.source} -->{condition} {edge.target}")
@@ -364,10 +375,21 @@ def render_review_svg(result: JavascriptAuditResult) -> str:
         )
     for node in nodes:
         x, y = positions[node.id]
+        flow_kind = result.compiled.flow_kinds.get(node.id, node.flow_kind)
+        if flow_kind == FLOW_KIND_GLOBAL_STATE:
+            shape = (
+                f'<path class="global-state-cloud" d="{_cloud_path(x, y, 680, 54)}" '
+                'fill="#f8fafc" stroke="#334155"/>'
+            )
+        else:
+            shape = (
+                f'<rect x="{x}" y="{y}" width="680" height="54" rx="8" '
+                'fill="#f8fafc" stroke="#334155"/>'
+            )
         fragments.extend(
             [
-                f'<g class="review-inline-fragment" data-node="{escape_xml(node.id)}">',
-                f'<rect x="{x}" y="{y}" width="680" height="54" rx="8" fill="#f8fafc" stroke="#334155"/>',
+                f'<g class="review-inline-fragment" data-node="{escape_xml(node.id)}" data-flow-kind="{escape_xml(flow_kind)}">',
+                shape,
                 f'<text x="{x + 16}" y="{y + 23}" font-family="sans-serif" font-size="15" font-weight="600">{escape_xml(node.id)}</text>',
                 f'<text x="{x + 16}" y="{y + 43}" font-family="monospace" font-size="12" fill="#475569">{escape_xml(node.type_used)}</text>',
                 "</g>",
@@ -382,6 +404,26 @@ def render_review_svg(result: JavascriptAuditResult) -> str:
         'fill="#64748b"/></marker></defs>'
         + "".join(fragments)
         + "</svg>\n"
+    )
+
+
+def _cloud_path(x: float, y: float, width: float, height: float) -> str:
+    """Return a scalable cloud outline contained by the requested box."""
+
+    def point(px: float, py: float) -> str:
+        return f"{x + width * px:.2f},{y + height * py:.2f}"
+
+    return " ".join(
+        (
+            f"M {point(0.12, 0.96)}",
+            f"C {point(0.04, 0.96)} {point(0.01, 0.78)} {point(0.06, 0.61)}",
+            f"C {point(0.01, 0.42)} {point(0.08, 0.22)} {point(0.18, 0.31)}",
+            f"C {point(0.22, 0.02)} {point(0.39, 0.00)} {point(0.44, 0.27)}",
+            f"C {point(0.52, 0.08)} {point(0.66, 0.15)} {point(0.67, 0.39)}",
+            f"C {point(0.76, 0.18)} {point(0.90, 0.30)} {point(0.87, 0.55)}",
+            f"C {point(0.98, 0.54)} {point(1.00, 0.82)} {point(0.91, 0.94)}",
+            f"C {point(0.78, 1.01)} {point(0.31, 1.00)} {point(0.12, 0.96)} Z",
+        )
     )
 
 

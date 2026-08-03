@@ -56,13 +56,81 @@ def call_name(node: ast.AST) -> str:
 
 
 def qualified_call_name(node: ast.AST, aliases: Mapping[str, str]) -> str:
+    reflected = reflected_reference_name(node, aliases)
+    if reflected:
+        return reflected
     if isinstance(node, ast.Name):
-        return aliases.get(node.id, node.id)
+        return _normalize_builtin_root(aliases.get(node.id, node.id))
     if isinstance(node, ast.Attribute):
-        return f"{qualified_call_name(node.value, aliases)}.{node.attr}"
+        left = qualified_call_name(node.value, aliases)
+        return f"{left}.{node.attr}" if left else node.attr
     if isinstance(node, ast.Call):
         return qualified_call_name(node.func, aliases)
     return ""
+
+
+def qualified_reference_name(node: ast.AST, aliases: Mapping[str, str]) -> str:
+    """Resolve a statically named value, including common reflection bypasses."""
+
+    reflected = reflected_reference_name(node, aliases)
+    if reflected:
+        return reflected
+    if isinstance(node, ast.Name):
+        return _normalize_builtin_root(aliases.get(node.id, node.id))
+    if isinstance(node, ast.Attribute):
+        left = qualified_reference_name(node.value, aliases)
+        return f"{left}.{node.attr}" if left else ""
+    return ""
+
+
+def reflected_reference_name(node: ast.AST, aliases: Mapping[str, str]) -> str:
+    """Resolve literal ``getattr``/``vars``/``__dict__`` lookup chains."""
+
+    if isinstance(node, ast.Subscript):
+        key = _literal_string(node.slice)
+        if not key:
+            return ""
+        base = qualified_reference_name(node.value, aliases)
+        if base.endswith(".__dict__"):
+            base = base[: -len(".__dict__")]
+        return f"{base}.{key}" if base else ""
+    if not isinstance(node, ast.Call):
+        return ""
+    if isinstance(node.func, ast.Attribute) and node.func.attr == "get" and node.args:
+        base = qualified_reference_name(node.func.value, aliases)
+        key = _literal_string(node.args[0])
+        if base.endswith(".__dict__") and key:
+            return f"{base[: -len('.__dict__')]}.{key}"
+    function = qualified_call_name(node.func, aliases)
+    if function in {"getattr", "builtins.getattr"} and len(node.args) >= 2:
+        base = qualified_reference_name(node.args[0], aliases)
+        attribute = _literal_string(node.args[1])
+        return f"{base}.{attribute}" if base and attribute else ""
+    if function in {"vars", "builtins.vars"} and len(node.args) == 1:
+        base = qualified_reference_name(node.args[0], aliases)
+        return f"{base}.__dict__" if base else ""
+    return ""
+
+
+def record_assignment_aliases(
+    node: ast.Assign | ast.AnnAssign | ast.NamedExpr,
+    aliases: dict[str, str],
+) -> None:
+    """Track simple callable/module aliases and invalidate overwritten names."""
+
+    value = node.value
+    resolved = qualified_reference_name(value, aliases)
+    if isinstance(node, ast.Assign):
+        targets = node.targets
+    else:
+        targets = (node.target,)
+    for target in targets:
+        if not isinstance(target, ast.Name):
+            continue
+        if resolved and resolved != target.id:
+            aliases[target.id] = resolved
+        else:
+            aliases.pop(target.id, None)
 
 
 def import_aliases_from_node(node: ast.Import | ast.ImportFrom) -> dict[str, str]:
@@ -71,6 +139,16 @@ def import_aliases_from_node(node: ast.Import | ast.ImportFrom) -> dict[str, str
     if not node.module:
         return {}
     return {alias.asname or alias.name: f"{node.module}.{alias.name}" for alias in node.names}
+
+
+def imported_module_roots(node: ast.Import | ast.ImportFrom) -> set[str]:
+    """Return resolved top-level module roots introduced by one import."""
+
+    return {
+        value.split(".", 1)[0]
+        for value in import_aliases_from_node(node).values()
+        if value
+    }
 
 
 def import_aliases(tree: ast.AST, *, defaults: Mapping[str, str] | None = None) -> dict[str, str]:
@@ -142,6 +220,18 @@ def _looks_pathlike_name(value: str) -> bool:
     return lowered in {"path", "root", "output", "destination", "run_dir"} or lowered.endswith(
         ("_path", "_dir", "_file", "_root")
     )
+
+
+def _literal_string(node: ast.AST) -> str:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return ""
+
+
+def _normalize_builtin_root(value: str) -> str:
+    if value == "__builtins__" or value.startswith("__builtins__."):
+        return f"builtins{value[len('__builtins__'):]}"
+    return value
 
 
 def _is_docstring_expr(stmt: ast.stmt) -> bool:

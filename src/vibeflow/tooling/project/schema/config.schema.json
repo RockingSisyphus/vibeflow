@@ -193,7 +193,8 @@
         "nodes": { "$ref": "#/$defs/nodes" },
         "edges": { "$ref": "#/$defs/edges" },
         "entry_mode": { "enum": ["sync", "async"], "default": "sync" },
-        "max_steps": { "type": "integer", "minimum": 1 }
+        "max_steps": { "type": "integer", "minimum": 1 },
+        "execution_lock": { "$ref": "#/$defs/executionLock" }
       }
     },
     "nodes": {
@@ -206,7 +207,7 @@
           "id": { "type": "string", "minLength": 1 },
           "type_used": { "type": "string", "minLength": 1 },
           "status": { "enum": ["planned", "implemented"] },
-          "flow_kind": { "enum": ["terminal", "process", "decision", "io", "predefined", "data_store", "document", "preparation"] },
+          "flow_kind": { "enum": ["terminal", "process", "decision", "io", "predefined", "data_store", "document", "preparation", "global_state"] },
           "planned_behavior": { "$ref": "#/$defs/plannedBehavior" },
           "display_name": { "type": "string" },
           "description": { "type": "string" },
@@ -222,7 +223,8 @@
           "allow_config_override": { "type": "boolean" },
           "override_child_config": { "type": "boolean" },
           "async": { "enum": ["detached", "result_key"] },
-          "result_key": { "type": "string", "minLength": 1 }
+          "result_key": { "type": "string", "minLength": 1 },
+          "execution_lock": { "$ref": "#/$defs/executionLock" }
         },
         "anyOf": [
           { "required": ["type_used"] },
@@ -240,6 +242,18 @@
     "hexColor": {
       "type": "string",
       "pattern": "^#[0-9A-Fa-f]{6}$"
+    },
+    "executionLock": {
+      "type": "object",
+      "required": ["key"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!vibeflow\\.).*\\S.*$"
+        }
+      },
+      "additionalProperties": false
     },
     "nodeStyle": {
       "type": "object",

@@ -60,6 +60,7 @@ _export(
 )
 _export(
     "vibeflow.targets.python.project.node",
+    "EFFECT_SCOPE_GLOBAL_STATE",
     "EFFECT_SCOPE_NONE",
     "EFFECT_SCOPE_PYTHON_IO",
     "EFFECT_SCOPE_TERMINAL",

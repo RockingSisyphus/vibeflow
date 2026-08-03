@@ -43,10 +43,12 @@
 - Python 业务实现放在 `python_project/{nodes,base_lib,plugins,configs}/`；JavaScript 业务实现放在 `javascript_project/{nodes,base_lib,plugins,host_extensions,configs,manifests,web}/`。不要把两种语言资源放进同一 root。
 - JS/TS 项目的工具链文件可以放在 `javascript.package_root` 指向的项目目录，包括 `package.json`、受支持的 lockfile 和本地 `node_modules`。不要让 VibeFlow 自动安装依赖，也不要把工具链依赖复制成 node 源码。
 - 不要把业务 `.py` 堆在 root 顶层或单个宽目录；`quality.structure` 默认允许 root 总文件数到 120，但单个代码目录超过 16 个 `.py` 会失败。
-- 普通 implemented node 和 planned `python_stub` 使用 `effect_scope=none`，无业务 IO。`flow_kind=io` 使用 `terminal`，只开放真实标准流、`print` / `input` / `argparse`。`flow_kind=document` / `data_store` 使用 `python_io`，开放文件、环境、网络、数据库、subprocess 和终端。
+- 普通 implemented node 和 planned `python_stub` 使用 `effect_scope=none`，无业务 IO。`flow_kind=io` 使用 `terminal`，只开放真实标准流、`print` / `input` / `argparse`。`flow_kind=document` / `data_store` 使用 `python_io`，开放文件、环境、网络、数据库、subprocess 和终端。`flow_kind=global_state` 使用 `effect_scope=global_state`，只额外开放所属 Target execution domain 内的易失 ambient state；Python Target 的 execution domain 是当前解释器进程。
 - 图形 `flow_kind=terminal` 仍是 `effect_scope=none`，不要和权限档位 `terminal` 混淆。`effect_scope` 由内核派生，不在 config 中自由声明。
 - 任意 node 只要 `external=True` 就以最高优先级使用 `effect_scope=trusted`；plugin 也是 `trusted`。`external=True` 会显式绕过普通 IO/purity 限制，只能用于真正外部维护/受信任实现，不能用来给项目内部代码逃避检查。契约、`flow_kind`、拓扑、输出和 trace 仍检查。
-- effectful 或 `external=True` node 的 `CONTRACT.examples` 只做结构检查、不执行；只有 `none` 范围的普通实现样例可执行。
+- `global_state` 不是系统 node；项目仍自行实现并注册。它可以修改进程内 RNG、默认选项、backend flag、全局 cache/registry 等易失 ambient state，但仍禁止文件、环境变量、网络、数据库、终端、subprocess、线程/进程创建、动态代码、动态 import 和直接 FFI。项目源码、本地 helper 和可解析的静态 import chain 仍完整审计；静态导入第三方计算库本身不要求 `external=True`，任意运行时 callback、外部实现引用或无法审计的边界才使用 `external=True`。
+- effectful 或 `external=True` node 的 `CONTRACT.examples` 只做结构检查、不执行；只有 `none` 范围的普通实现样例可执行。普通 Python 对象继续作为 envelope value 按引用流转，不能把 `global_state` 当成另一套对象通道或 Provider 权限。
+- global-state 修改默认持久且非事务：成功、失败或取消后内核都不 snapshot、rollback 或自动恢复。临时修改必须在同一个 `global_state` node 内用 `try/finally` 保存并恢复原值，不能依赖可能尚未执行的后续 node。
 - 控制流只写在 JSONC 的 `pipeline.edges` 中；不要用 Python 调用关系隐式表达流程。
 - `requires` / `provides` 只表达数据契约，不会自动生成控制流或图上的理论数据边；没有显式 edge，就没有图边。
 - 每个 `pipeline.nodes[]` 调用点必须写 `id` 和 `type_used`。旧 `name`、调用处旧 `type`、旧 `registry_key`、旧 `nodeset.xxx` 前缀都不再接受。
@@ -68,6 +70,11 @@
 - JS/TS node 必须把 Promise 返回给当前调用或交给显式 TaskPlan。丢弃
   `.then()`、`void promise`、模块级 Promise、长期监听器和未登记后台任务会在构建期失败。Python 后台工作使用
   `async: "detached"` 或 `async: "result_key"`，不在 node 内私自启动线程。
+- Core 的公共计划 ABI 是 `vibeflow.workflow.v3`；旧 `vibeflow.workflow.v2` 计划必须从真实 workflow config 重新生成，不能按缺省字段静默升级。JavaScript Target v1 会以 `TARGET.FEATURE.UNSUPPORTED` 拒绝 implemented `global_state` 或 implemented execution lock；planned 声明只进入 Architecture/Mermaid/SVG，不取得权限或锁。
+- 含 implemented `global_state` 的 Python root run 会自动在任何 node/hook 前以 exclusive 模式取得进程级 global-state execution lease；普通 root 以 shared 模式进入同一域。lease 覆盖嵌套 nodeset/loop、成功/失败 hook 和受保护异步收尾，并在所有受保护任务结束后才释放；不要用业务布尔变量代替这项框架语义。
+- 其他需要串行化的业务资源使用 `pipeline.execution_lock: {"key": "project.resource"}` 或调用点 `execution_lock`。key 必须是静态非空字符串，`vibeflow.` 前缀保留；v1 只有 exclusive。pipeline 锁覆盖整个 root，node/nodeset/loop 调用点锁覆盖完整调用；同一 lease 嵌套同 key 可重入，已经持有一个用户 key 时再获取不同 key 会编译失败，互不嵌套的不同 key 可并行。execution lock 只协调执行，不授予任何副作用权限。
+- 任何 global-state 或显式锁保护的 scope 都禁止 `async: "detached"`；`async: "result_key"` 只有在编译期能证明存在无条件 scheduled consumer path、结果必会 join 时才合法。异常和取消路径也必须等已启动的受保护 future 结束后再释放 lease。
+- `trace="boundary"` / `full` 必须保留 `lock_wait → lock_acquired → run/hook/task events → lock_released`；global-state node 已开始后若运行失败，还会记录 `global_state_may_have_changed`。这是状态可能持久改变的风险提示，不代表已经恢复。
 - `vibeflow.io.receive` 是 suspend，只能进入异步 JS workflow；
   `vibeflow.io.send` 是 immediate。需要回执时声明单独的 suspend Capability operation。
 - Python Runtime 路径由 `python_project/registry.py` 声明可用 node、base_lib 和 plugin；base_lib/plugin 的 `register(...)` 必须写 `display_name` 和 `description`。workflow config 只用 `base_lib.modules[].id` 和 `plugins[].id` 引用本流程实际使用的资源，不要把未使用资源写进 config。
@@ -87,7 +94,7 @@
   `context.config`。扩展工厂必须同步返回实例；`start()` / `stop()` 可异步。
 - Python root 配置包含 `project_target: "python"`、Registry、quality、可选 Runtime 和 `architecture.documents`；JavaScript root 包含 `project_target: "javascript"`、descriptor、`javascript` 工具链和可选架构配置。Target 专属字段不得混用。`runtime.async_max_workers` 控制每个 Python Runtime 自有线程池并发数（默认 4），`runtime.async_flush_timeout` 控制 detached task 收尾等待（默认 `null`，可设非负秒数），`runtime.nodeset_max_depth` 控制普通 nodeset 与 `loop.body` 的最大静态嵌套深度（默认 4）。
 - `python_project/ARCHITECTURE.jsonc` 是由真实 workflow、nodeset、registry 和资源配置确定性生成的单文件审查视图。在判断、解释或修改项目架构前，必须优先阅读它来了解入口流程、调用层级、节点职责、数据契约和配置来源。不要手工编辑它，也不要把它当成可执行 config；要改变项目架构，必须修改 `python_project/configs/*.jsonc` 中的真实 workflow config 或其导入的相关 nodeset JSONC，必要时再修改 registry metadata/config schema。单独的 `python run.py architecture ...` 只用于缺失文档的预读修复或单项诊断；正式审核必须使用会自动更新文档的 `python run.py review ...`。
-- 节点自定义颜色只能写在 `style.fill`、`style.stroke`、`style.text` 中，颜色必须是 `#RRGGBB`，且不得使用 VibeFlow 系统保留色。合法自定义色会覆盖节点默认/系统 class 的 fill/stroke/text 颜色，但不会取消 external node 的 `7px` non-scaling 粗边框。
+- 节点自定义颜色只能写在 `style.fill`、`style.stroke`、`style.text` 中，颜色必须是 `#RRGGBB`，且不得使用 VibeFlow 系统保留色。合法自定义色会覆盖节点默认/系统 class 的 fill/stroke/text 颜色，但不会取消 external node 的 `7px` non-scaling 粗边框，也不能把 `global_state` 的 Mermaid `cloud` 形状改回矩形。Architecture/Mermaid/SVG 显示 `effect_scope`、适用的 `execution_lock`、`contains_global_state` / `root_exclusive`，不显示 Provider 权限。
 - `display_name`、`description`、`style`、`similar_to` 是调用点元数据，不进入运行时 `params`；运行时同名参数必须写进 `config`。
 - 只有确认两个 node 是有意变体或副本时才写 `similar_to`，并且必须指向同作用域已存在 node、使用 `variant` 或 `copy`、写清 `reason`；不要用它掩盖应该拆分或抽 base_lib 的重复实现。
 - 普通 `pipeline.edges` 和 nodeset 内部 `pipeline.edges` 不允许形成环；所有循环都必须使用唯一一等 loop 类型 `vibeflow.loop.while` 调用 nodeset body。
@@ -115,7 +122,7 @@
 - 多个入口承诺相同语义时，它们必须在图上汇入同一套实际执行的共享语义节点或 nodeset。仅仅复用一个 Python helper 或 JS/TS base_lib、使用相似名字，或分别复制等价代码，不等于共享语义链。
 - guard 可以识别入口特有的词法或封装错误，但必须把规范化后的错误身份原样传递给后续错误处理；不要把不同错误统一改写成一个默认错误。错误构造节点只负责形成输出表示，不应重新判断或覆盖错误类别。
 - guard/error 分支不能形成从原始输入直达业务输出的捷径，从而绕过字段解析、类型转换、合并、校验或其他声明的共享职责。`data bypass` 只用于不触发目标的辅助数据投递，不能冒充业务主线或规避结构约束。
-- Python Runtime 的外部交互必须由显式 `io` / `data_store` / `document` node、原生 `vibeflow.io` 及其 contract 建模。JS/TS AOT 的宿主交互必须由 node descriptor 显式声明通用 Capability，并在每次 workflow 调用时注入或由 Host Extension 提供；base_lib 不得访问 Capability。业务结果应由拥有该语义的 node 提供；不要仅为获得更宽权限而伪造 `flow_kind`，也不要让输出 node 扫描原始输入重新计算结果。
+- Python Runtime 的外部交互必须由显式 `io` / `data_store` / `document` node、原生 `vibeflow.io` 及其 contract 建模；进程内易失 ambient state 则用 `global_state` 明确展示，两类权限互不继承。JS/TS AOT 的宿主交互必须由 node descriptor 显式声明通用 Capability，并在每次 workflow 调用时注入或由 Host Extension 提供；base_lib 不得访问 Capability。业务结果应由拥有该语义的 node 提供；不要仅为获得更宽权限而伪造 `flow_kind`，也不要让输出 node 扫描原始输入重新计算结果。
 - 优先建立 `terminal → input I/O → process/nodeset → output I/O → terminal` 控制脊柱。内部语义结果与外部输出用不同的明确 key/type，由 output I/O 无损适配，不要重复声明 provider key。
 - tagged value 的 tag 必须使用业务规范中的精确字面量，value 必须转换为匹配的 Python 原生类型；不缩写 tag，不把整数留作字符串。
 - 测试门禁的顶层 `OVERALL`/退出状态是完成判据；局部维度 PASS、若干 case 通过或生成了报告都不能替代顶层 PASS。任何代码修改都会使此前的通过结果失效，必须重新运行 required gate；只有最新结果与当前代码一致且顶层 PASS 时才能声明完成。

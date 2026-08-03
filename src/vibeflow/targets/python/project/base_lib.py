@@ -17,13 +17,16 @@ from vibeflow.targets.python.project.node import EFFECT_SCOPE_NONE
 from vibeflow.targets.python.quality.source_analysis.ast_rules import (
     boolop_branch_count,
     import_aliases_from_node,
+    imported_module_roots,
     import_modules,
     module_assignment_is_allowed,
     module_matches,
     module_statement_kind,
+    record_assignment_aliases,
 )
 from vibeflow.targets.python.quality.source_analysis.effects import (
     call_violation,
+    dynamic_namespace_reference,
     import_violation_code,
     process_argv_import_is_forbidden,
     process_argv_reference,
@@ -248,6 +251,7 @@ class _BaseLibAstScanner(ast.NodeVisitor):
         self.imports: set[str] = set()
         self.findings: list[BaseLibFinding] = []
         self.import_aliases: dict[str, str] = {"Path": "pathlib.Path"}
+        self.imported_module_roots: set[str] = set()
 
     def visit_Module(self, node: ast.Module) -> None:
         for stmt in node.body:
@@ -284,6 +288,7 @@ class _BaseLibAstScanner(ast.NodeVisitor):
             node,
             aliases=self.import_aliases,
             effect_scope=EFFECT_SCOPE_NONE,
+            imported_roots=self.imported_module_roots,
         )
         if violation_code:
             self._add(
@@ -293,12 +298,38 @@ class _BaseLibAstScanner(ast.NodeVisitor):
             )
         self.generic_visit(node)
 
+    def visit_Assign(self, node: ast.Assign) -> None:
+        record_assignment_aliases(node, self.import_aliases)
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        record_assignment_aliases(node, self.import_aliases)
+        self.generic_visit(node)
+
+    def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
+        record_assignment_aliases(node, self.import_aliases)
+        self.generic_visit(node)
+
     def visit_Attribute(self, node: ast.Attribute) -> None:
         reference = process_argv_reference(node, self.import_aliases)
         if reference:
             self._add(
                 "BASE_LIB.SIDE_EFFECT_CALL",
                 f"base_lib banned process argument access: {reference}",
+                node,
+            )
+        self.generic_visit(node)
+
+    def visit_Subscript(self, node: ast.Subscript) -> None:
+        reference = dynamic_namespace_reference(
+            node,
+            aliases=self.import_aliases,
+            imported_roots=self.imported_module_roots,
+        )
+        if reference:
+            self._add(
+                "BASE_LIB.SIDE_EFFECT_CALL",
+                f"base_lib banned dynamic module namespace lookup: {reference}",
                 node,
             )
         self.generic_visit(node)
@@ -342,6 +373,7 @@ class _BaseLibAstScanner(ast.NodeVisitor):
 
     def _check_import_node(self, node: ast.Import | ast.ImportFrom) -> None:
         self.import_aliases.update(import_aliases_from_node(node))
+        self.imported_module_roots.update(imported_module_roots(node))
         for module in import_modules(node):
             self._check_import(module, node)
 
