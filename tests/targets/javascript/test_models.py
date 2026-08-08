@@ -233,7 +233,7 @@ def _binding_workflow_plan() -> WorkflowPlan:
         max_steps=20,
     )
     return WorkflowPlan(
-        abi_version="vibeflow.workflow.v3",
+        abi_version="vibeflow.workflow.v4",
         workflow_id="binding.workflow",
         source=SourceRef(kind="graph", ref="binding.workflow"),
         entry_block="block:/",

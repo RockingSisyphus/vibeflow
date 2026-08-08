@@ -35,7 +35,7 @@ This SVG was exported from a complete integration sandbox example. Throughout AI
 
 ![VibeFlow comprehensive flowchart](docs/assets/comprehensive_flowchart.svg)
 
-The cloud-shaped node demonstrates the language-neutral `global_state` semantic together with its derived effect scope and named execution lock. The formally exported Mermaid source is [comprehensive_flowchart.mmd](docs/assets/comprehensive_flowchart.mmd).
+The cloud-shaped node demonstrates the language-neutral `global_state` semantic together with its derived effect scope, runtime-dispatch fact, and effective named execution lock (`none` when absent). The formally exported Mermaid source is [comprehensive_flowchart.mmd](docs/assets/comprehensive_flowchart.mmd).
 
 ## Who It Is For 👥
 
@@ -176,8 +176,9 @@ Every node declares a standard `flow_kind`:
 - `data_store`: data store request or reference.
 - `document`: document generation or document structure.
 - `preparation`: setup / initialization.
+- `global_state`: ephemeral ambient state or runtime callback/object-method dispatch.
 
-`flow_kind` and `external` determine the derived `effect_scope`: ordinary implemented nodes and planned `python_stub`s use `none`; `flow_kind=io` uses `terminal` and may access real standard streams plus `print`, `input`, and `argparse`; `document` and `data_store` use `python_io` and may access files, environment, network, databases, subprocesses, and the terminal; any `external=True` node and every plugin use highest-priority `trusted`. Diagram role `flow_kind=terminal` still maps to `none` and is unrelated to the `terminal` effect scope.
+`flow_kind` and `external` determine the derived `effect_scope`: ordinary implemented nodes and planned `python_stub`s use `none`; `flow_kind=io` uses `terminal` and may access real standard streams plus `print`, `input`, and `argparse`; `document` and `data_store` use `python_io` and may access files, environment, network, databases, subprocesses, and the terminal; `global_state` contains execution-domain ambient state and runtime dispatch; any `external=True` node and every plugin use highest-priority `trusted`. Diagram role `flow_kind=terminal` still maps to `none` and is unrelated to the `terminal` effect scope.
 
 ### Explicit Flow Edges
 
@@ -204,7 +205,9 @@ Ordinary `effect_scope=none` business nodes are pure:
 - No environment variable reads.
 - No direct calls to other nodes.
 
-An `io` node may perform real terminal interaction; `data_store` and `document` nodes may perform Python IO. `external=True` and plugins are `trusted` boundaries. `external=True` explicitly bypasses ordinary IO/purity restrictions, so it is reserved for genuinely external or audited trusted implementations—not a way to relabel internal code until checks pass. Contracts, topology, output keys, and trace rules still apply. Effectful or external node `CONTRACT.examples` are checked structurally but are not executed.
+An `io` node may perform real terminal interaction; `data_store` and `document` nodes may perform Python IO. `global_state` makes ambient state and callbacks/model/optimizer methods obtained from envelopes, registries, or caches visible as a cloud node. Objects still travel through envelopes, and this scope does not grant direct IO, dynamic-code, concurrency-creation, or FFI access. The Python Target emits an advisory warning for high-confidence, source-visible runtime dispatch in an ordinary node without blocking validation or execution; fixed builtins, Python protocols, and existing IO effect boundaries are not misclassified.
+
+`global_state` does not lock automatically. A project may declare a static named `execution_lock`: identical keys exclude each other, different keys may run concurrently, and no key means no lock plus a warning. `external=True` and plugins are `trusted` boundaries. External is reserved for a wrapper implementation whose source is unavailable, unresolvable, or unreviewable—not merely because it invokes a runtime callback. Contracts, topology, output keys, and trace rules still apply. Effectful or external node `CONTRACT.examples` are checked structurally but are not executed.
 
 ### Pre-Run Health Checks
 

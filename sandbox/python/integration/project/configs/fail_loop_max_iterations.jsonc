@@ -77,13 +77,7 @@
       {
         "display_name": "End",
         "description": "Would end if the loop converged.",
-        "requires": [
-          {
-            "type": "loop.next",
-            "cardinality": "exactly_one",
-            "display_name": "Loop Next"
-          }
-        ],
+
         "id": "end",
         "type_used": "semantic.loop_end"
       }

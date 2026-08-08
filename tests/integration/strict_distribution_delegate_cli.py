@@ -236,9 +236,8 @@ def test_built_run_keeps_javascript_roots_out_of_lazy_python_imports(
                     "0.1.0", "process",
                 )
                 CONTRACT = NodeContract(
-                    provides=(DataProvider("response.value", "response.value"),),
+                    provides=(DataProvider("response.value", "response.value", display_name="Response Value"),),
                     output_semantics={"response.value": ("lazy value",)},
-                    output_schema={"response.value": {"type": "integer"}},
                 )
                 def run_pure(self, inputs, params):
                     import lazy_helper
@@ -274,13 +273,6 @@ def test_built_run_keeps_javascript_roots_out_of_lazy_python_imports(
                             "type_used": "lazy.value",
                             "display_name": "Lazy Value",
                             "description": "Imports the Python root helper lazily.",
-                            "provides": [
-                                {
-                                    "key": "response.value",
-                                    "type": "response.value",
-                                    "display_name": "Response Value",
-                                }
-                            ],
                         },
                         {
                             "id": "end",
@@ -421,11 +413,10 @@ def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_co
             class ExitNode:
                 NODE_INFO = NodeInfo("custom.exit", "Exit", "test", "Loads a workspace-local helper lazily.", "0.1.0", "io")
                 CONTRACT = NodeContract(
-                    requires=(DataRequirement("cli.argv", "exactly_one"),),
-                    provides=(DataProvider("cli.exit_code", "cli.exit_code"),),
+                    requires=(DataRequirement("cli.argv", "exactly_one", display_name="CLI Argv"),),
+                    provides=(DataProvider("cli.exit_code", "cli.exit_code", display_name="CLI Exit Code"),),
                     input_semantics={"cli.argv": ("business argv",)},
                     output_semantics={"cli.exit_code": ("business exit",)},
-                    output_schema={"cli.exit_code": {"type": "integer"}},
                     examples=({"inputs": {"cli.argv": {"key": "cli.argv", "type": "cli.argv", "value": [], "source_node": "example"}}, "params": {}},),
                 )
                 def run_pure(self, inputs, params):
@@ -436,7 +427,7 @@ def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_co
             class EndNode:
                 NODE_INFO = NodeInfo("custom.end", "End", "test", "Ends the CLI.", "0.1.0", "terminal")
                 CONTRACT = NodeContract(
-                    requires=(DataRequirement("cli.exit_code", "exactly_one"),),
+                    requires=(DataRequirement("cli.exit_code", "exactly_one", display_name="CLI Exit Code"),),
                     input_semantics={"cli.exit_code": ("business exit",)},
                     examples=({"inputs": {"cli.exit_code": {"key": "cli.exit_code", "type": "cli.exit_code", "value": 0, "source_node": "example"}}, "params": {}},),
                 )
@@ -454,17 +445,18 @@ def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_co
                     "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                     "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit"}],
                     "nodes": [
-                        {"id": "start", "type_used": "custom.start"},
+                        {"id": "start", "type_used": "custom.start", "display_name": "Start", "description": "Starts the custom delegated CLI workflow."},
                         {
                             "id": "exit",
                             "type_used": "custom.exit",
-                            "requires": [{"type": "cli.argv", "cardinality": "exactly_one", "display_name": "CLI argv"}],
-                            "provides": [{"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit"}],
+                            "display_name": "Exit",
+                            "description": "Loads the custom project helper and returns its exit code.",
                         },
                         {
                             "id": "end",
                             "type_used": "custom.end",
-                            "requires": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit"}],
+                            "display_name": "End",
+                            "description": "Consumes the delegated CLI exit code.",
                         },
                     ],
                     "edges": [["start", "exit"], ["exit", "end"]],

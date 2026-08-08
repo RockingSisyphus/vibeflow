@@ -26,7 +26,6 @@
     "entry_mode": "sync",
     "execution_lock": null,
     "contains_global_state": false,
-    "root_exclusive": false,
     "nodes": [
       {
         "id": "start",
@@ -42,12 +41,15 @@
         },
         "flow_kind": "terminal",
         "effect_scope": "none",
+        "runtime_dispatch": "none",
         "execution_lock": null,
+        "effective_execution_lock": null,
         "contains_global_state": false,
         "status": "implemented",
         "planned_behavior": null,
         "requires": [],
         "provides": [],
+        "contract_source": "node_type",
         "join_policy": "safe_any",
         "async": null,
         "loop": null,
@@ -85,7 +87,9 @@
         },
         "flow_kind": "process",
         "effect_scope": "none",
+        "runtime_dispatch": "none",
         "execution_lock": null,
+        "effective_execution_lock": null,
         "contains_global_state": false,
         "status": "implemented",
         "planned_behavior": null,
@@ -94,9 +98,10 @@
           {
             "key": "value.in",
             "type": "value.in",
-            "display_name": "Value In"
+            "display_name": "value.in"
           }
         ],
+        "contract_source": "node_type",
         "join_policy": "safe_any",
         "async": null,
         "loop": null,
@@ -136,7 +141,9 @@
         },
         "flow_kind": "process",
         "effect_scope": "none",
+        "runtime_dispatch": "none",
         "execution_lock": null,
+        "effective_execution_lock": null,
         "contains_global_state": false,
         "status": "implemented",
         "planned_behavior": null,
@@ -144,16 +151,17 @@
           {
             "type": "value.in",
             "cardinality": "exactly_one",
-            "display_name": "Value In"
+            "display_name": "value.in"
           }
         ],
         "provides": [
           {
             "key": "semantic.value",
             "type": "semantic.value",
-            "display_name": "Internal Value"
+            "display_name": "semantic.value"
           }
         ],
+        "contract_source": "node_type",
         "join_policy": "safe_any",
         "async": null,
         "loop": null,
@@ -193,7 +201,9 @@
         },
         "flow_kind": "io",
         "effect_scope": "terminal",
+        "runtime_dispatch": "none",
         "execution_lock": null,
+        "effective_execution_lock": null,
         "contains_global_state": false,
         "status": "implemented",
         "planned_behavior": null,
@@ -201,16 +211,17 @@
           {
             "type": "semantic.value",
             "cardinality": "exactly_one",
-            "display_name": "Internal Value"
+            "display_name": "semantic.value"
           }
         ],
         "provides": [
           {
             "key": "response.value",
             "type": "response.value",
-            "display_name": "Response Value"
+            "display_name": "response.value"
           }
         ],
+        "contract_source": "node_type",
         "join_policy": "safe_any",
         "async": null,
         "loop": null,
@@ -248,12 +259,15 @@
         },
         "flow_kind": "terminal",
         "effect_scope": "none",
+        "runtime_dispatch": "none",
         "execution_lock": null,
+        "effective_execution_lock": null,
         "contains_global_state": false,
         "status": "implemented",
         "planned_behavior": null,
         "requires": [],
         "provides": [],
+        "contract_source": "node_type",
         "join_policy": "safe_any",
         "async": null,
         "loop": null,
@@ -302,13 +316,13 @@
         "transfers": [
           {
             "provider": {
-              "display_name": "Value In",
+              "display_name": "value.in",
               "key": "value.in",
               "type": "value.in"
             },
             "requirement": {
               "cardinality": "exactly_one",
-              "display_name": "Value In",
+              "display_name": "value.in",
               "type": "value.in"
             }
           }
@@ -326,13 +340,13 @@
         "transfers": [
           {
             "provider": {
-              "display_name": "Internal Value",
+              "display_name": "semantic.value",
               "key": "semantic.value",
               "type": "semantic.value"
             },
             "requirement": {
               "cardinality": "exactly_one",
-              "display_name": "Internal Value",
+              "display_name": "semantic.value",
               "type": "semantic.value"
             }
           }
@@ -368,7 +382,6 @@
         "description": "Add a configured delta and produce an internal semantic value.",
         "version": "0.1.0",
         "flow_kind": "process",
-        "purity": "pure",
         "effect_scope": "none",
         "author": null,
         "tags": [],
@@ -378,13 +391,15 @@
         "requires": [
           {
             "type": "value.in",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "value.in"
           }
         ],
         "provides": [
           {
             "key": "semantic.value",
-            "type": "semantic.value"
+            "type": "semantic.value",
+            "display_name": "semantic.value"
           }
         ],
         "input_semantics": {
@@ -396,16 +411,6 @@
           "semantic.value": [
             "internal arithmetic result"
           ]
-        },
-        "params_schema": {
-          "delta": {
-            "type": "number"
-          }
-        },
-        "output_schema": {
-          "semantic.value": {
-            "type": "number"
-          }
         }
       },
       "config": {
@@ -434,7 +439,6 @@
         "description": "Terminal end node after the output boundary completes.",
         "version": "0.1.0",
         "flow_kind": "terminal",
-        "purity": "pure",
         "effect_scope": "none",
         "author": null,
         "tags": [],
@@ -444,9 +448,7 @@
         "requires": [],
         "provides": [],
         "input_semantics": {},
-        "output_semantics": {},
-        "params_schema": {},
-        "output_schema": {}
+        "output_semantics": {}
       },
       "config": {
         "defaults": {},
@@ -468,7 +470,6 @@
         "description": "Adapt the internal arithmetic result to the external response contract.",
         "version": "0.1.0",
         "flow_kind": "io",
-        "purity": "pure",
         "effect_scope": "terminal",
         "author": null,
         "tags": [],
@@ -478,13 +479,15 @@
         "requires": [
           {
             "type": "semantic.value",
-            "cardinality": "exactly_one"
+            "cardinality": "exactly_one",
+            "display_name": "semantic.value"
           }
         ],
         "provides": [
           {
             "key": "response.value",
-            "type": "response.value"
+            "type": "response.value",
+            "display_name": "response.value"
           }
         ],
         "input_semantics": {
@@ -496,12 +499,6 @@
           "response.value": [
             "external numeric response"
           ]
-        },
-        "params_schema": {},
-        "output_schema": {
-          "response.value": {
-            "type": "number"
-          }
         }
       },
       "config": {
@@ -524,7 +521,6 @@
         "description": "Provide an initial numeric value.",
         "version": "0.1.0",
         "flow_kind": "process",
-        "purity": "pure",
         "effect_scope": "none",
         "author": null,
         "tags": [],
@@ -535,7 +531,8 @@
         "provides": [
           {
             "key": "value.in",
-            "type": "value.in"
+            "type": "value.in",
+            "display_name": "value.in"
           }
         ],
         "input_semantics": {},
@@ -543,16 +540,6 @@
           "value.in": [
             "initial numeric value"
           ]
-        },
-        "params_schema": {
-          "value": {
-            "type": "number"
-          }
-        },
-        "output_schema": {
-          "value.in": {
-            "type": "number"
-          }
         }
       },
       "config": {
@@ -581,7 +568,6 @@
         "description": "Terminal start node for the demo workflow.",
         "version": "0.1.0",
         "flow_kind": "terminal",
-        "purity": "pure",
         "effect_scope": "none",
         "author": null,
         "tags": [],
@@ -591,9 +577,7 @@
         "requires": [],
         "provides": [],
         "input_semantics": {},
-        "output_semantics": {},
-        "params_schema": {},
-        "output_schema": {}
+        "output_semantics": {}
       },
       "config": {
         "defaults": {},

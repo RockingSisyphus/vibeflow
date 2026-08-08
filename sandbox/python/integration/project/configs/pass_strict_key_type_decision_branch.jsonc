@@ -30,45 +30,16 @@
         "description": "Runs start."
       },
       {
-        "requires": [
-          {
-            "type": "calc.a",
-            "cardinality": "exactly_one",
-            "display_name": "Calc A"
-          },
-          {
-            "type": "calc.b",
-            "cardinality": "exactly_one",
-            "display_name": "Calc B"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.sum",
-            "type": "calc.sum",
-            "display_name": "Calc Sum"
-          }
-        ],
+
+
         "id": "add_pair",
         "type_used": "semantic.add_pair",
         "display_name": "Add Pair",
         "description": "Runs add_pair."
       },
       {
-        "requires": [
-          {
-            "type": "calc.sum",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Sum"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.scaled",
-            "type": "calc.scaled",
-            "display_name": "Calc Scaled"
-          }
-        ],
+
+
         "factor": 3,
         "id": "scale",
         "type_used": "semantic.scale",
@@ -76,45 +47,16 @@
         "description": "Runs scale."
       },
       {
-        "requires": [
-          {
-            "type": "calc.c",
-            "cardinality": "exactly_one",
-            "display_name": "Calc C"
-          },
-          {
-            "type": "calc.d",
-            "cardinality": "exactly_one",
-            "display_name": "Calc D"
-          }
-        ],
-        "provides": [
-          {
-            "key": "route.branch",
-            "type": "route.branch",
-            "display_name": "Route Branch"
-          }
-        ],
+
+
         "id": "compare",
         "type_used": "semantic.compare_gt",
         "display_name": "Compare",
         "description": "Runs compare."
       },
       {
-        "requires": [
-          {
-            "type": "calc.scaled",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Scaled"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.left_branch",
-            "type": "branch_result",
-            "display_name": "Calc Left Branch"
-          }
-        ],
+
+
         "bonus": 10,
         "id": "left_adjust",
         "type_used": "semantic.left_adjust",
@@ -122,20 +64,8 @@
         "description": "Runs left_adjust."
       },
       {
-        "requires": [
-          {
-            "type": "calc.scaled",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Scaled"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.right_branch",
-            "type": "branch_result",
-            "display_name": "Calc Right Branch"
-          }
-        ],
+
+
         "penalty": 6,
         "id": "right_adjust",
         "type_used": "semantic.right_adjust",
@@ -143,33 +73,15 @@
         "description": "Runs right_adjust."
       },
       {
-        "requires": [
-          {
-            "type": "branch_result",
-            "cardinality": "exactly_one",
-            "display_name": "Branch Result"
-          }
-        ],
-        "provides": [
-          {
-            "key": "branch.final",
-            "type": "final_result",
-            "display_name": "Branch Final"
-          }
-        ],
+
+
         "id": "consume_branch",
         "type_used": "semantic.branch_type_consumer",
         "display_name": "Consume Branch",
         "description": "Runs consume_branch."
       },
       {
-        "requires": [
-          {
-            "type": "final_result",
-            "cardinality": "exactly_one",
-            "display_name": "Final Result"
-          }
-        ],
+
         "id": "end",
         "type_used": "semantic.branch_final_end",
         "display_name": "End",

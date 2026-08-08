@@ -43,6 +43,7 @@ from nodes.legal_delegate_numeric_nodes import (
 from nodes.legal_loop_nodes import CopyBackNode, DoneCheckNode, DoneValueNode, IncrementNode
 from nodes.legal_math_nodes import (
     AddNode,
+    AddFinalToDeadNode,
     AddOutNode,
     AddThreeNode,
     BranchLeftNode,
@@ -77,6 +78,7 @@ from nodes.legal_semantic_nodes import (
     SemanticJoinPassthroughNode,
     SemanticLeftBranchEndNode,
     SemanticLeftAdjustNode,
+    SemanticLeftKeyAdjustNode,
     SemanticLeftValueNode,
     SemanticLoopDoneNode,
     SemanticLoopDoneValueNode,
@@ -86,6 +88,7 @@ from nodes.legal_semantic_nodes import (
     SemanticOuterAdvanceNode,
     SemanticRightBranchEndNode,
     SemanticRightAdjustNode,
+    SemanticRightKeyAdjustNode,
     SemanticRightValueNode,
     SemanticScaleNode,
     SemanticScaledEndNode,
@@ -98,6 +101,7 @@ from nodes.legal_training_nodes import (
     BackwardGradNode,
     BatchMetricsNode,
     ForwardLossNode,
+    OrdinaryCallbackWarningNode,
     OptimizerStepNode,
     TrainingBatchStepNode,
     TrainingInputNode,
@@ -118,6 +122,7 @@ def build_node_registry() -> NodeRegistry:
     registry.register("sandbox.constant", ConstantNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 1})
     registry.register("sandbox.add", AddNode, config_schema={"delta": {"type": "number"}}, config_defaults={"delta": 1})
     registry.register("sandbox.add_out", AddOutNode, config_schema={"delta": {"type": "number"}}, config_defaults={"delta": 1})
+    registry.register("sandbox.add_final_to_dead", AddFinalToDeadNode, config_schema={"delta": {"type": "number"}}, config_defaults={"delta": 1})
     registry.register("sandbox.multiply", MultiplyNode, config_schema={"factor": {"type": "number"}}, config_defaults={"factor": 2})
     registry.register("sandbox.branch_left", BranchLeftNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 1})
     registry.register("sandbox.branch_right", BranchRightNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 1})
@@ -172,6 +177,7 @@ def build_node_registry() -> NodeRegistry:
     registry.register("sandbox.numeric_print_output", NumericPrintOutputNode, config_schema={}, config_defaults={})
     registry.register("sandbox.numeric_stream_output", NumericStreamOutputNode, config_schema={}, config_defaults={})
     registry.register("sandbox.training_input", TrainingInputNode, config_schema={}, config_defaults={})
+    registry.register("sandbox.ordinary_callback", OrdinaryCallbackWarningNode, config_schema={}, config_defaults={})
     registry.register("sandbox.forward_loss", ForwardLossNode, config_schema={}, config_defaults={})
     registry.register("sandbox.backward_grad", BackwardGradNode, config_schema={}, config_defaults={})
     registry.register("sandbox.optimizer_step", OptimizerStepNode, config_schema={}, config_defaults={})
@@ -185,6 +191,8 @@ def build_node_registry() -> NodeRegistry:
     registry.register("semantic.compare_gt", SemanticCompareGtNode, config_schema={}, config_defaults={})
     registry.register("semantic.left_adjust", SemanticLeftAdjustNode, config_schema={"bonus": {"type": "number"}}, config_defaults={"bonus": 0})
     registry.register("semantic.right_adjust", SemanticRightAdjustNode, config_schema={"penalty": {"type": "number"}}, config_defaults={"penalty": 0})
+    registry.register("semantic.left_key_adjust", SemanticLeftKeyAdjustNode, config_schema={"bonus": {"type": "number"}}, config_defaults={"bonus": 0})
+    registry.register("semantic.right_key_adjust", SemanticRightKeyAdjustNode, config_schema={"penalty": {"type": "number"}}, config_defaults={"penalty": 0})
     registry.register("semantic.branch_type_consumer", SemanticBranchTypeConsumerNode, config_schema={}, config_defaults={})
     registry.register("semantic.branch_final_end", SemanticBranchFinalEndNode, config_schema={}, config_defaults={})
     registry.register("semantic.join_passthrough", SemanticJoinPassthroughNode, config_schema={}, config_defaults={})

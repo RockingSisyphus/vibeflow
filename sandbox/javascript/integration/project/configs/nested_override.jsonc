@@ -31,25 +31,8 @@
         "type_used": "sandbox.affine_outer",
         "display_name": "Run nested transform",
         "description": "Overrides only the qualified inner math node.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "joined_result",
-            "type": "sandbox.override.joined",
-            "display_name": "Overridden result"
-          },
-          {
-            "key": "default_result",
-            "type": "sandbox.override.default",
-            "display_name": "Default result"
-          }
-        ],
+
+
         "node_configs": {
           "inner.math": {
             "scale": 3,

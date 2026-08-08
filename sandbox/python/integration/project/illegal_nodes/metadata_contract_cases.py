@@ -5,18 +5,18 @@ from vibeflow.targets.python.project import NodeContract, NodeInfo
 
 
 def _provider(key: str) -> DataProvider:
-    return DataProvider(key, key)
+    return DataProvider(key, key, display_name=key)
 
 
 def _requirement(data_type: str) -> DataRequirement:
-    return DataRequirement(data_type, "exactly_one")
+    return DataRequirement(data_type, "exactly_one", display_name=data_type)
 
 
 class MissingInfoNode:
     CONTRACT = NodeContract(
         provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -28,7 +28,7 @@ class InfoWrongTypeNode:
     CONTRACT = NodeContract(
         provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -47,7 +47,7 @@ class EmptyTypeKeyNode:
     CONTRACT = NodeContract(
         provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -62,12 +62,12 @@ class NonPureNode:
         description="Bad node with non-pure metadata.",
         version="0.1.0",
         flow_kind="process",
-        purity="impure",
+
     )
     CONTRACT = NodeContract(
         provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -102,7 +102,7 @@ class DuplicateKeysNode:
         provides=(_provider("bad.out"),),
         input_semantics={"bad.in": ("bad input",)},
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -122,7 +122,7 @@ class MissingSemanticsNode:
         requires=(_requirement("bad.in"),),
         provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):

@@ -50,13 +50,17 @@ def test_javascript_descriptors_supply_core_execution_facts() -> None:
     assert facts.get("demo.fetch").to_dict() == {
         "type_key": "demo.fetch",
         "flow_kind": "terminal",
+        "effect_scope": "none",
+        "runtime_dispatch": None,
         "completion": "suspend",
         "schedule": "inline",
         "executor": "event_loop",
         "source_kind": "file",
-        "source_ref": "src/fetch.ts",
-        "source_export": "run",
-    }
+            "source_ref": "src/fetch.ts",
+            "source_export": "run",
+            "requires": [],
+            "provides": [],
+        }
 
 
 def test_target_mismatch_keeps_contract_fact_for_precise_frontend_error() -> None:

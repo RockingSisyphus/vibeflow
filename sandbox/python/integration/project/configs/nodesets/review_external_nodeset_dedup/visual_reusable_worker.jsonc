@@ -28,27 +28,13 @@
         "id": "side_value",
         "type_used": "semantic.slow_async_value",
         "display_name": "Produce Side Value",
-        "description": "Produces the configured detached worker value.",
-        "provides": [
-          {
-            "key": "async.value",
-            "type": "async.value",
-            "display_name": "Async Value"
-          }
-        ]
+        "description": "Produces the configured detached worker value."
       },
       {
         "id": "worker_end",
         "type_used": "semantic.async_value_end",
         "display_name": "Worker End",
-        "description": "Ends one reusable worker invocation.",
-        "requires": [
-          {
-            "type": "async.value",
-            "cardinality": "exactly_one",
-            "display_name": "Async Value"
-          }
-        ]
+        "description": "Ends one reusable worker invocation."
       }
     ],
     "edges": [

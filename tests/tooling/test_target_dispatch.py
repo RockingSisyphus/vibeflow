@@ -535,6 +535,18 @@ def test_shared_command_help_needs_no_project_or_target_import(
     assert output.err == ""
 
 
+def test_shared_javascript_svg_help_exposes_nodeset_diagnostics(capsys) -> None:
+    assert cli_main(["export-svg", "--help"]) == 0
+
+    output = capsys.readouterr()
+    assert "--expand-nodesets" in output.out
+    assert "--collapse-nodesets" in output.out
+    assert "--hide-contract" in output.out
+    assert "--hide-semantics" in output.out
+    assert "--mermaid-layout" in output.out
+    assert "--review-fragment-max-width" in output.out
+
+
 def test_mixed_workspace_quality_runs_each_root_in_an_isolated_process(
     tmp_path,
     monkeypatch,

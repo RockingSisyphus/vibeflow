@@ -20,20 +20,8 @@
         "type_used": "sandbox.runtime_failure",
         "display_name": "Throw node error",
         "description": "Throws a controlled Error from a valid TypeScript node.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ],
+
+
         "config": {
           "mode": "throw"
         }

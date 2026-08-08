@@ -15,9 +15,9 @@ class NodeImportNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("bad.out", "bad.out"),),
+        provides=(DataProvider("bad.out", "bad.out", display_name="bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -34,9 +34,9 @@ class DirectNodeCallNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("bad.out", "bad.out"),),
+        provides=(DataProvider("bad.out", "bad.out", display_name="bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -54,9 +54,9 @@ class NodeInternalReadNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("bad.out", "bad.out"),),
+        provides=(DataProvider("bad.out", "bad.out", display_name="bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):

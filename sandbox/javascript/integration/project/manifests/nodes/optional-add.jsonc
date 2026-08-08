@@ -28,16 +28,27 @@
     ],
     "params_schema": {},
     "params_defaults": {},
-    "output_schema": {
-      "result": {
-        "type": "number"
-      }
+    "input_semantics": {
+      "sandbox.x": [
+        "X input consumed by this node."
+      ],
+      "sandbox.optional.offset": [
+        "Optional offset input consumed by this node."
+      ]
+    },
+    "output_semantics": {
+      "result": [
+        "Result output produced by this node."
+      ]
     }
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "source": {
         "kind": "file",
         "ref": "nodes/optional_add.ts",
@@ -45,6 +56,8 @@
       }
     }
   ],
-  "base_libs": ["sandbox.math"],
+  "base_libs": [
+    "sandbox.math"
+  ],
   "capabilities": []
 }

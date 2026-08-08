@@ -7,17 +7,47 @@
   "version": "1.0.0",
   "flow_kind": "process",
   "contract": {
-    "requires": [{"type": "sandbox.number", "cardinality": "exactly_one", "display_name": "Number"}],
-    "provides": [{"key": "result", "type": "sandbox.math.result", "display_name": "Result"}],
+    "requires": [
+      {
+        "type": "sandbox.number",
+        "cardinality": "exactly_one",
+        "display_name": "Number"
+      }
+    ],
+    "provides": [
+      {
+        "key": "result",
+        "type": "sandbox.math.result",
+        "display_name": "Result"
+      }
+    ],
     "params_schema": {},
     "params_defaults": {},
-    "output_schema": {"result": {"type": "number"}}
+    "input_semantics": {
+      "sandbox.number": [
+        "Number input consumed by this node."
+      ]
+    },
+    "output_semantics": {
+      "result": [
+        "Result output produced by this node."
+      ]
+    }
   },
-  "implementations": [{
-    "language": "typescript",
-    "targets": ["browser", "node"],
-    "source": {"kind": "file", "ref": "negative/nodes/package_root_escape.ts", "export": "run"}
-  }],
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": [
+        "browser",
+        "node"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "negative/nodes/package_root_escape.ts",
+        "export": "run"
+      }
+    }
+  ],
   "base_libs": [],
   "capabilities": []
 }

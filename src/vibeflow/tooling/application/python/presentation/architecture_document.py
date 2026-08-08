@@ -37,7 +37,17 @@ def build_architecture_document(
     registry: object | None = None,
     resources: object | None = None,
 ) -> dict[str, object]:
-    actual_compiled = compile_for_render(graph, compiled, registry)
+    if registry is not None:
+        from vibeflow.targets.python.project.compiler import GraphCompiler
+
+        compilation = GraphCompiler().compile_with_findings(
+            graph,
+            registry=registry,
+        )
+        graph = compilation.workflow.graph
+        actual_compiled = compilation.compiled_graph
+    else:
+        actual_compiled = compile_for_render(graph, compiled, registry)
     roots = _root_paths(graph)
     return {
         "project_target": "python",
@@ -75,7 +85,12 @@ def _workflow_document(
     return {
         "source": source,
         "global_config": _config_declaration(global_config, source=source),
-        **_graph_body_document(graph, compiled, registry=registry),
+        **_graph_body_document(
+            graph,
+            compiled,
+            registry=registry,
+            graph_lock_scope="root",
+        ),
     }
 
 
@@ -87,7 +102,12 @@ def _nodesets_document(graph: GraphConfig, *, registry: object | None) -> dict[s
         body = None
         if nodeset.graph.nodes:
             compiled = compile_for_render(nodeset.graph, None, registry)
-            body = _graph_body_document(nodeset.graph, compiled, registry=registry)
+            body = _graph_body_document(
+                nodeset.graph,
+                compiled,
+                registry=registry,
+                graph_lock_scope="block",
+            )
         documents[type_key] = {
             "type_key": nodeset.type_key,
             "source": source,
@@ -111,6 +131,7 @@ def _graph_body_document(
     compiled: CompiledGraph,
     *,
     registry: object | None,
+    graph_lock_scope: str,
 ) -> dict[str, object]:
     contains_global_state = _graph_contains_global_state(
         graph,
@@ -123,15 +144,24 @@ def _graph_body_document(
         "max_steps": graph.max_steps,
         "entry_mode": graph.entry_mode,
         "execution_lock": (
-            _execution_lock_payload(graph.execution_lock, scope="root")
+            _execution_lock_payload(
+                graph.execution_lock,
+                scope=graph_lock_scope,
+            )
             if graph.execution_lock is not None
             else None
         ),
         "contains_global_state": contains_global_state,
-        "root_exclusive": (
-            contains_global_state or graph.execution_lock is not None
-        ),
-        "nodes": [_node_document(graph, compiled, node, registry=registry) for node in graph.nodes],
+        "nodes": [
+            _node_document(
+                graph,
+                compiled,
+                node,
+                registry=registry,
+                graph_lock_scope=graph_lock_scope,
+            )
+            for node in graph.nodes
+        ],
         "edges": [_edge_document(graph, compiled, edge) for edge in compiled.effective_edges],
     }
 
@@ -142,6 +172,7 @@ def _node_document(
     node: NodeSpec,
     *,
     registry: object | None,
+    graph_lock_scope: str,
 ) -> dict[str, object]:
     source = source_reference(graph.root_id, graph.root_path, graph.source_path)
     invocation = invocation_for_node(graph, node)
@@ -187,17 +218,31 @@ def _node_document(
         "source": source,
         "role": node_review_metadata(graph, node, registry),
         "flow_kind": node_flow_kind(node, compiled),
-        "effect_scope": node_review_effect_scope(graph, node, registry),
+        "effect_scope": compiled.effect_scopes.get(
+            node.id,
+            node_review_effect_scope(graph, node, registry),
+        ),
+        "runtime_dispatch": _runtime_dispatch_label(node, compiled),
         "execution_lock": (
-            _execution_lock_payload(node.execution_lock, scope="node")
+            _execution_lock_payload(
+                node.execution_lock,
+                scope="block" if invocation is not None else "node",
+            )
             if node.execution_lock is not None
             else None
+        ),
+        "effective_execution_lock": _effective_execution_lock(
+            graph,
+            node,
+            invocation=invocation,
+            graph_lock_scope=graph_lock_scope,
         ),
         "contains_global_state": contains_global_state,
         "status": node.status,
         "planned_behavior": effective_planned_behavior(node, target).to_dict() if planned else None,
         "requires": requirements_to_dicts(node.requires),
         "provides": providers_to_dicts(node.provides),
+        "contract_source": _contract_source(graph, node),
         "join_policy": node.join_policy,
         "async": async_config,
         "loop": node.loop.to_dict() or None,
@@ -211,8 +256,58 @@ def _node_document(
     }
 
 
+def _contract_source(graph: GraphConfig, node: NodeSpec) -> str:
+    if node.status == STATUS_PLANNED:
+        return "planned_config"
+    if node.type_used == IO_NODE_TYPE or node.type_used in LOOP_NODE_TYPES:
+        return "system_config"
+    if invocation_for_node(graph, node) is not None:
+        return "nodeset"
+    return "node_type"
+
+
 def _execution_lock_payload(lock: object, *, scope: str) -> dict[str, str]:
     return {"key": str(getattr(lock, "key", "")), "scope": scope}
+
+
+def _effective_execution_lock(
+    graph: GraphConfig,
+    node: NodeSpec,
+    *,
+    invocation: object | None,
+    graph_lock_scope: str,
+) -> dict[str, object] | None:
+    if node.execution_lock is not None:
+        return {
+            **_execution_lock_payload(
+                node.execution_lock,
+                scope="block" if invocation is not None else "node",
+            ),
+            "inherited": False,
+        }
+    if graph.execution_lock is not None:
+        return {
+            **_execution_lock_payload(
+                graph.execution_lock,
+                scope=graph_lock_scope,
+            ),
+            "inherited": True,
+        }
+    return None
+
+
+def _runtime_dispatch_label(
+    node: NodeSpec,
+    compiled: CompiledGraph,
+) -> str:
+    if node.status == STATUS_PLANNED:
+        return "unknown"
+    value = getattr(compiled, "runtime_dispatches", {}).get(node.id)
+    if value is True:
+        return "detected"
+    if value is False:
+        return "none"
+    return "unknown"
 
 
 def _graph_contains_global_state(
@@ -340,7 +435,6 @@ def _loop_node_type_document(type_key: str, *, roots: Mapping[str, str]) -> dict
             "version": "",
             "flow_kind": "predefined",
             "effect_scope": EFFECT_SCOPE_NONE,
-            "purity": "runtime_control",
             "author": None,
             "tags": ["loop", "nodeset", "control_flow"],
             "external": False,
@@ -357,8 +451,6 @@ def _loop_node_type_document(type_key: str, *, roots: Mapping[str, str]) -> dict
                 "collect": ["Collected body outputs use the declared mode and target key."],
                 "outputs": ["Loop state or body outputs are exposed through explicit from/as mappings."],
             },
-            "params_schema": {"node_field": "loop", "required": ["body"], "fields": field_schema},
-            "output_schema": {},
         },
         "config": {
             "defaults": {
@@ -398,7 +490,6 @@ def _io_node_type_document(type_key: str) -> dict[str, object]:
             ),
             "flow_kind": "io",
             "effect_scope": "terminal",
-            "purity": "host_io",
             "external": False,
         },
         "contract": {
@@ -430,7 +521,6 @@ def _node_info_document(info: object) -> dict[str, object]:
         "description": str(getattr(info, "description", "") or ""),
         "version": str(getattr(info, "version", "") or ""),
         "flow_kind": str(getattr(info, "flow_kind", "") or ""),
-        "purity": str(getattr(info, "purity", "") or ""),
         "effect_scope": effective_effect_scope(info),
         "author": getattr(info, "author", None),
         "tags": list(getattr(info, "tags", ()) or ()),
@@ -444,8 +534,6 @@ def _node_contract_document(contract: object) -> dict[str, object]:
         "provides": providers_to_dicts(tuple(getattr(contract, "provides", ()) or ())),
         "input_semantics": _snapshot(getattr(contract, "input_semantics", {}) or {}),
         "output_semantics": _snapshot(getattr(contract, "output_semantics", {}) or {}),
-        "params_schema": _snapshot(getattr(contract, "params_schema", {}) or {}),
-        "output_schema": _snapshot(getattr(contract, "output_schema", {}) or {}),
     }
 
 

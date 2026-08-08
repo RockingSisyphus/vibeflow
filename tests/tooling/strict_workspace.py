@@ -731,6 +731,59 @@ def test_workspace_registry_import_and_factory_errors_are_explicit(tmp_path) -> 
     assert missing_factory.value.rule_id == "WORKSPACE.REGISTRY.FACTORY"
 
 
+def test_workspace_registry_preflight_proves_declarations_from_sibling_root(tmp_path) -> None:
+    workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
+    _write_project_config(framework_root)
+    base_lib = framework_root / "base_lib"
+    base_lib.mkdir()
+    (base_lib / "__init__.py").write_text("", encoding="utf-8")
+    (base_lib / "node_contracts.py").write_text(
+        """
+from vibeflow.core import DataProvider, DataRequirement
+
+def REQ(data_type):
+    return DataRequirement(type=data_type, cardinality="exactly_one")
+
+def PROV(key, data_type=None):
+    return DataProvider(key=key, type=data_type or key)
+""".strip(),
+        encoding="utf-8",
+    )
+    (project_root / "task_node.py").write_text(
+        """
+from base_lib.node_contracts import PROV, REQ
+from vibeflow.targets.python.project import NodeContract, NodeInfo
+
+class TaskNode:
+    NODE_INFO = NodeInfo("task.cross_root", "Task", "task", "Uses framework declarations.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        requires=(REQ("task.in"),),
+        provides=(PROV("task.out"),),
+    )
+    def run_pure(self, inputs, params):
+        return {"task.out": inputs["task.in"]}
+""".strip(),
+        encoding="utf-8",
+    )
+    (project_root / "registry.py").write_text(
+        """
+from task_node import TaskNode
+from vibeflow.targets.python.project import NodeRegistry
+
+def build_node_registry():
+    registry = NodeRegistry()
+    registry.register("task.cross_root", TaskNode, config_schema={}, config_defaults={})
+    return registry
+""".strip(),
+        encoding="utf-8",
+    )
+    _write_project_config(project_root)
+
+    registry = build_workspace_node_registry(load_workspace_config(workspace_path))
+
+    assert registry.available() == ["task.cross_root"]
+
+
 def test_workspace_mode_rejects_config_level_policy(tmp_path) -> None:
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
     _write_registry(project_root, [("test.start", "StartNode", {}, {})])
@@ -1103,9 +1156,8 @@ from vibeflow.targets.python.project import NodeContract, NodeInfo
 class UsesMathNode:
     NODE_INFO = NodeInfo("test.uses_math", "Uses Math", "test", "Imports a helper.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        provides=(DataProvider("value.out", "value.out"),),
+        provides=(DataProvider("value.out", "value.out", display_name="Value Out"),),
         output_semantics={"value.out": ("computed value",)},
-        output_schema={"value.out": {"type": "number"}},
         examples=({"inputs": {}, "params": {}},),
     )
 

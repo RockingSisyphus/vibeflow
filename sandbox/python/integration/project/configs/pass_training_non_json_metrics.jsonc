@@ -15,33 +15,15 @@
         "description": "Runs start."
       },
       {
-        "requires": [
-          {
-            "type": "train.batch",
-            "cardinality": "exactly_one",
-            "display_name": "Train Batch"
-          }
-        ],
-        "provides": [
-          {
-            "key": "train.metrics",
-            "type": "train.metrics",
-            "display_name": "Train Metrics"
-          }
-        ],
+
+
         "id": "metrics",
         "type_used": "sandbox.batch_metrics",
         "display_name": "Metrics",
         "description": "Runs metrics."
       },
       {
-        "requires": [
-          {
-            "type": "train.metrics",
-            "cardinality": "exactly_one",
-            "display_name": "Train Metrics"
-          }
-        ],
+
         "id": "end",
         "type_used": "sandbox.training_metrics_end",
         "display_name": "End",

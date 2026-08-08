@@ -38,40 +38,16 @@
       {
         "display_name": "Increment Step",
         "description": "Calls the reusable increment nodeset for this iteration.",
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.next",
-            "type": "value.next",
-            "display_name": "Value Next"
-          }
-        ],
+
+
         "id": "increment_step",
         "type_used": "loop.increment_step"
       },
       {
         "display_name": "Done Check",
         "description": "Stops the while loop when value.next reaches the target.",
-        "requires": [
-          {
-            "type": "value.next",
-            "cardinality": "exactly_one",
-            "display_name": "Value Next"
-          }
-        ],
-        "provides": [
-          {
-            "key": "loop.done",
-            "type": "loop.done",
-            "display_name": "Loop Done"
-          }
-        ],
+
+
         "config": {
           "target": 3
         },
@@ -81,13 +57,7 @@
       {
         "display_name": "End",
         "description": "Ends after the iteration value is available.",
-        "requires": [
-          {
-            "type": "value.next",
-            "cardinality": "exactly_one",
-            "display_name": "Value Next"
-          }
-        ],
+
         "id": "end",
         "type_used": "sandbox.next_value_end"
       }

@@ -226,11 +226,6 @@ def _bind_implementations(
                     modules.append(module)
             node_payload["implementation_id"] = binding
             node_payload["implementation"] = implementation.to_dict()
-            _attach_output_schemas(
-                node_payload,
-                raw_overrides.get(node.type_used),
-                node=node,
-            )
         if node.subplan is None:
             return
         child_payload = node_payload.get("subplan")
@@ -267,26 +262,6 @@ def _bind_implementations(
             bind(node, node_payload, path)
 
     bind_workflow(workflow, serializable, ())
-
-
-def _attach_output_schemas(
-    node_payload: dict[str, Any],
-    raw_override: object,
-    *,
-    node: EmissionNode,
-) -> None:
-    output_schemas = (
-        raw_override.get("output_schema")
-        if isinstance(raw_override, Mapping)
-        else getattr(node, "output_schema", None)
-    )
-    if not isinstance(output_schemas, Mapping) or not output_schemas:
-        return
-    node_payload["output_schemas"] = {
-        str(key): dict(value)
-        for key, value in output_schemas.items()
-        if isinstance(value, Mapping)
-    }
 
 
 def _implementation_imports(

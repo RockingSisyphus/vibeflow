@@ -177,8 +177,19 @@ def build_execution_plan(
     runtime_options: object | None = None,
     plugin_registry: object | None = None,
     _check_nodeset_depth: bool = True,
+    _contracts_resolved: bool = False,
     _path: tuple[str, ...] = (),
 ) -> ExecutionPlan:
+    if not _contracts_resolved:
+        from vibeflow.targets.python.project.compiler import GraphCompiler
+
+        compilation = GraphCompiler().compile_with_findings(
+            graph,
+            registry=registry,
+            plugin_registry=plugin_registry,
+        )
+        graph = compilation.workflow.graph
+        compiled = compilation.compiled_graph
     if _check_nodeset_depth:
         options = normalize_runtime_options(runtime_options)
         violations = nodeset_depth_violations(graph, max_depth=options.nodeset_max_depth)
@@ -333,6 +344,7 @@ def _frame_for(
                 global_config=child_scope,
                 runtime_options=runtime_options,
                 _check_nodeset_depth=False,
+                _contracts_resolved=True,
                 _path=(*path, spec.id),
             ),
         )
@@ -372,6 +384,7 @@ def _frame_for(
                 global_config=child_scope,
                 runtime_options=runtime_options,
                 _check_nodeset_depth=False,
+                _contracts_resolved=True,
                 _path=(*path, spec.id),
             ),
         )
@@ -514,7 +527,7 @@ def _validate_execution_lock_scopes(
 ) -> None:
     root_key = plan.graph.execution_lock.key if plan.graph.execution_lock else ""
     active_key = _nested_lock_key(inherited_key, root_key, subject="pipeline")
-    root_protected = protected or bool(root_key) or plan.contains_global_state
+    root_protected = protected or bool(root_key)
     for frame in plan.frames.values():
         frame_key = (
             frame.execution_lock.key

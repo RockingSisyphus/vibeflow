@@ -8,9 +8,7 @@ from vibeflow.targets.python.quality.source_analysis.helpers import (
     _looks_structured_key,
     _looks_temporary_key,
     _non_empty_string,
-    _tokens,
     _validate_key_tuple,
-    _validate_schema_mapping,
     _validate_semantics,
     _violation,
 )
@@ -20,15 +18,13 @@ def _validate_node_info(info: object, *, expected_type: str | None, source: _Sou
     if not isinstance(info, NodeInfo):
         return [_violation("missing_node_info", "node must define NODE_INFO: NodeInfo", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
     violations: list[PurityViolation] = []
-    for field_name in ("type_key", "display_name", "category", "description", "version", "flow_kind", "purity"):
+    for field_name in ("type_key", "display_name", "category", "description", "version", "flow_kind"):
         if not _non_empty_string(getattr(info, field_name, None)):
             violations.append(_violation(f"node_info_{field_name}", f"NODE_INFO.{field_name} must be a non-empty string", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
     if _non_empty_string(getattr(info, "flow_kind", None)) and info.flow_kind not in FLOW_KINDS:
         violations.append(_violation("node_flow_kind_invalid", f"NODE_INFO.flow_kind must be one of {sorted(FLOW_KINDS)}", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
     if not isinstance(getattr(info, "external", False), bool):
         violations.append(_violation("node_external_invalid", "NODE_INFO.external must be a boolean", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    if info.purity != "pure":
-        violations.append(_violation("non_pure_node", "NODE_INFO.purity must be 'pure'", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
     if expected_type and info.type_key != expected_type:
         violations.append(_violation("type_mismatch", f"NODE_INFO.type_key {info.type_key!r} does not match expected type {expected_type!r}", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
     return violations
@@ -46,8 +42,6 @@ def _validate_contract(contract: object, *, source: _SourceInfo) -> list[PurityV
         violations.append(_violation("contract_overlap", "CONTRACT.requires types and CONTRACT.provides keys must not overlap", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
     violations.extend(_validate_semantics(contract.input_semantics, require_types, "CONTRACT.input_semantics", required=bool(requires), source=source))
     violations.extend(_validate_semantics(contract.output_semantics, provide_keys, "CONTRACT.output_semantics", required=bool(provides), source=source))
-    violations.extend(_validate_schema_mapping(contract.params_schema, (), "CONTRACT.params_schema", source=source, require_all=False))
-    violations.extend(_validate_schema_mapping(contract.output_schema, provide_keys, "CONTRACT.output_schema", source=source, require_all=bool(provides)))
     violations.extend(_validate_contract_examples_shape(contract.examples, source=source))
     return violations
 
@@ -57,8 +51,8 @@ def _validate_contract_requirements(value: object, field_name: str, *, source: _
         violations.append(_violation("contract_requirement_list", f"{field_name} must be a tuple/list of DataRequirement objects", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
         return ()
     types = tuple(item.type for item in value)
-    if any(not item.type.strip() or item.cardinality not in CARDINALITIES for item in value):
-        violations.append(_violation("contract_requirement_shape", f"{field_name} items must declare non-empty type and valid cardinality", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
+    if any(not item.type.strip() or item.cardinality not in CARDINALITIES or not item.display_name.strip() for item in value):
+        violations.append(_violation("contract_requirement_shape", f"{field_name} items must declare non-empty type/display_name and valid cardinality", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
     if len(set(types)) != len(types):
         violations.append(_violation("contract_duplicate_requirement_type", f"{field_name} must not contain duplicate types", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
     return tuple(value)
@@ -69,8 +63,8 @@ def _validate_contract_providers(value: object, field_name: str, *, source: _Sou
         violations.append(_violation("contract_provider_list", f"{field_name} must be a tuple/list of DataProvider objects", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
         return ()
     keys = tuple(item.key for item in value)
-    if any(not item.key.strip() or not item.type.strip() for item in value):
-        violations.append(_violation("contract_provider_shape", f"{field_name} items must declare non-empty key and type", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
+    if any(not item.key.strip() or not item.type.strip() or not item.display_name.strip() for item in value):
+        violations.append(_violation("contract_provider_shape", f"{field_name} items must declare non-empty key/type/display_name", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
     if len(set(keys)) != len(keys):
         violations.append(_violation("contract_duplicate_key", f"{field_name} must not contain duplicate keys", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
     return tuple(value)
@@ -226,23 +220,8 @@ def _validate_architecture_smells(
     metrics: NodeMetrics,
 ) -> list[PurityViolation]:
     warnings: list[PurityViolation] = []
-    metadata_tokens = _tokens(" ".join((info.type_key, info.display_name, info.category, info.description)))
     require_types = requirement_types(contract.requires)
     provide_keys = provider_keys(contract.provides)
-    contract_tokens = _tokens(" ".join((*require_types, *provide_keys)))
-    semantic_tokens = _tokens(" ".join(part for values in (*contract.input_semantics.values(), *contract.output_semantics.values()) for part in values))
-    if contract_tokens and not (contract_tokens & (metadata_tokens | semantic_tokens)):
-        warnings.append(
-            _violation(
-                "responsibility_mismatch",
-                "node metadata/semantics do not visibly describe contract keys",
-                source=source,
-                severity="warning",
-                failure_layer="contract",
-                suggested_fix_type="fix_contract",
-                details={"metadata_tokens": sorted(metadata_tokens), "contract_tokens": sorted(contract_tokens)},
-            )
-        )
     for key in (*require_types, *provide_keys):
         if _looks_temporary_key(key):
             warnings.append(
@@ -295,149 +274,3 @@ def _validate_contract_examples_shape(value: object, *, source: _SourceInfo) -> 
         if "outputs" in item:
             return [_violation("example_outputs_removed", f"CONTRACT.examples[{index}].outputs is removed; examples only declare inputs and params", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
     return []
-
-
-def _validate_examples(
-    node_cls: type[PureNode],
-    contract: NodeContract,
-    *,
-    source: _SourceInfo,
-    execute: bool = True,
-) -> list[PurityViolation]:
-    if not contract.examples:
-        return [_missing_examples_violation(source)]
-    findings: list[PurityViolation] = []
-    covers_contract = False
-    for index, example in enumerate(contract.examples):
-        if not isinstance(example, Mapping):
-            continue
-        inputs, params = _example_payload(example)
-        undeclared_params = set(params) - set(contract.params_schema)
-        if undeclared_params:
-            findings.append(_example_params_gap_violation(index, undeclared_params, source=source))
-            continue
-        if _example_covers_contract(contract, inputs):
-            covers_contract = True
-        else:
-            findings.append(_example_gap_violation(index, source=source))
-            continue
-        if execute:
-            findings.extend(_validate_example_output(node_cls, contract, inputs, params, index, source=source))
-    if not covers_contract:
-        findings.append(_no_covering_example_violation(source))
-    return findings
-
-
-def _example_payload(example: Mapping[str, object]) -> tuple[dict[str, object], dict[str, object]]:
-    return (
-        dict(example.get("inputs", {})),
-        dict(example.get("params", {})),
-    )
-
-
-def _example_covers_contract(contract: NodeContract, inputs: Mapping[str, object]) -> bool:
-    return set(requirement_types(contract.requires)) <= set(inputs)
-
-
-def _validate_example_output(
-    node_cls: type[PureNode],
-    contract: NodeContract,
-    inputs: Mapping[str, object],
-    params: Mapping[str, object],
-    index: int,
-    *,
-    source: _SourceInfo,
-) -> list[PurityViolation]:
-    actual_outputs, failure = _run_example(node_cls, inputs, params, index, source=source)
-    if failure is not None:
-        return [failure]
-    return _validate_example_output_keys(actual_outputs, contract, index, source=source)
-
-
-def _run_example(
-    node_cls: type[PureNode],
-    inputs: Mapping[str, object],
-    params: Mapping[str, object],
-    index: int,
-    *,
-    source: _SourceInfo,
-) -> tuple[object, PurityViolation | None]:
-    try:
-        return node_cls().run_pure(dict(inputs), dict(params)), None
-    except SystemExit as exc:
-        return None, _violation(
-            "example_failed",
-            f"CONTRACT.examples[{index}] raised SystemExit: {exc}",
-            source=source,
-            failure_layer="contract",
-            suggested_fix_type="fix_node",
-            details={"example_index": index},
-        )
-    except Exception as exc:  # noqa: BLE001 - health report must contain checker-visible failure.
-        return None, _violation(
-            "example_failed",
-            f"CONTRACT.examples[{index}] raised {type(exc).__name__}: {exc}",
-            source=source,
-            failure_layer="contract",
-            suggested_fix_type="fix_node",
-            details={"example_index": index},
-        )
-
-
-def _validate_example_output_keys(actual_outputs: object, contract: NodeContract, index: int, *, source: _SourceInfo) -> list[PurityViolation]:
-    expected = set(provider_keys(contract.provides))
-    if isinstance(actual_outputs, Mapping) and set(actual_outputs) == expected:
-        return []
-    return [
-        _violation(
-            "example_failed",
-            f"CONTRACT.examples[{index}] run_pure output keys must match CONTRACT.provides",
-            source=source,
-            failure_layer="contract",
-            suggested_fix_type="fix_node",
-            details={"example_index": index, "expected_keys": sorted(expected), "actual_keys": list(actual_outputs) if isinstance(actual_outputs, Mapping) else []},
-        )
-    ]
-
-
-def _missing_examples_violation(source: _SourceInfo) -> PurityViolation:
-    return _contract_example_warning("missing_examples", "node should provide at least one minimal example in CONTRACT.examples", source=source)
-
-
-def _example_gap_violation(index: int, *, source: _SourceInfo) -> PurityViolation:
-    return _violation(
-        "example_contract_gap",
-        f"CONTRACT.examples[{index}] does not cover requires/provides",
-        source=source,
-        severity="warning",
-        failure_layer="contract",
-        suggested_fix_type="fix_contract",
-        details={"example_index": index},
-    )
-
-
-def _example_params_gap_violation(index: int, undeclared: set[str], *, source: _SourceInfo) -> PurityViolation:
-    return _violation(
-        "example_contract_gap",
-        f"CONTRACT.examples[{index}] params contain undeclared keys: {sorted(undeclared)}",
-        source=source,
-        severity="warning",
-        failure_layer="contract",
-        suggested_fix_type="fix_contract",
-        details={"example_index": index, "undeclared_params": sorted(undeclared)},
-    )
-
-
-def _no_covering_example_violation(source: _SourceInfo) -> PurityViolation:
-    return _contract_example_warning("example_contract_gap", "node examples exist but none covers all requires/provides", source=source)
-
-
-def _contract_example_warning(code: str, message: str, *, source: _SourceInfo) -> PurityViolation:
-    return _violation(
-        code,
-        message,
-        source=source,
-        severity="warning",
-        failure_layer="contract",
-        suggested_fix_type="fix_contract",
-    )

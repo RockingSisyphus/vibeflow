@@ -277,14 +277,14 @@ def test_cli_inspect_node_reports_unmatched_type(tmp_path, capsys) -> None:
     module_path = tmp_path / "demo_node.py"
     module_path.write_text(
         """
+from vibeflow.core import DataProvider
 from vibeflow.targets.python.project import NodeContract, NodeInfo
 
 class DemoNode:
     NODE_INFO = NodeInfo(type_key="demo.other", display_name="Other", category="demo", description="Other.", version="0.1.0", flow_kind="process")
     CONTRACT = NodeContract(
-        provides=("demo.out",),
+        provides=(DataProvider("demo.out", "demo.out", display_name="Demo Out"),),
         output_semantics={"demo.out": ("demo output",)},
-        output_schema={"demo.out": {"type": "number"}},
         examples=({"inputs": {}, "params": {}},),
     )
 
@@ -314,7 +314,6 @@ class DemoNode:
             "missing_node_info",
         ),
         (_valid_node_source(info=VALID_NODE_INFO.replace('type_key="demo.node"', 'type_key=""')), "node_info_type_key"),
-        (_valid_node_source(info=VALID_NODE_INFO.replace('purity="pure"', 'purity="impure"') if 'purity=' in VALID_NODE_INFO else VALID_NODE_INFO.replace('version="0.1.0",', 'version="0.1.0",\n        purity="impure",')), "non_pure_node"),
         (
             f"""
 {VALID_NODE_IMPORT}
@@ -328,18 +327,11 @@ class DemoNode:
         ),
         (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('provides=(PROV("demo.out"),)', 'provides=(PROV("demo.out"), PROV("demo.out"))')), "contract_duplicate_key"),
         (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('output_semantics={"demo.out": ("demo output",)},', 'output_semantics={},')), "contract_semantics_missing"),
-        (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('output_schema={"demo.out": {"type": "number"}},', 'output_schema={},')), "contract_schema_missing"),
-        (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('output_schema={"demo.out": {"type": "number"}},', 'output_schema={"demo.out": {}},')), "contract_schema_shape"),
-        (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('output_schema={"demo.out": {"type": "number"}},', 'output_schema={"demo.out": {"snapshot": "opaque"}},')), "contract_schema_shape"),
-        (_valid_node_source(run_body='        return {"demo.out": params.get("delta", 1)}'), "undeclared_param"),
         (_valid_node_source(run_body='        return {"other.out": 1}'), "undeclared_output"),
         (_valid_node_source(run_body='        return {}'), "missing_output"),
         (
             _valid_node_source(
-                contract=VALID_NODE_CONTRACT.replace(
-                    'output_schema={"demo.out": {"type": "number"}},',
-                    'params_schema={"output_key": {"type": "string"}},\n        output_schema={"demo.out": {"type": "number"}},',
-                ),
+                contract=VALID_NODE_CONTRACT,
                 run_body='        return {params["output_key"]: 1}',
             ),
             "dynamic_output_key",
@@ -630,7 +622,8 @@ def test_collect_node_metrics_reports_complexity_and_contract_size() -> None:
     payload = metrics.to_dict()
     assert payload["function_count"] == 1
     assert payload["branch_count"] == 0
-    assert payload["param_count"] == 1
+    # Python node parameters are owned by Registry metadata, not NodeContract.
+    assert payload["param_count"] == 0
     assert payload["requires_count"] == 1
     assert payload["provides_count"] == 1
     assert payload["contract_key_count"] == 2
@@ -648,7 +641,7 @@ def test_complexity_policy_thresholds_are_enforced() -> None:
     )
     codes = {item.code for item in violations}
     assert "complexity_max_functions" in codes
-    assert "complexity_max_params" in codes
+    assert "complexity_max_params" not in codes
     assert "complexity_max_contract_keys" in codes
     assert all(item.suggested_fix_type in {"split_node", "fix_contract"} for item in violations if item.code.startswith("complexity_"))
 
@@ -660,10 +653,7 @@ def test_branch_and_nesting_complexity_are_enforced(tmp_path, capsys) -> None:
                 return {"demo.out": 2}
         return {"demo.out": 1}
 """.rstrip(),
-        contract=VALID_NODE_CONTRACT.replace(
-            'examples=({"inputs": {}, "params": {}},),',
-            'params_schema={"flag": {"type": "boolean"}, "other": {"type": "boolean"}},\n        examples=({"inputs": {}, "params": {}},),',
-        ),
+        contract=VALID_NODE_CONTRACT,
     )
     policy_path = tmp_path / "kernel_policy.jsonc"
     policy_path.write_text('{"complexity": {"max_branches": 1, "max_nesting_depth": 1}}', encoding="utf-8")
@@ -683,15 +673,15 @@ def test_inspect_node_reports_metrics_for_valid_node(tmp_path, capsys) -> None:
     assert payload["node"]["metrics"]["provides_count"] == 1
     assert set(payload["node"]["contract"]["examples"][0]) == {"inputs", "params"}
 
-def test_missing_examples_and_example_contract_gap_are_concerns(tmp_path, capsys) -> None:
+def test_missing_examples_and_example_contract_gap_are_accepted_as_documentation(tmp_path, capsys) -> None:
     no_examples_contract = VALID_NODE_CONTRACT.replace(
         '        examples=({"inputs": {}, "params": {}},),\n',
         "",
     )
     code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(contract=no_examples_contract))
     assert code == 0
-    assert payload["health"]["status"] == "CONCERNS"
-    assert any(warning["details"].get("legacy_code") == "missing_examples" for warning in payload["health"]["warnings"])
+    assert payload["health"]["status"] == "PASS"
+    assert not payload["health"]["warnings"]
 
     gap_contract = VALID_NODE_CONTRACT.replace(
         'provides=(PROV("demo.out"),),',
@@ -699,8 +689,8 @@ def test_missing_examples_and_example_contract_gap_are_concerns(tmp_path, capsys
     )
     code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(contract=gap_contract))
     assert code == 0
-    assert payload["health"]["status"] == "CONCERNS"
-    assert any(warning["details"].get("legacy_code") == "example_contract_gap" for warning in payload["health"]["warnings"])
+    assert payload["health"]["status"] == "PASS"
+    assert not payload["health"]["warnings"]
 
 def test_example_outputs_field_is_removed(tmp_path, capsys) -> None:
     bad_example_contract = VALID_NODE_CONTRACT.replace(
@@ -713,15 +703,15 @@ def test_example_outputs_field_is_removed(tmp_path, capsys) -> None:
     assert {error["details"].get("legacy_code") for error in payload["health"]["errors"]} == {"example_outputs_removed"}
 
 
-def test_output_schema_snapshot_is_deprecated_warning(tmp_path, capsys) -> None:
+def test_removed_output_schema_is_an_explicit_load_error(tmp_path, capsys) -> None:
     snapshot_contract = VALID_NODE_CONTRACT.replace(
-        'output_schema={"demo.out": {"type": "number"}},',
-        'output_schema={"demo.out": {"type": "number", "snapshot": "opaque"}},',
+        'examples=({"inputs": {}, "params": {}},),',
+        'output_schema={"demo.out": {"type": "number"}},\n        examples=({"inputs": {}, "params": {}},),',
     )
     code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(contract=snapshot_contract))
-    assert code == 0
-    assert payload["health"]["status"] == "CONCERNS"
-    assert {warning["details"].get("legacy_code") for warning in payload["health"]["warnings"]} == {"contract_schema_deprecated_snapshot"}
+    assert code == 1
+    assert payload["health"]["status"] == "ERROR"
+    assert payload["health"]["errors"][0]["rule_id"] == "NODE.INSPECT.LOAD_ERROR"
 
 
 def test_example_output_key_failure_is_health_error(tmp_path, capsys) -> None:
@@ -729,4 +719,4 @@ def test_example_output_key_failure_is_health_error(tmp_path, capsys) -> None:
     assert code == 1
     assert payload["health"]["status"] == "FAIL"
     legacy_codes = {error["details"].get("legacy_code") for error in payload["health"]["errors"]}
-    assert legacy_codes & {"undeclared_output", "example_failed"}
+    assert "undeclared_output" in legacy_codes

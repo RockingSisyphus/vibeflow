@@ -27,11 +27,16 @@
         "loop": {
           "body": "sandbox.permanent_port_body",
           "max_iterations": null
-        }
+        },
+        "requires": [],
+        "provides": []
       }
     ],
     "edges": [
-      {"from": "start", "to": "loop"}
+      {
+        "from": "start",
+        "to": "loop"
+      }
     ],
     "outputs": []
   }

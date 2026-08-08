@@ -1,4 +1,4 @@
-export const VIBEFLOW_WORKFLOW_ABI = "vibeflow.workflow.v3";
+export const VIBEFLOW_WORKFLOW_ABI = "vibeflow.workflow.v4";
 export const VIBEFLOW_PLUGIN_ABI = "vibeflow.plugin.v1";
 
 export class VibeFlowWorkflowError extends Error {
@@ -604,20 +604,15 @@ function validateNodeOutputs(node, outputs, state) {
     );
   }
   for (const provider of node.provides) {
-    const schemas = [
-      ["node contract", node.output_schemas?.[provider.key]],
-      ["data type", state.workflow.schemas?.[provider.type]],
-    ];
-    for (const [schemaKind, schema] of schemas) {
-      const failure = validateJsonSchema(outputs[provider.key], schema);
-      if (failure) {
-        throw vfError(
-          "VF_OUTPUT_SCHEMA",
-          `node '${node.id}' output '${provider.key}' failed ${schemaKind} schema validation: ${failure}`,
-          state.workflow,
-          { nodePath: nodePath(state, node.id) },
-        );
-      }
+    const schema = state.workflow.schemas?.[provider.type];
+    const failure = validateJsonSchema(outputs[provider.key], schema);
+    if (failure) {
+      throw vfError(
+        "VF_OUTPUT_SCHEMA",
+        `node '${node.id}' output '${provider.key}' failed data type schema validation: ${failure}`,
+        state.workflow,
+        { nodePath: nodePath(state, node.id) },
+      );
     }
   }
   return outputs;

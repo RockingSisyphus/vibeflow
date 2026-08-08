@@ -41,68 +41,21 @@
         "id": "inner",
         "type_used": "sandbox.affine_inner",
         "display_name": "Call overridden transform",
-        "description": "Calls the sibling whose qualified math node is overridden.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ]
-      },
+        "description": "Calls the sibling whose qualified math node is overridden."
+              },
       {
         "id": "sibling",
         "type_used": "sandbox.affine_inner_default",
         "display_name": "Call default transform",
-        "description": "Calls the sibling whose math node must retain descriptor defaults.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "default_result",
-            "type": "sandbox.override.default",
-            "display_name": "Default result"
-          }
-        ]
-      },
+        "description": "Calls the sibling whose math node must retain descriptor defaults."
+              },
       {
         "id": "join",
         "type_used": "sandbox.override_join",
         "display_name": "Join sibling results",
         "description": "Waits for both sibling paths before exposing the overridden result.",
-        "join_policy": "all",
-        "requires": [
-          {
-            "type": "sandbox.math.result",
-            "cardinality": "exactly_one",
-            "display_name": "Overridden result"
-          },
-          {
-            "type": "sandbox.override.default",
-            "cardinality": "exactly_one",
-            "display_name": "Default result"
-          }
-        ],
-        "provides": [
-          {
-            "key": "joined_result",
-            "type": "sandbox.override.joined",
-            "display_name": "Joined overridden result"
-          }
-        ]
-      },
+        "join_policy": "all"
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

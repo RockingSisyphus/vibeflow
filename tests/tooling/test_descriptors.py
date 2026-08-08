@@ -53,12 +53,11 @@ def _node_payload(
         "flow_kind": "process",
         "contract": {
             "requires": [],
-            "provides": [{"key": "value.out", "type": "value.out"}],
+            "provides": [{"key": "value.out", "type": "value.out", "display_name": "Result"}],
             "input_semantics": {},
             "output_semantics": {"value.out": ["result"]},
             "params_schema": {"delta": {"type": "number"}},
             "params_defaults": {"delta": 1},
-            "output_schema": {"value.out": {"type": "number"}},
             "examples": [{"inputs": {}, "params": {"delta": 1}}],
         },
         "implementations": [
@@ -273,10 +272,10 @@ class _LegacyNode:
         "process",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("value.out", "value.out"),),
+        provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
         output_semantics={"value.out": ("result",)},
-        params_schema={"value": {"type": "number"}},
-        output_schema={"value.out": {"type": "number"}},
+
+
         examples=({"inputs": {}, "params": {"value": 1}},),
     )
 

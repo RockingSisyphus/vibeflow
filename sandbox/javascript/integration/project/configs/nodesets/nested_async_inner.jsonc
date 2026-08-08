@@ -38,22 +38,8 @@
         "display_name": "Deferred double",
         "description": "Resolves the nested business result.",
         "async": "result_key",
-        "result_key": "doubled",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "doubled",
-            "type": "sandbox.async.value",
-            "display_name": "Doubled value"
-          }
-        ]
-      },
+        "result_key": "doubled"
+              },
       {
         "id": "audit",
         "type_used": "sandbox.detached_audit",

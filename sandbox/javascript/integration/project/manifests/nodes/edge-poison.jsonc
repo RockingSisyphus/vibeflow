@@ -23,16 +23,20 @@
     "params_defaults": {
       "value": 999
     },
-    "output_schema": {
-      "poisoned": {
-        "type": "number"
-      }
+    "input_semantics": {},
+    "output_semantics": {
+      "poisoned": [
+        "Poisoned payload output produced by this node."
+      ]
     }
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "source": {
         "kind": "file",
         "ref": "nodes/edge_poison.ts",

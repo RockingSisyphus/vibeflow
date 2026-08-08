@@ -1,7 +1,50 @@
 import re
 import xml.etree.ElementTree as ET
+from copy import deepcopy
 
 from tests.fixtures.support.strict_support import *
+
+
+def parse_graph_config(config):
+    """Migrate this module's legacy inline graphs to the effective-contract ABI."""
+    from vibeflow.tooling.project.graph_config import parse_graph_config as raw_parse_graph_config
+
+    migrated = deepcopy(config)
+    raw_nodesets = migrated.get("nodesets", []) if isinstance(migrated, dict) else []
+    nodeset_items = list(raw_nodesets.values()) if isinstance(raw_nodesets, dict) else list(raw_nodesets)
+    nodeset_types = {
+        str(item.get("type_key", ""))
+        for item in nodeset_items
+        if isinstance(item, dict) and item.get("type_key")
+    }
+
+    def visit(body):
+        pipeline = body.get("pipeline", body)
+        for node in pipeline.get("nodes", []):
+            node.setdefault("display_name", str(node.get("id", "Node")).replace("_", " ").title())
+            node.setdefault("description", f"Exercises {node.get('id', 'this node')} in the plugin test workflow.")
+            explicit = (
+                node.get("status") == "planned"
+                or node.get("type_used") == "vibeflow.io"
+                or str(node.get("type_used", "")).startswith("vibeflow.loop.")
+            )
+            if explicit:
+                node.setdefault("requires", [])
+                node.setdefault("provides", [])
+            else:
+                node.pop("requires", None)
+                node.pop("provides", None)
+        nested = body.get("nodesets", pipeline.get("nodesets", {}))
+        iterable = nested.values() if isinstance(nested, dict) else nested
+        for nodeset in iterable:
+            if not isinstance(nodeset, dict):
+                continue
+            nodeset.setdefault("display_name", str(nodeset.get("type_key", "Nodeset")))
+            nodeset.setdefault("description", "Defines a composite workflow used by plugin tests.")
+            visit(nodeset)
+
+    visit(migrated)
+    return raw_parse_graph_config(migrated)
 
 
 def _review_title_positions(svg_text: str) -> dict[str, tuple[float, float]]:
@@ -24,7 +67,7 @@ class SinkNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("value.in", "exactly_one"),),
+        requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"),),
         input_semantics={"value.in": ("input value",)},
         examples=({"inputs": {"value.in": 1}, "params": {}},),
     )
@@ -172,7 +215,7 @@ def test_health_report_and_mermaid_export() -> None:
     assert report.status == "CONCERNS"
     serialized = report.to_dict()
     assert serialized["warnings"][0]["rule_id"] == "GRAPH.SMELL.DUPLICATE_LOGIC"
-    mermaid = export_mermaid(graph)
+    mermaid = export_mermaid(graph, registry=_registry())
     assert "flowchart TD" in mermaid
     assert "data: Value In" in mermaid
     assert "provides:" not in mermaid
@@ -203,7 +246,7 @@ def test_mermaid_collapses_and_expands_nodesets_with_contract_metadata() -> None
         }
     )
 
-    collapsed = export_mermaid(graph)
+    collapsed = export_mermaid(graph, registry=_registry())
     assert 'composite@{ shape: fr-rect, label: "Composite\\n\\nid: composite\\ntype_used: math.add_one' in collapsed
     assert "---------- nodeset ----------" in collapsed
     assert "type_key: math.add_one" in collapsed
@@ -212,7 +255,7 @@ def test_mermaid_collapses_and_expands_nodesets_with_contract_metadata() -> None
     assert "data: Value Out" in collapsed
     assert "composite__inner" not in collapsed
 
-    expanded = export_mermaid(graph, expand_nodesets=True)
+    expanded = export_mermaid(graph, registry=_registry(), expand_nodesets=True)
     assert 'subgraph composite__expanded["Composite (id: composite, type_key: math.add_one)"]' in expanded
     assert 'composite__inner@{ shape: rect, label: "Inner\\n\\nid: inner\\ntype_used: test.add' in expanded
     assert "Internal add step." in expanded
@@ -270,7 +313,7 @@ def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nod
         },
     }
 
-    mermaid = export_mermaid(graph, expand_nodesets=True, resources=resources, mermaid_layout="review-columns")
+    mermaid = export_mermaid(graph, registry=_registry(), expand_nodesets=True, resources=resources, mermaid_layout="review-columns")
 
     assert mermaid.startswith("flowchart LR")
     assert 'subgraph __vibeflow_layout_main["main pipeline"]' in mermaid
@@ -639,9 +682,9 @@ def test_nodeset_detail_parent_mermaid_preserves_collapsed_callsite_edges() -> N
     )
 
     assert mermaid.startswith("flowchart TD")
-    assert 'child@{ shape: fr-rect, label: "Detail Leaf\\n\\nid: child\\ntype_used: detail.leaf' in mermaid
+    assert 'child@{ shape: fr-rect, label: "Child\\n\\nid: child\\ntype_used: detail.leaf' in mermaid
     assert "when: route == 'detail'" in mermaid
-    assert "child --> after" in mermaid
+    assert "child -->|" in mermaid and "| after" in mermaid
     assert "inner@{ shape:" not in mermaid
 
 
@@ -676,11 +719,12 @@ def test_nodeset_detail_fragment_recurses_nested_child_panels(tmp_path, monkeypa
     graph = parse_graph_config(
         {
             "nodesets": [
-                _nodeset_config("detail.leaf_one", pipeline=_input_add_pipeline(add={"id": "leaf_one_add"})),
-                _nodeset_config("detail.leaf_two", pipeline=_input_add_pipeline(add={"id": "leaf_two_add"})),
-                _nodeset_config("detail.leaf_three", pipeline=_input_add_pipeline(add={"id": "leaf_three_add"})),
+                    _nodeset_config("detail.leaf_one", pipeline=_input_add_pipeline(add={"id": "leaf_one_add"}), provides=[]),
+                    _nodeset_config("detail.leaf_two", pipeline=_input_add_pipeline(add={"id": "leaf_two_add"}), provides=[]),
+                    _nodeset_config("detail.leaf_three", pipeline=_input_add_pipeline(add={"id": "leaf_three_add"}), provides=[]),
                 _nodeset_config(
-                    "detail.mid",
+                        "detail.mid",
+                        provides=[],
                     pipeline={
                         "nodes": [
                             {"id": "mid_start", "type_used": "test.start"},
@@ -692,7 +736,8 @@ def test_nodeset_detail_fragment_recurses_nested_child_panels(tmp_path, monkeypa
                     },
                 ),
                 _nodeset_config(
-                    "detail.root",
+                        "detail.root",
+                        provides=[],
                     pipeline={
                         "nodes": [
                             {"id": "root_start", "type_used": "test.start"},
@@ -774,10 +819,9 @@ def test_nodeset_detail_groups_direct_calls_by_kind_in_first_occurrence_order(tm
                     {"id": "other", "type_used": "detail.other"},
                     {
                         "id": "b",
-                        "type_used": "detail.shared",
-                        "async": "result_key",
-                        "result_key": "shared.result",
-                        "provides": [PROV_SPEC("shared.result")],
+                            "type_used": "detail.shared",
+                            "async": "result_key",
+                            "result_key": "value.out",
                     },
                     {
                         "id": "c",
@@ -806,17 +850,13 @@ def test_nodeset_detail_groups_direct_calls_by_kind_in_first_occurrence_order(tm
     assert [node.id for node in groups[0].nodes] == ["a", "b", "c", "d"]
     group_title = review_fragments._nodeset_group_fragment_title(groups[0])
     assert group_title == (
-        "Detail Shared (calls: 4 [a, b{async=result_key,result_key=shared.result}, "
+            "Detail Shared (calls: 4 [a, b{async=result_key,result_key=value.out}, "
         "c{config=1,node_configs=1}, +1], type_key: detail.shared)"
     )
     assert "delta" not in group_title
     assert review_fragments._nodeset_group_fragment_title(groups[1]) == (
-        "Detail Other (id: other, type_key: detail.other)"
+        "Other (id: other, type_key: detail.other)"
     )
-
-    debug_mermaid = export_mermaid(graph, expand_nodesets=True)
-    for call_id in ("a", "b", "c", "d"):
-        assert f"{call_id}__inner" in debug_mermaid
 
     rendered: list[tuple[str, str]] = []
 
@@ -853,10 +893,11 @@ def test_nodeset_detail_deduplication_is_local_to_each_parent(tmp_path, monkeypa
     graph = parse_graph_config(
         {
             "nodesets": [
-                _nodeset_config("detail.shared", pipeline=shared_body),
-                _nodeset_config("detail.same_shape", pipeline=shared_body),
+                    _nodeset_config("detail.shared", pipeline=shared_body, provides=[]),
+                    _nodeset_config("detail.same_shape", pipeline=shared_body, provides=[]),
                 _nodeset_config(
-                    "detail.parent_one",
+                        "detail.parent_one",
+                        provides=[],
                     pipeline={
                         "nodes": [
                             {"id": "one_start", "type_used": "test.start"},
@@ -869,7 +910,8 @@ def test_nodeset_detail_deduplication_is_local_to_each_parent(tmp_path, monkeypa
                     },
                 ),
                 _nodeset_config(
-                    "detail.parent_two",
+                        "detail.parent_two",
+                        provides=[],
                     pipeline={
                         "nodes": [
                             {"id": "two_start", "type_used": "test.start"},
@@ -948,7 +990,7 @@ def test_mermaid_shows_when_edges_and_health_findings() -> None:
         ),
     )
 
-    mermaid = export_mermaid(graph, health_report=report)
+    mermaid = export_mermaid(graph, registry=_registry(), health_report=report)
     assert "---------- when ----------" in mermaid
     assert "when: flow.route == 'go'" in mermaid
     assert "data: Value In" in mermaid
@@ -980,7 +1022,7 @@ def test_health_report_status_fail_for_unknown_node() -> None:
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
     assert report.status == "FAIL"
     assert report.errors[0].rule_id == "NODE.TYPE.UNKNOWN"
-    assert report.errors[0].object_type == "node"
+    assert report.errors[0].object_type == "pipeline"
 
 def test_cli_validate_json_reports_pass(tmp_path, capsys) -> None:
     config_path = tmp_path / "workflow.json"
@@ -1055,11 +1097,10 @@ class DemoNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("demo.in", "exactly_one"),),
-        provides=(DataProvider("demo.out", "demo.out"),),
+        requires=(DataRequirement("demo.in", "exactly_one", display_name="Demo In"),),
+        provides=(DataProvider("demo.out", "demo.out", display_name="Demo Out"),),
         input_semantics={"demo.in": ("demo input",)},
         output_semantics={"demo.out": ("demo output",)},
-        output_schema={"demo.out": {"type": "number"}},
         examples=({"inputs": {"demo.in": 5}, "params": {}},),
     )
 
@@ -1073,7 +1114,9 @@ class DemoNode:
     assert code == 0
     assert payload["health"]["status"] == "PASS"
     assert payload["node"]["metadata"]["type_key"] == "demo.node"
-    assert payload["node"]["contract"]["requires"] == [{"type": "demo.in", "cardinality": "exactly_one"}]
+    assert payload["node"]["contract"]["requires"] == [
+        {"type": "demo.in", "cardinality": "exactly_one", "display_name": "Demo In"}
+    ]
     assert payload["node"]["source"]["lines"] > 0
 
 def test_cli_inspect_node_requires_module_boundary(capsys) -> None:

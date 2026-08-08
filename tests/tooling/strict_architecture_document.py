@@ -6,6 +6,8 @@ from vibeflow.tooling.application.python.presentation.architecture_document impo
     render_architecture_document,
 )
 from vibeflow.tooling.application.python.presentation.review_model import graph_root_ids
+from vibeflow.core.compiler import CompiledGraph
+from vibeflow.core.flow import ExecutionLockSpec, GraphConfig, NodeSpec
 
 
 def _architecture_graph(tmp_path):
@@ -166,7 +168,57 @@ def test_architecture_document_is_deterministic_and_keeps_planned_and_unused_bod
         "entrypoints": ["_run_loop_node", "_run_loop_block_node", "_run_while_loop"],
     }
     assert loop_type["config"]["defaults"]["max_iterations"] == 1000
-    assert loop_type["contract"]["params_schema"]["node_field"] == "loop"
+    assert loop_type["config"]["schema"]["node_field"] == "loop"
+
+
+def test_architecture_exposes_runtime_dispatch_and_effective_named_lock() -> None:
+    graph = GraphConfig(
+        nodes=(NodeSpec("cloud", "demo.cloud"),),
+        execution_lock=ExecutionLockSpec("project.runtime"),
+    )
+    compiled = CompiledGraph(
+        order=("cloud",),
+        explicit_edges=(),
+        data_edges=(),
+        effective_edges=(),
+        providers={},
+        consumers={},
+        flow_kinds={"cloud": "global_state"},
+        effect_scopes={"cloud": "global_state"},
+        runtime_dispatches={"cloud": True},
+        contains_global_state=True,
+    )
+
+    workflow = build_architecture_document(
+        graph,
+        compiled=compiled,
+    )["workflow"]
+    node = workflow["nodes"][0]
+
+    assert "root_exclusive" not in workflow
+    assert workflow["execution_lock"] == {
+        "key": "project.runtime",
+        "scope": "root",
+    }
+    assert node["effect_scope"] == "global_state"
+    assert node["runtime_dispatch"] == "detected"
+    assert node["execution_lock"] is None
+    assert node["effective_execution_lock"] == {
+        "key": "project.runtime",
+        "scope": "root",
+        "inherited": True,
+    }
+    mermaid = export_mermaid(graph, compiled=compiled)
+    assert 'cloud@{ shape: cloud' in mermaid
+    assert "effect_scope: global_state" in mermaid
+    assert "runtime_dispatch: detected" in mermaid
+    assert "execution_lock: project.runtime (root, inherited)" in mermaid
+
+    unlocked = export_mermaid(
+        GraphConfig(nodes=graph.nodes),
+        compiled=compiled,
+    )
+    assert "execution_lock: none" in unlocked
 
 
 def test_architecture_and_mermaid_keep_implemented_and_planned_host_extensions(
@@ -324,11 +376,11 @@ def test_architecture_and_mermaid_share_edge_contract_roles_and_loop_resource_ro
     assert edge["roles"] == ["mainline", "schedule", "transfer"]
     assert edge["transfers"] == [
         {
-            "provider": {"key": "value.copy", "type": "value.in", "display_name": "Value Copy"},
+            "provider": {"key": "value.in", "type": "value.in", "display_name": "Value In"},
             "requirement": {"type": "value.in", "cardinality": "exactly_one", "display_name": "Value In"},
         }
     ]
-    assert "value.copy -> value.in" in export_mermaid(graph, registry=_registry())
+    assert "data: Value In (id: value.in)" in export_mermaid(graph, registry=_registry())
 
     loop_graph = _architecture_graph(tmp_path / "roots")
     assert graph_root_ids(loop_graph) == frozenset({"app", "library"})
@@ -353,7 +405,7 @@ def test_architecture_node_types_include_contract_schema_defaults_and_python_ide
     seed_call = next(item for item in payload["workflow"]["nodes"] if item["id"] == "seed")
 
     assert seed_type["info"]["description"] == "Produces a seed value."
-    assert seed_type["contract"]["output_schema"] == {"value.in": {"type": "number"}}
+    assert "output_schema" not in seed_type["contract"]
     assert seed_type["config"] == {
         "defaults": {"value": 1},
         "schema": {"value": {"type": "number"}},

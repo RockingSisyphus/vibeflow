@@ -20,10 +20,9 @@ from vibeflow.tooling.application.javascript.audit import (
     audit_javascript_project,
     render_architecture,
     render_mermaid,
-    render_review_svg,
 )
 from vibeflow.core.compiler import CompiledGraph
-from vibeflow.core.flow import GraphConfig, NodeSpec, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, GraphConfigError, NodeSpec, STATUS_PLANNED
 from vibeflow.targets.javascript.build.toolchain import ToolchainInfo
 from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
 
@@ -84,7 +83,8 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
                 "provides": [_provider("value.out")],
                 "params_schema": {"delta": {"type": "number"}},
                 "params_defaults": {"delta": 1},
-                "output_schema": {"value.out": {"type": "number"}},
+                "input_semantics": {"value.in": ["input value"]},
+                "output_semantics": {"value.out": ["result value"]},
             },
             "implementations": [
                 {
@@ -118,7 +118,8 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
                 "provides": [_provider("start.value", "value.in")],
                 "params_schema": {},
                 "params_defaults": {},
-                "output_schema": {"start.value": {"type": "number"}},
+                "input_semantics": {"value.in": ["input value"]},
+                "output_semantics": {"start.value": ["forwarded value"]},
             },
             "implementations": [
                 {
@@ -224,8 +225,6 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
                         "type_used": "demo.add",
                         "display_name": "Add",
                         "description": "Nested add.",
-                        "requires": [_requirement("value.in")],
-                        "provides": [_provider("value.out")],
                         "config": {"delta": 2},
                     }
                 ],
@@ -257,16 +256,12 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
                         "type_used": "demo.start",
                         "display_name": "Start",
                         "description": "Starts the nested workflow.",
-                        "requires": [_requirement("value.in")],
-                        "provides": [_provider("start.value", "value.in")],
                     },
                     {
                         "id": "group",
                         "type_used": "demo.group",
                         "display_name": "Group",
                         "description": "Calls the group.",
-                        "requires": [_requirement("value.in")],
-                        "provides": [_provider("value.out")],
                         "config": {"delta": 4},
                         "allow_config_override": True,
                         "node_configs": {"add": {"delta": 7}},
@@ -745,20 +740,19 @@ def test_prepare_project_build_rejects_ambiguous_input_requiredness(
     assert captured.value.code == "VF_AOT_INPUT_REQUIRED"
 
 
-def test_prepare_project_build_checks_graph_call_contract(
+def test_prepare_project_build_rejects_graph_call_contract_duplicates(
     tmp_path: Path,
 ) -> None:
     request = _request(tmp_path)
     nodeset = Path(request.config).parent / "nodesets/group.jsonc"
     raw = json.loads(nodeset.read_text(encoding="utf-8"))
-    raw["pipeline"]["nodes"][0]["requires"][0]["cardinality"] = "optional_one"
+    raw["pipeline"]["nodes"][0]["requires"] = [_requirement("value.in", "optional_one")]
     _write(nodeset, raw)
 
-    with pytest.raises(ProjectBuildError) as captured:
+    with pytest.raises(GraphConfigError) as captured:
         prepare_project_build(request)
 
-    assert captured.value.code == "VF_AOT_CONTRACT_INVALID"
-    assert captured.value.node_path == ("group", "add")
+    assert "derived from type_used" in str(captured.value)
 
 
 def test_prepare_project_build_requires_schema_and_target_implementation(
@@ -901,11 +895,18 @@ def test_target_neutral_architecture_is_location_independent(
     )
 
     assert render_architecture(left_result) == render_architecture(right_result)
-    assert render_review_svg(left_result) == render_review_svg(right_result)
+    assert render_mermaid(left_result) == render_mermaid(right_result)
     assert left_result.architecture["workflow"]["source"] == {
         "root_id": "demo",
         "path": "workflow.jsonc",
     }
+    assert left_result.architecture["workflow"]["nodes"][1]["invokes"] == {
+        "kind": "nodeset",
+        "target": "demo.group",
+        "target_status": "implemented",
+    }
+    assert left_result.architecture["nodesets"]["demo.group"]["body"]["nodes"][0]["id"] == "add"
+    assert left_result.architecture["nodesets"]["demo.group"]["reachable_from_workflow"] is True
 
 
 def test_javascript_planned_global_state_renders_as_cloud_path() -> None:
@@ -940,23 +941,16 @@ def test_javascript_planned_global_state_renders_as_cloud_path() -> None:
     result = SimpleNamespace(graph=graph, compiled=compiled)
 
     mermaid = render_mermaid(result)
-    svg = render_review_svg(result)
-
     assert 'runtime_state@{ shape: cloud, label: "runtime_state' in mermaid
-    assert 'data-node="runtime_state" data-flow-kind="global_state"' in svg
-    assert '<path class="global-state-cloud"' in svg
-    assert 'data-node="ordinary" data-flow-kind="process"' in svg
-    assert '<rect ' in svg
+    assert "effect_scope: global_state" in mermaid
+    assert "runtime_dispatch: unknown" in mermaid
+    assert "execution_lock: none" in mermaid
 
 
 @pytest.mark.parametrize(
     ("manifest", "schema_path"),
     [
         ("manifests/data/value.in.jsonc", ("schema",)),
-        (
-            "manifests/nodes/add.jsonc",
-            ("contract", "output_schema", "value.out"),
-        ),
     ],
 )
 def test_prepare_project_build_rejects_schema_keywords_runtime_cannot_enforce(

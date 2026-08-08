@@ -23,17 +23,24 @@
     ],
     "params_schema": {},
     "params_defaults": {},
-    "output_schema": {
-      "negative_message": {
-        "type": "string",
-        "minLength": 1
-      }
+    "input_semantics": {
+      "sandbox.branch.forwarded": [
+        "Forwarded number input consumed by this node."
+      ]
+    },
+    "output_semantics": {
+      "negative_message": [
+        "Negative message output produced by this node."
+      ]
     }
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "source": {
         "kind": "file",
         "ref": "nodes/negative.ts",

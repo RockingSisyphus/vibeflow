@@ -32,6 +32,7 @@ from vibeflow.core.flow import (
     EdgeSpec,
     ExecutionLockSpec,
     GraphConfig,
+    LoopSpec,
     NodeSpec,
     NodesetSpec,
 )
@@ -250,11 +251,21 @@ print(json.dumps(sorted(
     assert json.loads(completed.stdout) == []
 
 
-def test_abi_v3_serializes_global_state_and_execution_locks() -> None:
+def test_abi_v4_serializes_runtime_dispatch_global_state_and_locks() -> None:
     facts = ImplementationFacts(
         (
-            ImplementationFact("fixture.state", flow_kind=FLOW_KIND_GLOBAL_STATE),
-            ImplementationFact("fixture.step", flow_kind="process"),
+            ImplementationFact(
+                "fixture.state",
+                flow_kind=FLOW_KIND_GLOBAL_STATE,
+                effect_scope=EFFECT_SCOPE_GLOBAL_STATE,
+                runtime_dispatch=True,
+            ),
+            ImplementationFact(
+                "fixture.step",
+                flow_kind="process",
+                effect_scope="none",
+                runtime_dispatch=False,
+            ),
         ),
         strict=True,
     )
@@ -275,24 +286,28 @@ def test_abi_v3_serializes_global_state_and_execution_locks() -> None:
     payload = plan.to_dict()
     root = plan.block(plan.entry_block)
 
-    assert plan.abi_version == WORKFLOW_ABI_VERSION == "vibeflow.workflow.v3"
+    assert plan.abi_version == WORKFLOW_ABI_VERSION == "vibeflow.workflow.v4"
     assert plan.contains_global_state is True
-    assert plan.root_exclusive is True
+    assert "root_exclusive" not in payload
     assert payload["execution_lock"] == {"key": "trainer", "scope": "root"}
     assert root.contains_global_state is True
-    assert root.root_exclusive is True
+    assert "root_exclusive" not in root.to_dict()
     state = root.node("state")
     assert state.effect_scope == EFFECT_SCOPE_GLOBAL_STATE
+    assert state.runtime_dispatch is True
     assert state.contains_global_state is True
+    assert root.node("step").runtime_dispatch is False
     assert root.node("step").execution_lock.to_dict() == {
         "key": "trainer",
         "scope": "node",
     }
     with pytest.raises(PortablePlanError, match="reserved prefix"):
         ExecutionLockPlan("vibeflow.internal", "node")
+    with pytest.raises(PortablePlanError, match="workflow ABI must be"):
+        replace(plan, abi_version="vibeflow.workflow.v3")
 
 
-def test_nested_global_state_propagates_to_root_and_rejects_detached_sibling() -> None:
+def test_nested_global_state_propagates_without_restricting_unlocked_async() -> None:
     facts = ImplementationFacts(
         (
             ImplementationFact("fixture.state", flow_kind=FLOW_KIND_GLOBAL_STATE),
@@ -315,7 +330,6 @@ def test_nested_global_state_propagates_to_root_and_rejects_detached_sibling() -
     )
     plan = _compile_global(safe_graph, facts)
     assert plan.contains_global_state is True
-    assert plan.root_exclusive is True
     assert plan.block(plan.entry_block).node(
         "group"
     ).contains_global_state is True
@@ -328,11 +342,8 @@ def test_nested_global_state_propagates_to_root_and_rejects_detached_sibling() -
         nodesets={nodeset.type_key: nodeset},
     )
 
-    with pytest.raises(
-        GraphCompileError,
-        match="node 'side' cannot use async='detached'",
-    ):
-        _compile_global(graph, facts)
+    unlocked = _compile_global(graph, facts)
+    assert unlocked.block(unlocked.entry_block).node("side").schedule == "detached"
 
 
 @pytest.mark.parametrize("planned_definition", (False, True))
@@ -371,12 +382,12 @@ def test_planned_nodeset_subtree_is_visible_but_never_compiled_for_execution(
 
     assert len(plan.blocks) == 1
     assert plan.contains_global_state is False
-    assert plan.root_exclusive is False
     assert root.contains_global_state is False
     assert future.status == "planned"
     assert future.child_block == ""
     assert future.contains_global_state is False
     assert future.execution_lock.key == "project.future"
+    assert future.execution_lock.scope == "block"
 
 
 def test_nested_execution_locks_must_reuse_same_key() -> None:
@@ -409,24 +420,67 @@ def test_nested_execution_locks_must_reuse_same_key() -> None:
         _compile_global(graph, facts)
 
 
+def test_composite_invocation_locks_use_block_scope() -> None:
+    facts = _facts()
+    child = _linear_graph()
+    nodeset = NodesetSpec(
+        type_key="fixture.group",
+        display_name="Group",
+        description="Composite lock scope fixture.",
+        requires=(),
+        provides=(),
+        graph=child,
+    )
+    graph = GraphConfig(
+        nodes=(
+            NodeSpec(
+                "group",
+                "fixture.group",
+                execution_lock=ExecutionLockSpec("project.group"),
+            ),
+            NodeSpec(
+                "loop",
+                "vibeflow.loop.while",
+                loop=LoopSpec(body="fixture.group", stop_after=1),
+                execution_lock=ExecutionLockSpec("project.loop"),
+            ),
+        ),
+        nodesets={nodeset.type_key: nodeset},
+    )
+
+    root = _compile_global(graph, facts).block("block:/")
+
+    assert root.node("group").execution_lock.scope == "block"
+    assert root.node("loop").execution_lock.scope == "block"
+
+
 def test_protected_result_key_requires_and_accepts_static_consumer_path() -> None:
     facts = ImplementationFacts(
         (
             ImplementationFact("fixture.state", flow_kind=FLOW_KIND_GLOBAL_STATE),
-            ImplementationFact("fixture.async", flow_kind="process"),
-            ImplementationFact("fixture.consume", flow_kind="process"),
+            ImplementationFact(
+                "fixture.async",
+                flow_kind="process",
+                provides=(DataProvider("value", "fixture.value", display_name="Value"),),
+            ),
+            ImplementationFact(
+                "fixture.consume",
+                flow_kind="process",
+                requires=(DataRequirement("fixture.value", "exactly_one", display_name="Fixture Value"),),
+            ),
         ),
         strict=True,
     )
     async_node = NodeSpec(
         "async",
         "fixture.async",
-        provides=(DataProvider("value", "fixture.value"),),
+        provides=(DataProvider("value", "fixture.value", display_name="value"),),
         async_mode="result_key",
         result_key="value",
     )
     unjoined = GraphConfig(
         nodes=(NodeSpec("state", "fixture.state"), async_node),
+        execution_lock=ExecutionLockSpec("trainer"),
     )
     with pytest.raises(GraphCompileError) as exc_info:
         _compile_global(unjoined, facts)
@@ -439,10 +493,11 @@ def test_protected_result_key_requires_and_accepts_static_consumer_path() -> Non
             NodeSpec(
                 "consume",
                 "fixture.consume",
-                requires=(DataRequirement("fixture.value", "exactly_one"),),
+                requires=(DataRequirement("fixture.value", "exactly_one", display_name="fixture.value"),),
             ),
         ),
         edges=(EdgeSpec("async", "consume"),),
+        execution_lock=ExecutionLockSpec("trainer"),
     )
     plan = _compile_global(joined, facts)
     assert plan.block(plan.entry_block).node("async").schedule == "deferred"

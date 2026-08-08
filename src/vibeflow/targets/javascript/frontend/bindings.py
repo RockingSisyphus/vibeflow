@@ -184,7 +184,6 @@ class JavascriptCallBinding:
     executor: str = "current"
     language: str = "javascript"
     params_schema: Mapping[str, object] | PortableObject = field(default_factory=dict)
-    output_schema: Mapping[str, object] | PortableObject = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "path", _binding_path(self.path))
@@ -211,9 +210,6 @@ class JavascriptCallBinding:
         object.__setattr__(self, "params_schema", _portable_object(
             self.params_schema, "params_schema"
         ))
-        object.__setattr__(self, "output_schema", _portable_object(
-            self.output_schema, "output_schema"
-        ))
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -228,7 +224,6 @@ class JavascriptCallBinding:
             "executor": self.executor,
             "language": self.language,
             "params_schema": self.params_schema.to_value(),
-            "output_schema": self.output_schema.to_value(),
         }
 
 @dataclass(frozen=True)
@@ -389,12 +384,8 @@ def build_javascript_binding_plan(
             completion = _completion(node, metadata)
             executor = _javascript_executor(completion, node.schedule)
             params_schema = _mapping_fact(metadata, "params_schema")
-            output_schema = _mapping_fact(metadata, "output_schema")
             schema_orders.extend(_contract_schema_orders(
                 path, "params_schema", params_schema
-            ))
-            schema_orders.extend(_contract_schema_orders(
-                path, "output_schema", output_schema
             ))
             calls.append(
                 JavascriptCallBinding(
@@ -415,7 +406,6 @@ def build_javascript_binding_plan(
                         metadata, node.implementation.ref
                     ),
                     params_schema=params_schema,
-                    output_schema=output_schema,
                 )
             )
     schema_mapping = schemas or {}

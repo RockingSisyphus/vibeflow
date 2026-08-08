@@ -14,11 +14,11 @@ class RouteNode:
         flow_kind="decision",
     )
     CONTRACT = NodeContract(
-        requires=("value.out",),
-        provides=("flow.route",),
+        requires=(DataRequirement("value.out", "exactly_one", display_name="Value Out"),),
+        provides=(DataProvider("flow.route", "flow.route", display_name="Flow Route"),),
         input_semantics={"value.out": ("output value",)},
         output_semantics={"flow.route": ("branch route",)},
-        output_schema={"flow.route": {"type": "string", "enum": ["again", "done"]}},
+
         examples=({"inputs": {"value.out": 1}, "params": {}},),
     )
 
@@ -40,6 +40,36 @@ class ExternalVisualNode:
 
     def run_pure(self, inputs, params):
         return {}
+
+
+class ExternalResultVisualNode(ExternalVisualNode):
+    NODE_INFO = NodeInfo(
+        type_key="test.external_result_visual",
+        display_name="External Result Visual",
+        category="test",
+        description="Exercises an external result-key boundary.",
+        version="0.1.0",
+        flow_kind="process",
+        external=True,
+    )
+    CONTRACT = NodeContract(
+        provides=(DataProvider("external.result", "external.result", display_name="External Result"),),
+        output_semantics={"external.result": ("external visual result",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"external.result": 1}
+
+
+class BackgroundVisualNode:
+    NODE_INFO = NodeInfo("test.background_visual", "Background Visual", "test", "Produces a detached background value.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        provides=(DataProvider("background.value", "background.value", display_name="Background Value"),),
+        output_semantics={"background.value": ("detached background value",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"background.value": 1}
 
 
 class GlobalVisualNode:
@@ -76,7 +106,7 @@ def test_compiler_merges_duplicate_explicit_edges_with_when() -> None:
                 "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
                     _node_call("add", "test.add", "Adds the incoming value.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("copy", "test.copy", "Copies the output value.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy")]),
+                    _node_call("copy", "test.copy", "Copies the output value."),
                 ],
                 "edges": [
                     {"from": "add", "to": "copy", "when": "flow.route == 'again'"},
@@ -113,7 +143,6 @@ def test_config_node_visual_metadata_and_style_are_not_runtime_params() -> None:
                             "style": "runtime style parameter",
                             "similar_to": "runtime similarity parameter",
                         },
-                        "provides": [PROV_SPEC("value.in")],
                     },
                     _node_call("base_seed", "test.seed", "Reference node for similar_to.", provides=[PROV_SPEC("base.value")]),
                 ]
@@ -482,6 +511,7 @@ def test_mermaid_custom_style_overrides_health_class_color() -> None:
 def test_mermaid_external_boundary_composes_with_health_custom_style_and_async_metadata(tmp_path) -> None:
     registry = _registry()
     register_node(registry, "test.external_visual", ExternalVisualNode)
+    register_node(registry, "test.external_result_visual", ExternalResultVisualNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -490,11 +520,10 @@ def test_mermaid_external_boundary_composes_with_health_custom_style_and_async_m
                     _node_call("external_warning", "test.external_visual", "Keeps its external boundary under a warning."),
                     _node_call(
                         "external_custom",
-                        "test.external_visual",
+                        "test.external_result_visual",
                         "Keeps its external boundary under custom colors.",
                         display_name="[EXTERNAL] Custom External",
                         style={"fill": "#123abc", "stroke": "#456def", "text": "#654321"},
-                        provides=[PROV_SPEC("external.result")],
                         result_key="external.result",
                         **{"async": "result_key"},
                     ),
@@ -553,8 +582,8 @@ def test_mermaid_renders_contracts_on_edges_and_hides_them_when_requested() -> N
         }
     )
 
-    text = export_mermaid(graph)
-    hidden = export_mermaid(graph, show_contract=False)
+    text = export_mermaid(graph, registry=_registry())
+    hidden = export_mermaid(graph, registry=_registry(), show_contract=False)
 
     assert "---------- when ----------" in text
     assert "when: flow.route == 'again'" in text
@@ -713,6 +742,8 @@ def test_compiler_applies_explicit_edge_roles_after_default_inference() -> None:
 
 
 def test_schedule_edges_keep_sync_mainline_before_async_branches() -> None:
+    registry = _registry()
+    register_node(registry, "test.background_visual", BackgroundVisualNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -724,9 +755,8 @@ def test_schedule_edges_keep_sync_mainline_before_async_branches() -> None:
                     ),
                     _node_call(
                         "background",
-                        "test.seed",
+                        "test.background_visual",
                         "Runs as a detached async side branch.",
-                        provides=[PROV_SPEC("background.value")],
                         **{"async": "detached"},
                     ),
                     _node_call(
@@ -751,7 +781,7 @@ def test_schedule_edges_keep_sync_mainline_before_async_branches() -> None:
         }
     )
 
-    compiled = GraphCompiler().compile(graph, registry=_registry())
+    compiled = GraphCompiler().compile(graph, registry=registry)
 
     assert [edge.pair for edge in compiled.schedule_edges] == [
         ("start", "seed"),
@@ -816,9 +846,9 @@ def test_python_runtime_separates_schedule_and_transfer_edges(
             "process",
         )
         CONTRACT = NodeContract(
-            requires=(DataRequirement("value.out", "exactly_one"),),
-            provides=(DataProvider("gate.value", "value.in"),),
-            output_schema={"gate.value": {"type": "number"}},
+            requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
+            provides=(DataProvider("gate.value", "value.in", display_name="gate.value"),),
+
         )
 
         def run_pure(self, inputs, params):
@@ -834,9 +864,9 @@ def test_python_runtime_separates_schedule_and_transfer_edges(
             "process",
         )
         CONTRACT = NodeContract(
-            requires=(DataRequirement("value.in", "exactly_one"),),
-            provides=(DataProvider("result", "mixed.result"),),
-            output_schema={"result": {"type": "number"}},
+            requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"),),
+            provides=(DataProvider("result", "mixed.result", display_name="result"),),
+
         )
 
         def run_pure(self, inputs, params):
@@ -940,8 +970,8 @@ def test_terminal_records_outputs_and_transfer_before_completion(
             "terminal",
         )
         CONTRACT = NodeContract(
-            provides=(DataProvider("terminal.value", "terminal.value"),),
-            output_schema={"terminal.value": {"type": "number"}},
+            provides=(DataProvider("terminal.value", "terminal.value", display_name="terminal.value"),),
+
         )
 
         def run_pure(self, inputs, params):
@@ -957,7 +987,7 @@ def test_terminal_records_outputs_and_transfer_before_completion(
             "process",
         )
         CONTRACT = NodeContract(
-            requires=(DataRequirement("terminal.value", "exactly_one"),),
+            requires=(DataRequirement("terminal.value", "exactly_one", display_name="terminal.value"),),
         )
 
         def run_pure(self, inputs, params):
@@ -1125,25 +1155,58 @@ def test_mermaid_renders_while_loop_shape_class_and_stop_condition() -> None:
 
 
 def test_mermaid_edge_contract_labels_summarize_provider_key_type_mapping() -> None:
+    class MappingProducerNode:
+        NODE_INFO = NodeInfo("test.mapping_producer", "Mapping Producer", "test", "Produces three mapped values.", "0.1.0", "process")
+        CONTRACT = NodeContract(
+            provides=(
+                DataProvider("value.copy", "value.in", display_name="Value Copy"),
+                DataProvider("other.copy", "other.in", display_name="Other Copy"),
+                DataProvider("extra.copy", "extra.in", display_name="Extra Copy"),
+            ),
+            output_semantics={
+                "value.copy": ("first mapped value",),
+                "other.copy": ("second mapped value",),
+                "extra.copy": ("third mapped value",),
+            },
+        )
+
+        def run_pure(self, inputs, params):
+            return {"value.copy": 1, "other.copy": 2, "extra.copy": 3}
+
+    class MappingConsumerNode:
+        NODE_INFO = NodeInfo("test.mapping_consumer", "Mapping Consumer", "test", "Consumes three mapped values.", "0.1.0", "process")
+        CONTRACT = NodeContract(
+            requires=(
+                DataRequirement("value.in", "exactly_one", display_name="Value In"),
+                DataRequirement("other.in", "exactly_one", display_name="Other In"),
+                DataRequirement("extra.in", "exactly_one", display_name="Extra In"),
+            ),
+            input_semantics={
+                "value.in": ("first mapped value",),
+                "other.in": ("second mapped value",),
+                "extra.in": ("third mapped value",),
+            },
+        )
+
+        def run_pure(self, inputs, params):
+            return {}
+
+    registry = NodeRegistry()
+    register_node(registry, "test.mapping_producer", MappingProducerNode)
+    register_node(registry, "test.mapping_consumer", MappingConsumerNode)
     graph = parse_graph_config(
         {
             "pipeline": {
                 "nodes": [
                     _node_call(
                         "producer",
-                        "test.seed",
+                        "test.mapping_producer",
                         "Produces several values.",
-                        provides=[
-                            PROV_SPEC("value.copy", "value.in"),
-                            PROV_SPEC("other.copy", "other.in"),
-                            PROV_SPEC("extra.copy", "extra.in"),
-                        ],
                     ),
                     _node_call(
                         "consumer",
-                        "test.add",
+                        "test.mapping_consumer",
                         "Consumes several values.",
-                        requires=[REQ_SPEC("value.in"), REQ_SPEC("other.in"), REQ_SPEC("extra.in")],
                     ),
                 ],
                 "edges": [{"from": "producer", "to": "consumer"}],
@@ -1151,7 +1214,7 @@ def test_mermaid_edge_contract_labels_summarize_provider_key_type_mapping() -> N
         }
     )
 
-    text = export_mermaid(graph)
+    text = export_mermaid(graph, registry=registry)
 
     assert "Value Copy (id: value.copy -> value.in)" in text
     assert "Other\\n      Copy (id: other.copy -> other.in)" in text
@@ -1215,26 +1278,11 @@ def test_config_schema_rejects_invalid_node_similarity_metadata() -> None:
         parse_graph_config({"pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.", similar_to={"node": "seed", "relationship": "copy", "reason": "self"})]}})
 
 
-def test_graph_health_warns_when_config_node_lacks_visual_metadata() -> None:
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "nodes": [
-                    _node_call("start", "test.start", "Starts the metadata warning fixture."),
-                    {"id": "seed", "type_used": "test.seed", "provides": [PROV_SPEC("value.in")]},
-                    _node_call("end", "test.in_end", "Consumes value.in at the end.", requires=[REQ_SPEC("value.in")]),
-                ],
-                "edges": _edge_chain("start", "seed", "end"),
-            }
-        }
-    )
-
-    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
-    rule_ids = {warning.rule_id for warning in report.warnings}
-
-    assert report.status == "CONCERNS"
-    assert "GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME" in rule_ids
-    assert "GRAPH.SMELL.MISSING_NODE_DESCRIPTION" in rule_ids
+def test_config_rejects_missing_instance_visual_metadata() -> None:
+    with pytest.raises(GraphConfigError, match="display_name must be a non-empty string"):
+        parse_graph_config(
+            {"pipeline": {"nodes": [{"id": "seed", "type_used": "test.seed"}]}}
+        )
 
 
 def test_config_rejects_removed_loop_registration() -> None:
@@ -1254,7 +1302,6 @@ def test_compiler_rejects_cycle_without_router() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
                     _node_call("add", "test.add", "Adds the incoming value.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                     _node_call("copy", "test.copy", "Copies the output value.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy")]),
                 ],
@@ -1275,11 +1322,10 @@ def test_compiler_rejects_cycle_with_decision_router() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
                     _node_call("add", "test.add", "Adds the incoming value.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                     _node_call("route", "test.route", "Routes the cycle branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
-                    _node_call("copy", "test.copy", "Copies the output value.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy")]),
+                    _node_call("copy", "test.start", "Receives the unconditional decision edge."),
                     _node_call("end", "test.start", "Exits the old decision cycle."),
                 ],
                 "edges": [
@@ -1338,7 +1384,7 @@ def test_compiler_rejects_unconditional_edge_from_decision() -> None:
                 "nodes": [
                     _node_call("add", "test.add", "Adds the incoming value.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                     _node_call("route", "test.route", "Routes the branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
-                    _node_call("copy", "test.copy", "Copies the output value.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy")]),
+                    _node_call("copy", "test.start", "Receives the unconditional decision edge."),
                 ],
                 "edges": [{"from": "route", "to": "copy"}],
             }

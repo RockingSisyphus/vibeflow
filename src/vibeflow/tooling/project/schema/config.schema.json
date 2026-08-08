@@ -202,15 +202,15 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["id"],
+        "required": ["id", "display_name", "description"],
         "properties": {
           "id": { "type": "string", "minLength": 1 },
           "type_used": { "type": "string", "minLength": 1 },
           "status": { "enum": ["planned", "implemented"] },
           "flow_kind": { "enum": ["terminal", "process", "decision", "io", "predefined", "data_store", "document", "preparation", "global_state"] },
           "planned_behavior": { "$ref": "#/$defs/plannedBehavior" },
-          "display_name": { "type": "string" },
-          "description": { "type": "string" },
+          "display_name": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+          "description": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
           "style": { "$ref": "#/$defs/nodeStyle" },
           "similar_to": { "$ref": "#/$defs/nodeSimilarity" },
           "join_policy": { "enum": ["safe_any", "any_active", "all"] },
@@ -233,8 +233,31 @@
         "allOf": [
           {
             "if": { "properties": { "status": { "const": "planned" } }, "required": ["status"] },
-            "then": true,
+            "then": { "required": ["requires", "provides"] },
             "else": { "not": { "required": ["planned_behavior"] } }
+          },
+          {
+            "if": {
+              "properties": { "type_used": { "enum": ["vibeflow.io", "vibeflow.loop.while"] } },
+              "required": ["type_used"]
+            },
+            "then": { "required": ["requires", "provides"] },
+            "else": {
+              "if": {
+                "not": {
+                  "properties": { "status": { "const": "planned" } },
+                  "required": ["status"]
+                }
+              },
+              "then": {
+                "not": {
+                  "anyOf": [
+                    { "required": ["requires"] },
+                    { "required": ["provides"] }
+                  ]
+                }
+              }
+            }
           }
         ]
       }

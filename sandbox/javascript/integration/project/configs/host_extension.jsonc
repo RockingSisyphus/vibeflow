@@ -38,22 +38,8 @@
         "id": "double",
         "type_used": "sandbox.host_double",
         "display_name": "Host double",
-        "description": "Calls the Capability provided by the Host Extension.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ]
-      },
+        "description": "Calls the Capability provided by the Host Extension."
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

@@ -11,9 +11,11 @@ import subprocess
 import sys
 import tempfile
 from typing import Any
+from xml.etree import ElementTree
 
 
 _SOURCE_SANDBOX_ROOT = Path(__file__).resolve().parent
+_REPOSITORY_ROOT = _SOURCE_SANDBOX_ROOT.parents[2]
 _RUNTIME_TEMP: tempfile.TemporaryDirectory[str] | None = None
 
 
@@ -278,6 +280,75 @@ def _source_map_case(result: Any) -> dict[str, Any]:
         "sourceCount": len(sources),
         "mappedSourceCount": len(mapped_sources),
     }
+
+
+def _review_case(puppeteer_root: Path) -> dict[str, Any]:
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = str(_REPOSITORY_ROOT / "src")
+    environment["VIBEFLOW_MERMAID_RENDERER_ROOT"] = str(puppeteer_root)
+    specs = (
+        ("nodeset.jsonc", "NODESET_ARCHITECTURE.jsonc", {"sandbox.arithmetic_nodeset"}),
+        (
+            "nested_async.jsonc",
+            "NESTED_ASYNC_ARCHITECTURE.jsonc",
+            {"sandbox.nested_async_outer", "sandbox.nested_async_inner"},
+        ),
+        (
+            "browser_permanent_port_host.jsonc",
+            "PERMANENT_PORT_ARCHITECTURE.jsonc",
+            {"sandbox.permanent_port_body"},
+        ),
+    )
+    reviewed: dict[str, Any] = {}
+    for config_name, architecture_name, expected_targets in specs:
+        output = _RUNTIME_ROOT / "reports" / f"{Path(config_name).stem}.expanded.svg"
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "vibeflow",
+                "review",
+                "--workspace",
+                str(_RUNTIME_ROOT / "vibeflow_config.jsonc"),
+                "--config",
+                str(CONFIG_ROOT / config_name),
+                "--output",
+                str(output),
+            ],
+            cwd=_RUNTIME_ROOT,
+            env=environment,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise AssertionError(completed.stderr or completed.stdout)
+        payload = json.loads(completed.stdout)
+        if payload.get("status") != "PASS" or payload.get("published") is not True:
+            raise AssertionError(payload)
+        root = ElementTree.parse(output).getroot()
+        coverage = {
+            element.attrib.get("data-review-target", "")
+            for element in root.iter()
+            if "review-inline-fragment" in element.attrib.get("class", "").split()
+        }
+        missing = expected_targets - coverage
+        if missing:
+            raise AssertionError(
+                f"review {config_name} is missing expanded targets: {sorted(missing)}"
+            )
+        architecture = PROJECT_ROOT / "review_artifacts" / architecture_name
+        architecture_text = architecture.read_text(encoding="utf-8")
+        for target in expected_targets:
+            if target not in architecture_text:
+                raise AssertionError(
+                    f"Architecture {architecture_name} is missing {target}"
+                )
+        reviewed[config_name] = {
+            "bytes": output.stat().st_size,
+            "coverage": sorted(coverage),
+        }
+    return reviewed
 
 
 def _single_file_case(result: Any) -> dict[str, Any]:
@@ -583,6 +654,7 @@ def main() -> int:
         )
         plugins = lambda: cache.build("plugins", "plugins.jsonc")
         cases: list[tuple[str, Any]] = [
+            ("review:javascript-expanded-parity", lambda: _review_case(puppeteer_root)),
             ("profile:esm-module", lambda: _manifest_case(
                 cache, key="linear_module", profile="esm-module"
             )),

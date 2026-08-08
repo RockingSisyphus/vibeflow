@@ -89,18 +89,6 @@ def node_descriptor_from_registry(
             descriptor_id=normalized,
         )
     config_spec = registry.get_config_spec(normalized)
-    contract_params_schema = getattr(contract, "params_schema", {})
-    if dict(contract_params_schema) != {
-        key: dict(value) for key, value in config_spec.schema.items()
-    }:
-        raise LegacyDescriptorError(
-            code="DESCRIPTOR.LEGACY_NODE.PARAMS_SCHEMA",
-            message=(
-                f"node '{normalized}' CONTRACT.params_schema does not match "
-                "its NodeRegistry config schema"
-            ),
-            descriptor_id=normalized,
-        )
     try:
         descriptor_contract = NodeContractDescriptor(
             requires=tuple(getattr(contract, "requires", ())),
@@ -109,7 +97,6 @@ def node_descriptor_from_registry(
             output_semantics=getattr(contract, "output_semantics", {}),
             params_schema=config_spec.schema,
             params_defaults=config_spec.defaults,
-            output_schema=getattr(contract, "output_schema", {}),
             examples=tuple(getattr(contract, "examples", ())),
         )
         implementation = ImplementationDescriptor(
@@ -128,7 +115,6 @@ def node_descriptor_from_registry(
             description=str(getattr(info, "description", "") or ""),
             version=str(getattr(info, "version", "") or ""),
             flow_kind=str(getattr(info, "flow_kind", "") or ""),
-            purity=str(getattr(info, "purity", "pure") or "pure"),
             author=getattr(info, "author", None),
             tags=tuple(getattr(info, "tags", ())),
             external=getattr(info, "external", False),
@@ -254,7 +240,6 @@ def _assert_node_contract_match(
         "description",
         "version",
         "flow_kind",
-        "purity",
         "author",
         "tags",
         "external",

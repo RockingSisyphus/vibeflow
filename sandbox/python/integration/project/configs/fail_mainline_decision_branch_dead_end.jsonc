@@ -17,20 +17,8 @@
       {
         "display_name": "Prepare Value",
         "description": "Produces value.out for the route decision.",
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.out",
-            "type": "value.out",
-            "display_name": "Value Out"
-          }
-        ],
+
+
         "delta": 1,
         "id": "prepare",
         "type_used": "sandbox.add"
@@ -38,20 +26,8 @@
       {
         "display_name": "Route",
         "description": "Routes either to the valid end branch or to a dead end.",
-        "requires": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one",
-            "display_name": "Value Out"
-          }
-        ],
-        "provides": [
-          {
-            "key": "flow.route",
-            "type": "flow.route",
-            "display_name": "Flow Route"
-          }
-        ],
+
+
         "threshold": 10,
         "id": "route",
         "type_used": "sandbox.route_decision"
@@ -59,20 +35,8 @@
       {
         "display_name": "Dead Branch",
         "description": "A decision branch that cannot reach an end terminal.",
-        "requires": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one",
-            "display_name": "Value Out"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.final",
-            "type": "value.final",
-            "display_name": "Value Final"
-          }
-        ],
+
+
         "delta": 1,
         "id": "dead",
         "type_used": "sandbox.add_out"
@@ -80,34 +44,16 @@
       {
         "display_name": "Dead Sink",
         "description": "Continues the dead branch without ever reaching an end terminal.",
-        "requires": [
-          {
-            "type": "value.final",
-            "cardinality": "exactly_one",
-            "display_name": "Value Final"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.dead",
-            "type": "value.final",
-            "display_name": "Value Dead"
-          }
-        ],
+
+
         "delta": 1,
         "id": "sink",
-        "type_used": "sandbox.add_out"
+        "type_used": "sandbox.add_final_to_dead"
       },
       {
         "display_name": "End",
         "description": "Ends the valid external branch.",
-        "requires": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one",
-            "display_name": "Value Out"
-          }
-        ],
+
         "id": "end",
         "type_used": "sandbox.out_value_end"
       }

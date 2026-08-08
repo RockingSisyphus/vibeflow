@@ -38,19 +38,33 @@
     ],
     "params_schema": {},
     "params_defaults": {},
-    "output_schema": {
-      "sum": {
-        "type": "number"
-      },
-      "forwarded_subtrahend": {
-        "type": "number"
-      }
+    "input_semantics": {
+      "sandbox.x": [
+        "X input consumed by this node."
+      ],
+      "sandbox.addend": [
+        "Addend input consumed by this node."
+      ],
+      "sandbox.subtrahend": [
+        "Subtrahend input consumed by this node."
+      ]
+    },
+    "output_semantics": {
+      "sum": [
+        "Sum output produced by this node."
+      ],
+      "forwarded_subtrahend": [
+        "Forwarded subtrahend output produced by this node."
+      ]
     }
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "source": {
         "kind": "file",
         "ref": "nodes/add.ts",
@@ -58,6 +72,8 @@
       }
     }
   ],
-  "base_libs": ["sandbox.math"],
+  "base_libs": [
+    "sandbox.math"
+  ],
   "capabilities": []
 }

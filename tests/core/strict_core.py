@@ -13,11 +13,11 @@ class ProviderPlanningBoundary(DemoBoundary):
 class TwoRouteNode:
     NODE_INFO = NodeInfo("test.two_route", "Two Route", "test", "Routes flow.", "0.1.0", "decision")
     CONTRACT = NodeContract(
-        requires=(DataRequirement("value.in", "exactly_one"),),
-        provides=(DataProvider("flow.route", "flow.route"),),
+        requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"),),
+        provides=(DataProvider("flow.route", "flow.route", display_name="flow.route"),),
         input_semantics={"value.in": ("input",)},
         output_semantics={"flow.route": ("route",)},
-        output_schema={"flow.route": {"type": "string", "enum": ["again", "done"]}},
+
         examples=({"inputs": {"value.in": 1}, "params": {}},),
     )
 
@@ -28,16 +28,48 @@ class TwoRouteNode:
 class BodyRouteNode:
     NODE_INFO = NodeInfo("test.body_route", "Body Route", "test", "Routes inside a loop body.", "0.1.0", "decision")
     CONTRACT = NodeContract(
-        requires=(DataRequirement("flow.route", "exactly_one"),),
-        provides=(DataProvider("flow.inner", "flow.inner"),),
+        requires=(DataRequirement("flow.route", "exactly_one", display_name="flow.route"),),
+        provides=(DataProvider("flow.inner", "flow.inner", display_name="flow.inner"),),
         input_semantics={"flow.route": ("outer loop route",)},
         output_semantics={"flow.inner": ("body branch route",)},
-        output_schema={"flow.inner": {"type": "string", "enum": ["left", "right"]}},
+
         examples=({"inputs": {"flow.route": "again"}, "params": {}},),
     )
 
     def run_pure(self, inputs, params):
         return {"flow.inner": "left"}
+
+
+class EmptyProcessNode:
+    NODE_INFO = NodeInfo("test.empty_process", "Empty Process", "test", "Keeps a structural branch in progress.", "0.1.0", "process")
+    CONTRACT = NodeContract()
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
+class BypassSourceNode:
+    NODE_INFO = NodeInfo("test.bypass_source", "Bypass Source", "test", "Produces a disconnected bypass value.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        provides=(DataProvider("source.value", "value.in", display_name="Source Value"),),
+        output_semantics={"source.value": ("source bypass value",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"source.value": 1}
+
+
+class BypassMiddleNode:
+    NODE_INFO = NodeInfo("test.bypass_middle", "Bypass Middle", "test", "Forwards a disconnected bypass value.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        requires=(DataRequirement("value.in", "exactly_one", display_name="Value In"),),
+        provides=(DataProvider("middle.value", "value.in", display_name="Middle Value"),),
+        input_semantics={"value.in": ("source bypass value",)},
+        output_semantics={"middle.value": ("forwarded bypass value",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"middle.value": inputs["value.in"]["value"]}
 
 
 def _register_fulltext_nodes(registry: NodeRegistry) -> None:
@@ -68,9 +100,9 @@ def test_external_flag_keeps_contract_but_skips_source_quality() -> None:
     class ExternalNode:
         NODE_INFO = NodeInfo("test.external", "External", "test", "Calls external package.", "0.1.0", "process", external=True)
         CONTRACT = NodeContract(
-            provides=(DataProvider("external.out", "external.out"),),
+            provides=(DataProvider("external.out", "external.out", display_name="external.out"),),
             output_semantics={"external.out": ("external output",)},
-            output_schema={"external.out": {"type": "string"}},
+
             examples=({"inputs": {}, "params": {}},),
         )
 
@@ -91,9 +123,9 @@ def test_external_flag_does_not_require_route_output() -> None:
     class ExternalProcessNode:
         NODE_INFO = NodeInfo("test.external_ok", "External", "test", "Calls external package.", "0.1.0", "process", external=True)
         CONTRACT = NodeContract(
-            provides=(DataProvider("external.out", "external.out"),),
+            provides=(DataProvider("external.out", "external.out", display_name="external.out"),),
             output_semantics={"external.out": ("external output",)},
-            output_schema={"external.out": {"type": "number"}},
+
             examples=({"inputs": {}, "params": {}},),
         )
 
@@ -118,7 +150,7 @@ def test_edge_when_syntax_is_static_config_error() -> None:
         )
 
 
-def test_decision_branch_value_must_match_output_schema() -> None:
+def test_decision_branch_value_is_not_inferred_from_an_output_schema() -> None:
     registry = _registry()
     register_node(registry, "test.two_route", TwoRouteNode)
     graph = parse_graph_config(
@@ -140,12 +172,13 @@ def test_decision_branch_value_must_match_output_schema() -> None:
     )
 
     report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
-    assert any(item.rule_id == "GRAPH.DECISION.UNKNOWN_BRANCH_VALUE" for item in report.errors)
+    assert not any(item.rule_id in {"GRAPH.DECISION.UNKNOWN_BRANCH_VALUE", "GRAPH.DECISION.MISSING_BRANCH_VALUE"} for item in (*report.errors, *report.warnings))
 
 
 def test_decision_branch_must_reach_end_in_acyclic_graph() -> None:
     registry = _registry()
     register_node(registry, "test.two_route", TwoRouteNode)
+    register_node(registry, "test.empty_process", EmptyProcessNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -153,8 +186,8 @@ def test_decision_branch_must_reach_end_in_acyclic_graph() -> None:
                     _node_call("start", "test.start", "Starts the branch reachability fixture."),
                     _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
                     _node_call("route", "test.two_route", "Chooses the route.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("flow.route")]),
-                    _node_call("copy", "test.seed", "Produces loop continuation data.", provides=[PROV_SPEC("value.in.copy", "value.in")]),
-                    _node_call("dead", "test.seed", "Produces dead-end data.", provides=[PROV_SPEC("value.in.dead", "value.in")]),
+                    _node_call("copy", "test.empty_process", "Continues the branch toward an end."),
+                    _node_call("dead", "test.empty_process", "Keeps the other branch as a dead end."),
                     _node_call("end", "test.start", "Ends the branch reachability fixture."),
                 ],
                 "edges": [
@@ -176,6 +209,7 @@ def test_decision_cycle_is_forbidden_even_with_exit() -> None:
     registry = _registry()
     register_node(registry, "test.two_route", TwoRouteNode)
     register_node(registry, "test.body_route", BodyRouteNode)
+    register_node(registry, "test.empty_process", EmptyProcessNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -184,8 +218,8 @@ def test_decision_cycle_is_forbidden_even_with_exit() -> None:
                     _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
                     _node_call("controller", "test.two_route", "Controls the outer route.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("flow.route")]),
                     _node_call("body_route", "test.body_route", "Controls the body route.", requires=[REQ_SPEC("flow.route")], provides=[PROV_SPEC("flow.inner")]),
-                    _node_call("left_continue", "test.seed", "Produces left continuation data.", provides=[PROV_SPEC("value.in.left", "value.in")]),
-                    _node_call("right_continue", "test.seed", "Produces right continuation data.", provides=[PROV_SPEC("value.in.right", "value.in")]),
+                    _node_call("left_continue", "test.empty_process", "Continues the left branch."),
+                    _node_call("right_continue", "test.empty_process", "Continues the right branch."),
                     _node_call("end", "test.start", "Ends the SCC fixture."),
                 ],
                 "edges": [
@@ -307,14 +341,16 @@ def test_explicit_shortcut_edge_is_data_bypass_and_does_not_trigger_target() -> 
 
 def test_mainline_data_bypass_without_trigger_has_actionable_details() -> None:
     registry = _registry()
+    register_node(registry, "test.bypass_source", BypassSourceNode)
+    register_node(registry, "test.bypass_middle", BypassMiddleNode)
     graph = parse_graph_config(
         {
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the bypass trigger fixture."),
                     _node_call("end", "test.start", "Ends the only reachable mainline."),
-                    _node_call("source", "test.seed", "Disconnected bypass source.", provides=[PROV_SPEC("value.in")]),
-                    _node_call("middle", "test.copy", "Disconnected intermediate node.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.copy", "value.in")]),
+                    _node_call("source", "test.bypass_source", "Disconnected bypass source."),
+                    _node_call("middle", "test.bypass_middle", "Disconnected intermediate node."),
                     _node_call("target", "test.in_end", "Disconnected bypass target.", requires=[REQ_SPEC("value.in")]),
                 ],
                 "edges": [
@@ -340,6 +376,7 @@ def test_mainline_data_bypass_without_trigger_has_actionable_details() -> None:
 
 def test_mainline_unexpected_sync_fanout_warning_has_actionable_details() -> None:
     registry = _registry()
+    register_node(registry, "test.empty_process", EmptyProcessNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -347,7 +384,7 @@ def test_mainline_unexpected_sync_fanout_warning_has_actionable_details() -> Non
                     _node_call("start", "test.start", "Starts the fanout fixture."),
                     _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
                     _node_call("source", "test.add", "Branches without decision semantics.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("side", "test.copy", "Side synchronous branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy", "value.in")]),
+                    _node_call("side", "test.empty_process", "Side synchronous branch."),
                     _node_call("end", "test.out_end", "Ends the fanout fixture.", requires=[REQ_SPEC("value.out")]),
                 ],
                 "edges": [
@@ -411,6 +448,7 @@ def test_mainline_sync_fanout_with_explicit_all_join_is_allowed() -> None:
 def test_mainline_decision_dead_end_warning_has_actionable_details() -> None:
     registry = _registry()
     register_node(registry, "test.two_route", TwoRouteNode)
+    register_node(registry, "test.empty_process", EmptyProcessNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -418,8 +456,8 @@ def test_mainline_decision_dead_end_warning_has_actionable_details() -> None:
                     _node_call("start", "test.start", "Starts the decision mainline fixture."),
                     _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
                     _node_call("route", "test.two_route", "Chooses the branch.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("flow.route")]),
-                    _node_call("dead", "test.copy", "Dead branch node.", provides=[PROV_SPEC("value.dead", "value.in")]),
-                    _node_call("sink", "test.copy", "Dead branch sink.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.sink", "value.out")]),
+                    _node_call("dead", "test.empty_process", "Dead branch node."),
+                    _node_call("sink", "test.empty_process", "Dead branch sink."),
                     _node_call("end", "test.start", "Valid terminal end."),
                 ],
                 "edges": [
@@ -447,7 +485,6 @@ def test_undeclared_cycle_is_rejected() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
                     _node_call("add", "test.add", "Adds value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                     _node_call("copy", "test.copy", "Copies value.out back to value.in.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy", "value.in")]),

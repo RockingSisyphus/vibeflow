@@ -15,20 +15,8 @@
         "type_used": "example.greet",
         "display_name": "Build greeting",
         "description": "Formats a greeting with an injected clock.",
-        "requires": [
-          {
-            "type": "name.text",
-            "cardinality": "exactly_one",
-            "display_name": "Name"
-          }
-        ],
-        "provides": [
-          {
-            "key": "greeting",
-            "type": "greeting.text",
-            "display_name": "Greeting"
-          }
-        ],
+
+
         "config": {
           "prefix": "Hello"
         }

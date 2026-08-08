@@ -38,20 +38,8 @@
         "description": "Runs start."
       },
       {
-        "requires": [
-          {
-            "type": "calc.resource",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Resource"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.scaled",
-            "type": "calc.scaled",
-            "display_name": "Calc Scaled"
-          }
-        ],
+
+
         "factor": 100,
         "id": "scale",
         "type_used": "sandbox.resource_scale",
@@ -59,40 +47,16 @@
         "description": "Runs scale."
       },
       {
-        "requires": [
-          {
-            "type": "calc.scaled",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Scaled"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.branch",
-            "type": "calc.branch",
-            "display_name": "Calc Branch"
-          }
-        ],
+
+
         "id": "use_scaled",
         "type_used": "semantic.use_scaled",
         "display_name": "Use Scaled",
         "description": "Runs use_scaled."
       },
       {
-        "requires": [
-          {
-            "type": "calc.branch",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Branch"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.final",
-            "type": "calc.final",
-            "display_name": "Calc Final"
-          }
-        ],
+
+
         "offset": -100,
         "id": "finalize",
         "type_used": "semantic.finalize",
@@ -100,13 +64,7 @@
         "description": "Runs finalize."
       },
       {
-        "requires": [
-          {
-            "type": "calc.final",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Final"
-          }
-        ],
+
         "id": "end",
         "type_used": "semantic.final_end",
         "display_name": "End",

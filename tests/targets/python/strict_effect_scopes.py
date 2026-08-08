@@ -19,8 +19,6 @@ from vibeflow.targets.python.quality.source_analysis.preflight import (
     PythonSourcePreflightError,
     preflight_python_source_facts,
 )
-from vibeflow.targets.python.quality.source_analysis.types import _SourceInfo
-from vibeflow.targets.python.quality.source_analysis.validators import _validate_examples
 from vibeflow.tooling.application.python.project.source_preflight import preflight_python_import_tree
 
 
@@ -36,9 +34,9 @@ def _effect_example_artifact_guard(tmp_path, monkeypatch):
 class IoExampleRaisesNode:
     NODE_INFO = NodeInfo("test.io_raises", "IO Raises", "test", "Exercises terminal IO.", "0.1.0", "io")
     CONTRACT = NodeContract(
-        provides=(DataProvider("effect.out", "effect.out"),),
+        provides=(DataProvider("effect.out", "effect.out", display_name="effect.out"),),
         output_semantics={"effect.out": ("effect output",)},
-        output_schema={"effect.out": {"type": "number"}},
+
         examples=({"inputs": {}, "params": {}},),
     )
 
@@ -49,9 +47,9 @@ class IoExampleRaisesNode:
 class IoExampleParamsGapNode(IoExampleRaisesNode):
     NODE_INFO = NodeInfo("test.io_params_gap", "IO Params Gap", "test", "Exercises terminal IO params.", "0.1.0", "io")
     CONTRACT = NodeContract(
-        provides=(DataProvider("effect.out", "effect.out"),),
+        provides=(DataProvider("effect.out", "effect.out", display_name="effect.out"),),
         output_semantics={"effect.out": ("effect output",)},
-        output_schema={"effect.out": {"type": "number"}},
+
         examples=({"inputs": {}, "params": {"undeclared": True}},),
     )
 
@@ -70,9 +68,9 @@ class ExternalExampleRaisesNode:
         external=True,
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("effect.out", "effect.out"),),
+        provides=(DataProvider("effect.out", "effect.out", display_name="effect.out"),),
         output_semantics={"effect.out": ("effect output",)},
-        output_schema={"effect.out": {"type": "number"}},
+
         examples=({"inputs": {}, "params": {}},),
     )
 
@@ -83,9 +81,9 @@ class ExternalExampleRaisesNode:
 class PureExampleRaisesNode:
     NODE_INFO = NodeInfo("test.pure_raises", "Pure Raises", "test", "Exercises pure examples.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        provides=(DataProvider("effect.out", "effect.out"),),
+        provides=(DataProvider("effect.out", "effect.out", display_name="effect.out"),),
         output_semantics={"effect.out": ("effect output",)},
-        output_schema={"effect.out": {"type": "number"}},
+
         examples=({"inputs": {}, "params": {}},),
     )
 
@@ -109,11 +107,11 @@ class ExternalCoverageGapNode(ExternalExampleRaisesNode):
         external=True,
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("effect.in", "exactly_one"),),
-        provides=(DataProvider("effect.out", "effect.out"),),
+        requires=(DataRequirement("effect.in", "exactly_one", display_name="effect.in"),),
+        provides=(DataProvider("effect.out", "effect.out", display_name="effect.out"),),
         input_semantics={"effect.in": ("effect input",)},
         output_semantics={"effect.out": ("effect output",)},
-        output_schema={"effect.out": {"type": "number"}},
+
         examples=({"inputs": {}, "params": {}},),
     )
 
@@ -175,7 +173,6 @@ def _legacy_codes(payload: dict[str, object], field: str = "errors") -> set[obje
 def test_effect_scope_mapping_preserves_pure_node_abi() -> None:
     positional = NodeInfo("demo.io", "IO", "demo", "Terminal IO.", "1.0.0", "io")
 
-    assert positional.purity == "pure"
     assert effective_effect_scope(positional) == EFFECT_SCOPE_TERMINAL
     assert effective_effect_scope(NodeInfo("demo.document", "Document", "demo", "Document IO.", "1.0.0", "document")) == EFFECT_SCOPE_PYTHON_IO
     assert effective_effect_scope(NodeInfo("demo.process", "Process", "demo", "Trusted process.", "1.0.0", "process", external=True)) == EFFECT_SCOPE_TRUSTED
@@ -690,21 +687,14 @@ def test_python_scope_allows_python_io_but_keeps_dynamic_code_gate(tmp_path, cap
     assert "banned_call" in _legacy_codes(payload)
 
 
-def test_effectful_and_trusted_examples_validate_without_execution() -> None:
+def test_examples_are_optional_documentation_and_never_execute() -> None:
     assert validate_node_class(IoExampleRaisesNode, policy=PurityPolicy(max_source_lines=1000)) == []
     assert validate_node_class(ExternalExampleRaisesNode, policy=PurityPolicy(max_source_lines=1, max_functions=0)) == []
     assert validate_node_class(GlobalStateExampleRaisesNode, policy=PurityPolicy(max_source_lines=1000)) == []
 
-    pure = validate_node_class(PureExampleRaisesNode, policy=PurityPolicy(max_source_lines=1000))
-    assert any(item.code == "example_failed" for item in pure)
-
-    gap = validate_node_class(ExternalCoverageGapNode, policy=PurityPolicy(max_source_lines=1000))
-    assert any(item.code == "example_contract_gap" for item in gap)
-    assert not any(item.code == "example_failed" for item in gap)
-
-    params_gap = validate_node_class(IoExampleParamsGapNode, policy=PurityPolicy(max_source_lines=1000))
-    assert any(item.details.get("undeclared_params") == ["undeclared"] for item in params_gap)
-    assert not any(item.code == "example_failed" for item in params_gap)
+    assert validate_node_class(PureExampleRaisesNode, policy=PurityPolicy(max_source_lines=1000)) == []
+    assert validate_node_class(ExternalCoverageGapNode, policy=PurityPolicy(max_source_lines=1000)) == []
+    assert validate_node_class(IoExampleParamsGapNode, policy=PurityPolicy(max_source_lines=1000)) == []
 
 
 def test_inspect_preflight_blocks_top_level_effect_before_module_execution(tmp_path, capsys) -> None:
@@ -813,6 +803,111 @@ class DemoNode:
     preflight_python_import_tree(module_path, project_root=tmp_path)
 
 
+def test_preflight_allows_proven_imported_contract_helpers_and_safe_base(tmp_path) -> None:
+    helper_root = tmp_path / "framework"
+    node_root = tmp_path / "project"
+    helper_root.mkdir()
+    node_root.mkdir()
+    helper_path = helper_root / "contract_helpers.py"
+    helper_path.write_text(
+        """
+from vibeflow.core import DataProvider, DataRequirement
+
+def REQ(data_type, cardinality="exactly_one"):
+    return DataRequirement(type=data_type, cardinality=cardinality, display_name=data_type)
+
+def PROV(key, data_type=None):
+    return DataProvider(key=key, type=data_type or key, display_name=key)
+
+class SafeRunMixin:
+    def run_pure(self, inputs, params):
+        return {"demo.out": 1}
+""".strip(),
+        encoding="utf-8",
+    )
+    module_path = node_root / "imported_declarative_node.py"
+    module_path.write_text(
+        """
+from contract_helpers import PROV, REQ, SafeRunMixin
+from vibeflow.targets.python.project import NodeContract, NodeInfo
+
+def contract_schema(include_label):
+    schema = {"value": {"type": "number"}}
+    if include_label:
+        schema["label"] = {"type": "string"}
+    return schema
+
+class DemoNode(SafeRunMixin):
+    NODE_INFO = NodeInfo("demo.imported", "Imported", "demo", "Uses audited declarations.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        requires=(REQ("demo.in"),),
+        provides=(PROV("demo.out"),),
+        input_semantics={"demo.in": ("demo input",)},
+        output_semantics={"demo.out": ("demo output",)},
+    )
+""".strip(),
+        encoding="utf-8",
+    )
+
+    preflight_python_import_tree(
+        module_path,
+        project_root=node_root,
+        source_roots=(helper_root,),
+    )
+
+
+def test_preflight_rejects_effectful_imported_contract_helper_before_execution(tmp_path) -> None:
+    helper_path = tmp_path / "effectful_contract_helpers.py"
+    helper_path.write_text(
+        """
+from vibeflow.core import DataRequirement
+
+def REQ(data_type):
+    open("artifact.txt", "w").write("executed")
+    return DataRequirement(type=data_type)
+""".strip(),
+        encoding="utf-8",
+    )
+    module_path = tmp_path / "effectful_imported_node.py"
+    module_path.write_text(
+        """
+from effectful_contract_helpers import REQ
+from vibeflow.targets.python.project import NodeContract, NodeInfo
+
+class DemoNode:
+    NODE_INFO = NodeInfo("demo.effectful", "Effectful", "demo", "Must be rejected.", "0.1.0", "process")
+    CONTRACT = NodeContract(requires=(REQ("demo.in"),))
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PythonSourcePreflightError, match="before source validation"):
+        preflight_python_import_tree(module_path, project_root=tmp_path)
+    assert not (tmp_path / "artifact.txt").exists()
+
+
+def test_preflight_allows_audited_node_info_helper_to_define_io_scope(tmp_path) -> None:
+    module_path = tmp_path / "helper_defined_scope.py"
+    module_path.write_text(
+        """
+import os
+from vibeflow.targets.python.project import NodeContract, NodeInfo
+
+def INFO(type_key):
+    return NodeInfo(type_key, "Stored", "demo", "Uses an audited metadata helper.", "0.1.0", "data_store")
+
+class DemoNode:
+    NODE_INFO = INFO("demo.stored")
+    CONTRACT = NodeContract()
+    def run_pure(self, inputs, params):
+        return {}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    preflight_python_import_tree(module_path, project_root=tmp_path)
+
+
 def test_preflight_does_not_trust_shadowed_metadata_constructor(tmp_path, capsys) -> None:
     source = _valid_node_source(info=_info_source("global_state")).replace(
         "class DemoNode:",
@@ -907,23 +1002,6 @@ def test_preflight_rejects_metadata_helper_callable_parameter_shadow(tmp_path, c
     assert "before source validation" in messages
 
 
-def test_pure_example_system_exit_becomes_example_failed() -> None:
-    contract = NodeContract(
-        provides=(DataProvider("effect.out", "effect.out"),),
-        examples=({"inputs": {}, "params": {}},),
-    )
-
-    findings = _validate_examples(
-        PureExampleSystemExitNode,
-        contract,
-        source=_SourceInfo(path="<example>", class_text="", class_start_line=1, module_text=""),
-    )
-
-    assert len(findings) == 1
-    assert findings[0].code == "example_failed"
-    assert "SystemExit" in findings[0].message
-
-
 def test_base_lib_none_scope_rejects_builtins_open_process_argv_and_system_exit(tmp_path) -> None:
     base_dir = tmp_path / "base_lib"
     base_dir.mkdir()
@@ -984,6 +1062,25 @@ def test_effect_findings_cannot_be_exempted_or_downgraded() -> None:
 
     assert errors == (finding,)
     assert warnings == ()
+    assert skipped == ()
+
+
+def test_runtime_dispatch_effect_finding_remains_advisory() -> None:
+    finding = HealthFinding(
+        rule_id="NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED",
+        severity="warning",
+        object_type="node",
+        object_id="callback",
+        failure_layer="implementation",
+        message="runtime dispatch is visible but undeclared",
+        suggested_fix_type="fix_contract",
+    )
+    policy = EffectivePolicy({"rules": {}}, ("test",))
+
+    errors, warnings, skipped = apply_policy_to_findings((), (finding,), policy)
+
+    assert errors == ()
+    assert warnings == (finding,)
     assert skipped == ()
 
 
@@ -1088,7 +1185,7 @@ def test_health_inspect_and_architecture_show_derived_effect_scope(tmp_path, cap
     )
     assert code == 0
     assert payload["node"]["metadata"]["effect_scope"] == EFFECT_SCOPE_TERMINAL
-    assert payload["node"]["metadata"]["purity"] == "pure"
+    assert "purity" not in payload["node"]["metadata"]
 
 
 def test_planned_flow_kind_never_elevates_architecture_scope() -> None:

@@ -89,7 +89,6 @@ def _parse_node(data: Mapping[str, Any]) -> NodeDescriptor:
             "description",
             "version",
             "flow_kind",
-            "purity",
             "author",
             "tags",
             "external",
@@ -117,7 +116,6 @@ def _parse_node(data: Mapping[str, Any]) -> NodeDescriptor:
             data.get("flow_kind"),
             field="node.flow_kind",
         ),
-        purity=_optional_string(data.get("purity")) or "pure",
         author=_nullable_string(data.get("author"), field="node.author"),
         tags=_string_list(data.get("tags", ()), field="node.tags"),
         external=_boolean(data.get("external", False), field="node.external"),
@@ -146,7 +144,6 @@ def _parse_contract(data: Mapping[str, Any]) -> NodeContractDescriptor:
             "output_semantics",
             "params_schema",
             "params_defaults",
-            "output_schema",
             "examples",
         },
         field="node.contract",
@@ -176,10 +173,6 @@ def _parse_contract(data: Mapping[str, Any]) -> NodeContractDescriptor:
         ),
         params_schema=config_spec.schema,
         params_defaults=config_spec.defaults,
-        output_schema=_mapping_or_empty(
-            data.get("output_schema"),
-            field="node.contract.output_schema",
-        ),
         examples=_mapping_list(
             data.get("examples", ()),
             field="node.contract.examples",
@@ -213,7 +206,10 @@ def _parse_requirements(value: object) -> tuple[DataRequirement, ...]:
                     field=f"{field}.type",
                 ),
                 cardinality=cardinality,
-                display_name=_optional_string(item.get("display_name")),
+                display_name=_required_string(
+                    item.get("display_name"),
+                    field=f"{field}.display_name",
+                ),
             )
         )
     return tuple(requirements)
@@ -239,7 +235,10 @@ def _parse_providers(value: object) -> tuple[DataProvider, ...]:
                     item.get("type"),
                     field=f"{field}.type",
                 ),
-                display_name=_optional_string(item.get("display_name")),
+                display_name=_required_string(
+                    item.get("display_name"),
+                    field=f"{field}.display_name",
+                ),
             )
         )
     return tuple(providers)

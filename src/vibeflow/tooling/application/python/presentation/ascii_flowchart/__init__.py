@@ -7,7 +7,7 @@ from vibeflow.tooling.application.python.presentation.ascii_flowchart.layout imp
 from vibeflow.tooling.application.python.presentation.ascii_flowchart.model import AsciiEdge, AsciiNode
 from vibeflow.tooling.application.python.presentation.ascii_flowchart.shapes import draw_node
 from vibeflow.core.compiler import CompiledGraph
-from vibeflow.tooling.application.python.presentation.helpers import compile_for_render, node_flow_kind, node_is_external, nodeset_for_node, shorten
+from vibeflow.tooling.application.python.presentation.helpers import effective_graph_for_render, compile_for_render, node_flow_kind, node_is_external, nodeset_for_node, shorten
 from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
 from vibeflow.core.constants import (
     FLOW_KIND_DATA_STORE,
@@ -41,6 +41,11 @@ def export_ascii_flowchart(
     show_semantics: bool = True,
     show_findings: bool = True,
 ) -> str:
+    graph, actual_compiled = effective_graph_for_render(
+        graph,
+        compiled,
+        registry,
+    )
     return _Renderer(
         expand_nodesets=expand_nodesets,
         registry=registry,
@@ -48,7 +53,7 @@ def export_ascii_flowchart(
         show_contract=show_contract,
         show_semantics=show_semantics,
         show_findings=show_findings,
-    ).render(graph, compile_for_render(graph, compiled, registry))
+    ).render(graph, actual_compiled)
 
 
 class _Renderer:

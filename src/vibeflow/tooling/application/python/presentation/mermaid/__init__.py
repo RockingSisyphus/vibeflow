@@ -6,7 +6,7 @@ from typing import Any, Mapping
 
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
-from vibeflow.tooling.application.python.presentation.helpers import compile_for_render, node_flow_kind, node_is_external, nodeset_for_node
+from vibeflow.tooling.application.python.presentation.helpers import effective_graph_for_render, compile_for_render, node_flow_kind, node_is_external, nodeset_for_node
 from vibeflow.tooling.application.python.presentation.review_model import node_review_effect_scope
 
 from vibeflow.tooling.application.python.presentation.mermaid.labels import (
@@ -62,7 +62,11 @@ def export_mermaid(
     show_findings: bool = True,
     mermaid_layout: str = MERMAID_LAYOUT_DEFAULT,
 ) -> str:
-    actual_compiled = compile_for_render(graph, compiled, registry)
+    graph, actual_compiled = effective_graph_for_render(
+        graph,
+        compiled,
+        registry,
+    )
     renderer = _MermaidRenderer(
         expand_nodesets=expand_nodesets,
         registry=registry,
@@ -88,10 +92,16 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
                 "planned_behavior": node.planned_behavior.to_dict(),
                 "flow_kind": node_flow_kind(node, compiled),
                 "effect_scope": compiled.effect_scopes.get(node.id, EFFECT_SCOPE_NONE),
+                "runtime_dispatch": _runtime_dispatch_label(node, compiled),
                 "execution_lock": (
                     node.execution_lock.to_dict()
                     if node.execution_lock is not None
                     else None
+                ),
+                "effective_execution_lock": _effective_execution_lock_payload(
+                    graph,
+                    node,
+                    graph_lock_scope="root",
                 ),
                 "metadata": node.metadata.to_dict(),
                 "style": node.style.to_dict(),
@@ -130,7 +140,6 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
             else None
         ),
         "contains_global_state": compiled.contains_global_state,
-        "root_exclusive": compiled.root_exclusive,
     }
     if graph.root_id or graph.root_path or graph.source_path:
         payload["graph_source"] = {"root_id": graph.root_id, "root_path": graph.root_path, "source_path": graph.source_path}
@@ -222,17 +231,39 @@ class _MermaidRenderer:
         indent: str,
         visited_nodesets: tuple[str, ...],
         expand_inline: bool | None = None,
+        inherited_lock: tuple[str, str, bool] | None = None,
+        graph_lock_scope: str = "root",
     ) -> None:
         should_expand = self.expand_nodesets if expand_inline is None else expand_inline
+        graph_lock = (
+            (graph.execution_lock.key, graph_lock_scope, False)
+            if graph.execution_lock is not None
+            else inherited_lock
+        )
         for node in graph.nodes:
             node_id = _safe_id(f"{prefix}{node.id}")
             nodeset = nodeset_for_node(graph, node)
+            effective_lock = (
+                (
+                    node.execution_lock.key,
+                    "block" if nodeset is not None else "node",
+                    False,
+                )
+                if node.execution_lock is not None
+                else (
+                    (graph_lock[0], graph_lock[1], True)
+                    if graph_lock is not None
+                    else None
+                )
+            )
             if nodeset is None:
                 is_external = self._node_is_external(node)
                 flow_kind = node_flow_kind(node, compiled) or FLOW_KIND_PROCESS
                 preferred_class = self._preferred_class_for_node(flow_kind=flow_kind, is_external=is_external)
                 class_name = self._class_for_node(node_id, preferred_class=preferred_class, planned=node.status == STATUS_PLANNED)
-                lines.append(f"{indent}{_node_shape(node_id, self._node_label(node, graph, is_external=is_external), flow_kind)}")
+                lines.append(
+                    f"{indent}{_node_shape(node_id, self._node_label(node, graph, compiled, effective_lock=effective_lock, is_external=is_external), flow_kind)}"
+                )
                 if class_name:
                     lines.append(f"{indent}class {node_id} {class_name};")
                 if flow_kind == FLOW_KIND_GLOBAL_STATE:
@@ -244,7 +275,23 @@ class _MermaidRenderer:
             flow_kind = node_flow_kind(node, compiled) or nodeset.flow_kind
             is_loop = node.type_used in LOOP_NODE_TYPES
             class_name = self._class_for_node(node_id, preferred_class="loopNode" if is_loop else "nodesetNode", planned=node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED)
-            label = self._loop_label(node, nodeset, graph) if is_loop else self._nodeset_label(node, nodeset, graph)
+            label = (
+                self._loop_label(
+                    node,
+                    nodeset,
+                    graph,
+                    compiled,
+                    effective_lock=effective_lock,
+                )
+                if is_loop
+                else self._nodeset_label(
+                    node,
+                    nodeset,
+                    graph,
+                    compiled,
+                    effective_lock=effective_lock,
+                )
+            )
             lines.append(f"{indent}{_node_shape(node_id, label, flow_kind, shape='trap-b' if is_loop else '')}")
             if class_name:
                 lines.append(f"{indent}class {node_id} {class_name};")
@@ -269,6 +316,12 @@ class _MermaidRenderer:
                     indent=f"{indent}  ",
                     visited_nodesets=(*visited_nodesets, nodeset.type_key),
                     expand_inline=True,
+                    inherited_lock=(
+                        (effective_lock[0], effective_lock[1], True)
+                        if effective_lock is not None
+                        else None
+                    ),
+                    graph_lock_scope="block",
                 )
                 self._render_edges(lines, nodeset.graph, nested_compiled, prefix=nested_prefix, indent=f"{indent}  ")
             lines.append(f"{indent}end")
@@ -432,7 +485,15 @@ class _MermaidRenderer:
             return tuple(dict.fromkeys(targets))
         return ()
 
-    def _node_label(self, node: NodeSpec, graph: GraphConfig, *, is_external: bool) -> str:
+    def _node_label(
+        self,
+        node: NodeSpec,
+        graph: GraphConfig,
+        compiled: CompiledGraph,
+        *,
+        effective_lock: tuple[str, str, bool] | None,
+        is_external: bool,
+    ) -> str:
         sections: list[list[str]] = [[self._node_title(node, is_external=is_external)], [f"id: {node.id}", f"type_used: {node.type_used}"]]
         source_lines = _source_lines(graph.root_id, graph.root_path, graph.source_path)
         if source_lines:
@@ -443,12 +504,26 @@ class _MermaidRenderer:
                 planned_lines.append(f"stub: {node.planned_behavior.stub_module}")
             sections.append(planned_lines)
         if self.show_semantics:
-            semantic_lines = self._node_semantic_lines(node, graph, is_external=is_external)
+            semantic_lines = self._node_semantic_lines(
+                node,
+                graph,
+                compiled,
+                effective_lock=effective_lock,
+                is_external=is_external,
+            )
             if semantic_lines:
                 sections.append([_section_label("meta"), *semantic_lines])
         return _join_label_sections(sections)
 
-    def _nodeset_label(self, node: NodeSpec, nodeset: NodesetSpec, graph: GraphConfig) -> str:
+    def _nodeset_label(
+        self,
+        node: NodeSpec,
+        nodeset: NodesetSpec,
+        graph: GraphConfig,
+        compiled: CompiledGraph,
+        *,
+        effective_lock: tuple[str, str, bool] | None,
+    ) -> str:
         title = node.metadata.display_name or nodeset.display_name or node.id
         sections: list[list[str]] = [[title], [f"id: {node.id}", f"type_used: {node.type_used}"]]
         source_lines = _source_lines(
@@ -465,10 +540,21 @@ class _MermaidRenderer:
                 planned_lines.append(f"stub: {behavior.stub_module}")
             sections.append(planned_lines)
         if self.show_semantics:
-            call_lines = (
+            call_lines = [
                 *_node_metadata_lines(node),
                 *_async_semantic_lines(node),
-                *_execution_lock_lines(node),
+            ]
+            effect_scope = compiled.effect_scopes.get(node.id, EFFECT_SCOPE_NONE)
+            if effect_scope != EFFECT_SCOPE_NONE:
+                call_lines.append(f"effect_scope: {effect_scope}")
+            call_lines.append(
+                f"runtime_dispatch: {_runtime_dispatch_label(node, compiled)}"
+            )
+            call_lines.extend(
+                _execution_lock_lines(
+                    effective_lock,
+                    show_none=(node_flow_kind(node, compiled) == FLOW_KIND_GLOBAL_STATE),
+                )
             )
             if call_lines:
                 sections.append([_section_label("call"), *call_lines])
@@ -481,7 +567,15 @@ class _MermaidRenderer:
             )
         return _join_label_sections(sections)
 
-    def _loop_label(self, node: NodeSpec, nodeset: NodesetSpec, graph: GraphConfig) -> str:
+    def _loop_label(
+        self,
+        node: NodeSpec,
+        nodeset: NodesetSpec,
+        graph: GraphConfig,
+        compiled: CompiledGraph,
+        *,
+        effective_lock: tuple[str, str, bool] | None,
+    ) -> str:
         title = node.metadata.display_name or nodeset.display_name or node.id
         sections: list[list[str]] = [[title], [f"id: {node.id}", f"type_used: {node.type_used}"]]
         source_lines = _source_lines(
@@ -496,10 +590,21 @@ class _MermaidRenderer:
         loop_lines = [_section_label("loop"), f"body: {nodeset.type_key}", f"stop: {_loop_stop_text(spec)}", f"max: {maximum}"]
         sections.append(loop_lines)
         if self.show_semantics:
-            call_lines = (
+            call_lines = [
                 *_node_metadata_lines(node),
                 *_async_semantic_lines(node),
-                *_execution_lock_lines(node),
+            ]
+            effect_scope = compiled.effect_scopes.get(node.id, EFFECT_SCOPE_NONE)
+            if effect_scope != EFFECT_SCOPE_NONE:
+                call_lines.append(f"effect_scope: {effect_scope}")
+            call_lines.append(
+                f"runtime_dispatch: {_runtime_dispatch_label(node, compiled)}"
+            )
+            call_lines.extend(
+                _execution_lock_lines(
+                    effective_lock,
+                    show_none=(node_flow_kind(node, compiled) == FLOW_KIND_GLOBAL_STATE),
+                )
             )
             if call_lines:
                 sections.append([_section_label("meta"), *call_lines])
@@ -533,7 +638,15 @@ class _MermaidRenderer:
             sections.append([_section_label("data"), f"data: {data_text}"])
         return _join_label_sections(sections)
 
-    def _node_semantic_lines(self, node: NodeSpec, graph: GraphConfig, *, is_external: bool) -> tuple[str, ...]:
+    def _node_semantic_lines(
+        self,
+        node: NodeSpec,
+        graph: GraphConfig,
+        compiled: CompiledGraph,
+        *,
+        effective_lock: tuple[str, str, bool] | None,
+        is_external: bool,
+    ) -> tuple[str, ...]:
         lines = list(_node_metadata_lines(node))
         if self.registry is not None and node.status != STATUS_PLANNED:
             try:
@@ -551,20 +664,73 @@ class _MermaidRenderer:
                     if text:
                         lines.append(f"{label}: {text}")
         lines.extend(_async_semantic_lines(node))
-        effect_scope = (
-            EFFECT_SCOPE_GLOBAL_STATE
-            if node.flow_kind == FLOW_KIND_GLOBAL_STATE
-            else node_review_effect_scope(graph, node, self.registry)
+        effect_scope = compiled.effect_scopes.get(
+            node.id,
+            (
+                EFFECT_SCOPE_GLOBAL_STATE
+                if node.flow_kind == FLOW_KIND_GLOBAL_STATE
+                else node_review_effect_scope(graph, node, self.registry)
+            ),
         )
         if effect_scope != EFFECT_SCOPE_NONE:
             lines.append(f"effect_scope: {effect_scope}")
-        lines.extend(_execution_lock_lines(node))
+        lines.append(
+            f"runtime_dispatch: {_runtime_dispatch_label(node, compiled)}"
+        )
+        lines.extend(
+            _execution_lock_lines(
+                effective_lock,
+                show_none=(effect_scope == EFFECT_SCOPE_GLOBAL_STATE),
+            )
+        )
         if is_external:
             lines.append("external: true")
         return tuple(lines)
 
 
-def _execution_lock_lines(node: NodeSpec) -> tuple[str, ...]:
-    if node.execution_lock is None:
-        return ()
-    return (f"execution_lock: {node.execution_lock.key}",)
+def _execution_lock_lines(
+    effective_lock: tuple[str, str, bool] | None,
+    *,
+    show_none: bool,
+) -> tuple[str, ...]:
+    if effective_lock is None:
+        return ("execution_lock: none",) if show_none else ()
+    key, scope, inherited = effective_lock
+    suffix = f"{scope}, inherited" if inherited else scope
+    return (f"execution_lock: {key} ({suffix})",)
+
+
+def _runtime_dispatch_label(
+    node: NodeSpec,
+    compiled: CompiledGraph,
+) -> str:
+    if node.status == STATUS_PLANNED:
+        return "unknown"
+    value = getattr(compiled, "runtime_dispatches", {}).get(node.id)
+    if value is True:
+        return "detected"
+    if value is False:
+        return "none"
+    return "unknown"
+
+
+def _effective_execution_lock_payload(
+    graph: GraphConfig,
+    node: NodeSpec,
+    *,
+    graph_lock_scope: str,
+) -> dict[str, object] | None:
+    nodeset = nodeset_for_node(graph, node)
+    if node.execution_lock is not None:
+        return {
+            "key": node.execution_lock.key,
+            "scope": "block" if nodeset is not None else "node",
+            "inherited": False,
+        }
+    if graph.execution_lock is not None:
+        return {
+            "key": graph.execution_lock.key,
+            "scope": graph_lock_scope,
+            "inherited": True,
+        }
+    return None

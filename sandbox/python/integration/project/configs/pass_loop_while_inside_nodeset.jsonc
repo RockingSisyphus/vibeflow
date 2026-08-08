@@ -17,30 +17,8 @@
       {
         "display_name": "Wrapper",
         "description": "Calls a nodeset that contains a first-class while loop node.",
-        "requires": [
-          {
-            "type": "loop.current",
-            "cardinality": "exactly_one",
-            "display_name": "Loop Current"
-          }
-        ],
-        "provides": [
-          {
-            "key": "loop.next",
-            "type": "loop.next",
-            "display_name": "Loop Next"
-          },
-          {
-            "key": "loop.done",
-            "type": "loop.done",
-            "display_name": "Loop Done"
-          },
-          {
-            "key": "loop.iterations",
-            "type": "loop.iterations",
-            "display_name": "Loop Iterations"
-          }
-        ],
+
+
         "id": "wrapper",
         "type_used": "loop.wrapper"
       },

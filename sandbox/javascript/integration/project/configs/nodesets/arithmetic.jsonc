@@ -58,62 +58,14 @@
         "id": "add",
         "type_used": "sandbox.add",
         "display_name": "Add x and a",
-        "description": "Computes x + a.",
-        "requires": [
-          {
-            "type": "sandbox.x",
-            "cardinality": "exactly_one",
-            "display_name": "X"
-          },
-          {
-            "type": "sandbox.addend",
-            "cardinality": "exactly_one",
-            "display_name": "Addend"
-          },
-          {
-            "type": "sandbox.subtrahend",
-            "cardinality": "exactly_one",
-            "display_name": "Subtrahend"
-          }
-        ],
-        "provides": [
-          {
-            "key": "sum",
-            "type": "sandbox.sum",
-            "display_name": "Sum"
-          },
-          {
-            "key": "forwarded_subtrahend",
-            "type": "sandbox.subtrahend.forwarded",
-            "display_name": "Forwarded subtrahend"
-          }
-        ]
-      },
+        "description": "Computes x + a."
+              },
       {
         "id": "subtract",
         "type_used": "sandbox.subtract",
         "display_name": "Subtract b",
-        "description": "Computes (x + a) - b.",
-        "requires": [
-          {
-            "type": "sandbox.sum",
-            "cardinality": "exactly_one",
-            "display_name": "Sum"
-          },
-          {
-            "type": "sandbox.subtrahend.forwarded",
-            "cardinality": "exactly_one",
-            "display_name": "Forwarded subtrahend"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ]
-      },
+        "description": "Computes (x + a) - b."
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

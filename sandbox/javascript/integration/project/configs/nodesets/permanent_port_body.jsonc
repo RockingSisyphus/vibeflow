@@ -22,27 +22,14 @@
         "io": {
           "operation": "receive",
           "port": "sandbox.permanent.in"
-        }
+        },
+        "requires": []
       },
       {
         "id": "calculate",
         "type_used": "sandbox.math",
         "display_name": "Calculate result",
         "description": "Applies x * 3 + 2 through the TypeScript math base_lib.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Received number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Calculated result"
-          }
-        ],
         "config": {
           "scale": 3,
           "offset": 2
@@ -63,12 +50,19 @@
         "io": {
           "operation": "send",
           "port": "sandbox.permanent.out"
-        }
+        },
+        "provides": []
       }
     ],
     "edges": [
-      {"from": "receive", "to": "calculate"},
-      {"from": "calculate", "to": "send"}
+      {
+        "from": "receive",
+        "to": "calculate"
+      },
+      {
+        "from": "calculate",
+        "to": "send"
+      }
     ],
     "outputs": []
   }

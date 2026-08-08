@@ -260,8 +260,6 @@ class RuntimeNodeMixin:
         nodeset = self.graph.nodesets.get(frame.nodeset_type_key)
         if nodeset is None:
             raise PipelineRuntimeError(f"unknown planned python_stub nodeset: {frame.nodeset_type_key}")
-        if not nodeset.provides:
-            raise PipelineRuntimeError(f"planned python_stub nodeset '{nodeset.type_key}' must declare provides")
         if set(frame.requires) != set(nodeset.requires):
             raise PipelineRuntimeError(f"planned python_stub nodeset instance '{frame.id}' requires must match nodeset '{nodeset.type_key}' requires")
         if set(frame.provides) != set(nodeset.provides):

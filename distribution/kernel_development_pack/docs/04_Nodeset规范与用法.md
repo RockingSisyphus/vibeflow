@@ -93,11 +93,11 @@ nodeset 是独立 JSONC 实现文件，作用类似 Python node 的 `.py` 文件
 
 ## Nodeset / loop 中的 global_state 与 execution lock
 
-Core 会穿过普通 nodeset、嵌套 nodeset 和 `loop.body` 递归传播 implemented `global_state`。只要任一真实可执行后代包含该语义，root Architecture/WorkflowPlan 就显示 `contains_global_state=true` / `root_exclusive=true`，Python root run 在调度任何 node 或 hook 前以 exclusive 模式取得进程级 execution lease。普通 root 以 shared 模式进入同一域。planned global-state 及 planned body 只用于 Architecture/Mermaid/SVG 审查，不触发权限、锁或 `contains_global_state`。
+Core 会穿过普通 nodeset、嵌套 nodeset 和 `loop.body` 递归传播 implemented `global_state`。只要任一真实可执行后代包含该语义，root Architecture/WorkflowPlan 就显示 `contains_global_state=true`；该事实不自动加锁或使 root 独占。planned global-state 及 planned body 只用于 Architecture/Mermaid/SVG 审查，不触发权限、锁或 `contains_global_state`。
 
 在 nodeset 或 loop 调用点配置 `"execution_lock": {"key": "project.resource"}` 时，该锁保护整个子 block，不是只保护进入动作。嵌套 nodeset/loop 和受管理线程继承同一 lease；同一用户 key 可重入，已持有一个用户 key 时再请求不同 key 会编译失败。互不嵌套的不同 sibling key 仍可并行；锁不授予任何副作用权限。
 
-受 global-state 或显式锁保护的 nodeset/loop 禁止 detached；`result_key` 只有能静态证明存在无条件 scheduled consumer path、结果必会 join 时才合法。成功/失败 hook 和已启动的受保护 future 收尾完成后 lease 才释放。global-state 修改不会因为退出 nodeset/loop 而自动恢复或 rollback；需要临时修改时，在同一 global-state node 内使用 `try/finally`。展开图中 global-state 仍使用 Mermaid `cloud` 形状，并显示 effect scope / execution lock。
+只有显式锁保护的 nodeset/loop 禁止 detached；`result_key` 只有能静态证明存在无条件 scheduled consumer path、结果必会 join 时才合法。成功/失败 hook 和已启动的受保护 future 收尾完成后 lease 才释放。无锁 global-state 使用普通异步规则，并产生未协调 warning。global-state 修改不会因为退出 nodeset/loop 而自动恢复或 rollback；需要临时修改时，在同一 global-state node 内使用 `try/finally`。展开图中 global-state 仍使用 Mermaid `cloud` 形状，并显示 effect scope、runtime dispatch 和有效 execution lock（无锁为 `none`）。
 
 ## 在主 config 中导入和调用
 

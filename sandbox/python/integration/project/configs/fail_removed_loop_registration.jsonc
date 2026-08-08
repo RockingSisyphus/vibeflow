@@ -9,40 +9,16 @@
     ],
     "nodes": [
       {
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.next",
-            "type": "value.next",
-            "display_name": "Value Next"
-          }
-        ],
+
+
         "id": "increment",
         "type_used": "sandbox.increment",
         "display_name": "Increment",
         "description": "Runs increment."
       },
       {
-        "requires": [
-          {
-            "type": "value.next",
-            "cardinality": "exactly_one",
-            "display_name": "Value Next"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.in.copy",
-            "type": "value.in",
-            "display_name": "Value In Copy"
-          }
-        ],
+
+
         "id": "copy",
         "type_used": "sandbox.copy_back",
         "display_name": "Copy",

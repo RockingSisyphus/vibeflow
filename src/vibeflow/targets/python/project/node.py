@@ -24,9 +24,7 @@ from vibeflow.core.contracts import DataProvider, DataRequirement
 EFFECT_SCOPE_TERMINAL = "terminal"
 EFFECT_SCOPE_PYTHON_IO = "python_io"
 
-# Effect authorization is derived from semantic node metadata.  ``purity`` is
-# retained as a compatibility field, but is deliberately not an authorization
-# input so projects cannot create two conflicting sources of truth.
+# Effect authorization is derived from semantic node metadata.
 _EFFECT_SCOPE_BY_FLOW_KIND: Mapping[str, str] = MappingProxyType(
     {
         FLOW_KIND_TERMINAL: EFFECT_SCOPE_NONE,
@@ -59,7 +57,6 @@ class NodeInfo:
     description: str
     version: str
     flow_kind: str
-    purity: str = "pure"
     author: str | None = None
     tags: tuple[str, ...] = ()
     external: bool = False
@@ -71,8 +68,6 @@ class NodeContract:
     provides: tuple[DataProvider, ...] = ()
     input_semantics: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     output_semantics: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
-    params_schema: Mapping[str, Any] = field(default_factory=dict)
-    output_schema: Mapping[str, Any] = field(default_factory=dict)
     examples: tuple[Mapping[str, Any], ...] = ()
 
 

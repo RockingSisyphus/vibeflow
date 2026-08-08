@@ -38,20 +38,8 @@
       {
         "display_name": "Increment",
         "description": "Moves the nested retry value toward the target.",
-        "requires": [
-          {
-            "type": "loop.current",
-            "cardinality": "exactly_one",
-            "display_name": "Loop Current"
-          }
-        ],
-        "provides": [
-          {
-            "key": "loop.next",
-            "type": "loop.next",
-            "display_name": "Loop Next"
-          }
-        ],
+
+
         "step": 2,
         "id": "increment",
         "type_used": "semantic.increment_until"
@@ -59,20 +47,8 @@
       {
         "display_name": "Done Check",
         "description": "Checks whether loop.next has reached the nested retry target.",
-        "requires": [
-          {
-            "type": "loop.next",
-            "cardinality": "exactly_one",
-            "display_name": "Loop Next"
-          }
-        ],
-        "provides": [
-          {
-            "key": "loop.done",
-            "type": "loop.done",
-            "display_name": "Loop Done"
-          }
-        ],
+
+
         "target": 7,
         "id": "done",
         "type_used": "semantic.loop_done_value"

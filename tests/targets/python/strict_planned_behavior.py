@@ -175,7 +175,7 @@ def run_stub(inputs, params):
     portable = runtime._plan.to_workflow_plan()
     planned = portable.block(portable.entry_block).node("stub")
     assert portable.contains_global_state is False
-    assert portable.root_exclusive is False
+    assert "root_exclusive" not in portable.to_dict()
     assert planned.status == "planned"
     assert planned.flow_kind == "global_state"
     assert planned.contains_global_state is False
@@ -197,14 +197,10 @@ def run_stub(inputs, params):
         event.get("details", {}).get("key") == "project.planned"
         for event in events
     )
-    global_acquired = next(
-        event
+    assert not any(
+        event["kind"] in {"lock_wait", "lock_acquired", "lock_released"}
         for event in events
-        if event["kind"] == "lock_acquired"
-        and event.get("details", {}).get("key")
-        == "vibeflow.runtime.global_state"
     )
-    assert global_acquired["details"]["mode"] == "shared"
 
 
 def test_python_stub_default_run_refuses_and_allow_flag_is_behavior_strict(tmp_path) -> None:

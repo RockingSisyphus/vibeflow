@@ -15,7 +15,6 @@ from vibeflow.core.planned import PLANNED_BEHAVIOR_PYTHON_STUB, PLANNED_BEHAVIOR
 
 @dataclass(frozen=True)
 class _DecisionFlow:
-    decision_schema_values: Mapping[str, set[object] | None]
     outgoing: dict[str, list[str]]
     outgoing_edges: dict[str, list[object]]
     incoming_edges: dict[str, list[object]]
@@ -27,7 +26,6 @@ def append_flowchart_health(
     compiled,
     state,
     *,
-    decision_schema_values: Mapping[str, set[object] | None] | None = None,
     owner: str = "pipeline",
 ) -> None:
     active_nodes = [node for node in graph.nodes if _node_participates_in_flow(graph, node)]
@@ -60,7 +58,6 @@ def append_flowchart_health(
     can_reach_end = _append_end_reachability_findings(ends, active_names, incoming_edges, outgoing_edges, incoming, state, owner=owner)
     if ends:
         decision_flow = _DecisionFlow(
-            decision_schema_values or {},
             outgoing,
             outgoing_edges,
             incoming_edges,
@@ -324,15 +321,7 @@ def _append_decision_branch_health(graph, compiled, state, flow: _DecisionFlow, 
 
 
 def _append_single_decision_health(node, nodes_by_name, state, flow: _DecisionFlow, *, owner: str) -> None:
-    schema_values = _decision_schema_values(
-        node,
-        flow.decision_schema_values,
-    )
-    equality_values: set[object] = set()
     for edge in flow.outgoing_edges.get(node.name, ()):
-        parsed = _parse_when(getattr(edge, "when", ""))
-        if parsed is not None:
-            equality_values.update(_validate_branch_value(node, parsed, schema_values, state, owner=owner, flow=flow))
         target = getattr(edge, "target", "")
         if target in nodes_by_name and not _is_loop_branch(node.name, target, flow.outgoing) and target not in flow.can_reach_end:
             state.errors.append(
@@ -348,7 +337,6 @@ def _append_single_decision_health(node, nodes_by_name, state, flow: _DecisionFl
                     },
                 )
             )
-    _append_missing_schema_branches(node, schema_values, equality_values, state, owner=owner, flow=flow)
 
 
 def _append_explicit_edge_duplicate_warnings(graph, state, *, owner: str) -> None:
@@ -378,81 +366,8 @@ def _append_explicit_edge_duplicate_warnings(graph, state, *, owner: str) -> Non
         )
 
 
-def _validate_branch_value(node, parsed: tuple[str, str, object], schema_values: set[object] | None, state, *, owner: str, flow: _DecisionFlow) -> set[object]:
-    key, operator, literal = parsed
-    if operator != "==":
-        return set()
-    if schema_values is not None and literal not in schema_values:
-        state.errors.append(
-            _flow_finding(
-                "GRAPH.DECISION.UNKNOWN_BRANCH_VALUE",
-                node.name,
-                f"decision node '{node.name}' has branch {key} == {literal!r}, not declared in output_schema",
-                object_type="node",
-                details={
-                    **_node_flow_details(owner, node.name, flow.incoming_edges, flow.outgoing_edges),
-                    "branch_key": key,
-                    "branch_value": literal,
-                    "declared_values": sorted(schema_values, key=str),
-                },
-            )
-        )
-    return {literal}
-
-
-def _append_missing_schema_branches(node, schema_values: set[object] | None, equality_values: set[object], state, *, owner: str, flow: _DecisionFlow) -> None:
-    if schema_values is None or not equality_values:
-        return
-    missing = schema_values - equality_values
-    if missing:
-        state.errors.append(
-            _flow_finding(
-                "GRAPH.DECISION.MISSING_BRANCH_VALUE",
-                node.name,
-                f"decision node '{node.name}' has no outgoing branch for schema values: {sorted(missing)!r}",
-                object_type="node",
-                details={
-                    **_node_flow_details(owner, node.name, flow.incoming_edges, flow.outgoing_edges),
-                    "declared_values": sorted(schema_values, key=str),
-                    "covered_values": sorted(equality_values, key=str),
-                    "missing_values": sorted(missing, key=str),
-                },
-            )
-        )
-
-
 def _is_loop_branch(node_name: str, target: str, outgoing: dict[str, list[str]]) -> bool:
     return node_name in _walk({target}, outgoing)
-
-
-def _decision_schema_values(
-    node: Any,
-    values_by_node: Mapping[str, set[object] | None],
-) -> set[object] | None:
-    return values_by_node.get(node.name)
-
-
-def _parse_when(expression: str) -> tuple[str, str, object] | None:
-    if not expression:
-        return None
-    for operator in ("==", "!="):
-        if operator not in expression:
-            continue
-        left, right = (part.strip() for part in expression.split(operator, 1))
-        if not left or not right:
-            return None
-        return left, operator, _literal_value(right)
-    return None
-
-
-def _literal_value(value: str) -> object:
-    if value == "true":
-        return True
-    if value == "false":
-        return False
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-        return value[1:-1]
-    return value
 
 
 def _node_flow_details(

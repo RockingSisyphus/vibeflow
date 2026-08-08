@@ -36,22 +36,8 @@
         "id": "increment",
         "type_used": "sandbox.loop_increment",
         "display_name": "Increment",
-        "description": "Adds one to the carry value.",
-        "requires": [
-          {
-            "type": "sandbox.loop.value",
-            "cardinality": "exactly_one",
-            "display_name": "Loop value"
-          }
-        ],
-        "provides": [
-          {
-            "key": "next",
-            "type": "sandbox.loop.next",
-            "display_name": "Next value"
-          }
-        ]
-      },
+        "description": "Adds one to the carry value."
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

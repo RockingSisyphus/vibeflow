@@ -100,9 +100,9 @@ class BadIoNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider(key="value.out", type="value.out"),),
+        provides=(DataProvider(key="value.out", type="value.out", display_name="value.out"),),
         output_semantics={"value.out": ("output value",)},
-        output_schema={"value.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -142,7 +142,9 @@ def _nodeset_config(
         "display_name": name.replace(".", " ").title(),
         "description": f"Composite flow for {name}.",
         "requires": _requirement_specs(requires),
-        "provides": _provider_specs(provides or ["value.out"]),
+        "provides": _provider_specs(
+            ["value.out"] if provides is None else provides
+        ),
         "pipeline": pipeline,
     }
 
@@ -174,6 +176,17 @@ def _node_call(name: str, node_type: str, default_description: str, **fields) ->
     type_used = str(fields.pop("type_used", fields.pop("type", node_type)))
     if type_used.startswith("nodeset."):
         type_used = type_used.removeprefix("nodeset.")
+    explicit_contract = (
+        fields.get("status") == "planned"
+        or type_used == "vibeflow.io"
+        or type_used in {"vibeflow.loop", "vibeflow.loop.while"}
+    )
+    if not explicit_contract:
+        fields.pop("requires", None)
+        fields.pop("provides", None)
+    else:
+        fields.setdefault("requires", [])
+        fields.setdefault("provides", [])
     return {
         "id": node_id,
         "type_used": type_used,
@@ -239,11 +252,11 @@ from vibeflow.targets.python.project import NodeContract, NodeInfo
 
 
 def REQ(data_type: str, cardinality: str = "exactly_one") -> DataRequirement:
-    return DataRequirement(type=data_type, cardinality=cardinality)
+    return DataRequirement(type=data_type, cardinality=cardinality, display_name=data_type)
 
 
 def PROV(key: str, data_type: str | None = None) -> DataProvider:
-    return DataProvider(key=key, type=data_type or key)
+    return DataProvider(key=key, type=data_type or key, display_name=key)
 
 
 """.rstrip() + "\n\n"
@@ -265,7 +278,6 @@ VALID_NODE_CONTRACT = """
     CONTRACT = NodeContract(
         provides=(PROV("demo.out"),),
         output_semantics={"demo.out": ("demo output",)},
-        output_schema={"demo.out": {"type": "number"}},
         examples=({"inputs": {}, "params": {}},),
     )
 """.rstrip()
@@ -342,7 +354,7 @@ def _failure_case_source(case: dict[str, object]) -> str:
 {VALID_NODE_IMPORT}
 class OtherNode:
     NODE_INFO = NodeInfo(type_key="demo.other", display_name="Other", category="demo", description="Other node.", version="0.1.0", flow_kind="process")
-    CONTRACT = NodeContract(provides=(PROV("other.out"),), output_semantics={{"other.out": ("other output",)}}, output_schema={{"other.out": {{"type": "number"}}}}, examples=({{"inputs": {{}}, "params": {{}}}},))
+    CONTRACT = NodeContract(provides=(PROV("other.out"),), output_semantics={{"other.out": ("other output",)}}, examples=({{"inputs": {{}}, "params": {{}}}},))
 
     def run_pure(self, inputs, params):
         return {{"other.out": 1}}

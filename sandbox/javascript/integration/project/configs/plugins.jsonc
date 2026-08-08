@@ -24,42 +24,20 @@
       {"key": "b", "type": "sandbox.subtrahend", "display_name": "Subtrahend", "required": true}
     ],
     "nodes": [
-      {"id": "start", "type_used": "sandbox.terminal", "display_name": "Start"},
+      {"id": "start", "type_used": "sandbox.terminal", "display_name": "Start", "description": "Starts the plugin integration workflow."},
       {
         "id": "add",
         "type_used": "sandbox.add",
         "display_name": "Add",
-        "requires": [
-          {"type": "sandbox.x", "cardinality": "exactly_one", "display_name": "X"},
-          {"type": "sandbox.addend", "cardinality": "exactly_one", "display_name": "Addend"},
-          {"type": "sandbox.subtrahend", "cardinality": "exactly_one", "display_name": "Subtrahend"}
-        ],
-        "provides": [
-          {"key": "sum", "type": "sandbox.sum", "display_name": "Sum"},
-          {
-            "key": "forwarded_subtrahend",
-            "type": "sandbox.subtrahend.forwarded",
-            "display_name": "Forwarded subtrahend"
-          }
-        ]
-      },
+        "description": "Adds the configured input value in this workflow instance."
+              },
       {
         "id": "subtract",
         "type_used": "sandbox.subtract",
         "display_name": "Subtract",
-        "requires": [
-          {"type": "sandbox.sum", "cardinality": "exactly_one", "display_name": "Sum"},
-          {
-            "type": "sandbox.subtrahend.forwarded",
-            "cardinality": "exactly_one",
-            "display_name": "Forwarded subtrahend"
-          }
-        ],
-        "provides": [
-          {"key": "result", "type": "sandbox.math.result", "display_name": "Result"}
-        ]
-      },
-      {"id": "end", "type_used": "sandbox.terminal", "display_name": "End"}
+        "description": "Subtracts the configured input value in this workflow instance."
+              },
+      {"id": "end", "type_used": "sandbox.terminal", "display_name": "End", "description": "Ends the plugin integration workflow."}
     ],
     "edges": [
       {"from": "start", "to": "add"},

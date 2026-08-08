@@ -105,10 +105,6 @@ def workflow_plan_from_execution_plan(
             scope="root",
         ),
         contains_global_state=execution_plan.contains_global_state,
-        root_exclusive=(
-            execution_plan.contains_global_state
-            or graph.execution_lock is not None
-        ),
     )
 
 
@@ -141,7 +137,14 @@ class _ExecutionPlanAdapter:
                 if frame.subplan is not None and not frame.is_planned
                 else ""
             )
-            nodes.append(self._node(spec, frame, child_block=child_block))
+            nodes.append(
+                self._node(
+                    spec,
+                    frame,
+                    compiled=execution_plan.compiled,
+                    child_block=child_block,
+                )
+            )
             if frame.subplan is not None and not frame.is_planned:
                 child_kind = "loop" if frame.is_loop else "nodeset"
                 child_loop = _loop_plan(spec.loop) if frame.is_loop else None
@@ -161,13 +164,6 @@ class _ExecutionPlanAdapter:
                     scope="root" if not path else "block",
                 ),
                 contains_global_state=execution_plan.contains_global_state,
-                root_exclusive=(
-                    not path
-                    and (
-                        execution_plan.contains_global_state
-                        or graph.execution_lock is not None
-                    )
-                ),
             )
         )
         for subplan, child_path, child_kind, child_loop in children:
@@ -183,6 +179,7 @@ class _ExecutionPlanAdapter:
         spec: NodeSpec,
         frame: Any,
         *,
+        compiled: CompiledGraph,
         child_block: str,
     ) -> NodeCallPlan:
         is_receive = (
@@ -228,10 +225,14 @@ class _ExecutionPlanAdapter:
             ),
             io_operation=spec.io.operation,
             io_port=spec.io.port if spec.io.operation else "",
-            effect_scope=execution_plan_effect_scope(frame),
+            effect_scope=compiled.effect_scopes.get(
+                spec.id,
+                execution_plan_effect_scope(frame),
+            ),
+            runtime_dispatch=compiled.runtime_dispatches.get(spec.id),
             execution_lock=_execution_lock_plan(
                 frame.execution_lock,
-                scope="node",
+                scope="block" if frame.is_nodeset or frame.is_loop else "node",
             ),
             contains_global_state=(
                 not frame.is_planned

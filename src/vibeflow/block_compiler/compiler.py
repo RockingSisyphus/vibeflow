@@ -155,7 +155,6 @@ def compile_graph_plan(
             scope="root",
         ),
         contains_global_state=root_block.contains_global_state,
-        root_exclusive=root_block.root_exclusive,
     )
 
 
@@ -348,13 +347,6 @@ class _PlannerState:
             nodes=tuple(nodes),
             execution_lock=block_lock,
             contains_global_state=contains_global_state,
-            root_exclusive=(
-                not path
-                and (
-                    contains_global_state
-                    or graph.execution_lock is not None
-                )
-            ),
         )
         return contains_global_state
 
@@ -426,9 +418,10 @@ class _PlannerState:
             io_operation=spec.io.operation,
             io_port=spec.io.port if spec.io.operation else "",
             effect_scope=effect_scope,
+            runtime_dispatch=compiled.runtime_dispatches.get(spec.id),
             execution_lock=_execution_lock_plan(
                 spec.execution_lock,
-                scope="node",
+                scope="block" if is_nodeset or is_loop else "node",
             ),
             contains_global_state=(
                 status != STATUS_PLANNED
@@ -469,7 +462,6 @@ def _block(
     nodes: tuple[NodeCallPlan, ...],
     execution_lock: ExecutionLockPlan | None = None,
     contains_global_state: bool = False,
-    root_exclusive: bool = False,
 ) -> BlockPlan:
     routes = _routes(compiled)
     incoming = {route.target for route in routes if route.schedule}
@@ -511,7 +503,6 @@ def _block(
             )
         ),
         contains_global_state=contains_global_state,
-        root_exclusive=root_exclusive,
     )
 
 
@@ -596,10 +587,7 @@ def _validate_protected_async_plan(
 ) -> None:
     if not blocks:
         return
-    root_protected = (
-        blocks[0].contains_global_state
-        or blocks[0].execution_lock is not None
-    )
+    root_protected = blocks[0].execution_lock is not None
     blocks_by_path = {block.path: block for block in blocks}
     for block in blocks:
         block_protected = root_protected or _block_has_protected_ancestor(
@@ -615,7 +603,7 @@ def _validate_protected_async_plan(
             if node.async_mode == "detached":
                 raise PortablePlanError(
                     f"protected block '{block.id}' cannot detach node "
-                    f"'{node.id}' while global_state or execution_lock is active"
+                    f"'{node.id}' while execution_lock is active"
                 )
             if (
                 node.async_mode == "result_key"

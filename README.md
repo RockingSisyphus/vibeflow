@@ -35,7 +35,7 @@ AI 仍然负责写业务代码，但它必须按流程图开发：每个节点�
 
 ![VibeFlow comprehensive flowchart](docs/assets/comprehensive_flowchart.svg)
 
-示例中的云形节点表示语言无关的 `global_state` 语义，并显示其派生 effect scope 与命名 execution lock；对应的正式导出 Mermaid 源码见 [comprehensive_flowchart.mmd](docs/assets/comprehensive_flowchart.mmd)。
+示例中的云形节点表示语言无关的 `global_state` 语义，并显示其派生 effect scope、runtime-dispatch 事实与有效命名 execution lock（没有时为 `none`）；对应的正式导出 Mermaid 源码见 [comprehensive_flowchart.mmd](docs/assets/comprehensive_flowchart.mmd)。
 
 ## 适合谁 👥
 
@@ -179,8 +179,9 @@ VibeFlow 的核心是一个严格的流程图运行时：普通 node 负责局�
 - `data_store`：数据存储请求或引用。
 - `document`：文档生成或文档结构。
 - `preparation`：准备 / 初始化。
+- `global_state`：易失 ambient state 或运行时 callback/对象方法分派。
 
-`flow_kind` 与 `external` 一起决定内核派生的 `effect_scope`：普通 implemented node 和 planned `python_stub` 为 `none`；`flow_kind=io` 为 `terminal`，开放真实标准流、`print` / `input` / `argparse`；`document` / `data_store` 为 `python_io`，开放文件、环境、网络、数据库、subprocess 和终端；任意 `external=True` node 和 plugin 为最高优先级 `trusted`。图形 `flow_kind=terminal` 仍是 `none`，不等于权限档位 `terminal`。
+`flow_kind` 与 `external` 一起决定内核派生的 `effect_scope`：普通 implemented node 和 planned `python_stub` 为 `none`；`flow_kind=io` 为 `terminal`，开放真实标准流、`print` / `input` / `argparse`；`document` / `data_store` 为 `python_io`，开放文件、环境、网络、数据库、subprocess 和终端；`global_state` 容纳运行域 ambient state 与 runtime dispatch；任意 `external=True` node 和 plugin 为最高优先级 `trusted`。图形 `flow_kind=terminal` 仍是 `none`，不等于权限档位 `terminal`。
 
 ### 显式流程边
 
@@ -205,7 +206,9 @@ Health 会在显式 edge 中推断同步主线、data bypass 和 async 相关边
 - 不读取环境变量。
 - 不直接调用其他 node。
 
-`io` node 可使用真实终端流，`data_store` / `document` node 可使用 Python IO。`external=True` 和 plugin 是 `trusted` 边界；`external=True` 确实会显式绕过普通 IO/purity 限制，因此只能用于真正外部维护或受信任实现。这些类别仍必须遵守契约、拓扑、输出和 trace，也不能仅为获得权限而伪造 `flow_kind`。effectful / external node 的 `CONTRACT.examples` 只做结构检查，不执行。
+`io` node 可使用真实终端流，`data_store` / `document` node 可使用 Python IO。`global_state` 让 ambient state 和从 envelope/registry/cache 取得的 callback/model/optimizer 方法在云形节点中可见；对象仍通过 envelope 流转，它不会额外开放直接 IO、动态代码、并发创建或 FFI。Python Target 会对源码可见、高置信度的 runtime dispatch 给普通 node 提示 warning，但不阻止 validate/run，也不误判固定 builtin、Python 协议或既有 IO effect 边界。
+
+`global_state` 不自动加锁；项目可用静态命名 `execution_lock` 表达冲突域，同 key 互斥、异 key 并行、无 key 不加锁并提示 warning。`external=True` 和 plugin 是 `trusted` 边界；external 只用于包装实现源码本身不可取得、不可解析或不可审查，而不是因为调用了 runtime callback。这些类别仍必须遵守契约、拓扑、输出和 trace。effectful / external node 的 `CONTRACT.examples` 只做结构检查，不执行。
 
 ### 运行前健康检查
 

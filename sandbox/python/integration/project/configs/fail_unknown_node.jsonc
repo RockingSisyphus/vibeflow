@@ -2,13 +2,7 @@
   "pipeline": {
     "nodes": [
       {
-        "provides": [
-          {
-            "key": "value.in",
-            "type": "value.in",
-            "display_name": "Value In"
-          }
-        ],
+
         "id": "missing",
         "type_used": "sandbox.missing",
         "display_name": "Missing",

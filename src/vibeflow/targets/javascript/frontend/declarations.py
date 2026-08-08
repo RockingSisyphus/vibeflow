@@ -89,7 +89,7 @@ def declarations(
             "  readonly detachedTimeoutMs?: number;",
             "}",
             "",
-            "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v3\";",
+            "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v4\";",
             "export const VIBEFLOW_PLUGIN_ABI: \"vibeflow.plugin.v1\";",
             _entry_declaration(workflow),
     ]

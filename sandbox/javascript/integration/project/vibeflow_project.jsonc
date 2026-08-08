@@ -8,11 +8,28 @@
     "base_lib": ["manifests/base_lib"],
     "data_schemas": ["manifests/data"],
     "capabilities": ["manifests/capabilities"],
-    "plugins": ["manifests/plugins"]
+    "plugins": ["manifests/plugins"],
+    "host_extensions": ["manifests/host_extensions"]
   },
   "javascript": {
     "package_root": ".",
     "external_packages": []
+  },
+  "architecture": {
+    "documents": [
+      {
+        "workflow": "configs/nodeset.jsonc",
+        "document": "review_artifacts/NODESET_ARCHITECTURE.jsonc"
+      },
+      {
+        "workflow": "configs/nested_async.jsonc",
+        "document": "review_artifacts/NESTED_ASYNC_ARCHITECTURE.jsonc"
+      },
+      {
+        "workflow": "configs/browser_permanent_port_host.jsonc",
+        "document": "review_artifacts/PERMANENT_PORT_ARCHITECTURE.jsonc"
+      }
+    ]
   },
   "quality_enabled": false
 }

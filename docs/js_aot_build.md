@@ -2,7 +2,7 @@
 
 VibeFlow 可以把同一份 workflow 编译为普通 JavaScript ESM。生成物在运行时不需要 Python，也不需要浏览器或 Node.js 安装 VibeFlow。同步 workflow 导出 `runWorkflow()`，显式异步 workflow 导出 `runWorkflowAsync()`。
 
-正式 Target 名是 `javascript`；TypeScript 是该 Target 支持的实现语言。VibeFlow 0.10.1 提供 `vibeflow.targets.javascript.frontend`、`.quality`、`.build` 以及 CLI 入口，不提供旧 AOT 模块路径，也不依赖 Python Target。
+正式 Target 名是 `javascript`；TypeScript 是该 Target 支持的实现语言。VibeFlow 0.12.0 提供 `vibeflow.targets.javascript.frontend`、`.quality`、`.build` 以及 CLI 入口，不提供旧 AOT 模块路径，也不依赖 Python Target。
 
 本文描述当前公开配置、节点 ABI、Workflow ABI 和构建命令。
 
@@ -83,6 +83,10 @@ project/
 
 `validate` 检查 workflow、descriptor 和 VibeFlow 架构边界，`review` 展示实际配置，`quality-check` 检查职责与依赖。三者都不判断项目是否支持某个平台。平台实现闭包只在 `build --target` 时解析。
 
+JavaScript `review` 与 Python 共用语言无关的 Architecture 审核模型、Mermaid/ASCII 表现层和 canonical `review-columns` SVG composer。正式审核从同一次审计快照读取根图、全部 nodeset definition、调用关系和实际选择的资源；普通 nodeset 与永久 loop body 分组展示，嵌套调用递归展开。SVG fragment 使用 `data-review-kind`、`data-review-owner`、`data-review-target` 标识覆盖项，发布前必须与快照计算出的预期集合完全一致；缺失、重复或意外 fragment 均以 `REVIEW.SVG.COVERAGE` fail closed。
+
+正式 SVG 必须由 Mermaid CLI 渲染。源码仓库默认使用 `tools/mermaid-renderer/`，分发包使用 `kernel/tools/mermaid-renderer/`；首次使用先在对应目录执行 `npm ci`。renderer 缺失或失败时返回 `REVIEW.SVG.RENDER` 并保留旧 SVG，不会退回手写 SVG、expanded MMD 或其他补位路径。
+
 `javascript.package_root` 是包含 `package.json`、lockfile 和项目本地 `node_modules` 的目录。`external_packages` 中的包不会进入 bundle，而是保留给下游 bundler 或实际宿主解析。
 
 `descriptors.plugins` 与 `descriptors.host_extensions` 只登记当前 project 可用的资源。
@@ -102,7 +106,6 @@ project/
   "description": "Builds a greeting.",
   "version": "1.0.0",
   "flow_kind": "process",
-  "purity": "pure",
   "external": false,
   "tags": [],
   "contract": {
@@ -120,8 +123,12 @@ project/
         "display_name": "Greeting"
       }
     ],
-    "input_semantics": {},
-    "output_semantics": {},
+    "input_semantics": {
+      "name.text": ["Name to include in the greeting."]
+    },
+    "output_semantics": {
+      "greeting": ["Greeting produced for the supplied name."]
+    },
     "params_schema": {
       "prefix": {
         "type": "string"
@@ -129,11 +136,6 @@ project/
     },
     "params_defaults": {
       "prefix": "Hello"
-    },
-    "output_schema": {
-      "greeting": {
-        "type": "string"
-      }
     },
     "examples": []
   },
@@ -165,7 +167,8 @@ project/
 - `requires` 按数据 `type` 声明输入，cardinality 为 `exactly_one`、`optional_one` 或 `all`。
 - `provides` 的 `key` 是实现返回对象中的 key，`type` 是流程中传递的数据类型。
 - `params_schema` 和 `params_defaults` 描述 workflow 中 node `config` 的合法形状。
-- `output_schema` 按 provider key 检查 node 返回值。
+- 每个输入输出端口都必须填写非空 `display_name`，`input_semantics` / `output_semantics` 必须逐项覆盖所有端口。
+- 输出结构和 TypeScript 类型只由 `provides[].type` 对应的独立 Data Schema 决定；node descriptor 不能按输出 key 覆盖数据结构。AOT 用到的类型缺少 Data Schema 时构建失败。
 - AOT 构建会为当前 target 选择唯一一个 JavaScript/TypeScript 实现；不存在或存在歧义都会失败。
 - `completion` 为 `immediate` 或 `suspend`，缺省为 `immediate`；它是实现能否立即返回的静态契约。
 - `source.ref` 相对于 project root。JS/TS AOT 工程构建当前使用文件源码；没有配套生成器的 `generated` source 不可用。
@@ -569,7 +572,7 @@ console.log(result.greeting);
 
 ## 6. 顶层 Workflow ABI
 
-JS AOT 使用 `vibeflow.workflow.v3`；`vibeflow.workflow.v2` 会被显式拒绝，不按缺省字段静默升级。公共 v3 IR 可以携带 node `effect_scope`，以及 workflow/block/node 的 `execution_lock`、`contains_global_state` 和适用层级的 `root_exclusive`，但 JavaScript Target v1 只接受不要求 global-state 或 execution-lock feature 的可执行计划。`entry_mode` 缺省为 `sync`，构建产物只导出匹配当前模式的入口：
+JS AOT 使用 `vibeflow.workflow.v4`；`vibeflow.workflow.v3` 会被显式拒绝，不按缺省字段静默升级。公共 v4 IR 可以携带 node `effect_scope`、三态 `runtime_dispatch`，以及 workflow/block/node 的 `execution_lock` 和 `contains_global_state`；`contains_global_state` 不隐含 root 锁。JavaScript Target v1 不实现 runtime-dispatch detector，相关事实为 `null`，并且只接受不要求 global-state 或 execution-lock feature 的可执行计划。`entry_mode` 缺省为 `sync`，构建产物只导出匹配当前模式的入口：
 
 ```ts
 export type WorkflowTraceMode = "off" | "boundary" | "full";
@@ -869,7 +872,7 @@ npx playwright test
 JS/Web AOT 只接受可静态检查、可移植的流程：
 
 - 不会把 Python node 自动翻译成 JavaScript；
-- implemented `flow_kind=global_state`、`effect_scope=global_state`、`contains_global_state=true` 和任何非空 `execution_lock` 均以 `TARGET.FEATURE.UNSUPPORTED` 拒绝；JS v1 不实现 process-wide execution lease、锁 trace 或自动 global-state 互斥；
+- implemented `flow_kind=global_state`、`effect_scope=global_state`、`contains_global_state=true` 和任何非空 `execution_lock` 均以 `TARGET.FEATURE.UNSUPPORTED` 拒绝；JS v1 不实现命名 execution lease、锁 trace 或 runtime-dispatch 检测；
 - `python_stub`、delegate-cli、任意 Python 对象和 Python Plugin 实现不能进入 JS target；JS/TS Plugin 必须使用当前 Target 的 descriptor 与 `vibeflow.plugin.v1`；
 - workflow 使用的普通 node 和 `base_lib` 必须有唯一的、与本次 `build --target` 匹配的 JS/TS 实现；
 - node 参数、输入输出和 Capability 边界必须是 JSON 可表达的数据；
@@ -877,7 +880,7 @@ JS/Web AOT 只接受可静态检查、可移植的流程：
 - Web Worker executor 尚未实现；JS TaskPlan 首版使用 event loop；
 - VibeFlow 只生成通用 Capability/Host Extension ABI 和核心 Port 契约，不内置任何具体宿主接线。
 
-Capability 与 Host Extension 不能自动替代 `global_state` 或 `execution_lock`：前者是显式宿主依赖，后者是 Core 的并发语义。若未来 JS Target 实现这些 feature，必须先遵守同一 WorkflowPlan v3 字段、Target feature gating、lease 生命周期和 trace 契约，不能只放宽 frontend parser。
+Capability 与 Host Extension 不能自动替代 `global_state` 或 `execution_lock`：前者是显式宿主依赖，后者是 Core 的并发语义。若未来 JS Target 实现这些 feature，必须先遵守同一 WorkflowPlan v4 字段、Target feature gating、runtime-dispatch 事实、显式命名 lease 生命周期和 trace 契约，不能只放宽 frontend parser。
 
 构建只因违反 VibeFlow 契约、缺少所选 target 实现，或 esbuild 无法生成完整产物而失败。普通语言、平台和业务问题由项目工具与真实运行测试负责。
 

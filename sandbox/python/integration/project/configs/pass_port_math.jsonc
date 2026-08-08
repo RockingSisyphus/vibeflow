@@ -17,27 +17,14 @@
         "io": {
           "operation": "receive",
           "port": "sandbox.math.in"
-        }
+        },
+        "requires": []
       },
       {
         "id": "add",
         "type_used": "sandbox.add",
         "display_name": "Add Two",
         "description": "Uses the shared Python math base_lib to add two.",
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.out",
-            "type": "value.out",
-            "display_name": "Value Out"
-          }
-        ],
         "config": {
           "delta": 2
         }
@@ -47,20 +34,6 @@
         "type_used": "sandbox.multiply",
         "display_name": "Multiply Three",
         "description": "Uses the shared Python math base_lib to multiply by three.",
-        "requires": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one",
-            "display_name": "Value Out"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.final",
-            "type": "value.final",
-            "display_name": "Final Value"
-          }
-        ],
         "config": {
           "factor": 3
         }
@@ -80,13 +53,23 @@
         "io": {
           "operation": "send",
           "port": "sandbox.math.out"
-        }
+        },
+        "provides": []
       }
     ],
     "edges": [
-      ["receive", "add"],
-      ["add", "multiply"],
-      ["multiply", "send"]
+      [
+        "receive",
+        "add"
+      ],
+      [
+        "add",
+        "multiply"
+      ],
+      [
+        "multiply",
+        "send"
+      ]
     ],
     "outputs": [
       {

@@ -103,6 +103,10 @@ def _batch_initial() -> dict[str, Any]:
     return {"train.batch": SandboxBatch([2, 4])}
 
 
+def _callback_initial() -> dict[str, Any]:
+    return {"callback.in": lambda: 23}
+
+
 COMPILED_SOURCE_FULL_REQUIRED = ("runtime._run_compiled_frame",)
 COMPILED_SOURCE_FAST_REQUIRED = ("runtime._run_compiled_frame",)
 COMPILED_SOURCE_FORBIDDEN = ("_run_node(",)
@@ -154,9 +158,9 @@ VALID_RUN_CASES = [
             "execution_lock: sandbox.global-state.serial",
         ),
         "expected_trace_kind_counts": {
-            "lock_wait": 3,
-            "lock_acquired": 3,
-            "lock_released": 3,
+            "lock_wait": 2,
+            "lock_acquired": 2,
+            "lock_released": 2,
             "global_state_enter": 1,
             "global_state_exit": 1,
         },
@@ -166,6 +170,18 @@ VALID_RUN_CASES = [
         "expected_global_state_trace": True,
     },
     {
+        "name": "ordinary_callback_warning",
+        "config": "pass_callback_warning.jsonc",
+        "initial_factory": _callback_initial,
+        "expected_outputs": {"value.out": 23},
+        "expected_health_warnings": [
+            "NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED",
+        ],
+        "expected_mermaid_contains": (
+            "runtime_dispatch: detected",
+        ),
+    },
+    {
         "name": "training_object_flow",
         "config": "pass_training_object_flow.jsonc",
         "initial_factory": _training_initial,
@@ -173,6 +189,15 @@ VALID_RUN_CASES = [
         "expected_same_as_initial": [("train.model_after", "train.model"), ("train.optimizer_after", "train.optimizer")],
         "expected_object_attrs": [("train.model_after", "weight", 0.7), ("train.optimizer_after", "steps", 1)],
         "expect_training_metrics": True,
+        "expected_health_warnings": [
+            "GRAPH.EXECUTION_LOCK.GLOBAL_STATE_UNCOORDINATED",
+        ],
+        "expected_mermaid_contains": (
+            "forward@{ shape: cloud",
+            "runtime_dispatch: detected",
+            "execution_lock: none",
+        ),
+        "expected_svg_cloud_nodes": ("forward", "backward", "step"),
     },
     {
         "name": "training_nodeset_object_flow",
@@ -872,7 +897,6 @@ INVALID_CASES = [
     {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "MissingInfoNode", "type": "bad.missing_info", "expect": "NODE.CONTRACT.MISSING_NODE_INFO"},
     {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "InfoWrongTypeNode", "type": "bad.info_type", "expect": "MISSING_NODE_INFO"},
     {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "EmptyTypeKeyNode", "type": "bad.empty", "expect": "NODE_INFO_TYPE_KEY"},
-    {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "NonPureNode", "type": "bad.non_pure", "expect": "NON_PURE_NODE"},
     {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "MissingContractNode", "type": "bad.missing_contract", "expect": "NODE.CONTRACT.MISSING_CONTRACT"},
     {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "DuplicateKeysNode", "type": "bad.duplicate_keys", "expect": "CONTRACT_DUPLICATE_REQUIREMENT_TYPE"},
     {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "MissingSemanticsNode", "type": "bad.missing_semantics", "expect": "CONTRACT_SEMANTICS_MISSING"},
@@ -902,7 +926,6 @@ INVALID_CASES = [
     {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "ExtraOutputNode", "type": "bad.extra_output", "expect": "NODE.PURITY.UNDECLARED_OUTPUT"},
     {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "MutateInputsNode", "type": "bad.mutate_inputs", "expect": "NODE.PURITY.INPUT_MUTATION"},
     {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "MutateNestedInputNode", "type": "bad.mutate_nested", "expect": "NODE.PURITY.INPUT_MUTATION"},
-    {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "UndeclaredParamNode", "type": "bad.undeclared_param", "expect": "UNDECLARED_PARAM"},
     {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "GlobalStateNode", "type": "bad.global_state", "expect": "MODULE_GLOBAL_STATE"},
     {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "SetAttrNode", "type": "bad.setattr", "expect": "NODE.PURITY.MONKEY_PATCH"},
     {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "MonkeyPatchNode", "type": "bad.monkey_patch", "expect": "NODE.PURITY.MONKEY_PATCH"},
@@ -921,7 +944,7 @@ INVALID_CASES = [
     {
         "kind": "config",
         "config": "fail_async_result_key_missing.jsonc",
-        "expect": "CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY",
+        "expect": "GRAPH.ASYNC.RESULT_KEY_CONTRACT",
     },
     {"kind": "run", "config": "fail_unknown_node.jsonc", "expect": "NODE.TYPE.UNKNOWN"},
     {"kind": "config", "config": "fail_removed_loop_registration.jsonc", "expect": "CONFIG.LOOPS.REMOVED"},
@@ -988,6 +1011,7 @@ def _run_sandbox(work_root: Path) -> int:
             *_run_review_cases(),
             *_run_delegate_cli_cases(),
             *_run_execution_model_cases(),
+            *_run_source_preflight_cases(),
             *_run_global_state_cases(),
             *_run_valid_cases(),
             *_run_invalid_cases(),
@@ -1900,8 +1924,8 @@ def _run_global_state_cases() -> list[CaseResult]:
             _run_global_state_protected_async_compile_case,
         ),
         (
-            "global-state:normal-global-lock-contention",
-            _run_global_state_lock_contention_case,
+            "global-state:unlocked-overlap",
+            _run_global_state_unlocked_overlap_case,
         ),
         (
             "global-state:failure-releases-lock",
@@ -1916,6 +1940,134 @@ def _run_global_state_cases() -> list[CaseResult]:
             result = CaseResult(name, "FAIL", str(exc))
         results.append(result)
     return results
+
+
+def _run_source_preflight_cases() -> list[CaseResult]:
+    cases = (
+        (
+            "source-preflight:imported-declarative-contract-helper",
+            _run_imported_declarative_helper_preflight_case,
+        ),
+        (
+            "source-preflight:effectful-imported-helper-rejected",
+            _run_effectful_imported_helper_preflight_case,
+        ),
+    )
+    results: list[CaseResult] = []
+    for name, runner in cases:
+        try:
+            result = runner()
+        except Exception as exc:
+            result = CaseResult(name, "FAIL", str(exc))
+        results.append(result)
+    return results
+
+
+def _run_imported_declarative_helper_preflight_case() -> CaseResult:
+    from vibeflow.tooling.application.python.project.source_preflight import (
+        preflight_python_import_tree,
+    )
+
+    case_root = WORK_ROOT / "source_preflight" / "allowed"
+    framework_root = case_root / "framework"
+    project_root = case_root / "project"
+    framework_root.mkdir(parents=True, exist_ok=True)
+    project_root.mkdir(parents=True, exist_ok=True)
+    (framework_root / "contracts.py").write_text(
+        """
+from vibeflow.core import DataProvider, DataRequirement
+
+def REQ(data_type, cardinality="exactly_one"):
+    return DataRequirement(type=data_type, cardinality=cardinality, display_name=data_type)
+
+def PROV(key, data_type=None):
+    return DataProvider(key=key, type=data_type or key, display_name=key)
+
+class SafeRunMixin:
+    def run_pure(self, inputs, params):
+        return {"sandbox.out": 1}
+""".strip(),
+        encoding="utf-8",
+    )
+    entry = project_root / "node.py"
+    entry.write_text(
+        """
+from contracts import PROV, REQ, SafeRunMixin
+from vibeflow.targets.python.project import NodeContract, NodeInfo
+
+def schema(include_label):
+    result = {"value": {"type": "number"}}
+    if include_label:
+        result["label"] = {"type": "string"}
+    return result
+
+class SandboxNode(SafeRunMixin):
+    NODE_INFO = NodeInfo("sandbox.preflight", "Preflight", "sandbox", "Imported declarations.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        requires=(REQ("sandbox.in"),),
+        provides=(PROV("sandbox.out"),),
+        input_semantics={"sandbox.in": ("sandbox input",)},
+        output_semantics={"sandbox.out": ("sandbox output",)},
+    )
+""".strip(),
+        encoding="utf-8",
+    )
+    preflight_python_import_tree(
+        entry,
+        project_root=project_root,
+        source_roots=(framework_root,),
+    )
+    return CaseResult(
+        "source-preflight:imported-declarative-contract-helper",
+        "PASS",
+    )
+
+
+def _run_effectful_imported_helper_preflight_case() -> CaseResult:
+    from vibeflow.targets.python.quality.source_analysis.preflight import (
+        PythonSourcePreflightError,
+    )
+    from vibeflow.tooling.application.python.project.source_preflight import (
+        preflight_python_import_tree,
+    )
+
+    case_root = WORK_ROOT / "source_preflight" / "rejected"
+    case_root.mkdir(parents=True, exist_ok=True)
+    artifact = case_root / "must_not_exist.txt"
+    (case_root / "contracts.py").write_text(
+        (
+            "from vibeflow.core import DataRequirement\n\n"
+            "def REQ(data_type):\n"
+            f"    open({str(artifact)!r}, 'w').write('executed')\n"
+            "    return DataRequirement(type=data_type)\n"
+        ),
+        encoding="utf-8",
+    )
+    entry = case_root / "node.py"
+    entry.write_text(
+        """
+from contracts import REQ
+from vibeflow.targets.python.project import NodeContract, NodeInfo
+
+class SandboxNode:
+    NODE_INFO = NodeInfo("sandbox.preflight.bad", "Bad Preflight", "sandbox", "Must not execute.", "0.1.0", "process")
+    CONTRACT = NodeContract(requires=(REQ("sandbox.in"),))
+""".strip(),
+        encoding="utf-8",
+    )
+    try:
+        preflight_python_import_tree(entry, project_root=case_root)
+    except PythonSourcePreflightError as exc:
+        if not any("before source validation" in item.message for item in exc.findings):
+            raise AssertionError(f"unexpected preflight findings: {exc.findings!r}") from exc
+    else:
+        raise AssertionError("effectful imported metadata helper was accepted")
+    if artifact.exists():
+        raise AssertionError("effectful imported metadata helper executed before rejection")
+    return CaseResult(
+        "source-preflight:effectful-imported-helper-rejected",
+        "PASS",
+    )
 
 
 def _run_global_state_forbidden_effect_audit() -> CaseResult:
@@ -1988,13 +2140,6 @@ def _run_global_state_protected_async_compile_case() -> CaseResult:
         "type_used": "sandbox.global_state_probe",
         "display_name": "State",
         "description": "Declares process-local ambient state.",
-        "provides": [
-            {
-                "key": "value.out",
-                "type": "value.out",
-                "display_name": "Value Out",
-            }
-        ],
     }
     cases = (
         (
@@ -2004,13 +2149,6 @@ def _run_global_state_protected_async_compile_case() -> CaseResult:
                 "type_used": "sandbox.constant",
                 "display_name": "Side",
                 "description": "Attempts to escape the protected root.",
-                "provides": [
-                    {
-                        "key": "value.in",
-                        "type": "value.in",
-                        "display_name": "Value In",
-                    }
-                ],
                 "async": "detached",
             },
             {"owner": "pipeline", "node": "side", "async": "detached"},
@@ -2022,13 +2160,6 @@ def _run_global_state_protected_async_compile_case() -> CaseResult:
                 "type_used": "sandbox.constant",
                 "display_name": "Future",
                 "description": "Has no statically provable consumer path.",
-                "provides": [
-                    {
-                        "key": "value.in",
-                        "type": "value.in",
-                        "display_name": "Value In",
-                    }
-                ],
                 "async": "result_key",
                 "result_key": "value.in",
             },
@@ -2041,9 +2172,20 @@ def _run_global_state_protected_async_compile_case() -> CaseResult:
         ),
     )
     rejected: list[str] = []
+    unlocked = parse_graph_config(
+        {"pipeline": {"nodes": [dict(state), dict(cases[0][1])]}}
+    )
+    GraphCompiler().compile(unlocked, registry=build_node_registry())
     for expected_rule, async_node, expected_details in cases:
         graph = parse_graph_config(
-            {"pipeline": {"nodes": [dict(state), async_node]}}
+            {
+                "pipeline": {
+                    "execution_lock": {
+                        "key": "sandbox.global-state.async"
+                    },
+                    "nodes": [dict(state), async_node],
+                }
+            }
         )
         try:
             GraphCompiler().compile(graph, registry=build_node_registry())
@@ -2065,7 +2207,7 @@ def _run_global_state_protected_async_compile_case() -> CaseResult:
     return CaseResult(
         "global-state:protected-async-compile",
         "PASS",
-        payload={"rejected": rejected},
+        payload={"unlocked_detached": "accepted", "rejected": rejected},
     )
 
 
@@ -2089,19 +2231,6 @@ def _global_state_runtime_graph(
                 "type_used": node_type,
                 "display_name": "Work",
                 "description": "Runs the lock probe.",
-                **(
-                    {
-                        "provides": [
-                            {
-                                "key": "value.out",
-                                "type": "value.out",
-                                "display_name": "Value Out",
-                            }
-                        ]
-                    }
-                    if node_type == "sandbox.global_state_probe"
-                    else {}
-                ),
             },
             {
                 "id": "end",
@@ -2146,7 +2275,7 @@ def _normal_runtime_graph():
     )
 
 
-def _run_global_state_lock_contention_case() -> CaseResult:
+def _run_global_state_unlocked_overlap_case() -> CaseResult:
     from vibeflow.targets.python.project import PluginRegistry
     from vibeflow.targets.python.runtime.engine import PipelineRuntime
 
@@ -2168,7 +2297,7 @@ def _run_global_state_lock_contention_case() -> CaseResult:
     plugins.register(HoldNormalRoot(), plugin_type="runtime")
     registry = build_node_registry()
     normal_dir = RUN_ROOT / "global-state-normal-reader"
-    global_dir = RUN_ROOT / "global-state-waiting-writer"
+    global_dir = RUN_ROOT / "global-state-unlocked-cloud"
     normal = PipelineRuntime(
         _normal_runtime_graph(),
         registry=registry,
@@ -2185,41 +2314,21 @@ def _run_global_state_lock_contention_case() -> CaseResult:
         if not entered.wait(timeout=2):
             raise AssertionError("normal root never entered its protected hook")
         global_future = executor.submit(global_runtime.run)
-        trace_path = global_dir / "runtime_trace.jsonl"
-        deadline = time.monotonic() + 2
-        while time.monotonic() < deadline:
-            if trace_path.is_file() and '"lock_wait"' in trace_path.read_text(
-                encoding="utf-8"
-            ):
-                break
-            time.sleep(0.01)
-        else:
-            release.set()
-            raise AssertionError("global-state root never reached lock_wait")
-        if global_future.done():
-            release.set()
-            raise AssertionError(
-                "global-state root completed while a normal root held shared access"
-            )
+        global_future.result(timeout=3)
         release.set()
         normal_future.result(timeout=3)
-        global_future.result(timeout=3)
     events = _runtime_trace_lines(global_dir)
-    waited = [
-        float(event.get("details", {}).get("wait_ms", 0))
-        for event in events
-        if event["kind"] == "lock_acquired"
-        and event.get("details", {}).get("key")
-        == "vibeflow.runtime.global_state"
+    lock_events = [
+        event for event in events if str(event.get("kind", "")).startswith("lock_")
     ]
-    if len(waited) != 1 or waited[0] <= 0:
+    if lock_events:
         raise AssertionError(
-            f"global-state root did not record a positive lock wait: {waited!r}"
+            f"unlocked global-state root emitted lock events: {lock_events!r}"
         )
     return CaseResult(
-        "global-state:normal-global-lock-contention",
+        "global-state:unlocked-overlap",
         "PASS",
-        payload={"exclusive_wait_ms": waited[0]},
+        payload={"overlapped_normal_root": True, "lock_events": 0},
     )
 
 
@@ -2283,13 +2392,6 @@ def _thread_probe_graph(*, async_mode: bool):
         "type_used": "sandbox.thread_probe",
         "display_name": "Thread probe",
         "description": "Reports the Python thread used to execute this node.",
-        "provides": [
-            {
-                "key": "thread.name",
-                "type": "thread.name",
-                "display_name": "Thread name",
-            }
-        ],
     }
     if async_mode:
         probe.update(
@@ -2314,20 +2416,6 @@ def _thread_probe_graph(*, async_mode: bool):
                         "type_used": "sandbox.thread_end",
                         "display_name": "Thread probe end",
                         "description": "Joins the thread probe result.",
-                        "requires": [
-                            {
-                                "type": "thread.name",
-                                "cardinality": "exactly_one",
-                                "display_name": "Thread name",
-                            }
-                        ],
-                        "provides": [
-                            {
-                                "key": "thread.result",
-                                "type": "thread.result",
-                                "display_name": "Thread result",
-                            }
-                        ],
                     },
                 ],
                 "edges": [
@@ -2360,8 +2448,8 @@ def _thread_probe_registry():
             flow_kind="process",
         )
         CONTRACT = NodeContract(
-            provides=(DataProvider("thread.name", "thread.name"),),
-            output_schema={"thread.name": {"type": "string"}},
+            provides=(DataProvider("thread.name", "thread.name", display_name="thread.name"),),
+
         )
 
         def run_pure(self, inputs, params):
@@ -2393,9 +2481,9 @@ def _thread_probe_registry():
             flow_kind="terminal",
         )
         CONTRACT = NodeContract(
-            requires=(DataRequirement("thread.name", "exactly_one"),),
-            provides=(DataProvider("thread.result", "thread.result"),),
-            output_schema={"thread.result": {"type": "string"}},
+            requires=(DataRequirement("thread.name", "exactly_one", display_name="thread.name"),),
+            provides=(DataProvider("thread.result", "thread.result", display_name="thread.result"),),
+
         )
 
         def run_pure(self, inputs, params):
@@ -2607,7 +2695,13 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     policy_result = resolve_effective_policy(document.data, config_path=config_path, explicit_policy_path=POLICY_PATH, plugin_registry=plugin_registry)
     graph = parse_graph_config(document.data)
     node_registry = build_node_registry()
-    compiled = GraphCompiler().compile(graph, registry=node_registry, plugin_registry=plugin_registry)
+    compilation = GraphCompiler().compile_with_findings(
+        graph,
+        registry=node_registry,
+        plugin_registry=plugin_registry,
+    )
+    graph = compilation.workflow.graph
+    compiled = compilation.compiled_graph
     runtime_options = RuntimeOptions(**case["runtime_options"]) if "runtime_options" in case else None
     plan = build_execution_plan(graph, compiled, registry=node_registry, runtime_options=runtime_options, global_config=resources.global_config)
     _assert_execution_plan(case, plan)
@@ -2872,8 +2966,8 @@ def _assert_global_state_architecture(architecture: dict[str, Any]) -> None:
     workflow = architecture["workflow"]
     if workflow.get("contains_global_state") is not True:
         raise AssertionError("Architecture did not propagate contains_global_state")
-    if workflow.get("root_exclusive") is not True:
-        raise AssertionError("Architecture did not mark the root exclusive")
+    if "root_exclusive" in workflow:
+        raise AssertionError("Architecture retained removed root_exclusive metadata")
     if workflow.get("execution_lock") != {
         "key": "sandbox.global-state.serial",
         "scope": "root",
@@ -2887,6 +2981,7 @@ def _assert_global_state_architecture(architecture: dict[str, Any]) -> None:
     expected = {
         "flow_kind": "global_state",
         "effect_scope": "global_state",
+        "runtime_dispatch": "none",
         "contains_global_state": True,
         "execution_lock": {
             "key": "sandbox.global-state.serial",
@@ -2920,20 +3015,11 @@ def _assert_global_state_trace(run_dir: Path) -> None:
         for event in events
         if event["kind"] == "lock_acquired"
     ]
-    automatic = [
-        item
-        for item in acquisitions
-        if item.get("key") == "vibeflow.runtime.global_state"
-    ]
     named = [
         item
         for item in acquisitions
         if item.get("key") == "sandbox.global-state.serial"
     ]
-    if len(automatic) != 1 or automatic[0].get("mode") != "exclusive":
-        raise AssertionError(
-            f"automatic global-state domain acquisition is invalid: {automatic!r}"
-        )
     if len(named) != 2 or [item.get("reentrant") for item in named] != [False, True]:
         raise AssertionError(
             f"named root/node lock reentrancy is invalid: {named!r}"
@@ -3005,14 +3091,14 @@ def _assert_execution_plan(case: dict[str, Any], plan) -> None:
                     f"got {actual_tasks!r}"
                 )
         if case.get("expected_workflow_global_state"):
-            if portable.abi_version != "vibeflow.workflow.v3":
+            if portable.abi_version != "vibeflow.workflow.v4":
                 raise AssertionError(
-                    f"expected WorkflowPlan v3, got {portable.abi_version!r}"
+                    f"expected WorkflowPlan v4, got {portable.abi_version!r}"
                 )
             if portable.contains_global_state is not True:
                 raise AssertionError("WorkflowPlan did not propagate global state")
-            if portable.root_exclusive is not True:
-                raise AssertionError("WorkflowPlan did not mark the root exclusive")
+            if "root_exclusive" in portable.to_dict():
+                raise AssertionError("WorkflowPlan retained root_exclusive")
             if portable.execution_lock is None or portable.execution_lock.to_dict() != {
                 "key": "sandbox.global-state.serial",
                 "scope": "root",
@@ -3027,6 +3113,10 @@ def _assert_execution_plan(case: dict[str, Any], plan) -> None:
                 )
             if state.contains_global_state is not True:
                 raise AssertionError("WorkflowPlan state does not declare global state")
+            if state.runtime_dispatch is not False:
+                raise AssertionError(
+                    f"WorkflowPlan state runtime_dispatch is {state.runtime_dispatch!r}"
+                )
             if state.execution_lock is None or state.execution_lock.to_dict() != {
                 "key": "sandbox.global-state.serial",
                 "scope": "node",
@@ -3228,7 +3318,7 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
 
     class RuntimeEndNode:
         NODE_INFO = NodeInfo("sandbox.runtime_end", "Runtime End", "sandbox", "runtime test end", "0.1.0", "terminal")
-        CONTRACT = NodeContract(requires=(DataRequirement("bad.out", "exactly_one"),), input_semantics={"bad.out": ("bad output",)}, examples=({"inputs": {"bad.out": 1}, "params": {}},))
+        CONTRACT = NodeContract(requires=(DataRequirement("bad.out", "exactly_one", display_name="bad.out"),), input_semantics={"bad.out": ("bad output",)}, examples=({"inputs": {"bad.out": 1}, "params": {}},))
 
         def run_pure(self, inputs, params):
             return {}
@@ -3241,8 +3331,8 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
     graph = GraphConfig(
         nodes=(
             NodeSpec(id="start", type_used="sandbox.runtime_start"),
-            NodeSpec(id="bad", type_used=str(case["type"]), provides=(DataProvider("bad.out", "bad.out"),)),
-            NodeSpec(id="end", type_used="sandbox.runtime_end", requires=(DataRequirement("bad.out", "exactly_one"),)),
+            NodeSpec(id="bad", type_used=str(case["type"]), provides=(DataProvider("bad.out", "bad.out", display_name="bad.out"),)),
+            NodeSpec(id="end", type_used="sandbox.runtime_end", requires=(DataRequirement("bad.out", "exactly_one", display_name="bad.out"),)),
         ),
         edges=(EdgeSpec("start", "bad"), EdgeSpec("bad", "end")),
     )
@@ -3267,7 +3357,7 @@ def _health_invalid_node(case: dict[str, Any]) -> CaseResult:
     cls = _load_class(PROJECT_DIR / str(case["module"]), str(case["class"]))
     registry = NodeRegistry()
     registry.register(str(case["type"]), cls, config_schema={}, config_defaults={})
-    graph = GraphConfig(nodes=(NodeSpec(id="bad", type_used=str(case["type"]), provides=(DataProvider("bad.out", "bad.out"),)),))
+    graph = GraphConfig(nodes=(NodeSpec(id="bad", type_used=str(case["type"]), provides=(DataProvider("bad.out", "bad.out", display_name="bad.out"),)),))
     policy = PurityPolicy(
         allowed_base_lib_paths=(str(PROJECT_DIR / "base_lib"),),
         allowed_base_lib_modules=("base_lib",),

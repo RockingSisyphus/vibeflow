@@ -425,10 +425,6 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
                 node,
                 suggested_fix_type="move_to_boundary",
             )
-        if isinstance(node.value, ast.Name) and node.value.id == "params":
-            key = _literal_subscript_key(node)
-            if key and key != "_global" and self.contract is not None and key not in self.contract.params_schema:
-                self._add("undeclared_param", f"params key is not declared in CONTRACT.params_schema: {key}", node, failure_layer="contract", suggested_fix_type="fix_contract")
         self.generic_visit(node)
 
     def _check_import(self, module: str, node: ast.AST) -> None:

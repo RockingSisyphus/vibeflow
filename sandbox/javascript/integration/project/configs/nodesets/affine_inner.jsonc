@@ -37,20 +37,8 @@
         "type_used": "sandbox.math",
         "display_name": "Affine transform",
         "description": "Uses defaults unless a qualified call-site override is supplied.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ],
+
+
         "config": {
           "scale": 2,
           "offset": 1

@@ -32,45 +32,16 @@
       {
         "display_name": "Add Pair",
         "description": "Adds the two arithmetic inputs before branch adjustment.",
-        "requires": [
-          {
-            "type": "calc.a",
-            "cardinality": "exactly_one",
-            "display_name": "Calc A"
-          },
-          {
-            "type": "calc.b",
-            "cardinality": "exactly_one",
-            "display_name": "Calc B"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.sum",
-            "type": "calc.sum",
-            "display_name": "Calc Sum"
-          }
-        ],
+
+
         "id": "add_pair",
         "type_used": "semantic.add_pair"
       },
       {
         "display_name": "Scale",
         "description": "Scales calc.sum for both mutually exclusive branch bodies.",
-        "requires": [
-          {
-            "type": "calc.sum",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Sum"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.scaled",
-            "type": "calc.scaled",
-            "display_name": "Calc Scaled"
-          }
-        ],
+
+
         "factor": 3,
         "id": "scale",
         "type_used": "semantic.scale"
@@ -78,45 +49,16 @@
       {
         "display_name": "Compare Route",
         "description": "Chooses whether the left or right branch is active.",
-        "requires": [
-          {
-            "type": "calc.c",
-            "cardinality": "exactly_one",
-            "display_name": "Calc C"
-          },
-          {
-            "type": "calc.d",
-            "cardinality": "exactly_one",
-            "display_name": "Calc D"
-          }
-        ],
-        "provides": [
-          {
-            "key": "route.branch",
-            "type": "route.branch",
-            "display_name": "Route Branch"
-          }
-        ],
+
+
         "id": "compare",
         "type_used": "semantic.compare_gt"
       },
       {
         "display_name": "Left Adjust",
         "description": "Runs only when the left branch is selected.",
-        "requires": [
-          {
-            "type": "calc.scaled",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Scaled"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.left_branch",
-            "type": "branch_result",
-            "display_name": "Calc Left Branch"
-          }
-        ],
+
+
         "bonus": 10,
         "id": "left_adjust",
         "type_used": "semantic.left_adjust"
@@ -124,20 +66,8 @@
       {
         "display_name": "Right Adjust",
         "description": "Runs only when the right branch is selected.",
-        "requires": [
-          {
-            "type": "calc.scaled",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Scaled"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.right_branch",
-            "type": "branch_result",
-            "display_name": "Calc Right Branch"
-          }
-        ],
+
+
         "penalty": 6,
         "id": "right_adjust",
         "type_used": "semantic.right_adjust"
@@ -146,33 +76,15 @@
         "display_name": "Consume Selected Branch",
         "description": "Consumes whichever mutually exclusive branch produced a branch_result value.",
         "join_policy": "any_active",
-        "requires": [
-          {
-            "type": "branch_result",
-            "cardinality": "exactly_one",
-            "display_name": "Branch Result"
-          }
-        ],
-        "provides": [
-          {
-            "key": "branch.final",
-            "type": "final_result",
-            "display_name": "Branch Final"
-          }
-        ],
+
+
         "id": "consume_branch",
         "type_used": "semantic.branch_type_consumer"
       },
       {
         "display_name": "End",
         "description": "Ends after the selected branch result is finalized.",
-        "requires": [
-          {
-            "type": "final_result",
-            "cardinality": "exactly_one",
-            "display_name": "Final Result"
-          }
-        ],
+
         "id": "end",
         "type_used": "semantic.branch_final_end"
       }

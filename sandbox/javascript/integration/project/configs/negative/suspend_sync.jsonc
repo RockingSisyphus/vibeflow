@@ -20,22 +20,8 @@
         "id": "invalid",
         "type_used": "sandbox.invalid.suspend_sync",
         "display_name": "Suspend sync mismatch",
-        "description": "Must fail because a suspend node must return a Promise.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ]
-      },
+        "description": "Must fail because a suspend node must return a Promise."
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

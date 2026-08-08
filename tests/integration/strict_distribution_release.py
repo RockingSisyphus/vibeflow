@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import zipfile
+from xml.etree import ElementTree
 
 import pytest
 
@@ -70,13 +71,24 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
         {
             "workflow": "configs/linear.jsonc",
             "document": "ARCHITECTURE.jsonc",
-        }
+        },
+        {
+            "workflow": "configs/browser_permanent_port_host.jsonc",
+            "document": "PERMANENT_PORT_ARCHITECTURE.jsonc",
+        },
     ]
     architecture = (
         javascript_project / "ARCHITECTURE.jsonc"
     ).read_text(encoding="utf-8")
     assert '"project_target": "javascript"' in architecture
     assert str(first.directory) not in architecture
+    permanent_architecture = (
+        javascript_project / "PERMANENT_PORT_ARCHITECTURE.jsonc"
+    ).read_text(encoding="utf-8")
+    assert '"target": "sandbox.permanent_port_body"' in permanent_architecture
+    assert '"body": {' in permanent_architecture
+    assert '"type_used": "sandbox.math"' in permanent_architecture
+    assert str(first.directory) not in permanent_architecture
 
     published_guidance = "\n".join(
         path.read_text(encoding="utf-8")
@@ -94,9 +106,11 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
     for marker in (
         "flow_kind=global_state",
         "effect_scope=global_state",
+        "runtime_dispatch",
+        "Callback",
         "execution_lock",
+        "vibeflow.workflow.v4",
         "vibeflow.workflow.v3",
-        "vibeflow.workflow.v2",
         "TARGET.FEATURE.UNSUPPORTED",
         "global_state_may_have_changed",
         "cloud",
@@ -110,7 +124,7 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
     assert b'FLOW_KIND_GLOBAL_STATE = "global_state"' in constants
     assert b'EFFECT_SCOPE_GLOBAL_STATE = "global_state"' in constants
     assert b"class ExecutionLockSpec" in flow
-    assert b'WORKFLOW_ABI_VERSION = "vibeflow.workflow.v3"' in workflow_model
+    assert b'WORKFLOW_ABI_VERSION = "vibeflow.workflow.v4"' in workflow_model
 
     with zipfile.ZipFile(first.archive) as archive:
         names = archive.namelist()
@@ -127,7 +141,9 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
         ).decode("utf-8")
         for marker in (
             "flow_kind=global_state",
+            "runtime_dispatch",
             "execution_lock",
+            "vibeflow.workflow.v4",
             "vibeflow.workflow.v3",
             "cloud",
         ):
@@ -145,6 +161,89 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
         check=False,
     )
     assert completed.returncode == 0, completed.stderr or completed.stdout
+
+
+def test_distribution_renderer_reviews_registered_permanent_loop(
+    tmp_path: Path,
+) -> None:
+    distribution = distribution_builder.build_distribution(
+        tmp_path / "distribution",
+        run_self_check=False,
+    )
+    for relative in (
+        "javascript_project",
+        "kernel/tools/mermaid-renderer",
+    ):
+        completed = subprocess.run(
+            ["npm", "ci"],
+            cwd=distribution / relative,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert completed.returncode == 0, completed.stderr or completed.stdout
+
+    output = distribution / "reports/javascript-permanent-port.svg"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "run.py",
+            "review",
+            "--config",
+            "javascript_project/configs/browser_permanent_port_host.jsonc",
+            "--output",
+            str(output.relative_to(distribution)),
+        ],
+        cwd=distribution,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "PASS"
+    assert payload["published"] is True
+    root = ElementTree.parse(output).getroot()
+    coverage = {
+        (
+            element.get("data-review-kind", ""),
+            element.get("data-review-target", ""),
+        )
+        for element in root.iter()
+        if "review-inline-fragment" in element.get("class", "").split()
+    }
+    assert ("workflow", "javascript-project") in coverage
+    assert ("loop_body", "sandbox.permanent_port_body") in coverage
+    assert ("resource", "host_extensions") in coverage
+
+    diagnostic_output = distribution / "reports/javascript-permanent-port-diagnostic.svg"
+    diagnostic = subprocess.run(
+        [
+            sys.executable,
+            "run.py",
+            "svg",
+            "--config",
+            "javascript_project/configs/browser_permanent_port_host.jsonc",
+            "--output",
+            str(diagnostic_output.relative_to(distribution)),
+            "--expand-nodesets",
+        ],
+        cwd=distribution,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert diagnostic.returncode == 0, diagnostic.stderr or diagnostic.stdout
+    diagnostic_root = ElementTree.parse(diagnostic_output).getroot()
+    diagnostic_coverage = {
+        (
+            element.get("data-review-kind", ""),
+            element.get("data-review-target", ""),
+        )
+        for element in diagnostic_root.iter()
+        if "review-inline-fragment" in element.get("class", "").split()
+    }
+    assert ("loop_body", "sandbox.permanent_port_body") in diagnostic_coverage
 
 
 @pytest.mark.parametrize("failure_call", [1, 2, 3, 4])

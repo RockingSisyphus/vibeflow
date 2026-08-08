@@ -23,16 +23,24 @@
     ],
     "params_schema": {},
     "params_defaults": {},
-    "output_schema": {
-      "value": {
-        "type": "string"
-      }
+    "input_semantics": {
+      "sandbox.storage.key": [
+        "Storage key input consumed by this node."
+      ]
+    },
+    "output_semantics": {
+      "value": [
+        "Stored value output produced by this node."
+      ]
     }
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "completion": "suspend",
       "source": {
         "kind": "file",
@@ -45,7 +53,9 @@
   "capabilities": [
     {
       "id": "sandbox.storage",
-      "operations": ["read"]
+      "operations": [
+        "read"
+      ]
     }
   ]
 }

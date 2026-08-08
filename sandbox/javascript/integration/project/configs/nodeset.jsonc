@@ -36,32 +36,8 @@
         "id": "arithmetic",
         "type_used": "sandbox.arithmetic_nodeset",
         "display_name": "Run arithmetic nodeset",
-        "description": "Computes (x + a) - b inside a nested block.",
-        "requires": [
-          {
-            "type": "sandbox.x",
-            "cardinality": "exactly_one",
-            "display_name": "X"
-          },
-          {
-            "type": "sandbox.addend",
-            "cardinality": "exactly_one",
-            "display_name": "Addend"
-          },
-          {
-            "type": "sandbox.subtrahend",
-            "cardinality": "exactly_one",
-            "display_name": "Subtrahend"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ]
-      },
+        "description": "Computes (x + a) - b inside a nested block."
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

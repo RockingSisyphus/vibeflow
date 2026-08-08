@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 from vibeflow.core.contracts import DataProvider, DataRequirement
 from vibeflow.targets.python.project.node import EFFECT_SCOPE_NONE, EFFECT_SCOPE_TRUSTED, NodeContract, NodeInfo, PureNode, effective_effect_scope
 from vibeflow.targets.python.quality.source_analysis.ast_rules import import_aliases_from_node, imported_module_roots
 from vibeflow.targets.python.quality.source_analysis.helpers import _dedupe_violations, _violation
 from vibeflow.targets.python.quality.source_analysis.metrics import _ComplexityCounter, _analyze_internal_call_chain
+from vibeflow.targets.python.quality.source_analysis.runtime_dispatch import (
+    RuntimeDispatchAnalysis,
+    RuntimeDispatchSite,
+    analyze_runtime_dispatch,
+)
 from vibeflow.targets.python.quality.source_analysis.source import _parse_source, _source_info
 from vibeflow.targets.python.quality.source_analysis.types import NodeMetrics, PurityPolicy, PurityViolation
 from vibeflow.targets.python.quality.source_analysis.validators import (
@@ -16,7 +21,6 @@ from vibeflow.targets.python.quality.source_analysis.validators import (
     _validate_call_chain_metrics,
     _validate_complexity_metrics,
     _validate_contract,
-    _validate_examples,
     _validate_flow_kind_contract,
     _validate_interface,
     _validate_node_info,
@@ -58,7 +62,6 @@ def validate_node_class(
     _append_contract_violations(node_cls, info, contract, expected_type, source, violations)
 
     if effect_scope == EFFECT_SCOPE_TRUSTED:
-        _append_examples_if_clean(node_cls, contract, source, violations, execute=False)
         return _dedupe_violations(violations)
 
     if source.class_text is None:
@@ -91,11 +94,41 @@ def validate_node_class(
     )
     _append_class_visitor_violations(visitor_context, violations)
 
+    if effect_scope == EFFECT_SCOPE_NONE:
+        analysis = analyze_runtime_dispatch(node_cls)
+        if analysis is not None and analysis.detected:
+            violations.append(_runtime_dispatch_warning(analysis))
+
     if scan_module:
         _append_module_violations(node_cls, source, policy, known_node_modules, known_node_class_names, effect_scope, violations)
-    _append_examples_if_clean(node_cls, contract, source, violations, execute=effect_scope == EFFECT_SCOPE_NONE)
-
     return _dedupe_violations(violations)
+
+
+def _runtime_dispatch_warning(analysis: RuntimeDispatchAnalysis) -> PurityViolation:
+    first = analysis.sites[0]
+    return PurityViolation(
+        code="runtime_dispatch",
+        rule_id="NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED",
+        severity="warning",
+        source_location={
+            "path": first.path,
+            "line": first.line,
+            "column": first.column,
+        },
+        failure_layer="implementation",
+        message=(
+            "node explicitly dispatches through a runtime-provided callable or "
+            "object; use flow_kind='global_state' to make this runtime boundary visible"
+        ),
+        suggested_fix_type="fix_contract",
+        details={
+            "dispatch_kind": first.dispatch_kind,
+            "callee": first.expression,
+            "origin": first.origin,
+            "site_count": len(analysis.sites),
+            "sites": [site.to_dict() for site in analysis.sites],
+        },
+    )
 
 
 def _append_contract_violations(node_cls, info, contract, expected_type, source, violations: list[PurityViolation]) -> None:
@@ -113,11 +146,6 @@ def _source_unavailable_violation(source) -> PurityViolation:
         source=source,
         suggested_fix_type="fix_node",
     )
-
-
-def _append_examples_if_clean(node_cls, contract, source, violations: list[PurityViolation], *, execute: bool) -> None:
-    if isinstance(contract, NodeContract) and not any(violation.severity == "error" for violation in violations):
-        violations.extend(_validate_examples(node_cls, contract, source=source, execute=execute))
 
 
 def _append_class_visitor_violations(context: _ClassVisitorContext, violations: list[PurityViolation]) -> None:
@@ -216,14 +244,13 @@ def collect_node_metrics(node_cls: type[Any]) -> NodeMetrics:
     call_chain = _analyze_internal_call_chain(tree)
     requires = getattr(contract, "requires", ()) if isinstance(contract, NodeContract) else ()
     provides = getattr(contract, "provides", ()) if isinstance(contract, NodeContract) else ()
-    params_schema = getattr(contract, "params_schema", {}) if isinstance(contract, NodeContract) else {}
     return NodeMetrics(
         source_lines=len(source.class_text.splitlines()),
         source_bytes=len(source.class_text.encode("utf-8")),
         function_count=counter.function_count,
         branch_count=counter.branch_count,
         max_nesting_depth=counter.max_nesting_depth,
-        param_count=len(params_schema) if isinstance(params_schema, Mapping) else 0,
+        param_count=0,
         requires_count=len(requires),
         provides_count=len(provides),
         contract_key_count=len(requires) + len(provides),
@@ -242,6 +269,9 @@ __all__ = [
     "NodePurityVisitor",
     "PurityPolicy",
     "PurityViolation",
+    "RuntimeDispatchAnalysis",
+    "RuntimeDispatchSite",
+    "analyze_runtime_dispatch",
     "collect_node_metrics",
     "validate_node_class",
 ]

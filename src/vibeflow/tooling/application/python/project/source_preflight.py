@@ -15,12 +15,17 @@ def preflight_python_import_tree(
     entry_path: Path,
     *,
     project_root: Path | None = None,
+    source_roots: tuple[Path, ...] = (),
 ) -> None:
     """Load a local import graph, then pass plain source facts to quality."""
 
     path = entry_path.resolve()
     root = (project_root or path.parent).resolve()
-    facts = collect_python_source_facts(path, project_root=root)
+    facts = collect_python_source_facts(
+        path,
+        project_root=root,
+        source_roots=source_roots,
+    )
     preflight_python_source_facts(str(path), facts)
 
 
@@ -28,13 +33,20 @@ def collect_python_source_facts(
     entry_path: Path,
     *,
     project_root: Path | None = None,
+    source_roots: tuple[Path, ...] = (),
 ) -> tuple[PythonSourceFact, ...]:
     """Read and resolve the project-local sources reachable from ``entry_path``."""
 
     path = entry_path.resolve()
     root = (project_root or path.parent).resolve()
+    roots = tuple(
+        dict.fromkeys(
+            candidate.resolve()
+            for candidate in (root, *source_roots)
+        )
+    )
     facts: dict[str, PythonSourceFact] = {}
-    _collect_source_fact(path, project_root=root, facts=facts)
+    _collect_source_fact(path, source_roots=roots, facts=facts)
     return tuple(facts[source_id] for source_id in sorted(facts))
 
 
@@ -53,12 +65,15 @@ def resolve_local_module_path(
 def _collect_source_fact(
     path: Path,
     *,
-    project_root: Path,
+    source_roots: tuple[Path, ...],
     facts: dict[str, PythonSourceFact],
 ) -> None:
     resolved = path.resolve()
     source_id = str(resolved)
     if source_id in facts:
+        return
+    project_root = _owning_source_root(resolved, source_roots)
+    if project_root is None:
         return
     try:
         source = resolved.read_text(encoding="utf-8")
@@ -67,6 +82,7 @@ def _collect_source_fact(
             source_id=source_id,
             path=source_id,
             source="",
+            module_name=_module_name(resolved, project_root),
             load_error=str(exc),
         )
         return
@@ -78,6 +94,7 @@ def _collect_source_fact(
             source_id=source_id,
             path=source_id,
             source=source,
+            module_name=_module_name(resolved, project_root),
             is_base_lib=_is_base_lib_source(resolved),
         )
         return
@@ -93,14 +110,14 @@ def _collect_source_fact(
     import_time_paths = _resolve_import_nodes(
         import_time_nodes,
         current_path=resolved,
-        project_root=project_root,
+        source_roots=source_roots,
     )
     runtime_paths = tuple(
         child
         for child in _resolve_import_nodes(
             runtime_nodes,
             current_path=resolved,
-            project_root=project_root,
+            source_roots=source_roots,
         )
         if not _is_base_lib_source(child)
     )
@@ -108,19 +125,20 @@ def _collect_source_fact(
         source_id=source_id,
         path=source_id,
         source=source,
+        module_name=_module_name(resolved, project_root),
         import_time_dependencies=tuple(str(child) for child in import_time_paths),
         runtime_dependencies=tuple(str(child) for child in runtime_paths),
         is_base_lib=_is_base_lib_source(resolved),
     )
     for child in (*import_time_paths, *runtime_paths):
-        _collect_source_fact(child, project_root=project_root, facts=facts)
+        _collect_source_fact(child, source_roots=source_roots, facts=facts)
 
 
 def _resolve_import_nodes(
     nodes: tuple[ast.Import | ast.ImportFrom, ...],
     *,
     current_path: Path,
-    project_root: Path,
+    source_roots: tuple[Path, ...],
 ) -> tuple[Path, ...]:
     paths: list[Path] = []
     for node in nodes:
@@ -128,7 +146,7 @@ def _resolve_import_nodes(
             _resolve_local_imports(
                 node,
                 current_path=current_path,
-                project_root=project_root,
+                source_roots=source_roots,
             )
         )
     return tuple(dict.fromkeys(paths))
@@ -138,17 +156,21 @@ def _resolve_local_imports(
     node: ast.Import | ast.ImportFrom,
     *,
     current_path: Path,
-    project_root: Path,
+    source_roots: tuple[Path, ...],
 ) -> tuple[Path, ...]:
     paths: list[Path] = []
+    project_root = _owning_source_root(current_path, source_roots)
+    if project_root is None:
+        return ()
     if isinstance(node, ast.Import):
         for alias in node.names:
-            paths.extend(
-                _paths_for_module_parts(
-                    project_root,
-                    tuple(alias.name.split(".")),
+            for source_root in source_roots:
+                paths.extend(
+                    _paths_for_module_parts(
+                        source_root,
+                        tuple(alias.name.split(".")),
+                    )
                 )
-            )
         return tuple(dict.fromkeys(paths))
 
     module_parts = tuple((node.module or "").split(".")) if node.module else ()
@@ -166,17 +188,22 @@ def _resolve_local_imports(
                     )
                 )
     else:
-        paths.extend(_paths_for_module_parts(project_root, module_parts))
-        for alias in node.names:
-            if alias.name != "*":
-                paths.extend(
-                    _paths_for_module_parts(
-                        project_root,
-                        (*module_parts, *alias.name.split(".")),
+        for source_root in source_roots:
+            paths.extend(_paths_for_module_parts(source_root, module_parts))
+            for alias in node.names:
+                if alias.name != "*":
+                    paths.extend(
+                        _paths_for_module_parts(
+                            source_root,
+                            (*module_parts, *alias.name.split(".")),
+                        )
                     )
-                )
     return tuple(
-        dict.fromkeys(path for path in paths if _is_within(path, project_root))
+        dict.fromkeys(
+            path
+            for path in paths
+            if any(_is_within(path, source_root) for source_root in source_roots)
+        )
     )
 
 
@@ -226,6 +253,35 @@ class _ImportTimeImportCollector(ast.NodeVisitor):
 
 def _is_base_lib_source(path: Path) -> bool:
     return "base_lib" in path.parts
+
+
+def _owning_source_root(
+    path: Path,
+    source_roots: tuple[Path, ...],
+) -> Path | None:
+    matches = tuple(
+        root
+        for root in source_roots
+        if _is_within(path, root)
+    )
+    if not matches:
+        return None
+    return max(matches, key=lambda root: len(root.parts))
+
+
+def _module_name(path: Path, project_root: Path) -> str:
+    try:
+        relative = path.resolve().relative_to(project_root.resolve())
+    except ValueError:
+        return ""
+    parts = list(relative.parts)
+    if not parts or parts[-1].startswith("."):
+        return ""
+    if parts[-1] == "__init__.py":
+        parts.pop()
+    elif parts[-1].endswith(".py"):
+        parts[-1] = parts[-1][:-3]
+    return ".".join(part for part in parts if part)
 
 
 def _is_within(path: Path, root: Path) -> bool:

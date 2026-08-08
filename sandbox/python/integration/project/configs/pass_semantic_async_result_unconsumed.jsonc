@@ -30,13 +30,7 @@
         "description": "Runs start."
       },
       {
-        "provides": [
-          {
-            "key": "async.value",
-            "type": "async.value",
-            "display_name": "Async Value"
-          }
-        ],
+
         "async": "result_key",
         "result_key": "async.value",
         "config": {
@@ -48,45 +42,16 @@
         "description": "Runs slow_async."
       },
       {
-        "requires": [
-          {
-            "type": "calc.a",
-            "cardinality": "exactly_one",
-            "display_name": "Calc A"
-          },
-          {
-            "type": "calc.b",
-            "cardinality": "exactly_one",
-            "display_name": "Calc B"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.sum",
-            "type": "calc.sum",
-            "display_name": "Calc Sum"
-          }
-        ],
+
+
         "id": "add_pair",
         "type_used": "semantic.add_pair",
         "display_name": "Add Pair",
         "description": "Runs add_pair."
       },
       {
-        "requires": [
-          {
-            "type": "calc.sum",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Sum"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.scaled",
-            "type": "calc.scaled",
-            "display_name": "Calc Scaled"
-          }
-        ],
+
+
         "config": {
           "factor": 3
         },
@@ -96,65 +61,24 @@
         "description": "Runs scale."
       },
       {
-        "requires": [
-          {
-            "type": "calc.c",
-            "cardinality": "exactly_one",
-            "display_name": "Calc C"
-          },
-          {
-            "type": "calc.d",
-            "cardinality": "exactly_one",
-            "display_name": "Calc D"
-          }
-        ],
-        "provides": [
-          {
-            "key": "route.branch",
-            "type": "route.branch",
-            "display_name": "Route Branch"
-          }
-        ],
+
+
         "id": "compare",
         "type_used": "semantic.compare_gt",
         "display_name": "Compare",
         "description": "Runs compare."
       },
       {
-        "requires": [
-          {
-            "type": "calc.scaled",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Scaled"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.branch",
-            "type": "calc.branch",
-            "display_name": "Calc Branch"
-          }
-        ],
+
+
         "id": "use_scaled",
         "type_used": "semantic.use_scaled",
         "display_name": "Use Scaled",
         "description": "Runs use_scaled."
       },
       {
-        "requires": [
-          {
-            "type": "calc.branch",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Branch"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.final",
-            "type": "calc.final",
-            "display_name": "Calc Final"
-          }
-        ],
+
+
         "config": {
           "offset": -4
         },
@@ -164,13 +88,7 @@
         "description": "Runs finalize."
       },
       {
-        "requires": [
-          {
-            "type": "calc.final",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Final"
-          }
-        ],
+
         "id": "end",
         "type_used": "semantic.final_end",
         "display_name": "End",

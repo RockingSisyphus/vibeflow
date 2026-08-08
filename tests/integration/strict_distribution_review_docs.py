@@ -74,14 +74,15 @@ def _assert_global_state_protocol(layer: str, text: str) -> None:
     for marker in (
         "flow_kind=global_state",
         "effect_scope=global_state",
+        "runtime_dispatch",
+        "callback",
         "execution_lock",
-        "shared",
         "exclusive",
         "try/finally",
         "detached",
         "result_key",
+        "vibeflow.workflow.v4",
         "vibeflow.workflow.v3",
-        "vibeflow.workflow.v2",
         "target.feature.unsupported",
         "cloud",
         "lock_wait",
@@ -100,6 +101,18 @@ def _assert_global_state_protocol(layer: str, text: str) -> None:
     assert "Provider" in text, layer
     assert "文件" in text and "环境变量" in text, layer
     assert "subprocess" in lowered and "动态 import" in text and "ffi" in lowered, layer
+    assert "graph.execution_lock.global_state_uncoordinated" in lowered, layer
+    assert "node.effect.runtime_dispatch.undeclared" in lowered, layer
+    same_key = any(
+        marker in lowered
+        for marker in ("同名", "相同 key", "同 key", "same key", "identical key")
+    )
+    different_key = any(
+        marker in lowered
+        for marker in ("异名", "不同 key", "异 key", "different key")
+    )
+    assert same_key and different_key, layer
+    assert re.search(r"(?:不|不会|不再).{0,32}自动.{0,16}(?:锁|互斥)", text), layer
     assert re.search(r"(?:不|不会|都不).{0,48}自动恢复", text), layer
     assert "rollback" in lowered, layer
     assert re.search(r"(?:不授予|不增加|不提供|不取得).{0,24}权限", text), layer
@@ -473,11 +486,13 @@ def test_built_distribution_architecture_exposes_execution_lock_facts(
         text = architecture_path.read_text(encoding="utf-8")
         for marker in (
             '"effect_scope"',
+            '"runtime_dispatch"',
             '"execution_lock"',
+            '"effective_execution_lock"',
             '"contains_global_state"',
-            '"root_exclusive"',
         ):
             assert marker in text, (architecture_path, marker)
+        assert '"root_exclusive"' not in text, architecture_path
 
     javascript_guide = (
         built_distribution
@@ -487,8 +502,8 @@ def test_built_distribution_architecture_exposes_execution_lock_facts(
     ).read_text(encoding="utf-8")
     assert 'implemented `flow_kind="global_state"`' in javascript_guide
     assert "TARGET.FEATURE.UNSUPPORTED" in javascript_guide
+    assert "vibeflow.workflow.v4" in javascript_guide
     assert "vibeflow.workflow.v3" in javascript_guide
-    assert "vibeflow.workflow.v2" in javascript_guide
 
 
 def test_review_docs_reject_old_public_renderer_and_io_permission_wording(

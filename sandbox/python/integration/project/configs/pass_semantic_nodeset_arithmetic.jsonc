@@ -20,65 +20,24 @@
         "description": "Runs start."
       },
       {
-        "requires": [
-          {
-            "type": "calc.a",
-            "cardinality": "exactly_one",
-            "display_name": "Calc A"
-          },
-          {
-            "type": "calc.b",
-            "cardinality": "exactly_one",
-            "display_name": "Calc B"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.scaled",
-            "type": "calc.scaled",
-            "display_name": "Calc Scaled"
-          }
-        ],
+
+
         "id": "arithmetic",
         "type_used": "semantic.arithmetic",
         "display_name": "Arithmetic",
         "description": "Runs arithmetic."
       },
       {
-        "requires": [
-          {
-            "type": "calc.scaled",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Scaled"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.branch",
-            "type": "calc.branch",
-            "display_name": "Calc Branch"
-          }
-        ],
+
+
         "id": "use_scaled",
         "type_used": "semantic.use_scaled",
         "display_name": "Use Scaled",
         "description": "Runs use_scaled."
       },
       {
-        "requires": [
-          {
-            "type": "calc.branch",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Branch"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.final",
-            "type": "calc.final",
-            "display_name": "Calc Final"
-          }
-        ],
+
+
         "offset": 5,
         "id": "finalize",
         "type_used": "semantic.finalize",
@@ -86,13 +45,7 @@
         "description": "Runs finalize."
       },
       {
-        "requires": [
-          {
-            "type": "calc.final",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Final"
-          }
-        ],
+
         "id": "end",
         "type_used": "semantic.final_end",
         "display_name": "End",

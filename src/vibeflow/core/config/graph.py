@@ -154,6 +154,19 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         raise GraphConfigError(f"pipeline.nodes[{index}].flow_kind must be one of {sorted(FLOW_KINDS)}")
     if status == STATUS_IMPLEMENTED and flow_kind:
         raise GraphConfigError(f"pipeline.nodes[{index}].flow_kind is only allowed for planned nodes")
+    explicit_contract = status == STATUS_PLANNED or type_used in LOOP_NODE_TYPES or type_used == IO_NODE_TYPE
+    if explicit_contract:
+        for field_name in ("requires", "provides"):
+            if field_name not in item:
+                raise GraphConfigError(
+                    f"pipeline.nodes[{index}].{field_name} is required for planned or system nodes"
+                )
+    else:
+        for field_name in ("requires", "provides"):
+            if field_name in item:
+                raise GraphConfigError(
+                    f"pipeline.nodes[{index}].{field_name} is derived from type_used and must not be declared"
+                )
     try:
         requires = parse_data_requirements(item.get("requires", ()), field=f"node[{node_id}].requires")
         provides = parse_data_providers(item.get("provides", ()), field=f"node[{node_id}].provides")
@@ -271,6 +284,17 @@ def _parse_nodesets(value: Any, *, project_root: str = "", root_id: str = "", ro
         type_key = str(item.get("type_key", "")).strip()
         if not type_key:
             raise GraphConfigError(f"nodesets[{index}] missing type_key")
+        for field_name in ("display_name", "description"):
+            raw_text = item.get(field_name)
+            if not isinstance(raw_text, str) or not raw_text.strip():
+                raise GraphConfigError(
+                    f"nodesets[{index}].{field_name} must be a non-empty string"
+                )
+        for field_name in ("requires", "provides"):
+            if field_name not in item:
+                raise GraphConfigError(
+                    f"nodesets[{index}].{field_name} is required"
+                )
         if type_key in type_keys:
             raise GraphConfigError(f"duplicate nodeset type_key: {type_key}")
         type_keys.add(type_key)
@@ -317,8 +341,8 @@ def _parse_nodesets(value: Any, *, project_root: str = "", root_id: str = "", ro
             )
         out[type_key] = NodesetSpec(
             type_key=type_key,
-            display_name=str(item.get("display_name", type_key)),
-            description=str(item.get("description", "")),
+            display_name=str(item["display_name"]).strip(),
+            description=str(item["description"]).strip(),
             requires=_parse_nodeset_requirements(item.get("requires", ()), field=f"nodeset[{type_key}].requires"),
             provides=_parse_nodeset_providers(item.get("provides", ()), field=f"nodeset[{type_key}].provides"),
             graph=graph,
@@ -407,8 +431,6 @@ def _parse_node_async(item: Mapping[str, Any], *, index: int, provides: tuple[Da
     result_key = str(item.get("result_key", "")).strip()
     if async_mode == "result_key" and not result_key:
         raise GraphConfigError(f"pipeline.nodes[{index}].result_key is required for async result_key")
-    if async_mode == "result_key" and result_key not in provider_keys(provides):
-        raise GraphConfigError(f"pipeline.nodes[{index}].result_key must be declared in provides")
     if async_mode != "result_key" and result_key:
         raise GraphConfigError(f"pipeline.nodes[{index}].result_key requires async='result_key'")
     return async_mode, result_key
@@ -439,13 +461,20 @@ def _parse_node_params(item: Mapping[str, Any], *, reserved: set[str], field: st
 
 
 def _parse_node_metadata(item: Mapping[str, Any]) -> NodeMetadata:
-    for removed in ("category", "version"):
+    for removed in ("category", "version", "purity"):
         if removed in item:
             raise GraphConfigError(f"node metadata field {removed!r} is removed; use display_name and description")
-    return NodeMetadata(
-        display_name=_optional_string(item.get("display_name", "")),
-        description=_optional_string(item.get("description", "")),
-    )
+    display_name = _optional_string(item.get("display_name", ""))
+    description = _optional_string(item.get("description", ""))
+    if not display_name:
+        raise GraphConfigError(
+            "node display_name must be a non-empty string describing this call instance"
+        )
+    if not description:
+        raise GraphConfigError(
+            "node description must be a non-empty string describing this call instance"
+        )
+    return NodeMetadata(display_name=display_name, description=description)
 
 
 def _optional_string(value: Any) -> str:

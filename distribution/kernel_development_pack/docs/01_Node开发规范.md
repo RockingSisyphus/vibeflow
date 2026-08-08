@@ -12,12 +12,12 @@ from vibeflow.targets.python.project import NodeContract, NodeInfo
 from base_lib.math_tools import add
 
 
-def REQ(data_type: str, cardinality: str = "exactly_one") -> DataRequirement:
-    return DataRequirement(type=data_type, cardinality=cardinality)
+def REQ(data_type: str, display_name: str, cardinality: str = "exactly_one") -> DataRequirement:
+    return DataRequirement(type=data_type, cardinality=cardinality, display_name=display_name)
 
 
-def PROV(key: str, data_type: str | None = None) -> DataProvider:
-    return DataProvider(key=key, type=data_type or key)
+def PROV(key: str, display_name: str, data_type: str | None = None) -> DataProvider:
+    return DataProvider(key=key, type=data_type or key, display_name=display_name)
 
 
 class AddNode:
@@ -30,12 +30,10 @@ class AddNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        requires=(REQ("value.in"),),
-        provides=(PROV("value.out"),),
+        requires=(REQ("value.in", "Input value"),),
+        provides=(PROV("value.out", "Output value"),),
         input_semantics={"value.in": ("input number",)},
         output_semantics={"value.out": ("output number",)},
-        params_schema={"delta": {"type": "number"}},
-        output_schema={"value.out": {"type": "number"}},
         examples=(
             {
                 "inputs": {"value.in": {"key": "value.in", "type": "value.in", "value": 2, "source_node": "example"}},
@@ -71,7 +69,7 @@ class AddNode:
 | `data_store` | 数据存储交互 |
 | `document` | 文档、文件或外部资源交互 |
 | `preparation` | 准备 / 初始化 |
-| `global_state` | Target execution domain 内的易失 ambient state |
+| `global_state` | Target execution domain 内的易失 ambient state 或 runtime dispatch |
 
 `flow_kind` 与 `external` 一起决定内核派生的 `effect_scope`：
 
@@ -80,7 +78,7 @@ class AddNode:
 | 其他普通 implemented（即非 `io` / `document` / `data_store` / `global_state`，且 `external=False`） | `none` | 无业务 IO |
 | `flow_kind=io` | `terminal` | stdin/stdout/stderr、`print`、`input`、`argparse` |
 | `flow_kind=document` / `data_store` | `python_io` | 文件、环境、网络、数据库、subprocess、终端 |
-| `flow_kind=global_state` 且 `external=False` | `global_state` | 仅 Target execution domain 内的易失 ambient state |
+| `flow_kind=global_state` 且 `external=False` | `global_state` | 易失 ambient state，以及运行时 callback/对象方法分派 |
 | 任意 `flow_kind` + `external=True` | `trusted` | 最高优先级信任边界 |
 | plugin | `trusted` | 信任边界 |
 | planned `python_stub` | `none` | 无业务 IO |
@@ -89,25 +87,23 @@ class AddNode:
 
 `run_pure(inputs, params)` 是稳定 node ABI 的方法名，不单独证明实现无副作用；真正的 IO 检查边界以派生 `effect_scope` 为准。
 
-`purity` 固定为 `"pure"`。副作用能力只由派生的 `effect_scope` 决定。
-
 可选字段：
 
 - `author`：作者或维护者，可省略。
 - `tags`：字符串元组，例如 `("training", "metrics")`，可省略。
-- `external`：默认 `False`。仅当 node 包装第三方库或外部维护代码时设为 `True`。
+- `external`：默认 `False`。仅当 node 的包装实现源码不可取得、不可解析或不可审查时设为 `True`；调用 runtime callback 本身不要求 external。
 
 `NodeInfo.type_key` 应和 registry 中注册的 key 保持一致。config 调用时实际查找的是 registry key；二者不一致会让人类和 AI 难以定位问题，也可能触发检查 warning。
 
 ## 外部依赖 node
 
-如果 node 包装第三方库或外部维护代码，使用：
+如果 node 的包装实现本身由外部维护且源码不能取得、不能解析或不能进入审查，使用：
 
 ```python
 NODE_INFO = NodeInfo(..., flow_kind="process", external=True)
 ```
 
-`external=True` 是“实现由第三方或外部维护”的最高优先级信任边界，使有效 `effect_scope=trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 purity/IO 绕过；不要为了让内部代码通过检查而滥用。它不改变 `flow_kind` 形状，不代表 decision，也不会让 cycle 合法化；审查图只在原形状上叠加 `[EXTERNAL]` 标题和 `7px` non-scaling 粗边框。契约、拓扑、输出 key、`flow_kind` 和 trace 仍然被检查。
+`external=True` 是“包装实现源码本身不可取得或不可审查”的最高优先级信任边界，使有效 `effect_scope=trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 purity/IO 绕过；不要为了让内部代码通过检查而滥用。调用从 envelope 取得的 callback/model/optimizer 方法应由受审计 `global_state` wrapper 表达，不需要 external。`external=True` 不改变 `flow_kind` 形状，不代表 decision，也不会让 cycle 合法化；契约、拓扑、输出 key、`flow_kind` 和 trace 仍然被检查。
 
 ## global_state node
 
@@ -121,13 +117,17 @@ NODE_INFO = NodeInfo(
 )
 ```
 
-Target 定义自己的 execution domain。Python Target 将其实现为当前解释器进程，并只额外允许修改进程内易失 ambient state，例如 RNG、运行时默认选项、backend flag、全局 cache 或 registry。它不继承 `terminal` 或 `python_io`：文件、环境变量、网络、数据库、终端、subprocess、线程/进程创建、`eval` / `exec` / `compile`、动态 import、`ctypes` / `cffi`、动态库载入和任意直接 FFI 仍禁止。
+Target 定义自己的 execution domain。Python Target 将其实现为当前解释器进程，并容纳进程内易失 ambient state以及从 envelope、registry、cache 或其他运行时对象取得的 callback/方法分派。典型调用包括 `callback(...)`、`model(...)` 和 `optimizer.step()`；这些对象仍经 `requires`/`provides` 输入输出。它不继承 `terminal` 或 `python_io`：文件、环境变量、网络、数据库、终端、subprocess、线程/进程创建、`eval` / `exec` / `compile`、动态 import、`ctypes` / `cffi`、动态库载入、任意直接 FFI 和可识别的系统级逃逸仍禁止。
 
-项目源码、本地 helper 与可解析的静态 import chain 都会在执行前接受 AST preflight，加载后继续现有质量与副作用检查。静态导入第三方计算库本身不要求 `external=True`；只有运行时 callback、外部实现引用或无法审计的边界继续使用 `external=True`。Core 和审计规则不按具体第三方库名称维护白名单。
+项目源码、本地 helper 与可解析的静态 import chain 都会在执行前接受 AST preflight，加载后继续现有质量与副作用检查。静态导入第三方计算库或调用运行时 callback 本身不要求 `external=True`；只有 wrapper 实现源码不可取得、不可解析或不可审查时才使用 `external=True`。Core 和审计规则不按具体第三方库名称维护白名单。
+
+Python Target 对源码中高置信度 runtime dispatch 做建议性识别。普通 `effect_scope=none` node 会得到 `NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED` warning，但 validate/run 继续；`global_state` 以及 `io` / `document` / `data_store` 不产生该 warning。固定 builtin、Python 隐式协议、只读 Mapping 的 `get/keys/values/items`、静态 import/构造、只传递未调用的 callable 及静态第三方/native API 内部不可见行为不应误报。`print`/`input`/`argparse` 与文件、Path、网络、数据库、subprocess 继续由原有 effect scope 判断；直接越权与系统逃逸仍是硬错误。
+
+公开 `runtime_dispatch` 事实使用三态：`true` 表示检测到，`false` 表示已分析但未检测到，`null` 表示 planned/external、源码不可分析或 Target 没有 detector。Architecture/Mermaid/SVG 对应显示 `detected` / `none` / `unknown`。
 
 普通 Python 对象仍作为 envelope value 按引用流转，并通过 `requires` / `provides` 暴露输入输出；`global_state` 不新增隐式黑板、对象通道或 Provider 权限。其 `CONTRACT.examples` 只检查结构，不执行。
 
-global-state 修改默认持久且非事务。成功、失败或取消后，VibeFlow 都不 snapshot、rollback 或自动恢复。若修改只应临时生效，必须在同一个 node 内用 `try/finally` 保存并恢复原值；不能依赖可能未执行的后续 node。Architecture/Mermaid/SVG 将它固定显示为 `cloud`，并展示派生 effect scope 与适用 execution lock，不展示 Provider 信息。
+global-state 修改默认持久且非事务。成功、失败或取消后，VibeFlow 都不 snapshot、rollback 或自动恢复。若修改只应临时生效，必须在同一个 node 内用 `try/finally` 保存并恢复原值；不能依赖可能未执行的后续 node。它不自动取得锁；无有效命名锁时照常运行并产生非阻断 warning。Architecture/Mermaid/SVG 将它固定显示为 `cloud`，并展示派生 effect scope、runtime dispatch 与有效 execution lock（无锁为 `none`），不展示 Provider 信息。
 
 ## 必填契约
 
@@ -135,15 +135,14 @@ global-state 修改默认持久且非事务。成功、失败或取消后，Vibe
 
 - `requires`：`DataRequirement(type, cardinality)`。node 按逻辑 `type` 消费输入。
 - `provides`：`DataProvider(key, type)`。`key` 是唯一输出地址，`type` 是可重复的逻辑数据类型。
+- 每个输入输出端口的 `display_name` 都必须是非空字符串。
 - `input_semantics`：必须覆盖所有 `requires`。
 - `output_semantics`：必须覆盖所有 `provides`。
-- `params_schema`：必须声明 `run_pure` 读取的每个配置参数。
-- `output_schema`：必须覆盖所有 `provides`。
-- `examples`：建议提供输入和参数示例，方便人和 AI 理解。对 `effect_scope=none` 的普通 node，它还用于证明最小输入/参数可运行并返回声明 key；effectful/external examples 不执行。
+- `examples`：可选的输入和参数文档示例；内核不会自动执行。
+
+`run_pure` 使用的配置参数 schema/defaults 只在 Registry 注册项中维护，不属于 `NodeContract`。Python 运行时继续检查实现返回的 key 是否与 `provides` 一致，但不要求节点声明 JSON 输出结构，也不验证业务值域。
 
 `requires` 不允许重复 type；`provides` 不允许重复 key。旧的字符串契约不再支持。
-
-`effect_scope=none` 的普通 node 会执行 examples 以验证最小样例。`terminal` / `python_io` / `global_state` 或 `external=True` node 的 examples 可能触发真实副作用，内核只检查其结构，不执行。
 
 `examples` 只写：
 
@@ -163,13 +162,7 @@ examples=({"inputs": {"value.in": {"key": "value.in", "type": "value.in", "value
 - `branch`
 - `selected_branch`
 
-建议在 `output_schema` 中用 enum 或 boolean 明确分支：
-
-```python
-output_schema={"flow.route": {"type": "string", "enum": ["again", "done"]}}
-```
-
-config 中从 decision 出发的 edge 必须写 `when`。
+config 中从 decision 出发的 edge 必须写非空 `when`。VibeFlow 只检查分支语法、可达性和拓扑，不从节点输出值域推断或验证业务分支集合。
 
 ## run_pure 规则
 
@@ -213,7 +206,7 @@ Runtime 允许输出任意 Python 对象，并按引用传给下游；不要求�
 - `_thread` / `threading` / `concurrent.futures` / `multiprocessing`
 - `ctypes` / `cffi` / 动态库载入或直接 FFI
 
-`effect_scope=terminal` 只额外开放真实 stdin/stdout/stderr、`print`、`input` 和 `argparse`，不开放文件、环境、网络、数据库或 subprocess。`python_io` 可以使用这些 Python IO 能力。`global_state` 只开放当前进程的易失 ambient state，不开放上述 IO、并发创建、动态代码、动态 import 或 FFI。`trusted` 跳过这组实现限制，由项目承担信任责任。
+`effect_scope=terminal` 只额外开放真实 stdin/stdout/stderr、`print`、`input` 和 `argparse`，不开放文件、环境、网络、数据库或 subprocess。`python_io` 可以使用这些 Python IO 能力。`global_state` 容纳当前进程的易失 ambient state 与 runtime dispatch，但不开放上述直接 IO、并发创建、动态代码、动态 import 或 FFI。`trusted` 跳过这组实现限制，由项目承担信任责任。
 
 node 不能导入其他 node，不能直接调用其他 node，不能读取其他 node 的 `NODE_INFO` 或 `CONTRACT`。
 

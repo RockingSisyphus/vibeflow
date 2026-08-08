@@ -28,7 +28,12 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
     status = str(value.get("status", "implemented")).strip()
     _validate_node_identity(value, prefix, findings, status=status)
     _validate_planned_behavior(value, prefix, findings, status=status)
-    _validate_node_contract_fields(value, prefix, findings)
+    _validate_node_contract_fields(
+        value,
+        prefix,
+        findings,
+        status=status,
+    )
     _validate_node_config_fields(value, prefix, findings)
     _validate_node_visual_fields(value, prefix, findings)
     _validate_node_similarity(value, prefix, findings)
@@ -71,7 +76,35 @@ def _validate_node_identity(value: Mapping[str, Any], prefix: str, findings: lis
             )
         )
 
-def _validate_node_contract_fields(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
+def _validate_node_contract_fields(
+    value: Mapping[str, Any],
+    prefix: str,
+    findings: list[HealthFinding],
+    *,
+    status: str,
+) -> None:
+    type_used = str(value.get("type_used", "")).strip()
+    explicit_contract = status == "planned" or type_used in LOOP_NODE_TYPES or type_used == IO_NODE_TYPE
+    if explicit_contract:
+        for field in ("requires", "provides"):
+            if field not in value:
+                findings.append(
+                    _error(
+                        "CONFIG.SCHEMA.NODE_CONTRACT_REQUIRED",
+                        f"{prefix}.{field} must be declared for planned or system nodes",
+                        f"{prefix}.{field}",
+                    )
+                )
+    else:
+        for field in ("requires", "provides"):
+            if field in value:
+                findings.append(
+                    _error(
+                        "CONFIG.SCHEMA.NODE_CONTRACT_DUPLICATE",
+                        f"{prefix}.{field} is derived from the implemented node type and must not be declared",
+                        f"{prefix}.{field}",
+                    )
+                )
     if "requires" in value:
         _validate_requirement_list(value["requires"], f"{prefix}.requires", findings, "CONFIG.SCHEMA.NODE_REQUIRES_LIST")
     if "provides" in value:
@@ -91,8 +124,14 @@ def _validate_node_visual_fields(value: Mapping[str, Any], prefix: str, findings
         if removed in value:
             findings.append(_error("CONFIG.SCHEMA.NODE_METADATA_REMOVED", f"{prefix}.{removed} is removed; use display_name and description", f"{prefix}.{removed}"))
     for field in ("display_name", "description"):
-        if field in value and not isinstance(value[field], str):
-            findings.append(_error("CONFIG.SCHEMA.NODE_METADATA_STRING", f"{prefix}.{field} must be a string", f"{prefix}.{field}"))
+        if not _non_empty_string(value.get(field)):
+            findings.append(
+                _error(
+                    "CONFIG.SCHEMA.NODE_METADATA_REQUIRED",
+                    f"{prefix}.{field} must be a non-empty string describing this call instance",
+                    f"{prefix}.{field}",
+                )
+            )
     if "style" not in value:
         return
     style = value["style"]
@@ -163,7 +202,12 @@ def _validate_node_async_fields(value: Mapping[str, Any], prefix: str, findings:
     result_key = value.get("result_key", "")
     if mode == "result_key" and not _non_empty_string(result_key):
         findings.append(_error("CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY", f"{prefix}.result_key is required when async is 'result_key'", f"{prefix}.result_key"))
-    if mode == "result_key" and _non_empty_string(result_key) and str(result_key).strip() not in _provider_keys(value.get("provides", [])):
+    if (
+        mode == "result_key"
+        and "provides" in value
+        and _non_empty_string(result_key)
+        and str(result_key).strip() not in _provider_keys(value.get("provides", []))
+    ):
         findings.append(_error("CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY", f"{prefix}.result_key must be declared in provides", f"{prefix}.result_key"))
     if mode != "result_key" and result_key:
         findings.append(_error("CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY", f"{prefix}.result_key requires async='result_key'", f"{prefix}.result_key"))

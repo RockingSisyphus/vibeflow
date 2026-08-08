@@ -11,9 +11,9 @@ class GlobalParamNode:
         flow_kind="process",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("value.out", "value.out"),),
+        provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
         output_semantics={"value.out": ("global config value",)},
-        output_schema={"value.out": {"type": "number"}},
+
         examples=({"inputs": {}, "params": {"_global": {"offset": 1}}},),
     )
 
@@ -658,9 +658,8 @@ from vibeflow.targets.python.project import NodeContract, NodeInfo
 class FutureNode:
     NODE_INFO = NodeInfo("test.future", "Future", "test", "Imports a planned base_lib.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        provides=(DataProvider("value.out", "value.out"),),
+        provides=(DataProvider("value.out", "value.out", display_name="Value Out"),),
         output_semantics={"value.out": ("future value",)},
-        output_schema={"value.out": {"type": "number"}},
         examples=({"inputs": {}, "params": {}},),
     )
 

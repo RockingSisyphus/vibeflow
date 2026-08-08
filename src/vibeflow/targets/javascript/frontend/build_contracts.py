@@ -50,36 +50,10 @@ def validate_schema_subset(
                         path=f"outputs[{output_spec.alias!r}].schema",
                     )
             for node in plan.nodes:
-                for provider_key, schema in getattr(
-                    node,
-                    "output_schema",
-                    {},
-                ).items():
-                    validate_portable_json_schema(
-                        schema,
-                        path=(
-                            f"nodes[{node.id!r}]"
-                            f".output_schema[{str(provider_key)!r}]"
-                        ),
-                    )
                 if node.subplan is not None:
                     visit(node.subplan)
 
         visit(workflow)
-        for type_key, raw in implementation_by_type.items():
-            if not isinstance(raw, Mapping):
-                continue
-            output_schemas = raw.get("output_schema")
-            if not isinstance(output_schemas, Mapping):
-                continue
-            for provider_key, schema in output_schemas.items():
-                validate_portable_json_schema(
-                    schema,
-                    path=(
-                        f"implementations[{str(type_key)!r}]"
-                        f".output_schema[{str(provider_key)!r}]"
-                    ),
-                )
     except (JavascriptJsonValueError, PortableSchemaError) as exc:
         raise AotBuildError(
             getattr(exc, "code", "VF_AOT_SCHEMA_UNSUPPORTED"),
@@ -138,18 +112,10 @@ def node_contract_check(
                     node,
                     implementations.get(node.type_used),
                 )
-                output_schemas = implementation_metadata.get("output_schema")
-                output_schema_mapping = (
-                    output_schemas
-                    if isinstance(output_schemas, Mapping)
-                    else {}
-                )
                 output_members = []
                 for provider in node.provides:
                     provider_schema = _provider_schema(
-                        provider.key,
                         provider.type,
-                        output_schema_mapping,
                         plan,
                         workflow,
                     )
@@ -236,7 +202,7 @@ def _node_contract_metadata(
     implementation: object,
 ) -> Mapping[str, Any]:
     metadata = dict(_implementation_metadata(implementation))
-    for key in ("params_schema", "output_schema"):
+    for key in ("params_schema",):
         value = getattr(node, key, None)
         if isinstance(value, Mapping):
             metadata[key] = value
@@ -244,15 +210,10 @@ def _node_contract_metadata(
 
 
 def _provider_schema(
-    provider_key: str,
     type_key: str,
-    output_schemas: Mapping[str, Any],
     plan: EmissionWorkflow,
     workflow: EmissionWorkflow,
 ) -> Mapping[str, Any] | None:
-    contract_schema = output_schemas.get(provider_key)
-    if isinstance(contract_schema, Mapping):
-        return contract_schema
     return plan.schemas.get(type_key, workflow.schemas.get(type_key))
 
 
@@ -347,13 +308,13 @@ def _node_context_type(
                 if operation is not None and operation.input_type
                 else None
             )
-            output_schema = (
+            operation_output_schema = (
                 workflow.schemas.get(operation.output_type)
                 if operation is not None and operation.output_type
                 else None
             )
             input_type = schema_to_typescript(input_schema)
-            output_type = schema_to_typescript(output_schema)
+            output_type = schema_to_typescript(operation_output_schema)
             return_type = (
                 f"Promise<{output_type}>"
                 if operation is not None

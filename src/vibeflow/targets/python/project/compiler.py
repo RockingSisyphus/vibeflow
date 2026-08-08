@@ -12,7 +12,7 @@ from typing import Any, Protocol
 from vibeflow.core.compiler import (
     CompiledGraph,
     GraphCompileError,
-    GraphCompiler as CoreGraphCompiler,
+    compile_core,
     explicit_flow_cycles,
 )
 from vibeflow.core.flow import (
@@ -26,9 +26,15 @@ from vibeflow.core.constants import (
     TARGET_FEATURE_GLOBAL_STATE,
 )
 from vibeflow.core.models import (
+    CoreCompilation,
+    CoreCompileRequest,
     ImplementationFact,
     ImplementationFacts,
     TargetFeatureSet,
+)
+from vibeflow.targets.python.project.node import effective_effect_scope
+from vibeflow.targets.python.quality.source_analysis.runtime_dispatch import (
+    analyze_runtime_dispatch,
 )
 
 
@@ -55,6 +61,27 @@ class GraphCompiler:
         plugin_registry: CompilerPluginRegistry | None = None,
         owner: str = "pipeline",
     ) -> CompiledGraph:
+        return self.compile_with_findings(
+            graph,
+            registry=registry,
+            catalog=catalog,
+            known_nodesets=known_nodesets,
+            plugin_registry=plugin_registry,
+            owner=owner,
+        ).compiled_graph
+
+    def compile_with_findings(
+        self,
+        graph: GraphConfig,
+        *,
+        registry: Any | None = None,
+        catalog: Any | None = None,
+        known_nodesets: set[str] | None = None,
+        plugin_registry: CompilerPluginRegistry | None = None,
+        owner: str = "pipeline",
+    ) -> CoreCompilation:
+        """Compile and retain advisory Core findings for health/report callers."""
+
         if registry is not None and catalog is not None:
             raise GraphCompileError(
                 "compile accepts either registry or catalog, not both"
@@ -67,28 +94,30 @@ class GraphCompiler:
             source=type_source,
             nodesets=nodesets,
         )
-        compiled = CoreGraphCompiler().compile(
-            graph,
-            implementation_facts=implementation_facts,
-            target_features=TargetFeatureSet(
-                target="python",
-                features=frozenset(
-                    {
-                        TARGET_FEATURE_EXECUTION_LOCKS,
-                        TARGET_FEATURE_GLOBAL_STATE,
-                    }
+        compilation = compile_core(
+            CoreCompileRequest(
+                graph=graph,
+                implementation_facts=implementation_facts,
+                target_features=TargetFeatureSet(
+                    target="python",
+                    features=frozenset(
+                        {
+                            TARGET_FEATURE_EXECUTION_LOCKS,
+                            TARGET_FEATURE_GLOBAL_STATE,
+                        }
+                    ),
                 ),
+                known_nodesets=frozenset(nodesets),
+                owner=owner,
             ),
-            known_nodesets=nodesets,
-            owner=owner,
         )
         _call_compiler_plugins(
             plugin_registry,
             "after_compile",
             graph,
-            compiled,
+            compilation.compiled_graph,
         )
-        return compiled
+        return compilation
 
 
 def _adapt_implementation_facts(
@@ -99,15 +128,28 @@ def _adapt_implementation_facts(
 ) -> ImplementationFacts:
     if source is None:
         return ImplementationFacts()
-    relevant = set(nodesets)
-    relevant.update(
-        node.type_used
-        for node in graph.nodes
-        if node.status != STATUS_PLANNED
-        and node.type_used not in LOOP_NODE_TYPES
-        and node.type_used != IO_NODE_TYPE
-        and node.type_used not in nodesets
-    )
+    nodeset_types = set(nodesets)
+    nodeset_types.update(graph.nodesets)
+    relevant: set[str] = set()
+    visited: set[int] = set()
+
+    def collect(current: GraphConfig) -> None:
+        if id(current) in visited:
+            return
+        visited.add(id(current))
+        nodeset_types.update(current.nodesets)
+        relevant.update(
+            node.type_used
+            for node in current.nodes
+            if node.status != STATUS_PLANNED
+            and node.type_used not in LOOP_NODE_TYPES
+            and node.type_used != IO_NODE_TYPE
+            and node.type_used not in nodeset_types
+        )
+        for nodeset in current.nodesets.values():
+            collect(nodeset.graph)
+
+    collect(graph)
     facts: list[ImplementationFact] = []
     for type_key in sorted(relevant):
         try:
@@ -121,7 +163,15 @@ def _adapt_implementation_facts(
 def _implementation_fact(type_key: str, registered: Any) -> ImplementationFact:
     direct_flow_kind = _text_attribute(registered, "flow_kind")
     info = getattr(registered, "NODE_INFO", None)
+    contract = getattr(registered, "CONTRACT", None)
     flow_kind = direct_flow_kind or _text_attribute(info, "flow_kind")
+    metadata = info if info is not None else registered
+    effect_scope = effective_effect_scope(metadata)
+    runtime_dispatch: bool | None = None
+    if getattr(metadata, "external", False) is not True and isinstance(registered, type):
+        analysis = analyze_runtime_dispatch(registered)
+        if analysis is not None:
+            runtime_dispatch = analysis.detected
     completion = _text_attribute(registered, "completion")
     source_kind = ""
     source_ref = ""
@@ -141,6 +191,10 @@ def _implementation_fact(type_key: str, registered: Any) -> ImplementationFact:
     return ImplementationFact(
         type_key=type_key,
         flow_kind=flow_kind,
+        effect_scope=effect_scope,
+        runtime_dispatch=runtime_dispatch,
+        requires=tuple(getattr(contract, "requires", ()) or ()),
+        provides=tuple(getattr(contract, "provides", ()) or ()),
         completion=completion or "immediate",
         source_kind=source_kind,
         source_ref=source_ref,

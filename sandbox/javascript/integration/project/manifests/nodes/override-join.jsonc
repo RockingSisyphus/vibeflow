@@ -28,16 +28,27 @@
     ],
     "params_schema": {},
     "params_defaults": {},
-    "output_schema": {
-      "joined_result": {
-        "type": "number"
-      }
+    "input_semantics": {
+      "sandbox.math.result": [
+        "Overridden result input consumed by this node."
+      ],
+      "sandbox.override.default": [
+        "Default result input consumed by this node."
+      ]
+    },
+    "output_semantics": {
+      "joined_result": [
+        "Joined overridden result output produced by this node."
+      ]
     }
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "source": {
         "kind": "file",
         "ref": "nodes/override_join.ts",

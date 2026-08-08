@@ -64,11 +64,10 @@ def wrap_value(value):
 class WrapperOneNode:
     NODE_INFO = NodeInfo("test.wrapper_one", "Wrapper One", "test", "Wrapper node.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        requires=(DataRequirement("value.in", "exactly_one"),),
-        provides=(DataProvider("wrap.one", "wrap.one"),),
+        requires=(DataRequirement("value.in", "exactly_one", display_name="Value In"),),
+        provides=(DataProvider("wrap.one", "wrap.one", display_name="Wrap One"),),
         input_semantics={"value.in": ("input value",)},
         output_semantics={"wrap.one": ("wrapped value",)},
-        output_schema={"wrap.one": {"type": "number"}},
         examples=({"inputs": {"value.in": 1}, "params": {}},),
     )
 
@@ -80,11 +79,10 @@ class WrapperOneNode:
 class WrapperTwoNode:
     NODE_INFO = NodeInfo("test.wrapper_two", "Wrapper Two", "test", "Wrapper node.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        requires=(DataRequirement("value.in", "exactly_one"),),
-        provides=(DataProvider("wrap.two", "wrap.two"),),
+        requires=(DataRequirement("value.in", "exactly_one", display_name="Value In"),),
+        provides=(DataProvider("wrap.two", "wrap.two", display_name="Wrap Two"),),
         input_semantics={"value.in": ("input value",)},
         output_semantics={"wrap.two": ("wrapped value",)},
-        output_schema={"wrap.two": {"type": "number"}},
         examples=({"inputs": {"value.in": 1}, "params": {}},),
     )
 

@@ -23,16 +23,24 @@
     ],
     "params_schema": {},
     "params_defaults": {},
-    "output_schema": {
-      "default_result": {
-        "type": "number"
-      }
+    "input_semantics": {
+      "sandbox.math.result": [
+        "Result input consumed by this node."
+      ]
+    },
+    "output_semantics": {
+      "default_result": [
+        "Default result output produced by this node."
+      ]
     }
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "source": {
         "kind": "file",
         "ref": "nodes/override_default.ts",

@@ -539,7 +539,11 @@ def _copy_javascript_project(target: Path) -> None:
                 {
                     "workflow": "configs/linear.jsonc",
                     "document": "ARCHITECTURE.jsonc",
-                }
+                },
+                {
+                    "workflow": "configs/browser_permanent_port_host.jsonc",
+                    "document": "PERMANENT_PORT_ARCHITECTURE.jsonc",
+                },
             ]
         },
         "quality_enabled": True,
@@ -747,24 +751,33 @@ sys.stdout.write(render_architecture(result))
     environment["VF_DISTRIBUTION_WORKSPACE"] = str(
         output / "vibeflow_config.jsonc"
     )
-    environment["VF_DISTRIBUTION_JS_CONFIG"] = str(
-        output / "javascript_project/configs/linear.jsonc"
+    specs = (
+        ("configs/linear.jsonc", "ARCHITECTURE.jsonc"),
+        (
+            "configs/browser_permanent_port_host.jsonc",
+            "PERMANENT_PORT_ARCHITECTURE.jsonc",
+        ),
     )
-    completed = subprocess.run(
-        [sys.executable, "-c", script],
-        cwd=ROOT,
-        env=environment,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if completed.returncode != 0:
-        raise BuildDistributionError(
-            "failed to generate JavaScript Architecture document: "
-            + (completed.stderr.strip() or completed.stdout.strip())
+    for config_relative, architecture_relative in specs:
+        environment["VF_DISTRIBUTION_JS_CONFIG"] = str(
+            output / "javascript_project" / config_relative
         )
-    architecture = output / "javascript_project/ARCHITECTURE.jsonc"
-    architecture.write_text(completed.stdout, encoding="utf-8")
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            env=environment,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise BuildDistributionError(
+                "failed to generate JavaScript Architecture document for "
+                f"{config_relative}: "
+                + (completed.stderr.strip() or completed.stdout.strip())
+            )
+        architecture = output / "javascript_project" / architecture_relative
+        architecture.write_text(completed.stdout, encoding="utf-8")
 
 
 def _write_distribution_metadata(output: Path) -> None:

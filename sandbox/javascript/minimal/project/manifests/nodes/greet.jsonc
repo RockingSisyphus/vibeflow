@@ -29,16 +29,24 @@
     "params_defaults": {
       "prefix": "Hello"
     },
-    "output_schema": {
-      "greeting": {
-        "type": "string"
-      }
+    "input_semantics": {
+      "name.text": [
+        "Name input consumed by this node."
+      ]
+    },
+    "output_semantics": {
+      "greeting": [
+        "Greeting output produced by this node."
+      ]
     }
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "completion": "suspend",
       "source": {
         "kind": "file",
@@ -47,11 +55,15 @@
       }
     }
   ],
-  "base_libs": ["example.text"],
+  "base_libs": [
+    "example.text"
+  ],
   "capabilities": [
     {
       "id": "example.clock",
-      "operations": ["now"]
+      "operations": [
+        "now"
+      ]
     }
   ]
 }

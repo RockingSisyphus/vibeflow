@@ -250,6 +250,33 @@ def _show_shared_command_help(command: str) -> int:
             parser.add_argument("--output", help="output file")
         if command == "export-architecture":
             parser.add_argument("--check", action="store_true")
+        if command in {"export-mermaid", "export-ascii", "export-svg"}:
+            parser.add_argument(
+                "--expand-nodesets",
+                dest="expand_nodesets",
+                action="store_true",
+                help="expand nodeset and loop-body detail",
+            )
+            parser.add_argument(
+                "--collapse-nodesets",
+                dest="expand_nodesets",
+                action="store_false",
+                help="keep nodeset and loop-body calls collapsed",
+            )
+            parser.add_argument("--hide-contract", action="store_true")
+            parser.add_argument("--hide-semantics", action="store_true")
+        if command in {"export-mermaid", "export-svg"}:
+            parser.add_argument(
+                "--mermaid-layout",
+                choices=("default", "review-columns"),
+                default="default",
+            )
+        if command == "export-svg":
+            parser.add_argument("--theme", default="default")
+            parser.add_argument("--background", default="transparent")
+            parser.add_argument("--mermaid-max-text-size", type=int)
+            parser.add_argument("--mermaid-max-edges", type=int)
+            parser.add_argument("--review-fragment-max-width", type=float)
     parser.print_help()
     return 0
 

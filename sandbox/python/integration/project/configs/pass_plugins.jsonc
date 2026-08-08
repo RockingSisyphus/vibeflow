@@ -53,33 +53,15 @@
         "description": "Runs start."
       },
       {
-        "requires": [
-          {
-            "type": "io.result",
-            "cardinality": "exactly_one",
-            "display_name": "Io Result"
-          }
-        ],
-        "provides": [
-          {
-            "key": "io.result.input",
-            "type": "io.result",
-            "display_name": "Io Result Input"
-          }
-        ],
+
+
         "id": "input",
         "type_used": "sandbox.io_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-        "provides": [
-          {
-            "key": "effects.request",
-            "type": "effects.request",
-            "display_name": "Effects Request"
-          }
-        ],
+
         "value": 1,
         "id": "request",
         "type_used": "sandbox.effect_request",
@@ -87,20 +69,8 @@
         "description": "Runs request."
       },
       {
-        "requires": [
-          {
-            "type": "io.result",
-            "cardinality": "exactly_one",
-            "display_name": "Io Result"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.in",
-            "type": "value.in",
-            "display_name": "Value In"
-          }
-        ],
+
+
         "delta": 1,
         "id": "add_result",
         "type_used": "sandbox.io_result_input",
@@ -108,33 +78,15 @@
         "description": "Runs add_result."
       },
       {
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.out",
-            "type": "value.out",
-            "display_name": "Value Out"
-          }
-        ],
+
+
         "id": "add_one",
         "type_used": "math.add_one",
         "display_name": "Add One",
         "description": "Runs add_one."
       },
       {
-        "requires": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one",
-            "display_name": "Value Out"
-          }
-        ],
+
         "id": "end",
         "type_used": "sandbox.out_value_end",
         "display_name": "End",

@@ -6,13 +6,7 @@ from typing import Callable, Mapping
 
 from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
 from vibeflow.targets.javascript.build.project_paths import safe_project_path
-from vibeflow.targets.javascript.frontend.schema import (
-    JavascriptJsonValueError,
-    PortableSchemaError,
-    validate_portable_json_schema,
-)
 from vibeflow.core.compiler import CompiledGraph
-from vibeflow.core.contracts import DataProvider, DataRequirement
 from vibeflow.core.descriptors import (
     BaseLibCatalog,
     ImplementationDescriptor,
@@ -109,14 +103,6 @@ def prepare_graph(
                     ),
                     call_path,
                 )
-            if not is_loop:
-                _check_contract(
-                    spec,
-                    requires=nodeset.requires,
-                    provides=nodeset.provides,
-                    path=call_path,
-                    subject=f"nodeset '{nodeset_key}'",
-                )
             if nodeset_key in active_nodesets:
                 chain = " -> ".join((*active_nodesets, nodeset_key))
                 raise ProjectBuildError(
@@ -163,14 +149,6 @@ def prepare_graph(
                 f"node type '{spec.type_used}' has no descriptor",
                 call_path,
             )
-        _check_contract(
-            spec,
-            requires=descriptor.contract.requires,
-            provides=descriptor.contract.provides,
-            path=call_path,
-            subject=f"node descriptor '{descriptor.type_key}'",
-        )
-        _validate_node_output_schemas(descriptor, path=call_path)
         implementation = select_implementation(
             descriptor.implementations,
             target=state.target,
@@ -187,7 +165,6 @@ def prepare_graph(
             **implementation_mapping,
             "params_schema": dict(descriptor.contract.params_schema),
             "params_defaults": dict(descriptor.contract.params_defaults),
-            "output_schema": dict(descriptor.contract.output_schema),
         }
         previous = state.implementations.get(descriptor.type_key)
         if previous is not None and previous != implementation_mapping:
@@ -243,30 +220,6 @@ def _effective_params(
             f"invalid effective params for '{spec.type_used}': {exc}",
             path,
         ) from exc
-
-
-def _check_contract(
-    spec: NodeSpec,
-    *,
-    requires: tuple[DataRequirement, ...],
-    provides: tuple[DataProvider, ...],
-    path: tuple[str, ...],
-    subject: str,
-) -> None:
-    mismatches: list[str] = []
-    if tuple(spec.requires) != tuple(requires):
-        mismatches.append("requires")
-    if tuple(spec.provides) != tuple(provides):
-        mismatches.append("provides")
-    if mismatches:
-        raise ProjectBuildError(
-            "VF_AOT_CONTRACT_INVALID",
-            (
-                f"graph call does not match {subject}: "
-                f"{', '.join(mismatches)}"
-            ),
-            path,
-        )
 
 
 def select_implementation(
@@ -344,28 +297,6 @@ def implementation_source(
             "completion": implementation.completion,
         },
     )
-
-
-def _validate_node_output_schemas(
-    descriptor: NodeDescriptor,
-    *,
-    path: tuple[str, ...],
-) -> None:
-    for provider_key, schema in descriptor.contract.output_schema.items():
-        try:
-            validate_portable_json_schema(
-                schema,
-                path=(
-                    f"node[{descriptor.type_key!r}]"
-                    f".output_schema[{provider_key!r}]"
-                ),
-            )
-        except (JavascriptJsonValueError, PortableSchemaError) as exc:
-            raise ProjectBuildError(
-                getattr(exc, "code", "VF_AOT_SCHEMA_UNSUPPORTED"),
-                str(exc),
-                path,
-            ) from exc
 
 
 def require_explicit_inputs(

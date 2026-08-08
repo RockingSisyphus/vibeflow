@@ -19,22 +19,8 @@
         "id": "invalid",
         "type_used": "sandbox.invalid.immediate_async",
         "display_name": "Immediate async mismatch",
-        "description": "Must fail because an immediate node cannot return a Promise.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ]
-      },
+        "description": "Must fail because an immediate node cannot return a Promise."
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
