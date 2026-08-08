@@ -18,11 +18,11 @@ def _env(inputs, data_type: str):
 
 
 def _req(data_type: str) -> DataRequirement:
-    return DataRequirement(data_type, "exactly_one")
+    return DataRequirement(data_type, "exactly_one", display_name=data_type)
 
 
 def _prov(key: str) -> DataProvider:
-    return DataProvider(key, key)
+    return DataProvider(key, key, display_name=key)
 
 
 class GuideStart:
@@ -31,6 +31,45 @@ class GuideStart:
 
     def run_pure(self, inputs, params):
         return {}
+
+
+class GuardSecond:
+    NODE_INFO = NodeInfo("guard.second", "Guard Second", "test", "Requires both the original and first result for a guardrail fixture.", "1.0.0", "process")
+    CONTRACT = NodeContract(
+        requires=(_req("value.in"), _req("value.out")),
+        provides=(DataProvider("value.final", "value.in", display_name="Value Final"),),
+        input_semantics={"value.in": ("original value",), "value.out": ("first result",)},
+        output_semantics={"value.final": ("final value compatible with value.in",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"value.final": _env(inputs, "value.out")}
+
+
+class GuardNormalize:
+    NODE_INFO = NodeInfo("guard.normalize", "Guard Normalize", "test", "Normalizes value.out into a value.in-compatible key.", "1.0.0", "process")
+    CONTRACT = NodeContract(
+        requires=(_req("value.out"),),
+        provides=(DataProvider("value.normalized", "value.in", display_name="Value Normalized"),),
+        input_semantics={"value.out": ("value to normalize",)},
+        output_semantics={"value.normalized": ("normalized value",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"value.normalized": _env(inputs, "value.out")}
+
+
+class GuardConsume:
+    NODE_INFO = NodeInfo("guard.consume", "Guard Consume", "test", "Consumes a mainline and bypassed value.", "1.0.0", "process")
+    CONTRACT = NodeContract(
+        requires=(_req("value.in"), _req("value.out")),
+        provides=(DataProvider("value.final", "value.out", display_name="Value Final"),),
+        input_semantics={"value.in": ("mainline normalized value",), "value.out": ("bypassed result",)},
+        output_semantics={"value.final": ("combined final value",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"value.final": _env(inputs, "value.in")}
 
 
 class GuideEnd:
@@ -46,7 +85,7 @@ class GuideRoute:
     CONTRACT = NodeContract(
         provides=(_prov("flow.route"),),
         output_semantics={"flow.route": ("selected branch",)},
-        output_schema={"flow.route": {"type": "string"}},
+
         examples=({"inputs": {}, "params": {}},),
     )
 
@@ -59,7 +98,7 @@ class GuideSource:
     CONTRACT = NodeContract(
         provides=(_prov("record.original"), _prov("record.current")),
         output_semantics={"record.original": ("original record",), "record.current": ("current record",)},
-        output_schema={"record.original": {"type": "string"}, "record.current": {"type": "string"}},
+
         examples=({"inputs": {}, "params": {}},),
     )
 
@@ -74,7 +113,7 @@ class GuideNormalize:
         provides=(_prov("record.normalized"),),
         input_semantics={"record.current": ("current record",)},
         output_semantics={"record.normalized": ("normalized record",)},
-        output_schema={"record.normalized": {"type": "string"}},
+
         examples=({"inputs": {"record.current": {"key": "record.current", "type": "record.current", "value": " A ", "source_node": "example"}}, "params": {}},),
     )
 
@@ -89,7 +128,7 @@ class GuideCombine:
         provides=(_prov("semantic.combined"),),
         input_semantics={"record.original": ("original record",), "record.normalized": ("normalized record",)},
         output_semantics={"semantic.combined": ("combined record",)},
-        output_schema={"semantic.combined": {"type": "array"}},
+
         examples=({"inputs": {"record.original": {"key": "record.original", "type": "record.original", "value": " A ", "source_node": "example"}, "record.normalized": {"key": "record.normalized", "type": "record.normalized", "value": "a", "source_node": "example"}}, "params": {}},),
     )
 
@@ -104,7 +143,7 @@ class GuideOutputValue:
         provides=(_prov("response.value"),),
         input_semantics={"semantic.combined": ("combined record",)},
         output_semantics={"response.value": ("external response",)},
-        output_schema={"response.value": {"type": "array"}},
+
         examples=({"inputs": {"semantic.combined": {"key": "semantic.combined", "type": "semantic.combined", "value": ["A", "a"], "source_node": "example"}}, "params": {}},),
     )
 
@@ -114,7 +153,7 @@ class GuideOutputValue:
 
 class GuideLeft:
     NODE_INFO = NodeInfo("guide.left", "Left", "guide", "Produces the left branch.", "1.0.0", "process")
-    CONTRACT = NodeContract(provides=(_prov("branch.left"),), output_semantics={"branch.left": ("left value",)}, output_schema={"branch.left": {"type": "number"}}, examples=({"inputs": {}, "params": {}},))
+    CONTRACT = NodeContract(provides=(_prov("branch.left"),), output_semantics={"branch.left": ("left value",)}, examples=({"inputs": {}, "params": {}},))
 
     def run_pure(self, inputs, params):
         return {"branch.left": 2}
@@ -122,7 +161,7 @@ class GuideLeft:
 
 class GuideRight:
     NODE_INFO = NodeInfo("guide.right", "Right", "guide", "Produces the right branch.", "1.0.0", "process")
-    CONTRACT = NodeContract(provides=(_prov("branch.right"),), output_semantics={"branch.right": ("right value",)}, output_schema={"branch.right": {"type": "number"}}, examples=({"inputs": {}, "params": {}},))
+    CONTRACT = NodeContract(provides=(_prov("branch.right"),), output_semantics={"branch.right": ("right value",)}, examples=({"inputs": {}, "params": {}},))
 
     def run_pure(self, inputs, params):
         return {"branch.right": 3}
@@ -135,7 +174,7 @@ class GuideMerge:
         provides=(_prov("semantic.merged"),),
         input_semantics={"branch.left": ("left value",), "branch.right": ("right value",)},
         output_semantics={"semantic.merged": ("merged value",)},
-        output_schema={"semantic.merged": {"type": "number"}},
+
         examples=({"inputs": {"branch.left": {"key": "branch.left", "type": "branch.left", "value": 2, "source_node": "example"}, "branch.right": {"key": "branch.right", "type": "branch.right", "value": 3, "source_node": "example"}}, "params": {}},),
     )
 
@@ -150,7 +189,7 @@ class GuideOutputMerged:
         provides=(_prov("response.value"),),
         input_semantics={"semantic.merged": ("merged value",)},
         output_semantics={"response.value": ("external response",)},
-        output_schema={"response.value": {"type": "number"}},
+
         examples=({"inputs": {"semantic.merged": {"key": "semantic.merged", "type": "semantic.merged", "value": 5, "source_node": "example"}}, "params": {}},),
     )
 
@@ -165,7 +204,7 @@ class GuideInput:
         provides=(_prov("input.text"),),
         input_semantics={"request.raw": ("raw request",)},
         output_semantics={"input.text": ("decoded text",)},
-        output_schema={"input.text": {"type": "string"}},
+
         examples=({"inputs": {"request.raw": {"key": "request.raw", "type": "request.raw", "value": "7", "source_node": "example"}}, "params": {}},),
     )
 
@@ -180,7 +219,7 @@ class GuideSemantic:
         provides=(_prov("semantic.number"),),
         input_semantics={"input.text": ("decoded text",)},
         output_semantics={"semantic.number": ("typed number",)},
-        output_schema={"semantic.number": {"type": "integer"}},
+
         examples=({"inputs": {"input.text": {"key": "input.text", "type": "input.text", "value": "7", "source_node": "example"}}, "params": {}},),
     )
 
@@ -195,7 +234,7 @@ class GuideOutputNumber:
         provides=(_prov("response.number"),),
         input_semantics={"semantic.number": ("typed number",)},
         output_semantics={"response.number": ("external number",)},
-        output_schema={"response.number": {"type": "integer"}},
+
         examples=({"inputs": {"semantic.number": {"key": "semantic.number", "type": "semantic.number", "value": 7, "source_node": "example"}}, "params": {}},),
     )
 
@@ -227,9 +266,12 @@ def _guide_registry() -> NodeRegistry:
 
 def _health(pipeline: dict):
     graph = parse_graph_config({"pipeline": pipeline})
+    registry = _registry()
+    for node_cls in (GuardSecond, GuardNormalize, GuardConsume):
+        registry.register(node_cls.NODE_INFO.type_key, node_cls, config_schema={}, config_defaults={})
     return validate_graph_health(
         graph,
-        registry=_registry(),
+        registry=registry,
         purity_policy=PurityPolicy(max_source_lines=1000),
     )
 
@@ -249,7 +291,7 @@ def test_runtime_guardrails_reject_empty_start_shortcut_and_transfer_only_all_jo
                 ),
                 _node_call(
                     "second",
-                    "test.copy",
+                    "guard.second",
                     "Needs both the original input and the first result.",
                     requires=[REQ_SPEC("value.in"), REQ_SPEC("value.out")],
                     provides=[PROV_SPEC("value.final", "value.in")],
@@ -296,14 +338,14 @@ def test_runtime_guardrails_allow_payload_bypass_on_a_sequential_control_spine()
                 ),
                 _node_call(
                     "normalize",
-                    "test.copy",
+                    "guard.normalize",
                     "Produces the mainline value.",
                     requires=[REQ_SPEC("value.out")],
                     provides=[PROV_SPEC("value.normalized", "value.in")],
                 ),
                 _node_call(
                     "consume",
-                    "test.add",
+                    "guard.consume",
                     "Consumes one mainline value and one legitimate bypassed value.",
                     requires=[REQ_SPEC("value.in"), REQ_SPEC("value.out")],
                     provides=[PROV_SPEC("value.final", "value.out")],
@@ -562,7 +604,7 @@ def test_ai_guidance_is_generic_and_contains_required_runtime_guardrails() -> No
             "runtime probe",
             "qualified_exec_order",
             "tagged value",
-            "vibeflow.workflow.v3",
+            "vibeflow.workflow.v4",
             *global_state_concepts,
         ),
         guides[1]: (
@@ -571,7 +613,7 @@ def test_ai_guidance_is_generic_and_contains_required_runtime_guardrails() -> No
             "output I/O",
             "qualified_exec_order",
             "tag",
-            "vibeflow.workflow.v3",
+            "vibeflow.workflow.v4",
             *global_state_concepts,
         ),
         guides[2]: (
@@ -590,7 +632,7 @@ def test_ai_guidance_is_generic_and_contains_required_runtime_guardrails() -> No
             "runtime probe",
             "qualified_exec_order",
             "tagged value",
-            "vibeflow.workflow.v3",
+            "vibeflow.workflow.v4",
             *global_state_concepts,
         ),
         guides[4]: (
@@ -600,7 +642,7 @@ def test_ai_guidance_is_generic_and_contains_required_runtime_guardrails() -> No
             "runtime probe",
             "qualified_exec_order",
             "tagged value",
-            "vibeflow.workflow.v3",
+            "vibeflow.workflow.v4",
             *global_state_concepts,
         ),
     }

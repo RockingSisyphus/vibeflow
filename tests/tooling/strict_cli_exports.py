@@ -23,10 +23,10 @@ def _write_export_config(path: Path) -> None:
             {
                 "pipeline": {
                     "nodes": [
-                        _node_call("start", "test.start", "Starts the export fixture."),
-                        _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
-                        _node_call("add", "test.add", "Adds delta to value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                        _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
+                        _node_call("start", "test.start", "Starts the export fixture.", status="planned", flow_kind="terminal", requires=[], provides=[]),
+                        _node_call("seed", "test.seed", "Produces value.in.", status="planned", flow_kind="process", requires=[], provides=[PROV_SPEC("value.in")]),
+                        _node_call("add", "test.add", "Adds delta to value.in.", status="planned", flow_kind="process", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                        _node_call("end", "test.out_end", "Consumes value.out at the end.", status="planned", flow_kind="terminal", requires=[REQ_SPEC("value.out")], provides=[]),
                     ],
                     "edges": [["start", "seed"], ["seed", "add"], ["add", "end"]],
                 }
@@ -309,7 +309,15 @@ def test_ascii_flowchart_distinguishes_standard_shapes() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"id": name, "status": "planned", "flow_kind": flow_kind}
+                    {
+                        "id": name,
+                        "status": "planned",
+                        "flow_kind": flow_kind,
+                        "display_name": name.title(),
+                        "description": f"Displays the {flow_kind} shape.",
+                        "requires": [],
+                        "provides": [],
+                    }
                     for name, flow_kind in nodes
                 ],
                 "edges": [

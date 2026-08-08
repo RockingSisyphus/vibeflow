@@ -23,14 +23,24 @@
     ],
     "params_schema": {},
     "params_defaults": {},
-    "output_schema": {
-      "result": {"type": "number"}
+    "input_semantics": {
+      "sandbox.number": [
+        "Number input consumed by this node."
+      ]
+    },
+    "output_semantics": {
+      "result": [
+        "Result output produced by this node."
+      ]
     }
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "completion": "immediate",
       "source": {
         "kind": "file",
@@ -43,7 +53,9 @@
   "capabilities": [
     {
       "id": "sandbox.host_math",
-      "operations": ["double"]
+      "operations": [
+        "double"
+      ]
     }
   ]
 }

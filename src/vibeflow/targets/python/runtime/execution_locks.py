@@ -14,9 +14,6 @@ import time
 from uuid import uuid4
 
 
-GLOBAL_STATE_LOCK_KEY = "vibeflow.runtime.global_state"
-
-
 @dataclass
 class ExecutionLease:
     run_id: str
@@ -186,9 +183,8 @@ class ExecutionLockCoordinator:
             )
         if lease.lease_id in state.readers and allow_reentrant:
             # Structured VibeFlow nesting never needs a shared-to-exclusive
-            # upgrade: recursive contains_global_state propagation makes the
-            # parent acquire exclusive up front. Failing here avoids the
-            # classic two-reader upgrade deadlock for dynamically-created runs.
+            # upgrade. Failing here avoids the classic two-reader upgrade
+            # deadlock for dynamically-created coordinator clients.
             raise RuntimeError(
                 f"execution lease cannot upgrade shared lock '{key}' to exclusive"
             )
@@ -224,6 +220,5 @@ __all__ = [
     "ExecutionLockAcquisition",
     "ExecutionLockCoordinator",
     "ExecutionLockToken",
-    "GLOBAL_STATE_LOCK_KEY",
     "PROCESS_EXECUTION_LOCK_COORDINATOR",
 ]

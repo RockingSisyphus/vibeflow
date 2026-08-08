@@ -252,7 +252,7 @@ class GlobalWorkerLeftNode:
         "global_state",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("worker.left", "worker.left"),),
+        provides=(DataProvider("worker.left", "worker.left", display_name="worker.left"),),
     )
 
     def run_pure(self, inputs, params):
@@ -271,7 +271,7 @@ class GlobalWorkerRightNode:
         "global_state",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("worker.right", "worker.right"),),
+        provides=(DataProvider("worker.right", "worker.right", display_name="worker.right"),),
     )
 
     def run_pure(self, inputs, params):
@@ -290,7 +290,7 @@ class OrdinaryWorkerNode:
         "process",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("worker.left", "worker.left"),),
+        provides=(DataProvider("worker.left", "worker.left", display_name="worker.left"),),
     )
 
     def run_pure(self, inputs, params):
@@ -308,7 +308,7 @@ class WorkerLeftJoinNode:
         "terminal",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("worker.left", "exactly_one"),),
+        requires=(DataRequirement("worker.left", "exactly_one", display_name="worker.left"),),
     )
 
     def run_pure(self, inputs, params):
@@ -326,7 +326,7 @@ class ProtectedSlowResultNode:
         "process",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("protected.result", "protected.result"),),
+        provides=(DataProvider("protected.result", "protected.result", display_name="protected.result"),),
     )
 
     def run_pure(self, inputs, params):
@@ -350,8 +350,8 @@ class ProtectedJoinNode:
     )
     CONTRACT = NodeContract(
         requires=(
-            DataRequirement("protected.result", "exactly_one"),
-            DataRequirement("value.out", "exactly_one"),
+            DataRequirement("protected.result", "exactly_one", display_name="protected.result"),
+            DataRequirement("value.out", "exactly_one", display_name="value.out"),
         ),
     )
 
@@ -370,7 +370,7 @@ class CoordinatedFailureNode:
         "process",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("value.out", "value.out"),),
+        provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
     )
 
     def run_pure(self, inputs, params):
@@ -411,8 +411,8 @@ class WorkerJoinNode:
     )
     CONTRACT = NodeContract(
         requires=(
-            DataRequirement("worker.left", "exactly_one"),
-            DataRequirement("worker.right", "exactly_one"),
+            DataRequirement("worker.left", "exactly_one", display_name="worker.left"),
+            DataRequirement("worker.right", "exactly_one", display_name="worker.right"),
         ),
     )
 
@@ -431,7 +431,7 @@ class DelayedResultNode:
         "process",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("late.normal", "late.normal"),),
+        provides=(DataProvider("late.normal", "late.normal", display_name="late.normal"),),
     )
 
     def run_pure(self, inputs, params):
@@ -450,7 +450,7 @@ class LateGlobalResultNode:
         "global_state",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("late.global", "late.global"),),
+        provides=(DataProvider("late.global", "late.global", display_name="late.global"),),
     )
 
     def run_pure(self, inputs, params):
@@ -469,9 +469,9 @@ class LateJoinNode:
     )
     CONTRACT = NodeContract(
         requires=(
-            DataRequirement("late.normal", "exactly_one"),
-            DataRequirement("late.global", "exactly_one"),
-            DataRequirement("value.out", "exactly_one"),
+            DataRequirement("late.normal", "exactly_one", display_name="late.normal"),
+            DataRequirement("late.global", "exactly_one", display_name="late.global"),
+            DataRequirement("value.out", "exactly_one", display_name="value.out"),
         ),
     )
 
@@ -490,7 +490,7 @@ class EarlyQuickResultNode:
         "process",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("early.quick", "early.quick"),),
+        provides=(DataProvider("early.quick", "early.quick", display_name="early.quick"),),
     )
 
     def run_pure(self, inputs, params):
@@ -509,7 +509,7 @@ class EarlySlowResultNode:
         "process",
     )
     CONTRACT = NodeContract(
-        provides=(DataProvider("early.slow", "early.slow"),),
+        provides=(DataProvider("early.slow", "early.slow", display_name="early.slow"),),
     )
 
     def run_pure(self, inputs, params):
@@ -532,7 +532,7 @@ class EarlyQuickEndNode:
         "terminal",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("early.quick", "exactly_one"),),
+        requires=(DataRequirement("early.quick", "exactly_one", display_name="early.quick"),),
     )
 
     def run_pure(self, inputs, params):
@@ -550,7 +550,7 @@ class EarlySlowEndNode:
         "terminal",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("early.slow", "exactly_one"),),
+        requires=(DataRequirement("early.slow", "exactly_one", display_name="early.slow"),),
     )
 
     def run_pure(self, inputs, params):
@@ -610,7 +610,7 @@ def _events(result) -> list[dict[str, object]]:
     ]
 
 
-def test_normal_roots_overlap_but_global_state_roots_are_exclusive(
+def test_unlocked_normal_and_global_state_roots_can_overlap(
     tmp_path: Path,
 ) -> None:
     _GateState.reset(parties=2)
@@ -623,7 +623,7 @@ def test_normal_roots_overlap_but_global_state_roots_are_exclusive(
         second.result(timeout=3)
     assert _GateState.maximum == 2
 
-    _GateState.reset()
+    _GateState.reset(parties=2)
     global_a = _runtime("test.global_probe", tmp_path / "global-a")
     global_b = _runtime("test.global_probe", tmp_path / "global-b")
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -631,12 +631,11 @@ def test_normal_roots_overlap_but_global_state_roots_are_exclusive(
         second = executor.submit(global_b.run)
         first_result = first.result(timeout=3)
         second_result = second.result(timeout=3)
-    assert _GateState.maximum == 1
+    assert _GateState.maximum == 2
     for result in (first_result, second_result):
         kinds = [item["kind"] for item in _events(result)]
-        assert kinds.index("lock_wait") < kinds.index("lock_acquired")
         assert kinds.index("global_state_enter") < kinds.index("global_state_exit")
-        assert kinds.index("global_state_exit") < kinds.index("lock_released")
+        assert not {"lock_wait", "lock_acquired", "lock_released"} & set(kinds)
 
 
 @pytest.mark.parametrize("execution", ("plan", "block", "compiled"))
@@ -653,13 +652,17 @@ def test_global_state_scope_runs_under_every_python_execution_mode(
 
     result = runtime.run()
 
-    kinds = [event["kind"] for event in _events(result)]
-    assert kinds.index("lock_acquired") < kinds.index("global_state_enter")
-    assert kinds.index("global_state_exit") < kinds.index("lock_released")
+    events = _events(result)
+    kinds = [event["kind"] for event in events]
+    assert kinds.index("global_state_enter") < kinds.index("global_state_exit")
+    assert not {"lock_wait", "lock_acquired", "lock_released"} & set(kinds)
+    entered = next(event for event in events if event["kind"] == "global_state_enter")
+    assert entered["details"]["domain"] is None
+    assert entered["details"]["scope"] is None
 
 
 @pytest.mark.parametrize("trace", ("full", "boundary"))
-def test_global_state_lock_events_are_kept_in_enabled_trace_modes(
+def test_unlocked_global_state_has_no_lock_events_in_enabled_trace_modes(
     tmp_path: Path,
     trace: str,
 ) -> None:
@@ -671,9 +674,8 @@ def test_global_state_lock_events_are_kept_in_enabled_trace_modes(
     ).run()
 
     kinds = [event["kind"] for event in _events(result)]
-    assert kinds.index("lock_wait") < kinds.index("lock_acquired")
-    assert kinds.index("lock_acquired") < kinds.index("global_state_enter")
-    assert kinds.index("global_state_exit") < kinds.index("lock_released")
+    assert kinds.index("global_state_enter") < kinds.index("global_state_exit")
+    assert not {"lock_wait", "lock_acquired", "lock_released"} & set(kinds)
 
 
 def test_global_state_lock_events_are_suppressed_when_trace_is_off(
@@ -692,12 +694,21 @@ def test_global_state_lock_events_are_suppressed_when_trace_is_off(
     ]
 
 
-def test_waiting_global_state_root_blocks_until_normal_root_finishes(
+def test_same_named_root_lock_blocks_until_holder_finishes(
     tmp_path: Path,
 ) -> None:
     _GateState.reset()
-    normal = _runtime("test.normal_gate", tmp_path / "normal")
-    global_runtime = _runtime("test.global_probe", tmp_path / "global")
+    lock_key = "project.shared-state"
+    normal = _runtime(
+        "test.normal_gate",
+        tmp_path / "normal",
+        root_lock=lock_key,
+    )
+    global_runtime = _runtime(
+        "test.global_probe",
+        tmp_path / "global",
+        root_lock=lock_key,
+    )
     with ThreadPoolExecutor(max_workers=2) as executor:
         normal_future = executor.submit(normal.run)
         assert _GateState.entered.wait(timeout=2)
@@ -715,39 +726,51 @@ def test_waiting_global_state_root_blocks_until_normal_root_finishes(
     )
 
 
-def test_waiting_global_writer_blocks_later_normal_roots(
+def test_different_named_root_lock_bypasses_waiting_domain(
     tmp_path: Path,
 ) -> None:
     _WriterPreferenceState.reset()
-    first = _runtime("test.blocking_normal", tmp_path / "first-reader")
-    writer = _runtime("test.holding_global", tmp_path / "writer")
-    follower = _runtime("test.following_normal", tmp_path / "follower")
+    first = _runtime(
+        "test.blocking_normal",
+        tmp_path / "first-holder",
+        root_lock="project.busy",
+    )
+    writer = _runtime(
+        "test.holding_global",
+        tmp_path / "waiter",
+        root_lock="project.busy",
+    )
+    follower = _runtime(
+        "test.following_normal",
+        tmp_path / "independent",
+        root_lock="project.independent",
+    )
 
     with ThreadPoolExecutor(max_workers=3) as executor:
         first_future = executor.submit(first.run)
         assert _WriterPreferenceState.first_entered.wait(timeout=2)
         writer_future = executor.submit(writer.run)
 
-        writer_trace = tmp_path / "writer" / "runtime_trace.jsonl"
+        writer_trace = tmp_path / "waiter" / "runtime_trace.jsonl"
         deadline = time.monotonic() + 2
         while time.monotonic() < deadline:
             if writer_trace.is_file() and '"lock_wait"' in writer_trace.read_text(encoding="utf-8"):
                 break
             time.sleep(0.01)
         else:
-            pytest.fail("global writer never reached its lock wait")
+            pytest.fail("same-domain root never reached its lock wait")
 
         follower_future = executor.submit(follower.run)
-        assert not _WriterPreferenceState.follower_entered.wait(timeout=0.1)
+        assert _WriterPreferenceState.follower_entered.wait(timeout=2)
+        follower_future.result(timeout=3)
+        assert not _WriterPreferenceState.writer_entered.is_set()
 
         _WriterPreferenceState.release_first.set()
         assert _WriterPreferenceState.writer_entered.wait(timeout=2)
-        assert not _WriterPreferenceState.follower_entered.wait(timeout=0.1)
 
         _WriterPreferenceState.release_writer.set()
         first_future.result(timeout=3)
         writer_future.result(timeout=3)
-        follower_future.result(timeout=3)
 
     assert _WriterPreferenceState.follower_entered.is_set()
 
@@ -792,6 +815,98 @@ def test_named_locks_serialize_same_key_and_allow_different_keys(
     assert _GateState.maximum == 2
 
 
+def test_nested_graph_lock_is_traced_as_block_scope(tmp_path: Path) -> None:
+    lock_key = "project.child-block"
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                {
+                    "type_key": "test.locked_child",
+                    "display_name": "Locked Child",
+                    "description": "Uses a block-scoped execution lock.",
+                    "requires": [],
+                    "provides": [],
+                    "pipeline": {
+                        "nodes": [
+                            _node_call(
+                                "child_start",
+                                "test.start",
+                                "Starts the locked child.",
+                            ),
+                            _node_call(
+                                "probe",
+                                "test.parallel_probe",
+                                "Runs inside the locked child.",
+                            ),
+                            _node_call(
+                                "child_end",
+                                "test.start",
+                                "Completes the locked child.",
+                            )
+                        ],
+                        "edges": _edge_chain(
+                            "child_start",
+                            "probe",
+                            "child_end",
+                        ),
+                    },
+                }
+            ],
+            "pipeline": {
+                "nodes": [
+                    _node_call("start", "test.start", "Starts the root."),
+                    _node_call(
+                        "child",
+                        "test.locked_child",
+                        "Runs the locked child block.",
+                        execution_lock={"key": lock_key},
+                    ),
+                    _node_call("end", "test.start", "Ends the root."),
+                ],
+                "edges": _edge_chain("start", "child", "end"),
+            },
+        }
+    )
+
+    registry = _registry()
+    register_node(registry, "test.parallel_probe", ParallelProbeNode)
+    first_runtime = PipelineRuntime(
+        graph,
+        registry=registry,
+        run_dir=tmp_path / "block-scope-a",
+    )
+    second_runtime = PipelineRuntime(
+        graph,
+        registry=registry,
+        run_dir=tmp_path / "block-scope-b",
+    )
+
+    _GateState.reset()
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(first_runtime.run)
+        second = executor.submit(second_runtime.run)
+        results = (first.result(timeout=3), second.result(timeout=3))
+
+    assert _GateState.maximum == 1
+
+    for result in results:
+        lock_events = [
+            event
+            for event in _events(result)
+            if event["kind"]
+            in {"lock_wait", "lock_acquired", "lock_released"}
+            and event.get("details", {}).get("key") == lock_key
+        ]
+        assert [event["kind"] for event in lock_events] == [
+            "lock_wait",
+            "lock_acquired",
+            "lock_released",
+        ]
+        assert {event["details"]["scope"] for event in lock_events} == {
+            "block"
+        }
+
+
 def test_same_named_lock_reenters_and_different_nested_key_is_rejected(
     tmp_path: Path,
 ) -> None:
@@ -827,7 +942,12 @@ def test_same_named_lock_reenters_and_different_nested_key_is_rejected(
 def test_failure_reports_possible_state_change_and_releases_the_lease(
     tmp_path: Path,
 ) -> None:
-    failing = _runtime("test.global_failure", tmp_path / "failure")
+    lock_key = "project.failure"
+    failing = _runtime(
+        "test.global_failure",
+        tmp_path / "failure",
+        root_lock=lock_key,
+    )
 
     with pytest.raises(RuntimeError, match="global boom"):
         failing.run()
@@ -847,7 +967,11 @@ def test_failure_reports_possible_state_change_and_releases_the_lease(
     # A second exclusive root completing proves the process-wide coordinator
     # did not retain the failed run's lease.
     _GateState.reset()
-    recovered = _runtime("test.global_probe", tmp_path / "recovered")
+    recovered = _runtime(
+        "test.global_probe",
+        tmp_path / "recovered",
+        root_lock=lock_key,
+    )
     with ThreadPoolExecutor(max_workers=1) as executor:
         executor.submit(recovered.run).result(timeout=3)
 
@@ -855,9 +979,11 @@ def test_failure_reports_possible_state_change_and_releases_the_lease(
 def test_base_exception_cancellation_reports_state_change_and_releases_lease(
     tmp_path: Path,
 ) -> None:
+    lock_key = "project.interrupt"
     interrupted = _runtime(
         "test.global_interrupt",
         tmp_path / "interrupted",
+        root_lock=lock_key,
     )
 
     with pytest.raises(KeyboardInterrupt, match="global cancelled"):
@@ -883,6 +1009,7 @@ def test_base_exception_cancellation_reports_state_change_and_releases_lease(
             _runtime(
                 "test.global_probe",
                 tmp_path / "after-interrupt",
+                root_lock=lock_key,
             ).run
         ).result(timeout=3)
 
@@ -943,7 +1070,8 @@ def test_global_state_root_keeps_joined_managed_workers_parallel(
     assert _GateState.maximum == 2
     kinds = [event["kind"] for event in _events(result)]
     assert kinds.count("async_result_join") == 2
-    assert kinds[-2:] == ["lock_released", "runtime_summary"]
+    assert "lock_released" not in kinds
+    assert kinds[-1] == "runtime_summary"
 
 
 @pytest.mark.parametrize(
@@ -1086,6 +1214,7 @@ def test_trace_failures_do_not_leak_acquired_domains(
     acquisition_failure = _runtime(
         "test.parallel_probe",
         tmp_path / "acquisition-failure",
+        root_lock="project.acquire-trace",
     )
     acquisition_record = acquisition_failure._record_runtime_event
 
@@ -1098,14 +1227,15 @@ def test_trace_failures_do_not_leak_acquired_domains(
     with pytest.raises(OSError, match="trace acquire failed"):
         acquisition_failure.run()
 
-    # An exclusive global-state root would time out here if the failed shared
-    # admission remained held.
+    # Reacquiring the same key proves the coordinator released the grant even
+    # though lock-acquired trace persistence failed.
     _GateState.reset()
     with ThreadPoolExecutor(max_workers=1) as executor:
         executor.submit(
             _runtime(
                 "test.global_probe",
                 tmp_path / "after-acquisition-failure",
+                root_lock="project.acquire-trace",
             ).run
         ).result(timeout=3)
 
@@ -1126,21 +1256,15 @@ def test_trace_failures_do_not_leak_acquired_domains(
     with pytest.raises(OSError, match="trace release failed"):
         release_failure.run()
 
-    # The release loop must continue after the named-domain trace failure, so
-    # both that named key and the automatic global domain remain reusable.
+    # The named key remains reusable even when its release trace fails.
     _GateState.reset()
     named = _runtime(
         "test.parallel_probe",
         tmp_path / "after-release-named",
         root_lock="project.trace",
     )
-    global_runtime = _runtime(
-        "test.global_probe",
-        tmp_path / "after-release-global",
-    )
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=1) as executor:
         executor.submit(named.run).result(timeout=3)
-        executor.submit(global_runtime.run).result(timeout=3)
 
 
 def test_state_change_warning_trace_failure_still_releases_domains(
@@ -1201,9 +1325,8 @@ def test_global_state_scope_trace_failures_release_node_lock_and_context(
 
     assert failing._execution_scope_is_protected() is False
 
-    # This root needs both the automatic global-state domain and the same
-    # user-named domain. Completing proves neither was stranded by scope trace
-    # persistence failing before or during cleanup.
+    # Completing with the same user-named domain proves it was not stranded by
+    # scope trace persistence failing before or during cleanup.
     recovered = _runtime(
         "test.global_probe",
         tmp_path / f"{failing_event}-recovered",
@@ -1281,8 +1404,7 @@ def test_dynamic_nested_runtime_rejects_a_different_user_lock_and_releases(
 
     assert outer._execution_scope_is_protected() is False
 
-    # Reacquiring A under an exclusive global-state root proves both A and the
-    # automatic global domain were released after the fail-fast path.
+    # Reacquiring A proves it was released after the fail-fast path.
     recovered = _runtime(
         "test.global_probe",
         tmp_path / "dynamic-recovered",
@@ -1296,6 +1418,7 @@ def test_dynamic_nested_runtime_rejects_a_different_user_lock_and_releases(
 def test_inherited_root_protection_drains_nested_failure_tasks_before_release(
     tmp_path: Path,
 ) -> None:
+    lock_key = "project.nested-protected"
     registry = _registry()
     register_node(registry, "test.global_noop", GlobalNoopNode)
     register_node(
@@ -1360,6 +1483,7 @@ def test_inherited_root_protection_drains_nested_failure_tasks_before_release(
                 )
             ],
             "pipeline": {
+                "execution_lock": {"key": lock_key},
                 "nodes": [
                     _node_call("start", "test.start", "Starts the root."),
                     _node_call(
@@ -1392,6 +1516,7 @@ def test_inherited_root_protection_drains_nested_failure_tasks_before_release(
     competitor = _runtime(
         "test.following_normal",
         tmp_path / "nested-competitor",
+        root_lock=lock_key,
     )
     _ProtectedTaskState.reset()
     _WriterPreferenceState.reset()
@@ -1565,6 +1690,7 @@ def test_unrelated_detached_sibling_does_not_inherit_node_lock_protection(
 def test_failure_warning_includes_global_task_started_during_final_drain(
     tmp_path: Path,
 ) -> None:
+    lock_key = "project.late-drain"
     registry = _registry()
     register_node(registry, "test.delayed_result", DelayedResultNode)
     register_node(
@@ -1576,6 +1702,7 @@ def test_failure_warning_includes_global_task_started_during_final_drain(
     graph = parse_graph_config(
         {
             "pipeline": {
+                "execution_lock": {"key": lock_key},
                 "nodes": [
                     _node_call("start", "test.start", "Starts queued work."),
                     _node_call(

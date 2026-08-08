@@ -1,0 +1,42 @@
+{
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "callback.in",
+        "type": "callback.in",
+        "display_name": "Runtime Callback"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "sandbox.start",
+        "display_name": "Start",
+        "description": "Starts the ordinary Callback warning example."
+      },
+      {
+        "id": "callback",
+        "type_used": "sandbox.ordinary_callback",
+        "display_name": "Ordinary Callback",
+        "description": "Invokes an envelope Callback without hiding or blocking it."
+              },
+      {
+        "id": "end",
+        "type_used": "sandbox.out_value_end",
+        "display_name": "End",
+        "description": "Ends after the Callback result is available."
+      }
+    ],
+    "edges": [
+      {"from": "start", "to": "callback"},
+      {"from": "callback", "to": "end"}
+    ],
+    "outputs": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one",
+        "display_name": "Callback Result"
+      }
+    ]
+  }
+}

@@ -19,88 +19,27 @@
         "id": "route",
         "type_used": "sandbox.route",
         "display_name": "Route by sign",
-        "description": "Selects the non-negative or negative branch.",
-        "requires": [
-          {
-            "type": "sandbox.x",
-            "cardinality": "exactly_one",
-            "display_name": "X"
-          }
-        ],
-        "provides": [
-          {
-            "key": "forwarded",
-            "type": "sandbox.branch.forwarded",
-            "display_name": "Forwarded number"
-          },
-          {
-            "key": "positive",
-            "type": "sandbox.branch.positive",
-            "display_name": "Non-negative branch"
-          }
-        ]
-      },
+        "description": "Selects the non-negative or negative branch."
+              },
       {
         "id": "positive",
         "type_used": "sandbox.positive",
         "display_name": "Format non-negative",
-        "description": "Formats the value only on the non-negative branch.",
-        "requires": [
-          {
-            "type": "sandbox.branch.forwarded",
-            "cardinality": "exactly_one",
-            "display_name": "Forwarded number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "positive_message",
-            "type": "sandbox.branch.message",
-            "display_name": "Positive message"
-          }
-        ]
-      },
+        "description": "Formats the value only on the non-negative branch."
+              },
       {
         "id": "negative",
         "type_used": "sandbox.negative",
         "display_name": "Format negative",
-        "description": "Formats the value only on the negative branch.",
-        "requires": [
-          {
-            "type": "sandbox.branch.forwarded",
-            "cardinality": "exactly_one",
-            "display_name": "Forwarded number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "negative_message",
-            "type": "sandbox.branch.message",
-            "display_name": "Negative message"
-          }
-        ]
-      },
+        "description": "Formats the value only on the negative branch."
+              },
       {
         "id": "join",
         "type_used": "sandbox.branch_join",
         "display_name": "Join selected branch",
         "description": "Consumes exactly the one active branch message.",
-        "join_policy": "any_active",
-        "requires": [
-          {
-            "type": "sandbox.branch.message",
-            "cardinality": "exactly_one",
-            "display_name": "Selected branch message"
-          }
-        ],
-        "provides": [
-          {
-            "key": "message",
-            "type": "sandbox.branch.output",
-            "display_name": "Message"
-          }
-        ]
-      },
+        "join_policy": "any_active"
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

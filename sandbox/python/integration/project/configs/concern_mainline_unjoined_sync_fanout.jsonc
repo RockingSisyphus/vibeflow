@@ -10,13 +10,7 @@
       {
         "display_name": "Fanout Source",
         "description": "Branches synchronously without being a decision node.",
-        "provides": [
-          {
-            "key": "value.in",
-            "type": "value.in",
-            "display_name": "Value In"
-          }
-        ],
+
         "value": 1,
         "id": "source",
         "type_used": "sandbox.constant"
@@ -24,20 +18,8 @@
       {
         "display_name": "Unjoined Side Branch",
         "description": "Looks like synchronous side work but never rejoins the mainline and is not async.",
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "side.value",
-            "type": "value.final",
-            "display_name": "Side Value"
-          }
-        ],
+
+
         "delta": 99,
         "id": "side",
         "type_used": "sandbox.add_out"
@@ -45,20 +27,8 @@
       {
         "display_name": "Finalize",
         "description": "Produces the final output on the mainline.",
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.out",
-            "type": "value.out",
-            "display_name": "Value Out"
-          }
-        ],
+
+
         "delta": 4,
         "id": "add",
         "type_used": "sandbox.add"
@@ -66,13 +36,7 @@
       {
         "display_name": "End",
         "description": "Ends after value.out is available.",
-        "requires": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one",
-            "display_name": "Value Out"
-          }
-        ],
+
         "id": "end",
         "type_used": "sandbox.out_value_end"
       }

@@ -28,19 +28,27 @@
     ],
     "params_schema": {},
     "params_defaults": {},
-    "output_schema": {
-      "forwarded": {
-        "type": "number"
-      },
-      "positive": {
-        "type": "boolean"
-      }
+    "input_semantics": {
+      "sandbox.x": [
+        "X input consumed by this node."
+      ]
+    },
+    "output_semantics": {
+      "forwarded": [
+        "Forwarded number output produced by this node."
+      ],
+      "positive": [
+        "Non-negative branch output produced by this node."
+      ]
     }
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "source": {
         "kind": "file",
         "ref": "nodes/route.ts",
@@ -48,6 +56,8 @@
       }
     }
   ],
-  "base_libs": ["sandbox.math"],
+  "base_libs": [
+    "sandbox.math"
+  ],
   "capabilities": []
 }

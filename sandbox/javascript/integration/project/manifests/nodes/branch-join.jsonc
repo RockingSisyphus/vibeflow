@@ -23,17 +23,24 @@
     ],
     "params_schema": {},
     "params_defaults": {},
-    "output_schema": {
-      "message": {
-        "type": "string",
-        "minLength": 1
-      }
+    "input_semantics": {
+      "sandbox.branch.message": [
+        "Selected branch message input consumed by this node."
+      ]
+    },
+    "output_semantics": {
+      "message": [
+        "Message output produced by this node."
+      ]
     }
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "source": {
         "kind": "file",
         "ref": "nodes/branch_join.ts",

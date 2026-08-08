@@ -106,7 +106,6 @@ def run_workspace_checked(
     _prepared_run_dir: Path | None = None,
 ) -> CheckedRunResult:
     from vibeflow.tooling.application.python.runner import (
-        _compile_with_registry_or_refuse,
         _execute_runtime,
         _new_run_id,
         _prepare_run_dir,
@@ -147,8 +146,6 @@ def run_workspace_checked(
         **validation_kwargs,
     )
     _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=env.registry, resources=resources, runtime_options=effective_runtime_options)
-    if health.status not in {"FAIL", "ERROR"}:
-        compiled = _compile_with_registry_or_refuse(graph, env.registry, effective_policy.to_dict(), run_dir, actual_run_id)
     _write_preflight_artifacts(run_dir, graph, compiled, health, registry=env.registry, resources=resources)
     _refuse_on_health_failure(health, run_dir, actual_run_id)
     execute_kwargs = {"delegate_cli": True} if delegate_cli else {}
@@ -444,7 +441,13 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
         return HealthReport(status=status, errors=errors, warnings=warnings, effective_policy=effective_policy.to_dict())
     try:
         graph = parse_graph_config(document.data, project_root=root.path, root_id=root.id, root_path=root.path, source_path=config_path)
-        compiled = GraphCompiler().compile(graph, registry=env.registry, plugin_registry=plugin_registry)
+        compilation = GraphCompiler().compile_with_findings(
+            graph,
+            registry=env.registry,
+            plugin_registry=plugin_registry,
+        )
+        graph = compilation.workflow.graph
+        compiled = compilation.compiled_graph
     except GraphConfigError as exc:
         return fail_report("CONFIG.SCHEMA.PARSE", str(exc), "config", str(config_path), "schema", effective_policy=effective_policy.to_dict())
     except GraphCompileError as exc:

@@ -15,33 +15,15 @@
         "description": "Runs start."
       },
       {
-        "requires": [
-          {
-            "type": "io.result",
-            "cardinality": "exactly_one",
-            "display_name": "Io Result"
-          }
-        ],
-        "provides": [
-          {
-            "key": "io.result.input",
-            "type": "io.result",
-            "display_name": "Io Result Input"
-          }
-        ],
+
+
         "id": "input",
         "type_used": "sandbox.io_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-        "provides": [
-          {
-            "key": "effects.request",
-            "type": "effects.request",
-            "display_name": "Effects Request"
-          }
-        ],
+
         "value": 5,
         "id": "request",
         "type_used": "sandbox.effect_request",
@@ -49,20 +31,8 @@
         "description": "Runs request."
       },
       {
-        "requires": [
-          {
-            "type": "io.result",
-            "cardinality": "exactly_one",
-            "display_name": "Io Result"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.final",
-            "type": "value.final",
-            "display_name": "Value Final"
-          }
-        ],
+
+
         "delta": 1,
         "id": "add_result",
         "type_used": "sandbox.io_result_add",
@@ -70,13 +40,7 @@
         "description": "Runs add_result."
       },
       {
-        "requires": [
-          {
-            "type": "value.final",
-            "cardinality": "exactly_one",
-            "display_name": "Value Final"
-          }
-        ],
+
         "id": "end",
         "type_used": "sandbox.final_value_end",
         "display_name": "End",

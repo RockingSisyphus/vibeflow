@@ -33,8 +33,8 @@ class _TerminalNode:
 class _StepNode:
     NODE_INFO = NodeInfo("test.step", "Step", "test", "Updates a loop value.", "1", "process")
     CONTRACT = NodeContract(
-        requires=(DataRequirement("value.current", "exactly_one"),),
-        provides=(DataProvider("value.next", "value.next"), DataProvider("loop.done", "loop.done")),
+        requires=(DataRequirement("value.current", "exactly_one", display_name="value.current"),),
+        provides=(DataProvider("value.next", "value.next", display_name="value.next"), DataProvider("loop.done", "loop.done", display_name="loop.done")),
     )
 
     def run_pure(self, inputs, params):
@@ -93,6 +93,16 @@ def _provider(key: str, data_type: str) -> dict[str, str]:
     return {"key": key, "type": data_type, "display_name": key}
 
 
+def _node(node_id: str, type_used: str, **fields) -> dict[str, object]:
+    return {
+        "id": node_id,
+        "type_used": type_used,
+        "display_name": node_id.replace("_", " ").title(),
+        "description": f"Portable-plan fixture instance {node_id}.",
+        **fields,
+    }
+
+
 def _loop_graph():
     return parse_graph_config(
         {
@@ -109,18 +119,9 @@ def _loop_graph():
                     "pipeline": {
                         "inputs": [_input("value.current", "value.current")],
                         "nodes": [
-                            {"id": "start", "type_used": "test.terminal"},
-                            {
-                                "id": "step",
-                                "type_used": "test.step",
-                                "requires": [_requirement("value.current")],
-                                "provides": [
-                                    _provider("value.next", "value.next"),
-                                    _provider("loop.done", "loop.done"),
-                                ],
-                                "config": {"delta": 2},
-                            },
-                            {"id": "end", "type_used": "test.terminal"},
+                            _node("start", "test.terminal"),
+                            _node("step", "test.step", config={"delta": 2}),
+                            _node("end", "test.terminal"),
                         ],
                         "edges": [["start", "step"], ["step", "end"]],
                         "outputs": [_output("value.next"), _output("loop.done")],
@@ -130,14 +131,14 @@ def _loop_graph():
             "pipeline": {
                 "inputs": [_input("value.current", "value.current")],
                 "nodes": [
-                    {"id": "start", "type_used": "test.terminal"},
-                    {
-                        "id": "repeat",
-                        "type_used": "vibeflow.loop.while",
-                        "requires": [_requirement("value.current")],
-                        "provides": [_provider("value.final", "value.final")],
-                        "node_configs": {"step": {"delta": 7}},
-                        "loop": {
+                    _node("start", "test.terminal"),
+                    _node(
+                        "repeat",
+                        "vibeflow.loop.while",
+                        requires=[_requirement("value.current")],
+                        provides=[_provider("value.final", "value.final")],
+                        node_configs={"step": {"delta": 7}},
+                        loop={
                             "body": "loop.step",
                             "max_iterations": 9,
                             "stop_when": {"from": "loop.done", "equals": True},
@@ -147,8 +148,8 @@ def _loop_graph():
                             "collect": [{"from": "value.next", "as": "value.history"}],
                             "outputs": [{"from": "value.next", "as": "value.final"}],
                         },
-                    },
-                    {"id": "end", "type_used": "test.terminal"},
+                    ),
+                    _node("end", "test.terminal"),
                 ],
                 "edges": [["start", "repeat"], ["repeat", "end"]],
                 "outputs": [_output("value.final")],
@@ -228,13 +229,9 @@ def test_python_execution_plan_adapter_preserves_global_state_and_locks() -> Non
             "pipeline": {
                 "execution_lock": {"key": "trainer"},
                 "nodes": [
-                    {"id": "start", "type_used": "test.terminal"},
-                    {
-                        "id": "state",
-                        "type_used": "test.global_state",
-                        "execution_lock": {"key": "trainer"},
-                    },
-                    {"id": "end", "type_used": "test.terminal"},
+                    _node("start", "test.terminal"),
+                    _node("state", "test.global_state", execution_lock={"key": "trainer"}),
+                    _node("end", "test.terminal"),
                 ],
                 "edges": [["start", "state"], ["state", "end"]],
             }
@@ -252,16 +249,17 @@ def test_python_execution_plan_adapter_preserves_global_state_and_locks() -> Non
     root = plan.block(plan.entry_block)
     state = root.node("state")
 
-    assert plan.abi_version == "vibeflow.workflow.v3"
+    assert plan.abi_version == "vibeflow.workflow.v4"
     assert plan.contains_global_state is True
-    assert plan.root_exclusive is True
+    assert "root_exclusive" not in plan.to_dict()
     assert plan.execution_lock.to_dict() == {
         "key": "trainer",
         "scope": "root",
     }
     assert root.contains_global_state is True
-    assert root.root_exclusive is True
+    assert "root_exclusive" not in root.to_dict()
     assert state.effect_scope == "global_state"
+    assert state.runtime_dispatch is False
     assert state.contains_global_state is True
     assert state.execution_lock.to_dict() == {
         "key": "trainer",
@@ -275,8 +273,8 @@ def test_graph_adapter_normalizes_routes_and_marks_legacy_input_requiredness_unk
             "pipeline": {
                 "inputs": [_input("flow.route", "flow.route")],
                 "nodes": [
-                    {"id": "route", "type_used": "test.route"},
-                    {"id": "end", "type_used": "test.end"},
+                    _node("route", "test.route"),
+                    _node("end", "test.end"),
                 ],
                 "edges": [{"from": "route", "to": "end", "when": "flow.route != 'skip'"}],
             }
@@ -309,11 +307,7 @@ def test_adapter_rejects_non_json_python_values_in_effective_params() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {
-                        "id": "step",
-                        "type_used": "test.step",
-                        "config": {"delta": Path("not-json")},
-                    }
+                    _node("step", "test.step", config={"delta": Path("not-json")})
                 ]
             }
         }

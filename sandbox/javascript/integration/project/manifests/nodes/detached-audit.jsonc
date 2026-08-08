@@ -18,12 +18,16 @@
     "params_defaults": {
       "label": "sandbox"
     },
-    "output_schema": {}
+    "input_semantics": {},
+    "output_semantics": {}
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "completion": "suspend",
       "source": {
         "kind": "file",
@@ -36,7 +40,9 @@
   "capabilities": [
     {
       "id": "sandbox.audit",
-      "operations": ["record"]
+      "operations": [
+        "record"
+      ]
     }
   ]
 }

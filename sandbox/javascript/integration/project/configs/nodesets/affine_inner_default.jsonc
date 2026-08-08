@@ -36,42 +36,14 @@
         "id": "math",
         "type_used": "sandbox.math",
         "display_name": "Default affine transform",
-        "description": "Uses the node descriptor defaults without a call-site override.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ]
-      },
+        "description": "Uses the node descriptor defaults without a call-site override."
+              },
       {
         "id": "expose",
         "type_used": "sandbox.override_default",
         "display_name": "Expose default result",
-        "description": "Gives the sibling result a distinct portable data type.",
-        "requires": [
-          {
-            "type": "sandbox.math.result",
-            "cardinality": "exactly_one",
-            "display_name": "Result"
-          }
-        ],
-        "provides": [
-          {
-            "key": "default_result",
-            "type": "sandbox.override.default",
-            "display_name": "Default result"
-          }
-        ]
-      },
+        "description": "Gives the sibling result a distinct portable data type."
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

@@ -19,73 +19,21 @@
         "id": "add_one",
         "type_used": "sandbox.fanout_add",
         "display_name": "Add one",
-        "description": "Computes x + 1 on the upper branch.",
-        "requires": [
-          {
-            "type": "sandbox.x",
-            "cardinality": "exactly_one",
-            "display_name": "X"
-          }
-        ],
-        "provides": [
-          {
-            "key": "added_branch",
-            "type": "sandbox.fanout.added",
-            "display_name": "Added branch"
-          }
-        ]
-      },
+        "description": "Computes x + 1 on the upper branch."
+              },
       {
         "id": "subtract_one",
         "type_used": "sandbox.fanout_subtract",
         "display_name": "Subtract one",
-        "description": "Computes x - 1 on the lower branch.",
-        "requires": [
-          {
-            "type": "sandbox.x",
-            "cardinality": "exactly_one",
-            "display_name": "X"
-          }
-        ],
-        "provides": [
-          {
-            "key": "subtracted_branch",
-            "type": "sandbox.fanout.subtracted",
-            "display_name": "Subtracted branch"
-          }
-        ]
-      },
+        "description": "Computes x - 1 on the lower branch."
+              },
       {
         "id": "join",
         "type_used": "sandbox.fanout_join",
         "display_name": "Join both branches",
         "description": "Waits for both arithmetic branches.",
-        "join_policy": "all",
-        "requires": [
-          {
-            "type": "sandbox.fanout.added",
-            "cardinality": "exactly_one",
-            "display_name": "Added branch"
-          },
-          {
-            "type": "sandbox.fanout.subtracted",
-            "cardinality": "exactly_one",
-            "display_name": "Subtracted branch"
-          }
-        ],
-        "provides": [
-          {
-            "key": "added",
-            "type": "sandbox.fanout.added.output",
-            "display_name": "Added"
-          },
-          {
-            "key": "subtracted",
-            "type": "sandbox.fanout.subtracted.output",
-            "display_name": "Subtracted"
-          }
-        ]
-      },
+        "join_policy": "all"
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

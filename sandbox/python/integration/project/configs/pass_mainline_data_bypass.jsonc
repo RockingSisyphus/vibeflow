@@ -10,13 +10,7 @@
       {
         "display_name": "Seed Value",
         "description": "Produces value.in for both the mainline preparation step and the explicit bypass edge.",
-        "provides": [
-          {
-            "key": "value.in",
-            "type": "value.in",
-            "display_name": "Value In"
-          }
-        ],
+
         "value": 4,
         "id": "seed",
         "type_used": "sandbox.constant"
@@ -24,40 +18,16 @@
       {
         "display_name": "Prepare Timing Step",
         "description": "Consumes value.in as a mainline timing step before the final add runs.",
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "effects.request",
-            "type": "effects.request",
-            "display_name": "Effects Request"
-          }
-        ],
+
+
         "id": "prepare",
         "type_used": "sandbox.effect_request"
       },
       {
         "display_name": "Final Add",
         "description": "Consumes value.in delivered by the explicit data bypass edge after prepare triggers it.",
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.out",
-            "type": "value.out",
-            "display_name": "Value Out"
-          }
-        ],
+
+
         "delta": 10,
         "id": "add",
         "type_used": "sandbox.add"
@@ -65,20 +35,8 @@
       {
         "display_name": "Finalize Value",
         "description": "Converts value.out into value.final for the end node.",
-        "requires": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one",
-            "display_name": "Value Out"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.final",
-            "type": "value.final",
-            "display_name": "Value Final"
-          }
-        ],
+
+
         "factor": 1,
         "id": "multiply",
         "type_used": "sandbox.multiply"
@@ -86,13 +44,7 @@
       {
         "display_name": "End",
         "description": "Ends after the final value is available.",
-        "requires": [
-          {
-            "type": "value.final",
-            "cardinality": "exactly_one",
-            "display_name": "Value Final"
-          }
-        ],
+
         "id": "end",
         "type_used": "sandbox.final_value_end"
       }

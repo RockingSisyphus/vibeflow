@@ -11,12 +11,16 @@
     "provides": [],
     "params_schema": {},
     "params_defaults": {},
-    "output_schema": {}
+    "input_semantics": {},
+    "output_semantics": {}
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "source": {
         "kind": "file",
         "ref": "nodes/terminal.ts",

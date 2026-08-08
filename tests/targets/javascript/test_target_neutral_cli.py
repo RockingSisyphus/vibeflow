@@ -140,7 +140,8 @@ def test_validate_audits_only_selected_node_and_base_lib_sources(
                 "provides": [],
                 "params_schema": {},
                 "params_defaults": {},
-                "output_schema": {},
+                "input_semantics": {},
+                "output_semantics": {},
             },
             "implementations": [
                 {

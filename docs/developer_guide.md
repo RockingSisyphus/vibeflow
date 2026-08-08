@@ -1,6 +1,6 @@
 # VibeFlow 使用者开发引导
 
-本文面向使用 VibeFlow（包名 `vibeflow`）编写业务 node、nodeset、plugin、base_lib 和 JSONC config 的开发者。VibeFlow 0.10.1 使用分层 API：Python 代码直接从所属包导入，不从根包导入业务对象。每个 workspace root 必须在 `vibeflow_project.jsonc` 中声明且只声明一个 Target：
+本文面向使用 VibeFlow（包名 `vibeflow`）编写业务 node、nodeset、plugin、base_lib 和 JSONC config 的开发者。VibeFlow 0.12.0 使用分层 API：Python 代码直接从所属包导入，不从根包导入业务对象。每个 workspace root 必须在 `vibeflow_project.jsonc` 中声明且只声明一个 Target：
 
 ```jsonc
 {"project_target": "python"}
@@ -85,7 +85,7 @@ def run_pure(self, inputs, params):
 | 其他普通 implemented node（即非 `io` / `document` / `data_store` / `global_state`，且 `external=False`） | `none` | 无业务 IO |
 | `flow_kind=io` | `terminal` | 真实 stdin/stdout/stderr、`print`、`input`、`argparse` |
 | `flow_kind=document` / `data_store` | `python_io` | 文件、环境、网络、数据库、subprocess、终端 |
-| `flow_kind=global_state` 且 `external=False` | `global_state` | 仅当前 Python 进程的易失 ambient state |
+| `flow_kind=global_state` 且 `external=False` | `global_state` | 当前 Python 进程的易失 ambient state，以及运行时 callback/对象方法分派 |
 | 任意 `flow_kind` + `external=True` | `trusted` | 最高优先级信任边界 |
 | plugin | `trusted` | 信任边界 |
 | planned `python_stub` | `none` | 无业务 IO |
@@ -135,9 +135,15 @@ NODE_INFO = NodeInfo(
 CONTRACT = NodeContract()
 ```
 
-`effect_scope=global_state` 只比普通受审计 node 多一项能力：修改当前 Python 进程的易失 ambient state，例如 Python/module/native-library 的 RNG、默认 dtype、grad mode、backend flag、全局 cache 或 registry。它仍禁止文件、环境变量、网络、数据库、终端、subprocess、线程/进程创建、`eval` / `exec` / `compile`、动态 import、`ctypes` / `cffi` 和任意 FFI。项目源码、本地 helper 与静态 import chain 都接受完整检查；静态导入第三方计算库本身不要求 `external=True`。任意运行时 callback、外部 model 引用或无法审计的实现仍应设为 `external=True`，由项目承担 `trusted` 信任边界。
+`effect_scope=global_state` 在普通受审计 node 的基础上容纳两类行为：修改当前 Python 进程的易失 ambient state，以及把控制权交给从 envelope、registry、cache 或其他运行时对象取得的 callback/方法。例如 RNG、默认 dtype、grad mode、backend flag、全局 cache/registry，以及 `model(...)`、`optimizer.step()` 或业务 callback。callback、model、optimizer 等对象仍通过 envelope 输入；`global_state` 只让这次动态分派在架构中明确可见。
 
-这是一套架构约束与合作式静态审计，不是 Python 安全沙箱。VibeFlow 会拒绝源码中可识别的直接越权操作，但不承诺证明任意第三方或 native 函数内部没有隐藏的文件、网络或其他副作用；无法检查到实现内部时必须使用 `external=True` 明确信任边界。
+它仍禁止直接文件、环境变量、网络、数据库、终端、subprocess、线程/进程创建、`eval` / `exec` / `compile`、动态 import、`ctypes` / `cffi` 和任意 FFI。`atexit.register`、`signal.signal`、`sys.settrace` / `sys.setprofile` 等可识别的系统级逃逸也继续禁止。项目源码、本地 helper 与静态 import chain 都接受完整检查；静态导入第三方计算库本身不要求 `external=True`。
+
+这是一套架构约束与合作式静态审计，不是 Python 安全沙箱。Python Target 会静态跟踪从 envelope/registry/cache 取得并在受审计源码中直接调用的值，包括 alias、属性、下标、`getattr(...)` 和可解析本地 helper。普通 `effect_scope=none` node 检测到高置信度 runtime dispatch 时产生 `NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED` warning，但 validate/run 继续；改成 `global_state` 后仍完整审计 wrapper，且不再产生这条 warning。现有 `io`、`document`、`data_store` 已经是图上可见 effect 边界，也不会被这条建议性检查误伤。
+
+固定 builtin、`for` / `with` / `iter` / `next` 等 Python 协议、只读 Mapping 的 `get/keys/values/items`、静态 import/构造调用，以及静态第三方或 native API 内部不可见的 callback 不强行推断。`print` / `input` / `argparse` 与 `open` / `pathlib` / 网络 / 数据库 / subprocess 继续由各自 effect scope 判断，不由 Callback detector 改判。VibeFlow 会拒绝源码中可识别的直接越权 effect，但不承诺证明任意第三方/native 函数内部没有隐藏 IO；这类不可见行为不会自动升级为 `external=True`。
+
+公开实现事实 `runtime_dispatch` 使用三态：`true` 表示检测到，`false` 表示已分析但未检测到，`null` 表示 planned/external、源码不可分析或当前 Target 没有 detector。Architecture/Mermaid/SVG 分别显示为 `detected`、`none`、`unknown`；它不保存 callback 对象或可执行实现。
 
 model、optimizer、scheduler、DataLoader 等普通 Python 对象不属于 ambient state，继续通过既有 envelope / contract 以引用传递；创建、更新和输出这些对象仍遵守现有 `requires` / `provides` 与输出 key 规则。`global_state` 不新增 Capability、Provider、隐式黑板或另一套对象数据通道。
 
@@ -163,13 +169,13 @@ def run_pure(self, inputs, params):
 
 ## Python 外部依赖 Node
 
-如果 node 会执行运行时注入的任意 callback、调用无法审计的外部 model 实现，或其实现本身由项目外部维护且不能进入完整检查，设置：
+只有当 node 的包装实现源码本身由外部维护且不能取得、不能解析或不能进入完整检查时，设置：
 
 ```python
 NodeInfo(..., flow_kind="process", external=True)
 ```
 
-静态导入第三方计算库并调用可审计的固定 API，本身不要求 `external=True`；代码仍按实际 `flow_kind` 的 effect scope 检查。`external=True` 是“实现或运行时行为无法由项目静态审计”的最高优先级信任边界，令有效 `effect_scope=trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 purity/IO 绕过；只能在项目愿意信任并审计该实现时使用。它仍不会跳过：
+静态导入第三方计算库、调用可审计的固定 API，或在受审计 `global_state` wrapper 中调用 envelope 提供的 callback/model/optimizer，本身都不要求 `external=True`。`external=True` 是“包装实现本身不可取得或不可审查”的最高优先级信任边界，令有效 `effect_scope=trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 purity/IO 绕过；只能在项目愿意信任该实现时使用。它仍不会跳过：
 
 - 元数据检查。
 - 契约检查。
@@ -224,6 +230,8 @@ def build_base_lib_registry() -> BaseLibRegistry:
 ```
 
 workflow config 再按 id 引用本流程实际使用的 base_lib：`"base_lib": {"modules": [{"id": "math_tools"}]}`。只有当前 workflow config 引用的 base_lib 会进入 node import allowlist；registry 中只注册但未引用的 helper 不能满足 implemented node 的 import 校验。implemented base_lib 必须提供 `BASE_LIB_INFO`；审查图资源元数据来自 `BaseLibRegistry.register(...)`。planned 资源不进入 resource registry，需要计划占位时用 planned node/nodeset。
+
+Python 的导入前源码检查支持跨本地模块的声明 helper：`NODE_INFO` / `CONTRACT` 等元数据可以调用已经沿静态 import graph 解析并证明无副作用的项目函数，也可以继承没有 metaclass 或 `__init_subclass__` hook 的已审计本地 mixin。判定依据是实际源码、有限控制结构和闭合调用链，不是函数名白名单；包含 IO、ambient-state 修改、动态代码、线程/进程、FFI、循环/递归或无法解析 callback 的导入期调用仍会在模块执行前失败。
 
 JS/TS `base_lib` 也放在 `project/base_lib/`，但由
 `project/manifests/base_lib/*.jsonc` descriptor 登记，不使用
@@ -685,7 +693,7 @@ trace 提供顶层和嵌套两层视图：`runtime.exec_order`、`runtime.node_r
 
 ### `execution_lock` 与 execution lease
 
-`global_state` 会自动取得进程级 ambient-state 执行域，不需要在 config 重复声明锁。需要把其他不可并发的业务调用按名字串行化时，可在 pipeline 或具体调用点配置公开的 `ExecutionLockSpec`：
+`global_state` 不会自动取得进程级锁。只有项目确实需要把可能冲突的调用按名字串行化时，才在 pipeline 或具体调用点配置公开的 `ExecutionLockSpec`：
 
 ```jsonc
 {
@@ -711,17 +719,17 @@ trace 提供顶层和嵌套两层视图：`runtime.exec_order`、`runtime.node_r
 }
 ```
 
-配置对象当前只有一个非空字符串字段 `key`，首尾空白会被规范化；`vibeflow.` 前缀保留给内核，项目不能使用。scope 不由用户填写：pipeline 声明编译为 root/block scope，调用点声明编译为 node scope。显式锁只限制相同 key 的并发执行，不改变 `flow_kind`、`effect_scope`、contract 或可用 IO 权限。
+配置对象当前只有一个非空字符串字段 `key`，首尾空白会被规范化；`vibeflow.` 前缀保留给内核，项目不能使用。scope 不由用户填写：pipeline 声明编译为 root/block scope，调用点声明编译为 node scope。相同 key 的 scope 互斥，不同 key 可并行；显式锁不改变 `flow_kind`、`effect_scope`、contract 或可用 IO 权限。
 
-每个 Python root run 从开始前建立一个 execution lease。普通 run 以 shared 模式进入 ambient-state 域；只要根 workflow、任意递归 nodeset 或 loop 含 implemented `global_state`，根 run 就在调度任何 node 前以 exclusive 模式进入同一域。锁一直持有到成功/失败 hooks、受保护的异步任务和 executor 收尾全部结束，再释放。这样普通 run 不会在 global-state run 中途读取或改写同一进程态。
+没有有效命名锁的 `global_state` node 照常运行，不与其他 root 自动互斥，并产生非阻断的 `GRAPH.EXECUTION_LOCK.GLOBAL_STATE_UNCOORDINATED` warning。Architecture/Mermaid/SVG 会显示 `execution_lock: none`，便于使用者确认这是主动选择而不是遗漏的隐藏系统锁。
 
-嵌套 nodeset、loop 和 VibeFlow 管理的线程继承同一 lease，重入按 lease id 而不是线程 id 判定；同一命名 key 可重入。已经持有一个用户 key 的嵌套作用域若再请求不同 key 会在编译或启动时失败，避免不一致锁顺序导致死锁。顶层 pipeline 锁覆盖整个 run；node 锁只覆盖该调用，但 runtime 仍会在 root lease 释放前收尽受保护任务。
+实际声明命名锁后，顶层 pipeline 锁从 `before_run` 覆盖整个 run、hooks 和受保护异步收尾；nodeset/loop 调用点锁覆盖完整子 block；普通 node 锁覆盖该 node 及其 hooks。嵌套 nodeset、loop 和 VibeFlow 管理的线程继承同一 lease，重入按 lease id 而不是线程 id 判定。同一 key 可重入；已经持有一个用户 key 的嵌套作用域若再请求不同 key 会在编译或启动时失败，避免不一致锁顺序导致死锁。父 scope 持有某 key 时，内部受管 worker 可以并行；锁用于阻止外部同 key scope 进入，不用于强制父 scope 内部串行。
 
-受保护作用域的异步规则是 fail closed：禁止 `async: "detached"`；`async: "result_key"` 只有在编译期能证明存在无条件 scheduled consumer path、结果必会 join 时才允许。含 `global_state` 的根作用域、带 pipeline 锁的 block，以及带调用点锁的 node/nodeset 都适用。runtime 还会在失败和取消路径等待已经启动的受保护 future，防止任务逃出 lease；这不是超时或强杀保证，因此此类任务仍必须可结束。
+受显式命名锁保护的作用域使用 fail-closed 异步规则：禁止 `async: "detached"`；`async: "result_key"` 只有在编译期能证明存在无条件 scheduled consumer path、结果必会 join 时才允许。runtime 还会在失败和取消路径等待已经启动的受保护 future，防止任务逃出 lease；这不是超时或强杀保证，因此此类任务仍必须可结束。无锁 `global_state` 使用与普通 node 相同的异步规则。
 
-`trace="boundary"` 和 `trace="full"` 会记录 `lock_wait`、`lock_acquired`、`lock_released`、`global_state_enter`、`global_state_exit`。如果 global-state node 已开始后 run 失败，还会记录 `global_state_may_have_changed` 及涉及的 qualified node，提醒状态可能已持久改变。`wait_ms`、lease、domain、scope、mode 和 reentrant 等锁事实位于事件 details；trace 不保存真实全局状态值。
+`trace="boundary"` 和 `trace="full"` 始终记录 `global_state_enter`、`global_state_exit`，只在确有显式命名锁时记录 `lock_wait`、`lock_acquired`、`lock_released`。如果 global-state node 已开始后 run 失败，还会记录 `global_state_may_have_changed` 及涉及的 qualified node，提醒状态可能已持久改变。`wait_ms`、lease、key、scope 和 reentrant 等锁事实位于事件 details；trace 不保存真实全局状态值。
 
-公共 `WorkflowPlan` ABI 是 `vibeflow.workflow.v3`，会携带 `effect_scope`、`execution_lock`、`contains_global_state` 和 `root_exclusive`，供 Target 在执行前决定能力和锁。planned `global_state` 或 lock 声明只用于 Architecture/review，不取得权限或锁。JavaScript Target v1 不支持 implemented `global_state` 或 implemented execution lock，会以 `TARGET.FEATURE.UNSUPPORTED` 拒绝；不要把它们替换为 JS 模块全局变量。JS 中应继续使用显式输入输出、Capability 或 Host Extension。
+公共 `WorkflowPlan` ABI 是 `vibeflow.workflow.v4`，会携带 `effect_scope`、三态 `runtime_dispatch`、`execution_lock` 和 `contains_global_state`。`contains_global_state` 只表示递归架构事实，不隐含 root 独占；v3 计划必须从源 config 重新生成。planned `global_state` 或 lock 声明只用于 Architecture/review，不取得权限或锁。JavaScript Target v1 不支持 implemented `global_state` 或 implemented execution lock，会以 `TARGET.FEATURE.UNSUPPORTED` 拒绝；其 Callback 分析事实为 unknown。不要把这些语义替换为 JS 模块全局变量。
 
 ## Python Runtime CLI 让渡模式 / delegate-cli
 
@@ -864,7 +872,7 @@ python run.py review --config project/configs/main.jsonc --output reports/graph.
 vibeflow review --workspace vibeflow_config.jsonc --config project/configs/main.jsonc --output reports/graph.expanded.svg
 ```
 
-workflow 必须已在所属 root 的 `architecture.documents` 中登记。`--output` 不能覆盖 workspace config、workflow config 或登记架构文档；冲突时以 `REVIEW.OUTPUT.CONFLICT` 失败且不改动源文件。`review` 会先在不依赖旧架构文档的情况下执行 graph/schema/health preflight，然后自动重新生成登记的 `ARCHITECTURE.jsonc` 并做 canonical 字节级检查，再执行正式 workspace validate。最后它在临时路径渲染固定展开 nodeset、完整 contract/semantics、默认主题和透明背景的 `review-columns` SVG，并解析 XML 检查根元素、`aria-roledescription="flowchart-review-columns"` 和至少一个真实、非空的 `g.review-inline-fragment`。全部通过后才把 SVG 发布到 `--output`。
+workflow 必须已在所属 root 的 `architecture.documents` 中登记。`--output` 不能覆盖 workspace config、workflow config 或登记架构文档；冲突时以 `REVIEW.OUTPUT.CONFLICT` 失败且不改动源文件。`review` 会先在不依赖旧架构文档的情况下执行 graph/schema/health preflight，然后自动重新生成登记的 `ARCHITECTURE.jsonc` 并做 canonical 字节级检查，再执行正式 workspace validate。最后它在临时路径渲染固定展开 nodeset、完整 contract/semantics、默认主题和透明背景的 `review-columns` SVG，并解析 XML 检查根元素、`aria-roledescription="flowchart-review-columns"` 和非空的 `g.review-inline-fragment`。每个 fragment 以 `data-review-kind`、`data-review-owner`、`data-review-target` 标记；缺失、重复或意外覆盖项以 `REVIEW.SVG.COVERAGE` 失败。全部通过后才把 SVG 发布到 `--output`。
 
 `review` 是 fail-closed 的。源图 preflight 失败时不修改架构文档、不渲染 SVG；渲染或结构检查失败时，已更新的架构文档可保留，但不覆盖旧 SVG。任何失败都不得用直接 mmdc、expanded Mermaid、手写 SVG 或旧产物补位。stdout 只输出包含 `status`、`failed_stage`、`config`、`architecture`、`validation`、`svg` 和 `published` 的一个 JSON 对象；不生成 provenance sidecar，不嵌入 provenance metadata。`PASS` / `CONCERNS` 返回 0，`FAIL` / `ERROR` 返回 1，参数错误返回 2。
 
@@ -887,15 +895,15 @@ vibeflow export-svg --config workflow.jsonc --expand-nodesets --output graph.exp
 
 正式运行也会写出 `graph.mmd`、`graph.txt`、快速图 `graph.svg`、详细审查图 `graph.expanded.svg` 和当次预期的 `architecture.jsonc`；运行产物不会覆盖 root 中登记的文档。
 
-Mermaid/SVG 节点 label 使用纯文本分区展示：首行是 `display_name`，缺省时回退到注册类 `NODE_INFO.display_name` 或 `id`；external implemented node 的首行增加 `[EXTERNAL]`；随后显示 `id:`、`type_used:`，nodeset/loop 还会显示 `type_key:` / `body:`。`global_state` 使用 cloud 形状，并显示派生的 `effect_scope:` 与适用的 `execution_lock:`；图中不展示任何 Provider 权限信息。所有异步调用显示 `async:`，`result_key` 模式同时显示 `result_key:`，再用 `---------- meta ----------`、`---------- status ----------`、`---------- nodeset ----------` 等分区展示说明。`requires/provides` 不再塞进节点内；数据契约显示在连边 label 上，优先显示 contract `display_name`，再显示 id/key/type 信息。
+Mermaid/SVG 节点 label 使用纯文本分区展示：首行是 `display_name`，缺省时回退到注册类 `NODE_INFO.display_name` 或 `id`；external implemented node 的首行增加 `[EXTERNAL]`；随后显示 `id:`、`type_used:`，nodeset/loop 还会显示 `type_key:` / `body:`。`global_state` 使用 cloud 形状，并显示派生的 `effect_scope:`、`runtime_dispatch:` 与有效 `execution_lock:`（没有时为 `none`）；图中不展示任何 Provider 权限信息。所有异步调用显示 `async:`，`result_key` 模式同时显示 `result_key:`，再用 `---------- meta ----------`、`---------- status ----------`、`---------- nodeset ----------` 等分区展示说明。`requires/provides` 不再塞进节点内；数据契约显示在连边 label 上，优先显示 contract `display_name`，再显示 id/key/type 信息。
 
 Mermaid/SVG 只画显式 edge。主线 edge 会加粗；data bypass edge 用虚线；async 相关 edge 保持 async 语义，不会被误标成同步主线。旧版本根据 `requires/provides` 自动派生的理论 data edge 不再画出。
 
-架构 JSONC 与 Mermaid 共用 nodeset/loop 调用识别、编译边角色、contract 匹配、metadata fallback、资源筛选和 source path 语义；SVG 继续消费 Mermaid。planned nodeset 有 body 时会出现在 JSONC 和展开图中，无 body 时则明确保留空占位。
+架构 JSONC、Mermaid/ASCII 与 SVG composer 共用语言无关审核快照中的 nodeset/loop 调用识别、编译边角色、contract 匹配、metadata fallback、资源筛选和 source path 语义。planned nodeset 有 body 时会出现在 JSONC 和展开图中，无 body 时则明确保留空占位。Python 与 JavaScript Target 使用同一审核模型和布局规则，但 registry 与 descriptor 的实现 metadata 不同，因此不要求跨 Target SVG 字节相同。
 
 SVG 渲染保持 `htmlLabels=false`，但会在 VibeFlow 内部调用 bundled Mermaid CLI 后对原生 SVG 文本做增强：标题加粗，包含 `external:`、`effect_scope:`、`execution_lock:`、`async:`、`result_key:` 在内的字段名前缀加粗，字段行左对齐，分区行加粗并弱化颜色。Mermaid CLI/mmdc 是内部实现，不是公开审核入口。plugin/base_lib 资源列使用同样的 label 规则，且只展示当前 workflow config 实际引用的资源；资源元数据来自 `project/registry.py` 的 resource registry。
 
 `export-svg` 会向 Mermaid CLI 传入渲染配置。普通图默认 `maxTextSize=200000`、`maxEdges=2000`；展开 nodeset 时默认 `maxTextSize=500000`、`maxEdges=5000`。如仍遇到 Mermaid 限制，可用 `--mermaid-max-text-size` 和 `--mermaid-max-edges` 覆盖。
 展开 nodeset 的 SVG 固定使用确定性 `review-columns` composer：最外层主流程在左侧纵向展示，当前 workflow 实际启用的 plugins/base_lib 分列展示，展开的 nodeset 放到右侧。nodeset 内部使用递归 detail-panel 布局：无直接子 nodeset 时横向展示；有直接子 nodeset 时父图保持全部 collapsed call-site 和原始连边。每个父 `GraphConfig` 只对直接调用做局部分组，键为 `(invocation.kind, type_key)`，并保持首次出现顺序；同组调用共享一个详情 fragment，其多调用标题显示总数、前三个调用 ID、剩余 `+N`，以及 async 模式、`result_key`、call config 数量和 `node_configs` 数量的紧凑摘要，不输出配置值。普通 nodeset 与 loop body 不混合，不同 `type_key` 不合并，同一定义在不同父上下文分别展开；`similar_to` 语义不变。审查图单个片段显示宽度默认上限为 `3200px`，可用 `--review-fragment-max-width` 覆盖。
 展开 Mermaid 源码只用于调试源码，不是详细审查 SVG 的输入；`export-mermaid --expand-nodesets` 及其 `review-columns` 调试布局仍按调用点展开，不使用局部详情去重。不要把 expanded `.mmd` 直接交给 Mermaid CLI/mmdc 转成 SVG。单项图形诊断可用 `export-svg --expand-nodesets`，正式架构审核使用 `review`。
-SVG 渲染不要求系统预装 Google Chrome；正常 `npm install` 后会优先使用 Puppeteer 自己安装/缓存的浏览器。如果该缓存不可用，再尝试非 snap 的系统 Chrome/Chromium。`/snap/bin/chromium` 会被跳过，因为它在 Puppeteer/mermaid-cli 下常见 profile lock 启动失败。
+SVG 渲染不要求系统预装 Google Chrome；正常 `npm ci` 后会优先使用 Puppeteer 自己安装/缓存的浏览器。如果该缓存不可用，再尝试非 snap 的系统 Chrome/Chromium。`/snap/bin/chromium` 会被跳过，因为它在 Puppeteer/mermaid-cli 下常见 profile lock 启动失败。

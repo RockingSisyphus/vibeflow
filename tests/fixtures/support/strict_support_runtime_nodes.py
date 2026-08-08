@@ -5,11 +5,11 @@ from vibeflow.targets.python.project import NodeContract, NodeInfo
 
 
 def REQ(data_type: str, cardinality: str = "exactly_one") -> DataRequirement:
-    return DataRequirement(type=data_type, cardinality=cardinality)
+    return DataRequirement(type=data_type, cardinality=cardinality, display_name=data_type.replace(".", " ").title())
 
 
 def PROV(key: str, data_type: str | None = None) -> DataProvider:
-    return DataProvider(key=key, type=data_type or key)
+    return DataProvider(key=key, type=data_type or key, display_name=key.replace(".", " ").title())
 
 
 def ENV(key: str, data_type: str, value):
@@ -69,8 +69,8 @@ class SeedNode:
     CONTRACT = NodeContract(
         provides=(PROV("value.in"),),
         output_semantics={"value.in": ("seed value",)},
-        params_schema={"value": {"type": "number"}},
-        output_schema={"value.in": {"type": "number"}},
+
+
         examples=({"inputs": {}, "params": {"value": 4}},),
     )
 
@@ -83,7 +83,7 @@ class LargePredictionNode:
     CONTRACT = NodeContract(
         provides=(PROV("value.out"),),
         output_semantics={"value.out": ("prediction mapping",)},
-        output_schema={"value.out": {"type": "object"}},
+
         examples=({"inputs": {}, "params": {}},),
     )
 
@@ -98,8 +98,8 @@ class AddNode:
         provides=(PROV("value.out"),),
         input_semantics={"value.in": ("input value",)},
         output_semantics={"value.out": ("output value",)},
-        params_schema={"delta": {"type": "number"}},
-        output_schema={"value.out": {"type": "number"}},
+
+
         examples=({"inputs": {"value.in": ENV("value.in", "value.in", 4)}, "params": {"delta": 3}},),
     )
 
@@ -114,7 +114,7 @@ class CopyNode:
         provides=(PROV("value.in"),),
         input_semantics={"value.out": ("output value",)},
         output_semantics={"value.in": ("input value",)},
-        output_schema={"value.in": {"type": "number"}},
+
         examples=({"inputs": {"value.out": ENV("value.out", "value.out", 7)}, "params": {}},),
     )
 
@@ -129,7 +129,7 @@ class RouteNode:
         provides=(PROV("flow.route"),),
         input_semantics={"value.out": ("output value",)},
         output_semantics={"flow.route": ("branch route",)},
-        output_schema={"flow.route": {"type": "string", "enum": ["again", "done"]}},
+
         examples=({"inputs": {"value.out": ENV("value.out", "value.out", 1)}, "params": {}},),
     )
 
@@ -142,7 +142,7 @@ class NanOutputNode:
     CONTRACT = NodeContract(
         provides=(PROV("value.out"),),
         output_semantics={"value.out": ("output value",)},
-        output_schema={"value.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -156,7 +156,7 @@ class EffectRequestNode:
         provides=(PROV("effects.request"),),
         input_semantics={"value.in": ("input value",)},
         output_semantics={"effects.request": ("structured effect request",)},
-        output_schema={"effects.request": {"type": "object"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -175,7 +175,7 @@ class SetOutputNode:
     CONTRACT = NodeContract(
         provides=(PROV("value.out"),),
         output_semantics={"value.out": ("output value",)},
-        output_schema={"value.out": {"type": "array"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -194,7 +194,7 @@ class OpaqueOutputNode:
     CONTRACT = NodeContract(
         provides=(PROV("value.out"),),
         output_semantics={"value.out": ("output value",)},
-        output_schema={"value.out": {"type": "object"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -215,7 +215,7 @@ class MutatingInputNode:
         provides=(PROV("value.out"),),
         input_semantics={"value.in": ("input value",)},
         output_semantics={"value.out": ("output value",)},
-        output_schema={"value.out": {"type": "array"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -255,8 +255,8 @@ class RuntimeFailNode:
     CONTRACT = NodeContract(
         provides=(PROV("value.out"),),
         output_semantics={"value.out": ("runtime output",)},
-        output_schema={"value.out": {"type": "number"}},
-        params_schema={"fail": {"type": "boolean"}},
+
+
         examples=({"inputs": {}, "params": {"fail": False}},),
     )
 
@@ -273,8 +273,8 @@ class CountingInitNode:
     CONTRACT = NodeContract(
         provides=(PROV("value.out"),),
         output_semantics={"value.out": ("configured output")},
-        params_schema={"value": {"type": "number"}},
-        output_schema={"value.out": {"type": "number"}},
+
+
         examples=({"inputs": {}, "params": {"value": 3}},),
     )
 
@@ -290,7 +290,7 @@ class DuplicateOneNode:
     CONTRACT = NodeContract(
         provides=(PROV("dup.one"),),
         output_semantics={"dup.one": ("duplicate value",)},
-        output_schema={"dup.one": {"type": "number"}},
+
         examples=({"inputs": {}, "params": {}},),
     )
 
@@ -303,7 +303,7 @@ class DuplicateTwoNode:
     CONTRACT = NodeContract(
         provides=(PROV("dup.two"),),
         output_semantics={"dup.two": ("duplicate value",)},
-        output_schema={"dup.two": {"type": "number"}},
+
         examples=({"inputs": {}, "params": {}},),
     )
 

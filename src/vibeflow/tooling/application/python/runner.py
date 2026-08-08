@@ -100,7 +100,15 @@ def run_checked(
     effective_policy = policy_result.effective_policy.to_dict()
     _write_json(run_dir / "effective_policy.json", effective_policy)
     preflight_warnings = _refuse_on_schema_findings(document.data, (*registry_context.findings, *resource_findings, *policy_result.findings), effective_policy, run_dir, actual_run_id)
-    graph, compiled = _compile_or_refuse(document.data, plugin_registry, effective_policy, run_dir, actual_run_id, config_path=path)
+    graph, compiled = _compile_or_refuse(
+        document.data,
+        plugin_registry,
+        effective_policy,
+        run_dir,
+        actual_run_id,
+        config_path=path,
+        registry=registry,
+    )
     health = _validate_run_health(
         graph,
         registry,
@@ -113,8 +121,6 @@ def run_checked(
         delegate_cli=delegate_cli,
     )
     _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources, runtime_options=effective_runtime_options)
-    if health.status not in {"FAIL", "ERROR"}:
-        compiled = _compile_with_registry_or_refuse(graph, registry, effective_policy, run_dir, actual_run_id)
     try:
         _write_preflight_artifacts(run_dir, graph, compiled, health, registry=registry, resources=resources)
     except Exception:
@@ -201,6 +207,7 @@ def _compile_or_refuse(
     run_id: str,
     *,
     config_path: Path,
+    registry: NodeRegistry,
 ):
     from vibeflow.core.flow import GraphConfigError
     from vibeflow.targets.python.project.compiler import GraphCompiler
@@ -214,31 +221,19 @@ def _compile_or_refuse(
             root_path=project_root,
             source_path=config_path,
         )
-        compiled = GraphCompiler().compile(graph, plugin_registry=plugin_registry)
+        compilation = GraphCompiler().compile_with_findings(
+            graph,
+            registry=registry,
+            plugin_registry=plugin_registry,
+        )
+        graph = compilation.workflow.graph
+        compiled = compilation.compiled_graph
     except (GraphConfigError, Exception) as exc:
         health = _compile_health_report(exc, effective_policy)
         _write_refused_artifacts(run_dir, health)
         result = CheckedRunResult(run_id, run_dir, health)
         raise CheckedRunError(f"run refused: health status {health.status}", result) from exc
     return graph, compiled
-
-
-def _compile_with_registry_or_refuse(
-    graph: GraphConfig,
-    registry: NodeRegistry,
-    effective_policy: dict[str, Any],
-    run_dir: Path,
-    run_id: str,
-):
-    from vibeflow.targets.python.project.compiler import GraphCompiler, GraphCompileError
-
-    try:
-        return GraphCompiler().compile(graph, registry=registry)
-    except GraphCompileError as exc:
-        health = _compile_health_report(exc, effective_policy)
-        _write_refused_artifacts(run_dir, health)
-        result = CheckedRunResult(run_id, run_dir, health)
-        raise CheckedRunError(f"run refused: health status {health.status}", result) from exc
 
 
 def _compile_health_report(exc: Exception, effective_policy: dict[str, Any]) -> HealthReport:

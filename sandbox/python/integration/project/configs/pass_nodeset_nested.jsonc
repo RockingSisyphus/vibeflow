@@ -15,40 +15,16 @@
         "description": "Runs start."
       },
       {
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.in.input",
-            "type": "value.in",
-            "display_name": "Value In Input"
-          }
-        ],
+
+
         "id": "input",
         "type_used": "sandbox.value_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.final",
-            "type": "value.final",
-            "display_name": "Value Final"
-          }
-        ],
+
+
         "node_configs": {
           "first.add": {
             "delta": 4
@@ -63,13 +39,7 @@
         "description": "Runs add_two."
       },
       {
-        "requires": [
-          {
-            "type": "value.final",
-            "cardinality": "exactly_one",
-            "display_name": "Value Final"
-          }
-        ],
+
         "id": "end",
         "type_used": "sandbox.final_value_end",
         "display_name": "End",

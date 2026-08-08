@@ -20,22 +20,8 @@
         "id": "invalid",
         "type_used": "sandbox.invalid.discarded_promise",
         "display_name": "discarded promise",
-        "description": "This negative fixture must fail during the JavaScript project audit.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ]
-      },
+        "description": "This negative fixture must fail during the JavaScript project audit."
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

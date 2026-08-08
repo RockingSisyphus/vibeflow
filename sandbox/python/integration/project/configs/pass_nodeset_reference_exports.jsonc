@@ -25,98 +25,23 @@
         "description": "Runs start."
       },
       {
-        "requires": [
-          {
-            "type": "train.model",
-            "cardinality": "exactly_one",
-            "display_name": "Train Model"
-          },
-          {
-            "type": "train.batch",
-            "cardinality": "exactly_one",
-            "display_name": "Train Batch"
-          },
-          {
-            "type": "train.optimizer",
-            "cardinality": "exactly_one",
-            "display_name": "Train Optimizer"
-          }
-        ],
-        "provides": [
-          {
-            "key": "train.model.input",
-            "type": "train.model",
-            "display_name": "Train Model Input"
-          },
-          {
-            "key": "train.batch.input",
-            "type": "train.batch",
-            "display_name": "Train Batch Input"
-          },
-          {
-            "key": "train.optimizer.input",
-            "type": "train.optimizer",
-            "display_name": "Train Optimizer Input"
-          }
-        ],
+
+
         "id": "training_input",
         "type_used": "sandbox.training_input",
         "display_name": "Training Input",
         "description": "Runs training_input."
       },
       {
-        "requires": [
-          {
-            "type": "train.model",
-            "cardinality": "exactly_one",
-            "display_name": "Train Model"
-          },
-          {
-            "type": "train.batch",
-            "cardinality": "exactly_one",
-            "display_name": "Train Batch"
-          },
-          {
-            "type": "train.optimizer",
-            "cardinality": "exactly_one",
-            "display_name": "Train Optimizer"
-          }
-        ],
-        "provides": [
-          {
-            "key": "train.model_after",
-            "type": "train.model_after",
-            "display_name": "Train Model After"
-          },
-          {
-            "key": "train.optimizer_after",
-            "type": "train.optimizer_after",
-            "display_name": "Train Optimizer After"
-          },
-          {
-            "key": "train.step_report",
-            "type": "train.step_report",
-            "display_name": "Train Step Report"
-          },
-          {
-            "key": "train.metrics",
-            "type": "train.metrics",
-            "display_name": "Train Metrics"
-          }
-        ],
+
+
         "id": "train_step",
         "type_used": "training.reference_step",
         "display_name": "Train Step",
         "description": "Runs train_step."
       },
       {
-        "requires": [
-          {
-            "type": "train.metrics",
-            "cardinality": "exactly_one",
-            "display_name": "Train Metrics"
-          }
-        ],
+
         "id": "end",
         "type_used": "sandbox.training_metrics_end",
         "display_name": "End",

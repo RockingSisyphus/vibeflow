@@ -31,12 +31,6 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
         if compiled is not None
         else any(declared_global_state.values())
     )
-    root_exclusive = (
-        compiled.root_exclusive
-        if compiled is not None
-        else contains_global_state or graph.execution_lock is not None
-    )
-
     return {
         "summary": {
             "nodes": len(nodes),
@@ -45,7 +39,6 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
             "data_edges": len(compiled.data_edges) if compiled is not None else 0,
             "reported_edges": len(edges),
             "contains_global_state": contains_global_state,
-            "root_exclusive": root_exclusive,
         },
         "execution_lock": (
             _execution_lock_payload(graph.execution_lock, scope="root")
@@ -53,7 +46,6 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
             else None
         ),
         "contains_global_state": contains_global_state,
-        "root_exclusive": root_exclusive,
         "entry_nodes": [node for node in nodes if not incoming.get(node)],
         "terminal_nodes": [node for node in nodes if not adjacency.get(node)],
         "god_nodes": [
@@ -67,10 +59,18 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
                 "type_used": node.type_used,
                 "flow_kind": _effective_flow_kind(node, compiled),
                 "effect_scope": _effective_effect_scope(node, compiled),
+                "runtime_dispatch": _runtime_dispatch_label(node, compiled),
                 "execution_lock": (
-                    _execution_lock_payload(node.execution_lock, scope="node")
+                    _execution_lock_payload(
+                        node.execution_lock,
+                        scope=_node_lock_scope(node, graph),
+                    )
                     if node.execution_lock is not None
                     else None
+                ),
+                "effective_execution_lock": _effective_execution_lock(
+                    graph,
+                    node,
                 ),
                 "contains_global_state": (
                     node.status != STATUS_PLANNED
@@ -93,6 +93,48 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
 
 def _execution_lock_payload(lock: object, *, scope: str) -> dict[str, str]:
     return {"key": str(getattr(lock, "key", "")), "scope": scope}
+
+
+def _effective_execution_lock(
+    graph: GraphConfig,
+    node: NodeSpec,
+) -> dict[str, object] | None:
+    if node.execution_lock is not None:
+        return {
+            **_execution_lock_payload(
+                node.execution_lock,
+                scope=_node_lock_scope(node, graph),
+            ),
+            "inherited": False,
+        }
+    if graph.execution_lock is not None:
+        return {
+            **_execution_lock_payload(graph.execution_lock, scope="root"),
+            "inherited": True,
+        }
+    return None
+
+
+def _node_lock_scope(node: NodeSpec, graph: GraphConfig) -> str:
+    return (
+        "block"
+        if _declared_nodeset_target(node, graph.nodesets)
+        else "node"
+    )
+
+
+def _runtime_dispatch_label(
+    node: NodeSpec,
+    compiled: CompiledGraph | None,
+) -> str:
+    if node.status == STATUS_PLANNED or compiled is None:
+        return "unknown"
+    value = getattr(compiled, "runtime_dispatches", {}).get(node.id)
+    if value is True:
+        return "detected"
+    if value is False:
+        return "none"
+    return "unknown"
 
 
 def _effective_flow_kind(node: object, compiled: CompiledGraph | None) -> str:

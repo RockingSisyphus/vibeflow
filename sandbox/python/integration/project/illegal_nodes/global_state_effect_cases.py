@@ -19,7 +19,7 @@ def _contract() -> NodeContract:
     return NodeContract(
         provides=(DataProvider("bad.out", "bad.out", "Bad Out"),),
         output_semantics={"bad.out": ("Unreachable output for an invalid node.",)},
-        output_schema={"bad.out": {"type": "integer"}},
+
     )
 
 

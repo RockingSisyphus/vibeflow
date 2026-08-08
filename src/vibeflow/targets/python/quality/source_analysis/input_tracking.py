@@ -179,10 +179,7 @@ class _NodeDataTrackingMixin:
             self._check_params_key_node(node.args[0], node)
 
     def _check_params_key_node(self, key_node: ast.AST, node: ast.Call) -> None:
-        if isinstance(key_node, ast.Constant) and isinstance(key_node.value, str):
-            key = key_node.value
-            if key != "_global" and self.contract is not None and key not in self.contract.params_schema:
-                self._add("undeclared_param", f"params key is not declared in CONTRACT.params_schema: {key}", node, failure_layer="contract", suggested_fix_type="fix_contract")
+        del key_node, node
 
     def _check_assignment_target(self, target: ast.AST, node: ast.AST) -> None:
         if self._target_mutates_node_input(target):

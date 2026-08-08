@@ -45,9 +45,9 @@ class _AliasNode:
     )
     CONTRACT = NodeContract(
         provides=(
-            DataProvider("exact", "value.exact"),
-            DataProvider("optional", "value.optional"),
-            DataProvider("item", "value.item"),
+            DataProvider("exact", "value.exact", display_name="exact"),
+            DataProvider("optional", "value.optional", display_name="optional"),
+            DataProvider("item", "value.item", display_name="item"),
         )
     )
 
@@ -65,9 +65,9 @@ class _AddNode:
         "process",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("number", "exactly_one"),),
-        provides=(DataProvider("answer", "answer"),),
-        params_schema={"delta": {"type": "number"}},
+        requires=(DataRequirement("number", "exactly_one", display_name="number"),),
+        provides=(DataProvider("answer", "answer", display_name="answer"),),
+
     )
 
     def run_pure(self, inputs, params):
@@ -84,10 +84,10 @@ class _RouteNode:
         "decision",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("number", "exactly_one"),),
+        requires=(DataRequirement("number", "exactly_one", display_name="number"),),
         provides=(
-            DataProvider("number.branch", "number"),
-            DataProvider("branch.left", "branch.left"),
+            DataProvider("number.branch", "number", display_name="number.branch"),
+            DataProvider("branch.left", "branch.left", display_name="branch.left"),
         ),
     )
 
@@ -140,8 +140,8 @@ class _LeftNode:
         "process",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("number", "exactly_one"),),
-        provides=(DataProvider("left.answer", "answer"),),
+        requires=(DataRequirement("number", "exactly_one", display_name="number"),),
+        provides=(DataProvider("left.answer", "answer", display_name="left.answer"),),
     )
 
     def run_pure(self, inputs, params):
@@ -158,8 +158,8 @@ class _RightNode:
         "process",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("number", "exactly_one"),),
-        provides=(DataProvider("right.answer", "answer"),),
+        requires=(DataRequirement("number", "exactly_one", display_name="number"),),
+        provides=(DataProvider("right.answer", "answer", display_name="right.answer"),),
     )
 
     def run_pure(self, inputs, params):
@@ -176,8 +176,8 @@ class _OptionalLeftNode:
         "process",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("number", "optional_one"),),
-        provides=(DataProvider("left.answer", "answer"),),
+        requires=(DataRequirement("number", "optional_one", display_name="number"),),
+        provides=(DataProvider("left.answer", "answer", display_name="left.answer"),),
     )
 
     def run_pure(self, inputs, params):
@@ -196,8 +196,8 @@ class _OptionalRightNode:
         "process",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("number", "optional_one"),),
-        provides=(DataProvider("right.answer", "answer"),),
+        requires=(DataRequirement("number", "optional_one", display_name="number"),),
+        provides=(DataProvider("right.answer", "answer", display_name="right.answer"),),
     )
 
     def run_pure(self, inputs, params):
@@ -215,7 +215,7 @@ class _LeftItemNode:
         "1",
         "process",
     )
-    CONTRACT = NodeContract(provides=(DataProvider("left", "item"),))
+    CONTRACT = NodeContract(provides=(DataProvider("left", "item", display_name="left"),))
 
     def run_pure(self, inputs, params):
         return {"left": 1}
@@ -230,10 +230,21 @@ class _RightItemNode:
         "1",
         "process",
     )
-    CONTRACT = NodeContract(provides=(DataProvider("right", "item"),))
+    CONTRACT = NodeContract(provides=(DataProvider("right", "item", display_name="right"),))
 
     def run_pure(self, inputs, params):
         return {"right": 2}
+
+
+class _ItemJoinNode:
+    NODE_INFO = NodeInfo("fixture.item_join", "Item Join", "conformance", "Consumes one active fan-in item.", "1", "terminal")
+    CONTRACT = NodeContract(
+        requires=(DataRequirement("item", "exactly_one", display_name="Item"),),
+        input_semantics={"item": ("selected fan-in item",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
 
 
 class _DoubleNode:
@@ -246,8 +257,8 @@ class _DoubleNode:
         "process",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("number", "exactly_one"),),
-        provides=(DataProvider("answer", "answer"),),
+        requires=(DataRequirement("number", "exactly_one", display_name="number"),),
+        provides=(DataProvider("answer", "answer", display_name="answer"),),
     )
 
     def run_pure(self, inputs, params):
@@ -279,8 +290,8 @@ class _IncrementNode:
         "process",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("loop.current", "exactly_one"),),
-        provides=(DataProvider("loop.next", "loop.next"),),
+        requires=(DataRequirement("loop.current", "exactly_one", display_name="loop.current"),),
+        provides=(DataProvider("loop.next", "loop.next", display_name="loop.next"),),
     )
 
     def run_pure(self, inputs, params):
@@ -297,12 +308,12 @@ class _IncrementUntilNode:
         "process",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("loop.current", "exactly_one"),),
+        requires=(DataRequirement("loop.current", "exactly_one", display_name="loop.current"),),
         provides=(
-            DataProvider("loop.next", "loop.next"),
-            DataProvider("loop.done", "loop.done"),
+            DataProvider("loop.next", "loop.next", display_name="loop.next"),
+            DataProvider("loop.done", "loop.done", display_name="loop.done"),
         ),
-        params_schema={"target": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -323,12 +334,12 @@ class _AdvanceOuterNode:
         "process",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("inner.final", "exactly_one"),),
+        requires=(DataRequirement("inner.final", "exactly_one", display_name="inner.final"),),
         provides=(
-            DataProvider("loop.next", "loop.next"),
-            DataProvider("loop.done", "loop.done"),
+            DataProvider("loop.next", "loop.next", display_name="loop.next"),
+            DataProvider("loop.done", "loop.done", display_name="loop.done"),
         ),
-        params_schema={"target": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -456,6 +467,7 @@ JAVASCRIPT_EXPORTS = {
     "fixture.optional_right": "optionalRight",
     "fixture.left_item": "leftItem",
     "fixture.right_item": "rightItem",
+    "fixture.item_join": "terminal",
     "fixture.double": "double",
     "fixture.async_double": "asyncDouble",
     "fixture.increment": "increment",
@@ -511,6 +523,7 @@ def _registry() -> NodeRegistry:
         ("fixture.optional_right", _OptionalRightNode),
         ("fixture.left_item", _LeftItemNode),
         ("fixture.right_item", _RightItemNode),
+        ("fixture.item_join", _ItemJoinNode),
         ("fixture.double", _DoubleNode),
         ("fixture.async_double", _AsyncDoubleNode),
         ("fixture.increment", _IncrementNode),
@@ -577,15 +590,17 @@ def _node(
     provides: list[dict[str, str]] | None = None,
     **extra,
 ) -> dict[str, object]:
-    return {
+    node = {
         "id": node_id,
         "type_used": type_key,
         "display_name": node_id,
         "description": f"Conformance node {node_id}.",
-        "requires": requires or [],
-        "provides": provides or [],
         **extra,
     }
+    if type_key in {"vibeflow.io", "vibeflow.loop.while"} or extra.get("status") == "planned":
+        node["requires"] = requires or []
+        node["provides"] = provides or []
+    return node
 
 
 def _edge(
@@ -1054,12 +1069,7 @@ def test_portable_conformance_safe_any_ignores_unselected_data_edge(
                     "fixture.right_item",
                     provides=[_provider("right", "item")],
                 ),
-                _node(
-                    "join",
-                    "fixture.terminal",
-                    requires=[_requirement("item")],
-                    join_policy="safe_any",
-                ),
+                    _node("join", "fixture.item_join", join_policy="safe_any"),
             ],
             "edges": [
                 _edge("start", "direct"),

@@ -62,7 +62,7 @@ def test_tooling_path_adapter_keeps_core_parser_filesystem_free(
     from vibeflow.tooling.project.graph_config import parse_graph_config
 
     document = {
-        "pipeline": {"nodes": [{"id": "node", "type_used": "test.node"}]}
+        "pipeline": {"nodes": [{"id": "node", "type_used": "test.node", "display_name": "Node", "description": "Exercises the path adapter."}]}
     }
     relative = Path("relative-project-root")
     core_graph = parse_graph_config_data(
@@ -89,11 +89,15 @@ def test_planned_structural_and_python_source_events_keep_finding_order(
         {
             "pipeline": {
                 "nodes": [
-                    {
-                        "id": "planned",
-                        "status": "planned",
-                        "flow_kind": "process",
-                        "planned_behavior": {
+                        {
+                            "id": "planned",
+                            "status": "planned",
+                            "flow_kind": "process",
+                            "display_name": "Planned",
+                            "description": "Exercises planned finding order.",
+                            "requires": [],
+                            "provides": [],
+                            "planned_behavior": {
                             "kind": "python_stub",
                             "stub_module": "stubs/missing.py",
                         },

@@ -66,6 +66,12 @@ def _write_review_workspace(
         pipeline["nodes"][2]["status"] = "planned"
         pipeline["nodes"][2]["flow_kind"] = "process"
         pipeline["nodes"][2]["planned_behavior"] = "transparent"
+        pipeline["nodes"][2]["requires"] = [
+            {"type": "value.in", "cardinality": "exactly_one", "display_name": "Value In"}
+        ]
+        pipeline["nodes"][2]["provides"] = [
+            {"key": "value.out", "type": "value.out", "display_name": "Value Out"}
+        ]
     workflow_path.write_text(json.dumps({"pipeline": pipeline}, indent=2), encoding="utf-8")
     return workspace_path, workflow_path, architecture_path, output_path
 
@@ -435,4 +441,23 @@ def test_project_template_run_injects_workspace_for_review(tmp_path) -> None:
         "main.jsonc",
         "--output",
         "graph.svg",
+    ]
+    assert namespace["_kernel_cli_args"](
+        [
+            "svg",
+            "--config",
+            "main.jsonc",
+            "--output",
+            "graph.svg",
+            "--expand-nodesets",
+        ]
+    ) == [
+        "export-svg",
+        "--workspace",
+        str(workspace_path),
+        "--config",
+        "main.jsonc",
+        "--output",
+        "graph.svg",
+        "--expand-nodesets",
     ]

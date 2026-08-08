@@ -7,7 +7,9 @@
         "id": "a",
         "type_used": "a",
         "display_name": "A",
-        "description": "Runs a."
+        "description": "Runs a.",
+        "requires": [],
+        "provides": []
       }
     ]
   },

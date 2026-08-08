@@ -193,6 +193,7 @@ def _default_rule_id(code: str) -> str:
     effect_rules = {
         "effect_call": "NODE.EFFECT.CALL_FORBIDDEN",
         "effect_import": "NODE.EFFECT.IMPORT_FORBIDDEN",
+        "runtime_dispatch": "NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED",
     }
     if code in effect_rules:
         return effect_rules[code]
@@ -225,12 +226,8 @@ def _default_rule_id(code: str) -> str:
     if code.startswith("complexity_") or code in {
         "call_chain_too_deep",
         "confusing_key_name",
-        "example_contract_gap",
-        "example_failed",
         "example_shape",
-        "missing_examples",
         "recursive_call_chain",
-        "responsibility_mismatch",
         "temporary_key",
         "wide_contract",
     }:

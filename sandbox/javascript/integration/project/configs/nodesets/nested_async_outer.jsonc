@@ -36,22 +36,8 @@
         "id": "inner",
         "type_used": "sandbox.nested_async_inner",
         "display_name": "Run async inner block",
-        "description": "Runs deferred and detached work one level deeper.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "doubled",
-            "type": "sandbox.async.value",
-            "display_name": "Doubled value"
-          }
-        ]
-      },
+        "description": "Runs deferred and detached work one level deeper."
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

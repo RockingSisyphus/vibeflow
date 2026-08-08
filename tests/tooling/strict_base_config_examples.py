@@ -5,6 +5,19 @@ import ast
 from vibeflow.core.inspection import build_architecture_report
 from vibeflow.targets.python.quality.source_analysis.ast_rules import import_aliases, import_roots, qualified_call_name
 
+
+class CycleCopyNode:
+    NODE_INFO = NodeInfo("test.copy_alt", "Cycle Copy", "test", "Copies value.out into a distinct value.in-compatible key.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        requires=(DataRequirement("value.out", "exactly_one", display_name="Value Out"),),
+        provides=(DataProvider("value.copy", "value.in", display_name="Value Copy"),),
+        input_semantics={"value.out": ("value to copy around the cycle",)},
+        output_semantics={"value.copy": ("copied value compatible with value.in",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"value.copy": inputs["value.out"]["value"]}
+
 def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) -> None:
     manifest = load_config_document(
         _repo_root() / "tests" / "fixtures" / "project_quality" / "cases.jsonc"
@@ -47,6 +60,7 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
     for case in manifest["health_cases"]:
         registry = _registry()
         register_node(registry, "test.route", RuntimeRouteNode)
+        register_node(registry, "test.copy_alt", CycleCopyNode)
         graph = parse_graph_config(case["config"])
         report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
         rule_ids = {finding.rule_id for finding in (*report.errors, *report.warnings)}
@@ -163,8 +177,8 @@ def test_mermaid_collapsed_and_expanded_views_share_top_level_compiled_edges() -
             },
         }
     )
-    collapsed = export_mermaid(graph, expand_nodesets=False)
-    expanded = export_mermaid(graph, expand_nodesets=True)
+    collapsed = export_mermaid(graph, registry=_registry(), expand_nodesets=False)
+    expanded = export_mermaid(graph, registry=_registry(), expand_nodesets=True)
     assert "data: Value In" in collapsed
     assert "data: Value In" in expanded
     assert "flow__inner" not in collapsed

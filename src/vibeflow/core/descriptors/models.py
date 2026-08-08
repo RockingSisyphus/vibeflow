@@ -211,7 +211,6 @@ class NodeContractDescriptor:
     output_semantics: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     params_schema: Mapping[str, Any] = field(default_factory=dict)
     params_defaults: Mapping[str, Any] = field(default_factory=dict)
-    output_schema: Mapping[str, Any] = field(default_factory=dict)
     examples: tuple[Mapping[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
@@ -240,28 +239,39 @@ class NodeContractDescriptor:
                 raise DescriptorModelError(
                     f"unsupported requirement cardinality: {requirement.cardinality}"
                 )
+            _required_text(
+                requirement.display_name,
+                field_name=f"contract.requires[{requirement.type}].display_name",
+            )
+        for provider in provides:
+            _required_text(
+                provider.display_name,
+                field_name=f"contract.provides[{provider.key}].display_name",
+            )
+        input_semantics = _semantic_mapping(
+            self.input_semantics,
+            field_name="contract.input_semantics",
+        )
+        output_semantics = _semantic_mapping(
+            self.output_semantics,
+            field_name="contract.output_semantics",
+        )
+        if set(input_semantics) != set(requirement_types):
+            raise DescriptorModelError(
+                "contract.input_semantics must cover exactly every required data type"
+            )
+        if set(output_semantics) != set(provider_keys):
+            raise DescriptorModelError(
+                "contract.output_semantics must cover exactly every provided key"
+            )
         examples = tuple(
             _freeze_mapping(item, field_name=f"contract.examples[{index}]")
             for index, item in enumerate(self.examples)
         )
         object.__setattr__(self, "requires", requires)
         object.__setattr__(self, "provides", provides)
-        object.__setattr__(
-            self,
-            "input_semantics",
-            _semantic_mapping(
-                self.input_semantics,
-                field_name="contract.input_semantics",
-            ),
-        )
-        object.__setattr__(
-            self,
-            "output_semantics",
-            _semantic_mapping(
-                self.output_semantics,
-                field_name="contract.output_semantics",
-            ),
-        )
+        object.__setattr__(self, "input_semantics", input_semantics)
+        object.__setattr__(self, "output_semantics", output_semantics)
         object.__setattr__(
             self,
             "params_schema",
@@ -278,14 +288,6 @@ class NodeContractDescriptor:
                 field_name="contract.params_defaults",
             ),
         )
-        object.__setattr__(
-            self,
-            "output_schema",
-            _freeze_mapping(
-                self.output_schema,
-                field_name="contract.output_schema",
-            ),
-        )
         object.__setattr__(self, "examples", examples)
 
     def to_dict(self) -> dict[str, object]:
@@ -300,7 +302,6 @@ class NodeContractDescriptor:
             },
             "params_schema": _thaw_json(self.params_schema),
             "params_defaults": _thaw_json(self.params_defaults),
-            "output_schema": _thaw_json(self.output_schema),
             "examples": [_thaw_json(item) for item in self.examples],
         }
 
@@ -342,7 +343,6 @@ class NodeDescriptor:
     implementations: tuple[ImplementationDescriptor, ...] = ()
     base_libs: tuple[str, ...] = ()
     capabilities: tuple[CapabilityRequirementDescriptor, ...] = ()
-    purity: str = "pure"
     author: str | None = None
     tags: tuple[str, ...] = ()
     external: bool = False
@@ -413,11 +413,6 @@ class NodeDescriptor:
             _string_tuple(self.base_libs, field_name="node.base_libs"),
         )
         object.__setattr__(self, "capabilities", capabilities)
-        object.__setattr__(
-            self,
-            "purity",
-            _required_text(self.purity, field_name="node.purity"),
-        )
         object.__setattr__(self, "author", _optional_text(self.author))
         object.__setattr__(
             self,
@@ -448,7 +443,6 @@ class NodeDescriptor:
             "description": self.description,
             "version": self.version,
             "flow_kind": self.flow_kind,
-            "purity": self.purity,
             "tags": list(self.tags),
             "external": self.external,
             "contract": self.contract.to_dict(),

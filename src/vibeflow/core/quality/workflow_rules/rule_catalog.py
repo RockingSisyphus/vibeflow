@@ -12,6 +12,11 @@ RULE_CATALOG: dict[str, dict[str, str]] = {
         "layer": "implementation",
         "suggested_fix_type": "fix_contract",
     },
+    "NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED": {
+        "severity": "warning",
+        "layer": "implementation",
+        "suggested_fix_type": "fix_contract",
+    },
     "GRAPH.CYCLE.FORBIDDEN": {
         "severity": "error",
         "layer": "topology",
@@ -68,6 +73,11 @@ RULE_CATALOG: dict[str, dict[str, str]] = {
         "suggested_fix_type": "fix_config",
     },
     "GRAPH.JOIN.REDUNDANT_ALL": {
+        "severity": "warning",
+        "layer": "topology",
+        "suggested_fix_type": "fix_config",
+    },
+    "GRAPH.EXECUTION_LOCK.GLOBAL_STATE_UNCOORDINATED": {
         "severity": "warning",
         "layer": "topology",
         "suggested_fix_type": "fix_config",

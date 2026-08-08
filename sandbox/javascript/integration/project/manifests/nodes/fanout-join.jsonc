@@ -33,19 +33,30 @@
     ],
     "params_schema": {},
     "params_defaults": {},
-    "output_schema": {
-      "added": {
-        "type": "number"
-      },
-      "subtracted": {
-        "type": "number"
-      }
+    "input_semantics": {
+      "sandbox.fanout.added": [
+        "Added branch input consumed by this node."
+      ],
+      "sandbox.fanout.subtracted": [
+        "Subtracted branch input consumed by this node."
+      ]
+    },
+    "output_semantics": {
+      "added": [
+        "Added output produced by this node."
+      ],
+      "subtracted": [
+        "Subtracted output produced by this node."
+      ]
     }
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "source": {
         "kind": "file",
         "ref": "nodes/fanout_join.ts",

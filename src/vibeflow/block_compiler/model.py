@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping, TypeAlias
 
 
-WORKFLOW_ABI_VERSION = "vibeflow.workflow.v3"
+WORKFLOW_ABI_VERSION = "vibeflow.workflow.v4"
 _CARDINALITIES = frozenset({"exactly_one", "optional_one", "all"})
 _BLOCK_KINDS = frozenset({"workflow", "nodeset", "loop"})
 _CONDITION_OPERATORS = frozenset({"==", "!="})
@@ -322,6 +322,7 @@ class NodeCallPlan:
     io_operation: str = ""
     io_port: str = ""
     effect_scope: str = "none"
+    runtime_dispatch: bool | None = None
     execution_lock: ExecutionLockPlan | None = None
     contains_global_state: bool = False
 
@@ -340,6 +341,12 @@ class NodeCallPlan:
             )
         if not isinstance(self.effect_scope, str) or not self.effect_scope:
             raise PortablePlanError("node effect_scope must be non-empty")
+        if self.runtime_dispatch is not None and not isinstance(
+            self.runtime_dispatch, bool
+        ):
+            raise PortablePlanError(
+                "node runtime_dispatch must be true, false, or null"
+            )
         if self.execution_lock is not None and not isinstance(
             self.execution_lock, ExecutionLockPlan
         ):
@@ -381,6 +388,7 @@ class NodeCallPlan:
             "io_operation": self.io_operation,
             "io_port": self.io_port,
             "effect_scope": self.effect_scope,
+            "runtime_dispatch": self.runtime_dispatch,
             "execution_lock": (
                 self.execution_lock.to_dict()
                 if self.execution_lock is not None
@@ -448,7 +456,6 @@ class BlockPlan:
     loop: LoopPlan | None = None
     execution_lock: ExecutionLockPlan | None = None
     contains_global_state: bool = False
-    root_exclusive: bool = False
 
     def __post_init__(self) -> None:
         if self.kind not in _BLOCK_KINDS:
@@ -463,8 +470,6 @@ class BlockPlan:
             raise PortablePlanError(
                 "block contains_global_state must be a boolean"
             )
-        if not isinstance(self.root_exclusive, bool):
-            raise PortablePlanError("block root_exclusive must be a boolean")
 
     def node(self, node_id: str) -> NodeCallPlan:
         for node in self.nodes:
@@ -494,7 +499,6 @@ class BlockPlan:
                 else None
             ),
             "contains_global_state": self.contains_global_state,
-            "root_exclusive": self.root_exclusive,
         }
 
 
@@ -511,7 +515,6 @@ class WorkflowPlan:
     entry_mode: str = "sync"
     execution_lock: ExecutionLockPlan | None = None
     contains_global_state: bool = False
-    root_exclusive: bool = False
 
     def __post_init__(self) -> None:
         if self.abi_version != WORKFLOW_ABI_VERSION:
@@ -532,10 +535,6 @@ class WorkflowPlan:
         if not isinstance(self.contains_global_state, bool):
             raise PortablePlanError(
                 "workflow contains_global_state must be a boolean"
-            )
-        if not isinstance(self.root_exclusive, bool):
-            raise PortablePlanError(
-                "workflow root_exclusive must be a boolean"
             )
 
     def block(self, block_id: str) -> BlockPlan:
@@ -561,7 +560,6 @@ class WorkflowPlan:
                 else None
             ),
             "contains_global_state": self.contains_global_state,
-            "root_exclusive": self.root_exclusive,
         }
 
     def to_json(self) -> str:

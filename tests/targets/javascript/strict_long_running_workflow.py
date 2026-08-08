@@ -50,7 +50,7 @@ const workflow = await import(pathToFileURL({json.dumps(str(path))}).href);
 
 def _empty_sync_plan(node_module: Path) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v3",
+        "abi_version": "vibeflow.workflow.v4",
         "workflow_id": "test.host-lifecycle",
         "entry_mode": "sync",
         "inputs": [],
@@ -88,8 +88,10 @@ class _DoubleNode:
         "process",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("number", "exactly_one"),),
-        provides=(DataProvider("answer", "answer"),),
+        requires=(DataRequirement("number", "exactly_one", display_name="number"),),
+        provides=(DataProvider("answer", "answer", display_name="answer"),),
+        input_semantics={"number": ("number to double",)},
+        output_semantics={"answer": ("doubled number",)},
     )
 
     def run_pure(self, inputs, params):
@@ -108,6 +110,9 @@ def test_python_port_nodes_receive_transform_and_send(
                     {
                         "id": "receive",
                         "type_used": "vibeflow.io",
+                        "display_name": "Receive number",
+                        "description": "Receives the input number from the math input port.",
+                        "requires": [],
                         "provides": [_provider("number", "number")],
                         "io": {
                             "operation": "receive",
@@ -117,13 +122,16 @@ def test_python_port_nodes_receive_transform_and_send(
                     {
                         "id": "double",
                         "type_used": "test.double",
-                        "requires": [_requirement("number")],
-                        "provides": [_provider("answer", "answer")],
+                        "display_name": "Double number",
+                        "description": "Doubles the received number for this workflow.",
                     },
                     {
                         "id": "send",
                         "type_used": "vibeflow.io",
+                        "display_name": "Send answer",
+                        "description": "Sends the doubled answer through the math output port.",
                         "requires": [_requirement("answer")],
+                        "provides": [],
                         "io": {
                             "operation": "send",
                             "port": "math.out",
@@ -190,7 +198,7 @@ export function double(inputs) {
         encoding="utf-8",
     )
     plan = {
-        "abi_version": "vibeflow.workflow.v3",
+        "abi_version": "vibeflow.workflow.v4",
         "workflow_id": "test.port",
         "entry_mode": "async",
         "inputs": [],
@@ -385,7 +393,7 @@ export function createHostExtension() {
         encoding="utf-8",
     )
     plan = {
-        "abi_version": "vibeflow.workflow.v3",
+        "abi_version": "vibeflow.workflow.v4",
         "workflow_id": "test.host",
         "entry_mode": "sync",
         "inputs": [

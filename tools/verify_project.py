@@ -175,10 +175,8 @@ class StartNode:
 class SeedNode:
     NODE_INFO = NodeInfo("isolation.seed", "Seed", "isolation", "Produces the isolation result.", "1.0.0", "process")
     CONTRACT = NodeContract(
-        provides=(DataProvider(key="value.out", type="value.out"),),
+        provides=(DataProvider(key="value.out", type="value.out", display_name="Result"),),
         output_semantics={"value.out": ("isolation result",)},
-        params_schema={"value": {"type": "number"}},
-        output_schema={"value.out": {"type": "number"}},
         examples=({"inputs": {}, "params": {"value": 7}},),
     )
     def run_pure(self, inputs, params):
@@ -187,7 +185,7 @@ class SeedNode:
 class EndNode:
     NODE_INFO = NodeInfo("isolation.end", "End", "isolation", "Consumes the isolation result.", "1.0.0", "terminal")
     CONTRACT = NodeContract(
-        requires=(DataRequirement(type="value.out", cardinality="exactly_one"),),
+        requires=(DataRequirement(type="value.out", cardinality="exactly_one", display_name="Result"),),
         input_semantics={"value.out": ("isolation result",)},
         examples=({"inputs": {"value.out": {"key": "value.out", "type": "value.out", "value": 7, "source_node": "seed"}}, "params": {}},),
     )
@@ -313,8 +311,8 @@ config.write_text(json.dumps({
     "pipeline": {
         "nodes": [
             {"id": "start", "type_used": "isolation.start", "display_name": "Start", "description": "Starts the isolation workflow."},
-            {"id": "seed", "type_used": "isolation.seed", "display_name": "Seed", "description": "Produces the isolation result.", "provides": [{"key": "value.out", "type": "value.out", "display_name": "Result"}], "value": 7},
-            {"id": "end", "type_used": "isolation.end", "display_name": "End", "description": "Consumes the isolation result.", "requires": [{"type": "value.out", "cardinality": "exactly_one", "display_name": "Result"}]},
+            {"id": "seed", "type_used": "isolation.seed", "display_name": "Seed", "description": "Produces the isolation result.", "value": 7},
+            {"id": "end", "type_used": "isolation.end", "display_name": "End", "description": "Consumes the isolation result."},
         ],
         "edges": [["start", "seed"], ["seed", "end"]],
         "outputs": [{"type": "value.out", "cardinality": "exactly_one", "display_name": "Result"}],

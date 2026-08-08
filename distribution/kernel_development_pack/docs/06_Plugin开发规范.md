@@ -316,9 +316,9 @@ Runtime plugin 适合记录观测数据、附加 trace、统计耗时或上报�
 
 ## Plugin 与 global_state / execution lock
 
-Plugin 是显式 `trusted` callback 边界，不是权限 Provider。Policy Plugin 不能把普通 node 改成 global-state scope，Compiler Plugin 不能删除 `contains_global_state` 或 lock plan，Runtime Plugin 也不能用 hook、布尔变量或手写锁替代 Architecture 中的显式并发语义。项目需要修改运行域的易失 ambient state 时，仍应实现 `flow_kind="global_state"` node；需要串行化业务资源时，仍应在 pipeline 或调用点声明静态 `execution_lock`。锁只协调执行，不增加 plugin 或 node 的副作用权限。
+Plugin 是显式 `trusted` callback 边界，不是权限 Provider。Policy Plugin 不能把普通 node 改成 global-state scope，Compiler Plugin 不能删除 `contains_global_state` 或 lock plan，Runtime Plugin 也不能用 hook、布尔变量或手写锁替代 Architecture 中的显式并发语义。项目需要修改运行域的易失 ambient state 或执行 runtime dispatch 时，仍应实现 `flow_kind="global_state"` node；需要串行化业务资源时，仍应在 pipeline 或调用点声明静态 `execution_lock`。锁只协调执行，不增加 plugin 或 node 的副作用权限。
 
-含 implemented global-state 的 Python root run 会在 `before_run` 之前取得独占 execution lease，并在成功/失败 hook 和受保护异步收尾结束后释放。因此 runtime hook 在该 lease 内执行，但这只是生命周期保护，不会把 plugin 变成 global-state node，也不代表框架会自动恢复已改变的进程态。
+`global_state` 不会自动取得 root lease。只有显式的 root/block/node `execution_lock` 才建立 lease，并在其成功/失败 hook 和受保护异步收尾结束后释放；同 key 互斥，异 key 并行。无锁 global-state 的 runtime hook 不处于隐藏锁内。无论是否加锁，框架都不会自动恢复已改变的进程态。
 
 ## Python Finding Plugin
 

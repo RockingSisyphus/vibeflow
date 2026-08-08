@@ -19,22 +19,8 @@
         "id": "seed",
         "type_used": "sandbox.fanout_add",
         "display_name": "Seed payload",
-        "description": "Adds one to x and transfers the result without scheduling the consumer.",
-        "requires": [
-          {
-            "type": "sandbox.x",
-            "cardinality": "exactly_one",
-            "display_name": "X"
-          }
-        ],
-        "provides": [
-          {
-            "key": "added_branch",
-            "type": "sandbox.fanout.added",
-            "display_name": "Added payload"
-          }
-        ]
-      },
+        "description": "Adds one to x and transfers the result without scheduling the consumer."
+              },
       {
         "id": "delay",
         "type_used": "sandbox.terminal",
@@ -46,35 +32,15 @@
         "type_used": "sandbox.edge_poison",
         "display_name": "Produce sentinel",
         "description": "Produces a same-typed sentinel that must not reach the consumer.",
-        "provides": [
-          {
-            "key": "poisoned",
-            "type": "sandbox.fanout.added",
-            "display_name": "Poisoned payload"
-          }
-        ],
+
         "value": 999
       },
       {
         "id": "consume",
         "type_used": "sandbox.edge_consume",
         "display_name": "Consume transferred payload",
-        "description": "Runs only after poison schedules it, then doubles the seed payload.",
-        "requires": [
-          {
-            "type": "sandbox.fanout.added",
-            "cardinality": "exactly_one",
-            "display_name": "Transferred payload"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ]
-      },
+        "description": "Runs only after poison schedules it, then doubles the seed payload."
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

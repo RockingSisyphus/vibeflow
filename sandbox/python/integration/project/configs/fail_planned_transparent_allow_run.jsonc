@@ -20,25 +20,8 @@
         "description": "Runs start."
       },
       {
-        "requires": [
-          {
-            "type": "calc.a",
-            "cardinality": "exactly_one",
-            "display_name": "Calc A"
-          },
-          {
-            "type": "calc.b",
-            "cardinality": "exactly_one",
-            "display_name": "Calc B"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.sum",
-            "type": "calc.sum",
-            "display_name": "Calc Sum"
-          }
-        ],
+
+
         "id": "add_pair",
         "type_used": "semantic.add_pair",
         "display_name": "Add Pair",
@@ -67,40 +50,16 @@
         "description": "Runs future_scale."
       },
       {
-        "requires": [
-          {
-            "type": "calc.scaled",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Scaled"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.branch",
-            "type": "calc.branch",
-            "display_name": "Calc Branch"
-          }
-        ],
+
+
         "id": "use_scaled",
         "type_used": "semantic.use_scaled",
         "display_name": "Use Scaled",
         "description": "Runs use_scaled."
       },
       {
-        "requires": [
-          {
-            "type": "calc.branch",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Branch"
-          }
-        ],
-        "provides": [
-          {
-            "key": "calc.final",
-            "type": "calc.final",
-            "display_name": "Calc Final"
-          }
-        ],
+
+
         "config": {
           "offset": 1
         },
@@ -110,13 +69,7 @@
         "description": "Runs finalize."
       },
       {
-        "requires": [
-          {
-            "type": "calc.final",
-            "cardinality": "exactly_one",
-            "display_name": "Calc Final"
-          }
-        ],
+
         "id": "end",
         "type_used": "semantic.final_end",
         "display_name": "End",

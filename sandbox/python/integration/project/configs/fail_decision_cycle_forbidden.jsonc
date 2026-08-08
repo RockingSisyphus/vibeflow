@@ -17,60 +17,24 @@
       {
         "display_name": "Input",
         "description": "Reads the initial loop value.",
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.in.input",
-            "type": "value.in",
-            "display_name": "Value In Input"
-          }
-        ],
+
+
         "id": "input",
         "type_used": "sandbox.value_input"
       },
       {
         "display_name": "Increment",
         "description": "Advances the retry value.",
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.next",
-            "type": "value.next",
-            "display_name": "Value Next"
-          }
-        ],
+
+
         "id": "increment",
         "type_used": "sandbox.increment"
       },
       {
         "display_name": "Done Check",
         "description": "Routes to either repeat or exit.",
-        "requires": [
-          {
-            "type": "value.next",
-            "cardinality": "exactly_one",
-            "display_name": "Value Next"
-          }
-        ],
-        "provides": [
-          {
-            "key": "loop.done",
-            "type": "loop.done",
-            "display_name": "Loop Done"
-          }
-        ],
+
+
         "target": 2,
         "id": "done",
         "type_used": "sandbox.done_check"
@@ -78,38 +42,15 @@
       {
         "display_name": "Copy Back",
         "description": "Copies value.next back to value.in for the forbidden graph edge cycle.",
-        "requires": [
-          {
-            "type": "value.next",
-            "cardinality": "exactly_one",
-            "display_name": "Value Next"
-          },
-          {
-            "type": "loop.done",
-            "cardinality": "exactly_one",
-            "display_name": "Loop Done"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.in.copy",
-            "type": "value.in",
-            "display_name": "Value In Copy"
-          }
-        ],
+
+
         "id": "copy",
         "type_used": "sandbox.copy_back"
       },
       {
         "display_name": "End",
         "description": "Shows that even an exit branch does not make ordinary cycles legal.",
-        "requires": [
-          {
-            "type": "value.next",
-            "cardinality": "exactly_one",
-            "display_name": "Value Next"
-          }
-        ],
+
         "id": "end",
         "type_used": "sandbox.next_value_end"
       }

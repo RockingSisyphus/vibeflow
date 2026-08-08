@@ -58,35 +58,8 @@
       {
         "display_name": "Init Inner",
         "description": "Copies outer state into inner-loop scoped keys and resets the inner counter.",
-        "requires": [
-          {
-            "type": "outer.current",
-            "cardinality": "exactly_one",
-            "display_name": "Outer Current"
-          },
-          {
-            "type": "total.current",
-            "cardinality": "exactly_one",
-            "display_name": "Total Current"
-          }
-        ],
-        "provides": [
-          {
-            "key": "outer.inner.seed",
-            "type": "outer.inner",
-            "display_name": "Outer Inner Seed"
-          },
-          {
-            "key": "total.inner.seed",
-            "type": "total.inner",
-            "display_name": "Total Inner Seed"
-          },
-          {
-            "key": "inner.current.seed",
-            "type": "inner.current",
-            "display_name": "Inner Current Seed"
-          }
-        ],
+
+
         "inner_start": 0,
         "id": "init_inner",
         "type_used": "semantic.inner_loop_init"
@@ -170,35 +143,8 @@
       {
         "display_name": "Advance Outer",
         "description": "Carries the inner total back to outer state and advances the outer counter.",
-        "requires": [
-          {
-            "type": "outer.inner",
-            "cardinality": "exactly_one",
-            "display_name": "Outer Inner"
-          },
-          {
-            "type": "total.inner",
-            "cardinality": "exactly_one",
-            "display_name": "Total Inner"
-          }
-        ],
-        "provides": [
-          {
-            "key": "outer.current.next",
-            "type": "outer.current",
-            "display_name": "Outer Current Next"
-          },
-          {
-            "key": "total.current.next",
-            "type": "total.current",
-            "display_name": "Total Current Next"
-          },
-          {
-            "key": "outer.done",
-            "type": "outer.done",
-            "display_name": "Outer Done"
-          }
-        ],
+
+
         "outer_limit": 2,
         "id": "advance_outer",
         "type_used": "semantic.outer_advance"

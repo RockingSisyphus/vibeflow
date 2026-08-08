@@ -1,6 +1,6 @@
 # VibeFlow 目标愿景
 
-> 当前版本：0.10.1。每个 project root 显式选择 Python 或 JavaScript Target；两个 Target 及其 Application closure 保持完全隔离。
+> 当前版本：0.12.0。每个 project root 显式选择 Python 或 JavaScript Target；两个 Target 及其 Application closure 保持完全隔离。
 
 ## 设计初衷
 
@@ -22,7 +22,7 @@ VibeFlow 是可迁移、可复用的严格标准流程图内核。业务开发�
 核心原则：
 
 - node 必须足够小。
-- 普通 node 默认必须是无业务 IO 的纯函数；需要真实副作用时必须用可审计的 `flow_kind` / `external` 分类取得对应 `effect_scope`。`global_state` 只增加语言运行时的易失 ambient-state 权限，不是通用 IO 或任意代码权限。
+- 普通 node 默认必须是无业务 IO 的纯函数；需要真实副作用时必须用可审计的 `flow_kind` / `external` 分类取得对应 `effect_scope`。`global_state` 是易失 ambient state 与运行时动态分派的可见边界，不是通用 IO 或任意代码权限。
 - node 之间不允许通过 Python 或 JavaScript/TypeScript 源码直接导入、调用或形成隐式耦合。
 - 程序控制流只能由 config 中显式 `pipeline.edges` 声明。
 - `requires` / `provides` 是严格 key/type 数据契约，不是控制流推导来源。
@@ -55,6 +55,7 @@ tooling → targets/python ──────┐
 - `flow_kind`：标准流程图角色，决定 node 的架构语义和图形形状。
 - `effect_scope`：内核从 `flow_kind`、`external` 和实现类别确定的副作用检查档位；不是 config 中可自由声明的字段。
 - `ambient state`：不通过 envelope 传递、由同一语言运行时或进程中的调用隐式共享的易失状态，例如 RNG、默认 dtype、grad mode、backend flag、全局 cache/registry。
+- `runtime dispatch`：受审计源码把控制权交给从 envelope、registry、cache 或其他运行时对象取得的 callable/方法；它是架构事实，不等于该对象本身属于 ambient state。
 - `ExecutionLockSpec`：语言无关的命名执行域配置。Target 通过一次 root run 的 execution lease 管理等待、获取、可重入嵌套和释放。
 - `nodeset`：由多个 node 或其他 nodeset 组成的复合拓扑单元。
 - `pipeline`：最终可运行拓扑，由 JSONC 配置声明 node、nodeset 和显式 flow edge。
@@ -85,9 +86,9 @@ tooling → targets/python ──────┐
 | `data_store` | 数据存储请求或引用 |
 | `document` | 文档生成或文档结构 |
 | `preparation` | 准备 / 初始化 |
-| `global_state` | 修改当前语言运行时或进程的易失 ambient state |
+| `global_state` | 访问易失 ambient state，或调用运行时取得的 callback/对象方法 |
 
-`external_dependency` 不是流程图类型。无法静态审计的第三方运行时行为或外部维护代码用 `NodeInfo.external=True` 标记；单纯静态导入可审计的计算库不需要这一标记。`external` 不会改变 `flow_kind` 图形形状、不会让 cycle 合法化，也不会自动成为 decision。审查图会在原形状上叠加 `[EXTERNAL]` 标题前缀和 `7px` non-scaling 粗边框，使信任边界一眼可见。
+`external_dependency` 不是流程图类型。只有 node 的包装实现本身不可取得、不可解析或不可审查时，才用 `NodeInfo.external=True` 标记。调用从 envelope 取得的 callback/model/optimizer 方法本身不再要求 external；应使用 `global_state` 让动态控制权交接在图中可见。`external` 不会改变 `flow_kind` 图形形状、不会让 cycle 合法化，也不会自动成为 decision。审查图会在原形状上叠加 `[EXTERNAL]` 标题前缀和 `7px` non-scaling 粗边框，使信任边界一眼可见。
 
 `flow_kind` 同时参与确定实现可用的 `effect_scope`，因此不能再把它描述成“只影响图形、不影响 IO 能力”。内核采用固定映射：
 
@@ -96,7 +97,7 @@ tooling → targets/python ──────┐
 | 普通 implemented node（`external=False`，包括图形 `flow_kind=terminal/process/decision/predefined/preparation`） | `none` | 无业务 IO |
 | `flow_kind=io` | `terminal` | 真实 stdin/stdout/stderr，以及 `print`、`input`、`argparse` |
 | `flow_kind=document` 或 `flow_kind=data_store` | `python_io` | 文件、环境、网络、数据库、subprocess 和终端 IO |
-| `flow_kind=global_state` 且 `external=False` | `global_state` | 仅当前运行时或进程的易失 ambient state |
+| `flow_kind=global_state` 且 `external=False` | `global_state` | 当前运行域的易失 ambient state，以及源码可见的 runtime dispatch |
 | 任意 `flow_kind` 且 `external=True` | `trusted` | 信任边界，优先级最高 |
 | plugin | `trusted` | 信任边界 |
 | planned `python_stub` | `none` | 无业务 IO |
@@ -105,17 +106,21 @@ tooling → targets/python ──────┐
 
 ## global_state 与执行隔离
 
-`global_state` 是语言无关的流程语义，不是 Python 专属逃生口，也不是名为 `vibeflow.global_state` 的系统 node。项目仍实现并注册自己的 node；Core 负责 `flow_kind`、派生 `effect_scope`、Target feature、可移植计划和并发约束，具体 Target 负责在自己的语言与运行时中审计和执行。首个实现位于 Python Target；JavaScript Target v1 不声明这一能力。
+`global_state` 是语言无关的流程语义，不是 Python 专属逃生口，也不是名为 `vibeflow.global_state` 的系统 node。项目仍实现并注册自己的 node；Core 负责 `flow_kind`、派生 `effect_scope`、Target feature 和可移植计划，具体 Target 负责在自己的语言与运行时中审计和执行。首个实现位于 Python Target；JavaScript Target v1 不声明这一能力。
 
-它相对普通受审计 node 只增加一项授权：修改当前语言运行时或进程中的易失 ambient state。Python 中的典型对象包括 Python/module/native-library 的 RNG、默认 dtype、grad mode、backend flag、全局 cache 或 registry。文件、环境变量、网络、数据库、终端、subprocess、线程或进程创建、`eval` / `exec` / `compile`、动态 import、`ctypes` / `cffi` 和任意 FFI 均不因此获权。项目源码、本地 helper 和静态 import chain 继续接受完整质量与副作用检查；静态导入第三方计算库本身不要求 `external=True`，但运行时注入的任意 callback、外部 model 引用或无法审计的实现仍属于 `external=True` / `trusted` 边界。effectful node 的 examples 只检查结构，不执行。
+它在普通受审计 node 的基础上容纳两类行为：访问当前语言运行时或进程中的易失 ambient state，以及调用从 envelope、registry、cache 或其他运行时对象取得的 callback/方法。Python 中的典型例子包括 RNG、默认 dtype、grad mode、backend flag、全局 cache/registry，以及 `model(...)`、`optimizer.step()` 或业务 callback。对象仍从 envelope 输入，只有动态控制权交接由 `global_state` 表达。
 
-这里的“审计”是架构与代码质量约束，不是语言安全沙箱。Target 可以拒绝源码中可识别的直接越权调用，但不承诺证明任意第三方或 native 函数内部没有隐藏 IO；无法检查到实现内部时必须显式进入 `external=True` / `trusted` 边界。
+这项语义不授予直接文件、环境变量、网络、数据库、终端、subprocess、线程或进程创建、`eval` / `exec` / `compile`、动态 import、`ctypes` / `cffi` 或任意 FFI 权限。`atexit.register`、`signal.signal`、`sys.settrace` / `sys.setprofile` 等可识别的系统级逃逸也继续禁止。项目源码、本地 helper 和静态 import chain 仍接受完整质量与副作用检查；静态导入第三方计算库本身不要求 `external=True`。只有包装实现本身不可取得、不可解析或不可审查时才使用 `external=True` / `trusted`。effectful node 的 examples 只检查结构，不执行。
+
+这里的“审计”是架构与代码质量约束，不是语言安全沙箱。Python Target 对源码中高置信度的 runtime dispatch 做建议性识别：普通 `effect_scope=none` node 会得到 warning，但 validate/run 继续；`global_state` 和已有 `io` / `document` / `data_store` 边界不产生这条 warning。固定 builtin、Python 协议、静态 import/构造调用，以及静态第三方/native API 内部不可见的 callback 不强行推断。源码中可识别的直接越权 effect 仍是 error。
+
+Core 的 `ImplementationFact.runtime_dispatch` 是 Target-neutral 三态事实：`true` 表示 Target 检测到，`false` 表示已分析且未检测到，`null` 表示未分析或 Target 不支持。详细源码位置仍属于 Target finding，不把 callable 或语言 AST 放入公共计划。
 
 model、optimizer、scheduler、DataLoader 等普通对象不是 ambient state，继续通过现有 envelope / contract 以引用流转；`global_state` 不新增另一套对象数据通道或权限 Provider。创建、更新和输出这些普通对象仍遵守既有 `requires` / `provides` 与输出 key 规则。
 
 `global_state` 默认是持久、非事务语义。run 成功、失败或取消后，VibeFlow 都不会 snapshot、rollback 或自动恢复进程态；锁只提供并发隔离，不提供事务性或恢复保证。如果一个操作只想临时改变进程态并要求可靠恢复，必须在同一个 `global_state` node 内以 `try/finally` 保存并恢复原值，不能依赖框架或尚未执行的后续 node。
 
-含 implemented `global_state` 的最外层 run 使用进程级 execution lease，从执行开始到 runtime hooks 与受保护异步收尾全部结束，一直独占 ambient-state 执行域。普通 run 以共享模式进入同一执行域，因此不会与 global-state run 并发穿透；嵌套 nodeset、loop 和受框架管理的线程继承同一 lease，并按 lease 而不是 OS 线程可重入。用户还可在 pipeline 或调用点配置命名 `ExecutionLockSpec`；嵌套作用域必须复用同一 key，避免锁顺序死锁。受保护作用域禁止 `detached`，`result_key` 只有在编译期能证明存在 scheduled consumer path 时才允许，运行时收尾仍会等待所有受保护任务后再释放锁。
+`global_state` 本身不自动取得进程级锁，也不使整个 root 独占。需要协调并发时，项目在 pipeline 或调用点配置命名 `ExecutionLockSpec`：相同 key 互斥，不同 key 可并行，未声明 key 就不加锁并产生 `GRAPH.EXECUTION_LOCK.GLOBAL_STATE_UNCOORDINATED` warning。嵌套作用域只能复用已经持有的同一 key，避免锁顺序死锁；同 key 按 execution lease 可重入。只有实际受显式锁保护的 scope 禁止 `detached`，`result_key` 也必须在释放锁前可证明会 join，运行时异常/取消收尾会 drain 已启动的受保护任务。
 
 ## Node 元数据目标
 
@@ -133,7 +138,7 @@ NodeInfo(
 )
 ```
 
-`external=True` 只表示“该实现或运行时注入行为无法由项目静态审计”。静态导入第三方计算库并调用固定、可检查 API 本身不构成 external。内核仍验证：
+`external=True` 只表示“该 node 的包装实现本身无法由项目取得或静态审计”。静态导入第三方计算库、调用固定 API，或者由受审计 `global_state` wrapper 调用运行时对象，本身都不构成 external。内核仍验证：
 
 - `NODE_INFO`
 - `CONTRACT`
@@ -219,9 +224,9 @@ Tooling 加载 workflow config + registry / descriptor
   -> Python Runtime 或 JavaScript emitter
 ```
 
-`WorkflowPlan` / `BlockPlan` 必须是确定、不可变、可序列化的中间表示。当前公共 ABI 是 `vibeflow.workflow.v3`。它们可以包含稳定 ID、JSON 值、输入输出、cardinality、路由、标准化条件、合流、`completion`/`schedule`/`executor`、TaskPlan、有限或永久 loop、IO、block 引用和 `SourceRef`，但不能包含 Python class、callable、实例、任意 Python 对象或 emitter 已生成的源码。bundler、HTML 模板和 package manager 也不属于这层模型。
+`WorkflowPlan` / `BlockPlan` 必须是确定、不可变、可序列化的中间表示。当前公共 ABI 是 `vibeflow.workflow.v4`。它们可以包含稳定 ID、JSON 值、输入输出、cardinality、路由、标准化条件、合流、`completion`/`schedule`/`executor`、TaskPlan、有限或永久 loop、IO、block 引用和 `SourceRef`，但不能包含 Python class、callable、实例、任意 Python 对象或 emitter 已生成的源码。bundler、HTML 模板和 package manager 也不属于这层模型。
 
-ABI v3 在公共计划中携带 node 的 `effect_scope`，以及 workflow / block / node 的 `execution_lock`、`contains_global_state` 和适用层级的 `root_exclusive`。`ExecutionLockPlan.scope` 只描述 `root | block | node`，不携带 Python 锁对象。递归 nodeset/loop 必须把 `contains_global_state` 向根传播，使 Target 在进入执行前就能取得正确锁模式。旧 `vibeflow.workflow.v2` 必须显式拒绝，不能按缺省字段静默升级。
+ABI v4 在公共计划中携带 node 的 `effect_scope`、三态 `runtime_dispatch`，以及 workflow / block / node 的 `execution_lock` 和 `contains_global_state`。`ExecutionLockPlan.scope` 只描述 `root | block | node`，不携带 Python 锁对象；`contains_global_state` 只是一项递归架构事实，不隐含锁。旧 `vibeflow.workflow.v3` 必须显式拒绝，不能按缺省字段静默升级。
 
 当前实现是：
 
@@ -276,7 +281,7 @@ planned nodeset 也可以包含由 planned nodes/edges 构成的 `pipeline` body
 
 - `status` 默认是 `implemented`。
 - planned node 可声明 config `flow_kind`。
-- planned `global_state` 只进入架构审查，不取得 ambient-state 权限、不触发 execution lease 独占，也不能据此运行；只有 implemented 内容参与 `contains_global_state` 传播。
+- planned `global_state` 只进入架构审查，不取得 ambient-state/runtime-dispatch 权限、不触发命名锁，也不能据此运行；只有 implemented 内容参与 `contains_global_state` 传播。
 - implemented node 不允许在 config 中伪造 `flow_kind`。
 - `planned_behavior` 默认是 `blocking`；也可写 `transparent` 让 planned 内容参与 flow 连通性检查。
 - `python_stub` planned 内容只用于开发测试，必须写 `project/stubs/*.py` 下的 `run_stub(inputs, params)`，通过显式运行开关才可执行，且始终使用 `effect_scope=none`。
@@ -303,8 +308,8 @@ planned nodeset 也可以包含由 planned nodes/edges 构成的 `pipeline` body
 
 - 交互式 stdin/stdout/stderr、`print`、`input`、`argparse`：使用 `flow_kind=io`，对应 `effect_scope=terminal`。
 - 文件、环境、网络、数据库、subprocess 或需要终端能力的文档/存储工作：使用 `flow_kind=document` 或 `flow_kind=data_store`，对应 `effect_scope=python_io`。
-- 当前运行时或进程的 RNG、默认 dtype、grad mode、backend flag、全局 cache/registry：使用 `flow_kind=global_state`，对应 `effect_scope=global_state`；这一档不包含任何 IO、动态代码、FFI 或并发创建权限。
-- 运行时注入的任意 callback、无法审计的外部 model 行为或外部维护实现：使用真实 `flow_kind` + `external=True`，对应最高优先级 `effect_scope=trusted`。
+- 当前运行时或进程的 RNG、默认 dtype、grad mode、backend flag、全局 cache/registry，以及源码可见的 runtime callback/对象方法分派：使用 `flow_kind=global_state`，对应 `effect_scope=global_state`；这一档不包含任何 IO、动态代码、FFI 或并发创建权限。
+- 包装实现源码本身不可取得、不可解析或不可审查：使用真实 `flow_kind` + `external=True`，对应最高优先级 `effect_scope=trusted`。
 - plugin：始终属于 `trusted`；启用即表示项目信任其 hook 实现。
 - 其他普通 implemented node，以及 planned `python_stub`：`effect_scope=none`。
 
@@ -350,7 +355,7 @@ Planned Plugin 可以暂时没有 descriptor 或源码，只进入架构审查�
 图中应显示：
 
 - 标准 flow_kind 形状。
-- `global_state` 的 cloud 形状、派生 `effect_scope` 和 execution lock；不显示任何 Provider 权限信息。
+- `global_state` 的 cloud 形状、派生 `effect_scope`、`runtime_dispatch` 与有效 execution lock（没有时明确显示 `none`）；不显示任何 Provider 权限信息。
 - planned / external 标记。
 - decision `when` 条件。
 - nodeset 折叠/展开。
@@ -367,7 +372,7 @@ python run.py review \
   --output reports/graph.expanded.svg
 ```
 
-它必须以已登记的真实 workflow 为输入，依次完成不依赖旧架构文档的 graph/schema/health preflight、canonical `ARCHITECTURE.jsonc` 更新及复核、workspace validate、expanded `review-columns` SVG 渲染和 SVG 结构检查。任一步失败都必须返回失败且不发布新的目标 SVG；不得直接调用 Mermaid CLI/mmdc、渲染 expanded MMD、复用旧 SVG 或手写图进行补位。
+它必须以已登记的真实 workflow 为输入，依次完成不依赖旧架构文档的 graph/schema/health preflight、canonical `ARCHITECTURE.jsonc` 更新及复核、workspace validate、expanded `review-columns` SVG 渲染和 SVG 结构检查。Python registry 与 JavaScript descriptor adapter 向同一语言无关审核快照提供实现事实，根图、全部 nodeset definition、调用路径、资源和 Target metadata 只从该快照生成；JavaScript Application 不得导入 Python Target/Application。fragment 的 kind/owner/target 必须与快照计算出的预期覆盖集合精确相等。任一步失败都必须返回失败且不发布新的目标 SVG；不得直接调用 Mermaid CLI/mmdc、渲染 expanded MMD、复用旧 SVG 或手写图进行补位。
 
 普通 `architecture`、`validate` 和 `svg` 命令仍可用于单项生成或诊断，但不能分别执行后声称完成了正式架构审核。`review` 的 `PASS` / `CONCERNS` 也只代表机器审核结果，不代表人类批准实现。
 
@@ -408,4 +413,4 @@ runs/<run_id>/
   output_summary.json
 ```
 
-trace 默认保存结构摘要，不保存原始输入输出。Python Target 的 boundary/full trace 还必须记录 `lock_wait`、`lock_acquired`、`lock_released`、`global_state_enter`、`global_state_exit`；global-state node 已开始后若 run 失败，额外记录 `global_state_may_have_changed`，提醒进程态可能已经持久改变。
+trace 默认保存结构摘要，不保存原始输入输出。Python Target 的 boundary/full trace 始终记录 `global_state_enter`、`global_state_exit`，并只为实际声明的命名锁记录 `lock_wait`、`lock_acquired`、`lock_released`；global-state node 已开始后若 run 失败，额外记录 `global_state_may_have_changed`，提醒进程态可能已经持久改变。

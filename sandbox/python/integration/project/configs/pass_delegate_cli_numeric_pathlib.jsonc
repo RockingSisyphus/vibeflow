@@ -17,89 +17,44 @@
         "id": "parse_argv",
         "type_used": "sandbox.numeric_argv",
         "display_name": "Parse numeric argv",
-        "description": "Parses the left, right, and output paths from delegated argv.",
-        "requires": [
-          {"type": "cli.argv", "cardinality": "exactly_one", "display_name": "CLI Argv"}
-        ],
-        "provides": [
-          {"key": "cli.left_path", "type": "cli.left_path", "display_name": "Left Path"},
-          {"key": "cli.right_path", "type": "cli.right_path", "display_name": "Right Path"},
-          {"key": "cli.output_path", "type": "cli.output_path", "display_name": "Output Path"}
-        ]
-      },
+        "description": "Parses the left, right, and output paths from delegated argv."
+              },
       {
         "id": "read_stdin",
         "type_used": "sandbox.numeric_builtin_input",
         "display_name": "Read stdin with input",
-        "description": "Reads one integer from the real stdin using input().",
-        "provides": [
-          {"key": "number.stdin", "type": "number.stdin", "display_name": "Stdin Number"}
-        ]
+        "description": "Reads one integer from the real stdin using input()."
       },
       {
         "id": "read_left",
         "type_used": "sandbox.numeric_path_left",
         "display_name": "Read left with Path",
-        "description": "Reads the left integer using Path.read_text().",
-        "requires": [
-          {"type": "cli.left_path", "cardinality": "exactly_one", "display_name": "Left Path"}
-        ],
-        "provides": [
-          {"key": "number.left", "type": "number.left", "display_name": "Left Number"}
-        ]
-      },
+        "description": "Reads the left integer using Path.read_text()."
+              },
       {
         "id": "read_right",
         "type_used": "sandbox.numeric_open_right",
         "display_name": "Read right with open",
-        "description": "Reads the right integer using builtins.open().readline().",
-        "requires": [
-          {"type": "cli.right_path", "cardinality": "exactly_one", "display_name": "Right Path"}
-        ],
-        "provides": [
-          {"key": "number.right", "type": "number.right", "display_name": "Right Number"}
-        ]
-      },
+        "description": "Reads the right integer using builtins.open().readline()."
+              },
       {
         "id": "sum_numbers",
         "type_used": "sandbox.numeric_sum",
         "display_name": "Sum three numbers",
-        "description": "Adds the stdin, left-file, and right-file integers.",
-        "requires": [
-          {"type": "number.stdin", "cardinality": "exactly_one", "display_name": "Stdin Number"},
-          {"type": "number.left", "cardinality": "exactly_one", "display_name": "Left Number"},
-          {"type": "number.right", "cardinality": "exactly_one", "display_name": "Right Number"}
-        ],
-        "provides": [
-          {"key": "number.total", "type": "number.total", "display_name": "Total"}
-        ]
-      },
+        "description": "Adds the stdin, left-file, and right-file integers."
+              },
       {
         "id": "write_file",
         "type_used": "sandbox.numeric_path_writer",
         "display_name": "Write result with Path",
-        "description": "Writes the total using Path.write_text().",
-        "requires": [
-          {"type": "cli.output_path", "cardinality": "exactly_one", "display_name": "Output Path"},
-          {"type": "number.total", "cardinality": "exactly_one", "display_name": "Total"}
-        ],
-        "provides": [
-          {"key": "document.output_written", "type": "document.output_written", "display_name": "Written Output"}
-        ]
-      },
+        "description": "Writes the total using Path.write_text()."
+              },
       {
         "id": "write_output",
         "type_used": "sandbox.numeric_print_output",
         "display_name": "Write console with print",
-        "description": "Writes stdout with print and stderr with sys.stderr.write.",
-        "requires": [
-          {"type": "number.total", "cardinality": "exactly_one", "display_name": "Total"},
-          {"type": "document.output_written", "cardinality": "exactly_one", "display_name": "Written Output"}
-        ],
-        "provides": [
-          {"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI Exit Code"}
-        ]
-      },
+        "description": "Writes stdout with print and stderr with sys.stderr.write."
+              },
       {
         "id": "end",
         "type_used": "sandbox.delegate_end",
@@ -109,10 +64,7 @@
           "node": "start",
           "relationship": "copy",
           "reason": "Both terminal calls intentionally use the same empty lifecycle implementation."
-        },
-        "requires": [
-          {"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI Exit Code"}
-        ]
+        }
       }
     ],
     "edges": [

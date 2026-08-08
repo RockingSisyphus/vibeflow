@@ -237,25 +237,29 @@ def prepare_project_build(
             ) as plugin_runner:
                 plugin_runner.validate_policy(graph)
                 plugin_runner.before_compile(graph)
-                compiled = _compile_core_graph(
+                compilation = _compile_core_compilation(
                     graph,
                     implementation_facts=implementation_facts,
                     target_features=target_features,
                     known_nodesets=set(graph.nodesets),
                     owner="pipeline",
                 )
+                graph = compilation.workflow.graph
+                compiled = compilation.compiled_graph
                 plugin_runner.after_compile(graph, compiled)
                 plugin_report = plugin_runner.report()
         except JavascriptPluginError as exc:
             raise ProjectBuildError(exc.code, str(exc)) from exc
     else:
-        compiled = _compile_core_graph(
+        compilation = _compile_core_compilation(
             graph,
             implementation_facts=implementation_facts,
             target_features=target_features,
             known_nodesets=set(graph.nodesets),
             owner="pipeline",
         )
+        graph = compilation.workflow.graph
+        compiled = compilation.compiled_graph
     try:
         top_overrides = normalize_node_config_overrides(
             request.node_config_overrides or {}
@@ -498,6 +502,23 @@ def _compile_core_graph(
 ) -> CompiledGraph:
     """Call the public Core compile boundary and return its graph view."""
 
+    return _compile_core_compilation(
+        graph,
+        implementation_facts=implementation_facts,
+        target_features=target_features,
+        known_nodesets=known_nodesets,
+        owner=owner,
+    ).compiled_graph
+
+
+def _compile_core_compilation(
+    graph: GraphConfig,
+    *,
+    implementation_facts: ImplementationFacts,
+    target_features: TargetFeatureSet,
+    known_nodesets: set[str],
+    owner: str,
+):
     return compile_core(
         CoreCompileRequest(
             graph=graph,
@@ -506,7 +527,7 @@ def _compile_core_graph(
             known_nodesets=frozenset(known_nodesets),
             owner=owner,
         )
-    ).compiled_graph
+    )
 
 
 def build_project_aot(request: ProjectBuildRequest) -> ProjectBuildResult:

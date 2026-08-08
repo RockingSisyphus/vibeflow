@@ -367,6 +367,8 @@ def test_workspace_architecture_gate_is_isolated_per_root(tmp_path) -> None:
         node["type_used"] = f"second.{node['id']}"
         node["status"] = "planned"
         node["flow_kind"] = "terminal" if node["id"] in {"start", "end"} else "process"
+        node["requires"] = []
+        node["provides"] = []
     second_workflow.write_text(json.dumps(second_payload, indent=2), encoding="utf-8")
     workspace_path.write_text(
         json.dumps(

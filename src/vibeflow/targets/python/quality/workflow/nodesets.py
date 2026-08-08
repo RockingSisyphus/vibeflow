@@ -204,8 +204,6 @@ def _validate_nodeset_contract(nodeset) -> tuple[HealthFinding, ...]:
         values = provider_keys(getattr(nodeset, field_name, ()))
         if any(not value.strip() for value in values) or len(set(values)) != len(values):
             findings.append(_nodeset_finding("NODESET.CONTRACT.KEYS", nodeset.type_key, f"nodeset.{field_name} must contain unique non-empty keys", details={"field": field_name}))
-    if not nodeset.provides:
-        findings.append(_nodeset_finding("NODESET.CONTRACT.PROVIDES", nodeset.type_key, "nodeset.provides must declare at least one output key"))
     return tuple(findings)
 
 

@@ -36,13 +36,7 @@
       {
         "display_name": "Seed Value",
         "description": "Produces the initial value.",
-        "provides": [
-          {
-            "key": "value.in",
-            "type": "value.in",
-            "display_name": "Value In"
-          }
-        ],
+
         "value": 4,
         "id": "seed",
         "type_used": "example.seed"
@@ -50,33 +44,15 @@
       {
         "display_name": "Add One Flow",
         "description": "Runs the reusable add-one nodeset.",
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.out",
-            "type": "value.out",
-            "display_name": "Value Out"
-          }
-        ],
+
+
         "id": "add_one_flow",
         "type_used": "example.add_one"
       },
       {
         "display_name": "End",
         "description": "Consumes the final pipeline output.",
-        "requires": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one",
-            "display_name": "Value Out"
-          }
-        ],
+
         "id": "end",
         "type_used": "example.end"
       }

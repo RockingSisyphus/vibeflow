@@ -5,11 +5,11 @@ from vibeflow.targets.python.project import NodeContract, NodeInfo
 
 
 def REQ(data_type: str, cardinality: str = "exactly_one") -> DataRequirement:
-    return DataRequirement(type=data_type, cardinality=cardinality)
+    return DataRequirement(type=data_type, cardinality=cardinality, display_name=data_type)
 
 
 def PROV(key: str, data_type: str | None = None) -> DataProvider:
-    return DataProvider(key=key, type=data_type or key)
+    return DataProvider(key=key, type=data_type or key, display_name=key)
 
 
 def VALUE(inputs, data_type: str):
@@ -37,10 +37,7 @@ class DelegateArgvNode:
             "cli.input_path": ("业务 --input 参数指定的文件路径。",),
             "cli.verbose": ("是否启用详细业务输出。",),
         },
-        output_schema={
-            "cli.input_path": {"type": "string"},
-            "cli.verbose": {"type": "boolean"},
-        },
+
         examples=({"inputs": {"cli.argv": ENV("cli.argv", ["--input", "data.yaml", "--verbose"])}, "params": {}},),
     )
 
@@ -68,7 +65,7 @@ class DelegateDocumentNode:
         provides=(PROV("document.message"),),
         input_semantics={"cli.input_path": ("需要读取的业务输入文件路径。",)},
         output_semantics={"document.message": ("从输入文档提取的 message 字符串。",)},
-        output_schema={"document.message": {"type": "string"}},
+
         examples=({"inputs": {"cli.input_path": ENV("cli.input_path", "data.yaml")}, "params": {}},),
     )
 
@@ -94,7 +91,7 @@ class DelegateBusinessNode:
         provides=(PROV("business.message"),),
         input_semantics={"document.message": ("输入文档中的原始消息。",)},
         output_semantics={"business.message": ("完成核心业务处理的消息。",)},
-        output_schema={"business.message": {"type": "string"}},
+
         examples=({"inputs": {"document.message": ENV("document.message", "hello")}, "params": {}},),
     )
 
@@ -119,7 +116,7 @@ class DelegateOutputNode:
             "cli.verbose": ("是否向 stderr 输出详细信息。",),
         },
         output_semantics={"cli.exit_code": ("进程应返回的业务退出码。",)},
-        output_schema={"cli.exit_code": {"type": "integer", "minimum": 0, "maximum": 255}},
+
         examples=({
             "inputs": {
                 "business.message": ENV("business.message", "processed:hello"),

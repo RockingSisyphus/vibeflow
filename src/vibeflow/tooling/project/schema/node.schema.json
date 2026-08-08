@@ -7,7 +7,7 @@
   "properties": {
     "NODE_INFO": {
       "type": "object",
-      "required": ["type_key", "display_name", "category", "description", "version", "flow_kind", "purity"],
+      "required": ["type_key", "display_name", "category", "description", "version", "flow_kind"],
       "properties": {
         "type_key": { "type": "string", "minLength": 1 },
         "display_name": { "type": "string", "minLength": 1 },
@@ -15,8 +15,7 @@
         "description": { "type": "string", "minLength": 1 },
         "version": { "type": "string", "minLength": 1 },
         "flow_kind": { "enum": ["terminal", "process", "decision", "io", "predefined", "data_store", "document", "preparation", "global_state"] },
-        "external": { "type": "boolean" },
-        "purity": { "type": "string", "const": "pure" }
+        "external": { "type": "boolean" }
       }
     },
     "CONTRACT": {
@@ -30,32 +29,32 @@
   "$defs": {
     "contract": {
       "type": "object",
-      "required": ["requires", "provides", "input_semantics", "output_semantics", "params_schema", "output_schema"],
+      "required": ["requires", "provides", "input_semantics", "output_semantics"],
       "properties": {
         "requires": { "type": "array", "items": { "$ref": "#/$defs/dataRequirement" } },
         "provides": { "type": "array", "items": { "$ref": "#/$defs/dataProvider" } },
         "input_semantics": { "type": "object" },
         "output_semantics": { "type": "object" },
-        "params_schema": { "type": "object" },
-        "output_schema": { "type": "object" },
         "examples": { "type": "array", "items": { "type": "object" } }
       }
     },
     "dataProvider": {
       "type": "object",
-      "required": ["key", "type"],
+      "required": ["key", "type", "display_name"],
       "properties": {
         "key": { "type": "string", "minLength": 1 },
-        "type": { "type": "string", "minLength": 1 }
+        "type": { "type": "string", "minLength": 1 },
+        "display_name": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },
     "dataRequirement": {
       "type": "object",
-      "required": ["type", "cardinality"],
+      "required": ["type", "cardinality", "display_name"],
       "properties": {
         "type": { "type": "string", "minLength": 1 },
-        "cardinality": { "enum": ["exactly_one", "optional_one", "all"] }
+        "cardinality": { "enum": ["exactly_one", "optional_one", "all"] },
+        "display_name": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     }

@@ -8,13 +8,7 @@
         "description": "Runs start."
       },
       {
-        "provides": [
-          {
-            "key": "branch.left",
-            "type": "branch.left",
-            "display_name": "Branch Left"
-          }
-        ],
+
         "value": 4,
         "id": "left",
         "type_used": "sandbox.branch_left",
@@ -22,13 +16,7 @@
         "description": "Runs left."
       },
       {
-        "provides": [
-          {
-            "key": "branch.right",
-            "type": "branch.right",
-            "display_name": "Branch Right"
-          }
-        ],
+
         "value": 6,
         "id": "right",
         "type_used": "sandbox.branch_right",
@@ -36,58 +24,23 @@
         "description": "Runs right."
       },
       {
-        "requires": [
-          {
-            "type": "branch.left",
-            "cardinality": "exactly_one",
-            "display_name": "Branch Left"
-          },
-          {
-            "type": "branch.right",
-            "cardinality": "exactly_one",
-            "display_name": "Branch Right"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.in",
-            "type": "value.in",
-            "display_name": "Value In"
-          }
-        ],
+
+
         "id": "sum",
         "type_used": "sandbox.sum_pair",
         "display_name": "Sum",
         "description": "Runs sum."
       },
       {
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.out",
-            "type": "value.out",
-            "display_name": "Value Out"
-          }
-        ],
+
+
         "id": "add",
         "type_used": "sandbox.add_three",
         "display_name": "Add",
         "description": "Runs add."
       },
       {
-        "requires": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one",
-            "display_name": "Value Out"
-          }
-        ],
+
         "id": "end",
         "type_used": "sandbox.out_value_end",
         "display_name": "End",

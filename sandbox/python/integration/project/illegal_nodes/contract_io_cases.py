@@ -11,11 +11,11 @@ def _info(type_key):
 
 
 def _provider(key: str) -> DataProvider:
-    return DataProvider(key, key)
+    return DataProvider(key, key, display_name=key)
 
 
 def _requirement(data_type: str) -> DataRequirement:
-    return DataRequirement(data_type, "exactly_one")
+    return DataRequirement(data_type, "exactly_one", display_name=data_type)
 
 
 class DynamicOutputKeyNode:
@@ -23,7 +23,7 @@ class DynamicOutputKeyNode:
     CONTRACT = NodeContract(
         provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -36,7 +36,7 @@ class MissingOutputNode:
     CONTRACT = NodeContract(
         provides=(_provider("bad.out"), _provider("bad.extra")),
         output_semantics={"bad.out": ("bad output",), "bad.extra": ("extra output",)},
-        output_schema={"bad.out": {"type": "number"}, "bad.extra": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -48,7 +48,7 @@ class ExtraOutputNode:
     CONTRACT = NodeContract(
         provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -62,7 +62,7 @@ class MutateInputsNode:
         provides=(_provider("bad.out"),),
         input_semantics={"bad.in": ("bad input",)},
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -77,7 +77,7 @@ class MutateNestedInputNode:
         provides=(_provider("bad.out"),),
         input_semantics={"bad.items": ("bad input list",)},
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -91,7 +91,7 @@ class UndeclaredParamNode:
     CONTRACT = NodeContract(
         provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -103,7 +103,7 @@ class SetOutputNode:
     CONTRACT = NodeContract(
         provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "array"}},
+
     )
 
     def run_pure(self, inputs, params):
@@ -115,7 +115,7 @@ class NaNOutputNode:
     CONTRACT = NodeContract(
         provides=(_provider("bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):

@@ -172,9 +172,6 @@ class BoundNodeView:
         self.params_schema = _ordered_contract_schemas(
             context, binding, "params_schema"
         )
-        self.output_schema = _ordered_contract_schemas(
-            context, binding, "output_schema"
-        )
         self.implementation = (
             None
             if source.is_nodeset or source.is_loop or source.io_operation

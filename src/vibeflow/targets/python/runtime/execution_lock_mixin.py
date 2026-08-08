@@ -12,14 +12,13 @@ from vibeflow.core.flow import STATUS_PLANNED
 from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
 from vibeflow.targets.python.runtime.execution_locks import (
     CURRENT_EXECUTION_LEASE,
-    GLOBAL_STATE_LOCK_KEY,
     PROCESS_EXECUTION_LOCK_COORDINATOR,
     ExecutionLease,
     ExecutionLockToken,
 )
 
 
-_CURRENT_EXECUTION_LOCK_STACK: ContextVar[tuple[str, ...]] = ContextVar(
+_CURRENT_EXECUTION_LOCK_STACK: ContextVar[tuple[tuple[str, str], ...]] = ContextVar(
     "vibeflow_python_execution_lock_stack",
     default=(),
 )
@@ -50,28 +49,17 @@ class RuntimeExecutionLockMixin:
         self._lease = inherited or ExecutionLease.create()
         self._lease_context_token = CURRENT_EXECUTION_LEASE.set(self._lease)
         try:
-            mode = (
-                "exclusive"
-                if self._plan.contains_global_state
-                else "shared"
-            )
-            held = self._acquire_execution_lock(
-                GLOBAL_STATE_LOCK_KEY,
-                mode=mode,
-                scope="root",
-            )
-            self._run_lock_tokens.append((held, "root"))
             root_lock = self.graph.execution_lock
             if root_lock is not None:
+                scope = "block" if self._trace_path_prefix else "root"
                 held = self._acquire_execution_lock(
                     root_lock.key,
                     mode="exclusive",
-                    scope="root",
+                    scope=scope,
                 )
-                self._run_lock_tokens.append((held, "root"))
+                self._run_lock_tokens.append((held, scope))
             if (
                 _CURRENT_EXECUTION_PROTECTION_DEPTH.get() > 0
-                or self._plan.contains_global_state
                 or root_lock is not None
             ):
                 self._root_protection_context_token = (
@@ -154,7 +142,7 @@ class RuntimeExecutionLockMixin:
         lock_stack = _CURRENT_EXECUTION_LOCK_STACK.get()
         active_user_keys = tuple(
             held_key
-            for held_key in lock_stack
+            for held_key, _held_scope in lock_stack
             if not held_key.startswith("vibeflow.")
         )
         if (
@@ -169,7 +157,7 @@ class RuntimeExecutionLockMixin:
             key,
             mode=mode,
             lease=lease,
-            allow_reentrant=key in lock_stack,
+            allow_reentrant=any(held_key == key for held_key, _ in lock_stack),
         )
         acquired_details = dict(details)
         acquired_details["wait_ms"] = acquisition.waited_ms
@@ -188,7 +176,7 @@ class RuntimeExecutionLockMixin:
             PROCESS_EXECUTION_LOCK_COORDINATOR.release(acquisition.token)
             raise
         context_token = _CURRENT_EXECUTION_LOCK_STACK.set(
-            (*lock_stack, key)
+            (*lock_stack, (key, scope))
         )
         return _HeldExecutionLock(acquisition.token, context_token)
 
@@ -227,12 +215,18 @@ class RuntimeExecutionLockMixin:
         node_type = str(getattr(frame, "node_type", "node"))
         is_planned = getattr(frame, "status", "implemented") == STATUS_PLANNED
         lock = None if is_planned else getattr(frame, "execution_lock", None)
+        lock_scope = (
+            "block"
+            if getattr(frame, "is_nodeset", False)
+            or getattr(frame, "is_loop", False)
+            else "node"
+        )
         held_lock: _HeldExecutionLock | None = None
         if lock is not None:
             held_lock = self._acquire_execution_lock(
                 lock.key,
                 mode="exclusive",
-                scope="node",
+                scope=lock_scope,
                 node_name=node_name,
                 node_type=node_type,
             )
@@ -245,7 +239,7 @@ class RuntimeExecutionLockMixin:
         global_state_entered = False
         primary_error: BaseException | None = None
         try:
-            if held_lock is not None or is_global_state:
+            if held_lock is not None:
                 protection_context_token = (
                     _CURRENT_EXECUTION_PROTECTION_DEPTH.set(
                         _CURRENT_EXECUTION_PROTECTION_DEPTH.get() + 1
@@ -291,7 +285,7 @@ class RuntimeExecutionLockMixin:
                 if held_lock is not None:
                     self._release_execution_lock(
                         held_lock,
-                        scope="node",
+                        scope=lock_scope,
                         node_name=node_name,
                         node_type=node_type,
                     )
@@ -312,10 +306,16 @@ class RuntimeExecutionLockMixin:
 
     def _lease_details(self) -> dict[str, object]:
         lease = self._lease
+        lock_stack = _CURRENT_EXECUTION_LOCK_STACK.get()
+        effective_key, effective_scope = (
+            lock_stack[-1] if lock_stack else (None, None)
+        )
         return {
             "run_id": lease.run_id if lease is not None else "",
             "lease_id": lease.lease_id if lease is not None else "",
-            "domain": GLOBAL_STATE_LOCK_KEY,
+            "key": effective_key,
+            "domain": effective_key,
+            "scope": effective_scope,
         }
 
     def _track_protected_future(

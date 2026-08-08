@@ -222,9 +222,9 @@ def test_cli_validate_jsonc_outputs_effective_policy(tmp_path, capsys) -> None:
     // explicit edges define the graph
     "nodes": [
       {"id": "start", "type_used": "test.start", "display_name": "Start", "description": "Starts the flow."},
-      {"id": "seed", "type_used": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in", "display_name": "Value In"}]},
-      {"id": "add", "type_used": "test.add", "display_name": "Add", "description": "Adds value.in.", "requires": [{"type": "value.in", "cardinality": "exactly_one", "display_name": "Value In"}], "provides": [{"key": "value.out", "type": "value.out", "display_name": "Value Out"}]},
-      {"id": "end", "type_used": "test.out_end", "display_name": "End", "description": "Ends the flow.", "requires": [{"type": "value.out", "cardinality": "exactly_one", "display_name": "Value Out"}]}
+      {"id": "seed", "type_used": "test.seed", "display_name": "Seed", "description": "Produces value.in."},
+      {"id": "add", "type_used": "test.add", "display_name": "Add", "description": "Adds value.in."},
+      {"id": "end", "type_used": "test.out_end", "display_name": "End", "description": "Ends the flow."}
     ],
     "edges": [["start", "seed"], ["seed", "add"], ["add", "end"]],
     "outputs": [{"type": "value.out", "cardinality": "exactly_one", "display_name": "Value Out"}]

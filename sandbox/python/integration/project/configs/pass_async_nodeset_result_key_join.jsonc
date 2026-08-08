@@ -19,40 +19,16 @@
         "description": "Runs start."
       },
       {
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.in.input",
-            "type": "value.in",
-            "display_name": "Value In Input"
-          }
-        ],
+
+
         "id": "input",
         "type_used": "sandbox.value_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.out",
-            "type": "value.out",
-            "display_name": "Value Out"
-          }
-        ],
+
+
         "async": "result_key",
         "result_key": "value.out",
         "id": "composite",
@@ -61,13 +37,7 @@
         "description": "Runs composite."
       },
       {
-        "requires": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one",
-            "display_name": "Value Out"
-          }
-        ],
+
         "id": "end",
         "type_used": "sandbox.out_value_end",
         "display_name": "End",

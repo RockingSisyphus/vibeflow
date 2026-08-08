@@ -20,20 +20,8 @@
         "type_used": "sandbox.runtime_failure",
         "display_name": "Return invalid output",
         "description": "Returns a value that violates the declared numeric Schema.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ],
+
+
         "config": {
           "mode": "bad_output"
         }

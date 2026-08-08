@@ -23,16 +23,24 @@
     ],
     "params_schema": {},
     "params_defaults": {},
-    "output_schema": {
-      "next": {
-        "type": "number"
-      }
+    "input_semantics": {
+      "sandbox.loop.value": [
+        "Loop value input consumed by this node."
+      ]
+    },
+    "output_semantics": {
+      "next": [
+        "Next value output produced by this node."
+      ]
     }
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "source": {
         "kind": "file",
         "ref": "nodes/loop_increment.ts",
@@ -40,6 +48,8 @@
       }
     }
   ],
-  "base_libs": ["sandbox.math"],
+  "base_libs": [
+    "sandbox.math"
+  ],
   "capabilities": []
 }

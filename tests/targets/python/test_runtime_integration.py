@@ -49,8 +49,8 @@ class _DoubleNode:
         "process",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("number", "exactly_one"),),
-        provides=(DataProvider("answer", "answer"),),
+        requires=(DataRequirement("number", "exactly_one", display_name="number"),),
+        provides=(DataProvider("answer", "answer", display_name="answer"),),
     )
 
     def run_pure(self, inputs, params):
@@ -380,6 +380,9 @@ def test_python_port_semantics_and_trace_match_all_execution_modes(
                     {
                         "id": "receive",
                         "type_used": "vibeflow.io",
+                        "display_name": "Receive number",
+                        "description": "Receives the number used by this integration workflow.",
+                        "requires": [],
                         "provides": [PROV_SPEC("number")],
                         "io": {"operation": "receive", "port": "math.in"},
                     },
@@ -393,7 +396,10 @@ def test_python_port_semantics_and_trace_match_all_execution_modes(
                     {
                         "id": "send",
                         "type_used": "vibeflow.io",
+                        "display_name": "Send answer",
+                        "description": "Sends the doubled answer from this integration workflow.",
                         "requires": [REQ_SPEC("answer")],
+                        "provides": [],
                         "io": {"operation": "send", "port": "math.out"},
                     },
                 ],

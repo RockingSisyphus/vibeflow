@@ -23,16 +23,24 @@
     ],
     "params_schema": {},
     "params_defaults": {},
-    "output_schema": {
-      "doubled": {
-        "type": "number"
-      }
+    "input_semantics": {
+      "sandbox.number": [
+        "Number input consumed by this node."
+      ]
+    },
+    "output_semantics": {
+      "doubled": [
+        "Doubled value output produced by this node."
+      ]
     }
   },
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "completion": "suspend",
       "source": {
         "kind": "file",

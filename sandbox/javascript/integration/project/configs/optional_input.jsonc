@@ -25,27 +25,8 @@
         "id": "add",
         "type_used": "sandbox.optional_add",
         "display_name": "Add optional offset",
-        "description": "Adds offset when supplied and otherwise adds zero.",
-        "requires": [
-          {
-            "type": "sandbox.x",
-            "cardinality": "exactly_one",
-            "display_name": "X"
-          },
-          {
-            "type": "sandbox.optional.offset",
-            "cardinality": "optional_one",
-            "display_name": "Optional offset"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ]
-      },
+        "description": "Adds offset when supplied and otherwise adds zero."
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

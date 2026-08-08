@@ -68,45 +68,8 @@
       {
         "display_name": "Accumulate",
         "description": "Adds outer plus inner plus one into the running total and advances the inner counter.",
-        "requires": [
-          {
-            "type": "outer.inner",
-            "cardinality": "exactly_one",
-            "display_name": "Outer Inner"
-          },
-          {
-            "type": "inner.current",
-            "cardinality": "exactly_one",
-            "display_name": "Inner Current"
-          },
-          {
-            "type": "total.inner",
-            "cardinality": "exactly_one",
-            "display_name": "Total Inner"
-          }
-        ],
-        "provides": [
-          {
-            "key": "outer.inner.next",
-            "type": "outer.inner",
-            "display_name": "Outer Inner Next"
-          },
-          {
-            "key": "inner.current.next",
-            "type": "inner.current",
-            "display_name": "Inner Current Next"
-          },
-          {
-            "key": "total.inner.next",
-            "type": "total.inner",
-            "display_name": "Total Inner Next"
-          },
-          {
-            "key": "inner.done",
-            "type": "inner.done",
-            "display_name": "Inner Done"
-          }
-        ],
+
+
         "inner_limit": 99,
         "id": "accumulate",
         "type_used": "semantic.inner_accumulate"

@@ -10,13 +10,7 @@
       {
         "display_name": "Seed Value",
         "description": "Produces value.in for the mainline and the async side nodeset.",
-        "provides": [
-          {
-            "key": "value.in",
-            "type": "value.in",
-            "display_name": "Value In"
-          }
-        ],
+
         "value": 4,
         "id": "seed",
         "type_used": "sandbox.constant"
@@ -24,13 +18,7 @@
       {
         "display_name": "Async Side Task",
         "description": "Runs the side nodeset as detached async work.",
-        "provides": [
-          {
-            "key": "async.value",
-            "type": "async.value",
-            "display_name": "Async Value"
-          }
-        ],
+
         "async": "detached",
         "id": "side_task",
         "type_used": "side.async_value"
@@ -38,20 +26,8 @@
       {
         "display_name": "Main Add",
         "description": "Continues the synchronous mainline without waiting for side_task.",
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "value.out",
-            "type": "value.out",
-            "display_name": "Value Out"
-          }
-        ],
+
+
         "delta": 6,
         "id": "main_add",
         "type_used": "sandbox.add"
@@ -59,13 +35,7 @@
       {
         "display_name": "End",
         "description": "Ends after the mainline output is available.",
-        "requires": [
-          {
-            "type": "value.out",
-            "cardinality": "exactly_one",
-            "display_name": "Value Out"
-          }
-        ],
+
         "id": "end",
         "type_used": "sandbox.out_value_end"
       }

@@ -1,6 +1,52 @@
 from tests.fixtures.support.strict_support import *
+from copy import deepcopy
 
 from vibeflow.targets.python.project.policy import EffectivePolicy
+
+
+def parse_graph_config(config):
+    """Migrate legacy inline fixtures to source-owned effective contracts."""
+    from vibeflow.tooling.project.graph_config import parse_graph_config as raw_parse_graph_config
+
+    migrated = deepcopy(config)
+
+    def visit(body):
+        pipeline = body.get("pipeline", body)
+        for node in pipeline.get("nodes", []):
+            node.setdefault("display_name", str(node.get("id", "Node")).replace("_", " ").title())
+            node.setdefault("description", f"Exercises {node.get('id', 'this node')} in the graph-health fixture.")
+            explicit = (
+                node.get("status") == "planned"
+                or node.get("type_used") == "vibeflow.io"
+                or str(node.get("type_used", "")).startswith("vibeflow.loop.")
+            )
+            if explicit:
+                node.setdefault("requires", [])
+                node.setdefault("provides", [])
+            else:
+                node.pop("requires", None)
+                node.pop("provides", None)
+        nested = body.get("nodesets", pipeline.get("nodesets", {}))
+        iterable = nested.values() if isinstance(nested, dict) else nested
+        for nodeset in iterable:
+            if isinstance(nodeset, dict):
+                nodeset.setdefault("display_name", str(nodeset.get("type_key", "Nodeset")))
+                nodeset.setdefault("description", "Defines a nested graph-health fixture.")
+                visit(nodeset)
+
+    visit(migrated)
+    return raw_parse_graph_config(migrated)
+
+
+class DuplicateThreeNode:
+    NODE_INFO = NodeInfo("test.duplicate_three", "Duplicate Three", "test", "Duplicates output for an unclaimed comparison.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        provides=(DataProvider("dup.three", "dup.three", display_name="Duplicate Three"),),
+        output_semantics={"dup.three": ("third duplicate fixture value",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"dup.three": 1}
 
 def test_architecture_smells_warn_for_mismatched_metadata_and_unstable_keys(tmp_path, capsys) -> None:
     info = VALID_NODE_INFO.replace('description="Demo node."', 'description="Calculates invoice total."')
@@ -8,7 +54,6 @@ def test_architecture_smells_warn_for_mismatched_metadata_and_unstable_keys(tmp_
     CONTRACT = NodeContract(
         provides=(PROV("Tmp Key"),),
         output_semantics={"Tmp Key": ("scratch debug value",)},
-        output_schema={"Tmp Key": {"type": "number"}},
         examples=({"inputs": {}, "params": {}},),
     )
 """.rstrip()
@@ -16,7 +61,7 @@ def test_architecture_smells_warn_for_mismatched_metadata_and_unstable_keys(tmp_
     code, payload = _inspect_node_source(tmp_path, capsys, source)
     assert code == 0
     warnings = {warning["details"].get("legacy_code") for warning in payload["health"]["warnings"]}
-    assert "responsibility_mismatch" in warnings
+    assert "responsibility_mismatch" not in warnings
     assert "temporary_key" in warnings
     assert "confusing_key_name" in warnings
 
@@ -24,6 +69,7 @@ def test_graph_health_reports_node_metrics_duplicate_logic_and_confusing_node_na
     registry = NodeRegistry()
     register_node(registry, "test.duplicate_one", DuplicateOneNode)
     register_node(registry, "test.duplicate_two", DuplicateTwoNode)
+    register_node(registry, "test.duplicate_three", DuplicateThreeNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -150,8 +196,8 @@ def test_graph_health_checks_each_nested_nodeset_definition_once() -> None:
     assert len(_findings(findings, "GRAPH.FLOW.UNREACHABLE_FROM_START", owner="nodeset:ns0", node="bad")) == 1
     assert len(_findings(findings, "GRAPH.FLOW.CANNOT_REACH_END", owner="nodeset:ns0", node="bad")) == 1
     assert len(_findings(findings, "GRAPH.FLOW.ORPHAN_NODE", owner="nodeset:ns0", node="bad")) == 1
-    assert len(_findings(findings, "GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME", owner="nodeset:ns0", object_id="bad")) == 1
-    assert len(_findings(findings, "GRAPH.SMELL.MISSING_NODE_DESCRIPTION", owner="nodeset:ns0", object_id="bad")) == 1
+    assert not _findings(findings, "GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME", owner="nodeset:ns0", object_id="bad")
+    assert not _findings(findings, "GRAPH.SMELL.MISSING_NODE_DESCRIPTION", owner="nodeset:ns0", object_id="bad")
 
 
 def test_graph_health_keeps_same_node_problem_separate_by_owner() -> None:
@@ -162,14 +208,12 @@ def test_graph_health_keeps_same_node_problem_separate_by_owner() -> None:
                 _bad_leaf_nodeset("right.leaf"),
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
-                "nodes": [
-                    _node_call("start", "test.start", "Starts the owner aggregation fixture."),
-                    _node_call("left", "left.leaf", "Calls the left leaf.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("left.out")]),
-                    _node_call("right", "right.leaf", "Calls the right leaf.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("right.out")]),
-                    _node_call("end", "test.start", "Ends the owner aggregation fixture."),
-                ],
-                "edges": [{"from": "start", "to": "left"}, {"from": "start", "to": "right"}, {"from": "left", "to": "end"}, {"from": "right", "to": "end"}],
+                    "inputs": [PROV_SPEC("value.in")],
+                    "nodes": [
+                        _node_call("start", "test.start", "Starts the owner aggregation fixture."),
+                        _node_call("end", "test.start", "Ends the owner aggregation fixture."),
+                    ],
+                    "edges": [{"from": "start", "to": "end"}],
             },
         }
     )
@@ -542,6 +586,7 @@ def test_graph_health_keeps_unclaimed_duplicate_logic_pairs() -> None:
     registry = NodeRegistry()
     register_node(registry, "test.duplicate_one", DuplicateOneNode)
     register_node(registry, "test.duplicate_two", DuplicateTwoNode)
+    register_node(registry, "test.duplicate_three", DuplicateThreeNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -554,7 +599,7 @@ def test_graph_health_keeps_unclaimed_duplicate_logic_pairs() -> None:
                         provides=[PROV_SPEC("dup.variant")],
                         similar_to={"node": "base", "relationship": "copy", "reason": "Copied implementation for a distinct contract."},
                     ),
-                    _node_call("unclaimed", "test.duplicate_two", "Produces an undeclared duplicate fixture value.", provides=[PROV_SPEC("dup.unclaimed")]),
+                    _node_call("unclaimed", "test.duplicate_three", "Produces an undeclared duplicate fixture value."),
                 ]
             }
         }
@@ -867,9 +912,10 @@ def test_nodeset_health_rejects_export_and_internal_key_leak() -> None:
     rule_ids = {error.rule_id for error in report.errors}
     assert "NODESET.PROVIDES.UNKNOWN_KEY" in rule_ids
 
-def test_nodeset_health_and_runtime_reject_external_contract_mismatch() -> None:
-    graph = parse_graph_config(
-        {
+def test_nodeset_call_rejects_duplicate_external_contract() -> None:
+    from vibeflow.tooling.project.graph_config import parse_graph_config as raw_parse_graph_config
+
+    config = {
             "nodesets": [
                 _nodeset_config(
                     "math.add_one",
@@ -883,19 +929,23 @@ def test_nodeset_health_and_runtime_reject_external_contract_mismatch() -> None:
                 "inputs": [PROV_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the mismatch fixture."),
-                    _node_call("bad_composite", "math.add_one", "Calls the composite with a wrong external contract.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("wrong.out")]),
+                    {
+                        "id": "bad_composite",
+                        "type_used": "math.add_one",
+                        "display_name": "Bad Composite",
+                        "description": "Attempts to redefine a nodeset contract at its call site.",
+                        "requires": [REQ_SPEC("value.in")],
+                        "provides": [PROV_SPEC("wrong.out")],
+                    },
                     _node_call("end", "test.start", "Ends the mismatch fixture."),
                 ],
                 "edges": _edge_chain("start", "bad_composite", "end"),
             },
         }
-    )
-    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
-    assert any(error.rule_id == "NODESET.CONTRACT.EXTERNAL_MISMATCH" for error in report.errors)
-    with pytest.raises(PipelineRuntimeError, match="did not produce"):
-        PipelineRuntime(graph, registry=_registry()).run({"value.in": 2})
+    with pytest.raises(GraphConfigError, match="derived from type_used"):
+        raw_parse_graph_config(config)
 
-def test_nodeset_health_rejects_nested_nodeset_contract_mismatch() -> None:
+def test_nodeset_health_rejects_nested_nodeset_unknown_exports() -> None:
     graph = parse_graph_config(
         {
             "nodesets": [
@@ -917,7 +967,7 @@ def test_nodeset_health_rejects_nested_nodeset_contract_mismatch() -> None:
     )
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
     assert any(
-        error.rule_id == "NODESET.CONTRACT.EXTERNAL_MISMATCH" and error.details.get("owner") == "nodeset:outer.flow"
+        error.rule_id == "NODESET.PROVIDES.UNKNOWN_KEY" and error.details.get("nodeset") == "outer.flow"
         for error in report.errors
     )
 

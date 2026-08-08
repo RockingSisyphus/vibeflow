@@ -1,6 +1,6 @@
 # VibeFlow 可复制开发包
 
-版本：0.10.1
+版本：0.12.0
 
 这个目录可以整体复制到其他位置作为新项目起点。它包含一个通用 kernel、内核文档、AI 开发提示词，以及相互隔离的 Python 和 JavaScript 示例 root。`DISTRIBUTION.json` 记录版本、root 和内核 hash。
 
@@ -59,7 +59,7 @@ Node/Workflow ABI、`vibeflow.plugin.v1`、同步/异步入口、Port、Capabili
 `kernel/docs/11_JS_TS与Web_AOT构建指南.md`。`javascript_project/` 本身是可直接
 validate、review 和 build 的数学示例，包含登记的 `ARCHITECTURE.jsonc`、TS Node、
 base_lib、Plugin、Capability 和 Host Extension。包内另有
-`configs/browser_permanent_port_host.jsonc`，用于验证真实浏览器中的无界 loop、
+`configs/browser_permanent_port_host.jsonc` 及登记的 `PERMANENT_PORT_ARCHITECTURE.jsonc`，用于验证真实浏览器中的无界 loop、
 Port、Host 实例隔离和取消。完整的语义与反例 Sandbox 只保留在 VibeFlow 源码仓库，
 不复制进正式分发包。
 
@@ -79,11 +79,13 @@ CLI 让渡模式 / `delegate-cli` 用于把 workflow 当成普通业务 CLI。�
 
 副作用权限由内核派生：普通 implemented node 和 planned `python_stub` 是 `none`；`flow_kind=io` 是 `terminal`；`document` / `data_store` 是 `python_io`；`flow_kind=global_state` 是 `global_state`；任意 `external=True` node 和 plugin 是最高优先级 `trusted`。图形 `flow_kind=terminal` 仍是 `none`。effectful / external node 的 examples 只检查结构，不执行。
 
-`global_state` 是语言无关的 Core 语义，不是一个 `vibeflow.global_state` 系统 node；项目继续自行实现并注册自己的 node。它只额外允许 Target execution domain 内的易失 ambient state，Python Target 将该域实现为当前解释器进程。文件、环境变量、网络、数据库、终端、subprocess、线程/进程创建、动态代码、动态 import 和直接 FFI 仍不允许。普通对象继续经 envelope / contract 按引用传递，不会因为 `global_state` 获得另一套对象通道或 Provider。
+`global_state` 是语言无关的 Core 语义，不是一个 `vibeflow.global_state` 系统 node；项目继续自行实现并注册自己的 node。它容纳 Target execution domain 内的易失 ambient state，以及从 envelope、registry、cache 或其他运行时对象取得的 callback/方法分派。Python Target 会对源码可见的高置信度 runtime dispatch 做建议性识别：普通 node 得到 warning 但仍可 validate/run，`global_state` 和现有 IO effect 边界不产生该 warning。普通对象继续经 envelope / contract 按引用传递，不会因此获得另一套对象通道或 Provider。
 
-含 implemented `global_state` 的 Python root run 会自动使用进程级 shared/exclusive execution lease：普通 run 可彼此并发，global-state run 独占同一域。需要串行化其他业务资源时，可在 `pipeline.execution_lock` 或 `pipeline.nodes[].execution_lock` 写 `{"key": "project.resource"}`；锁只协调执行，不增加权限。key 必须静态非空，`vibeflow.` 前缀保留；同一 lease 嵌套同 key 可重入，嵌套不同 key 会失败。锁覆盖 hooks、嵌套 block 和受保护异步收尾；保护范围内禁止 detached，`result_key` 必须有可证明的 join 路径。
+文件、环境变量、网络、数据库、终端、subprocess、线程/进程创建、动态代码、动态 import、直接 FFI 和可识别的系统级逃逸仍不允许；这些规则与 Callback 识别彼此独立。只有包装实现源码本身不可取得、不可解析或不可审查时才使用 `external=True`。
 
-global-state 修改默认持久且非事务；成功、失败或取消后都不自动恢复或 rollback。需要临时修改时，在同一个 node 内用 `try/finally` 恢复。公共计划 ABI 是 `vibeflow.workflow.v3`，旧 v2 计划需从源 config 重新生成。JavaScript Target v1 可以在 Architecture/Mermaid/SVG 中展示 planned global-state/lock，但会拒绝 implemented 执行。图中 `global_state` 固定使用 Mermaid `cloud` 形状并显示 effect scope / execution lock，不显示 Provider 权限；boundary/full trace 会记录 lock wait/acquire/release，失败风险以 `global_state_may_have_changed` 提示。
+`global_state` 不自动加锁。需要串行化冲突资源时，可在 `pipeline.execution_lock` 或 `pipeline.nodes[].execution_lock` 写 `{"key": "project.resource"}`；同 key 互斥、异 key 并行、无 key 不加锁并产生非阻断 warning。锁只协调执行，不增加权限。key 必须静态非空，`vibeflow.` 前缀保留；同一 lease 嵌套同 key可重入，嵌套不同 key 会失败。只有实际锁定的 scope 才禁止 detached，`result_key` 必须有可证明的 join 路径。
+
+global-state 修改默认持久且非事务；成功、失败或取消后都不自动恢复或 rollback。需要临时修改时，在同一个 node 内用 `try/finally` 恢复。公共计划 ABI 是 `vibeflow.workflow.v4`，旧 v3 计划需从源 config 重新生成。JavaScript Target v1 可以展示 planned global-state/lock，但会拒绝 implemented 执行，runtime-dispatch 事实为 unknown。图中 `global_state` 固定使用 Mermaid `cloud` 形状并显示 effect scope、runtime dispatch 和有效 execution lock（无锁为 `none`）；boundary/full trace 只为显式锁记录 wait/acquire/release，失败风险以 `global_state_may_have_changed` 提示。
 
 ## 读取 Python Runtime 真实运行结果
 
@@ -161,11 +163,11 @@ pipeline config 不再声明 `policy`，但必须声明本 workflow 实际使用
 
 ```powershell
 cd kernel/tools/mermaid-renderer
-npm install
+npm ci
 cd ../../..
 ```
 
-不要求系统预装 Google Chrome。正常执行 `npm install` 后，Puppeteer 会安装并使用自己的浏览器缓存；如果该缓存不可用，VibeFlow 会再尝试非 snap 的系统 Chrome/Chromium。`/snap/bin/chromium` 会被跳过，因为它在 Puppeteer/mermaid-cli 下常见 profile lock 启动失败。
+不要求系统预装 Google Chrome。正常执行 `npm ci` 后，Puppeteer 会安装并使用自己的浏览器缓存；如果该缓存不可用，VibeFlow 会再尝试非 snap 的系统 Chrome/Chromium。`/snap/bin/chromium` 会被跳过，因为它在 Puppeteer/mermaid-cli 下常见 profile lock 启动失败。
 
 `kernel/docs/`、`kernel/tools/`、`kernel/LICENSE` 和
 `kernel/THIRD_PARTY_NOTICES.md` 是随内核分发的只读参考材料；根目录

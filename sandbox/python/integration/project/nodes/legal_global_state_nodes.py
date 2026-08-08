@@ -34,7 +34,7 @@ class GlobalStateProbeNode:
                 "not increment it.",
             )
         },
-        output_schema={"value.out": {"type": "integer"}},
+
         examples=({"inputs": {}, "params": {}},),
     )
 

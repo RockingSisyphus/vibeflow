@@ -5,11 +5,11 @@ from vibeflow.targets.python.project import NodeContract, NodeInfo
 
 
 def REQ(data_type: str) -> DataRequirement:
-    return DataRequirement(type=data_type, cardinality="exactly_one")
+    return DataRequirement(type=data_type, cardinality="exactly_one", display_name=data_type)
 
 
 def PROV(key: str) -> DataProvider:
-    return DataProvider(key=key, type=key)
+    return DataProvider(key=key, type=key, display_name=key)
 
 
 def VALUE(inputs, data_type: str):
@@ -38,11 +38,7 @@ class NumericArgvNode:
             "cli.right_path": ("--right 指定的右侧数值文件。",),
             "cli.output_path": ("--output 指定的计算结果文件。",),
         },
-        output_schema={
-            "cli.left_path": {"type": "string"},
-            "cli.right_path": {"type": "string"},
-            "cli.output_path": {"type": "string"},
-        },
+
         examples=({
             "inputs": {"cli.argv": ENV("cli.argv", ["--left", "left.txt", "--right", "right.txt", "--output", "sum.txt"])},
             "params": {},
@@ -76,7 +72,7 @@ class NumericBuiltinInputNode:
     CONTRACT = NodeContract(
         provides=(PROV("number.stdin"),),
         output_semantics={"number.stdin": ("从真实 stdin 读取的整数。",)},
-        output_schema={"number.stdin": {"type": "integer"}},
+
         examples=({"inputs": {}, "params": {}},),
     )
 
@@ -96,7 +92,7 @@ class NumericStreamInputNode:
     CONTRACT = NodeContract(
         provides=(PROV("number.stdin"),),
         output_semantics={"number.stdin": ("从真实 stdin stream 读取的整数。",)},
-        output_schema={"number.stdin": {"type": "integer"}},
+
         examples=({"inputs": {}, "params": {}},),
     )
 
@@ -120,7 +116,7 @@ class NumericPathLeftNode:
         provides=(PROV("number.left"),),
         input_semantics={"cli.left_path": ("左侧数值文件路径。",)},
         output_semantics={"number.left": ("左侧文件中的整数。",)},
-        output_schema={"number.left": {"type": "integer"}},
+
         examples=({"inputs": {"cli.left_path": ENV("cli.left_path", "left.txt")}, "params": {}},),
     )
 
@@ -145,7 +141,7 @@ class NumericPathRightNode:
         provides=(PROV("number.right"),),
         input_semantics={"cli.right_path": ("右侧数值文件路径。",)},
         output_semantics={"number.right": ("右侧文件中的整数。",)},
-        output_schema={"number.right": {"type": "integer"}},
+
         examples=({"inputs": {"cli.right_path": ENV("cli.right_path", "right.txt")}, "params": {}},),
     )
 
@@ -170,7 +166,7 @@ class NumericOpenLeftNode:
         provides=(PROV("number.left"),),
         input_semantics={"cli.left_path": ("左侧数值文件路径。",)},
         output_semantics={"number.left": ("左侧文件中的整数。",)},
-        output_schema={"number.left": {"type": "integer"}},
+
         examples=({"inputs": {"cli.left_path": ENV("cli.left_path", "left.txt")}, "params": {}},),
     )
 
@@ -196,7 +192,7 @@ class NumericOpenRightNode:
         provides=(PROV("number.right"),),
         input_semantics={"cli.right_path": ("右侧数值文件路径。",)},
         output_semantics={"number.right": ("右侧文件中的整数。",)},
-        output_schema={"number.right": {"type": "integer"}},
+
         examples=({"inputs": {"cli.right_path": ENV("cli.right_path", "right.txt")}, "params": {}},),
     )
 
@@ -226,7 +222,7 @@ class NumericSumNode:
             "number.right": ("右侧文件中的整数。",),
         },
         output_semantics={"number.total": ("三个输入整数之和。",)},
-        output_schema={"number.total": {"type": "integer"}},
+
         examples=({
             "inputs": {
                 "number.stdin": ENV("number.stdin", 7),
@@ -259,7 +255,7 @@ class NumericPathWriterNode:
             "number.total": ("需要持久化的求和结果。",),
         },
         output_semantics={"document.output_written": ("已成功写入的结果文件路径。",)},
-        output_schema={"document.output_written": {"type": "string"}},
+
         examples=({
             "inputs": {
                 "cli.output_path": ENV("cli.output_path", "sum.txt"),
@@ -294,7 +290,7 @@ class NumericOpenWriterNode:
             "number.total": ("需要持久化的求和结果。",),
         },
         output_semantics={"document.output_written": ("已成功写入的结果文件路径。",)},
-        output_schema={"document.output_written": {"type": "string"}},
+
         examples=({
             "inputs": {
                 "cli.output_path": ENV("cli.output_path", "sum.txt"),
@@ -330,7 +326,7 @@ class NumericPrintOutputNode:
             "document.output_written": ("用于保证文件写入已完成的路径回执。",),
         },
         output_semantics={"cli.exit_code": ("成功时返回的业务退出码。",)},
-        output_schema={"cli.exit_code": {"type": "integer", "minimum": 0, "maximum": 255}},
+
         examples=({
             "inputs": {
                 "number.total": ENV("number.total", 31),
@@ -365,7 +361,7 @@ class NumericStreamOutputNode:
             "document.output_written": ("用于保证文件写入已完成的路径回执。",),
         },
         output_semantics={"cli.exit_code": ("成功时返回的业务退出码。",)},
-        output_schema={"cli.exit_code": {"type": "integer", "minimum": 0, "maximum": 255}},
+
         examples=({
             "inputs": {
                 "number.total": ENV("number.total", 41),

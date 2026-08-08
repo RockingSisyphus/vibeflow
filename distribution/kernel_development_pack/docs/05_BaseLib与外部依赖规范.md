@@ -30,6 +30,10 @@ base_lib 应保持：
 - 依赖链不要过长。
 - 函数短小、分支少、嵌套浅。
 
+`NODE_INFO`、`CONTRACT`、`BASE_LIB_INFO` 和 `PLUGIN_INFO` 可以调用项目本地的声明 helper。例如可以在 `base_lib.node_contracts` 中定义 `REQ(...)` / `PROV(...)`，再由 node 模块导入并构造 `DataRequirement` / `DataProvider`。Python Target 会先读取完整本地 import graph，只有当 helper 本身以及它继续调用的本地函数都能被证明为有限、无副作用的声明构造时才允许导入执行；规则根据源码和调用链判断，不根据 `REQ` 等函数名开白名单。
+
+声明 helper 不得包含文件、环境、网络、subprocess、线程/进程、动态代码、动态 import、FFI、模块全局修改或无法解析的 callback，也不得用顶层循环或递归参与导入期构造。普通、可解析且没有 metaclass / `__init_subclass__` hook 的本地 mixin 继承可以使用；无法审计的外部基类仍须进入明确的 `external=True` 信任边界。
+
 每个 root 的 `python_project/registry.py` 可以用 `build_base_lib_registry()` 声明该 root 下可用的 base_lib：
 
 ```python
@@ -87,8 +91,8 @@ implemented base_lib 必须暴露 `BASE_LIB_INFO`，用于实现自检和 inspec
 - `io`：交互式终端边界，可使用真实 stdin/stdout/stderr、`print`、`input` 和 `argparse`。
 - `data_store`：存储语义，可执行文件、环境、网络、数据库、subprocess 和终端 IO。
 - `document`：文档/文件语义，可执行同一组 Python IO。
-- `global_state`：语言无关的运行域易失 ambient-state 语义；Python Target 中只额外允许当前解释器进程的 RNG、默认选项、backend flag、全局 cache/registry 等进程态。
-- 任意真实 `flow_kind` + `external=True`：包装第三方库或外部维护代码，使用最高优先级的 trusted 边界。
+- `global_state`：语言无关的运行域边界；Python Target 中容纳当前解释器进程的 RNG、默认选项、backend flag、全局 cache/registry 等 ambient state，以及从 envelope/registry/cache 取得的 runtime callback/对象方法分派。
+- 任意真实 `flow_kind` + `external=True`：包装实现源码本身不可取得、不可解析或不可审查，使用最高优先级的 trusted 边界。
 
 内核从实现分类派生固定 `effect_scope`：
 
@@ -102,7 +106,7 @@ implemented base_lib 必须暴露 `BASE_LIB_INFO`，用于实现自检和 inspec
 | plugin | `trusted` |
 | planned `python_stub` | `none` |
 
-`effect_scope` 不是 config 可调的权限字段。图形 `flow_kind=terminal` 仍是 `none`，不等于权限档位 `terminal`。`global_state` 不继承 `terminal` 或 `python_io`，仍禁止文件、环境变量、网络、数据库、终端、subprocess、线程/进程创建、动态代码、动态 import 和直接 FFI。选择 `flow_kind` 必须先符合业务语义，不得仅为获得更宽能力而伪造语义。
+`effect_scope` 不是 config 可调的权限字段。图形 `flow_kind=terminal` 仍是 `none`，不等于权限档位 `terminal`。`global_state` 不继承 `terminal` 或 `python_io`，仍禁止文件、环境变量、网络、数据库、终端、subprocess、线程/进程创建、动态代码、动态 import、直接 FFI 和可识别的系统级逃逸。选择 `flow_kind` 必须先符合业务语义，不得仅为获得更宽能力而伪造语义。
 
 这些 node 仍然是内核拓扑的一部分，必须声明 `CONTRACT`、`requires/provides` 和 examples，并遵守契约、拓扑、输出 key 和 trace 检查。`terminal` / `python_io` / `global_state` 或 `external=True` node 的 examples 可能触发真实副作用，内核只验证结构，不执行。
 
@@ -125,11 +129,10 @@ from vibeflow.core import DataProvider, DataRequirement
 
 NODE_INFO = NodeInfo(..., flow_kind="data_store")
 CONTRACT = NodeContract(
-    requires=(DataRequirement("value.final", "exactly_one"),),
-    provides=(DataProvider("effects.request", "effects.request"),),
+    requires=(DataRequirement("value.final", "exactly_one", "Final value"),),
+    provides=(DataProvider("effects.request", "effects.request", "Storage request"),),
     input_semantics={"value.final": ("final numeric value",)},
     output_semantics={"effects.request": ("structured storage request",)},
-    output_schema={"effects.request": {"type": "object"}},
 )
 ```
 
@@ -147,7 +150,7 @@ NODE_INFO = NodeInfo(..., flow_kind="document")
 
 ## external=True
 
-如果 node 包装第三方库或外部维护代码：
+如果 node 的包装实现源码本身由外部维护且不可取得、不可解析或不可审查：
 
 ```python
 NODE_INFO = NodeInfo(
@@ -157,9 +160,9 @@ NODE_INFO = NodeInfo(
 )
 ```
 
-`external=True` 表示实现由第三方或外部主体维护，并以最高优先级把有效 `effect_scope` 设为 `trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 IO/purity 绕过，由项目承担信任责任。它不会跳过契约、`flow_kind`、拓扑、输出或 trace 检查，也不改变 `flow_kind` 形状；审查图会叠加 `[EXTERNAL]` 标题和 `7px` non-scaling 粗边框。如果这个外部 node 负责分支路由，必须同时声明 `flow_kind="decision"` 并满足 decision 规则。
+`external=True` 表示包装实现源码本身无法进入项目审查，并以最高优先级把有效 `effect_scope` 设为 `trusted`。它会跳过普通 node 的源码质量、导入链和副作用限制，因此确实是显式 IO/purity 绕过，由项目承担信任责任。它不会跳过契约、`flow_kind`、拓扑、输出或 trace 检查，也不改变 `flow_kind` 形状；审查图会叠加 `[EXTERNAL]` 标题和 `7px` non-scaling 粗边框。如果这个外部 node 负责分支路由，必须同时声明 `flow_kind="decision"` 并满足 decision 规则。
 
-静态导入第三方计算库本身不要求 `external=True`：项目源码、本地 helper 和可解析的静态 import chain 仍按真实 `effect_scope` 受审计。只有任意运行时 callback、外部对象提供的不可审计行为，或无法解析的实现边界，才应明确使用 `external=True` / `trusted`。VibeFlow 不维护任何具体工具或厂商 API 白名单；规则只依据通用语义和代码是否可审计。
+静态导入第三方计算库，或在受审计 `global_state` wrapper 中调用 envelope 提供的 callback/model/optimizer，本身都不要求 `external=True`。Python Target 只对源码可见、高置信度的 runtime dispatch 给出建议性事实，不推断静态第三方/native API 内部行为。只有 wrapper 实现源码本身不可取得、不可解析或不可审查时才使用 `external=True` / `trusted`。VibeFlow 不维护任何具体工具或厂商 API 白名单。
 
 ## 真实副作用应该放在哪里
 
@@ -168,6 +171,6 @@ NODE_INFO = NodeInfo(
 1. 交互式 CLI 的参数解析、提示和输出放在 `flow_kind=io` node；CLI 让渡模式 / `delegate-cli` 传入 `cli.argv`，业务代码直接使用真实标准流。
 2. 文件/文档操作放在 `document`，存储/数据系统操作放在 `data_store`；二者均由 `python_io` 档位审计。
 3. `process` / `decision` / 图形 `terminal` 等普通 node 保持 `none`，只做纯计算、路由和生命周期表达。
-4. 进程内易失 ambient state 使用 `global_state`；普通 model/optimizer 等对象仍经 envelope / contract 按引用流转，不属于全局状态权限。
-5. 必须调用外部维护或无法审计的实现时才使用 `external=True`；plugin 同样属于 `trusted`。对这两类实现做项目级审计。
+4. 进程内易失 ambient state 或源码可见 runtime dispatch 使用 `global_state`；普通 model/optimizer 等对象仍经 envelope / contract 按引用流转。
+5. wrapper 实现源码本身不可取得或不可审查时才使用 `external=True`；plugin 同样属于 `trusted`。对这两类实现做项目级审计。
 6. 所有真实副作用仍通过显式 node/plugin、契约和图上路径呈现；不要藏在 `base_lib`、普通 node 或未声明资源中。

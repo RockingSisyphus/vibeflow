@@ -54,12 +54,18 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         if boundary_registry is not None:
             raise PipelineRuntimeError("boundary_registry is removed; use flowchart nodes")
         self._assert_planned_runtime_allowed(graph)
-        self.graph = graph
         self.registry = registry
         self._plugin_registry = plugin_registry
         self._runtime_plugins = plugin_registry.runtime_plugins() if plugin_registry is not None else ()
         self._hook_plan = runtime_hook_plan(self._runtime_plugins, self.runtime_options)
-        self.compiled = GraphCompiler().compile(graph, registry=registry, plugin_registry=plugin_registry)
+        compilation = GraphCompiler().compile_with_findings(
+            graph,
+            registry=registry,
+            plugin_registry=plugin_registry,
+        )
+        graph = compilation.workflow.graph
+        self.graph = graph
+        self.compiled = compilation.compiled_graph
         self._plan = build_execution_plan(
             graph,
             self.compiled,
@@ -68,6 +74,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
             global_config=global_config,
             runtime_options=self.runtime_options,
             plugin_registry=plugin_registry,
+            _contracts_resolved=True,
         )
         self.trace = RuntimeTrace()
         self._node_runs: dict[str, int] = {node.name: 0 for node in graph.nodes}

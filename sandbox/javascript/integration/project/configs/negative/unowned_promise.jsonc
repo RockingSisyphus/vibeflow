@@ -20,22 +20,8 @@
         "id": "invalid",
         "type_used": "sandbox.invalid.unowned_promise",
         "display_name": "Unowned Promise",
-        "description": "Must fail because Promise work is discarded instead of awaited or assigned to a TaskPlan.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ]
-      },
+        "description": "Must fail because Promise work is discarded instead of awaited or assigned to a TaskPlan."
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

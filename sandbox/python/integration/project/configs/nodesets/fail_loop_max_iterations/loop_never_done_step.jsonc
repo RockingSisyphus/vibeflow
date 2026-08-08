@@ -38,20 +38,8 @@
       {
         "display_name": "Increment",
         "description": "Increments too slowly to reach the target before max_iterations.",
-        "requires": [
-          {
-            "type": "loop.current",
-            "cardinality": "exactly_one",
-            "display_name": "Loop Current"
-          }
-        ],
-        "provides": [
-          {
-            "key": "loop.next",
-            "type": "loop.next",
-            "display_name": "Loop Next"
-          }
-        ],
+
+
         "step": 1,
         "id": "increment",
         "type_used": "semantic.increment_until"
@@ -59,20 +47,8 @@
       {
         "display_name": "Done Check",
         "description": "Uses a high target so the loop exceeds max_iterations.",
-        "requires": [
-          {
-            "type": "loop.next",
-            "cardinality": "exactly_one",
-            "display_name": "Loop Next"
-          }
-        ],
-        "provides": [
-          {
-            "key": "loop.done",
-            "type": "loop.done",
-            "display_name": "Loop Done"
-          }
-        ],
+
+
         "target": 99,
         "id": "done",
         "type_used": "semantic.loop_done_value"

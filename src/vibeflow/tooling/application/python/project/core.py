@@ -74,12 +74,13 @@ def build_workspace_environment(workspace: WorkspaceConfig) -> WorkspaceEnvironm
 def build_workspace_node_registry(workspace: WorkspaceConfig) -> NodeRegistry:
     registry = NodeRegistry()
     sources: dict[str, dict[str, object]] = {}
+    source_roots = _python_source_roots(workspace)
     for root in workspace.roots:
         if root.project_target != "python":
             continue
         if not root.registry_ref:
             continue
-        root_registry = _load_root_registry(root)
+        root_registry = _load_root_registry(root, source_roots=source_roots)
         _merge_node_registry(registry, root_registry, root=root, sources=sources)
     return registry
 
@@ -91,10 +92,14 @@ def load_workspace_resources(workspace: WorkspaceConfig) -> tuple[dict[str, Work
     plugins: list[object] = []
     host_extensions: list[object] = []
     registries: dict[str, WorkspaceResourceRegistries] = {}
+    source_roots = _python_source_roots(workspace)
     for root in workspace.roots:
         if root.project_target != "python":
             continue
-        base_registry, plugin_registry, has_base_registry, has_plugin_registry, registry_findings = _load_root_resource_registries(root)
+        base_registry, plugin_registry, has_base_registry, has_plugin_registry, registry_findings = _load_root_resource_registries(
+            root,
+            source_roots=source_roots,
+        )
         findings.extend(annotate_findings(registry_findings, root=root, source_path=root.config_path))
         legacy_resources, resource_findings = load_config_resources(root.project_config, base_path=root.path)
         findings.extend(annotate_findings(resource_findings, root=root, source_path=root.config_path))
@@ -358,12 +363,21 @@ def _resolve_workspace_relative(value: str, *, base: Path) -> Path:
     return path.resolve()
 
 
-def _load_root_registry(root: WorkspaceRoot) -> NodeRegistry:
+def _load_root_registry(
+    root: WorkspaceRoot,
+    *,
+    source_roots: tuple[Path, ...] = (),
+) -> NodeRegistry:
     module_ref, sep, factory_name = root.registry_ref.partition(":")
     if not sep or not module_ref.strip() or not factory_name.strip():
         raise WorkspaceConfigError("WORKSPACE.REGISTRY.REF", f"registry must use module_or_file:function syntax: {root.registry_ref}", {"path": str(root.config_path)})
-    with _temporary_sys_path(root.path):
-        module = _registry_module_or_error(module_ref.strip(), root=root)
+    ordered_roots = _ordered_source_roots(root.path, source_roots)
+    with _temporary_sys_paths(ordered_roots):
+        module = _registry_module_or_error(
+            module_ref.strip(),
+            root=root,
+            source_roots=ordered_roots,
+        )
         factory = _registry_factory_or_error(module, factory_name.strip(), root=root)
         try:
             registry = factory()
@@ -374,7 +388,11 @@ def _load_root_registry(root: WorkspaceRoot) -> NodeRegistry:
     return registry
 
 
-def _load_root_resource_registries(root: WorkspaceRoot) -> tuple[BaseLibRegistry, PluginResourceRegistry, bool, bool, tuple[HealthFinding, ...]]:
+def _load_root_resource_registries(
+    root: WorkspaceRoot,
+    *,
+    source_roots: tuple[Path, ...] = (),
+) -> tuple[BaseLibRegistry, PluginResourceRegistry, bool, bool, tuple[HealthFinding, ...]]:
     base_registry = BaseLibRegistry()
     plugin_registry = PluginResourceRegistry()
     has_base_registry = False
@@ -386,8 +404,13 @@ def _load_root_resource_registries(root: WorkspaceRoot) -> tuple[BaseLibRegistry
     if not sep or not module_ref.strip():
         return base_registry, plugin_registry, has_base_registry, has_plugin_registry, ()
     try:
-        with _temporary_sys_path(root.path):
-            module = _registry_module_or_error(module_ref.strip(), root=root)
+        ordered_roots = _ordered_source_roots(root.path, source_roots)
+        with _temporary_sys_paths(ordered_roots):
+            module = _registry_module_or_error(
+                module_ref.strip(),
+                root=root,
+                source_roots=ordered_roots,
+            )
     except WorkspaceConfigError as exc:
         findings.append(
             workspace_finding(
@@ -429,9 +452,18 @@ def _load_root_resource_registries(root: WorkspaceRoot) -> tuple[BaseLibRegistry
     return base_registry, plugin_registry, has_base_registry, has_plugin_registry, tuple(findings)
 
 
-def _registry_module_or_error(module_ref: str, *, root: WorkspaceRoot):
+def _registry_module_or_error(
+    module_ref: str,
+    *,
+    root: WorkspaceRoot,
+    source_roots: tuple[Path, ...] = (),
+):
     try:
-        return _import_registry_module(module_ref, root=root)
+        return _import_registry_module(
+            module_ref,
+            root=root,
+            source_roots=source_roots,
+        )
     except Exception as exc:
         raise WorkspaceConfigError("WORKSPACE.REGISTRY.IMPORT", f"registry import failed for root '{root.id}' ({root.registry_ref}): {exc}", {"path": str(root.config_path)}) from exc
 
@@ -446,11 +478,20 @@ def _registry_factory_or_error(module: object, factory_name: str, *, root: Works
     return factory
 
 
-def _import_registry_module(module_ref: str, *, root: WorkspaceRoot):
+def _import_registry_module(
+    module_ref: str,
+    *,
+    root: WorkspaceRoot,
+    source_roots: tuple[Path, ...] = (),
+):
     candidate = (root.path / module_ref).resolve()
     if module_ref.endswith(".py") or candidate.exists():
         path = Path(module_ref).resolve() if Path(module_ref).is_absolute() else candidate
-        preflight_python_import_tree(path, project_root=root.path)
+        preflight_python_import_tree(
+            path,
+            project_root=root.path,
+            source_roots=source_roots,
+        )
         module_name = f"_vibeflow_workspace_registry_{abs(hash((str(root.path), str(path))))}"
         spec = importlib.util.spec_from_file_location(module_name, path)
         if spec is None or spec.loader is None:
@@ -461,7 +502,11 @@ def _import_registry_module(module_ref: str, *, root: WorkspaceRoot):
         return module
     local_path = resolve_local_module_path(module_ref, project_root=root.path)
     if local_path is not None:
-        preflight_python_import_tree(local_path, project_root=root.path)
+        preflight_python_import_tree(
+            local_path,
+            project_root=root.path,
+            source_roots=source_roots,
+        )
     return importlib.import_module(module_ref)
 
 
@@ -512,19 +557,41 @@ def _with_resource_source(resources, *, root: WorkspaceRoot) -> tuple[object, ..
 
 
 @contextmanager
-def _temporary_sys_path(path: Path):
-    value = str(path.resolve())
-    inserted = value not in sys.path
-    if inserted:
+def _temporary_sys_paths(paths: tuple[Path, ...]):
+    inserted: list[str] = []
+    for path in reversed(paths):
+        value = str(path.resolve())
+        if value in sys.path:
+            continue
         sys.path.insert(0, value)
+        inserted.append(value)
     try:
         yield
     finally:
-        if inserted:
+        for value in inserted:
             try:
                 sys.path.remove(value)
             except ValueError:
                 pass
+
+
+def _python_source_roots(workspace: WorkspaceConfig) -> tuple[Path, ...]:
+    return tuple(
+        root.path.resolve()
+        for root in workspace.roots
+        if root.project_target == "python"
+    )
+
+
+def _ordered_source_roots(
+    primary: Path,
+    source_roots: tuple[Path, ...],
+) -> tuple[Path, ...]:
+    return tuple(
+        dict.fromkeys(
+            (primary.resolve(), *(path.resolve() for path in source_roots))
+        )
+    )
 
 
 __all__ = [

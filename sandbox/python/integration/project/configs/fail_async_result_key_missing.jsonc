@@ -14,13 +14,7 @@
         "description": "Declares a result_key that is absent from provides.",
         "async": "result_key",
         "result_key": "value.missing",
-        "provides": [
-          {
-            "key": "value.in",
-            "type": "value.in",
-            "display_name": "Value In"
-          }
-        ],
+
         "config": {
           "value": 4
         }
@@ -29,14 +23,7 @@
         "id": "end",
         "type_used": "sandbox.final_value_end",
         "display_name": "End",
-        "description": "Would end the invalid result_key fixture.",
-        "requires": [
-          {
-            "type": "value.final",
-            "cardinality": "exactly_one",
-            "display_name": "Value Final"
-          }
-        ]
+        "description": "Would end the invalid result_key fixture."
       }
     ],
     "edges": [

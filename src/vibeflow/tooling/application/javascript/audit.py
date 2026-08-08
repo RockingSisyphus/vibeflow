@@ -82,12 +82,16 @@ class JavascriptAuditResult:
     document: ConfigDocument
     graph: GraphConfig
     compiled: CompiledGraph
+    compiled_by_path: Mapping[tuple[str, ...], CompiledGraph]
+    compiled_nodesets: Mapping[str, CompiledGraph]
     catalogs: DescriptorCatalogs
     implementation_facts: ImplementationFacts
     plan: WorkflowPlan
     architecture: Mapping[str, object]
     import_policy: Mapping[str, Any]
     source_files: tuple[str, ...]
+    plugin_records: tuple[Mapping[str, object], ...] = ()
+    host_records: tuple[Mapping[str, object], ...] = ()
     toolchain: AuditToolchainInfo | None = None
 
     @property
@@ -150,7 +154,7 @@ def audit_javascript_project(
     require_explicit_inputs(graph, path=())
     compiled_by_path: dict[tuple[str, ...], CompiledGraph] = {}
     used_node_types: set[str] = set()
-    compiled = _validate_graph_tree(
+    compilation = _validate_graph_tree(
         graph,
         catalogs=catalogs,
         facts=facts,
@@ -159,6 +163,20 @@ def audit_javascript_project(
         compiled_by_path=compiled_by_path,
         used_node_types=used_node_types,
     )
+    graph = compilation.workflow.graph
+    compiled = compilation.compiled_graph
+    compiled_nodesets = {
+        type_key: compile_core(
+            CoreCompileRequest(
+                graph=nodeset.graph,
+                implementation_facts=facts,
+                target_features=TargetFeatureSet(target="javascript"),
+                known_nodesets=frozenset(nodeset.graph.nodesets),
+                owner=f"nodeset:{type_key}",
+            )
+        ).compiled_graph
+        for type_key, nodeset in sorted(graph.nodesets.items())
+    }
     plan = compile_graph_plan(
         graph,
         compiled,
@@ -241,7 +259,14 @@ def audit_javascript_project(
     architecture = _architecture_payload(
         graph,
         compiled=compiled,
+        compiled_nodesets=compiled_nodesets,
         catalogs=catalogs,
+        used_node_types=frozenset(used_node_types),
+        active_base_lib_ids=frozenset(
+            str(owner.get("id", ""))
+            for owner in import_policy.get("owners", ())
+            if owner.get("kind") == "base_lib"
+        ),
         plugin_records=plugin_records,
         host_records=host_records,
         root_id=root.id,
@@ -253,12 +278,16 @@ def audit_javascript_project(
         document=document,
         graph=graph,
         compiled=compiled,
+        compiled_by_path=dict(compiled_by_path),
+        compiled_nodesets=compiled_nodesets,
         catalogs=catalogs,
         implementation_facts=facts,
         plan=plan,
         architecture=architecture,
         import_policy=import_policy,
         source_files=source_files,
+        plugin_records=plugin_records,
+        host_records=host_records,
         toolchain=toolchain,
     )
 
@@ -296,6 +325,18 @@ def inspect_payload(result: JavascriptAuditResult) -> dict[str, object]:
                         node.id,
                         node.flow_kind,
                     ),
+                    "effect_scope": _effect_scope_label(
+                        compiled,
+                        node.id,
+                        compiled.flow_kinds.get(node.id, node.flow_kind),
+                    ),
+                    "runtime_dispatch": _runtime_dispatch_label(
+                        compiled,
+                        node.id,
+                    ),
+                    "effective_execution_lock": (
+                        _effective_lock_text(graph, node) or None
+                    ),
                     "requires": requirements_to_dicts(node.requires),
                     "provides": providers_to_dicts(node.provides),
                 }
@@ -318,93 +359,81 @@ def inspect_payload(result: JavascriptAuditResult) -> dict[str, object]:
     }
 
 
-def render_mermaid(result: JavascriptAuditResult) -> str:
-    lines = ["flowchart TD"]
-    for node in result.graph.nodes:
-        label = f"{node.id}\\n{node.type_used}".replace('"', "'")
-        flow_kind = result.compiled.flow_kinds.get(node.id, node.flow_kind)
-        if flow_kind == FLOW_KIND_GLOBAL_STATE:
-            shape = mermaid_shape_for_flow_kind(flow_kind)
-            lines.append(
-                f'  {node.id}@{{ shape: {shape}, label: "{label}" }}'
-            )
-        else:
-            lines.append(f'  {node.id}["{label}"]')
-    for edge in result.compiled.effective_edges:
-        condition = f"|{edge.when}|" if edge.when else ""
-        lines.append(f"  {edge.source} -->{condition} {edge.target}")
-    return "\n".join(lines) + "\n"
+def render_mermaid(
+    result: JavascriptAuditResult,
+    *,
+    expand_nodesets: bool = False,
+    show_contract: bool = True,
+    show_semantics: bool = True,
+    mermaid_layout: str = "default",
+) -> str:
+    from vibeflow.tooling.application.javascript.review import render_mermaid as render
+
+    return render(
+        result,
+        expand_nodesets=expand_nodesets,
+        show_contract=show_contract,
+        show_semantics=show_semantics,
+        mermaid_layout=mermaid_layout,
+    )
 
 
-def render_ascii(result: JavascriptAuditResult) -> str:
-    lines = [
-        f"workflow {result.plan.workflow_id} ({result.graph.entry_mode})",
-    ]
-    incoming = {
-        node.id: [] for node in result.graph.nodes
-    }
-    for edge in result.compiled.effective_edges:
-        incoming.setdefault(edge.target, []).append(edge.source)
-    for node in result.graph.nodes:
-        parents = ", ".join(sorted(incoming.get(node.id, ()))) or "entry"
-        lines.append(f"- {node.id} [{node.type_used}] <- {parents}")
-    return "\n".join(lines) + "\n"
+def render_ascii(
+    result: JavascriptAuditResult,
+    *,
+    expand_nodesets: bool = False,
+    show_contract: bool = True,
+    show_semantics: bool = True,
+) -> str:
+    from vibeflow.tooling.application.javascript.review import render_ascii as render
+
+    return render(
+        result,
+        expand_nodesets=expand_nodesets,
+        show_contract=show_contract,
+        show_semantics=show_semantics,
+    )
 
 
 def render_review_svg(result: JavascriptAuditResult) -> str:
-    nodes = tuple(result.graph.nodes)
-    width = 760
-    row_height = 86
-    height = max(140, 50 + len(nodes) * row_height)
-    positions = {
-        node.id: (40, 30 + index * row_height)
-        for index, node in enumerate(nodes)
-    }
-    fragments: list[str] = []
-    for edge in result.compiled.effective_edges:
-        source = positions.get(edge.source)
-        target = positions.get(edge.target)
-        if source is None or target is None:
-            continue
-        x1, y1 = source
-        x2, y2 = target
-        fragments.append(
-            f'<line x1="{x1 + 680}" y1="{y1 + 27}" '
-            f'x2="{x2 + 680}" y2="{y2 + 27}" '
-            'stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>'
-        )
-    for node in nodes:
-        x, y = positions[node.id]
-        flow_kind = result.compiled.flow_kinds.get(node.id, node.flow_kind)
-        if flow_kind == FLOW_KIND_GLOBAL_STATE:
-            shape = (
-                f'<path class="global-state-cloud" d="{_cloud_path(x, y, 680, 54)}" '
-                'fill="#f8fafc" stroke="#334155"/>'
-            )
-        else:
-            shape = (
-                f'<rect x="{x}" y="{y}" width="680" height="54" rx="8" '
-                'fill="#f8fafc" stroke="#334155"/>'
-            )
-        fragments.extend(
-            [
-                f'<g class="review-inline-fragment" data-node="{escape_xml(node.id)}" data-flow-kind="{escape_xml(flow_kind)}">',
-                shape,
-                f'<text x="{x + 16}" y="{y + 23}" font-family="sans-serif" font-size="15" font-weight="600">{escape_xml(node.id)}</text>',
-                f'<text x="{x + 16}" y="{y + 43}" font-family="monospace" font-size="12" fill="#475569">{escape_xml(node.type_used)}</text>',
-                "</g>",
-            ]
-        )
-    return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" '
-        f'height="{height}" viewBox="0 0 {width} {height}" '
-        'role="img" aria-roledescription="flowchart-review-columns">'
-        '<defs><marker id="arrow" markerWidth="8" markerHeight="8" '
-        'refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" '
-        'fill="#64748b"/></marker></defs>'
-        + "".join(fragments)
-        + "</svg>\n"
+    from vibeflow.tooling.application.javascript.review import render_review_svg as render
+
+    return render(result)
+
+
+def _runtime_dispatch_label(compiled: CompiledGraph, node_id: str) -> str:
+    value = getattr(compiled, "runtime_dispatches", {}).get(node_id)
+    if value is True:
+        return "detected"
+    if value is False:
+        return "none"
+    return "unknown"
+
+
+def _effect_scope_label(
+    compiled: CompiledGraph,
+    node_id: str,
+    flow_kind: str,
+) -> str:
+    return compiled.effect_scopes.get(
+        node_id,
+        "global_state" if flow_kind == FLOW_KIND_GLOBAL_STATE else "none",
     )
+
+
+def _effective_lock_text(graph: GraphConfig, node: object) -> str:
+    node_lock = getattr(node, "execution_lock", None)
+    if node_lock is not None:
+        node_type = str(getattr(node, "type_used", ""))
+        scope = (
+            "block"
+            if node_type in LOOP_NODE_TYPES or node_type in graph.nodesets
+            else "node"
+        )
+        return f"{node_lock.key} ({scope})"
+    if graph.execution_lock is not None:
+        return f"{graph.execution_lock.key} (root, inherited)"
+    return ""
 
 
 def _cloud_path(x: float, y: float, width: float, height: float) -> str:
@@ -436,8 +465,8 @@ def _validate_graph_tree(
     active_nodesets: tuple[str, ...],
     compiled_by_path: dict[tuple[str, ...], CompiledGraph],
     used_node_types: set[str],
-) -> CompiledGraph:
-    compiled = compile_core(
+):
+    compilation = compile_core(
         CoreCompileRequest(
             graph=graph,
             implementation_facts=facts,
@@ -445,7 +474,9 @@ def _validate_graph_tree(
             known_nodesets=frozenset(graph.nodesets),
             owner="pipeline" if not path else "nodeset:" + ".".join(path),
         )
-    ).compiled_graph
+    )
+    graph = compilation.workflow.graph
+    compiled = compilation.compiled_graph
     for node in graph.nodes:
         call_path = (*path, node.id)
         if node.status == STATUS_PLANNED:
@@ -463,14 +494,6 @@ def _validate_graph_tree(
                     f"unknown nodeset '{nodeset_key}'",
                     call_path,
                 )
-            if not is_loop:
-                _check_contract(
-                    node,
-                    nodeset.requires,
-                    nodeset.provides,
-                    owner=f"nodeset '{nodeset_key}'",
-                    path=call_path,
-                )
             if nodeset_key in active_nodesets:
                 chain = " -> ".join((*active_nodesets, nodeset_key))
                 raise ProjectBuildError(
@@ -487,7 +510,7 @@ def _validate_graph_tree(
                 compiled_by_path=compiled_by_path,
                 used_node_types=used_node_types,
             )
-            compiled_by_path[call_path] = child
+            compiled_by_path[call_path] = child.compiled_graph
             continue
         descriptor = catalogs.nodes.get(node.type_used)
         if descriptor is None:
@@ -506,13 +529,6 @@ def _validate_graph_tree(
                 f"node '{node.type_used}' has no JavaScript/TypeScript implementation",
                 call_path,
             )
-        _check_contract(
-            node,
-            descriptor.contract.requires,
-            descriptor.contract.provides,
-            owner=f"node descriptor '{descriptor.type_key}'",
-            path=call_path,
-        )
         for base_lib_id in descriptor.base_libs:
             if catalogs.base_libs.get(base_lib_id) is None:
                 raise ProjectBuildError(
@@ -546,28 +562,7 @@ def _validate_graph_tree(
         used_types.update(item.type for item in node.requires)
         used_types.update(item.type for item in node.provides)
     schemas_for_types(used_types, catalogs=catalogs)
-    return compiled
-
-
-def _check_contract(
-    node: object,
-    requires: tuple[object, ...],
-    provides: tuple[object, ...],
-    *,
-    owner: str,
-    path: tuple[str, ...],
-) -> None:
-    mismatches: list[str] = []
-    if tuple(getattr(node, "requires", ())) != tuple(requires):
-        mismatches.append("requires")
-    if tuple(getattr(node, "provides", ())) != tuple(provides):
-        mismatches.append("provides")
-    if mismatches:
-        raise ProjectBuildError(
-            "VF_AOT_CONTRACT_INVALID",
-            f"graph call does not match {owner}: {', '.join(mismatches)}",
-            path,
-        )
+    return compilation
 
 
 def _plugin_records(
@@ -747,32 +742,55 @@ def _architecture_payload(
     graph: GraphConfig,
     *,
     compiled: CompiledGraph,
+    compiled_nodesets: Mapping[str, CompiledGraph],
     catalogs: DescriptorCatalogs,
+    used_node_types: frozenset[str],
+    active_base_lib_ids: frozenset[str],
     plugin_records: tuple[Mapping[str, object], ...],
     host_records: tuple[Mapping[str, object], ...],
     root_id: str,
     source_path: str,
 ) -> dict[str, object]:
-    report = build_architecture_report(graph, compiled=compiled)
     return {
         "project_target": "javascript",
-        "workflow": {
-            "source": {"root_id": root_id, "path": source_path},
-            "entry_mode": graph.entry_mode,
-            **report,
-        },
+        "workflow": _javascript_graph_document(
+            graph,
+            compiled,
+            source={"root_id": root_id, "path": source_path},
+            graph_lock_scope="root",
+        ),
         "nodesets": {
             key: {
                 "type_key": value.type_key,
+                "source": _javascript_source_reference(value),
+                "display_name": value.display_name,
+                "description": value.description,
                 "status": value.status,
                 "flow_kind": value.flow_kind,
+                "effect_scope": "none",
+                "reachable_from_workflow": key in _reachable_javascript_nodesets(graph),
                 "requires": requirements_to_dicts(value.requires),
                 "provides": providers_to_dicts(value.provides),
+                "global_config": dict(value.global_config),
+                "body": (
+                    _javascript_graph_document(
+                        value.graph,
+                        compiled_nodesets[key],
+                        source=_javascript_source_reference(value),
+                        graph_lock_scope="block",
+                    )
+                    if value.graph.nodes
+                    else None
+                ),
             }
             for key, value in sorted(graph.nodesets.items())
         },
         "node_types": {
             descriptor.type_key: {
+                "display_name": descriptor.display_name,
+                "description": descriptor.description,
+                "category": descriptor.category,
+                "version": descriptor.version,
                 "flow_kind": descriptor.flow_kind,
                 "contract": descriptor.contract.to_dict(),
                 "implementations": [
@@ -783,12 +801,235 @@ def _architecture_payload(
             for descriptor in catalogs.nodes
         },
         "resources": {
-            "base_lib": catalogs.base_libs.to_dict(),
-            "capabilities": catalogs.capabilities.to_dict(),
+            "data_schemas": catalogs.schemas.to_dict(),
+            "base_lib": {
+                key: value
+                for key, value in catalogs.base_libs.to_dict().items()
+                if key in active_base_lib_ids
+            },
+            "capabilities": {
+                key: value
+                for key, value in catalogs.capabilities.to_dict().items()
+                if key in _active_capability_ids(
+                    catalogs,
+                    used_node_types=used_node_types,
+                    host_records=host_records,
+                )
+            },
             "host_extensions": list(host_records),
             "plugins": list(plugin_records),
         },
     }
+
+
+def _active_capability_ids(
+    catalogs: DescriptorCatalogs,
+    *,
+    used_node_types: frozenset[str],
+    host_records: tuple[Mapping[str, object], ...],
+) -> frozenset[str]:
+    active = {
+        requirement.id
+        for type_key in used_node_types
+        for descriptor in (catalogs.nodes.get(type_key),)
+        if descriptor is not None
+        for requirement in descriptor.capabilities
+    }
+    for record in host_records:
+        for provided in record.get("provides", ()):
+            if isinstance(provided, Mapping):
+                capability_id = str(provided.get("id", ""))
+            else:
+                capability_id = str(provided)
+            if capability_id:
+                active.add(capability_id)
+    return frozenset(active)
+
+
+def _javascript_graph_document(
+    graph: GraphConfig,
+    compiled: CompiledGraph,
+    *,
+    source: Mapping[str, str],
+    graph_lock_scope: str,
+) -> dict[str, object]:
+    report = build_architecture_report(graph, compiled=compiled)
+    return {
+        "source": dict(source),
+        "inputs": providers_to_dicts(graph.inputs),
+        "outputs": requirements_to_dicts(graph.outputs),
+        "max_steps": graph.max_steps,
+        "entry_mode": graph.entry_mode,
+        "execution_lock": (
+            {"key": graph.execution_lock.key, "scope": graph_lock_scope}
+            if graph.execution_lock is not None
+            else None
+        ),
+        "contains_global_state": bool(
+            getattr(compiled, "contains_global_state", False)
+        ),
+        "summary": report.get("summary", {}),
+        "entry_nodes": report.get("entry_nodes", []),
+        "terminal_nodes": report.get("terminal_nodes", []),
+        "god_nodes": report.get("god_nodes", []),
+        "nodes": [
+            _javascript_node_document(
+                graph,
+                compiled,
+                node,
+                source=source,
+                graph_lock_scope=graph_lock_scope,
+            )
+            for node in graph.nodes
+        ],
+        "edges": [
+            _javascript_edge_document(graph, compiled, edge)
+            for edge in compiled.effective_edges
+        ],
+    }
+
+
+def _javascript_node_document(
+    graph: GraphConfig,
+    compiled: CompiledGraph,
+    node: object,
+    *,
+    source: Mapping[str, str],
+    graph_lock_scope: str,
+) -> dict[str, object]:
+    node_id = str(getattr(node, "id", ""))
+    type_used = str(getattr(node, "type_used", ""))
+    is_loop = type_used in LOOP_NODE_TYPES
+    target = getattr(getattr(node, "loop", None), "body", "") if is_loop else type_used
+    nodeset = graph.nodesets.get(target)
+    invokes = None
+    if nodeset is not None:
+        invokes = {
+            "kind": "loop_body" if is_loop else "nodeset",
+            "target": target,
+            "target_status": nodeset.status,
+        }
+    flow_kind = compiled.flow_kinds.get(node_id, str(getattr(node, "flow_kind", "")))
+    lock = getattr(node, "execution_lock", None)
+    effective_lock = None
+    if lock is not None:
+        effective_lock = {
+            "key": lock.key,
+            "scope": "block" if invokes else "node",
+            "inherited": False,
+        }
+    elif graph.execution_lock is not None:
+        effective_lock = {
+            "key": graph.execution_lock.key,
+            "scope": graph_lock_scope,
+            "inherited": True,
+        }
+    async_mode = str(getattr(node, "async_mode", ""))
+    status = str(getattr(node, "status", "implemented"))
+    contract_source = (
+        "planned_config"
+        if status == STATUS_PLANNED
+        else "system_config"
+        if type_used == IO_NODE_TYPE or is_loop
+        else "nodeset"
+        if nodeset is not None
+        else "node_type"
+    )
+    return {
+        "id": node_id,
+        "type_used": type_used,
+        "source": dict(source),
+        "role": getattr(node, "metadata").to_dict(),
+        "contract_source": contract_source,
+        "flow_kind": flow_kind,
+        "effect_scope": _effect_scope_label(compiled, node_id, flow_kind),
+        "runtime_dispatch": _runtime_dispatch_label(compiled, node_id),
+        "execution_lock": (
+            {"key": lock.key, "scope": "block" if invokes else "node"}
+            if lock is not None
+            else None
+        ),
+        "effective_execution_lock": effective_lock,
+        "contains_global_state": flow_kind == FLOW_KIND_GLOBAL_STATE,
+        "status": status,
+        "planned_behavior": (
+            getattr(node, "planned_behavior").to_dict()
+            if str(getattr(node, "status", "")) == STATUS_PLANNED
+            else None
+        ),
+        "requires": requirements_to_dicts(getattr(node, "requires")),
+        "provides": providers_to_dicts(getattr(node, "provides")),
+        "join_policy": str(getattr(node, "join_policy", "")),
+        "async": (
+            {"mode": async_mode, "result_key": str(getattr(node, "result_key", "")) or None}
+            if async_mode
+            else None
+        ),
+        "loop": getattr(node, "loop").to_dict() or None,
+        "io": getattr(node, "io").to_dict() or None,
+        "invokes": invokes,
+        "config": {
+            "call": dict(getattr(node, "params")),
+            "node_configs": dict(getattr(node, "node_config_overrides")),
+            "allow_config_override": bool(getattr(node, "allow_config_override")),
+        },
+    }
+
+
+def _javascript_edge_document(
+    graph: GraphConfig,
+    compiled: CompiledGraph,
+    edge: object,
+) -> dict[str, object]:
+    pair = (str(getattr(edge, "source", "")), str(getattr(edge, "target", "")))
+    roles = [
+        name
+        for name, values in (
+            ("mainline", compiled.mainline_edges),
+            ("data_bypass", compiled.data_bypass_edges),
+            ("async", compiled.async_edges),
+            ("schedule", compiled.schedule_edges),
+            ("transfer", compiled.transfer_edges),
+        )
+        if pair in {item.pair for item in values}
+    ]
+    return {
+        "from": pair[0],
+        "to": pair[1],
+        "when": str(getattr(edge, "when", "")),
+        "roles": roles,
+    }
+
+
+def _javascript_source_reference(value: object) -> dict[str, str]:
+    root_id = str(getattr(value, "root_id", ""))
+    root_path = Path(str(getattr(value, "root_path", "") or ".")).resolve()
+    source_path = Path(str(getattr(value, "source_path", "") or ".")).resolve()
+    try:
+        path = source_path.relative_to(root_path).as_posix()
+    except ValueError:
+        path = source_path.name
+    return {"root_id": root_id, "path": path}
+
+
+def _reachable_javascript_nodesets(graph: GraphConfig) -> frozenset[str]:
+    reachable: set[str] = set()
+
+    def visit(body: GraphConfig) -> None:
+        for node in body.nodes:
+            target = (
+                node.loop.body
+                if node.type_used in LOOP_NODE_TYPES
+                else node.type_used
+            )
+            nodeset = body.nodesets.get(target)
+            if nodeset is None or target in reachable:
+                continue
+            reachable.add(target)
+            visit(nodeset.graph)
+
+    visit(graph)
+    return frozenset(reachable)
 
 
 def _driver_import_policy(policy: Mapping[str, Any]) -> dict[str, Any]:

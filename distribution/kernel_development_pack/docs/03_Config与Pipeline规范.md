@@ -165,7 +165,7 @@ workspace 模式下，node registry 按 `roots` 顺序加载，但 Python node �
 
 `pipeline.entry_mode` 允许 `sync | async`，缺省 `sync`。它决定 JS AOT 的公共入口：同步构建导出直接返回值的 `runWorkflow()`，异步构建导出 `runWorkflowAsync()`。需要 suspend Node/Capability、deferred/result_key、detached 或原生 `receive` 的 JS workflow 必须显式写 `async`。Python `runtime.run()` 阻塞返回，异步任务由 Python Target 的线程执行器处理。
 
-Core 编译产物的公共 ABI 是 `vibeflow.workflow.v3`，包含节点 `effect_scope`、workflow/block/node 的 `execution_lock`、`contains_global_state` 与适用层级的 `root_exclusive`。旧 `vibeflow.workflow.v2` 计划不会按缺省字段静默升级，必须从真实 workflow config 重新生成。
+Core 编译产物的公共 ABI 是 `vibeflow.workflow.v4`，包含节点 `effect_scope`、三态 `runtime_dispatch`，以及 workflow/block/node 的 `execution_lock` 和 `contains_global_state`。`contains_global_state` 不隐含 root 锁；旧 `vibeflow.workflow.v3` 计划不会按缺省字段静默升级，必须从真实 workflow config 重新生成。
 
 Python 项目在 `registry.py` 注册可用 base_lib 和 Plugin；JS/TS 项目在
 `descriptors.plugins` 登记 `vibeflow.plugin.v1` 实现。两条路径都由 workflow
@@ -396,19 +396,15 @@ class ParseCliNode:
         flow_kind="io",
     )
     CONTRACT = NodeContract(
-        requires=(DataRequirement("cli.argv", "exactly_one"),),
+        requires=(DataRequirement("cli.argv", "exactly_one", "CLI Arguments"),),
         provides=(
-            DataProvider("cli.input_path", "cli.input_path"),
-            DataProvider("cli.verbose", "cli.verbose"),
+            DataProvider("cli.input_path", "cli.input_path", "CLI Input Path"),
+            DataProvider("cli.verbose", "cli.verbose", "CLI Verbose"),
         ),
         input_semantics={"cli.argv": ("Delegated business argument tokens.",)},
         output_semantics={
             "cli.input_path": ("Path supplied through --input.",),
             "cli.verbose": ("Whether verbose business output is enabled.",),
-        },
-        output_schema={
-            "cli.input_path": {"type": "string"},
-            "cli.verbose": {"type": "boolean"},
         },
         examples=({
             "inputs": {
@@ -741,10 +737,10 @@ Health 会拒绝 `GRAPH.DATA.RUNTIME_REQUIREMENT_UNREACHABLE`、`GRAPH.DATA.NO_P
   "pipeline": {
     "nodes": [
       {"id":"start","type_used":"guide.start","display_name":"Start","description":"Starts the flow."},
-      {"id":"source","type_used":"guide.source","display_name":"Source","description":"Produces original and current values.","provides":[{"key":"record.original","type":"record.original","display_name":"Original"},{"key":"record.current","type":"record.current","display_name":"Current"}]},
-      {"id":"normalize","type_used":"guide.normalize","display_name":"Normalize","description":"Normalizes the current value.","requires":[{"type":"record.current","cardinality":"exactly_one","display_name":"Current"}],"provides":[{"key":"record.normalized","type":"record.normalized","display_name":"Normalized"}]},
-      {"id":"combine","type_used":"guide.combine","display_name":"Combine","description":"Combines both values.","requires":[{"type":"record.original","cardinality":"exactly_one","display_name":"Original"},{"type":"record.normalized","cardinality":"exactly_one","display_name":"Normalized"}],"provides":[{"key":"semantic.combined","type":"semantic.combined","display_name":"Combined"}]},
-      {"id":"output","type_used":"guide.output_value","display_name":"Output I/O","description":"Adapts the semantic result.","requires":[{"type":"semantic.combined","cardinality":"exactly_one","display_name":"Combined"}],"provides":[{"key":"response.value","type":"response.value","display_name":"Response"}]},
+      {"id":"source","type_used":"guide.source","display_name":"Source","description":"Produces original and current values."},
+      {"id":"normalize","type_used":"guide.normalize","display_name":"Normalize","description":"Normalizes the current value."},
+      {"id":"combine","type_used":"guide.combine","display_name":"Combine","description":"Combines both values."},
+      {"id":"output","type_used":"guide.output_value","display_name":"Output I/O","description":"Adapts the semantic result."},
       {"id":"end","type_used":"guide.end","display_name":"End","description":"Ends after the response.","similar_to":{"node":"start","relationship":"copy","reason":"Both terminal calls intentionally use the same empty lifecycle implementation."}}
     ],
     "edges":[["start","source"],["source","normalize"],["normalize","combine"],["source","combine"],["combine","output"],["output","end"]],
@@ -761,10 +757,10 @@ Health 会拒绝 `GRAPH.DATA.RUNTIME_REQUIREMENT_UNREACHABLE`、`GRAPH.DATA.NO_P
   "pipeline": {
     "nodes": [
       {"id":"start","type_used":"guide.start","display_name":"Start","description":"Starts both branches."},
-      {"id":"left","type_used":"guide.left","display_name":"Left","description":"Produces the left value.","provides":[{"key":"branch.left","type":"branch.left","display_name":"Left Value"}]},
-      {"id":"right","type_used":"guide.right","display_name":"Right","description":"Produces the right value.","similar_to":{"node":"left","relationship":"variant","reason":"The parallel branches intentionally share the same pure constant-source shape."},"provides":[{"key":"branch.right","type":"branch.right","display_name":"Right Value"}]},
-      {"id":"merge","type_used":"guide.merge","display_name":"Merge","description":"Waits for both branches.","join_policy":"all","requires":[{"type":"branch.left","cardinality":"exactly_one","display_name":"Left Value"},{"type":"branch.right","cardinality":"exactly_one","display_name":"Right Value"}],"provides":[{"key":"semantic.merged","type":"semantic.merged","display_name":"Merged"}]},
-      {"id":"output","type_used":"guide.output_merged","display_name":"Output I/O","description":"Adapts the merged value.","requires":[{"type":"semantic.merged","cardinality":"exactly_one","display_name":"Merged"}],"provides":[{"key":"response.value","type":"response.value","display_name":"Response"}]},
+      {"id":"left","type_used":"guide.left","display_name":"Left","description":"Produces the left value."},
+      {"id":"right","type_used":"guide.right","display_name":"Right","description":"Produces the right value.","similar_to":{"node":"left","relationship":"variant","reason":"The parallel branches intentionally share the same pure constant-source shape."}},
+      {"id":"merge","type_used":"guide.merge","display_name":"Merge","description":"Waits for both branches.","join_policy":"all"},
+      {"id":"output","type_used":"guide.output_merged","display_name":"Output I/O","description":"Adapts the merged value."},
       {"id":"end","type_used":"guide.end","display_name":"End","description":"Ends after the response.","similar_to":{"node":"start","relationship":"copy","reason":"Both terminal calls intentionally use the same empty lifecycle implementation."}}
     ],
     "edges":[["start","left"],["start","right"],["left","merge"],["right","merge"],["merge","output"],["output","end"]],
@@ -782,9 +778,9 @@ Health 会拒绝 `GRAPH.DATA.RUNTIME_REQUIREMENT_UNREACHABLE`、`GRAPH.DATA.NO_P
     "inputs":[{"key":"request.raw","type":"request.raw","display_name":"Raw Request"}],
     "nodes": [
       {"id":"start","type_used":"guide.start","display_name":"Start","description":"Starts the boundary flow."},
-      {"id":"input","type_used":"guide.input","display_name":"Input I/O","description":"Decodes the external representation.","requires":[{"type":"request.raw","cardinality":"exactly_one","display_name":"Raw Request"}],"provides":[{"key":"input.text","type":"input.text","display_name":"Input Text"}]},
-      {"id":"semantic","type_used":"guide.semantic","display_name":"Semantic Process","description":"Produces a typed internal value.","requires":[{"type":"input.text","cardinality":"exactly_one","display_name":"Input Text"}],"provides":[{"key":"semantic.number","type":"semantic.number","display_name":"Semantic Number"}]},
-      {"id":"output","type_used":"guide.output_number","display_name":"Output I/O","description":"Adapts the internal value.","requires":[{"type":"semantic.number","cardinality":"exactly_one","display_name":"Semantic Number"}],"provides":[{"key":"response.number","type":"response.number","display_name":"Response Number"}]},
+      {"id":"input","type_used":"guide.input","display_name":"Input I/O","description":"Decodes the external representation."},
+      {"id":"semantic","type_used":"guide.semantic","display_name":"Semantic Process","description":"Produces a typed internal value."},
+      {"id":"output","type_used":"guide.output_number","display_name":"Output I/O","description":"Adapts the internal value."},
       {"id":"end","type_used":"guide.end","display_name":"End","description":"Ends after the response.","similar_to":{"node":"start","relationship":"copy","reason":"Both terminal calls intentionally use the same empty lifecycle implementation."}}
     ],
     "edges":[["start","input"],["input","semantic"],["semantic","output"],["output","end"]],
@@ -835,9 +831,9 @@ planned node / planned nodeset 可选 `planned_behavior`：
 
 ## global_state 与 execution_lock
 
-`flow_kind=global_state` 是语言无关的 Core 语义，并派生 `effect_scope=global_state`；它表示 node 有意访问或修改 Target execution domain 中不经 envelope 流转的易失 ambient state。它不是系统 node，也不增加 Provider、隐式黑板或另一套对象通道。Python Target 把 execution domain 实现为当前解释器进程；普通 Python 对象仍通过 `requires` / `provides` 在 envelope 中按引用传递。
+`flow_kind=global_state` 是语言无关的 Core 语义，并派生 `effect_scope=global_state`；它表示 node 有意访问 Target execution domain 中不经 envelope 流转的易失 ambient state，或把控制权交给从 envelope/registry/cache 取得的运行时 callback/对象方法。它不是系统 node，也不增加 Provider、隐式黑板或另一套对象通道。Python Target 把 execution domain 实现为当前解释器进程；普通 Python 对象仍通过 `requires` / `provides` 在 envelope 中按引用传递。
 
-含 implemented global-state 的 root plan 会递归标记 `contains_global_state=true` / `root_exclusive=true`。Python Runtime 在任何 node 或 hook 前进入进程级 global-state 执行域：普通 root 以 shared 模式进入，global-state root 以 exclusive 模式进入。lease 由嵌套 nodeset、loop 和受管理线程继承，一直覆盖成功/失败 hooks 和受保护异步收尾，保护任务真正结束后才释放。global-state 修改是持久、非事务的；成功、失败或取消后都不 snapshot、rollback 或自动恢复，临时修改必须在同一 node 内使用 `try/finally`。
+含 implemented global-state 的 root plan 会递归标记 `contains_global_state=true`，但不会因此自动独占 root。Python Target 对源码可见、高置信度的 runtime dispatch 产生实现事实；普通 `none` node 检测到时只给 warning，`global_state` 和现有 IO effect 边界不产生该 warning。global-state 修改是持久、非事务的；成功、失败或取消后都不 snapshot、rollback 或自动恢复，临时修改必须在同一 node 内使用 `try/finally`。
 
 需要为其他业务资源建立架构可见的串行语义时，使用公开 `ExecutionLockSpec`：
 
@@ -858,12 +854,12 @@ planned node / planned nodeset 可选 `planned_behavior`：
 }
 ```
 
-- key 必须是静态非空字符串，`vibeflow.` 前缀保留给系统。v1 只有 exclusive 模式，每个 scope 最多一个显式 key。
+- key 必须是静态非空字符串，`vibeflow.` 前缀保留给系统。v1 只有 exclusive 模式，每个 scope 最多一个显式 key；同 key 互斥，不同 key 可并行。
 - `pipeline.execution_lock` 保护整个 root run；`pipeline.nodes[].execution_lock` 保护该调用，nodeset/loop 调用点上的锁自然覆盖完整子 block。execution lock 不授予任何 effect 权限。
 - 已持有一个用户 key 时，嵌套 scope 只能复用同 key；同 key 按同一 lease 可重入，不同 key 嵌套会编译失败。互不嵌套的不同 sibling key 可并行。
-- planned global-state 或 planned 调用上的 lock 只进入 Architecture/review，不取得权限、不加锁、不参与 `contains_global_state`。JavaScript Target v1 会正确展示它们，但对 implemented global-state/lock 以 `TARGET.FEATURE.UNSUPPORTED` 拒绝执行。
-- 任何 global-state 或显式锁保护的 scope 都禁止 `async: "detached"`；`async: "result_key"` 只有在编译期能证明存在无条件 scheduled consumer path、结果必会 join 时才合法。Runtime 在异常/取消路径也会 fail-safe drain 已启动的受保护 future。
-- Architecture JSON 显示 `effect_scope`、`execution_lock`、`contains_global_state` / `root_exclusive`。Mermaid/SVG 中 global-state 固定使用 `cloud`；boundary/full trace 记录 `lock_wait → lock_acquired → run/hook/task events → lock_released`，global-state 已开始后失败则追加 `global_state_may_have_changed`。该事件只是风险提示，不代表状态已恢复。
+- planned global-state 或 planned 调用上的 lock 只进入 Architecture/review，不取得权限、不加锁、不参与 `contains_global_state`。JavaScript Target v1 会正确展示它们，但对 implemented global-state/lock 以 `TARGET.FEATURE.UNSUPPORTED` 拒绝执行，其 runtime-dispatch 事实为 unknown。
+- `global_state` 本身不自动加锁；无有效锁时照常运行并产生 `GRAPH.EXECUTION_LOCK.GLOBAL_STATE_UNCOORDINATED` warning。只有显式锁保护的 scope 禁止 `async: "detached"`；`async: "result_key"` 只有在编译期能证明存在无条件 scheduled consumer path、结果必会 join 时才合法。Runtime 在异常/取消路径也会 fail-safe drain 已启动的受保护 future。
+- Architecture JSON 显示 `effect_scope`、`runtime_dispatch`、有效 `execution_lock`（无锁为 `none`）和 `contains_global_state`。Mermaid/SVG 中 global-state 固定使用 `cloud`；boundary/full trace 只为显式锁记录 `lock_wait → lock_acquired → ... → lock_released`，global-state 始终记录 enter/exit，已开始后失败则追加 `global_state_may_have_changed`。该事件只是风险提示，不代表状态已恢复。
 
 ## async node
 
@@ -950,7 +946,7 @@ policy 来源优先级：
 - `GRAPH.FLOW.MISSING_END`：没有 terminal end，或 end 有 outgoing edge。
 - `GRAPH.FLOW.UNREACHABLE_FROM_START`：某个 implemented node 从 start 走不到。
 - `GRAPH.FLOW.CANNOT_REACH_END`：某个 implemented node 不能到达 end。
-- `GRAPH.DECISION.MISSING_BRANCH_VALUE`：decision 的 `output_schema` 声明了 enum/boolean 分支，但 edge 没覆盖。
+- decision 的每条分支 edge 必须填写非空 `when`；内核检查分支语法、可达性与是否能到达合法汇合或终点，不验证业务输出值域是否穷尽。
 - `GRAPH.CYCLE.FORBIDDEN`：普通 graph 中出现显式 edge 环；请改用 `vibeflow.loop.while`。
 - `GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT`：非 decision 同步节点分出多条同步主线，但没有 data bypass、async 或 `join_policy: "all"` 汇合语义；看 `details.branch_nodes` / `branch_edges` 修改。
 - `GRAPH.MAINLINE.AMBIGUOUS_SIDE_BRANCH`：某个同步旁路不在任何主线变体中；通常应接回主线、删除，或把它标成 async。

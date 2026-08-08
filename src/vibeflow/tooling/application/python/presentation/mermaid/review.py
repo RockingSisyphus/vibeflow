@@ -146,14 +146,26 @@ def _render_nodesets_column(renderer: Any, lines: list[str], graph: GraphConfig)
     for node, nodeset in nodeset_nodes:
         if nodeset is None:
             continue
-        group_anchor = _render_one_nodeset(renderer, lines, node, nodeset)
+        group_anchor = _render_one_nodeset(
+            renderer,
+            lines,
+            graph,
+            node,
+            nodeset,
+        )
         renderer._append_edge_line(lines, f"    {previous_anchor} ~~~ {group_anchor}")
         previous_anchor = group_anchor
     lines.append("  end")
     return column_anchor
 
 
-def _render_one_nodeset(renderer: Any, lines: list[str], node: Any, nodeset: Any) -> str:
+def _render_one_nodeset(
+    renderer: Any,
+    lines: list[str],
+    graph: GraphConfig,
+    node: Any,
+    nodeset: Any,
+) -> str:
     group_id = _safe_id(f"__vibeflow_layout_nodesets__{node.id}__expanded")
     group_anchor = _safe_id(f"{group_id}__anchor")
     title = node.metadata.display_name or nodeset.display_name or node.id
@@ -170,6 +182,16 @@ def _render_one_nodeset(renderer: Any, lines: list[str], node: Any, nodeset: Any
         indent="      ",
         visited_nodesets=(nodeset.type_key,),
         expand_inline=True,
+        inherited_lock=(
+            (node.execution_lock.key, "block", True)
+            if node.execution_lock is not None
+            else (
+                (graph.execution_lock.key, "root", True)
+                if graph.execution_lock is not None
+                else None
+            )
+        ),
+        graph_lock_scope="block",
     )
     renderer._render_edges(lines, nodeset.graph, nested_compiled, prefix=nested_prefix, indent="      ")
     if nodeset.graph.nodes:

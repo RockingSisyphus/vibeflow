@@ -19,22 +19,8 @@
         "id": "invalid",
         "type_used": "sandbox.invalid.runtime_import",
         "display_name": "Runtime import",
-        "description": "Must fail because the local helper is not a registered resource owner.",
-        "requires": [
-          {
-            "type": "sandbox.number",
-            "cardinality": "exactly_one",
-            "display_name": "Number"
-          }
-        ],
-        "provides": [
-          {
-            "key": "result",
-            "type": "sandbox.math.result",
-            "display_name": "Result"
-          }
-        ]
-      },
+        "description": "Must fail because the local helper is not a registered resource owner."
+              },
       {
         "id": "end",
         "type_used": "sandbox.terminal",

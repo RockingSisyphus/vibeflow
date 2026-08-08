@@ -65,7 +65,13 @@ def validate_graph_health(
             )
         )
     try:
-        compiled = GraphCompiler().compile(graph, plugin_registry=plugin_registry)
+        compilation = GraphCompiler().compile_with_findings(
+            graph,
+            registry=registry,
+            plugin_registry=plugin_registry,
+        )
+        graph = compilation.workflow.graph
+        compiled = compilation.compiled_graph
     except GraphCompileError as exc:
         return _compile_error_report(exc)
 
@@ -85,14 +91,10 @@ def validate_graph_health(
         state,
     )
     _append_node_visual_metadata_warnings(graph, state)
-    if not state.errors:
-        try:
-            compiled = GraphCompiler().compile(graph, registry=registry)
-        except GraphCompileError as exc:
-            return _compile_error_report(exc)
-        if registry is not None:
-            append_flowchart_health(graph, compiled, state, registry=registry)
-            _append_mainline_health(graph, compiled, registry, state)
+    if not state.errors and registry is not None:
+        append_flowchart_health(graph, compiled, state, registry=registry)
+        _append_mainline_health(graph, compiled, registry, state)
+        _append_core_advisory_findings(compilation.findings, state)
     if registry is not None:
         _append_node_config_health(graph, registry, state, global_config=global_config)
     append_data_contract_warnings(graph, compiled, state, registry=registry)
@@ -440,6 +442,32 @@ def _append_mainline_health(graph: GraphConfig, compiled: CompiledGraph, registr
     from vibeflow.targets.python.quality.workflow.mainline import append_mainline_health
 
     append_mainline_health(graph, compiled, state, registry=registry)
+
+
+def _append_core_advisory_findings(
+    findings: tuple[object, ...],
+    state: _HealthValidationState,
+) -> None:
+    """Translate non-blocking Core findings into the public health report."""
+
+    for finding in findings:
+        if getattr(finding, "rule_id", "") != (
+            "GRAPH.EXECUTION_LOCK.GLOBAL_STATE_UNCOORDINATED"
+        ):
+            continue
+        details = dict(getattr(finding, "details", {}) or {})
+        state.warnings.append(
+            HealthFinding(
+                rule_id=finding.rule_id,
+                severity="warning",
+                object_type="node",
+                object_id=str(getattr(finding, "source", "")),
+                failure_layer="topology",
+                message=str(getattr(finding, "message", "")),
+                suggested_fix_type="fix_config",
+                details=details,
+            )
+        )
 
 
 def _append_graph_plugin_findings(

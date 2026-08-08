@@ -127,34 +127,10 @@ def registry_node_class(registry: NodeRegistry | None, type_key: str) -> type | 
 
 
 def node_review_metadata(graph: GraphConfig, node: NodeSpec, registry: NodeRegistry | None) -> dict[str, object]:
-    invocation = invocation_for_node(graph, node)
-    node_cls = registry_node_class(registry, node.type_used) if invocation is None else None
-    info = getattr(node_cls, "NODE_INFO", None) if node_cls is not None else None
-    nodeset = invocation.nodeset if invocation is not None else None
-    display_name = (
-        node.metadata.display_name
-        or str(getattr(nodeset, "display_name", "") or "")
-        or str(getattr(info, "display_name", "") or "")
-        or node.id
-    )
-    description = (
-        node.metadata.description
-        or str(getattr(nodeset, "description", "") or "")
-        or str(getattr(info, "description", "") or "")
-    )
-    if node.type_used == IO_NODE_TYPE:
-        display_name = node.metadata.display_name or (
-            "Receive from Port"
-            if node.io.operation == "receive"
-            else "Send to Port"
-        )
-        description = node.metadata.description or (
-            f"{node.io.operation} on host port '{node.io.port}'"
-        )
     return {
-        "display_name": display_name,
-        "description": description,
-        "description_source": _description_source(node, nodeset=nodeset, info=info),
+        "display_name": node.metadata.display_name,
+        "description": node.metadata.description,
+        "description_source": "call",
     }
 
 
@@ -292,16 +268,6 @@ def source_reference(root_id: object = "", root_path: object = "", source_path: 
     if relative:
         payload["path"] = relative
     return payload
-
-
-def _description_source(node: NodeSpec, *, nodeset: NodesetSpec | None, info: object | None) -> str:
-    if node.metadata.description:
-        return "call"
-    if nodeset is not None and nodeset.description:
-        return "nodeset"
-    if info is not None and str(getattr(info, "description", "") or ""):
-        return "node_type"
-    return ""
 
 
 def _edge_pairs(edges: object) -> frozenset[tuple[str, str]]:

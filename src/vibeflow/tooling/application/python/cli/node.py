@@ -128,7 +128,6 @@ def node_info_payload(info: object) -> dict[str, object]:
         "description": info.description,
         "version": info.version,
         "flow_kind": info.flow_kind,
-        "purity": info.purity,
         "external": info.external,
         "effect_scope": effective_effect_scope(info),
     }
@@ -142,8 +141,6 @@ def contract_payload(contract: object) -> dict[str, object]:
         "provides": providers_to_dicts(contract.provides),
         "input_semantics": {key: list(value) for key, value in contract.input_semantics.items()},
         "output_semantics": {key: list(value) for key, value in contract.output_semantics.items()},
-        "params_schema": dict(contract.params_schema),
-        "output_schema": dict(contract.output_schema),
         "examples": [dict(example) for example in contract.examples],
     }
 

@@ -288,23 +288,36 @@ class NoDeepcopyObject:
 class LoopCopyNode:
     NODE_INFO = NodeInfo("test.loop_copy", "Loop Copy", "test", "Copies value.out into the next value.in slot.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        requires=(DataRequirement("value.out", "exactly_one"),),
-        provides=(DataProvider("value.loop", "value.in"),),
+        requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
+        provides=(DataProvider("value.loop", "value.in", display_name="value.loop"),),
         input_semantics={"value.out": ("output value",)},
         output_semantics={"value.loop": ("next loop input",)},
-        output_schema={"value.loop": {"type": "number"}},
+
     )
 
     def run_pure(self, inputs, params):
         return {"value.loop": inputs["value.out"]["value"]}
 
 
+class BranchCopyNode:
+    NODE_INFO = NodeInfo("test.branch_copy", "Branch Copy", "test", "Copies value.out into a distinct value.in-compatible key.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        requires=(DataRequirement("value.out", "exactly_one", display_name="Value Out"),),
+        provides=(DataProvider("value.copy", "value.in", display_name="Value Copy"),),
+        input_semantics={"value.out": ("output value selected by the route",)},
+        output_semantics={"value.copy": ("copied value compatible with value.in",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"value.copy": inputs["value.out"]["value"]}
+
+
 class LoopAddItemNode:
     NODE_INFO = NodeInfo("test.loop_add_item", "Loop Add Item", "test", "Adds one loop item into a running total.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        requires=(DataRequirement("total.current", "exactly_one"), DataRequirement("item.value", "exactly_one")),
-        provides=(DataProvider("total.next", "total.next"), DataProvider("item.metric", "item.metric")),
-        output_schema={"total.next": {"type": "number"}, "item.metric": {"type": "number"}},
+        requires=(DataRequirement("total.current", "exactly_one", display_name="total.current"), DataRequirement("item.value", "exactly_one", display_name="item.value")),
+        provides=(DataProvider("total.next", "total.next", display_name="total.next"), DataProvider("item.metric", "item.metric", display_name="item.metric")),
+
     )
 
     def run_pure(self, inputs, params):
@@ -315,10 +328,10 @@ class LoopAddItemNode:
 class LoopStepUntilNode:
     NODE_INFO = NodeInfo("test.loop_step_until", "Loop Step Until", "test", "Increments loop.current until it reaches target.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        requires=(DataRequirement("loop.current", "exactly_one"),),
-        provides=(DataProvider("loop.next", "loop.next"), DataProvider("loop.done", "loop.done")),
-        params_schema={"target": {"type": "number"}},
-        output_schema={"loop.next": {"type": "number"}, "loop.done": {"type": "boolean"}},
+        requires=(DataRequirement("loop.current", "exactly_one", display_name="loop.current"),),
+        provides=(DataProvider("loop.next", "loop.next", display_name="loop.next"), DataProvider("loop.done", "loop.done", display_name="loop.done")),
+
+
     )
 
     def run_pure(self, inputs, params):
@@ -326,12 +339,34 @@ class LoopStepUntilNode:
         return {"loop.next": value, "loop.done": value >= params.get("target", 3)}
 
 
+class LoopNextEndNode:
+    NODE_INFO = NodeInfo("test.loop_next_end", "Loop Next End", "test", "Ends one loop body after loop.next is ready.", "0.1.0", "terminal")
+    CONTRACT = NodeContract(
+        requires=(DataRequirement("loop.next", "exactly_one", display_name="Loop Next"),),
+        input_semantics={"loop.next": ("next loop value",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
+class LoopFinalEndNode:
+    NODE_INFO = NodeInfo("test.loop_final_end", "Loop Final End", "test", "Ends a loop workflow after loop.final is ready.", "0.1.0", "terminal")
+    CONTRACT = NodeContract(
+        requires=(DataRequirement("loop.final", "exactly_one", display_name="Loop Final"),),
+        input_semantics={"loop.final": ("final loop value",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
 class JoinPassthroughNode:
     NODE_INFO = NodeInfo("test.join_passthrough", "Join Passthrough", "test", "Copies value.in to value.out.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        requires=(DataRequirement("value.in", "exactly_one"),),
-        provides=(DataProvider("value.out", "value.out"),),
-        output_schema={"value.out": {"type": "number"}},
+        requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"),),
+        provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
+
     )
 
     def run_pure(self, inputs, params):
@@ -341,8 +376,8 @@ class JoinPassthroughNode:
 class ConditionalValueNode:
     NODE_INFO = NodeInfo("test.conditional_value", "Conditional Value", "test", "Provides value.in and a branch flag.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        provides=(DataProvider("value.alt", "value.in"), DataProvider("flow.use_alt", "flow.use_alt")),
-        output_schema={"value.alt": {"type": "number"}, "flow.use_alt": {"type": "boolean"}},
+        provides=(DataProvider("value.alt", "value.in", display_name="value.alt"), DataProvider("flow.use_alt", "flow.use_alt", display_name="flow.use_alt")),
+
     )
 
     def run_pure(self, inputs, params):
@@ -351,7 +386,7 @@ class ConditionalValueNode:
 
 class LeftValueNode:
     NODE_INFO = NodeInfo("test.left_value", "Left Value", "test", "Produces left value.in.", "0.1.0", "process")
-    CONTRACT = NodeContract(provides=(DataProvider("value.left", "value.in"),), output_schema={"value.left": {"type": "number"}})
+    CONTRACT = NodeContract(provides=(DataProvider("value.left", "value.in", display_name="value.left"),))
 
     def run_pure(self, inputs, params):
         return {"value.left": 1}
@@ -359,7 +394,7 @@ class LeftValueNode:
 
 class RightValueNode:
     NODE_INFO = NodeInfo("test.right_value", "Right Value", "test", "Produces right value.in.", "0.1.0", "process")
-    CONTRACT = NodeContract(provides=(DataProvider("value.right", "value.in"),), output_schema={"value.right": {"type": "number"}})
+    CONTRACT = NodeContract(provides=(DataProvider("value.right", "value.in", display_name="value.right"),))
 
     def run_pure(self, inputs, params):
         return {"value.right": 2}
@@ -367,7 +402,7 @@ class RightValueNode:
 
 class OtherValueNode:
     NODE_INFO = NodeInfo("test.other_value", "Other Value", "test", "Produces other.in.", "0.1.0", "process")
-    CONTRACT = NodeContract(provides=(DataProvider("other.in", "other.in"),), output_schema={"other.in": {"type": "number"}})
+    CONTRACT = NodeContract(provides=(DataProvider("other.in", "other.in", display_name="other.in"),))
 
     def run_pure(self, inputs, params):
         return {"other.in": 10}
@@ -376,9 +411,9 @@ class OtherValueNode:
 class TwoInputJoinNode:
     NODE_INFO = NodeInfo("test.two_input_join", "Two Input Join", "test", "Adds value.in and other.in.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        requires=(DataRequirement("value.in", "exactly_one"), DataRequirement("other.in", "exactly_one")),
-        provides=(DataProvider("value.out", "value.out"),),
-        output_schema={"value.out": {"type": "number"}},
+        requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"), DataRequirement("other.in", "exactly_one", display_name="other.in")),
+        provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
+
     )
 
     def run_pure(self, inputs, params):
@@ -388,8 +423,8 @@ class TwoInputJoinNode:
 class InactiveRouteNode:
     NODE_INFO = NodeInfo("test.inactive_route", "Inactive Route", "test", "Produces a false route flag.", "0.1.0", "decision")
     CONTRACT = NodeContract(
-        provides=(DataProvider("flow.route", "flow.route"),),
-        output_schema={"flow.route": {"type": "boolean"}},
+        provides=(DataProvider("flow.route", "flow.route", display_name="flow.route"),),
+
     )
 
     def run_pure(self, inputs, params):
@@ -400,6 +435,8 @@ def _loop_registry() -> NodeRegistry:
     registry = _registry()
     register_node(registry, "test.loop_add_item", LoopAddItemNode)
     register_node(registry, "test.loop_step_until", LoopStepUntilNode, {"target": {"type": "number"}}, {"target": 3})
+    register_node(registry, "test.loop_next_end", LoopNextEndNode)
+    register_node(registry, "test.loop_final_end", LoopFinalEndNode)
     register_node(registry, "test.join_passthrough", JoinPassthroughNode)
     register_node(registry, "test.conditional_value", ConditionalValueNode)
     register_node(registry, "test.left_value", LeftValueNode)
@@ -430,7 +467,7 @@ def _fixed_count_loop_graph(*, max_iterations: int = 10, stop_after: int = 3):
                                 requires=[REQ_SPEC("loop.current")],
                                 provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
                             ),
-                            _node_call("end", "test.out_end", "Ends the fixed loop body.", requires=[REQ_SPEC("loop.next")]),
+                            _node_call("end", "test.loop_next_end", "Ends the fixed loop body."),
                         ],
                         "edges": _edge_chain("start", "step", "end"),
                         "outputs": [REQ_SPEC("loop.next"), REQ_SPEC("loop.done")],
@@ -460,7 +497,7 @@ def _fixed_count_loop_graph(*, max_iterations: int = 10, stop_after: int = 3):
                             ],
                         },
                     ),
-                    _node_call("end", "test.out_end", "Ends after loop.final.", requires=[REQ_SPEC("loop.final")]),
+                    _node_call("end", "test.loop_final_end", "Ends after loop.final."),
                 ],
                 "edges": _edge_chain("start", "count_loop", "end"),
                 "outputs": [REQ_SPEC("loop.final"), REQ_SPEC("loop.history"), REQ_SPEC("loop.iterations")],
@@ -518,7 +555,7 @@ def _while_loop_graph(
                                 provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
                                 config={"target": target},
                             ),
-                            _node_call("end", "test.out_end", "Ends the while body.", requires=[REQ_SPEC("loop.next")]),
+                            _node_call("end", "test.loop_next_end", "Ends the while body."),
                         ],
                         "edges": _edge_chain("start", "step", "end"),
                         "outputs": [REQ_SPEC("loop.next"), REQ_SPEC("loop.done")],
@@ -537,7 +574,7 @@ def _while_loop_graph(
                         provides=[PROV_SPEC("loop.final"), PROV_SPEC("loop.iterations")],
                         loop=loop,
                     ),
-                    _node_call("end", "test.out_end", "Ends after loop.final.", requires=[REQ_SPEC("loop.final")]),
+                    _node_call("end", "test.loop_final_end", "Ends after loop.final."),
                 ],
                 "edges": _edge_chain("start", "while_loop", "end"),
                 "outputs": [REQ_SPEC("loop.final"), REQ_SPEC("loop.iterations")],
@@ -719,7 +756,7 @@ def test_block_execution_compiles_loop_body_with_nested_nodeset() -> None:
                                 requires=[REQ_SPEC("loop.current")],
                                 provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
                             ),
-                            _node_call("end", "test.out_end", "Ends inner step.", requires=[REQ_SPEC("loop.next")]),
+                            _node_call("end", "test.loop_next_end", "Ends inner step."),
                         ],
                         "edges": _edge_chain("start", "step", "end"),
                         "outputs": [REQ_SPEC("loop.next"), REQ_SPEC("loop.done")],
@@ -741,7 +778,7 @@ def test_block_execution_compiles_loop_body_with_nested_nodeset() -> None:
                                 requires=[REQ_SPEC("loop.current")],
                                 provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
                             ),
-                            _node_call("end", "test.out_end", "Ends uncompiled body.", requires=[REQ_SPEC("loop.next")]),
+                            _node_call("end", "test.loop_next_end", "Ends uncompiled body."),
                         ],
                         "edges": _edge_chain("start", "nested", "end"),
                         "outputs": [REQ_SPEC("loop.next"), REQ_SPEC("loop.done")],
@@ -769,7 +806,7 @@ def test_block_execution_compiles_loop_body_with_nested_nodeset() -> None:
                             ],
                         },
                     ),
-                    _node_call("end", "test.out_end", "Ends block rejection fixture.", requires=[REQ_SPEC("loop.final")]),
+                    _node_call("end", "test.loop_final_end", "Ends block rejection fixture."),
                 ],
                 "edges": _edge_chain("start", "while_loop", "end"),
                 "outputs": [REQ_SPEC("loop.final")],
@@ -1005,12 +1042,9 @@ def test_runtime_options_boundary_trace_records_only_boundaries() -> None:
 
     assert context.get("value.in")["value"] == 1
     assert [event["kind"] for event in _runtime_trace_events_from_context(context)] == [
-        "lock_wait",
-        "lock_acquired",
         "run_start",
         "type_resolve",
         "run_end",
-        "lock_released",
     ]
     assert runtime.trace.exec_order == ["start", "seed", "end"]
     assert runtime.trace.current_node == "end"
@@ -1050,7 +1084,7 @@ def test_runtime_options_compiled_executes_linear_block(monkeypatch) -> None:
     assert context.get("value.out")["value"] == 5
     assert list(context.get("runtime.exec_order")) == ["start", "seed", "add", "end"]
     assert context.get("runtime.edge_executions") == {"start->seed": 1, "seed->add": 1, "add->end": 1}
-    assert [event["kind"] for event in _runtime_trace_events_from_context(context)] == ["lock_wait", "lock_acquired", "run_start", "block_enter", "type_resolve", "type_resolve", "block_exit", "run_end", "lock_released"]
+    assert [event["kind"] for event in _runtime_trace_events_from_context(context)] == ["run_start", "block_enter", "type_resolve", "type_resolve", "block_exit", "run_end"]
 
 
 def test_runtime_options_compiled_runs_generated_block_when_node_hooks_enabled(monkeypatch) -> None:
@@ -1075,7 +1109,7 @@ def test_runtime_options_compiled_runs_generated_block_when_node_hooks_enabled(m
     ).run({})
 
     assert context.get("value.out")["value"] == 5
-    assert [event["kind"] for event in _runtime_trace_events_from_context(context)] == ["lock_wait", "lock_acquired", "run_start", "block_enter", "type_resolve", "type_resolve", "block_exit", "run_end", "lock_released"]
+    assert [event["kind"] for event in _runtime_trace_events_from_context(context)] == ["run_start", "block_enter", "type_resolve", "type_resolve", "block_exit", "run_end"]
     assert calls == [
         ("before", "start"),
         ("after", "start"),
@@ -1098,7 +1132,7 @@ def test_runtime_options_compiled_full_trace_records_node_events(monkeypatch) ->
     assert context.get("value.out")["value"] == 5
     events = _runtime_trace_events_from_context(context)
     event_kinds = [event["kind"] for event in events]
-    assert event_kinds == ["lock_wait", "lock_acquired", "block_enter", "node", "node", "type_resolve", "node", "type_resolve", "node", "block_exit", "lock_released"]
+    assert event_kinds == ["block_enter", "node", "node", "type_resolve", "node", "type_resolve", "node", "block_exit"]
     assert [event["node"] for event in events if event["kind"] == "node"] == ["start", "seed", "add", "end"]
     assert not context.exists("runtime.events")
     assert context.get("runtime.event_count") == len(events)
@@ -1126,13 +1160,16 @@ def test_runtime_options_compiled_failure_records_node_and_block_failed() -> Non
 
     assert runtime.trace.current_node == "bad"
     events = [line for line in _runtime_trace_lines(Path(runtime.trace.trace_path)) if line["kind"] != "runtime_summary"]
-    assert [event["kind"] for event in events] == ["lock_wait", "lock_acquired", "run_start", "block_enter", "node_failed", "block_failed", "lock_released"]
-    assert "boom" in events[4]["failure"]
+    assert [event["kind"] for event in events] == ["run_start", "block_enter", "node_failed", "block_failed"]
+    assert "boom" in next(
+        event for event in events if event["kind"] == "node_failed"
+    )["failure"]
 
 
 def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
     registry = _registry()
     register_node(registry, "test.route", RouteNode)
+    register_node(registry, "test.branch_copy", BranchCopyNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1141,7 +1178,7 @@ def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
                     _node_call("seed", "test.seed", "Produces initial value.in.", provides=[PROV_SPEC("value.in")], config={"value": 1}),
                     _node_call("add", "test.add", "Adds value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                     _node_call("route", "test.route", "Chooses the route.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
-                    _node_call("copy", "test.copy", "Copies value.out on the alternate branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy", "value.in")]),
+                    _node_call("copy", "test.branch_copy", "Copies value.out on the alternate branch."),
                     _node_call("end", "test.start", "Ends the compiled branch fixture."),
                 ],
                 "edges": [
@@ -1174,10 +1211,10 @@ def test_runtime_options_compiled_rejects_decision_loop() -> None:
     class DoneCheckNode:
         NODE_INFO = NodeInfo("test.done_check", "Done Check", "test", "Checks loop completion.", "0.1.0", "decision")
         CONTRACT = NodeContract(
-            requires=(DataRequirement("value.out", "exactly_one"),),
-            provides=(DataProvider("loop.done", "loop.done"), DataProvider("value.loop", "value.in")),
-            output_schema={"loop.done": {"type": "boolean"}},
-            params_schema={"target": {"type": "number"}},
+            requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
+            provides=(DataProvider("loop.done", "loop.done", display_name="loop.done"), DataProvider("value.loop", "value.in", display_name="value.loop")),
+
+
         )
 
         def run_pure(self, inputs, params):
@@ -1197,9 +1234,9 @@ def test_runtime_options_block_rejects_decision_loop_before_max_steps() -> None:
     class NeverDoneNode:
         NODE_INFO = NodeInfo("test.never_done", "Never Done", "test", "Never exits loop.", "0.1.0", "decision")
         CONTRACT = NodeContract(
-            requires=(DataRequirement("value.out", "exactly_one"),),
-            provides=(DataProvider("loop.done", "loop.done"), DataProvider("value.loop", "value.in")),
-            output_schema={"loop.done": {"type": "boolean"}},
+            requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
+            provides=(DataProvider("loop.done", "loop.done", display_name="loop.done"), DataProvider("value.loop", "value.in", display_name="value.loop")),
+
         )
 
         def run_pure(self, inputs, params):
@@ -1218,8 +1255,8 @@ def test_runtime_options_compiled_generates_block_with_async_barrier() -> None:
     class OutToNextNode:
         NODE_INFO = NodeInfo("test.out_to_next", "Out To Next", "test", "Copies value.out to value.next.", "0.1.0", "process")
         CONTRACT = NodeContract(
-            requires=(DataRequirement("value.out", "exactly_one"),),
-            provides=(DataProvider("value.next", "value.next"),),
+            requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
+            provides=(DataProvider("value.next", "value.next", display_name="value.next"),),
         )
 
         def run_pure(self, inputs, params):
@@ -1227,7 +1264,7 @@ def test_runtime_options_compiled_generates_block_with_async_barrier() -> None:
 
     class NextEndNode:
         NODE_INFO = NodeInfo("test.next_end", "Next End", "test", "Ends after value.next.", "0.1.0", "terminal")
-        CONTRACT = NodeContract(requires=(DataRequirement("value.next", "exactly_one"),))
+        CONTRACT = NodeContract(requires=(DataRequirement("value.next", "exactly_one", display_name="value.next"),))
 
         def run_pure(self, inputs, params):
             return {}
@@ -1297,6 +1334,7 @@ def _decision_loop_graph(*, target: int, max_steps: int = 20):
 def test_runtime_options_block_executes_simple_conditional_route() -> None:
     registry = _registry()
     register_node(registry, "test.route", RouteNode)
+    register_node(registry, "test.branch_copy", BranchCopyNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1305,7 +1343,7 @@ def test_runtime_options_block_executes_simple_conditional_route() -> None:
                     _node_call("seed", "test.seed", "Produces initial value.in.", provides=[PROV_SPEC("value.in")], config={"value": 1}),
                     _node_call("add", "test.add", "Adds value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
                     _node_call("route", "test.route", "Chooses the route.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
-                    _node_call("copy", "test.copy", "Copies value.out on the alternate branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy", "value.in")]),
+                    _node_call("copy", "test.branch_copy", "Copies value.out on the alternate branch."),
                     _node_call("end", "test.start", "Ends the conditional route fixture."),
                 ],
                 "edges": [
@@ -1525,7 +1563,7 @@ def test_async_result_key_joins_when_required() -> None:
 def test_async_result_key_not_joined_when_unconsumed() -> None:
     class SlowResultNode:
         NODE_INFO = NodeInfo("test.slow_result", "Slow Result", "test", "Slow result-key async task.", "0.1.0", "process")
-        CONTRACT = NodeContract(provides=(DataProvider("value.async", "value.async"),), examples=({"inputs": {}, "params": {}},))
+        CONTRACT = NodeContract(provides=(DataProvider("value.async", "value.async", display_name="value.async"),), examples=({"inputs": {}, "params": {}},))
 
         def run_pure(self, inputs, params):
             time.sleep(0.2)
@@ -1580,8 +1618,7 @@ def test_async_detached_failure_records_warning_and_completes() -> None:
 
 
 def test_async_result_key_requires_declared_output() -> None:
-    with pytest.raises(GraphConfigError, match="result_key must be declared"):
-        parse_graph_config(
+    graph = parse_graph_config(
             {
                 "pipeline": {
                     "nodes": [
@@ -1593,6 +1630,8 @@ def test_async_result_key_requires_declared_output() -> None:
                 }
             }
         )
+    with pytest.raises(GraphCompileError, match="effective provides"):
+        GraphCompiler().compile(graph, registry=_registry())
 
 
 def test_config_schema_reports_async_result_key_not_in_provides() -> None:
@@ -1606,7 +1645,9 @@ def test_config_schema_reports_async_result_key_not_in_provides() -> None:
         }
     )
 
-    assert any(finding.rule_id == "CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY" and "declared in provides" in finding.message for finding in findings)
+    # Ordinary-node contracts come from the Registry, so this relationship is
+    # intentionally checked only after the effective graph has been resolved.
+    assert not any(finding.rule_id == "CONFIG.SCHEMA.NODE_ASYNC_RESULT_KEY" for finding in findings)
 
 
 def test_runtime_no_longer_has_json_snapshot_output_mode() -> None:
@@ -1663,7 +1704,7 @@ def test_async_nodeset_result_key_joins_when_required() -> None:
 def test_async_detached_timeout_records_warning_and_does_not_block() -> None:
     class SlowNode:
         NODE_INFO = NodeInfo("test.slow", "Slow", "test", "Slow detached task.", "0.1.0", "process")
-        CONTRACT = NodeContract(provides=(DataProvider("value.out", "value.out"),), examples=({"inputs": {}, "params": {}},))
+        CONTRACT = NodeContract(provides=(DataProvider("value.out", "value.out", display_name="value.out"),), examples=({"inputs": {}, "params": {}},))
 
         def run_pure(self, inputs, params):
             time.sleep(0.05)
@@ -1924,7 +1965,7 @@ def test_runtime_trace_counts_while_loop_nodeset_steps() -> None:
                                 provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
                                 config={"target": 3},
                             ),
-                            _node_call("end", "test.out_end", "Ends while body.", requires=[REQ_SPEC("loop.next")]),
+                            _node_call("end", "test.loop_next_end", "Ends while body."),
                         ],
                         "edges": _edge_chain("start", "step", "end"),
                         "outputs": [REQ_SPEC("loop.next"), REQ_SPEC("loop.done")],
@@ -2160,18 +2201,15 @@ def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, ca
     for name in ("compiled_graph.json", "health_report.json", "graph.txt", "graph.mmd", "runtime_trace.jsonl", "output_summary.json"):
         assert (run_dir / name).exists()
     trace_kinds = [json.loads(line)["kind"] for line in (run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
-    assert trace_kinds == ["lock_wait", "lock_acquired", "run_start", "block_enter", "type_resolve", "block_exit", "run_end", "lock_released", "runtime_summary"]
+    assert trace_kinds == ["run_start", "block_enter", "type_resolve", "block_exit", "run_end", "runtime_summary"]
     assert plan_code == 0
     assert plan_payload["status"] in {"PASS", "CONCERNS"}
     plan_run_dir = Path(plan_payload["run_dir"])
     plan_trace_kinds = [json.loads(line)["kind"] for line in (plan_run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
     assert plan_trace_kinds == [
-        "lock_wait",
-        "lock_acquired",
         "run_start",
         "type_resolve",
         "run_end",
-        "lock_released",
         "runtime_summary",
     ]
     if is_mermaid_svg_renderer_available():
@@ -2259,8 +2297,13 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
     assert template_nodes["end"].get("requires") in (None, [])
     assert template_nodes["end"].get("provides") in (None, [])
     assert template_nodes["output"]["type_used"] == "demo.output"
-    assert template_nodes["output"]["requires"][0]["type"] == "semantic.value"
-    assert template_nodes["output"]["provides"][0]["type"] == "response.value"
+    assert "requires" not in template_nodes["output"]
+    assert "provides" not in template_nodes["output"]
+    architecture_text = (output / "python_project" / "ARCHITECTURE.jsonc").read_text(encoding="utf-8")
+    template_architecture = json.loads(architecture_text[architecture_text.index("{"):])
+    output_contract = template_architecture["node_types"]["demo.output"]["contract"]
+    assert output_contract["requires"][0]["type"] == "semantic.value"
+    assert output_contract["provides"][0]["type"] == "response.value"
     assert template_config["pipeline"]["outputs"][0]["type"] == "response.value"
 
     assert not (output / "docs").exists()

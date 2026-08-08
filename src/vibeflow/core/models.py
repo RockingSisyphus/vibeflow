@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from vibeflow.core.contracts import DataProvider, DataRequirement
 from vibeflow.core.flow import GraphConfig
 
 if TYPE_CHECKING:
@@ -23,6 +24,10 @@ class ImplementationFact:
 
     type_key: str
     flow_kind: str = ""
+    effect_scope: str = ""
+    runtime_dispatch: bool | None = None
+    requires: tuple[DataRequirement, ...] = ()
+    provides: tuple[DataProvider, ...] = ()
     completion: str = "immediate"
     schedule: str = "inline"
     executor: str = "current"
@@ -34,6 +39,7 @@ class ImplementationFact:
         text_fields = (
             self.type_key,
             self.flow_kind,
+            self.effect_scope,
             self.completion,
             self.schedule,
             self.executor,
@@ -43,6 +49,24 @@ class ImplementationFact:
         )
         if not all(isinstance(value, str) for value in text_fields):
             raise ValueError("implementation facts must contain only strings")
+        if self.runtime_dispatch is not None and not isinstance(
+            self.runtime_dispatch, bool
+        ):
+            raise ValueError(
+                "implementation runtime_dispatch must be true, false, or null"
+            )
+        requires = tuple(self.requires)
+        provides = tuple(self.provides)
+        if not all(isinstance(item, DataRequirement) for item in requires):
+            raise ValueError(
+                "implementation requires must contain DataRequirement values"
+            )
+        if not all(isinstance(item, DataProvider) for item in provides):
+            raise ValueError(
+                "implementation provides must contain DataProvider values"
+            )
+        object.__setattr__(self, "requires", requires)
+        object.__setattr__(self, "provides", provides)
         if not self.type_key.strip():
             raise ValueError("implementation type_key must be non-empty")
         if self.completion not in COMPLETIONS:
@@ -58,10 +82,14 @@ class ImplementationFact:
                 f"implementation executor must be one of {sorted(EXECUTORS)}"
             )
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, object]:
         return {
             "type_key": self.type_key,
             "flow_kind": self.flow_kind,
+            "effect_scope": self.effect_scope,
+            "runtime_dispatch": self.runtime_dispatch,
+            "requires": [item.to_dict() for item in self.requires],
+            "provides": [item.to_dict() for item in self.provides],
             "completion": self.completion,
             "schedule": self.schedule,
             "executor": self.executor,

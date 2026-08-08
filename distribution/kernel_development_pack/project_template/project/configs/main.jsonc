@@ -22,13 +22,7 @@
       {
         "display_name": "Seed Value",
         "description": "Creates the initial value used by the add node.",
-        "provides": [
-          {
-            "key": "value.in",
-            "type": "value.in",
-            "display_name": "Value In"
-          }
-        ],
+
         "config": {
           "value": 2
         },
@@ -38,20 +32,8 @@
       {
         "display_name": "Semantic Add",
         "description": "Adds a configured delta and produces the internal semantic value.",
-        "requires": [
-          {
-            "type": "value.in",
-            "cardinality": "exactly_one",
-            "display_name": "Value In"
-          }
-        ],
-        "provides": [
-          {
-            "key": "semantic.value",
-            "type": "semantic.value",
-            "display_name": "Internal Value"
-          }
-        ],
+
+
         "config": {
           "delta": 3
         },
@@ -61,20 +43,8 @@
       {
         "display_name": "Output Value",
         "description": "Adapts the internal arithmetic result to the external response contract.",
-        "requires": [
-          {
-            "type": "semantic.value",
-            "cardinality": "exactly_one",
-            "display_name": "Internal Value"
-          }
-        ],
-        "provides": [
-          {
-            "key": "response.value",
-            "type": "response.value",
-            "display_name": "Response Value"
-          }
-        ],
+
+
         "id": "output",
         "type_used": "demo.output"
       },

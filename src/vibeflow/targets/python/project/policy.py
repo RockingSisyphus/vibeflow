@@ -47,6 +47,9 @@ DEFAULT_POLICY_DATA: dict[str, Any] = {
 
 
 _ABSOLUTE_FINDING_RULES = frozenset({"BASE_LIB.BANNED_IMPORT", "BASE_LIB.FORBIDDEN_PROJECT_IMPORT", "BASE_LIB.GLOBAL_STATE", "BASE_LIB.SIDE_EFFECT_CALL", "BASE_LIB.TOP_LEVEL_SIDE_EFFECT", "NODE.BASE_LIB.INDIRECT_VIOLATION"})
+_ADVISORY_EFFECT_RULES = frozenset(
+    {"NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED"}
+)
 
 
 @dataclass(frozen=True)
@@ -265,7 +268,10 @@ def validate_plugin_relaxations(
 
 
 def _policy_bucket(finding: HealthFinding, exemptions: list[Mapping[str, Any]], downgrades: list[Mapping[str, Any]]) -> tuple[str, HealthFinding]:
-    if finding.rule_id.startswith("NODE.EFFECT.") or finding.rule_id in _ABSOLUTE_FINDING_RULES:
+    if (
+        finding.rule_id.startswith("NODE.EFFECT.")
+        and finding.rule_id not in _ADVISORY_EFFECT_RULES
+    ) or finding.rule_id in _ABSOLUTE_FINDING_RULES:
         return "error", finding
     exemption = _matching_rule_override(finding, exemptions)
     if exemption is not None:

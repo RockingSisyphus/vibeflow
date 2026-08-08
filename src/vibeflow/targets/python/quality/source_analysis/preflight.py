@@ -18,6 +18,7 @@ from vibeflow.targets.python.quality.source_analysis.ast_rules import (
     qualified_call_name,
 )
 from vibeflow.targets.python.quality.source_analysis.effects import import_violation_code
+from vibeflow.targets.python.quality.source_analysis.effects import call_violation
 from vibeflow.targets.python.quality.source_analysis.types import PurityPolicy, _SourceInfo
 from vibeflow.targets.python.quality.source_analysis.visitors import ModulePurityVisitor
 
@@ -39,6 +40,83 @@ _SAFE_METADATA_CALLS = frozenset(
 )
 _SAFE_METADATA_BUILTINS = frozenset({"dict", "frozenset", "list", "set", "tuple"})
 _SAFE_METADATA_TYPES = _SAFE_METADATA_CALLS - _SAFE_METADATA_BUILTINS
+_SAFE_DECLARATIVE_BUILTINS = frozenset(
+    {
+        *_SAFE_METADATA_BUILTINS,
+        "abs",
+        "all",
+        "any",
+        "bool",
+        "enumerate",
+        "float",
+        "int",
+        "isinstance",
+        "len",
+        "max",
+        "min",
+        "range",
+        "round",
+        "sorted",
+        "str",
+        "sum",
+        "type",
+        "zip",
+    }
+)
+_SAFE_DECLARATIVE_METHODS = frozenset(
+    {
+        "copy",
+        "endswith",
+        "get",
+        "isascii",
+        "items",
+        "keys",
+        "lower",
+        "removeprefix",
+        "removesuffix",
+        "replace",
+        "rsplit",
+        "split",
+        "startswith",
+        "strip",
+        "upper",
+        "values",
+    }
+)
+_UNSAFE_DECLARATIVE_HELPER_NODES = (
+    ast.AsyncFor,
+    ast.AsyncFunctionDef,
+    ast.AsyncWith,
+    ast.Await,
+    ast.Delete,
+    ast.For,
+    ast.Global,
+    ast.Import,
+    ast.ImportFrom,
+    ast.Lambda,
+    ast.Nonlocal,
+    ast.Raise,
+    ast.Try,
+    ast.While,
+    ast.With,
+    ast.Yield,
+    ast.YieldFrom,
+)
+_SAFE_BUILTIN_BASES = frozenset(
+    {
+        "BaseException",
+        "Exception",
+        "LookupError",
+        "RuntimeError",
+        "TypeError",
+        "ValueError",
+        "dict",
+        "list",
+        "object",
+        "set",
+        "tuple",
+    }
+)
 _SAFE_IMPLICIT_DECORATORS = frozenset(
     {
         "builtins.classmethod",
@@ -78,6 +156,7 @@ class PythonSourceFact:
     source_id: str
     path: str
     source: str
+    module_name: str = ""
     import_time_dependencies: tuple[str, ...] = ()
     runtime_dependencies: tuple[str, ...] = ()
     is_base_lib: bool = False
@@ -105,6 +184,8 @@ def preflight_python_source_facts(
         for source in sources
     }
     findings: list[PythonPreflightFinding] = []
+    metadata_helpers = _proven_metadata_helpers(sources)
+    safe_class_bases = _proven_safe_class_bases(sources)
     _preflight_fact(
         entry_source_id,
         source_by_id=source_by_id,
@@ -112,6 +193,8 @@ def preflight_python_source_facts(
         active=set(),
         visited=set(),
         findings=findings,
+        metadata_helpers=metadata_helpers,
+        safe_class_bases=safe_class_bases,
     )
     deduped = tuple(
         dict.fromkeys(
@@ -139,6 +222,8 @@ def _preflight_fact(
     active: set[str],
     visited: set[tuple[str, tuple[str, ...]]],
     findings: list[PythonPreflightFinding],
+    metadata_helpers: frozenset[str],
+    safe_class_bases: frozenset[str],
 ) -> None:
     if source_id in active:
         return
@@ -179,7 +264,22 @@ def _preflight_fact(
     audited_scopes = tuple(scope for scope in scopes if scope != EFFECT_SCOPE_TRUSTED)
     import_time_scopes = audited_scopes or ((EFFECT_SCOPE_NONE,) if not scopes else ())
     if import_time_scopes:
-        _append_module_findings(path, tree, import_time_scopes, findings)
+        _append_module_findings(
+            path,
+            tree,
+            import_time_scopes,
+            findings,
+            metadata_helpers=metadata_helpers,
+            safe_class_bases=safe_class_bases,
+            skip_import_scope=(
+                not own_scopes
+                and (
+                    _module_declares_node(tree)
+                    or (fact.is_base_lib and not inherited_scopes)
+                )
+            ),
+            module_name=fact.module_name,
+        )
     if audited_scopes:
         if (
             not own_scopes
@@ -205,6 +305,8 @@ def _preflight_fact(
             active=active,
             visited=visited,
             findings=findings,
+            metadata_helpers=metadata_helpers,
+            safe_class_bases=safe_class_bases,
         )
     active.remove(source_id)
 
@@ -214,8 +316,20 @@ def _append_module_findings(
     tree: ast.Module,
     scopes: tuple[str, ...],
     findings: list[PythonPreflightFinding],
+    *,
+    metadata_helpers: frozenset[str],
+    safe_class_bases: frozenset[str],
+    skip_import_scope: bool,
+    module_name: str,
 ) -> None:
-    visitor = _ImportTimeVisitor(path=path, scopes=scopes)
+    visitor = _ImportTimeVisitor(
+        path=path,
+        scopes=scopes,
+        metadata_helpers=metadata_helpers,
+        safe_class_bases=safe_class_bases,
+        skip_import_scope=skip_import_scope,
+        module_name=module_name,
+    )
     visitor.visit(tree)
     findings.extend(visitor.findings)
 
@@ -258,20 +372,46 @@ def _append_helper_findings(
 
 
 class _ImportTimeVisitor(ast.NodeVisitor):
-    def __init__(self, *, path: str, scopes: tuple[str, ...]) -> None:
+    def __init__(
+        self,
+        *,
+        path: str,
+        scopes: tuple[str, ...],
+        metadata_helpers: frozenset[str],
+        safe_class_bases: frozenset[str],
+        skip_import_scope: bool,
+        module_name: str,
+    ) -> None:
         self.path = path
         self.scopes = scopes
         self.policy = PurityPolicy()
         self.aliases: dict[str, str] = {}
         self.findings: list[PythonPreflightFinding] = []
         self._safe_metadata = False
-        self._safe_metadata_helpers: set[str] = set()
+        self._safe_metadata_helpers: set[str] = set(metadata_helpers)
+        if module_name:
+            prefix = f"{module_name}."
+            self._safe_metadata_helpers.update(
+                name[len(prefix):]
+                for name in metadata_helpers
+                if name.startswith(prefix) and "." not in name[len(prefix):]
+            )
+        local_class_bases = set(safe_class_bases)
+        if module_name:
+            prefix = f"{module_name}."
+            local_class_bases.update(
+                name[len(prefix):]
+                for name in safe_class_bases
+                if name.startswith(prefix) and "." not in name[len(prefix):]
+            )
+        self._safe_class_bases = frozenset(local_class_bases)
+        self._skip_import_scope = skip_import_scope
         self._shadowed_names: set[str] = set()
 
     def visit_Module(self, node: ast.Module) -> None:
         self.aliases.update(import_aliases(node))
         self._shadowed_names = _module_shadowed_names(node)
-        self._safe_metadata_helpers = _safe_metadata_helpers(node)
+        self._safe_metadata_helpers.update(_safe_metadata_helpers(node))
         for statement in node.body:
             if isinstance(statement, (ast.Import, ast.ImportFrom)):
                 self.visit(statement)
@@ -280,7 +420,7 @@ class _ImportTimeVisitor(ast.NodeVisitor):
             elif isinstance(statement, ast.ClassDef):
                 self.visit(statement)
             elif isinstance(statement, (ast.Assign, ast.AnnAssign)):
-                metadata = _metadata_assignment(statement)
+                metadata = _metadata_assignment(statement) or _immutable_declaration_assignment(statement)
                 if isinstance(statement, ast.AnnAssign):
                     self.visit(statement.annotation)
                 previous = self._safe_metadata
@@ -302,7 +442,13 @@ class _ImportTimeVisitor(ast.NodeVisitor):
         for expression in node.bases:
             self.visit(expression)
             name = qualified_call_name(expression, self.aliases)
-            if name not in {"builtins.object", "object"}:
+            raw_name = qualified_call_name(expression, {})
+            if not _safe_class_base_is_allowed(
+                name,
+                raw_name=raw_name,
+                safe_class_bases=self._safe_class_bases,
+                shadowed_names=self._shadowed_names,
+            ):
                 self._add(
                     expression,
                     "audited node import chain must not invoke __init_subclass__ before source validation",
@@ -328,7 +474,7 @@ class _ImportTimeVisitor(ast.NodeVisitor):
                 if isinstance(statement, ast.AnnAssign):
                     self.visit(statement.annotation)
                 previous = self._safe_metadata
-                self._safe_metadata = _metadata_assignment(statement)
+                self._safe_metadata = _metadata_assignment(statement) or _immutable_declaration_assignment(statement)
                 if statement.value is not None:
                     self.visit(statement.value)
                 self._safe_metadata = previous
@@ -349,11 +495,18 @@ class _ImportTimeVisitor(ast.NodeVisitor):
     def visit_Call(self, node: ast.Call) -> None:
         name = qualified_call_name(node.func, self.aliases)
         raw_name = qualified_call_name(node.func, {})
-        if not self._safe_metadata or not _safe_metadata_call_is_allowed(
-            name,
-            raw_name=raw_name,
-            helpers=self._safe_metadata_helpers,
-            shadowed_names=self._shadowed_names,
+        safe_class_wrapper = (
+            name in _SAFE_IMPLICIT_DECORATORS
+            and raw_name.split(".", 1)[0] not in self._shadowed_names
+        )
+        if not safe_class_wrapper and (
+            not self._safe_metadata
+            or not _safe_metadata_call_is_allowed(
+                name,
+                raw_name=raw_name,
+                helpers=self._safe_metadata_helpers,
+                shadowed_names=self._shadowed_names,
+            )
         ):
             self._add(
                 node,
@@ -436,19 +589,27 @@ class _ImportTimeVisitor(ast.NodeVisitor):
             )
 
     def _check_import(self, module: str, node: ast.AST) -> None:
-        for scope in self.scopes:
-            violation_code = import_violation_code(
-                module,
-                effect_scope=scope,
-                policy=self.policy,
+        if self._skip_import_scope:
+            return
+        violations = tuple(
+            (
+                scope,
+                import_violation_code(
+                    module,
+                    effect_scope=scope,
+                    policy=self.policy,
+                ),
             )
-            if violation_code:
-                self._add(
-                    node,
-                    f"audited node import chain uses a forbidden import for scope {scope!r}: {module}",
-                    legacy_code=violation_code,
-                )
-                return
+            for scope in self.scopes
+        )
+        denied = tuple((scope, code) for scope, code in violations if code)
+        if denied and len(denied) == len(violations):
+            scope, violation_code = denied[0]
+            self._add(
+                node,
+                f"audited node import chain uses a forbidden import for scope {scope!r}: {module}",
+                legacy_code=violation_code,
+            )
 
     def _add(
         self,
@@ -485,14 +646,310 @@ def _node_effect_scopes(tree: ast.Module) -> tuple[str, ...]:
         value = assignment.value
         flow_kind = ""
         external = False
-        if isinstance(value, ast.Call) and qualified_call_name(value.func, {}).rsplit(".", 1)[-1] == "NodeInfo":
-            flow_node = _call_argument(value, "flow_kind", 5)
-            external_node = _call_argument(value, "external", 9)
-            flow_kind = _static_flow_kind(flow_node)
-            external = isinstance(external_node, ast.Constant) and external_node.value is True
+        if not (
+            isinstance(value, ast.Call)
+            and qualified_call_name(value.func, {}).rsplit(".", 1)[-1] == "NodeInfo"
+        ):
+            continue
+        flow_node = _call_argument(value, "flow_kind", 5)
+        external_node = _call_argument(value, "external", 9)
+        flow_kind = _static_flow_kind(flow_node)
+        external = isinstance(external_node, ast.Constant) and external_node.value is True
         info = SimpleNamespace(flow_kind=flow_kind, external=external)
         scopes.append(effective_effect_scope(info))
     return tuple(scopes)
+
+
+def _module_declares_node(tree: ast.Module) -> bool:
+    return any(
+        isinstance(item, ast.ClassDef)
+        and any(
+            isinstance(statement, (ast.Assign, ast.AnnAssign))
+            and _assignment_has_name(statement, "NODE_INFO")
+            for statement in item.body
+        )
+        for item in tree.body
+    )
+
+
+def _proven_metadata_helpers(
+    sources: tuple[PythonSourceFact, ...],
+) -> frozenset[str]:
+    candidates: dict[str, tuple[ast.FunctionDef, ast.Module]] = {}
+    for fact in sources:
+        if not fact.module_name:
+            continue
+        try:
+            tree = ast.parse(fact.source, filename=fact.path)
+        except SyntaxError:
+            continue
+        for node in tree.body:
+            if isinstance(node, ast.FunctionDef):
+                candidates[f"{fact.module_name}.{node.name}"] = (node, tree)
+
+    proven: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for qualified_name, (node, tree) in candidates.items():
+            if qualified_name in proven:
+                continue
+            module_name = qualified_name.rsplit(".", 1)[0]
+            if _declarative_helper_is_proven(
+                node,
+                tree=tree,
+                module_name=module_name,
+                candidates=candidates,
+                proven=proven,
+            ):
+                proven.add(qualified_name)
+                changed = True
+    return frozenset(proven)
+
+
+def _declarative_helper_is_proven(
+    node: ast.FunctionDef,
+    *,
+    tree: ast.Module,
+    module_name: str,
+    candidates: Mapping[str, tuple[ast.FunctionDef, ast.Module]],
+    proven: set[str],
+) -> bool:
+    for nested in ast.walk(node):
+        if isinstance(nested, _UNSAFE_DECLARATIVE_HELPER_NODES):
+            return False
+        if isinstance(nested, (ast.FunctionDef, ast.ClassDef)) and nested is not node:
+            return False
+
+    aliases = import_aliases(tree)
+    imported_roots = {
+        value.split(".", 1)[0]
+        for value in aliases.values()
+        if value
+    }
+    parameters = {
+        argument.arg
+        for argument in (
+            *node.args.posonlyargs,
+            *node.args.args,
+            *node.args.kwonlyargs,
+        )
+    }
+    if node.args.vararg is not None:
+        parameters.add(node.args.vararg.arg)
+    if node.args.kwarg is not None:
+        parameters.add(node.args.kwarg.arg)
+    local_names = _function_local_names(node)
+    module_state_names = _module_bound_names(tree)
+    callable_aliases = {
+        key: value
+        for key, value in aliases.items()
+        if key not in local_names and key not in parameters
+    }
+
+    for nested in ast.walk(node):
+        if isinstance(nested, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            targets = nested.targets if isinstance(nested, ast.Assign) else (nested.target,)
+            if any(
+                not _declarative_assignment_target_is_safe(
+                    target,
+                    local_names=local_names,
+                    parameters=parameters,
+                )
+                for target in targets
+            ):
+                return False
+        if not isinstance(nested, ast.Call):
+            continue
+        violation_code, _ = call_violation(
+            nested,
+            aliases=callable_aliases,
+            effect_scope=EFFECT_SCOPE_NONE,
+            imported_roots=imported_roots,
+            module_state_names=module_state_names,
+            local_names=local_names | parameters,
+        )
+        if violation_code:
+            return False
+        name = qualified_call_name(nested.func, callable_aliases)
+        raw_name = qualified_call_name(nested.func, {})
+        if _declarative_call_is_intrinsically_safe(name, raw_name=raw_name):
+            continue
+        resolved = _resolve_local_callable(
+            name,
+            module_name=module_name,
+            candidates=candidates,
+        )
+        if resolved not in proven:
+            return False
+    return True
+
+
+def _function_local_names(node: ast.FunctionDef) -> set[str]:
+    names: set[str] = set()
+    for nested in ast.walk(node):
+        if isinstance(nested, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            targets = nested.targets if isinstance(nested, ast.Assign) else (nested.target,)
+            for target in targets:
+                names.update(_target_names(target))
+        elif isinstance(nested, ast.comprehension):
+            names.update(_target_names(nested.target))
+    return names
+
+
+def _module_bound_names(tree: ast.Module) -> set[str]:
+    names: set[str] = set()
+    for statement in tree.body:
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(statement.name)
+        elif isinstance(statement, ast.Assign):
+            for target in statement.targets:
+                names.update(_target_names(target))
+        elif isinstance(statement, ast.AnnAssign):
+            names.update(_target_names(statement.target))
+    return names
+
+
+def _declarative_assignment_target_is_safe(
+    target: ast.AST,
+    *,
+    local_names: set[str],
+    parameters: set[str],
+) -> bool:
+    if isinstance(target, ast.Name):
+        return True
+    if isinstance(target, (ast.List, ast.Tuple)):
+        return all(
+            _declarative_assignment_target_is_safe(
+                item,
+                local_names=local_names,
+                parameters=parameters,
+            )
+            for item in target.elts
+        )
+    if isinstance(target, (ast.Attribute, ast.Subscript)):
+        root = target.value
+        while isinstance(root, (ast.Attribute, ast.Subscript)):
+            root = root.value
+        return (
+            isinstance(root, ast.Name)
+            and root.id in local_names
+            and root.id not in parameters
+        )
+    return False
+
+
+def _declarative_call_is_intrinsically_safe(name: str, *, raw_name: str) -> bool:
+    leaf = name.rsplit(".", 1)[-1]
+    if leaf in _SAFE_DECLARATIVE_BUILTINS:
+        return name in {leaf, f"builtins.{leaf}"}
+    if leaf in _SAFE_METADATA_TYPES and name.startswith("vibeflow."):
+        return True
+    return (
+        isinstance(raw_name, str)
+        and "." in raw_name
+        and leaf in _SAFE_DECLARATIVE_METHODS
+    )
+
+
+def _resolve_local_callable(
+    name: str,
+    *,
+    module_name: str,
+    candidates: Mapping[str, object],
+) -> str:
+    if name in candidates:
+        return name
+    if "." not in name:
+        local_name = f"{module_name}.{name}"
+        if local_name in candidates:
+            return local_name
+    return ""
+
+
+def _proven_safe_class_bases(
+    sources: tuple[PythonSourceFact, ...],
+) -> frozenset[str]:
+    candidates: dict[str, tuple[ast.ClassDef, ast.Module]] = {}
+    for fact in sources:
+        if not fact.module_name:
+            continue
+        try:
+            tree = ast.parse(fact.source, filename=fact.path)
+        except SyntaxError:
+            continue
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef):
+                candidates[f"{fact.module_name}.{node.name}"] = (node, tree)
+
+    proven: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for qualified_name, (node, tree) in candidates.items():
+            if qualified_name in proven or node.keywords:
+                continue
+            if any(
+                isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and statement.name == "__init_subclass__"
+                for statement in node.body
+            ):
+                continue
+            aliases = import_aliases(tree)
+            module_name = qualified_name.rsplit(".", 1)[0]
+            if all(
+                _class_candidate_base_is_proven(
+                    base,
+                    aliases=aliases,
+                    module_name=module_name,
+                    candidates=candidates,
+                    proven=proven,
+                )
+                for base in node.bases
+            ):
+                proven.add(qualified_name)
+                changed = True
+    return frozenset(proven)
+
+
+def _class_candidate_base_is_proven(
+    node: ast.AST,
+    *,
+    aliases: Mapping[str, str],
+    module_name: str,
+    candidates: Mapping[str, object],
+    proven: set[str],
+) -> bool:
+    name = qualified_call_name(node, aliases)
+    raw_name = qualified_call_name(node, {})
+    if _safe_builtin_base_is_allowed(name, raw_name=raw_name):
+        return True
+    resolved = _resolve_local_callable(
+        name,
+        module_name=module_name,
+        candidates=candidates,
+    )
+    return resolved in proven
+
+
+def _safe_builtin_base_is_allowed(name: str, *, raw_name: str) -> bool:
+    leaf = name.rsplit(".", 1)[-1]
+    return leaf in _SAFE_BUILTIN_BASES and name in {leaf, f"builtins.{leaf}"}
+
+
+def _safe_class_base_is_allowed(
+    name: str,
+    *,
+    raw_name: str,
+    safe_class_bases: frozenset[str],
+    shadowed_names: set[str],
+) -> bool:
+    if name in safe_class_bases or raw_name in safe_class_bases:
+        return True
+    raw_root = raw_name.split(".", 1)[0]
+    if raw_root in shadowed_names:
+        return False
+    return _safe_builtin_base_is_allowed(name, raw_name=raw_name)
 
 
 def _safe_metadata_helpers(tree: ast.Module) -> set[str]:
@@ -644,12 +1101,18 @@ def _safe_metadata_call_is_allowed(
 ) -> bool:
     if name in helpers:
         return True
+    leaf = name.rsplit(".", 1)[-1]
+    base = name.rsplit(".", 1)[0] if "." in name else ""
+    raw_base = raw_name.rsplit(".", 1)[0] if "." in raw_name else ""
+    if leaf in _SAFE_DECLARATIVE_METHODS and (
+        base in helpers or raw_base in helpers
+    ):
+        return True
     raw_root = raw_name.split(".", 1)[0]
     if raw_root in shadowed_names:
         return False
-    leaf = name.rsplit(".", 1)[-1]
-    if leaf in _SAFE_METADATA_BUILTINS:
-        return name in {leaf, f"builtins.{leaf}"}
+    if _declarative_call_is_intrinsically_safe(name, raw_name=raw_name):
+        return True
     return leaf in _SAFE_METADATA_TYPES and name.startswith("vibeflow.")
 
 
@@ -711,6 +1174,36 @@ def _metadata_assignment(node: ast.Assign | ast.AnnAssign) -> bool:
     return any(
         _assignment_has_name(node, name)
         for name in {"BASE_LIB_INFO", "CONTRACT", "NODE_INFO", "PLUGIN_INFO"}
+    )
+
+
+def _immutable_declaration_assignment(node: ast.Assign | ast.AnnAssign) -> bool:
+    targets = node.targets if isinstance(node, ast.Assign) else (node.target,)
+    if not targets or not all(
+        isinstance(target, ast.Name) and target.id.isupper()
+        for target in targets
+    ):
+        return False
+    return node.value is not None and _is_immutable_declaration_expression(node.value)
+
+
+def _is_immutable_declaration_expression(node: ast.AST) -> bool:
+    if isinstance(node, ast.Constant):
+        return True
+    if isinstance(node, ast.Tuple):
+        return all(_is_immutable_declaration_expression(item) for item in node.elts)
+    if not isinstance(node, ast.Call):
+        return False
+    name = qualified_call_name(node.func, {})
+    return (
+        name in {"frozenset", "builtins.frozenset"}
+        and not node.keywords
+        and len(node.args) == 1
+        and isinstance(node.args[0], (ast.Set, ast.Tuple, ast.List))
+        and all(
+            _is_immutable_declaration_expression(item)
+            for item in node.args[0].elts
+        )
     )
 
 

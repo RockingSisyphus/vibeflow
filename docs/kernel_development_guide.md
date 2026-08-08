@@ -2,7 +2,7 @@
 
 本文档面向维护 VibeFlow（包名 `vibeflow`）自身的开发者，不是面向业务项目编写 node、nodeset 或 plugin 的使用者指南。
 
-VibeFlow 0.10.1 使用分层 API。根包不导出业务对象，维护代码只使用 `vibeflow.core`、`vibeflow.block_compiler`、`vibeflow.targets.*` 和 `vibeflow.tooling.*` 的所属层入口。
+VibeFlow 0.12.0 使用分层 API。根包不导出业务对象，维护代码只使用 `vibeflow.core`、`vibeflow.block_compiler`、`vibeflow.targets.*` 和 `vibeflow.tooling.*` 的所属层入口。
 
 ## 基本验证流程
 
@@ -50,8 +50,8 @@ Tooling 标准化项目数据
 
 维护规则：
 
-- `WorkflowPlan` / `BlockPlan` 只保存冻结的 JSON 值、稳定 ID、契约、路由、block 引用和 `SourceRef`，不得保存 Python class、callable、实例或生成后的 Python/JavaScript 源码。当前唯一公共 ABI 是 `vibeflow.workflow.v3`；v2 输入必须显式拒绝，不能靠字段缺省静默升级。
-- ABI v3 的 node 计划携带 `effect_scope`、`execution_lock`、`contains_global_state`；block/workflow 计划还携带适用层级的 `execution_lock`、`contains_global_state`、`root_exclusive`。`ExecutionLockPlan` 只保存 key 与派生的 `root | block | node` scope，不得保存 Python lock、condition 或 coordinator。
+- `WorkflowPlan` / `BlockPlan` 只保存冻结的 JSON 值、稳定 ID、契约、路由、block 引用和 `SourceRef`，不得保存 Python class、callable、实例或生成后的 Python/JavaScript 源码。当前唯一公共 ABI 是 `vibeflow.workflow.v4`；v3 输入必须显式拒绝，不能靠字段缺省静默升级。
+- ABI v4 的 node 计划携带 `effect_scope`、三态 `runtime_dispatch`、`execution_lock`、`contains_global_state`；block/workflow 计划携带适用层级的 `execution_lock` 和 `contains_global_state`。`root_exclusive` 已移除，`contains_global_state` 不隐含锁。`ExecutionLockPlan` 只保存 key 与派生的 `root | block | node` scope，不得保存 Python lock、condition 或 coordinator。
 - `PythonBindingPlan` 保存 callable、有效参数和插件引用；`JavascriptBindingPlan` 保存 JS/TS 源码、Schema、base_lib、Plugin、Capability、Host Extension 和 import policy。两者都不能进入公共 IR。
 - Python Runtime 支持 `ExecutionPlan` 与 plan/block/compiled 三种模式；这些对象属于 Python Target，不进入公共 IR。
 - JavaScript emitter 以 `WorkflowPlan + JavascriptBindingPlan` 为语义来源。
@@ -77,21 +77,25 @@ Tooling 标准化项目数据
 
 ### `global_state` 与 execution lease 维护契约
 
-`flow_kind=global_state` 是 Core 拥有的语言无关语义，不是 Python Target 私有 config，也不是 `vibeflow.global_state` 系统 node。Core 负责合法 flow kind、派生 `effect_scope=global_state`、feature gating、受保护 async 规则和 `contains_global_state` 事实；Block Compiler 负责把事实递归传播到 nodeset/loop、生成 ABI v3 lock 字段并验证嵌套锁顺序；Target 决定自己的 ambient state 集合并实现审计、锁与 trace。当前只有 Python Target 声明 `global_state` 和 `execution_locks`，JavaScript Target v1 两项都不声明。
+`flow_kind=global_state` 是 Core 拥有的语言无关语义，不是 Python Target 私有 config，也不是 `vibeflow.global_state` 系统 node。Core 负责合法 flow kind、派生 `effect_scope=global_state`、feature gating、`runtime_dispatch` 实现事实和 `contains_global_state` 事实；Block Compiler 负责把事实递归传播到 nodeset/loop、生成 ABI v4 字段并验证显式锁的异步与嵌套顺序；Target 决定自己的 ambient state 与 runtime-dispatch 检测方式并实现审计、锁与 trace。当前只有 Python Target 声明 `global_state` 和 `execution_locks`，JavaScript Target v1 两项都不声明。
 
-Python 的 global-state scope 只开放当前进程内 Python/module/native-library 的易失 ambient state，例如 RNG、默认 dtype、grad mode、backend flag、全局 cache/registry。该 allowlist 不能扩张为文件、环境变量、网络、数据库、终端、subprocess、线程/进程创建、`eval` / `exec` / `compile`、动态 import、`ctypes` / `cffi` 或任意 FFI。项目源码、本地 helper 和静态 import chain 均须完整分析；静态第三方计算库 import 本身不等于 external，运行时 callback、外部 model 引用或无法审计实现仍须进入 `external=True` / `trusted` 边界。examples 只做结构检查。model、optimizer、scheduler、DataLoader 等普通对象继续沿现有 envelope / contract 以引用流转；不得为 global-state 另建 Provider、隐式数据通道或另一套对象协议。
+Python 的 global-state scope 容纳当前进程内 Python/module/native-library 的易失 ambient state，以及从 envelope、registry、cache 或运行时对象取得的 callback/方法分派。该边界不能扩张为直接文件、环境变量、网络、数据库、终端、subprocess、线程/进程创建、`eval` / `exec` / `compile`、动态 import、`ctypes` / `cffi` 或任意 FFI；可识别的系统级 callback 逃逸同样拒绝。项目源码、本地 helper 和静态 import chain 均须完整分析；静态第三方计算库 import 本身不等于 external。只有 wrapper 实现源码不可取得、不可解析或不可审查时才进入 `external=True` / `trusted`。examples 只做结构检查。model、optimizer、scheduler、DataLoader 等普通对象继续沿现有 envelope / contract 以引用流转；不得为 global-state 另建 Provider、隐式数据通道或另一套对象协议。
 
-维护者不得把这套 AST 规则描述成安全沙箱：它是合作式架构与质量审计，只拒绝可识别的直接越权操作，不承诺证明任意第三方或 native 函数内部没有隐藏 IO。无法深入检查的实现必须保留在 `external=True` / `trusted` 边界。
+维护者不得把这套 AST 规则描述成安全沙箱：它是合作式架构与质量审计，只拒绝可识别的直接越权操作，不承诺证明任意第三方或 native 函数内部没有隐藏 IO。静态 API 内部不可见的行为不强行推断，也不因此自动要求 `external=True`。
+
+runtime-dispatch analyzer 必须独立于 effect-name gate 和 import metadata preflight。它只报告源码可见、高置信度的运行时 callable/receiver 分派，跟踪 envelope/registry/cache 来源、赋值、属性、下标、分支、闭包和可解析本地 helper；不得执行 example/callback，也不得维护 Torch/NumPy 等工具白名单。固定 builtin、Python 隐式协议、只读 Mapping 的 `get/keys/values/items`、静态 import/构造调用、只传递未调用的 callable，以及静态第三方/native API 内部不可见行为均不报告。`print`/`input`/`argparse` 与文件、Path、网络、数据库、subprocess 仍交给原有 effect analyzer。普通 `none` scope 只得到 warning；`global_state` 和既有 IO effect scope 抑制这条 warning，但 `runtime_dispatch` 事实仍进入计划和 Architecture。
+
+Python import preflight 必须先读取完整本地 source graph，再以固定点方式证明导入期声明 helper 和本地基类。允许与否只能由已解析源码、有限控制结构、闭合调用链以及 effect 检查决定，不得维护 `REQ`、`PROV` 或项目模块名白名单。跨模块 helper 内的任一未解析调用、循环/递归、动态代码、IO、线程/进程、FFI 或 ambient-state 修改都必须让调用者保持未证明状态；本地基类存在 metaclass、`__init_subclass__` 或未解析父类时同样拒绝。静态预检通过后，加载出的每个 node 仍按其真实 `effect_scope` 执行现有完整 class/module quality 检查。
 
 语义默认持久且非事务：runtime 不 snapshot、rollback 或自动恢复 ambient state，成功、异常和取消都一样。若一个操作只需临时改变状态并要求可靠恢复，业务实现必须在同一个 global-state node 内用 `try/finally` 恢复；锁本身不提供事务或恢复。维护代码和错误文本都不能暗示失败后已恢复。
 
 公开配置只接受 `pipeline.execution_lock: {"key": "..."}` 与 `pipeline.nodes[].execution_lock: {"key": "..."}`。`ExecutionLockSpec` 只含规范化的非空 key；`vibeflow.` 前缀保留。scope 由编译位置派生，显式锁不提供任何副作用权限。外层已经持有用户 key 时，嵌套 block/node 只能复用同一 key；不同 key 必须在 Block Compiler 和 runtime planning 双重拒绝。planned global-state 只用于 Architecture/review，不加入 `contains_global_state`、不触发 feature/独占锁，也不可执行。
 
-Python root run 必须在任何 node 或 hook 前建立 execution lease。所有 run 以 shared 模式进入内部 ambient-state 域；递归计划含 implemented global-state 时改为 exclusive，因此普通 run 与 global-state run 互斥。pipeline 命名锁以 exclusive root/block scope 获取，调用点锁以 exclusive node scope 获取。嵌套 runtime 和受管理线程继承同一 lease，重入按 lease id 而不是线程 id；release 必须晚于 success/failure hooks、受保护 future drain 和 executor shutdown。异常路径也必须成对释放，且不得让 future 逃出 lease。
+Python root 不再为 global-state 自动获取 shared/exclusive ambient-state lease。只有非空显式 `execution_lock` 才进入协调器：同 key 互斥，不同 key 并行，无 key 的 global-state 正常执行并产生建议性 warning。pipeline 命名锁以 exclusive root/block scope 获取，调用点锁以 exclusive node scope 获取。嵌套 runtime 和受管理线程继承同一 lease，重入按 lease id 而不是线程 id；release 必须晚于 success/failure hooks、受保护 future drain 和 executor shutdown。异常路径也必须成对释放，且不得让 future 逃出显式锁 scope。
 
-任一受保护作用域都禁止 detached。`result_key` 只有静态存在无条件 scheduled consumer path、能够保证 join 时才合法；Core、Block Compiler 与 Python runtime planning 必须一致校验，runtime 收尾再作 fail-safe drain。Architecture JSON、Mermaid 与 SVG 应显示 `effect_scope`、execution lock、`contains_global_state` / `root_exclusive` 等适用事实；global-state 使用 cloud 图例，不展示 Provider 权限。boundary/full trace 必须稳定保留 `lock_wait`、`lock_acquired`、`lock_released`、`global_state_enter`、`global_state_exit`，失败且 global-state 已开始时追加 `global_state_may_have_changed`。
+任一显式锁保护作用域都禁止 detached。`result_key` 只有静态存在无条件 scheduled consumer path、能够保证 join 时才合法；Core、Block Compiler 与 Python runtime planning 必须一致校验，runtime 收尾再作 fail-safe drain。无锁 global-state 使用普通异步规则。Architecture JSON、Mermaid 与 SVG 应显示 `effect_scope`、`runtime_dispatch`、有效 execution lock（无锁时为 `none`）和 `contains_global_state`；global-state 使用 cloud 图例，不展示 Provider 权限。boundary/full trace 始终保留 `global_state_enter`、`global_state_exit`，只为显式锁记录 wait/acquire/release，失败且 global-state 已开始时追加 `global_state_may_have_changed`。
 
-该语义的最低回归覆盖应跨 Core、Block Compiler、Python Target 和 JS Target：递归传播与 planned 排除、ABI v2 拒绝/v3 round-trip、feature gating、同 key 可重入与异 key 嵌套拒绝、普通/shared 对 global-state/exclusive 的并发隔离、hooks/异步收尾之后才释放、异常释放和 may-have-changed trace、detached/result join 门禁，以及 JS 统一的 `TARGET.FEATURE.UNSUPPORTED`。图形回归还要覆盖 shared cloud shape helper、Architecture 字段和 Python/JS review SVG；文档或图例不得暗示额外对象协议或 Provider 授权。
+该语义的最低回归覆盖应跨 Core、Block Compiler、Python Target 和 JS Target：递归传播与 planned 排除、ABI v3 拒绝/v4 round-trip、feature gating、三态 runtime-dispatch、同 key 可重入与异 key 嵌套拒绝、无锁 global-state 并行与 warning、同 key 串行/异 key 并行、hooks/异步收尾之后才释放、异常释放和 may-have-changed trace、仅显式锁 scope 的 detached/result join 门禁，以及 JS 统一的 `TARGET.FEATURE.UNSUPPORTED`。检测回归必须覆盖普通 callback warning、global-state/IO scope 抑制、builtin/协议/静态调用不误报。图形回归还要覆盖 shared cloud shape helper、Architecture 字段和 Python/JS review SVG。
 
 修改上述语义后必须运行完整 Python integration Sandbox，而不能只依赖单元测试：
 
@@ -99,7 +103,7 @@ Python root run 必须在任何 node 或 hook 前建立 execution lease。所有
 PYTHONDONTWRITEBYTECODE=1 python sandbox/python/integration/run_all.py
 ```
 
-其中专门案例会验证 global-state examples 不执行、禁止副作用矩阵、WorkflowPlan v3 与 Architecture 传播、命名锁重入、普通/shared root 与 global-state/exclusive root 的真实竞争、失败告警与锁复用、受保护 detached/unjoined result 拒绝，以及 mmdc 生成 SVG 中的 cloud path。旧流程的 trace 精确序列可忽略统一的 root 通行锁边界事件，但 global-state 专门案例必须继续严格检查锁的数量、顺序、mode、reentrant、wait time 和 run ID。
+其中专门案例会验证 global-state examples 不执行、禁止副作用矩阵、WorkflowPlan v4 与 Architecture 传播、runtime-dispatch 检测及 IO/builtin 误报回归、无锁 warning、同 key 重入/串行和异 key 并行、失败释放、仅显式锁 scope 的 detached/unjoined result 拒绝，以及 mmdc 生成 SVG 中的 cloud path。trace 案例必须确认无锁 cloud 不产生锁事件，显式锁仍严格保持 wait/acquire/release 的数量、顺序、reentrant、wait time 和 run ID。
 
 ## JS/TS AOT 验证
 
@@ -211,10 +215,10 @@ PYTHONPATH=src python3 -m vibeflow review \
 3. 重新生成登记的 `ARCHITECTURE.jsonc`，再用 canonical check 做字节级复核。
 4. 执行正常 workspace validate，使新架构文档也通过正式门禁。
 5. 向临时路径调用 canonical expanded SVG renderer。
-6. 解析 SVG XML，确认根元素、`aria-roledescription="flowchart-review-columns"` 和至少一个真实 `review-inline-fragment`。
+6. 解析 SVG XML，确认根元素、`aria-roledescription="flowchart-review-columns"` 和非空 `review-inline-fragment`，并用 `data-review-kind`、`data-review-owner`、`data-review-target` 对照审核快照的预期覆盖集合；缺失、重复或意外 fragment 都以 `REVIEW.SVG.COVERAGE` 失败。
 7. 所有检查通过后才替换目标 SVG；失败时删除临时文件并保留原目标文件。
 
-命令不得调用直接 mmdc fallback，也不得把旧 SVG、expanded MMD 或手写图当作审核成功。renderer 阶段失败后，已经成功更新的架构文档可以保留，但 JSON 结果必须返回 `published: false`。标准输出只写一个 JSON 对象，包含 `status`、`failed_stage`、config、architecture、validation、SVG 路径和 `published`；不写 provenance hash、sidecar 路径或额外人类文本。`PASS` / `CONCERNS` 返回 0，`FAIL` / `ERROR` 返回 1，argparse 参数错误返回 2。
+命令不得调用直接 mmdc fallback，也不得把旧 SVG、expanded MMD 或手写图当作审核成功。Python 与 JavaScript 都从各自 adapter 构造同一语言无关审核快照，再进入同一个 canonical composer；JavaScript Application 不得导入 Python Target/Application。renderer 阶段失败后，已经成功更新的架构文档可以保留，但 JSON 结果必须返回 `published: false`。标准输出只写一个 JSON 对象，包含 `status`、`failed_stage`、config、architecture、validation、SVG 路径和 `published`；0.12.0 的 JavaScript 输出暂时保留 `project_target` 与旧 `output` 别名。不写 provenance hash、sidecar 路径或额外人类文本。`PASS` / `CONCERNS` 返回 0，`FAIL` / `ERROR` 返回 1，argparse 参数错误返回 2。
 
 `review` 是正式审核入口；现有 `architecture`、`validate`、`svg` 继续作为单项生成和诊断命令。用户要求“审核后再实现”时，即使 `review` 成功也必须等待后续一条明确的用户批准消息，不能把机器检查成功解释成人类确认。
 
@@ -224,7 +228,7 @@ PYTHONPATH=src python3 -m vibeflow review \
 - 缺失、陈旧或非 canonical 架构文档能被重新生成；未登记 workflow 返回 `REVIEW.ARCHITECTURE.UNREGISTERED` 且不生成 SVG。
 - graph/schema/health preflight 失败时，架构文档不变且 renderer 未被调用。
 - workspace `CONCERNS` 返回 0 并继续生成审核图。
-- renderer 异常或 SVG 为空、不可解析、缺 composer 标记、缺真实 fragment 时不发布，原 SVG 保持不变，并分别报告 `svg` 或 `svg_check` 阶段。
+- renderer 异常或 SVG 为空、不可解析、缺 composer 标记、缺真实 fragment、覆盖集合缺失/重复/意外时不发布，原 SVG 保持不变，并分别报告 `REVIEW.SVG.RENDER`、结构错误或 `REVIEW.SVG.COVERAGE`。
 - 发布包入口正确注入 workspace；直接内核入口缺少 `--workspace` 时保持 argparse 错误。
 - 普通 SVG 与 `--expand-nodesets` 都经过回归测试，expanded SVG 强制经过 composer。
 - 审核产物不生成 `.provenance.json`，也不嵌入 provenance metadata。
@@ -270,7 +274,7 @@ PYTHONPATH=src python3 -m vibeflow delegate-cli \
 | plugin | `trusted` |
 | planned `python_stub` | `none` |
 
-图形 `flow_kind=terminal` 仍映射到 `none`，不要与 `effect_scope=terminal` 混淆。`terminal` scope 只开放 stdin/stdout/stderr、`print`、`input`、`argparse`；`python_io` 开放文件、环境、网络、数据库、subprocess 和终端；`global_state` 只开放当前进程易失 ambient state，明确不继承 `terminal` 或 `python_io`；`trusted` 跳过普通实现的副作用限制，但不跳过契约、拓扑、输出和 trace。effectful 或 `external=True` node 的 `CONTRACT.examples` 只能做结构校验，不得在健康检查中执行；planned `python_stub` 继续按 `none` 检查。
+图形 `flow_kind=terminal` 仍映射到 `none`，不要与 `effect_scope=terminal` 混淆。`terminal` scope 只开放 stdin/stdout/stderr、`print`、`input`、`argparse`；`python_io` 开放文件、环境、网络、数据库、subprocess 和终端；`global_state` 容纳当前进程易失 ambient state 与 runtime dispatch，明确不继承 `terminal` 或 `python_io`；`trusted` 跳过普通实现的副作用限制，但不跳过契约、拓扑、输出和 trace。effectful 或 `external=True` node 的 `CONTRACT.examples` 只能做结构校验，不得在健康检查中执行；planned `python_stub` 继续按 `none` 检查。
 
 ### `delegate-cli` 回归测试最低集合
 

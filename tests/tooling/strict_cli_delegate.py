@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -11,12 +12,61 @@ from vibeflow.core.contracts import DataEnvelope, DataProvider, DataRequirement,
 from vibeflow.core import HealthReport
 from vibeflow.tooling.application.python.diagnostics import emit_core_diagnostic
 from vibeflow.tooling.application.python.runner import CheckedRunResult
-from vibeflow.tooling.project.graph_config import parse_graph_config
+from vibeflow.tooling.project.graph_config import parse_graph_config as _parse_graph_config
 from vibeflow.targets.python.project.node import NodeContract, NodeInfo
 from vibeflow.targets.python.project.plugins import PluginRegistry
 from vibeflow.targets.python.project.registry import NodeRegistry
 from vibeflow.targets.python.runtime import PipelineRuntime
 from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
+
+
+def parse_graph_config(config):
+    """Give legacy test fixtures the now-required per-instance documentation."""
+    migrated = deepcopy(config)
+    raw_nodesets = migrated.get("nodesets", []) if isinstance(migrated, dict) else []
+    if isinstance(raw_nodesets, dict):
+        nodeset_items = list(raw_nodesets.values())
+    else:
+        nodeset_items = list(raw_nodesets)
+    nodeset_types = {
+        str(item.get("type_key", ""))
+        for item in nodeset_items
+        if isinstance(item, dict) and item.get("type_key")
+    }
+
+    implemented_types = {
+        "delegate.start", "delegate.authorized_exit", "delegate.unauthorized_exit",
+        "delegate.none_exit", "delegate.bool_exit", "delegate.negative_exit",
+        "delegate.large_exit", "delegate.string_exit", "delegate.argparse_exit",
+        "delegate.detached_exit", "delegate.second_detached_exit",
+        "delegate.detached_failure", "delegate.successful_side",
+        "delegate.normal_exit", "delegate.async_diagnostic_exit", "delegate.exit_end",
+        "delegate.argv_gate", "delegate.parallel_join_exit", "delegate.parallel_join_failure",
+    }
+
+    def visit(body):
+        pipeline = body.get("pipeline", body)
+        for node in pipeline.get("nodes", []):
+            node.setdefault("display_name", str(node.get("id", "Node")).replace("_", " ").title())
+            node.setdefault("description", f"Exercises {node.get('id', 'this node')} in the delegated CLI test workflow.")
+            if node.get("type_used") in {"delegate.output", "delegate.shadow"}:
+                node.setdefault("status", "planned")
+                node.setdefault("flow_kind", "process")
+                node.setdefault("requires", [])
+                node.setdefault("provides", [])
+            elif node.get("type_used") in implemented_types or node.get("type_used") in nodeset_types:
+                node.pop("requires", None)
+                node.pop("provides", None)
+        nested_nodesets = body.get("nodesets", pipeline.get("nodesets", {}))
+        iterable = nested_nodesets.values() if isinstance(nested_nodesets, dict) else nested_nodesets
+        for nodeset in iterable:
+            if isinstance(nodeset, dict):
+                nodeset.setdefault("display_name", "Nested delegated CLI workflow")
+                nodeset.setdefault("description", "Defines a nested workflow used by delegated CLI tests.")
+                visit(nodeset)
+
+    visit(migrated)
+    return _parse_graph_config(migrated)
 
 
 @pytest.fixture(autouse=True)
@@ -38,11 +88,11 @@ class _StartNode:
 class _AuthorizedExitNode:
     NODE_INFO = NodeInfo("delegate.authorized_exit", "Authorized exit", "test", "Exits delegated CLI.", "0.1.0", "io")
     CONTRACT = NodeContract(
-        requires=(DataRequirement("cli.argv", "exactly_one"),),
-        provides=(DataProvider("cli.exit_code", "cli.exit_code"),),
+        requires=(DataRequirement("cli.argv", "exactly_one", display_name="cli.argv"),),
+        provides=(DataProvider("cli.exit_code", "cli.exit_code", display_name="cli.exit_code"),),
         input_semantics={"cli.argv": ("business argv",)},
         output_semantics={"cli.exit_code": ("business exit code",)},
-        output_schema={"cli.exit_code": {"type": "integer"}},
+
         examples=({"inputs": {"cli.argv": {"key": "cli.argv", "type": "cli.argv", "value": [], "source_node": "example"}}, "params": {}},),
     )
 
@@ -103,7 +153,11 @@ class _ArgparseExitNode(_AuthorizedExitNode):
 
 class _DetachedExitNode:
     NODE_INFO = NodeInfo("delegate.detached_exit", "Detached exit", "test", "Exits from a detached task.", "0.1.0", "io")
-    CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}},))
+    CONTRACT = NodeContract(
+        provides=(DataProvider("async.first", "async.first", display_name="First async result"),),
+        output_semantics={"async.first": ("first delegated async result",)},
+        examples=({"inputs": {}, "params": {}},),
+    )
 
     def run_pure(self, inputs, params):
         raise SystemExit(11)
@@ -111,6 +165,10 @@ class _DetachedExitNode:
 
 class _SecondDetachedExitNode(_DetachedExitNode):
     NODE_INFO = NodeInfo("delegate.second_detached_exit", "Second detached exit", "test", "Exits from another detached task.", "0.1.0", "io")
+    CONTRACT = NodeContract(
+        provides=(DataProvider("async.second", "async.second", display_name="Second async result"),),
+        output_semantics={"async.second": ("second delegated async result",)},
+    )
 
     def run_pure(self, inputs, params):
         raise SystemExit(12)
@@ -118,6 +176,10 @@ class _SecondDetachedExitNode(_DetachedExitNode):
 
 class _DetachedFailureNode(_DetachedExitNode):
     NODE_INFO = NodeInfo("delegate.detached_failure", "Detached failure", "test", "Fails from a detached task.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        provides=(DataProvider("async.pending", "async.pending", display_name="Pending async result"),),
+        output_semantics={"async.pending": ("pending task result used by the async failure fixture",)},
+    )
 
     def run_pure(self, inputs, params):
         raise RuntimeError("late detached failure")
@@ -126,9 +188,9 @@ class _DetachedFailureNode(_DetachedExitNode):
 class _SuccessfulSideNode:
     NODE_INFO = NodeInfo("delegate.successful_side", "Successful side", "test", "Completes an async side task.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        provides=(DataProvider("async.pending", "async.pending"),),
+        provides=(DataProvider("async.pending", "async.pending", display_name="async.pending"),),
         output_semantics={"async.pending": ("completed side result",)},
-        output_schema={"async.pending": {"type": "string"}},
+
         examples=({"inputs": {}, "params": {}},),
     )
 
@@ -136,12 +198,59 @@ class _SuccessfulSideNode:
         return {"async.pending": "done"}
 
 
+class _ArgvGateNode:
+    NODE_INFO = NodeInfo("delegate.argv_gate", "Argv gate", "test", "Forwards CLI arguments after pending work starts.", "0.1.0", "process")
+    CONTRACT = NodeContract(
+        requires=(DataRequirement("cli.argv", "exactly_one", display_name="CLI argv"),),
+        provides=(DataProvider("cli.argv.gated", "cli.argv", display_name="Forwarded CLI argv"),),
+        input_semantics={"cli.argv": ("business argv",)},
+        output_semantics={"cli.argv.gated": ("forwarded business argv",)},
+    )
+
+    def run_pure(self, inputs, params):
+        return {"cli.argv.gated": inputs["cli.argv"]["value"]}
+
+
+class _ParallelJoinExitNode:
+    NODE_INFO = NodeInfo("delegate.parallel_join_exit", "Parallel exit join", "test", "Joins two delegated exit results.", "0.1.0", "terminal")
+    CONTRACT = NodeContract(
+        requires=(
+            DataRequirement("async.first", "exactly_one", display_name="First async result"),
+            DataRequirement("async.second", "exactly_one", display_name="Second async result"),
+        ),
+        input_semantics={
+            "async.first": ("first delegated async result",),
+            "async.second": ("second delegated async result",),
+        },
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
+class _ParallelJoinFailureNode:
+    NODE_INFO = NodeInfo("delegate.parallel_join_failure", "Parallel failure join", "test", "Joins an exit result with a failing result.", "0.1.0", "terminal")
+    CONTRACT = NodeContract(
+        requires=(
+            DataRequirement("async.first", "exactly_one", display_name="First async result"),
+            DataRequirement("async.pending", "exactly_one", display_name="Pending async result"),
+        ),
+        input_semantics={
+            "async.first": ("first delegated async result",),
+            "async.pending": ("pending async result",),
+        },
+    )
+
+    def run_pure(self, inputs, params):
+        return {}
+
+
 class _NormalExitNode:
     NODE_INFO = NodeInfo("delegate.normal_exit", "Normal exit", "test", "Returns a normal delegated exit.", "0.1.0", "process")
     CONTRACT = NodeContract(
-        provides=(DataProvider("cli.exit_code", "cli.exit_code"),),
+        provides=(DataProvider("cli.exit_code", "cli.exit_code", display_name="cli.exit_code"),),
         output_semantics={"cli.exit_code": ("business exit code",)},
-        output_schema={"cli.exit_code": {"type": "integer"}},
+
         examples=({"inputs": {}, "params": {}},),
     )
 
@@ -167,7 +276,7 @@ class _AsyncDiagnosticExitNode(_NormalExitNode):
 class _ExitEndNode:
     NODE_INFO = NodeInfo("delegate.exit_end", "Exit end", "test", "Consumes a delegated exit.", "0.1.0", "terminal")
     CONTRACT = NodeContract(
-        requires=(DataRequirement("cli.exit_code", "exactly_one"),),
+        requires=(DataRequirement("cli.exit_code", "exactly_one", display_name="cli.exit_code"),),
         input_semantics={"cli.exit_code": ("business exit code",)},
         examples=(
             {
@@ -203,6 +312,9 @@ def _runtime_registry() -> NodeRegistry:
     registry.register("delegate.second_detached_exit", _SecondDetachedExitNode, config_schema={}, config_defaults={})
     registry.register("delegate.detached_failure", _DetachedFailureNode, config_schema={}, config_defaults={})
     registry.register("delegate.successful_side", _SuccessfulSideNode, config_schema={}, config_defaults={})
+    registry.register("delegate.argv_gate", _ArgvGateNode, config_schema={}, config_defaults={})
+    registry.register("delegate.parallel_join_exit", _ParallelJoinExitNode, config_schema={}, config_defaults={})
+    registry.register("delegate.parallel_join_failure", _ParallelJoinFailureNode, config_schema={}, config_defaults={})
     registry.register("delegate.normal_exit", _NormalExitNode, config_schema={}, config_defaults={})
     registry.register("delegate.async_diagnostic_exit", _AsyncDiagnosticExitNode, config_schema={}, config_defaults={})
     registry.register("delegate.exit_end", _ExitEndNode, config_schema={}, config_defaults={})
@@ -282,6 +394,8 @@ def _multiple_detached_graph(second_node_type: str):
 
 
 def _parallel_result_graph(second_node_type: str):
+    second_result_key = "async.pending" if second_node_type == "delegate.detached_failure" else "async.second"
+    join_type = "delegate.parallel_join_failure" if second_node_type == "delegate.detached_failure" else "delegate.parallel_join_exit"
     return parse_graph_config(
         {
             "pipeline": {
@@ -299,17 +413,12 @@ def _parallel_result_graph(second_node_type: str):
                     {
                         "id": "second",
                         "type_used": second_node_type,
-                        "provides": [{"key": "async.second", "type": "async.second", "display_name": "Second result"}],
                         "async": "result_key",
-                        "result_key": "async.second",
+                        "result_key": second_result_key,
                     },
                     {
                         "id": "join",
-                        "type_used": "delegate.exit_end",
-                        "requires": [
-                            {"type": "async.first", "cardinality": "exactly_one", "display_name": "First result"},
-                            {"type": "async.second", "cardinality": "exactly_one", "display_name": "Second result"},
-                        ],
+                        "type_used": join_type,
                     },
                 ],
                 "edges": [["start", "first"], ["start", "second"], ["first", "join"], ["second", "join"]],
@@ -329,9 +438,6 @@ def _async_diagnostic_graph():
                     {
                         "id": "output",
                         "type_used": "delegate.async_diagnostic_exit",
-                        "provides": [
-                            {"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit code"}
-                        ],
                         "async": "result_key",
                         "result_key": "cli.exit_code",
                     },
@@ -344,19 +450,17 @@ def _async_diagnostic_graph():
 
 
 def _unconsumed_result_graph(*node_types: str):
+    result_keys = {
+        "delegate.detached_exit": "async.first",
+        "delegate.second_detached_exit": "async.second",
+        "delegate.detached_failure": "async.pending",
+    }
     async_nodes = [
         {
             "id": f"side_{index}",
             "type_used": node_type,
-            "provides": [
-                {
-                    "key": f"async.side_{index}",
-                    "type": f"async.side_{index}",
-                    "display_name": f"Side result {index}",
-                }
-            ],
             "async": "result_key",
-            "result_key": f"async.side_{index}",
+            "result_key": result_keys[node_type],
         }
         for index, node_type in enumerate(node_types)
     ]
@@ -415,7 +519,7 @@ def _exit_with_pending_pipeline(
         "nodes": [
             {"id": "inner_start", "type_used": "delegate.start"},
             pending_node,
-            {"id": "gate", "type_used": "delegate.start"},
+            {"id": "gate", "type_used": "delegate.argv_gate"},
             {"id": "inner_exit", "type_used": exit_node_type},
         ],
         "edges": [

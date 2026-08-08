@@ -157,13 +157,6 @@ class StaticWorkflowEmitter(
                 "schedule": node.schedule,
                 "executor": node.executor,
             }
-            output_schemas = node_payload.get("output_schemas")
-            if isinstance(output_schemas, Mapping) and output_schemas:
-                node_metadata["output_schemas"] = {
-                    str(key): dict(value)
-                    for key, value in output_schemas.items()
-                    if isinstance(value, Mapping)
-                }
             result.append(
                 constant(code.node_names[node.id], node_metadata)
             )

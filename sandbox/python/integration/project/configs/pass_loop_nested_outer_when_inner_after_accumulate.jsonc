@@ -10,18 +10,7 @@
       {
         "display_name": "Seed",
         "description": "Creates initial outer and total values for nested loop accumulation.",
-        "provides": [
-          {
-            "key": "outer.current",
-            "type": "outer.current",
-            "display_name": "Outer Current"
-          },
-          {
-            "key": "total.current",
-            "type": "total.current",
-            "display_name": "Total Current"
-          }
-        ],
+
         "outer_start": 0,
         "total_start": 0,
         "id": "seed",

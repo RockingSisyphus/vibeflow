@@ -10,9 +10,9 @@ def _info(type_key):
 
 def _contract():
     return NodeContract(
-        provides=(DataProvider("bad.out", "bad.out"),),
+        provides=(DataProvider("bad.out", "bad.out", display_name="bad.out"),),
         output_semantics={"bad.out": ("bad output",)},
-        output_schema={"bad.out": {"type": "number"}},
+
     )
 
 

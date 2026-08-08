@@ -8,13 +8,7 @@
         "description": "Runs start."
       },
       {
-        "provides": [
-          {
-            "key": "branch.left",
-            "type": "branch_result",
-            "display_name": "Branch Left"
-          }
-        ],
+
         "value": 4,
         "id": "left",
         "type_used": "sandbox.branch_left",
@@ -22,13 +16,7 @@
         "description": "Runs left."
       },
       {
-        "provides": [
-          {
-            "key": "branch.right",
-            "type": "branch_result",
-            "display_name": "Branch Right"
-          }
-        ],
+
         "value": 6,
         "id": "right",
         "type_used": "sandbox.branch_right",
@@ -36,33 +24,15 @@
         "description": "Runs right."
       },
       {
-        "requires": [
-          {
-            "type": "branch_result",
-            "cardinality": "exactly_one",
-            "display_name": "Branch Result"
-          }
-        ],
-        "provides": [
-          {
-            "key": "branch.final",
-            "type": "final_result",
-            "display_name": "Branch Final"
-          }
-        ],
+
+
         "id": "consume_branch",
         "type_used": "semantic.branch_type_consumer",
         "display_name": "Consume Branch",
         "description": "Runs consume_branch."
       },
       {
-        "requires": [
-          {
-            "type": "final_result",
-            "cardinality": "exactly_one",
-            "display_name": "Final Result"
-          }
-        ],
+
         "id": "end",
         "type_used": "semantic.branch_final_end",
         "display_name": "End",

@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from vibeflow.core.constants import (
+    EFFECT_SCOPE_GLOBAL_STATE,
+    EFFECT_SCOPE_NONE,
+    FLOW_KIND_GLOBAL_STATE,
+)
 from vibeflow.core.descriptors import DescriptorCatalogs, NodeCatalog
 from vibeflow.core.models import ImplementationFact, ImplementationFacts
 
@@ -82,6 +87,10 @@ def implementation_facts_from_catalog(
             ImplementationFact(
                 type_key=descriptor.type_key,
                 flow_kind=descriptor.flow_kind,
+                effect_scope=_effect_scope(descriptor.flow_kind),
+                runtime_dispatch=None,
+                requires=descriptor.contract.requires,
+                provides=descriptor.contract.provides,
                 completion=completion,
                 schedule="inline",
                 executor=(
@@ -129,6 +138,10 @@ def target_neutral_implementation_facts_from_catalog(
             ImplementationFact(
                 type_key=descriptor.type_key,
                 flow_kind=descriptor.flow_kind,
+                effect_scope=_effect_scope(descriptor.flow_kind),
+                runtime_dispatch=None,
+                requires=descriptor.contract.requires,
+                provides=descriptor.contract.provides,
                 completion=completion,
                 schedule="inline",
                 executor=(
@@ -137,6 +150,14 @@ def target_neutral_implementation_facts_from_catalog(
             )
         )
     return ImplementationFacts(tuple(facts), strict=True)
+
+
+def _effect_scope(flow_kind: str) -> str:
+    return (
+        EFFECT_SCOPE_GLOBAL_STATE
+        if flow_kind == FLOW_KIND_GLOBAL_STATE
+        else EFFECT_SCOPE_NONE
+    )
 
 
 __all__ = [

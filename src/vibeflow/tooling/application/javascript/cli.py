@@ -66,6 +66,24 @@ def add_audit_parsers(subparsers: argparse._SubParsersAction) -> None:
         command.add_argument("--output")
         if name == "export-architecture":
             command.add_argument("--check", action="store_true")
+        if name in {"export-mermaid", "export-ascii", "export-svg"}:
+            command.add_argument("--expand-nodesets", dest="expand_nodesets", action="store_true")
+            command.add_argument("--collapse-nodesets", dest="expand_nodesets", action="store_false")
+            command.add_argument("--hide-contract", action="store_true")
+            command.add_argument("--hide-semantics", action="store_true")
+            command.set_defaults(expand_nodesets=False)
+        if name in {"export-mermaid", "export-svg"}:
+            command.add_argument(
+                "--mermaid-layout",
+                choices=("default", "review-columns"),
+                default="default",
+            )
+        if name == "export-svg":
+            command.add_argument("--theme", default="default")
+            command.add_argument("--background", default="transparent")
+            command.add_argument("--mermaid-max-text-size", type=int, default=None)
+            command.add_argument("--mermaid-max-edges", type=int, default=None)
+            command.add_argument("--review-fragment-max-width", type=float, default=None)
 
     review = subparsers.add_parser(
         "review",
@@ -262,92 +280,242 @@ def handle_export_architecture(args: argparse.Namespace) -> int:
 def handle_export_mermaid(args: argparse.Namespace) -> int:
     from vibeflow.tooling.application.javascript.audit import render_mermaid
 
-    return _handle_text_export(args, render_mermaid)
+    return _handle_text_export(
+        args,
+        render_mermaid,
+        expand_nodesets=bool(args.expand_nodesets),
+        show_contract=not bool(args.hide_contract),
+        show_semantics=not bool(args.hide_semantics),
+        mermaid_layout=str(args.mermaid_layout),
+    )
 
 
 def handle_export_ascii(args: argparse.Namespace) -> int:
     from vibeflow.tooling.application.javascript.audit import render_ascii
 
-    return _handle_text_export(args, render_ascii)
+    return _handle_text_export(
+        args,
+        render_ascii,
+        expand_nodesets=bool(args.expand_nodesets),
+        show_contract=not bool(args.hide_contract),
+        show_semantics=not bool(args.hide_semantics),
+    )
 
 
 def handle_export_svg(args: argparse.Namespace) -> int:
-    from vibeflow.tooling.application.javascript.audit import render_review_svg
-
-    return _handle_text_export(args, render_review_svg)
-
-
-def handle_review(args: argparse.Namespace) -> int:
-    from vibeflow.tooling.application.javascript.audit import (
-        render_architecture,
-        render_review_svg,
-    )
+    from vibeflow.tooling.application.javascript.review import write_review_svg
+    from vibeflow.tooling.presentation.review_types import REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH
 
     result, error = _audit(args)
     if error is not None:
         _print_error(error, as_json=True)
         return 1
     assert result is not None
-    spec = next(
-        (
-            item
-            for item in result.root.architecture_documents
-            if item.workflow_path.resolve() == result.config_path.resolve()
-        ),
-        None,
-    )
-    if spec is None:
-        _print_error(
-            ValueError("workflow has no registered Architecture document"),
-            as_json=True,
-            code="WORKSPACE.PROJECT_CONFIG.ARCHITECTURE",
-        )
-        return 1
-    output = Path(args.output).resolve()
-    protected = {
-        result.workspace.path.resolve(),
-        result.config_path.resolve(),
-        spec.document_path.resolve(),
-    }
-    if output in protected:
-        _print_error(
-            ValueError(
-                "review output cannot overwrite workspace, workflow, or "
-                "Architecture source"
-            ),
-            as_json=True,
-            code="REVIEW.OUTPUT.CONFLICT",
-        )
-        return 1
-    architecture = render_architecture(result)
-    svg = render_review_svg(result)
+    output = Path(args.output).resolve() if args.output else None
     try:
-        _validate_review_documents(architecture, svg)
-        _publish_review_pair(
-            (
-                (spec.document_path, architecture),
-                (output, svg),
+        if output is not None:
+            write_review_svg(
+                result,
+                output,
+                expand_nodesets=bool(args.expand_nodesets),
+                show_contract=not bool(args.hide_contract),
+                show_semantics=not bool(args.hide_semantics),
+                theme=str(args.theme),
+                background=str(args.background),
+                max_text_size=args.mermaid_max_text_size,
+                max_edges=args.mermaid_max_edges,
+                review_fragment_max_width=(
+                    args.review_fragment_max_width
+                    if args.review_fragment_max_width is not None
+                    else REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH
+                ),
+                mermaid_layout=str(args.mermaid_layout),
             )
-        )
-    except OSError as exc:
-        _print_error(exc, as_json=True, code="REVIEW.PUBLISH")
+        else:
+            with tempfile.TemporaryDirectory(prefix="vibeflow-javascript-export-svg-") as raw:
+                temporary = Path(raw) / "graph.svg"
+                write_review_svg(
+                    result,
+                    temporary,
+                    expand_nodesets=bool(args.expand_nodesets),
+                    show_contract=not bool(args.hide_contract),
+                    show_semantics=not bool(args.hide_semantics),
+                    theme=str(args.theme),
+                    background=str(args.background),
+                    max_text_size=args.mermaid_max_text_size,
+                    max_edges=args.mermaid_max_edges,
+                    review_fragment_max_width=(
+                        args.review_fragment_max_width
+                        if args.review_fragment_max_width is not None
+                        else REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH
+                    ),
+                    mermaid_layout=str(args.mermaid_layout),
+                )
+                print(temporary.read_text(encoding="utf-8"), end="")
+    except Exception as exc:
+        _print_error(exc, as_json=True, code="SVG.RENDER")
         return 1
-    except ValueError as exc:
-        _print_error(exc, as_json=True, code="REVIEW.GENERATED.INVALID")
-        return 1
-    print(
-        json.dumps(
-            {
-                "status": "PASS",
-                "project_target": "javascript",
-                "architecture": str(spec.document_path),
-                "output": str(output),
-                "published": True,
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
+    return 0
+
+
+def handle_review(args: argparse.Namespace) -> int:
+    from vibeflow.tooling.application.javascript.audit import (
+        render_architecture,
     )
+    from vibeflow.tooling.application.javascript.review import (
+        expected_review_coverage,
+        write_review_svg,
+    )
+
+    config_path = Path(args.config).resolve()
+    output = Path(args.output).resolve()
+    payload: dict[str, object] = {
+        "status": "ERROR",
+        "failed_stage": None,
+        "config": str(config_path),
+        "architecture": None,
+        "validation": None,
+        "svg": str(output),
+        "output": str(output),
+        "project_target": "javascript",
+        "published": False,
+    }
+
+    try:
+        from vibeflow.tooling.project.workspace_loader import load_workspace_config
+
+        workspace = load_workspace_config(Path(args.workspace).resolve())
+        root = workspace.root_for_path(config_path)
+        if root is None:
+            return _finish_review_failure(
+                payload,
+                "workspace",
+                "WORKSPACE.CONFIG.OUTSIDE_ROOT",
+                ValueError(f"config is not under any workspace root: {config_path}"),
+            )
+        spec = next(
+            (
+                item
+                for item in root.architecture_documents
+                if item.workflow_path.resolve() == config_path
+            ),
+            None,
+        )
+        if spec is None:
+            return _finish_review_failure(
+                payload,
+                "architecture",
+                "REVIEW.ARCHITECTURE.UNREGISTERED",
+                ValueError(
+                    f"workflow is not registered in {root.config_path} architecture.documents: {config_path}"
+                ),
+                status="FAIL",
+            )
+        architecture_path = spec.document_path.resolve()
+        payload["architecture"] = str(architecture_path)
+        protected = {workspace.path.resolve(), config_path, architecture_path}
+        if output in protected:
+            return _finish_review_failure(
+                payload,
+                "output",
+                "REVIEW.OUTPUT.CONFLICT",
+                ValueError(
+                    "review output cannot overwrite workspace, workflow, or Architecture source"
+                ),
+                status="FAIL",
+            )
+    except Exception as exc:
+        return _finish_review_failure(
+            payload,
+            "workspace",
+            str(getattr(exc, "rule_id", "WORKSPACE.LOAD")),
+            exc,
+        )
+
+    result, error = _audit(args)
+    if error is not None:
+        return _finish_review_failure(
+            payload,
+            "preflight",
+            str(getattr(error, "code", getattr(error, "rule_id", "REVIEW.PREFLIGHT"))),
+            error,
+            status="FAIL",
+        )
+    assert result is not None
+    architecture = render_architecture(result)
+    try:
+        _atomic_write(architecture_path, architecture)
+        if architecture_path.read_text(encoding="utf-8") != architecture:
+            raise ValueError("generated Architecture document is not canonical after publication")
+        _validate_architecture_document(architecture)
+    except Exception as exc:
+        return _finish_review_failure(
+            payload,
+            "architecture",
+            "REVIEW.ARCHITECTURE.WRITE",
+            exc,
+        )
+
+    validation = _audit_success_payload(result)
+    payload["validation"] = validation
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            prefix=f".{output.name}.",
+            suffix=".tmp",
+            dir=output.parent,
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+        write_review_svg(
+            result,
+            temporary,
+            expand_nodesets=True,
+            show_contract=True,
+            show_semantics=True,
+            theme="default",
+            background="transparent",
+            mermaid_layout="review-columns",
+        )
+    except Exception as exc:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+        return _finish_review_failure(
+            payload,
+            "svg",
+            "REVIEW.SVG.RENDER",
+            exc,
+            status="FAIL",
+        )
+    try:
+        assert temporary is not None
+        _validate_review_svg_file(
+            temporary,
+            expected_coverage=expected_review_coverage(result),
+        )
+    except Exception as exc:
+        temporary.unlink(missing_ok=True)
+        return _finish_review_failure(
+            payload,
+            "svg_check",
+            str(getattr(exc, "code", "REVIEW.SVG.COVERAGE")),
+            exc,
+            status="FAIL",
+        )
+    try:
+        os.replace(temporary, output)
+    except OSError as exc:
+        temporary.unlink(missing_ok=True)
+        return _finish_review_failure(
+            payload,
+            "publish",
+            "REVIEW.SVG.PUBLISH",
+            exc,
+        )
+
+    payload.update(status="PASS", failed_stage=None, published=True)
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -579,14 +747,14 @@ def _audit_success_payload(result) -> dict[str, object]:
     return payload
 
 
-def _handle_text_export(args: argparse.Namespace, renderer) -> int:
+def _handle_text_export(args: argparse.Namespace, renderer, **render_options) -> int:
     result, error = _audit(args)
     if error is not None:
         _print_error(error, as_json=True)
         return 1
     assert result is not None
     _write_or_print(
-        renderer(result),
+        renderer(result, **render_options),
         Path(args.output).resolve() if args.output else None,
     )
     return 0
@@ -691,7 +859,13 @@ def _publish_review_pair(
                 backup.unlink(missing_ok=True)
 
 
-def _validate_review_documents(architecture: str, svg: str) -> None:
+class _ReviewSvgValidationError(ValueError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+def _validate_architecture_document(architecture: str) -> None:
     from vibeflow.tooling.project.document_kinds import (
         ARCHITECTURE_DOCUMENT_HEADER,
     )
@@ -711,14 +885,110 @@ def _validate_review_documents(architecture: str, svg: str) -> None:
         or payload.get("project_target") != "javascript"
     ):
         raise ValueError("generated Architecture document has an invalid target")
+
+
+def _validate_review_svg_file(
+    path: Path,
+    *,
+    expected_coverage: frozenset[tuple[str, str, str]],
+) -> None:
+    try:
+        root = ElementTree.parse(path).getroot()
+    except (OSError, ElementTree.ParseError) as exc:
+        raise _ReviewSvgValidationError(
+            "REVIEW.SVG.XML",
+            "generated review SVG is not valid XML",
+        ) from exc
+    if not root.tag.endswith("svg"):
+        raise _ReviewSvgValidationError(
+            "REVIEW.SVG.ROOT",
+            "generated review SVG has an invalid root element",
+        )
+    if root.get("aria-roledescription") != "flowchart-review-columns":
+        raise _ReviewSvgValidationError(
+            "REVIEW.SVG.LAYOUT",
+            "generated review SVG has no review layout marker",
+        )
+    fragments = [
+        element
+        for element in root.iter()
+        if element.tag.endswith("g")
+        and "review-inline-fragment" in element.get("class", "").split()
+    ]
+    if not any(len(list(fragment)) > 0 for fragment in fragments):
+        raise _ReviewSvgValidationError(
+            "REVIEW.SVG.FRAGMENT",
+            "generated review SVG has no non-empty review fragment",
+        )
+    actual_items = [
+        (
+            fragment.get("data-review-kind", ""),
+            fragment.get("data-review-owner", ""),
+            fragment.get("data-review-target", ""),
+        )
+        for fragment in fragments
+        if fragment.get("data-review-kind", "") in {
+            "workflow",
+            "resource",
+            "nodeset",
+            "loop_body",
+        }
+    ]
+    actual = frozenset(actual_items)
+    duplicates = sorted(
+        item for item in actual if actual_items.count(item) > 1
+    )
+    missing = sorted(expected_coverage - actual)
+    unexpected = sorted(actual - expected_coverage)
+    if missing or unexpected or duplicates:
+        raise _ReviewSvgValidationError(
+            "REVIEW.SVG.COVERAGE",
+            "generated review SVG coverage mismatch: "
+            f"missing={missing}, unexpected={unexpected}, duplicates={duplicates}",
+        )
+
+
+def _validate_review_documents(architecture: str, svg: str) -> None:
+    """Compatibility validation used by older programmatic callers."""
+
+    _validate_architecture_document(architecture)
     try:
         root = ElementTree.fromstring(svg)
     except ElementTree.ParseError as exc:
         raise ValueError("generated review SVG is not valid XML") from exc
-    if not root.tag.endswith("svg") or root.get("role") != "img":
+    if not root.tag.endswith("svg"):
         raise ValueError("generated review SVG has an invalid root element")
     if root.get("aria-roledescription") != "flowchart-review-columns":
         raise ValueError("generated review SVG has no review layout marker")
+
+
+def _finish_review_failure(
+    payload: dict[str, object],
+    stage: str,
+    code: str,
+    error: BaseException,
+    *,
+    status: str = "ERROR",
+) -> int:
+    message = str(getattr(error, "message", str(error)))
+    payload.update(
+        status=status,
+        failed_stage=stage,
+        published=False,
+        code=code,
+        error={
+            "rule_id": code,
+            "severity": "error",
+            "object_type": "review",
+            "object_id": str(payload.get("config") or ""),
+            "failure_layer": stage,
+            "message": message,
+            "details": {},
+            "suggested_fix_type": "fix_config",
+        },
+    )
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 1
 
 
 def _quality_configs(
