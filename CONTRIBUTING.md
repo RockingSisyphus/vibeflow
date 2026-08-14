@@ -1,8 +1,8 @@
 # Contributing to VibeFlow
 
-This guide is for people changing the VibeFlow framework. Project authors should start with `docs/developer_guide.md` or `docs/js_aot_build.md`.
+This guide is for people changing the VibeFlow framework. Project authors should start with `docs/overview.md` and `docs/user/quickstart.md`.
 
-VibeFlow 0.10.1 uses independent Python and JavaScript Target application closures. Every project root declares exactly one `project_target`; do not introduce cross-Target workflow execution or imports. Use the layered packages directly; do not add root-level business exports or restore removed `aot`, `runtime`, `portable`, `config`, `health`, `purity`, `devtools`, `rendering`, or `workspace` APIs.
+VibeFlow 0.13.2 uses independent Python and JavaScript Target application closures. Every project root declares exactly one `project_target`; do not introduce cross-Target workflow execution or imports. Use the layered packages directly and keep language-specific implementation outside Core.
 
 ## Architecture rules
 
@@ -100,14 +100,13 @@ python distribution/build.py \
   --archive-dir /tmp/vibeflow-distribution-archives
 ```
 
-Do not edit generated distribution output. Change `distribution/kernel_development_pack/`, `docs/` or `src/vibeflow/`, then rebuild.
+Do not edit generated distribution output. Change canonical sources under `docs/`, `distribution/prompts/` or `src/vibeflow/`, then rebuild.
 
 ## Documentation
 
-- User-visible Python behavior belongs in `docs/developer_guide.md`.
-- JavaScript Target descriptors, ABI and AOT profiles belong in `docs/js_aot_build.md`.
-- Framework maintenance belongs in `docs/kernel_development_guide.md`.
-- Long-lived architecture belongs in `docs/kernel_target_vision.md`.
-- Distribution-facing documents are source files under `distribution/kernel_development_pack/`.
+- Stable user interfaces belong in `docs/user/`.
+- Language-neutral design belongs in `docs/design/`.
+- Repository and release procedures belong in `docs/maintainers/`.
+- Distribution prompts only route agents to canonical user documentation.
 - Keep runnable claims synchronized with `sandbox/`.
-- Historical plans can explain design decisions but do not define the current public API.
+- Git history and release notes preserve migration history; active guides describe current behavior.

@@ -1,0 +1,63 @@
+{
+  "schema": "vibeflow.distribution-profiles.v1",
+  "document_sets": {
+    "common": [
+      "docs/overview.md",
+      "docs/user/quickstart.md",
+      "docs/user/workflow-and-config.md",
+      "docs/user/python-development.md",
+      "docs/user/javascript-development.md",
+      "docs/user/nodesets-and-loops.md",
+      "docs/user/plugins-and-integrations.md",
+      "docs/user/commands-and-results.md"
+    ],
+    "collaborative": [
+      "docs/user/profiles/collaborative.md"
+    ],
+    "autonomous": [
+      "docs/user/profiles/autonomous.md"
+    ]
+  },
+  "profiles": {
+    "collaborative": {
+      "prompt_fragments": [
+        "distribution/prompts/common.md",
+        "distribution/prompts/collaborative.md"
+      ],
+      "document_sets": ["common", "collaborative"],
+      "agent_protocol": {
+        "change_inventory": "required",
+        "planned_review": true,
+        "human_approval_gate": true,
+        "required_review_artifact": "expanded_svg"
+      },
+      "agent_automation": {
+        "refresh_architecture": true,
+        "validate": true,
+        "quality": true,
+        "build": true,
+        "workflow_execution_probe": true
+      }
+    },
+    "autonomous": {
+      "prompt_fragments": [
+        "distribution/prompts/common.md",
+        "distribution/prompts/autonomous.md"
+      ],
+      "document_sets": ["common", "autonomous"],
+      "agent_protocol": {
+        "change_inventory": "optional",
+        "planned_review": false,
+        "human_approval_gate": false,
+        "required_review_artifact": "on_demand"
+      },
+      "agent_automation": {
+        "refresh_architecture": true,
+        "validate": true,
+        "quality": true,
+        "build": true,
+        "workflow_execution_probe": true
+      }
+    }
+  }
+}

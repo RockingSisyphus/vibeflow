@@ -1,0 +1,7 @@
+{
+  "kind": "node", "type_key": "minimal.end", "display_name": "Workflow end", "category": "boundary",
+  "description": "Marks the structural end after the response is available.", "version": "0.13.2", "flow_kind": "terminal",
+  "contract": {"requires": [], "provides": [], "params_schema": {}, "params_defaults": {}, "input_semantics": {}, "output_semantics": {}},
+  "implementations": [{"language": "typescript", "targets": ["browser", "node"], "source": {"kind": "file", "ref": "nodes/end.ts", "export": "run"}}],
+  "base_libs": [], "capabilities": []
+}

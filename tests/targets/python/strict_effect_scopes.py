@@ -88,7 +88,7 @@ class PureExampleRaisesNode:
     )
 
     def run_pure(self, inputs, params):
-        raise RuntimeError("pure examples still execute")
+        raise RuntimeError("examples must not execute")
 
 
 class PureExampleSystemExitNode:

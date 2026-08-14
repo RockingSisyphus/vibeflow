@@ -1,0 +1,13 @@
+{
+  "kind": "node", "type_key": "minimal.input_boundary", "display_name": "Input boundary", "category": "boundary",
+  "description": "Adapts the public request into the workflow's internal payload.", "version": "0.13.2", "flow_kind": "io",
+  "contract": {
+    "requires": [{"type": "payload.request", "cardinality": "exactly_one", "display_name": "Public request"}],
+    "provides": [{"key": "internal_payload", "type": "payload.internal", "display_name": "Internal payload"}],
+    "params_schema": {}, "params_defaults": {},
+    "input_semantics": {"payload.request": ["Generic payload supplied by the caller."]},
+    "output_semantics": {"internal_payload": ["Internal payload passed to business processing."]}
+  },
+  "implementations": [{"language": "typescript", "targets": ["browser", "node"], "source": {"kind": "file", "ref": "nodes/input_boundary.ts", "export": "run"}}],
+  "base_libs": [], "capabilities": []
+}

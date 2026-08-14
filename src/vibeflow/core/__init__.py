@@ -56,6 +56,12 @@ from vibeflow.core.flow import (
     NodesetSpec,
 )
 from vibeflow.core.findings import Finding, HealthFinding, HealthReport
+from vibeflow.core.result_scope import (
+    CoverageItem,
+    add_result_scope,
+    format_result_scope,
+    result_scope_payload,
+)
 from vibeflow.core.models import (
     CoreCompilation,
     CoreCompileRequest,
@@ -97,6 +103,7 @@ __all__ = [
     "ConfigScope",
     "CoreCompilation",
     "CoreCompileRequest",
+    "CoverageItem",
     "DataEnvelope",
     "DataProvider",
     "DataRequirement",
@@ -145,10 +152,12 @@ __all__ = [
     "ValidatedWorkflow",
     "WorkflowQualityRequest",
     "analyze_nodeset_dependencies",
+    "add_result_scope",
     "attach_global_config",
     "compile_core",
     "config_override_conflicts",
     "explicit_flow_cycles",
+    "format_result_scope",
     "effective_node_params",
     "evaluate_project_quality",
     "merge_config_scopes",
@@ -162,5 +171,6 @@ __all__ = [
     "normalize_node_config_overrides",
     "normalize_node_config_spec",
     "scoped_node_params",
+    "result_scope_payload",
     "validate_workflow_quality",
 ]

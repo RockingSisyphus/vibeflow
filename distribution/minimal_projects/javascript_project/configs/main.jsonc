@@ -1,0 +1,28 @@
+{
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "request",
+        "type": "payload.request",
+        "display_name": "Public request",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {"id": "start", "type_used": "minimal.start", "display_name": "Start request workflow", "description": "Starts this generic input-to-output workflow."},
+      {"id": "input_boundary", "type_used": "minimal.input_boundary", "display_name": "Receive request", "description": "Converts the public request into the internal payload."},
+      {"id": "process_payload", "type_used": "minimal.process_payload", "display_name": "Apply business processing", "description": "Runs the project-specific transformation implemented in nodes/process_payload.ts."},
+      {"id": "output_boundary", "type_used": "minimal.output_boundary", "display_name": "Return response", "description": "Converts the processed payload into the public response."},
+      {"id": "end", "type_used": "minimal.end", "display_name": "End request workflow", "description": "Ends after the declared public response is available.", "similar_to": {"node": "start", "relationship": "copy", "reason": "The start and end terminal implementations intentionally return no data at opposite workflow boundaries."}}
+    ],
+    "edges": [
+      {"from": "start", "to": "input_boundary"},
+      {"from": "input_boundary", "to": "process_payload"},
+      {"from": "process_payload", "to": "output_boundary"},
+      {"from": "output_boundary", "to": "end"}
+    ],
+    "outputs": [
+      {"type": "payload.response", "cardinality": "exactly_one", "display_name": "Public response", "as": "response"}
+    ]
+  }
+}

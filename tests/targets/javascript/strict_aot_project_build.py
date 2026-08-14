@@ -21,8 +21,17 @@ from vibeflow.tooling.application.javascript.audit import (
     render_architecture,
     render_mermaid,
 )
+from vibeflow.tooling.application.javascript.review import write_review_svg
 from vibeflow.core.compiler import CompiledGraph
-from vibeflow.core.flow import GraphConfig, GraphConfigError, NodeSpec, STATUS_PLANNED
+from vibeflow.core.flow import (
+    GraphConfig,
+    GraphConfigError,
+    NodeMetadata,
+    NodeSpec,
+    NodeStyle,
+    STATUS_PLANNED,
+)
+from vibeflow.tooling.presentation.mermaid import is_mermaid_svg_renderer_available
 from vibeflow.targets.javascript.build.toolchain import ToolchainInfo
 from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
 
@@ -942,9 +951,173 @@ def test_javascript_planned_global_state_renders_as_cloud_path() -> None:
 
     mermaid = render_mermaid(result)
     assert 'runtime_state@{ shape: cloud, label: "runtime_state' in mermaid
+    assert "class vf_runtime_state plannedNode;" in mermaid
+    assert "class vf_ordinary plannedNode;" in mermaid
+    assert "status: planned blocking" in mermaid
     assert "effect_scope: global_state" in mermaid
     assert "runtime_dispatch: unknown" in mermaid
     assert "execution_lock: none" in mermaid
+
+
+def test_javascript_mermaid_composes_planned_custom_and_external_styles(
+    tmp_path: Path,
+) -> None:
+    graph = GraphConfig(
+        nodes=(
+            NodeSpec(
+                id="planned",
+                type_used="future.planned",
+                status=STATUS_PLANNED,
+                flow_kind="process",
+                metadata=NodeMetadata(
+                    display_name="Planned",
+                    description="Shows planned styling.",
+                ),
+            ),
+            NodeSpec(
+                id="custom",
+                type_used="demo.custom",
+                metadata=NodeMetadata(
+                    display_name="Custom",
+                    description="Shows custom colours.",
+                ),
+                style=NodeStyle(
+                    fill="#dbeafe",
+                    stroke="#1d4ed8",
+                    text="#172554",
+                ),
+            ),
+            NodeSpec(
+                id="external",
+                type_used="demo.external",
+                metadata=NodeMetadata(
+                    display_name="External",
+                    description="Shows the external boundary.",
+                ),
+            ),
+            NodeSpec(
+                id="external_custom",
+                type_used="demo.external_custom",
+                metadata=NodeMetadata(
+                    display_name="External Custom",
+                    description="Combines custom colours and the external boundary.",
+                ),
+                style=NodeStyle(
+                    fill="#fce7f3",
+                    stroke="#be185d",
+                    text="#500724",
+                ),
+            ),
+        )
+    )
+    compiled = CompiledGraph(
+        order=tuple(node.id for node in graph.nodes),
+        explicit_edges=(),
+        data_edges=(),
+        effective_edges=(),
+        providers={},
+        consumers={},
+        flow_kinds={node.id: node.flow_kind or "process" for node in graph.nodes},
+        effect_scopes={"external": "trusted", "external_custom": "trusted"},
+    )
+    descriptors = {
+        "demo.custom": SimpleNamespace(
+            display_name="Custom",
+            description="Shows custom colours.",
+            external=False,
+        ),
+        "demo.external": SimpleNamespace(
+            display_name="External",
+            description="Shows the external boundary.",
+            external=True,
+        ),
+        "demo.external_custom": SimpleNamespace(
+            display_name="External Custom",
+            description="Combines custom colours and the external boundary.",
+            external=True,
+        ),
+    }
+    result = SimpleNamespace(
+        graph=graph,
+        compiled=compiled,
+        catalogs=SimpleNamespace(nodes=descriptors),
+        architecture={"resources": {}},
+        plugin_records=(),
+        host_records=(),
+        compiled_nodesets={},
+        plan=SimpleNamespace(workflow_id="visual-test"),
+        root=SimpleNamespace(id="visual-test"),
+    )
+
+    mermaid = render_mermaid(result)
+
+    assert "classDef plannedNode fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;" in mermaid
+    assert "class vf_planned plannedNode;" in mermaid
+    assert "status: planned blocking" in mermaid
+    assert "class vf_custom defaultNode;" in mermaid
+    assert "style vf_custom fill:#dbeafe,stroke:#1d4ed8,color:#172554;" in mermaid
+    assert "[EXTERNAL] External" in mermaid
+    assert mermaid.count("external: true") == 2
+    for node_id in ("vf_external", "vf_external_custom"):
+        assert f"class {node_id} externalDependency;" in mermaid
+        assert f"class {node_id} externalBoundary;" in mermaid
+    assert "style vf_external_custom fill:#fce7f3,stroke:#be185d,color:#500724;" in mermaid
+
+    if not is_mermaid_svg_renderer_available():
+        pytest.skip("Mermaid SVG renderer is not installed")
+
+    for expand_nodesets, filename in (
+        (False, "default.svg"),
+        (True, "review-columns.svg"),
+    ):
+        output = tmp_path / filename
+        write_review_svg(
+            result,
+            output,
+            expand_nodesets=expand_nodesets,
+            mermaid_layout="review-columns" if expand_nodesets else "default",
+        )
+        svg = output.read_text(encoding="utf-8")
+        assert "plannedNode" in svg
+        assert "fill:#fef08a !important" in svg
+        assert "stroke-dasharray:6 3 !important" in svg
+        assert "externalDependency externalBoundary" in svg
+        assert "fill:#fce7f3 !important" in svg
+        assert "stroke:#be185d !important" in svg
+        assert "stroke-width:7px !important" in svg
+
+
+def test_javascript_audit_carries_descriptor_external_and_config_style_to_mermaid(
+    tmp_path: Path,
+) -> None:
+    request = _request(tmp_path)
+    project = Path(request.config).parent
+    descriptor_path = project / "manifests/nodes/start.jsonc"
+    descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+    descriptor["external"] = True
+    _write(descriptor_path, descriptor)
+    config = json.loads(Path(request.config).read_text(encoding="utf-8"))
+    config["pipeline"]["nodes"][0]["style"] = {
+        "fill": "#fce7f3",
+        "stroke": "#be185d",
+        "text": "#500724",
+    }
+    _write(Path(request.config), config)
+
+    result = audit_javascript_project(
+        JavascriptAuditRequest(
+            workspace=request.workspace,
+            config=request.config,
+            audit_sources=False,
+        )
+    )
+    mermaid = render_mermaid(result)
+
+    assert "[EXTERNAL] Start" in mermaid
+    assert "external: true" in mermaid
+    assert "class vf_start externalDependency;" in mermaid
+    assert "class vf_start externalBoundary;" in mermaid
+    assert "style vf_start fill:#fce7f3,stroke:#be185d,color:#500724;" in mermaid
 
 
 @pytest.mark.parametrize(

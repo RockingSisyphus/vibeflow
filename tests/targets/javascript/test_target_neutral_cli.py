@@ -222,12 +222,12 @@ def test_homogeneous_javascript_quality_respects_disabled_root(
 
     payload = json.loads(capsys.readouterr().out)
     assert exit_code == 0
-    assert payload == {
-        "status": "PASS",
-        "project_target": "javascript",
-        "reports": [],
-        "skipped": "quality_enabled=false",
-    }
+    assert payload["status"] == "PASS"
+    assert payload["project_target"] == "javascript"
+    assert payload["reports"] == []
+    assert payload["skipped"] == "quality_enabled=false"
+    assert payload["result_code"] == "VIBEFLOW_QUALITY_PASS"
+    assert payload["checked"] == []
 
 
 def test_minimal_javascript_validate_needs_no_platform_target(

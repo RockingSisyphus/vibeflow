@@ -1,0 +1,7 @@
+{
+  "kind": "node", "type_key": "minimal.start", "display_name": "Workflow start", "category": "boundary",
+  "description": "Marks the structural start of the minimal workflow.", "version": "0.13.2", "flow_kind": "terminal",
+  "contract": {"requires": [], "provides": [], "params_schema": {}, "params_defaults": {}, "input_semantics": {}, "output_semantics": {}},
+  "implementations": [{"language": "typescript", "targets": ["browser", "node"], "source": {"kind": "file", "ref": "nodes/start.ts", "export": "run"}}],
+  "base_libs": [], "capabilities": []
+}

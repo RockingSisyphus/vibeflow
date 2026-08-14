@@ -829,27 +829,15 @@ def _write_failing_nodeset_config(
                     }
                 ],
                 "nodes": [
-                    {"id": "start", "type_used": "sandbox.terminal"},
+                    {"id": "start", "type_used": "sandbox.terminal", "display_name": "Nested start", "description": "Starts the failing nested block."},
                     {
                         "id": "fail",
                         "type_used": "sandbox.runtime_failure",
-                        "requires": [
-                            {
-                                "type": "sandbox.number",
-                                "cardinality": "exactly_one",
-                                "display_name": "Number",
-                            }
-                        ],
-                        "provides": [
-                            {
-                                "key": "result",
-                                "type": "sandbox.math.result",
-                                "display_name": "Result",
-                            }
-                        ],
+                        "display_name": "Raise nested failure",
+                        "description": "Raises the controlled failure observed by runtime hooks.",
                         "config": {"mode": "throw"},
                     },
-                    {"id": "end", "type_used": "sandbox.terminal"},
+                    {"id": "end", "type_used": "sandbox.terminal", "display_name": "Nested end", "description": "Would end the nested block if the failure node completed."},
                 ],
                 "edges": [
                     {"from": "start", "to": "fail"},
@@ -882,26 +870,14 @@ def _write_failing_nodeset_config(
                     }
                 ],
                 "nodes": [
-                    {"id": "start", "type_used": "sandbox.terminal"},
+                    {"id": "start", "type_used": "sandbox.terminal", "display_name": "Workflow start", "description": "Starts the plugin failure workflow."},
                     {
                         "id": "broken",
                         "type_used": "test.plugin_failure_nodeset",
-                        "requires": [
-                            {
-                                "type": "sandbox.number",
-                                "cardinality": "exactly_one",
-                                "display_name": "Number",
-                            }
-                        ],
-                        "provides": [
-                            {
-                                "key": "result",
-                                "type": "sandbox.math.result",
-                                "display_name": "Result",
-                            }
-                        ],
+                        "display_name": "Run failing nodeset",
+                        "description": "Invokes the nested block whose controlled failure is observed.",
                     },
-                    {"id": "after", "type_used": "sandbox.terminal"},
+                    {"id": "after", "type_used": "sandbox.terminal", "display_name": "After failure", "description": "Must remain unreachable after the nested failure."},
                 ],
                 "edges": [
                     {"from": "start", "to": "broken"},

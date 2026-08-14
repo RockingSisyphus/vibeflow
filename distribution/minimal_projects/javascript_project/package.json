@@ -1,0 +1,10 @@
+{
+  "name": "vibeflow-javascript-minimal",
+  "version": "0.13.2",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "esbuild": "0.28.1",
+    "typescript": "7.0.2"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "kind": "node", "type_key": "minimal.output_boundary", "display_name": "Output boundary", "category": "boundary",
+  "description": "Adapts the processed payload to the public response.", "version": "0.13.2", "flow_kind": "io",
+  "contract": {
+    "requires": [{"type": "payload.processed", "cardinality": "exactly_one", "display_name": "Processed payload"}],
+    "provides": [{"key": "response", "type": "payload.response", "display_name": "Public response"}],
+    "params_schema": {}, "params_defaults": {},
+    "input_semantics": {"payload.processed": ["Processed payload ready to leave the workflow."]},
+    "output_semantics": {"response": ["Generic response returned to the caller."]}
+  },
+  "implementations": [{"language": "typescript", "targets": ["browser", "node"], "source": {"kind": "file", "ref": "nodes/output_boundary.ts", "export": "run"}}],
+  "base_libs": [], "capabilities": []
+}

@@ -2,252 +2,59 @@
 
 [中文](README.md)
 
-> Keep AI-built projects from turning into an unmaintainable pile of mud.
-
-VibeFlow forces AI to plan the program's rough architecture before development, and automatically generates a directly readable standard program flowchart from the program's **real code logic** so developers can understand the real structural logic of each part instead of guessing from AI descriptions that may be distorted. VibeFlow forces AI to follow high cohesion, low coupling, small files, small functions, explicit flow edges, and checkable contracts. AI can still move fast, but every edit must return to a visual, verifiable, runnable flowchart.
-
-## Why VibeFlow 🧯
-
-LLMs are great at writing code quickly. Across many rounds of edits, they are also great at quietly creating these problems:
-
-- One function keeps growing until nobody wants to touch it.
-- New features bypass existing structure and add hidden dependencies.
-- Bug fixes become local patches while the root cause stays alive.
-- The project architecture gradually becomes bloated and chaotic until AI itself can no longer understand it.
-
-Eventually the code may still run, but the structure is no longer reviewable, new features are hard to add, and bugs become hard to fix.
-
-VibeFlow moves these risks earlier. Before AI writes code, the project already carries executable rules for structure, contracts, flow, and artifacts.
-
-## In One Sentence 🧭
-
-VibeFlow constrains a project into a runnable, checkable, visual standard flowchart.
+VibeFlow structures AI-assisted programs as explicit workflows that can be executed, checked, and rendered as architecture views. Business logic lives in small Nodes, Config declares control flow, port contracts declare data flow, and Core validates the structure before execution or build.
 
 ```text
-terminal start -> io input -> process -> decision -> process -> io output -> terminal end
+terminal start → input I/O → process / nodeset → output I/O → terminal end
 ```
-
-AI still writes business code, but it must work through the flowchart: each node stays small, control flow comes only from config, and every run starts with health checks.
-
-## Showcase ✨
-
-This SVG was exported from a complete integration sandbox example. Throughout AI development, developers can inspect the latest flowchart generated under `reports/` at any time to understand the project's current logical structure and keep track of the whole project state with minimal effort.
 
 ![VibeFlow comprehensive flowchart](docs/assets/comprehensive_flowchart.svg)
 
-The cloud-shaped node demonstrates the language-neutral `global_state` semantic together with its derived effect scope, runtime-dispatch fact, and effective named execution lock (`none` when absent). The formally exported Mermaid source is [comprehensive_flowchart.mmd](docs/assets/comprehensive_flowchart.mmd).
+## Main capabilities
 
-## Who It Is For 👥
+- Python Runtime and JavaScript/TypeScript AOT;
+- Nodes, Nodesets, Loops, Plugins, Capabilities, and explicit effect boundaries;
+- deterministic Architecture, Mermaid, ASCII, and SVG views;
+- config, contract, reachability, control-flow, quality, build, and execution-evidence checks;
+- collaborative and autonomous development protocols over the same Core and machine rules.
 
-- Developers using OpenCode, Codex, Claude Code, or other vibe coding tools for long-running projects.
-- Teams that want AI assistance without losing project structure.
-- Projects where business flow should be reviewable as Mermaid, ASCII, or SVG diagrams.
-- Workflows that need automatic structure, contract, and quality checks before execution.
+VibeFlow validates engineering structure. Project tests remain responsible for business results, requirements, external semantics, and domain-data correctness.
 
-## Usage 🚀
+## Getting started
 
-VibeFlow is designed for release-package usage.
+Download and extract one release package:
 
-1. Download the latest package from GitHub Releases.
-2. Extract it into your workspace.
-3. Open or create a project in that directory with any vibe coding tool, such as OpenCode, Codex, or Claude Code.
-4. Let AI follow `AGENTS.md` and classify the task first: for an existing project, read the registered architecture document and modify the real workflow/nodeset in place; only a greenfield project starts from a coarse planned flowchart.
-5. Generate the formal architecture review artifact with `python run.py review`. If you asked for implementation only after review, AI must wait for your explicit approval in a later message.
+- `vibeflow-distribution-0.13.2.zip` for human-reviewed collaboration;
+- `vibeflow-distribution-autonomous-0.13.2.zip` for unattended development.
 
-The release package root includes `AGENTS.md`. AI tools that support project instructions can read it automatically and learn:
+The root `AGENTS.md` routes AI agents to task-specific documentation. Human readers can start at `kernel/docs/README.md`. Both packages include minimal `python_project/` and `javascript_project/` roots.
 
-- Which directories are editable.
-- Which kernel files should not be modified.
-- How to add nodes, nodesets, and plugins.
-- How to run validate, run, quality, and diagram commands.
-- How to read and regenerate `ARCHITECTURE.jsonc` without editing it by hand.
-- Which health checks must pass before execution.
-- How to distinguish greenfield work from changes to an existing project and edit the real sources.
-- How to generate a formal review with `review` and wait for explicit human approval before implementation.
-- How to expose a workflow as an ordinary business command with CLI delegation mode / `delegate-cli`.
-
-You do not need to understand the full kernel source first. Treat the release package as an AI development workspace with built-in rules.
-
-## Typical Release Package Layout 📦
-
-```text
-AGENTS.md         # project rules for AI tools
-README.md         # project guide
-run.py            # project entrypoint
-DISTRIBUTION.json # release version, roots, and kernel hash
-kernel/
-  vibeflow-kernel.zip
-  MANIFEST.sha256
-  README.md
-  docs/
-  tools/
-python_project/
-  ARCHITECTURE.jsonc # generated single-file architecture review view
-  nodes/          # business nodes
-  base_lib/       # pure helper functions
-  plugins/        # optional policy/runtime plugins
-  configs/        # JSONC flow configs
-  registry.py     # node registration
-javascript_project/
-  ARCHITECTURE.jsonc
-  configs/
-  nodes/
-  base_lib/
-  plugins/
-  host_extensions/
-  manifests/
-  web/
-  package.json
-  package-lock.json
-runs/
-reports/
-```
-
-Common commands:
+Python smoke run:
 
 ```bash
-python run.py architecture --config python_project/configs/main.jsonc --output python_project/ARCHITECTURE.jsonc
-python run.py review --config python_project/configs/main.jsonc --output reports/graph.expanded.svg
 python run.py validate --config python_project/configs/main.jsonc
-python run.py run --config python_project/configs/main.jsonc --run-root runs
-python run.py delegate-cli --config python_project/configs/main.jsonc -- --input data.yaml --verbose
-python run.py review --config javascript_project/configs/linear.jsonc --output reports/javascript.svg
-python run.py build --config javascript_project/configs/linear.jsonc --target node --profile single-esm --out-dir output/node
-python run.py build --config javascript_project/configs/linear.jsonc --target browser --profile web-app --html javascript_project/web/index.template.html --app-entry javascript_project/web/app.ts --out-dir output/web
-python run.py quality --path python_project
+python run.py run --config python_project/configs/main.jsonc --input python_project/probe_input.json
 ```
 
-Each root must select exactly one language backend with `project_target: "python" | "javascript"` in `vibeflow_project.jsonc`. A workspace may contain both root types, but one workflow cannot mix Targets. Browser and Node are not workflow declarations; JavaScript users select the required output with each `build --target` call.
+JavaScript smoke run:
 
-Each root can register workflow/document pairs under `architecture.documents`. Fixed comments mark the generated document as non-executable; mutable-looking status properties are deliberately absent. AI should read it first to understand the project architecture. To change that architecture, edit the real workflow config or relevant nodesets, update registry metadata/config schema when needed, and regenerate the document; never edit the generated document itself. Workspace validation and execution reject a registered document that is missing, stale, or manually reformatted, with source locations and a repair command.
-
-`review` is the formal architecture-review entry point. It checks registration and the existing graph, refreshes and verifies the canonical `ARCHITECTURE.jsonc`, runs workspace validation, then generates and checks an expanded `review-columns` SVG. If any stage fails, it does not substitute an old SVG, a hand-written diagram, or a direct mmdc render, and it does not publish the failed artifact to the target path. `PASS` or `CONCERNS` only means that machine review completed; when the task says “implement after review,” explicit human approval in a later message is still required.
-
-CLI delegation mode / `delegate-cli` exposes a workflow as an ordinary business CLI. The first `--` optionally separates core and business arguments; tokens not consumed by the core retain their order and enter the graph as `cli.argv`. The graph must produce exactly one `cli.exit_code`, a non-bool integer from 0 through 255. Business code uses the real process stdin/stdout/stderr: VibeFlow does not capture, rewrite, or append JSON/newlines. Kernel diagnostics go to the run's `vibeflow.log`, which records neither raw argv nor business streams. Only `io`, `document`, and `data_store` nodes and runtime plugins may issue an authorized `SystemExit`. Normal and authorized business exits return 0–255, framework failures return 1, and argparse errors in known core options return 2. `delegate-cli` does not change the general execution role of `run` or the formal architecture-review role of `review`.
-
-The same root config can set `runtime.async_max_workers` (default 4), `runtime.async_flush_timeout` (default `null`), and `runtime.nodeset_max_depth` (default 4). Each Runtime owns its thread pool; ordinary nodeset calls and `loop.body` share the static depth limit, while loop iteration count does not increase it. Worker count and nodeset depth have no CLI flags.
-
-The `svg` command internally passes an expanded render config to the bundled Mermaid CLI. Mermaid CLI/mmdc is a kernel implementation detail, not a public review entry point. Normal graphs default to `maxTextSize=200000`; `--expand-nodesets` defaults to `maxTextSize=500000`. Very large graphs can override this with `--mermaid-max-text-size` and `--mermaid-max-edges`. An implemented Python node with `external=True` keeps its `flow_kind` shape, gains a deterministic `[EXTERNAL]` title prefix, and receives a `7px` non-scaling boundary. Health or custom styles may override the boundary color, but cannot remove its width.
-Expanded SVG exports always use the deterministic `review-columns` composer: the main pipeline stays on the left, followed by the workflow's plugins, base_lib, and expanded nodesets. Nodeset details use a recursive detail-panel layout: leaf nodesets render horizontally, while parents retain every collapsed call-site and original edge. Within each parent pipeline or nodeset, direct calls retain first-occurrence order; repeated calls with the same invocation kind and `type_key` share one detail panel whose title summarizes the call count, call IDs, and compact differences. Ordinary nodeset calls and loop bodies never merge, and the same definition still expands separately under different parents.
-`graph.expanded.mmd` is a Mermaid source debug artifact only. It remains expanded per call-site and does not use the local detail deduplication described above. Do not render it directly with Mermaid CLI/mmdc. Formal architecture review must use `run.py review`; `run.py svg --expand-nodesets` remains a single-artifact export or diagnostic entry point.
-SVG rendering does not require Google Chrome to be preinstalled. After a normal `npm install`, VibeFlow first uses Puppeteer's installed/cached browser. `/snap/bin/chromium` is skipped because it commonly fails under Puppeteer/mermaid-cli with profile-lock launch errors.
-
-## AI Development Workflow 🛠️
-
-Classify the task first, then follow the matching path:
-
-```text
-Modify an existing project
-  -> Read the registered ARCHITECTURE.jsonc
-  -> Locate the real workflow / nodeset sources referenced by it
-  -> List reused / modified / deleted / added objects
-  -> Make the smallest change in the original config and nodesets
-  -> run.py review -> explicit later human approval -> implement -> validate / quality / run
-
-Create a greenfield project
-  -> Abstract a coarse standard flowchart
-  -> Write planned nodesets into the real JSONC
-  -> run.py review -> explicit later human approval
-  -> Implement node / base_lib / plugin / config in stages
-  -> validate / quality / run
+```bash
+npm ci --prefix javascript_project
+python run.py build --config javascript_project/configs/main.jsonc --target node --profile esm-module --out-dir javascript_project/build/node
+node javascript_project/scripts/workflow_execution_probe.mjs
 ```
 
-An existing workflow is modified in place by default. A parallel review config, hand-written Mermaid, conceptual diagram, or vague delta picture cannot replace review of the real config. Only a greenfield project or a full redesign explicitly approved by a human starts from a new coarse planned topology. A planned nodeset may omit its body or include a progressively refined body. That body appears in the architecture document, expanded diagrams, and applicable static checks, but it is not executed as an implemented body. A `python_stub` nodeset remains one stub call; an implemented nodeset requires a complete pipeline.
+## Documentation
 
-VibeFlow does not stop you from vibe coding. It makes every vibe return to a checkable structure.
+- [Project overview](docs/overview.md)
+- [User development guides](docs/README.md#使用者开发)
+- [System design](docs/README.md#系统设计)
+- [Kernel maintenance](docs/README.md#内核维护)
 
-## How It Works ⚙️
+Run the complete source-repository gate with:
 
-VibeFlow is a strict flowchart runtime. Ordinary nodes handle local pure computation, explicitly classified nodes/plugins perform real effects within derived effect scopes, JSONC config declares control flow, the compiler builds an executable graph, and the health checker blocks structural drift and contract errors before runtime.
+```bash
+python tools/verify_project.py --full
+```
 
-It turns project architecture from a verbal convention into executable checks.
-
-## Core Features 🧩
-
-### Standard Flowchart Constraints
-
-Every node declares a standard `flow_kind`:
-
-- `terminal`: start / end.
-- `process`: normal processing.
-- `decision`: branch / route.
-- `io`: input / output action.
-- `predefined`: predefined process / nodeset.
-- `data_store`: data store request or reference.
-- `document`: document generation or document structure.
-- `preparation`: setup / initialization.
-- `global_state`: ephemeral ambient state or runtime callback/object-method dispatch.
-
-`flow_kind` and `external` determine the derived `effect_scope`: ordinary implemented nodes and planned `python_stub`s use `none`; `flow_kind=io` uses `terminal` and may access real standard streams plus `print`, `input`, and `argparse`; `document` and `data_store` use `python_io` and may access files, environment, network, databases, subprocesses, and the terminal; `global_state` contains execution-domain ambient state and runtime dispatch; any `external=True` node and every plugin use highest-priority `trusted`. Diagram role `flow_kind=terminal` still maps to `none` and is unrelated to the `terminal` effect scope.
-
-### Explicit Flow Edges
-
-Program control flow comes only from `pipeline.edges` in JSONC config.
-
-`requires` / `provides` are data contracts, not hidden control-flow inference. This keeps multi-round AI edits from creating implicit paths and invisible dependencies.
-
-Health classifies explicit edges as synchronous mainline, data bypass, or
-async. When control and data must be separated explicitly, an object edge may
-set `schedule: false` (transfer only) or `transfer: false` (schedule only).
-Omitted roles retain the existing inference, and both roles cannot be false.
-Join/readiness uses schedule edges; node inbox delivery uses transfer edges.
-
-Data contracts use strict structured fields: `provides` declares a unique `key` and logical `type`, while `requires` consumes by `type` plus `cardinality`. Runtime passes envelopes through node inboxes and edge payloads; nodes cannot read early upstream outputs through a multi-hop global Context, and final results keep only `pipeline.outputs`.
-
-### Small Nodes And Explicit Effects
-
-Ordinary `effect_scope=none` business nodes are pure:
-
-- No file reads or writes.
-- No network access.
-- No database access.
-- No browser or external process launches.
-- No environment variable reads.
-- No direct calls to other nodes.
-
-An `io` node may perform real terminal interaction; `data_store` and `document` nodes may perform Python IO. `global_state` makes ambient state and callbacks/model/optimizer methods obtained from envelopes, registries, or caches visible as a cloud node. Objects still travel through envelopes, and this scope does not grant direct IO, dynamic-code, concurrency-creation, or FFI access. The Python Target emits an advisory warning for high-confidence, source-visible runtime dispatch in an ordinary node without blocking validation or execution; fixed builtins, Python protocols, and existing IO effect boundaries are not misclassified.
-
-`global_state` does not lock automatically. A project may declare a static named `execution_lock`: identical keys exclude each other, different keys may run concurrently, and no key means no lock plus a warning. `external=True` and plugins are `trusted` boundaries. External is reserved for a wrapper implementation whose source is unavailable, unresolvable, or unreviewable—not merely because it invokes a runtime callback. Contracts, topology, output keys, and trace rules still apply. Effectful or external node `CONTRACT.examples` are checked structurally but are not executed.
-
-### Pre-Run Health Checks
-
-Before execution, VibeFlow checks:
-
-- Node metadata completeness.
-- Input and output contracts.
-- Reachability from start to end.
-- Whether ordinary graph/nodeset cycles are absent; iteration must use the first-class `vibeflow.loop.while` node.
-- Each node's derived effect scope and structure rules.
-- Whether config, plugins, or nodesets break project boundaries.
-
-If checks fail, the run is refused with traceable reasons.
-
-### Visual Artifacts
-
-The same config can export:
-
-- Mermaid flowcharts.
-- ASCII terminal flowcharts.
-- SVG diagrams.
-
-Humans can review the system shape, and AI tools get a clearer project map.
-
-## Repository Docs 📚
-
-- `docs/kernel_target_vision.md`: vision.
-- `docs/developer_guide.md`: user development guide.
-- [JavaScript/TypeScript node and Web AOT build guide](docs/js_aot_build.md).
-- `docs/kernel_development_guide.md`: VibeFlow maintenance guide.
-- `distribution/kernel_development_pack/`: release package template.
-
-## License 📄
-
-VibeFlow is licensed under the GNU Affero General Public License v3.0 (AGPLv3). See `LICENSE`.
-
-## Status 🚧
-
-VibeFlow is evolving quickly. The current focus is stabilizing structure discipline, flowchart representation, pre-run checks, and the release-package experience for AI-assisted development.
-
-If more software will be maintained by humans and AI together, projects need more than stronger generation. They need harder structural boundaries.
-
-VibeFlow is that boundary.
+Current package version: `0.13.2`. Workflow ABI: `vibeflow.workflow.v4`.

@@ -26,6 +26,7 @@ from vibeflow.core.mainline import MainlineFinding, analyze_mainline
 from vibeflow.core.models import (
     CoreCompilation,
     CoreCompileRequest,
+    ImplementationFact,
     ImplementationFacts,
     TargetFeatureSet,
     ValidatedWorkflow,
@@ -233,24 +234,69 @@ def _resolve_effective_graph(
     graph: GraphConfig,
     *,
     implementations: ImplementationFacts,
-    nodeset_registry: dict[str, NodesetSpec] | None = None,
-    active_nodesets: frozenset[str] = frozenset(),
 ) -> GraphConfig:
-    """Return the target-neutral graph whose implemented contracts are resolved.
+    """Resolve one dynamic-programming state per graph definition.
 
     Config owns call-site metadata and topology. Implemented node contracts come
     from Target facts, while nodeset calls inherit their public nodeset contract.
     Planned and system nodes retain the explicit contracts parsed from config.
+
+    A graph's ``nodesets`` mapping is a symbol table, not a child collection.
+    Every parsed nodeset body intentionally sees the same table for forward
+    references.  Resolve the root and each definition exactly once, then attach
+    one shared resolved symbol table to every state.  No state depends on a
+    child body's resolved nodes, so recursive evaluation is neither necessary
+    nor correct here.
     """
 
-    registry = dict(nodeset_registry or {})
-    registry.update(graph.nodesets)
+    definition_by_key = dict(graph.nodesets)
+    facts_by_type = {fact.type_key: fact for fact in implementations.nodes}
+    resolved_registry: dict[str, NodesetSpec] = {}
+
+    # Bottom-up DP table.  ``None`` is the root state; every other key is the
+    # unique nodeset definition state identified by its type_key.
+    state_sources: tuple[tuple[str | None, GraphConfig], ...] = (
+        (None, graph),
+        *(
+            (type_key, nodeset.graph)
+            for type_key, nodeset in definition_by_key.items()
+        ),
+    )
+    resolved_states: dict[str | None, GraphConfig] = {}
+    for state_key, source_graph in state_sources:
+        resolved_states[state_key] = replace(
+            source_graph,
+            nodes=_resolve_effective_nodes(
+                source_graph.nodes,
+                definition_by_key=definition_by_key,
+                facts_by_type=facts_by_type,
+            ),
+            nodesets=resolved_registry,
+        )
+
+    for type_key, nodeset in definition_by_key.items():
+        resolved_registry[type_key] = replace(
+            nodeset,
+            graph=resolved_states[type_key],
+        )
+
+    return resolved_states[None]
+
+
+def _resolve_effective_nodes(
+    nodes: tuple[NodeSpec, ...],
+    *,
+    definition_by_key: dict[str, NodesetSpec],
+    facts_by_type: dict[str, ImplementationFact],
+) -> tuple[NodeSpec, ...]:
+    """Evaluate the contract transition for one DP graph state."""
+
     resolved_nodes: list[NodeSpec] = []
-    for node in graph.nodes:
+    for node in nodes:
         if node.status == STATUS_PLANNED or node.type_used in LOOP_NODE_TYPES or node.type_used == IO_NODE_TYPE:
             resolved_nodes.append(node)
             continue
-        nodeset = registry.get(node.type_used)
+        nodeset = definition_by_key.get(node.type_used)
         if nodeset is not None:
             resolved_nodes.append(
                 replace(
@@ -260,7 +306,7 @@ def _resolve_effective_graph(
                 )
             )
             continue
-        fact = implementations.get(node.type_used)
+        fact = facts_by_type.get(node.type_used)
         if fact is None:
             resolved_nodes.append(node)
             continue
@@ -271,25 +317,7 @@ def _resolve_effective_graph(
                 provides=tuple(fact.provides),
             )
         )
-
-    resolved_nodesets: dict[str, NodesetSpec] = {}
-    for type_key, nodeset in graph.nodesets.items():
-        if type_key in active_nodesets:
-            resolved_nodesets[type_key] = nodeset
-            continue
-        resolved_body = _resolve_effective_graph(
-            nodeset.graph,
-            implementations=implementations,
-            nodeset_registry=registry,
-            active_nodesets=active_nodesets | {type_key},
-        )
-        resolved_nodesets[type_key] = replace(nodeset, graph=resolved_body)
-
-    return replace(
-        graph,
-        nodes=tuple(resolved_nodes),
-        nodesets=resolved_nodesets,
-    )
+    return tuple(resolved_nodes)
 
 
 def _validate_resolved_node_contracts(

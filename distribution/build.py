@@ -5,78 +5,48 @@ from dataclasses import dataclass
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
 import tomllib
+from urllib.parse import unquote, urlsplit
 import zipfile
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+
+try:
+    from .profile_config import (
+        DistributionProfile,
+        DistributionProfileError,
+        PROFILE_NAMES,
+        load_distribution_profiles,
+    )
+except ImportError:  # direct ``python distribution/build.py`` execution
+    from profile_config import (
+        DistributionProfile,
+        DistributionProfileError,
+        PROFILE_NAMES,
+        load_distribution_profiles,
+    )
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = ROOT / "dist" / "vibeflow-distribution"
+DEFAULT_AUTONOMOUS_OUTPUT = ROOT / "dist" / "vibeflow-distribution-autonomous"
 DEFAULT_ARCHIVE_DIR = ROOT / "archive"
 ARCHIVE_ROOT_NAME = "vibeflow-distribution"
-PYTHON_TEMPLATE_RELATIVE = Path("distribution/kernel_development_pack/project_template/project")
-JAVASCRIPT_TEMPLATE_RELATIVE = Path("sandbox/javascript/integration/project")
-JAVASCRIPT_TEMPLATE_FILES = (
-    "package.json",
-    "package-lock.json",
-    "configs/linear.jsonc",
-    "configs/plugins.jsonc",
-    "configs/host_extension.jsonc",
-    "configs/browser_permanent_port_host.jsonc",
-    "configs/nodesets/permanent_port_body.jsonc",
-    "base_lib/math.ts",
-    "nodes/add.ts",
-    "nodes/subtract.ts",
-    "nodes/terminal.ts",
-    "nodes/host_double.ts",
-    "nodes/math.ts",
-    "plugins/policy_audit.ts",
-    "plugins/compiler_audit.ts",
-    "plugins/runtime_audit.ts",
-    "host_extensions/math_host.ts",
-    "host_extensions/browser_port_host.ts",
-    "web/app.ts",
-    "web/index.template.html",
-    "web/browser_host_app.ts",
-    "web/browser_host.template.html",
-    "manifests/base_lib/math.jsonc",
-    "manifests/capabilities/host-math.jsonc",
-    "manifests/host_extensions/math-host.jsonc",
-    "manifests/host_extensions/browser-port-host.jsonc",
-    "manifests/nodes/add.jsonc",
-    "manifests/nodes/subtract.jsonc",
-    "manifests/nodes/terminal.jsonc",
-    "manifests/nodes/host-double.jsonc",
-    "manifests/nodes/math.jsonc",
-    "manifests/plugins/policy-audit.jsonc",
-    "manifests/plugins/compiler-audit.jsonc",
-    "manifests/plugins/runtime-audit.jsonc",
-    "manifests/data/x.jsonc",
-    "manifests/data/addend.jsonc",
-    "manifests/data/subtrahend.jsonc",
-    "manifests/data/sum.jsonc",
-    "manifests/data/subtrahend-forwarded.jsonc",
-    "manifests/data/math-result.jsonc",
-    "manifests/data/number.jsonc",
-)
-EXTRA_DOCS = (
-    ("developer_guide.md", "10_Kernel能力与项目开发指南.md"),
-    ("js_aot_build.md", "11_JS_TS与Web_AOT构建指南.md"),
-)
+MINIMAL_PROJECTS_RELATIVE = Path("distribution/minimal_projects")
+PROFILES_PATH = ROOT / "distribution" / "profiles.jsonc"
 PYTHON_STANDARD_DIRS = (
     "nodes",
-    "base_lib",
-    "plugins",
     "configs",
-    "configs/nodesets",
-    "stubs",
 )
 MANIFEST_RELATIVE = Path("kernel/MANIFEST.sha256")
 KERNEL_ZIP_RELATIVE = Path("kernel/vibeflow-kernel.zip")
 VERSION = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
 ARCHIVE_NAME = f"vibeflow-distribution-{VERSION}.zip"
+AUTONOMOUS_ARCHIVE_NAME = f"vibeflow-distribution-autonomous-{VERSION}.zip"
 PROTECTED_FILES = (
     "run.py",
     "DISTRIBUTION.json",
@@ -103,6 +73,12 @@ class DistributionArtifacts:
     archive: Path
 
 
+@dataclass(frozen=True)
+class ReleaseSetArtifacts:
+    collaborative: DistributionArtifacts
+    autonomous: DistributionArtifacts
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Build the copyable VibeFlow distribution directory and deterministic ZIP."
@@ -111,8 +87,18 @@ def main() -> int:
     output_group.add_argument(
         "--output-dir",
         type=Path,
-        default=DEFAULT_OUTPUT,
         help=f"distribution directory to publish (default: {DEFAULT_OUTPUT})",
+    )
+    parser.add_argument(
+        "--autonomous-output-dir",
+        type=Path,
+        help="autonomous distribution directory when --profile all",
+    )
+    parser.add_argument(
+        "--profile",
+        choices=("all", *PROFILE_NAMES),
+        default="all",
+        help="distribution profile to publish (default: all)",
     )
     output_group.add_argument(
         "--output",
@@ -129,17 +115,35 @@ def main() -> int:
     parser.add_argument("--keep-existing", action="store_true", help="fail instead of replacing an existing output directory")
     args = parser.parse_args()
     output = args.legacy_output if args.legacy_output is not None else args.output_dir
+    if output is None:
+        output = DEFAULT_AUTONOMOUS_OUTPUT if args.profile == "autonomous" else DEFAULT_OUTPUT
     try:
-        artifacts = build_release(
-            output,
-            archive_dir=args.archive_dir,
-            replace=not args.keep_existing,
-        )
+        if args.profile == "all":
+            autonomous_output = args.autonomous_output_dir or _default_autonomous_sibling(output)
+            release_set = build_release_set(
+                output,
+                autonomous_output=autonomous_output,
+                archive_dir=args.archive_dir,
+                replace=not args.keep_existing,
+            )
+            artifacts_list = (release_set.collaborative, release_set.autonomous)
+        else:
+            if args.autonomous_output_dir is not None:
+                raise BuildDistributionError("--autonomous-output-dir is only valid with --profile all")
+            artifacts_list = (
+                build_release(
+                    output,
+                    archive_dir=args.archive_dir,
+                    replace=not args.keep_existing,
+                    profile=args.profile,
+                ),
+            )
     except BuildDistributionError as exc:
         print(str(exc), file=sys.stderr)
         return 1
-    print(f"built distribution directory: {artifacts.directory}")
-    print(f"built distribution archive: {artifacts.archive}")
+    for artifacts in artifacts_list:
+        print(f"built distribution directory: {artifacts.directory}")
+        print(f"built distribution archive: {artifacts.archive}")
     return 0
 
 
@@ -149,10 +153,13 @@ def build_release(
     archive_dir: Path = DEFAULT_ARCHIVE_DIR,
     replace: bool = True,
     run_self_check: bool = True,
+    profile: str = "collaborative",
 ) -> DistributionArtifacts:
+    profiles = _load_profiles()
+    selected = _select_profile(profiles, profile)
     output = _safe_output_path(output)
     archive_dir = _safe_archive_dir(archive_dir)
-    archive = archive_dir / ARCHIVE_NAME
+    archive = archive_dir / _archive_name(profile)
     _validate_release_paths(output=output, archive=archive)
     if output.exists() and not replace:
         raise BuildDistributionError(f"output already exists: {output}")
@@ -172,7 +179,7 @@ def build_release(
     staged_output = output_staging_root / "payload"
     staged_archive = archive_staging_root / ARCHIVE_NAME
     try:
-        _populate_distribution(staged_output)
+        _populate_distribution(staged_output, profile=selected)
         _verify_staged_distribution(staged_output)
         _write_distribution_archive(staged_output, staged_archive)
         _verify_distribution_archive(staged_output, staged_archive)
@@ -192,11 +199,67 @@ def build_release(
     return DistributionArtifacts(directory=output, archive=archive)
 
 
+def build_release_set(
+    collaborative_output: Path = DEFAULT_OUTPUT,
+    *,
+    autonomous_output: Path = DEFAULT_AUTONOMOUS_OUTPUT,
+    archive_dir: Path = DEFAULT_ARCHIVE_DIR,
+    replace: bool = True,
+    run_self_check: bool = True,
+) -> ReleaseSetArtifacts:
+    profiles = _load_profiles()
+    outputs = {
+        "collaborative": _safe_output_path(collaborative_output),
+        "autonomous": _safe_output_path(autonomous_output),
+    }
+    archive_dir = _safe_archive_dir(archive_dir)
+    archives = {name: archive_dir / _archive_name(name) for name in PROFILE_NAMES}
+    targets = [*outputs.values(), *archives.values()]
+    for left_index, left in enumerate(targets):
+        for right in targets[left_index + 1 :]:
+            if left == right or left in right.parents or right in left.parents:
+                raise BuildDistributionError(f"release-set paths must not overlap: {left}; {right}")
+    if not replace:
+        existing = [path for path in targets if path.exists()]
+        if existing:
+            raise BuildDistributionError(f"release target already exists: {existing[0]}")
+    if run_self_check:
+        _run_core_self_check()
+
+    staging: dict[Path, tuple[Path, Path]] = {}
+    try:
+        for name in PROFILE_NAMES:
+            output = outputs[name]
+            archive = archives[name]
+            output.parent.mkdir(parents=True, exist_ok=True)
+            archive.parent.mkdir(parents=True, exist_ok=True)
+            output_root = Path(tempfile.mkdtemp(prefix=f".{output.name}.vibeflow-build-", dir=output.parent))
+            archive_root = Path(tempfile.mkdtemp(prefix=f".{archive.name}.vibeflow-build-", dir=archive.parent))
+            staged_output = output_root / "payload"
+            staged_archive = archive_root / archive.name
+            staging[output] = (staged_output, output_root)
+            staging[archive] = (staged_archive, archive_root)
+            _populate_distribution(staged_output, profile=profiles[name])
+            _verify_staged_distribution(staged_output)
+            _write_distribution_archive(staged_output, staged_archive)
+            _verify_distribution_archive(staged_output, staged_archive)
+        _publish_release_targets(staging, replace=replace)
+    finally:
+        for _, root in staging.values():
+            if root.exists():
+                _remove_tree(root)
+    return ReleaseSetArtifacts(
+        collaborative=DistributionArtifacts(outputs["collaborative"], archives["collaborative"]),
+        autonomous=DistributionArtifacts(outputs["autonomous"], archives["autonomous"]),
+    )
+
+
 def build_distribution(
     output: Path,
     *,
     replace: bool = True,
     run_self_check: bool = True,
+    profile: str = "collaborative",
 ) -> Path:
     """Build only a directory for programmatic tests and compatibility callers.
 
@@ -204,6 +267,7 @@ def build_distribution(
     publishes the matching deterministic outer ZIP as well.
     """
 
+    selected = _select_profile(_load_profiles(), profile)
     output = _safe_output_path(output)
     if output.exists() and not replace:
         raise BuildDistributionError(f"output already exists: {output}")
@@ -218,7 +282,7 @@ def build_distribution(
     )
     staged_output = staging_root / "payload"
     try:
-        _populate_distribution(staged_output)
+        _populate_distribution(staged_output, profile=selected)
         _verify_staged_distribution(staged_output)
         _publish_distribution(
             staged_output,
@@ -241,12 +305,37 @@ def _safe_output_path(output: Path) -> Path:
     resolved = expanded.resolve()
     if resolved == Path(resolved.anchor):
         raise BuildDistributionError("distribution output must not be a filesystem root")
-    if (resolved == ROOT or ROOT in resolved.parents) and resolved != DEFAULT_OUTPUT.resolve():
+    allowed_repository_outputs = {DEFAULT_OUTPUT.resolve(), DEFAULT_AUTONOMOUS_OUTPUT.resolve()}
+    if (resolved == ROOT or ROOT in resolved.parents) and resolved not in allowed_repository_outputs:
         raise BuildDistributionError(
             "distribution output inside the source repository must be the canonical release path: "
             f"{resolved}"
         )
     return resolved
+
+
+def _default_autonomous_sibling(collaborative_output: Path) -> Path:
+    return collaborative_output.with_name(f"{collaborative_output.name}-autonomous")
+
+
+def _archive_name(profile: str) -> str:
+    return ARCHIVE_NAME if profile == "collaborative" else AUTONOMOUS_ARCHIVE_NAME
+
+
+def _load_profiles() -> dict[str, DistributionProfile]:
+    try:
+        return load_distribution_profiles(PROFILES_PATH)
+    except DistributionProfileError as exc:
+        raise BuildDistributionError(str(exc)) from exc
+
+
+def _select_profile(
+    profiles: dict[str, DistributionProfile], profile: str
+) -> DistributionProfile:
+    try:
+        return profiles[profile]
+    except KeyError as exc:
+        raise BuildDistributionError(f"unknown distribution profile: {profile}") from exc
 
 
 def _safe_archive_dir(archive_dir: Path) -> Path:
@@ -274,34 +363,113 @@ def _validate_release_paths(*, output: Path, archive: Path) -> None:
         )
 
 
-def _populate_distribution(output: Path) -> None:
+def _populate_distribution(output: Path, *, profile: DistributionProfile | None = None) -> None:
+    profile = profile or _select_profile(_load_profiles(), "collaborative")
     output.mkdir(parents=True)
     _copy_tree(
         ROOT / "distribution" / "kernel_development_pack" / "project_template",
         output,
-        excluded_top_level={"project"},
+        excluded_top_level={"project", "AGENTS.md", "README.md"},
     )
     _copy_tree(
-        ROOT / PYTHON_TEMPLATE_RELATIVE,
+        ROOT / MINIMAL_PROJECTS_RELATIVE / "python_project",
         output / "python_project",
-        excluded_top_level={"manifests"},
     )
-    _copy_javascript_project(output / "javascript_project")
     _copy_tree(
-        ROOT / "distribution" / "kernel_development_pack" / "docs",
-        output / "kernel" / "docs",
+        ROOT / MINIMAL_PROJECTS_RELATIVE / "javascript_project",
+        output / "javascript_project",
     )
+    _write_profile_assets(output, profile)
     _copy_mermaid_renderer_config(output)
     _copy_license(output)
     _copy_third_party_notices(output)
-    _copy_extra_docs(output / "kernel" / "docs")
     _write_kernel_archive(ROOT / "src" / "vibeflow", output / KERNEL_ZIP_RELATIVE)
     _ensure_standard_project_dirs(output)
     _write_workspace_config(output)
+    _write_python_architecture(output)
     _write_javascript_architecture(output)
-    _write_distribution_metadata(output)
+    _write_distribution_metadata(output, profile=profile)
     _write_kernel_manifest(output)
     _normalize_output_modes(output)
+
+
+def _write_profile_assets(output: Path, profile: DistributionProfile) -> None:
+    prompt_parts = [path.read_text(encoding="utf-8").rstrip() for path in profile.prompt_fragments]
+    (output / "AGENTS.md").write_text("\n\n".join(prompt_parts) + "\n", encoding="utf-8")
+    profile_title = "人机协同" if profile.name == "collaborative" else "无人值守"
+    (output / "README.md").write_text(
+        f"# VibeFlow {VERSION} {profile_title}开发包\n\n"
+        "本发行包包含相同内核下的最小 Python Runtime 与 JavaScript AOT 项目。"
+        "先阅读 `AGENTS.md` 和 `kernel/docs/README.md`。\n",
+        encoding="utf-8",
+    )
+    docs_root = output / "kernel" / "docs"
+    docs_root.mkdir(parents=True, exist_ok=True)
+    for source in profile.documents:
+        destination = docs_root / source.relative_to(ROOT / "docs")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(source.read_bytes())
+    profile_document = next(
+        source.relative_to(ROOT / "docs").as_posix()
+        for source in profile.documents
+        if source.parent.name == "profiles"
+    )
+    links = [
+        f"- [{source.stem}]({source.relative_to(ROOT / 'docs').as_posix()})"
+        for source in profile.documents
+    ]
+    (docs_root / "README.md").write_text(
+        "# VibeFlow 使用者文档\n\n"
+        f"当前开发协议：[{profile.name}]({profile_document})。\n\n"
+        "按任务阅读以下规范：\n\n"
+        + "\n".join(links)
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _publish_release_targets(
+    staging: dict[Path, tuple[Path, Path]], *, replace: bool
+) -> None:
+    backups: dict[Path, Path] = {}
+    published: list[Path] = []
+    try:
+        for target, (staged, root) in staging.items():
+            if target.exists():
+                if not replace:
+                    raise BuildDistributionError(f"release target already exists: {target}")
+                backup = root / "previous"
+                os.replace(target, backup)
+                backups[target] = backup
+            os.replace(staged, target)
+            published.append(target)
+    except BaseException as exc:
+        rollback_errors: list[str] = []
+        for target in reversed(published):
+            try:
+                if target.is_dir() and not target.is_symlink():
+                    _remove_tree(target)
+                elif target.exists() or target.is_symlink():
+                    target.unlink()
+            except OSError as rollback_exc:
+                rollback_errors.append(f"remove {target}: {rollback_exc}")
+        for target, backup in backups.items():
+            try:
+                if backup.exists():
+                    os.replace(backup, target)
+            except OSError as rollback_exc:
+                rollback_errors.append(f"restore {target}: {rollback_exc}")
+        if rollback_errors:
+            raise BuildDistributionError(
+                "release-set publication failed and rollback was incomplete: "
+                + "; ".join(rollback_errors)
+            ) from exc
+        raise
+    for backup in backups.values():
+        if backup.is_dir():
+            _remove_tree(backup)
+        elif backup.exists():
+            backup.unlink()
 
 
 def _publish_distribution(
@@ -414,19 +582,37 @@ def _run_core_self_check() -> None:
 def _verify_staged_distribution(output: Path) -> None:
     """Exercise the staged launcher without importing from the source tree."""
 
+    _verify_profile_assets(output)
+
     environment = os.environ.copy()
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     environment.pop("PYTHONPATH", None)
     checks = (
         ("kernel integrity", [sys.executable, "run.py", "verify-kernel"]),
         (
-            "Python example validation",
+            "Python minimal project validation",
             [
                 sys.executable,
                 "run.py",
                 "validate",
                 "--config",
                 "python_project/configs/main.jsonc",
+            ],
+        ),
+        (
+            "Python workflow execution probe",
+            [
+                sys.executable,
+                "run.py",
+                "run",
+                "--config",
+                "python_project/configs/main.jsonc",
+                "--input",
+                "python_project/probe_input.json",
+                "--run-root",
+                str(output.parent / "probe-runs"),
+                "--run-id",
+                "distribution-probe",
             ],
         ),
     )
@@ -446,6 +632,77 @@ def _verify_staged_distribution(output: Path) -> None:
             f"staged distribution {label} failed"
             + (f": {diagnostic}" if diagnostic else "")
         )
+
+
+def _verify_profile_assets(output: Path) -> None:
+    try:
+        metadata = json.loads((output / "DISTRIBUTION.json").read_text(encoding="utf-8"))
+        profile = _select_profile(_load_profiles(), str(metadata.get("development_profile", "")))
+    except (OSError, json.JSONDecodeError, BuildDistributionError) as exc:
+        raise BuildDistributionError(f"distribution profile metadata is invalid: {exc}") from exc
+    if (
+        metadata.get("agent_protocol") != dict(profile.agent_protocol)
+        or metadata.get("agent_automation") != dict(profile.agent_automation)
+    ):
+        raise BuildDistributionError("distribution metadata does not match the selected agent protocol")
+    expected_prompt = "\n\n".join(
+        path.read_text(encoding="utf-8").rstrip()
+        for path in profile.prompt_fragments
+    ) + "\n"
+    if (output / "AGENTS.md").read_text(encoding="utf-8") != expected_prompt:
+        raise BuildDistributionError("generated AGENTS.md does not match its distribution profile")
+    docs_root = output / "kernel" / "docs"
+    actual_docs = sorted(
+        path.relative_to(docs_root)
+        for path in docs_root.rglob("*.md")
+        if path.is_file() and path.name != "README.md"
+    )
+    expected_paths = sorted(source.relative_to(ROOT / "docs") for source in profile.documents)
+    if actual_docs != expected_paths:
+        raise BuildDistributionError("generated profile document set is incomplete or contains extras")
+    for source in profile.documents:
+        relative = source.relative_to(ROOT / "docs")
+        if (docs_root / relative).read_bytes() != source.read_bytes():
+            raise BuildDistributionError(f"generated profile document differs from source: {relative}")
+    _verify_distribution_document_links(output)
+
+
+def _verify_distribution_document_links(output: Path) -> None:
+    """Resolve packaged guidance links from their published locations."""
+
+    documents = [output / "AGENTS.md", output / "README.md"]
+    documents.extend(sorted((output / "kernel" / "docs").rglob("*.md")))
+    for document in documents:
+        source = document.read_text(encoding="utf-8")
+        for raw_target in re.findall(r"(?<!!)\[[^\]]+\]\(([^)]+)\)", source):
+            target = raw_target.strip()
+            if target.startswith("<") and target.endswith(">"):
+                target = target[1:-1].strip()
+            parsed = urlsplit(target)
+            if parsed.scheme or parsed.netloc:
+                if parsed.scheme == "file":
+                    raise BuildDistributionError(
+                        f"distribution document uses a file URI: {document.relative_to(output)}: {target}"
+                    )
+                continue
+            if not parsed.path:
+                continue
+            relative = Path(unquote(parsed.path))
+            if relative.is_absolute():
+                raise BuildDistributionError(
+                    f"distribution document uses an absolute link: {document.relative_to(output)}: {target}"
+                )
+            destination = (document.parent / relative).resolve()
+            try:
+                destination.relative_to(output.resolve())
+            except ValueError as exc:
+                raise BuildDistributionError(
+                    f"distribution document link escapes the package: {document.relative_to(output)}: {target}"
+                ) from exc
+            if not destination.is_file():
+                raise BuildDistributionError(
+                    f"distribution document link is missing in the package: {document.relative_to(output)}: {target}"
+                )
 
 
 def _copy_tree(
@@ -469,89 +726,6 @@ def _copy_tree(
         else:
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(path.read_bytes())
-
-
-def _copy_extra_docs(target: Path) -> None:
-    for source_name, target_name in EXTRA_DOCS:
-        source = ROOT / "docs" / source_name
-        destination = target / target_name
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(source.read_bytes())
-
-
-def _copy_javascript_project(target: Path) -> None:
-    source_root = ROOT / JAVASCRIPT_TEMPLATE_RELATIVE
-    for relative_text in JAVASCRIPT_TEMPLATE_FILES:
-        relative = Path(relative_text)
-        source = source_root / relative
-        if not source.is_file():
-            raise BuildDistributionError(
-                f"JavaScript distribution template source is missing: {source}"
-            )
-        destination = target / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(source.read_bytes())
-    package_payload = {
-        "name": "vibeflow-javascript-example",
-        "version": VERSION,
-        "private": True,
-        "type": "module",
-        "devDependencies": {
-            "esbuild": "0.28.1",
-            "typescript": "7.0.2",
-        },
-    }
-    (target / "package.json").write_text(
-        json.dumps(package_payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    lock_path = target / "package-lock.json"
-    lock_payload = json.loads(lock_path.read_text(encoding="utf-8"))
-    lock_payload["name"] = package_payload["name"]
-    lock_payload["version"] = VERSION
-    root_package = lock_payload.get("packages", {}).get("")
-    if not isinstance(root_package, dict):
-        raise BuildDistributionError(
-            "JavaScript template lockfile has no root package record"
-        )
-    root_package["name"] = package_payload["name"]
-    root_package["version"] = VERSION
-    lock_path.write_text(
-        json.dumps(lock_payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    project_config = {
-        "project_target": "javascript",
-        "descriptors": {
-            "nodes": ["manifests/nodes"],
-            "base_lib": ["manifests/base_lib"],
-            "data_schemas": ["manifests/data"],
-            "capabilities": ["manifests/capabilities"],
-            "plugins": ["manifests/plugins"],
-            "host_extensions": ["manifests/host_extensions"],
-        },
-        "javascript": {
-            "package_root": ".",
-            "external_packages": [],
-        },
-        "architecture": {
-            "documents": [
-                {
-                    "workflow": "configs/linear.jsonc",
-                    "document": "ARCHITECTURE.jsonc",
-                },
-                {
-                    "workflow": "configs/browser_permanent_port_host.jsonc",
-                    "document": "PERMANENT_PORT_ARCHITECTURE.jsonc",
-                },
-            ]
-        },
-        "quality_enabled": True,
-    }
-    (target / "vibeflow_project.jsonc").write_text(
-        json.dumps(project_config, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
 
 
 def _copy_mermaid_renderer_config(output: Path) -> None:
@@ -751,13 +925,7 @@ sys.stdout.write(render_architecture(result))
     environment["VF_DISTRIBUTION_WORKSPACE"] = str(
         output / "vibeflow_config.jsonc"
     )
-    specs = (
-        ("configs/linear.jsonc", "ARCHITECTURE.jsonc"),
-        (
-            "configs/browser_permanent_port_host.jsonc",
-            "PERMANENT_PORT_ARCHITECTURE.jsonc",
-        ),
-    )
+    specs = (("configs/main.jsonc", "ARCHITECTURE.jsonc"),)
     for config_relative, architecture_relative in specs:
         environment["VF_DISTRIBUTION_JS_CONFIG"] = str(
             output / "javascript_project" / config_relative
@@ -780,11 +948,50 @@ sys.stdout.write(render_architecture(result))
         architecture.write_text(completed.stdout, encoding="utf-8")
 
 
-def _write_distribution_metadata(output: Path) -> None:
+def _write_python_architecture(output: Path) -> None:
+    script = """
+import sys
+from vibeflow.tooling.application.cli import main
+raise SystemExit(main(sys.argv[1:]))
+""".strip()
+    environment = os.environ.copy()
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    environment["PYTHONPATH"] = str(ROOT / "src")
+    command = [
+        sys.executable,
+        "-c",
+        script,
+        "export-architecture",
+        "--workspace",
+        str(output / "vibeflow_config.jsonc"),
+        "--config",
+        str(output / "python_project" / "configs" / "main.jsonc"),
+        "--output",
+        str(output / "python_project" / "ARCHITECTURE.jsonc"),
+    ]
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise BuildDistributionError(
+            "failed to generate Python Architecture document: "
+            + (completed.stderr.strip() or completed.stdout.strip())
+        )
+
+
+def _write_distribution_metadata(output: Path, *, profile: DistributionProfile) -> None:
     kernel_archive = output / KERNEL_ZIP_RELATIVE
     payload = {
-        "schema": "vibeflow.distribution.v1",
+        "schema": "vibeflow.distribution.v2",
         "version": VERSION,
+        "development_profile": profile.name,
+        "agent_protocol": dict(profile.agent_protocol),
+        "agent_automation": dict(profile.agent_automation),
         "roots": [
             {
                 "id": "python-project",
