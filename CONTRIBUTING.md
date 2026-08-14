@@ -58,6 +58,15 @@ python tools/verify_project.py --full
 
 It runs the independent repository self-check, tests for every layer, both integration Sandboxes, Python/JavaScript conformance, Node/browser AOT profiles, wheel isolation and a temporary distribution smoke test.
 
+For direct pytest use, run the isolated repository entrypoint instead of invoking pytest from the checkout root:
+
+```bash
+python tools/run_tests.py -- tests/core/test_result_scope.py
+python tools/run_tests.py
+```
+
+It uses a disposable working directory, the repository `src` tree only, no user-site packages, and no automatically loaded third-party pytest plugins. This keeps runtime output and test caches out of the worktree.
+
 For a focused check, run one independent quality profile:
 
 ```bash
