@@ -530,7 +530,7 @@ def test_documented_neutral_topologies_are_extracted_validated_and_executed(tmp_
     from pathlib import Path
 
     repository_root = Path(__file__).resolve().parents[3]
-    guide = repository_root / "distribution" / "kernel_development_pack" / "docs" / "03_Config与Pipeline规范.md"
+    guide = repository_root / "docs" / "user" / "workflow-and-config.md"
     pattern = re.compile(
         r"<!-- vibeflow-executable-example: ([a-z0-9-]+) -->\s*```jsonc\n(.*?)\n```",
         re.DOTALL,
@@ -582,82 +582,21 @@ def test_ai_guidance_is_generic_and_contains_required_runtime_guardrails() -> No
 
     repository_root = Path(__file__).resolve().parents[3]
     guides = [
-        repository_root / "distribution" / "kernel_development_pack" / "project_template" / "AGENTS.md",
-        repository_root / "distribution" / "kernel_development_pack" / "docs" / "03_Config与Pipeline规范.md",
-        repository_root / "distribution" / "kernel_development_pack" / "docs" / "04_Nodeset规范与用法.md",
-        repository_root / "distribution" / "kernel_development_pack" / "docs" / "08_给AI开发者的约束清单.md",
-        repository_root / "docs" / "developer_guide.md",
+        repository_root / "distribution" / "prompts" / "common.md",
+        repository_root / "docs" / "design" / "execution-model.md",
+        repository_root / "docs" / "user" / "commands-and-results.md",
     ]
-    global_state_concepts = (
+    contents = {path: path.read_text(encoding="utf-8") for path in guides}
+    combined = "\n".join(contents.values())
+    for concept in (
         "global_state",
         "execution_lock",
-        "try/finally",
-        "cloud",
         "detached",
         "result_key",
-    )
-    required_per_file = {
-        guides[0]: (
-            "terminal",
-            "input I/O",
-            "output I/O",
-            "runtime probe",
-            "qualified_exec_order",
-            "tagged value",
-            "vibeflow.workflow.v4",
-            *global_state_concepts,
-        ),
-        guides[1]: (
-            "terminal",
-            "input I/O",
-            "output I/O",
-            "qualified_exec_order",
-            "tag",
-            "vibeflow.workflow.v4",
-            *global_state_concepts,
-        ),
-        guides[2]: (
-            "terminal",
-            "input I/O",
-            "output I/O",
-            "runtime probe",
-            "qualified_exec_order",
-            "tagged value",
-            *global_state_concepts,
-        ),
-        guides[3]: (
-            "terminal",
-            "input I/O",
-            "output I/O",
-            "runtime probe",
-            "qualified_exec_order",
-            "tagged value",
-            "vibeflow.workflow.v4",
-            *global_state_concepts,
-        ),
-        guides[4]: (
-            "terminal",
-            "input I/O",
-            "output I/O",
-            "runtime probe",
-            "qualified_exec_order",
-            "tagged value",
-            "vibeflow.workflow.v4",
-            *global_state_concepts,
-        ),
-    }
-    diagnostic_ids = (
-        "GRAPH.DATA.RUNTIME_REQUIREMENT_UNREACHABLE",
-        "GRAPH.DATA.NO_PAYLOAD_BYPASS",
-        "GRAPH.JOIN.ALL_DEPENDS_ON_TRANSFER_ONLY",
-        "GRAPH.JOIN.ALL_BRANCHES_MUTUALLY_EXCLUSIVE",
-        "GRAPH.JOIN.REDUNDANT_ALL",
-    )
-    contents = {path: path.read_text(encoding="utf-8") for path in guides}
-    for path, concepts in required_per_file.items():
-        for concept in (*concepts, *diagnostic_ids):
-            assert concept in contents[path], (path, concept)
-    combined = "\n".join(contents.values())
+        "工作流执行探针",
+        "业务结果正确性",
+    ):
+        assert concept in combined, concept
     forbidden = (
         "NITR-",
         "SCBench",

@@ -5,7 +5,7 @@ import json
 import math
 import sys
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from vibeflow.tooling.application.python.run_directory import parse_run_id_argument
 
@@ -165,6 +165,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _handle_validate(args: argparse.Namespace) -> int:
+    from vibeflow.core.result_scope import add_result_scope, format_result_scope
     from vibeflow.tooling.application.python.cli.config import validate_config_path
     from vibeflow.tooling.application.python.reports import format_finding_text
 
@@ -181,10 +182,15 @@ def _handle_validate(args: argparse.Namespace) -> int:
             report = validate_workspace_config_path(Path(args.config), workspace=workspace)
     else:
         report = validate_config_path(Path(args.config), policy_path=Path(args.policy) if args.policy else None)
+    payload = add_result_scope(
+        report.to_dict(),
+        "vibeflow_structure",
+        checked_ids=None if report.status in {"PASS", "CONCERNS"} else (),
+    )
     if args.json:
-        print(report.to_json())
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
-        print(report.status)
+        print(format_result_scope(payload))
         for finding in (*report.errors, *report.warnings):
             print(format_finding_text(finding))
     return 0 if report.status in {"PASS", "CONCERNS"} else 1
@@ -245,6 +251,7 @@ def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
 
 
 def _handle_run(args: argparse.Namespace) -> int:
+    from vibeflow.core.result_scope import add_result_scope
     from vibeflow.targets.python.project.registry import GLOBAL_NODE_REGISTRY
     from vibeflow.tooling.application.python.runner import CheckedRunError, run_checked
 
@@ -284,10 +291,39 @@ def _handle_run(args: argparse.Namespace) -> int:
                 runtime_options=_runtime_options_from_args(args),
             )
     except CheckedRunError as exc:
-        payload = {"status": exc.result.health.status, "run_id": exc.result.run_id, "run_dir": str(exc.result.run_dir), "error": str(exc), "health": exc.result.health.to_dict()}
+        payload = add_result_scope(
+            {"status": exc.result.health.status, "run_id": exc.result.run_id, "run_dir": str(exc.result.run_dir), "error": str(exc), "health": exc.result.health.to_dict()},
+            "vibeflow_workflow_execution",
+            checked_ids=(),
+        )
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 1
-    payload = {"status": result.health.status, "run_id": result.run_id, "run_dir": str(result.run_dir)}
+    checked = ["workflow_started", "structural_runtime"]
+    context = result.context
+    if context is not None and hasattr(context, "get"):
+        try:
+            if context.get("runtime.qualified_exec_order"):
+                checked.append("execution_order")
+        except Exception:
+            pass
+    try:
+        from vibeflow.tooling.project.config_loader import load_config_document
+
+        document = load_config_document(Path(args.config))
+        pipeline = document.data.get("pipeline", {})
+        if isinstance(pipeline, Mapping) and pipeline.get("outputs"):
+            checked.append("declared_outputs")
+    except Exception:
+        pass
+    payload = add_result_scope(
+        {"status": result.health.status, "run_id": result.run_id, "run_dir": str(result.run_dir)},
+        "vibeflow_workflow_execution",
+        checked_ids=checked,
+    )
+    (result.run_dir / "workflow_execution_report.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 

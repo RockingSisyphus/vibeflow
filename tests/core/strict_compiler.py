@@ -3,6 +3,9 @@ from tests.fixtures.support.strict_support import *
 import time
 from xml.etree import ElementTree
 
+import vibeflow.core.compiler as core_compiler
+from vibeflow.core.flow import NodeSpec
+
 
 class RouteNode:
     NODE_INFO = NodeInfo(
@@ -212,7 +215,9 @@ def test_config_node_join_policy_and_loop_are_not_runtime_params() -> None:
     assert node.params == {"join_policy": "runtime", "loop": "runtime"}
 
 
-def test_nodeset_parser_uses_shared_symbol_table_for_forward_references_and_large_chains() -> None:
+def test_nodeset_effective_graph_uses_one_dp_state_per_definition(
+    monkeypatch,
+) -> None:
     nodesets = []
     for index in range(20):
         if index == 19:
@@ -251,6 +256,70 @@ def test_nodeset_parser_uses_shared_symbol_table_for_forward_references_and_larg
     assert len(graph.nodesets) == 20
     assert graph.nodesets["perf.ns19"].graph.nodesets is graph.nodesets
     assert graph.nodesets["perf.ns0"].graph.nodesets["perf.ns19"] is graph.nodesets["perf.ns19"]
+
+    evaluated_states: list[tuple[NodeSpec, ...]] = []
+    resolve_state = core_compiler._resolve_effective_nodes
+
+    def count_state(nodes, **kwargs):
+        evaluated_states.append(nodes)
+        return resolve_state(nodes, **kwargs)
+
+    monkeypatch.setattr(core_compiler, "_resolve_effective_nodes", count_state)
+    compile_started = time.perf_counter()
+    compilation = GraphCompiler().compile_with_findings(graph, registry=_registry())
+    effective = compilation.workflow.graph
+
+    assert time.perf_counter() - compile_started < 1.0
+    assert len(evaluated_states) == 21
+    assert effective.nodes[0].provides == effective.nodesets["perf.ns0"].provides
+    assert effective.nodesets["perf.ns0"].graph.nodes[0].provides == effective.nodesets["perf.ns1"].provides
+    assert all(
+        nodeset.graph.nodesets is effective.nodesets
+        for nodeset in effective.nodesets.values()
+    )
+
+
+def test_nodeset_dp_state_is_reused_across_multiple_call_sites(monkeypatch) -> None:
+    graph = parse_graph_config(
+        {
+            "nodesets": [
+                _nodeset_config(
+                    f"reuse.ns{index}",
+                    provides=[],
+                    pipeline={
+                        "nodes": [
+                            _node_call(
+                                "start",
+                                "test.start",
+                                "Starts a reusable nodeset body.",
+                            )
+                        ]
+                    },
+                )
+                for index in range(3)
+            ],
+            "pipeline": {
+                "nodes": [
+                    _node_call("left", "reuse.ns0", "Calls the shared definition."),
+                    _node_call("right", "reuse.ns0", "Calls the shared definition again."),
+                    _node_call("other", "reuse.ns2", "Calls another definition."),
+                ]
+            },
+        }
+    )
+    evaluated_states: list[tuple[NodeSpec, ...]] = []
+    resolve_state = core_compiler._resolve_effective_nodes
+
+    def count_state(nodes, **kwargs):
+        evaluated_states.append(nodes)
+        return resolve_state(nodes, **kwargs)
+
+    monkeypatch.setattr(core_compiler, "_resolve_effective_nodes", count_state)
+
+    compilation = GraphCompiler().compile_with_findings(graph, registry=_registry())
+
+    assert len(evaluated_states) == 4
+    assert compilation.workflow.graph.nodesets["reuse.ns1"].graph.nodes[0].type_used == "test.start"
 
 
 def test_parse_rejects_unknown_nodeset_call_with_reference_detail() -> None:

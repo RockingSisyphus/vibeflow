@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path, PurePosixPath
 
 
@@ -53,6 +54,7 @@ def add_quality_parser(subparsers) -> None:
 
 
 def handle_quality_check(args: argparse.Namespace) -> int:
+    from vibeflow.core.result_scope import add_result_scope
     from vibeflow.core.quality import QualityStructureLimits, QualityThresholds
     from vibeflow.tooling.application.python.quality_output import format_quality_summary
     from vibeflow.tooling.application.python.project.quality_scan import DEFAULT_EXCLUDED_DIRS, scan_code_quality
@@ -77,9 +79,27 @@ def handle_quality_check(args: argparse.Namespace) -> int:
             check_side_effects=bool(args.check_side_effects),
         )
     if isinstance(report, HealthReport):
-        print(report.to_json() if args.json else _format_health_summary(report))
+        payload = add_result_scope(
+            report.to_dict(),
+            "vibeflow_quality",
+            checked_ids=None if report.status in {"PASS", "CONCERNS"} else (),
+        )
+        print(
+            json.dumps(payload, ensure_ascii=False, indent=2)
+            if args.json
+            else _format_health_summary(report)
+        )
         return 0 if report.status in {"PASS", "CONCERNS"} else 1
-    print(report.to_json() if args.json else format_quality_summary(report))
+    payload = add_result_scope(
+        report.to_dict(),
+        "vibeflow_quality",
+        checked_ids=None,
+    )
+    print(
+        json.dumps(payload, ensure_ascii=False, indent=2)
+        if args.json
+        else format_quality_summary(report)
+    )
     return 0 if report.status in {"PASS", "CONCERNS"} else 1
 
 
@@ -169,9 +189,15 @@ def _workspace_quality_report(args, thresholds, structure_overrides, structure_e
 
 
 def _format_health_summary(report) -> str:
+    from vibeflow.core.result_scope import add_result_scope, format_result_scope
     from vibeflow.tooling.application.python.reports import format_finding_text
 
-    lines = [report.status]
+    payload = add_result_scope(
+        report.to_dict(),
+        "vibeflow_quality",
+        checked_ids=None if report.status in {"PASS", "CONCERNS"} else (),
+    )
+    lines = [format_result_scope(payload)]
     lines.extend(format_finding_text(finding) for finding in (*report.errors, *report.warnings))
     return "\n".join(lines)
 

@@ -9,6 +9,8 @@ import tempfile
 from typing import Mapping, Sequence
 from xml.etree import ElementTree
 
+from vibeflow.core.result_scope import add_result_scope, format_result_scope
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Create the JavaScript application parser without loading Python."""
@@ -193,7 +195,7 @@ def handle_build(args: argparse.Namespace) -> int:
                 dict(item) if isinstance(item, Mapping) else str(item)
                 for item in diagnostics
             ]
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        print(json.dumps(add_result_scope(payload, "vibeflow_build", checked_ids=()), ensure_ascii=False, indent=2))
         return 1
 
     payload = {
@@ -212,6 +214,7 @@ def handle_build(args: argparse.Namespace) -> int:
         payload["warnings"] = [
             dict(item) for item in warnings
         ]
+    payload = add_result_scope(payload, "vibeflow_build")
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -226,7 +229,7 @@ def handle_validate(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
-        print("PASS")
+        print(format_result_scope(payload))
     return 0
 
 
@@ -515,6 +518,7 @@ def handle_review(args: argparse.Namespace) -> int:
         )
 
     payload.update(status="PASS", failed_stage=None, published=True)
+    payload = add_result_scope(payload, "vibeflow_review_artifact")
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -561,7 +565,7 @@ def handle_quality_check(args: argparse.Namespace) -> int:
             explicit_path=args.path,
         )
     except Exception as exc:
-        _print_error(exc, as_json=True)
+        _print_error(exc, as_json=True, validation_scope="vibeflow_quality")
         return 1
     reports: list[dict[str, object]] = []
     failed = False
@@ -586,6 +590,11 @@ def handle_quality_check(args: argparse.Namespace) -> int:
         "reports": reports,
         **({"skipped": "quality_enabled=false"} if not configs else {}),
     }
+    payload = add_result_scope(
+        payload,
+        "vibeflow_quality",
+        checked_ids=None if configs else (),
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 1 if failed else 0
 
@@ -632,7 +641,7 @@ def _handle_standalone_quality(
             "path": str(selected),
             "reports": [_error_payload(exc)],
         }
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        print(json.dumps(add_result_scope(payload, "vibeflow_quality", checked_ids=()), ensure_ascii=False, indent=2))
         return 1
     payload = {
         "status": "PASS",
@@ -642,6 +651,7 @@ def _handle_standalone_quality(
         "toolchain": result.toolchain.to_dict(),
         "reports": [],
     }
+    payload = add_result_scope(payload, "vibeflow_quality")
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -744,7 +754,7 @@ def _audit_success_payload(result) -> dict[str, object]:
     }
     if result.toolchain is not None:
         payload["toolchain"] = result.toolchain.to_dict()
-    return payload
+    return add_result_scope(payload, "vibeflow_structure")
 
 
 def _handle_text_export(args: argparse.Namespace, renderer, **render_options) -> int:
@@ -987,7 +997,7 @@ def _finish_review_failure(
             "suggested_fix_type": "fix_config",
         },
     )
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    print(json.dumps(add_result_scope(payload, "vibeflow_review_artifact", checked_ids=()), ensure_ascii=False, indent=2))
     return 1
 
 
@@ -1110,13 +1120,22 @@ def _error_payload(error: Exception, *, config: Path | None = None) -> dict[str,
     return payload
 
 
-def _print_error(error: Exception, *, as_json: bool, code: str = "") -> None:
-    payload = _error_payload(error)
+def _print_error(
+    error: Exception,
+    *,
+    as_json: bool,
+    code: str = "",
+    validation_scope: str = "vibeflow_structure",
+) -> None:
+    payload = add_result_scope(
+        _error_payload(error), validation_scope, checked_ids=()
+    )
     if code:
         payload["code"] = code
     if as_json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
+        print(format_result_scope(payload))
         print(f"ERROR {payload['code']}: {payload['error']}")
 
 

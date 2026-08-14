@@ -1691,7 +1691,7 @@ def _run_external_nodeset_dedup_review_case() -> CaseResult:
     output_path.unlink(missing_ok=True)
 
     validation = _run_validate_cli(EXTERNAL_DEDUP_REVIEW_CONFIG_PATH)
-    if validation.returncode != 0 or validation.stdout.strip() != "PASS":
+    if validation.returncode != 0 or "VIBEFLOW_STRUCTURE_PASS" not in validation.stdout:
         raise AssertionError(
             "review fixture must pass health validation before SVG export: "
             f"returncode={validation.returncode}, stdout={validation.stdout!r}, stderr={validation.stderr!r}"
@@ -1784,7 +1784,8 @@ def _run_external_nodeset_dedup_review_case() -> CaseResult:
         "review:external_nodeset_dedup_visual",
         "PASS",
         payload={
-            "health": validation.stdout.strip(),
+            "health": "PASS",
+            "result_code": "VIBEFLOW_STRUCTURE_PASS",
             "svg": str(output_path.relative_to(WORK_ROOT)),
             "external_nodes": len(external_nodes),
             "worker_calls": 4,

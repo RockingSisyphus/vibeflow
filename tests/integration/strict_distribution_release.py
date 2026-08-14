@@ -40,6 +40,20 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
     assert first.archive.read_bytes() == second.archive.read_bytes()
     metadata = json.loads((first.directory / "DISTRIBUTION.json").read_text(encoding="utf-8"))
     assert metadata == {
+        "agent_automation": {
+            "build": True,
+            "quality": True,
+            "refresh_architecture": True,
+            "validate": True,
+            "workflow_execution_probe": True,
+        },
+        "agent_protocol": {
+            "change_inventory": "required",
+            "human_approval_gate": True,
+            "planned_review": True,
+            "required_review_artifact": "expanded_svg",
+        },
+        "development_profile": "collaborative",
         "kernel": {
             "archive": "kernel/vibeflow-kernel.zip",
             "sha256": hashlib.sha256(
@@ -58,7 +72,7 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
                 "project_target": "javascript",
             },
         ],
-        "schema": "vibeflow.distribution.v1",
+        "schema": "vibeflow.distribution.v2",
         "version": distribution_builder.VERSION,
     }
     javascript_project = first.directory / "javascript_project"
@@ -69,51 +83,34 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
     )
     assert project_config["architecture"]["documents"] == [
         {
-            "workflow": "configs/linear.jsonc",
+            "workflow": "configs/main.jsonc",
             "document": "ARCHITECTURE.jsonc",
-        },
-        {
-            "workflow": "configs/browser_permanent_port_host.jsonc",
-            "document": "PERMANENT_PORT_ARCHITECTURE.jsonc",
-        },
+        }
     ]
     architecture = (
         javascript_project / "ARCHITECTURE.jsonc"
     ).read_text(encoding="utf-8")
     assert '"project_target": "javascript"' in architecture
     assert str(first.directory) not in architecture
-    permanent_architecture = (
-        javascript_project / "PERMANENT_PORT_ARCHITECTURE.jsonc"
-    ).read_text(encoding="utf-8")
-    assert '"target": "sandbox.permanent_port_body"' in permanent_architecture
-    assert '"body": {' in permanent_architecture
-    assert '"type_used": "sandbox.math"' in permanent_architecture
-    assert str(first.directory) not in permanent_architecture
+    assert '"type_used": "minimal.process_payload"' in architecture
 
     published_guidance = "\n".join(
         path.read_text(encoding="utf-8")
         for path in (
             first.directory / "README.md",
             first.directory / "AGENTS.md",
-            first.directory / "kernel/docs/01_Node开发规范.md",
-            first.directory / "kernel/docs/03_Config与Pipeline规范.md",
-            first.directory / "kernel/docs/07_启动命令与报告.md",
-            first.directory / "kernel/docs/08_给AI开发者的约束清单.md",
-            first.directory / "kernel/docs/10_Kernel能力与项目开发指南.md",
-            first.directory / "kernel/docs/11_JS_TS与Web_AOT构建指南.md",
+            first.directory / "kernel/docs/overview.md",
+            first.directory / "kernel/docs/user/workflow-and-config.md",
+            first.directory / "kernel/docs/user/commands-and-results.md",
+            first.directory / "kernel/docs/user/profiles/collaborative.md",
         )
     )
     for marker in (
-        "flow_kind=global_state",
-        "effect_scope=global_state",
-        "runtime_dispatch",
-        "Callback",
-        "execution_lock",
-        "vibeflow.workflow.v4",
-        "vibeflow.workflow.v3",
-        "TARGET.FEATURE.UNSUPPORTED",
-        "global_state_may_have_changed",
-        "cloud",
+        "effect_scope",
+        "工作流执行探针",
+        "业务结果",
+        "planned",
+        "人工批准",
     ):
         assert marker in published_guidance
 
@@ -137,18 +134,14 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
             "utf-8"
         )
         archived_config_guide = archive.read(
-            "vibeflow-distribution/kernel/docs/03_Config与Pipeline规范.md"
+            "vibeflow-distribution/kernel/docs/user/commands-and-results.md"
         ).decode("utf-8")
         for marker in (
-            "flow_kind=global_state",
-            "runtime_dispatch",
-            "execution_lock",
-            "vibeflow.workflow.v4",
-            "vibeflow.workflow.v3",
-            "cloud",
+            "工作流执行探针",
+            "业务结果",
         ):
-            assert marker in archived_agents
             assert marker in archived_config_guide
+        assert "kernel/docs/user/commands-and-results.md" in archived_agents
 
     extracted = tmp_path / "extracted"
     with zipfile.ZipFile(first.archive) as archive:
@@ -163,7 +156,7 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
     assert completed.returncode == 0, completed.stderr or completed.stdout
 
 
-def test_distribution_renderer_reviews_registered_permanent_loop(
+def test_distribution_renderer_reviews_minimal_javascript_workflow(
     tmp_path: Path,
 ) -> None:
     distribution = distribution_builder.build_distribution(
@@ -183,14 +176,14 @@ def test_distribution_renderer_reviews_registered_permanent_loop(
         )
         assert completed.returncode == 0, completed.stderr or completed.stdout
 
-    output = distribution / "reports/javascript-permanent-port.svg"
+    output = distribution / "reports/javascript-minimal.svg"
     completed = subprocess.run(
         [
             sys.executable,
             "run.py",
             "review",
             "--config",
-            "javascript_project/configs/browser_permanent_port_host.jsonc",
+            "javascript_project/configs/main.jsonc",
             "--output",
             str(output.relative_to(distribution)),
         ],
@@ -202,6 +195,7 @@ def test_distribution_renderer_reviews_registered_permanent_loop(
     assert completed.returncode == 0, completed.stderr or completed.stdout
     payload = json.loads(completed.stdout)
     assert payload["status"] == "PASS"
+    assert payload["result_code"] == "VIBEFLOW_REVIEW_ARTIFACT_PASS"
     assert payload["published"] is True
     root = ElementTree.parse(output).getroot()
     coverage = {
@@ -213,37 +207,6 @@ def test_distribution_renderer_reviews_registered_permanent_loop(
         if "review-inline-fragment" in element.get("class", "").split()
     }
     assert ("workflow", "javascript-project") in coverage
-    assert ("loop_body", "sandbox.permanent_port_body") in coverage
-    assert ("resource", "host_extensions") in coverage
-
-    diagnostic_output = distribution / "reports/javascript-permanent-port-diagnostic.svg"
-    diagnostic = subprocess.run(
-        [
-            sys.executable,
-            "run.py",
-            "svg",
-            "--config",
-            "javascript_project/configs/browser_permanent_port_host.jsonc",
-            "--output",
-            str(diagnostic_output.relative_to(distribution)),
-            "--expand-nodesets",
-        ],
-        cwd=distribution,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    assert diagnostic.returncode == 0, diagnostic.stderr or diagnostic.stdout
-    diagnostic_root = ElementTree.parse(diagnostic_output).getroot()
-    diagnostic_coverage = {
-        (
-            element.get("data-review-kind", ""),
-            element.get("data-review-target", ""),
-        )
-        for element in diagnostic_root.iter()
-        if "review-inline-fragment" in element.get("class", "").split()
-    }
-    assert ("loop_body", "sandbox.permanent_port_body") in diagnostic_coverage
 
 
 @pytest.mark.parametrize("failure_call", [1, 2, 3, 4])

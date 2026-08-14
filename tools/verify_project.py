@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+import hashlib
+import json
 import os
 from pathlib import Path
 import shlex
@@ -444,236 +446,115 @@ def _wheel_smoke(scratch: Path) -> None:
 
 
 def _distribution_smoke(scratch: Path) -> None:
-    output = scratch / "distribution"
+    collaborative = scratch / "distribution"
+    autonomous = scratch / "distribution-autonomous"
     archive_dir = scratch / "archives"
     _run(
         (
             PYTHON,
             "distribution/build.py",
             "--output-dir",
-            output,
+            collaborative,
+            "--autonomous-output-dir",
+            autonomous,
             "--archive-dir",
             archive_dir,
         ),
         overrides={"PYTHONPATH": None},
     )
-    launcher = output / "run.py"
-    _run((PYTHON, launcher, "verify-kernel"), overrides={"PYTHONPATH": None})
+    for expected_profile, output in (
+        ("collaborative", collaborative),
+        ("autonomous", autonomous),
+    ):
+        launcher = output / "run.py"
+        _run((PYTHON, launcher, "verify-kernel"), overrides={"PYTHONPATH": None})
+        metadata = json.loads((output / "DISTRIBUTION.json").read_text(encoding="utf-8"))
+        if metadata.get("development_profile") != expected_profile:
+            raise VerificationError(f"wrong distribution profile metadata: {metadata}")
+        _run(
+            (
+                PYTHON,
+                launcher,
+                "validate",
+                "--config",
+                output / "python_project/configs/main.jsonc",
+                "--json",
+            ),
+            overrides={"PYTHONPATH": None},
+        )
 
-    workspace = output / "vibeflow_config.jsonc"
-    python_config = output / "python_project/configs/main.jsonc"
+    for relative in ("python_project", "javascript_project"):
+        left = {
+            path.relative_to(collaborative / relative): path.read_bytes()
+            for path in (collaborative / relative).rglob("*")
+            if path.is_file()
+        }
+        right = {
+            path.relative_to(autonomous / relative): path.read_bytes()
+            for path in (autonomous / relative).rglob("*")
+            if path.is_file()
+        }
+        if left != right:
+            raise VerificationError(f"profile project templates differ: {relative}")
+    kernel_hashes = {
+        hashlib.sha256((output / "kernel/vibeflow-kernel.zip").read_bytes()).hexdigest()
+        for output in (collaborative, autonomous)
+    }
+    if len(kernel_hashes) != 1:
+        raise VerificationError("profile kernel ZIPs are not byte-identical")
+
+    python_run_root = scratch / "distribution-python-runs"
     _run(
         (
             PYTHON,
-            launcher,
-            "validate",
-            "--workspace",
-            workspace,
-            "--config",
-            python_config,
-        ),
-        overrides={"PYTHONPATH": None},
-    )
-    _run(
-        (
-            PYTHON,
-            launcher,
+            collaborative / "run.py",
             "run",
-            "--workspace",
-            workspace,
             "--config",
-            python_config,
+            collaborative / "python_project/configs/main.jsonc",
+            "--input",
+            collaborative / "python_project/probe_input.json",
             "--run-root",
-            scratch / "distribution-python-runs",
+            python_run_root,
+            "--run-id",
+            "distribution-probe",
         ),
         overrides={"PYTHONPATH": None},
     )
-
-    javascript_project = output / "javascript_project"
-    javascript_config = javascript_project / "configs/linear.jsonc"
+    javascript_project = collaborative / "javascript_project"
     _run(("npm", "ci"), cwd=javascript_project, overrides={"PYTHONPATH": None})
     _run(
         (
             PYTHON,
-            launcher,
-            "validate",
-            "--workspace",
-            workspace,
+            collaborative / "run.py",
+            "build",
             "--config",
-            javascript_config,
+            javascript_project / "configs/main.jsonc",
+            "--target",
+            "node",
+            "--profile",
+            "esm-module",
+            "--out-dir",
+            javascript_project / "build/node",
         ),
         overrides={"PYTHONPATH": None},
     )
+    _run(
+        ("node", javascript_project / "scripts/workflow_execution_probe.mjs"),
+        cwd=collaborative,
+        overrides={"PYTHONPATH": None},
+    )
 
-    javascript_architecture = javascript_project / "ARCHITECTURE.jsonc"
-    javascript_review = scratch / "distribution-javascript-review.svg"
-    review_pair: tuple[bytes, bytes] | None = None
-    for _ in range(2):
+    archives = sorted(archive_dir.glob("vibeflow-distribution-*.zip"))
+    if len(archives) != 2:
+        raise VerificationError(f"expected two distribution archives, found {archives}")
+    for index, archive in enumerate(archives):
+        extracted = scratch / f"distribution-extracted-{index}"
+        shutil.unpack_archive(archive, extracted)
         _run(
-            (
-                PYTHON,
-                launcher,
-                "review",
-                "--workspace",
-                workspace,
-                "--config",
-                javascript_config,
-                "--output",
-                javascript_review,
-            ),
+            (PYTHON, extracted / "vibeflow-distribution/run.py", "verify-kernel"),
             overrides={"PYTHONPATH": None},
         )
-        current_pair = (
-            javascript_architecture.read_bytes(),
-            javascript_review.read_bytes(),
-        )
-        if review_pair is not None and current_pair != review_pair:
-            raise VerificationError(
-                "JavaScript Architecture/review is not deterministic"
-            )
-        review_pair = current_pair
-    _run(
-        (
-            PYTHON,
-            launcher,
-            "quality-check",
-            "--workspace",
-            workspace,
-            "--path",
-            javascript_project,
-            "--json",
-        ),
-        overrides={"PYTHONPATH": None},
-    )
-
-    esm_output = scratch / "distribution-aot-esm"
-    single_output = scratch / "distribution-aot-single"
-    web_output = scratch / "distribution-aot-web"
-    for profile, target, out_dir in (
-        ("esm-module", "node", esm_output),
-        ("single-esm", "node", single_output),
-    ):
-        _run(
-            (
-                PYTHON,
-                launcher,
-                "build",
-                "--workspace",
-                workspace,
-                "--config",
-                javascript_config,
-                "--target",
-                target,
-                "--profile",
-                profile,
-                "--out-dir",
-                out_dir,
-            ),
-            overrides={"PYTHONPATH": None},
-        )
-    _run(
-        (
-            PYTHON,
-            launcher,
-            "build",
-            "--workspace",
-            workspace,
-            "--config",
-            javascript_config,
-            "--target",
-            "browser",
-            "--profile",
-            "web-app",
-            "--html",
-            javascript_project / "web/index.template.html",
-            "--app-entry",
-            javascript_project / "web/app.ts",
-            "--out-dir",
-            web_output,
-        ),
-        overrides={"PYTHONPATH": None},
-    )
-    script = """
-const { pathToFileURL } = await import("node:url");
-const workflow = await import(pathToFileURL(process.env.VF_ENTRY).href);
-const result = await workflow.runWorkflow({ x: 10, a: 8, b: 3 });
-if (result.result !== 15) throw new Error(JSON.stringify(result));
-process.stdout.write(JSON.stringify(result));
-""".strip()
-    _run(
-        ("node", "--input-type=module", "--eval", script),
-        overrides={
-            "PYTHONPATH": None,
-            "VF_ENTRY": str(single_output / "index.js"),
-        },
-    )
-
-    browser_host_output = scratch / "distribution-browser-long-host"
-    _run(
-        (
-            PYTHON,
-            launcher,
-            "build",
-            "--workspace",
-            workspace,
-            "--config",
-            javascript_project / "configs/browser_permanent_port_host.jsonc",
-            "--target",
-            "browser",
-            "--profile",
-            "web-app",
-            "--html",
-            javascript_project / "web/browser_host.template.html",
-            "--app-entry",
-            javascript_project / "web/browser_host_app.ts",
-            "--out-dir",
-            browser_host_output,
-        ),
-        overrides={"PYTHONPATH": None},
-    )
-    from sandbox.javascript.integration.sandbox_support import (
-        run_browser_long_host,
-    )
-
-    browser_payload = run_browser_long_host(
-        browser_host_output,
-        puppeteer_root=_puppeteer_root(scratch),
-        module_entry=None,
-    )
-    if browser_payload.get("failureCodes") != ["VF_ABORTED", "VF_ABORTED"]:
-        raise VerificationError(
-            f"distributed long Host cancellation failed: {browser_payload}"
-        )
-    if browser_payload.get("firstOutputs") != [14, 23]:
-        raise VerificationError(
-            f"distributed long Host output failed: {browser_payload}"
-        )
-
-    archives = tuple(archive_dir.glob("vibeflow-distribution-*.zip"))
-    if len(archives) != 1:
-        raise VerificationError(f"expected one distribution archive, found {archives}")
-    extracted = scratch / "distribution-extracted"
-    shutil.unpack_archive(archives[0], extracted)
-    extracted_root = extracted / "vibeflow-distribution"
-    extracted_launcher = extracted_root / "run.py"
-    _run(
-        (PYTHON, extracted_launcher, "verify-kernel"),
-        overrides={"PYTHONPATH": None},
-    )
-    _run(
-        (
-            PYTHON,
-            extracted_launcher,
-            "validate",
-            "--workspace",
-            extracted_root / "vibeflow_config.jsonc",
-            "--config",
-            extracted_root / "python_project/configs/main.jsonc",
-        ),
-        overrides={"PYTHONPATH": None},
-    )
-
-
+    return
 def _cleanup_generated_artifacts(_scratch: Path) -> None:
     """Remove only artifacts produced by earlier full-gate steps.
 

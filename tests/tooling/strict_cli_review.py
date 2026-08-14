@@ -129,15 +129,13 @@ def test_review_refreshes_architecture_validates_and_atomically_publishes_svg(
     payload = json.loads(stdout)
 
     assert code == 0
-    assert payload == {
-        "status": payload["validation"]["status"],
-        "failed_stage": None,
-        "config": str(workflow_path.resolve()),
-        "architecture": str(architecture_path.resolve()),
-        "validation": payload["validation"],
-        "svg": str(output_path.resolve()),
-        "published": True,
-    }
+    assert payload["status"] == payload["validation"]["status"]
+    assert payload["failed_stage"] is None
+    assert payload["config"] == str(workflow_path.resolve())
+    assert payload["architecture"] == str(architecture_path.resolve())
+    assert payload["svg"] == str(output_path.resolve())
+    assert payload["published"] is True
+    assert payload["result_code"].startswith("VIBEFLOW_REVIEW_ARTIFACT_")
     assert payload["status"] in {"PASS", "CONCERNS"}
     assert architecture_path.read_text(encoding="utf-8").startswith(ARCHITECTURE_DOCUMENT_HEADER)
     assert output_path.read_text(encoding="utf-8") == _CANONICAL_SVG

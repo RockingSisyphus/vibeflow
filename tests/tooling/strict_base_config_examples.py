@@ -101,7 +101,7 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         if "expected_rule_id" in case:
             expected_rule = str(case["expected_rule_id"])
             assert expected_rule in rule_ids
-            assert payload["summary"]["score"] < 100
+            assert payload["details_summary"]["score"] < 100
             assert payload["top_offenders"]
             observed.add(expected_rule)
         if "expected_absent_rule_id" in case:
@@ -616,7 +616,8 @@ def test_cli_quality_check_json_and_text_outputs(tmp_path, capsys) -> None:
     assert json_code == 0
     assert json_payload["status"] == "CONCERNS"
     assert json_payload["scope_summary"]["other"]["warnings"] >= 1
-    assert "score" in json_payload["summary"]
+    assert "score" in json_payload["details_summary"]
+    assert json_payload["result_code"].startswith("VIBEFLOW_QUALITY_")
     assert "top_offenders" in json_payload
     assert json_payload["warnings"][0]["rule_id"] == "QUALITY.SIDE_EFFECT.CALL"
     assert text_code == 0

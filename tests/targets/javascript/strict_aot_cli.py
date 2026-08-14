@@ -115,8 +115,9 @@ def test_build_cli_preserves_stable_error_codes(
     )
 
     assert status == 1
-    assert json.loads(capsys.readouterr().out) == {
-        "status": "ERROR",
-        "code": "VF_AOT_INPUT_REQUIRED",
-        "error": "JS AOT inputs must declare required",
-    }
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "ERROR"
+    assert payload["code"] == "VF_AOT_INPUT_REQUIRED"
+    assert payload["error"] == "JS AOT inputs must declare required"
+    assert payload["result_code"] == "VIBEFLOW_BUILD_ERROR"
+    assert payload["checked"] == []

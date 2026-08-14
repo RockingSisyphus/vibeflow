@@ -7,8 +7,9 @@ import re
 import tempfile
 from typing import Mapping
 
-from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE
+from vibeflow.core.constants import FLOW_KIND_DOCUMENT, FLOW_KIND_GLOBAL_STATE
 from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, NodeSpec, NodesetSpec, STATUS_PLANNED
+from vibeflow.core.planned import effective_planned_behavior, planned_behavior_label
 from vibeflow.tooling.application.mermaid_shapes import mermaid_shape_for_flow_kind
 from vibeflow.tooling.presentation.mermaid import (
     DEFAULT_MERMAID_MAX_EDGES,
@@ -17,6 +18,7 @@ from vibeflow.tooling.presentation.mermaid import (
     EXPANDED_MERMAID_MAX_TEXT_SIZE,
     render_mermaid_svg,
 )
+from vibeflow.tooling.presentation.style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
 from vibeflow.tooling.presentation.review_layout import (
     _compose_svg,
     _validate_review_fragment_max_width,
@@ -423,19 +425,28 @@ def _graph_mermaid(
     show_contract: bool,
     show_semantics: bool,
 ) -> str:
-    lines = [f"flowchart {direction}"]
+    lines = [
+        f"flowchart {direction}",
+        *(f"  {line}" for line in mermaid_class_def_lines(MERMAID_MAIN_CLASS_ORDER)),
+    ]
     for node in graph.nodes:
-        catalogs = getattr(result, "catalogs", None)
-        descriptor = (
-            catalogs.nodes.get(node.type_used)
-            if catalogs is not None
-            else None
+        descriptor = _node_descriptor(result, node)
+        nodeset = _nodeset_for_node(graph, node)
+        is_planned = node.status == STATUS_PLANNED or (
+            nodeset is not None and nodeset.status == STATUS_PLANNED
+        )
+        is_external = (
+            not is_planned
+            and nodeset is None
+            and bool(getattr(descriptor, "external", False))
         )
         display_name = (
             node.metadata.display_name
             or str(getattr(descriptor, "display_name", "") or "")
             or node.id
         )
+        if is_external and not display_name.startswith("[EXTERNAL]"):
+            display_name = f"[EXTERNAL] {display_name}"
         description = (
             node.metadata.description
             or str(getattr(descriptor, "description", "") or "")
@@ -446,6 +457,17 @@ def _graph_mermaid(
             label.append(f"body: {node.loop.body}")
         elif node.type_used in graph.nodesets:
             label.append(f"type_key: {node.type_used}")
+        if is_planned:
+            behavior = effective_planned_behavior(node, nodeset)
+            label.extend(
+                (
+                    "",
+                    "---------- status ----------",
+                    f"status: {planned_behavior_label(behavior)}",
+                )
+            )
+            if behavior.stub_module:
+                label.append(f"stub: {behavior.stub_module}")
         if description:
             label.extend(("", "---------- meta ----------", f"desc: {description}"))
         if show_semantics:
@@ -461,9 +483,21 @@ def _graph_mermaid(
                 label.append(f"async: {node.async_mode}")
             if node.result_key:
                 label.append(f"result_key: {node.result_key}")
+            if is_external:
+                label.append("external: true")
         escaped = _escape_label("\\n".join(label))
         shape = mermaid_shape_for_flow_kind(flow_kind or "process")
-        lines.append(f'  {_safe_id(node.id)}@{{ shape: {shape}, label: "{escaped}" }}')
+        node_id = _safe_id(node.id)
+        lines.append(f'  {node_id}@{{ shape: {shape}, label: "{escaped}" }}')
+        lines.append(
+            f"  class {node_id} "
+            f"{_node_class(node, nodeset=nodeset, flow_kind=flow_kind, is_external=is_external)};"
+        )
+        if is_external:
+            lines.append(f"  class {node_id} externalBoundary;")
+        custom_style = _custom_node_style(node)
+        if custom_style:
+            lines.append(f"  style {node_id} {custom_style};")
     edge_pairs = {
         name: {item.pair for item in values}
         for name, values in (
@@ -494,6 +528,55 @@ def _graph_mermaid(
         elif pair in edge_pairs["async"]:
             lines.append(f"  linkStyle {index} stroke-dasharray:3 3;")
     return "\n".join(lines) + "\n"
+
+
+def _node_descriptor(result: object, node: NodeSpec) -> object | None:
+    catalogs = getattr(result, "catalogs", None)
+    nodes = getattr(catalogs, "nodes", None)
+    get_descriptor = getattr(nodes, "get", None)
+    if not callable(get_descriptor):
+        return None
+    return get_descriptor(node.type_used)
+
+
+def _nodeset_for_node(graph: GraphConfig, node: NodeSpec) -> NodesetSpec | None:
+    if node.type_used in LOOP_NODE_TYPES:
+        return graph.nodesets.get(node.loop.body)
+    return graph.nodesets.get(node.type_used)
+
+
+def _node_class(
+    node: NodeSpec,
+    *,
+    nodeset: NodesetSpec | None,
+    flow_kind: str,
+    is_external: bool,
+) -> str:
+    if node.status == STATUS_PLANNED or (
+        nodeset is not None and nodeset.status == STATUS_PLANNED
+    ):
+        return "plannedNode"
+    if is_external:
+        return "externalDependency"
+    if node.type_used in LOOP_NODE_TYPES:
+        return "loopNode"
+    if nodeset is not None:
+        return "nodesetNode"
+    if flow_kind == FLOW_KIND_DOCUMENT:
+        return "documentNode"
+    return "defaultNode"
+
+
+def _custom_node_style(node: NodeSpec) -> str:
+    style = node.style.to_dict()
+    fields: list[str] = []
+    if "fill" in style:
+        fields.append(f"fill:{style['fill']}")
+    if "stroke" in style:
+        fields.append(f"stroke:{style['stroke']}")
+    if "text" in style:
+        fields.append(f"color:{style['text']}")
+    return ",".join(fields)
 
 
 def _invocation_groups(graph: GraphConfig) -> tuple[_InvocationGroup, ...]:

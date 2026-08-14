@@ -445,4 +445,14 @@ def _review_finding(
 
 
 def _print_result(result: Mapping[str, object]) -> None:
-    print(json.dumps(dict(result), ensure_ascii=False, indent=2))
+    from vibeflow.core.result_scope import add_result_scope
+
+    status = str(result.get("status", "ERROR"))
+    payload = add_result_scope(
+        result,
+        "vibeflow_review_artifact",
+        checked_ids=None
+        if status in {"PASS", "CONCERNS"} and bool(result.get("published"))
+        else (),
+    )
+    print(json.dumps(payload, ensure_ascii=False, indent=2))

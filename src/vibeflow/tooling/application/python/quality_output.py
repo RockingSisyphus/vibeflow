@@ -15,8 +15,16 @@ def format_quality_summary(
 ) -> str:
     payload = report.to_dict()
     summary = payload["summary"]
+    from vibeflow.core.result_scope import add_result_scope, format_result_scope
+
+    scoped_payload = add_result_scope(
+        payload,
+        "vibeflow_quality",
+        checked_ids=None,
+    )
+
     lines = [
-        str(report.status),
+        format_result_scope(scoped_payload),
         (
             f"root={report.root} files={summary['files']} "
             f"errors={summary['errors']} warnings={summary['warnings']} "
