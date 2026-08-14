@@ -105,25 +105,15 @@ def _compileall(scratch: Path) -> None:
 
 
 def _pytest(scratch: Path) -> None:
-    paths = tuple(ROOT / item for item in TEST_GROUPS if (ROOT / item).exists())
-    if not paths:
-        paths = (ROOT / "tests",)
-    work_root = scratch / "pytest-work"
-    work_root.mkdir(parents=True, exist_ok=True)
-    toolchain_root = scratch / "pytest-javascript-toolchain"
-    toolchain_root.mkdir(parents=True, exist_ok=True)
-    for name in ("package.json", "package-lock.json"):
-        shutil.copy2(
-            ROOT / "sandbox/javascript/minimal/project" / name,
-            toolchain_root / name,
-        )
-    _run(("npm", "ci"), cwd=toolchain_root)
     _run(
-        (PYTHON, "-m", "pytest", "-q", "-p", "no:cacheprovider", *paths),
-        cwd=work_root,
-        overrides={
-            "VIBEFLOW_TEST_TOOLCHAIN_ROOT": str(toolchain_root),
-        },
+        (
+            PYTHON,
+            "tools/run_tests.py",
+            "--scratch",
+            scratch / "pytest",
+            "--",
+            *(ROOT / item for item in TEST_GROUPS if (ROOT / item).exists()),
+        )
     )
 
 
@@ -410,7 +400,7 @@ def _wheel_smoke(scratch: Path) -> None:
         ROOT / "sandbox/javascript/minimal/vibeflow_config.jsonc",
         javascript_fixture,
     )
-    prepared_toolchain = scratch / "pytest-javascript-toolchain/node_modules"
+    prepared_toolchain = scratch / "pytest/javascript-toolchain/node_modules"
     if prepared_toolchain.is_dir():
         (javascript_project / "node_modules").symlink_to(
             prepared_toolchain,

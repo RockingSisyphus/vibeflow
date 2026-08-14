@@ -20,6 +20,15 @@
 python tools/verify_project.py --full
 ```
 
+独立运行 pytest 时必须使用隔离入口，而不是在仓库根目录直接执行 `python -m pytest`：
+
+```bash
+python tools/run_tests.py -- tests/core/test_result_scope.py
+python tools/run_tests.py
+```
+
+该入口在临时工作目录执行测试，固定本仓 `src`、关闭用户站点和自动加载的第三方 pytest 插件，并在结束后移除临时目录。这样运行时默认的 `runs/vibeflow` 与测试缓存不会污染工作树。
+
 完整入口覆盖仓库质量、pytest、Python sandbox、JavaScript integration、wheel 隔离、双发行 smoke、确定性归档和清洁工作树检查。
 
 仓库自检器为：
