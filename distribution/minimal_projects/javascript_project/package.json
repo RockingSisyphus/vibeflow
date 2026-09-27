@@ -1,6 +1,6 @@
 {
   "name": "vibeflow-javascript-minimal",
-  "version": "0.13.2",
+  "version": "0.14.1",
   "private": true,
   "type": "module",
   "devDependencies": {

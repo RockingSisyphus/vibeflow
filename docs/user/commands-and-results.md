@@ -17,6 +17,8 @@ VibeFlow 的公开命令分别报告结构、质量、构建、审核产物或�
 
 `review` 生成并校验审核产物。collaborative profile 中，产物成功仍需后续人工批准；autonomous profile 按任务直接完成适用门禁。
 
+正式审核必须对真实 Config 的完整工作流执行 `review`。工具生成成功不能证明配置就是实际生产流程；局部、概念性或脱离真实调用的配置不能凭 PASS 作为批准依据。协同模式对原位 planned 变更及新增工作流的具体要求见其 profile 文档。
+
 ## 检查范围
 
 一次命令的 `checked` 只列出实际完成的阶段。结构检查可以覆盖：
@@ -38,6 +40,16 @@ VibeFlow 命令不检查：
 - 领域数据正确性。
 
 这些结论由项目测试、集成测试和真实环境验收提供。
+
+报告完成状态时，按本次任务实际执行的证据区分：`validate`／`quality-check` 说明其 `checked` 范围内的静态结果；`build` 说明目标产物已构建；执行探针说明指定输入走过的执行路径；业务测试和真实环境验收才支持相应的业务结论。局部 PASS、产物存在或旧报告不能代替当前代码对应的顶层结果。任务要求的检查失败时，先读失败项并修复原因；代码和输入未变化时，无需反复运行同一失败检查。
+
+### Python 与 JavaScript 项目质量
+
+`quality-check` 检查当前根的手写源码与找到的工作流；即使没有工作流，也会输出 `source_quality`。JSON 同时包含 `source_quality`、逐工作流的 `reports` 和顶层状态；Python 原有的源码报告字段仍保留在顶层。警告产生 `CONCERNS`、退出码 0，错误产生 `FAIL`、退出码 1。
+
+JavaScript/TypeScript 扫描 `.js`、`.jsx`、`.ts`、`.tsx`、`.mjs`、`.cjs`、`.mts`、`.cts` 及声明源码，包括未注册的手写文件和测试文件；自动排除 `generated`、`dist`、`build`、`node_modules` 等产物目录。可重复使用 `--exclude-dir NAME` 和 `--exclude-path ROOT_RELATIVE_PATH` 排除其他目录或文件。独立 `--path` 源码扫描需要项目本地安装的 TypeScript；`--enable-structure-limits` 可为独立扫描启用根目录结构上限。
+
+Node/base_lib 源码大小、可选复杂度上限及 Node→base_lib 静态依赖链使用两种 Target 共享的规则。依赖链包含 Node 本身，默认长度超过 4 为警告、超过 6 为错误；仅计入可解析的项目内导入。`policy.complexity.max_*` 默认不启用；显式设置 `max_params` 时统计 Node 配置 schema 的键数。JavaScript 的 `--policy` 接受与 Python 一致的 JSONC 策略文件。`validate`、`review`、`build` 只检查它们直接处理的图与已注册实现；`run` 的检查范围不因项目源码报告而扩大。
 
 ## 工作流执行探针
 

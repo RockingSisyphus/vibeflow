@@ -1229,6 +1229,10 @@ def test_build_project_aot_forwards_prepared_request(
         return fake
 
     monkeypatch.setattr("vibeflow.tooling.application.javascript.build.build_aot", fake_build)
+    monkeypatch.setattr(
+        "vibeflow.tooling.application.javascript.build.inspect_registered_implementations",
+        lambda *args, **kwargs: (),
+    )
     result = build_project_aot(request)
 
     assert result.entry == fake.entry

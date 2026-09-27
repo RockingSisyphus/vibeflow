@@ -12,19 +12,13 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 from vibeflow.core.findings import HealthFinding
+from vibeflow.core.quality.policy_data import COMMON_POLICY_DATA, merge_policy_data
 from vibeflow.targets.python.project.plugins import PluginRegistry, plugin_error
 from vibeflow.targets.python.quality.source_analysis.types import BANNED_IMPORT_ROOTS, PurityPolicy
 
 
 DEFAULT_POLICY_DATA: dict[str, Any] = {
-    "node_source": {"max_lines": 500, "max_bytes": 60000, "warn_lines": 450, "warn_bytes": 54000},
-    "complexity": {
-        "max_functions": None,
-        "max_branches": None,
-        "max_nesting_depth": None,
-        "max_params": None,
-        "max_contract_keys": None,
-    },
+    **deepcopy(COMMON_POLICY_DATA),
     "imports": {
         "allowed_roots": [],
         "banned_roots": sorted(BANNED_IMPORT_ROOTS),
@@ -32,12 +26,6 @@ DEFAULT_POLICY_DATA: dict[str, Any] = {
         "banned_modules": ["urllib.request"],
     },
     "base_lib": {"allowed_paths": [], "allowed_modules": [], "banned_modules": []},
-    "maintainability": {
-        "warn_call_chain_length": 4,
-        "max_call_chain_length": 4,
-        "warn_dependency_chain_length": 4,
-        "max_dependency_chain_length": 6,
-    },
     "rules": {
         "downgrades": [],
         "exemptions": [],
@@ -130,8 +118,7 @@ def default_effective_policy() -> EffectivePolicy:
 def merge_policy(base: dict[str, Any], override: Mapping[str, Any]) -> None:
     """Merge an already-validated policy update into an effective policy."""
 
-    append_paths = {("rules", "downgrades"), ("rules", "exemptions")}
-    _deep_merge(base, override, path=(), append_paths=append_paths)
+    merge_policy_data(base, override)
 
 
 PolicySchemaValidator = Callable[..., tuple[HealthFinding, ...] | list[HealthFinding]]
@@ -387,28 +374,6 @@ def _relaxed_policy_rule_ids(update: Mapping[str, Any]) -> set[str]:
             relaxed.add(str(item["rule_id"]))
     return relaxed
 
-
-def _deep_merge(
-    base: dict[str, Any],
-    override: Mapping[str, Any],
-    *,
-    path: tuple[str, ...],
-    append_paths: set[tuple[str, ...]],
-) -> None:
-    for key, value in override.items():
-        key = str(key)
-        next_path = (*path, key)
-        if next_path in append_paths and isinstance(value, list):
-            existing = base.get(key)
-            if not isinstance(existing, list):
-                base[key] = []
-            base[key].extend(deepcopy(value))
-        elif isinstance(value, Mapping) and isinstance(base.get(key), dict):
-            _deep_merge(
-                base[key], value, path=next_path, append_paths=append_paths
-            )
-        else:
-            base[key] = deepcopy(value)
 
 __all__ = [
     "DEFAULT_POLICY_DATA",

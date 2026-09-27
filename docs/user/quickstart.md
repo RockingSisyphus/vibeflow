@@ -4,15 +4,16 @@
 
 ## 选择项目根
 
-任务涉及 Python Node、Registry 或直接运行 workflow 时，修改 `python_project/`。任务涉及 JavaScript/TypeScript descriptor 或构建普通 ESM 时，修改 `javascript_project/`。一次 workflow 只属于一个 Target。
+先查看工作区的 `vibeflow_config.jsonc`，根据任务选择实际 root 及其声明的 Target。以下 `python_project/` 和 `javascript_project/` 是分发包最小项目的示例路径；业务项目可以有多个不同名称的 root。一次 workflow 只属于一个 Target。
 
 开始修改前依次阅读：
 
 1. 根目录 `AGENTS.md`；
 2. 所选 root 的 README 和 `vibeflow_project.jsonc`；
-3. 已登记的 `ARCHITECTURE.jsonc`；
-4. 架构文档所指向的真实 Config、Nodeset 和 Node source；
-5. 与任务对应的使用者文档。
+3. 目标目录及其上级目录中更具体的项目 `AGENTS.md`；
+4. 已登记的 `ARCHITECTURE.jsonc`；
+5. 架构文档所指向的真实 Config、Nodeset 和 Node source；
+6. 与任务对应的使用者文档。
 
 Architecture 是生成的审查视图。结构变更落在真实 source 中，然后重新生成 Architecture。
 

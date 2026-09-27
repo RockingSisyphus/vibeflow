@@ -24,8 +24,8 @@ VibeFlow validates engineering structure. Project tests remain responsible for b
 
 Download and extract one release package:
 
-- `vibeflow-distribution-0.13.2.zip` for human-reviewed collaboration;
-- `vibeflow-distribution-autonomous-0.13.2.zip` for unattended development.
+- `vibeflow-distribution-0.14.1.zip` for human-reviewed collaboration;
+- `vibeflow-distribution-autonomous-0.14.1.zip` for unattended development.
 
 The root `AGENTS.md` routes AI agents to task-specific documentation. Human readers can start at `kernel/docs/README.md`. Both packages include minimal `python_project/` and `javascript_project/` roots.
 
@@ -57,4 +57,4 @@ Run the complete source-repository gate with:
 python tools/verify_project.py --full
 ```
 
-Current package version: `0.13.2`. Workflow ABI: `vibeflow.workflow.v4`.
+Current package version: `0.14.1`. Workflow ABI: `vibeflow.workflow.v4`.

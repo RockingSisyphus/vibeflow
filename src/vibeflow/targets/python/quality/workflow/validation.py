@@ -174,7 +174,10 @@ def _validate_graph_node(
     from vibeflow.targets.python.quality.source_analysis import collect_node_metrics
 
     state.node_effect_scopes[spec.id] = effective_effect_scope(getattr(node_cls, "NODE_INFO", None))
-    metrics = collect_node_metrics(node_cls)
+    configured_param_count = len(registry.get_config_spec(spec.type_used).schema)
+    metrics = collect_node_metrics(
+        node_cls, configured_param_count=configured_param_count
+    )
     state.node_metrics[spec.id] = metrics.to_dict()
     _validate_plugin_schema_extensions(plugin_registry, state.errors, spec.id, node_cls, purity_policy)
     _record_node_fingerprint(spec.id, metrics, state)
@@ -322,6 +325,7 @@ def _append_node_purity_findings(
         known_node_class_names=known_classes,
         known_node_modules=known_modules,
         scan_module=True,
+        configured_param_count=len(registry.get_config_spec(spec.type_used).schema),
     ):
         append_finding_by_severity(_node_violation_finding(spec.id, violation), state.errors, state.warnings)
 
@@ -413,24 +417,12 @@ def _append_duplicate_logic_findings(state: _HealthValidationState) -> None:
 
 
 def _append_nodeset_health(graph: GraphConfig, registry: NodeRegistry | None, state: _HealthValidationState) -> None:
+    from vibeflow.core.quality.nodesets import nodeset_quality_findings
     from vibeflow.targets.python.quality.workflow.nodesets import append_nodeset_finding, validate_nodesets
 
-    for nodeset in graph.nodesets.values():
-        if len(nodeset.graph.nodes) > 10:
-            append_nodeset_finding(
-                state.warnings,
-                state.nodeset_findings,
-                HealthFinding(
-                    rule_id="NODESET.SMELL.TOO_WIDE",
-                    severity="warning",
-                    object_type="nodeset",
-                    object_id=nodeset.type_key,
-                    failure_layer="topology",
-                    message=f"nodeset has {len(nodeset.graph.nodes)} internal nodes; consider splitting it",
-                    suggested_fix_type="fix_nodeset",
-                    details={"node_count": len(nodeset.graph.nodes), "limit": 10},
-                ),
-            )
+    for finding in nodeset_quality_findings(graph):
+        if finding.severity == "warning":
+            append_nodeset_finding(state.warnings, state.nodeset_findings, finding)
     nodeset_errors, nodeset_warnings = validate_nodesets(graph, registry=registry)
     for finding in nodeset_errors:
         append_nodeset_finding(state.errors, state.nodeset_findings, finding)

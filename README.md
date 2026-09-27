@@ -24,8 +24,8 @@ VibeFlow 检查工程结构，不代替项目的业务测试、需求验收或�
 
 从 GitHub Release 下载所需发行包并解压：
 
-- `vibeflow-distribution-0.13.2.zip`：人机协同审核；
-- `vibeflow-distribution-autonomous-0.13.2.zip`：无人值守开发。
+- `vibeflow-distribution-0.14.1.zip`：人机协同审核；
+- `vibeflow-distribution-autonomous-0.14.1.zip`：无人值守开发。
 
 打开解压目录后，AI 从根 `AGENTS.md` 获得任务阅读路径；人类从 `kernel/docs/README.md` 进入使用者手册。两个包都包含最小的 `python_project/` 和 `javascript_project/`。
 
@@ -57,4 +57,4 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 python tools/verify_project.py --full
 ```
 
-当前包版本为 `0.13.2`，Workflow ABI 为 `vibeflow.workflow.v4`。
+当前包版本为 `0.14.1`，Workflow ABI 为 `vibeflow.workflow.v4`。

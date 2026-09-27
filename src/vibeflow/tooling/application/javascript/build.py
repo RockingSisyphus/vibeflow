@@ -12,6 +12,8 @@ from vibeflow.targets.javascript.build.project_graph import (
     prepare_graph as _prepare_graph,
     require_explicit_inputs as _require_explicit_inputs,
 )
+from vibeflow.targets.javascript.build.nodeset_limits import check_nodeset_depth, nodeset_width_warnings
+from vibeflow.targets.javascript.quality.implementation import inspect_registered_implementations
 from vibeflow.targets.javascript.build.project_paths import (
     javascript_options as _javascript_options,
     safe_project_path as _safe_project_path,
@@ -65,6 +67,7 @@ from vibeflow.core.config.scope import (
     normalize_node_config_overrides,
 )
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
+from vibeflow.tooling.project.quality_policy import resolve_shared_quality_policy
 from vibeflow.tooling.project.workspace_model import (
     WorkspaceConfig,
     WorkspaceRoot,
@@ -88,6 +91,7 @@ class ProjectBuildRequest:
     html_template: str | Path | None = None
     app_entry: str | Path | None = None
     node_command: str = "node"
+    policy_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -96,6 +100,7 @@ class PreparedProjectBuild:
     root: WorkspaceRoot
     config_path: Path
     package_root: Path
+    quality_policy_data: Mapping[str, Any]
     graph: GraphConfig
     compiled: CompiledGraph
     catalogs: DescriptorCatalogs
@@ -118,7 +123,7 @@ class PreparedProjectBuild:
     plugin_findings: tuple[Mapping[str, Any], ...] = ()
     plugin_relaxations: tuple[Mapping[str, Any], ...] = ()
     plugin_audit_sources: tuple[str, ...] = ()
-    warnings: tuple[Mapping[str, str], ...] = ()
+    warnings: tuple[Mapping[str, object], ...] = ()
     javascript_bindings: JavascriptBindingPlan | None = None
 
 
@@ -204,6 +209,14 @@ def prepare_project_build(
     )
 
     document = load_workspace_config_document(config_path, workspace=workspace)
+    quality_policy_data, _, policy_findings = resolve_shared_quality_policy(
+        document.data,
+        config_path=config_path,
+        explicit_policy_path=request.policy_path,
+    )
+    if policy_findings:
+        first = policy_findings[0]
+        raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in policy_findings))
     graph = parse_graph_config(
         document.data,
         project_root=root.path,
@@ -216,6 +229,7 @@ def prepare_project_build(
         catalogs=catalogs,
         hooks=before_compile_hooks,
     )
+    check_nodeset_depth(graph, max_depth=javascript["nodeset_max_depth"])
     plugin_plan = _javascript_plugin_plan(
         document.data,
         catalogs=catalogs,
@@ -430,11 +444,22 @@ def prepare_project_build(
         runtime_plugins=plugin_plan.runtime_plugins,
         import_policy=import_policy,
     )
+    warnings = list(nodeset_width_warnings(graph))
+    if uses_legacy_host_extensions:
+        warnings.append({
+            "code": "VF_AOT_HOST_EXTENSION_LEGACY_SELECTION",
+            "message": (
+                "javascript.host_extensions is deprecated; select "
+                "host extensions in the workflow-level "
+                "host_extensions list"
+            ),
+        })
     return PreparedProjectBuild(
         workspace=workspace,
         root=root,
         config_path=config_path,
         package_root=package_root,
+        quality_policy_data=quality_policy_data,
         graph=graph,
         compiled=compiled,
         catalogs=catalogs,
@@ -474,20 +499,7 @@ def prepare_project_build(
         plugin_audit_sources=tuple(
             item.module for item in _active_plugin_bindings(plugin_plan)
         ),
-        warnings=(
-            (
-                {
-                    "code": "VF_AOT_HOST_EXTENSION_LEGACY_SELECTION",
-                    "message": (
-                        "javascript.host_extensions is deprecated; select "
-                        "host extensions in the workflow-level "
-                        "host_extensions list"
-                    ),
-                },
-            )
-            if uses_legacy_host_extensions
-            else ()
-        ),
+        warnings=tuple(warnings),
         javascript_bindings=javascript_bindings,
     )
 
@@ -532,6 +544,33 @@ def _compile_core_compilation(
 
 def build_project_aot(request: ProjectBuildRequest) -> ProjectBuildResult:
     prepared = prepare_project_build(request)
+    owners = prepared.import_policy.get("owners", ())
+    selected_files = tuple(
+        str(owner["path"])
+        for owner in owners
+        if isinstance(owner, Mapping) and owner.get("kind") in {"node", "base_lib"}
+    )
+    if selected_files:
+        findings = inspect_registered_implementations(
+            prepared.catalogs,
+            project_root=prepared.root.path,
+            package_root=prepared.package_root,
+            selected_files=selected_files,
+            policy_data=prepared.quality_policy_data,
+            node_command=request.node_command,
+        )
+        errors = tuple(item for item in findings if item.severity == "error")
+        if errors:
+            first = errors[0]
+            raise ProjectBuildError(
+                first.rule_id,
+                first.message,
+                diagnostics=tuple(item.to_dict() for item in errors),
+            )
+        prepared = replace(
+            prepared,
+            warnings=(*prepared.warnings, *(item.to_dict() for item in findings if item.severity == "warning")),
+        )
     result = build_aot(
         BuildRequest(
             plan=prepared.plan,

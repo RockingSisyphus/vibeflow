@@ -160,25 +160,15 @@ def _root_arguments(
         if name in options_with_values:
             index += 1 if "=" in item else 2
             continue
-        if target == "python" and name == "--node-command":
-            index += 1 if "=" in item else 2
-            continue
-        if target == "javascript" and name != "--node-command":
+        if (target == "python" and name in {"--node-command", "--policy"}) or (
+            target == "javascript" and name == "--check-side-effects"
+        ):
             index += 1
-            if (
-                "=" not in item
-                and index < len(args)
-                and not args[index].startswith("--")
-            ):
+            if "=" not in item and index < len(args) and not args[index].startswith("--"):
                 index += 1
             continue
         clean.append(item)
-        if (
-            target == "javascript"
-            and name == "--node-command"
-            and "=" not in item
-            and index + 1 < len(args)
-        ):
+        if "=" not in item and index + 1 < len(args) and not args[index + 1].startswith("--"):
             clean.append(args[index + 1])
             index += 1
         index += 1

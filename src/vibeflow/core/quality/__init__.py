@@ -2,6 +2,7 @@
 
 from vibeflow.core.findings import Finding
 from vibeflow.core.quality.evaluator import evaluate_project_quality
+from vibeflow.core.quality.nodesets import nodeset_quality_findings
 from vibeflow.core.quality.models import (
     DirectoryQuality,
     FileQuality,
@@ -13,6 +14,7 @@ from vibeflow.core.quality.models import (
     QualityPolicy,
     QualityReport,
     QualityStructureLimits,
+    QualityStructureConventions,
     QualityStructureRoles,
     QualityThresholds,
     SourceQualityReport,
@@ -44,6 +46,7 @@ __all__ = [
     "QualityReport",
     "RULE_CATALOG",
     "QualityStructureLimits",
+    "QualityStructureConventions",
     "QualityStructureRoles",
     "QualityThresholds",
     "SourceQualityReport",
@@ -53,6 +56,7 @@ __all__ = [
     "append_join_policy_health",
     "duplicate_logic_findings",
     "evaluate_project_quality",
+    "nodeset_quality_findings",
     "rule_catalog",
     "schema_finding",
     "validate_workflow_quality",

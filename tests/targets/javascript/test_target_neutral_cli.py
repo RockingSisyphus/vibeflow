@@ -299,7 +299,7 @@ def test_standalone_quality_uses_explicit_javascript_target(
     assert payload["source_files"] == [str(project / "source.ts")]
 
 
-def test_standalone_quality_reports_unowned_long_lived_work(
+def test_standalone_quality_keeps_unregistered_source_out_of_ownership_audit(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -333,12 +333,10 @@ def test_standalone_quality_reports_unowned_long_lived_work(
     )
 
     payload = json.loads(capsys.readouterr().out)
-    diagnostics = payload["reports"][0]["diagnostics"]
-    assert exit_code == 1
-    assert payload["status"] == "FAIL"
-    assert "VF_SOURCE_LISTENER_UNOWNED" in {
-        item["code"] for item in diagnostics
-    }
+    assert exit_code == 0
+    assert payload["status"] == "PASS"
+    assert payload["reports"] == []
+    assert payload["source_quality"]["summary"]["files"] == 1
 
 
 def test_project_quality_detects_browser_only_discarded_fetch(

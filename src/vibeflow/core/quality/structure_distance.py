@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import PurePosixPath
 from typing import Mapping, Sequence
 
-from .models import FileQuality, PrefixClusterQuality, QualityFinding, QualityThresholds
+from .models import FileQuality, PrefixClusterQuality, QualityFinding, QualityStructureConventions, QualityThresholds
 
 
 def dependency_distance_summary(
@@ -29,12 +29,14 @@ def dependency_distance_findings(
     dependency_graph: Mapping[str, Sequence[str]],
     import_sites_by_edge: Mapping[tuple[str, str], Sequence[Mapping[str, object]]],
     thresholds: QualityThresholds,
+    conventions: QualityStructureConventions | None = None,
 ) -> list[QualityFinding]:
+    conventions = conventions or QualityStructureConventions()
     files_by_module = {file.module: file for file in files}
     module_clusters = {module: cluster for cluster in clusters for module in cluster.modules}
     findings = []
     for source, targets in dependency_graph.items():
-        if _is_distance_exempt_source(source):
+        if _is_distance_exempt_source(source, conventions):
             continue
         far_directories: set[str] = set()
         for target in targets:
@@ -45,7 +47,7 @@ def dependency_distance_findings(
                 continue
             target_directory = directory_for_path(files_by_module[target].path)
             far_directories.add(target_directory)
-            if is_internal_module(files_by_module[target].path):
+            if is_internal_module(files_by_module[target].path, conventions):
                 findings.append(_distant_internal_import_finding(source, target, distance, module_clusters.get(target), import_sites_by_edge))
         if len(far_directories) > thresholds.max_scattered_dependency_directories:
             findings.append(_scattered_dependency_finding(source, far_directories, dependency_graph, files_by_module, import_sites_by_edge))
@@ -59,11 +61,12 @@ def directory_for_path(path: str) -> str:
     return parent.as_posix()
 
 
-def is_internal_module(path: str) -> bool:
+def is_internal_module(path: str, conventions: QualityStructureConventions | None = None) -> bool:
+    conventions = conventions or QualityStructureConventions()
     stem = PurePosixPath(path).stem
-    if stem == "__init__":
+    if stem in conventions.ignored_prefix_stems:
         return False
-    return stem.startswith("_") or stem.endswith(("_helpers", "_rules", "_visitors", "_validators"))
+    return stem.startswith("_") or stem.endswith(conventions.internal_suffixes)
 
 
 def module_path_distance(source: FileQuality, target: FileQuality) -> int:
@@ -149,9 +152,9 @@ def _scattered_dependency_finding(
     )
 
 
-def _is_distance_exempt_source(module: str) -> bool:
-    leaf = module.rsplit(".", 1)[-1]
-    return leaf in {"runtime", "runner", "health", "cli", "cli_reports", "cli_config", "cli_node"}
+def _is_distance_exempt_source(module: str, conventions: QualityStructureConventions) -> bool:
+    leaf = PurePosixPath(module).stem if "/" in module else module.rsplit(".", 1)[-1]
+    return leaf in conventions.distance_exempt_stems
 
 
 def _directory_parts(directory: str) -> tuple[str, ...]:

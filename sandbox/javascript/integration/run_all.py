@@ -567,6 +567,29 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
     return cases
 
 
+def _quality_group_case() -> dict[str, Any]:
+    """Reuse the independent source-quality sandbox in the full JS suite."""
+
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = str(_REPOSITORY_ROOT / "src")
+    environment["VIBEFLOW_TEST_TOOLCHAIN_ROOT"] = str(PROJECT_ROOT)
+    completed = subprocess.run(
+        [
+            sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+            str(_REPOSITORY_ROOT / "tests/targets/javascript/test_quality_sandbox.py"),
+            str(_REPOSITORY_ROOT / "tests/targets/javascript/test_nodeset_limits.py"),
+        ],
+        cwd=_REPOSITORY_ROOT,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode:
+        raise AssertionError(completed.stdout + completed.stderr)
+    return {"result": completed.stdout.strip().splitlines()[-1]}
+
+
 def _source_marker_location(path: Path, marker: str) -> tuple[int, int]:
     source = path.read_text(encoding="utf-8")
     offset = source.index(marker)
@@ -827,6 +850,7 @@ def main() -> int:
             )
         )
         cases.extend(_negative_cases(cache))
+        cases.append(("quality:shared-source-rules", _quality_group_case))
         results = execute_cases(cases)
 
     write_report(results)

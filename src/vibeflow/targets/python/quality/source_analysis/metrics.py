@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 from typing import Any
 
+from vibeflow.core.quality.implementation import analyze_call_graph
 from vibeflow.targets.python.quality.source_analysis.ast_rules import boolop_branch_count, call_name
 from vibeflow.targets.python.quality.source_analysis.helpers import _fingerprint_function
 from vibeflow.targets.python.quality.source_analysis.types import _CallChainAnalysis
@@ -89,23 +90,12 @@ def _analyze_internal_call_chain(tree: ast.Module) -> _CallChainAnalysis:
         collector.visit(method)
         graph[name] = collector.calls
 
-    recursive_paths: list[tuple[str, ...]] = []
-    best_path: tuple[str, ...] = ("run_pure",)
-
-    def dfs(name: str, path: tuple[str, ...]) -> None:
-        nonlocal best_path
-        if len(path) > len(best_path):
-            best_path = path
-        for target in sorted(graph.get(name, ())):
-            if target in path:
-                cycle = (*path[path.index(target):], target)
-                if cycle not in recursive_paths:
-                    recursive_paths.append(cycle)
-                continue
-            dfs(target, (*path, target))
-
-    dfs("run_pure", ("run_pure",))
-    return _CallChainAnalysis(length=len(best_path), path=best_path, recursive_paths=tuple(recursive_paths))
+    result = analyze_call_graph(graph, entry="run_pure")
+    return _CallChainAnalysis(
+        length=result.length,
+        path=result.path,
+        recursive_paths=result.recursive_paths,
+    )
 
 
 class _InternalMethodCallCollector(ast.NodeVisitor):

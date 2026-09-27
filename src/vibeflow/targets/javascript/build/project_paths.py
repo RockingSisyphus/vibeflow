@@ -35,6 +35,16 @@ def javascript_options(root: WorkspaceRoot) -> dict[str, object]:
             "VF_AOT_JAVASCRIPT_CONFIG",
             "javascript.host_extensions must be a list",
         )
+    nodeset_max_depth = raw.get("nodeset_max_depth", 4)
+    if (
+        not isinstance(nodeset_max_depth, int)
+        or isinstance(nodeset_max_depth, bool)
+        or nodeset_max_depth <= 0
+    ):
+        raise ProjectBuildError(
+            "VF_AOT_JAVASCRIPT_CONFIG",
+            "javascript.nodeset_max_depth must be a positive integer",
+        )
     return {
         "package_root": package_root,
         "external_packages": tuple(
@@ -45,6 +55,7 @@ def javascript_options(root: WorkspaceRoot) -> dict[str, object]:
                 str(item).strip() for item in host_extensions
             )
         ),
+        "nodeset_max_depth": nodeset_max_depth,
     }
 
 

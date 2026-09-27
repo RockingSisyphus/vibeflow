@@ -645,7 +645,7 @@ def test_mixed_workspace_quality_runs_each_root_in_an_isolated_process(
         assert options["stderr"] is subprocess.PIPE
         assert "PYTHONPATH" in options["env"]
     assert "--max-lines" in child_calls[0][0]
-    assert "--max-lines" not in child_calls[1][0]
+    assert "--max-lines" in child_calls[1][0]
 
 
 def test_mixed_workspace_quality_keeps_workspace_for_external_roots(

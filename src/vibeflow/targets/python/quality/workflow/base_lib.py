@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from vibeflow.targets.python.project.base_lib_types import BaseLibDependencySummary, BaseLibFinding
 from vibeflow.core.findings import HealthFinding
+from vibeflow.core.quality.implementation import (
+    CallChain, ImplementationLimits, evaluate_base_lib_dependency_chain,
+)
 
 
 def base_lib_finding_to_health(finding: BaseLibFinding) -> HealthFinding:
@@ -25,22 +28,23 @@ def append_dependency_chain_findings(
     summary: BaseLibDependencySummary,
     policy,
 ) -> None:
-    if summary.longest_chain_length > policy.max_dependency_chain_length:
-        target, severity, limit = errors, "error", policy.max_dependency_chain_length
-    elif summary.longest_chain_length > policy.warn_dependency_chain_length:
-        target, severity, limit = warnings, "warning", policy.warn_dependency_chain_length
-    else:
+    finding = evaluate_base_lib_dependency_chain(
+        CallChain(summary.longest_chain_length, summary.longest_chain, summary.recursive_chains),
+        ImplementationLimits.from_policy(policy),
+    )
+    if finding is None:
         return
+    target = errors if finding.severity == "error" else warnings
     target.append(
         HealthFinding(
-            rule_id="NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP",
-            severity=severity,
+            rule_id=finding.rule_id,
+            severity=finding.severity,
             object_type="node",
             object_id=node_name,
             failure_layer="base_lib",
-            message=f"node base_lib dependency chain length is {summary.longest_chain_length} > {limit}",
-            suggested_fix_type="fix_base_lib",
-            details=summary.to_dict() | {"limit": limit},
+            message=finding.message,
+            suggested_fix_type=finding.suggested_fix_type,
+            details=summary.to_dict() | {"limit": finding.details["limit"]},
         )
     )
 

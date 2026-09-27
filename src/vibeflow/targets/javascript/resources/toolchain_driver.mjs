@@ -1786,8 +1786,297 @@ function identifierIsReference(ts, node) {
   return true;
 }
 
-async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = true) {
-  const files = [...new Set([...(request.typecheckFiles || []), ...extraFiles])]
+function qualityLineCount(text) {
+  if (!text) return 0;
+  const lines = text.split(/\r\n|\r|\n/).length;
+  return /(?:\r\n|\r|\n)$/.test(text) ? lines - 1 : lines;
+}
+
+function qualityPosition(sourceFile, node) {
+  const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+  return { line: position.line + 1, column: position.character + 1 };
+}
+
+function qualityIsFunction(ts, node) {
+  return Boolean(node.body) && (
+    ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node)
+    || ts.isArrowFunction(node) || ts.isMethodDeclaration(node)
+    || ts.isConstructorDeclaration(node) || ts.isGetAccessorDeclaration(node)
+    || ts.isSetAccessorDeclaration(node)
+  );
+}
+
+function qualityBranch(ts, node) {
+  const kind = node.kind;
+  if (kind === ts.SyntaxKind.IfStatement
+      || kind === ts.SyntaxKind.ForStatement
+      || kind === ts.SyntaxKind.ForInStatement
+      || kind === ts.SyntaxKind.ForOfStatement
+      || kind === ts.SyntaxKind.WhileStatement
+      || kind === ts.SyntaxKind.DoStatement
+      || kind === ts.SyntaxKind.SwitchStatement
+      || kind === ts.SyntaxKind.TryStatement
+      || kind === ts.SyntaxKind.ConditionalExpression) return true;
+  return kind === ts.SyntaxKind.BinaryExpression && [
+    ts.SyntaxKind.AmpersandAmpersandToken,
+    ts.SyntaxKind.BarBarToken,
+    ts.SyntaxKind.QuestionQuestionToken,
+  ].includes(node.operatorToken?.kind);
+}
+
+function qualityBranchMetrics(ts, root) {
+  let branches = 0;
+  let maxDepth = 0;
+  function visit(node, depth) {
+    const next = depth + (qualityBranch(ts, node) ? 1 : 0);
+    if (next > depth) branches += 1;
+    maxDepth = Math.max(maxDepth, next);
+    visitChildren(ts, node, (child) => visit(child, next));
+  }
+  visit(root, 0);
+  return { branches, maxDepth };
+}
+
+function qualityFunctionName(ts, node, sourceFile) {
+  if (node.name?.text) return String(node.name.text);
+  const parent = node.parent;
+  if (parent?.name?.text) return String(parent.name.text);
+  const location = qualityPosition(sourceFile, node);
+  return `anonymous@${location.line}:${location.column}`;
+}
+
+function qualityFingerprint(ts, node) {
+  const kinds = [];
+  function visit(child) {
+    kinds.push(String(child.kind));
+    visitChildren(ts, child, visit);
+  }
+  visit(node.body || node);
+  return kinds.join(",");
+}
+
+function qualityFunctions(ts, sourceFile) {
+  const functions = [];
+  let classCount = 0;
+  function visit(node, scope) {
+    const classNode = ts.isClassDeclaration(node) || ts.isClassExpression(node);
+    if (classNode) classCount += 1;
+    let nextScope = scope;
+    if (qualityIsFunction(ts, node)) {
+      const name = qualityFunctionName(ts, node, sourceFile);
+      const start = qualityPosition(sourceFile, node).line;
+      const end = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
+      const complexity = qualityBranchMetrics(ts, node.body);
+      functions.push({
+        qualname: [...scope, name].join("."),
+        line_start: start,
+        line_end: end,
+        lines: Math.max(1, end - start + 1),
+        branches: complexity.branches,
+        max_nesting_depth: complexity.maxDepth,
+        param_count: node.parameters?.length || 0,
+        ast_fingerprint: qualityFingerprint(ts, node),
+      });
+      nextScope = [...scope, name];
+    } else if (classNode) {
+      nextScope = [...scope, qualityFunctionName(ts, node, sourceFile)];
+    }
+    visitChildren(ts, node, (child) => visit(child, nextScope));
+  }
+  visit(sourceFile, []);
+  return { functions, classCount };
+}
+
+function qualityPublicApiCount(ts, sourceFile) {
+  let count = 0;
+  for (const statement of sourceFile.statements || []) {
+    if (statement.modifiers?.some((item) => item.kind === ts.SyntaxKind.ExportKeyword)) {
+      count += 1;
+    } else if (ts.isExportDeclaration(statement)) {
+      count += statement.exportClause?.elements?.length || 1;
+    } else if (ts.isExportAssignment(statement)) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function qualitySyntaxDiagnostics(ts, program, sourceFile) {
+  const diagnostics = ts.__native
+    ? program.getSyntacticDiagnostics(sourceFile.fileName)
+    : program.getSyntacticDiagnostics(sourceFile);
+  return diagnostics.map((item) => {
+    const data = diagnosticText(ts, item);
+    const offset = item.start ?? item.pos ?? item.range?.start ?? 0;
+    const position = sourceFile.getLineAndCharacterOfPosition(
+      typeof offset === "number" ? offset : 0,
+    );
+    return {
+      code: "QUALITY.SYNTAX.JAVASCRIPT",
+      severity: "error",
+      object_type: "file",
+      path: path.resolve(sourceFile.fileName),
+      line: data.line || position.line + 1,
+      column: data.column || position.character + 1,
+      message: data.message,
+    };
+  });
+}
+
+function qualityCallGraph(ts, sourceFile, exportName) {
+  const functions = new Map();
+  const aliases = new Map();
+  function register(name, node) {
+    if (!name || !node?.body) return;
+    functions.set(name, node);
+    const leaf = name.split(".").at(-1);
+    aliases.set(leaf, aliases.has(leaf) ? null : name);
+  }
+  function collect(node, owner = "") {
+    if (qualityIsFunction(ts, node)) {
+      let name = node.name?.text || "";
+      const parent = node.parent;
+      if (!name && parent?.name?.text) name = parent.name.text;
+      if (name) register(owner ? `${owner}.${name}` : name, node);
+      if (node.body) visitChildren(ts, node.body, (child) => collect(child, owner));
+      return;
+    }
+    if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) {
+      const className = node.name?.text || owner;
+      visitChildren(ts, node, (child) => collect(child, className));
+      return;
+    }
+    if (ts.isVariableDeclaration(node) && node.name?.text
+        && node.initializer && ts.isObjectLiteralExpression(node.initializer)) {
+      visitChildren(ts, node.initializer, (child) => collect(child, node.name.text));
+      return;
+    }
+    visitChildren(ts, node, (child) => collect(child, owner));
+  }
+  collect(sourceFile);
+  const graph = {};
+  for (const [name, node] of functions) {
+    const calls = new Set();
+    const shadowed = new Set();
+    function addBinding(binding) {
+      if (ts.isIdentifier(binding)) {
+        shadowed.add(binding.text);
+      } else if (binding?.elements) {
+        for (const element of binding.elements) {
+          if (element?.name) addBinding(element.name);
+        }
+      }
+    }
+    for (const parameter of node.parameters || []) addBinding(parameter.name);
+    function collectShadowed(child) {
+      if (child !== node.body && qualityIsFunction(ts, child)) return;
+      if (ts.isVariableDeclaration(child) && child.name) {
+        if (!child.initializer || !qualityIsFunction(ts, child.initializer)) {
+          addBinding(child.name);
+        }
+      }
+      visitChildren(ts, child, collectShadowed);
+    }
+    collectShadowed(node.body);
+    function visit(child) {
+      if (child !== node.body && qualityIsFunction(ts, child)) return;
+      if (ts.isCallExpression(child)) {
+        const expression = child.expression;
+        let target = "";
+        if (ts.isIdentifier(expression)) {
+          target = shadowed.has(expression.text)
+            ? "" : (aliases.get(expression.text) || "");
+        } else if (ts.isPropertyAccessExpression(expression)) {
+          const receiver = expression.expression;
+          if (ts.isIdentifier(receiver)) {
+            const candidate = `${receiver.text}.${expression.name.text}`;
+            target = functions.has(candidate) ? candidate : "";
+          } else if (receiver.kind === ts.SyntaxKind.ThisKeyword) {
+            const candidate = `${name.split(".")[0]}.${expression.name.text}`;
+            target = functions.has(candidate) ? candidate : "";
+          }
+        }
+        if (target) calls.add(target);
+      }
+      visitChildren(ts, child, visit);
+    }
+    visit(node.body);
+    graph[name] = [...calls].sort();
+  }
+  const entry = functions.has(exportName) ? exportName : (aliases.get(exportName) || "");
+  return { entry, calls: graph };
+}
+
+function collectQualityFacts(ts, program, checker, project, sourceFiles, request) {
+  const root = path.resolve(request.qualityRoot || request.packageRoot);
+  const selected = new Set(
+    (request.qualityFiles || []).map((file) => path.resolve(file)),
+  );
+  const modules = new Map(
+    [...selected].map((file) => [file, path.relative(root, file).split(path.sep).join("/")]),
+  );
+  const files = [];
+  const findings = [];
+  const implementations = [];
+  for (const sourceFile of sourceFiles) {
+    const filePath = path.resolve(sourceFile.fileName);
+    if (!selected.has(filePath)) continue;
+    const module = modules.get(filePath);
+    const text = sourceFile.getFullText();
+    const syntax = qualitySyntaxDiagnostics(ts, program, sourceFile);
+    findings.push(...syntax.map((item) => ({ ...item, object_id: module })));
+    const parsed = syntax.length ? { functions: [], classCount: 0 } : qualityFunctions(ts, sourceFile);
+    const complexity = syntax.length ? { branches: 0, maxDepth: 0 } : qualityBranchMetrics(ts, sourceFile);
+    const importSites = [];
+    if (!syntax.length) {
+      for (const imported of importSpecifiers(ts, sourceFile)) {
+        const resolved = resolvedImportFile(ts, checker, project, imported, filePath);
+        // A bare unresolved package name can look exactly like a root-relative
+        // module ID.  Keep its spelling in raw_import, but mark the normalized
+        // target as external so Core cannot infer an internal edge from text.
+        const target = modules.get(path.resolve(resolved || ""))
+          || `external:${imported.value}`;
+        const location = qualityPosition(sourceFile, imported.node);
+        importSites.push({
+          source_module: module,
+          imported: target,
+          raw_import: imported.value,
+          path: module,
+          line: location.line,
+          column: location.column,
+        });
+      }
+    }
+    files.push({
+      path: module,
+      module,
+      lines: qualityLineCount(text),
+      bytes: Buffer.byteLength(text, "utf8"),
+      function_count: parsed.functions.length,
+      class_count: parsed.classCount,
+      public_api_count: syntax.length ? 0 : qualityPublicApiCount(ts, sourceFile),
+      branch_count: complexity.branches,
+      max_nesting_depth: complexity.maxDepth,
+      imports: [...new Set(importSites.map((item) => item.imported))].sort(),
+      functions: parsed.functions,
+      import_sites: importSites,
+    });
+    for (const item of request.qualityImplementations || []) {
+      if (path.resolve(item.path) !== filePath || syntax.length) continue;
+      implementations.push({
+        path: module,
+        type_key: String(item.type_key || ""),
+        kind: String(item.kind || "node"),
+        export: String(item.export ?? "run"),
+        ...qualityCallGraph(ts, sourceFile, String(item.export ?? "run")),
+      });
+    }
+  }
+  return { files: files.sort((a, b) => a.path.localeCompare(b.path)), findings, implementations };
+}
+
+async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = true, qualityOnly = false) {
+  const files = [...new Set([...(request.typecheckFiles || []), ...(request.qualityFiles || []), ...extraFiles])]
     .map((item) => path.resolve(item));
   const contractFiles = new Set(
     (request.contractCheckFiles || []).map((item) => path.resolve(item)),
@@ -1899,19 +2188,22 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
         .map((item) => diagnosticText(ts, item))
       : [];
   }
-  const policy = normalizeImportPolicy(
-    request.importPolicy,
-    request.packageRoot,
-  );
-  deriveTransitiveOwners(
-    ts,
-    sourceFiles,
-    checker,
-    project,
-    policy,
-  );
-  const rootFiles = new Set(files.map((item) => path.resolve(item)));
   try {
+    if (qualityOnly) {
+      return collectQualityFacts(ts, program, checker, project, sourceFiles, request);
+    }
+    const policy = normalizeImportPolicy(
+      request.importPolicy,
+      request.packageRoot,
+    );
+    deriveTransitiveOwners(
+      ts,
+      sourceFiles,
+      checker,
+      project,
+      policy,
+    );
+    const rootFiles = new Set(files.map((item) => path.resolve(item)));
     for (const sourceFile of sourceFiles) {
       if (sourceFile.isDeclarationFile) continue;
       const owned = ownerFor(ts, sourceFile.fileName, policy);
@@ -1953,9 +2245,25 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
         checker,
         policy,
       ));
+      const sharedOwners = policy.owners.filter(
+        (item) => path.resolve(item.path) === path.resolve(sourceFile.fileName),
+      );
+      for (const alternate of sharedOwners.slice(1)) {
+        const alternatePolicy = {
+          ...policy,
+          owners: [alternate, ...policy.owners.filter((item) => item !== alternate)],
+        };
+        findings.push(...auditCompletionAndPromiseOwnership(
+          ts, sourceFile, checker, alternatePolicy,
+        ).map((finding) => ({
+          ...finding,
+          owner: { id: alternate.id, kind: alternate.kind, path: alternate.path },
+        })));
+      }
     }
     if (findings.length) {
       const diagnosticsWithOwners = findings.map((finding) => {
+        if (finding.owner) return finding;
         const owner = finding.file
           ? ownerFor(ts, finding.file, policy)
           : null;
@@ -2111,7 +2419,7 @@ async function main() {
   const request = JSON.parse(await readFile(requestPath, "utf8"));
   const packageRoot = path.resolve(request.packageRoot);
   const tools = await packageTools(packageRoot, {
-    requireEsbuild: request.command !== "audit",
+    requireEsbuild: request.command === "build",
   });
   const probe = {
     node: process.versions.node,
@@ -2127,6 +2435,10 @@ async function main() {
   if (request.command === "audit") {
     await auditContracts(tools.typescript, request, [], false);
     return { ok: true, probe, audit: { checked: true } };
+  }
+  if (request.command === "quality-facts") {
+    const facts = await auditContracts(tools.typescript, request, [], false, true);
+    return { ok: true, probe, quality: facts };
   }
   fail("VF_PROTOCOL", `unknown driver command '${String(request.command)}'`);
 }
