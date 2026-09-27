@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path, PurePosixPath
+from pathlib import Path
+
+
+from vibeflow.tooling.application.quality_options import (
+    add_quality_limit_arguments,
+    _quality_thresholds,
+    _quality_structure_overrides,
+    _quality_structure_enabled,
+)
 
 
 def add_quality_parser(subparsers) -> None:
@@ -17,40 +25,7 @@ def add_quality_parser(subparsers) -> None:
     )
     quality.add_argument("--json", action="store_true", help="emit full quality report JSON")
     quality.add_argument("--check-side-effects", action="store_true", help="also warn about side-effect capable imports and calls")
-    quality.add_argument("--max-lines", type=int, default=500, help="maximum Python file lines before error")
-    quality.add_argument("--warn-lines", type=int, default=450, help="Python file lines before warning")
-    quality.add_argument("--max-bytes", type=int, default=60000, help="maximum Python file bytes before error")
-    quality.add_argument("--max-file-branches", type=int, default=150, help="maximum Python file branch count before warning")
-    quality.add_argument("--max-directory-fanout", type=int, default=25, help="maximum directory fanout before warning")
-    quality.add_argument("--max-directory-fanin", type=int, default=25, help="maximum directory fanin before warning")
-    quality.add_argument("--max-prefix-cluster-files", type=int, default=12, help="maximum same-prefix files before package warning")
-    quality.add_argument("--max-public-entry-bypass-imports", type=int, default=3, help="maximum direct internal imports from one cluster before warning")
-    quality.add_argument("--max-dependency-distance", type=int, default=3, help="maximum module path distance before warning")
-    quality.add_argument("--max-scattered-dependency-directories", type=int, default=6, help="maximum far dependency directories before warning")
-    quality.add_argument("--max-function-lines", type=int, default=80, help="maximum function lines before warning")
-    quality.add_argument("--max-function-branches", type=int, default=12, help="maximum function branch count before warning")
-    quality.add_argument("--max-function-nesting", type=int, default=4, help="maximum function nesting depth before warning")
-    quality.add_argument("--max-function-params", type=int, default=6, help="maximum function parameter count before warning")
-    quality.add_argument("--warn-dependency-depth", type=int, default=6, help="dependency chain length before warning")
-    quality.add_argument("--max-dependency-depth", type=int, default=10, help="dependency chain length before error")
-    _add_structure_arguments(quality)
-    quality.add_argument("--include-references", action="store_true", help="also scan references/ directories")
-    quality.add_argument(
-        "--exclude-dir",
-        action="append",
-        default=[],
-        type=_directory_name,
-        metavar="NAME",
-        help="exclude a top-level directory relative to each scan root; repeatable",
-    )
-    quality.add_argument(
-        "--exclude-path",
-        action="append",
-        default=[],
-        type=_root_relative_path,
-        metavar="PATH",
-        help="exclude an exact root-relative file or directory; repeatable",
-    )
+    add_quality_limit_arguments(quality)
 
 
 def handle_quality_check(args: argparse.Namespace) -> int:
@@ -79,8 +54,9 @@ def handle_quality_check(args: argparse.Namespace) -> int:
             check_side_effects=bool(args.check_side_effects),
         )
     if isinstance(report, HealthReport):
+        source_payload = report.to_dict()
         payload = add_result_scope(
-            report.to_dict(),
+            {**source_payload, "source_quality": source_payload, "reports": []},
             "vibeflow_quality",
             checked_ids=None if report.status in {"PASS", "CONCERNS"} else (),
         )
@@ -90,85 +66,50 @@ def handle_quality_check(args: argparse.Namespace) -> int:
             else _format_health_summary(report)
         )
         return 0 if report.status in {"PASS", "CONCERNS"} else 1
+    source_payload = report.to_dict()
+    workflow_reports = _python_quality_workflow_reports(args)
+    statuses = {str(item.get("status", "ERROR")) for item in workflow_reports}
+    status = (
+        "FAIL" if report.status == "FAIL" or statuses.intersection({"FAIL", "ERROR"})
+        else "CONCERNS" if report.status == "CONCERNS" or "CONCERNS" in statuses
+        else "PASS"
+    )
     payload = add_result_scope(
-        report.to_dict(),
+        {**source_payload, "status": status, "source_quality": source_payload, "reports": workflow_reports},
         "vibeflow_quality",
         checked_ids=None,
     )
     print(
         json.dumps(payload, ensure_ascii=False, indent=2)
         if args.json
-        else format_quality_summary(report)
+        else "\n".join((f"Project quality: {status}", format_quality_summary(report), *(f"Workflow: {item['status']} {item['config']}" for item in workflow_reports)))
     )
-    return 0 if report.status in {"PASS", "CONCERNS"} else 1
+    return 0 if status in {"PASS", "CONCERNS"} else 1
 
 
-def _add_structure_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--enable-structure-limits", action="store_true", help="enable root structure limits for --path scans")
-    parser.add_argument("--no-structure-limits", action="store_true", help="disable workspace/root structure limits")
-    parser.add_argument("--warn-root-code-files", type=int, default=None, help="root Python file count before warning")
-    parser.add_argument("--max-root-code-files", type=int, default=None, help="root Python file count before error")
-    parser.add_argument("--warn-code-dirs", type=int, default=None, help="code directory count before warning")
-    parser.add_argument("--max-code-dirs", type=int, default=None, help="code directory count before error")
-    parser.add_argument("--warn-code-files-per-dir", type=int, default=None, help="direct Python files per directory before warning")
-    parser.add_argument("--max-code-files-per-dir", type=int, default=None, help="direct Python files per directory before error")
-    parser.add_argument("--warn-code-dir-depth", type=int, default=None, help="code directory depth before warning")
-    parser.add_argument("--max-code-dir-depth", type=int, default=None, help="code directory depth before error")
-    parser.add_argument("--warn-child-code-dirs-per-dir", type=int, default=None, help="direct child code directories before warning")
-    parser.add_argument("--max-child-code-dirs-per-dir", type=int, default=None, help="direct child code directories before error")
-    parser.add_argument("--warn-root-level-code-files", type=int, default=None, help="non-allowlisted top-level Python files before warning")
-    parser.add_argument("--max-root-level-code-files", type=int, default=None, help="non-allowlisted top-level Python files before error")
+def _python_quality_workflow_reports(args: argparse.Namespace) -> list[dict[str, object]]:
+    from vibeflow.tooling.application.python.workspace_service import validate_workspace_config_path
+    from vibeflow.tooling.project.workflow_discovery import workflow_configs_for_root
+    from vibeflow.tooling.project.workspace_loader import find_project_config, load_project_workspace, load_workspace_config
 
-
-def _directory_name(value: str) -> str:
-    name = value.strip()
-    if (
-        not name
-        or name in {".", ".."}
-        or "/" in name
-        or "\\" in name
-    ):
-        raise argparse.ArgumentTypeError(
-            "directory name must be one non-empty path component"
-        )
-    return name
-
-
-def _root_relative_path(value: str) -> str:
-    raw = value.strip()
-    path = PurePosixPath(raw)
-    if (
-        not raw
-        or raw.startswith("/")
-        or "\\" in raw
-        or not path.parts
-        or any(part in {"", ".", ".."} for part in path.parts)
-    ):
-        raise argparse.ArgumentTypeError(
-            "excluded path must be a non-empty root-relative POSIX path"
-        )
-    return path.as_posix()
-
-
-def _quality_thresholds(args: argparse.Namespace, threshold_cls):
-    return threshold_cls(
-        max_file_lines=args.max_lines,
-        warn_file_lines=args.warn_lines,
-        max_file_bytes=args.max_bytes,
-        max_file_branches=args.max_file_branches,
-        max_directory_fanout=args.max_directory_fanout,
-        max_directory_fanin=args.max_directory_fanin,
-        max_prefix_cluster_files=args.max_prefix_cluster_files,
-        max_public_entry_bypass_imports=args.max_public_entry_bypass_imports,
-        max_dependency_distance=args.max_dependency_distance,
-        max_scattered_dependency_directories=args.max_scattered_dependency_directories,
-        max_function_lines=args.max_function_lines,
-        max_function_branches=args.max_function_branches,
-        max_function_nesting=args.max_function_nesting,
-        max_function_params=args.max_function_params,
-        warn_dependency_chain=args.warn_dependency_depth,
-        max_dependency_chain=args.max_dependency_depth,
-    )
+    if args.workspace and args.path is None:
+        workspace = load_workspace_config(args.workspace)
+    else:
+        selected = Path(args.path or ".").resolve()
+        if not selected.is_dir():
+            return []
+        project = find_project_config(selected)
+        if project is None or project.parent != selected:
+            return []
+        workspace = load_project_workspace(project)
+    reports = []
+    for root in workspace.roots:
+        if root.project_target != "python" or not root.quality_enabled:
+            continue
+        for config in workflow_configs_for_root(root):
+            result = validate_workspace_config_path(config, workspace=workspace)
+            reports.append({"config": str(config), **result.to_dict()})
+    return reports
 
 
 def _workspace_quality_report(args, thresholds, structure_overrides, structure_enabled, excluded_dirs):
@@ -224,29 +165,3 @@ def _load_workspace_for_quality(path: Path):
                 ),
             ),
         )
-
-
-def _quality_structure_enabled(args: argparse.Namespace, has_overrides: bool) -> bool | None:
-    if args.no_structure_limits:
-        return False
-    if args.enable_structure_limits or has_overrides:
-        return True
-    return None
-
-
-def _quality_structure_overrides(args: argparse.Namespace) -> dict[str, object]:
-    fields = (
-        "warn_root_code_files",
-        "max_root_code_files",
-        "warn_code_dirs",
-        "max_code_dirs",
-        "warn_code_files_per_dir",
-        "max_code_files_per_dir",
-        "warn_code_dir_depth",
-        "max_code_dir_depth",
-        "warn_child_code_dirs_per_dir",
-        "max_child_code_dirs_per_dir",
-        "warn_root_level_code_files",
-        "max_root_level_code_files",
-    )
-    return {field: getattr(args, field) for field in fields if getattr(args, field) is not None}

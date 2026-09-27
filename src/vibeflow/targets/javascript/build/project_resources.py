@@ -445,21 +445,27 @@ def import_policy(
     host_extensions: tuple[Mapping[str, Any], ...] = (),
 ) -> dict[str, Any]:
     owners: list[dict[str, Any]] = []
-    owner_by_path: dict[Path, tuple[str, str]] = {}
+    owner_by_path: dict[Path, list[tuple[str, str]]] = {}
 
     def add_owner(path: Path, *, kind: str, resource_id: str) -> None:
         resolved = path.resolve()
-        previous = owner_by_path.get(resolved)
+        previous = owner_by_path.setdefault(resolved, [])
         current = (kind, resource_id)
-        if previous is not None and previous != current:
+        if current in previous:
+            return
+        if previous and not all(
+            prior_kind == kind == "node"
+            and node_catalog.get(prior_id).base_libs == node_catalog.get(resource_id).base_libs
+            for prior_kind, prior_id in previous
+        ):
             raise ProjectBuildError(
                 "VF_AOT_IMPORT_OWNER",
                 (
                     f"source '{resolved}' is claimed by both "
-                    f"{previous[0]} '{previous[1]}' and {kind} '{resource_id}'"
+                    f"{previous[0][0]} '{previous[0][1]}' and {kind} '{resource_id}'"
                 ),
             )
-        owner_by_path[resolved] = current
+        previous.append(current)
 
     for descriptor in node_catalog:
         for implementation in descriptor.implementations:
@@ -499,46 +505,38 @@ def import_policy(
                 kind="host_extension",
                 resource_id=str(extension["id"]),
             )
-    for path, (kind, resource_id) in sorted(
+    for path, claims in sorted(
         owner_by_path.items(),
         key=lambda item: item[0].as_posix(),
     ):
-        owner: dict[str, Any] = {
-            "path": str(path),
-            "kind": kind,
-            "id": resource_id,
-        }
-        if kind == "node":
-            selected = implementations.get(resource_id)
-            if (
-                selected is not None
-                and Path(str(selected.get("module", ""))).resolve() == path
-            ):
-                owner["export"] = str(selected.get("export", "run"))
-                owner["completion"] = str(
-                    selected.get("completion", "immediate")
+        for kind, resource_id in claims:
+            owner: dict[str, Any] = {
+                "path": str(path),
+                "kind": kind,
+                "id": resource_id,
+            }
+            if kind == "node":
+                selected = implementations.get(resource_id)
+                if (
+                    selected is not None
+                    and Path(str(selected.get("module", ""))).resolve() == path
+                ):
+                    owner["export"] = str(selected.get("export", "run"))
+                    owner["completion"] = str(selected.get("completion", "immediate"))
+            elif kind == "host_extension":
+                selected = next(
+                    (
+                        extension
+                        for extension in host_extensions
+                        if str(extension.get("id", "")) == resource_id
+                        and Path(str(extension.get("module", ""))).resolve() == path
+                    ),
+                    None,
                 )
-        elif kind == "host_extension":
-            selected = next(
-                (
-                    extension
-                    for extension in host_extensions
-                    if str(extension.get("id", "")) == resource_id
-                    and Path(
-                        str(extension.get("module", ""))
-                    ).resolve() == path
-                ),
-                None,
-            )
-            if selected is not None:
-                owner["export"] = str(
-                    selected.get("export", "createHostExtension")
-                )
-                # host_extension_closure rejects any descriptor whose factory
-                # is not declared immediate. Carry that contract into the
-                # TypeScript policy so the source implementation is verified.
-                owner["completion"] = "immediate"
-        owners.append(owner)
+                if selected is not None:
+                    owner["export"] = str(selected.get("export", "createHostExtension"))
+                    owner["completion"] = "immediate"
+            owners.append(owner)
     return {
         "owners": owners,
         "node_base_libs": {
@@ -578,7 +576,7 @@ def target_neutral_import_policy(
     node types plus their transitive base-lib dependencies for validate/review.
     """
 
-    owners_by_path: dict[Path, dict[str, Any]] = {}
+    owners_by_path: dict[Path, list[dict[str, Any]]] = {}
 
     def add_implementation(
         implementation: ImplementationDescriptor,
@@ -610,26 +608,19 @@ def target_neutral_import_policy(
             "export": implementation.source.export or default_export,
             "completion": implementation.completion,
         }
-        previous = owners_by_path.get(source)
-        if previous is not None and (
-            previous["kind"],
-            previous["id"],
-            previous["export"],
-            previous["completion"],
-        ) != (
-            owner["kind"],
-            owner["id"],
-            owner["export"],
-            owner["completion"],
+        previous = owners_by_path.setdefault(source, [])
+        if owner in previous:
+            return
+        if previous and not all(
+            item["kind"] == kind == "node"
+            and catalogs.nodes.get(item["id"]).base_libs == catalogs.nodes.get(resource_id).base_libs
+            for item in previous
         ):
             raise ProjectBuildError(
                 "VF_AOT_IMPORT_OWNER",
-                (
-                    f"source '{source}' has incompatible VibeFlow owners or "
-                    "contracts"
-                ),
+                f"source '{source}' has incompatible VibeFlow owners or contracts",
             )
-        owners_by_path[source] = owner
+        previous.append(owner)
 
     selected_nodes = tuple(
         descriptor
@@ -718,8 +709,9 @@ def target_neutral_import_policy(
             )
 
     owners = [
-        owners_by_path[path]
+        owner
         for path in sorted(owners_by_path, key=lambda item: item.as_posix())
+        for owner in owners_by_path[path]
     ]
     return (
         {
@@ -744,14 +736,28 @@ def target_neutral_import_policy(
             },
             "allowed_external_packages": sorted(allowed_external),
         },
-        tuple(str(item["path"]) for item in owners),
+        tuple(sorted({str(item["path"]) for item in owners})),
     )
+
+
+def driver_import_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
+    """Project-neutral owner facts in the driver request spelling."""
+
+    return {
+        "owners": [dict(item) for item in policy.get("owners", ())],
+        "nodeBaseLibs": dict(policy.get("node_base_libs", {})),
+        "baseLibDependencies": dict(policy.get("base_lib_dependencies", {})),
+        "hostExtensionDependencies": dict(policy.get("host_extension_dependencies", {})),
+        "pluginDependencies": dict(policy.get("plugin_dependencies", {})),
+        "allowedExternalPackages": list(policy.get("allowed_external_packages", ())),
+    }
 
 
 __all__ = [
     "base_lib_closure",
     "enriched_payload",
     "import_policy",
+    "driver_import_policy",
     "host_extension_closure",
     "required_capabilities",
     "schemas_for_types",

@@ -7,6 +7,8 @@ from typing import Mapping
 
 from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, NodeSpec
 
+NODESET_WIDTH_WARNING = 10
+
 
 @dataclass(frozen=True)
 class NodesetDependency:

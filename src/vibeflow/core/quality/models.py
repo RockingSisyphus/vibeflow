@@ -98,6 +98,23 @@ class QualityStructureLimits:
 class QualityStructureRoles:
     base_lib_paths: tuple[str, ...] = ("base_lib",)
     base_lib_modules: tuple[str, ...] = ()
+    module_roles: Mapping[str, str] = field(default_factory=dict)
+    infer_roles_from_path: bool = True
+
+
+@dataclass(frozen=True)
+class QualityStructureConventions:
+    """Target supplied names and source layout hints used by shared rules."""
+
+    code_label: str = "Python"
+    package_entry: str = "__init__.py"
+    suggested_entry_files: tuple[str, ...] = ("__init__.py", "api.py")
+    public_entry_stems: tuple[str, ...] = ("__init__", "api", "types")
+    ignored_prefix_stems: tuple[str, ...] = ("__init__",)
+    internal_suffixes: tuple[str, ...] = ("_helpers", "_rules", "_visitors", "_validators")
+    source_extension: str = ".py"
+    require_exports_for_public_entry: bool = False
+    distance_exempt_stems: tuple[str, ...] = ("runtime", "runner", "health", "cli", "cli_reports", "cli_config", "cli_node")
 
 
 @dataclass(frozen=True, init=False)
@@ -285,6 +302,7 @@ class QualityPolicy:
     thresholds: QualityThresholds = field(default_factory=QualityThresholds)
     structure_limits: QualityStructureLimits | None = None
     structure_roles: QualityStructureRoles = field(default_factory=QualityStructureRoles)
+    structure_conventions: QualityStructureConventions = field(default_factory=QualityStructureConventions)
 
 
 @dataclass(frozen=True)

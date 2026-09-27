@@ -10,7 +10,7 @@ from .structure_distance import (
     directory_for_path,
     is_internal_module,
 )
-from .models import DirectoryQuality, FileQuality, PrefixClusterQuality, QualityFinding, QualityThresholds
+from .models import DirectoryQuality, FileQuality, PrefixClusterQuality, QualityFinding, QualityStructureConventions, QualityThresholds
 
 
 def analyze_directory_structure(
@@ -18,17 +18,19 @@ def analyze_directory_structure(
     dependency_graph: Mapping[str, Sequence[str]],
     import_sites_by_edge: Mapping[tuple[str, str], Sequence[Mapping[str, object]]],
     thresholds: QualityThresholds,
+    conventions: QualityStructureConventions | None = None,
 ) -> tuple[tuple[DirectoryQuality, ...], tuple[PrefixClusterQuality, ...], dict[str, object], list[QualityFinding]]:
+    conventions = conventions or QualityStructureConventions()
     module_directories = {file.module: directory_for_path(file.path) for file in files}
     directories = _directory_reports(module_directories, dependency_graph)
-    clusters = _prefix_clusters(files, dependency_graph)
+    clusters = _prefix_clusters(files, dependency_graph, conventions)
     distance_summary = dependency_distance_summary(module_directories, dependency_graph)
     summary = _structure_summary(directories, clusters, distance_summary)
     findings = [
-        *_directory_findings(directories, thresholds),
-        *_prefix_cluster_findings(clusters, thresholds),
-        *_public_boundary_findings(clusters, files, dependency_graph, import_sites_by_edge, thresholds),
-        *dependency_distance_findings(clusters, files, dependency_graph, import_sites_by_edge, thresholds),
+        *_directory_findings(directories, thresholds, conventions),
+        *_prefix_cluster_findings(clusters, thresholds, conventions),
+        *_public_boundary_findings(clusters, files, dependency_graph, import_sites_by_edge, thresholds, conventions),
+        *dependency_distance_findings(clusters, files, dependency_graph, import_sites_by_edge, thresholds, conventions),
     ]
     return directories, clusters, summary, findings
 
@@ -74,12 +76,13 @@ def _directory_reports(
 def _prefix_clusters(
     files: Sequence[FileQuality],
     dependency_graph: Mapping[str, Sequence[str]],
+    conventions: QualityStructureConventions,
 ) -> tuple[PrefixClusterQuality, ...]:
     files_by_module = {file.module: file for file in files}
     prefix_groups: dict[tuple[str, str], set[str]] = defaultdict(set)
     for file in files:
         stem = PurePosixPath(file.path).stem
-        if stem == "__init__":
+        if stem in conventions.ignored_prefix_stems:
             continue
         directory = directory_for_path(file.path)
         for prefix in _candidate_prefixes(stem):
@@ -109,7 +112,7 @@ def _prefix_clusters(
             sorted(
                 module
                 for module in modules
-                if _is_public_entry_candidate(files_by_module[module].path, prefix)
+                if _is_public_entry_candidate(files_by_module[module], prefix, conventions)
             )
         )
         clusters.append(
@@ -170,6 +173,7 @@ def _structure_summary(
 def _directory_findings(
     directories: tuple[DirectoryQuality, ...],
     thresholds: QualityThresholds,
+    conventions: QualityStructureConventions,
 ) -> list[QualityFinding]:
     findings = []
     for directory in directories:
@@ -177,11 +181,12 @@ def _directory_findings(
         fanin = len(directory.incoming_directories)
         if fanout > thresholds.max_directory_fanout:
             findings.append(
-                _structure_finding(
+                    _structure_finding(
                     "QUALITY.STRUCTURE.DIRECTORY_FANOUT",
                     directory,
                     f"directory depends on {fanout} other directories",
                     {"fanout": fanout, "outgoing_directories": directory.outgoing_directories},
+                    conventions,
                 )
             )
         if fanin > thresholds.max_directory_fanin:
@@ -191,6 +196,7 @@ def _directory_findings(
                     directory,
                     f"directory is depended on by {fanin} other directories",
                     {"fanin": fanin, "incoming_directories": directory.incoming_directories},
+                    conventions,
                 )
             )
     return findings
@@ -199,6 +205,7 @@ def _directory_findings(
 def _prefix_cluster_findings(
     clusters: tuple[PrefixClusterQuality, ...],
     thresholds: QualityThresholds,
+    conventions: QualityStructureConventions,
 ) -> list[QualityFinding]:
     findings = []
     for cluster in clusters:
@@ -217,7 +224,7 @@ def _prefix_cluster_findings(
                         "files": cluster.files,
                         "public_entry_candidates": cluster.public_entry_candidates,
                         "suggested_package_dir": _suggested_package_dir(cluster),
-                        "suggested_layout": _suggested_package_layout(cluster),
+                        "suggested_layout": _suggested_package_layout(cluster, conventions),
                         "import_update_candidates": cluster.external_incoming_modules,
                     },
                 )
@@ -231,6 +238,7 @@ def _public_boundary_findings(
     dependency_graph: Mapping[str, Sequence[str]],
     import_sites_by_edge: Mapping[tuple[str, str], Sequence[Mapping[str, object]]],
     thresholds: QualityThresholds,
+    conventions: QualityStructureConventions,
 ) -> list[QualityFinding]:
     files_by_module = {file.module: file for file in files}
     module_clusters = {
@@ -247,7 +255,7 @@ def _public_boundary_findings(
             cluster = module_clusters.get(target)
             if cluster is None or source in cluster.modules:
                 continue
-            if is_internal_module(files_by_module[target].path):
+            if is_internal_module(files_by_module[target].path, conventions):
                 findings.append(_internal_module_imported_finding(source, target, cluster, import_sites_by_edge))
                 targets_by_cluster[cluster.cluster_name].append(target)
         findings.extend(
@@ -357,9 +365,11 @@ def _select_prefix_groups(
     return tuple(sorted(selected, key=lambda item: _cluster_name(item[0], item[1])))
 
 
-def _is_public_entry_candidate(path: str, prefix: str) -> bool:
-    stem = PurePosixPath(path).stem
-    return stem in {prefix, "__init__", "api", "types"} or stem.endswith("_types")
+def _is_public_entry_candidate(file: FileQuality, prefix: str, conventions: QualityStructureConventions) -> bool:
+    stem = PurePosixPath(file.path).stem
+    if conventions.require_exports_for_public_entry and file.public_api_count == 0:
+        return False
+    return stem in {prefix, *conventions.public_entry_stems} or stem.endswith("_types")
 
 
 def _cluster_name(directory: str, prefix: str) -> str:
@@ -370,17 +380,17 @@ def _suggested_package_dir(cluster: PrefixClusterQuality) -> str:
     return cluster.prefix if cluster.directory == "." else f"{cluster.directory}/{cluster.prefix}"
 
 
-def _suggested_package_layout(cluster: PrefixClusterQuality) -> tuple[str, ...]:
+def _suggested_package_layout(cluster: PrefixClusterQuality, conventions: QualityStructureConventions) -> tuple[str, ...]:
     package_dir = _suggested_package_dir(cluster)
-    entries = {f"{package_dir}/__init__.py"}
+    entries = {f"{package_dir}/{conventions.package_entry}"}
     for path in cluster.files:
         stem = PurePosixPath(path).stem
         if stem == cluster.prefix:
             continue
         if stem.startswith(f"{cluster.prefix}_"):
-            entries.add(f"{package_dir}/{stem.removeprefix(cluster.prefix + '_')}.py")
+            entries.add(f"{package_dir}/{stem.removeprefix(cluster.prefix + '_')}{conventions.source_extension}")
         else:
-            entries.add(f"{package_dir}/{stem}.py")
+            entries.add(f"{package_dir}/{stem}{conventions.source_extension}")
     return tuple(sorted(entries))
 
 
@@ -389,6 +399,7 @@ def _structure_finding(
     directory: DirectoryQuality,
     message: str,
     details: Mapping[str, object],
+    conventions: QualityStructureConventions,
 ) -> QualityFinding:
     return QualityFinding(
         rule_id=rule_id,
@@ -397,15 +408,15 @@ def _structure_finding(
         object_id=directory.directory,
         message=message,
         suggested_fix_type="clarify_structure",
-        details={"directory": directory.directory, **_structure_suggestion(rule_id), **details},
+        details={"directory": directory.directory, **_structure_suggestion(rule_id, conventions), **details},
     )
 
 
-def _structure_suggestion(rule_id: str) -> dict[str, object]:
+def _structure_suggestion(rule_id: str, conventions: QualityStructureConventions) -> dict[str, object]:
     if rule_id == "QUALITY.STRUCTURE.DIRECTORY_FANIN":
         return {
             "suggestion": "consider adding or clarifying a public API module for this directory",
-            "suggested_entry_files": ("__init__.py", "api.py"),
+            "suggested_entry_files": conventions.suggested_entry_files,
         }
     if rule_id == "QUALITY.STRUCTURE.DIRECTORY_FANOUT":
         return {

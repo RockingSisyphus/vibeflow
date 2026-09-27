@@ -1,6 +1,6 @@
 {
   "kind": "node", "type_key": "minimal.output_boundary", "display_name": "Output boundary", "category": "boundary",
-  "description": "Adapts the processed payload to the public response.", "version": "0.13.2", "flow_kind": "io",
+  "description": "Adapts the processed payload to the public response.", "version": "0.14.1", "flow_kind": "io",
   "contract": {
     "requires": [{"type": "payload.processed", "cardinality": "exactly_one", "display_name": "Processed payload"}],
     "provides": [{"key": "response", "type": "payload.response", "display_name": "Public response"}],

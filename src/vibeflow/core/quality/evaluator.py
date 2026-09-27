@@ -54,6 +54,7 @@ def evaluate_project_quality(
             dependency_graph,
             import_sites,
             active.thresholds,
+            active.structure_conventions,
         )
     )
     findings.extend(structure_findings)
@@ -63,6 +64,7 @@ def evaluate_project_quality(
         import_sites,
         active.structure_limits,
         roles=active.structure_roles,
+        conventions=active.structure_conventions,
     )
     structure_summary.update(root_summary)
     findings.extend(root_findings)
@@ -103,47 +105,54 @@ def _file_findings(
             "QUALITY.FILE.MAX_LINES",
             "error",
             f"file has {file.lines} lines",
+            file.lines, thresholds.max_file_lines,
         ),
         (
             thresholds.warn_file_lines <= file.lines <= thresholds.max_file_lines,
             "QUALITY.FILE.WARN_LINES",
             "warning",
             f"file has {file.lines} lines",
+            file.lines, thresholds.warn_file_lines,
         ),
         (
             file.bytes > thresholds.max_file_bytes,
             "QUALITY.FILE.MAX_BYTES",
             "error",
             f"file has {file.bytes} bytes",
+            file.bytes, thresholds.max_file_bytes,
         ),
         (
             file.function_count > thresholds.max_functions_per_file,
             "QUALITY.FILE.TOO_MANY_FUNCTIONS",
             "warning",
             f"file has {file.function_count} functions",
+            file.function_count, thresholds.max_functions_per_file,
         ),
         (
             file.class_count > thresholds.max_classes_per_file,
             "QUALITY.FILE.TOO_MANY_CLASSES",
             "warning",
             f"file has {file.class_count} classes",
+            file.class_count, thresholds.max_classes_per_file,
         ),
         (
             file.public_api_count > thresholds.max_public_api_per_file,
             "QUALITY.FILE.TOO_WIDE_PUBLIC_API",
             "warning",
             f"file exposes {file.public_api_count} public top-level objects",
+            file.public_api_count, thresholds.max_public_api_per_file,
         ),
         (
             file.branch_count > thresholds.max_file_branches,
             "QUALITY.FILE.TOO_MANY_BRANCHES",
             "warning",
             f"file has {file.branch_count} branches",
+            file.branch_count, thresholds.max_file_branches,
         ),
     )
     findings = [
-        _finding(rule_id, severity, "file", file.path, source_path, 1, message)
-        for matched, rule_id, severity, message in checks
+        _finding(rule_id, severity, "file", file.path, source_path, 1, message, {"actual": actual, "limit": limit})
+        for matched, rule_id, severity, message, actual, limit in checks
         if matched
     ]
     for function in file.functions:
@@ -153,21 +162,25 @@ def _file_findings(
                 function.lines > thresholds.max_function_lines,
                 "QUALITY.FUNCTION.MAX_LINES",
                 f"function has {function.lines} lines",
+                function.lines, thresholds.max_function_lines,
             ),
             (
                 function.branches > thresholds.max_function_branches,
                 "QUALITY.FUNCTION.TOO_MANY_BRANCHES",
                 f"function has {function.branches} branches",
+                function.branches, thresholds.max_function_branches,
             ),
             (
                 function.max_nesting_depth > thresholds.max_function_nesting,
                 "QUALITY.FUNCTION.TOO_DEEP_NESTING",
                 f"function nesting depth is {function.max_nesting_depth}",
+                function.max_nesting_depth, thresholds.max_function_nesting,
             ),
             (
                 function.param_count > thresholds.max_function_params,
                 "QUALITY.FUNCTION.TOO_MANY_PARAMS",
                 f"function has {function.param_count} parameters",
+                function.param_count, thresholds.max_function_params,
             ),
         )
         findings.extend(
@@ -179,8 +192,9 @@ def _file_findings(
                 source_path,
                 function.line_start,
                 message,
+                {"actual": actual, "limit": limit},
             )
-            for matched, rule_id, message in function_checks
+            for matched, rule_id, message, actual, limit in function_checks
             if matched
         )
     return findings
@@ -194,6 +208,7 @@ def _finding(
     source_path: str,
     line: int,
     message: str,
+    details: Mapping[str, object] | None = None,
 ) -> QualityFinding:
     return QualityFinding(
         rule_id=rule_id,
@@ -203,6 +218,7 @@ def _finding(
         source_location={"path": source_path, "line": line},
         message=message,
         suggested_fix_type="refactor",
+        details=details or {},
     )
 
 

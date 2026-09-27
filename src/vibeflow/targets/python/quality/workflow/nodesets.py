@@ -11,9 +11,8 @@ from vibeflow.core.flow import (
 )
 from vibeflow.core.nodeset_dependencies import (
     analyze_nodeset_dependencies,
-    nodeset_dependency_cycles,
-    nodeset_depth_violations,
 )
+from vibeflow.core.quality.nodesets import nodeset_quality_findings
 from vibeflow.core.findings import HealthFinding, HealthReport
 from vibeflow.core.contracts import provider_keys, providers_to_dicts, requirement_types, requirements_to_dicts
 from vibeflow.targets.python.project.registry import NodeRegistry, NodeRegistryError
@@ -56,15 +55,10 @@ def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry | None) -> t
                         details={"referenced_nodeset": ref_name},
                     )
                 )
-    for cycle in nodeset_dependency_cycles(dependencies):
-        errors.append(
-            _nodeset_finding(
-                "NODESET.RECURSION",
-                cycle[0],
-                "nodeset recursion is forbidden: " + " -> ".join(cycle),
-                details={"cycle": cycle},
-            )
-        )
+    errors.extend(
+        finding for finding in nodeset_quality_findings(graph)
+        if finding.rule_id == "NODESET.RECURSION"
+    )
     errors.extend(_validate_nodeset_usages(graph.nodes, graph.nodesets, owner="pipeline"))
     for nodeset in graph.nodesets.values():
         errors.extend(_validate_nodeset_usages(nodeset.graph.nodes, graph.nodesets, owner=f"nodeset:{nodeset.type_key}"))
@@ -72,18 +66,10 @@ def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry | None) -> t
 
 
 def validate_nodeset_depth(graph: GraphConfig, *, max_depth: int) -> tuple[HealthFinding, ...]:
-    findings: list[HealthFinding] = []
-    for violation in nodeset_depth_violations(graph, max_depth=max_depth):
-        chain_text = " -> ".join(violation.chain)
-        findings.append(
-            _nodeset_finding(
-                "NODESET.NESTING.DEPTH_EXCEEDED",
-                violation.chain[0],
-                f"nodeset nesting depth {violation.actual_depth} exceeds configured maximum {max_depth}: {chain_text}",
-                details=violation.to_details(),
-            )
-        )
-    return tuple(findings)
+    return tuple(
+        finding for finding in nodeset_quality_findings(graph, max_depth=max_depth)
+        if finding.rule_id == "NODESET.NESTING.DEPTH_EXCEEDED"
+    )
 
 
 def nodeset_depth_error_report(graph: GraphConfig, compiled, *, max_depth: int) -> HealthReport | None:

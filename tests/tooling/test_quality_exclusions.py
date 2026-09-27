@@ -103,6 +103,8 @@ def test_quality_cli_accepts_repeated_top_level_exclusions(
 
     assert code == 0
     payload = json.loads(capsys.readouterr().out)
+    assert payload["source_quality"]["status"] == payload["status"]
+    assert payload["reports"] == []
     assert payload["details_summary"]["files"] == 2
     assert {
         item["path"] for item in payload["files"]

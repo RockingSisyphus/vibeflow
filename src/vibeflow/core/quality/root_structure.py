@@ -5,7 +5,7 @@ from pathlib import PurePosixPath
 from typing import Mapping, Sequence
 
 from .structure_distance import directory_for_path
-from .models import FileQuality, ImportSite, QualityFinding, QualityStructureLimits, QualityStructureRoles
+from .models import FileQuality, ImportSite, QualityFinding, QualityStructureConventions, QualityStructureLimits, QualityStructureRoles
 
 
 _ROOT_DIR = "(root)"
@@ -21,16 +21,18 @@ def analyze_root_structure(
     limits: QualityStructureLimits | None,
     *,
     roles: QualityStructureRoles | None = None,
+    conventions: QualityStructureConventions | None = None,
 ) -> tuple[dict[str, object], tuple[QualityFinding, ...]]:
     if limits is None or not limits.enabled:
         return {}, ()
     stats = _root_stats(files)
+    conventions = conventions or QualityStructureConventions()
     findings = [
-        *_root_count_findings(stats, limits),
-        *_directory_file_count_findings(stats, limits),
+        *_root_count_findings(stats, limits, conventions),
+        *_directory_file_count_findings(stats, limits, conventions),
         *_directory_depth_findings(stats, limits),
         *_child_directory_findings(stats, limits),
-        *_root_level_file_findings(stats, limits),
+        *_root_level_file_findings(stats, limits, conventions),
     ]
     if limits.enforce_role_imports:
         findings.extend(_role_import_findings(files, dependency_graph, import_sites_by_edge, roles or QualityStructureRoles()))
@@ -72,7 +74,7 @@ def _root_stats(files: Sequence[FileQuality]) -> dict[str, object]:
     }
 
 
-def _root_count_findings(stats: Mapping[str, object], limits: QualityStructureLimits) -> list[QualityFinding]:
+def _root_count_findings(stats: Mapping[str, object], limits: QualityStructureLimits, conventions: QualityStructureConventions) -> list[QualityFinding]:
     return [
         *filter(
             None,
@@ -84,7 +86,7 @@ def _root_count_findings(stats: Mapping[str, object], limits: QualityStructureLi
                     int(stats["code_file_count"]),
                     limits.warn_root_code_files,
                     limits.max_root_code_files,
-                    "root has {actual} Python code files",
+                    f"root has {{actual}} {conventions.code_label} code files",
                     {"code_file_count": stats["code_file_count"]},
                 ),
                 _threshold_finding(
@@ -102,7 +104,7 @@ def _root_count_findings(stats: Mapping[str, object], limits: QualityStructureLi
     ]
 
 
-def _directory_file_count_findings(stats: Mapping[str, object], limits: QualityStructureLimits) -> list[QualityFinding]:
+def _directory_file_count_findings(stats: Mapping[str, object], limits: QualityStructureLimits, conventions: QualityStructureConventions) -> list[QualityFinding]:
     direct_files = stats["direct_files"]
     files_by_dir = stats["files_by_dir"]
     assert isinstance(direct_files, Counter)
@@ -116,7 +118,7 @@ def _directory_file_count_findings(stats: Mapping[str, object], limits: QualityS
             count,
             limits.warn_code_files_per_dir,
             limits.max_code_files_per_dir,
-            "directory has {actual} Python code files",
+            f"directory has {{actual}} {conventions.code_label} code files",
             {"directory": directory, "files": files_by_dir.get(directory, ())},
             source_path=_first_path(files_by_dir.get(directory, ())),
         )
@@ -170,7 +172,7 @@ def _child_directory_findings(stats: Mapping[str, object], limits: QualityStruct
     return findings
 
 
-def _root_level_file_findings(stats: Mapping[str, object], limits: QualityStructureLimits) -> list[QualityFinding]:
+def _root_level_file_findings(stats: Mapping[str, object], limits: QualityStructureLimits, conventions: QualityStructureConventions) -> list[QualityFinding]:
     root_files = tuple(path for path in stats["root_level_files"] if PurePosixPath(path).name not in limits.allowed_root_code_files)
     finding = _threshold_finding(
         "QUALITY.STRUCTURE.ROOT_LEVEL_CODE_FILE",
@@ -179,7 +181,7 @@ def _root_level_file_findings(stats: Mapping[str, object], limits: QualityStruct
         len(root_files),
         limits.warn_root_level_code_files,
         limits.max_root_level_code_files,
-        "root has {actual} non-allowlisted top-level Python files",
+        f"root has {{actual}} non-allowlisted top-level {conventions.code_label} files",
         {"files": root_files, "allowed_root_code_files": limits.allowed_root_code_files},
         source_path=_first_path(root_files),
     )
@@ -293,9 +295,11 @@ def _directory(path: PurePosixPath) -> str:
 
 
 def _role_for_file(file: FileQuality, roles: QualityStructureRoles) -> str:
+    if file.module in roles.module_roles:
+        return roles.module_roles[file.module]
     if _is_declared_base_lib(file, roles):
         return _BASE_LIB_ROLE
-    return _role_for_path(file.path)
+    return _role_for_path(file.path) if roles.infer_roles_from_path else "unknown"
 
 
 def _is_declared_base_lib(file: FileQuality, roles: QualityStructureRoles) -> bool:

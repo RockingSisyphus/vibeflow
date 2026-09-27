@@ -1,6 +1,12 @@
 from __future__ import annotations
 import inspect
 from typing import Mapping
+from vibeflow.core.quality.implementation import (
+    CallChain,
+    ImplementationLimits,
+    ImplementationMetrics,
+    evaluate_node_implementation,
+)
 from vibeflow.core.contracts import CARDINALITIES, DataProvider, DataRequirement, provider_keys, requirement_types
 from vibeflow.core.constants import FLOW_KIND_DECISION, FLOW_KINDS
 from vibeflow.targets.python.project.node import NodeContract, NodeInfo, PureNode
@@ -139,77 +145,63 @@ def _validate_signature(
 
 
 def _validate_source_size(source_text: str, *, policy: PurityPolicy, source: _SourceInfo) -> list[PurityViolation]:
-    violations: list[PurityViolation] = []
-    line_count = len(source_text.splitlines())
-    byte_count = len(source_text.encode("utf-8"))
-    if line_count > policy.max_source_lines:
-        violations.append(_violation("source_too_large", f"node source has {line_count} lines > {policy.max_source_lines}", source=source, suggested_fix_type="split_node", details={"lines": line_count, "limit": policy.max_source_lines}))
-    elif policy.warn_source_lines is not None and line_count >= policy.warn_source_lines:
-        violations.append(_violation("source_near_limit", f"node source has {line_count} lines >= warning threshold {policy.warn_source_lines}", source=source, severity="warning", suggested_fix_type="split_node", details={"lines": line_count, "limit": policy.warn_source_lines}))
-    if byte_count > policy.max_source_bytes:
-        violations.append(_violation("source_bytes_too_large", f"node source has {byte_count} bytes > {policy.max_source_bytes}", source=source, suggested_fix_type="split_node", details={"bytes": byte_count, "limit": policy.max_source_bytes}))
-    elif policy.warn_source_bytes is not None and byte_count >= policy.warn_source_bytes:
-        violations.append(_violation("source_bytes_near_limit", f"node source has {byte_count} bytes >= warning threshold {policy.warn_source_bytes}", source=source, severity="warning", suggested_fix_type="split_node", details={"bytes": byte_count, "limit": policy.warn_source_bytes}))
-    return violations
+    facts = ImplementationMetrics(
+        source_lines=len(source_text.splitlines()),
+        source_bytes=len(source_text.encode("utf-8")),
+    )
+    return _numeric_violations(facts, policy, source, prefix="source_")
 
 
 def _validate_complexity_metrics(metrics: NodeMetrics, *, policy: PurityPolicy, source: _SourceInfo) -> list[PurityViolation]:
-    checks = (
-        ("max_functions", policy.max_functions, metrics.function_count, "function_count", "split_node"),
-        ("max_branches", policy.max_branches, metrics.branch_count, "branch_count", "split_node"),
-        ("max_nesting_depth", policy.max_nesting_depth, metrics.max_nesting_depth, "max_nesting_depth", "split_node"),
-        ("max_params", policy.max_params, metrics.param_count, "param_count", "fix_contract"),
-        ("max_contract_keys", policy.max_contract_keys, metrics.contract_key_count, "contract_key_count", "fix_contract"),
-    )
-    violations: list[PurityViolation] = []
-    for code, limit, actual, detail_key, fix_type in checks:
-        if limit is not None and actual > limit:
-            violations.append(
-                _violation(
-                    f"complexity_{code}",
-                    f"node {detail_key} is {actual} > policy limit {limit}",
-                    source=source,
-                    suggested_fix_type=fix_type,
-                    details={detail_key: actual, "limit": limit, "metrics": metrics.to_dict()},
-                )
-            )
-    return violations
+    return _numeric_violations(_core_metrics(metrics), policy, source, prefix="complexity_")
 
 
 def _validate_call_chain_metrics(metrics: NodeMetrics, *, policy: PurityPolicy, source: _SourceInfo) -> list[PurityViolation]:
-    violations: list[PurityViolation] = []
-    for path in metrics.recursive_call_chains:
-        violations.append(
-            _violation(
-                "recursive_call_chain",
-                "node internal helper calls must not be recursive: " + " -> ".join(path),
-                source=source,
-                suggested_fix_type="split_node",
-                details={"path": list(path), "metrics": metrics.to_dict()},
-            )
+    return [
+        violation for violation in _numeric_violations(_core_metrics(metrics), policy, source)
+        if violation.code in {"call_chain_too_deep", "recursive_call_chain"}
+    ]
+
+
+def _core_metrics(metrics: NodeMetrics) -> ImplementationMetrics:
+    return ImplementationMetrics(
+        source_lines=metrics.source_lines,
+        source_bytes=metrics.source_bytes,
+        function_count=metrics.function_count,
+        branch_count=metrics.branch_count,
+        max_nesting_depth=metrics.max_nesting_depth,
+        param_count=metrics.param_count,
+        contract_key_count=metrics.contract_key_count,
+        call_chain=CallChain(
+            metrics.call_chain_length,
+            metrics.call_chain_path,
+            metrics.recursive_call_chains,
+        ),
+        report_metrics=metrics.to_dict(),
+    )
+
+
+def _numeric_violations(
+    metrics: ImplementationMetrics,
+    policy: PurityPolicy,
+    source: _SourceInfo,
+    *,
+    prefix: str | None = None,
+) -> list[PurityViolation]:
+    return [
+        _violation(
+            finding.code,
+            finding.message,
+            source=source,
+            severity=finding.severity,
+            suggested_fix_type=finding.suggested_fix_type,
+            details=finding.details,
         )
-    if metrics.call_chain_length > policy.max_call_chain_length:
-        violations.append(
-            _violation(
-                "call_chain_too_deep",
-                f"node internal call chain length is {metrics.call_chain_length} > {policy.max_call_chain_length}",
-                source=source,
-                suggested_fix_type="split_node",
-                details={"length": metrics.call_chain_length, "limit": policy.max_call_chain_length, "path": list(metrics.call_chain_path)},
-            )
+        for finding in evaluate_node_implementation(
+            metrics, ImplementationLimits.from_policy(policy)
         )
-    elif metrics.call_chain_length >= policy.warn_call_chain_length:
-        violations.append(
-            _violation(
-                "call_chain_too_deep",
-                f"node internal call chain length is {metrics.call_chain_length} >= warning threshold {policy.warn_call_chain_length}",
-                source=source,
-                severity="warning",
-                suggested_fix_type="split_node",
-                details={"length": metrics.call_chain_length, "limit": policy.warn_call_chain_length, "path": list(metrics.call_chain_path)},
-            )
-        )
-    return violations
+        if prefix is None or finding.code.startswith(prefix)
+    ]
 
 
 def _validate_architecture_smells(

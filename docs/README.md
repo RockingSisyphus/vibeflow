@@ -26,6 +26,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 ## 内核维护
 
 - [开发与验证](maintainers/development.md)
+- [架构质检的阻断边界](maintainers/quality-boundaries.md)
 - [发行与文档装配](maintainers/release.md)
 
 完整仓库门禁使用 `python tools/verify_project.py --full`。用户项目的 `quality` 命令与仓库自检器职责不同，详见相应文档。

@@ -62,7 +62,7 @@ def validate_config_path(path: Path, *, policy_path: Path | None = None) -> Heal
         graph = parse_graph_config(document.data, project_root=project_root_for_config(path))
     except GraphConfigError as exc:
         return graph_config_error_report(exc, path=path, effective_policy=effective_policy)
-    depth_findings = validate_nodeset_depth(graph, max_depth=4)
+    depth_findings = validate_nodeset_depth(graph, max_depth=_configured_nodeset_depth(path))
     if depth_findings:
         return HealthReport(
             status="FAIL",
@@ -89,6 +89,16 @@ def validate_config_path(path: Path, *, policy_path: Path | None = None) -> Heal
         },
         effective_policy=effective_policy,
     )
+
+
+def _configured_nodeset_depth(path: Path) -> int:
+    from vibeflow.tooling.project.workspace_loader import find_project_config, load_project_workspace
+
+    project = find_project_config(path)
+    if project is None:
+        return 4
+    workspace = load_project_workspace(project)
+    return int(workspace.roots[0].runtime_options.get("nodeset_max_depth", 4))
 
 
 def inspect_config_payload(path: Path, *, policy_path: Path | None = None) -> tuple[dict[str, object], int]:

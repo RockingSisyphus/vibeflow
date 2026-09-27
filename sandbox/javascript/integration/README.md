@@ -101,7 +101,7 @@ python run.py build --config javascript_project/configs/linear.jsonc \
   --target node --profile single-esm --out-dir output/javascript
 ```
 
-The complete 65-case integration runner, including its browser installation,
+The complete 67-case integration runner, including its browser installation,
 remains in this source repository.  The release example keeps its own locked
 TypeScript/esbuild toolchain and does not share dependencies with the Python
 example root.

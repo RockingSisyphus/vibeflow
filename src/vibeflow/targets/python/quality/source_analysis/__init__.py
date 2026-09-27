@@ -51,6 +51,7 @@ def validate_node_class(
     known_node_modules: tuple[str, ...] = (),
     known_node_class_names: tuple[str, ...] = (),
     scan_module: bool = False,
+    configured_param_count: int = 0,
 ) -> list[PurityViolation]:
     policy = policy or PurityPolicy()
     source = _source_info(node_cls)
@@ -73,7 +74,7 @@ def validate_node_class(
     if isinstance(class_tree, PurityViolation):
         violations.append(class_tree)
         return violations
-    metrics = collect_node_metrics(node_cls)
+    metrics = collect_node_metrics(node_cls, configured_param_count=configured_param_count)
     violations.extend(_validate_complexity_metrics(metrics, policy=policy, source=source))
     violations.extend(_validate_call_chain_metrics(metrics, policy=policy, source=source))
     if isinstance(info, NodeInfo) and isinstance(contract, NodeContract) and _contract_items_valid(contract):
@@ -231,7 +232,9 @@ def _append_module_violations(
 
 
 
-def collect_node_metrics(node_cls: type[Any]) -> NodeMetrics:
+def collect_node_metrics(
+    node_cls: type[Any], *, configured_param_count: int = 0
+) -> NodeMetrics:
     source = _source_info(node_cls)
     contract = getattr(node_cls, "CONTRACT", None)
     if source.class_text is None:
@@ -250,7 +253,7 @@ def collect_node_metrics(node_cls: type[Any]) -> NodeMetrics:
         function_count=counter.function_count,
         branch_count=counter.branch_count,
         max_nesting_depth=counter.max_nesting_depth,
-        param_count=0,
+        param_count=configured_param_count,
         requires_count=len(requires),
         provides_count=len(provides),
         contract_key_count=len(requires) + len(provides),

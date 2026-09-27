@@ -29,7 +29,7 @@ RESOURCE_SHA256 = {
         "c44adbc170890ec536d1b5f73a3f4d17831475b149044c34098e42877f577d2b"
     ),
     "toolchain_driver.mjs": (
-        "ffe86e7fde3438415a3c4a9626d8807d4029cf79143e6f35823f6fa4493c1f16"
+        "b8b991c5f3210bb119184ffeb2da1b8b4e5dd924a4ffd5f9e13d186339dca0cd"
     ),
 }
 

@@ -79,6 +79,14 @@ class DriverAuditResult:
     toolchain: AuditToolchainInfo
 
 
+@dataclass(frozen=True)
+class DriverQualityResult:
+    toolchain: AuditToolchainInfo
+    files: tuple[Mapping[str, Any], ...]
+    findings: tuple[Mapping[str, Any], ...]
+    implementations: tuple[Mapping[str, Any], ...] = ()
+
+
 def probe_toolchain(
     package_root: str | Path,
     *,
@@ -188,6 +196,46 @@ def run_audit_driver(
     )
     _validate_audit_versions(info)
     return DriverAuditResult(toolchain=info)
+
+
+def run_quality_facts_driver(
+    request: Mapping[str, Any],
+    *,
+    package_root: str | Path,
+    node_command: str = "node",
+) -> DriverQualityResult:
+    """Extract syntax and architecture facts without ownership or type checks."""
+
+    root = _validated_package_root(package_root)
+    payload = _run_driver(
+        {
+            **dict(request),
+            "command": "quality-facts",
+            "packageRoot": str(root),
+            "target": "neutral",
+            "profile": "",
+            "typecheckFiles": [],
+            "contractCheckFiles": [],
+        },
+        node_command=node_command,
+    )
+    probe = payload.get("probe")
+    quality = payload.get("quality")
+    if not isinstance(probe, Mapping) or not isinstance(quality, Mapping):
+        raise AotToolchainError("VF_PROTOCOL", "toolchain driver omitted quality facts")
+    files = quality.get("files")
+    findings = quality.get("findings")
+    implementations = quality.get("implementations", [])
+    if not isinstance(files, list) or not isinstance(findings, list) or not isinstance(implementations, list) or not all(
+        isinstance(item, Mapping) for item in (*files, *findings, *implementations)
+    ):
+        raise AotToolchainError("VF_PROTOCOL", "toolchain driver returned invalid quality facts")
+    info = AuditToolchainInfo(
+        node=str(probe.get("node", "")),
+        typescript=str(probe.get("typescript", "")),
+    )
+    _validate_audit_versions(info)
+    return DriverQualityResult(info, tuple(files), tuple(findings), tuple(implementations))
 
 
 def _validated_package_root(value: str | Path) -> Path:
@@ -441,8 +489,10 @@ __all__ = [
     "AuditToolchainInfo",
     "DriverAuditResult",
     "DriverBuildResult",
+    "DriverQualityResult",
     "ToolchainInfo",
     "probe_toolchain",
     "run_audit_driver",
+    "run_quality_facts_driver",
     "run_build_driver",
 ]

@@ -7,6 +7,11 @@ import inspect
 from pathlib import Path
 from typing import Mapping
 
+from vibeflow.core.quality.implementation import (
+    ImplementationLimits,
+    ImplementationMetrics,
+    evaluate_base_lib_implementation,
+)
 from vibeflow.targets.python.project.base_lib_types import (
     BaseLibDependencySummary,
     BaseLibFinding,
@@ -136,28 +141,18 @@ def summarize_base_lib_dependency_chain(
             for resolved in (_resolve_base_lib_import(imported, module_reports),)
         )
     )
-    best_chain: tuple[str, ...] = ()
-    recursive_chains: list[tuple[str, ...]] = []
+    from vibeflow.core.quality.implementation import analyze_call_graph
 
-    def dfs(module: str, path: tuple[str, ...]) -> None:
-        nonlocal best_chain
-        if len(path) > len(best_chain):
-            best_chain = path
-        for target in sorted(edges.get(module, ())):
-            if target in path:
-                cycle = (*path[path.index(target) :], target)
-                if cycle not in recursive_chains:
-                    recursive_chains.append(cycle)
-                continue
-            dfs(target, (*path, target))
-
-    for start in starts:
-        dfs(start, ("node", start))
+    graph = {module: tuple(targets) for module, targets in edges.items()}
+    for module in (*module_reports, *starts):
+        graph.setdefault(module, ())
+    graph["node"] = starts
+    chain = analyze_call_graph(graph, entry="node") if starts else None
     return BaseLibDependencySummary(
         imported_modules=starts,
-        longest_chain_length=len(best_chain),
-        longest_chain=best_chain,
-        recursive_chains=tuple(recursive_chains),
+        longest_chain_length=chain.length if chain else 0,
+        longest_chain=chain.path if chain else (),
+        recursive_chains=chain.recursive_paths if chain else (),
     )
 
 
@@ -471,30 +466,10 @@ def _size_findings(
     *,
     policy: PurityPolicy,
 ) -> tuple[BaseLibFinding, ...]:
-    findings: list[BaseLibFinding] = []
-    lines = len(text.splitlines())
-    bytes_ = len(text.encode("utf-8"))
-    if lines > policy.max_source_lines:
-        findings.append(
-            _finding(
-                "BASE_LIB.SOURCE.MAX_LINES",
-                f"base_lib file has {lines} lines > {policy.max_source_lines}",
-                path=path,
-                module=module,
-                details={"lines": lines, "limit": policy.max_source_lines},
-            )
-        )
-    if bytes_ > policy.max_source_bytes:
-        findings.append(
-            _finding(
-                "BASE_LIB.SOURCE.MAX_BYTES",
-                f"base_lib file has {bytes_} bytes > {policy.max_source_bytes}",
-                path=path,
-                module=module,
-                details={"bytes": bytes_, "limit": policy.max_source_bytes},
-            )
-        )
-    return tuple(findings)
+    facts = ImplementationMetrics(
+        source_lines=len(text.splitlines()), source_bytes=len(text.encode("utf-8"))
+    )
+    return _numeric_findings(path, module, facts, policy, prefix="BASE_LIB.SOURCE.")
 
 
 def _complexity_findings(
@@ -504,39 +479,35 @@ def _complexity_findings(
     *,
     policy: PurityPolicy,
 ) -> tuple[BaseLibFinding, ...]:
-    checks = (
-        (
-            "BASE_LIB.COMPLEXITY.MAX_FUNCTIONS",
-            policy.max_functions,
-            counter.function_count,
-            "function_count",
-        ),
-        (
-            "BASE_LIB.COMPLEXITY.MAX_BRANCHES",
-            policy.max_branches,
-            counter.branch_count,
-            "branch_count",
-        ),
-        (
-            "BASE_LIB.COMPLEXITY.MAX_NESTING_DEPTH",
-            policy.max_nesting_depth,
-            counter.max_nesting_depth,
-            "max_nesting_depth",
-        ),
+    facts = ImplementationMetrics(
+        function_count=counter.function_count,
+        branch_count=counter.branch_count,
+        max_nesting_depth=counter.max_nesting_depth,
     )
-    findings: list[BaseLibFinding] = []
-    for rule_id, limit, actual, key in checks:
-        if limit is not None and actual > limit:
-            findings.append(
-                _finding(
-                    rule_id,
-                    f"base_lib {key} is {actual} > policy limit {limit}",
-                    path=path,
-                    module=module,
-                    details={key: actual, "limit": limit},
-                )
-            )
-    return tuple(findings)
+    return _numeric_findings(path, module, facts, policy, prefix="BASE_LIB.COMPLEXITY.")
+
+
+def _numeric_findings(
+    path: str,
+    module: str,
+    facts: ImplementationMetrics,
+    policy: PurityPolicy,
+    *,
+    prefix: str,
+) -> tuple[BaseLibFinding, ...]:
+    return tuple(
+        _finding(
+            item.rule_id,
+            item.message,
+            path=path,
+            module=module,
+            details=item.details,
+        )
+        for item in evaluate_base_lib_implementation(
+            facts, ImplementationLimits.from_policy(policy)
+        )
+        if item.rule_id.startswith(prefix)
+    )
 
 
 def _dependency_closure_findings(

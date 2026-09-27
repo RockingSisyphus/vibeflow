@@ -29,19 +29,23 @@ from vibeflow.core.inspection import build_architecture_report
 from vibeflow.targets.javascript.build.project_graph import (
     require_explicit_inputs,
 )
+from vibeflow.targets.javascript.build.nodeset_limits import check_nodeset_depth, nodeset_width_warnings
 from vibeflow.targets.javascript.build.project_paths import (
     javascript_options,
     safe_project_path,
 )
 from vibeflow.targets.javascript.build.project_resources import (
+    driver_import_policy,
     schemas_for_types,
     target_neutral_import_policy,
 )
 from vibeflow.targets.javascript.build.toolchain import (
     AotToolchainError,
     AuditToolchainInfo,
+    DriverQualityResult,
     run_audit_driver,
 )
+from vibeflow.targets.javascript.quality.implementation import inspect_registered_implementations
 from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
 from vibeflow.targets.javascript.frontend.facts import (
     JavascriptImplementationFactsError,
@@ -61,6 +65,7 @@ from vibeflow.tooling.project.host_extensions import host_extension_resources
 from vibeflow.tooling.project.plugin_review import load_plugin_review_resources
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
 from vibeflow.tooling.project.workspace_model import WorkspaceConfig, WorkspaceRoot
+from vibeflow.tooling.project.quality_policy import resolve_shared_quality_policy
 from vibeflow.tooling.application.mermaid_shapes import (
     mermaid_shape_for_flow_kind,
 )
@@ -73,6 +78,8 @@ class JavascriptAuditRequest:
     node_command: str = "node"
     audit_sources: bool = True
     audit_registered_resources: bool = False
+    policy_path: Path | None = None
+    quality_facts_by_root: Mapping[str, DriverQualityResult] | None = None
 
 
 @dataclass(frozen=True)
@@ -90,6 +97,7 @@ class JavascriptAuditResult:
     architecture: Mapping[str, object]
     import_policy: Mapping[str, Any]
     source_files: tuple[str, ...]
+    warnings: tuple[Mapping[str, object], ...] = ()
     plugin_records: tuple[Mapping[str, object], ...] = ()
     host_records: tuple[Mapping[str, object], ...] = ()
     toolchain: AuditToolchainInfo | None = None
@@ -144,6 +152,18 @@ def audit_javascript_project(
     except JavascriptImplementationFactsError as exc:
         raise ProjectBuildError(exc.code, exc.message) from exc
     document = load_workspace_config_document(config_path, workspace=workspace)
+    policy_data, _, policy_findings = resolve_shared_quality_policy(
+        document.data,
+        config_path=config_path,
+        explicit_policy_path=request.policy_path,
+    )
+    if policy_findings:
+        first = policy_findings[0]
+        raise ProjectBuildError(
+            first.rule_id,
+            first.message,
+            diagnostics=tuple(item.to_dict() for item in policy_findings),
+        )
     graph = parse_graph_config(
         document.data,
         project_root=root.path,
@@ -151,6 +171,9 @@ def audit_javascript_project(
         root_path=root.path,
         source_path=config_path,
     )
+    width_warnings = nodeset_width_warnings(graph)
+    javascript = javascript_options(root)
+    check_nodeset_depth(graph, max_depth=javascript["nodeset_max_depth"])
     require_explicit_inputs(graph, path=())
     compiled_by_path: dict[tuple[str, ...], CompiledGraph] = {}
     used_node_types: set[str] = set()
@@ -194,7 +217,6 @@ def audit_javascript_project(
         root=root,
         catalogs=catalogs,
     )
-    javascript = javascript_options(root)
     package_root = safe_project_path(
         root.path,
         javascript["package_root"],
@@ -239,22 +261,41 @@ def audit_javascript_project(
         plugin_ids=frozenset(plugin_ids),
     )
     toolchain: AuditToolchainInfo | None = None
+    implementation_warnings = ()
     if request.audit_sources and source_files:
         try:
             audited = run_audit_driver(
                 {
                     "typecheckFiles": list(source_files),
-                    "importPolicy": _driver_import_policy(import_policy),
+                    "importPolicy": driver_import_policy(import_policy),
                 },
                 package_root=package_root,
                 node_command=request.node_command,
             )
             toolchain = audited.toolchain
+            implementation_findings = inspect_registered_implementations(
+                catalogs,
+                project_root=root.path,
+                package_root=package_root,
+                selected_files=source_files,
+                policy_data=policy_data,
+                node_command=request.node_command,
+                prefetched_facts=(request.quality_facts_by_root or {}).get(str(root.path)),
+            )
+            implementation_errors = tuple(item for item in implementation_findings if item.severity == "error")
+            implementation_warnings = tuple(item.to_dict() for item in implementation_findings if item.severity == "warning")
+            if implementation_errors:
+                first = implementation_errors[0]
+                raise ProjectBuildError(
+                    first.rule_id,
+                    first.message,
+                    diagnostics=(*tuple(item.to_dict() for item in implementation_errors), *width_warnings),
+                )
         except AotToolchainError as exc:
             raise ProjectBuildError(
                 exc.code,
                 str(exc),
-                diagnostics=exc.diagnostics,
+                diagnostics=(*exc.diagnostics, *width_warnings),
             ) from exc
     architecture = _architecture_payload(
         graph,
@@ -286,6 +327,7 @@ def audit_javascript_project(
         architecture=architecture,
         import_policy=import_policy,
         source_files=source_files,
+        warnings=(*width_warnings, *implementation_warnings),
         plugin_records=plugin_records,
         host_records=host_records,
         toolchain=toolchain,
@@ -1030,23 +1072,6 @@ def _reachable_javascript_nodesets(graph: GraphConfig) -> frozenset[str]:
 
     visit(graph)
     return frozenset(reachable)
-
-
-def _driver_import_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        "owners": [dict(item) for item in policy.get("owners", ())],
-        "nodeBaseLibs": dict(policy.get("node_base_libs", {})),
-        "baseLibDependencies": dict(
-            policy.get("base_lib_dependencies", {})
-        ),
-        "hostExtensionDependencies": dict(
-            policy.get("host_extension_dependencies", {})
-        ),
-        "pluginDependencies": dict(policy.get("plugin_dependencies", {})),
-        "allowedExternalPackages": list(
-            policy.get("allowed_external_packages", ())
-        ),
-    }
 
 
 __all__ = [
