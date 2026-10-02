@@ -90,7 +90,7 @@ class ImplementationFinding:
     details: Mapping[str, object]
 
 
-def evaluate_node_implementation(
+def _node_implementation_facts(
     metrics: ImplementationMetrics, limits: ImplementationLimits
 ) -> tuple[ImplementationFinding, ...]:
     findings: list[ImplementationFinding] = []
@@ -124,7 +124,7 @@ def evaluate_node_implementation(
     return tuple(findings)
 
 
-def evaluate_base_lib_implementation(
+def _base_lib_implementation_facts(
     metrics: ImplementationMetrics, limits: ImplementationLimits
 ) -> tuple[ImplementationFinding, ...]:
     findings: list[ImplementationFinding] = []
@@ -146,7 +146,7 @@ def evaluate_base_lib_implementation(
     return tuple(findings)
 
 
-def evaluate_base_lib_dependency_chain(
+def _base_lib_dependency_facts(
     chain: CallChain, limits: ImplementationLimits
 ) -> ImplementationFinding | None:
     """Judge a Node's statically known path through base_lib modules."""
@@ -166,6 +166,22 @@ def evaluate_base_lib_dependency_chain(
         {"longest_chain_length": chain.length, "longest_chain": list(chain.path),
          "recursive_chains": [list(path) for path in chain.recursive_paths], "limit": limit},
     )
+
+
+def evaluate_node_implementation(metrics: ImplementationMetrics, limits: ImplementationLimits) -> tuple[ImplementationFinding, ...]:
+    from vibeflow.core.rules.builtin.implementation import evaluate_implementation_rule
+    return evaluate_implementation_rule("node", metrics=metrics, limits=limits)
+
+
+def evaluate_base_lib_implementation(metrics: ImplementationMetrics, limits: ImplementationLimits) -> tuple[ImplementationFinding, ...]:
+    from vibeflow.core.rules.builtin.implementation import evaluate_implementation_rule
+    return evaluate_implementation_rule("base_lib", metrics=metrics, limits=limits)
+
+
+def evaluate_base_lib_dependency_chain(chain: CallChain, limits: ImplementationLimits) -> ImplementationFinding | None:
+    from vibeflow.core.rules.builtin.implementation import evaluate_implementation_rule
+    findings = evaluate_implementation_rule("dependency_chain", chain=chain, limits=limits)
+    return findings[0] if findings else None
 
 
 def _node_finding(

@@ -4,54 +4,125 @@
   "title": "VibeFlow Config",
   "type": "object",
   "properties": {
-    "pipeline": { "$ref": "#/$defs/pipeline" },
-    "nodes": { "$ref": "#/$defs/nodes" },
-    "edges": { "$ref": "#/$defs/edges" },
-    "entry_mode": { "enum": ["sync", "async"] },
-    "max_steps": { "type": "integer", "minimum": 1 },
+    "pipeline": {
+      "$ref": "#/$defs/pipeline"
+    },
+    "nodes": {
+      "$ref": "#/$defs/nodes"
+    },
+    "edges": {
+      "$ref": "#/$defs/edges"
+    },
+    "entry_mode": {
+      "enum": [
+        "sync",
+        "async"
+      ]
+    },
+    "max_steps": {
+      "type": "integer",
+      "minimum": 1
+    },
     "nodeset_imports": {
       "type": "array",
       "items": {
         "anyOf": [
-          { "type": "string", "minLength": 1 },
+          {
+            "type": "string",
+            "minLength": 1
+          },
           {
             "type": "object",
-            "required": ["path"],
+            "required": [
+              "path"
+            ],
             "properties": {
-              "root": { "type": "string", "minLength": 1 },
-              "path": { "type": "string", "minLength": 1 }
+              "root": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
             },
             "additionalProperties": false
           }
         ]
       }
     },
-    "global_config": { "$ref": "#/$defs/scopedConfig" },
+    "global_config": {
+      "$ref": "#/$defs/scopedConfig"
+    },
     "base_lib": {
       "type": "object",
       "properties": {
-        "paths": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
         "modules": {
           "type": "array",
           "items": {
             "anyOf": [
-              { "type": "string", "minLength": 1 },
+              {
+                "type": "string",
+                "minLength": 1
+              },
               {
                 "type": "object",
                 "properties": {
-                  "id": { "type": "string", "minLength": 1 },
-                  "module": { "type": "string", "minLength": 1 },
-                  "name": { "type": "string", "minLength": 1 },
-                  "status": { "enum": ["planned", "implemented"] },
-                  "display_name": { "type": "string" },
-                  "category": { "type": "string" },
-                  "description": { "type": "string" },
-                  "version": { "type": "string" }
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "module": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "status": {
+                    "enum": [
+                      "planned",
+                      "implemented"
+                    ]
+                  },
+                  "display_name": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "string"
+                  }
                 },
                 "anyOf": [
-                  { "required": ["id"] },
-                  { "required": ["module"] },
-                  { "required": ["name"] }
+                  {
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "module"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "name"
+                    ]
+                  }
                 ]
               }
             ]
@@ -59,39 +130,117 @@
         }
       }
     },
-    "policy": { "$ref": "policy.schema.json" },
+    "policy": {
+      "$ref": "policy.schema.json"
+    },
     "plugins": {
       "type": "array",
       "items": {
         "anyOf": [
-          { "type": "string", "minLength": 1 },
+          {
+            "type": "string",
+            "minLength": 1
+          },
           {
             "type": "object",
             "properties": {
-              "module": { "type": "string", "minLength": 1 },
-              "path": { "type": "string", "minLength": 1 },
-              "id": { "type": "string", "minLength": 1 },
-              "name": { "type": "string", "minLength": 1 },
-              "class": { "type": "string", "minLength": 1 },
-              "factory": { "type": "string", "minLength": 1 },
-              "type": { "enum": ["policy", "compiler", "runtime"] },
-              "status": { "enum": ["planned", "implemented"] },
-              "priority": { "type": "integer", "minimum": 1 },
-              "enabled": { "type": "boolean" },
-              "conflict": { "enum": ["error", "replace"] },
-              "scope": { "type": "string" },
-              "display_name": { "type": "string" },
-              "category": { "type": "string" },
-              "description": { "type": "string" },
-              "version": { "type": "string" },
-              "config": { "type": "object" },
-              "settings": { "type": "object" }
+              "module": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "class": {
+                "type": "string",
+                "minLength": 1
+              },
+              "factory": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "enum": [
+                  "compiler",
+                  "runtime"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "planned",
+                  "implemented"
+                ]
+              },
+              "priority": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "conflict": {
+                "enum": [
+                  "error",
+                  "replace"
+                ]
+              },
+              "scope": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "category": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "config": {
+                "type": "object"
+              },
+              "settings": {
+                "type": "object"
+              }
             },
             "anyOf": [
-              { "required": ["id"] },
-              { "required": ["module"] },
-              { "required": ["path"] },
-              { "required": ["name"], "properties": { "status": { "const": "planned" } } }
+              {
+                "required": [
+                  "id"
+                ]
+              },
+              {
+                "required": [
+                  "module"
+                ]
+              },
+              {
+                "required": [
+                  "path"
+                ]
+              },
+              {
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "status": {
+                    "const": "planned"
+                  }
+                }
+              }
             ]
           }
         ]
@@ -101,100 +250,243 @@
       "type": "array",
       "items": {
         "anyOf": [
-          { "type": "string", "minLength": 1 },
+          {
+            "type": "string",
+            "minLength": 1
+          },
           {
             "type": "object",
             "properties": {
-              "id": { "type": "string", "minLength": 1 },
-              "name": { "type": "string", "minLength": 1 },
-              "status": { "enum": ["planned", "implemented"] },
-              "enabled": { "type": "boolean" },
-              "display_name": { "type": "string" },
-              "category": { "type": "string" },
-              "description": { "type": "string" },
-              "version": { "type": "string" },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "enum": [
+                  "planned",
+                  "implemented"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "category": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
               "targets": {
                 "type": "array",
-                "items": { "type": "string", "minLength": 1 },
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
                 "uniqueItems": true
               },
               "provides": {
                 "type": "array",
-                "items": { "type": "string", "minLength": 1 },
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
                 "uniqueItems": true
               },
               "dependencies": {
                 "type": "array",
-                "items": { "type": "string", "minLength": 1 },
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
                 "uniqueItems": true
               },
-              "config": { "type": "object" },
-              "settings": { "type": "object" }
+              "config": {
+                "type": "object"
+              },
+              "settings": {
+                "type": "object"
+              }
             },
             "anyOf": [
-              { "required": ["id"] },
-              { "required": ["name"] }
+              {
+                "required": [
+                  "id"
+                ]
+              },
+              {
+                "required": [
+                  "name"
+                ]
+              }
             ],
             "additionalProperties": false
           }
         ]
       }
+    },
+    "rulesets": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
     }
   },
   "$defs": {
     "dataProvider": {
       "type": "object",
-      "required": ["key", "type", "display_name"],
+      "required": [
+        "key",
+        "type",
+        "display_name"
+      ],
       "properties": {
-        "key": { "type": "string", "minLength": 1 },
-        "type": { "type": "string", "minLength": 1 },
-        "display_name": { "type": "string", "minLength": 1 }
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "additionalProperties": false
     },
     "dataRequirement": {
       "type": "object",
-      "required": ["type", "cardinality", "display_name"],
+      "required": [
+        "type",
+        "cardinality",
+        "display_name"
+      ],
       "properties": {
-        "type": { "type": "string", "minLength": 1 },
-        "cardinality": { "enum": ["exactly_one", "optional_one", "all"] },
-        "display_name": { "type": "string", "minLength": 1 }
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cardinality": {
+          "enum": [
+            "exactly_one",
+            "optional_one",
+            "all"
+          ]
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "additionalProperties": false
     },
     "pipelineInput": {
       "type": "object",
-      "required": ["key", "type", "display_name"],
+      "required": [
+        "key",
+        "type",
+        "display_name"
+      ],
       "properties": {
-        "key": { "type": "string", "minLength": 1 },
-        "type": { "type": "string", "minLength": 1 },
-        "display_name": { "type": "string", "minLength": 1 },
-        "required": { "type": "boolean" }
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean"
+        }
       },
       "additionalProperties": false
     },
     "pipelineOutput": {
       "type": "object",
-      "required": ["type", "cardinality", "display_name"],
+      "required": [
+        "type",
+        "cardinality",
+        "display_name"
+      ],
       "properties": {
-        "type": { "type": "string", "minLength": 1 },
-        "cardinality": { "enum": ["exactly_one", "optional_one", "all"] },
-        "display_name": { "type": "string", "minLength": 1 },
-        "as": { "type": "string", "minLength": 1 }
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cardinality": {
+          "enum": [
+            "exactly_one",
+            "optional_one",
+            "all"
+          ]
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "as": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "additionalProperties": false
     },
     "pipeline": {
       "type": "object",
-      "required": ["nodes"],
+      "required": [
+        "nodes"
+      ],
       "properties": {
-        "inputs": { "type": "array", "items": { "$ref": "#/$defs/pipelineInput" } },
-        "outputs": { "type": "array", "items": { "$ref": "#/$defs/pipelineOutput" } },
-        "nodes": { "$ref": "#/$defs/nodes" },
-        "edges": { "$ref": "#/$defs/edges" },
-        "entry_mode": { "enum": ["sync", "async"], "default": "sync" },
-        "max_steps": { "type": "integer", "minimum": 1 },
-        "execution_lock": { "$ref": "#/$defs/executionLock" }
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pipelineInput"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pipelineOutput"
+          }
+        },
+        "nodes": {
+          "$ref": "#/$defs/nodes"
+        },
+        "edges": {
+          "$ref": "#/$defs/edges"
+        },
+        "entry_mode": {
+          "enum": [
+            "sync",
+            "async"
+          ],
+          "default": "sync"
+        },
+        "max_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "execution_lock": {
+          "$ref": "#/$defs/executionLock"
+        }
       }
     },
     "nodes": {
@@ -202,58 +494,199 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["id", "display_name", "description"],
+        "required": [
+          "id",
+          "display_name",
+          "description"
+        ],
         "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "type_used": { "type": "string", "minLength": 1 },
-          "status": { "enum": ["planned", "implemented"] },
-          "flow_kind": { "enum": ["terminal", "process", "decision", "io", "predefined", "data_store", "document", "preparation", "global_state"] },
-          "planned_behavior": { "$ref": "#/$defs/plannedBehavior" },
-          "display_name": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
-          "description": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
-          "style": { "$ref": "#/$defs/nodeStyle" },
-          "similar_to": { "$ref": "#/$defs/nodeSimilarity" },
-          "join_policy": { "enum": ["safe_any", "any_active", "all"] },
-          "loop": { "$ref": "#/$defs/loopSpec" },
-          "io": { "$ref": "#/$defs/ioSpec" },
-          "requires": { "type": "array", "items": { "$ref": "#/$defs/dataRequirement" } },
-          "provides": { "type": "array", "items": { "$ref": "#/$defs/dataProvider" } },
-          "config": { "type": "object" },
-          "node_configs": { "type": "object" },
-          "allow_config_override": { "type": "boolean" },
-          "override_child_config": { "type": "boolean" },
-          "async": { "enum": ["detached", "result_key"] },
-          "result_key": { "type": "string", "minLength": 1 },
-          "execution_lock": { "$ref": "#/$defs/executionLock" }
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type_used": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "implemented"
+            ]
+          },
+          "flow_kind": {
+            "enum": [
+              "terminal",
+              "process",
+              "decision",
+              "io",
+              "predefined",
+              "data_store",
+              "document",
+              "preparation",
+              "global_state"
+            ]
+          },
+          "planned_behavior": {
+            "$ref": "#/$defs/plannedBehavior"
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": ".*\\S.*"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": ".*\\S.*"
+          },
+          "style": {
+            "$ref": "#/$defs/nodeStyle"
+          },
+          "similar_to": {
+            "$ref": "#/$defs/nodeSimilarity"
+          },
+          "join_policy": {
+            "enum": [
+              "safe_any",
+              "any_active",
+              "all"
+            ]
+          },
+          "loop": {
+            "$ref": "#/$defs/loopSpec"
+          },
+          "io": {
+            "$ref": "#/$defs/ioSpec"
+          },
+          "requires": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/dataRequirement"
+            }
+          },
+          "provides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/dataProvider"
+            }
+          },
+          "config": {
+            "type": "object"
+          },
+          "node_configs": {
+            "type": "object"
+          },
+          "allow_config_override": {
+            "type": "boolean"
+          },
+          "override_child_config": {
+            "type": "boolean"
+          },
+          "async": {
+            "enum": [
+              "detached",
+              "result_key"
+            ]
+          },
+          "result_key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "execution_lock": {
+            "$ref": "#/$defs/executionLock"
+          }
         },
         "anyOf": [
-          { "required": ["type_used"] },
-          { "required": ["status", "flow_kind"], "properties": { "status": { "const": "planned" } } }
+          {
+            "required": [
+              "type_used"
+            ]
+          },
+          {
+            "required": [
+              "status",
+              "flow_kind"
+            ],
+            "properties": {
+              "status": {
+                "const": "planned"
+              }
+            }
+          }
         ],
         "allOf": [
           {
-            "if": { "properties": { "status": { "const": "planned" } }, "required": ["status"] },
-            "then": { "required": ["requires", "provides"] },
-            "else": { "not": { "required": ["planned_behavior"] } }
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "planned"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "requires",
+                "provides"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "planned_behavior"
+                ]
+              }
+            }
           },
           {
             "if": {
-              "properties": { "type_used": { "enum": ["vibeflow.io", "vibeflow.loop.while"] } },
-              "required": ["type_used"]
+              "properties": {
+                "type_used": {
+                  "enum": [
+                    "vibeflow.io",
+                    "vibeflow.loop.while"
+                  ]
+                }
+              },
+              "required": [
+                "type_used"
+              ]
             },
-            "then": { "required": ["requires", "provides"] },
+            "then": {
+              "required": [
+                "requires",
+                "provides"
+              ]
+            },
             "else": {
               "if": {
                 "not": {
-                  "properties": { "status": { "const": "planned" } },
-                  "required": ["status"]
+                  "properties": {
+                    "status": {
+                      "const": "planned"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
                 }
               },
               "then": {
                 "not": {
                   "anyOf": [
-                    { "required": ["requires"] },
-                    { "required": ["provides"] }
+                    {
+                      "required": [
+                        "requires"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "provides"
+                      ]
+                    }
                   ]
                 }
               }
@@ -268,7 +701,9 @@
     },
     "executionLock": {
       "type": "object",
-      "required": ["key"],
+      "required": [
+        "key"
+      ],
       "properties": {
         "key": {
           "type": "string",
@@ -281,41 +716,103 @@
     "nodeStyle": {
       "type": "object",
       "properties": {
-        "fill": { "$ref": "#/$defs/hexColor" },
-        "stroke": { "$ref": "#/$defs/hexColor" },
-        "text": { "$ref": "#/$defs/hexColor" }
+        "fill": {
+          "$ref": "#/$defs/hexColor"
+        },
+        "stroke": {
+          "$ref": "#/$defs/hexColor"
+        },
+        "text": {
+          "$ref": "#/$defs/hexColor"
+        },
+        "shape": {
+          "enum": [
+            "rect",
+            "rounded",
+            "stadium",
+            "diamond",
+            "lean-r",
+            "lean-l",
+            "fr-rect",
+            "cyl",
+            "doc",
+            "hex",
+            "cloud",
+            "circle",
+            "dbl-circ"
+          ]
+        },
+        "icon": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "additionalProperties": false
     },
     "nodeSimilarity": {
       "type": "object",
-      "required": ["node", "relationship", "reason"],
+      "required": [
+        "node",
+        "relationship",
+        "reason"
+      ],
       "properties": {
-        "node": { "type": "string", "minLength": 1 },
-        "relationship": { "enum": ["variant", "copy"] },
-        "reason": { "type": "string", "minLength": 1 }
+        "node": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relationship": {
+          "enum": [
+            "variant",
+            "copy"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "additionalProperties": false
     },
     "loopSpec": {
       "type": "object",
-      "required": ["body"],
+      "required": [
+        "body"
+      ],
       "properties": {
-        "body": { "type": "string", "minLength": 1 },
+        "body": {
+          "type": "string",
+          "minLength": 1
+        },
         "max_iterations": {
           "anyOf": [
-            { "type": "integer", "minimum": 1 },
-            { "type": "null" }
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
           ],
           "default": 1000
         },
-        "stop_after": { "type": "integer", "minimum": 1 },
+        "stop_after": {
+          "type": "integer",
+          "minimum": 1
+        },
         "stop_when": {
           "type": "object",
-          "required": ["from"],
+          "required": [
+            "from"
+          ],
           "properties": {
-            "from": { "type": "string", "minLength": 1 },
-            "equals": { "type": "boolean" }
+            "from": {
+              "type": "string",
+              "minLength": 1
+            },
+            "equals": {
+              "type": "boolean"
+            }
           },
           "additionalProperties": false
         },
@@ -323,11 +820,24 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["from", "as", "update"],
+            "required": [
+              "from",
+              "as",
+              "update"
+            ],
             "properties": {
-              "from": { "type": "string", "minLength": 1 },
-              "as": { "type": "string", "minLength": 1 },
-              "update": { "type": "string", "minLength": 1 }
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "as": {
+                "type": "string",
+                "minLength": 1
+              },
+              "update": {
+                "type": "string",
+                "minLength": 1
+              }
             },
             "additionalProperties": false
           }
@@ -336,11 +846,22 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["from", "as"],
+            "required": [
+              "from",
+              "as"
+            ],
             "properties": {
-              "from": { "type": "string", "minLength": 1 },
-              "as": { "type": "string", "minLength": 1 },
-              "mode": { "const": "all" }
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "as": {
+                "type": "string",
+                "minLength": 1
+              },
+              "mode": {
+                "const": "all"
+              }
             },
             "additionalProperties": false
           }
@@ -349,10 +870,19 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["from", "as"],
+            "required": [
+              "from",
+              "as"
+            ],
             "properties": {
-              "from": { "type": "string", "minLength": 1 },
-              "as": { "type": "string", "minLength": 1 }
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "as": {
+                "type": "string",
+                "minLength": 1
+              }
             },
             "additionalProperties": false
           }
@@ -362,30 +892,59 @@
     },
     "ioSpec": {
       "type": "object",
-      "required": ["operation"],
+      "required": [
+        "operation"
+      ],
       "properties": {
-        "operation": { "enum": ["receive", "send"] },
-        "port": { "type": "string", "minLength": 1, "default": "default" }
+        "operation": {
+          "enum": [
+            "receive",
+            "send"
+          ]
+        },
+        "port": {
+          "type": "string",
+          "minLength": 1,
+          "default": "default"
+        }
       },
       "additionalProperties": false
     },
     "scopedConfig": {
       "type": "object",
       "properties": {
-        "config": { "type": "object" },
-        "values": { "type": "object" },
-        "allow_config_override": { "type": "boolean" },
-        "override_child_config": { "type": "boolean" }
+        "config": {
+          "type": "object"
+        },
+        "values": {
+          "type": "object"
+        },
+        "allow_config_override": {
+          "type": "boolean"
+        },
+        "override_child_config": {
+          "type": "boolean"
+        }
       }
     },
     "plannedBehavior": {
       "oneOf": [
-        { "enum": ["blocking", "transparent"] },
+        {
+          "enum": [
+            "blocking",
+            "transparent"
+          ]
+        },
         {
           "type": "object",
-          "required": ["kind", "stub_module"],
+          "required": [
+            "kind",
+            "stub_module"
+          ],
           "properties": {
-            "kind": { "const": "python_stub" },
+            "kind": {
+              "const": "python_stub"
+            },
             "stub_module": {
               "type": "string",
               "pattern": "^project/stubs/[^.][^\\n\\r]*\\.py$"
@@ -403,23 +962,48 @@
             "type": "array",
             "minItems": 2,
             "maxItems": 2,
-            "items": { "type": "string", "minLength": 1 }
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
           {
             "type": "object",
-            "required": ["from", "to"],
+            "required": [
+              "from",
+              "to"
+            ],
             "properties": {
-              "from": { "type": "string", "minLength": 1 },
-              "to": { "type": "string", "minLength": 1 },
-              "when": { "type": "string" },
-              "schedule": { "type": "boolean" },
-              "transfer": { "type": "boolean" }
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              },
+              "when": {
+                "type": "string"
+              },
+              "schedule": {
+                "type": "boolean"
+              },
+              "transfer": {
+                "type": "boolean"
+              }
             },
             "not": {
-              "required": ["schedule", "transfer"],
+              "required": [
+                "schedule",
+                "transfer"
+              ],
               "properties": {
-                "schedule": { "const": false },
-                "transfer": { "const": false }
+                "schedule": {
+                  "const": false
+                },
+                "transfer": {
+                  "const": false
+                }
               }
             }
           }

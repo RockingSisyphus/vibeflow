@@ -21,6 +21,8 @@ STATUSES = {"planned", "implemented"}
 
 def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
+    if "rulesets" in config:
+        _validate_string_list(config["rulesets"], "rulesets", findings)
     if _is_nodeset_definition(config):
         _validate_nodeset(config, "nodeset", findings)
         if "nodeset_imports" in config:
@@ -251,7 +253,7 @@ def _validate_policy(value: Any, prefix: str, findings: list[HealthFinding], *, 
     if "maintainability" in value:
         _validate_int_policy(value["maintainability"], f"{prefix}.maintainability", ("warn_call_chain_length", "max_call_chain_length", "warn_dependency_chain_length", "max_dependency_chain_length"), findings, rule_source=rule_source, allow_null=False)
     if "rules" in value:
-        _validate_rules_policy(value["rules"], f"{prefix}.rules", findings, rule_source=rule_source)
+        findings.append(_error("CONFIG.POLICY.RULES.REMOVED", "policy rules are removed; select a Ruleset with overrides", f"{prefix}.rules"))
 
 
 def _validate_node_source_policy(value: Any, prefix: str, findings: list[HealthFinding], *, rule_source: str) -> None:
@@ -291,15 +293,6 @@ def _validate_string_list_policy(value: Any, prefix: str, fields: tuple[str, ...
             )
 
 
-def _validate_rules_policy(value: Any, prefix: str, findings: list[HealthFinding], *, rule_source: str) -> None:
-    _validate_policy_section(value, prefix, findings, rule_source=rule_source)
-    if not isinstance(value, Mapping):
-        return
-    for field in ("downgrades", "exemptions"):
-        if field in value:
-            _validate_rule_entries(value[field], f"{prefix}.{field}", findings, rule_source=rule_source)
-
-
 def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
     if not isinstance(value, list):
         findings.append(_error("CONFIG.SCHEMA.PLUGINS_LIST", "plugins must be a list", "plugins"))
@@ -322,10 +315,10 @@ def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
             findings.append(_error("CONFIG.SCHEMA.PLUGIN_PLANNED_ID", f"{prefix} planned plugin must define id, module/path, or name", prefix))
         if "class" in item and not _non_empty_string(item["class"]):
             findings.append(_error("CONFIG.SCHEMA.PLUGIN_CLASS", f"{prefix}.class must be a non-empty string", f"{prefix}.class"))
-        if item.get("type", "policy") == "boundary":
+        if item.get("type", "runtime") == "boundary":
             findings.append(_error("CONFIG.BOUNDARY.REMOVED", f"{prefix}.type boundary is removed; use runtime plugins", f"{prefix}.type"))
-        elif item.get("type", "policy") not in {"policy", "compiler", "runtime"}:
-            findings.append(_error("CONFIG.SCHEMA.PLUGIN_TYPE", f"{prefix}.type must be policy, compiler, or runtime", f"{prefix}.type"))
+        elif item.get("type", "runtime") not in {"compiler", "runtime"}:
+            findings.append(_error("CONFIG.SCHEMA.PLUGIN_TYPE", f"{prefix}.type must be compiler or runtime; review checks use Rule resources", f"{prefix}.type"))
         if "priority" in item:
             _validate_positive_int(item["priority"], f"{prefix}.priority", findings, "CONFIG.SCHEMA.PLUGIN_PRIORITY")
         if item.get("conflict", "error") not in {"error", "replace"}:
@@ -490,27 +483,6 @@ def _validate_resource_metadata_strings(value: Mapping[str, Any], prefix: str, f
 def _validate_policy_section(value: Any, prefix: str, findings: list[HealthFinding], *, rule_source: str) -> None:
     if not isinstance(value, Mapping):
         findings.append(_error("CONFIG.SCHEMA.POLICY_SECTION", f"{prefix} must be an object", prefix, rule_source=rule_source))
-
-
-def _validate_rule_entries(value: Any, prefix: str, findings: list[HealthFinding], *, rule_source: str) -> None:
-    if not isinstance(value, list):
-        findings.append(_error("CONFIG.SCHEMA.POLICY_RULES_LIST", f"{prefix} must be a list", prefix, rule_source=rule_source))
-        return
-    for index, item in enumerate(value):
-        item_prefix = f"{prefix}[{index}]"
-        if not isinstance(item, Mapping):
-            findings.append(_error("CONFIG.SCHEMA.POLICY_RULE_OBJECT", f"{item_prefix} must be an object", item_prefix, rule_source=rule_source))
-            continue
-        if not _non_empty_string(item.get("rule_id")):
-            findings.append(_error("CONFIG.SCHEMA.POLICY_RULE_ID", f"{item_prefix}.rule_id must be a non-empty string", f"{item_prefix}.rule_id", rule_source=rule_source))
-        if prefix.endswith(".downgrades") and item.get("to") not in {"warning", "info", "skip"}:
-            findings.append(_error("CONFIG.SCHEMA.POLICY_RULE_TO", f"{item_prefix}.to must be warning, info, or skip", f"{item_prefix}.to", rule_source=rule_source))
-        if not _non_empty_string(item.get("reason")):
-            findings.append(_error("CONFIG.SCHEMA.POLICY_RULE_REASON", f"{item_prefix}.reason must be a non-empty string", f"{item_prefix}.reason", rule_source=rule_source))
-        if "scope" in item and not isinstance(item["scope"], Mapping):
-            findings.append(_error("CONFIG.SCHEMA.POLICY_RULE_SCOPE", f"{item_prefix}.scope must be an object", f"{item_prefix}.scope", rule_source=rule_source))
-        if not _non_empty_string(item.get("expires")):
-            findings.append(_error("CONFIG.SCHEMA.POLICY_RULE_EXPIRES", f"{item_prefix}.expires must be a non-empty string", f"{item_prefix}.expires", rule_source=rule_source))
 
 
 def _is_nodeset_definition(config: Mapping[str, Any]) -> bool:

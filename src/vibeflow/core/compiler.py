@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from vibeflow.core.algorithms import strongly_connected_components
 from vibeflow.core.constants import (
-    EFFECT_SCOPE_GLOBAL_STATE,
-    EFFECT_SCOPE_NONE,
     FLOW_KIND_DECISION,
     FLOW_KIND_GLOBAL_STATE,
     FLOW_KIND_IO,
@@ -808,11 +806,7 @@ def _node_effect_scopes(
 ) -> dict[str, str]:
     scopes: dict[str, str] = {}
     for node_id, spec in nodes_by_name.items():
-        fallback = (
-            EFFECT_SCOPE_GLOBAL_STATE
-            if flow_kinds.get(node_id) == FLOW_KIND_GLOBAL_STATE
-            else EFFECT_SCOPE_NONE
-        )
+        fallback = "unavailable" if spec.status == STATUS_PLANNED else "unconstrained"
         if (
             spec.status == STATUS_PLANNED
             or spec.type_used in LOOP_NODE_TYPES

@@ -28,10 +28,16 @@ from vibeflow.core.descriptors.models import (
     PluginDescriptor,
 )
 from vibeflow.core.config.node import NodeConfigError
+from vibeflow.core.descriptors.catalogs import BundleCatalog, NodeCategoryCatalog, RuleCatalog, RulesetCatalog
+from vibeflow.core.descriptors.categories import ContributionBundle
 
 
 _CONFIG_KEYS = (
+    "categories",
     "nodes",
+    "rules",
+    "rulesets",
+    "bundles",
     "base_lib",
     "data_schemas",
     "capabilities",
@@ -39,7 +45,11 @@ _CONFIG_KEYS = (
     "plugins",
 )
 _MANIFEST_KINDS = {
+    "categories": "node_category",
     "nodes": "node",
+    "rules": "rule",
+    "rulesets": "ruleset",
+    "bundles": "bundle",
     "base_lib": "base_lib",
     "data_schemas": "data_schema",
     "capabilities": "capability",
@@ -48,7 +58,7 @@ _MANIFEST_KINDS = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass
 class DescriptorLoadError(ValueError):
     code: str
     message: str
@@ -139,6 +149,16 @@ def load_descriptor_catalogs(
     capabilities = CapabilityCatalog()
     host_extensions = HostExtensionCatalog()
     plugins = PluginCatalog()
+    categories = NodeCategoryCatalog()
+    bundles = BundleCatalog()
+    rules = RuleCatalog()
+    rulesets = RulesetCatalog()
+    from vibeflow.core.rules.builtin import builtin_rule_resources
+    builtin_rules, builtin_rulesets = builtin_rule_resources()
+    for descriptor in builtin_rules:
+        rules.register(descriptor, source="builtin:" + descriptor.id)
+    for descriptor in builtin_rulesets:
+        rulesets.register(descriptor, source="builtin:" + descriptor.id)
     catalogs = {
         "nodes": nodes,
         "base_lib": base_libs,
@@ -146,6 +166,10 @@ def load_descriptor_catalogs(
         "capabilities": capabilities,
         "host_extensions": host_extensions,
         "plugins": plugins,
+        "categories": categories,
+        "bundles": bundles,
+        "rules": rules,
+        "rulesets": rulesets,
     }
     parsed_files: set[Path] = set()
     source_files: list[Path] = []
@@ -192,6 +216,8 @@ def load_descriptor_catalogs(
                     ) from exc
                 source_files.append(manifest_path)
 
+    _load_bundle_resources(root, catalogs, parsed_files, source_files)
+
     return DescriptorCatalogs(
         nodes=nodes,
         base_libs=base_libs,
@@ -199,8 +225,45 @@ def load_descriptor_catalogs(
         capabilities=capabilities,
         host_extensions=host_extensions,
         plugins=plugins,
+        categories=categories,
+        bundles=bundles,
+        rules=rules,
+        rulesets=rulesets,
         source_files=tuple(source_files),
     )
+
+
+def _load_bundle_resources(root: Path, catalogs: Mapping[str, object], parsed_files: set[Path], source_files: list[Path]) -> None:
+    visiting: list[Path] = []
+    expanded: set[Path] = set()
+
+    def expand(bundle: ContributionBundle, bundle_path: Path) -> None:
+        if bundle_path in visiting:
+            raise DescriptorLoadError("DESCRIPTOR.BUNDLE.CYCLE", "bundle reference cycle: " + " -> ".join(str(path) for path in (*visiting, bundle_path)), str(bundle_path))
+        if bundle_path in expanded:
+            return
+        visiting.append(bundle_path)
+        for group, references in bundle.resources.items():
+            for reference in references:
+                raw = Path(reference)
+                if _looks_absolute(raw):
+                    raise DescriptorLoadError("DESCRIPTOR.PATH.ABSOLUTE", "bundle resource refs must be relative", str(bundle_path), reference)
+                resource_path = _safe_project_file(root, bundle_path.parent / raw, label="bundle resource", require_exists=True)
+                descriptor = _load_manifest(resource_path, expected_kind=_MANIFEST_KINDS[group], project_root=root)
+                if resource_path not in parsed_files:
+                    try:
+                        catalogs[group].register(descriptor, source=str(resource_path))
+                    except DescriptorCatalogError as exc:
+                        raise DescriptorLoadError(exc.code, exc.message, exc.source, exc.previous_source) from exc
+                    parsed_files.add(resource_path)
+                    source_files.append(resource_path)
+                if isinstance(descriptor, ContributionBundle):
+                    expand(descriptor, resource_path)
+        visiting.pop()
+        expanded.add(bundle_path)
+
+    for bundle in tuple(catalogs["bundles"]):
+        expand(bundle, Path(catalogs["bundles"].source_for(bundle.id)))
 
 
 def parse_descriptor_manifest(

@@ -17,7 +17,7 @@ from vibeflow.core.flow import IO_NODE_TYPE, JOIN_POLICIES, LOOP_NODE_TYPES, LOO
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.constants import FLOW_KINDS
 from vibeflow.core.planned import PLANNED_BEHAVIOR_BLOCKING, PLANNED_BEHAVIOR_PYTHON_STUB, PLANNED_BEHAVIOR_TRANSPARENT, validate_stub_module_ref
-from vibeflow.core.style import NODE_STYLE_FIELDS, is_hex_color, is_reserved_system_color, normalize_hex_color
+from vibeflow.core.style import NODE_STYLE_FIELDS, NODE_PRESENTATION_FIELDS, NODE_SHAPES, is_hex_color, is_reserved_system_color, normalize_hex_color
 
 STATUSES = {"planned", "implemented"}
 
@@ -138,9 +138,12 @@ def _validate_node_visual_fields(value: Mapping[str, Any], prefix: str, findings
     if not isinstance(style, Mapping):
         findings.append(_error("CONFIG.SCHEMA.NODE_STYLE_OBJECT", f"{prefix}.style must be an object", f"{prefix}.style"))
         return
-    unknown = sorted(set(str(key) for key in style) - set(NODE_STYLE_FIELDS))
+    unknown = sorted(set(str(key) for key in style) - set(NODE_PRESENTATION_FIELDS))
     if unknown:
         findings.append(_error("CONFIG.SCHEMA.NODE_STYLE_FIELD", f"{prefix}.style contains unknown keys: {unknown}", f"{prefix}.style"))
+    for field in ("shape", "icon"):
+        if field in style and (not _non_empty_string(style[field]) or (field == "shape" and style[field] not in NODE_SHAPES)):
+            findings.append(_error("CONFIG.SCHEMA.NODE_STYLE_FIELD", f"{prefix}.style.{field} is invalid", f"{prefix}.style.{field}"))
     for field in NODE_STYLE_FIELDS:
         if field not in style:
             continue

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import replace
 
 from typing import Any, Mapping
 
@@ -60,7 +61,7 @@ def parse_graph_config_data(
         root_path=actual_root_path,
         source_path=actual_source_path,
     )
-    return graph
+    return replace(graph, rulesets=_parse_rulesets(config.get("rulesets", ("vibeflow.workflow",))))
 
 
 def _parse_graph_body(
@@ -120,6 +121,7 @@ def _parse_graph_body(
         root_path=root_path,
         source_path=source_path,
         execution_lock=execution_lock,
+        rulesets=_parse_rulesets(raw.get("rulesets", ("vibeflow.workflow",))),
     )
 
 
@@ -339,6 +341,7 @@ def _parse_nodesets(value: Any, *, project_root: str = "", root_id: str = "", ro
                 root_path=nodeset_root_path,
                 source_path=nodeset_source_path,
             )
+        graph = replace(graph, rulesets=_parse_rulesets(item.get("rulesets", ("vibeflow.workflow",))))
         out[type_key] = NodesetSpec(
             type_key=type_key,
             display_name=str(item["display_name"]).strip(),
@@ -355,6 +358,14 @@ def _parse_nodesets(value: Any, *, project_root: str = "", root_id: str = "", ro
             source_path=nodeset_source_path,
         )
     return out
+
+
+def _parse_rulesets(value: object) -> tuple[str, ...]:
+    if isinstance(value, str) or not isinstance(value, (list, tuple)) or not all(isinstance(item, str) and item.strip() for item in value):
+        raise GraphConfigError("rulesets must be a list of non-empty rule set IDs")
+    if len(set(value)) != len(value):
+        raise GraphConfigError("rulesets contains duplicate IDs")
+    return tuple(value)
 
 
 def _parse_nodeset_requirements(value: Any, *, field: str) -> tuple[DataRequirement, ...]:
@@ -482,11 +493,12 @@ def _optional_string(value: Any) -> str:
 
 
 def _parse_node_style(value: Any, *, field: str) -> NodeStyle:
+    from vibeflow.core.style import NODE_PRESENTATION_FIELDS, NODE_SHAPES
     if value in (None, {}):
         return NodeStyle()
     if not isinstance(value, Mapping):
         raise GraphConfigError(f"{field} must be an object")
-    unknown = sorted(set(str(key) for key in value) - set(NODE_STYLE_FIELDS))
+    unknown = sorted(set(str(key) for key in value) - set(NODE_PRESENTATION_FIELDS))
     if unknown:
         raise GraphConfigError(f"{field} contains unknown keys: {unknown}")
     parsed: dict[str, str] = {}
@@ -500,7 +512,16 @@ def _parse_node_style(value: Any, *, field: str) -> NodeStyle:
         if is_reserved_system_color(normalized):
             raise GraphConfigError(f"{field}.{key} uses reserved VibeFlow system color: {normalized}")
         parsed[key] = normalized
-    return NodeStyle(fill=parsed.get("fill", ""), stroke=parsed.get("stroke", ""), text=parsed.get("text", ""))
+    for key in ("shape", "icon"):
+        if key not in value:
+            continue
+        item = value[key]
+        if not isinstance(item, str) or not item.strip():
+            raise GraphConfigError(f"{field}.{key} must be a non-empty string")
+        if key == "shape" and item not in NODE_SHAPES:
+            raise GraphConfigError(f"{field}.shape must be one of {sorted(NODE_SHAPES)}")
+        parsed[key] = item
+    return NodeStyle(**parsed)
 
 
 def _parse_node_similarity(value: Any, *, field: str) -> NodeSimilarity:

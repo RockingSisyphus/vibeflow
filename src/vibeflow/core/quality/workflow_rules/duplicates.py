@@ -5,7 +5,7 @@ from typing import Mapping
 from vibeflow.core.findings import HealthFinding
 
 
-def duplicate_logic_findings(
+def _duplicate_logic_facts(
     fingerprints: dict[str, str],
     node_metrics: dict[str, dict[str, object]],
     *,
@@ -50,6 +50,12 @@ def duplicate_logic_findings(
                     )
                 )
     return tuple(findings)
+
+
+def duplicate_logic_findings(fingerprints, node_metrics, *, node_types=None, node_similarities=None):
+    from vibeflow.core.rules.builtin.workflow import evaluate_workflow_topic
+    return evaluate_workflow_topic("duplicates", fingerprints=fingerprints, node_metrics=node_metrics,
+                                   node_types=node_types, node_similarities=node_similarities).findings
 
 
 def _fingerprint_groups(fingerprints: Mapping[str, str]) -> dict[str, list[str]]:

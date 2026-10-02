@@ -34,6 +34,7 @@ from vibeflow.core.descriptors.models import (
     SourceLocator,
 )
 from vibeflow.core.config.node import normalize_node_config_spec
+from vibeflow.core.descriptors.categories import ContributionBundle, NodeCategoryDescriptor
 
 
 def parse_descriptor_manifest(
@@ -60,6 +61,9 @@ def parse_descriptor_manifest(
             f"descriptor kind '{kind}' does not match directory kind "
             f"'{expected_kind}'"
         )
+    if kind in {"rule", "ruleset"}:
+        from vibeflow.tooling.project.rule_descriptor_parser import parse_rule, parse_ruleset
+        return (parse_rule if kind == "rule" else parse_ruleset)(data)
     parser: dict[str, Callable[[Mapping[str, Any]], object]] = {
         "node": _parse_node,
         "base_lib": _parse_base_lib,
@@ -67,6 +71,8 @@ def parse_descriptor_manifest(
         "capability": _parse_capability,
         "host_extension": _parse_host_extension,
         "plugin": _parse_plugin,
+        "node_category": _parse_category,
+        "bundle": _parse_bundle,
     }
     try:
         selected = parser[kind]
@@ -96,6 +102,9 @@ def _parse_node(data: Mapping[str, Any]) -> NodeDescriptor:
             "implementations",
             "base_libs",
             "capabilities",
+            "rulesets",
+            "presentation",
+            "metadata",
         },
         field="node",
     )
@@ -131,6 +140,30 @@ def _parse_node(data: Mapping[str, Any]) -> NodeDescriptor:
         capabilities=_parse_capability_requirements(
             data.get("capabilities", ()),
         ),
+        rulesets=_string_list(data["rulesets"], field="node.rulesets") if "rulesets" in data else None,
+        presentation=_mapping_or_empty(data.get("presentation"), field="node.presentation"),
+        metadata=_mapping_or_empty(data.get("metadata"), field="node.metadata"),
+    )
+
+
+def _parse_category(data: Mapping[str, Any]) -> NodeCategoryDescriptor:
+    _check_fields(data, allowed={"kind", "id", "display_name", "description", "default_rulesets", "presentation", "metadata"}, field="category")
+    return NodeCategoryDescriptor(
+        id=_required_string(data.get("id"), field="category.id"),
+        display_name=_optional_string(data.get("display_name")),
+        description=_optional_string(data.get("description")),
+        default_rulesets=_string_list(data.get("default_rulesets", ()), field="category.default_rulesets"),
+        presentation=_mapping_or_empty(data.get("presentation"), field="category.presentation"),
+        metadata=_mapping_or_empty(data.get("metadata"), field="category.metadata"),
+    )
+
+
+def _parse_bundle(data: Mapping[str, Any]) -> ContributionBundle:
+    _check_fields(data, allowed={"kind", "id", "description", "resources"}, field="bundle")
+    return ContributionBundle(
+        id=_required_string(data.get("id"), field="bundle.id"),
+        description=_optional_string(data.get("description")),
+        resources=_mapping_or_empty(data.get("resources"), field="bundle.resources"),
     )
 
 

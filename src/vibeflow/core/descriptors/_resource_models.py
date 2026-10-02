@@ -16,7 +16,7 @@ from vibeflow.core.descriptors.models import (
 )
 
 
-PLUGIN_TYPES = frozenset({"policy", "compiler", "runtime"})
+PLUGIN_TYPES = frozenset({"compiler", "runtime"})
 
 
 @dataclass(frozen=True)

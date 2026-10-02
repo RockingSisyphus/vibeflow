@@ -27,7 +27,7 @@ class PlannedImplementationCheck:
     project_root: str
 
 
-def planned_health_events(
+def _planned_health_facts(
     graph,
 ) -> tuple[HealthFinding | PlannedImplementationCheck, ...]:
     events: list[HealthFinding | PlannedImplementationCheck] = []
@@ -61,6 +61,14 @@ def planned_health_events(
                     _planned_child_finding(nodeset.type_key, severity="warning")
                 )
     return tuple(events)
+
+
+def planned_health_events(graph):
+    from vibeflow.core.rules.builtin.workflow import evaluate_workflow_topic
+    result = evaluate_workflow_topic("planned", graph=graph)
+    if result.state != "completed":
+        return result.findings
+    return tuple(result.records["events"].value)
 
 
 def graph_has_planned(graph, *, visited_nodesets: set[str] | None = None) -> bool:
