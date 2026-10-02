@@ -1,0 +1,59 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.final_value_end",
+  "display_name": "最终数值结束",
+  "category": "sandbox",
+  "description": "当 value.final 已经生成后终止流程；它验证所有非计划节点都能够从开始节点抵达明确的 Terminal 结束节点。",
+  "version": "0.1.0",
+  "flow_kind": "terminal",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "value.final",
+        "cardinality": "exactly_one",
+        "display_name": "value.final"
+      }
+    ],
+    "provides": [],
+    "input_semantics": {
+      "value.final": [
+        "final numeric value"
+      ]
+    },
+    "output_semantics": {},
+    "examples": [
+      {
+        "inputs": {
+          "value.final": {
+            "key": "value.final",
+            "type": "value.final",
+            "value": 1,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_math_nodes.py",
+        "export": "FinalValueEndNode"
+      }
+    }
+  ]
+}

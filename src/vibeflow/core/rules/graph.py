@@ -10,7 +10,7 @@ from vibeflow.core.config.node import merge_node_config, normalize_node_config_s
 from vibeflow.core.rules.models import RuleCall, RuleDescriptor, RuleRelation, RulesetDescriptor, plain, readonly
 
 
-@dataclass(frozen=True)
+@dataclass
 class RuleGraphError(ValueError):
     code: str
     message: str
@@ -243,6 +243,8 @@ def _effective_calls(expansion: _Expansion, selected: set[str]) -> dict[str, tup
 
 def compile_ruleset(ruleset: str | RulesetDescriptor, *, rules: Any, rulesets: Any = None, entrypoint: str = "static") -> RulePlan:
     """Build a portable executable plan; graph direction is consumer -> provider."""
+    if entrypoint not in {"import", "static", "run"}:
+        raise RuleGraphError("RULE.ENTRYPOINT.INVALID", f"unknown rule entrypoint: {entrypoint!r}")
     descriptor = _lookup(rulesets, ruleset, "ruleset") if isinstance(ruleset, str) else ruleset
     if not isinstance(descriptor, RulesetDescriptor):
         raise TypeError("ruleset must be RulesetDescriptor or registered ID")

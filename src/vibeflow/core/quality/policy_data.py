@@ -25,25 +25,17 @@ COMMON_POLICY_DATA: dict[str, dict[str, Any]] = {
 
 
 def merge_policy_data(base: dict[str, Any], override: Mapping[str, Any]) -> None:
-    """Merge validated policy values while appending existing rule exceptions."""
+    """Merge validated numeric defaults used as Rule parameters."""
 
-    append_paths = {("rules", "downgrades"), ("rules", "exemptions")}
-
-    def visit(target: dict[str, Any], update: Mapping[str, Any], path: tuple[str, ...]) -> None:
+    def visit(target: dict[str, Any], update: Mapping[str, Any]) -> None:
         for raw_key, value in update.items():
             key = str(raw_key)
-            next_path = (*path, key)
-            if next_path in append_paths and isinstance(value, list):
-                existing = target.get(key)
-                if not isinstance(existing, list):
-                    target[key] = []
-                target[key].extend(deepcopy(value))
-            elif isinstance(value, Mapping) and isinstance(target.get(key), dict):
-                visit(target[key], value, next_path)
+            if isinstance(value, Mapping) and isinstance(target.get(key), dict):
+                visit(target[key], value)
             else:
                 target[key] = deepcopy(value)
 
-    visit(base, override, ())
+    visit(base, override)
 
 
 __all__ = ["COMMON_POLICY_DATA", "merge_policy_data"]

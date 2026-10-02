@@ -170,7 +170,7 @@ print(json.dumps(sorted(name for name in sys.modules if name.startswith(forbidde
     assert json.loads(completed.stdout) == []
 
 
-def test_global_state_requires_target_feature_and_derives_effect_scope() -> None:
+def test_global_state_requires_target_feature_without_implicit_effect_permission() -> None:
     graph = GraphConfig(nodes=(NodeSpec("state", "fixture.state"),))
     facts = ImplementationFacts(
         (ImplementationFact("fixture.state", flow_kind=FLOW_KIND_GLOBAL_STATE),),
@@ -204,7 +204,7 @@ def test_global_state_requires_target_feature_and_derives_effect_scope() -> None
         )
     )
     compiled = compilation.graph
-    assert compiled.effect_scopes == {"state": EFFECT_SCOPE_GLOBAL_STATE}
+    assert compiled.effect_scopes == {"state": "unconstrained"}
     assert compiled.runtime_dispatches == {"state": None}
     assert compiled.contains_global_state is True
     assert [item.rule_id for item in compilation.findings] == [
@@ -216,7 +216,7 @@ def test_global_state_requires_target_feature_and_derives_effect_scope() -> None
     assert report["execution_lock"] is None
     report_node = report["nodes"][0]
     assert report_node["flow_kind"] == FLOW_KIND_GLOBAL_STATE
-    assert report_node["effect_scope"] == EFFECT_SCOPE_GLOBAL_STATE
+    assert report_node["effect_scope"] == "unconstrained"
     assert report_node["execution_lock"] is None
     assert report_node["contains_global_state"] is True
 
@@ -744,7 +744,7 @@ def test_planned_global_state_is_visible_but_does_not_require_feature_or_lock() 
         )
     ).graph
 
-    assert compiled.effect_scopes == {"future": EFFECT_SCOPE_GLOBAL_STATE}
+    assert compiled.effect_scopes == {"future": "unavailable"}
     assert compiled.contains_global_state is False
 
 

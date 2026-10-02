@@ -39,7 +39,7 @@ def plugin_resources(config: Mapping[str, Any], *, plugin_registry: object | Non
             continue
         module = str(spec.get("module", spec.get("path", ""))).strip()
         class_name = str(spec.get("class", spec.get("factory", "Plugin"))).strip() or "Plugin"
-        plugin_type = str(spec.get("type", "policy")).strip() or "policy"
+        plugin_type = str(spec.get("type", "runtime")).strip() or "runtime"
         registered = registry_resources.get((module, class_name, plugin_type))
         config_keys = _plugin_config_keys(spec, prefix, findings)
         if registered is not None:

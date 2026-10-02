@@ -2,6 +2,15 @@ from tests.fixtures.support.strict_support import *
 
 
 def test_nodeset_imports_expand_for_validate_inspect_mermaid_and_run(tmp_path, capsys) -> None:
+    from tests.fixtures.support.declarations import write_node_manifests
+    write_node_manifests(tmp_path, [
+        ("test.start", "StartNode", {}, {}),
+        ("test.out_end", "OutEndNode", {}, {}),
+        ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}),
+        ("test.add", "AddNode", {"delta": {"type": "number"}}, {"delta": 1}),
+    ])
+    (tmp_path / "vibeflow_project.jsonc").write_text(json.dumps({
+        "project_target": "python", "descriptors": {"nodes": ["manifests/nodes"]}}))
     imports_path = tmp_path / "math_add_one.jsonc"
     imports_path.write_text(
         json.dumps(
@@ -37,7 +46,7 @@ def test_nodeset_imports_expand_for_validate_inspect_mermaid_and_run(tmp_path, c
 
     assert cli_main(["validate", "--config", str(config_path), "--json"]) == 0
     validate_payload = json.loads(capsys.readouterr().out)
-    assert validate_payload["info"]["nodesets"] == ["math.add_one"]
+    assert "nodeset:math.add_one" in validate_payload["info"]["mainline"]
     assert validate_payload["info"]["nodeset_imports"][0]["type_keys"] == ["math.add_one"]
 
     assert cli_main(["inspect-config", "--config", str(config_path)]) == 0

@@ -17,7 +17,6 @@ from vibeflow.targets.python.project.plugins import (
     CompilerPlugin,
     PluginDescriptor,
     PluginRegistry,
-    PolicyPlugin,
     RuntimePlugin,
     plugin_error,
 )
@@ -67,7 +66,7 @@ def load_plugins_from_config(
             plugin, info, config_keys = _load_plugin(spec, base_path=base_path)
             registry.register(
                 plugin,
-                plugin_type=str(spec.get("type", getattr(plugin, "plugin_type", "policy"))),
+                plugin_type=str(spec.get("type", getattr(plugin, "plugin_type", "runtime"))),
                 name=str(spec.get("name", getattr(plugin, "name", plugin.__class__.__name__))),
                 priority=int(spec.get("priority", getattr(plugin, "priority", 100))),
                 scope=str(spec.get("scope", getattr(plugin, "scope", "project"))),
@@ -109,6 +108,12 @@ def _resolve_registered_plugin_spec(
     resolved.setdefault("description", registered.description)
     resolved.setdefault("category", registered.category)
     resolved.setdefault("version", registered.version)
+    resolved.setdefault("priority", registered.priority)
+    if registered.config_schema or registered.config_defaults:
+        from vibeflow.core.config.node import normalize_node_config_spec, merge_node_config
+        merged = merge_node_config(normalize_node_config_spec(registered.config_schema,registered.config_defaults), normalize_plugin_config(spec))
+        resolved["config"] = merged
+    resolved["declared_metadata"] = True
     return resolved
 
 
@@ -133,10 +138,10 @@ def _load_plugin(spec: Mapping[str, Any], *, base_path: Path) -> tuple[object, P
     configure = getattr(plugin, "configure", None)
     if callable(configure):
         configure(dict(plugin_config))
-    plugin_type = str(spec.get("type", getattr(plugin, "plugin_type", "policy")))
+    plugin_type = str(spec.get("type", getattr(plugin, "plugin_type", "runtime")))
     if getattr(plugin, "PLUGIN_INFO", None) is None and getattr(module, "PLUGIN_INFO", None) is not None:
         setattr(plugin, "PLUGIN_INFO", getattr(module, "PLUGIN_INFO"))
-    info = normalize_plugin_info(plugin, plugin_type=plugin_type)
+    info = PluginInfo(str(spec.get("name",spec.get("id",""))),plugin_type,str(spec.get("display_name","")),str(spec.get("category","")),str(spec.get("description","")),str(spec.get("version",""))) if spec.get("declared_metadata") else normalize_plugin_info(plugin, plugin_type=plugin_type)
     return plugin, info, tuple(sorted(plugin_config))
 
 

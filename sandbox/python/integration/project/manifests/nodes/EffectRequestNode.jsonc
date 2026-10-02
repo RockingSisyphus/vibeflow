@@ -1,0 +1,60 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.effect_request",
+  "display_name": "Effect Request",
+  "category": "sandbox",
+  "description": "Expresses an external effect request as data.",
+  "version": "0.1.0",
+  "flow_kind": "data_store",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [],
+    "provides": [
+      {
+        "key": "effects.request",
+        "type": "effects.request",
+        "display_name": "effects.request"
+      }
+    ],
+    "input_semantics": {},
+    "output_semantics": {
+      "effects.request": [
+        "structured request for an external effect"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {},
+        "params": {
+          "value": 5
+        }
+      }
+    ],
+    "params_schema": {
+      "value": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "value": 1
+    }
+  },
+  "rulesets": [
+    "vibeflow.data_store"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_external_nodes.py",
+        "export": "EffectRequestNode"
+      }
+    }
+  ]
+}

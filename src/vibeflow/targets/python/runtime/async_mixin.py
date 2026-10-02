@@ -101,16 +101,15 @@ class RuntimeAsyncMixin:
                     failure = PipelineRuntimeError(
                         f"node '{frame.name}' attempted SystemExit outside delegate CLI mode"
                     )
-                elif frame.is_planned_stub or frame.flow_kind not in {"io", "document", "data_store"}:
-                    subject = "planned python_stub node" if frame.is_planned_stub else "node"
-                    failure = PipelineRuntimeError(
-                        f"{subject} '{frame.name}' with flow_kind '{frame.flow_kind}' cannot control delegate CLI exit"
-                    )
                 else:
-                    raise normalize_delegate_cli_system_exit(
-                        exc,
-                        source=frame.name,
-                    ) from exc
+                    try:
+                        exit_signal = normalize_delegate_cli_system_exit(
+                            exc, source=frame.name, effect_scope=frame.effect_scope
+                        )
+                    except PipelineRuntimeError as denied:
+                        failure = denied
+                    else:
+                        raise exit_signal from exc
                 if worker_scoped_hooks:
                     self._call_runtime_plugins(
                         "node_failed",

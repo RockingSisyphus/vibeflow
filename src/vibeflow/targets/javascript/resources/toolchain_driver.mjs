@@ -282,6 +282,7 @@ function normalizeImportPolicy(raw, packageRoot) {
         id: String(item.id),
         export: String(item.export || "run"),
         completion: String(item.completion || "immediate"),
+        effectScope: String(item.effect_scope || "unconstrained"),
       }))
       .sort((left, right) => right.path.length - left.path.length)
     : [];
@@ -2128,7 +2129,11 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
       compilerOptions: jsonCompilerOptions,
       files,
     }), "utf8");
-    const api = new ts.API({ cwd: path.resolve(request.packageRoot) });
+    const snapshots = new Map((request.sourceSnapshots || []).map(source => [path.resolve(source.path), source.text]));
+    const api = new ts.API({ cwd: path.resolve(request.packageRoot), fs: {
+      readFile: name => snapshots.get(path.resolve(name)),
+      fileExists: name => snapshots.has(path.resolve(name)) ? true : undefined,
+    } });
     let snapshot;
     try {
       snapshot = api.updateSnapshot({ openProjects: [configPath] });
@@ -2178,7 +2183,11 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
         ? ["lib.es2022.d.ts"]
         : ["lib.es2022.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"],
     };
-    program = ts.createProgram({ rootNames: files, options: compilerOptions });
+    const snapshots = new Map((request.sourceSnapshots || []).map(source => [path.resolve(source.path), source.text]));
+    const host = ts.createCompilerHost(compilerOptions);
+    const readFile = host.readFile.bind(host);
+    host.readFile = name => snapshots.get(path.resolve(name)) ?? readFile(name);
+    program = ts.createProgram({ rootNames: files, options: compilerOptions, host });
     checker = program.getTypeChecker();
     sourceFiles = program.getSourceFiles();
     diagnostics = checkDiagnostics
@@ -2208,47 +2217,30 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
       if (sourceFile.isDeclarationFile) continue;
       const owned = ownerFor(ts, sourceFile.fileName, policy);
       if (!owned && !rootFiles.has(path.resolve(sourceFile.fileName))) continue;
-      findings.push(...auditParsedSource(ts, sourceFile, request.profile));
-      findings.push(...auditImportOwnership(ts, sourceFile, checker, project, policy));
-      findings.push(...auditTopLevelPurity(ts, sourceFile, policy));
-      findings.push(...auditCompletionAndPromiseOwnership(
-        ts,
-        sourceFile,
-        checker,
-        policy,
-      ));
-      findings.push(...auditModuleRegExpState(ts, sourceFile, policy));
-      findings.push(...auditModuleStateWrites(
-        ts,
-        sourceFile,
-        checker,
-        project,
-        policy,
-      ));
-      findings.push(...auditBaseLibHostIo(
-        ts,
-        sourceFile,
-        checker,
-        project,
-        policy,
-      ));
-      findings.push(...auditPluginHostIo(
-        ts,
-        sourceFile,
-        checker,
-        project,
-        policy,
-      ));
-      findings.push(...auditUnclassifiedHiddenWork(
-        ts,
-        sourceFile,
-        checker,
-        policy,
-      ));
+      const topics = new Set(request.ruleTopics || []);
+      if (request.profile === "single-esm") findings.push(...auditSingleEsmConstraints(ts, sourceFile));
+      if (topics.has("imports")) {
+        findings.push(...auditParsedSource(ts, sourceFile, ""));
+        findings.push(...auditImportOwnership(ts, sourceFile, checker, project, policy));
+      }
+      if (topics.has("purity")) findings.push(...auditTopLevelPurity(ts, sourceFile, policy));
+      if (topics.has("completion")) findings.push(...auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy));
+      if (topics.has("module_state")) {
+        findings.push(...auditModuleRegExpState(ts, sourceFile, policy));
+        findings.push(...auditModuleStateWrites(ts, sourceFile, checker, project, policy));
+      }
+      if (topics.has("host_io")) {
+        const ioPolicy = request.ruleSubjectKind === "node" ? {
+          ...policy, owners: policy.owners.map(owner => owner.kind === "node" && owner.id === request.ruleSubjectId ? {...owner, kind: "base_lib"} : owner),
+        } : policy;
+        findings.push(...auditBaseLibHostIo(ts, sourceFile, checker, project, ioPolicy));
+        findings.push(...auditPluginHostIo(ts, sourceFile, checker, project, policy));
+      }
+      if (topics.has("ownership")) findings.push(...auditUnclassifiedHiddenWork(ts, sourceFile, checker, policy));
       const sharedOwners = policy.owners.filter(
         (item) => path.resolve(item.path) === path.resolve(sourceFile.fileName),
       );
-      for (const alternate of sharedOwners.slice(1)) {
+      for (const alternate of topics.has("completion") ? sharedOwners.slice(1) : []) {
         const alternatePolicy = {
           ...policy,
           owners: [alternate, ...policy.owners.filter((item) => item !== alternate)],
@@ -2260,6 +2252,12 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
           owner: { id: alternate.id, kind: alternate.kind, path: alternate.path },
         })));
       }
+    }
+    if (request.command === "rule-check") {
+      return {
+        findings: findings.map(finding => ({ ...finding, owner: finding.owner || ownerFor(ts, finding.file, policy) })),
+        sources: sourceFiles.filter(file => !file.isDeclarationFile && !file.fileName.includes(`${path.sep}node_modules${path.sep}`)).map(file => ({ path: path.resolve(file.fileName), text: file.text })),
+      };
     }
     if (findings.length) {
       const diagnosticsWithOwners = findings.map((finding) => {
@@ -2435,6 +2433,10 @@ async function main() {
   if (request.command === "audit") {
     await auditContracts(tools.typescript, request, [], false);
     return { ok: true, probe, audit: { checked: true } };
+  }
+  if (request.command === "rule-check") {
+    const rules = await auditContracts(tools.typescript, request, [], false);
+    return { ok: true, probe, rules };
   }
   if (request.command === "quality-facts") {
     const facts = await auditContracts(tools.typescript, request, [], false, true);

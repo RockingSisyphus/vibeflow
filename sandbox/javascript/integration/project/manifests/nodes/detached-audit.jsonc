@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.detached_audit",
   "display_name": "Detached audit",
   "category": "sandbox",

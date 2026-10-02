@@ -1,6 +1,6 @@
-export const VIBEFLOW_PLUGIN_ABI: "vibeflow.plugin.v1";
+export const VIBEFLOW_PLUGIN_ABI: "vibeflow.plugin.v2";
 
-export type PluginType = "policy" | "compiler" | "runtime";
+export type PluginType = "compiler" | "runtime";
 export type PluginTarget = "node" | "browser";
 export type PluginCompletion = "immediate" | "suspend";
 export type JsonValue =
@@ -12,17 +12,13 @@ export type JsonValue =
   | { readonly [key: string]: JsonValue };
 
 export interface PluginFactoryContext {
-  readonly abiVersion: "vibeflow.plugin.v1";
+  readonly abiVersion: "vibeflow.plugin.v2";
   readonly pluginId: string;
   readonly pluginType: PluginType;
   readonly target: PluginTarget;
   readonly workflowId: string;
   readonly config: Readonly<Record<string, JsonValue>>;
   readonly signal: AbortSignal;
-}
-
-export interface PolicyPluginContext extends PluginFactoryContext {
-  readonly pluginType: "policy";
 }
 
 export interface CompilerPluginContext extends PluginFactoryContext {
@@ -33,17 +29,9 @@ export interface RuntimePluginContext extends PluginFactoryContext {
   readonly pluginType: "runtime";
 }
 
-export interface PolicyPlugin {
-  extendPolicy?(payload: Readonly<Record<string, JsonValue>>): JsonValue | void;
-  validateNode?(payload: Readonly<Record<string, JsonValue>>): JsonValue | void;
-  validateGraph?(payload: Readonly<Record<string, JsonValue>>): JsonValue | void;
-  validateNodeset?(payload: Readonly<Record<string, JsonValue>>): JsonValue | void;
-}
-
 export interface CompilerPlugin {
   beforeCompile?(payload: Readonly<Record<string, JsonValue>>): JsonValue | void;
   afterCompile?(payload: Readonly<Record<string, JsonValue>>): JsonValue | void;
-  validateCompiledGraph?(payload: Readonly<Record<string, JsonValue>>): JsonValue | void;
 }
 
 export interface RuntimeHookSummary {
@@ -67,7 +55,7 @@ export interface RuntimePlugin {
   dispose?(): void | Promise<void>;
 }
 
-export type PluginInstance = PolicyPlugin | CompilerPlugin | RuntimePlugin;
+export type PluginInstance = CompilerPlugin | RuntimePlugin;
 
 export type CreatePlugin = (
   context: Readonly<PluginFactoryContext>,

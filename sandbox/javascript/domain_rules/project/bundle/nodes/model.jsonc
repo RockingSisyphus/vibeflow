@@ -1,0 +1,49 @@
+{
+  "kind": "node",
+  "type_key": "example.model",
+  "display_name": "Model",
+  "category": "model_block",
+  "description": "One explicitly named function block.",
+  "version": "0.15.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "example.input",
+        "cardinality": "exactly_one",
+        "display_name": "example.input"
+      }
+    ],
+    "provides": [
+      {
+        "key": "feature",
+        "type": "example.feature",
+        "display_name": "feature"
+      }
+    ],
+    "input_semantics": {
+      "example.input": [
+        "Numerical input to this functional block."
+      ]
+    },
+    "output_semantics": {
+      "feature": [
+        "Numerical output produced by this functional block."
+      ]
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": [
+        "browser",
+        "node"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/model.ts",
+        "export": "run"
+      }
+    }
+  ]
+}

@@ -11,6 +11,7 @@ RESOURCE_NAMES = frozenset(
         "runtime_helpers.mjs",
         "plugin_worker.mjs",
         "plugin_abi.d.ts",
+        "rule_abi.d.ts",
         "toolchain_driver.mjs",
     }
 )

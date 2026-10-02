@@ -155,58 +155,36 @@ def _venv_python(root: Path) -> Path:
 
 
 _PYTHON_ISOLATION_NODES = """
-from vibeflow.core import DataProvider, DataRequirement
-from vibeflow.targets.python.project import NodeContract, NodeInfo
-
 class StartNode:
-    NODE_INFO = NodeInfo("isolation.start", "Start", "isolation", "Starts the isolation workflow.", "1.0.0", "terminal")
-    CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}},))
     def run_pure(self, inputs, params):
         return {}
 
 class SeedNode:
-    NODE_INFO = NodeInfo("isolation.seed", "Seed", "isolation", "Produces the isolation result.", "1.0.0", "process")
-    CONTRACT = NodeContract(
-        provides=(DataProvider(key="value.out", type="value.out", display_name="Result"),),
-        output_semantics={"value.out": ("isolation result",)},
-        examples=({"inputs": {}, "params": {"value": 7}},),
-    )
     def run_pure(self, inputs, params):
         return {"value.out": params["value"]}
 
 class EndNode:
-    NODE_INFO = NodeInfo("isolation.end", "End", "isolation", "Consumes the isolation result.", "1.0.0", "terminal")
-    CONTRACT = NodeContract(
-        requires=(DataRequirement(type="value.out", cardinality="exactly_one", display_name="Result"),),
-        input_semantics={"value.out": ("isolation result",)},
-        examples=({"inputs": {"value.out": {"key": "value.out", "type": "value.out", "value": 7, "source_node": "seed"}}, "params": {}},),
-    )
     def run_pure(self, inputs, params):
         return {}
 """.strip() + "\n"
 
-_PYTHON_ISOLATION_REGISTRY = """
-from vibeflow.targets.python.project import NodeRegistry
 
-from isolation_nodes import EndNode, SeedNode, StartNode
-
-
-def build_node_registry():
-    registry = NodeRegistry()
-    registry.register(
-        "isolation.start", StartNode, config_schema={}, config_defaults={}
-    )
-    registry.register(
-        "isolation.seed",
-        SeedNode,
-        config_schema={"value": {"type": "number"}},
-        config_defaults={"value": 7},
-    )
-    registry.register(
-        "isolation.end", EndNode, config_schema={}, config_defaults={}
-    )
-    return registry
-""".strip() + "\n"
+def _isolation_declarations() -> list[dict[str, object]]:
+    declarations = []
+    for key, symbol, kind in (("start", "StartNode", "terminal"), ("seed", "SeedNode", "process"), ("end", "EndNode", "terminal")):
+        contract = {}
+        if key == "seed":
+            contract = {"provides": [{"key": "value.out", "type": "value.out", "display_name": "Result"}],
+                        "output_semantics": {"value.out": ["Isolation result"]},
+                        "params_schema": {"value": {"type": "number"}}, "params_defaults": {"value": 7}}
+        elif key == "end":
+            contract = {"requires": [{"type": "value.out", "cardinality": "exactly_one", "display_name": "Result"}],
+                        "input_semantics": {"value.out": ["Isolation result"]}}
+        declarations.append({"kind": "node", "type_key": "isolation." + key, "display_name": key.title(),
+            "category": "isolation", "description": "Isolated " + key + " implementation.", "version": "1.0.0",
+            "flow_kind": kind, "rulesets": ["vibeflow.process"], "contract": contract,
+            "implementations": [{"language": "python", "targets": ["python"], "source": {"kind": "file", "ref": "isolation_nodes.py", "export": symbol}}]})
+    return declarations
 
 
 def _blocked_import_finder_source(prefixes: tuple[str, ...]) -> str:
@@ -276,7 +254,7 @@ def _python_cli_isolation_probe() -> str:
             )
         )
         + f"NODE_SOURCE = {_PYTHON_ISOLATION_NODES!r}\n"
-        + f"REGISTRY_SOURCE = {_PYTHON_ISOLATION_REGISTRY!r}\n"
+        + f"DECLARATIONS = {_isolation_declarations()!r}\n"
         + r'''
 import json
 import os
@@ -288,7 +266,7 @@ root.mkdir(parents=True, exist_ok=True)
 project_config = root / "vibeflow_project.jsonc"
 project_config.write_text(json.dumps({
     "project_target": "python",
-    "registry": "registry.py:build_node_registry",
+    "descriptors": {"nodes": ["manifests/nodes"]},
 }), encoding="utf-8")
 workspace = root / "vibeflow_config.jsonc"
 workspace.write_text(json.dumps({
@@ -296,7 +274,10 @@ workspace.write_text(json.dumps({
 }), encoding="utf-8")
 node_path = root / "isolation_nodes.py"
 node_path.write_text(NODE_SOURCE, encoding="utf-8")
-(root / "registry.py").write_text(REGISTRY_SOURCE, encoding="utf-8")
+declaration_dir = root / "manifests/nodes"
+declaration_dir.mkdir(parents=True)
+for descriptor in DECLARATIONS:
+    (declaration_dir / (descriptor["type_key"] + ".jsonc")).write_text(json.dumps(descriptor), encoding="utf-8")
 
 config = root / "workflow.jsonc"
 config.write_text(json.dumps({
@@ -376,9 +357,9 @@ def _wheel_smoke(scratch: Path) -> None:
             "from vibeflow.targets.javascript import WorkflowSpec",
             "from vibeflow.tooling.project.config_loader import load_config_document",
             "root = files('vibeflow')",
-            "for name in ('config.schema.json', 'health_report.schema.json', 'node.schema.json', 'nodeset.schema.json', 'policy.schema.json'):",
+            "for name in ('config.schema.json', 'health_report.schema.json', 'node.schema.json', 'nodeset.schema.json', 'policy.schema.json', 'rule.schema.json', 'ruleset.schema.json', 'node_category.schema.json', 'bundle.schema.json'):",
             "    assert root.joinpath('tooling/project/schema', name).is_file()",
-            "for name in ('runtime_helpers.mjs', 'toolchain_driver.mjs', 'plugin_worker.mjs', 'plugin_abi.d.ts'):",
+            "for name in ('runtime_helpers.mjs', 'toolchain_driver.mjs', 'plugin_worker.mjs', 'plugin_abi.d.ts', 'rule_abi.d.ts'):",
             "    assert root.joinpath('targets/javascript/resources', name).is_file()",
             "for removed in ('aot', 'runtime', 'portable', 'config', 'health', 'purity', 'devtools', 'rendering', 'workspace'):",
             "    assert not root.joinpath(removed).is_dir(), removed",

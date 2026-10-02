@@ -1,0 +1,85 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.report_document",
+  "display_name": "生成中文报告文档",
+  "category": "sandbox",
+  "description": "把最终数值和审计请求组合成可输出的报告文档内容；该节点用于验证标准流程图中的 Document 文档形状。",
+  "version": "0.1.0",
+  "flow_kind": "document",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "value.final",
+        "cardinality": "exactly_one",
+        "display_name": "value.final"
+      },
+      {
+        "type": "effects.request",
+        "cardinality": "exactly_one",
+        "display_name": "effects.request"
+      }
+    ],
+    "provides": [
+      {
+        "key": "document.report",
+        "type": "document.report",
+        "display_name": "document.report"
+      }
+    ],
+    "input_semantics": {
+      "value.final": [
+        "最终业务数值。"
+      ],
+      "effects.request": [
+        "包含审计字段的结构化存储请求。"
+      ]
+    },
+    "output_semantics": {
+      "document.report": [
+        "面向最终输出的报告文档正文，当前示例用字符串模拟文档内容。"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "value.final": {
+            "key": "value.final",
+            "type": "value.final",
+            "value": 13,
+            "source_node": "example"
+          },
+          "effects.request": {
+            "key": "effects.request",
+            "type": "effects.request",
+            "value": {
+              "final": 13
+            },
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.document"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_comprehensive_nodes.py",
+        "export": "ReportDocumentNode"
+      }
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.invalid.barrel_import",
   "display_name": "Invalid barrel node import",
   "category": "sandbox-negative",

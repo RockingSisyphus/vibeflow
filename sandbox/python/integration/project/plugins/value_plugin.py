@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from vibeflow.targets.python.project import PluginInfo
+from plugins import value_state
 
 
 PLUGIN_INFO = PluginInfo(
@@ -12,18 +13,10 @@ PLUGIN_INFO = PluginInfo(
     version="0.1.0",
 )
 
-SHIFT_BY = 0
-
-
-def plugin_shift(value: int | float) -> int | float:
-    return value + SHIFT_BY
-
-
 class ValueShiftPlugin:
     name = "sandbox_value_shift"
     priority = 5
     PLUGIN_INFO = PLUGIN_INFO
 
     def configure(self, config):
-        global SHIFT_BY
-        SHIFT_BY = config.get("shift", 0)
+        value_state.SHIFT_BY = config.get("shift", 0)

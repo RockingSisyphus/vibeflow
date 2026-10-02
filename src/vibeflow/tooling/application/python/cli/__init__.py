@@ -261,16 +261,29 @@ def _handle_run(args: argparse.Namespace) -> int:
         print(json.dumps({"status": "ERROR", "error": str(exc)}, ensure_ascii=False, indent=2))
         return 1
     try:
-        if getattr(args, "workspace", None):
-            if args.policy:
+        from vibeflow.tooling.project.workspace_loader import find_project_config, load_project_workspace
+        project_config = find_project_config(Path(args.config))
+        if getattr(args, "workspace", None) or project_config is not None:
+            if args.policy and getattr(args,"workspace",None):
                 return _workspace_policy_arg_error()
             from vibeflow.core.findings import HealthReport
             from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
 
-            workspace = _load_workspace_for_cli(Path(args.workspace))
+            workspace = _load_workspace_for_cli(Path(args.workspace)) if getattr(args,"workspace",None) else load_project_workspace(project_config)
             if isinstance(workspace, HealthReport):
                 print(json.dumps({"status": workspace.status, "error": "workspace load failed", "health": workspace.to_dict()}, ensure_ascii=False, indent=2))
                 return 1
+            if args.policy:
+                from dataclasses import replace
+                from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
+                from vibeflow.tooling.project.config_loader import load_config_document
+                policy = resolve_effective_policy(load_config_document(Path(args.config)).data,
+                    config_path=Path(args.config), explicit_policy_path=Path(args.policy))
+                if policy.findings:
+                    report = HealthReport(status="FAIL",errors=tuple(policy.findings))
+                    print(json.dumps({"status":report.status,"error":"policy load failed","health":report.to_dict()},ensure_ascii=False,indent=2))
+                    return 1
+                workspace = replace(workspace,policy=policy.effective_policy.data)
 
             result = run_workspace_checked(
                 Path(args.config),

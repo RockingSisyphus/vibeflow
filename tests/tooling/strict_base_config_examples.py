@@ -1,22 +1,34 @@
+from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
 
 import ast
+from tests.fixtures.support.rule_inspection import _inspect_node_source, _valid_node_source, node_document
 
 from vibeflow.core.inspection import build_architecture_report
 from vibeflow.targets.python.quality.source_analysis.ast_rules import import_aliases, import_roots, qualified_call_name
 
 
-class CycleCopyNode:
-    NODE_INFO = NodeInfo("test.copy_alt", "Cycle Copy", "test", "Copies value.out into a distinct value.in-compatible key.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+CycleCopyNode_DECLARATION = node_declaration(NodeInfo("test.copy_alt", "Cycle Copy", "test", "Copies value.out into a distinct value.in-compatible key.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("value.out", "exactly_one", display_name="Value Out"),),
         provides=(DataProvider("value.copy", "value.in", display_name="Value Copy"),),
         input_semantics={"value.out": ("value to copy around the cycle",)},
         output_semantics={"value.copy": ("copied value compatible with value.in",)},
-    )
+    ), rulesets=("vibeflow.process",))
+
+class CycleCopyNode:
 
     def run_pure(self, inputs, params):
         return {"value.copy": inputs["value.out"]["value"]}
+
+def _failure_case_source(case):
+    if case.get("kind") == "generated_giant_node":
+        return _valid_node_source(run_body="\n".join(["        value = 1"] * 510 + ['        return {"demo.out": value}']))
+    if case.get("kind") == "node_mutual_call":
+        return 'class OtherNode:\n    def run_pure(self, inputs, params):\n        return {"other.out": 1}\n\n' + _valid_node_source(run_body='        OtherNode().run_pure({}, {})\n        return {"demo.out": 1}')
+    if case.get("kind") == "module_top_level_side_effect":
+        return "len([])\n\n" + _valid_node_source()
+    return ("import importlib\n" if case.get("name") == "dynamic_import" else "") + _valid_node_source(run_body=case["run_body"])
+
 
 def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) -> None:
     manifest = load_config_document(
@@ -26,14 +38,14 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
     from tests.fixtures.support.strict_support_runtime_nodes import RouteNode as RuntimeRouteNode
 
     for case in manifest["node_cases"]:
-        code, payload = _inspect_node_source(tmp_path / str(case["name"]), capsys, _failure_case_source(case))
+        additional = ()
+        if case.get("kind") == "node_mutual_call":
+            additional = (node_document(type_key="demo.other", class_name="OtherNode", contract={"provides": [{"key": "other.out", "type": "other.out", "display_name": "Other"}], "output_semantics": {"other.out": ["other result"]}}),)
+        code, payload = _inspect_node_source(tmp_path / str(case["name"]), capsys, _failure_case_source(case), additional_nodes=additional)
         assert code == 1
-        legacy_codes = {
-            finding["details"].get("legacy_code")
-            for finding in (*payload["health"]["errors"], *payload["health"]["warnings"])
-        }
-        expected = str(case["expected_legacy_code"])
-        assert expected in legacy_codes
+        codes = {finding["code"] for finding in (*payload["health"]["errors"], *payload["health"]["warnings"])}
+        expected = str(case["expected_code"])
+        assert expected in codes
         observed.add(expected)
 
     for case in manifest["config_cases"]:
@@ -59,8 +71,8 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
 
     for case in manifest["health_cases"]:
         registry = _registry()
-        register_node(registry, "test.route", RuntimeRouteNode)
-        register_node(registry, "test.copy_alt", CycleCopyNode)
+        register_node(registry, RouteNode_DECLARATION, RuntimeRouteNode)
+        register_node(registry, CycleCopyNode_DECLARATION, CycleCopyNode)
         graph = parse_graph_config(case["config"])
         report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
         rule_ids = {finding.rule_id for finding in (*report.errors, *report.warnings)}
@@ -70,21 +82,14 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
             assert expected_rule in report.info["rule_catalog"]
         observed.add(expected_rule)
 
-    for case in manifest["policy_cases"]:
+    for case in manifest["rule_cases"]:
         registry = _registry()
         graph = parse_graph_config(case["config"])
-        policy = resolve_effective_policy(case["config"], config_path=tmp_path / f"{case['name']}.json").effective_policy
-        report = validate_graph_health(graph, registry=registry, effective_policy=policy)
-        buckets = {
-            "errors": report.errors,
-            "warnings": report.warnings,
-            "skipped": report.skipped,
-        }
-        expected_rule = str(case["expected_rule_id"])
-        expected_bucket = str(case["expected_bucket"])
-        assert any(finding.rule_id == expected_rule for finding in buckets[expected_bucket])
-        assert not any(finding.rule_id == expected_rule for finding in (*report.errors, *report.warnings))
-        observed.add(expected_rule)
+        report = validate_graph_health(graph, registry=registry)
+        assert report.info["workflow_rulesets"] == []
+        assert not any(finding.rule_id == case["absent_code"] for finding in (*report.errors, *report.warnings))
+        assert report.skipped == ()
+        observed.add(str(case["absent_code"]))
 
     for case in manifest["quality_cases"]:
         case_dir = tmp_path / str(case["name"])
@@ -119,11 +124,11 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         observed.add("ARCHITECTURE.REPORT.OPTIONAL")
 
     assert {
-        "source_too_large",
-        "banned_call",
-        "effect_call",
-        "node_direct_call",
-        "module_side_effect",
+        "NODE.PURITY.SOURCE_TOO_LARGE",
+        "NODE.PURITY.BANNED_CALL",
+        "NODE.EFFECT.CALL_FORBIDDEN",
+        "NODE.METADATA.NODE_DIRECT_CALL",
+        "NODE.IMPORT.SIDE_EFFECT",
         "CONFIG.LOOPS.REMOVED",
         "CONFIG.BOUNDARY.REMOVED",
         "BASE_LIB.FORBIDDEN_PROJECT_IMPORT",
@@ -136,23 +141,13 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         "ARCHITECTURE.REPORT.OPTIONAL",
     } <= observed
 
-def test_policy_downgrade_schema_requires_audit_fields() -> None:
-    findings = collect_config_schema_findings(
-        {
-            "policy": {
-                "rules": {
-                    "downgrades": [
-                        {"rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER", "to": "warning", "scope": "bad"}
-                    ]
-                }
-            },
-            "pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])]},
-        }
-    )
-    rule_ids = {finding.rule_id for finding in findings}
-    assert "CONFIG.SCHEMA.POLICY_RULE_REASON" in rule_ids
-    assert "CONFIG.SCHEMA.POLICY_RULE_SCOPE" in rule_ids
-    assert "CONFIG.SCHEMA.POLICY_RULE_EXPIRES" in rule_ids
+def test_removed_policy_downgrades_require_explicit_ruleset_migration() -> None:
+    findings = collect_config_schema_findings({
+        "policy": {"rules": {"downgrades": [{"rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER", "to": "warning"}]}},
+        "pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.")]},
+    })
+    assert "CONFIG.POLICY.RULES.REMOVED" in {item.rule_id for item in findings}
+
 
 def test_mermaid_collapsed_and_expanded_views_share_top_level_compiled_edges() -> None:
     graph = parse_graph_config(
@@ -619,7 +614,7 @@ def test_cli_quality_check_json_and_text_outputs(tmp_path, capsys) -> None:
     assert "score" in json_payload["details_summary"]
     assert json_payload["result_code"].startswith("VIBEFLOW_QUALITY_")
     assert "top_offenders" in json_payload
-    assert json_payload["warnings"][0]["rule_id"] == "QUALITY.SIDE_EFFECT.CALL"
+    assert "QUALITY.SIDE_EFFECT.CALL" in {item["code"] for item in json_payload["warnings"]}
     assert text_code == 0
     assert "scopes:" in text_output
     assert "score=" in text_output

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tests.fixtures.support.declarations import node_declaration, configured_declaration
 
 import json
 from pathlib import Path
@@ -78,21 +79,21 @@ def _empty_sync_plan(node_module: Path) -> dict[str, object]:
     }
 
 
-class _DoubleNode:
-    NODE_INFO = NodeInfo(
+_DoubleNode_DECLARATION = node_declaration(NodeInfo(
         "test.double",
         "Double",
         "test",
         "Doubles a number.",
         "1",
         "process",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         requires=(DataRequirement("number", "exactly_one", display_name="number"),),
         provides=(DataProvider("answer", "answer", display_name="answer"),),
         input_semantics={"number": ("number to double",)},
         output_semantics={"answer": ("doubled number",)},
-    )
+    ), rulesets=("vibeflow.process",))
+
+class _DoubleNode:
 
     def run_pure(self, inputs, params):
         del params
@@ -153,12 +154,7 @@ def test_python_port_nodes_receive_transform_and_send(
         }
     )
     registry = NodeRegistry()
-    registry.register(
-        "test.double",
-        _DoubleNode,
-        config_schema={},
-        config_defaults={},
-    )
+    registry.register(configured_declaration(_DoubleNode_DECLARATION, {}, {}), _DoubleNode)
     sent: list[dict[str, object]] = []
     runtime = PipelineRuntime(
         graph,

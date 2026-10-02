@@ -3,27 +3,27 @@
     {
       "name": "giant_node",
       "kind": "generated_giant_node",
-      "expected_legacy_code": "source_too_large"
+      "expected_code": "NODE.PURITY.SOURCE_TOO_LARGE"
     },
     {
       "name": "hidden_side_effect",
       "run_body": "        open(\"x.txt\", \"w\")\n        return {\"demo.out\": 1}",
-      "expected_legacy_code": "effect_call"
+      "expected_code": "NODE.EFFECT.CALL_FORBIDDEN"
     },
     {
       "name": "dynamic_import",
       "run_body": "        importlib.import_module(\"math\")\n        return {\"demo.out\": 1}",
-      "expected_legacy_code": "banned_call"
+      "expected_code": "NODE.PURITY.BANNED_CALL"
     },
     {
       "name": "node_mutual_call",
       "kind": "node_mutual_call",
-      "expected_legacy_code": "node_direct_call"
+      "expected_code": "NODE.METADATA.NODE_DIRECT_CALL"
     },
     {
       "name": "module_top_level_side_effect",
       "kind": "module_top_level_side_effect",
-      "expected_legacy_code": "module_side_effect"
+      "expected_code": "NODE.IMPORT.SIDE_EFFECT"
     }
   ],
   "config_cases": [
@@ -245,26 +245,12 @@
       }
     }
   ],
-  "policy_cases": [
+  "rule_cases": [
     {
-      "name": "policy_exempts_confusing_node_name",
-      "expected_rule_id": "GRAPH.SMELL.CONFUSING_NODE_NAME",
-      "expected_bucket": "skipped",
+      "name": "ruleset_can_leave_workflow_unconstrained",
+      "absent_code": "GRAPH.SMELL.CONFUSING_NODE_NAME",
       "config": {
-        "policy": {
-          "rules": {
-            "exemptions": [
-              {
-                "rule_id": "GRAPH.SMELL.CONFUSING_NODE_NAME",
-                "scope": {
-                  "object_id": "BadName"
-                },
-                "reason": "documented failure-case exemption",
-                "expires": "2099-01-01"
-              }
-            ]
-          }
-        },
+        "rulesets": [],
         "pipeline": {
           "nodes": [
             {

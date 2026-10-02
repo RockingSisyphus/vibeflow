@@ -1,4 +1,5 @@
 from tests.fixtures.support.strict_support import *
+from tests.fixtures.support.declarations import write_node_manifests
 
 from importlib import resources
 
@@ -174,7 +175,7 @@ def test_workspace_requires_an_explicit_valid_project_target(tmp_path) -> None:
         (
             {
                 "project_target": "python",
-                "registry": "registry.py:build_node_registry",
+                "descriptors": {"nodes": ["manifests/nodes"]},
                 "javascript": {"package_root": "."},
             },
             ["javascript"],
@@ -182,7 +183,6 @@ def test_workspace_requires_an_explicit_valid_project_target(tmp_path) -> None:
         (
             {
                 "project_target": "python",
-                "registry": "registry.py:build_node_registry",
                 "descriptors": {
                     "host_extensions": ["manifests/host_extensions"]
                 },
@@ -192,12 +192,12 @@ def test_workspace_requires_an_explicit_valid_project_target(tmp_path) -> None:
         (
             {
                 "project_target": "javascript",
-                "registry": "registry.py:build_node_registry",
+                "descriptors": {"nodes": ["manifests/nodes"]},
                 "runtime": {},
                 "base_lib": {},
                 "plugins": [],
             },
-            ["base_lib", "plugins", "registry", "runtime"],
+            ["base_lib", "plugins", "runtime"],
         ),
     ],
 )
@@ -305,7 +305,7 @@ def test_workspace_project_config_override_and_missing_project_config(tmp_path) 
         json.dumps(
             {
                 "project_target": "python",
-                "registry": "registry.py:build_node_registry",
+                "descriptors": {"nodes": ["manifests/nodes"]},
                 "quality_enabled": False,
             }
         ),
@@ -648,7 +648,7 @@ def test_workspace_project_quality_structure_config_validation(tmp_path) -> None
         json.dumps(
             {
                 "project_target": "python",
-                "registry": "registry.py:build_node_registry",
+                "descriptors": {"nodes": ["manifests/nodes"]},
                 "quality_enabled": True,
                 "quality": {"structure": {"warn_code_files_per_dir": 2, "max_code_files_per_dir": 3}},
                 "base_lib": {"paths": [], "modules": []},
@@ -669,7 +669,7 @@ def test_workspace_project_quality_structure_config_validation(tmp_path) -> None
         json.dumps(
             {
                 "project_target": "python",
-                "registry": "registry.py:build_node_registry",
+                "descriptors": {"nodes": ["manifests/nodes"]},
                 "quality": {"structure": {"warn_code_files_per_dir": 5, "max_code_files_per_dir": 3}},
             }
         ),
@@ -696,92 +696,44 @@ def test_workspace_registry_conflicts_report_roots(tmp_path) -> None:
     assert "project" in conflict.value.message
 
 
-def test_workspace_registry_import_and_factory_errors_are_explicit(tmp_path) -> None:
-    workspace_path, project_root, framework_root = _workspace_fixture(tmp_path, write_workspace=False)
-    _write_project_config(framework_root)
-    (project_root / "vibeflow_project.jsonc").write_text(
-        json.dumps(
-            {
-                "project_target": "python",
-                "registry": "missing_registry.py:build_node_registry",
-                "quality_enabled": True,
-            }
-        ),
-        encoding="utf-8",
-    )
-    workspace_path.write_text(json.dumps({"roots": [{"id": "project", "path": "project"}]}), encoding="utf-8")
-
-    with pytest.raises(WorkspaceConfigError) as missing_module:
-        build_workspace_node_registry(load_workspace_config(workspace_path))
-    assert missing_module.value.rule_id == "WORKSPACE.REGISTRY.IMPORT"
-
-    (project_root / "registry.py").write_text("def not_registry():\n    return None\n", encoding="utf-8")
-    (project_root / "vibeflow_project.jsonc").write_text(
-        json.dumps(
-            {
-                "project_target": "python",
-                "registry": "registry.py:build_node_registry",
-                "quality_enabled": True,
-            }
-        ),
-        encoding="utf-8",
-    )
-    with pytest.raises(WorkspaceConfigError) as missing_factory:
-        build_workspace_node_registry(load_workspace_config(workspace_path))
-    assert missing_factory.value.rule_id == "WORKSPACE.REGISTRY.FACTORY"
-
-
-def test_workspace_registry_preflight_proves_declarations_from_sibling_root(tmp_path) -> None:
+def test_workspace_declaration_and_implementation_errors_are_explicit(tmp_path) -> None:
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
     _write_project_config(framework_root)
+    _write_project_config(project_root)
+    _write_registry(project_root, [("test.seed", "SeedNode", {}, {})])
+    path = project_root / "manifests/nodes/test-seed.jsonc"
+    payload = json.loads(path.read_text())
+    payload["implementations"][0]["source"]["ref"] = "missing.py"
+    path.write_text(json.dumps(payload))
+    from vibeflow.targets.python.project import NodeRegistryError
+    with pytest.raises((WorkspaceConfigError, NodeRegistryError), match="source does not exist"):
+        build_workspace_node_registry(load_workspace_config(workspace_path))
+    payload["implementations"][0]["source"]["ref"] = "fixture_nodes.py"
+    payload["implementations"][0]["source"]["export"] = "MissingClass"
+    path.write_text(json.dumps(payload))
+    registry = build_workspace_node_registry(load_workspace_config(workspace_path))
+    with pytest.raises((AttributeError, NodeRegistryError), match="MissingClass"):
+        registry.get("test.seed")
+
+
+def test_workspace_declarations_resolve_implementation_imports_from_sibling_root(tmp_path) -> None:
+    workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
+    _write_project_config(framework_root)
+    _write_project_config(project_root)
     base_lib = framework_root / "base_lib"
     base_lib.mkdir()
-    (base_lib / "__init__.py").write_text("", encoding="utf-8")
-    (base_lib / "node_contracts.py").write_text(
-        """
-from vibeflow.core import DataProvider, DataRequirement
-
-def REQ(data_type):
-    return DataRequirement(type=data_type, cardinality="exactly_one")
-
-def PROV(key, data_type=None):
-    return DataProvider(key=key, type=data_type or key)
-""".strip(),
-        encoding="utf-8",
-    )
-    (project_root / "task_node.py").write_text(
-        """
-from base_lib.node_contracts import PROV, REQ
-from vibeflow.targets.python.project import NodeContract, NodeInfo
-
-class TaskNode:
-    NODE_INFO = NodeInfo("task.cross_root", "Task", "task", "Uses framework declarations.", "0.1.0", "process")
-    CONTRACT = NodeContract(
-        requires=(REQ("task.in"),),
-        provides=(PROV("task.out"),),
-    )
-    def run_pure(self, inputs, params):
-        return {"task.out": inputs["task.in"]}
-""".strip(),
-        encoding="utf-8",
-    )
-    (project_root / "registry.py").write_text(
-        """
-from task_node import TaskNode
-from vibeflow.targets.python.project import NodeRegistry
-
-def build_node_registry():
-    registry = NodeRegistry()
-    registry.register("task.cross_root", TaskNode, config_schema={}, config_defaults={})
-    return registry
-""".strip(),
-        encoding="utf-8",
-    )
-    _write_project_config(project_root)
-
+    (base_lib / "__init__.py").write_text("")
+    (base_lib / "node_helpers.py").write_text("def transform(value):\n    return value + 1\n")
+    (project_root / "task_node.py").write_text("from base_lib.node_helpers import transform\nclass TaskNode:\n    def run_pure(self, inputs, params):\n        return {'value.in': transform(params.get('value', 1))}\n")
+    _write_registry(project_root, [("task.cross_root", "SeedNode", {"value": {"type": "number"}}, {"value": 1})])
+    path = project_root / "manifests/nodes/task-cross_root.jsonc"
+    payload = json.loads(path.read_text())
+    payload["rulesets"] = []
+    payload["implementations"][0]["source"] = {"kind": "file", "ref": "task_node.py", "export": "TaskNode"}
+    path.write_text(json.dumps(payload))
     registry = build_workspace_node_registry(load_workspace_config(workspace_path))
-
     assert registry.available() == ["task.cross_root"]
+    assert registry.get("task.cross_root")().run_pure({}, {"value": 4}) == {"value.in": 5}
 
 
 def test_workspace_mode_rejects_config_level_policy(tmp_path) -> None:
@@ -852,7 +804,7 @@ def test_workspace_quality_role_imports_use_declared_base_lib_paths_and_modules(
         json.dumps(
             {
                 "project_target": "python",
-                "registry": "registry.py:build_node_registry",
+                "descriptors": {"nodes": ["manifests/nodes"]},
                 "quality_enabled": True,
                 "base_lib": {
                     "paths": ["task_base_lib"],
@@ -1140,9 +1092,6 @@ def test_workspace_available_base_lib_does_not_allow_node_import_until_config_re
         (package / "__init__.py").write_text("", encoding="utf-8")
     (project_root / "base_lib" / "math_tools.py").write_text(
         """
-from vibeflow.targets.python.project import BaseLibInfo
-
-BASE_LIB_INFO = BaseLibInfo("base_lib.math_tools", "Math Tools", "math", "Registered helper.", "0.1.0")
 VALUE = 1
 """.strip(),
         encoding="utf-8",
@@ -1154,39 +1103,25 @@ from vibeflow.core import DataProvider
 from vibeflow.targets.python.project import NodeContract, NodeInfo
 
 class UsesMathNode:
-    NODE_INFO = NodeInfo("test.uses_math", "Uses Math", "test", "Imports a helper.", "0.1.0", "process")
-    CONTRACT = NodeContract(
-        provides=(DataProvider("value.out", "value.out", display_name="Value Out"),),
-        output_semantics={"value.out": ("computed value",)},
-        examples=({"inputs": {}, "params": {}},),
-    )
 
     def run_pure(self, inputs, params):
         return {"value.out": 1}
 """.strip(),
         encoding="utf-8",
     )
-    (project_root / "registry.py").write_text(
-        """
-from vibeflow.targets.python.project import BaseLibRegistry, NodeRegistry
-from tests.fixtures.support import strict_support_runtime_nodes as support
-from nodes.uses_math import UsesMathNode
-
-def build_node_registry():
-    registry = NodeRegistry()
-    registry.register("test.start", support.StartNode, config_schema={}, config_defaults={})
-    registry.register("test.uses_math", UsesMathNode, config_schema={}, config_defaults={})
-    registry.register("test.out_end", support.OutEndNode, config_schema={}, config_defaults={})
-    return registry
-
-def build_base_lib_registry():
-    registry = BaseLibRegistry()
-    registry.register("math_tools", module="base_lib.math_tools", display_name="Math Tools", description="Registered helper.")
-    return registry
-""".strip(),
-        encoding="utf-8",
-    )
+    _write_registry(project_root, [("test.start", "StartNode", {}, {}), ("test.uses_math", "LargePredictionNode", {}, {}), ("test.out_end", "OutEndNode", {}, {})])
+    declaration_path = project_root / "manifests/nodes/test-uses_math.jsonc"
+    declaration = json.loads(declaration_path.read_text())
+    declaration["implementations"][0]["source"] = {"kind": "file", "ref": "nodes/uses_math.py", "export": "UsesMathNode"}
+    declaration_path.write_text(json.dumps(declaration))
     _write_project_config(project_root)
+    manifests = project_root / "manifests/base_lib"
+    manifests.mkdir()
+    (manifests / "math_tools.jsonc").write_text(json.dumps({"kind": "base_lib", "id": "math_tools", "display_name": "Math Tools", "category": "math", "description": "Declared helper metadata.", "version": "1.0.0", "implementations": [{"language": "python", "targets": ["python"], "source": {"kind": "module", "ref": "base_lib.math_tools"}}]}))
+    project_config = project_root / "vibeflow_project.jsonc"
+    data = json.loads(project_config.read_text())
+    data["descriptors"]["base_lib"] = ["manifests/base_lib"]
+    project_config.write_text(json.dumps(data))
     config_path = project_root / "configs" / "main.jsonc"
     config_path.parent.mkdir()
     nodes = [
@@ -1345,7 +1280,8 @@ def _write_project_config(root: Path, *, quality_enabled: bool = True, runtime: 
     root.mkdir(parents=True, exist_ok=True)
     payload = {
         "project_target": "python",
-        "registry": "registry.py:build_node_registry",
+        "descriptors": {"nodes": ["manifests/nodes"]},
+        "registry": "registry.py:resources",
         "quality_enabled": quality_enabled,
         "base_lib": {"paths": [], "modules": []},
         "plugins": [],
@@ -1361,19 +1297,9 @@ def _write_project_config(root: Path, *, quality_enabled: bool = True, runtime: 
 
 
 def _write_registry(root: Path, registrations: list[tuple[str, str, dict, dict]]) -> None:
-    lines = [
-        "from vibeflow.targets.python.project import NodeRegistry",
-        "from tests.fixtures.support import strict_support_runtime_nodes as nodes",
-        "",
-        "def build_node_registry():",
-        "    registry = NodeRegistry()",
-    ]
-    for key, class_name, schema, defaults in registrations:
-        lines.append(f"    registry.register({key!r}, nodes.{class_name}, config_schema={schema!r}, config_defaults={defaults!r})")
-    lines.append("    return registry")
-    lines.append("")
+    write_node_manifests(root, registrations)
     root.mkdir(parents=True, exist_ok=True)
-    (root / "registry.py").write_text("\n".join(lines), encoding="utf-8")
+    (root / "registry.py").touch()
 
 
 def _append_resource_registry(

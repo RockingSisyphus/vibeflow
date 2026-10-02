@@ -1,17 +1,15 @@
+"""Canonical declarations and delayed Python implementation bindings."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-import inspect
+import sys
 from typing import Any, Callable, Mapping
 
-from vibeflow.core.config.node import (
-    NodeConfigError,
-    NodeConfigSpec,
-    merge_node_config,
-    normalize_node_config_spec,
-)
-from vibeflow.targets.python.project.node import PureNode
-from vibeflow.targets.python.project.registry_base import RegistryBase
+from vibeflow.core.config.node import NodeConfigError, NodeConfigSpec, merge_node_config, normalize_node_config_spec
+from vibeflow.core.descriptors.models import NodeDescriptor
+from vibeflow.core.descriptors.catalogs import NodeCategoryCatalog
+from vibeflow.core.descriptors.categories import selected_node_rulesets
 
 
 @dataclass
@@ -30,32 +28,101 @@ class NodeRegistrationInfo:
     line: int
 
 
-class NodeRegistry(RegistryBase[type[PureNode]]):
-    def __init__(self) -> None:
-        super().__init__()
-        self._config_specs: dict[str, NodeConfigSpec] = {}
-        self._registration_info: dict[str, NodeRegistrationInfo] = {}
+class NodeRegistry:
+    """Register metadata without importing project implementations.
 
-    def register(
-        self,
-        key: str,
-        value: type[PureNode] | None = None,
-        *,
-        config_schema: Mapping[str, Any] | None = None,
-        config_defaults: Mapping[str, Any] | None = None,
-        overwrite: bool = False,
-    ) -> type[PureNode] | Callable[[type[PureNode]], type[PureNode]]:
-        config_spec = _config_spec_or_error(config_schema, config_defaults)
-        if value is None:
-            return self._decorator_for_node(key, config_spec, overwrite=overwrite)
-        self._register_node(key, value, config_spec, overwrite=overwrite)
-        return value
+    Classes provide execution only. All contracts, metadata, configuration and
+    rule selections come from the declared NodeDescriptor.
+    """
+
+    def __init__(self) -> None:
+        self._descriptors: dict[str, NodeDescriptor] = {}
+        self._registry: dict[str, type] = {}
+        self._loaders: dict[str, Callable[[], type]] = {}
+        self._registration_info: dict[str, NodeRegistrationInfo] = {}
+        self._config_specs: dict[str, NodeConfigSpec] = {}
+        self.categories = NodeCategoryCatalog()
+        self.rule_catalogs: object | None = None
+        self._effect_policies: dict[str, str] = {}
+        self.rule_policy_resolver: Callable[[str], str] | None = None
+        self._rule_defaults: dict[str, object] = {"purity_policy":None,"quality_policy":None}
+
+    def configure_rule_defaults(self, *, purity_policy=None, quality_policy=None) -> None:
+        """Carry the current check's numeric defaults into delayed imports."""
+        self._rule_defaults = {"purity_policy":purity_policy,"quality_policy":quality_policy}
+
+    def rule_defaults(self) -> Mapping[str, object]:
+        return dict(self._rule_defaults)
+
+    def register(self, descriptor: NodeDescriptor, implementation: type | None = None, *, loader: Callable[[], type] | None = None, source: str = "", overwrite: bool = False) -> NodeDescriptor:
+        if not isinstance(descriptor, NodeDescriptor):
+            raise NodeRegistryError("registration requires a NodeDescriptor; class metadata and registry factories are not declarations")
+        key = descriptor.type_key
+        if key in self._descriptors and not overwrite:
+            raise NodeRegistryError(f"key already registered: {key}")
+        if implementation is not None and loader is not None:
+            raise NodeRegistryError("provide an implementation or a delayed loader, not both")
+        config_spec = normalize_node_config_spec(descriptor.contract.params_schema, descriptor.contract.params_defaults)
+        self._descriptors[key] = descriptor
+        self._effect_policies.pop(key,None)
+        self._registry.pop(key, None)
+        self._loaders.pop(key, None)
+        if implementation is not None:
+            self._registry[key] = implementation
+        elif loader is not None:
+            self._loaders[key] = loader
+        self._config_specs[key] = config_spec
+        frame = sys._getframe(1)
+        self._registration_info[key] = NodeRegistrationInfo(key, "declaration" if source else frame.f_code.co_name, source or frame.f_code.co_filename, 1 if source else frame.f_lineno)
+        return descriptor
+
+    def descriptor(self, key: str) -> NodeDescriptor:
+        try:
+            return self._descriptors[str(key).strip()]
+        except KeyError as exc:
+            raise NodeRegistryError(f"unknown node key '{key}'") from exc
+
+    def get(self, key: str) -> type:
+        normalized = self.descriptor(key).type_key
+        if normalized not in self._registry:
+            loader = self._loaders.get(normalized)
+            if loader is None:
+                raise NodeRegistryError(f"node '{normalized}' has no Python implementation binding")
+            value = loader()
+            if not isinstance(value, type):
+                raise NodeRegistryError(f"node '{normalized}' implementation must be a class")
+            self._registry[normalized] = value
+        return self._registry[normalized]
+
+    def available(self) -> list[str]:
+        return sorted(self._descriptors)
+
+    def rulesets(self, key: str) -> tuple[str, ...]:
+        return selected_node_rulesets(self.descriptor(key), self.categories)
+
+    def source_info(self, key: str) -> NodeRegistrationInfo:
+        return self._registration_info[self.descriptor(key).type_key]
+
+    def effect_scope(self, key: str) -> str:
+        """Describe a selected rule policy; this never grants OS permissions."""
+        self.descriptor(key)
+        if key in self._effect_policies:
+            return self._effect_policies[key]
+        if self.rule_policy_resolver is not None:
+            return self.rule_policy_resolver(key)
+        from vibeflow.targets.python.quality.rule_adapter import selected_effect_scope
+        return selected_effect_scope(self, key)
+
+    def record_effect_policy(self, key: str, scope: str) -> None:
+        self.descriptor(key)
+        self._effect_policies[key] = scope
+
+    def reset_effect_policies(self, keys) -> None:
+        for key in keys:
+            self._effect_policies.pop(key,None)
 
     def get_config_spec(self, key: str) -> NodeConfigSpec:
-        normalized = self._normalize_key(key)
-        if normalized not in self._config_specs:
-            raise self._unknown_error(normalized)
-        return self._config_specs[normalized]
+        return self._config_specs[self.descriptor(key).type_key]
 
     def merge_config(self, key: str, overrides: Mapping[str, Any] | None) -> dict[str, Any]:
         try:
@@ -64,73 +131,52 @@ class NodeRegistry(RegistryBase[type[PureNode]]):
             raise NodeRegistryError(str(exc)) from exc
 
     def registration_info(self) -> tuple[NodeRegistrationInfo, ...]:
-        return tuple(self._registration_info[key] for key in sorted(self._registration_info))
-
-    def _decorator_for_node(
-        self,
-        key: str,
-        config_spec: NodeConfigSpec,
-        *,
-        overwrite: bool,
-    ) -> Callable[[type[PureNode]], type[PureNode]]:
-        def decorator(value: type[PureNode]) -> type[PureNode]:
-            self._register_node(key, value, config_spec, overwrite=overwrite)
-            return value
-
-        return decorator
-
-    def _register_node(
-        self,
-        key: str,
-        value: type[PureNode],
-        config_spec: NodeConfigSpec,
-        *,
-        overwrite: bool,
-    ) -> None:
-        normalized = self._normalize_key(key)
-        self._validate_value(normalized, value)
-        if normalized in self._registry and not overwrite:
-            raise self._duplicate_error(normalized)
-        self._registry[normalized] = value
-        self._config_specs[normalized] = config_spec
-        self._registration_info[normalized] = _capture_registration_info(normalized)
-
-    def _validate_value(self, normalized: str, node_cls: type[PureNode]) -> None:
-        if getattr(node_cls, "__topology_boundary__", False) or _looks_boundary_class(node_cls):
-            raise NodeRegistryError(f"boundary class cannot be registered as a node: {normalized}")
-
-    def _empty_key_error(self) -> Exception:
-        return NodeRegistryError("registry key cannot be empty")
-
-    def _duplicate_error(self, normalized: str) -> Exception:
-        return NodeRegistryError(f"key already registered: {normalized}")
-
-    def _unknown_error(self, normalized: str) -> Exception:
-        return NodeRegistryError(f"unknown node key '{normalized}'")
+        return tuple(self._registration_info[key] for key in self.available())
 
 
 GLOBAL_NODE_REGISTRY = NodeRegistry()
 
 
-def _looks_boundary_class(value: object) -> bool:
-    return all(callable(getattr(value, method, None)) for method in ("before_run", "after_run", "before_iteration", "after_iteration"))
+@dataclass(frozen=True, init=False)
+class NodeRegistryQueries:
+    """A snapshot of read-only declaration queries exposed to rule handlers."""
 
+    def __init__(self, registry):
+        from types import MappingProxyType
+        from dataclasses import replace
+        from vibeflow.core.rules.models import readonly
+        object.__setattr__(self,'_descriptors',MappingProxyType({key:registry.descriptor(key) for key in registry.available()}))
+        object.__setattr__(self,'_sources',MappingProxyType({key:registry.source_info(key) for key in registry.available()}))
+        object.__setattr__(self,'_configs',MappingProxyType({key:replace(registry.get_config_spec(key),
+            schema=readonly(registry.get_config_spec(key).schema),defaults=readonly(registry.get_config_spec(key).defaults)) for key in registry.available()}))
+        object.__setattr__(self,'_effects',MappingProxyType({key:registry.effect_scope(key) for key in registry.available()}))
+        object.__setattr__(self,'_rulesets',MappingProxyType({key:registry.rulesets(key) for key in registry.available()}))
+        object.__setattr__(self,'source_context_snapshot',getattr(registry,"source_context_snapshot",None))
 
-def _capture_registration_info(key: str) -> NodeRegistrationInfo:
-    for frame in inspect.stack(context=0)[2:]:
-        if frame.filename.endswith(("registry.py", "registry_base.py")):
-            continue
-        return NodeRegistrationInfo(key=key, function=frame.function, path=frame.filename, line=frame.lineno)
-    return NodeRegistrationInfo(key=key, function="", path="", line=0)
+    def descriptor(self,key):
+        return self._descriptors[key]
 
+    def available(self):
+        return tuple(sorted(self._descriptors))
 
-def _config_spec_or_error(
-    schema: Mapping[str, Any] | None,
-    defaults: Mapping[str, Any] | None,
-) -> NodeConfigSpec:
-    if schema is None or defaults is None:
-        raise NodeRegistryError("node registration requires config_schema and config_defaults")
-    try:
-        return normalize_node_config_spec(schema, defaults)
-    except NodeConfigError as exc:
-        raise NodeRegistryError(str(exc)) from exc
+    def get_config_spec(self,key):
+        return self._configs[key]
+
+    def merge_config(self,key,overrides):
+        from vibeflow.core.rules.models import readonly
+        try:
+            return readonly(merge_node_config(self.get_config_spec(key),overrides))
+        except NodeConfigError as exc:
+            raise NodeRegistryError(str(exc)) from exc
+
+    def effect_scope(self,key):
+        return self._effects[key]
+
+    def rulesets(self,key):
+        return self._rulesets[key]
+
+    def source_info(self,key):
+        return self._sources[key]
+
+    def registration_info(self):
+        return tuple(self._sources[key] for key in self.available())

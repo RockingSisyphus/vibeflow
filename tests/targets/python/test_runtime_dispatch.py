@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tests.fixtures.support.declarations import node_declaration, configured_declaration
 
 import math
 
@@ -7,7 +8,7 @@ import pytest
 from tests.fixtures.support import runtime_dispatch_helpers
 
 from vibeflow.core import DataProvider, DataRequirement
-from vibeflow.targets.python.project.compiler import _implementation_fact
+from vibeflow.targets.python.project.compiler import _implementation_fact, _runtime_dispatch_fact
 from vibeflow.targets.python.project.registry import NodeRegistry
 from vibeflow.targets.python.project.node import (
     EFFECT_SCOPE_GLOBAL_STATE,
@@ -18,7 +19,6 @@ from vibeflow.targets.python.project.node import (
 )
 from vibeflow.targets.python.quality.source_analysis import (
     analyze_runtime_dispatch,
-    validate_node_class,
 )
 from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
 from vibeflow.tooling.project.graph_config import parse_graph_config
@@ -146,16 +146,16 @@ _CONTRACT = NodeContract(
 )
 
 
-class OrdinaryCallbackNode:
-    NODE_INFO = NodeInfo(
+OrdinaryCallbackNode_DECLARATION = node_declaration(NodeInfo(
         "test.callback.ordinary",
         "Ordinary Callback",
         "test",
         "Invokes a runtime callback from an ordinary process node.",
         "0.1.0",
         "process",
-    )
-    CONTRACT = _CONTRACT
+    ), _CONTRACT, rulesets=("vibeflow.process",))
+
+class OrdinaryCallbackNode:
 
     def run_pure(self, inputs, params):
         callback = _value(inputs, "callback.in")
@@ -163,16 +163,16 @@ class OrdinaryCallbackNode:
         return {"callback.out": value}
 
 
-class GlobalStateCallbackNode:
-    NODE_INFO = NodeInfo(
+GlobalStateCallbackNode_DECLARATION = node_declaration(NodeInfo(
         "test.callback.global",
         "Global Callback",
         "test",
         "Declares a visible runtime callback boundary.",
         "0.1.0",
         "global_state",
-    )
-    CONTRACT = _CONTRACT
+    ), _CONTRACT, rulesets=("vibeflow.global_state",))
+
+class GlobalStateCallbackNode:
 
     def run_pure(self, inputs, params):
         callback = _value(inputs, "callback.in")
@@ -180,16 +180,16 @@ class GlobalStateCallbackNode:
         return {"callback.out": value}
 
 
-class IoCallbackNode:
-    NODE_INFO = NodeInfo(
+IoCallbackNode_DECLARATION = node_declaration(NodeInfo(
         "test.callback.io",
         "IO Callback",
         "test",
         "Invokes a runtime callback inside an existing IO boundary.",
         "0.1.0",
         "io",
-    )
-    CONTRACT = _CONTRACT
+    ), _CONTRACT, rulesets=("vibeflow.io",))
+
+class IoCallbackNode:
 
     def run_pure(self, inputs, params):
         callback = _value(inputs, "callback.in")
@@ -197,8 +197,7 @@ class IoCallbackNode:
         return {"callback.out": value}
 
 
-class ExternalCallbackNode:
-    NODE_INFO = NodeInfo(
+ExternalCallbackNode_DECLARATION = node_declaration(NodeInfo(
         "test.callback.external",
         "External Callback",
         "test",
@@ -206,14 +205,23 @@ class ExternalCallbackNode:
         "0.1.0",
         "process",
         external=True,
-    )
-    CONTRACT = _CONTRACT
+    ), _CONTRACT, rulesets=("vibeflow.process",))
+
+class ExternalCallbackNode:
 
     def run_pure(self, inputs, params):
         callback = _value(inputs, "callback.in")
         value = callback() if callable(callback) else callback
         return {"callback.out": value}
 
+
+
+def _check(declaration,implementation):
+    from vibeflow.tooling.application.python.project.declarations import collect_node_source_context
+    from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rules
+    registry=NodeRegistry()
+    registry.register(declaration,implementation)
+    return execute_python_node_rules(registry,collect_node_source_context(registry,(declaration.type_key,))).findings
 
 def _expressions(node_cls) -> set[str]:
     analysis = analyze_runtime_dispatch(node_cls)
@@ -250,7 +258,7 @@ def test_does_not_flag_builtins_protocols_static_imports_or_mapping_reads() -> N
 
 
 def test_ordinary_node_warns_without_blocking_but_visible_effect_boundaries_do_not() -> None:
-    ordinary = validate_node_class(OrdinaryCallbackNode)
+    ordinary = _check(OrdinaryCallbackNode_DECLARATION,OrdinaryCallbackNode)
     warnings = [
         item
         for item in ordinary
@@ -261,8 +269,8 @@ def test_ordinary_node_warns_without_blocking_but_visible_effect_boundaries_do_n
     assert warnings[0].details["site_count"] == 1
     assert not any(item.severity == "error" for item in ordinary)
 
-    for node_cls in (GlobalStateCallbackNode, IoCallbackNode):
-        findings = validate_node_class(node_cls)
+    for declaration,node_cls in ((GlobalStateCallbackNode_DECLARATION,GlobalStateCallbackNode),(IoCallbackNode_DECLARATION,IoCallbackNode)):
+        findings = _check(declaration,node_cls)
         assert not any(
             item.rule_id == "NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED"
             for item in findings
@@ -270,43 +278,42 @@ def test_ordinary_node_warns_without_blocking_but_visible_effect_boundaries_do_n
 
 
 def test_compiler_fact_records_tri_state_runtime_dispatch_and_effect_scope() -> None:
-    ordinary = _implementation_fact("test.callback.ordinary", OrdinaryCallbackNode)
-    global_state = _implementation_fact("test.callback.global", GlobalStateCallbackNode)
-    io = _implementation_fact("test.callback.io", IoCallbackNode)
-    external = _implementation_fact("test.callback.external", ExternalCallbackNode)
-    static = _implementation_fact("test.callback.static", StaticAndProtocolCalls)
-
-    assert ordinary.effect_scope == EFFECT_SCOPE_NONE
-    assert ordinary.runtime_dispatch is True
-    assert global_state.effect_scope == EFFECT_SCOPE_GLOBAL_STATE
-    assert global_state.runtime_dispatch is True
-    assert io.effect_scope == EFFECT_SCOPE_TERMINAL
-    assert io.runtime_dispatch is True
-    assert external.runtime_dispatch is None
-    assert static.runtime_dispatch is False
+    from dataclasses import replace
+    registry=NodeRegistry()
+    for declaration,implementation in ((OrdinaryCallbackNode_DECLARATION,OrdinaryCallbackNode),(GlobalStateCallbackNode_DECLARATION,GlobalStateCallbackNode),(IoCallbackNode_DECLARATION,IoCallbackNode)):
+        registry.register(declaration,implementation)
+    registry.register(ExternalCallbackNode_DECLARATION)
+    static=replace(OrdinaryCallbackNode_DECLARATION,type_key="test.callback.static")
+    registry.register(static,StaticAndProtocolCalls)
+    def fact(key):
+        return _implementation_fact(key,registry.descriptor(key),effect_scope=registry.effect_scope(key),runtime_dispatch=_runtime_dispatch_fact(registry,key))
+    assert fact("test.callback.ordinary").effect_scope == EFFECT_SCOPE_NONE
+    assert fact("test.callback.ordinary").runtime_dispatch is True
+    assert fact("test.callback.global").effect_scope == EFFECT_SCOPE_GLOBAL_STATE
+    assert fact("test.callback.global").runtime_dispatch is True
+    assert fact("test.callback.io").effect_scope == EFFECT_SCOPE_TERMINAL
+    assert fact("test.callback.io").runtime_dispatch is True
+    assert fact("test.callback.external").runtime_dispatch is None
+    assert fact("test.callback.static").runtime_dispatch is False
 
 
 def test_training_sandbox_declares_runtime_model_and_optimizer_calls_as_global_state() -> None:
-    from sandbox.python.integration.project.nodes.legal_training_nodes import (
-        BackwardGradNode,
-        ForwardLossNode,
-        OptimizerStepNode,
-        TrainingBatchStepNode,
-    )
-
-    for node_cls in (
-        ForwardLossNode,
-        BackwardGradNode,
-        OptimizerStepNode,
-        TrainingBatchStepNode,
-    ):
-        analysis = analyze_runtime_dispatch(node_cls)
+    from pathlib import Path
+    from vibeflow.tooling.project.workspace_loader import load_project_workspace
+    from vibeflow.tooling.application.python.project.declarations import declared_python_registry,collect_node_source_context
+    from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rules
+    project=Path(__file__).resolve().parents[3]/"sandbox/python/integration/project"
+    registry=declared_python_registry(load_project_workspace(project))
+    keys=("sandbox.forward_loss","sandbox.backward_grad","sandbox.optimizer_step","sandbox.training_batch_step")
+    context=collect_node_source_context(registry,keys)
+    from vibeflow.targets.python.quality.source_analysis.runtime_dispatch import analyze_source_runtime_dispatch
+    for key in keys:
+        node=next(item for item in context.nodes if item.type_key == key)
+        analysis=analyze_source_runtime_dispatch(context,node)
         assert analysis is not None and analysis.detected
-        assert node_cls.NODE_INFO.flow_kind == "global_state"
-        assert not any(
-            finding.rule_id == "NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED"
-            for finding in validate_node_class(node_cls)
-        )
+        assert registry.descriptor(key).flow_kind == "global_state"
+    report=execute_python_node_rules(registry,context)
+    assert not any(item.code == "NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED" for item in report.findings)
 
 
 def _global_state_graph(*, lock_scope: str = ""):
@@ -352,37 +359,16 @@ def _global_state_graph(*, lock_scope: str = ""):
 
 
 def _global_state_health(*, lock_scope: str = ""):
-    from sandbox.python.integration.project.nodes.legal_global_state_nodes import (
-        GlobalStateProbeNode,
-    )
-    from tests.fixtures.support.strict_support_runtime_nodes import (
-        OutEndNode,
-        StartNode,
-    )
-
-    registry = NodeRegistry()
-    registry.register(
-        "sandbox.global_state_probe",
-        GlobalStateProbeNode,
-        config_schema={},
-        config_defaults={},
-    )
-    registry.register(
-        "test.start",
-        StartNode,
-        config_schema={},
-        config_defaults={},
-    )
-    registry.register(
-        "test.out_end",
-        OutEndNode,
-        config_schema={},
-        config_defaults={},
-    )
-    return validate_graph_health(
-        _global_state_graph(lock_scope=lock_scope),
-        registry=registry,
-    )
+    from pathlib import Path
+    from vibeflow.tooling.project.workspace_loader import load_project_workspace
+    from vibeflow.tooling.application.python.project.declarations import declared_python_registry,collect_workflow_source_context
+    from tests.fixtures.support.strict_support_runtime_nodes import OutEndNode,OutEndNode_DECLARATION,StartNode,StartNode_DECLARATION
+    project=Path(__file__).resolve().parents[3]/"sandbox/python/integration/project"
+    registry=declared_python_registry(load_project_workspace(project))
+    registry.register(StartNode_DECLARATION,StartNode)
+    registry.register(OutEndNode_DECLARATION,OutEndNode)
+    graph=_global_state_graph(lock_scope=lock_scope)
+    return validate_graph_health(graph,registry=registry,source_context=collect_workflow_source_context(registry,graph))
 
 
 def test_unlocked_global_state_health_warning_is_advisory() -> None:

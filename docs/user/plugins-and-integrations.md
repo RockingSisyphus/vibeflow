@@ -2,58 +2,13 @@
 
 Plugin 扩展治理、编译或单次运行 hook；BaseLib 提供纯 helper；JavaScript Capability 与 Host Extension 连接宿主能力。
 
+## 领域规则与资源包
+
+审查扩展使用 Rule/Ruleset，不再提供 policy validate hooks。插件包可以同时贡献分类、Node、Rule 和 Ruleset，Node 选中即按需加载；参考 [Rule、Ruleset 与业务分类](rules-and-categories.md)。
+
 ## Python Plugin
 
-Plugin 使用 `PluginInfo` 描述资源，并实现对应 hook：
-
-```python
-from vibeflow.targets.python.project import PluginInfo
-
-
-class Plugin:
-    PLUGIN_INFO = PluginInfo(
-        name="example_policy",
-        plugin_type="policy",
-        display_name="Example policy",
-        category="policy",
-        description="Adds project-specific structural findings.",
-        version="1.0.0",
-    )
-    name = "example_policy"
-    priority = 20
-
-    def extend_policy(self, policy):
-        return {"policy": {"maintainability": {"max_call_chain_length": 6}}}
-```
-
-Python 支持 `policy`、`compiler`、`runtime` 三类 Plugin。项目 Registry 登记可用资源，workflow 通过 `plugins[].id` 选择本次使用项：
-
-```python
-from vibeflow.targets.python.project import PluginResourceRegistry
-
-
-def build_plugin_registry() -> PluginResourceRegistry:
-    registry = PluginResourceRegistry()
-    registry.register(
-        "example_policy",
-        module="plugins.example_policy",
-        class_name="Plugin",
-        plugin_type="policy",
-        display_name="Example policy",
-        category="policy",
-        description="Adds project-specific structural findings.",
-        version="1.0.0",
-    )
-    return registry
-```
-
-workflow 只启用显式选择的 Plugin：
-
-```jsonc
-"plugins": [{"id": "example_policy", "config": {}}]
-```
-
-Runtime Plugin 围绕一次 workflow run 执行 hook；Plugin 是 `trusted` 边界，但仍遵守 Core 不可降级规则、契约和拓扑。
+生命周期插件保留 compiler/runtime 两类。使用 PluginInfo 描述资源，通过 PluginResourceRegistry 登记，workflow 的 plugins 显式选择本次生命周期实例。编译变换与运行 hook 不承担领域审查，也不会因同包 Ruleset 被选择而自动开启。
 
 ## JavaScript Plugin
 
@@ -80,9 +35,9 @@ Descriptor 指向同步工厂 `createPlugin(context)`：
 
 ```ts
 export function createPlugin(context: Readonly<{
-  abiVersion: "vibeflow.plugin.v1";
+  abiVersion: "vibeflow.plugin.v2";
   pluginId: string;
-  pluginType: "policy" | "compiler" | "runtime";
+  pluginType: "compiler" | "runtime";
   target: "browser" | "node";
   workflowId: string;
   config: Readonly<Record<string, unknown>>;

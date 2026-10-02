@@ -68,7 +68,6 @@ _export(
     "NodeContract",
     "NodeInfo",
     "PureNode",
-    "effective_effect_scope",
 )
 _export(
     "vibeflow.targets.python.project.planned",
@@ -89,7 +88,6 @@ _export(
     "CompilerPlugin",
     "PluginDescriptor",
     "PluginRegistry",
-    "PolicyPlugin",
     "RuntimePlugin",
     "plugin_error",
 )
@@ -98,11 +96,8 @@ _export(
     "DEFAULT_POLICY_DATA",
     "EffectivePolicy",
     "PolicyResolveResult",
-    "apply_policy_plugins",
-    "apply_policy_to_findings",
     "default_effective_policy",
     "merge_policy",
-    "validate_plugin_relaxations",
 )
 _export(
     "vibeflow.targets.python.project.registry",

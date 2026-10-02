@@ -77,7 +77,7 @@ def test_plugin_descriptor_parser_reports_stable_codes() -> None:
     )
     with pytest.raises(JavascriptPluginError) as factory:
         parse_javascript_plugin_descriptor(suspending_policy)
-    assert factory.value.code == "VF_AOT_PLUGIN_FACTORY"
+    assert factory.value.code == "VF_AOT_PLUGIN_TYPE"
 
     invalid_config = _descriptor()
     invalid_config["config"] = []
@@ -196,6 +196,6 @@ def test_plugin_abi_declaration_is_packaged_with_the_target() -> None:
     )
     source = declaration.read_text(encoding="utf-8")
 
-    assert '"vibeflow.plugin.v1"' in source
+    assert '"vibeflow.plugin.v2"' in source
     assert "interface RuntimePlugin" in source
     assert "type CreateRuntimePlugin" in source

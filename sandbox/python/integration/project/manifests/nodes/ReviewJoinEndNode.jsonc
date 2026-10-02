@@ -1,0 +1,115 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.review_join_end",
+  "display_name": "Review Join End",
+  "category": "sandbox",
+  "description": "Terminates the review fixture after the external result and every repeated worker result have joined.",
+  "version": "0.1.0",
+  "flow_kind": "terminal",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "value.final",
+        "cardinality": "exactly_one",
+        "display_name": "value.final"
+      },
+      {
+        "type": "worker.a",
+        "cardinality": "exactly_one",
+        "display_name": "worker.a"
+      },
+      {
+        "type": "worker.b",
+        "cardinality": "exactly_one",
+        "display_name": "worker.b"
+      },
+      {
+        "type": "worker.c",
+        "cardinality": "exactly_one",
+        "display_name": "worker.c"
+      },
+      {
+        "type": "worker.d",
+        "cardinality": "exactly_one",
+        "display_name": "worker.d"
+      }
+    ],
+    "provides": [],
+    "input_semantics": {
+      "value.final": [
+        "external result"
+      ],
+      "worker.a": [
+        "first repeated worker result"
+      ],
+      "worker.b": [
+        "second repeated worker result"
+      ],
+      "worker.c": [
+        "third repeated worker result"
+      ],
+      "worker.d": [
+        "fourth repeated worker result"
+      ]
+    },
+    "output_semantics": {},
+    "examples": [
+      {
+        "inputs": {
+          "value.final": {
+            "key": "value.final",
+            "type": "value.final",
+            "value": 15,
+            "source_node": "example"
+          },
+          "worker.a": {
+            "key": "worker.a",
+            "type": "worker.a",
+            "value": 42,
+            "source_node": "example"
+          },
+          "worker.b": {
+            "key": "worker.b",
+            "type": "worker.b",
+            "value": 101,
+            "source_node": "example"
+          },
+          "worker.c": {
+            "key": "worker.c",
+            "type": "worker.c",
+            "value": 202,
+            "source_node": "example"
+          },
+          "worker.d": {
+            "key": "worker.d",
+            "type": "worker.d",
+            "value": 42,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_math_nodes.py",
+        "export": "ReviewJoinEndNode"
+      }
+    }
+  ]
+}

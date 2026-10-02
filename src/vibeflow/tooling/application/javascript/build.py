@@ -7,13 +7,13 @@ from typing import Any, Callable, Mapping
 
 from vibeflow.targets.javascript.build.builder import BuildRequest, BuildResult, build_aot
 from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
+from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
 from vibeflow.targets.javascript.build.project_graph import (
     PreparationState as _PreparationState,
     prepare_graph as _prepare_graph,
     require_explicit_inputs as _require_explicit_inputs,
 )
-from vibeflow.targets.javascript.build.nodeset_limits import check_nodeset_depth, nodeset_width_warnings
-from vibeflow.targets.javascript.quality.implementation import inspect_registered_implementations
+from vibeflow.targets.javascript.quality.rules import JavascriptRuleReport, node_type_calls, run_javascript_rules, run_javascript_workflow_rules
 from vibeflow.targets.javascript.build.project_paths import (
     javascript_options as _javascript_options,
     safe_project_path as _safe_project_path,
@@ -23,6 +23,7 @@ from vibeflow.targets.javascript.build.project_resources import (
     enriched_payload as _enriched_payload,
     host_extension_closure as _host_extension_closure,
     import_policy as _import_policy,
+    target_neutral_import_policy,
     required_capabilities as _required_capabilities,
     schemas_for_types as _schemas_for_types,
     used_schema_types as _used_schema_types,
@@ -67,7 +68,6 @@ from vibeflow.core.config.scope import (
     normalize_node_config_overrides,
 )
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
-from vibeflow.tooling.project.quality_policy import resolve_shared_quality_policy
 from vibeflow.tooling.project.workspace_model import (
     WorkspaceConfig,
     WorkspaceRoot,
@@ -91,7 +91,6 @@ class ProjectBuildRequest:
     html_template: str | Path | None = None
     app_entry: str | Path | None = None
     node_command: str = "node"
-    policy_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -100,7 +99,7 @@ class PreparedProjectBuild:
     root: WorkspaceRoot
     config_path: Path
     package_root: Path
-    quality_policy_data: Mapping[str, Any]
+    rule_report: JavascriptRuleReport
     graph: GraphConfig
     compiled: CompiledGraph
     catalogs: DescriptorCatalogs
@@ -120,8 +119,6 @@ class PreparedProjectBuild:
     planned_plugins: tuple[str, ...] = ()
     plugin_bindings: tuple[Mapping[str, Any], ...] = ()
     plugin_annotations: tuple[Mapping[str, Any], ...] = ()
-    plugin_findings: tuple[Mapping[str, Any], ...] = ()
-    plugin_relaxations: tuple[Mapping[str, Any], ...] = ()
     plugin_audit_sources: tuple[str, ...] = ()
     warnings: tuple[Mapping[str, object], ...] = ()
     javascript_bindings: JavascriptBindingPlan | None = None
@@ -157,7 +154,7 @@ def prepare_project_build(
     *,
     before_compile_hooks: tuple[BeforeCompileHook, ...] = (),
 ) -> PreparedProjectBuild:
-    """Load and validate one workspace workflow without invoking Node.js."""
+    """Load one workflow and execute its selected static and import rules."""
 
     if request.target not in {"browser", "node"}:
         raise ProjectBuildError(
@@ -209,14 +206,6 @@ def prepare_project_build(
     )
 
     document = load_workspace_config_document(config_path, workspace=workspace)
-    quality_policy_data, _, policy_findings = resolve_shared_quality_policy(
-        document.data,
-        config_path=config_path,
-        explicit_policy_path=request.policy_path,
-    )
-    if policy_findings:
-        first = policy_findings[0]
-        raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in policy_findings))
     graph = parse_graph_config(
         document.data,
         project_root=root.path,
@@ -229,7 +218,6 @@ def prepare_project_build(
         catalogs=catalogs,
         hooks=before_compile_hooks,
     )
-    check_nodeset_depth(graph, max_depth=javascript["nodeset_max_depth"])
     plugin_plan = _javascript_plugin_plan(
         document.data,
         catalogs=catalogs,
@@ -237,9 +225,25 @@ def prepare_project_build(
         entry_mode=graph.entry_mode,
         project_root=root.path,
     )
+    selected_hosts = _declared_host_extensions(document.data, legacy_ids=tuple(javascript["host_extensions"]), catalog=catalogs.host_extensions)
+    rule_import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]), node_ids=frozenset(node_type_calls(graph)), host_extension_ids=frozenset(item.id for item in selected_hosts if item.status == "implemented"), plugin_ids=frozenset(item.id for item in _active_plugin_bindings(plugin_plan)))
+    rule_report = run_javascript_rules(graph, catalogs, project_root=root.path, package_root=package_root, phase="static", target=request.target, import_policy=rule_import_policy, node_command=request.node_command,
+                                     quality_policy=javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
+    rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")
+    if rule_errors:
+        first = rule_errors[0]
+        raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in rule_report.findings))
+    rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={}, node_report=rule_report, project_root=root.path, package_root=package_root, phase="import", target=request.target, node_command=request.node_command,
+        rule_defaults={"vibeflow.workflow": {"nodeset_max_depth": javascript["nodeset_max_depth"]}, "vibeflow.graph.nodesets": {"nodeset_max_depth": javascript["nodeset_max_depth"]}},
+        quality_policy=javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
+    rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")
+    if rule_errors:
+        first = rule_errors[0]
+        raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in rule_report.findings))
+    implementation_facts = implementation_facts_from_catalog(node_catalog, target=request.target, effect_policies=rule_report.policies)
     _require_explicit_inputs(graph, path=())
     plugin_report = JavascriptBuildPluginReport()
-    build_plugins = (*plugin_plan.policy_plugins, *plugin_plan.compiler_plugins)
+    build_plugins = plugin_plan.compiler_plugins
     if build_plugins:
         try:
             with JavascriptBuildPluginRunner(
@@ -249,7 +253,6 @@ def prepare_project_build(
                 workflow_id=request.workflow_id or config_path.stem,
                 node_command=request.node_command,
             ) as plugin_runner:
-                plugin_runner.validate_policy(graph)
                 plugin_runner.before_compile(graph)
                 compilation = _compile_core_compilation(
                     graph,
@@ -319,6 +322,12 @@ def prepare_project_build(
         active_nodesets=(),
     )
 
+    rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **state.compiled_by_path}, node_report=rule_report, project_root=root.path, package_root=package_root, rule_defaults={"vibeflow.workflow": {"nodeset_max_depth": javascript["nodeset_max_depth"]}, "vibeflow.graph.nodesets": {"nodeset_max_depth": javascript["nodeset_max_depth"]}}, target=request.target, node_command=request.node_command,
+                                                 quality_policy=javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
+    workflow_errors = tuple(item for item in rule_report.findings if item.severity == "error")
+    if workflow_errors:
+        first = workflow_errors[0]
+        raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in rule_report.findings))
     base_lib_order, base_lib_implementations = _base_lib_closure(
         state.used_nodes,
         catalog=base_lib_catalog,
@@ -444,7 +453,7 @@ def prepare_project_build(
         runtime_plugins=plugin_plan.runtime_plugins,
         import_policy=import_policy,
     )
-    warnings = list(nodeset_width_warnings(graph))
+    warnings = [*(item.to_dict() for item in rule_report.findings if item.severity == "warning")]
     if uses_legacy_host_extensions:
         warnings.append({
             "code": "VF_AOT_HOST_EXTENSION_LEGACY_SELECTION",
@@ -459,7 +468,7 @@ def prepare_project_build(
         root=root,
         config_path=config_path,
         package_root=package_root,
-        quality_policy_data=quality_policy_data,
+        rule_report=rule_report,
         graph=graph,
         compiled=compiled,
         catalogs=catalogs,
@@ -494,8 +503,6 @@ def prepare_project_build(
             for item in _active_plugin_bindings(plugin_plan)
         ),
         plugin_annotations=plugin_report.annotations,
-        plugin_findings=plugin_report.findings,
-        plugin_relaxations=plugin_report.relaxations,
         plugin_audit_sources=tuple(
             item.module for item in _active_plugin_bindings(plugin_plan)
         ),
@@ -544,33 +551,6 @@ def _compile_core_compilation(
 
 def build_project_aot(request: ProjectBuildRequest) -> ProjectBuildResult:
     prepared = prepare_project_build(request)
-    owners = prepared.import_policy.get("owners", ())
-    selected_files = tuple(
-        str(owner["path"])
-        for owner in owners
-        if isinstance(owner, Mapping) and owner.get("kind") in {"node", "base_lib"}
-    )
-    if selected_files:
-        findings = inspect_registered_implementations(
-            prepared.catalogs,
-            project_root=prepared.root.path,
-            package_root=prepared.package_root,
-            selected_files=selected_files,
-            policy_data=prepared.quality_policy_data,
-            node_command=request.node_command,
-        )
-        errors = tuple(item for item in findings if item.severity == "error")
-        if errors:
-            first = errors[0]
-            raise ProjectBuildError(
-                first.rule_id,
-                first.message,
-                diagnostics=tuple(item.to_dict() for item in errors),
-            )
-        prepared = replace(
-            prepared,
-            warnings=(*prepared.warnings, *(item.to_dict() for item in findings if item.severity == "warning")),
-        )
     result = build_aot(
         BuildRequest(
             plan=prepared.plan,
@@ -593,9 +573,6 @@ def build_project_aot(request: ProjectBuildRequest) -> ProjectBuildResult:
                 "active": list(prepared.plugin_bindings),
                 "annotations": [
                     dict(item) for item in prepared.plugin_annotations
-                ],
-                "relaxations": [
-                    dict(item) for item in prepared.plugin_relaxations
                 ],
             },
             audit_sources=prepared.plugin_audit_sources,
@@ -666,7 +643,6 @@ def _active_plugin_bindings(
     plan: JavascriptPluginBindingPlan,
 ) -> tuple[JavascriptPluginBinding, ...]:
     return (
-        *plan.policy_plugins,
         *plan.compiler_plugins,
         *plan.runtime_plugins,
     )
@@ -714,7 +690,6 @@ def _with_plugin_source_hashes(
         )
 
     return JavascriptPluginBindingPlan(
-        policy_plugins=tuple(hashed(item) for item in plan.policy_plugins),
         compiler_plugins=tuple(hashed(item) for item in plan.compiler_plugins),
         runtime_plugins=tuple(hashed(item) for item in plan.runtime_plugins),
         planned_plugins=plan.planned_plugins,

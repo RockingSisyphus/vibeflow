@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tests.fixtures.support.declarations import node_declaration, configured_declaration
 
 import importlib.util
 import json
@@ -74,36 +75,24 @@ def cli_main(args):
     return main(args)
 
 
-def collect_node_metrics(*args, **kwargs):
-    from vibeflow.targets.python.quality import collect_node_metrics as impl
-
-    return impl(*args, **kwargs)
+def register_node(registry: NodeRegistry, descriptor, node_cls: type, schema: dict | None = None, defaults: dict | None = None, **kwargs):
+    registry.register(configured_declaration(descriptor, schema, defaults), node_cls, **kwargs)
 
 
-def validate_node_class(*args, **kwargs):
-    from vibeflow.targets.python.quality import validate_node_class as impl
-
-    return impl(*args, **kwargs)
-
-
-def register_node(registry: NodeRegistry, key: str, node_cls: type, schema: dict | None = None, defaults: dict | None = None, **kwargs):
-    registry.register(key, node_cls, config_schema=schema or {}, config_defaults=defaults or {}, **kwargs)
-
-
-class BadIoNode:
-    NODE_INFO = NodeInfo(
+BadIoNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.bad_io",
         display_name="Bad IO",
         category="test",
         description="Illegally performs IO.",
         version="0.1.0",
         flow_kind="process",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         provides=(DataProvider(key="value.out", type="value.out", display_name="value.out"),),
         output_semantics={"value.out": ("output value",)},
 
-    )
+    ), rulesets=("vibeflow.process",))
+
+class BadIoNode:
 
     def run_pure(self, inputs, params):
         time.sleep(0)
@@ -114,18 +103,18 @@ def _registry() -> NodeRegistry:
     from . import strict_support_runtime_nodes as runtime_nodes
 
     registry = NodeRegistry()
-    register_node(registry, "test.start", runtime_nodes.StartNode)
-    register_node(registry, "test.value_input", runtime_nodes.ValueInputNode)
-    register_node(registry, "test.out_end", runtime_nodes.OutEndNode)
-    register_node(registry, "test.in_end", runtime_nodes.InEndNode)
-    register_node(registry, "test.seed", runtime_nodes.SeedNode, {"value": {"type": "number"}}, {"value": 1})
-    register_node(registry, "test.add", runtime_nodes.AddNode, {"delta": {"type": "number"}}, {"delta": 1})
-    register_node(registry, "test.copy", runtime_nodes.CopyNode)
-    register_node(registry, "test.identity_object", runtime_nodes.IdentityObjectNode)
-    register_node(registry, "test.nan_output", runtime_nodes.NanOutputNode)
-    register_node(registry, "test.runtime_fail", runtime_nodes.RuntimeFailNode, {"fail": {"type": "boolean"}}, {"fail": False})
-    register_node(registry, "test.counting_init", runtime_nodes.CountingInitNode, {"value": {"type": "number"}}, {"value": 3})
-    register_node(registry, "test.effect_request", runtime_nodes.EffectRequestNode)
+    register_node(registry, runtime_nodes.StartNode_DECLARATION, runtime_nodes.StartNode)
+    register_node(registry, runtime_nodes.ValueInputNode_DECLARATION, runtime_nodes.ValueInputNode)
+    register_node(registry, runtime_nodes.OutEndNode_DECLARATION, runtime_nodes.OutEndNode)
+    register_node(registry, runtime_nodes.InEndNode_DECLARATION, runtime_nodes.InEndNode)
+    register_node(registry, runtime_nodes.SeedNode_DECLARATION, runtime_nodes.SeedNode, {"value": {"type": "number"}}, {"value": 1})
+    register_node(registry, runtime_nodes.AddNode_DECLARATION, runtime_nodes.AddNode, {"delta": {"type": "number"}}, {"delta": 1})
+    register_node(registry, runtime_nodes.CopyNode_DECLARATION, runtime_nodes.CopyNode)
+    register_node(registry, runtime_nodes.IdentityObjectNode_DECLARATION, runtime_nodes.IdentityObjectNode)
+    register_node(registry, runtime_nodes.NanOutputNode_DECLARATION, runtime_nodes.NanOutputNode)
+    register_node(registry, runtime_nodes.RuntimeFailNode_DECLARATION, runtime_nodes.RuntimeFailNode, {"fail": {"type": "boolean"}}, {"fail": False})
+    register_node(registry, runtime_nodes.CountingInitNode_DECLARATION, runtime_nodes.CountingInitNode, {"value": {"type": "number"}}, {"value": 3})
+    register_node(registry, runtime_nodes.EffectRequestNode_DECLARATION, runtime_nodes.EffectRequestNode)
     return registry
 
 
@@ -247,65 +236,6 @@ def _input_add_pipeline(*, add: dict | None = None) -> dict:
     }
 
 
-VALID_NODE_IMPORT = """from vibeflow.core import DataProvider, DataRequirement
-from vibeflow.targets.python.project import NodeContract, NodeInfo
-
-
-def REQ(data_type: str, cardinality: str = "exactly_one") -> DataRequirement:
-    return DataRequirement(type=data_type, cardinality=cardinality, display_name=data_type)
-
-
-def PROV(key: str, data_type: str | None = None) -> DataProvider:
-    return DataProvider(key=key, type=data_type or key, display_name=key)
-
-
-""".rstrip() + "\n\n"
-
-
-VALID_NODE_INFO = """
-    NODE_INFO = NodeInfo(
-        type_key="demo.node",
-        display_name="Demo",
-        category="demo",
-        description="Demo node.",
-        version="0.1.0",
-        flow_kind="process",
-    )
-""".rstrip()
-
-
-VALID_NODE_CONTRACT = """
-    CONTRACT = NodeContract(
-        provides=(PROV("demo.out"),),
-        output_semantics={"demo.out": ("demo output",)},
-        examples=({"inputs": {}, "params": {}},),
-    )
-""".rstrip()
-
-
-def _inspect_node_source(tmp_path, capsys, source: str, *, node_type: str = "demo.node", class_name: str = "DemoNode", extra_args=None):
-    tmp_path.mkdir(parents=True, exist_ok=True)
-    module_path = tmp_path / "demo_node.py"
-    module_path.write_text(source.strip(), encoding="utf-8")
-    args = ["inspect-node", "--type", node_type, "--module", str(module_path), "--class", class_name]
-    if extra_args:
-        args.extend(extra_args)
-    code = cli_main(args)
-    return code, json.loads(capsys.readouterr().out)
-
-
-def _valid_node_source(*, run_body: str = '        return {"demo.out": 1}', contract: str = VALID_NODE_CONTRACT, info: str = VALID_NODE_INFO) -> str:
-    return f"""
-{VALID_NODE_IMPORT}
-class DemoNode:
-{info}
-{contract}
-
-    def run_pure(self, inputs, params):
-{run_body}
-"""
-
-
 def _write_base_lib_chain(tmp_path: Path, modules: list[str]) -> None:
     base_dir = tmp_path / "base_lib"
     base_dir.mkdir()
@@ -343,44 +273,6 @@ def _load_module_from_path(path: Path, name: str):
     sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
-
-
-def _failure_case_source(case: dict[str, object]) -> str:
-    kind = str(case.get("kind", ""))
-    if kind == "generated_giant_node":
-        return _valid_node_source() + "\n" + "\n".join("    # filler line" for _ in range(510))
-    if kind == "node_mutual_call":
-        return f"""
-{VALID_NODE_IMPORT}
-class OtherNode:
-    NODE_INFO = NodeInfo(type_key="demo.other", display_name="Other", category="demo", description="Other node.", version="0.1.0", flow_kind="process")
-    CONTRACT = NodeContract(provides=(PROV("other.out"),), output_semantics={{"other.out": ("other output",)}}, examples=({{"inputs": {{}}, "params": {{}}}},))
-
-    def run_pure(self, inputs, params):
-        return {{"other.out": 1}}
-
-
-class DemoNode:
-{VALID_NODE_INFO}
-{VALID_NODE_CONTRACT}
-
-    def run_pure(self, inputs, params):
-        OtherNode().run_pure({{}}, {{}})
-        return {{"demo.out": 1}}
-"""
-    if kind == "module_top_level_side_effect":
-        return f"""
-{VALID_NODE_IMPORT}
-len([])
-
-class DemoNode:
-{VALID_NODE_INFO}
-{VALID_NODE_CONTRACT}
-
-    def run_pure(self, inputs, params):
-        return {{"demo.out": 1}}
-"""
-    return _valid_node_source(run_body=str(case["run_body"]))
 
 
 __all__ = [name for name in globals() if not name.startswith("__")]

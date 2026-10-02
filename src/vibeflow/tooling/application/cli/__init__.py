@@ -43,6 +43,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not raw_args or raw_args[0] in {"-h", "--help"}:
         return _show_root_help(raw_args)
     command = raw_args[0]
+    if command == "review-rules":
+        from vibeflow.tooling.application.rule_review import main as rule_main
+        return rule_main(raw_args[1:])
     if command not in (
         _PYTHON_ONLY_COMMANDS | _JAVASCRIPT_ONLY_COMMANDS | _SHARED_COMMANDS
     ):
@@ -101,6 +104,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("export-ascii", "export a workflow as ASCII"),
         ("export-svg", "render a workflow as SVG"),
         ("review", "review a workflow"),
+        ("review-rules", "inspect a workflow's effective rule graphs"),
         ("run", "run a Python workflow"),
         ("delegate-cli", "run a delegated Python CLI workflow"),
         ("quality-check", "check a project"),

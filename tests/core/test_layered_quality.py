@@ -39,8 +39,8 @@ def test_health_and_source_quality_share_plain_finding_base() -> None:
     assert isinstance(quality, Finding)
     assert health.code == "TEST.HEALTH"
     assert quality.code == "QUALITY.SYNTAX.PYTHON"
-    assert "code" not in health.to_dict()
-    assert "code" not in quality.to_dict()
+    assert health.to_dict()["code"] == "TEST.HEALTH"
+    assert quality.to_dict()["code"] == "QUALITY.SYNTAX.PYTHON"
 
 
 def test_core_quality_evaluates_only_target_extracted_facts() -> None:

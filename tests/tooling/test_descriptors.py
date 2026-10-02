@@ -21,14 +21,11 @@ from vibeflow.core.descriptors import (
 )
 from vibeflow.targets.python.project.descriptors import (
     adapt_base_lib_registry,
-    adapt_node_registry,
-    node_descriptor_from_registry,
 )
 from vibeflow.tooling.project.descriptor_loader import (
     DescriptorLoadError,
     load_descriptor_catalogs,
 )
-from vibeflow.targets.python.project.node import NodeContract, NodeInfo
 from vibeflow.targets.python.project.registry import NodeRegistry
 
 
@@ -262,62 +259,30 @@ def test_catalogs_sort_ids_and_preserve_source_diagnostics() -> None:
     assert catalog.source_for("demo.z") == "z.jsonc"
 
 
-class _LegacyNode:
-    NODE_INFO = NodeInfo(
-        "demo.legacy",
-        "Legacy",
-        "demo",
-        "Legacy node.",
-        "1.0.0",
-        "process",
-    )
-    CONTRACT = NodeContract(
-        provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
-        output_semantics={"value.out": ("result",)},
-
-
-        examples=({"inputs": {}, "params": {"value": 1}},),
-    )
-
+class _DeclaredNode:
     def run_pure(self, inputs, params):
         return {"value.out": params["value"]}
 
 
-def test_legacy_adapters_keep_python_bindings_outside_descriptors() -> None:
+def test_declared_metadata_is_authoritative_for_python_bindings() -> None:
     registry = NodeRegistry()
-    registry.register(
-        "demo.legacy",
-        _LegacyNode,
-        config_schema={"value": {"type": "number"}},
-        config_defaults={"value": 1},
-    )
-    legacy = node_descriptor_from_registry(registry, "demo.legacy")
-    static = replace(
-        legacy,
-        implementations=(
-            ImplementationDescriptor(
-                language="typescript",
-                targets=("browser", "node"),
-                source=SourceLocator(
-                    kind="file",
-                    ref="project/nodes/legacy.ts",
-                    export="run",
-                ),
-            ),
+    descriptor = NodeDescriptor(
+        type_key="demo.declared", display_name="Declared", category="demo",
+        description="A declared node.", version="1.0.0", flow_kind="process",
+        rulesets=("vibeflow.process",),
+        contract=NodeContractDescriptor(
+            provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
+            output_semantics={"value.out": ("result",)},
+            params_schema={"value": {"type": "number"}}, params_defaults={"value": 1},
         ),
     )
-    static_catalog = NodeCatalog((static,))
-
-    adapted = adapt_node_registry(registry, static_catalog=static_catalog)
-
-    assert adapted.binding("demo.legacy") is _LegacyNode
-    assert {
-        implementation.language
-        for implementation in adapted.catalog.require(
-            "demo.legacy"
-        ).implementations
-    } == {"python", "typescript"}
-    json.dumps(adapted.catalog.to_dict())
+    registry.register(descriptor, _DeclaredNode, source="nodes/declared.jsonc")
+    assert registry.descriptor("demo.declared") is descriptor
+    assert registry.get("demo.declared") is _DeclaredNode
+    assert registry.get_config_spec("demo.declared").defaults["value"] == 1
+    assert not hasattr(_DeclaredNode, "NODE_INFO")
+    assert not hasattr(_DeclaredNode, "CONTRACT")
+    json.dumps(descriptor.to_dict())
 
     base_registry = BaseLibRegistry()
     base_registry.register(

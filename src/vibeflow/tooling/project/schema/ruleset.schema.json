@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibeflow.local/schema/ruleset.schema.json",
+  "title": "VibeFlow RulesetDescriptor",
+  "type": "object",
+  "required": [
+    "kind",
+    "id"
+  ],
+  "properties": {
+    "kind": {
+      "const": "ruleset"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "display_name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "calls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ruleset_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "params": {
+            "type": "object"
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "rule_id"
+            ],
+            "not": {
+              "required": [
+                "ruleset_id"
+              ]
+            }
+          },
+          {
+            "required": [
+              "ruleset_id"
+            ],
+            "not": {
+              "required": [
+                "rule_id"
+              ]
+            }
+          }
+        ],
+        "additionalProperties": false
+      }
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "source",
+          "target",
+          "kind"
+        ],
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "includes",
+              "requires",
+              "overrides"
+            ]
+          },
+          "bindings": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "params": {
+            "type": "object"
+          },
+          "replace_rule": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "entrypoints": {
+      "type": "object",
+      "properties": {
+        "import": {"$ref": "#/$defs/entrypoint"},
+        "static": {"$ref": "#/$defs/entrypoint"},
+        "run": {"$ref": "#/$defs/entrypoint"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "entrypoint": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "additionalProperties": false
+}

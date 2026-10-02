@@ -21,7 +21,7 @@ from vibeflow.core.descriptors.models import (
 from vibeflow.core.flow import STATUS_IMPLEMENTED, STATUS_PLANNED, STATUSES
 
 
-@dataclass(frozen=True)
+@dataclass
 class PluginSelectionError(ValueError):
     """A stable, language-neutral plugin selection failure."""
 

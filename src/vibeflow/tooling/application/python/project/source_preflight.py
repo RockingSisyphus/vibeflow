@@ -34,6 +34,7 @@ def collect_python_source_facts(
     *,
     project_root: Path | None = None,
     source_roots: tuple[Path, ...] = (),
+    _facts: dict[str, PythonSourceFact] | None = None,
 ) -> tuple[PythonSourceFact, ...]:
     """Read and resolve the project-local sources reachable from ``entry_path``."""
 
@@ -45,7 +46,7 @@ def collect_python_source_facts(
             for candidate in (root, *source_roots)
         )
     )
-    facts: dict[str, PythonSourceFact] = {}
+    facts: dict[str, PythonSourceFact] = {} if _facts is None else _facts
     _collect_source_fact(path, source_roots=roots, facts=facts)
     return tuple(facts[source_id] for source_id in sorted(facts))
 
@@ -83,19 +84,24 @@ def _collect_source_fact(
             path=source_id,
             source="",
             module_name=_module_name(resolved, project_root),
+            root_path=str(project_root),
             load_error=str(exc),
         )
         return
 
     try:
         tree = ast.parse(source, filename=source_id)
-    except SyntaxError:
+    except SyntaxError as exc:
         facts[source_id] = PythonSourceFact(
             source_id=source_id,
             path=source_id,
             source=source,
             module_name=_module_name(resolved, project_root),
+            root_path=str(project_root),
             is_base_lib=_is_base_lib_source(resolved),
+            parse_error=str(exc),
+            parse_line=exc.lineno or 1,
+            parse_column=exc.offset or 1,
         )
         return
 
@@ -119,16 +125,17 @@ def _collect_source_fact(
             current_path=resolved,
             source_roots=source_roots,
         )
-        if not _is_base_lib_source(child)
     )
     facts[source_id] = PythonSourceFact(
         source_id=source_id,
         path=source_id,
         source=source,
         module_name=_module_name(resolved, project_root),
+        root_path=str(project_root),
         import_time_dependencies=tuple(str(child) for child in import_time_paths),
         runtime_dependencies=tuple(str(child) for child in runtime_paths),
         is_base_lib=_is_base_lib_source(resolved),
+        _tree=tree,
     )
     for child in (*import_time_paths, *runtime_paths):
         _collect_source_fact(child, source_roots=source_roots, facts=facts)

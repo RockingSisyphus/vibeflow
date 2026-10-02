@@ -49,7 +49,7 @@ def test_build_cli_prints_one_machine_readable_success_object(
         }
     )
     result = SimpleNamespace(
-        prepared=SimpleNamespace(plan=SimpleNamespace(workflow_id="demo.workflow")),
+        prepared=SimpleNamespace(plan=SimpleNamespace(workflow_id="demo.workflow"), rule_report=SimpleNamespace(to_dict=lambda: {})),
         out_dir=out_dir,
         entry=out_dir / "workflow.js",
         manifest=out_dir / "vibeflow-build.json",

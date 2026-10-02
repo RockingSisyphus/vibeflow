@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.runtime_failure",
   "display_name": "Runtime failure fixture",
   "category": "sandbox",

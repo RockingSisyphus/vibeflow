@@ -1,4 +1,4 @@
-"""Build-time JavaScript Policy and Compiler Plugin orchestration."""
+"""Build-time JavaScript Compiler Plugin lifecycle orchestration."""
 
 from __future__ import annotations
 
@@ -27,15 +27,11 @@ _GRAPH_MUTATION_KEYS = frozenset(
 
 @dataclass(frozen=True)
 class JavascriptBuildPluginReport:
-    findings: tuple[Mapping[str, object], ...] = ()
     annotations: tuple[Mapping[str, object], ...] = ()
-    relaxations: tuple[Mapping[str, object], ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "findings": [dict(item) for item in self.findings],
             "annotations": [dict(item) for item in self.annotations],
-            "relaxations": [dict(item) for item in self.relaxations],
         }
 
 
@@ -60,9 +56,7 @@ class JavascriptBuildPluginRunner:
         self.node_command = str(node_command)
         self._session: JavascriptPluginSession | None = None
         self._ids: dict[str, str] = {}
-        self._findings: list[Mapping[str, object]] = []
         self._annotations: list[Mapping[str, object]] = []
-        self._relaxations: list[Mapping[str, object]] = []
 
     def __enter__(self) -> JavascriptBuildPluginRunner:
         session = JavascriptPluginSession(
@@ -70,7 +64,7 @@ class JavascriptBuildPluginRunner:
         ).__enter__()
         self._session = session
         try:
-            bindings = (*self.plan.policy_plugins, *self.plan.compiler_plugins)
+            bindings = self.plan.compiler_plugins
             for index, binding in enumerate(bindings):
                 session_id = f"{binding.plugin_type}:{index}:{binding.id}"
                 session.open(
@@ -86,34 +80,6 @@ class JavascriptBuildPluginRunner:
             self._session = None
             raise
         return self
-
-    def validate_policy(self, graph: object) -> None:
-        projection = json_projection(graph)
-        assert isinstance(projection, Mapping)
-        for binding in self.plan.policy_plugins:
-            self._invoke(
-                binding,
-                "extendPolicy",
-                {
-                    "policy": {
-                        "coreErrorsNonDowngradable": True,
-                        "target": self.target,
-                    }
-                },
-            )
-            nodes = projection.get("nodes", ())
-            if isinstance(nodes, Sequence) and not isinstance(nodes, str):
-                for node in nodes:
-                    self._invoke(binding, "validateNode", {"node": node})
-            nodesets = projection.get("nodesets", {})
-            if isinstance(nodesets, Mapping):
-                for nodeset_id in sorted(str(key) for key in nodesets):
-                    self._invoke(
-                        binding,
-                        "validateNodeset",
-                        {"id": nodeset_id, "nodeset": nodesets[nodeset_id]},
-                    )
-            self._invoke(binding, "validateGraph", {"graph": projection})
 
     def before_compile(self, graph: object) -> None:
         projection = json_projection(graph)
@@ -131,13 +97,10 @@ class JavascriptBuildPluginRunner:
         }
         for binding in self.plan.compiler_plugins:
             self._invoke(binding, "afterCompile", payload)
-            self._invoke(binding, "validateCompiledGraph", payload)
 
     def report(self) -> JavascriptBuildPluginReport:
         return JavascriptBuildPluginReport(
-            findings=tuple(self._findings),
             annotations=tuple(self._annotations),
-            relaxations=tuple(self._relaxations),
         )
 
     def __exit__(self, exc_type, exc, traceback) -> None:
@@ -173,58 +136,13 @@ class JavascriptBuildPluginRunner:
                 "VF_PLUGIN_HOOK_RESULT",
                 f"plugin '{binding.id}' hook '{hook}' attempted to mutate the graph: {mutation_keys}",
             )
-        self._collect_findings(binding, hook, returned.get("findings", ()))
+        if "findings" in returned or "relaxations" in returned:
+            raise JavascriptPluginError("VF_PLUGIN_HOOK_RESULT", "Compiler lifecycle hooks cannot return rule findings or relaxations; use a Rule")
         self._collect_annotations(
             binding,
             hook,
             returned.get("annotations", returned.get("annotation", ())),
         )
-        if hook == "extendPolicy":
-            self._collect_relaxations(
-                binding,
-                returned.get("relaxations", ()),
-            )
-            policy = returned.get("policy")
-            if isinstance(policy, Mapping) and any(
-                str(key) in {
-                    "disableCoreErrors",
-                    "removeCoreFinding",
-                    "allowInvalidGraph",
-                }
-                for key in policy
-            ):
-                raise JavascriptPluginError(
-                    "VF_PLUGIN_POLICY",
-                    f"plugin '{binding.id}' attempted to disable a non-downgradable Core error",
-                )
-
-    def _collect_findings(
-        self,
-        binding: JavascriptPluginBinding,
-        hook: str,
-        value: object,
-    ) -> None:
-        for finding in _mapping_items(value, subject="findings"):
-            normalized = {
-                "plugin_id": binding.id,
-                "plugin_type": binding.plugin_type,
-                "hook": hook,
-                **finding,
-            }
-            self._findings.append(MappingProxyType(normalized))
-            if str(finding.get("severity", "info")).lower() == "error":
-                raise JavascriptPluginError(
-                    "VF_PLUGIN_POLICY"
-                    if binding.plugin_type == "policy"
-                    else "VF_PLUGIN_COMPILE",
-                    str(
-                        finding.get(
-                            "message",
-                            f"plugin '{binding.id}' rejected the build",
-                        )
-                    ),
-                )
-
     def _collect_annotations(
         self,
         binding: JavascriptPluginBinding,
@@ -244,28 +162,6 @@ class JavascriptBuildPluginRunner:
                         **annotation,
                     }
                 )
-            )
-
-    def _collect_relaxations(
-        self,
-        binding: JavascriptPluginBinding,
-        value: object,
-    ) -> None:
-        for relaxation in _mapping_items(value, subject="relaxations"):
-            required = {"rule", "scope", "reason"}
-            if not required.issubset(relaxation):
-                raise JavascriptPluginError(
-                    "VF_PLUGIN_POLICY",
-                    f"plugin '{binding.id}' relaxation must declare rule, scope, and reason",
-                )
-            rule = str(relaxation.get("rule", ""))
-            if rule.startswith(("CORE.", "VF_")):
-                raise JavascriptPluginError(
-                    "VF_PLUGIN_POLICY",
-                    f"plugin '{binding.id}' cannot relax non-downgradable rule '{rule}'",
-                )
-            self._relaxations.append(
-                MappingProxyType({"plugin_id": binding.id, **relaxation})
             )
 
 

@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.invalid.undeclared_external",
   "display_name": "Invalid undeclared external import",
   "category": "sandbox-negative",

@@ -1,0 +1,26 @@
+{
+  "kind": "node",
+  "type_key": "example.boundary",
+  "display_name": "Boundary",
+  "category": "flowchart",
+  "description": "A native start or end boundary.",
+  "version": "0.15.0",
+  "flow_kind": "terminal",
+  "contract": {},
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "domain_nodes.py",
+        "export": "Boundary"
+      }
+    }
+  ],
+  "rulesets": [
+    "vibeflow.io"
+  ]
+}

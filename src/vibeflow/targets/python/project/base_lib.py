@@ -81,23 +81,22 @@ def analyze_base_lib_source(
         )
 
     counter = _ComplexityCounter()
-    scanner = _BaseLibAstScanner(path=path, module=module, policy=policy)
     counter.visit(tree)
-    scanner.visit(tree)
-    findings = [*scanner.findings]
-    findings.extend(_size_findings(path, module, source_text, policy=policy))
-    findings.extend(_complexity_findings(path, module, counter, policy=policy))
-    return BaseLibModuleReport(
-        module=module,
-        path=path,
-        source_lines=len(source_text.splitlines()),
-        source_bytes=len(source_text.encode("utf-8")),
-        function_count=counter.function_count,
-        branch_count=counter.branch_count,
-        max_nesting_depth=counter.max_nesting_depth,
-        imports=tuple(sorted(scanner.imports)),
-        findings=tuple(findings),
-    )
+    from vibeflow.core.rules import RuleContext, compile_ruleset, execute_rule_plan
+    from vibeflow.core.rules.builtin import builtin_rule_resources
+    from vibeflow.targets.python.quality.rules import python_rule_handlers
+    from vibeflow.targets.python.quality.source_context import PythonSourceFile
+    rules, rulesets = builtin_rule_resources()
+    plan = compile_ruleset("vibeflow.base_lib", rules={item.id:item for item in rules},
+        rulesets={item.id:item for item in rulesets}, entrypoint="static")
+    context = RuleContext(facts={"base_lib_file":PythonSourceFile(path,module,source_text,_tree=tree),"purity_policy":policy},
+        subject={"kind":"base_lib","id":module,"source_identity":("python",path,source_text)},target="python")
+    result = execute_rule_plan(plan,context,handlers=python_rule_handlers())
+    findings = tuple(BaseLibFinding(rule_id=item.code,message=item.message,severity=item.severity,
+        object_id=module,source_location=item.source_location,details=item.details) for item in result.findings)
+    imports = tuple(sorted({imported for item in ast.walk(tree) if isinstance(item,(ast.Import,ast.ImportFrom)) for imported in import_modules(item)}))
+    return BaseLibModuleReport(module,path,len(source_text.splitlines()),len(source_text.encode()),
+        counter.function_count,counter.branch_count,counter.max_nesting_depth,imports,findings)
 
 
 def build_base_lib_scan_report(
@@ -238,185 +237,6 @@ def _module_name(path: Path, *, root: Path) -> str:
     return ".".join((prefix, *parts)) if parts else prefix
 
 
-class _BaseLibAstScanner(ast.NodeVisitor):
-    def __init__(self, *, path: str, module: str, policy: PurityPolicy) -> None:
-        self.path = path
-        self.module = module
-        self.policy = policy
-        self.imports: set[str] = set()
-        self.findings: list[BaseLibFinding] = []
-        self.import_aliases: dict[str, str] = {"Path": "pathlib.Path"}
-        self.imported_module_roots: set[str] = set()
-
-    def visit_Module(self, node: ast.Module) -> None:
-        for stmt in node.body:
-            kind = module_statement_kind(stmt)
-            if kind in {"import", "definition"}:
-                self.visit(stmt)
-            elif kind == "assignment":
-                self._visit_module_assignment(stmt)
-            elif kind != "docstring":
-                self._add(
-                    "BASE_LIB.TOP_LEVEL_SIDE_EFFECT",
-                    "base_lib top level may only contain imports, definitions, immutable constants, and docstrings",
-                    stmt,
-                )
-
-    def visit_Import(self, node: ast.Import) -> None:
-        self._check_import_node(node)
-
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        module = node.module or ""
-        if process_argv_import_is_forbidden(
-            module,
-            {alias.name for alias in node.names},
-        ):
-            self._add(
-                "BASE_LIB.BANNED_IMPORT",
-                "base_lib must not import process sys.argv",
-                node,
-            )
-        self._check_import_node(node)
-
-    def visit_Call(self, node: ast.Call) -> None:
-        violation_code, forbidden = call_violation(
-            node,
-            aliases=self.import_aliases,
-            effect_scope=EFFECT_SCOPE_NONE,
-            imported_roots=self.imported_module_roots,
-        )
-        if violation_code:
-            self._add(
-                "BASE_LIB.SIDE_EFFECT_CALL",
-                f"base_lib banned side-effect call: {forbidden}",
-                node,
-            )
-        self.generic_visit(node)
-
-    def visit_Assign(self, node: ast.Assign) -> None:
-        record_assignment_aliases(node, self.import_aliases)
-        self.generic_visit(node)
-
-    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
-        record_assignment_aliases(node, self.import_aliases)
-        self.generic_visit(node)
-
-    def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
-        record_assignment_aliases(node, self.import_aliases)
-        self.generic_visit(node)
-
-    def visit_Attribute(self, node: ast.Attribute) -> None:
-        reference = process_argv_reference(node, self.import_aliases)
-        if reference:
-            self._add(
-                "BASE_LIB.SIDE_EFFECT_CALL",
-                f"base_lib banned process argument access: {reference}",
-                node,
-            )
-        self.generic_visit(node)
-
-    def visit_Subscript(self, node: ast.Subscript) -> None:
-        reference = dynamic_namespace_reference(
-            node,
-            aliases=self.import_aliases,
-            imported_roots=self.imported_module_roots,
-        )
-        if reference:
-            self._add(
-                "BASE_LIB.SIDE_EFFECT_CALL",
-                f"base_lib banned dynamic module namespace lookup: {reference}",
-                node,
-            )
-        self.generic_visit(node)
-
-    def visit_Raise(self, node: ast.Raise) -> None:
-        if not isinstance(node.exc, ast.Call):
-            reference = system_exit_reference(node.exc, self.import_aliases)
-            if reference and system_exit_is_forbidden(EFFECT_SCOPE_NONE):
-                self._add(
-                    "BASE_LIB.SIDE_EFFECT_CALL",
-                    f"base_lib banned process exit: {reference}",
-                    node,
-                )
-        self.generic_visit(node)
-
-    def visit_Global(self, node: ast.Global) -> None:
-        self._add(
-            "BASE_LIB.GLOBAL_STATE",
-            "base_lib must not use global mutation",
-            node,
-        )
-
-    def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
-        self._add(
-            "BASE_LIB.GLOBAL_STATE",
-            "base_lib must not use nonlocal mutation",
-            node,
-        )
-
-    def _visit_module_assignment(self, node: ast.Assign | ast.AnnAssign) -> None:
-        if _is_base_lib_info_assignment(node):
-            self.visit(node)
-            return
-        if not module_assignment_is_allowed(node):
-            self._add(
-                "BASE_LIB.GLOBAL_STATE",
-                "base_lib must not hold mutable module-level state",
-                node,
-            )
-        self.visit(node)
-
-    def _check_import_node(self, node: ast.Import | ast.ImportFrom) -> None:
-        self.import_aliases.update(import_aliases_from_node(node))
-        self.imported_module_roots.update(imported_module_roots(node))
-        for module in import_modules(node):
-            self._check_import(module, node)
-
-    def _check_import(self, module: str, node: ast.AST) -> None:
-        self.imports.add(module)
-        if any(
-            part in FORBIDDEN_PROJECT_IMPORT_PARTS for part in module.split(".")
-        ):
-            self._add(
-                "BASE_LIB.FORBIDDEN_PROJECT_IMPORT",
-                "base_lib must not import node, plugin, boundary, runtime, or "
-                f"side-effect layer: {module}",
-                node,
-            )
-            return
-        if module_matches(module, self.policy.banned_base_lib_modules):
-            self._add(
-                "BASE_LIB.BANNED_MODULE",
-                f"base_lib module is banned by policy: {module}",
-                node,
-            )
-            return
-        if import_violation_code(
-            module,
-            effect_scope=EFFECT_SCOPE_NONE,
-            policy=self.policy,
-        ):
-            self._add(
-                "BASE_LIB.BANNED_IMPORT",
-                f"base_lib banned import: {module}",
-                node,
-            )
-
-    def _add(self, rule_id: str, message: str, node: ast.AST) -> None:
-        self.findings.append(
-            _finding(
-                rule_id,
-                message,
-                path=self.path,
-                module=self.module,
-                line=getattr(node, "lineno", None),
-                column=(getattr(node, "col_offset", 0) + 1)
-                if hasattr(node, "col_offset")
-                else None,
-            )
-        )
-
-
 class _ComplexityCounter(ast.NodeVisitor):
     def __init__(self) -> None:
         self.function_count = 0
@@ -459,57 +279,6 @@ class _ComplexityCounter(ast.NodeVisitor):
         self._nesting -= 1
 
 
-def _size_findings(
-    path: str,
-    module: str,
-    text: str,
-    *,
-    policy: PurityPolicy,
-) -> tuple[BaseLibFinding, ...]:
-    facts = ImplementationMetrics(
-        source_lines=len(text.splitlines()), source_bytes=len(text.encode("utf-8"))
-    )
-    return _numeric_findings(path, module, facts, policy, prefix="BASE_LIB.SOURCE.")
-
-
-def _complexity_findings(
-    path: str,
-    module: str,
-    counter: _ComplexityCounter,
-    *,
-    policy: PurityPolicy,
-) -> tuple[BaseLibFinding, ...]:
-    facts = ImplementationMetrics(
-        function_count=counter.function_count,
-        branch_count=counter.branch_count,
-        max_nesting_depth=counter.max_nesting_depth,
-    )
-    return _numeric_findings(path, module, facts, policy, prefix="BASE_LIB.COMPLEXITY.")
-
-
-def _numeric_findings(
-    path: str,
-    module: str,
-    facts: ImplementationMetrics,
-    policy: PurityPolicy,
-    *,
-    prefix: str,
-) -> tuple[BaseLibFinding, ...]:
-    return tuple(
-        _finding(
-            item.rule_id,
-            item.message,
-            path=path,
-            module=module,
-            details=item.details,
-        )
-        for item in evaluate_base_lib_implementation(
-            facts, ImplementationLimits.from_policy(policy)
-        )
-        if item.rule_id.startswith(prefix)
-    )
-
-
 def _dependency_closure_findings(
     reports: dict[str, BaseLibModuleReport],
     edges: tuple[tuple[str, str], ...],
@@ -548,16 +317,6 @@ def _resolve_base_lib_import(
         ):
             return candidate
     return ""
-
-
-def _is_base_lib_info_assignment(node: ast.Assign | ast.AnnAssign) -> bool:
-    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-    if not any(
-        isinstance(target, ast.Name) and target.id == "BASE_LIB_INFO"
-        for target in targets
-    ):
-        return False
-    return isinstance(node.value, (ast.Call, ast.Dict))
 
 
 def _is_base_lib_module(module: str) -> bool:

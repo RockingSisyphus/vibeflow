@@ -1,4 +1,5 @@
 from tests.fixtures.support.strict_support import *
+from tests.fixtures.support.rule_inspection import _valid_node_source, _inspect_node_source, write_registry_project
 
 def test_node_base_lib_dependency_chain_warning_and_error(tmp_path, capsys, monkeypatch) -> None:
     _clear_base_lib_modules()
@@ -93,76 +94,26 @@ def test_policy_default_discovery_explicit_and_inline_merge_order(tmp_path) -> N
     config_path = tmp_path / "workflow.jsonc"
     discovered_path = tmp_path / "kernel_policy.jsonc"
     explicit_path = tmp_path / "explicit_policy.jsonc"
-    config_path.write_text(
-        json.dumps(
-            {
-                "policy": {
-                    "node_source": {"max_bytes": 3000},
-                    "imports": {"allowed_roots": ["inline_allowed"]},
-                    "rules": {
-                        "downgrades": [
-                            {
-                                "rule_id": "NODE.SOURCE.MAX_LINES",
-                                "to": "warning",
-                                "scope": {"node": "inline"},
-                                "reason": "inline",
-                                "expires": "2026-12-31",
-                            }
-                        ]
-                    },
-                },
-                "pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])]},
-            }
-        ),
-        encoding="utf-8",
-    )
-    discovered_path.write_text(
-        '{"node_source": {"max_lines": 400}, "imports": {"allowed_roots": ["discovered"]}}',
-        encoding="utf-8",
-    )
-    explicit_path.write_text(
-        json.dumps(
-            {
-                "policy": {
-                    "node_source": {"max_lines": 250},
-                    "imports": {"allowed_roots": ["explicit"]},
-                    "rules": {
-                        "downgrades": [
-                            {
-                                "rule_id": "NODE.IMPORT.BANNED",
-                                "to": "info",
-                                "scope": {"node": "explicit"},
-                                "reason": "explicit",
-                                "expires": "2026-12-31",
-                            }
-                        ],
-                        "exemptions": [
-                            {
-                                "rule_id": "NODE.IMPORT.BANNED",
-                                "scope": {"node": "explicit"},
-                                "reason": "explicit",
-                                "expires": "2026-12-31",
-                            }
-                        ],
-                    },
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-    document = load_config_document(config_path)
-    result = resolve_effective_policy(document.data, config_path=config_path, explicit_policy_path=explicit_path)
+    config_path.write_text(json.dumps({"policy": {"node_source": {"max_bytes": 3000}, "imports": {"allowed_roots": ["inline_allowed"]}},
+        "pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.")]}}), encoding="utf-8")
+    discovered_path.write_text('{"node_source": {"max_lines": 400}, "imports": {"allowed_roots": ["discovered"]}}', encoding="utf-8")
+    explicit_path.write_text('{"policy": {"node_source": {"max_lines": 250}, "imports": {"allowed_roots": ["explicit"]}}}', encoding="utf-8")
+    result = resolve_effective_policy(load_config_document(config_path).data, config_path=config_path, explicit_policy_path=explicit_path)
     policy = result.effective_policy.to_dict()
     assert result.findings == ()
     assert policy["node_source"]["max_lines"] == 250
     assert policy["node_source"]["max_bytes"] == 3000
     assert policy["imports"]["allowed_roots"] == ["inline_allowed"]
-    assert len(policy["rules"]["downgrades"]) == 2
-    assert len(policy["rules"]["exemptions"]) == 1
     assert policy["sources"][0] == "kernel.default_policy"
     assert f"project.policy:{discovered_path}" in policy["sources"]
     assert f"project.policy:{explicit_path}" in policy["sources"]
     assert policy["sources"][-1] == "config.inline_policy"
+
+
+def test_policy_diagnostic_filters_are_replaced_by_rule_graph_configuration(tmp_path) -> None:
+    document = {"policy": {"rules": {"downgrades": [{"rule_id": "NODE.IMPORT.BANNED", "to": "warning"}]}}}
+    result = resolve_effective_policy(document, config_path=tmp_path / "workflow.jsonc")
+    assert any(item.code == "CONFIG.POLICY.RULES.REMOVED" for item in result.findings)
 
 def test_policy_discovery_prefers_kernel_policy_over_governance(tmp_path) -> None:
     config_path = tmp_path / "workflow.json"
@@ -210,6 +161,7 @@ def test_schema_validation_rejects_policy_bool_as_int() -> None:
     assert any(finding.rule_id == "CONFIG.SCHEMA.POLICY_POSITIVE_INT" for finding in findings)
 
 def test_cli_validate_jsonc_outputs_effective_policy(tmp_path, capsys) -> None:
+    write_registry_project(tmp_path, _registry(), ("test.start", "test.seed", "test.add", "test.out_end"))
     config_path = tmp_path / "workflow.jsonc"
     config_path.write_text(
         """
@@ -233,13 +185,19 @@ def test_cli_validate_jsonc_outputs_effective_policy(tmp_path, capsys) -> None:
 """.strip(),
         encoding="utf-8",
     )
-    code = cli_main(["validate", "--config", str(config_path), "--json"])
+    document = json.loads(config_path.read_text().replace("// explicit edges define the graph", ""))
+    policy = document.pop("policy")
+    config_path.write_text(json.dumps(document), encoding="utf-8")
+    workspace_path = tmp_path / "vibeflow_config.jsonc"
+    workspace_path.write_text(json.dumps({"policy": policy, "roots": [{"id": "project", "path": "."}]}), encoding="utf-8")
+    code = cli_main(["validate", "--config", str(config_path), "--workspace", str(workspace_path), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert code == 0
-    assert payload["status"] == "PASS"
+    assert payload["status"] == "CONCERNS"
+    assert {item["code"] for item in payload["warnings"]} == {"GRAPH.SMELL.DUPLICATE_LOGIC"}
     assert payload["effective_policy"]["node_source"]["max_lines"] == 222
     assert payload["effective_policy"]["base_lib"]["allowed_modules"] == ["shared.math"]
-    assert payload["effective_policy"]["sources"][-1] == "config.inline_policy"
+    assert payload["effective_policy"]["sources"][-1] == f"workspace.policy:{workspace_path}"
 
 def test_cli_validate_bad_jsonc_reports_syntax_layer(tmp_path, capsys) -> None:
     config_path = tmp_path / "bad.jsonc"
@@ -282,6 +240,7 @@ def test_cli_validate_topology_error_reports_topology_layer(tmp_path, capsys) ->
     assert payload["errors"][0]["failure_layer"] == "topology"
 
 def test_cli_validate_explicit_policy_path_and_inspect_config(tmp_path, capsys) -> None:
+    write_registry_project(tmp_path, _registry(), ("test.start", "test.seed", "test.add", "test.out_end"))
     config_path = tmp_path / "workflow.json"
     policy_path = tmp_path / "policy.jsonc"
     config_path.write_text(
@@ -305,12 +264,9 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
     project = _repo_root() / "sandbox" / "python" / "minimal"
     _clear_base_lib_modules()
     monkeypatch.syspath_prepend(str(project))
-    module = _load_module_from_path(project / "nodes.py", "_minimal_project_nodes")
-    registry = NodeRegistry()
-    register_node(registry, "example.start", module.StartNode)
-    register_node(registry, "example.end", module.EndNode)
-    register_node(registry, "example.seed", module.SeedNode, {"value": {"type": "number"}}, {"value": 1})
-    register_node(registry, "example.add", module.AddNode, {"delta": {"type": "number"}}, {"delta": 1})
+    from vibeflow.tooling.project.workspace_loader import load_project_workspace
+    from vibeflow.tooling.application.python.project.declarations import declared_python_registry
+    registry = declared_python_registry(load_project_workspace(project))
 
     result = run_checked(
         project / "config.jsonc",
@@ -321,7 +277,7 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
 
     assert result.context.get("value.out")["value"] == 5
     assert result.health.status == "CONCERNS"
-    assert "plugin.policy:minimal_project_policy" in result.health.effective_policy["sources"]
+    assert result.health.info["rule_executions"]
     assert result.health.effective_policy["base_lib"]["allowed_modules"] == ["base_lib.math_tools"]
     assert (result.run_dir / "compiled_graph.json").exists()
     assert (result.run_dir / "graph.txt").exists()

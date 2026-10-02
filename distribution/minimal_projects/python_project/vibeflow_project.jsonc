@@ -1,6 +1,5 @@
 {
   "project_target": "python",
-  "registry": "registry.py:build_node_registry",
   "quality_enabled": true,
   "runtime": {
     "async_max_workers": 4,
@@ -13,6 +12,11 @@
         "workflow": "configs/main.jsonc",
         "document": "ARCHITECTURE.jsonc"
       }
+    ]
+  },
+  "descriptors": {
+    "nodes": [
+      "manifests/nodes"
     ]
   }
 }

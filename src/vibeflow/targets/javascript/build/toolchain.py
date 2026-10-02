@@ -198,6 +198,31 @@ def run_audit_driver(
     return DriverAuditResult(toolchain=info)
 
 
+@dataclass(frozen=True)
+class DriverRuleResult:
+    toolchain: AuditToolchainInfo
+    findings: tuple[Mapping[str, Any], ...]
+    sources: tuple[Mapping[str, Any], ...]
+
+
+def run_rule_check_driver(
+    request: Mapping[str, Any], *, package_root: str | Path,
+    node_command: str = "node",
+) -> DriverRuleResult:
+    """Run only source-analysis topics requested by a selected Rule."""
+    root = _validated_package_root(package_root)
+    payload = _run_driver({**dict(request), "command": "rule-check", "packageRoot": str(root), "target": "neutral", "profile": "", "contractCheckFiles": []}, node_command=node_command)
+    probe, result = payload.get("probe"), payload.get("rules")
+    if not isinstance(probe, Mapping) or not isinstance(result, Mapping):
+        raise AotToolchainError("VF_PROTOCOL", "source Rule driver omitted its result")
+    findings, sources = result.get("findings"), result.get("sources")
+    if not isinstance(findings, list) or not isinstance(sources, list) or not all(isinstance(value, Mapping) for value in (*findings, *sources)):
+        raise AotToolchainError("VF_PROTOCOL", "source Rule driver returned invalid results")
+    info = AuditToolchainInfo(str(probe.get("node", "")), str(probe.get("typescript", "")))
+    _validate_audit_versions(info)
+    return DriverRuleResult(info, tuple(findings), tuple(sources))
+
+
 def run_quality_facts_driver(
     request: Mapping[str, Any],
     *,
@@ -493,6 +518,8 @@ __all__ = [
     "ToolchainInfo",
     "probe_toolchain",
     "run_audit_driver",
+    "run_rule_check_driver",
+    "DriverRuleResult",
     "run_quality_facts_driver",
     "run_build_driver",
 ]

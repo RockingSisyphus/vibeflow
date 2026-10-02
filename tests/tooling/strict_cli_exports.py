@@ -1,8 +1,8 @@
+from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
 
 
-class CliExternalNode:
-    NODE_INFO = NodeInfo(
+CliExternalNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.cli_external",
         display_name="CLI External",
         category="test",
@@ -10,8 +10,9 @@ class CliExternalNode:
         version="0.1.0",
         flow_kind="process",
         external=True,
-    )
-    CONTRACT = NodeContract()
+    ), NodeContract(), rulesets=("vibeflow.process",))
+
+class CliExternalNode:
 
     def run_pure(self, inputs, params):
         return {}
@@ -125,7 +126,7 @@ class Plugin:
                 "plugins": [
                     {
                         "module": str(plugin_path),
-                        "type": "policy",
+                        "type": "runtime",
                         "display_name": "Config Policy",
                         "category": "policy",
                         "description": "Config-level policy declaration.",
@@ -133,7 +134,7 @@ class Plugin:
                     },
                     {
                         "name": "future_policy",
-                        "type": "policy",
+                        "type": "runtime",
                         "status": "planned",
                         "display_name": "Future Policy",
                         "category": "policy",
@@ -244,7 +245,7 @@ def test_cli_workspace_mermaid_and_collapsed_svg_keep_external_registry_metadata
     import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render_module
 
     registry = NodeRegistry()
-    register_node(registry, "test.cli_external", CliExternalNode)
+    register_node(registry, CliExternalNode_DECLARATION, CliExternalNode)
     graph = parse_graph_config(
         {
             "pipeline": {

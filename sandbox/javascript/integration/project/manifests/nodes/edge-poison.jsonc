@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.edge_poison",
   "display_name": "Edge poison",
   "category": "sandbox",

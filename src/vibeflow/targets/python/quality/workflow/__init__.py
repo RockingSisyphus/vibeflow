@@ -8,10 +8,6 @@ from importlib import import_module
 _EXPORTS = {
     "HealthFinding": ("vibeflow.core.findings", "HealthFinding"),
     "HealthReport": ("vibeflow.core.findings", "HealthReport"),
-    "PythonNodeQualityFacts": (
-        "vibeflow.targets.python.quality.workflow.facts",
-        "PythonNodeQualityFacts",
-    ),
     "append_dependency_chain_findings": (
         "vibeflow.targets.python.quality.workflow.base_lib",
         "append_dependency_chain_findings",

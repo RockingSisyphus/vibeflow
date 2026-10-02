@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibeflow.local/schema/bundle.schema.json",
+  "title": "VibeFlow ContributionBundle",
+  "type": "object",
+  "required": [
+    "kind",
+    "id"
+  ],
+  "properties": {
+    "kind": {
+      "const": "bundle"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "categories": {"$ref": "#/$defs/references"},
+        "nodes": {"$ref": "#/$defs/references"},
+        "rules": {"$ref": "#/$defs/references"},
+        "rulesets": {"$ref": "#/$defs/references"},
+        "base_lib": {"$ref": "#/$defs/references"},
+        "data_schemas": {"$ref": "#/$defs/references"},
+        "capabilities": {"$ref": "#/$defs/references"},
+        "host_extensions": {"$ref": "#/$defs/references"},
+        "plugins": {"$ref": "#/$defs/references"},
+        "bundles": {"$ref": "#/$defs/references"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "references": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "additionalProperties": false
+}

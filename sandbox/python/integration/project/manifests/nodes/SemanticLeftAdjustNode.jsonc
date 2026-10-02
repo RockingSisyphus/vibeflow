@@ -1,0 +1,77 @@
+{
+  "kind": "node",
+  "type_key": "semantic.left_adjust",
+  "display_name": "Semantic Left Adjust",
+  "category": "semantic",
+  "description": "Adds a configured bonus to calc.scaled after the left decision branch is selected.",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "calc.scaled",
+        "cardinality": "exactly_one",
+        "display_name": "calc.scaled"
+      }
+    ],
+    "provides": [
+      {
+        "key": "calc.left_branch",
+        "type": "branch_result",
+        "display_name": "calc.left_branch"
+      }
+    ],
+    "input_semantics": {
+      "calc.scaled": [
+        "scaled arithmetic value selected for the left branch"
+      ]
+    },
+    "output_semantics": {
+      "calc.left_branch": [
+        "left branch value after adding bonus"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "calc.scaled": {
+            "key": "calc.scaled",
+            "type": "calc.scaled",
+            "value": 21,
+            "source_node": "example"
+          }
+        },
+        "params": {
+          "bonus": 10
+        }
+      }
+    ],
+    "params_schema": {
+      "bonus": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "bonus": 0
+    }
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_semantic_nodes.py",
+        "export": "SemanticLeftAdjustNode"
+      }
+    }
+  ]
+}

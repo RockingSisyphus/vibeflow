@@ -9,7 +9,8 @@ from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
 from vibeflow.core.flow import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, LoopSpec, NodeSpec, STATUS_PLANNED
 from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE
 from vibeflow.core.planned import effective_planned_behavior
-from vibeflow.targets.python.project.node import EFFECT_SCOPE_NONE, EFFECT_SCOPE_TRUSTED, effective_effect_scope
+from vibeflow.targets.python.project.node import EFFECT_SCOPE_TRUSTED
+from vibeflow.tooling.presentation.node_presentation import registry_descriptor, registry_category, resolve_presentation
 from vibeflow.tooling.application.python.presentation.helpers import compile_for_render
 from vibeflow.tooling.application.python.presentation.review_model import (
     edge_roles,
@@ -116,7 +117,8 @@ def _nodesets_document(graph: GraphConfig, *, registry: object | None) -> dict[s
             "status": nodeset.status,
             "planned_behavior": nodeset.planned_behavior.to_dict() if nodeset.status == STATUS_PLANNED else None,
             "flow_kind": nodeset.flow_kind,
-            "effect_scope": EFFECT_SCOPE_NONE,
+            "effect_scope": "unavailable" if nodeset.status == STATUS_PLANNED else "unconstrained",
+            "rulesets": list(nodeset.graph.rulesets),
             "reachable_from_workflow": type_key in reachable,
             "requires": requirements_to_dicts(nodeset.requires),
             "provides": providers_to_dicts(nodeset.provides),
@@ -139,6 +141,7 @@ def _graph_body_document(
         registry=registry,
     )
     return {
+        "rulesets": list(graph.rulesets),
         "inputs": providers_to_dicts(graph.inputs),
         "outputs": requirements_to_dicts(graph.outputs),
         "max_steps": graph.max_steps,
@@ -218,10 +221,9 @@ def _node_document(
         "source": source,
         "role": node_review_metadata(graph, node, registry),
         "flow_kind": node_flow_kind(node, compiled),
-        "effect_scope": compiled.effect_scopes.get(
-            node.id,
-            node_review_effect_scope(graph, node, registry),
-        ),
+        "rulesets": list(target.graph.rulesets) if target is not None else list(registry.rulesets(node.type_used)) if registry_descriptor(registry, node.type_used) is not None else [],
+        "presentation": resolve_presentation(registry_descriptor(registry, node.type_used), registry_category(registry, registry_descriptor(registry, node.type_used)), flow_kind=node_flow_kind(node, compiled), native_class=("loopNode" if node.type_used in LOOP_NODE_TYPES else "nodesetNode") if invocation is not None else "", status_class="plannedNode" if planned else "", call_style=node.style).to_dict(),
+        "effect_scope": node_review_effect_scope(graph, node, registry, compiled=compiled),
         "runtime_dispatch": _runtime_dispatch_label(node, compiled),
         "execution_lock": (
             _execution_lock_payload(
@@ -392,7 +394,8 @@ def _node_type_document(
         return _io_node_type_document(type_key)
     has_implemented_occurrence = any(node.status != STATUS_PLANNED for _, node in occurrences)
     node_cls = registry_node_class(registry, type_key) if has_implemented_occurrence else None
-    if node_cls is None:
+    descriptor = registry_descriptor(registry, type_key)
+    if descriptor is None:
         owner, node = occurrences[0]
         metadata = node_review_metadata(owner, node, registry)
         return {
@@ -402,16 +405,22 @@ def _node_type_document(
                 "display_name": metadata["display_name"],
                 "description": metadata["description"],
                 "flow_kind": node.flow_kind,
-                "effect_scope": EFFECT_SCOPE_NONE,
+                "effect_scope": "unconstrained" if has_implemented_occurrence else "unavailable",
             },
             "contract": None,
             "config": None,
+            "rulesets": [],
         }
     return {
         "type_key": type_key,
-        "source": _python_source(node_cls, roots=roots),
-        "info": _node_info_document(getattr(node_cls, "NODE_INFO", None)),
-        "contract": _node_contract_document(getattr(node_cls, "CONTRACT", None)),
+        "source": _python_source(node_cls, roots=roots) if node_cls is not None else {"implementations": [item.to_dict() for item in descriptor.implementations]},
+        "declaration": next((source_reference(root_id, root_path, registry.source_info(type_key).path)
+                             for root_id, root_path in sorted(roots.items())
+                             if source_reference(root_id, root_path, registry.source_info(type_key).path).get("path")), {}),
+        "info": {**_node_info_document(descriptor), "effect_scope": registry.effect_scope(type_key) if has_implemented_occurrence else "unavailable"},
+        "contract": _node_contract_document(descriptor.contract),
+        "rulesets": list(registry.rulesets(type_key)),
+        "presentation": resolve_presentation(descriptor, registry_category(registry, descriptor)).to_dict(),
         "config": _node_config_document(registry, type_key),
     }
 
@@ -434,7 +443,7 @@ def _loop_node_type_document(type_key: str, *, roots: Mapping[str, str]) -> dict
             "description": "Repeats one nodeset body with optional termination, carried state, collected values, and exposed outputs; an unbounded loop is valid when max_iterations is null.",
             "version": "",
             "flow_kind": "predefined",
-            "effect_scope": EFFECT_SCOPE_NONE,
+            "effect_scope": "unconstrained",
             "author": None,
             "tags": ["loop", "nodeset", "control_flow"],
             "external": False,
@@ -489,7 +498,7 @@ def _io_node_type_document(type_key: str) -> dict[str, object]:
                 "Capability."
             ),
             "flow_kind": "io",
-            "effect_scope": "terminal",
+            "effect_scope": "unconstrained",
             "external": False,
         },
         "contract": {
@@ -521,7 +530,6 @@ def _node_info_document(info: object) -> dict[str, object]:
         "description": str(getattr(info, "description", "") or ""),
         "version": str(getattr(info, "version", "") or ""),
         "flow_kind": str(getattr(info, "flow_kind", "") or ""),
-        "effect_scope": effective_effect_scope(info),
         "author": getattr(info, "author", None),
         "tags": list(getattr(info, "tags", ()) or ()),
         "external": bool(getattr(info, "external", False)),

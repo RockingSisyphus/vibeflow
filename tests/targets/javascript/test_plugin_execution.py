@@ -159,12 +159,10 @@ def _binding(
 def _build_runner(
     root: Path,
     *,
-    policy: tuple[JavascriptPluginBinding, ...] = (),
     compiler: tuple[JavascriptPluginBinding, ...] = (),
 ) -> JavascriptBuildPluginRunner:
     return JavascriptBuildPluginRunner(
         JavascriptPluginBindingPlan(
-            policy_plugins=policy,
             compiler_plugins=compiler,
         ),
         package_root=root,
@@ -173,80 +171,13 @@ def _build_runner(
     )
 
 
-@pytest.mark.parametrize(
-    ("returned", "expected_code"),
-    (
-        (
-            {"policy": {"disableCoreErrors": True}},
-            "VF_PLUGIN_POLICY",
-        ),
-        (
-            {
-                "relaxations": [
-                    {
-                        "rule": "CORE.GRAPH.INVALID",
-                        "scope": "workflow",
-                        "reason": "test must not weaken Core",
-                    }
-                ]
-            },
-            "VF_PLUGIN_POLICY",
-        ),
-        (
-            {
-                "findings": [
-                    {"severity": "error", "message": "policy rejected graph"}
-                ]
-            },
-            "VF_PLUGIN_POLICY",
-        ),
-        (
-            {"graph": {"nodes": []}},
-            "VF_PLUGIN_HOOK_RESULT",
-        ),
-    ),
-)
-def test_policy_plugin_cannot_relax_or_mutate_core_contracts(
-    plugin_package: Path,
-    returned: dict[str, object],
-    expected_code: str,
-) -> None:
-    binding = _binding(
-        plugin_package,
-        f"policy_{expected_code.lower()}",
-        "policy",
-        "export function createPlugin() {\n"
-        "  return { extendPolicy() { return "
-        + json.dumps(returned)
-        + "; } };\n"
-        "}\n",
-    )
-
-    with _build_runner(plugin_package, policy=(binding,)) as runner:
-        with pytest.raises(JavascriptPluginError) as failure:
-            runner.validate_policy({"nodes": [], "nodesets": {}})
-
-    assert failure.value.code == expected_code
-
-
-def test_policy_hook_exception_is_a_stable_plugin_failure(
-    plugin_package: Path,
-) -> None:
-    binding = _binding(
-        plugin_package,
-        "policy_throw",
-        "policy",
-        "export function createPlugin() {\n"
-        "  return { validateGraph() { throw new Error('policy exploded'); } };\n"
-        "}\n",
-    )
-
-    with _build_runner(plugin_package, policy=(binding,)) as runner:
-        with pytest.raises(JavascriptPluginError) as failure:
-            runner.validate_policy({"nodes": [], "nodesets": {}})
-
-    assert failure.value.code == "VF_PLUGIN_HOOK_RESULT"
-    assert "validateGraph" in str(failure.value)
+@pytest.mark.parametrize("hook", ("extendPolicy", "validateNode", "validateGraph", "validateNodeset", "validateCompiledGraph"))
+def test_plugin_v2_rejects_removed_review_hooks(plugin_package: Path, hook: str) -> None:
+    binding = _binding(plugin_package, "removed_hook", "compiler", f"export function createPlugin() {{ return {{ {hook}() {{ return {{}}; }} }}; }}")
+    with pytest.raises(JavascriptPluginError) as failure:
+        with _build_runner(plugin_package, compiler=(binding,)):
+            pass
+    assert failure.value.code == "VF_PLUGIN_ABI"
 
 
 def test_compiler_plugin_hooks_keep_one_instance_and_order(
@@ -270,11 +201,6 @@ export function createPlugin() {
       phase = 2;
       return { annotation: { phase: "after" } };
     },
-    validateCompiledGraph() {
-      if (phase !== 2) throw new Error("validateCompiledGraph order");
-      phase = 3;
-      return { annotation: { phase: "validate" } };
-    },
   };
 }
 """,
@@ -288,12 +214,10 @@ export function createPlugin() {
     assert [item["hook"] for item in report.annotations] == [
         "beforeCompile",
         "afterCompile",
-        "validateCompiledGraph",
     ]
     assert [item["phase"] for item in report.annotations] == [
         "before",
         "after",
-        "validate",
     ]
 
 
@@ -309,9 +233,6 @@ export function createPlugin() {
   return {
     beforeCompile() { return { annotation: { phase: "before" } }; },
     afterCompile() { throw new Error("compiler exploded"); },
-    validateCompiledGraph() {
-      return { annotation: { phase: "must-not-run" } };
-    },
   };
 }
 """,
@@ -327,119 +248,21 @@ export function createPlugin() {
     assert [item["phase"] for item in report.annotations] == ["before"]
 
 
-def test_immediate_plugin_rejects_async_hook_at_static_validation(
-    plugin_package: Path,
-) -> None:
-    binding = _binding(
-        plugin_package,
-        "immediate_async",
-        "runtime",
-        """
-export function createPlugin() {
-  return { async beforeRun() { await Promise.resolve(); } };
-}
-""",
-    )
-
-    from vibeflow.targets.javascript.build.plugin_session import (
-        JavascriptPluginSession,
-    )
-
+def test_immediate_plugin_rejects_async_hook_at_invocation(plugin_package: Path) -> None:
+    from vibeflow.targets.javascript.build.plugin_session import JavascriptPluginSession
+    binding = _binding(plugin_package, "immediate_async", "runtime", "export function createPlugin() { return {async beforeRun() { await Promise.resolve(); }}; }")
     with JavascriptPluginSession() as session:
+        session.open("runtime:immediate", plugin=binding.to_dict(), package_root=plugin_package, target="node", workflow_id="plugin.test")
         with pytest.raises(JavascriptPluginError) as failure:
-            session.open(
-                "runtime:immediate",
-                plugin=binding.to_dict(),
-                package_root=plugin_package,
-                target="node",
-                workflow_id="plugin.test",
-            )
-
-    assert failure.value.code == "VF_PLUGIN_TYPECHECK"
-    diagnostics = failure.value.details.get("diagnostics", [])
-    assert any(
-        item.get("code") == "VF_COMPLETION_IMMEDIATE_PROMISE"
-        for item in diagnostics
-        if isinstance(item, dict)
-    )
+            session.invoke("runtime:immediate", "beforeRun", {})
+    assert failure.value.code == "VF_PLUGIN_COMPLETION"
 
 
-@pytest.mark.parametrize(
-    ("plugin_type", "source", "expected_diagnostic"),
-    (
-        (
-            "policy",
-            """
-let sharedRuns = 0;
-export function createPlugin() {
-  return {
-    validateGraph() { sharedRuns += 1; return {}; },
-  };
-}
-""",
-            "VF_MODULE_STATE",
-        ),
-        (
-            "policy",
-            """
-const shared = { runs: 0 };
-export function createPlugin() {
-  return {
-    validateGraph() { shared.runs += 1; return {}; },
-  };
-}
-""",
-            "VF_MODULE_STATE",
-        ),
-        (
-            "compiler",
-            """
-type TestGlobal = typeof globalThis & { __vfCompilerLeak?: number };
-export function createPlugin() {
-  return {
-    beforeCompile() {
-      (globalThis as TestGlobal).__vfCompilerLeak = 1;
-      return {};
-    },
-  };
-}
-""",
-            "VF_PLUGIN_HOST_IO",
-        ),
-    ),
-)
-def test_build_time_plugin_rejects_shared_module_or_host_global_state(
-    plugin_package: Path,
-    plugin_type: str,
-    source: str,
-    expected_diagnostic: str,
-) -> None:
-    binding = _binding(
-        plugin_package,
-        f"{plugin_type}_shared_state",
-        plugin_type,
-        source,
-    )
-    runner = _build_runner(
-        plugin_package,
-        policy=(binding,) if plugin_type == "policy" else (),
-        compiler=(binding,) if plugin_type == "compiler" else (),
-    )
-
-    with pytest.raises(JavascriptPluginError) as failure:
-        with runner:
-            if plugin_type == "policy":
-                runner.validate_policy({"nodes": [], "nodesets": {}})
-            else:
-                runner.before_compile({"nodes": []})
-
-    assert failure.value.code == "VF_PLUGIN_TYPECHECK"
-    diagnostics = failure.value.details.get("diagnostics", [])
-    assert expected_diagnostic in {
-        item.get("code")
-        for item in diagnostics
-        if isinstance(item, dict)
-    }
+def test_compiler_lifecycle_can_use_module_state(plugin_package: Path) -> None:
+    binding = _binding(plugin_package, "compiler_state", "compiler", "let runs = 0; export function createPlugin() { return {beforeCompile() { runs += 1; return {annotation: {runs}}; }}; }")
+    with _build_runner(plugin_package, compiler=(binding,)) as runner:
+        runner.before_compile({})
+        assert runner.report().annotations[0]["runs"] == 1
 
 
 def _write_json(path: Path, value: object) -> None:
@@ -649,7 +472,6 @@ def test_real_build_packages_only_runtime_plugins_and_omits_planned_source(
     assert [
         item["id"] for item in manifest["plugins"]["active"]
     ] == [
-        "sandbox.policy_audit",
         "sandbox.compiler_audit",
         "sandbox.runtime_audit",
     ]
@@ -721,7 +543,7 @@ export function createPlugin() {
         ),
     ),
 )
-def test_real_runtime_plugin_rejects_shared_module_or_host_global_state(
+def test_real_runtime_plugin_supports_selected_lifecycle_authority(
     javascript_project: _Project,
     source: str,
     diagnostic_code: str,
@@ -737,19 +559,8 @@ def test_real_runtime_plugin_rejects_shared_module_or_host_global_state(
         ["test.shared_state"],
     )
 
-    with pytest.raises(AotBuildError) as failure:
-        _build_project(
-            javascript_project,
-            config,
-            key=f"plugin-shared-state-{diagnostic_code.lower()}",
-        )
-
-    assert failure.value.code == "VF_IMPORT_POLICY"
-    assert diagnostic_code in {
-        item.get("code")
-        for item in failure.value.diagnostics
-        if isinstance(item, dict)
-    }
+    result = _build_project(javascript_project, config, key=f"plugin-authority-{diagnostic_code.lower()}")
+    assert result.entry.is_file()
 
 
 def test_runtime_plugin_observes_run_block_node_and_nodeset_hooks(

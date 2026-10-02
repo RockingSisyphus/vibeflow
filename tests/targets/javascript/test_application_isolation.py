@@ -12,36 +12,7 @@ import pytest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 JAVASCRIPT_SANDBOX = REPOSITORY_ROOT / "sandbox/javascript/minimal"
-PYTHON_ISOLATION_NODES = """
-from vibeflow.core import DataProvider, DataRequirement
-from vibeflow.targets.python.project import NodeContract, NodeInfo
-
-class StartNode:
-    NODE_INFO = NodeInfo("isolation.start", "Start", "isolation", "Starts the isolation workflow.", "1.0.0", "terminal")
-    CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}},))
-    def run_pure(self, inputs, params):
-        return {}
-
-class SeedNode:
-    NODE_INFO = NodeInfo("isolation.seed", "Seed", "isolation", "Produces the isolation result.", "1.0.0", "process")
-    CONTRACT = NodeContract(
-        provides=(DataProvider(key="value.out", type="value.out", display_name="Result"),),
-        output_semantics={"value.out": ("isolation result",)},
-        examples=({"inputs": {}, "params": {"value": 7}},),
-    )
-    def run_pure(self, inputs, params):
-        return {"value.out": params["value"]}
-
-class EndNode:
-    NODE_INFO = NodeInfo("isolation.end", "End", "isolation", "Consumes the isolation result.", "1.0.0", "terminal")
-    CONTRACT = NodeContract(
-        requires=(DataRequirement(type="value.out", cardinality="exactly_one", display_name="Result"),),
-        input_semantics={"value.out": ("isolation result",)},
-        examples=({"inputs": {"value.out": {"key": "value.out", "type": "value.out", "value": 7, "source_node": "seed"}}, "params": {}},),
-    )
-    def run_pure(self, inputs, params):
-        return {}
-""".strip() + "\n"
+from tools.verify_project import _PYTHON_ISOLATION_NODES as PYTHON_ISOLATION_NODES, _isolation_declarations
 
 
 def _blocked_import_finder_source(prefixes: tuple[str, ...]) -> str:
@@ -231,7 +202,7 @@ def test_python_application_run_succeeds_when_javascript_target_is_blocked(
             "vibeflow.targets.javascript",
             "vibeflow.tooling.application.javascript",
         )
-    ) + f"NODE_SOURCE = {PYTHON_ISOLATION_NODES!r}\n" + textwrap.dedent(
+    ) + f"NODE_SOURCE = {PYTHON_ISOLATION_NODES!r}\nDECLARATIONS = {_isolation_declarations()!r}\n" + textwrap.dedent(
         r'''
         import importlib.util
         import json
@@ -255,14 +226,10 @@ def test_python_application_run_succeeds_when_javascript_target_is_blocked(
         spec.loader.exec_module(module)
 
         registry = NodeRegistry()
-        registry.register("isolation.start", module.StartNode, config_schema={}, config_defaults={})
-        registry.register(
-            "isolation.seed",
-            module.SeedNode,
-            config_schema={"value": {"type": "number"}},
-            config_defaults={"value": 7},
-        )
-        registry.register("isolation.end", module.EndNode, config_schema={}, config_defaults={})
+        from vibeflow.tooling.project.descriptor_parser import parse_descriptor_manifest
+        for data in DECLARATIONS:
+            descriptor = parse_descriptor_manifest(data)
+            registry.register(descriptor, getattr(module, data["implementations"][0]["source"]["export"]))
 
         config = root / "workflow.jsonc"
         config.write_text(json.dumps({

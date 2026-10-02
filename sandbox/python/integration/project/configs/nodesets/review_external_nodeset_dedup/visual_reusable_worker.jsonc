@@ -34,7 +34,12 @@
         "id": "worker_end",
         "type_used": "semantic.async_value_end",
         "display_name": "Worker End",
-        "description": "Ends one reusable worker invocation."
+        "description": "Ends one reusable worker invocation.",
+        "similar_to": {
+          "node": "worker_start",
+          "relationship": "variant",
+          "reason": "The worker boundaries intentionally use the same empty return while entering and closing one invocation."
+        }
       }
     ],
     "edges": [

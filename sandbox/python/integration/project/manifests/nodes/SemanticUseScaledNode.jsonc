@@ -1,0 +1,69 @@
+{
+  "kind": "node",
+  "type_key": "semantic.use_scaled",
+  "display_name": "Semantic Use Scaled",
+  "category": "semantic",
+  "description": "Promotes calc.scaled to calc.branch so finalization has one stable input key.",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "calc.scaled",
+        "cardinality": "exactly_one",
+        "display_name": "calc.scaled"
+      }
+    ],
+    "provides": [
+      {
+        "key": "calc.branch",
+        "type": "calc.branch",
+        "display_name": "calc.branch"
+      }
+    ],
+    "input_semantics": {
+      "calc.scaled": [
+        "scaled arithmetic value"
+      ]
+    },
+    "output_semantics": {
+      "calc.branch": [
+        "branch value copied from calc.scaled"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "calc.scaled": {
+            "key": "calc.scaled",
+            "type": "calc.scaled",
+            "value": 21,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_semantic_nodes.py",
+        "export": "SemanticUseScaledNode"
+      }
+    }
+  ]
+}

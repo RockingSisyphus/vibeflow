@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 
 from tests.fixtures.support.strict_support import _nodeset_config, _seed_add_pipeline, _seed_only_pipeline, cli_main
+from tests.fixtures.support.declarations import write_node_manifests
 
 from vibeflow.tooling.project.config_loader import load_raw_config_document
 from vibeflow.tooling.application.python.presentation.architecture_document import ARCHITECTURE_DOCUMENT_HEADER
@@ -36,7 +37,7 @@ def _write_architecture_workspace(
     )
     project_config: dict[str, object] = {
         "project_target": "python",
-        "registry": "registry.py:build_node_registry",
+        "descriptors": {"nodes": ["manifests/nodes"], "base_lib": ["manifests/base_lib"]},
         "quality_enabled": False,
     }
     if registered:
@@ -49,39 +50,26 @@ def _write_architecture_workspace(
         json.dumps(project_config, indent=2),
         encoding="utf-8",
     )
-    registry_lines = [
-        "from vibeflow.targets.python.project import BaseLibRegistry, NodeRegistry",
-        "from tests.fixtures.support import strict_support_runtime_nodes as nodes",
-        "",
-        "def build_node_registry():",
-        "    registry = NodeRegistry()",
-        "    registry.register('test.start', nodes.StartNode, config_schema={}, config_defaults={})",
-        "    registry.register('test.seed', nodes.SeedNode, config_schema={'value': {'type': 'number'}}, config_defaults={'value': 1})",
-        "    registry.register('test.add', nodes.AddNode, config_schema={'delta': {'type': 'number'}}, config_defaults={'delta': 1})",
-        "    registry.register('test.out_end', nodes.OutEndNode, config_schema={}, config_defaults={})",
-        "    registry.register('test.in_end', nodes.InEndNode, config_schema={}, config_defaults={})",
-        "    return registry",
-        "",
-    ]
+    write_node_manifests(project, (
+        ("test.start", "StartNode", {}, {}),
+        ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}),
+        ("test.add", "AddNode", {"delta": {"type": "number"}}, {"delta": 1}),
+        ("test.out_end", "OutEndNode", {}, {}),
+        ("test.in_end", "InEndNode", {}, {}),
+    ))
+    resource_manifests = project / "manifests" / "base_lib"
+    resource_manifests.mkdir()
     if include_resource:
-        registry_lines.extend(
-            [
-                "def build_base_lib_registry():",
-                "    registry = BaseLibRegistry()",
-                "    registry.register('fixture_lib', module='base_lib.fixture', display_name='Fixture Lib', description='Fixture resource one.')",
-                "    return registry",
-                "",
-            ]
-        )
         base_lib = project / "base_lib"
         base_lib.mkdir()
         (base_lib / "__init__.py").write_text("", encoding="utf-8")
-        (base_lib / "fixture.py").write_text(
-            "from vibeflow.targets.python.project import BaseLibInfo\n\n"
-            "BASE_LIB_INFO = BaseLibInfo('base_lib.fixture', 'Fixture Lib', 'test', 'Fixture resource one.', '0.1.0')\n",
-            encoding="utf-8",
-        )
-    (project / "registry.py").write_text("\n".join(registry_lines), encoding="utf-8")
+        (base_lib / "fixture.py").write_text("def value():\n    return 1\n", encoding="utf-8")
+        (resource_manifests / "fixture_lib.jsonc").write_text(json.dumps({
+            "kind": "base_lib", "id": "fixture_lib", "display_name": "Fixture Lib",
+            "category": "test", "description": "Fixture resource one.", "version": "0.1.0",
+            "implementations": [{"language": "python", "targets": ["python"],
+                                 "source": {"kind": "module", "ref": "base_lib.fixture"}}],
+        }), encoding="utf-8")
     workflow: dict[str, object] = {"pipeline": _seed_add_pipeline()}
     if include_resource:
         workflow["base_lib"] = {"modules": [{"id": "fixture_lib"}]}
@@ -285,12 +273,10 @@ def test_workspace_architecture_tracks_unused_imported_nodeset_changes(tmp_path)
 def test_workspace_architecture_tracks_registry_config_default_changes(tmp_path) -> None:
     workspace_path, workflow_path, document_path = _write_architecture_workspace(tmp_path)
     assert _export_registered_document(workspace_path, workflow_path, document_path) == 0
-    registry_path = document_path.parent / "registry.py"
-    registry_text = registry_path.read_text(encoding="utf-8")
-    registry_path.write_text(
-        registry_text.replace("config_defaults={'value': 1}", "config_defaults={'value': 22}"),
-        encoding="utf-8",
-    )
+    declaration_path = document_path.parent / "manifests" / "nodes" / "test-seed.jsonc"
+    declaration = json.loads(declaration_path.read_text(encoding="utf-8"))
+    declaration["contract"]["params_defaults"]["value"] = 22
+    declaration_path.write_text(json.dumps(declaration), encoding="utf-8")
 
     report = validate_workspace_config_path(
         workflow_path,
@@ -308,12 +294,10 @@ def test_workspace_architecture_tracks_active_resource_registration_changes(tmp_
         include_resource=True,
     )
     assert _export_registered_document(workspace_path, workflow_path, document_path) == 0
-    registry_path = document_path.parent / "registry.py"
-    registry_text = registry_path.read_text(encoding="utf-8")
-    registry_path.write_text(
-        registry_text.replace("Fixture resource one.", "Fixture resource changed substantially."),
-        encoding="utf-8",
-    )
+    resource_path = document_path.parent / "manifests" / "base_lib" / "fixture_lib.jsonc"
+    resource = json.loads(resource_path.read_text(encoding="utf-8"))
+    resource["description"] = "Fixture resource changed substantially."
+    resource_path.write_text(json.dumps(resource), encoding="utf-8")
 
     report = validate_workspace_config_path(
         workflow_path,
@@ -355,13 +339,8 @@ def test_workspace_architecture_gate_is_isolated_per_root(tmp_path) -> None:
     shutil.copytree(first_document.parent, second_project)
     second_workflow = second_project / "configs" / "main.jsonc"
     second_document = second_project / "ARCHITECTURE.jsonc"
-    second_registry = second_project / "registry.py"
-    second_registry.write_text(
-        "from vibeflow.targets.python.project import NodeRegistry\n\n"
-        "def build_node_registry():\n"
-        "    return NodeRegistry()\n",
-        encoding="utf-8",
-    )
+    for declaration in (second_project / "manifests" / "nodes").glob("*.jsonc"):
+        declaration.unlink()
     second_payload = json.loads(second_workflow.read_text(encoding="utf-8"))
     for node in second_payload["pipeline"]["nodes"]:
         node["type_used"] = f"second.{node['id']}"

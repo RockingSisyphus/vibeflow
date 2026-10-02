@@ -1,0 +1,113 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.optimizer_step",
+  "display_name": "Optimizer Step",
+  "category": "training",
+  "description": "Invokes a runtime-provided optimizer and returns the same objects.",
+  "version": "0.1.0",
+  "flow_kind": "global_state",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "train.model",
+        "cardinality": "exactly_one",
+        "display_name": "train.model"
+      },
+      {
+        "type": "train.optimizer",
+        "cardinality": "exactly_one",
+        "display_name": "train.optimizer"
+      },
+      {
+        "type": "train.grad",
+        "cardinality": "exactly_one",
+        "display_name": "train.grad"
+      }
+    ],
+    "provides": [
+      {
+        "key": "train.model_after",
+        "type": "train.model_after",
+        "display_name": "train.model_after"
+      },
+      {
+        "key": "train.optimizer_after",
+        "type": "train.optimizer_after",
+        "display_name": "train.optimizer_after"
+      },
+      {
+        "key": "train.step_report",
+        "type": "train.step_report",
+        "display_name": "train.step_report"
+      }
+    ],
+    "input_semantics": {
+      "train.model": [
+        "model object"
+      ],
+      "train.optimizer": [
+        "optimizer object"
+      ],
+      "train.grad": [
+        "numeric gradient"
+      ]
+    },
+    "output_semantics": {
+      "train.model_after": [
+        "same model object after step"
+      ],
+      "train.optimizer_after": [
+        "same optimizer object after step"
+      ],
+      "train.step_report": [
+        "small JSON-safe training report"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "train.model": {
+            "key": "train.model",
+            "type": "train.model",
+            "value": {},
+            "source_node": "example"
+          },
+          "train.optimizer": {
+            "key": "train.optimizer",
+            "type": "train.optimizer",
+            "value": {},
+            "source_node": "example"
+          },
+          "train.grad": {
+            "key": "train.grad",
+            "type": "train.grad",
+            "value": 0.1,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.global_state"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_training_nodes.py",
+        "export": "OptimizerStepNode"
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "kind": "node",
+  "type_key": "example.transform",
+  "display_name": "Transform",
+  "category": "data_transform",
+  "description": "One explicitly named function block.",
+  "version": "0.15.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "example.feature",
+        "cardinality": "exactly_one",
+        "display_name": "example.feature"
+      }
+    ],
+    "provides": [
+      {
+        "key": "output",
+        "type": "example.output",
+        "display_name": "output"
+      }
+    ],
+    "input_semantics": {
+      "example.feature": [
+        "Numerical input to this functional block."
+      ]
+    },
+    "output_semantics": {
+      "output": [
+        "Numerical output produced by this functional block."
+      ]
+    }
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": [
+        "browser",
+        "node"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/transform.ts",
+        "export": "run"
+      }
+    }
+  ]
+}

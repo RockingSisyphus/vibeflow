@@ -9,7 +9,7 @@ import pytest
 from vibeflow.targets.python.project.compiler import GraphCompiler
 from vibeflow.core.contracts import DataProvider, DataRequirement
 from vibeflow.tooling.project.graph_config import parse_graph_config
-from vibeflow.targets.python.project.node import NodeContract, NodeInfo
+from vibeflow.core.descriptors import NodeContractDescriptor, NodeDescriptor
 from vibeflow.block_compiler import (
     PipelineInputSpec,
     PipelineOutputSpec,
@@ -22,35 +22,40 @@ from vibeflow.targets.python.runtime.planning import build_execution_plan
 from vibeflow.targets.python.runtime.support.portable_adapter import build_workflow_plan
 
 
+_TerminalNode_DECLARATION = NodeDescriptor(
+    'test.terminal', 'Terminal', 'test', 'Starts or ends a flow.', '1', 'terminal',
+    contract=NodeContractDescriptor(params_schema={}, params_defaults={}),
+    rulesets=(),
+)
+
+
 class _TerminalNode:
-    NODE_INFO = NodeInfo("test.terminal", "Terminal", "test", "Starts or ends a flow.", "1", "terminal")
-    CONTRACT = NodeContract()
 
     def run_pure(self, inputs, params):
         return {}
 
 
+_StepNode_DECLARATION = NodeDescriptor(
+    'test.step', 'Step', 'test', 'Updates a loop value.', '1', 'process',
+    contract=NodeContractDescriptor(requires=(DataRequirement('value.current', 'exactly_one', display_name='value.current'),), provides=(DataProvider('value.next', 'value.next', display_name='value.next'), DataProvider('loop.done', 'loop.done', display_name='loop.done')), params_schema={'delta': {'type': 'number'}}, params_defaults={'delta': 1}, input_semantics={'value.current': ('Conformance input value.current.',)}, output_semantics={'value.next': ('Conformance output value.next.',), 'loop.done': ('Conformance output loop.done.',)}),
+    rulesets=('vibeflow.process',),
+)
+
+
 class _StepNode:
-    NODE_INFO = NodeInfo("test.step", "Step", "test", "Updates a loop value.", "1", "process")
-    CONTRACT = NodeContract(
-        requires=(DataRequirement("value.current", "exactly_one", display_name="value.current"),),
-        provides=(DataProvider("value.next", "value.next", display_name="value.next"), DataProvider("loop.done", "loop.done", display_name="loop.done")),
-    )
 
     def run_pure(self, inputs, params):
         return {"value.next": 1, "loop.done": True}
 
 
+_GlobalStateNode_DECLARATION = NodeDescriptor(
+    'test.global_state', 'Global State', 'test', 'Changes audited ambient state.', '1', 'global_state',
+    contract=NodeContractDescriptor(params_schema={}, params_defaults={}),
+    rulesets=('vibeflow.global_state',),
+)
+
+
 class _GlobalStateNode:
-    NODE_INFO = NodeInfo(
-        "test.global_state",
-        "Global State",
-        "test",
-        "Changes audited ambient state.",
-        "1",
-        "global_state",
-    )
-    CONTRACT = NodeContract()
 
     def run_pure(self, inputs, params):
         return {}
@@ -58,19 +63,9 @@ class _GlobalStateNode:
 
 def _registry() -> NodeRegistry:
     registry = NodeRegistry()
-    registry.register("test.terminal", _TerminalNode, config_schema={}, config_defaults={})
-    registry.register(
-        "test.step",
-        _StepNode,
-        config_schema={"delta": {"type": "number"}},
-        config_defaults={"delta": 1},
-    )
-    registry.register(
-        "test.global_state",
-        _GlobalStateNode,
-        config_schema={},
-        config_defaults={},
-    )
+    registry.register(_TerminalNode_DECLARATION, _TerminalNode)
+    registry.register(_StepNode_DECLARATION, _StepNode)
+    registry.register(_GlobalStateNode_DECLARATION, _GlobalStateNode)
     return registry
 
 

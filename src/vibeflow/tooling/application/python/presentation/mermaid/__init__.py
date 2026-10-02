@@ -1,4 +1,5 @@
 from __future__ import annotations
+from vibeflow.tooling.presentation.node_presentation import registry_descriptor, registry_category, resolve_presentation
 
 import textwrap
 from typing import TYPE_CHECKING
@@ -91,7 +92,7 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
                 "status": node.status,
                 "planned_behavior": node.planned_behavior.to_dict(),
                 "flow_kind": node_flow_kind(node, compiled),
-                "effect_scope": compiled.effect_scopes.get(node.id, EFFECT_SCOPE_NONE),
+                "effect_scope": node_review_effect_scope(graph, node, None, compiled=compiled),
                 "runtime_dispatch": _runtime_dispatch_label(node, compiled),
                 "execution_lock": (
                     node.execution_lock.to_dict()
@@ -261,20 +262,23 @@ class _MermaidRenderer:
                 flow_kind = node_flow_kind(node, compiled) or FLOW_KIND_PROCESS
                 preferred_class = self._preferred_class_for_node(flow_kind=flow_kind, is_external=is_external)
                 class_name = self._class_for_node(node_id, preferred_class=preferred_class, planned=node.status == STATUS_PLANNED)
+                presentation = self._presentation(node, node_id, native_class=preferred_class, status_class=class_name, flow_kind=flow_kind)
                 lines.append(
-                    f"{indent}{_node_shape(node_id, self._node_label(node, graph, compiled, effective_lock=effective_lock, is_external=is_external), flow_kind)}"
+                    f"{indent}{_node_shape(node_id, self._node_label(node, graph, compiled, effective_lock=effective_lock, is_external=is_external), flow_kind, shape=presentation.shape)}"
                 )
                 if class_name:
                     lines.append(f"{indent}class {node_id} {class_name};")
-                if flow_kind == FLOW_KIND_GLOBAL_STATE:
+                if presentation.shape == "cloud":
                     lines.append(f"{indent}class {node_id} {_MERMAID_CLOUD_NODE_CLASS};")
                 if is_external:
                     lines.append(f"{indent}class {node_id} externalBoundary;")
-                self._render_custom_node_style(lines, node, node_id, indent=indent)
+                lines.append(f"{indent}style {node_id} {presentation.mermaid_style()};")
                 continue
             flow_kind = node_flow_kind(node, compiled) or nodeset.flow_kind
             is_loop = node.type_used in LOOP_NODE_TYPES
-            class_name = self._class_for_node(node_id, preferred_class="loopNode" if is_loop else "nodesetNode", planned=node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED)
+            native_class = "loopNode" if is_loop else "nodesetNode"
+            class_name = self._class_for_node(node_id, preferred_class=native_class, planned=node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED)
+            presentation = self._presentation(node, node_id, native_class=native_class, status_class=class_name, flow_kind=flow_kind)
             label = (
                 self._loop_label(
                     node,
@@ -292,12 +296,12 @@ class _MermaidRenderer:
                     effective_lock=effective_lock,
                 )
             )
-            lines.append(f"{indent}{_node_shape(node_id, label, flow_kind, shape='trap-b' if is_loop else '')}")
+            lines.append(f"{indent}{_node_shape(node_id, label, flow_kind, shape=presentation.shape)}")
             if class_name:
                 lines.append(f"{indent}class {node_id} {class_name};")
-            if flow_kind == FLOW_KIND_GLOBAL_STATE:
+            if presentation.shape == "cloud":
                 lines.append(f"{indent}class {node_id} {_MERMAID_CLOUD_NODE_CLASS};")
-            self._render_custom_node_style(lines, node, node_id, indent=indent)
+            lines.append(f"{indent}style {node_id} {presentation.mermaid_style()};")
             if not should_expand:
                 continue
             group_id = _safe_id(f"{prefix}{node.id}__expanded")
@@ -465,6 +469,10 @@ class _MermaidRenderer:
         if fields:
             lines.append(f"{indent}style {node_id} {','.join(fields)};")
 
+    def _presentation(self, node: NodeSpec, node_id: str, *, native_class: str, status_class: str, flow_kind: str):
+        descriptor = registry_descriptor(self.registry, node.type_used)
+        return resolve_presentation(descriptor, registry_category(self.registry, descriptor), native_class=native_class, status_class=status_class if status_class in {"healthError", "healthWarning", "plannedNode"} else "", call_style=node.style, flow_kind=flow_kind)
+
     def _node_is_external(self, node: NodeSpec) -> bool:
         return node_is_external(node, self.registry)
 
@@ -495,6 +503,15 @@ class _MermaidRenderer:
         is_external: bool,
     ) -> str:
         sections: list[list[str]] = [[self._node_title(node, is_external=is_external)], [f"id: {node.id}", f"type_used: {node.type_used}"]]
+        descriptor = registry_descriptor(self.registry, node.type_used)
+        category = registry_category(self.registry, descriptor)
+        presentation = resolve_presentation(descriptor, category, call_style=node.style)
+        icon = presentation.values.get("icon", "")
+        if icon:
+            sections[0][0] = f"{icon} {sections[0][0]}"
+        if descriptor is not None:
+            selections = self.registry.rulesets(node.type_used)
+            sections.append([f"category: {descriptor.category}", f"rulesets: {', '.join(selections) or 'unconstrained'}"])
         source_lines = _source_lines(graph.root_id, graph.root_path, graph.source_path)
         if source_lines:
             sections.append([_section_label("source"), *source_lines])
@@ -541,10 +558,12 @@ class _MermaidRenderer:
             sections.append(planned_lines)
         if self.show_semantics:
             call_lines = [
+                f"flow_kind: {node_flow_kind(node, compiled) or nodeset.flow_kind}",
+                f"rulesets: {', '.join(nodeset.graph.rulesets) or 'unconstrained'}",
                 *_node_metadata_lines(node),
                 *_async_semantic_lines(node),
             ]
-            effect_scope = compiled.effect_scopes.get(node.id, EFFECT_SCOPE_NONE)
+            effect_scope = node_review_effect_scope(graph, node, self.registry, compiled=compiled)
             if effect_scope != EFFECT_SCOPE_NONE:
                 call_lines.append(f"effect_scope: {effect_scope}")
             call_lines.append(
@@ -591,10 +610,12 @@ class _MermaidRenderer:
         sections.append(loop_lines)
         if self.show_semantics:
             call_lines = [
+                f"flow_kind: {node_flow_kind(node, compiled) or nodeset.flow_kind}",
+                f"rulesets: {', '.join(nodeset.graph.rulesets) or 'unconstrained'}",
                 *_node_metadata_lines(node),
                 *_async_semantic_lines(node),
             ]
-            effect_scope = compiled.effect_scopes.get(node.id, EFFECT_SCOPE_NONE)
+            effect_scope = node_review_effect_scope(graph, node, self.registry, compiled=compiled)
             if effect_scope != EFFECT_SCOPE_NONE:
                 call_lines.append(f"effect_scope: {effect_scope}")
             call_lines.append(
@@ -615,11 +636,7 @@ class _MermaidRenderer:
         if node.metadata.display_name:
             title = node.metadata.display_name
         elif self.registry is not None and node.status != STATUS_PLANNED:
-            try:
-                node_cls = self.registry.get(node.type_used)
-            except Exception:
-                node_cls = None
-            info = getattr(node_cls, "NODE_INFO", None) if node_cls is not None else None
+            info = registry_descriptor(self.registry, node.type_used)
             display_name = str(getattr(info, "display_name", "")).strip() if info is not None else ""
             if display_name:
                 title = display_name
@@ -648,12 +665,9 @@ class _MermaidRenderer:
         is_external: bool,
     ) -> tuple[str, ...]:
         lines = list(_node_metadata_lines(node))
+        lines.append(f"flow_kind: {node_flow_kind(node, compiled) or 'process'}")
         if self.registry is not None and node.status != STATUS_PLANNED:
-            try:
-                node_cls = self.registry.get(node.type_used)
-            except Exception:
-                node_cls = None
-            info = getattr(node_cls, "NODE_INFO", None) if node_cls is not None else None
+            info = registry_descriptor(self.registry, node.type_used)
             if info is not None and not lines:
                 for label, value in (
                     ("category", getattr(info, "category", "")),
@@ -664,14 +678,7 @@ class _MermaidRenderer:
                     if text:
                         lines.append(f"{label}: {text}")
         lines.extend(_async_semantic_lines(node))
-        effect_scope = compiled.effect_scopes.get(
-            node.id,
-            (
-                EFFECT_SCOPE_GLOBAL_STATE
-                if node.flow_kind == FLOW_KIND_GLOBAL_STATE
-                else node_review_effect_scope(graph, node, self.registry)
-            ),
-        )
+        effect_scope = node_review_effect_scope(graph, node, self.registry, compiled=compiled)
         if effect_scope != EFFECT_SCOPE_NONE:
             lines.append(f"effect_scope: {effect_scope}")
         lines.append(

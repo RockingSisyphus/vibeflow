@@ -22,7 +22,7 @@ STATUSES = {"planned", "implemented"}
 def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
     if "rulesets" in config:
-        _validate_string_list(config["rulesets"], "rulesets", findings)
+        _validate_string_list(config["rulesets"], "rulesets", findings, "CONFIG.SCHEMA.RULESETS")
     if _is_nodeset_definition(config):
         _validate_nodeset(config, "nodeset", findings)
         if "nodeset_imports" in config:
@@ -170,6 +170,8 @@ def _validate_nodesets(value: Any, findings: list[HealthFinding]) -> None:
 
 def _validate_nodeset(item: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
     status = str(item.get("status", "implemented")).strip()
+    if "rulesets" in item:
+        _validate_string_list(item["rulesets"], f"{prefix}.rulesets", findings, "CONFIG.SCHEMA.RULESETS")
     _validate_nodeset_identity(item, prefix, findings, status=status)
     _validate_nodeset_metadata(item, prefix, findings, status=status)
     _validate_nodeset_contract(item, prefix, findings, status=status)

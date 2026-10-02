@@ -1,0 +1,8 @@
+{
+  "kind": "data_schema",
+  "type_key": "example.feature",
+  "representation": "json",
+  "schema": {
+    "type": "number"
+  }
+}

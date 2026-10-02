@@ -1,0 +1,90 @@
+{
+  "kind": "node",
+  "type_key": "semantic.loop_done",
+  "display_name": "Semantic Loop Done",
+  "category": "semantic",
+  "description": "Compares loop.next with target and emits loop.done for loop routing.",
+  "version": "0.1.0",
+  "flow_kind": "decision",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "loop.next",
+        "cardinality": "exactly_one",
+        "display_name": "loop.next"
+      }
+    ],
+    "provides": [
+      {
+        "key": "loop.done",
+        "type": "loop.done",
+        "display_name": "loop.done"
+      }
+    ],
+    "input_semantics": {
+      "loop.next": [
+        "candidate loop value after increment"
+      ]
+    },
+    "output_semantics": {
+      "loop.done": [
+        "true when loop.next is greater than or equal to target"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "loop.next": {
+            "key": "loop.next",
+            "type": "loop.next",
+            "value": 5,
+            "source_node": "example"
+          }
+        },
+        "params": {
+          "target": 7
+        }
+      },
+      {
+        "inputs": {
+          "loop.next": {
+            "key": "loop.next",
+            "type": "loop.next",
+            "value": 7,
+            "source_node": "example"
+          }
+        },
+        "params": {
+          "target": 7
+        }
+      }
+    ],
+    "params_schema": {
+      "target": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "target": 0
+    }
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_semantic_nodes.py",
+        "export": "SemanticLoopDoneNode"
+      }
+    }
+  ]
+}

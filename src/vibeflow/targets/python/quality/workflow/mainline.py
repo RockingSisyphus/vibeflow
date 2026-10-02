@@ -5,7 +5,7 @@ from vibeflow.core.findings import HealthFinding
 from vibeflow.core.mainline import analyze_mainline
 
 
-def append_mainline_health(graph, compiled, state, *, registry, owner: str = "pipeline", visited_nodesets: set[str] | None = None) -> None:
+def append_mainline_health(graph, compiled, state, *, registry, owner: str = "pipeline", visited_nodesets: set[str] | None = None, include_nested: bool = True) -> None:
     if visited_nodesets is None:
         visited_nodesets = set()
     analysis = analyze_mainline(graph, compiled.effective_edges, compiled.flow_kinds, owner=owner)
@@ -23,7 +23,7 @@ def append_mainline_health(graph, compiled, state, *, registry, owner: str = "pi
                 details=dict(finding.details),
             )
         )
-    for nodeset in graph.nodesets.values():
+    for nodeset in graph.nodesets.values() if include_nested else ():
         if nodeset.status == "planned" or nodeset.type_key in visited_nodesets:
             continue
         visited_nodesets.add(nodeset.type_key)

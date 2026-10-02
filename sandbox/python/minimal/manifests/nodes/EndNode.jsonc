@@ -1,0 +1,59 @@
+{
+  "kind": "node",
+  "type_key": "example.end",
+  "display_name": "End",
+  "category": "example",
+  "description": "Ends after value.out is produced.",
+  "version": "0.1.0",
+  "flow_kind": "terminal",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one",
+        "display_name": "value.out"
+      }
+    ],
+    "provides": [],
+    "input_semantics": {
+      "value.out": [
+        "final numeric value"
+      ]
+    },
+    "output_semantics": {},
+    "params_schema": {},
+    "params_defaults": {},
+    "examples": [
+      {
+        "inputs": {
+          "value.out": {
+            "key": "value.out",
+            "type": "value.out",
+            "value": 2,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ]
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes.py",
+        "export": "EndNode"
+      }
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "kind": "rule",
+  "id": "sandbox.domain_audit",
+  "outputs": {
+    "audit": "sandbox.audit.v1"
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": [
+        "browser",
+        "node"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "rules/domain_audit.ts",
+        "export": "check"
+      }
+    }
+  ]
+}

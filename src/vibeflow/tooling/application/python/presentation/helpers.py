@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.flow import GraphConfig, NodeSpec, STATUS_PLANNED
 from vibeflow.tooling.application.python.presentation.review_model import node_flow_kind, nodeset_for_node
+from vibeflow.tooling.presentation.node_presentation import registry_descriptor
 
 if TYPE_CHECKING:
     from vibeflow.targets.python.project.registry import NodeRegistry
@@ -13,11 +14,7 @@ if TYPE_CHECKING:
 def node_is_external(node: NodeSpec, registry) -> bool:
     if registry is None or node.status == STATUS_PLANNED:
         return False
-    try:
-        node_cls = registry.get(node.type_used)
-    except Exception:
-        return False
-    return bool(getattr(getattr(node_cls, "NODE_INFO", None), "external", False))
+    return bool(getattr(registry_descriptor(registry, node.type_used), "external", False))
 
 
 def compile_for_render(graph: GraphConfig, compiled: CompiledGraph | None, registry: NodeRegistry | None) -> CompiledGraph:

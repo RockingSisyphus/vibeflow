@@ -1,6 +1,7 @@
 """Integration gates for the Python Target runtime."""
 
 from __future__ import annotations
+from tests.fixtures.support.declarations import node_declaration, configured_declaration
 
 from hashlib import sha256
 import json
@@ -39,19 +40,19 @@ from vibeflow.targets.python.runtime import (
 EXECUTION_MODES = ("plan", "block", "compiled")
 
 
-class _DoubleNode:
-    NODE_INFO = NodeInfo(
+_DoubleNode_DECLARATION = node_declaration(NodeInfo(
         "integration.double",
         "Double",
         "integration",
         "Doubles a received number.",
         "1.0.0",
         "process",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         requires=(DataRequirement("number", "exactly_one", display_name="number"),),
         provides=(DataProvider("answer", "answer", display_name="answer"),),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class _DoubleNode:
 
     def run_pure(self, inputs, params):
         del params
@@ -409,12 +410,7 @@ def test_python_port_semantics_and_trace_match_all_execution_modes(
         }
     )
     registry = NodeRegistry()
-    registry.register(
-        "integration.double",
-        _DoubleNode,
-        config_schema={},
-        config_defaults={},
-    )
+    registry.register(configured_declaration(_DoubleNode_DECLARATION, {}, {}), _DoubleNode)
     sent: list[dict[str, object]] = []
 
     def receive(request: Mapping[str, object]) -> dict[str, object]:

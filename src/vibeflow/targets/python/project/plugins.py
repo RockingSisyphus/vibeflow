@@ -15,11 +15,6 @@ from vibeflow.targets.python.project.node import EFFECT_SCOPE_TRUSTED
 from vibeflow.targets.python.project.resources import PluginInfo, PluginResource
 
 
-class PolicyPlugin(Protocol):
-    name: str
-    priority: int
-
-
 class CompilerPlugin(Protocol):
     name: str
     priority: int
@@ -67,7 +62,6 @@ class PluginRegistry:
 
     def __init__(self) -> None:
         self._plugins: dict[str, list[object]] = {
-            "policy": [],
             "compiler": [],
             "runtime": [],
         }
@@ -77,7 +71,7 @@ class PluginRegistry:
         self,
         plugin: object,
         *,
-        plugin_type: str = "policy",
+        plugin_type: str = "runtime",
         name: str | None = None,
         priority: int | None = None,
         scope: str = "project",
@@ -138,9 +132,6 @@ class PluginRegistry:
             source_path,
         )
 
-    def policy_plugins(self) -> tuple[object, ...]:
-        return tuple(self._plugins["policy"])
-
     def compiler_plugins(self) -> tuple[object, ...]:
         return tuple(self._plugins["compiler"])
 
@@ -149,7 +140,7 @@ class PluginRegistry:
 
     def descriptors(self) -> tuple[PluginDescriptor, ...]:
         ordered: list[PluginDescriptor] = []
-        for plugin_type in ("policy", "compiler", "runtime"):
+        for plugin_type in ("compiler", "runtime"):
             for plugin in self._plugins[plugin_type]:
                 ordered.append(self._descriptors[id(plugin)])
         return tuple(ordered)
@@ -216,7 +207,7 @@ def _normalize_type(value: str) -> str:
     normalized = str(value).strip().lower()
     if normalized == "boundary":
         raise ValueError("boundary plugins are removed; use runtime plugins")
-    if normalized not in {"policy", "compiler", "runtime"}:
+    if normalized not in {"compiler", "runtime"}:
         raise ValueError(f"unknown plugin type: {value}")
     return normalized
 
@@ -224,7 +215,6 @@ __all__ = [
     "CompilerPlugin",
     "PluginDescriptor",
     "PluginRegistry",
-    "PolicyPlugin",
     "RuntimePlugin",
     "plugin_error",
 ]

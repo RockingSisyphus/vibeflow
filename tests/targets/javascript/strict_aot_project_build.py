@@ -214,6 +214,7 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
         project / "nodesets/group.jsonc",
         {
             "type_key": "demo.group",
+            "rulesets": [],
             "display_name": "Group",
             "description": "Nested group.",
             "flow_kind": "terminal",
@@ -245,6 +246,7 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
         config,
         {
             "global_config": {"delta": 3},
+            "rulesets": [],
             "nodeset_imports": ["nodesets/group.jsonc"],
             "pipeline": {
                 "inputs": [
@@ -954,7 +956,8 @@ def test_javascript_planned_global_state_renders_as_cloud_path() -> None:
     assert "class vf_runtime_state plannedNode;" in mermaid
     assert "class vf_ordinary plannedNode;" in mermaid
     assert "status: planned blocking" in mermaid
-    assert "effect_scope: global_state" in mermaid
+    assert "flow_kind: global_state" in mermaid
+    assert "effect_scope: unavailable" in mermaid
     assert "runtime_dispatch: unknown" in mermaid
     assert "execution_lock: none" in mermaid
 
@@ -1022,16 +1025,19 @@ def test_javascript_mermaid_composes_planned_custom_and_external_styles(
     )
     descriptors = {
         "demo.custom": SimpleNamespace(
+            category="",
             display_name="Custom",
             description="Shows custom colours.",
             external=False,
         ),
         "demo.external": SimpleNamespace(
+            category="",
             display_name="External",
             description="Shows the external boundary.",
             external=True,
         ),
         "demo.external_custom": SimpleNamespace(
+            category="",
             display_name="External Custom",
             description="Combines custom colours and the external boundary.",
             external=True,
@@ -1229,10 +1235,6 @@ def test_build_project_aot_forwards_prepared_request(
         return fake
 
     monkeypatch.setattr("vibeflow.tooling.application.javascript.build.build_aot", fake_build)
-    monkeypatch.setattr(
-        "vibeflow.tooling.application.javascript.build.inspect_registered_implementations",
-        lambda *args, **kwargs: (),
-    )
     result = build_project_aot(request)
 
     assert result.entry == fake.entry

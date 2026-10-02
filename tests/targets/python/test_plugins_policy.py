@@ -9,7 +9,6 @@ import sys
 
 import pytest
 
-from vibeflow.core import HealthFinding
 from vibeflow.targets.python.project import plugins as target_plugins
 from vibeflow.targets.python.project import policy as target_policy
 from vibeflow.targets.python.project.plugin_loader import load_plugins_from_config
@@ -72,14 +71,14 @@ def test_registry_preserves_priority_name_order_and_duplicate_messages() -> None
     registry.register(alpha, name="alpha", priority=20)
     registry.register(early, name="early", priority=10)
 
-    assert registry.policy_plugins() == (early, alpha, beta)
+    assert registry.runtime_plugins() == (early, alpha, beta)
     assert [item.name for item in registry.descriptors()] == [
         "early",
         "alpha",
         "beta",
     ]
 
-    with pytest.raises(ValueError, match="^duplicate policy plugin: alpha$"):
+    with pytest.raises(ValueError, match="^duplicate runtime plugin: alpha$"):
         registry.register(Plugin(), name="alpha")
 
     replacement = Plugin()
@@ -89,7 +88,7 @@ def test_registry_preserves_priority_name_order_and_duplicate_messages() -> None
         priority=5,
         conflict="replace",
     )
-    assert registry.policy_plugins() == (replacement, early, beta)
+    assert registry.runtime_plugins() == (replacement, early, beta)
 
 
 def test_planned_plugin_is_not_imported_instantiated_or_registered(
@@ -110,7 +109,7 @@ def test_planned_plugin_is_not_imported_instantiated_or_registered(
                 {
                     "path": str(source),
                     "class": "Plugin",
-                    "type": "policy",
+                    "type": "runtime",
                     "status": "planned",
                 }
             ]
@@ -123,107 +122,64 @@ def test_planned_plugin_is_not_imported_instantiated_or_registered(
     assert not marker.exists()
 
 
-def test_target_policy_merge_and_finding_application_are_pure() -> None:
-    policy = target_policy.default_effective_policy()
-    target_policy.merge_policy(
-        policy.data,
-        {
-            "rules": {
-                "downgrades": [
-                    {
-                        "rule_id": "GRAPH.SMELL.DUPLICATE_LOGIC",
-                        "to": "warning",
-                        "reason": "accepted",
-                    }
-                ],
-                "exemptions": [
-                    {
-                        "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
-                        "reason": "accepted",
-                    }
-                ],
-            }
-        },
-    )
-    duplicate = HealthFinding(
-        rule_id="GRAPH.SMELL.DUPLICATE_LOGIC",
-        message="duplicate",
-        severity="error",
-    )
-    unconsumed = HealthFinding(
-        rule_id="GRAPH.DATA.UNCONSUMED_PROVIDER",
-        message="unconsumed",
-        severity="warning",
-    )
-
-    errors, warnings, skipped = target_policy.apply_policy_to_findings(
-        (duplicate,),
-        (unconsumed,),
-        policy,
-    )
-
-    assert errors == ()
-    assert [item.rule_id for item in warnings] == [duplicate.rule_id]
-    assert [item.rule_id for item in skipped] == [unconsumed.rule_id]
+def test_numeric_rule_defaults_are_pure_and_do_not_mutate_other_checks() -> None:
+    first = target_policy.default_effective_policy()
+    second = target_policy.default_effective_policy()
+    target_policy.merge_policy(first.data, {"node_source": {"max_lines": 20}})
+    assert first.to_purity_policy().max_source_lines == 20
+    assert second.to_purity_policy().max_source_lines == 500
+    assert first.sources == ("kernel.default_policy",)
 
 
-def test_target_policy_hooks_follow_registry_order_and_require_relaxations() -> None:
-    calls: list[str] = []
-
-    class StrictPlugin:
-        def __init__(self, name: str) -> None:
-            self.name = name
-
-        def extend_policy(self, policy):
-            calls.append(self.name)
-            return {"node_source": {"max_lines": policy["node_source"]["max_lines"] - 1}}
+def test_review_hooks_are_removed_from_lifecycle_registry() -> None:
+    class OldPolicyPlugin:
+        def extend_policy(self, _policy):
+            raise AssertionError("old review hooks must not execute")
 
     registry = target_plugins.PluginRegistry()
-    registry.register(StrictPlugin("zeta"), priority=10)
-    registry.register(StrictPlugin("alpha"), priority=10)
-    effective = target_policy.default_effective_policy().data
-    sources = ["kernel.default_policy"]
-    findings: list[HealthFinding] = []
-    target_policy.apply_policy_plugins(
-        effective,
-        sources,
-        findings,
-        registry,
-        collect_schema_findings=lambda *_args, **_kwargs: (),
+    with pytest.raises(ValueError, match="unknown plugin type: policy"):
+        registry.register(OldPolicyPlugin(), plugin_type="policy")
+    assert not hasattr(registry, "policy_plugins")
+    assert not hasattr(target_policy, "apply_policy_plugins")
+    assert not hasattr(target_policy, "apply_policy_to_findings")
+
+
+def test_selected_ruleset_can_allow_print_without_changing_process_identity() -> None:
+    from tests.fixtures.support.rule_inspection import node_document
+    from vibeflow.core.descriptors import DescriptorCatalogs
+    from vibeflow.core.rules import RuleCall, RuleRelation, RulesetDescriptor
+    from vibeflow.targets.python.project.registry import NodeRegistry
+    from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rules
+    from vibeflow.targets.python.quality.source_context import (
+        PythonSourceFile, PythonSourceNode, build_python_source_context,
     )
+    from vibeflow.tooling.project.descriptor_parser import parse_descriptor_manifest
 
-    assert calls == ["alpha", "zeta"]
-    assert findings == []
-    assert effective["node_source"]["max_lines"] == 498
-    assert sources == [
-        "kernel.default_policy",
-        "plugin.policy:alpha",
-        "plugin.policy:zeta",
-    ]
+    source = PythonSourceFile.parse("/fixture/demo_node.py", "demo_node", '''
+class DemoNode:
+    def run_pure(self, inputs, params):
+        print("a selected terminal operation")
+        return {"demo.out": 1}
+''')
+    terminal = RulesetDescriptor("project.print", (RuleCall("base", ruleset_id="vibeflow.process"),), (
+        RuleRelation("$self", "base/effects", "overrides", params={"effect_scope": "terminal"}),
+        RuleRelation("$self", "base/imports", "overrides", params={"effect_scope": "terminal"}),
+    ))
+    catalogs = DescriptorCatalogs.empty()
+    catalogs.rulesets.register(terminal)
 
-    class RelaxingPlugin:
-        name = "relaxing"
+    def check(selection):
+        descriptor = parse_descriptor_manifest(node_document(rulesets=selection))
+        assert descriptor.flow_kind == "process"
+        registry = NodeRegistry()
+        registry.register(descriptor)
+        registry.rule_catalogs = (catalogs,)
+        context = build_python_source_context((PythonSourceNode(descriptor, source.path, "DemoNode"),), (source,))
+        return execute_python_node_rules(registry, context)
 
-        def extend_policy(self, policy):
-            return {"node_source": {"max_lines": policy["node_source"]["max_lines"] + 1}}
-
-    relaxing = target_plugins.PluginRegistry()
-    relaxing.register(RelaxingPlugin())
-    effective = target_policy.default_effective_policy().data
-    findings = []
-    target_policy.apply_policy_plugins(
-        effective,
-        ["kernel.default_policy"],
-        findings,
-        relaxing,
-        collect_schema_findings=lambda *_args, **_kwargs: (),
-    )
-
-    assert [item.rule_id for item in findings] == [
-        "PLUGIN.POLICY.RELAXATION_REQUIRED"
-    ]
-    assert findings[0].message == (
-        "plugin policy relaxation must include relaxations list with rule_id, "
-        "scope, reason, and source"
-    )
-    assert effective["node_source"]["max_lines"] == 500
+    rejected = check(["vibeflow.process"])
+    assert any(item.code == "NODE.EFFECT.CALL_FORBIDDEN" for item in rejected.findings)
+    allowed = check(["project.print"])
+    assert not any(item.severity == "error" for item in allowed.findings)
+    assert allowed.effect_scopes["demo.node"] == "terminal"
+    assert any(invocation.results for invocation in allowed.executions)

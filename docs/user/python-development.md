@@ -1,108 +1,59 @@
 # Python Node 与 BaseLib
 
-Python Node 适合实现一个可独立描述、具有显式输入输出的局部步骤。可复用的纯计算 helper 放入 BaseLib。
+Node 使用独立声明描述身份、契约、规则与实现。实现类只负责执行，不再定义 NODE_INFO/CONTRACT，也不再通过 registry.py 发现 Node。
 
-## 最小 Node
+## 声明一个 Node
 
-公共接口来自 `vibeflow.core` 和 `vibeflow.targets.python.project`：
+项目配置指定目录：
+
+```jsonc
+{"project_target": "python", "descriptors": {"nodes": ["manifests/nodes"]}}
+```
+
+`manifests/nodes/normalize.jsonc`：
+
+```jsonc
+{
+  "kind": "node", "type_key": "example.normalize_text",
+  "display_name": "Normalize text", "category": "text",
+  "description": "Normalizes whitespace in supplied text.", "version": "1.0.0",
+  "flow_kind": "process", "rulesets": ["vibeflow.process"],
+  "contract": {
+    "requires": [{"type": "text.raw", "cardinality": "exactly_one", "display_name": "Raw text"}],
+    "provides": [{"key": "normalized_text", "type": "text.normalized", "display_name": "Normalized text"}],
+    "input_semantics": {"text.raw": ["Text before normalization."]},
+    "output_semantics": {"normalized_text": ["Normalized whitespace."]},
+    "params_schema": {"collapse_newlines": {"type": "boolean"}},
+    "params_defaults": {"collapse_newlines": true}
+  },
+  "implementations": [{"language": "python", "targets": ["python"],
+    "source": {"kind": "file", "ref": "nodes/normalize.py", "export": "NormalizeTextNode"}}]
+}
+```
+
+`nodes/normalize.py`：
 
 ```python
-from vibeflow.core import DataProvider, DataRequirement
-from vibeflow.targets.python.project import NodeContract, NodeInfo
-
-
 class NormalizeTextNode:
-    NODE_INFO = NodeInfo(
-        type_key="example.normalize_text",
-        display_name="Normalize text",
-        category="text",
-        description="Normalizes whitespace in supplied text.",
-        version="1.0.0",
-        flow_kind="process",
-    )
-    CONTRACT = NodeContract(
-        requires=(
-            DataRequirement(
-                type="text.raw",
-                cardinality="exactly_one",
-                display_name="Raw text",
-            ),
-        ),
-        provides=(
-            DataProvider(
-                key="normalized_text",
-                type="text.normalized",
-                display_name="Normalized text",
-            ),
-        ),
-        input_semantics={"text.raw": ("Text before whitespace normalization.",)},
-        output_semantics={"normalized_text": ("Text with normalized whitespace.",)},
-    )
-
     def run_pure(self, inputs, params):
         value = inputs["text.raw"]["value"]
         return {"normalized_text": " ".join(value.split())}
 ```
 
-每个端口需要易读名称，`input_semantics` / `output_semantics` 覆盖全部端口。返回 mapping 的 key 必须与 `CONTRACT.provides` 一致。`examples` 可作为源码文档保留，VibeFlow 不自动执行它。
+返回 mapping 的 key 与声明 provides 一致。参数 schema/defaults 属于声明，调用实例的 `config` 覆盖参数；display_name/description 是实例说明。声明和 import 规则先读取，实际实现延迟绑定。
 
-## Registry 与参数
+程序化使用也只登记明确的声明：`registry.register(descriptor, ImplementationClass)`，或提供 loader 延迟绑定。Registry 不读取实现类元数据。
 
-参数 schema/defaults 由 Registry 保存：
+## 业务分类与规则
 
-```python
-from vibeflow.targets.python.project import NodeRegistry
-
-
-def build_node_registry() -> NodeRegistry:
-    registry = NodeRegistry()
-    registry.register(
-        "example.normalize_text",
-        NormalizeTextNode,
-        config_schema={
-            "collapse_newlines": {"type": "boolean"},
-        },
-        config_defaults={"collapse_newlines": True},
-    )
-    return registry
-```
-
-调用实例的参数写在 `config` 中；`display_name` 和 `description` 是实例文档，不进入 `params`：
-
-```jsonc
-{
-  "id": "normalize_title",
-  "type_used": "example.normalize_text",
-  "display_name": "Normalize title",
-  "description": "Normalizes the title before classification.",
-  "config": {"collapse_newlines": true}
-}
-```
+`category/tags` 表达业务身份，`flow_kind` 表达原生执行身份。Node 的约束来自所选 Ruleset；分类默认颜色、形状、图标和规则选择见 [Rule、Ruleset 与业务分类](rules-and-categories.md)。模型功能块不需要固定连接方式，可以使用原生串行、分支、Nodeset 和 Loop。
 
 ## BaseLib
 
-BaseLib 保存可由多个 Node 导入的纯函数：
-
-```python
-from vibeflow.targets.python.project import BaseLibInfo
-
-BASE_LIB_INFO = BaseLibInfo(
-    module="base_lib.text_tools",
-    display_name="Text tools",
-    category="text",
-    description="Pure text transformation helpers.",
-    version="1.0.0",
-)
-
-def normalize_whitespace(value: str) -> str:
-    return " ".join(value.split())
-```
-
-在 `build_base_lib_registry()` 中用 `BaseLibRegistry.register(...)` 登记，再在 workflow 顶层通过 `base_lib.modules[].id` 选择。本流程未选择的 BaseLib 不进入 Node 的允许依赖集合。
-
-验证 Node 和 Registry：
+BaseLib 保存可复用的 helper。现有 BaseLib 资源登记与 workflow 选择保留；源码约束由相应内置 Rule 执行。Node 导入 helper 仅产生引用关系，不自动赋予其中定义领域对象的归属。
 
 ```bash
 python run.py validate --config python_project/configs/main.jsonc
 python run.py quality --path python_project
+python run.py review-rules --config python_project/configs/main.jsonc --json
 ```

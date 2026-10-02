@@ -1,0 +1,22 @@
+{
+  "kind": "bundle",
+  "id": "example.python_domain",
+  "resources": {
+    "categories": [
+      "../bundle/categories/model.jsonc",
+      "../bundle/categories/transform.jsonc"
+    ],
+    "nodes": [
+      "../bundle/nodes/model.jsonc",
+      "../bundle/nodes/transform.jsonc",
+      "../bundle/nodes/boundary.jsonc"
+    ],
+    "rules": [
+      "../bundle/rules/model-definition.jsonc"
+    ],
+    "rulesets": [
+      "../bundle/rulesets/model-domain.jsonc",
+      "../bundle/rulesets/data-domain.jsonc"
+    ]
+  }
+}

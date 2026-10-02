@@ -24,9 +24,7 @@ from vibeflow.targets.python.runtime.summaries import summarize_mapping
 from vibeflow.tooling.application.python.run_directory import validate_run_id
 from vibeflow.tooling.application.python.runner import CheckedRunError, CheckedRunResult
 from vibeflow.tooling.project.graph_config import parse_graph_config
-from vibeflow.tooling.application.python.project.python_quality import (
-    collect_python_workflow_quality_facts,
-)
+from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
 from vibeflow.tooling.project.config_loader import (
     ConfigLoadError,
     load_workspace_config_document,
@@ -143,8 +141,13 @@ def run_workspace_checked(
         env=env,
         workspace=workspace,
         runtime_options=effective_runtime_options,
+        rule_phase="run",
         **validation_kwargs,
     )
+    if health.info.get("rule_phase") == "import" and health.status in {"FAIL", "ERROR"}:
+        _write_refused_artifacts(run_dir, health)
+        _refuse_on_health_failure(health, run_dir, actual_run_id)
+    compiled = GraphCompiler().compile(graph, registry=env.registry)
     _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=env.registry, resources=resources, runtime_options=effective_runtime_options)
     _write_preflight_artifacts(run_dir, graph, compiled, health, registry=env.registry, resources=resources)
     _refuse_on_health_failure(health, run_dir, actual_run_id)
@@ -176,16 +179,17 @@ def load_workspace_graph_for_export(
     if isinstance(prepared, HealthReport):
         return None, None, None, ConfigResources(), prepared
     _, graph, compiled, resources, _, _, _ = prepared
-    if validate_health:
-        health = _validate_prepared_workspace_graph(
+    health = _validate_prepared_workspace_graph(
             prepared,
             env=env,
             workspace=workspace,
             runtime_options=_workspace_runtime_options(path, workspace=workspace),
             check_architecture_document=False,
         )
+    if validate_health:
         if health.status in {"FAIL", "ERROR"}:
             return None, None, None, ConfigResources(), health
+    compiled = GraphCompiler().compile(graph, registry=env.registry)
     return graph, compiled, env.registry, resources, None
 
 
@@ -197,6 +201,7 @@ def _validate_prepared_workspace_graph(
     runtime_options: RuntimeOptions,
     check_architecture_document: bool = True,
     delegate_cli: bool = False,
+    rule_phase: str = "static",
 ) -> HealthReport:
     document, graph, compiled, resources, plugin_registry, effective_policy, warnings = prepared
     purity_policy = effective_policy.to_purity_policy()
@@ -208,12 +213,10 @@ def _validate_prepared_workspace_graph(
         purity_policy=purity_policy,
         effective_policy=effective_policy,
         nodeset_max_depth=runtime_options.nodeset_max_depth,
-        node_quality_facts=collect_python_workflow_quality_facts(
-            graph,
-            registry=env.registry,
-            policy=purity_policy,
-        ),
+        source_context=collect_workflow_source_context(env.registry, graph),
+        rule_phase=rule_phase,
     )
+    compiled = GraphCompiler().compile(graph, registry=env.registry)
     info = dict(health.info)
     info["nodeset_imports"] = [dict(item) for item in document.nodeset_imports]
     info["resources"] = resources.to_dict()
@@ -433,6 +436,7 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
     )
     preflight_findings.extend(annotate_findings(policy_result.findings, root=root, source_path=config_path))
     effective_policy = policy_result.effective_policy
+    env.registry.configure_rule_defaults(purity_policy=effective_policy.to_purity_policy())
     schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *preflight_findings))
     errors = tuple(finding for finding in schema_findings if finding.severity == "error")
     warnings = tuple(finding for finding in schema_findings if finding.severity == "warning")

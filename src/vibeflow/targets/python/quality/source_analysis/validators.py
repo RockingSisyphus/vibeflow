@@ -20,130 +20,6 @@ from vibeflow.targets.python.quality.source_analysis.helpers import (
 )
 from vibeflow.targets.python.quality.source_analysis.types import NodeMetrics, PurityPolicy, PurityViolation, _SourceInfo
 
-def _validate_node_info(info: object, *, expected_type: str | None, source: _SourceInfo) -> list[PurityViolation]:
-    if not isinstance(info, NodeInfo):
-        return [_violation("missing_node_info", "node must define NODE_INFO: NodeInfo", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
-    violations: list[PurityViolation] = []
-    for field_name in ("type_key", "display_name", "category", "description", "version", "flow_kind"):
-        if not _non_empty_string(getattr(info, field_name, None)):
-            violations.append(_violation(f"node_info_{field_name}", f"NODE_INFO.{field_name} must be a non-empty string", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    if _non_empty_string(getattr(info, "flow_kind", None)) and info.flow_kind not in FLOW_KINDS:
-        violations.append(_violation("node_flow_kind_invalid", f"NODE_INFO.flow_kind must be one of {sorted(FLOW_KINDS)}", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    if not isinstance(getattr(info, "external", False), bool):
-        violations.append(_violation("node_external_invalid", "NODE_INFO.external must be a boolean", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    if expected_type and info.type_key != expected_type:
-        violations.append(_violation("type_mismatch", f"NODE_INFO.type_key {info.type_key!r} does not match expected type {expected_type!r}", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    return violations
-
-
-def _validate_contract(contract: object, *, source: _SourceInfo) -> list[PurityViolation]:
-    if not isinstance(contract, NodeContract):
-        return [_violation("missing_contract", "node must define CONTRACT: NodeContract", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
-    violations: list[PurityViolation] = []
-    requires = _validate_contract_requirements(contract.requires, "CONTRACT.requires", source=source, violations=violations)
-    provides = _validate_contract_providers(contract.provides, "CONTRACT.provides", source=source, violations=violations)
-    require_types = requirement_types(requires)
-    provide_keys = provider_keys(provides)
-    if set(require_types) & set(provide_keys):
-        violations.append(_violation("contract_overlap", "CONTRACT.requires types and CONTRACT.provides keys must not overlap", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    violations.extend(_validate_semantics(contract.input_semantics, require_types, "CONTRACT.input_semantics", required=bool(requires), source=source))
-    violations.extend(_validate_semantics(contract.output_semantics, provide_keys, "CONTRACT.output_semantics", required=bool(provides), source=source))
-    violations.extend(_validate_contract_examples_shape(contract.examples, source=source))
-    return violations
-
-
-def _validate_contract_requirements(value: object, field_name: str, *, source: _SourceInfo, violations: list[PurityViolation]) -> tuple[DataRequirement, ...]:
-    if not isinstance(value, (list, tuple)) or any(not isinstance(item, DataRequirement) for item in value):
-        violations.append(_violation("contract_requirement_list", f"{field_name} must be a tuple/list of DataRequirement objects", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-        return ()
-    types = tuple(item.type for item in value)
-    if any(not item.type.strip() or item.cardinality not in CARDINALITIES or not item.display_name.strip() for item in value):
-        violations.append(_violation("contract_requirement_shape", f"{field_name} items must declare non-empty type/display_name and valid cardinality", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    if len(set(types)) != len(types):
-        violations.append(_violation("contract_duplicate_requirement_type", f"{field_name} must not contain duplicate types", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    return tuple(value)
-
-
-def _validate_contract_providers(value: object, field_name: str, *, source: _SourceInfo, violations: list[PurityViolation]) -> tuple[DataProvider, ...]:
-    if not isinstance(value, (list, tuple)) or any(not isinstance(item, DataProvider) for item in value):
-        violations.append(_violation("contract_provider_list", f"{field_name} must be a tuple/list of DataProvider objects", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-        return ()
-    keys = tuple(item.key for item in value)
-    if any(not item.key.strip() or not item.type.strip() or not item.display_name.strip() for item in value):
-        violations.append(_violation("contract_provider_shape", f"{field_name} items must declare non-empty key/type/display_name", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    if len(set(keys)) != len(keys):
-        violations.append(_violation("contract_duplicate_key", f"{field_name} must not contain duplicate keys", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    return tuple(value)
-
-
-def _validate_flow_kind_contract(info: NodeInfo, contract: NodeContract, *, source: _SourceInfo) -> list[PurityViolation]:
-    if info.flow_kind != FLOW_KIND_DECISION:
-        return []
-    route_keys = tuple(provider.key for provider in contract.provides if _looks_route_key(provider.key))
-    if route_keys:
-        return []
-    return [
-        _violation(
-            "node_decision_missing_route_output",
-            "decision nodes must provide a route/decision/branch output key",
-            source=source,
-            failure_layer="contract",
-            suggested_fix_type="fix_contract",
-        )
-    ]
-
-
-def _looks_route_key(key: str) -> bool:
-    leaf = key.rsplit(".", 1)[-1].rsplit("_", 1)[-1]
-    return leaf in {"route", "decision", "branch", "selected", "done", "should_retry"} or key.endswith("selected_branch")
-
-
-def _validate_interface(node_cls: type[PureNode], *, source: _SourceInfo) -> list[PurityViolation]:
-    violations: list[PurityViolation] = []
-    if "run" in node_cls.__dict__:
-        violations.append(_violation("context_run_forbidden", "pure node must not define run(context, ...)", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    run_pure = node_cls.__dict__.get("run_pure")
-    if run_pure is None:
-        violations.append(_violation("missing_run_pure", "node must define run_pure(self, inputs, params)", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    elif inspect.iscoroutinefunction(run_pure):
-        violations.append(_violation("async_run_pure", "run_pure must not be async", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    else:
-        violations.extend(_validate_signature(run_pure, ("self", "inputs", "params"), "run_pure", source=source))
-    init = node_cls.__dict__.get("__init__")
-    if init is not None:
-        violations.extend(_validate_signature(init, ("self",), "__init__", source=source, allow_defaulted=False))
-    for name, value in node_cls.__dict__.items():
-        if name.startswith("_") or name in {"run_pure"}:
-            continue
-        if callable(value):
-            violations.append(_violation("public_callable", f"node must not expose public callable method: {name}", source=source, failure_layer="contract", suggested_fix_type="fix_contract"))
-    return violations
-
-
-def _validate_signature(
-    func: object,
-    expected_names: tuple[str, ...],
-    function_name: str,
-    *,
-    source: _SourceInfo,
-    allow_defaulted: bool = True,
-) -> list[PurityViolation]:
-    try:
-        signature = inspect.signature(func)
-    except (TypeError, ValueError) as exc:
-        return [_violation("signature_unavailable", f"{function_name} signature is unavailable: {exc}", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
-    params = list(signature.parameters.values())
-    valid_kinds = {inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.POSITIONAL_ONLY}
-    if len(params) != len(expected_names) or tuple(param.name for param in params) != expected_names:
-        return [_violation("run_pure_signature" if function_name == "run_pure" else "init_signature", f"{function_name} must have signature ({', '.join(expected_names)})", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
-    for param in params:
-        if param.kind not in valid_kinds:
-            return [_violation("run_pure_signature" if function_name == "run_pure" else "init_signature", f"{function_name} must not use *args, **kwargs, or keyword-only parameters", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
-        if not allow_defaulted and param.default is not inspect.Parameter.empty:
-            return [_violation("init_signature", "__init__ must not accept configured parameters", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
-    return []
-
-
 def _validate_source_size(source_text: str, *, policy: PurityPolicy, source: _SourceInfo) -> list[PurityViolation]:
     facts = ImplementationMetrics(
         source_lines=len(source_text.splitlines()),
@@ -256,13 +132,13 @@ def _validate_architecture_smells(
 
 def _validate_contract_examples_shape(value: object, *, source: _SourceInfo) -> list[PurityViolation]:
     if not isinstance(value, tuple):
-        return [_violation("example_shape", "CONTRACT.examples must be a tuple of example mappings", source=source, severity="warning", failure_layer="contract", suggested_fix_type="fix_contract")]
+        return [_violation("example_shape", "descriptor contract.examples must be a tuple of example mappings", source=source, severity="warning", failure_layer="contract", suggested_fix_type="fix_contract")]
     for index, item in enumerate(value):
         if not isinstance(item, Mapping):
-            return [_violation("example_shape", f"CONTRACT.examples[{index}] must be a mapping", source=source, severity="warning", failure_layer="contract", suggested_fix_type="fix_contract")]
+            return [_violation("example_shape", f"descriptor contract.examples[{index}] must be a mapping", source=source, severity="warning", failure_layer="contract", suggested_fix_type="fix_contract")]
         for field_name in ("inputs", "params"):
             if field_name not in item or not isinstance(item[field_name], Mapping):
-                return [_violation("example_shape", f"CONTRACT.examples[{index}].{field_name} must be a mapping", source=source, severity="warning", failure_layer="contract", suggested_fix_type="fix_contract")]
+                return [_violation("example_shape", f"descriptor contract.examples[{index}].{field_name} must be a mapping", source=source, severity="warning", failure_layer="contract", suggested_fix_type="fix_contract")]
         if "outputs" in item:
-            return [_violation("example_outputs_removed", f"CONTRACT.examples[{index}].outputs is removed; examples only declare inputs and params", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
+            return [_violation("example_outputs_removed", f"descriptor contract.examples[{index}].outputs is removed; examples only declare inputs and params", source=source, failure_layer="contract", suggested_fix_type="fix_contract")]
     return []

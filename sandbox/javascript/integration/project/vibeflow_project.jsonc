@@ -5,11 +5,27 @@
       "manifests/nodes",
       "negative/manifests/nodes"
     ],
-    "base_lib": ["manifests/base_lib"],
-    "data_schemas": ["manifests/data"],
-    "capabilities": ["manifests/capabilities"],
-    "plugins": ["manifests/plugins"],
-    "host_extensions": ["manifests/host_extensions"]
+    "base_lib": [
+      "manifests/base_lib"
+    ],
+    "data_schemas": [
+      "manifests/data"
+    ],
+    "capabilities": [
+      "manifests/capabilities"
+    ],
+    "plugins": [
+      "manifests/plugins"
+    ],
+    "host_extensions": [
+      "manifests/host_extensions"
+    ],
+    "rules": [
+      "manifests/rules"
+    ],
+    "rulesets": [
+      "manifests/rulesets"
+    ]
   },
   "javascript": {
     "package_root": ".",

@@ -114,7 +114,6 @@ def add_audit_parsers(subparsers: argparse._SubParsersAction) -> None:
     )
     quality.add_argument("--json", action="store_true")
     quality.add_argument("--node-command", default="node", help=argparse.SUPPRESS)
-    quality.add_argument("--policy", help="explicit shared quality policy JSONC path")
     add_quality_limit_arguments(quality)
 
 
@@ -122,7 +121,6 @@ def _add_audit_input(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--workspace", required=True)
     parser.add_argument("--config", required=True)
     parser.add_argument("--node-command", default="node", help=argparse.SUPPRESS)
-    parser.add_argument("--policy", help="explicit shared quality policy JSONC path")
 
 
 def add_build_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -144,7 +142,6 @@ def add_build_parser(subparsers: argparse._SubParsersAction) -> None:
     )
     build.add_argument("--out-dir", required=True, help="dedicated output directory")
     build.add_argument("--entry-name", default="", help="JavaScript entry file name")
-    build.add_argument("--policy", help="explicit shared quality policy JSONC path")
     build.add_argument(
         "--sourcemap",
         choices=("none", "external", "inline"),
@@ -191,7 +188,6 @@ def handle_build(args: argparse.Namespace) -> int:
                 ),
                 app_entry=Path(args.app_entry) if args.app_entry else None,
                 node_command=args.node_command,
-                policy_path=Path(args.policy) if args.policy else None,
             )
         )
     except Exception as exc:
@@ -219,6 +215,7 @@ def handle_build(args: argparse.Namespace) -> int:
         "manifest": str(result.manifest),
         "files": list(result.files),
         "toolchain": result.build.toolchain.to_dict(),
+        "rule_checks": result.prepared.rule_report.to_dict(),
     }
     warnings = tuple(getattr(result.prepared, "warnings", ()) or ())
     if warnings:
@@ -588,14 +585,25 @@ def handle_quality_check(args: argparse.Namespace) -> int:
     source_reports = _project_source_quality(workspace, args, configs, facts_cache=facts_cache)
     reports: list[dict[str, object]] = []
     for config in configs:
+        from vibeflow.core.quality import QualityThresholds
+        from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
+        from dataclasses import replace
+        configured_root = workspace.root_for_path(config)
+        limits = configured_root.quality_structure
+        overrides = _quality_structure_overrides(args)
+        enabled = _quality_structure_enabled(args, bool(overrides))
+        if enabled is False:
+            limits = None
+        elif overrides:
+            limits = replace(limits, **overrides)
         namespace = argparse.Namespace(
             workspace=str(workspace_path),
             config=str(config),
             node_command=args.node_command,
-            policy=args.policy,
             audit_registered_resources=True,
             workspace_config=workspace,
             quality_facts_by_root=facts_cache,
+            quality_policy=javascript_quality_policy(thresholds=_quality_thresholds(args, QualityThresholds), structure_limits=limits),
         )
         result, error = _audit(namespace)
         if error is not None:
@@ -679,7 +687,6 @@ def _project_source_quality(workspace, args: argparse.Namespace, configs: Sequen
     from vibeflow.targets.javascript.quality.source import DEFAULT_EXCLUDED_DIRS, scan_javascript_quality
     from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
     from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
-    from vibeflow.tooling.project.quality_policy import resolve_shared_quality_policy
 
     selected = Path(args.path).resolve() if args.path else None
     configured = Path(args.config).resolve() if args.config else None
@@ -713,14 +720,6 @@ def _project_source_quality(workspace, args: argparse.Namespace, configs: Sequen
             limits = replace(limits if limits is not None else QualityStructureLimits(), **overrides)
         try:
             catalogs = load_project_descriptor_catalogs(root.path, project_config=root.config_path)
-            policy_data, _, policy_findings = resolve_shared_quality_policy(
-                root.project_config,
-                config_path=root.config_path,
-                explicit_policy_path=Path(args.policy) if args.policy else None,
-            )
-            if policy_findings:
-                first = policy_findings[0]
-                raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in policy_findings))
             report = scan_javascript_quality(
                 scan_path,
                 package_root=package_root,
@@ -728,15 +727,17 @@ def _project_source_quality(workspace, args: argparse.Namespace, configs: Sequen
                 structure_limits=_javascript_structure_limits(limits),
                 structure_roles=_javascript_structure_roles(root, catalogs),
                 registered_catalogs=catalogs if scan_path == root.path else None,
-                policy_data=policy_data,
                 excluded_dirs=_javascript_exclusions(args, DEFAULT_EXCLUDED_DIRS),
                 node_command=args.node_command,
                 facts_cache=facts_cache if scan_path == root.path else None,
             )
             if scan_path == root.path and not any(root.path in config.parents for config in configs):
+                from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
                 report = _audit_registered_without_workflow(
                     report, catalogs, root, package_root,
                     node_command=args.node_command,
+                    quality_policy=javascript_quality_policy(thresholds=_quality_thresholds(args, QualityThresholds),
+                        structure_limits=_javascript_structure_limits(limits), structure_roles=_javascript_structure_roles(root, catalogs)),
                 )
             reports.append(report.to_dict())
         except Exception as exc:
@@ -744,48 +745,18 @@ def _project_source_quality(workspace, args: argparse.Namespace, configs: Sequen
     return reports
 
 
-def _audit_registered_without_workflow(report, catalogs, root, package_root: Path, *, node_command: str):
+def _audit_registered_without_workflow(report, catalogs, root, package_root: Path, *, node_command: str, quality_policy=None):
     from dataclasses import replace
-
-    from vibeflow.core.quality import QualityFinding
-    from vibeflow.targets.javascript.build.project_resources import driver_import_policy, target_neutral_import_policy
-    from vibeflow.targets.javascript.build.toolchain import AotToolchainError, run_audit_driver
-
+    from vibeflow.core.flow import GraphConfig
+    from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
+    from vibeflow.targets.javascript.quality.rules import run_javascript_rules
     javascript = root.project_config.get("javascript", {})
     external = set(javascript.get("external_packages", ())) if isinstance(javascript, Mapping) else set()
-    import_policy, files = target_neutral_import_policy(
-        catalogs=catalogs,
-        project_root=root.path,
-        allowed_external=external,
-        node_ids=None,
-        host_extension_ids=frozenset(item.id for item in catalogs.host_extensions),
-        plugin_ids=frozenset(item.id for item in catalogs.plugins),
-    )
-    if not files:
-        return report
-    try:
-        run_audit_driver(
-            {"typecheckFiles": list(files), "importPolicy": driver_import_policy(import_policy)},
-            package_root=package_root,
-            node_command=node_command,
-        )
-    except AotToolchainError as exc:
-        diagnostics = exc.diagnostics or ({"code": exc.code, "message": str(exc)},)
-        findings = tuple(
-            QualityFinding(
-                rule_id=str(item.get("code", exc.code)),
-                severity="error",
-                object_type=str(item.get("owner", {}).get("kind", "source")) if isinstance(item.get("owner"), Mapping) else "source",
-                object_id=str(item.get("owner", {}).get("id", item.get("file", ""))) if isinstance(item.get("owner"), Mapping) else str(item.get("file", "")),
-                source_location={"path": str(item.get("file", "")), "line": int(item.get("line", 1)), "column": int(item.get("column", 1))},
-                message=str(item.get("message", str(exc))),
-                suggested_fix_type="fix_implementation",
-                details=dict(item),
-            )
-            for item in diagnostics
-        )
-        return replace(report, status="FAIL", findings=(*report.findings, *findings))
-    return report
+    import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=root.path, allowed_external=external, node_ids=None, host_extension_ids=frozenset(item.id for item in catalogs.host_extensions), plugin_ids=frozenset(item.id for item in catalogs.plugins))
+    selected = run_javascript_rules(GraphConfig(nodes=(), project_root=str(root.path), rulesets=()), catalogs, project_root=root.path, package_root=package_root, import_policy=import_policy, node_command=node_command, include_registered=True, quality_policy=quality_policy)
+    findings = (*report.findings, *selected.findings)
+    status = "FAIL" if any(item.severity == "error" for item in findings) else "CONCERNS" if findings else "PASS"
+    return replace(report, findings=findings, status=status)
 
 
 def _javascript_structure_roles(root, catalogs):
@@ -899,11 +870,11 @@ def _audit(args: argparse.Namespace):
                     ),
                     config=Path(args.config),
                     node_command=str(args.node_command),
-                    policy_path=Path(args.policy) if getattr(args, "policy", None) else None,
                     audit_registered_resources=bool(
                         getattr(args, "audit_registered_resources", False)
                     ),
                     quality_facts_by_root=getattr(args, "quality_facts_by_root", None),
+                    quality_policy=getattr(args, "quality_policy", None),
                 )
             ),
             None,
@@ -919,6 +890,7 @@ def _audit_success_payload(result) -> dict[str, object]:
         "workflow_id": result.plan.workflow_id,
         "config": str(result.config_path),
         "source_files": list(result.source_files),
+        "rule_checks": result.rule_report.to_dict() if result.rule_report else {},
     }
     if result.warnings:
         payload["status"] = "CONCERNS"

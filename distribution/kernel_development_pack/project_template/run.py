@@ -166,6 +166,7 @@ WORKSPACE_COMMANDS = {
     "inspect-config",
     "quality-check",
     "review",
+    "review-rules",
     "run",
     "validate",
 }

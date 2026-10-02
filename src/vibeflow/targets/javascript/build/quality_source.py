@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, MutableMapping
+from dataclasses import replace
 import os
 from pathlib import Path
 
@@ -21,7 +22,7 @@ from vibeflow.core.quality import (
     evaluate_project_quality,
 )
 from vibeflow.targets.javascript.build.toolchain import AotToolchainError, DriverQualityResult, run_quality_facts_driver
-from vibeflow.targets.javascript.build.quality_implementation import evaluate_registered_facts, registered_implementation_requests
+from vibeflow.targets.javascript.build.quality_implementation import registered_implementation_requests
 
 
 SOURCE_SUFFIXES = frozenset({".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts"})
@@ -33,6 +34,23 @@ DEFAULT_EXCLUDED_DIRS = frozenset({
 })
 
 
+def javascript_quality_policy(*, thresholds: QualityThresholds | None = None,
+                              structure_limits: QualityStructureLimits | None = None,
+                              structure_roles: QualityStructureRoles | None = None) -> QualityPolicy:
+    if structure_limits is not None and structure_limits.allowed_root_code_files == QualityStructureLimits().allowed_root_code_files:
+        structure_limits = replace(structure_limits, allowed_root_code_files=("index.ts", "index.js", "index.tsx", "index.jsx", "index.mts", "index.mjs"))
+    return QualityPolicy(
+        thresholds=thresholds or QualityThresholds(), structure_limits=structure_limits,
+        structure_roles=structure_roles or QualityStructureRoles(base_lib_paths=(), infer_roles_from_path=False),
+        structure_conventions=QualityStructureConventions(
+            code_label="JavaScript/TypeScript", package_entry="index.ts",
+            suggested_entry_files=("index.ts", "index.js"), public_entry_stems=("index", "api", "types"),
+            ignored_prefix_stems=("index",), internal_suffixes=("_helpers", "_rules", "_visitors", "_validators", "-internal"),
+            source_extension=".ts", require_exports_for_public_entry=True,
+        ),
+    )
+
+
 def scan_javascript_quality(
     root: Path | str,
     *,
@@ -41,7 +59,6 @@ def scan_javascript_quality(
     structure_limits: QualityStructureLimits | None = None,
     structure_roles: QualityStructureRoles | None = None,
     registered_catalogs: object | None = None,
-    policy_data: Mapping[str, object] | None = None,
     excluded_dirs: Iterable[str] = DEFAULT_EXCLUDED_DIRS,
     node_command: str = "node",
     facts_cache: MutableMapping[str, DriverQualityResult] | None = None,
@@ -51,7 +68,7 @@ def scan_javascript_quality(
     selected = Path(root).expanduser().resolve()
     files = tuple(_iter_source_files(selected, set(excluded_dirs)))
     project_root = selected if selected.is_dir() else selected.parent
-    ownership, descriptors = (
+    ownership, _ = (
         registered_implementation_requests(
             registered_catalogs,
             project_root=project_root,
@@ -77,46 +94,16 @@ def scan_javascript_quality(
     }:
         raise AotToolchainError("QUALITY.FACTS.MISSING", "JavaScript parser omitted selected source files")
     findings = list(_finding_fact(item) for item in facts.findings)
-    if ownership and policy_data is not None:
-        for item in evaluate_registered_facts(
-            facts, ownership, descriptors,
-            project_root=project_root, policy_data=policy_data,
-        ):
-            if item.rule_id == "QUALITY.SYNTAX.JAVASCRIPT":
-                continue
-            details = dict(item.details)
-            source = str(details.get("source", ""))
-            export = str(details.get("export", ""))
-            findings.append(QualityFinding(
-                rule_id=item.rule_id,
-                severity=item.severity,
-                object_type=item.object_type,
-                object_id=f"{item.object_id}:{source}:{export}",
-                message=item.message,
-                source_location=item.source_location,
-                suggested_fix_type=item.suggested_fix_type,
-                details=details,
-            ))
     return evaluate_project_quality(
         ProjectQualityFacts(
             root=str(selected if selected.is_dir() else selected.parent),
             files=parsed_files,
             findings=tuple(findings),
         ),
-        QualityPolicy(
-            thresholds=thresholds or QualityThresholds(),
+        javascript_quality_policy(
+            thresholds=thresholds,
             structure_limits=structure_limits,
-            structure_roles=structure_roles or QualityStructureRoles(base_lib_paths=(), infer_roles_from_path=False),
-            structure_conventions=QualityStructureConventions(
-                code_label="JavaScript/TypeScript",
-                package_entry="index.ts",
-                suggested_entry_files=("index.ts", "index.js"),
-                public_entry_stems=("index", "api", "types"),
-                ignored_prefix_stems=("index",),
-                internal_suffixes=("_helpers", "_rules", "_visitors", "_validators", "-internal"),
-                source_extension=".ts",
-                require_exports_for_public_entry=True,
-            ),
+            structure_roles=structure_roles,
         ),
     )
 
@@ -217,4 +204,4 @@ def _finding_fact(row: Mapping[str, object]) -> QualityFinding:
     )
 
 
-__all__ = ["DEFAULT_EXCLUDED_DIRS", "scan_javascript_quality"]
+__all__ = ["DEFAULT_EXCLUDED_DIRS", "javascript_quality_policy", "scan_javascript_quality"]

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
+import shutil
 
 from vibeflow.tooling.application.javascript.build import (
     ProjectBuildRequest,
@@ -15,15 +17,19 @@ EXAMPLE_ROOT = REPOSITORY_ROOT / "sandbox" / "javascript" / "minimal"
 def test_minimal_js_aot_example_prepares_without_importing_business_modules(
     tmp_path: Path,
 ) -> None:
+    example = tmp_path / "example"
+    shutil.copytree(EXAMPLE_ROOT, example, ignore=shutil.ignore_patterns("node_modules", "__pycache__"))
+    toolchain = Path(os.environ["VIBEFLOW_TEST_TOOLCHAIN_ROOT"])
+    (example / "project/node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
     prepared = prepare_project_build(
         ProjectBuildRequest(
-            workspace=EXAMPLE_ROOT / "vibeflow_config.jsonc",
-            config=EXAMPLE_ROOT / "project/configs/greeting.jsonc",
+            workspace=example / "vibeflow_config.jsonc",
+            config=example / "project/configs/greeting.jsonc",
             out_dir=tmp_path / "dist",
             target="browser",
             profile="web-app",
-            html_template=EXAMPLE_ROOT / "project/web/index.template.html",
-            app_entry=EXAMPLE_ROOT / "project/web/app.ts",
+            html_template=example / "project/web/index.template.html",
+            app_entry=example / "project/web/app.ts",
         )
     )
 

@@ -1,0 +1,52 @@
+{
+  "kind": "node",
+  "type_key": "semantic.inactive_route",
+  "display_name": "Semantic Inactive Route",
+  "category": "semantic",
+  "description": "Emits an inactive boolean route used to verify explicit any_active join behavior.",
+  "version": "0.1.0",
+  "flow_kind": "decision",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [],
+    "provides": [
+      {
+        "key": "flow.route",
+        "type": "flow.route",
+        "display_name": "flow.route"
+      }
+    ],
+    "input_semantics": {},
+    "output_semantics": {
+      "flow.route": [
+        "false route condition"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {},
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_semantic_nodes.py",
+        "export": "SemanticInactiveRouteNode"
+      }
+    }
+  ]
+}

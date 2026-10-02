@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
+import os
+import shutil
 from pathlib import Path
 from typing import Mapping
 
@@ -77,15 +79,19 @@ def test_real_projects_emit_deterministic_bound_modules(
     tmp_path: Path,
     config_name: str,
 ) -> None:
+    example = tmp_path / "integration"
+    shutil.copytree(TYPESCRIPT_SANDBOX, example, ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc"))
+    toolchain = Path(os.environ["VIBEFLOW_TEST_TOOLCHAIN_ROOT"])
+    (example / "project/node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
     prepared = prepare_project_build(
         ProjectBuildRequest(
             workspace=(
-                TYPESCRIPT_HOST_WORKSPACE
+                example / "vibeflow_host_config.jsonc"
                 if config_name
                 in {"host_extension.jsonc", "permanent_port_host.jsonc"}
-                else TYPESCRIPT_WORKSPACE
+                else example / "vibeflow_config.jsonc"
             ),
-            config=TYPESCRIPT_PROJECT / "configs" / config_name,
+            config=example / "project/configs" / config_name,
             out_dir=tmp_path / config_name,
             target="node",
             profile="single-esm",

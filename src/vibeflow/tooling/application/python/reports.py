@@ -150,7 +150,7 @@ def format_finding_text(finding: HealthFinding) -> str:
     )
     if finding.details:
         details = json.dumps(
-            dict(finding.details),
+        finding.to_dict()["details"],
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),

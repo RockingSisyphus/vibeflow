@@ -300,7 +300,7 @@ def run_stub(inputs, params):
 
 
 @pytest.mark.parametrize("delegate_cli", [False, True])
-def test_planned_python_stub_system_exit_is_always_pipeline_failure(tmp_path, delegate_cli) -> None:
+def test_planned_python_stub_system_exit_obeys_delegate_protocol(tmp_path, delegate_cli) -> None:
     _stub_project(
         tmp_path,
         """
@@ -317,11 +317,17 @@ def run_stub(inputs, params):
         delegate_cli=delegate_cli,
     )
 
-    with pytest.raises(PipelineRuntimeError, match="planned python_stub.*attempted SystemExit"):
-        runtime.run({"value.in": 5})
-
-    assert runtime.trace.stop_reason == "node_failed"
-    assert "planned stubs use effect scope none" in runtime.trace.exception
+    assert runtime._plan.frame("stub").effect_scope == "unconstrained"
+    if delegate_cli:
+        result = runtime.run({"value.in": 5})
+        assert result.get("cli.exit_code")["value"] == 4
+        assert runtime.trace.stop_reason == "business_exit"
+        assert runtime.trace.exception == ""
+    else:
+        with pytest.raises(PipelineRuntimeError, match="planned python_stub.*attempted SystemExit outside delegate CLI mode"):
+            runtime.run({"value.in": 5})
+        assert runtime.trace.stop_reason == "node_failed"
+        assert "outside delegate CLI mode" in runtime.trace.exception
 
 
 def test_planned_python_stub_nodeset_executes_as_single_stub(tmp_path) -> None:

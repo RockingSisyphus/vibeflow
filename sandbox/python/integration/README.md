@@ -1,6 +1,6 @@
 # 集成沙盒
 
-这个目录模拟真实业务项目使用 `vibeflow` 的方式：业务侧只编写 node、受控 `base_lib`、插件和 JSONC 配置。运行器通过 `pyproject.toml` 与 `src/vibeflow` 自动定位仓库，不会在 Sandbox 中创建内核软链接。
+这个目录模拟真实业务项目使用 `vibeflow` 的方式：业务侧编写执行 Node、独立 Node 声明、`base_lib`、Rule/Ruleset、生命周期插件和 JSONC 配置。Node 类只保留执行代码；`project/manifests/nodes` 是元数据与契约的权威来源。运行器通过 `pyproject.toml` 与 `src/vibeflow` 自动定位仓库，不会在 Sandbox 中创建内核软链接。
 
 运行：
 
@@ -8,7 +8,7 @@
 PYTHONPATH=src python sandbox/python/integration/run_all.py
 ```
 
-脚本会把项目复制到临时目录，并在同一临时目录执行 `npm ci` 安装 Mermaid CLI/Puppeteer，再批量运行合法配置、非法 node、非法 `base_lib`、非法配置和非法插件。默认不在源码树留下依赖、报告或运行产物；需要检查产物时使用 `--keep-artifacts`，结果会写入本目录的 `.artifacts/`。它还会使用真实 CLI 验证本工作区新增的 `review` 审核流程：
+脚本会把项目复制到临时目录，并在同一临时目录执行 `npm ci` 安装 Mermaid CLI/Puppeteer，再批量运行合法配置、非法 Node 源码、非法独立声明、非法 `base_lib`、非法配置和 Rule 处理器错误。可以用 `VIBEFLOW_MERMAID_RENDERER_ROOT` 复用已经按锁文件安装的渲染器。默认不在源码树留下依赖、报告或运行产物；需要检查产物时使用 `--keep-artifacts`，结果会写入本目录的 `.artifacts/`。它还会使用真实 CLI 验证本工作区新增的 `review` 审核流程：
 
 - 对已登记的嵌套 nodeset workflow，先写入陈旧架构，再确认 `review` 自动刷新 canonical `ARCHITECTURE.jsonc` 并发布 expanded `review-columns` SVG。
 - 对未登记的 workflow，确认返回 `REVIEW.ARCHITECTURE.UNREGISTERED`，不修改已登记架构，也不发布 SVG。
@@ -43,7 +43,9 @@ python tools/run_tests.py -- tests/targets/python/test_quality_workspace_sandbox
 - `1`：合法 case 失败，或非法 case 未被拒绝。
 - `2`：环境错误，例如无法定位仓库源码。
 
-本目录包含故意违规的 Python 文件，用于验证内核能拒绝坏代码。仓库自检器应把这些已知反例按 fixture 精确归属，不能把它们误报为 VibeFlow 源码问题，也不能因此跳过整个 Sandbox。
+Node 声明显式选择 `vibeflow.process`、`vibeflow.io`、`vibeflow.document` 或 `vibeflow.global_state` 等 Ruleset；这些规则的执行记录决定报告中的允许副作用范围。`rulesets: []` 的原生执行机制 fixture 不隐式补充源码审查。`project/rules/checks.py` 和独立 Rule 资源验证正常诊断、处理器异常、返回结构错误以及必需 record 缺失；compiler/runtime 插件仍只参与各自生命周期。源码预检先解析实际导入闭包，再运行选中的 import Rule，不导入业务模块。
+
+本目录包含故意违规的 Python 文件和独立 JSONC 声明，用于验证所选规则或声明解析器能拒绝相应问题。仓库自检器应把这些已知反例按 fixture 精确归属，不能把它们误报为 VibeFlow 源码问题，也不能因此跳过整个 Sandbox。
 
 ## Flowchart 示例
 

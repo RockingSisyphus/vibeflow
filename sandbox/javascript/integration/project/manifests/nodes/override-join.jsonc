@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.override_join",
   "display_name": "Join override siblings",
   "category": "sandbox",

@@ -34,11 +34,10 @@ def _registry_flow_kinds(graph, registry) -> dict[str, str]:
         if node.status == STATUS_PLANNED:
             continue
         try:
-            node_cls = registry.get(node.type_used)
+            descriptor = registry.descriptor(node.type_used)
         except Exception:
             continue
-        info = getattr(node_cls, "NODE_INFO", None)
-        flow_kind = str(getattr(info, "flow_kind", ""))
+        flow_kind = descriptor.flow_kind
         if flow_kind:
             kinds[node.name] = flow_kind
     return kinds

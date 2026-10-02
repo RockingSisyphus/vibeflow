@@ -14,8 +14,12 @@ class _Findings:
 
 def _flow(context, inputs, params):
     from vibeflow.core.quality.workflow_rules.flow import _flowchart_health_facts
+    from vibeflow.core.quality.workflow_rules.flow_data import append_data_contract_warnings
     state = _Findings()
     _flowchart_health_facts(context.require("graph"), context.require("compiled"), state, owner=context.facts.get("owner", "pipeline"))
+    append_data_contract_warnings(context.require("graph"), context.require("compiled"), state,
+                                  owner=context.facts.get("owner", "pipeline"),
+                                  runtime_flow_kinds=context.facts.get("runtime_flow_kinds"))
     return RuleResult(findings=tuple((*state.errors, *state.warnings)))
 
 
@@ -77,7 +81,8 @@ def workflow_rule_checks(context, inputs, params):
         findings.extend(_duplicates(context, inputs, params).findings)
     planned = _planned(context, inputs, params)
     findings.extend(planned.findings)
-    return RuleResult({"planned_events": planned.records["events"]}, tuple(findings))
+    return RuleResult({"planned_events": planned.records["events"],
+                       "workflow_review": RuleRecord("vibeflow.workflow_review.v1", {"mainline": {}})}, tuple(findings))
 
 
 __all__ = ["evaluate_workflow_topic", "workflow_rule_checks", "workflow_topic_handlers", "workflow_topic_resources"]

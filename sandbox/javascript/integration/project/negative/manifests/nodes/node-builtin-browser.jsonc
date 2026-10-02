@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.invalid.node_builtin_browser",
   "display_name": "Invalid browser Node builtin",
   "category": "sandbox-negative",

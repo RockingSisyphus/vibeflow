@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.loop_increment",
   "display_name": "Loop increment",
   "category": "sandbox",

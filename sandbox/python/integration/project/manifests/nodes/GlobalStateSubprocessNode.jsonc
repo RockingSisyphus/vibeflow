@@ -1,0 +1,47 @@
+{
+  "kind": "node",
+  "type_key": "bad.global_state.subprocess",
+  "display_name": "Forbidden Global State Effect",
+  "category": "sandbox",
+  "description": "Verifies that global_state does not grant unrelated effects.",
+  "version": "0.1.0",
+  "flow_kind": "global_state",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [],
+    "provides": [
+      {
+        "key": "bad.out",
+        "type": "bad.out",
+        "display_name": "Bad Out"
+      }
+    ],
+    "input_semantics": {},
+    "output_semantics": {
+      "bad.out": [
+        "Unreachable output for an invalid node."
+      ]
+    },
+    "params_schema": {},
+    "params_defaults": {},
+    "examples": []
+  },
+  "rulesets": [
+    "vibeflow.global_state"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "illegal_nodes/global_state_effect_cases.py",
+        "export": "GlobalStateSubprocessNode"
+      }
+    }
+  ]
+}

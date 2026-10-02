@@ -1,4 +1,4 @@
-"""Persistent Node JSONL session for JavaScript build-time plugins."""
+"""Persistent Node JSONL session for JavaScript lifecycle plugins and Rules."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from importlib.resources import as_file
 import json
 from pathlib import Path
 import subprocess
+import tempfile
 from typing import Any, Mapping
 
 from vibeflow.targets.javascript.resources import resource
@@ -22,24 +23,26 @@ class PluginHookResult:
 
 
 class JavascriptPluginSession:
-    """Own one plugin worker process for a deterministic build session."""
+    """Own one worker process for a lifecycle or formal Rule check session."""
 
     def __init__(self, *, node_command: str = "node") -> None:
         self.node_command = str(node_command)
         self._resource_context = None
         self._process: subprocess.Popen[str] | None = None
         self._opened: list[str] = []
+        self._stderr = None
 
     def __enter__(self) -> JavascriptPluginSession:
         context = as_file(resource("plugin_worker.mjs"))
         worker_path = context.__enter__()
         self._resource_context = context
+        self._stderr = tempfile.TemporaryFile(mode="w+t", encoding="utf-8")
         try:
             self._process = subprocess.Popen(
                 [self.node_command, str(worker_path)],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=self._stderr,
                 text=True,
                 encoding="utf-8",
                 bufsize=1,
@@ -47,6 +50,8 @@ class JavascriptPluginSession:
         except Exception:
             context.__exit__(None, None, None)
             self._resource_context = None
+            self._stderr.close()
+            self._stderr = None
             raise
         return self
 
@@ -70,6 +75,26 @@ class JavascriptPluginSession:
             }
         )
         self._opened.append(str(session_id))
+
+    def open_rule(
+        self, session_id: str, *, rule: Mapping[str, Any],
+        package_root: str | Path, target: str = "javascript",
+    ) -> None:
+        self._request({
+            "command": "openRule", "sessionId": session_id, "rule": dict(rule),
+            "packageRoot": str(Path(package_root).resolve()), "target": target,
+        })
+        self._opened.append(session_id)
+
+    def evaluate_rule(
+        self, session_id: str, *, context: Mapping[str, Any],
+        params: Mapping[str, Any], inputs: Mapping[str, Any],
+    ) -> object:
+        response = self._request({
+            "command": "evaluateRule", "sessionId": session_id,
+            "context": dict(context), "params": dict(params), "inputs": dict(inputs),
+        })
+        return response.get("result")
 
     def invoke(
         self,
@@ -118,6 +143,9 @@ class JavascriptPluginSession:
         self._resource_context = None
         if context is not None:
             context.__exit__(exc_type, exc, traceback)
+        if self._stderr is not None:
+            self._stderr.close()
+            self._stderr = None
 
     def _request(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
         process = self._process
@@ -139,7 +167,10 @@ class JavascriptPluginSession:
         process.stdin.flush()
         line = process.stdout.readline()
         if not line:
-            stderr = process.stderr.read() if process.stderr is not None else ""
+            stderr = ""
+            if self._stderr is not None:
+                self._stderr.seek(0)
+                stderr = self._stderr.read()
             raise JavascriptPluginError(
                 "VF_PLUGIN_PROCESS",
                 f"JavaScript plugin worker exited unexpectedly: {stderr.strip()}",

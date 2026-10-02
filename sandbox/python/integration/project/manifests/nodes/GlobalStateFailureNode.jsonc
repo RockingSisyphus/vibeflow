@@ -1,0 +1,42 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.global_state_failure",
+  "display_name": "Global State Failure",
+  "category": "sandbox",
+  "description": "Fails after changing audited process-local ambient state.",
+  "version": "0.1.0",
+  "flow_kind": "global_state",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [],
+    "provides": [],
+    "input_semantics": {},
+    "output_semantics": {},
+    "examples": [
+      {
+        "inputs": {},
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.global_state"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_global_state_nodes.py",
+        "export": "GlobalStateFailureNode"
+      }
+    }
+  ]
+}

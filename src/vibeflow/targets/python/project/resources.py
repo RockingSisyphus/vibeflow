@@ -7,7 +7,7 @@ the target.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 from vibeflow.core.flow import STATUS_IMPLEMENTED, STATUS_PLANNED
@@ -94,7 +94,7 @@ class BaseLibResource:
 class PluginResource:
     name: str
     id: str = ""
-    plugin_type: str = "policy"
+    plugin_type: str = "runtime"
     status: str = STATUS_IMPLEMENTED
     module: str = ""
     class_name: str = "Plugin"
@@ -103,6 +103,9 @@ class PluginResource:
     description: str = ""
     version: str = ""
     config_keys: tuple[str, ...] = ()
+    config_schema: Mapping[str, Any] = field(default_factory=dict)
+    config_defaults: Mapping[str, Any] = field(default_factory=dict)
+    priority: int = 100
     info: PluginInfo | None = None
     root_id: str = ""
     root_path: str = ""
@@ -181,11 +184,14 @@ class PluginResourceRegistry:
         *,
         module: str,
         class_name: str = "Plugin",
-        plugin_type: str = "policy",
+        plugin_type: str = "runtime",
         display_name: str,
         description: str,
         category: str = "",
         version: str = "",
+        config_schema: Mapping[str, Any] | None = None,
+        config_defaults: Mapping[str, Any] | None = None,
+        priority: int = 100,
     ) -> None:
         resource_id = _required_id(id, "plugin id")
         if resource_id in self._resources:
@@ -193,7 +199,7 @@ class PluginResourceRegistry:
         self._resources[resource_id] = PluginResource(
             id=resource_id,
             name=resource_id,
-            plugin_type=str(plugin_type).strip() or "policy",
+            plugin_type=str(plugin_type).strip() or "runtime",
             status=STATUS_IMPLEMENTED,
             module=_required_id(module, "plugin module"),
             class_name=str(class_name).strip() or "Plugin",
@@ -201,6 +207,7 @@ class PluginResourceRegistry:
             category=str(category).strip(),
             description=str(description).strip(),
             version=str(version).strip(),
+            config_schema=dict(config_schema or {}), config_defaults=dict(config_defaults or {}), priority=priority,
         )
 
     def get(self, id: str) -> PluginResource | None:

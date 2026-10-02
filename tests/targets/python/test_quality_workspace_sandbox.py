@@ -33,26 +33,11 @@ def workspace_case(tmp_path: Path, distribution_seed: Path) -> Path:
     base_lib.mkdir(parents=True)
     (base_lib / "__init__.py").write_text("", encoding="utf-8")
     (base_lib / "shared_math.py").write_text(
-        'from vibeflow.core import DataProvider, DataRequirement\n'
-        'from vibeflow.targets.python.project import BaseLibInfo\n'
-        'BASE_LIB_INFO = BaseLibInfo("base_lib.shared_math", "Shared math", '
-        '"math", "Pure helper owned by the sibling root.", "1.0.0")\n'
-        '\ndef identity(value):\n    return value\n'
-        '\ndef require(data_type, display_name):\n'
-        '    return DataRequirement(type=data_type, cardinality="exactly_one", display_name=display_name)\n'
-        '\ndef provide(key, data_type, display_name):\n'
-        '    return DataProvider(key=key, type=data_type, display_name=display_name)\n',
-        encoding="utf-8",
-    )
-    (framework / "registry.py").write_text(
-        'from vibeflow.targets.python.project import NodeRegistry\n'
-        '\ndef build_node_registry():\n    return NodeRegistry()\n',
-        encoding="utf-8",
+        'def identity(value):\n    return value\n', encoding="utf-8",
     )
     (framework / "vibeflow_project.jsonc").write_text(
         json.dumps({
             "project_target": "python",
-            "registry": "registry.py:build_node_registry",
             "base_lib": {"paths": ["base_lib"]},
             "quality_enabled": True,
         }),
@@ -68,21 +53,16 @@ def workspace_case(tmp_path: Path, distribution_seed: Path) -> Path:
     project_config = project / "vibeflow_project.jsonc"
     data = json.loads(project_config.read_text(encoding="utf-8"))
     data.pop("architecture")
+    data["registry"] = "resources.py:build_base_lib_registry"
     project_config.write_text(json.dumps(data), encoding="utf-8")
     node_source = project / "nodes/workflow_nodes.py"
     source = node_source.read_text(encoding="utf-8")
-    source = source.replace(
-        "from vibeflow.core import DataProvider, DataRequirement",
-        "from base_lib.shared_math import identity, require as _require, provide as _provide",
-    ).replace(
+    source = 'from base_lib.shared_math import identity\n' + source.replace(
         '_value(inputs, "payload.internal")',
         'identity(_value(inputs, "payload.internal"))',
     )
-    helpers_start = source.index("def _require(")
-    helpers_end = source.index("def _value(")
-    source = source[:helpers_start] + source[helpers_end:]
     node_source.write_text(source, encoding="utf-8")
-    registry = project / "registry.py"
+    registry = project / "resources.py"
     with registry.open("a", encoding="utf-8") as handle:
         handle.write(
             '\nfrom vibeflow.targets.python.project import BaseLibRegistry\n'
@@ -135,7 +115,7 @@ def test_root_quality_retains_sibling_base_lib_context(workspace_case: Path, ent
     assert report["effective_policy"]["base_lib"]["allowed_modules"] == ["base_lib.shared_math"]
     assert {root["id"] for root in report["info"]["workspace"]["roots"]} == {"framework", "project"}
     assert {item["path"] for item in quality["source_quality"]["files"]} == {
-        "__init__.py", "registry.py", "nodes/__init__.py", "nodes/workflow_nodes.py",
+        "__init__.py", "resources.py", "nodes/__init__.py", "nodes/workflow_nodes.py",
     }
 
 

@@ -1,0 +1,69 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.numeric_path_left",
+  "display_name": "通过 Path 读取左数值",
+  "category": "sandbox",
+  "description": "使用 Path.read_text 读取左侧整数文件。",
+  "version": "0.1.0",
+  "flow_kind": "document",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "cli.left_path",
+        "cardinality": "exactly_one",
+        "display_name": "cli.left_path"
+      }
+    ],
+    "provides": [
+      {
+        "key": "number.left",
+        "type": "number.left",
+        "display_name": "number.left"
+      }
+    ],
+    "input_semantics": {
+      "cli.left_path": [
+        "左侧数值文件路径。"
+      ]
+    },
+    "output_semantics": {
+      "number.left": [
+        "左侧文件中的整数。"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "cli.left_path": {
+            "key": "cli.left_path",
+            "type": "cli.left_path",
+            "value": "left.txt",
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.document"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_delegate_numeric_nodes.py",
+        "export": "NumericPathLeftNode"
+      }
+    }
+  ]
+}

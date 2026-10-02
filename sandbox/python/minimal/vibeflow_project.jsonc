@@ -1,0 +1,8 @@
+{
+  "project_target": "python",
+  "descriptors": {
+    "nodes": [
+      "manifests/nodes"
+    ]
+  }
+}

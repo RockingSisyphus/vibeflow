@@ -1,0 +1,52 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.global_state_probe",
+  "display_name": "Global State Probe",
+  "category": "sandbox",
+  "description": "Changes audited process-local ambient state without using any third-party library.",
+  "version": "0.1.0",
+  "flow_kind": "global_state",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [],
+    "provides": [
+      {
+        "key": "value.out",
+        "type": "value.out",
+        "display_name": "Value Out"
+      }
+    ],
+    "input_semantics": {},
+    "output_semantics": {
+      "value.out": [
+        "Number of real runtime invocations; structural examples must not increment it."
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {},
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.global_state"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_global_state_nodes.py",
+        "export": "GlobalStateProbeNode"
+      }
+    }
+  ]
+}

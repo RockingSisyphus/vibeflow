@@ -17,8 +17,6 @@ from vibeflow.targets.python.project.policy import (
     DEFAULT_POLICY_DATA,
     EffectivePolicy,
     PolicyResolveResult,
-    apply_policy_plugins as _target_apply_policy_plugins,
-    apply_policy_to_findings,
     default_effective_policy,
 )
 from vibeflow.tooling.project.quality_policy import resolve_shared_quality_policy
@@ -40,8 +38,6 @@ def resolve_effective_policy(
     sources = list(resolved_sources)
     findings = list(resolved_findings)
 
-    if plugin_registry is not None:
-        _apply_policy_plugins(effective, sources, findings, plugin_registry)
 
     _apply_config_base_lib_declarations(
         effective,
@@ -53,21 +49,6 @@ def resolve_effective_policy(
     return PolicyResolveResult(
         EffectivePolicy(effective, tuple(sources)),
         tuple(findings),
-    )
-
-
-def _apply_policy_plugins(
-    effective: dict[str, Any],
-    sources: list[str],
-    findings: list[HealthFinding],
-    plugin_registry: PluginRegistry,
-) -> None:
-    _target_apply_policy_plugins(
-        effective,
-        sources,
-        findings,
-        plugin_registry,
-        collect_schema_findings=collect_policy_schema_findings,
     )
 
 
@@ -94,7 +75,6 @@ __all__ = [
     "DEFAULT_POLICY_DATA",
     "EffectivePolicy",
     "PolicyResolveResult",
-    "apply_policy_to_findings",
     "default_effective_policy",
     "resolve_effective_policy",
 ]

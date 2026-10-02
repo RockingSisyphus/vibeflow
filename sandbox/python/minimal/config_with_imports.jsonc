@@ -1,15 +1,4 @@
 {
-  "plugins": [
-    {
-      "module": "plugins.py",
-      "class": "Plugin",
-      "type": "policy",
-      "display_name": "Example Policy",
-      "category": "example",
-      "description": "Policy plugin for the minimal imported-nodeset example.",
-      "version": "0.1.0"
-    }
-  ],
   "base_lib": {
     "paths": [
       "base_lib"
@@ -49,7 +38,6 @@
       {
         "display_name": "Seed Value",
         "description": "Produces the initial value.",
-
         "value": 4,
         "id": "seed",
         "type_used": "example.seed"
@@ -57,15 +45,12 @@
       {
         "display_name": "Add One Flow",
         "description": "Runs the imported add-one nodeset.",
-
-
         "id": "add_one_flow",
         "type_used": "example.add_one"
       },
       {
         "display_name": "End",
         "description": "Consumes the final pipeline output.",
-
         "id": "end",
         "type_used": "example.end"
       }

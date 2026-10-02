@@ -9,6 +9,7 @@
       "docs/user/javascript-development.md",
       "docs/user/nodesets-and-loops.md",
       "docs/user/plugins-and-integrations.md",
+      "docs/user/rules-and-categories.md",
       "docs/user/commands-and-results.md"
     ],
     "collaborative": [
@@ -24,7 +25,10 @@
         "distribution/prompts/common.md",
         "distribution/prompts/collaborative.md"
       ],
-      "document_sets": ["common", "collaborative"],
+      "document_sets": [
+        "common",
+        "collaborative"
+      ],
       "agent_protocol": {
         "change_inventory": "required",
         "planned_review": true,
@@ -44,7 +48,10 @@
         "distribution/prompts/common.md",
         "distribution/prompts/autonomous.md"
       ],
-      "document_sets": ["common", "autonomous"],
+      "document_sets": [
+        "common",
+        "autonomous"
+      ],
       "agent_protocol": {
         "change_inventory": "optional",
         "planned_review": false,

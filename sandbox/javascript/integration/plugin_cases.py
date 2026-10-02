@@ -12,13 +12,12 @@ def plugin_manifest_case(result: object) -> dict[str, Any]:
     plugins = manifest["plugins"]
     active = plugins["active"]
     declared = plugins["declared"]
-    assert manifest["plugin_abi_version"] == "vibeflow.plugin.v1"
+    assert manifest["plugin_abi_version"] == "vibeflow.plugin.v2"
     assert [item["id"] for item in active] == [
-        "sandbox.policy_audit",
         "sandbox.compiler_audit",
         "sandbox.runtime_audit",
     ]
-    assert len(declared) == 4
+    assert len(declared) == 3
     assert plugins["planned"] == ["sandbox.future_runtime"]
     for item in active:
         assert len(item["source_hash"]) == 64
@@ -38,11 +37,8 @@ def build_plugin_hook_case(result: object) -> dict[str, Any]:
     annotations = manifest["plugins"]["annotations"]
     hooks = [item["hook"] for item in annotations]
     assert hooks == [
-        "extendPolicy",
-        "validateGraph",
         "beforeCompile",
         "afterCompile",
-        "validateCompiledGraph",
     ]
     source = getattr(result, "entry").read_text(encoding="utf-8")
     assert "policy_audit" not in source

@@ -98,7 +98,7 @@ def validate_owned_build_directory(
         _invalid_manifest("project_target must be 'javascript'")
     _require_text(manifest, "workflow_id")
     if "plugin_abi_version" in manifest:
-        if manifest.get("plugin_abi_version") != "vibeflow.plugin.v1":
+        if manifest.get("plugin_abi_version") != "vibeflow.plugin.v2":
             _invalid_manifest("plugin_abi_version is invalid")
         _validate_plugins(manifest.get("plugins"))
     if manifest.get("entry_mode") not in {"sync", "async"}:
@@ -198,7 +198,6 @@ def _validate_plugins(value: Any) -> None:
         "annotations",
         "declared",
         "planned",
-        "relaxations",
     }:
         _invalid_manifest("plugins must contain the canonical plugin fields")
     for field in (
@@ -206,7 +205,6 @@ def _validate_plugins(value: Any) -> None:
         "annotations",
         "declared",
         "planned",
-        "relaxations",
     ):
         if not isinstance(value.get(field), list):
             _invalid_manifest(f"plugins.{field} must be a list")

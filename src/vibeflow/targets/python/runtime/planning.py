@@ -60,6 +60,7 @@ class NodeFrame:
     is_terminal: bool
     is_nodeset: bool
     status: str = STATUS_IMPLEMENTED
+    effect_scope: str = "unconstrained"
     transfer_incoming: tuple[EdgeSpec, ...] = ()
     transfer_outgoing: tuple[EdgeSpec, ...] = ()
     is_loop: bool = False
@@ -176,7 +177,6 @@ def build_execution_plan(
     global_config: Mapping[str, Any] | ConfigScope | None = None,
     runtime_options: object | None = None,
     plugin_registry: object | None = None,
-    _check_nodeset_depth: bool = True,
     _contracts_resolved: bool = False,
     _path: tuple[str, ...] = (),
 ) -> ExecutionPlan:
@@ -190,15 +190,6 @@ def build_execution_plan(
         )
         graph = compilation.workflow.graph
         compiled = compilation.compiled_graph
-    if _check_nodeset_depth:
-        options = normalize_runtime_options(runtime_options)
-        violations = nodeset_depth_violations(graph, max_depth=options.nodeset_max_depth)
-        if violations:
-            violation = violations[0]
-            raise PipelineRuntimeError(
-                f"nodeset nesting depth {violation.actual_depth} exceeds configured maximum "
-                f"{violation.limit}: {' -> '.join(violation.chain)}"
-            )
     try:
         overrides = normalize_node_config_overrides(node_config_overrides or {})
     except ConfigBindingError as exc:
@@ -343,7 +334,6 @@ def _frame_for(
                 node_config_overrides=nested_overrides,
                 global_config=child_scope,
                 runtime_options=runtime_options,
-                _check_nodeset_depth=False,
                 _contracts_resolved=True,
                 _path=(*path, spec.id),
             ),
@@ -383,7 +373,6 @@ def _frame_for(
                 node_config_overrides=nested_overrides,
                 global_config=child_scope,
                 runtime_options=runtime_options,
-                _check_nodeset_depth=False,
                 _contracts_resolved=True,
                 _path=(*path, spec.id),
             ),
@@ -426,6 +415,7 @@ def _frame_for(
         transfer_incoming=transfer_incoming,
         transfer_outgoing=transfer_outgoing,
         flow_kind=flow_kind,
+        effect_scope=compiled.effect_scopes.get(spec.id, "unconstrained"),
         is_terminal=flow_kind == "terminal",
         is_nodeset=False,
         status=frame_status,
@@ -475,6 +465,7 @@ def _planned_stub_frame(
         transfer_incoming=transfer_incoming,
         transfer_outgoing=transfer_outgoing,
         flow_kind=flow_kind,
+        effect_scope="unconstrained",
         is_terminal=flow_kind == "terminal",
         is_nodeset=nodeset is not None,
         status=status,

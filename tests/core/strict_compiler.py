@@ -1,3 +1,4 @@
+from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
 
 import time
@@ -7,30 +8,29 @@ import vibeflow.core.compiler as core_compiler
 from vibeflow.core.flow import NodeSpec
 
 
-class RouteNode:
-    NODE_INFO = NodeInfo(
+RouteNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.route",
         display_name="Route",
         category="test",
         description="Routes the next step.",
         version="0.1.0",
         flow_kind="decision",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         requires=(DataRequirement("value.out", "exactly_one", display_name="Value Out"),),
         provides=(DataProvider("flow.route", "flow.route", display_name="Flow Route"),),
         input_semantics={"value.out": ("output value",)},
         output_semantics={"flow.route": ("branch route",)},
 
         examples=({"inputs": {"value.out": 1}, "params": {}},),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class RouteNode:
 
     def run_pure(self, inputs, params):
         return {"flow.route": "done"}
 
 
-class ExternalVisualNode:
-    NODE_INFO = NodeInfo(
+ExternalVisualNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.external_visual",
         display_name="External Visual",
         category="test",
@@ -38,15 +38,15 @@ class ExternalVisualNode:
         version="0.1.0",
         flow_kind="process",
         external=True,
-    )
-    CONTRACT = NodeContract()
+    ), NodeContract(), rulesets=("vibeflow.process",))
+
+class ExternalVisualNode:
 
     def run_pure(self, inputs, params):
         return {}
 
 
-class ExternalResultVisualNode(ExternalVisualNode):
-    NODE_INFO = NodeInfo(
+ExternalResultVisualNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.external_result_visual",
         display_name="External Result Visual",
         category="test",
@@ -54,52 +54,52 @@ class ExternalResultVisualNode(ExternalVisualNode):
         version="0.1.0",
         flow_kind="process",
         external=True,
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         provides=(DataProvider("external.result", "external.result", display_name="External Result"),),
         output_semantics={"external.result": ("external visual result",)},
-    )
+    ), rulesets=("vibeflow.process",))
+
+class ExternalResultVisualNode(ExternalVisualNode):
 
     def run_pure(self, inputs, params):
         return {"external.result": 1}
 
 
-class BackgroundVisualNode:
-    NODE_INFO = NodeInfo("test.background_visual", "Background Visual", "test", "Produces a detached background value.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+BackgroundVisualNode_DECLARATION = node_declaration(NodeInfo("test.background_visual", "Background Visual", "test", "Produces a detached background value.", "0.1.0", "process"), NodeContract(
         provides=(DataProvider("background.value", "background.value", display_name="Background Value"),),
         output_semantics={"background.value": ("detached background value",)},
-    )
+    ), rulesets=("vibeflow.process",))
+
+class BackgroundVisualNode:
 
     def run_pure(self, inputs, params):
         return {"background.value": 1}
 
 
-class GlobalVisualNode:
-    NODE_INFO = NodeInfo(
+GlobalVisualNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.global_visual",
         display_name="Global Visual",
         category="test",
         description="Exercises global-state cloud styling.",
         version="0.1.0",
         flow_kind="global_state",
-    )
-    CONTRACT = NodeContract()
+    ), NodeContract(), rulesets=("vibeflow.global_state",))
+
+class GlobalVisualNode:
 
     def run_pure(self, inputs, params):
         return {}
 
 
+from dataclasses import replace
+
+ExternalGlobalVisualNode_DECLARATION = replace(
+    GlobalVisualNode_DECLARATION, type_key="test.external_global_visual",
+    display_name="External Global Visual", description="Exercises external boundaries on a cloud shape.", external=True,
+)
+
 class ExternalGlobalVisualNode(GlobalVisualNode):
-    NODE_INFO = NodeInfo(
-        type_key="test.external_global_visual",
-        display_name="External Global Visual",
-        category="test",
-        description="Exercises external boundaries on a cloud shape.",
-        version="0.1.0",
-        flow_kind="global_state",
-        external=True,
-    )
+    pass
 
 
 def test_compiler_merges_duplicate_explicit_edges_with_when() -> None:
@@ -579,8 +579,8 @@ def test_mermaid_custom_style_overrides_health_class_color() -> None:
 
 def test_mermaid_external_boundary_composes_with_health_custom_style_and_async_metadata(tmp_path) -> None:
     registry = _registry()
-    register_node(registry, "test.external_visual", ExternalVisualNode)
-    register_node(registry, "test.external_result_visual", ExternalResultVisualNode)
+    register_node(registry, ExternalVisualNode_DECLARATION, ExternalVisualNode)
+    register_node(registry, ExternalResultVisualNode_DECLARATION, ExternalResultVisualNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -812,7 +812,7 @@ def test_compiler_applies_explicit_edge_roles_after_default_inference() -> None:
 
 def test_schedule_edges_keep_sync_mainline_before_async_branches() -> None:
     registry = _registry()
-    register_node(registry, "test.background_visual", BackgroundVisualNode)
+    register_node(registry, BackgroundVisualNode_DECLARATION, BackgroundVisualNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -905,45 +905,45 @@ def test_compiler_rejects_edge_with_no_effective_role_after_inference() -> None:
 def test_python_runtime_separates_schedule_and_transfer_edges(
     execution: str,
 ) -> None:
-    class GatePoisonNode:
-        NODE_INFO = NodeInfo(
+    GatePoisonNode_DECLARATION = node_declaration(NodeInfo(
             "test.edge_gate",
             "Edge Gate",
             "test",
             "Produces a same-typed value that must not cross a schedule-only edge.",
             "0.1.0",
             "process",
-        )
-        CONTRACT = NodeContract(
+        ), NodeContract(
             requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
             provides=(DataProvider("gate.value", "value.in", display_name="gate.value"),),
 
-        )
+        ), rulesets=("vibeflow.process",))
+
+    class GatePoisonNode:
 
         def run_pure(self, inputs, params):
             return {"gate.value": inputs["value.out"]["value"] + 100}
 
-    class MixedEdgeConsumerNode:
-        NODE_INFO = NodeInfo(
+    MixedEdgeConsumerNode_DECLARATION = node_declaration(NodeInfo(
             "test.edge_consumer",
             "Edge Consumer",
             "test",
             "Consumes only the transfer-only payload.",
             "0.1.0",
             "process",
-        )
-        CONTRACT = NodeContract(
+        ), NodeContract(
             requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"),),
             provides=(DataProvider("result", "mixed.result", display_name="result"),),
 
-        )
+        ), rulesets=("vibeflow.process",))
+
+    class MixedEdgeConsumerNode:
 
         def run_pure(self, inputs, params):
             return {"result": inputs["value.in"]["value"] + 10}
 
     registry = _registry()
-    register_node(registry, "test.edge_gate", GatePoisonNode)
-    register_node(registry, "test.edge_consumer", MixedEdgeConsumerNode)
+    register_node(registry, GatePoisonNode_DECLARATION, GatePoisonNode)
+    register_node(registry, MixedEdgeConsumerNode_DECLARATION, MixedEdgeConsumerNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1029,42 +1029,42 @@ def test_python_runtime_separates_schedule_and_transfer_edges(
 def test_terminal_records_outputs_and_transfer_before_completion(
     execution: str,
 ) -> None:
-    class TerminalProducerNode:
-        NODE_INFO = NodeInfo(
+    TerminalProducerNode_DECLARATION = node_declaration(NodeInfo(
             "test.terminal_producer",
             "Terminal Producer",
             "test",
             "Produces a final value before completing the workflow.",
             "0.1.0",
             "terminal",
-        )
-        CONTRACT = NodeContract(
+        ), NodeContract(
             provides=(DataProvider("terminal.value", "terminal.value", display_name="terminal.value"),),
 
-        )
+        ), rulesets=("vibeflow.process",))
+
+    class TerminalProducerNode:
 
         def run_pure(self, inputs, params):
             return {"terminal.value": 9}
 
-    class TransferSinkNode:
-        NODE_INFO = NodeInfo(
+    TransferSinkNode_DECLARATION = node_declaration(NodeInfo(
             "test.transfer_sink",
             "Transfer Sink",
             "test",
             "Accepts a transfer-only terminal value without being scheduled.",
             "0.1.0",
             "process",
-        )
-        CONTRACT = NodeContract(
+        ), NodeContract(
             requires=(DataRequirement("terminal.value", "exactly_one", display_name="terminal.value"),),
-        )
+        ), rulesets=("vibeflow.process",))
+
+    class TransferSinkNode:
 
         def run_pure(self, inputs, params):
             return {}
 
     registry = _registry()
-    register_node(registry, "test.terminal_producer", TerminalProducerNode)
-    register_node(registry, "test.transfer_sink", TransferSinkNode)
+    register_node(registry, TerminalProducerNode_DECLARATION, TerminalProducerNode)
+    register_node(registry, TransferSinkNode_DECLARATION, TransferSinkNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1224,9 +1224,7 @@ def test_mermaid_renders_while_loop_shape_class_and_stop_condition() -> None:
 
 
 def test_mermaid_edge_contract_labels_summarize_provider_key_type_mapping() -> None:
-    class MappingProducerNode:
-        NODE_INFO = NodeInfo("test.mapping_producer", "Mapping Producer", "test", "Produces three mapped values.", "0.1.0", "process")
-        CONTRACT = NodeContract(
+    MappingProducerNode_DECLARATION = node_declaration(NodeInfo("test.mapping_producer", "Mapping Producer", "test", "Produces three mapped values.", "0.1.0", "process"), NodeContract(
             provides=(
                 DataProvider("value.copy", "value.in", display_name="Value Copy"),
                 DataProvider("other.copy", "other.in", display_name="Other Copy"),
@@ -1237,14 +1235,14 @@ def test_mermaid_edge_contract_labels_summarize_provider_key_type_mapping() -> N
                 "other.copy": ("second mapped value",),
                 "extra.copy": ("third mapped value",),
             },
-        )
+        ), rulesets=("vibeflow.process",))
+
+    class MappingProducerNode:
 
         def run_pure(self, inputs, params):
             return {"value.copy": 1, "other.copy": 2, "extra.copy": 3}
 
-    class MappingConsumerNode:
-        NODE_INFO = NodeInfo("test.mapping_consumer", "Mapping Consumer", "test", "Consumes three mapped values.", "0.1.0", "process")
-        CONTRACT = NodeContract(
+    MappingConsumerNode_DECLARATION = node_declaration(NodeInfo("test.mapping_consumer", "Mapping Consumer", "test", "Consumes three mapped values.", "0.1.0", "process"), NodeContract(
             requires=(
                 DataRequirement("value.in", "exactly_one", display_name="Value In"),
                 DataRequirement("other.in", "exactly_one", display_name="Other In"),
@@ -1255,14 +1253,16 @@ def test_mermaid_edge_contract_labels_summarize_provider_key_type_mapping() -> N
                 "other.in": ("second mapped value",),
                 "extra.in": ("third mapped value",),
             },
-        )
+        ), rulesets=("vibeflow.process",))
+
+    class MappingConsumerNode:
 
         def run_pure(self, inputs, params):
             return {}
 
     registry = NodeRegistry()
-    register_node(registry, "test.mapping_producer", MappingProducerNode)
-    register_node(registry, "test.mapping_consumer", MappingConsumerNode)
+    register_node(registry, MappingProducerNode_DECLARATION, MappingProducerNode)
+    register_node(registry, MappingConsumerNode_DECLARATION, MappingConsumerNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1387,7 +1387,7 @@ def test_compiler_rejects_cycle_without_router() -> None:
 
 def test_compiler_rejects_cycle_with_decision_router() -> None:
     registry = _registry()
-    register_node(registry, "test.route", RouteNode)
+    register_node(registry, RouteNode_DECLARATION, RouteNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1417,7 +1417,7 @@ def test_graph_health_reports_forbidden_cycle() -> None:
     from tests.fixtures.support.strict_support_runtime_nodes import RouteNode as RuntimeRouteNode
 
     registry = _registry()
-    register_node(registry, "test.route", RuntimeRouteNode)
+    register_node(registry, RouteNode_DECLARATION, RuntimeRouteNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1445,7 +1445,7 @@ def test_graph_health_reports_forbidden_cycle() -> None:
 
 def test_compiler_rejects_unconditional_edge_from_decision() -> None:
     registry = _registry()
-    register_node(registry, "test.route", RouteNode)
+    register_node(registry, RouteNode_DECLARATION, RouteNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1468,7 +1468,7 @@ def test_compiled_payload_uses_registry_flow_kind() -> None:
     from vibeflow.tooling.application.python.presentation.mermaid import compiled_graph_payload
 
     registry = _registry()
-    register_node(registry, "test.route", RouteNode)
+    register_node(registry, RouteNode_DECLARATION, RouteNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1551,7 +1551,7 @@ def test_global_state_uses_cloud_shape_and_keeps_visual_styles(tmp_path) -> None
     mermaid = export_mermaid(graph)
 
     assert 'runtime_state@{ shape: cloud, label: "Runtime State' in mermaid
-    assert "effect_scope: global_state" in mermaid
+    assert "effect_scope: unavailable" in mermaid
     assert "class runtime_state plannedNode;" in mermaid
     assert "class runtime_state vibeflowCloudNode;" in mermaid
     assert (
@@ -1594,10 +1594,10 @@ def test_global_state_cloud_survives_health_external_and_custom_styles(
     tmp_path,
 ) -> None:
     registry = _registry()
-    register_node(registry, "test.global_visual", GlobalVisualNode)
+    register_node(registry, GlobalVisualNode_DECLARATION, GlobalVisualNode)
     register_node(
         registry,
-        "test.external_global_visual",
+        ExternalGlobalVisualNode_DECLARATION,
         ExternalGlobalVisualNode,
     )
     graph = parse_graph_config(

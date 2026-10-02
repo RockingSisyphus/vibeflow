@@ -1,0 +1,107 @@
+{
+  "kind": "node",
+  "type_key": "semantic.inner_loop_init",
+  "display_name": "Semantic Inner Loop Init",
+  "category": "semantic",
+  "description": "Passes outer state through and initializes the inner counter before a nested inner loop.",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "outer.current",
+        "cardinality": "exactly_one",
+        "display_name": "outer.current"
+      },
+      {
+        "type": "total.current",
+        "cardinality": "exactly_one",
+        "display_name": "total.current"
+      }
+    ],
+    "provides": [
+      {
+        "key": "outer.inner.seed",
+        "type": "outer.inner",
+        "display_name": "outer.inner.seed"
+      },
+      {
+        "key": "total.inner.seed",
+        "type": "total.inner",
+        "display_name": "total.inner.seed"
+      },
+      {
+        "key": "inner.current.seed",
+        "type": "inner.current",
+        "display_name": "inner.current.seed"
+      }
+    ],
+    "input_semantics": {
+      "outer.current": [
+        "current outer loop counter"
+      ],
+      "total.current": [
+        "running nested-loop total"
+      ]
+    },
+    "output_semantics": {
+      "outer.inner.seed": [
+        "outer counter passed into the inner loop"
+      ],
+      "total.inner.seed": [
+        "running total passed into the inner loop"
+      ],
+      "inner.current.seed": [
+        "fresh inner loop counter"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "outer.current": {
+            "key": "outer.current",
+            "type": "outer.current",
+            "value": 1,
+            "source_node": "example"
+          },
+          "total.current": {
+            "key": "total.current",
+            "type": "total.current",
+            "value": 3,
+            "source_node": "example"
+          }
+        },
+        "params": {
+          "inner_start": 0
+        }
+      }
+    ],
+    "params_schema": {
+      "inner_start": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "inner_start": 0
+    }
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_semantic_nodes.py",
+        "export": "SemanticInnerLoopInitNode"
+      }
+    }
+  ]
+}

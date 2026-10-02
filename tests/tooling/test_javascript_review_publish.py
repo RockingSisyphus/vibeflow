@@ -55,6 +55,7 @@ def _review_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         source_files=(),
         toolchain=None,
         warnings=(),
+        rule_report=None,
     )
     monkeypatch.setattr(audit, "render_architecture", lambda _result: rendered_architecture)
     monkeypatch.setattr(review, "expected_review_coverage", lambda _result: frozenset({("workflow", "", "demo")}))

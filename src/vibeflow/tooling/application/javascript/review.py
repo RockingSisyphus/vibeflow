@@ -19,6 +19,8 @@ from vibeflow.tooling.presentation.mermaid import (
     render_mermaid_svg,
 )
 from vibeflow.tooling.presentation.style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
+from vibeflow.tooling.presentation.node_presentation import resolve_presentation
+from vibeflow.core.descriptors.categories import selected_node_rulesets
 from vibeflow.tooling.presentation.review_layout import (
     _compose_svg,
     _validate_review_fragment_max_width,
@@ -95,9 +97,11 @@ def render_ascii(
             semantics = ""
             if show_semantics:
                 flow_kind = compiled.flow_kinds.get(node.id, node.flow_kind)
+                nodeset = _nodeset_for_node(graph, node)
+                planned = node.status == STATUS_PLANNED or nodeset is not None and nodeset.status == STATUS_PLANNED
                 semantics = (
                     f" flow_kind={flow_kind or 'process'}"
-                    f" effect_scope={_effect_scope(compiled, node.id, flow_kind)}"
+                    f" effect_scope={'unavailable' if planned else _effect_scope(compiled, node.id, flow_kind)}"
                     f" runtime_dispatch={_runtime_dispatch(compiled, node.id)}"
                 )
             lines.append(
@@ -431,6 +435,8 @@ def _graph_mermaid(
     ]
     for node in graph.nodes:
         descriptor = _node_descriptor(result, node)
+        category_catalog = getattr(getattr(result, "catalogs", None), "categories", None)
+        category = category_catalog.get(getattr(descriptor, "category", "")) if category_catalog is not None else None
         nodeset = _nodeset_for_node(graph, node)
         is_planned = node.status == STATUS_PLANNED or (
             nodeset is not None and nodeset.status == STATUS_PLANNED
@@ -452,7 +458,16 @@ def _graph_mermaid(
             or str(getattr(descriptor, "description", "") or "")
         )
         flow_kind = compiled.flow_kinds.get(node.id, node.flow_kind)
+        node_class = _node_class(node, nodeset=nodeset, flow_kind=flow_kind, is_external=is_external)
+        presentation = resolve_presentation(descriptor, category, flow_kind=flow_kind,
+            native_class="externalDependency" if descriptor is not None and bool(getattr(descriptor, "external", False)) and nodeset is None else "loopNode" if node.type_used in LOOP_NODE_TYPES else "nodesetNode" if nodeset is not None else "documentNode" if flow_kind == FLOW_KIND_DOCUMENT else "defaultNode",
+            status_class=node_class if node_class == "plannedNode" else "", call_style=node.style)
         label = [display_name, "", f"id: {node.id}", f"type_used: {node.type_used}"]
+        if presentation.values.get("icon"):
+            label[0] = f"{presentation.values['icon']} {label[0]}"
+        if descriptor is not None:
+            selection = selected_node_rulesets(descriptor, category_catalog or {})
+            label.extend((f"category: {descriptor.category}", f"rulesets: {', '.join(selection) or 'unconstrained'}"))
         if node.type_used in LOOP_NODE_TYPES:
             label.append(f"body: {node.loop.body}")
         elif node.type_used in graph.nodesets:
@@ -474,7 +489,7 @@ def _graph_mermaid(
             label.extend(
                 (
                     f"flow_kind: {flow_kind or 'process'}",
-                    f"effect_scope: {_effect_scope(compiled, node.id, flow_kind)}",
+                    f"effect_scope: {'unavailable' if is_planned else _effect_scope(compiled, node.id, flow_kind)}",
                     f"runtime_dispatch: {_runtime_dispatch(compiled, node.id)}",
                     f"execution_lock: {_lock_text(graph, node) or 'none'}",
                 )
@@ -486,7 +501,7 @@ def _graph_mermaid(
             if is_external:
                 label.append("external: true")
         escaped = _escape_label("\\n".join(label))
-        shape = mermaid_shape_for_flow_kind(flow_kind or "process")
+        shape = presentation.shape
         node_id = _safe_id(node.id)
         lines.append(f'  {node_id}@{{ shape: {shape}, label: "{escaped}" }}')
         lines.append(
@@ -495,7 +510,7 @@ def _graph_mermaid(
         )
         if is_external:
             lines.append(f"  class {node_id} externalBoundary;")
-        custom_style = _custom_node_style(node)
+        custom_style = presentation.mermaid_style()
         if custom_style:
             lines.append(f"  style {node_id} {custom_style};")
     edge_pairs = {
@@ -698,7 +713,7 @@ def _runtime_dispatch(compiled: object, node_id: str) -> str:
 def _effect_scope(compiled: object, node_id: str, flow_kind: str) -> str:
     return getattr(compiled, "effect_scopes", {}).get(
         node_id,
-        "global_state" if flow_kind == FLOW_KIND_GLOBAL_STATE else "none",
+        "unconstrained",
     )
 
 

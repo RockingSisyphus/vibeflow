@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tests.fixtures.support.declarations import write_node_manifests
 
 import ast
 import json
@@ -38,7 +39,7 @@ def _write_review_workspace(
     )
     project_config: dict[str, object] = {
         "project_target": "python",
-        "registry": "registry.py:build_node_registry",
+        "descriptors": {"nodes": ["manifests/nodes"]},
         "quality_enabled": False,
     }
     if registered:
@@ -49,18 +50,10 @@ def _write_review_workspace(
         json.dumps(project_config, indent=2),
         encoding="utf-8",
     )
-    (project / "registry.py").write_text(
-        "from vibeflow.targets.python.project import NodeRegistry\n"
-        "from tests.fixtures.support import strict_support_runtime_nodes as nodes\n\n"
-        "def build_node_registry():\n"
-        "    registry = NodeRegistry()\n"
-        "    registry.register('test.start', nodes.StartNode, config_schema={}, config_defaults={})\n"
-        "    registry.register('test.seed', nodes.SeedNode, config_schema={'value': {'type': 'number'}}, config_defaults={'value': 1})\n"
-        "    registry.register('test.add', nodes.AddNode, config_schema={'delta': {'type': 'number'}}, config_defaults={'delta': 1})\n"
-        "    registry.register('test.out_end', nodes.OutEndNode, config_schema={}, config_defaults={})\n"
-        "    return registry\n",
-        encoding="utf-8",
-    )
+    write_node_manifests(project, [("test.start", "StartNode", {}, {}),
+        ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}),
+        ("test.add", "AddNode", {"delta": {"type": "number"}}, {"delta": 1}),
+        ("test.out_end", "OutEndNode", {}, {})])
     pipeline = _seed_add_pipeline()
     if planned:
         pipeline["nodes"][2]["status"] = "planned"

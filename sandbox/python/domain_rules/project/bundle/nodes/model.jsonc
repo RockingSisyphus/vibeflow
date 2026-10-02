@@ -1,0 +1,68 @@
+{
+  "kind": "node",
+  "type_key": "example.model",
+  "display_name": "ModelBlock",
+  "category": "model_block",
+  "description": "One model_block block in the example workflow.",
+  "version": "0.15.0",
+  "flow_kind": "process",
+  "contract": {
+    "requires": [
+      {
+        "type": "example.input",
+        "cardinality": "exactly_one",
+        "display_name": "Input"
+      }
+    ],
+    "provides": [
+      {
+        "key": "feature",
+        "type": "example.feature",
+        "display_name": "Feature"
+      }
+    ],
+    "input_semantics": {
+      "example.input": [
+        "Input value for this functional block."
+      ]
+    },
+    "output_semantics": {
+      "feature": [
+        "Scaled model output."
+      ]
+    },
+    "params_schema": {
+      "gain": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "gain": 2
+    },
+    "examples": [
+      {
+        "inputs": {
+          "example.input": {
+            "value": 3
+          }
+        },
+        "params": {
+          "gain": 2
+        }
+      }
+    ]
+  },
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "domain_nodes.py",
+        "export": "ModelBlock"
+      }
+    }
+  ]
+}

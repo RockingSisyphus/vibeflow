@@ -11,7 +11,6 @@ from vibeflow.targets.python.project.policy import (
     DEFAULT_POLICY_DATA,
     EffectivePolicy,
     PolicyResolveResult,
-    apply_policy_plugins,
     merge_policy,
 )
 from vibeflow.tooling.project.config_schema import (
@@ -53,14 +52,6 @@ def resolve_workspace_effective_policy(
                 merge_policy(effective, workspace_policy)
                 sources.append(f"workspace.policy:{workspace_path}")
     _apply_workspace_base_lib_declarations(effective, sources, base_lib_policies)
-    if plugin_registry is not None:
-        apply_policy_plugins(
-            effective,
-            sources,
-            findings,
-            plugin_registry,
-            collect_schema_findings=collect_policy_schema_findings,
-        )
     return PolicyResolveResult(EffectivePolicy(effective, tuple(sources)), tuple(findings))
 
 

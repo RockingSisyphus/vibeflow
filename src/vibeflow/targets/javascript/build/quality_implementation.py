@@ -74,6 +74,8 @@ def registered_implementation_requests(
         for implementation in descriptor.implementations:
             if implementation.language not in {"javascript", "typescript"} or implementation.source.kind != "file":
                 continue
+            if str((project_root / implementation.source.ref).resolve()) not in selected:
+                continue
             source = safe_project_path(project_root, implementation.source.ref, subject=f"node '{descriptor.type_key}' source", require_file=True)
             if str(source) not in selected:
                 continue
@@ -85,6 +87,8 @@ def registered_implementation_requests(
     for descriptor in catalogs.base_libs:
         for implementation in descriptor.implementations:
             if implementation.language not in {"javascript", "typescript"} or implementation.source.kind != "file":
+                continue
+            if str((project_root / implementation.source.ref).resolve()) not in selected:
                 continue
             source = safe_project_path(project_root, implementation.source.ref, subject=f"base_lib '{descriptor.id}' source", require_file=True)
             if str(source) not in selected:

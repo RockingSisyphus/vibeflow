@@ -97,6 +97,7 @@ def run_checked(
         explicit_policy_path=Path(policy_path) if policy_path else None,
         plugin_registry=plugin_registry,
     )
+    registry.configure_rule_defaults(purity_policy=policy_result.effective_policy.to_purity_policy())
     effective_policy = policy_result.effective_policy.to_dict()
     _write_json(run_dir / "effective_policy.json", effective_policy)
     preflight_warnings = _refuse_on_schema_findings(document.data, (*registry_context.findings, *resource_findings, *policy_result.findings), effective_policy, run_dir, actual_run_id)
@@ -120,6 +121,11 @@ def run_checked(
         preflight_warnings=preflight_warnings,
         delegate_cli=delegate_cli,
     )
+    if health.info.get("rule_phase") == "import" and health.status in {"FAIL", "ERROR"}:
+        _write_refused_artifacts(run_dir, health)
+        _refuse_on_health_failure(health, run_dir, actual_run_id)
+    from vibeflow.targets.python.project.compiler import GraphCompiler
+    compiled = GraphCompiler().compile(graph, registry=registry)
     _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources, runtime_options=effective_runtime_options)
     try:
         _write_preflight_artifacts(run_dir, graph, compiled, health, registry=registry, resources=resources)
@@ -268,9 +274,7 @@ def _validate_run_health(
     delegate_cli: bool = False,
 ) -> HealthReport:
     from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
-    from vibeflow.tooling.application.python.project.python_quality import (
-        collect_python_workflow_quality_facts,
-    )
+    from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
 
     purity_policy = policy_result.effective_policy.to_purity_policy()
     health = validate_graph_health(
@@ -281,11 +285,8 @@ def _validate_run_health(
         purity_policy=purity_policy,
         effective_policy=policy_result.effective_policy,
         nodeset_max_depth=runtime_options.nodeset_max_depth,
-        node_quality_facts=collect_python_workflow_quality_facts(
-            graph,
-            registry=registry,
-            policy=purity_policy,
-        ),
+        source_context=collect_workflow_source_context(registry, graph),
+        rule_phase="run",
     )
     info = dict(health.info)
     info["nodeset_imports"] = [dict(item) for item in nodeset_imports]

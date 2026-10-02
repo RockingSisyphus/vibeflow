@@ -1,6 +1,7 @@
 """Runtime conformance tests for global-state leases and named locks."""
 
 from __future__ import annotations
+from tests.fixtures.support.declarations import node_declaration, configured_declaration
 
 from concurrent.futures import ThreadPoolExecutor
 import json
@@ -90,16 +91,16 @@ class _ProtectedTaskState:
         cls.finished = threading.Event()
 
 
-class NormalGateNode:
-    NODE_INFO = NodeInfo(
+NormalGateNode_DECLARATION = node_declaration(NodeInfo(
         "test.normal_gate",
         "Normal Gate",
         "test",
         "Blocks a normal root for lock coordination tests.",
         "0.1.0",
         "process",
-    )
-    CONTRACT = NodeContract()
+    ), NodeContract(), rulesets=("vibeflow.process",))
+
+class NormalGateNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -107,16 +108,16 @@ class NormalGateNode:
         return {}
 
 
-class ParallelProbeNode:
-    NODE_INFO = NodeInfo(
+ParallelProbeNode_DECLARATION = node_declaration(NodeInfo(
         "test.parallel_probe",
         "Parallel Probe",
         "test",
         "Measures overlapping root execution.",
         "0.1.0",
         "process",
-    )
-    CONTRACT = NodeContract()
+    ), NodeContract(), rulesets=("vibeflow.process",))
+
+class ParallelProbeNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -124,16 +125,16 @@ class ParallelProbeNode:
         return {}
 
 
-class GlobalProbeNode:
-    NODE_INFO = NodeInfo(
+GlobalProbeNode_DECLARATION = node_declaration(NodeInfo(
         "test.global_probe",
         "Global Probe",
         "test",
         "Touches ambient interpreter state for runtime lock tests.",
         "0.1.0",
         "global_state",
-    )
-    CONTRACT = NodeContract()
+    ), NodeContract(), rulesets=("vibeflow.global_state",))
+
+class GlobalProbeNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -141,16 +142,16 @@ class GlobalProbeNode:
         return {}
 
 
-class BlockingNormalNode:
-    NODE_INFO = NodeInfo(
+BlockingNormalNode_DECLARATION = node_declaration(NodeInfo(
         "test.blocking_normal",
         "Blocking Normal",
         "test",
         "Holds one shared root admission.",
         "0.1.0",
         "process",
-    )
-    CONTRACT = NodeContract()
+    ), NodeContract(), rulesets=("vibeflow.process",))
+
+class BlockingNormalNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -159,16 +160,16 @@ class BlockingNormalNode:
         return {}
 
 
-class HoldingGlobalNode:
-    NODE_INFO = NodeInfo(
+HoldingGlobalNode_DECLARATION = node_declaration(NodeInfo(
         "test.holding_global",
         "Holding Global",
         "test",
         "Holds the exclusive global-state admission.",
         "0.1.0",
         "global_state",
-    )
-    CONTRACT = NodeContract()
+    ), NodeContract(), rulesets=("vibeflow.global_state",))
+
+class HoldingGlobalNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -177,16 +178,16 @@ class HoldingGlobalNode:
         return {}
 
 
-class FollowingNormalNode:
-    NODE_INFO = NodeInfo(
+FollowingNormalNode_DECLARATION = node_declaration(NodeInfo(
         "test.following_normal",
         "Following Normal",
         "test",
         "Attempts shared admission behind a waiting writer.",
         "0.1.0",
         "process",
-    )
-    CONTRACT = NodeContract()
+    ), NodeContract(), rulesets=("vibeflow.process",))
+
+class FollowingNormalNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -194,66 +195,66 @@ class FollowingNormalNode:
         return {}
 
 
-class GlobalFailureNode:
-    NODE_INFO = NodeInfo(
+GlobalFailureNode_DECLARATION = node_declaration(NodeInfo(
         "test.global_failure",
         "Global Failure",
         "test",
         "Fails after ambient state may have changed.",
         "0.1.0",
         "global_state",
-    )
-    CONTRACT = NodeContract()
+    ), NodeContract(), rulesets=("vibeflow.global_state",))
+
+class GlobalFailureNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
         raise RuntimeError("global boom")
 
 
-class GlobalInterruptNode:
-    NODE_INFO = NodeInfo(
+GlobalInterruptNode_DECLARATION = node_declaration(NodeInfo(
         "test.global_interrupt",
         "Global Interrupt",
         "test",
         "Simulates cancellation after ambient state may have changed.",
         "0.1.0",
         "global_state",
-    )
-    CONTRACT = NodeContract()
+    ), NodeContract(), rulesets=("vibeflow.global_state",))
+
+class GlobalInterruptNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
         raise KeyboardInterrupt("global cancelled")
 
 
-class GlobalNoopNode:
-    NODE_INFO = NodeInfo(
+GlobalNoopNode_DECLARATION = node_declaration(NodeInfo(
         "test.global_noop",
         "Global Noop",
         "test",
         "Marks a root as global-state protected without delaying it.",
         "0.1.0",
         "global_state",
-    )
-    CONTRACT = NodeContract()
+    ), NodeContract(), rulesets=("vibeflow.global_state",))
+
+class GlobalNoopNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
         return {}
 
 
-class GlobalWorkerLeftNode:
-    NODE_INFO = NodeInfo(
+GlobalWorkerLeftNode_DECLARATION = node_declaration(NodeInfo(
         "test.global_worker_left",
         "Global Worker Left",
         "test",
         "Runs one managed global-state worker.",
         "0.1.0",
         "global_state",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         provides=(DataProvider("worker.left", "worker.left", display_name="worker.left"),),
-    )
+    ), rulesets=("vibeflow.global_state",))
+
+class GlobalWorkerLeftNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -261,18 +262,18 @@ class GlobalWorkerLeftNode:
         return {"worker.left": True}
 
 
-class GlobalWorkerRightNode:
-    NODE_INFO = NodeInfo(
+GlobalWorkerRightNode_DECLARATION = node_declaration(NodeInfo(
         "test.global_worker_right",
         "Global Worker Right",
         "test",
         "Runs another managed global-state worker.",
         "0.1.0",
         "global_state",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         provides=(DataProvider("worker.right", "worker.right", display_name="worker.right"),),
-    )
+    ), rulesets=("vibeflow.global_state",))
+
+class GlobalWorkerRightNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -280,54 +281,54 @@ class GlobalWorkerRightNode:
         return {"worker.right": True}
 
 
-class OrdinaryWorkerNode:
-    NODE_INFO = NodeInfo(
+OrdinaryWorkerNode_DECLARATION = node_declaration(NodeInfo(
         "test.ordinary_worker",
         "Ordinary Worker",
         "test",
         "Runs one ordinary managed result worker.",
         "0.1.0",
         "process",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         provides=(DataProvider("worker.left", "worker.left", display_name="worker.left"),),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class OrdinaryWorkerNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
         return {"worker.left": True}
 
 
-class WorkerLeftJoinNode:
-    NODE_INFO = NodeInfo(
+WorkerLeftJoinNode_DECLARATION = node_declaration(NodeInfo(
         "test.worker_left_join",
         "Worker Left Join",
         "test",
         "Joins one ordinary worker result.",
         "0.1.0",
         "terminal",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         requires=(DataRequirement("worker.left", "exactly_one", display_name="worker.left"),),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class WorkerLeftJoinNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
         return {}
 
 
-class ProtectedSlowResultNode:
-    NODE_INFO = NodeInfo(
+ProtectedSlowResultNode_DECLARATION = node_declaration(NodeInfo(
         "test.protected_slow_result",
         "Protected Slow Result",
         "test",
         "Waits so failure cleanup must retain an inherited lease.",
         "0.1.0",
         "process",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         provides=(DataProvider("protected.result", "protected.result", display_name="protected.result"),),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class ProtectedSlowResultNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -339,39 +340,39 @@ class ProtectedSlowResultNode:
             _ProtectedTaskState.finished.set()
 
 
-class ProtectedJoinNode:
-    NODE_INFO = NodeInfo(
+ProtectedJoinNode_DECLARATION = node_declaration(NodeInfo(
         "test.protected_join",
         "Protected Join",
         "test",
         "Joins a protected result and a second branch.",
         "0.1.0",
         "terminal",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         requires=(
             DataRequirement("protected.result", "exactly_one", display_name="protected.result"),
             DataRequirement("value.out", "exactly_one", display_name="value.out"),
         ),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class ProtectedJoinNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
         return {}
 
 
-class CoordinatedFailureNode:
-    NODE_INFO = NodeInfo(
+CoordinatedFailureNode_DECLARATION = node_declaration(NodeInfo(
         "test.coordinated_failure",
         "Coordinated Failure",
         "test",
         "Fails only after the sibling protected worker has started.",
         "0.1.0",
         "process",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class CoordinatedFailureNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -379,16 +380,16 @@ class CoordinatedFailureNode:
         raise RuntimeError("coordinated boom")
 
 
-class UnrelatedDetachedNode:
-    NODE_INFO = NodeInfo(
+UnrelatedDetachedNode_DECLARATION = node_declaration(NodeInfo(
         "test.unrelated_detached",
         "Unrelated Detached",
         "test",
         "Waits outside a sibling node's named lock scope.",
         "0.1.0",
         "process",
-    )
-    CONTRACT = NodeContract()
+    ), NodeContract(), rulesets=("vibeflow.process",))
+
+class UnrelatedDetachedNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -400,39 +401,39 @@ class UnrelatedDetachedNode:
             _ProtectedTaskState.finished.set()
 
 
-class WorkerJoinNode:
-    NODE_INFO = NodeInfo(
+WorkerJoinNode_DECLARATION = node_declaration(NodeInfo(
         "test.worker_join",
         "Worker Join",
         "test",
         "Joins both managed worker results before root completion.",
         "0.1.0",
         "terminal",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         requires=(
             DataRequirement("worker.left", "exactly_one", display_name="worker.left"),
             DataRequirement("worker.right", "exactly_one", display_name="worker.right"),
         ),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class WorkerJoinNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
         return {}
 
 
-class DelayedResultNode:
-    NODE_INFO = NodeInfo(
+DelayedResultNode_DECLARATION = node_declaration(NodeInfo(
         "test.delayed_result",
         "Delayed Result",
         "test",
         "Occupies the sole managed worker before a late global task.",
         "0.1.0",
         "process",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         provides=(DataProvider("late.normal", "late.normal", display_name="late.normal"),),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class DelayedResultNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -440,58 +441,58 @@ class DelayedResultNode:
         return {"late.normal": True}
 
 
-class LateGlobalResultNode:
-    NODE_INFO = NodeInfo(
+LateGlobalResultNode_DECLARATION = node_declaration(NodeInfo(
         "test.late_global_result",
         "Late Global Result",
         "test",
         "Starts only while failure cleanup drains managed work.",
         "0.1.0",
         "global_state",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         provides=(DataProvider("late.global", "late.global", display_name="late.global"),),
-    )
+    ), rulesets=("vibeflow.global_state",))
+
+class LateGlobalResultNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
         return {"late.global": True}
 
 
-class LateJoinNode:
-    NODE_INFO = NodeInfo(
+LateJoinNode_DECLARATION = node_declaration(NodeInfo(
         "test.late_join",
         "Late Join",
         "test",
         "Provides a provable join path for cleanup tasks.",
         "0.1.0",
         "terminal",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         requires=(
             DataRequirement("late.normal", "exactly_one", display_name="late.normal"),
             DataRequirement("late.global", "exactly_one", display_name="late.global"),
             DataRequirement("value.out", "exactly_one", display_name="value.out"),
         ),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class LateJoinNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
         return {}
 
 
-class EarlyQuickResultNode:
-    NODE_INFO = NodeInfo(
+EarlyQuickResultNode_DECLARATION = node_declaration(NodeInfo(
         "test.early_quick_result",
         "Early Quick Result",
         "test",
         "Completes the branch whose terminal ends the root early.",
         "0.1.0",
         "process",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         provides=(DataProvider("early.quick", "early.quick", display_name="early.quick"),),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class EarlyQuickResultNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -499,18 +500,18 @@ class EarlyQuickResultNode:
         return {"early.quick": True}
 
 
-class EarlySlowResultNode:
-    NODE_INFO = NodeInfo(
+EarlySlowResultNode_DECLARATION = node_declaration(NodeInfo(
         "test.early_slow_result",
         "Early Slow Result",
         "test",
         "Keeps an unselected result branch active during early termination.",
         "0.1.0",
         "process",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         provides=(DataProvider("early.slow", "early.slow", display_name="early.slow"),),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class EarlySlowResultNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -522,36 +523,36 @@ class EarlySlowResultNode:
             _ProtectedTaskState.finished.set()
 
 
-class EarlyQuickEndNode:
-    NODE_INFO = NodeInfo(
+EarlyQuickEndNode_DECLARATION = node_declaration(NodeInfo(
         "test.early_quick_end",
         "Early Quick End",
         "test",
         "Ends the root after consuming only the quick branch.",
         "0.1.0",
         "terminal",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         requires=(DataRequirement("early.quick", "exactly_one", display_name="early.quick"),),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class EarlyQuickEndNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
         return {}
 
 
-class EarlySlowEndNode:
-    NODE_INFO = NodeInfo(
+EarlySlowEndNode_DECLARATION = node_declaration(NodeInfo(
         "test.early_slow_end",
         "Early Slow End",
         "test",
         "Provides the statically visible join path for the slow branch.",
         "0.1.0",
         "terminal",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         requires=(DataRequirement("early.slow", "exactly_one", display_name="early.slow"),),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class EarlySlowEndNode:
 
     def run_pure(self, inputs, params):
         del inputs, params
@@ -568,14 +569,14 @@ def _runtime(
     trace: str = "full",
 ) -> PipelineRuntime:
     registry = _registry()
-    register_node(registry, "test.normal_gate", NormalGateNode)
-    register_node(registry, "test.parallel_probe", ParallelProbeNode)
-    register_node(registry, "test.global_probe", GlobalProbeNode)
-    register_node(registry, "test.global_failure", GlobalFailureNode)
-    register_node(registry, "test.global_interrupt", GlobalInterruptNode)
-    register_node(registry, "test.blocking_normal", BlockingNormalNode)
-    register_node(registry, "test.holding_global", HoldingGlobalNode)
-    register_node(registry, "test.following_normal", FollowingNormalNode)
+    register_node(registry, NormalGateNode_DECLARATION, NormalGateNode)
+    register_node(registry, ParallelProbeNode_DECLARATION, ParallelProbeNode)
+    register_node(registry, GlobalProbeNode_DECLARATION, GlobalProbeNode)
+    register_node(registry, GlobalFailureNode_DECLARATION, GlobalFailureNode)
+    register_node(registry, GlobalInterruptNode_DECLARATION, GlobalInterruptNode)
+    register_node(registry, BlockingNormalNode_DECLARATION, BlockingNormalNode)
+    register_node(registry, HoldingGlobalNode_DECLARATION, HoldingGlobalNode)
+    register_node(registry, FollowingNormalNode_DECLARATION, FollowingNormalNode)
     middle = _node_call(
         "work",
         node_type,
@@ -869,7 +870,7 @@ def test_nested_graph_lock_is_traced_as_block_scope(tmp_path: Path) -> None:
     )
 
     registry = _registry()
-    register_node(registry, "test.parallel_probe", ParallelProbeNode)
+    register_node(registry, ParallelProbeNode_DECLARATION, ParallelProbeNode)
     first_runtime = PipelineRuntime(
         graph,
         registry=registry,
@@ -1018,9 +1019,9 @@ def test_global_state_root_keeps_joined_managed_workers_parallel(
     tmp_path: Path,
 ) -> None:
     registry = _registry()
-    register_node(registry, "test.global_worker_left", GlobalWorkerLeftNode)
-    register_node(registry, "test.global_worker_right", GlobalWorkerRightNode)
-    register_node(registry, "test.worker_join", WorkerJoinNode)
+    register_node(registry, GlobalWorkerLeftNode_DECLARATION, GlobalWorkerLeftNode)
+    register_node(registry, GlobalWorkerRightNode_DECLARATION, GlobalWorkerRightNode)
+    register_node(registry, WorkerJoinNode_DECLARATION, WorkerJoinNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1088,9 +1089,9 @@ def test_parallel_sibling_node_locks_use_logical_scope_reentrancy(
     expected_maximum: int,
 ) -> None:
     registry = _registry()
-    register_node(registry, "test.global_worker_left", GlobalWorkerLeftNode)
-    register_node(registry, "test.global_worker_right", GlobalWorkerRightNode)
-    register_node(registry, "test.worker_join", WorkerJoinNode)
+    register_node(registry, GlobalWorkerLeftNode_DECLARATION, GlobalWorkerLeftNode)
+    register_node(registry, GlobalWorkerRightNode_DECLARATION, GlobalWorkerRightNode)
+    register_node(registry, WorkerJoinNode_DECLARATION, WorkerJoinNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1154,8 +1155,8 @@ def test_ordinary_async_hooks_keep_scheduler_thread_and_join_order(
     tmp_path: Path,
 ) -> None:
     registry = _registry()
-    register_node(registry, "test.ordinary_worker", OrdinaryWorkerNode)
-    register_node(registry, "test.worker_left_join", WorkerLeftJoinNode)
+    register_node(registry, OrdinaryWorkerNode_DECLARATION, OrdinaryWorkerNode)
+    register_node(registry, WorkerLeftJoinNode_DECLARATION, WorkerLeftJoinNode)
     calls: list[tuple[str, str, str]] = []
 
     class HookPlugin:
@@ -1348,16 +1349,16 @@ def test_dynamic_nested_runtime_rejects_a_different_user_lock_and_releases(
         root_lock=inner_key,
     )
 
-    class DynamicNestedRuntimeNode:
-        NODE_INFO = NodeInfo(
+    DynamicNestedRuntimeNode_DECLARATION = node_declaration(NodeInfo(
             "test.dynamic_nested_runtime",
             "Dynamic Nested Runtime",
             "test",
             "Attempts to acquire another user domain through a nested runtime.",
             "0.1.0",
             "process",
-        )
-        CONTRACT = NodeContract()
+        ), NodeContract(), rulesets=("vibeflow.process",))
+
+    class DynamicNestedRuntimeNode:
 
         def run_pure(self, inputs, params):
             del inputs, params
@@ -1367,7 +1368,7 @@ def test_dynamic_nested_runtime_rejects_a_different_user_lock_and_releases(
     registry = _registry()
     register_node(
         registry,
-        "test.dynamic_nested_runtime",
+        DynamicNestedRuntimeNode_DECLARATION,
         DynamicNestedRuntimeNode,
     )
     graph = parse_graph_config(
@@ -1420,16 +1421,16 @@ def test_inherited_root_protection_drains_nested_failure_tasks_before_release(
 ) -> None:
     lock_key = "project.nested-protected"
     registry = _registry()
-    register_node(registry, "test.global_noop", GlobalNoopNode)
+    register_node(registry, GlobalNoopNode_DECLARATION, GlobalNoopNode)
     register_node(
         registry,
-        "test.protected_slow_result",
+        ProtectedSlowResultNode_DECLARATION,
         ProtectedSlowResultNode,
     )
-    register_node(registry, "test.protected_join", ProtectedJoinNode)
+    register_node(registry, ProtectedJoinNode_DECLARATION, ProtectedJoinNode)
     register_node(
         registry,
-        "test.coordinated_failure",
+        CoordinatedFailureNode_DECLARATION,
         CoordinatedFailureNode,
     )
     graph = parse_graph_config(
@@ -1542,10 +1543,10 @@ def test_early_terminal_fails_closed_and_retains_lock_until_result_finishes(
 ) -> None:
     lock_key = "project.early-terminal"
     registry = _registry()
-    register_node(registry, "test.early_quick_result", EarlyQuickResultNode)
-    register_node(registry, "test.early_slow_result", EarlySlowResultNode)
-    register_node(registry, "test.early_quick_end", EarlyQuickEndNode)
-    register_node(registry, "test.early_slow_end", EarlySlowEndNode)
+    register_node(registry, EarlyQuickResultNode_DECLARATION, EarlyQuickResultNode)
+    register_node(registry, EarlySlowResultNode_DECLARATION, EarlySlowResultNode)
+    register_node(registry, EarlyQuickEndNode_DECLARATION, EarlyQuickEndNode)
+    register_node(registry, EarlySlowEndNode_DECLARATION, EarlySlowEndNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1631,10 +1632,10 @@ def test_unrelated_detached_sibling_does_not_inherit_node_lock_protection(
     tmp_path: Path,
 ) -> None:
     registry = _registry()
-    register_node(registry, "test.parallel_probe", ParallelProbeNode)
+    register_node(registry, ParallelProbeNode_DECLARATION, ParallelProbeNode)
     register_node(
         registry,
-        "test.unrelated_detached",
+        UnrelatedDetachedNode_DECLARATION,
         UnrelatedDetachedNode,
     )
     graph = parse_graph_config(
@@ -1692,13 +1693,13 @@ def test_failure_warning_includes_global_task_started_during_final_drain(
 ) -> None:
     lock_key = "project.late-drain"
     registry = _registry()
-    register_node(registry, "test.delayed_result", DelayedResultNode)
+    register_node(registry, DelayedResultNode_DECLARATION, DelayedResultNode)
     register_node(
         registry,
-        "test.late_global_result",
+        LateGlobalResultNode_DECLARATION,
         LateGlobalResultNode,
     )
-    register_node(registry, "test.late_join", LateJoinNode)
+    register_node(registry, LateJoinNode_DECLARATION, LateJoinNode)
     graph = parse_graph_config(
         {
             "pipeline": {

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tests.fixtures.support.declarations import node_declaration, configured_declaration
 
 import sys
 from copy import deepcopy
@@ -77,70 +78,78 @@ def _stub_delegate_workspace_loader(monkeypatch):
     )
 
 
+_StartNode_DECLARATION = node_declaration(NodeInfo("delegate.start", "Start", "test", "Starts delegate test.", "0.1.0", "terminal"), NodeContract(examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+
 class _StartNode:
-    NODE_INFO = NodeInfo("delegate.start", "Start", "test", "Starts delegate test.", "0.1.0", "terminal")
-    CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}},))
 
     def run_pure(self, inputs, params):
         return {}
 
 
-class _AuthorizedExitNode:
-    NODE_INFO = NodeInfo("delegate.authorized_exit", "Authorized exit", "test", "Exits delegated CLI.", "0.1.0", "io")
-    CONTRACT = NodeContract(
+_AuthorizedExitNode_DECLARATION = node_declaration(NodeInfo("delegate.authorized_exit", "Authorized exit", "test", "Exits delegated CLI.", "0.1.0", "io"), NodeContract(
         requires=(DataRequirement("cli.argv", "exactly_one", display_name="cli.argv"),),
         provides=(DataProvider("cli.exit_code", "cli.exit_code", display_name="cli.exit_code"),),
         input_semantics={"cli.argv": ("business argv",)},
         output_semantics={"cli.exit_code": ("business exit code",)},
 
         examples=({"inputs": {"cli.argv": {"key": "cli.argv", "type": "cli.argv", "value": [], "source_node": "example"}}, "params": {}},),
-    )
+    ), rulesets=("vibeflow.io",))
+
+class _AuthorizedExitNode:
 
     def run_pure(self, inputs, params):
         raise SystemExit(2)
 
 
-class _UnauthorizedExitNode(_AuthorizedExitNode):
-    NODE_INFO = NodeInfo("delegate.unauthorized_exit", "Unauthorized exit", "test", "Cannot exit delegated CLI.", "0.1.0", "process")
+_UnauthorizedExitNode_DECLARATION = node_declaration(NodeInfo("delegate.unauthorized_exit", "Unauthorized exit", "test", "Cannot exit delegated CLI.", "0.1.0", "process"), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.process",))
 
+class _UnauthorizedExitNode(_AuthorizedExitNode):
+    pass
+
+
+_NoneExitNode_DECLARATION = node_declaration(NodeInfo("delegate.none_exit", "None exit", "test", "Exits delegated CLI with the default success code.", "0.1.0", "io"), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
 
 class _NoneExitNode(_AuthorizedExitNode):
-    NODE_INFO = NodeInfo("delegate.none_exit", "None exit", "test", "Exits delegated CLI with the default success code.", "0.1.0", "io")
 
     def run_pure(self, inputs, params):
         raise SystemExit(None)
 
 
+_BoolExitNode_DECLARATION = node_declaration(NodeInfo("delegate.bool_exit", "Bool exit", "test", "Attempts an invalid boolean CLI exit.", "0.1.0", "io"), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
+
 class _BoolExitNode(_AuthorizedExitNode):
-    NODE_INFO = NodeInfo("delegate.bool_exit", "Bool exit", "test", "Attempts an invalid boolean CLI exit.", "0.1.0", "io")
 
     def run_pure(self, inputs, params):
         raise SystemExit(True)
 
 
+_NegativeExitNode_DECLARATION = node_declaration(NodeInfo("delegate.negative_exit", "Negative exit", "test", "Attempts an invalid negative CLI exit.", "0.1.0", "io"), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
+
 class _NegativeExitNode(_AuthorizedExitNode):
-    NODE_INFO = NodeInfo("delegate.negative_exit", "Negative exit", "test", "Attempts an invalid negative CLI exit.", "0.1.0", "io")
 
     def run_pure(self, inputs, params):
         raise SystemExit(-1)
 
 
+_LargeExitNode_DECLARATION = node_declaration(NodeInfo("delegate.large_exit", "Large exit", "test", "Attempts an invalid oversized CLI exit.", "0.1.0", "io"), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
+
 class _LargeExitNode(_AuthorizedExitNode):
-    NODE_INFO = NodeInfo("delegate.large_exit", "Large exit", "test", "Attempts an invalid oversized CLI exit.", "0.1.0", "io")
 
     def run_pure(self, inputs, params):
         raise SystemExit(256)
 
 
+_StringExitNode_DECLARATION = node_declaration(NodeInfo("delegate.string_exit", "String exit", "test", "Attempts an invalid string CLI exit.", "0.1.0", "io"), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
+
 class _StringExitNode(_AuthorizedExitNode):
-    NODE_INFO = NodeInfo("delegate.string_exit", "String exit", "test", "Attempts an invalid string CLI exit.", "0.1.0", "io")
 
     def run_pure(self, inputs, params):
         raise SystemExit("invalid")
 
 
+_ArgparseExitNode_DECLARATION = node_declaration(NodeInfo("delegate.argparse_exit", "Argparse exit", "test", "Exercises real argparse exits.", "0.1.0", "io"), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
+
 class _ArgparseExitNode(_AuthorizedExitNode):
-    NODE_INFO = NodeInfo("delegate.argparse_exit", "Argparse exit", "test", "Exercises real argparse exits.", "0.1.0", "io")
 
     def run_pure(self, inputs, params):
         import argparse
@@ -151,69 +160,67 @@ class _ArgparseExitNode(_AuthorizedExitNode):
         return {"cli.exit_code": 0}
 
 
-class _DetachedExitNode:
-    NODE_INFO = NodeInfo("delegate.detached_exit", "Detached exit", "test", "Exits from a detached task.", "0.1.0", "io")
-    CONTRACT = NodeContract(
+_DetachedExitNode_DECLARATION = node_declaration(NodeInfo("delegate.detached_exit", "Detached exit", "test", "Exits from a detached task.", "0.1.0", "io"), NodeContract(
         provides=(DataProvider("async.first", "async.first", display_name="First async result"),),
         output_semantics={"async.first": ("first delegated async result",)},
         examples=({"inputs": {}, "params": {}},),
-    )
+    ), rulesets=("vibeflow.io",))
+
+class _DetachedExitNode:
 
     def run_pure(self, inputs, params):
         raise SystemExit(11)
 
 
-class _SecondDetachedExitNode(_DetachedExitNode):
-    NODE_INFO = NodeInfo("delegate.second_detached_exit", "Second detached exit", "test", "Exits from another detached task.", "0.1.0", "io")
-    CONTRACT = NodeContract(
+_SecondDetachedExitNode_DECLARATION = node_declaration(NodeInfo("delegate.second_detached_exit", "Second detached exit", "test", "Exits from another detached task.", "0.1.0", "io"), NodeContract(
         provides=(DataProvider("async.second", "async.second", display_name="Second async result"),),
         output_semantics={"async.second": ("second delegated async result",)},
-    )
+    ), rulesets=("vibeflow.io",))
+
+class _SecondDetachedExitNode(_DetachedExitNode):
 
     def run_pure(self, inputs, params):
         raise SystemExit(12)
 
 
-class _DetachedFailureNode(_DetachedExitNode):
-    NODE_INFO = NodeInfo("delegate.detached_failure", "Detached failure", "test", "Fails from a detached task.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+_DetachedFailureNode_DECLARATION = node_declaration(NodeInfo("delegate.detached_failure", "Detached failure", "test", "Fails from a detached task.", "0.1.0", "process"), NodeContract(
         provides=(DataProvider("async.pending", "async.pending", display_name="Pending async result"),),
         output_semantics={"async.pending": ("pending task result used by the async failure fixture",)},
-    )
+    ), rulesets=("vibeflow.process",))
+
+class _DetachedFailureNode(_DetachedExitNode):
 
     def run_pure(self, inputs, params):
         raise RuntimeError("late detached failure")
 
 
-class _SuccessfulSideNode:
-    NODE_INFO = NodeInfo("delegate.successful_side", "Successful side", "test", "Completes an async side task.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+_SuccessfulSideNode_DECLARATION = node_declaration(NodeInfo("delegate.successful_side", "Successful side", "test", "Completes an async side task.", "0.1.0", "process"), NodeContract(
         provides=(DataProvider("async.pending", "async.pending", display_name="async.pending"),),
         output_semantics={"async.pending": ("completed side result",)},
 
         examples=({"inputs": {}, "params": {}},),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class _SuccessfulSideNode:
 
     def run_pure(self, inputs, params):
         return {"async.pending": "done"}
 
 
-class _ArgvGateNode:
-    NODE_INFO = NodeInfo("delegate.argv_gate", "Argv gate", "test", "Forwards CLI arguments after pending work starts.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+_ArgvGateNode_DECLARATION = node_declaration(NodeInfo("delegate.argv_gate", "Argv gate", "test", "Forwards CLI arguments after pending work starts.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("cli.argv", "exactly_one", display_name="CLI argv"),),
         provides=(DataProvider("cli.argv.gated", "cli.argv", display_name="Forwarded CLI argv"),),
         input_semantics={"cli.argv": ("business argv",)},
         output_semantics={"cli.argv.gated": ("forwarded business argv",)},
-    )
+    ), rulesets=("vibeflow.process",))
+
+class _ArgvGateNode:
 
     def run_pure(self, inputs, params):
         return {"cli.argv.gated": inputs["cli.argv"]["value"]}
 
 
-class _ParallelJoinExitNode:
-    NODE_INFO = NodeInfo("delegate.parallel_join_exit", "Parallel exit join", "test", "Joins two delegated exit results.", "0.1.0", "terminal")
-    CONTRACT = NodeContract(
+_ParallelJoinExitNode_DECLARATION = node_declaration(NodeInfo("delegate.parallel_join_exit", "Parallel exit join", "test", "Joins two delegated exit results.", "0.1.0", "terminal"), NodeContract(
         requires=(
             DataRequirement("async.first", "exactly_one", display_name="First async result"),
             DataRequirement("async.second", "exactly_one", display_name="Second async result"),
@@ -222,15 +229,15 @@ class _ParallelJoinExitNode:
             "async.first": ("first delegated async result",),
             "async.second": ("second delegated async result",),
         },
-    )
+    ), rulesets=("vibeflow.process",))
+
+class _ParallelJoinExitNode:
 
     def run_pure(self, inputs, params):
         return {}
 
 
-class _ParallelJoinFailureNode:
-    NODE_INFO = NodeInfo("delegate.parallel_join_failure", "Parallel failure join", "test", "Joins an exit result with a failing result.", "0.1.0", "terminal")
-    CONTRACT = NodeContract(
+_ParallelJoinFailureNode_DECLARATION = node_declaration(NodeInfo("delegate.parallel_join_failure", "Parallel failure join", "test", "Joins an exit result with a failing result.", "0.1.0", "terminal"), NodeContract(
         requires=(
             DataRequirement("async.first", "exactly_one", display_name="First async result"),
             DataRequirement("async.pending", "exactly_one", display_name="Pending async result"),
@@ -239,43 +246,44 @@ class _ParallelJoinFailureNode:
             "async.first": ("first delegated async result",),
             "async.pending": ("pending async result",),
         },
-    )
+    ), rulesets=("vibeflow.process",))
+
+class _ParallelJoinFailureNode:
 
     def run_pure(self, inputs, params):
         return {}
 
 
-class _NormalExitNode:
-    NODE_INFO = NodeInfo("delegate.normal_exit", "Normal exit", "test", "Returns a normal delegated exit.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+_NormalExitNode_DECLARATION = node_declaration(NodeInfo("delegate.normal_exit", "Normal exit", "test", "Returns a normal delegated exit.", "0.1.0", "process"), NodeContract(
         provides=(DataProvider("cli.exit_code", "cli.exit_code", display_name="cli.exit_code"),),
         output_semantics={"cli.exit_code": ("business exit code",)},
 
         examples=({"inputs": {}, "params": {}},),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class _NormalExitNode:
 
     def run_pure(self, inputs, params):
         return {"cli.exit_code": 0}
 
 
-class _AsyncDiagnosticExitNode(_NormalExitNode):
-    NODE_INFO = NodeInfo(
+_AsyncDiagnosticExitNode_DECLARATION = node_declaration(NodeInfo(
         "delegate.async_diagnostic_exit",
         "Async diagnostic exit",
         "test",
         "Emits a core diagnostic from an async worker.",
         "0.1.0",
         "process",
-    )
+    ), _NormalExitNode_DECLARATION.contract, rulesets=("vibeflow.process",))
+
+class _AsyncDiagnosticExitNode(_NormalExitNode):
 
     def run_pure(self, inputs, params):
         emit_core_diagnostic("ASYNC-CORE-DIAGNOSTIC")
         return {"cli.exit_code": 0}
 
 
-class _ExitEndNode:
-    NODE_INFO = NodeInfo("delegate.exit_end", "Exit end", "test", "Consumes a delegated exit.", "0.1.0", "terminal")
-    CONTRACT = NodeContract(
+_ExitEndNode_DECLARATION = node_declaration(NodeInfo("delegate.exit_end", "Exit end", "test", "Consumes a delegated exit.", "0.1.0", "terminal"), NodeContract(
         requires=(DataRequirement("cli.exit_code", "exactly_one", display_name="cli.exit_code"),),
         input_semantics={"cli.exit_code": ("business exit code",)},
         examples=(
@@ -291,7 +299,9 @@ class _ExitEndNode:
                 "params": {},
             },
         ),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class _ExitEndNode:
 
     def run_pure(self, inputs, params):
         return {}
@@ -299,25 +309,25 @@ class _ExitEndNode:
 
 def _runtime_registry() -> NodeRegistry:
     registry = NodeRegistry()
-    registry.register("delegate.start", _StartNode, config_schema={}, config_defaults={})
-    registry.register("delegate.authorized_exit", _AuthorizedExitNode, config_schema={}, config_defaults={})
-    registry.register("delegate.unauthorized_exit", _UnauthorizedExitNode, config_schema={}, config_defaults={})
-    registry.register("delegate.none_exit", _NoneExitNode, config_schema={}, config_defaults={})
-    registry.register("delegate.bool_exit", _BoolExitNode, config_schema={}, config_defaults={})
-    registry.register("delegate.negative_exit", _NegativeExitNode, config_schema={}, config_defaults={})
-    registry.register("delegate.large_exit", _LargeExitNode, config_schema={}, config_defaults={})
-    registry.register("delegate.string_exit", _StringExitNode, config_schema={}, config_defaults={})
-    registry.register("delegate.argparse_exit", _ArgparseExitNode, config_schema={}, config_defaults={})
-    registry.register("delegate.detached_exit", _DetachedExitNode, config_schema={}, config_defaults={})
-    registry.register("delegate.second_detached_exit", _SecondDetachedExitNode, config_schema={}, config_defaults={})
-    registry.register("delegate.detached_failure", _DetachedFailureNode, config_schema={}, config_defaults={})
-    registry.register("delegate.successful_side", _SuccessfulSideNode, config_schema={}, config_defaults={})
-    registry.register("delegate.argv_gate", _ArgvGateNode, config_schema={}, config_defaults={})
-    registry.register("delegate.parallel_join_exit", _ParallelJoinExitNode, config_schema={}, config_defaults={})
-    registry.register("delegate.parallel_join_failure", _ParallelJoinFailureNode, config_schema={}, config_defaults={})
-    registry.register("delegate.normal_exit", _NormalExitNode, config_schema={}, config_defaults={})
-    registry.register("delegate.async_diagnostic_exit", _AsyncDiagnosticExitNode, config_schema={}, config_defaults={})
-    registry.register("delegate.exit_end", _ExitEndNode, config_schema={}, config_defaults={})
+    registry.register(configured_declaration(_StartNode_DECLARATION, {}, {}), _StartNode)
+    registry.register(configured_declaration(_AuthorizedExitNode_DECLARATION, {}, {}), _AuthorizedExitNode)
+    registry.register(_UnauthorizedExitNode_DECLARATION, _UnauthorizedExitNode)
+    registry.register(_NoneExitNode_DECLARATION, _NoneExitNode)
+    registry.register(_BoolExitNode_DECLARATION, _BoolExitNode)
+    registry.register(_NegativeExitNode_DECLARATION, _NegativeExitNode)
+    registry.register(_LargeExitNode_DECLARATION, _LargeExitNode)
+    registry.register(_StringExitNode_DECLARATION, _StringExitNode)
+    registry.register(_ArgparseExitNode_DECLARATION, _ArgparseExitNode)
+    registry.register(configured_declaration(_DetachedExitNode_DECLARATION, {}, {}), _DetachedExitNode)
+    registry.register(configured_declaration(_SecondDetachedExitNode_DECLARATION, {}, {}), _SecondDetachedExitNode)
+    registry.register(configured_declaration(_DetachedFailureNode_DECLARATION, {}, {}), _DetachedFailureNode)
+    registry.register(configured_declaration(_SuccessfulSideNode_DECLARATION, {}, {}), _SuccessfulSideNode)
+    registry.register(configured_declaration(_ArgvGateNode_DECLARATION, {}, {}), _ArgvGateNode)
+    registry.register(configured_declaration(_ParallelJoinExitNode_DECLARATION, {}, {}), _ParallelJoinExitNode)
+    registry.register(configured_declaration(_ParallelJoinFailureNode_DECLARATION, {}, {}), _ParallelJoinFailureNode)
+    registry.register(configured_declaration(_NormalExitNode_DECLARATION, {}, {}), _NormalExitNode)
+    registry.register(_AsyncDiagnosticExitNode_DECLARATION, _AsyncDiagnosticExitNode)
+    registry.register(configured_declaration(_ExitEndNode_DECLARATION, {}, {}), _ExitEndNode)
     return registry
 
 

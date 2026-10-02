@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.storage_read",
   "display_name": "Read storage",
   "category": "sandbox",

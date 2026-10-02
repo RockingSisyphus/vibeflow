@@ -11,6 +11,7 @@ import textwrap
 import pytest
 
 from distribution.build import build_distribution
+from tests.fixtures.support.rule_inspection import node_document
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -21,6 +22,29 @@ SOURCE_RUNNER = (
     / "project_template"
     / "run.py"
 )
+
+
+
+def _write_node_declarations(project: Path, source: str, declarations: tuple[tuple, ...]) -> None:
+    manifests = project / "manifests" / "nodes"
+    manifests.mkdir(parents=True)
+    for key, class_name, flow_kind, contract, rulesets in declarations:
+        document = node_document(type_key=key, class_name=class_name, contract=contract, rulesets=rulesets)
+        document["flow_kind"] = flow_kind
+        document["implementations"][0]["source"]["ref"] = source
+        (manifests / f"{key}.jsonc").write_text(json.dumps(document), encoding="utf-8")
+
+
+def _required(data_type: str) -> dict:
+    return {"type": data_type, "cardinality": "exactly_one", "display_name": data_type}
+
+
+def _provided(data_type: str) -> dict:
+    return {"key": data_type, "type": data_type, "display_name": data_type}
+
+
+def _example(data_type: str, value) -> dict:
+    return {"inputs": {data_type: {"key": data_type, "type": data_type, "value": value, "source_node": "example"}}, "params": {}}
 
 
 def _load_kernel_cli_args(source_path: Path, workspace_path: Path):
@@ -192,69 +216,39 @@ def test_built_run_keeps_javascript_roots_out_of_lazy_python_imports(
         json.dumps(
             {
                 "project_target": "python",
-                "registry": "registry.py:build_node_registry",
+                "descriptors": {"nodes": ["manifests/nodes"]},
                 "quality_enabled": False,
             }
         ),
         encoding="utf-8",
     )
-    (python_project / "registry.py").write_text(
-        textwrap.dedent(
-            """
-            from vibeflow.targets.python.project import NodeRegistry
-            from nodes.lazy_nodes import EndNode, LazyNode, StartNode
-
-            def build_node_registry():
-                registry = NodeRegistry()
-                registry.register("lazy.start", StartNode, config_schema={}, config_defaults={})
-                registry.register("lazy.value", LazyNode, config_schema={}, config_defaults={})
-                registry.register("lazy.end", EndNode, config_schema={}, config_defaults={})
-                return registry
-            """
-        ).lstrip(),
-        encoding="utf-8",
-    )
     (nodes / "lazy_nodes.py").write_text(
         textwrap.dedent(
             """
-            from vibeflow.core import DataProvider
-            from vibeflow.targets.python.project import NodeContract, NodeInfo
-
             class StartNode:
-                NODE_INFO = NodeInfo(
-                    "lazy.start", "Start", "test",
-                    "Starts the lazy import workflow.", "0.1.0", "terminal",
-                )
-                CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}},))
                 def run_pure(self, inputs, params):
                     return {}
 
             class LazyNode:
-                NODE_INFO = NodeInfo(
-                    "lazy.value", "Lazy Value", "test",
-                    "Imports a workspace-local helper during execution.",
-                    "0.1.0", "process",
-                )
-                CONTRACT = NodeContract(
-                    provides=(DataProvider("response.value", "response.value", display_name="Response Value"),),
-                    output_semantics={"response.value": ("lazy value",)},
-                )
                 def run_pure(self, inputs, params):
                     import lazy_helper
                     return {"response.value": lazy_helper.VALUE}
 
             class EndNode:
-                NODE_INFO = NodeInfo(
-                    "lazy.end", "End", "test",
-                    "Ends the lazy import workflow.", "0.1.0", "terminal",
-                )
-                CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}},))
                 def run_pure(self, inputs, params):
                     return {}
             """
         ).lstrip(),
         encoding="utf-8",
     )
+    _write_node_declarations(python_project, "nodes/lazy_nodes.py", (
+        ("lazy.start", "StartNode", "terminal", {"examples": [{"inputs": {}, "params": {}}]}, ["vibeflow.process"]),
+        ("lazy.value", "LazyNode", "process", {
+            "provides": [_provided("response.value")],
+            "output_semantics": {"response.value": ["lazy value"]},
+        }, ["vibeflow.process"]),
+        ("lazy.end", "EndNode", "terminal", {"examples": [{"inputs": {}, "params": {}}]}, ["vibeflow.process"]),
+    ))
 
     config_path = python_project / "main.jsonc"
     config_path.write_text(
@@ -376,67 +370,46 @@ def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_co
         json.dumps(
             {
                 "project_target": "python",
-                "registry": "registry.py:build_node_registry",
+                "descriptors": {"nodes": ["manifests/nodes"]},
                 "quality_enabled": False,
             }
         ),
         encoding="utf-8",
     )
-    (project / "registry.py").write_text(
-        textwrap.dedent(
-            """
-            from vibeflow.targets.python.project import NodeRegistry
-            from nodes.cli_nodes import StartNode, ExitNode, EndNode
-
-            def build_node_registry():
-                registry = NodeRegistry()
-                registry.register("custom.start", StartNode, config_schema={}, config_defaults={})
-                registry.register("custom.exit", ExitNode, config_schema={}, config_defaults={})
-                registry.register("custom.end", EndNode, config_schema={}, config_defaults={})
-                return registry
-            """
-        ).lstrip(),
-        encoding="utf-8",
-    )
     (nodes / "cli_nodes.py").write_text(
         textwrap.dedent(
             """
-            from vibeflow.core import DataProvider, DataRequirement
-            from vibeflow.targets.python.project import NodeContract, NodeInfo
-
             class StartNode:
-                NODE_INFO = NodeInfo("custom.start", "Start", "test", "Starts the CLI.", "0.1.0", "terminal")
-                CONTRACT = NodeContract(examples=({"inputs": {}, "params": {}},))
                 def run_pure(self, inputs, params):
                     return {}
 
             class ExitNode:
-                NODE_INFO = NodeInfo("custom.exit", "Exit", "test", "Loads a workspace-local helper lazily.", "0.1.0", "io")
-                CONTRACT = NodeContract(
-                    requires=(DataRequirement("cli.argv", "exactly_one", display_name="CLI Argv"),),
-                    provides=(DataProvider("cli.exit_code", "cli.exit_code", display_name="CLI Exit Code"),),
-                    input_semantics={"cli.argv": ("business argv",)},
-                    output_semantics={"cli.exit_code": ("business exit",)},
-                    examples=({"inputs": {"cli.argv": {"key": "cli.argv", "type": "cli.argv", "value": [], "source_node": "example"}}, "params": {}},),
-                )
                 def run_pure(self, inputs, params):
                     import lazy_helper
                     print(lazy_helper.__file__)
                     return {"cli.exit_code": lazy_helper.CODE}
 
             class EndNode:
-                NODE_INFO = NodeInfo("custom.end", "End", "test", "Ends the CLI.", "0.1.0", "terminal")
-                CONTRACT = NodeContract(
-                    requires=(DataRequirement("cli.exit_code", "exactly_one", display_name="CLI Exit Code"),),
-                    input_semantics={"cli.exit_code": ("business exit",)},
-                    examples=({"inputs": {"cli.exit_code": {"key": "cli.exit_code", "type": "cli.exit_code", "value": 0, "source_node": "example"}}, "params": {}},),
-                )
                 def run_pure(self, inputs, params):
                     return {}
             """
         ).lstrip(),
         encoding="utf-8",
     )
+    _write_node_declarations(project, "nodes/cli_nodes.py", (
+        ("custom.start", "StartNode", "terminal", {"examples": [{"inputs": {}, "params": {}}]}, ["vibeflow.process"]),
+        ("custom.exit", "ExitNode", "io", {
+            "requires": [_required("cli.argv")], "provides": [_provided("cli.exit_code")],
+            "input_semantics": {"cli.argv": ["business argv"]},
+            "output_semantics": {"cli.exit_code": ["business exit"]},
+            "examples": [_example("cli.argv", [])],
+        }, ["vibeflow.io"]),
+        ("custom.end", "EndNode", "terminal", {
+            "requires": [_required("cli.exit_code")],
+            "input_semantics": {"cli.exit_code": ["business exit"]},
+            "examples": [_example("cli.exit_code", 0)],
+        }, ["vibeflow.process"]),
+    ))
     config = project / "main.jsonc"
     config.write_text(
         json.dumps(

@@ -1,8 +1,7 @@
-"""Compatibility compiler facade with Python compiler-plugin orchestration.
+"""Python compiler adapter with declaration facts and compiler-plugin orchestration.
 
 The language-neutral graph compiler lives in :mod:`vibeflow.core.compiler`.
-This module adapts legacy Registry/Catalog objects into static facts and keeps
-the established Python compiler-plugin hook order.
+This module adapts canonical declarations and available implementation facts.
 """
 
 from __future__ import annotations
@@ -32,7 +31,6 @@ from vibeflow.core.models import (
     ImplementationFacts,
     TargetFeatureSet,
 )
-from vibeflow.targets.python.project.node import effective_effect_scope
 from vibeflow.targets.python.quality.source_analysis.runtime_dispatch import (
     analyze_runtime_dispatch,
 )
@@ -45,7 +43,7 @@ class CompilerPluginRegistry(Protocol):
 
 
 class GraphCompiler:
-    """Legacy Python-facing compiler wrapper.
+    """Python-facing compiler adapter.
 
     Dynamic registry lookup and plugin execution stop at this boundary; Core
     receives only immutable, language-neutral implementation facts.
@@ -153,25 +151,16 @@ def _adapt_implementation_facts(
     facts: list[ImplementationFact] = []
     for type_key in sorted(relevant):
         try:
-            registered = _require_registered_type(source, type_key)
+            registered = source.descriptor(type_key) if callable(getattr(source, "descriptor", None)) else _require_registered_type(source, type_key)
         except Exception:
             continue
-        facts.append(_implementation_fact(type_key, registered))
+        facts.append(_implementation_fact(type_key, registered, effect_scope=source.effect_scope(type_key) if callable(getattr(source, "effect_scope", None)) else "unconstrained", runtime_dispatch=_runtime_dispatch_fact(source, type_key)))
     return ImplementationFacts(tuple(facts), strict=True)
 
 
-def _implementation_fact(type_key: str, registered: Any) -> ImplementationFact:
-    direct_flow_kind = _text_attribute(registered, "flow_kind")
-    info = getattr(registered, "NODE_INFO", None)
-    contract = getattr(registered, "CONTRACT", None)
-    flow_kind = direct_flow_kind or _text_attribute(info, "flow_kind")
-    metadata = info if info is not None else registered
-    effect_scope = effective_effect_scope(metadata)
-    runtime_dispatch: bool | None = None
-    if getattr(metadata, "external", False) is not True and isinstance(registered, type):
-        analysis = analyze_runtime_dispatch(registered)
-        if analysis is not None:
-            runtime_dispatch = analysis.detected
+def _implementation_fact(type_key: str, registered: Any, *, effect_scope: str = "unconstrained", runtime_dispatch: bool | None = None) -> ImplementationFact:
+    flow_kind = _text_attribute(registered, "flow_kind")
+    contract = getattr(registered, "contract", None)
     completion = _text_attribute(registered, "completion")
     source_kind = ""
     source_ref = ""
@@ -184,10 +173,6 @@ def _implementation_fact(type_key: str, registered: Any) -> ImplementationFact:
         source_kind = _text_attribute(source, "kind")
         source_ref = _text_attribute(source, "ref")
         source_export = _text_attribute(source, "export")
-    if not source_ref:
-        source_ref = _text_attribute(registered, "__module__")
-        source_export = _text_attribute(registered, "__qualname__")
-        source_kind = "module" if source_ref else ""
     return ImplementationFact(
         type_key=type_key,
         flow_kind=flow_kind,
@@ -200,6 +185,29 @@ def _implementation_fact(type_key: str, registered: Any) -> ImplementationFact:
         source_ref=source_ref,
         source_export=source_export,
     )
+
+
+def _runtime_dispatch_fact(registry, type_key):
+    context = getattr(registry, "source_context_snapshot", None)
+    node = next((item for item in context.nodes if item.type_key == type_key), None) if context is not None else None
+    loader = getattr(registry,"source_context_loader",None)
+    if node is None and callable(loader):
+        previous = context
+        try:
+            context = loader(type_key)
+            node = next((item for item in context.nodes if item.type_key == type_key),None)
+        finally:
+            registry.source_context_snapshot = previous
+    if node is not None:
+        from vibeflow.targets.python.quality.source_analysis.runtime_dispatch import analyze_source_runtime_dispatch
+        analysis = analyze_source_runtime_dispatch(context, node)
+        return analysis.detected if analysis is not None else None
+    implementation = getattr(registry, "_registry", {}).get(type_key)
+    if implementation is None:
+        return None
+    from vibeflow.targets.python.quality.source_analysis.runtime_dispatch import analyze_runtime_dispatch
+    analysis = analyze_runtime_dispatch(implementation)
+    return analysis.detected if analysis is not None else None
 
 
 def _text_attribute(value: object, name: str) -> str:

@@ -50,7 +50,7 @@ def test_javascript_descriptors_supply_core_execution_facts() -> None:
     assert facts.get("demo.fetch").to_dict() == {
         "type_key": "demo.fetch",
         "flow_kind": "terminal",
-        "effect_scope": "none",
+        "effect_scope": "unconstrained",
         "runtime_dispatch": None,
         "completion": "suspend",
         "schedule": "inline",

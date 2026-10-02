@@ -1,0 +1,83 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.delegate_output",
+  "display_name": "写出 CLI 结果",
+  "category": "sandbox",
+  "description": "把业务结果写入真实 stdout/stderr，并形成保留的 cli.exit_code。",
+  "version": "0.1.0",
+  "flow_kind": "io",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "business.message",
+        "cardinality": "exactly_one",
+        "display_name": "business.message"
+      },
+      {
+        "type": "cli.verbose",
+        "cardinality": "exactly_one",
+        "display_name": "cli.verbose"
+      }
+    ],
+    "provides": [
+      {
+        "key": "cli.exit_code",
+        "type": "cli.exit_code",
+        "display_name": "cli.exit_code"
+      }
+    ],
+    "input_semantics": {
+      "business.message": [
+        "需要输出的最终业务消息。"
+      ],
+      "cli.verbose": [
+        "是否向 stderr 输出详细信息。"
+      ]
+    },
+    "output_semantics": {
+      "cli.exit_code": [
+        "进程应返回的业务退出码。"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "business.message": {
+            "key": "business.message",
+            "type": "business.message",
+            "value": "processed:hello",
+            "source_node": "example"
+          },
+          "cli.verbose": {
+            "key": "cli.verbose",
+            "type": "cli.verbose",
+            "value": true,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.io"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_delegate_cli_nodes.py",
+        "export": "DelegateOutputNode"
+      }
+    }
+  ]
+}

@@ -1,4 +1,6 @@
 from tests.fixtures.support.strict_support import *
+from tests.fixtures.support.rule_inspection import _valid_node_source, _inspect_node_source, node_document
+from vibeflow.tooling.project.descriptor_parser import parse_descriptor_manifest
 
 
 def test_urllib_parse_is_allowed_but_urllib_request_is_banned_for_nodes(tmp_path, capsys) -> None:
@@ -20,7 +22,7 @@ def test_urllib_parse_is_allowed_but_urllib_request_is_banned_for_nodes(tmp_path
     )
     code, payload = _inspect_node_source(tmp_path / "request", capsys, request_source)
     assert code == 1
-    assert any(error["details"].get("legacy_code") == "effect_import" for error in payload["health"]["errors"])
+    assert any(error["code"] == "NODE.EFFECT.IMPORT_FORBIDDEN" for error in payload["health"]["errors"])
 
 
 def test_urllib_parse_is_allowed_but_urllib_request_is_banned_for_base_lib(tmp_path) -> None:
@@ -55,37 +57,16 @@ def test_graph_health_suppresses_duplicate_logic_for_standard_wrappers(tmp_path)
     module_path = tmp_path / "wrapper_nodes.py"
     module_path.write_text(
         """
-from vibeflow.core import DataProvider, DataRequirement
-from vibeflow.targets.python.project import NodeContract, NodeInfo
-
 def wrap_value(value):
     return value + 1
 
 class WrapperOneNode:
-    NODE_INFO = NodeInfo("test.wrapper_one", "Wrapper One", "test", "Wrapper node.", "0.1.0", "process")
-    CONTRACT = NodeContract(
-        requires=(DataRequirement("value.in", "exactly_one", display_name="Value In"),),
-        provides=(DataProvider("wrap.one", "wrap.one", display_name="Wrap One"),),
-        input_semantics={"value.in": ("input value",)},
-        output_semantics={"wrap.one": ("wrapped value",)},
-        examples=({"inputs": {"value.in": 1}, "params": {}},),
-    )
-
     def run_pure(self, inputs, params):
         value = inputs["value.in"]
         result = wrap_value(value)
         return {"wrap.one": result}
 
 class WrapperTwoNode:
-    NODE_INFO = NodeInfo("test.wrapper_two", "Wrapper Two", "test", "Wrapper node.", "0.1.0", "process")
-    CONTRACT = NodeContract(
-        requires=(DataRequirement("value.in", "exactly_one", display_name="Value In"),),
-        provides=(DataProvider("wrap.two", "wrap.two", display_name="Wrap Two"),),
-        input_semantics={"value.in": ("input value",)},
-        output_semantics={"wrap.two": ("wrapped value",)},
-        examples=({"inputs": {"value.in": 1}, "params": {}},),
-    )
-
     def run_pure(self, inputs, params):
         value = inputs["value.in"]
         result = wrap_value(value)
@@ -95,8 +76,18 @@ class WrapperTwoNode:
     )
     module = _load_module_from_path(module_path, "_wrapper_nodes")
     registry = NodeRegistry()
-    register_node(registry, "test.wrapper_one", module.WrapperOneNode)
-    register_node(registry, "test.wrapper_two", module.WrapperTwoNode)
+    for key, implementation, output in (
+        ("test.wrapper_one", module.WrapperOneNode, "wrap.one"),
+        ("test.wrapper_two", module.WrapperTwoNode, "wrap.two"),
+    ):
+        declaration = node_document(type_key=key, class_name=implementation.__name__, contract={
+            "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC(output)],
+            "input_semantics": {"value.in": ["input value"]},
+            "output_semantics": {output: ["wrapped value"]},
+            "examples": [{"inputs": {"value.in": 1}, "params": {}}],
+        })
+        declaration["implementations"][0]["source"]["ref"] = str(module_path)
+        register_node(registry, parse_descriptor_manifest(declaration), implementation)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -108,7 +99,9 @@ class WrapperTwoNode:
             }
         }
     )
-    report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
+    from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
+    source_context = collect_workflow_source_context(registry, graph)
+    report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000), source_context=source_context)
     payload = report.to_dict()
     assert payload["info"]["node_metrics"]["wrapper_one"]["run_pure_shape"] == "wrapper"
     assert payload["info"]["node_metrics"]["wrapper_two"]["run_pure_shape"] == "wrapper"
