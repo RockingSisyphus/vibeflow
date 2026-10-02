@@ -104,7 +104,7 @@ def _compileall(scratch: Path) -> None:
     )
 
 
-def _pytest(scratch: Path) -> None:
+def _pytest(scratch: Path, *, with_renderer: bool = False) -> None:
     _run(
         (
             PYTHON,
@@ -113,7 +113,9 @@ def _pytest(scratch: Path) -> None:
             scratch / "pytest",
             "--",
             *(ROOT / item for item in TEST_GROUPS if (ROOT / item).exists()),
-        )
+        ),
+        overrides={"VIBEFLOW_MERMAID_RENDERER_ROOT": str(_puppeteer_root(scratch))}
+        if with_renderer else None,
     )
 
 
@@ -562,7 +564,7 @@ def _steps(*, full: bool) -> tuple[Step, ...]:
     base = (
         Step("repository-quality", _repository_quality),
         Step("compileall", _compileall),
-        Step("pytest", _pytest),
+        Step("pytest", lambda scratch: _pytest(scratch, with_renderer=full)),
     )
     if not full:
         return base

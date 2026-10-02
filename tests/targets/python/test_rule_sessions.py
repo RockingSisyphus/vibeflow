@@ -303,8 +303,8 @@ def test_selected_project_theme_reports_original_parse_location_without_reparse(
 @pytest.mark.parametrize("max_lines",[2,1000])
 def test_checked_run_import_file_rule_uses_current_command_numeric_defaults_before_marker(tmp_path,max_lines):
     import json
-    from vibeflow.tooling.application.python.project.declarations import _bind_node,PythonSourceRuleError
-    from vibeflow.tooling.application.python.runner import run_checked
+    from vibeflow.tooling.application.python.project.declarations import _bind_node
+    from vibeflow.tooling.application.python.runner import CheckedRunError,run_checked
     selection = RulesetDescriptor("test.import.files",calls=(RuleCall("files",rule_id="vibeflow.quality.files"),),
         entrypoints={"static":(),"run":(),"import":("files",)})
     registry = _registry(tmp_path,(),selection)
@@ -316,10 +316,12 @@ def test_checked_run_import_file_rule_uses_current_command_numeric_defaults_befo
     workflow.write_text(json.dumps({"policy":{"node_source":{"max_lines":max_lines}},"rulesets":[],"pipeline":{"nodes":[
         {"id":"leaf","type_used":"test.leaf","display_name":"Leaf","description":"One delayed import."}]}}))
     if max_lines == 2:
-        with pytest.raises(PythonSourceRuleError) as failure:
+        with pytest.raises(CheckedRunError) as failure:
             run_checked(workflow,registry=registry,run_root=tmp_path / "runs",run_id="strict-import")
-        finding = next(item for item in failure.value.findings if item.code == "QUALITY.FILE.MAX_LINES")
+        finding = next(item for item in failure.value.result.health.errors if item.code == "QUALITY.FILE.MAX_LINES")
         assert finding.details["limit"] == 2
+        assert finding.definition_id == "vibeflow.quality.files"
+        assert failure.value.result.health.info["rule_phase"] == "import"
         assert not marker.exists()
     else:
         result = run_checked(workflow,registry=registry,run_root=tmp_path / "runs",run_id="allowed-import")

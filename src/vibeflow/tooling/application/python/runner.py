@@ -10,7 +10,7 @@ from uuid import uuid4
 from vibeflow.core.findings import HealthFinding, HealthReport
 from vibeflow.core.flow import GraphConfig
 from vibeflow.targets.python.project.plugin_loader import load_plugins_from_config
-from vibeflow.targets.python.project.registry import NodeRegistry
+from vibeflow.targets.python.project.registry import NodeRegistry, NodeRegistryError
 from vibeflow.targets.python.runtime.options import (
     RuntimeOptions,
     runtime_options as normalize_runtime_options,
@@ -139,6 +139,7 @@ def run_checked(
         graph, registry, plugin_registry, initial, run_dir, effective_runtime_options, resources,
         capabilities=capabilities,
         delegate_cli=delegate_cli,
+        health=health,
     )
     _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
     return CheckedRunResult(actual_run_id, run_dir, health, context)
@@ -407,19 +408,30 @@ def _execute_runtime(
     *,
     capabilities: Mapping[str, object] | None = None,
     delegate_cli: bool = False,
+    health: HealthReport | None = None,
 ):
     from vibeflow.targets.python.runtime.engine import PipelineRuntime
 
-    runtime = PipelineRuntime(
-        graph,
-        registry=registry,
-        plugin_registry=plugin_registry,
-        run_dir=run_dir,
-        global_config=resources.global_config,
-        runtime_options=runtime_options,
-        capabilities=capabilities,
-        delegate_cli=delegate_cli,
-    )
+    try:
+        runtime = PipelineRuntime(
+            graph,
+            registry=registry,
+            plugin_registry=plugin_registry,
+            run_dir=run_dir,
+            global_config=resources.global_config,
+            runtime_options=runtime_options,
+            capabilities=capabilities,
+            delegate_cli=delegate_cli,
+        )
+    except NodeRegistryError as exc:
+        findings = getattr(exc,"findings",())
+        if not findings:
+            raise
+        failed = replace(health or HealthReport(status="ERROR"),status="ERROR",
+            errors=(*(health.errors if health is not None else ()),*findings))
+        _write_refused_artifacts(run_dir,failed)
+        raise CheckedRunError("run refused: implementation binding failed",
+            CheckedRunResult(run_dir.name,run_dir,failed)) from exc
     try:
         context = runtime.run(initial)
     finally:

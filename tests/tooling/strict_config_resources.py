@@ -1,5 +1,6 @@
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
+from tests.fixtures.support.strict_support_runtime_implementations import GlobalParamNode
 
 
 GlobalParamNode_DECLARATION = node_declaration(NodeInfo(
@@ -15,12 +16,6 @@ GlobalParamNode_DECLARATION = node_declaration(NodeInfo(
 
         examples=({"inputs": {}, "params": {"_global": {"offset": 1}}},),
     ), rulesets=("vibeflow.process",))
-
-class GlobalParamNode:
-
-    def run_pure(self, inputs, params):
-        return {"value.out": params["_global"]["offset"]}
-
 
 def test_config_resource_schema_rejects_invalid_status_and_plugin_config() -> None:
     findings = collect_config_schema_findings(

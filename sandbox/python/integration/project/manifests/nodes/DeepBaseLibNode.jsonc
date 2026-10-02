@@ -39,7 +39,7 @@
       ],
       "source": {
         "kind": "file",
-        "ref": "illegal_nodes/maintainability_cases.py",
+        "ref": "illegal_nodes/deep_dependency_node.py",
         "export": "DeepBaseLibNode"
       }
     }

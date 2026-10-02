@@ -34,6 +34,12 @@ def validate_graph_health(graph, *, registry=None, boundary_registry=None, plugi
         return _build_health_report(graph, None, plugin_registry, state, effective_policy=effective_policy, rule_phase="import")
     source_report = None
     if registry is not None and source_context is not None:
+        if rule_phase != "import":
+            import_report = execute_python_node_rules(registry, source_context, phase="import", purity_policy=purity_policy, quality_policy=quality_policy)
+            _append_findings(state, import_report.findings)
+            state.rule_executions.extend(import_report.executions)
+            if state.errors:
+                return _build_health_report(graph, None, plugin_registry, state, effective_policy=effective_policy, rule_phase="import")
         source_report = execute_python_node_rules(registry, source_context, phase=rule_phase, purity_policy=purity_policy, quality_policy=quality_policy)
         _append_findings(state, source_report.findings)
         state.rule_executions.extend(source_report.executions)

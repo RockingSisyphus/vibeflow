@@ -132,6 +132,7 @@ def test_architecture_document_is_deterministic_and_keeps_planned_and_unused_bod
         "workflow",
         "nodesets",
         "node_types",
+        "node_categories",
         "resources",
     ]
     assert payload["project_target"] == "python"
@@ -410,7 +411,7 @@ def test_architecture_node_types_include_contract_schema_defaults_and_python_ide
         "defaults": {"value": 1},
         "schema": {"value": {"type": "number"}},
     }
-    assert seed_type["source"]["module"] == "tests.fixtures.support.strict_support_runtime_nodes"
+    assert seed_type["source"]["module"] == "tests.fixtures.support.strict_support_runtime_implementations"
     assert seed_type["source"]["class"] == "SeedNode"
     assert "examples" not in seed_type["contract"]
     assert seed_call["config"]["call"]["values"] == {"value": 4}

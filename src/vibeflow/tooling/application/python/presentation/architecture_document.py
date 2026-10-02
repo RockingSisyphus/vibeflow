@@ -50,11 +50,13 @@ def build_architecture_document(
     else:
         actual_compiled = compile_for_render(graph, compiled, registry)
     roots = _root_paths(graph)
+    categories = getattr(registry, "categories", None)
     return {
         "project_target": "python",
         "workflow": _workflow_document(graph, actual_compiled, registry=registry, resources=resources),
         "nodesets": _nodesets_document(graph, registry=registry),
         "node_types": _node_types_document(graph, registry=registry, roots=roots),
+        "node_categories": categories.to_dict() if categories is not None else {},
         "resources": _resources_document(graph, resources, roots=roots),
     }
 
@@ -180,6 +182,8 @@ def _node_document(
     source = source_reference(graph.root_id, graph.root_path, graph.source_path)
     invocation = invocation_for_node(graph, node)
     target = invocation.nodeset if invocation is not None else None
+    descriptor = registry_descriptor(registry, node.type_used)
+    selected_rulesets = list(target.graph.rulesets) if target is not None else list(registry.rulesets(node.type_used)) if descriptor is not None else []
     planned = node.status == STATUS_PLANNED or getattr(target, "status", "") == STATUS_PLANNED
     async_config = None
     if node.async_mode:
@@ -220,8 +224,10 @@ def _node_document(
         "type_used": node.type_used,
         "source": source,
         "role": node_review_metadata(graph, node, registry),
+        "category": getattr(descriptor, "category", ""),
         "flow_kind": node_flow_kind(node, compiled),
-        "rulesets": list(target.graph.rulesets) if target is not None else list(registry.rulesets(node.type_used)) if registry_descriptor(registry, node.type_used) is not None else [],
+        "rulesets": selected_rulesets,
+        "selected_rulesets": selected_rulesets,
         "presentation": resolve_presentation(registry_descriptor(registry, node.type_used), registry_category(registry, registry_descriptor(registry, node.type_used)), flow_kind=node_flow_kind(node, compiled), native_class=("loopNode" if node.type_used in LOOP_NODE_TYPES else "nodesetNode") if invocation is not None else "", status_class="plannedNode" if planned else "", call_style=node.style).to_dict(),
         "effect_scope": node_review_effect_scope(graph, node, registry, compiled=compiled),
         "runtime_dispatch": _runtime_dispatch_label(node, compiled),

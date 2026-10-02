@@ -1,3 +1,4 @@
+from tests.fixtures.support.strict_support_runtime_implementations import DuplicateThreeNode
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
 from copy import deepcopy
@@ -54,10 +55,6 @@ DuplicateThreeNode_DECLARATION = node_declaration(NodeInfo("test.duplicate_three
         output_semantics={"dup.three": ("third duplicate fixture value",)},
     ), rulesets=("vibeflow.process",))
 
-class DuplicateThreeNode:
-
-    def run_pure(self, inputs, params):
-        return {"dup.three": 1}
 
 def test_architecture_smells_warn_for_mismatched_metadata_and_unstable_keys(tmp_path, capsys) -> None:
     descriptor = node_document(contract={"provides":[PROV_SPEC("Tmp Key")],

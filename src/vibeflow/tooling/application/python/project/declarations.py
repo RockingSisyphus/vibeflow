@@ -162,32 +162,55 @@ def _load_rule_handlers(registry, plan, workspace):
             raise NodeRegistryError(f"rule '{rule.id}' has no declaring Python project")
         # Trusted rule code has normal process capabilities; Node effect Rules do not sandbox it.
         manifest = next(catalog.rules.source_for(rule.id) for root,catalog in zip(roots,registry.rule_catalogs) if root is owner)
-        base = Path(manifest).parent if manifest and not manifest.startswith("builtin:") else owner.path
-        path = _implementation_path(source.kind, source.ref, owner.path, registry.source_roots)
         symbol = source.export or rule.handler
         if not symbol:
             raise NodeRegistryError(f"rule '{rule.id}' must name its exported handler")
-        with _source_paths((owner.path,*registry.source_roots)):
-            name = f"_vibeflow_rule_{abs(hash(str(path)))}"
-            module = sys.modules.get(name)
-            if module is None:
-                spec = importlib.util.spec_from_file_location(name,path)
-                if spec is None or spec.loader is None:
-                    raise NodeRegistryError(f"cannot load rule source: {path}")
-                module = importlib.util.module_from_spec(spec)
-                sys.modules[name] = module
-                try:
-                    spec.loader.exec_module(module)
-                except BaseException:
-                    sys.modules.pop(name,None)
-                    raise
-            value = module
-            for part in symbol.split("."):
-                value = getattr(value,part)
-        if not callable(value):
-            raise NodeRegistryError(f"rule '{rule.id}' handler must be callable")
-        handlers[rule.id] = value
+        path = None
+        try:
+            path = _implementation_path(source.kind, source.ref, owner.path, registry.source_roots)
+            handlers[rule.id] = _load_rule_handler(path, symbol, owner, registry)
+        except Exception as exc:
+            implementation = {"kind":source.kind,"ref":source.ref,"export":symbol}
+            if path is not None or source.kind == "file":
+                implementation["path"] = str(path or (owner.path / source.ref).resolve())
+            raise PythonRuleBindingError(rule.id, manifest, implementation, exc) from exc
     return handlers
+
+
+def _load_rule_handler(path, symbol, owner, registry):
+    with _source_paths((owner.path,*registry.source_roots)):
+        name = f"_vibeflow_rule_{abs(hash(str(path)))}"
+        module = sys.modules.get(name)
+        if module is None:
+            spec = importlib.util.spec_from_file_location(name,path)
+            if spec is None or spec.loader is None:
+                raise NodeRegistryError(f"cannot load rule source: {path}")
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[name] = module
+            try:
+                spec.loader.exec_module(module)
+            except BaseException:
+                sys.modules.pop(name,None)
+                raise
+        value = module
+        for part in symbol.split("."):
+            value = getattr(value,part)
+    if not callable(value):
+        raise NodeRegistryError("declared Rule handler must be callable")
+    return value
+
+
+class PythonRuleBindingError(NodeRegistryError):
+    """A declaration-backed Rule implementation could not be loaded."""
+    def __init__(self, rule_id, manifest, implementation, cause):
+        from vibeflow.core.findings import HealthFinding
+        symbol = implementation["export"]
+        message = f"rule '{rule_id}' handler '{symbol}' could not be bound: {cause}"
+        self.findings = (HealthFinding(rule_id="RULE.IMPLEMENTATION.LOAD", severity="error",
+            object_type="rule", object_id=rule_id, definition_id=rule_id, failure_layer="rule",
+            message=message, source_location={"path":str(manifest),"line":1,"column":1},
+            details={"implementation":implementation}),)
+        super().__init__(message)
 
 
 def _implementation_path(kind: str, reference: str, root: Path, roots: tuple[Path, ...]) -> Path:
@@ -207,9 +230,14 @@ def _implementation_path(kind: str, reference: str, root: Path, roots: tuple[Pat
 
 
 def _bind_node(registry: NodeRegistry, key: str, roots: tuple[Path, ...]) -> type:
+    from dataclasses import replace
     from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rules
 
-    context = collect_node_source_context(registry, (key,))
+    snapshot = getattr(registry, "source_context_snapshot", None)
+    selected = tuple(node for node in snapshot.nodes if node.type_key == key) if snapshot is not None else ()
+    # The checked workflow already supplied its actual calls and ownership.
+    # Limit this binding check to its Node without replacing the full snapshot.
+    context = replace(snapshot,nodes=selected) if selected else collect_node_source_context(registry, (key,))
     results = execute_python_node_rules(registry, context, phase="import",**registry.rule_defaults())
     findings = tuple(item for item in results.findings if item.severity == "error")
     if findings:
@@ -217,24 +245,33 @@ def _bind_node(registry: NodeRegistry, key: str, roots: tuple[Path, ...]) -> typ
     path, symbol, _, root = registry.source_locations[key]
     relative = path.relative_to(root).with_suffix("")
     module_name = ".".join(relative.parts)
-    with _source_paths((root, *roots)):
-        module = sys.modules.get(module_name)
-        if module is None or Path(getattr(module, "__file__", "")).resolve() != path:
-            specification = importlib.util.spec_from_file_location(module_name, path)
-            if specification is None or specification.loader is None:
-                raise NodeRegistryError(f"cannot load declared Python source: {path}")
-            module = importlib.util.module_from_spec(specification)
-            sys.modules[module_name] = module
-            try:
-                specification.loader.exec_module(module)
-            except BaseException:
-                sys.modules.pop(module_name, None)
-                raise
-        implementation = module
-        for member in symbol.split("."):
-            implementation = getattr(implementation, member)
-    if not isinstance(implementation, type):
-        raise NodeRegistryError(f"declared Python symbol '{symbol}' must be a class")
+    try:
+        with _source_paths((root, *roots)):
+            module = sys.modules.get(module_name)
+            if module is None or Path(getattr(module, "__file__", "")).resolve() != path:
+                specification = importlib.util.spec_from_file_location(module_name, path)
+                if specification is None or specification.loader is None:
+                    raise NodeRegistryError(f"cannot load declared Python source: {path}")
+                module = importlib.util.module_from_spec(specification)
+                sys.modules[module_name] = module
+                try:
+                    specification.loader.exec_module(module)
+                except BaseException:
+                    sys.modules.pop(module_name, None)
+                    raise
+            implementation = module
+            for member in symbol.split("."):
+                implementation = getattr(implementation, member)
+        if not isinstance(implementation, type):
+            raise NodeRegistryError(f"declared Python symbol '{symbol}' must be a class")
+    except Exception as exc:
+        from vibeflow.core.findings import HealthFinding
+        error = NodeRegistryError(f"node '{key}' implementation '{symbol}' could not be bound: {exc}")
+        error.findings = (HealthFinding(rule_id="NODE.IMPLEMENTATION.BINDING",severity="error",
+            object_type="node",object_id=key,failure_layer="implementation",message=str(error),
+            source_location={"path":registry.source_info(key).path,"line":1,"column":1},
+            details={"implementation":{"path":str(path),"export":symbol}}),)
+        raise error from exc
     return implementation
 
 

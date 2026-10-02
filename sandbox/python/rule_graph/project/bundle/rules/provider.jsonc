@@ -1,0 +1,52 @@
+{
+  "kind": "rule",
+  "id": "example.number_provider",
+  "description": "Produce a typed list independently from audit findings.",
+  "scope": "call",
+  "params_schema": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "valid",
+        "empty",
+        "warning",
+        "error",
+        "missing",
+        "wrong_type",
+        "failed",
+        "unavailable"
+      ]
+    },
+    "value": {
+      "type": "integer"
+    },
+    "marker": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    }
+  },
+  "params_defaults": {
+    "mode": "valid",
+    "value": 3,
+    "marker": "",
+    "source": "rules/provider.py"
+  },
+  "outputs": {
+    "numbers": "example.numbers.v1"
+  },
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "rules/provider.py",
+        "export": "check"
+      }
+    }
+  ]
+}

@@ -213,3 +213,143 @@ def test_rule_review_does_not_import_node_or_rule_implementations(domain_project
     assert interface["parameter_sources"]["allowed_methods"].startswith("override:")
     assert not node_marker.exists()
     assert not rule_marker.exists()
+
+
+@pytest.mark.parametrize("location", ["module", "ordinary_node"])
+def test_same_file_model_definitions_have_precise_domain_ownership(domain_project, capsys, location):
+    workspace, project = domain_project
+    path = project / "domain_nodes.py"
+    source = path.read_text()
+    if location == "module":
+        source += "\n\ndef model_forward(value):\n    return value\n"
+        symbol = "model_forward"
+    else:
+        source = source.replace("class DataTransform:\n", "class DataTransform:\n"
+            "    def model_forward(self, value):\n        return value\n\n")
+        symbol = "DataTransform.model_forward"
+    path.write_text(source)
+    line = next(index for index, value in enumerate(source.splitlines(), 1)
+                if value.lstrip().startswith("def model_forward(") and
+                (location == "module" and value.startswith("def ") or
+                 location == "ordinary_node" and index > source.splitlines().index("class DataTransform:") + 1))
+    code, payload = _call(capsys, ["validate", *_common(workspace, project), "--json"])
+    assert code == 1, payload
+    finding = next(item for item in payload["errors"]
+                   if item["code"] == "EXAMPLE.MODEL.LOCATION" and item["details"]["symbol"] == symbol)
+    assert finding["definition_id"] == "example.model_definition"
+    assert finding["source_location"] == {"path": str(path), "line": line, "column": 1}
+    if location == "ordinary_node":
+        assert finding["details"]["node_type"] == "example.transform"
+        assert finding["details"]["ownership"] == [{"node_type": "example.transform", "relation": "helper_reference"}]
+        assert finding["details"]["calls"] == [{"owner": "pipeline", "node": "transform"}]
+    else:
+        # Sharing a module with an allowed model implementation does not grant
+        # ownership to an unrelated, module-level definition.
+        assert finding["details"]["ownership"] == []
+
+
+@pytest.mark.parametrize("selection", ["default", "terminal", "empty"])
+def test_process_print_policy_is_checked_and_executed_through_cli(domain_project, capsys, tmp_path, monkeypatch, selection):
+    workspace, project = domain_project
+    source = project / "domain_nodes.py"
+    source.write_text(source.read_text().replace('return {"result": value + params["offset"]}',
+        'print("domain transform result", value + params["offset"])\n'
+        '        return {"result": value + params["offset"]}'))
+    declaration = project / "bundle/nodes/transform.jsonc"
+    node = json.loads(declaration.read_text())
+    assert node["flow_kind"] == "process"
+    if selection == "empty":
+        node["rulesets"] = []
+        declaration.write_text(json.dumps(node))
+    elif selection == "terminal":
+        ruleset = project / "bundle/rulesets/data-domain.jsonc"
+        data = json.loads(ruleset.read_text())
+        data["relations"] = [{"source": "$self", "target": "native/effects", "kind": "overrides",
+                              "params": {"effect_scope": "terminal"}}]
+        ruleset.write_text(json.dumps(data))
+    import vibeflow.tooling.application.python.workspace_service as service
+    results = []
+    def capture(*args, **kwargs):
+        result = run_workspace_checked(*args, **kwargs)
+        results.append(result)
+        return result
+    monkeypatch.setattr(service, "run_workspace_checked", capture)
+    code = main(["run", *_common(workspace, project), "--input", str(workspace.parent / "input.json"),
+                 "--run-root", str(tmp_path / "runs"), "--run-id", selection])
+    output = capsys.readouterr().out
+    printed = "domain transform result 7\n"
+    if selection == "default":
+        assert code == 1
+        assert printed not in output
+        payload = json.loads(output)
+        finding = next(item for item in payload["health"]["errors"] if item["code"] == "NODE.EFFECT.CALL_FORBIDDEN")
+        assert finding["definition_id"] == "vibeflow.no_side_effects"
+        assert not (tmp_path / "runs/default/output_summary.json").exists()
+        return
+    assert code == 0, output
+    assert output.startswith(printed)
+    payload = json.loads(output[len(printed):])
+    assert payload["status"] in {"PASS", "CONCERNS"}
+    run_dir = Path(payload["run_dir"])
+    summary = json.loads((run_dir / "output_summary.json").read_text())
+    assert summary["result"]["value"] == {"scalar": True, "type": "int"}
+    assert results[0].context.get("result")["value"] == 7
+    health = json.loads((run_dir / "health_report.json").read_text())
+    assert health["info"]["node_effect_scopes"]["transform"] == ("terminal" if selection == "terminal" else "unconstrained")
+    assert json.loads(declaration.read_text())["flow_kind"] == "process"
+
+
+def test_selected_import_interface_rejects_missing_export_before_module_execution(domain_project, capsys, tmp_path):
+    workspace, project = domain_project
+    marker = project / "business-module-imported"
+    path = project / "domain_nodes.py"
+    path.write_text(f"from pathlib import Path\nPath({str(marker)!r}).write_text('imported')\n" + path.read_text())
+    for manifest in (project / "bundle/nodes").glob("*.jsonc"):
+        node = json.loads(manifest.read_text())
+        node["rulesets"] = []
+        if node["type_key"] == "example.model":
+            node["rulesets"] = ["example.prebind_interface"]
+            node["implementations"][0]["source"]["export"] = "MissingModel"
+        manifest.write_text(json.dumps(node))
+    declaration = project / "bundle/rulesets/prebind-interface.jsonc"
+    declaration.write_text(json.dumps({"kind":"ruleset","id":"example.prebind_interface",
+        "calls":[{"id":"interface","rule_id":"vibeflow.node_interface"}],
+        "entrypoints":{"import":["interface"],"static":[],"run":[]}}))
+    bundle = project / "bundles/domain.jsonc"
+    resources = json.loads(bundle.read_text())
+    resources["resources"]["rulesets"].append("../bundle/rulesets/prebind-interface.jsonc")
+    bundle.write_text(json.dumps(resources))
+    code, payload = _call(capsys, ["validate", *_common(workspace, project), "--json"])
+    assert code == 1, payload
+    finding = next(item for item in payload["errors"] if item["code"] == "NODE.IMPLEMENTATION.SYMBOL")
+    assert finding["definition_id"] == "vibeflow.node_interface"
+    assert finding["source_location"]["path"] == str(path)
+    assert finding["details"]["calls"] == [{"owner":"pipeline","node":"model"}]
+    assert payload["info"]["rule_phase"] == "import"
+    assert not marker.exists()
+    code, payload = _call(capsys, ["run", *_common(workspace, project),
+        "--input", str(workspace.parent / "input.json"), "--run-root", str(tmp_path / "runs"), "--run-id", "prebind-interface"])
+    assert code == 1, payload
+    assert any(item["definition_id"] == "vibeflow.node_interface" for item in payload["health"]["errors"])
+    assert not marker.exists()
+    assert not (tmp_path / "runs/prebind-interface/output_summary.json").exists()
+
+
+@pytest.mark.parametrize("export", ["check", "missing_module_rule"])
+def test_module_rule_binding_uses_resolved_source_provenance(domain_project, capsys, export):
+    workspace, project = domain_project
+    manifest = project / "bundle/rules/model-definition.jsonc"
+    data = json.loads(manifest.read_text())
+    data["implementations"][0]["source"] = {"kind":"module","ref":"rules.model_definition","export":export}
+    manifest.write_text(json.dumps(data))
+    code, payload = _call(capsys, ["validate", *_common(workspace, project), "--json"])
+    if export == "check":
+        assert code == 0, payload
+        assert _evidence(payload,"example.model")["category"] == "model_block"
+    else:
+        assert code == 1, payload
+        finding = next(item for item in payload["errors"] if item["code"] == "RULE.IMPLEMENTATION.LOAD")
+        assert finding["definition_id"] == "example.model_definition"
+        assert finding["source_location"] == {"path":str(manifest),"line":1,"column":1}
+        assert finding["details"]["implementation"] == {"kind":"module","ref":"rules.model_definition",
+            "export":export,"path":str(project / "rules/model_definition.py")}

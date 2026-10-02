@@ -1,0 +1,21 @@
+{
+  "kind": "bundle",
+  "id": "example.python_rule_graph",
+  "resources": {
+    "nodes": [
+      "../bundle/nodes/boundary.jsonc",
+      "../bundle/nodes/calculate.jsonc"
+    ],
+    "rules": [
+      "../bundle/rules/provider.jsonc",
+      "../bundle/rules/checker.jsonc",
+      "../bundle/rules/replacement.jsonc",
+      "../bundle/rules/wrong-replacement.jsonc"
+    ],
+    "rulesets": [
+      "../bundle/rulesets/graph.jsonc",
+      "../bundle/rulesets/shared.jsonc",
+      "../bundle/rulesets/nested.jsonc"
+    ]
+  }
+}

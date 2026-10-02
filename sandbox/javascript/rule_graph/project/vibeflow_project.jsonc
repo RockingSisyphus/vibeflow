@@ -1,0 +1,16 @@
+{
+  "project_target": "javascript",
+  "descriptors": {
+    "bundles": [
+      "bundles"
+    ],
+    "data_schemas": [
+      "manifests/data"
+    ]
+  },
+  "javascript": {
+    "package_root": ".",
+    "external_packages": []
+  },
+  "quality_enabled": false
+}

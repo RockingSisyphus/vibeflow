@@ -1,0 +1,10 @@
+{
+  "kind": "ruleset",
+  "id": "example.nested",
+  "calls": [
+    {
+      "id": "pair",
+      "ruleset_id": "example.shared_pair"
+    }
+  ]
+}

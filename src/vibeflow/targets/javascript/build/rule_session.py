@@ -12,7 +12,7 @@ from vibeflow.core.descriptors.categories import selected_node_rulesets
 from vibeflow.core.findings import Finding, HealthFinding
 from vibeflow.core.rules import (
     RuleContext, RuleRecord, RuleResult, compile_ruleset, execute_rule_plan,
-    EFFECT_POLICY_TYPE,
+    EFFECT_POLICY_TYPE, RuleGraphError, rule_graph_error_finding,
 )
 from vibeflow.core.rules.models import plain
 from vibeflow.core.rules.builtin.workflow import workflow_rule_checks, workflow_topic_handlers
@@ -21,9 +21,36 @@ from vibeflow.core.rules.builtin.project_quality import project_quality_handlers
 from vibeflow.core.quality import ProjectQualityFacts, QualityPolicy
 from vibeflow.core.flow import LOOP_NODE_TYPES, STATUS_PLANNED
 from vibeflow.targets.javascript.build.plugin_session import JavascriptPluginSession
+from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
+from vibeflow.targets.javascript.frontend.plugin_descriptors import JavascriptPluginError
 from vibeflow.targets.javascript.build.toolchain import run_rule_check_driver, run_quality_facts_driver
 from vibeflow.targets.javascript.build.project_resources import driver_import_policy
 from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy, _file_fact, _finding_fact
+
+
+def _compile_rule_plan(ruleset_id: str, *, catalogs: Any, entrypoint: str, rules: Any = None,
+                       context: RuleContext | None = None, selection_source: str = ""):
+    try:
+        return compile_ruleset(ruleset_id, rules=catalogs.rules if rules is None else rules,
+                               rulesets=catalogs.rulesets, entrypoint=entrypoint)
+    except RuleGraphError as error:
+        subject = context.subject if context is not None else {}
+        owner = str(subject.get("type_key", subject.get("workflow", "")))
+        finding = rule_graph_error_finding(error, rulesets=catalogs.rulesets,
+            object_type="node_type" if "type_key" in subject else "ruleset", object_id=owner)
+        if context is not None:
+            finding = replace(finding, details={**finding.details, "node_type": str(subject.get("type_key", "")),
+                                              "call_paths": plain(subject.get("call_paths", ()))})
+            if "type_key" in subject:
+                descriptor = subject.get("descriptor", {})
+                selection_source = catalogs.nodes.source_for(owner)
+                if descriptor.get("rulesets") is None:
+                    selection_source = catalogs.categories.source_for(str(descriptor.get("category", ""))) or selection_source
+            else:
+                selection_source = str(context.scope.get("workflow", ""))
+        if not finding.source_location and selection_source:
+            finding = replace(finding, source_location={"path": selection_source, "line": 1, "column": 1}, source_path=selection_source)
+        raise ProjectBuildError(error.code, error.message, diagnostics=(finding.to_dict(),)) from error
 
 
 @dataclass(frozen=True)
@@ -302,7 +329,7 @@ class _RuleSession:
                 for rule_id, defaults in context.facts.get("rule_defaults", {}).items():
                     if rule_id in rules:
                         rules[rule_id] = replace(rules[rule_id], params_defaults={**rules[rule_id].params_defaults, **defaults})
-                plan = compile_ruleset(ruleset_id, rules=rules, rulesets=self.catalogs.rulesets, entrypoint=phase)
+                plan = _compile_rule_plan(ruleset_id, rules=rules, catalogs=self.catalogs, entrypoint=phase, context=active_context)
                 project_handlers = project_quality_handlers()
                 if active_context.facts.get("evaluate_sources", True) and any(
                     {item.rule.id, item.rule.handler, item.original_rule_id} & project_handlers.keys()
@@ -323,12 +350,22 @@ class _RuleSession:
                             raise ValueError(f"Rule '{rule.id}' requires exactly one compatible JavaScript/TypeScript implementation")
                         if self.worker is None:
                             self.worker = self.stack.enter_context(JavascriptPluginSession(node_command=self.node_command))
-                        if rule.id not in self.sessions:
-                            source = implementations[0].source
-                            session_id = f"rule:{rule.id}"
-                            self.worker.open_rule(session_id, rule={"id": rule.id, "module": str((self.project_root / source.ref).resolve()), "export": source.export or "check"}, package_root=self.package_root, target=self.target)
-                            self.sessions[rule.id] = session_id
-                        returned = self.worker.evaluate_rule(self.sessions[rule.id], context={"facts": _rule_wire_facts(ctx.facts), "subject": plain(ctx.subject), "scope": plain(ctx.scope), "phase": ctx.phase, "target": ctx.target}, params=plain(params), inputs={key: item.to_dict() for key, item in inputs.items()})
+                        source = implementations[0].source
+                        module = str((self.project_root / source.ref).resolve())
+                        try:
+                            if rule.id not in self.sessions:
+                                session_id = f"rule:{rule.id}"
+                                self.worker.open_rule(session_id, rule={"id": rule.id, "module": module, "export": source.export or "check"}, package_root=self.package_root, target=self.target)
+                                self.sessions[rule.id] = session_id
+                            returned = self.worker.evaluate_rule(self.sessions[rule.id], context={"facts": _rule_wire_facts(ctx.facts), "subject": plain(ctx.subject), "scope": plain(ctx.scope), "phase": ctx.phase, "target": ctx.target}, params=plain(params), inputs={key: item.to_dict() for key, item in inputs.items()})
+                        except JavascriptPluginError as error:
+                            declaration = self.catalogs.rules.source_for(rule.id)
+                            # Resource provenance has no syntax span: identify the containing declaration.
+                            finding = _finding({"code": "RULE.EXECUTION", "message": f"rule '{rule.id}' failed: {error}",
+                                "source_location": {"path": declaration or module, "line": 1, "column": 1},
+                                "details": {"implementation": {"path": module, "export": source.export or "check"},
+                                            "cause_code": error.code, "cause_details": error.details}}, rule.id, ctx)
+                            return RuleResult(findings=(finding,), state="failed")
                         if not isinstance(returned, Mapping):
                             raise ValueError(f"Rule '{rule.id}' returned a non-object result")
                         return RuleResult(records=returned.get("records", {}), findings=tuple(_finding(item, rule.id, ctx) for item in returned.get("findings", ())), state=str(returned.get("state", "completed")))
@@ -375,7 +412,7 @@ def run_javascript_rules(
     source_scopes: dict[str, Mapping[str, Any]] = {}
     rule_defaults = project_quality_rule_defaults(quality_policy or javascript_quality_policy())
     workflow_import_sources = evaluate_sources and any(
-        compile_ruleset(ruleset_id, rules=catalogs.rules, rulesets=catalogs.rulesets, entrypoint="import").invocations
+        _compile_rule_plan(ruleset_id, catalogs=catalogs, entrypoint="import", selection_source=str(block.source_path or "")).invocations
         for block, _ in _workflow_blocks(graph) for ruleset_id in block.rulesets
     )
     with ExitStack() as stack:

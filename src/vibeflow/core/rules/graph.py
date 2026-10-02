@@ -241,7 +241,7 @@ def _effective_calls(expansion: _Expansion, selected: set[str]) -> dict[str, tup
     return effective
 
 
-def compile_ruleset(ruleset: str | RulesetDescriptor, *, rules: Any, rulesets: Any = None, entrypoint: str = "static") -> RulePlan:
+def _compile_ruleset(ruleset: str | RulesetDescriptor, *, rules: Any, rulesets: Any = None, entrypoint: str = "static") -> RulePlan:
     """Build a portable executable plan; graph direction is consumer -> provider."""
     if entrypoint not in {"import", "static", "run"}:
         raise RuleGraphError("RULE.ENTRYPOINT.INVALID", f"unknown rule entrypoint: {entrypoint!r}")
@@ -285,4 +285,32 @@ def compile_ruleset(ruleset: str | RulesetDescriptor, *, rules: Any, rulesets: A
     return RulePlan(descriptor.id, entrypoint, invocations, tuple(expansion.relations))
 
 
-__all__ = ["RuleGraphError", "RuleInvocation", "RulePlan", "compile_ruleset"]
+def compile_ruleset(ruleset: str | RulesetDescriptor, *, rules: Any, rulesets: Any = None,
+                    entrypoint: str = "static") -> RulePlan:
+    """Compile a graph and retain its logical resource origin on failures."""
+    try:
+        return _compile_ruleset(ruleset, rules=rules, rulesets=rulesets, entrypoint=entrypoint)
+    except RuleGraphError as exc:
+        resource_id = ruleset if isinstance(ruleset, str) else ruleset.id
+        exc.details = {"ruleset_id": resource_id, "entrypoint": entrypoint, **exc.details}
+        raise
+
+
+def rule_graph_error_finding(error: RuleGraphError, *, rulesets: Any = None,
+                             object_type: str = "ruleset", object_id: str = ""):
+    """Map loaded catalog provenance to a diagnostic without reading files.
+
+    Catalogs record a resource file, rather than syntax spans. Line one points
+    to the declaration without inventing a precise relationship location.
+    """
+    from vibeflow.core.findings import HealthFinding
+    resource_id = str(error.details.get("ruleset_id", ""))
+    source_for = getattr(rulesets, "source_for", None)
+    source = str(source_for(resource_id) or "") if callable(source_for) else ""
+    location = {"path": source, "line": 1, "column": 1} if source and not source.startswith("builtin:") else {}
+    return HealthFinding(rule_id=error.code, severity="error", object_type=object_type,
+        object_id=object_id or resource_id, message=error.message, failure_layer="rule",
+        source_location=location, source_path=source, details=dict(error.details), rule_source=f"ruleset:{resource_id}")
+
+
+__all__ = ["RuleGraphError", "RuleInvocation", "RulePlan", "compile_ruleset", "rule_graph_error_finding"]
