@@ -47,6 +47,8 @@ VibeFlow 命令不检查：
 
 `quality-check` 检查当前根的手写源码与找到的工作流；即使没有工作流，也会输出 `source_quality`。JSON 同时包含 `source_quality`、逐工作流的 `reports` 和顶层状态；Python 原有的源码报告字段仍保留在顶层。警告产生 `CONCERNS`、退出码 0，错误产生 `FAIL`、退出码 1。
 
+在已选择的 workspace 中，`quality --path <root>` 只扫描该 root 的源码与工作流。Python 工作流依赖解析保留完整 workspace 的登记和 policy，支持兄弟 root 的 BaseLib 与 Node。发行包装器会自动选用同目录的 `vibeflow_config.jsonc`；直接调用内核 CLI 时用 `--workspace` 指定。没有 workspace 的独立项目仍按自身 `vibeflow_project.jsonc` 加载。
+
 JavaScript/TypeScript 扫描 `.js`、`.jsx`、`.ts`、`.tsx`、`.mjs`、`.cjs`、`.mts`、`.cts` 及声明源码，包括未注册的手写文件和测试文件；自动排除 `generated`、`dist`、`build`、`node_modules` 等产物目录。可重复使用 `--exclude-dir NAME` 和 `--exclude-path ROOT_RELATIVE_PATH` 排除其他目录或文件。独立 `--path` 源码扫描需要项目本地安装的 TypeScript；`--enable-structure-limits` 可为独立扫描启用根目录结构上限。
 
 Node/base_lib 源码大小、可选复杂度上限及 Node→base_lib 静态依赖链使用两种 Target 共享的规则。依赖链包含 Node 本身，默认长度超过 4 为警告、超过 6 为错误；仅计入可解析的项目内导入。`policy.complexity.max_*` 默认不启用；显式设置 `max_params` 时统计 Node 配置 schema 的键数。JavaScript 的 `--policy` 接受与 Python 一致的 JSONC 策略文件。`validate`、`review`、`build` 只检查它们直接处理的图与已注册实现；`run` 的检查范围不因项目源码报告而扩大。

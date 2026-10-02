@@ -1,6 +1,6 @@
 # 发行与文档装配
 
-VibeFlow 0.14.1 默认发布 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。
+VibeFlow 0.14.2 默认发布 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。
 
 ## Profile 配置
 

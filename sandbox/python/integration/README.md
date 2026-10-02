@@ -22,6 +22,12 @@ PYTHONPATH=src python sandbox/python/integration/run_all.py
 - 使用两个真实数值 CLI graph 覆盖多种 Python IO：IO 节点从 stdin 读取数字，两个 document 节点分别从文件读取数字，process 节点求和，再由 document 节点写文件、IO 节点写 stdout/stderr。`pathlib` 用例组合 `input()`、`Path.read_text/write_text`、`open().readline()`、`print()` 和 `sys.stderr.write()`，验证 `7 + 11 + 13 = 31`；标准流用例组合 `sys.stdin.readline()`、`open().read/write()`、`Path.read_text()` 和 `sys.stdout/stderr.write()`，验证 `5 + 17 + 19 = 41`。
 - 两个数值用例都按 UTF-8 字节精确检查 stdout、stderr 和输出文件，并检查退出码；同时确认 architecture/health 不会执行 effectful examples、派生 effect scope 符合节点职责、health 为 `PASS/CONCERNS`、`output_summary.json` 包含 `cli.exit_code`、关键节点各执行一次，以及 `vibeflow.log` 不泄露 stdin、文件内容、业务路径或输出内容。
 
+完整入口还复用独立的跨 root 质检沙箱：从发行最小项目构造 framework/project 双 root，Node 的契约与计算 helper 来自 framework BaseLib，通过真实 `run.py` 对比 `validate`、`quality` 与 `quality --path project`。用例覆盖默认及显式 workspace、直接内核 CLI、所选 root 的扫描范围、真实未声明 BaseLib 错误、workspace policy、独立 root、文件/子目录扫描、禁用 workflow 质检和混合 Target 的隔离子进程。可只运行这一组：
+
+```bash
+python tools/run_tests.py -- tests/targets/python/test_quality_workspace_sandbox.py
+```
+
 使用 `--keep-artifacts` 时，脚本输出：
 
 - `.artifacts/reports/summary.json`

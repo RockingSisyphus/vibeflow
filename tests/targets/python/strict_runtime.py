@@ -2264,7 +2264,7 @@ def test_distribution_build_is_deterministic_without_wall_clock_metadata(tmp_pat
     }
     assert first_files == second_files
     metadata = json.loads((first / "DISTRIBUTION.json").read_text(encoding="utf-8"))
-    assert metadata["version"] == "0.14.1"
+    assert metadata["version"] == "0.14.2"
     assert metadata["development_profile"] == "collaborative"
 
 
