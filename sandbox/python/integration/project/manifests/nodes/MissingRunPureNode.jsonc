@@ -1,0 +1,47 @@
+{
+  "kind": "node",
+  "type_key": "bad.missing_run_pure",
+  "display_name": "Bad",
+  "category": "bad",
+  "description": "Bad signature node.",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [],
+    "provides": [
+      {
+        "key": "bad.out",
+        "type": "bad.out",
+        "display_name": "bad.out"
+      }
+    ],
+    "input_semantics": {},
+    "output_semantics": {
+      "bad.out": [
+        "bad output"
+      ]
+    },
+    "examples": [],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "illegal_nodes/signature_cases.py",
+        "export": "MissingRunPureNode"
+      }
+    }
+  ]
+}

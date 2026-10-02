@@ -1,0 +1,52 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.numeric_stream_input",
+  "display_name": "通过 stdin stream 读取数值",
+  "category": "sandbox",
+  "description": "使用 sys.stdin.readline() 从真实标准输入读取一个整数。",
+  "version": "0.1.0",
+  "flow_kind": "io",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [],
+    "provides": [
+      {
+        "key": "number.stdin",
+        "type": "number.stdin",
+        "display_name": "number.stdin"
+      }
+    ],
+    "input_semantics": {},
+    "output_semantics": {
+      "number.stdin": [
+        "从真实 stdin stream 读取的整数。"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {},
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.io"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_delegate_numeric_nodes.py",
+        "export": "NumericStreamInputNode"
+      }
+    }
+  ]
+}

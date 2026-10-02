@@ -1,0 +1,112 @@
+{
+  "kind": "node",
+  "type_key": "semantic.outer_advance",
+  "display_name": "Semantic Outer Advance",
+  "category": "semantic",
+  "description": "Passes the inner-loop total out, advances the outer counter, and emits the outer bool stop signal.",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "outer.inner",
+        "cardinality": "exactly_one",
+        "display_name": "outer.inner"
+      },
+      {
+        "type": "total.inner",
+        "cardinality": "exactly_one",
+        "display_name": "total.inner"
+      }
+    ],
+    "provides": [
+      {
+        "key": "outer.current.next",
+        "type": "outer.current",
+        "display_name": "outer.current.next"
+      },
+      {
+        "key": "total.current.next",
+        "type": "total.current",
+        "display_name": "total.current.next"
+      },
+      {
+        "key": "outer.done",
+        "type": "outer.done",
+        "display_name": "outer.done"
+      }
+    ],
+    "input_semantics": {
+      "outer.inner": [
+        "outer loop counter before advance"
+      ],
+      "total.inner": [
+        "running total after the inner loop"
+      ]
+    },
+    "output_semantics": {
+      "outer.current.next": [
+        "next outer loop counter"
+      ],
+      "total.current.next": [
+        "running total carried to the next outer iteration"
+      ],
+      "outer.done": [
+        "true when the next outer counter reaches the configured limit"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "outer.inner": {
+            "key": "outer.inner",
+            "type": "outer.inner",
+            "value": 1,
+            "source_node": "example"
+          },
+          "total.inner": {
+            "key": "total.inner",
+            "type": "total.inner",
+            "value": 8,
+            "source_node": "example"
+          }
+        },
+        "params": {
+          "outer_step": 1,
+          "outer_limit": 2
+        }
+      }
+    ],
+    "params_schema": {
+      "outer_step": {
+        "type": "number"
+      },
+      "outer_limit": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "outer_step": 1,
+      "outer_limit": 1
+    }
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_semantic_nodes.py",
+        "export": "SemanticOuterAdvanceNode"
+      }
+    }
+  ]
+}

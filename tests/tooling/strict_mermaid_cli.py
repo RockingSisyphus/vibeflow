@@ -1,6 +1,9 @@
 from xml.etree import ElementTree
 
 from tests.fixtures.support.strict_support import *
+from tests.fixtures.support.rule_inspection import VALID_NODE_IMPORT, _valid_node_source, _inspect_node_source, node_document
+from tests.core.strict_core import _review_node
+from vibeflow.targets.python.quality.source_analysis.types import _default_rule_id
 
 
 def test_mermaid_renderer_prefers_google_chrome_over_snap_chromium(monkeypatch) -> None:
@@ -274,187 +277,95 @@ def test_mermaid_renderer_falls_back_to_non_snap_system_browser(tmp_path, monkey
 
 
 def test_cli_inspect_node_reports_unmatched_type(tmp_path, capsys) -> None:
-    module_path = tmp_path / "demo_node.py"
-    module_path.write_text(
-        """
-from vibeflow.core import DataProvider
-from vibeflow.targets.python.project import NodeContract, NodeInfo
-
-class DemoNode:
-    NODE_INFO = NodeInfo(type_key="demo.other", display_name="Other", category="demo", description="Other.", version="0.1.0", flow_kind="process")
-    CONTRACT = NodeContract(
-        provides=(DataProvider("demo.out", "demo.out", display_name="Demo Out"),),
-        output_semantics={"demo.out": ("demo output",)},
-        examples=({"inputs": {}, "params": {}},),
-    )
-
-    def run_pure(self, inputs, params):
-        return {"demo.out": 1}
-""".strip(),
-        encoding="utf-8",
-    )
-    code = cli_main(["inspect-node", "--type", "demo.node", "--module", str(module_path)])
-    payload = json.loads(capsys.readouterr().out)
+    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(), node_type="demo.missing")
     assert code == 1
     assert payload["health"]["status"] == "ERROR"
-    assert payload["health"]["errors"][0]["rule_id"] == "NODE.INSPECT.LOAD_ERROR"
+    assert payload["health"]["errors"][0]["code"] == "NODE.INSPECT.LOAD_ERROR"
 
-@pytest.mark.parametrize(
-    ("source", "legacy_code"),
-    [
-        (
-            f"""
-{VALID_NODE_IMPORT}
-class DemoNode:
-{VALID_NODE_CONTRACT}
 
-    def run_pure(self, inputs, params):
-        return {{"demo.out": 1}}
-""",
-            "missing_node_info",
-        ),
-        (_valid_node_source(info=VALID_NODE_INFO.replace('type_key="demo.node"', 'type_key=""')), "node_info_type_key"),
-        (
-            f"""
-{VALID_NODE_IMPORT}
-class DemoNode:
-{VALID_NODE_INFO}
+@pytest.mark.parametrize(("changes", "reason"), [
+    ({"type_key": ""}, "type_key"),
+    ({"contract": {}}, "contract"),
+    ({"contract": {"provides": [{"key": "demo.out", "type": "demo.out", "display_name": "Demo"}, {"key": "demo.out", "type": "demo.out", "display_name": "Demo"}]}}, "duplicate"),
+    ({"contract": {"provides": [{"key": "demo.out", "type": "demo.out", "display_name": "Demo"}], "output_semantics": {}}}, "semantics"),
+])
+def test_inspect_node_rejects_invalid_declarations(tmp_path, capsys, changes, reason) -> None:
+    declaration = {**node_document(), **changes}
+    if changes == {"contract": {}}:
+        declaration.pop("contract")
+    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(), descriptor=declaration)
+    assert code == 1
+    assert payload["health"]["status"] == "ERROR"
+    assert reason in payload["health"]["errors"][0]["message"].lower()
 
-    def run_pure(self, inputs, params):
-        return {{"demo.out": 1}}
-""",
-            "missing_contract",
-        ),
-        (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('provides=(PROV("demo.out"),)', 'provides=(PROV("demo.out"), PROV("demo.out"))')), "contract_duplicate_key"),
-        (_valid_node_source(contract=VALID_NODE_CONTRACT.replace('output_semantics={"demo.out": ("demo output",)},', 'output_semantics={},')), "contract_semantics_missing"),
-        (_valid_node_source(run_body='        return {"other.out": 1}'), "undeclared_output"),
-        (_valid_node_source(run_body='        return {}'), "missing_output"),
-        (
-            _valid_node_source(
-                contract=VALID_NODE_CONTRACT,
-                run_body='        return {params["output_key"]: 1}',
-            ),
-            "dynamic_output_key",
-        ),
-        (
-            f"""
-{VALID_NODE_IMPORT}
-class DemoNode:
-{VALID_NODE_INFO}
-{VALID_NODE_CONTRACT}
-""",
-            "missing_run_pure",
-        ),
-        (
-            _valid_node_source(run_body='        return {"demo.out": 1}\n\n    def run(self, context):\n        return context'),
-            "context_run_forbidden",
-        ),
-        (
-            _valid_node_source().replace("def run_pure(self, inputs, params):", "def run_pure(self, inputs, params, extra):"),
-            "run_pure_signature",
-        ),
-        (
-            _valid_node_source().replace("def run_pure(self, inputs, params):", "async def run_pure(self, inputs, params):"),
-            "async_run_pure",
-        ),
-        (
-            _valid_node_source(run_body='        while True:\n            return {"demo.out": 1}'),
-            "internal_loop",
-        ),
-        (
-            _valid_node_source(run_body='        return {"demo.out": 1}\n\n    def helper(self):\n        return 1'),
-            "public_callable",
-        ),
-        (
-            _valid_node_source(run_body='        return {"demo.out": 1}').replace("class DemoNode:", "class DemoNode:\n    def __init__(self, client):\n        self.x = client"),
-            "init_signature",
-        ),
-        (
-            _valid_node_source(run_body='        return {"demo.out": 1}').replace("class DemoNode:", "class DemoNode:\n    def __init__(self):\n        self.session = None"),
-            "resource_field",
-        ),
-        (_valid_node_source(run_body='        open("x.txt", "w")\n        return {"demo.out": 1}'), "effect_call"),
-        (_valid_node_source(run_body='        import os\n        return {"demo.out": 1}'), "effect_import"),
-        (_valid_node_source(run_body='        os.getenv("HOME")\n        return {"demo.out": 1}'), "effect_call"),
-        (_valid_node_source(run_body='        subprocess.run(["echo", "x"])\n        return {"demo.out": 1}'), "effect_call"),
-        (_valid_node_source(run_body='        requests.get("https://example.com")\n        return {"demo.out": 1}'), "effect_call"),
-        (_valid_node_source(run_body='        sqlite3.connect("x.db")\n        return {"demo.out": 1}'), "effect_call"),
-        (_valid_node_source(run_body='        eval("1 + 1")\n        return {"demo.out": 1}'), "banned_call"),
-        (_valid_node_source(run_body='        importlib.import_module("math")\n        return {"demo.out": 1}'), "banned_call"),
-        (_valid_node_source(run_body='        global X\n        X = 1\n        return {"demo.out": 1}'), "global_state"),
-        (_valid_node_source(run_body='        setattr(self, "x", 1)\n        return {"demo.out": 1}'), "monkey_patch"),
-        (_valid_node_source(run_body='        DemoNode.x = 1\n        return {"demo.out": 1}'), "monkey_patch"),
-        (_valid_node_source(run_body='        from nodes.other_node import OtherNode\n        return {"demo.out": 1}'), "node_import"),
-        (
-            _valid_node_source().replace(VALID_NODE_IMPORT, VALID_NODE_IMPORT + "CACHE = {}\n\n"),
-            "module_global_state",
-        ),
-        (
-            _valid_node_source().replace(VALID_NODE_IMPORT, VALID_NODE_IMPORT + "if True:\n    X = 1\n\n"),
-            "module_side_effect",
-        ),
-        (_valid_node_source(run_body='        Path("x").read_text()\n        return {"demo.out": 1}'), "effect_call"),
-        (
-            _valid_node_source(
-                run_body='        path = Path("x")\n        path.write_text("bad")\n        return {"demo.out": 1}'
-            ),
-            "effect_call",
-        ),
-        (
-            _valid_node_source(
-                run_body='        path = Path("x")\n        (path / "child").open()\n        return {"demo.out": 1}'
-            ),
-            "effect_call",
-        ),
-        (_valid_node_source(run_body='        compile("1", "<x>", "eval")\n        return {"demo.out": 1}'), "banned_call"),
-    ],
-)
-def test_inspect_node_rejects_invalid_node_shapes(tmp_path, capsys, source, legacy_code) -> None:
+
+@pytest.mark.parametrize(("source", "diagnostic"), [
+    (_valid_node_source(run_body='        return {"other.out": 1}'), "undeclared_output"),
+    (_valid_node_source(run_body='        return {}'), "missing_output"),
+    (_valid_node_source(run_body='        return {params["output_key"]: 1}'), "dynamic_output_key"),
+    ("class DemoNode:\n    pass", "missing_run_pure"),
+    (_valid_node_source(run_body='        return {"demo.out": 1}\n\n    def run(self, context):\n        return context'), "context_run_forbidden"),
+    (_valid_node_source().replace("def run_pure(self, inputs, params):", "def run_pure(self, inputs, params, extra):"), "run_pure_signature"),
+    (_valid_node_source().replace("def run_pure(self, inputs, params):", "async def run_pure(self, inputs, params):"), "async_run_pure"),
+    (_valid_node_source(run_body='        while True:\n            return {"demo.out": 1}'), "internal_loop"),
+    (_valid_node_source(run_body='        return {"demo.out": 1}\n\n    def helper(self):\n        return 1'), "public_callable"),
+    (_valid_node_source().replace("class DemoNode:", "class DemoNode:\n    def __init__(self, client):\n        self.x = client"), "init_signature"),
+    (_valid_node_source().replace("class DemoNode:", "class DemoNode:\n    def __init__(self):\n        self.session = None"), "resource_field"),
+    (_valid_node_source(run_body='        open("x.txt", "w")\n        return {"demo.out": 1}'), "effect_call"),
+    (_valid_node_source(run_body='        import os\n        return {"demo.out": 1}'), "effect_import"),
+    (_valid_node_source(run_body='        os.getenv("HOME")\n        return {"demo.out": 1}'), "effect_call"),
+    (_valid_node_source(run_body='        subprocess.run(["echo", "x"])\n        return {"demo.out": 1}'), "effect_call"),
+    (_valid_node_source(run_body='        requests.get("https://example.com")\n        return {"demo.out": 1}'), "effect_call"),
+    (_valid_node_source(run_body='        sqlite3.connect("x.db")\n        return {"demo.out": 1}'), "effect_call"),
+    (_valid_node_source(run_body='        eval("1 + 1")\n        return {"demo.out": 1}'), "banned_call"),
+    (_valid_node_source(run_body='        importlib.import_module("math")\n        return {"demo.out": 1}'), "banned_call"),
+    (_valid_node_source(run_body='        global X\n        X = 1\n        return {"demo.out": 1}'), "global_state"),
+    (_valid_node_source(run_body='        setattr(self, "x", 1)\n        return {"demo.out": 1}'), "monkey_patch"),
+    (_valid_node_source(run_body='        DemoNode.x = 1\n        return {"demo.out": 1}'), "monkey_patch"),
+    (_valid_node_source(run_body='        from nodes.other_node import OtherNode\n        return {"demo.out": 1}'), "node_import"),
+    (_valid_node_source().replace(VALID_NODE_IMPORT, VALID_NODE_IMPORT + "CACHE = {}\n\n"), "module_global_state"),
+    (_valid_node_source().replace(VALID_NODE_IMPORT, VALID_NODE_IMPORT + "if True:\n    X = 1\n\n"), "module_side_effect"),
+    (_valid_node_source(run_body='        Path("x").read_text()\n        return {"demo.out": 1}'), "effect_call"),
+    (_valid_node_source(run_body='        path = Path("x")\n        path.write_text("bad")\n        return {"demo.out": 1}'), "effect_call"),
+    (_valid_node_source(run_body='        path = Path("x")\n        (path / "child").open()\n        return {"demo.out": 1}'), "effect_call"),
+    (_valid_node_source(run_body='        compile("1", "<x>", "eval")\n        return {"demo.out": 1}'), "banned_call"),
+])
+def test_inspect_node_rejects_invalid_node_shapes(tmp_path, capsys, source, diagnostic) -> None:
     code, payload = _inspect_node_source(tmp_path, capsys, source)
     assert code == 1
-    errors = payload["health"]["errors"]
-    assert any(error["details"].get("legacy_code") == legacy_code for error in errors), errors
+    expected = "NODE.IMPORT.SIDE_EFFECT" if diagnostic in {"module_global_state", "module_side_effect"} else _default_rule_id(diagnostic)
+    assert any(error["code"] == expected for error in payload["health"]["errors"]), payload
+
 
 def test_inspect_node_rejects_node_direct_call_and_internal_read(tmp_path, capsys) -> None:
-    other_info = VALID_NODE_INFO.replace('type_key="demo.node"', 'type_key="demo.other"').replace('display_name="Demo"', 'display_name="Other"')
-    source = f"""
-{VALID_NODE_IMPORT}
-class OtherNode:
-{other_info}
-{VALID_NODE_CONTRACT}
-
+    source = """class OtherNode:
     def run_pure(self, inputs, params):
-        return {{"demo.out": 1}}
+        return {"demo.out": 1}
 
 class DemoNode:
-{VALID_NODE_INFO}
-{VALID_NODE_CONTRACT}
-
     def run_pure(self, inputs, params):
-        OtherNode.CONTRACT
-        return OtherNode().run_pure({{}}, {{}})
+        OtherNode._private
+        return OtherNode().run_pure({}, {})
 """
-    code, payload = _inspect_node_source(tmp_path, capsys, source)
+    code, payload = _inspect_node_source(tmp_path, capsys, source,
+        additional_nodes=(node_document(type_key="demo.other", class_name="OtherNode"),))
     assert code == 1
-    legacy_codes = {error["details"].get("legacy_code") for error in payload["health"]["errors"]}
-    assert "node_direct_call" in legacy_codes
-    assert "node_internal_read" in legacy_codes
+    codes = {error["code"] for error in payload["health"]["errors"]}
+    assert _default_rule_id("node_direct_call") in codes
+    assert _default_rule_id("node_internal_read") in codes
 
-def test_validate_node_class_warns_when_source_nears_policy_limit() -> None:
-    violations = validate_node_class(SeedNode, policy=PurityPolicy(max_source_lines=1000, warn_source_lines=1))
-    assert any(item.code == "source_near_limit" and item.severity == "warning" for item in violations)
+
+def test_selected_rule_warns_when_source_nears_policy_limit() -> None:
+    violations = _review_node(SeedNode_DECLARATION, SeedNode, policy=PurityPolicy(max_source_lines=1000, warn_source_lines=1)).findings
+    assert any(item.code == "NODE.PURITY.SOURCE_NEAR_LIMIT" and item.severity == "warning" for item in violations)
+
 
 def test_cli_inspect_node_uses_explicit_policy_path(tmp_path, capsys) -> None:
     policy_path = tmp_path / "kernel_policy.jsonc"
     policy_path.write_text('{"node_source": {"max_lines": 1}}', encoding="utf-8")
-    code, payload = _inspect_node_source(
-        tmp_path,
-        capsys,
-        _valid_node_source(),
-        extra_args=["--policy", str(policy_path)],
-    )
+    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(), extra_args=["--policy", str(policy_path)])
     assert code == 1
-    assert any(error["details"].get("legacy_code") == "source_too_large" for error in payload["health"]["errors"])
+    assert any(error["code"] == "NODE.PURITY.SOURCE_TOO_LARGE" for error in payload["health"]["errors"])
 
 def test_node_internal_call_chain_short_path_is_allowed(tmp_path, capsys) -> None:
     source = _valid_node_source(
@@ -553,13 +464,17 @@ def test_node_internal_call_chain_recursion_fails(tmp_path, capsys) -> None:
 
 def test_graph_health_reports_node_call_chain_metrics() -> None:
     graph = parse_graph_config({"pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])]}})
-    report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
-    assert report.info["node_metrics"]["seed"]["call_chain_length"] == 1
-    assert report.info["node_metrics"]["seed"]["call_chain_path"] == ["run_pure"]
+    from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
+    registry = _registry()
+    source_context = collect_workflow_source_context(registry, graph)
+    report = validate_graph_health(graph, registry=registry, source_context=source_context, purity_policy=PurityPolicy(max_source_lines=1000))
+    metrics = report.to_dict()["info"]["node_metrics"]["seed"]
+    assert metrics["call_chain_length"] == 1
+    assert metrics["call_chain_path"] == ["run_pure"]
 
 def test_runtime_allows_non_json_object_output_by_reference() -> None:
     registry = _registry()
-    register_node(registry, "test.set_output", SetOutputNode)
+    register_node(registry, SetOutputNode_DECLARATION, SetOutputNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -578,7 +493,7 @@ def test_runtime_allows_non_json_object_output_by_reference() -> None:
 
 def test_runtime_ignores_legacy_snapshot_metadata() -> None:
     registry = _registry()
-    register_node(registry, "test.opaque_output", OpaqueOutputNode)
+    register_node(registry, OpaqueOutputNode_DECLARATION, OpaqueOutputNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -597,7 +512,7 @@ def test_runtime_ignores_legacy_snapshot_metadata() -> None:
 
 def test_runtime_allows_input_mutation_by_reference() -> None:
     registry = _registry()
-    register_node(registry, "test.mutating_input", MutatingInputNode)
+    register_node(registry, MutatingInputNode_DECLARATION, MutatingInputNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -618,8 +533,8 @@ def test_runtime_allows_input_mutation_by_reference() -> None:
     assert value == [1, 2, 3]
 
 def test_collect_node_metrics_reports_complexity_and_contract_size() -> None:
-    metrics = collect_node_metrics(AddNode)
-    payload = metrics.to_dict()
+    report = _review_node(AddNode_DECLARATION, AddNode, policy=PurityPolicy(max_source_lines=1000))
+    payload = report.node_metrics[AddNode_DECLARATION.type_key]
     assert payload["function_count"] == 1
     assert payload["branch_count"] == 0
     # Python node parameters are owned by Registry metadata, not NodeContract.
@@ -630,8 +545,8 @@ def test_collect_node_metrics_reports_complexity_and_contract_size() -> None:
     assert payload["source_lines"] > 0
 
 def test_complexity_policy_thresholds_are_enforced() -> None:
-    violations = validate_node_class(
-        AddNode,
+    violations = _review_node(
+        AddNode_DECLARATION, AddNode,
         policy=PurityPolicy(
             max_source_lines=1000,
             max_functions=0,
@@ -639,11 +554,12 @@ def test_complexity_policy_thresholds_are_enforced() -> None:
             max_contract_keys=1,
         ),
     )
+    violations = violations.findings
     codes = {item.code for item in violations}
-    assert "complexity_max_functions" in codes
-    assert "complexity_max_params" not in codes
-    assert "complexity_max_contract_keys" in codes
-    assert all(item.suggested_fix_type in {"split_node", "fix_contract"} for item in violations if item.code.startswith("complexity_"))
+    assert "NODE.MAINTAINABILITY.COMPLEXITY_MAX_FUNCTIONS" in codes
+    assert "NODE.MAINTAINABILITY.COMPLEXITY_MAX_PARAMS" not in codes
+    assert "NODE.MAINTAINABILITY.COMPLEXITY_MAX_CONTRACT_KEYS" in codes
+    assert all(item.suggested_fix_type in {"split_node", "fix_contract"} for item in violations if item.code.startswith("NODE.MAINTAINABILITY.COMPLEXITY_"))
 
 def test_branch_and_nesting_complexity_are_enforced(tmp_path, capsys) -> None:
     source = _valid_node_source(
@@ -653,15 +569,14 @@ def test_branch_and_nesting_complexity_are_enforced(tmp_path, capsys) -> None:
                 return {"demo.out": 2}
         return {"demo.out": 1}
 """.rstrip(),
-        contract=VALID_NODE_CONTRACT,
     )
     policy_path = tmp_path / "kernel_policy.jsonc"
     policy_path.write_text('{"complexity": {"max_branches": 1, "max_nesting_depth": 1}}', encoding="utf-8")
     code, payload = _inspect_node_source(tmp_path, capsys, source, extra_args=["--policy", str(policy_path)])
     assert code == 1
-    codes = {error["details"].get("legacy_code") for error in payload["health"]["errors"]}
-    assert "complexity_max_branches" in codes
-    assert "complexity_max_nesting_depth" in codes
+    codes = {error["code"] for error in payload["health"]["errors"]}
+    assert "NODE.MAINTAINABILITY.COMPLEXITY_MAX_BRANCHES" in codes
+    assert "NODE.MAINTAINABILITY.COMPLEXITY_MAX_NESTING_DEPTH" in codes
     assert payload["node"]["metrics"]["branch_count"] == 2
     assert payload["node"]["metrics"]["max_nesting_depth"] == 2
 
@@ -674,49 +589,38 @@ def test_inspect_node_reports_metrics_for_valid_node(tmp_path, capsys) -> None:
     assert set(payload["node"]["contract"]["examples"][0]) == {"inputs", "params"}
 
 def test_missing_examples_and_example_contract_gap_are_accepted_as_documentation(tmp_path, capsys) -> None:
-    no_examples_contract = VALID_NODE_CONTRACT.replace(
-        '        examples=({"inputs": {}, "params": {}},),\n',
-        "",
-    )
-    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(contract=no_examples_contract))
+    declaration = node_document()
+    declaration["contract"].pop("examples")
+    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(), descriptor=declaration)
     assert code == 0
     assert payload["health"]["status"] == "PASS"
-    assert not payload["health"]["warnings"]
+    declaration["contract"].update({"requires": [{"type": "demo.in", "cardinality": "exactly_one", "display_name": "Demo In"}], "input_semantics": {"demo.in": ["demo input"]}})
+    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(), descriptor=declaration)
+    assert code == 0
+    assert payload["health"]["status"] == "PASS"
 
-    gap_contract = VALID_NODE_CONTRACT.replace(
-        'provides=(PROV("demo.out"),),',
-        'requires=(REQ("demo.in"),),\n        provides=(PROV("demo.out"),),\n        input_semantics={"demo.in": ("demo input",)},',
-    )
-    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(contract=gap_contract))
-    assert code == 0
-    assert payload["health"]["status"] == "PASS"
-    assert not payload["health"]["warnings"]
 
 def test_example_outputs_field_is_removed(tmp_path, capsys) -> None:
-    bad_example_contract = VALID_NODE_CONTRACT.replace(
-        'examples=({"inputs": {}, "params": {}},),',
-        'examples=({"inputs": {}, "params": {}, "outputs": {"demo.out": 1}},),',
-    )
-    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(contract=bad_example_contract))
+    declaration = node_document()
+    declaration["contract"]["examples"][0]["outputs"] = {"demo.out": 1}
+    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(), descriptor=declaration)
     assert code == 1
-    assert payload["health"]["status"] == "FAIL"
-    assert {error["details"].get("legacy_code") for error in payload["health"]["errors"]} == {"example_outputs_removed"}
+    assert payload["health"]["status"] == "ERROR"
+    assert "outputs" in payload["health"]["errors"][0]["message"]
 
 
 def test_removed_output_schema_is_an_explicit_load_error(tmp_path, capsys) -> None:
-    snapshot_contract = VALID_NODE_CONTRACT.replace(
-        'examples=({"inputs": {}, "params": {}},),',
-        'output_schema={"demo.out": {"type": "number"}},\n        examples=({"inputs": {}, "params": {}},),',
-    )
-    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(contract=snapshot_contract))
+    declaration = node_document()
+    declaration["contract"]["output_schema"] = {"demo.out": {"type": "number"}}
+    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(), descriptor=declaration)
     assert code == 1
     assert payload["health"]["status"] == "ERROR"
-    assert payload["health"]["errors"][0]["rule_id"] == "NODE.INSPECT.LOAD_ERROR"
+    assert payload["health"]["errors"][0]["code"] == "NODE.INSPECT.LOAD_ERROR"
 
 
 def test_example_output_key_failure_is_health_error(tmp_path, capsys) -> None:
     code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(run_body='        return {"demo.other": 1}'))
     assert code == 1
     assert payload["health"]["status"] == "FAIL"
-    legacy_codes = {error["details"].get("legacy_code") for error in payload["health"]["errors"]}
-    assert "undeclared_output" in legacy_codes
+    legacy_codes = {error["code"] for error in payload["health"]["errors"]}
+    assert _default_rule_id("undeclared_output") in legacy_codes

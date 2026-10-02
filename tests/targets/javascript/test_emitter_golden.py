@@ -230,53 +230,33 @@ def _emission_cases() -> dict[str, tuple[dict[str, object], tuple[dict, ...]]]:
 
 # These hashes intentionally freeze generated source formatting as well as its
 # semantic plan.  Update them only after reviewing an intentional ABI change.
-EMISSION_GOLDENS = {
-    "sync": (
-        "b5de169bdd562ef494fa2cf010af259455745729500408cd21309ffadbeead3e",
-        "c71bee984f7a2f2adc2f7c3d14958ef0d9d2dc7d57c3e7d859895b7423fde73a",
-        "53e8507930ecd9f043c897669c0ff7a2dd4697e44de7540c5079f9442710faef",
-    ),
-    "async": (
-        "601f59d0e4ab446dd2d42ead585aae8c699daf60747669adae5db4fc66329cc0",
-        "99463ae82a12cec2a41f82a84e45125337fe0bb8407a6edae15c2fb852839bd0",
-        "19d01b13302c398cf9c22bd074274bfeb78fa22081ad37afba46a9cbab0fb755",
-    ),
-    "nested_nodeset": (
-        "5a96d9a44405ea1c712f20466aaeb6f219bf2395d4a88148276577f55e0b1503",
-        "c71bee984f7a2f2adc2f7c3d14958ef0d9d2dc7d57c3e7d859895b7423fde73a",
-        "60d3fe09ab50bd1b34714fbab3c59772e0ddfc5fed1e0d8b513d80e194b9c579",
-    ),
-    "bounded_loop": (
-        "6f33d1b6ebe750974ee4e29fa4e8061b0f6d1a9365654af1ee52a2ecd55f957d",
-        "c71bee984f7a2f2adc2f7c3d14958ef0d9d2dc7d57c3e7d859895b7423fde73a",
-        "00ca22caf38d62947c800d9934c05931baa9a9fad1da8cb3ecca8817cb37af3e",
-    ),
-    "unbounded_loop": (
-        "986b6e8555029a7bbfdacbb75f0c4b636d0a206f1ed25c0259262c8c1c8938ee",
-        "c71bee984f7a2f2adc2f7c3d14958ef0d9d2dc7d57c3e7d859895b7423fde73a",
-        "b9885ee397416a76e43970aa768b3dd4574b87b0d12dc5605794fcade0bbe71d",
-    ),
-    "deferred": (
-        "4ec357ad00a53f939cd47e925dd1e122039e1fbc40a2efa3477b360966573c30",
-        "99463ae82a12cec2a41f82a84e45125337fe0bb8407a6edae15c2fb852839bd0",
-        "b3cc12a80cb958eca09111c026c00e149f095023ee7f2d2bd95678c1d68b7d9f",
-    ),
-    "detached": (
-        "1aa0278e9a3cf2bf09d676836890c546b9a022a1c04bd1bc9b9ffd8b22ae2b59",
-        "5fbf9b482a0f5a29d6c8ddde696a072f0a157fe9bfbc26eaf6f0024f3514e3f1",
-        "a655bd121ffb1466eba440e2a8c76a283615b58d95a3a7cc956451b7288c5888",
-    ),
-    "port": (
-        "b17ca2bfb29a504281ef20172f55a491cdae27f33259500fe8a8f0aaa1206f04",
-        "c53179950876a250328cd379f04a8770ea8da21ae6454239b4f587a859b994b9",
-        "3d8d823f0d64d73f593ed0efb5442a887e85c67b4c486f3a1727bd5a9743fc10",
-    ),
-    "host_extension": (
-        "55b4b6a134488ff9690d6e3783811f4d48d622dca985e4a0f72e371815e9d581",
-        "cc178b5c0177c4ec3fd08e550efb47d81610879347b233f4cb69ece1a4ae7d4a",
-        "53e8507930ecd9f043c897669c0ff7a2dd4697e44de7540c5079f9442710faef",
-    ),
-}
+EMISSION_GOLDENS = {'sync': ('61e4d1f73fe49453e37b020b49c22b7dc596c94c83246a81f7a44002475b56ab',
+          'ddaed751bc5ede3babfee2c8ed6d9c319642230f9f5dfd8f6d7da0adf1cf40b3',
+          '53e8507930ecd9f043c897669c0ff7a2dd4697e44de7540c5079f9442710faef'),
+ 'async': ('1eb28b6fb1d2f322b8c64c768bd6ecd8797d339d4f0fec1f3e5f1f1a54c20a5c',
+           '921f7bfb7a7d8a483e29df8eeba0d5061f334b4227ec572d9373f973bed661b5',
+           '19d01b13302c398cf9c22bd074274bfeb78fa22081ad37afba46a9cbab0fb755'),
+ 'nested_nodeset': ('5ad4f82d67f2e6d9b3b9dba8fd0cac8d35eccec14e1845759fc78eee2674b614',
+                    'ddaed751bc5ede3babfee2c8ed6d9c319642230f9f5dfd8f6d7da0adf1cf40b3',
+                    '60d3fe09ab50bd1b34714fbab3c59772e0ddfc5fed1e0d8b513d80e194b9c579'),
+ 'bounded_loop': ('eeeb1c2894bbc48436b510033dd8b92c9193bfb0ea09de7c9a89f453794d8e6c',
+                  'ddaed751bc5ede3babfee2c8ed6d9c319642230f9f5dfd8f6d7da0adf1cf40b3',
+                  '00ca22caf38d62947c800d9934c05931baa9a9fad1da8cb3ecca8817cb37af3e'),
+ 'unbounded_loop': ('50f97c7cba21d8a2908934bec07939de452a389a1f38a1e72d6176bf37d77551',
+                    'ddaed751bc5ede3babfee2c8ed6d9c319642230f9f5dfd8f6d7da0adf1cf40b3',
+                    'b9885ee397416a76e43970aa768b3dd4574b87b0d12dc5605794fcade0bbe71d'),
+ 'deferred': ('93f9b555cb11d83285b3ba998782b27483a47b28765768cfa9f71d30f6bd104b',
+              '921f7bfb7a7d8a483e29df8eeba0d5061f334b4227ec572d9373f973bed661b5',
+              'b3cc12a80cb958eca09111c026c00e149f095023ee7f2d2bd95678c1d68b7d9f'),
+ 'detached': ('ec591781d865de2ccdc6da9b1d12f9b129a7aa9ccdebe9a3777c0d71ca200b43',
+              '52ae5e492c0eb35c36653c8ee482cf2493aefc33e03376fa215c9e3f1c97d088',
+              'a655bd121ffb1466eba440e2a8c76a283615b58d95a3a7cc956451b7288c5888'),
+ 'port': ('2232319aa7dc473c77ebe9475064a802a35474d511cb6201a37f8b8dff05a654',
+          '5ace1824ba35811b790b0b2c3f0ceae1068a7c80cf02f864afefeb3d36a72af5',
+          '3d8d823f0d64d73f593ed0efb5442a887e85c67b4c486f3a1727bd5a9743fc10'),
+ 'host_extension': ('030f3558919b96c51231aa0dd3072979a6576ffe24b8912f4c93ac48455a1f81',
+                    'cc1500ed3579c79bcc291d7ef13ba9dc52655fa1717c98ae39a5f4fe2d3f1bac',
+                    '53e8507930ecd9f043c897669c0ff7a2dd4697e44de7540c5079f9442710faef')}
 
 NORMALIZED_WORKFLOW_SHA256 = (
     "84040e3d50fdd63d581f8f8e778bc0144d77d98746a35c27a33fde64b85c4a04"

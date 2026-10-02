@@ -1,0 +1,77 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.done_value",
+  "display_name": "Done Value",
+  "category": "sandbox",
+  "description": "Emits loop.done as ordinary data for while-loop stop_when.",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "value.next",
+        "cardinality": "exactly_one",
+        "display_name": "value.next"
+      }
+    ],
+    "provides": [
+      {
+        "key": "loop.done",
+        "type": "loop.done",
+        "display_name": "loop.done"
+      }
+    ],
+    "input_semantics": {
+      "value.next": [
+        "next value"
+      ]
+    },
+    "output_semantics": {
+      "loop.done": [
+        "whether the loop should stop"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "value.next": {
+            "key": "value.next",
+            "type": "value.next",
+            "value": 3,
+            "source_node": "example"
+          }
+        },
+        "params": {
+          "target": 3
+        }
+      }
+    ],
+    "params_schema": {
+      "target": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "target": 3
+    }
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_loop_nodes.py",
+        "export": "DoneValueNode"
+      }
+    }
+  ]
+}

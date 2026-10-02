@@ -320,6 +320,9 @@ class QualityReport:
     prefix_clusters: tuple[PrefixClusterQuality, ...] = ()
     structure_summary: Mapping[str, object] = field(default_factory=dict)
     workspace_roots: tuple[Mapping[str, object], ...] = ()
+    checked_rulesets: tuple[str, ...] | None = None
+    rule_executions: tuple[Mapping[str, object], ...] = ()
+    record_availability: Mapping[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, object]:
         errors = [finding.to_dict() for finding in self.findings if finding.severity == "error"]
@@ -346,6 +349,13 @@ class QualityReport:
             "errors": errors,
             "warnings": warnings,
         }
+        if self.checked_rulesets is not None:
+            payload["checked_rulesets"] = list(self.checked_rulesets)
+            payload["rule_executions"] = list(self.rule_executions)
+            payload["record_availability"] = dict(self.record_availability)
+            for name, state in self.record_availability.items():
+                if state != "available" and name in payload:
+                    payload[name] = None
         if self.workspace_roots:
             payload["workspace_roots"] = [dict(root) for root in self.workspace_roots]
         return payload

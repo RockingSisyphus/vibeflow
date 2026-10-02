@@ -36,7 +36,7 @@ PLUGIN_ERROR_CODES = {
         "VF_AOT_PLUGIN_PLANNED_DEPENDENCY"
     ),
 }
-PLUGIN_ABI_VERSION = "vibeflow.plugin.v1"
+PLUGIN_ABI_VERSION = "vibeflow.plugin.v2"
 
 
 class JavascriptPluginError(ValueError):
@@ -62,14 +62,12 @@ class JavascriptPluginError(ValueError):
 class JavascriptPluginBindingPlan:
     """Static Target binding split by lifecycle role and Planned status."""
 
-    policy_plugins: tuple[JavascriptPluginBinding, ...] = ()
     compiler_plugins: tuple[JavascriptPluginBinding, ...] = ()
     runtime_plugins: tuple[JavascriptPluginBinding, ...] = ()
     planned_plugins: tuple[JavascriptPluginBinding, ...] = ()
 
     def __post_init__(self) -> None:
         groups = {
-            "policy": tuple(self.policy_plugins),
             "compiler": tuple(self.compiler_plugins),
             "runtime": tuple(self.runtime_plugins),
         }
@@ -98,7 +96,6 @@ class JavascriptPluginBindingPlan:
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "policy": [item.to_dict() for item in self.policy_plugins],
             "compiler": [item.to_dict() for item in self.compiler_plugins],
             "runtime": [item.to_dict() for item in self.runtime_plugins],
             "planned": [item.to_dict() for item in self.planned_plugins],
@@ -142,6 +139,8 @@ def parse_javascript_plugin_descriptor(
             str(data.get("id", "") or "").strip(),
         )
     plugin_id = _required_string(data.get("id"), field="plugin.id")
+    if data.get("type") not in {"compiler", "runtime"}:
+        raise JavascriptPluginError("VF_AOT_PLUGIN_TYPE", "Plugin ABI v2 supports compiler/runtime; domain checks use Rule resources", plugin_id)
     config = _mapping(data.get("config", {}), field="plugin.config")
     _check_fields(
         config,
@@ -330,9 +329,6 @@ def build_javascript_plugin_binding_plan(
         for item in resolution.planned
     )
     return JavascriptPluginBindingPlan(
-        policy_plugins=tuple(
-            item for item in active if item.plugin_type == "policy"
-        ),
         compiler_plugins=tuple(
             item for item in active if item.plugin_type == "compiler"
         ),
@@ -370,7 +366,7 @@ def _binding_from_resolved(
             f"plugin '{resolved.id}' has no JavaScript implementation for '{target}'",
             resolved.id,
         )
-    if resolved.plugin_type in {"policy", "compiler"} and (
+    if resolved.plugin_type == "compiler" and (
         implementation.completion != "immediate"
     ):
         raise JavascriptPluginError(
@@ -484,7 +480,7 @@ def _validate_javascript_descriptor(descriptor: PluginDescriptor) -> None:
     for implementation in descriptor.implementations:
         if implementation.language == "python":
             continue
-        if descriptor.plugin_type in {"policy", "compiler"} and (
+        if descriptor.plugin_type == "compiler" and (
             implementation.completion != "immediate"
         ):
             raise JavascriptPluginError(

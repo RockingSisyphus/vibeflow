@@ -1,0 +1,83 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.numeric_open_writer",
+  "display_name": "通过 open 写入结果",
+  "category": "sandbox",
+  "description": "使用 builtins.open().write() 将 number.total 写入 cli.output_path，并提供 document.output_written。",
+  "version": "0.1.0",
+  "flow_kind": "document",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "cli.output_path",
+        "cardinality": "exactly_one",
+        "display_name": "cli.output_path"
+      },
+      {
+        "type": "number.total",
+        "cardinality": "exactly_one",
+        "display_name": "number.total"
+      }
+    ],
+    "provides": [
+      {
+        "key": "document.output_written",
+        "type": "document.output_written",
+        "display_name": "document.output_written"
+      }
+    ],
+    "input_semantics": {
+      "cli.output_path": [
+        "需要写入的结果文件路径。"
+      ],
+      "number.total": [
+        "需要持久化的求和结果。"
+      ]
+    },
+    "output_semantics": {
+      "document.output_written": [
+        "已成功写入的结果文件路径。"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "cli.output_path": {
+            "key": "cli.output_path",
+            "type": "cli.output_path",
+            "value": "sum.txt",
+            "source_node": "example"
+          },
+          "number.total": {
+            "key": "number.total",
+            "type": "number.total",
+            "value": 41,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.document"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_delegate_numeric_nodes.py",
+        "export": "NumericOpenWriterNode"
+      }
+    }
+  ]
+}

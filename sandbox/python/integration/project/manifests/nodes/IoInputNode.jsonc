@@ -1,0 +1,69 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.io_input",
+  "display_name": "读取外部结果输入",
+  "category": "sandbox",
+  "description": "在流程中读取外部系统已经准备好的 io.result，用来验证边界被移除后 IO 节点如何承接外部数据。",
+  "version": "0.1.0",
+  "flow_kind": "io",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "io.result",
+        "cardinality": "exactly_one",
+        "display_name": "io.result"
+      }
+    ],
+    "provides": [
+      {
+        "key": "io.result.input",
+        "type": "io.result",
+        "display_name": "io.result.input"
+      }
+    ],
+    "input_semantics": {
+      "io.result": [
+        "外部系统或测试初始上下文提供的数值结果。"
+      ]
+    },
+    "output_semantics": {
+      "io.result.input": [
+        "pass-through io.result envelope from pipeline input"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "io.result": {
+            "key": "io.result",
+            "type": "io.result",
+            "value": 1,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.io"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_math_nodes.py",
+        "export": "IoInputNode"
+      }
+    }
+  ]
+}

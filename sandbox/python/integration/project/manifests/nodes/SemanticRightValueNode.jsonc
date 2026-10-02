@@ -1,0 +1,60 @@
+{
+  "kind": "node",
+  "type_key": "semantic.right_value",
+  "display_name": "Semantic Right Value",
+  "category": "semantic",
+  "description": "Produces a right value.in-compatible provider for join conflict tests.",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [],
+    "provides": [
+      {
+        "key": "value.right",
+        "type": "value.in",
+        "display_name": "value.right"
+      }
+    ],
+    "input_semantics": {},
+    "output_semantics": {
+      "value.right": [
+        "right value provider"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {},
+        "params": {
+          "value": 2
+        }
+      }
+    ],
+    "params_schema": {
+      "value": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "value": 2
+    }
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_semantic_nodes.py",
+        "export": "SemanticRightValueNode"
+      }
+    }
+  ]
+}

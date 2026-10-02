@@ -416,13 +416,42 @@ def _atomic_failure_case(cache: BuildCache) -> dict[str, Any]:
     return {"preservedFiles": len(after)}
 
 
+def _browser_platform_rejection_case(cache: BuildCache) -> dict[str, Any]:
+    """Check selected Rule preflight and the independent esbuild platform limit."""
+    source = PROJECT_ROOT / "negative/nodes/node_builtin_browser.ts"
+    line, column = _source_marker_location(source, '"node:fs"')
+    selected = expect_build_failure(
+        lambda: cache.build("negative_node_builtin_browser", "negative/node_builtin_browser.jsonc", target="browser"),
+        expected_code="VF_BASE_LIB_HOST_IO",
+        expected_definition_id="vibeflow.no_side_effects",
+        expected_owner_id="sandbox.invalid.node_builtin_browser",
+        expected_owner_kind="node",
+        expected_file=source,
+        expected_line=line,
+        expected_column=column,
+    )
+    manifest = PROJECT_ROOT / "negative/manifests/nodes/node-builtin-browser.jsonc"
+    original = manifest.read_text(encoding="utf-8")
+    declaration = json.loads(original)
+    declaration["rulesets"] = []
+    manifest.write_text(json.dumps(declaration), encoding="utf-8")
+    try:
+        platform = expect_build_failure(
+            lambda: cache.build("negative_node_builtin_browser_unconstrained", "negative/node_builtin_browser.jsonc", target="browser"),
+            expected_code="VF_ESBUILD",
+        )
+        assert_equal(platform["diagnostics"], ["ESBUILD", "VF_ESBUILD"], label="native browser platform diagnostics")
+    finally:
+        manifest.write_text(original, encoding="utf-8")
+    return {"selected_rule": selected, "unconstrained_platform": platform}
+
+
 def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
     expected = {
         "direct_node_import": "VF_IMPORT_NODE_TO_NODE",
         "undeclared_base_lib": "VF_IMPORT_BASE_LIB",
         "dynamic_import": "VF_IMPORT_DYNAMIC",
         "runtime_import": "VF_IMPORT_OWNER",
-        "node_builtin_browser": "VF_ESBUILD",
         "immediate_async": "VF_COMPLETION_IMMEDIATE_PROMISE",
         "suspend_sync": "VF_COMPLETION_SUSPEND_NON_PROMISE",
         "unowned_promise": "VF_PROMISE_UNOWNED",
@@ -442,7 +471,7 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
         "module_promise": "VF_IMPORT_SIDE_EFFECT",
         "discarded_promise": "VF_PROMISE_UNOWNED",
         "long_lived_listener": "VF_NODE_LONG_LIVED_LISTENER",
-        "global_state": "VF_MODULE_STATE",
+        "global_state": "VF_IMPORT_SIDE_EFFECT",
     }
     precise = {
         "barrel_import": (
@@ -509,10 +538,12 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
             "sandbox.invalid.global_state",
             "node",
             "negative/nodes/global_state.ts",
-            "count +=",
+            "let count",
         ),
     }
-    cases: list[tuple[str, Any]] = []
+    cases: list[tuple[str, Any]] = [
+        ("reject:node_builtin_browser", lambda: _browser_platform_rejection_case(cache)),
+    ]
     for name, code in expected.items():
         precise_expectation = precise.get(name)
         expected_location = (
@@ -536,6 +567,13 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
                         target="browser",
                     ),
                     expected_code=code,
+                    expected_definition_id=(
+                        "vibeflow.node_interface"
+                        if name in {"discarded_promise", "long_lived_listener"}
+                        else "vibeflow.import_side_effects"
+                        if precise_expectation is not None
+                        else None
+                    ),
                     expected_owner_id=(
                         precise_expectation[0]
                         if precise_expectation is not None

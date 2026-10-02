@@ -32,52 +32,6 @@ BRANCH_NODES = (
     ast.Match,
 )
 
-SIDE_EFFECT_IMPORT_ROOTS = frozenset(
-    {
-        "boto3",
-        "dotenv",
-        "httpx",
-        "playwright",
-        "psycopg2",
-        "pymongo",
-        "pymysql",
-        "redis",
-        "requests",
-        "selenium",
-        "shutil",
-        "socket",
-        "sqlalchemy",
-        "sqlite3",
-        "subprocess",
-    }
-)
-SIDE_EFFECT_CALLS = frozenset(
-    {"__import__", "compile", "eval", "exec", "input", "open"}
-)
-SIDE_EFFECT_ATTR_CALLS = frozenset(
-    {
-        "httpx.get",
-        "httpx.post",
-        "importlib.import_module",
-        "os.getenv",
-        "os.system",
-        "pathlib.Path.read_text",
-        "pathlib.Path.write_text",
-        "requests.get",
-        "requests.post",
-        "shutil.copy",
-        "shutil.copytree",
-        "shutil.move",
-        "socket.socket",
-        "sqlite3.connect",
-        "sqlalchemy.create_engine",
-        "subprocess.Popen",
-        "subprocess.call",
-        "subprocess.run",
-    }
-)
-
-
 @dataclass(frozen=True)
 class PythonSource:
     """One source unit supplied by Tooling; paths are display-only strings."""
@@ -108,6 +62,13 @@ def analyze_python_source(
     except SyntaxError as exc:
         return _syntax_error(source, line_count, byte_count, exc)
 
+    return analyze_python_source_tree(source, tree, check_side_effects=check_side_effects)
+
+
+def analyze_python_source_tree(source: PythonSource, tree: ast.Module, *, check_side_effects: bool = False) -> PythonSourceQuality:
+    """Extract the same facts from an already parsed, Target-owned tree."""
+    byte_count = len(source.text.encode("utf-8"))
+    line_count = len(source.text.splitlines())
     functions = tuple(_collect_functions(tree))
     function_count = sum(
         isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
@@ -125,11 +86,7 @@ def analyze_python_source(
         source.relative_path,
         tree,
     )
-    findings = (
-        tuple(_side_effect_findings(source, tree))
-        if check_side_effects
-        else ()
-    )
+    findings = _selected_source_effect_findings(source,tree) if check_side_effects else ()
     return PythonSourceQuality(
         file=FileQuality(
             path=source.relative_path,
@@ -147,6 +104,23 @@ def analyze_python_source(
         ),
         findings=findings,
     )
+
+
+def _selected_source_effect_findings(source,tree):
+    from vibeflow.core.rules import RuleCall, RuleContext, RulesetDescriptor, compile_ruleset, execute_rule_plan
+    from vibeflow.core.rules.builtin import builtin_rule_resources
+    from vibeflow.targets.python.quality.rules import python_rule_handlers
+    from vibeflow.targets.python.quality.source_context import PythonSourceFile
+    rules, _ = builtin_rule_resources()
+    selection = RulesetDescriptor("vibeflow.python.source_effects",calls=(RuleCall("effects",rule_id="vibeflow.no_side_effects"),))
+    plan = compile_ruleset(selection,rules={item.id:item for item in rules})
+    context = RuleContext(facts={"python_source":source,
+        "source_file":PythonSourceFile(source.source_path,source.module,source.text,_tree=tree)},
+        subject={"kind":"python_source","id":source.relative_path},target="python")
+    result = execute_rule_plan(plan,context,handlers=python_rule_handlers())
+    return tuple(QualityFinding(rule_id=item.code,severity=item.severity,object_type=item.object_type,object_id=item.object_id,
+        message=item.message,source_location=item.source_location,suggested_fix_type=item.suggested_fix_type,
+        details=item.details,definition_id=item.definition_id) for item in result.findings)
 
 
 def _syntax_error(
@@ -375,70 +349,9 @@ def _fingerprint_function(node: ast.AST) -> str:
     return ast.dump(clone, include_attributes=False)
 
 
-def _side_effect_findings(
-    source: PythonSource,
-    tree: ast.AST,
-) -> list[QualityFinding]:
-    findings: list[QualityFinding] = []
-    aliases = import_aliases(tree, defaults={"Path": "pathlib.Path"})
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            for root in import_roots(node):
-                if root in SIDE_EFFECT_IMPORT_ROOTS:
-                    findings.append(
-                        _effect_finding(
-                            source,
-                            node,
-                            "QUALITY.SIDE_EFFECT.IMPORT",
-                            f"imports side-effect capable module {root}",
-                        )
-                    )
-            continue
-        if not isinstance(node, ast.Call):
-            continue
-        call_name = qualified_call_name(node.func, aliases) or "<dynamic>"
-        path_effect = path_effect_call_name(node, aliases)
-        if (
-            call_name in SIDE_EFFECT_CALLS
-            or any(
-                call_name == banned or call_name.startswith(f"{banned}.")
-                for banned in SIDE_EFFECT_ATTR_CALLS
-            )
-            or path_effect
-        ):
-            findings.append(
-                _effect_finding(
-                    source,
-                    node,
-                    "QUALITY.SIDE_EFFECT.CALL",
-                    f"calls side-effect capable API {path_effect or call_name}",
-                )
-            )
-    return findings
-
-
-def _effect_finding(
-    source: PythonSource,
-    node: ast.AST,
-    rule_id: str,
-    message: str,
-) -> QualityFinding:
-    return QualityFinding(
-        rule_id=rule_id,
-        severity="warning",
-        object_type="file",
-        object_id=source.relative_path,
-        source_location={
-            "path": source.source_path,
-            "line": getattr(node, "lineno", 1),
-        },
-        message=message,
-        suggested_fix_type="isolate_side_effect",
-    )
-
-
 __all__ = [
     "PythonSource",
     "PythonSourceQuality",
     "analyze_python_source",
+    "analyze_python_source_tree",
 ]

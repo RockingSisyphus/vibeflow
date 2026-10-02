@@ -12,6 +12,7 @@ import pytest
 
 from vibeflow.targets.javascript.build import BuildRequest, build_aot
 from vibeflow.targets.javascript.frontend.errors import AotBuildError
+from vibeflow.targets.javascript.build.toolchain import run_rule_check_driver
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -270,30 +271,9 @@ def test_project_dependency_negative_has_precise_diagnostic(
         for owner in case.owners
     )
     entry = project / "entry.ts"
-    with pytest.raises(AotBuildError) as caught:
-        build_aot(
-            BuildRequest(
-                plan=_plan(
-                    entry,
-                    entry_mode=case.entry_mode,
-                    completion=case.completion,
-                ),
-                project_root=project,
-                package_root=project,
-                out_dir=project / "dist",
-                target="browser",
-                profile="single-esm",
-                import_policy={
-                    "owners": owners,
-                    "node_base_libs": case.node_base_libs or {},
-                    "base_lib_dependencies": {"test.base": []},
-                },
-            )
-        )
-    matching = [
-        item for item in caught.value.diagnostics if item.get("code") == case.code
-    ]
-    assert matching, [item.get("code") for item in caught.value.diagnostics]
+    checked = run_rule_check_driver({"typecheckFiles": [str(entry)], "ruleTopics": ["imports", "purity", "ownership", "completion", "module_state"], "importPolicy": {"owners": owners, "node_base_libs": case.node_base_libs or {}, "base_lib_dependencies": {"test.base": []}}}, package_root=project)
+    matching = [item for item in checked.findings if item.get("code") == case.code]
+    assert matching, [item.get("code") for item in checked.findings]
     diagnostic = matching[0]
     expected_file = (project / case.diagnostic_file).resolve()
     expected_source = case.sources[case.diagnostic_file]
@@ -301,7 +281,7 @@ def test_project_dependency_negative_has_precise_diagnostic(
     assert Path(str(diagnostic["file"])).resolve() == expected_file
     assert diagnostic["line"] == expected_line
     assert diagnostic["column"] == expected_column
-    assert diagnostic["owner"] == {
+    assert {key: diagnostic["owner"][key] for key in ("id", "kind", "path")} == {
         "id": "test.base" if case.name == "base-lib-reverse" else "test.entry",
         "kind": "base_lib" if case.name == "base-lib-reverse" else "node",
         "path": str(
@@ -343,12 +323,10 @@ def test_failed_replace_preserves_every_existing_output_byte(tmp_path: Path) -> 
         for path in built.out_dir.rglob("*")
         if path.is_file()
     }
-    entry.write_text('export function run() { return eval("1"); }\n', encoding="utf-8")
+    entry.write_text('import {missing} from "./missing.ts"; export function run() { return missing(); }\n', encoding="utf-8")
     with pytest.raises(AotBuildError) as caught:
         build_aot(BuildRequest(**{**request.__dict__, "replace": True}))
-    assert "VF_IMPORT_DYNAMIC_CODE" in {
-        item.get("code") for item in caught.value.diagnostics
-    }
+    assert caught.value.code in {"VF_ESBUILD", "VF_TYPESCRIPT"}
     after = {
         path.relative_to(built.out_dir).as_posix(): path.read_bytes()
         for path in built.out_dir.rglob("*")

@@ -85,13 +85,12 @@ Decision Node 使用 `flow_kind="decision"`，提供 route-like 输出，例如 
 
 | `flow_kind` 或实现 | 使用者可见边界 |
 | --- | --- |
-| 普通 Node | 局部计算，不执行业务 I/O |
-| `io` | 真实终端输入输出 |
-| `document` / `data_store` | 文件、网络、数据库等 Python I/O |
-| `global_state` | 易失 ambient state 与源码可见 runtime dispatch |
-| `external=True` / Plugin | 受项目信任的外部实现边界 |
+| `vibeflow.process` Ruleset | 默认禁止副作用 |
+| `vibeflow.io` Ruleset | 允许真实终端输入输出 |
+| `vibeflow.document` / `vibeflow.data_store` Ruleset | 允许文件、网络、数据库等 Python I/O |
+| `vibeflow.global_state` Ruleset | 允许易失状态与源码可见 runtime dispatch |
 
-`effect_scope` 由 VibeFlow 派生，不是 Config 可自由设置的权限字段。需要协调 `global_state` 冲突资源时使用静态命名 `execution_lock`；相同 key 互斥，不同 key 可并行。
+Node 声明显式选择 Ruleset；分类可以提供默认选择。`flow_kind` 继续表示执行身份，`external` 继续表示外部边界，它们不授予副作用权限。报告中的 `effect_scope` 来自有效规则记录；显式空选择表示未约束。详见[规则与分类](rules-and-categories.md)。需要协调 `global_state` 冲突资源时使用静态命名 `execution_lock`；相同 key 互斥，不同 key 可并行。
 
 ## 可执行结构示例
 

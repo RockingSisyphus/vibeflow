@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tests.fixtures.support.declarations import write_node_manifests
 
 import json
 from pathlib import Path
@@ -28,13 +29,13 @@ def test_planned_static_plugin_is_complete_without_descriptor() -> None:
         {
             "plugins": [
                 {
-                    "id": "demo.future_policy",
+                    "id": "demo.future_runtime",
                     "status": "planned",
-                    "type": "policy",
+                    "type": "runtime",
                     "targets": ["browser"],
                     "config": {"level": "future"},
-                    "display_name": "Future Policy",
-                    "description": "Reviews a future policy.",
+                    "display_name": "Future Runtime",
+                    "description": "Provides a future runtime extension.",
                 }
             ]
         },
@@ -43,18 +44,18 @@ def test_planned_static_plugin_is_complete_without_descriptor() -> None:
 
     assert [item.to_dict() for item in resources] == [
         {
-            "id": "demo.future_policy",
-            "name": "demo.future_policy",
-            "type": "policy",
+            "id": "demo.future_runtime",
+            "name": "demo.future_runtime",
+            "type": "runtime",
             "status": "planned",
             "targets": ["browser"],
             "dependencies": [],
             "config": {"level": "future"},
             "config_keys": ["level"],
             "priority": 100,
-            "display_name": "Future Policy",
+            "display_name": "Future Runtime",
             "category": "",
-            "description": "Reviews a future policy.",
+            "description": "Provides a future runtime extension.",
             "version": "",
         }
     ]
@@ -189,31 +190,16 @@ def _write_plugin_workspace(
         json.dumps(
             {
                 "project_target": "python",
-                "registry": "registry.py:build_node_registry",
                 "quality_enabled": False,
-                "descriptors": {"plugins": ["manifests/plugins"]},
+                "descriptors": {"nodes": ["manifests/nodes"], "plugins": ["manifests/plugins"]},
             }
         ),
         encoding="utf-8",
     )
-    (project / "registry.py").write_text(
-        "\n".join(
-            (
-                "from vibeflow.targets.python.project import NodeRegistry",
-                "from tests.fixtures.support import strict_support_runtime_nodes as nodes",
-                "",
-                "def build_node_registry():",
-                "    registry = NodeRegistry()",
-                "    registry.register('test.start', nodes.StartNode, config_schema={}, config_defaults={})",
-                "    registry.register('test.seed', nodes.SeedNode, config_schema={'value': {'type': 'number'}}, config_defaults={'value': 1})",
-                "    registry.register('test.add', nodes.AddNode, config_schema={'delta': {'type': 'number'}}, config_defaults={'delta': 1})",
-                "    registry.register('test.out_end', nodes.OutEndNode, config_schema={}, config_defaults={})",
-                "    return registry",
-                "",
-            )
-        ),
-        encoding="utf-8",
-    )
+    write_node_manifests(project, [("test.start", "StartNode", {}, {}),
+        ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}),
+        ("test.add", "AddNode", {"delta": {"type": "number"}}, {"delta": 1}),
+        ("test.out_end", "OutEndNode", {}, {})])
     (manifests / "runtime-audit.jsonc").write_text(
         json.dumps(
             {

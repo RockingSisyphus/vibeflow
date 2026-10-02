@@ -116,9 +116,9 @@ def test_unknown_planned_plugin_is_architecture_only() -> None:
     resolution = resolve_plugin_selections(
         (
             PluginSelection(
-                id="future.policy",
+                id="future.runtime",
                 status="planned",
-                plugin_type="policy",
+                plugin_type="runtime",
                 targets=("browser",),
                 config={"mode": "review"},
             ),

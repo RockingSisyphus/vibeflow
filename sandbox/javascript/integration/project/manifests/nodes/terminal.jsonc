@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.terminal",
   "display_name": "Sandbox terminal",
   "category": "sandbox",

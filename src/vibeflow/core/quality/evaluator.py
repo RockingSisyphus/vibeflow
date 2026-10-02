@@ -21,36 +21,53 @@ from .structure import analyze_directory_structure
 def evaluate_project_quality(
     facts: ProjectQualityFacts,
     policy: QualityPolicy | None = None,
+    *,
+    rulesets=None,
+    rules=None,
+    ruleset_catalog=None,
+    handlers=None,
+    entrypoint: str = "static",
+    context=None,
 ) -> SourceQualityReport:
-    """Run the selected built-in project rules over already-extracted facts."""
-    from vibeflow.core.rules import RuleContext, compile_ruleset, execute_rule_plan
-    from vibeflow.core.rules.models import plain
+    """Run an explicit Rule selection over the supplied source scope.
+
+    ``None`` selects the default project Ruleset; ``()`` requests facts only.
+    Resources and callables can be supplied by any composition root. Neither
+    this function nor the Rule handlers discover additional files or Nodes.
+    """
+    from dataclasses import replace
+    from vibeflow.core.rules import RuleCall, RuleContext, RuleDescriptor, RulesetDescriptor, compile_ruleset, execute_rule_plan
     from vibeflow.core.rules.builtin.project_quality import project_quality_handlers, project_quality_resources
+    from vibeflow.core.quality.rule_report import project_quality_report
 
     active = policy or QualityPolicy()
-    files = tuple(sorted(facts.files, key=lambda item: item.path))
-    normalized = ProjectQualityFacts(facts.root, files, facts.findings)
-    rules, ruleset = project_quality_resources()
-    plan = compile_ruleset(ruleset, rules={item.id: item for item in rules})
-    execution = execute_rule_plan(plan, RuleContext(facts={"project_facts": normalized, "quality_policy": active}),
-                                  handlers=project_quality_handlers())
-    dependency_result = execution.results["dependencies"]
-    structure_result = execution.results["structure"]
-    if dependency_result.state != "completed" or structure_result.state != "completed":
-        raise ValueError("project-quality facts are unavailable: " + "; ".join(item.message for item in execution.findings))
-    dependency_records = dependency_result.records
-    structure_records = structure_result.records
-    findings = _dedupe_findings((*execution.findings, *facts.findings))
-    has_error = any(finding.severity == "error" for finding in findings)
-    status = "FAIL" if has_error else ("CONCERNS" if findings else "PASS")
-    return SourceQualityReport(
-        status=status, root=facts.root, thresholds=active.thresholds, files=files,
-        dependency_graph={key: tuple(value) for key, value in dependency_records["graph"].value.items()},
-        longest_dependency_chain=tuple(dependency_records["chain"].value),
-        findings=tuple(findings), directory_graph=tuple(structure_records["directories"].value),
-        prefix_clusters=tuple(structure_records["clusters"].value),
-        structure_summary=plain(structure_records["summary"].value),
-    )
+    normalized = ProjectQualityFacts(facts.root, tuple(sorted(facts.files, key=lambda item: item.path)), facts.findings)
+    builtin_rules, default_set = project_quality_resources(active)
+    resources = {item.id: item for item in builtin_rules}
+    resources.update(_resources_by_id(rules))
+    sets = {default_set.id: default_set, **_resources_by_id(ruleset_catalog)}
+    selected = (default_set.id,) if rulesets is None else (rulesets,) if isinstance(rulesets, (str, RuleDescriptor, RulesetDescriptor)) else tuple(rulesets)
+    implementations = {**project_quality_handlers(), **dict(handlers or {})}
+    base_context = context or RuleContext(subject={"kind": "source", "id": facts.root},
+        scope={"root": facts.root, "files": tuple(item.path for item in normalized.files)}, phase=entrypoint)
+    active_context = replace(base_context, facts={**base_context.facts, "project_facts": normalized}, phase=entrypoint)
+    executions, selected_ids = [], []
+    for item in selected:
+        if isinstance(item, RuleDescriptor):
+            resources[item.id] = item
+            item = RulesetDescriptor("rule:" + item.id, (RuleCall("check", item.id),))
+        elif isinstance(item, str) and item not in sets and item in resources:
+            item = RulesetDescriptor("rule:" + item, (RuleCall("check", item),))
+        plan = compile_ruleset(item, rules=resources, rulesets=sets, entrypoint=entrypoint)
+        selected_ids.append(plan.ruleset_id)
+        executions.append(execute_rule_plan(plan, active_context, handlers=implementations))
+    return project_quality_report(normalized, active, tuple(executions), tuple(selected_ids))
+
+
+def _resources_by_id(resources):
+    if resources is None:
+        return {}
+    return dict(resources) if isinstance(resources, Mapping) else {item.id: item for item in resources}
 
 
 def _file_findings(

@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.invalid.package_root_escape",
   "display_name": "Invalid package root escape",
   "category": "sandbox-negative",

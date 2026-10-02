@@ -79,6 +79,34 @@ def _trace_helper_input_parameters(
     return tainted
 
 
+def source_input_parameters(sources, node) -> dict[str, set[str]]:
+    """Propagate input ownership along resolved, project-local symbol calls."""
+    symbols = {item.id:item for item in sources.helpers(node.type_key) if isinstance(item.node,(ast.FunctionDef,ast.AsyncFunctionDef))}
+    seeds = {key:{"inputs"} for key,item in symbols.items() if item.path == node.path and item.name.startswith(node.symbol+".") and item.name.endswith(".run_pure")}
+    tainted = {key:set(value) for key,value in seeds.items()}
+    pending = list(seeds)
+    while pending:
+        key = pending.pop()
+        symbol = symbols[key]
+        aliases = _input_reference_aliases(symbol.node,tainted[key])
+        references = {(ref.line,ref.column):ref.target for ref in sources.references if ref.source == key and ref.kind == "call"}
+        for call in (item for item in ast.walk(symbol.node) if isinstance(item,ast.Call)):
+            target = symbols.get(references.get((call.lineno,call.col_offset+1)))
+            if target is None:
+                continue
+            helper = target.node
+            if isinstance(call.func,ast.Attribute) and isinstance(call.func.value,ast.Name) and call.func.value.id in {"self","cls"}:
+                from copy import deepcopy
+                call = deepcopy(call)
+                call.args.insert(0,ast.Constant(None))
+            names = _tainted_helper_parameters(call,helper,aliases)
+            unseen = names-tainted.setdefault(target.id,set())
+            if unseen:
+                tainted[target.id].update(unseen)
+                pending.append(target.id)
+    return tainted
+
+
 def _called_module_helpers(node: ast.AST, helpers: dict[str, ast.AST]) -> set[str]:
     return {
         child.func.id

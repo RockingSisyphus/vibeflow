@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibeflow.local/schema/rule.schema.json",
+  "title": "VibeFlow RuleDescriptor",
+  "type": "object",
+  "required": [
+    "kind",
+    "id"
+  ],
+  "properties": {
+    "kind": {
+      "const": "rule"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "display_name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "scope": {
+      "enum": [
+        "call",
+        "source"
+      ],
+      "default": "call"
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "params_schema": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
+    "params_defaults": {
+      "type": "object"
+    },
+    "handler": {
+      "type": "string"
+    },
+    "implementations": {
+      "type": "array",
+      "items": {
+        "$ref": "node.schema.json#/$defs/implementation"
+      }
+    }
+  },
+  "additionalProperties": false
+}

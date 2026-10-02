@@ -1,0 +1,83 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.training_metrics",
+  "display_name": "Training Metrics",
+  "category": "training",
+  "description": "Emits non-JSON metrics without snapshotting values.",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "train.model_after",
+        "cardinality": "exactly_one",
+        "display_name": "train.model_after"
+      },
+      {
+        "type": "train.loss",
+        "cardinality": "exactly_one",
+        "display_name": "train.loss"
+      }
+    ],
+    "provides": [
+      {
+        "key": "train.metrics",
+        "type": "train.metrics",
+        "display_name": "train.metrics"
+      }
+    ],
+    "input_semantics": {
+      "train.model_after": [
+        "model object"
+      ],
+      "train.loss": [
+        "numeric loss"
+      ]
+    },
+    "output_semantics": {
+      "train.metrics": [
+        "metrics object containing non-JSON values"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "train.model_after": {
+            "key": "train.model_after",
+            "type": "train.model_after",
+            "value": {},
+            "source_node": "example"
+          },
+          "train.loss": {
+            "key": "train.loss",
+            "type": "train.loss",
+            "value": 1,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_training_nodes.py",
+        "export": "TrainingMetricsNode"
+      }
+    }
+  ]
+}

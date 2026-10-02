@@ -1,0 +1,17 @@
+{
+  "kind": "node_category",
+  "id": "data_transform",
+  "display_name": "数据变换",
+  "description": "A business category; native Node composition remains unchanged.",
+  "default_rulesets": [
+    "example.data_domain"
+  ],
+  "presentation": {
+    "fill": "#dff7df",
+    "shape": "rounded"
+  },
+  "metadata": {
+    "domain": "example",
+    "icon": "transform"
+  }
+}

@@ -18,12 +18,5 @@ export function createPlugin(_context: PluginContext) {
       phase = 2;
       return {annotation: {phase: "afterCompile"}};
     },
-    validateCompiledGraph() {
-      if (phase !== 2) {
-        throw new Error("validateCompiledGraph ran out of order");
-      }
-      phase = 3;
-      return {annotation: {phase: "validateCompiledGraph"}};
-    },
   };
 }

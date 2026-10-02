@@ -1,0 +1,69 @@
+{
+  "kind": "node",
+  "type_key": "semantic.branch_type_consumer",
+  "display_name": "Semantic Branch Type Consumer",
+  "category": "semantic",
+  "description": "Consumes one branch_result envelope and uses its source key to produce a source-aware final value.",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "branch_result",
+        "cardinality": "exactly_one",
+        "display_name": "branch_result"
+      }
+    ],
+    "provides": [
+      {
+        "key": "branch.final",
+        "type": "final_result",
+        "display_name": "branch.final"
+      }
+    ],
+    "input_semantics": {
+      "branch_result": [
+        "one selected branch result envelope"
+      ]
+    },
+    "output_semantics": {
+      "branch.final": [
+        "source-aware final branch value"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "branch_result": {
+            "key": "calc.left_branch",
+            "type": "branch_result",
+            "value": 31,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_semantic_nodes.py",
+        "export": "SemanticBranchTypeConsumerNode"
+      }
+    }
+  ]
+}

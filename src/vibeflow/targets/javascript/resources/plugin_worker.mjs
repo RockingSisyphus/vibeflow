@@ -1,40 +1,16 @@
 import { createRequire } from "node:module";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
+import { readFileSync, statSync } from "node:fs";
+import { format } from "node:util";
 import path from "node:path";
 import process from "node:process";
 import readline from "node:readline";
 import { pathToFileURL } from "node:url";
 
-const PLUGIN_ABI = "vibeflow.plugin.v1";
+const PLUGIN_ABI = "vibeflow.plugin.v2";
+const RULE_ABI = "vibeflow.rule.v1";
 const instances = new Map();
-
-function visitChildren(ts, node, visitor) {
-  if (typeof ts.forEachChild === "function") ts.forEachChild(node, visitor);
-  else if (typeof node.forEachChild === "function") node.forEachChild(visitor);
-}
-
-function isKind(ts, node, legacyName, nativeName, syntaxName) {
-  const predicate = ts[legacyName] || ts[nativeName];
-  if (typeof predicate === "function") return predicate(node);
-  return node?.kind === ts.SyntaxKind[syntaxName];
-}
-
-function isStringLiteralLike(ts, node) {
-  return isKind(
-    ts,
-    node,
-    "isStringLiteralLike",
-    "isStringLiteral",
-    "StringLiteral",
-  ) || isKind(
-    ts,
-    node,
-    "isNoSubstitutionTemplateLiteral",
-    "isNoSubstitutionTemplateLiteral",
-    "NoSubstitutionTemplateLiteral",
-  );
-}
+// Keep trusted implementations' ordinary logging outside the JSONL protocol.
+console.log = (...values) => process.stderr.write(format(...values) + "\n");
 
 function failure(code, message, details = {}) {
   const error = new Error(message);
@@ -42,548 +18,194 @@ function failure(code, message, details = {}) {
   error.details = details;
   throw error;
 }
-
 function deepFreeze(value) {
   if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) deepFreeze(child);
   return Object.freeze(value);
 }
-
 function jsonValue(value, pathName = "result") {
   if (value === undefined) return null;
-  if (value === null || typeof value === "string" || typeof value === "boolean") {
-    return value;
-  }
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) failure("VF_PLUGIN_HOOK_RESULT", `${pathName} contains a non-finite number`);
-    return value;
-  }
-  if (Array.isArray(value)) {
-    return value.map((item, index) => jsonValue(item, `${pathName}[${index}]`));
-  }
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (Array.isArray(value)) return value.map((item, index) => jsonValue(item, `${pathName}[${index}]`));
   if (typeof value === "object") {
     const output = {};
-    for (const [key, item] of Object.entries(value)) {
-      output[key] = jsonValue(item, `${pathName}.${key}`);
-    }
+    for (const [key, item] of Object.entries(value)) output[key] = jsonValue(item, `${pathName}.${key}`);
     return output;
   }
-  failure("VF_PLUGIN_HOOK_RESULT", `${pathName} must contain JSON values`);
+  failure("RULE.RESULT.INVALID", `${pathName} must contain portable JSON values`);
 }
-
 async function localTools(packageRoot) {
   const require = createRequire(path.join(packageRoot, "package.json"));
-  let ts;
-  let esbuild;
-  try {
-    const version = require("typescript");
-    if (typeof version.createProgram === "function") {
-      ts = version;
-    } else {
-      const astPath = require.resolve("typescript/unstable/ast");
-      const apiPath = require.resolve("typescript/unstable/sync");
-      const [ast, api] = await Promise.all([
-        import(pathToFileURL(astPath).href),
-        import(pathToFileURL(apiPath).href),
-      ]);
-      ts = {
-        ...ast,
-        ...api,
-        version: String(version.version || ""),
-        __native: true,
-      };
+  const version = require("typescript");
+  let ts = version;
+  if (typeof version.createSourceFile !== "function") {
+    const [ast, api] = await Promise.all([import(pathToFileURL(require.resolve("typescript/unstable/ast")).href), import(pathToFileURL(require.resolve("typescript/unstable/sync")).href)]);
+    ts = {...ast, ...api};
+  }
+  return { ts, esbuild: require("esbuild") };
+}
+function sourceService(ts, packageRoot, facts) {
+  const provided = new Map();
+  for (const source of facts.sources || []) {
+    if (source && source.path && typeof source.text === "string") provided.set(path.resolve(source.path), source.text);
+  }
+  const cache = new Map();
+  let api = null;
+  const snapshots = [];
+  function parsed(file) {
+    const absolute = path.resolve(packageRoot, file);
+    const text = provided.get(absolute) ?? readFileSync(absolute, "utf8");
+    const cached = cache.get(absolute);
+    if (cached?.text === text) return cached;
+    let tree;
+    if (typeof ts.createSourceFile === "function") tree = ts.createSourceFile(absolute, text, ts.ScriptTarget.Latest, true);
+    else {
+      if (!api) api = new ts.API({cwd: packageRoot, fs: {readFile: name => provided.get(path.resolve(name)), fileExists: name => provided.has(path.resolve(name)) ? true : undefined}});
+      const snapshot = api.updateSnapshot({openFiles: [absolute]});
+      snapshots.push(snapshot);
+      tree = snapshot.getDefaultProjectForFile(absolute)?.program.getSourceFile(absolute);
+      if (!tree) failure("RULE.SOURCE.UNAVAILABLE", `TypeScript did not parse ${absolute}`);
     }
-    esbuild = require("esbuild");
-  } catch (cause) {
-    failure("VF_PLUGIN_TYPECHECK", "project-local TypeScript/esbuild cannot be resolved", {
-      cause: String(cause),
-    });
+    const result = { text, tree };
+    cache.set(absolute, result);
+    return result;
   }
-  return { ts, esbuild };
-}
-
-function callableReturnsPromise(ts, checker, node) {
-  if (!checker) return false;
-  try {
-    let signature = typeof checker.getSignatureFromDeclaration === "function"
-      ? checker.getSignatureFromDeclaration(node)
-      : null;
-    if (!signature) {
-      const type = checker.getTypeAtLocation(node.name || node);
-      signature = checker.getSignaturesOfType(type, ts.SignatureKind.Call)[0];
-    }
-    if (!signature) return false;
-    const returnType = typeof checker.getReturnTypeOfSignature === "function"
-      ? checker.getReturnTypeOfSignature(signature)
-      : signature.getReturnType();
-    const text = checker.typeToString(returnType);
-    if (/\bPromise(?:Like)?\s*</.test(text)) return true;
-    if (typeof checker.getPromisedTypeOfPromise === "function"
-        && checker.getPromisedTypeOfPromise(returnType)) return true;
-    return Boolean(checker.getPropertyOfType?.(returnType, "then"));
-  } catch {
-    return false;
+  function location(tree, node) {
+    const start = tree.getLineAndCharacterOfPosition(node.getStart(tree));
+    const end = tree.getLineAndCharacterOfPosition(node.getEnd());
+    return { path: path.resolve(tree.fileName), line: start.line + 1, column: start.character + 1, end_line: end.line + 1, end_column: end.character + 1 };
   }
-}
-
-function unwrapExpression(ts, node) {
-  let current = node;
-  while (current) {
-    if (ts.isParenthesizedExpression?.(current)
-        || ts.isAsExpression?.(current)
-        || ts.isTypeAssertionExpression?.(current)
-        || ts.isNonNullExpression?.(current)
-        || ts.isSatisfiesExpression?.(current)) {
-      current = current.expression;
-      continue;
-    }
-    return current;
+  function children(node) {
+    const result = [];
+    if (typeof ts.forEachChild === "function") ts.forEachChild(node, child => { result.push(child); });
+    else node.forEachChild(child => { result.push(child); });
+    return result;
   }
-  return current;
-}
-
-function isAssignmentOperator(ts, kind) {
-  return kind >= ts.SyntaxKind.FirstAssignment
-    && kind <= ts.SyntaxKind.LastAssignment;
-}
-
-function isDeepFrozenLiteral(ts, node, insideFreeze = false) {
-  const value = unwrapExpression(ts, node);
-  if (!value) return true;
-  if (isStringLiteralLike(ts, value)
-      || ts.isNumericLiteral(value)
-      || value.kind === ts.SyntaxKind.TrueKeyword
-      || value.kind === ts.SyntaxKind.FalseKeyword
-      || value.kind === ts.SyntaxKind.NullKeyword
-      || value.kind === ts.SyntaxKind.UndefinedKeyword
-      || ts.isArrowFunction(value)
-      || ts.isFunctionExpression(value)) return true;
-  if (ts.isNoSubstitutionTemplateLiteral(value)) return true;
-  if (ts.isArrayLiteralExpression(value)) {
-    return insideFreeze && value.elements.every(
-      (item) => isDeepFrozenLiteral(ts, item),
-    );
+  function describe(tree, node, recursive = false) {
+    return { kind: ts.SyntaxKind[node.kind] || String(node.kind), name: node.name?.getText(tree) || "", text: node.getText(tree), ...location(tree, node), ...(recursive ? { children: children(node).map(child => describe(tree, child, true)) } : {}) };
   }
-  if (ts.isObjectLiteralExpression(value)) {
-    return insideFreeze && value.properties.every((item) => {
-      if (ts.isPropertyAssignment(item)) {
-        return isDeepFrozenLiteral(ts, item.initializer);
+  function resolvedImport(file, specifier) {
+    if (!specifier.startsWith(".")) return null;
+    const base = path.resolve(path.dirname(file), specifier);
+    const stem = /\.(?:js|jsx|mjs|cjs)$/.test(base) ? base.replace(/\.[^.]+$/, "") : base;
+    const candidates = [base, ...[".ts", ".tsx", ".js", ".mjs", ".mts", ".cts"].map(suffix => stem + suffix), path.join(base, "index.ts"), path.join(base, "index.js")];
+    return candidates.find(candidate => provided.has(candidate) || (statSync(candidate, {throwIfNoEntry: false})?.isFile() && !path.extname(candidate).includes("json"))) || null;
+  }
+  function imports(file) {
+    const {tree} = parsed(file);
+    return tree.statements.filter(node => node.moduleSpecifier).map(node => ({ specifier: node.moduleSpecifier.text, resolved_path: resolvedImport(tree.fileName, node.moduleSpecifier.text), ...location(tree, node) }));
+  }
+  function reachable(file) {
+    const found = new Set();
+    function visit(current) { const absolute = path.resolve(packageRoot, current); if (found.has(absolute)) return; found.add(absolute); for (const item of imports(absolute)) if (item.resolved_path) visit(item.resolved_path); }
+    visit(file); return [...found];
+  }
+  return Object.freeze({
+    dispose() { for (const snapshot of snapshots) snapshot.dispose(); api?.close(); },
+    text(file) { return parsed(file).text; },
+    ast(file) { const {tree} = parsed(file); return deepFreeze(describe(tree, tree, true)); },
+    symbols(file) {
+      const {tree} = parsed(file); const result = [];
+      function visit(node, owners = []) {
+        const kind = ts.SyntaxKind[node.kind] || "";
+        const named = node.name && /Declaration$/.test(kind);
+        const name = named ? node.name.getText(tree) : "";
+        if (named) result.push({ ...describe(tree, node), qualname: [...owners, name].join(".") });
+        for (const child of children(node)) visit(child, named ? [...owners, name] : owners);
       }
-      return ts.isMethodDeclaration(item)
-        || ts.isGetAccessorDeclaration?.(item)
-        || ts.isSetAccessorDeclaration?.(item);
-    });
-  }
-  if (ts.isCallExpression(value)
-      && ts.isPropertyAccessExpression(value.expression)
-      && ts.isIdentifier(value.expression.expression)
-      && value.expression.expression.text === "Object"
-      && value.expression.name.text === "freeze"
-      && value.arguments.length === 1) {
-    return isDeepFrozenLiteral(ts, value.arguments[0], true);
-  }
-  if (ts.isPrefixUnaryExpression(value)) {
-    return value.operator !== ts.SyntaxKind.PlusPlusToken
-      && value.operator !== ts.SyntaxKind.MinusMinusToken
-      && value.operator !== ts.SyntaxKind.DeleteKeyword
-      && isDeepFrozenLiteral(ts, value.operand);
-  }
-  if (ts.isBinaryExpression(value)) {
-    return !isAssignmentOperator(ts, value.operatorToken.kind)
-      && value.operatorToken.kind !== ts.SyntaxKind.CommaToken
-      && isDeepFrozenLiteral(ts, value.left)
-      && isDeepFrozenLiteral(ts, value.right);
-  }
-  if (ts.isConditionalExpression(value)) {
-    return isDeepFrozenLiteral(ts, value.condition)
-      && isDeepFrozenLiteral(ts, value.whenTrue)
-      && isDeepFrozenLiteral(ts, value.whenFalse);
-  }
-  return ts.isIdentifier(value)
-    && new Set(["undefined", "NaN", "Infinity"]).has(value.text);
+      visit(tree); return deepFreeze(result);
+    },
+    imports(file) { return deepFreeze(imports(file)); },
+    reachable(file) { return Object.freeze(reachable(file)); },
+    ownership(file) {
+      const absolute = path.resolve(packageRoot, file);
+      const declared = (facts.source_owners || []).filter(item => path.resolve(item.path) === absolute);
+      const nodeTypes = new Set();
+      for (const source of facts.sources || []) if (source.owner && (facts.source_files || []).includes(source.path) && reachable(source.path).includes(absolute)) nodeTypes.add(source.owner);
+      return deepFreeze({path: absolute, declared, node_types: [...nodeTypes]});
+    },
+    nodes(file, kind) {
+      const {tree} = parsed(file); const result = [];
+      function visit(node) { if ((ts.SyntaxKind[node.kind] || String(node.kind)) === kind) result.push(describe(tree, node)); for (const child of children(node)) visit(child); }
+      visit(tree); return deepFreeze(result);
+    },
+  });
 }
-
-function auditPluginModuleState(ts, sourceFile, plugin) {
-  const findings = [];
-  const report = (node, code, message) => {
-    const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
-    findings.push({
-      code,
-      message,
-      owner: plugin.id,
-      file: path.resolve(sourceFile.fileName),
-      line: position.line + 1,
-      column: position.character + 1,
-    });
-  };
-  for (const statement of sourceFile.statements) {
-    if (ts.isImportDeclaration(statement)) {
-      const clause = statement.importClause;
-      if (!clause || (!clause.name && !clause.namedBindings)) {
-        report(
-          statement,
-          "VF_MODULE_STATE",
-          `plugin '${plugin.id}' cannot use a side-effect-only import`,
-        );
-      }
-      continue;
-    }
-    if (ts.isImportEqualsDeclaration?.(statement)
-        || ts.isExportDeclaration(statement)
-        || ts.isFunctionDeclaration(statement)
-        || ts.isInterfaceDeclaration(statement)
-        || ts.isTypeAliasDeclaration(statement)
-        || ts.isEmptyStatement(statement)) continue;
-    if (ts.isVariableStatement(statement)) {
-      const immutable = Boolean(
-        statement.declarationList.flags & ts.NodeFlags.Const
-      );
-      if (immutable && statement.declarationList.declarations.every(
-        (item) => isDeepFrozenLiteral(ts, item.initializer),
-      )) continue;
-    }
-    if (ts.isExpressionStatement(statement)
-        && isStringLiteralLike(ts, statement.expression)) continue;
-    report(
-      statement,
-      "VF_MODULE_STATE",
-      `plugin '${plugin.id}' cannot retain mutable or executable module state`,
-    );
-  }
-  return findings;
-}
-
-function identifierIsRuntimeReference(ts, node) {
-  const parent = node.parent;
-  if (!parent) return true;
-  if ((ts.isPropertyAccessExpression(parent) && parent.name === node)
-      || (ts.isPropertyAssignment(parent) && parent.name === node)
-      || (ts.isMethodDeclaration(parent) && parent.name === node)
-      || (ts.isVariableDeclaration(parent) && parent.name === node)
-      || ts.isImportSpecifier(parent)
-      || ts.isExportSpecifier(parent)
-      || ts.isBindingElement(parent)
-      || ts.isTypeReferenceNode(parent)
-      || ts.isTypeQueryNode?.(parent)) return false;
-  let current = parent;
-  while (current && !ts.isSourceFile(current)) {
-    if (ts.isTypeNode?.(current)) return false;
-    if (ts.isAsExpression?.(current) && current.expression === node) return true;
-    current = current.parent;
-  }
-  return true;
-}
-
-function auditPluginHostGlobals(ts, sourceFile, plugin, checker) {
-  const findings = [];
-  // This is a plugin/host-extension responsibility boundary, not a platform
-  // compatibility list. It is intentionally the union of common browser and
-  // Node host primitives for every selected build target.
-  const hostRoots = new Set([
-    "globalThis", "window", "self", "global", "document", "process",
-    "localStorage", "sessionStorage", "navigator", "location", "fetch",
-    "XMLHttpRequest", "WebSocket", "EventSource", "indexedDB", "caches",
-    "Worker", "SharedWorker",
-  ]);
-  function locallyDeclared(node) {
-    try {
-      const symbol = checker?.getSymbolAtLocation(node);
-      return Boolean(symbol?.declarations?.some((item) => {
-        const file = item.getSourceFile();
-        return !file.isDeclarationFile && path.resolve(file.fileName) === path.resolve(sourceFile.fileName);
-      }));
-    } catch {
-      return false;
-    }
-  }
-  function visit(node) {
-    if (ts.isIdentifier(node)
-        && hostRoots.has(node.text)
-        && identifierIsRuntimeReference(ts, node)
-        && !locallyDeclared(node)) {
-      const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
-      findings.push({
-        code: "VF_PLUGIN_HOST_IO",
-        message: `plugin '${plugin.id}' cannot access host primitive '${node.text}'; use a host_extension`,
-        owner: plugin.id,
-        file: path.resolve(sourceFile.fileName),
-        line: position.line + 1,
-        column: position.character + 1,
-      });
-    }
-    visitChildren(ts, node, visit);
-  }
-  visit(sourceFile);
-  return findings;
-}
-
-function pluginSourceAudit(ts, sourceFile, plugin, checker) {
-  const findings = [
-    ...auditPluginModuleState(ts, sourceFile, plugin),
-    ...auditPluginHostGlobals(ts, sourceFile, plugin, checker),
-  ];
-  const report = (node, code, message) => {
-    const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
-    findings.push({
-      code,
-      message,
-      owner: plugin.id,
-      file: path.resolve(sourceFile.fileName),
-      line: position.line + 1,
-      column: position.character + 1,
-    });
-  };
-  function visit(node) {
-    if (ts.isCallExpression(node)) {
-      const expression = node.expression;
-      const name = ts.isIdentifier(expression)
-        ? expression.text
-        : ts.isPropertyAccessExpression(expression)
-          ? expression.name.text
-          : "";
-      if (new Set(["addEventListener", "eventOn", "on", "once", "setInterval", "setTimeout"]).has(name)) {
-        report(
-          node,
-          "VF_PLUGIN_LONG_LIVED_LISTENER",
-          `plugin '${plugin.id}' cannot register long-lived listeners or timers`,
-        );
-      }
-      const dynamicImport = expression.kind === ts.SyntaxKind.ImportKeyword;
-      const requireCall = ts.isIdentifier(expression) && expression.text === "require";
-      if ((dynamicImport || requireCall)
-          && (!node.arguments[0] || !isStringLiteralLike(ts, node.arguments[0]))) {
-        report(node, "VF_PLUGIN_IMPORT_POLICY", "plugin imports must use static string literals");
-      }
-      const promiseChain = ts.isPropertyAccessExpression(expression)
-        && new Set(["then", "catch", "finally"]).has(expression.name.text);
-      if (promiseChain && ts.isExpressionStatement(node.parent)) {
-        report(node, "VF_PLUGIN_PROMISE_UNOWNED", `plugin '${plugin.id}' discards Promise work`);
-      }
-    }
-    if (plugin.completion === "immediate"
-        && (ts.isFunctionDeclaration(node)
-          || ts.isFunctionExpression(node)
-          || ts.isArrowFunction(node)
-          || ts.isMethodDeclaration(node))
-        && (node.modifiers?.some((item) => item.kind === ts.SyntaxKind.AsyncKeyword)
-          || callableReturnsPromise(ts, checker, node))) {
-      report(node, "VF_COMPLETION_IMMEDIATE_PROMISE", `immediate plugin '${plugin.id}' cannot declare async functions`);
-    }
-    visitChildren(ts, node, visit);
-  }
-  visit(sourceFile);
-  return findings;
-}
-
-async function loadPlugin(request) {
-  const plugin = request.plugin || {};
+async function loadImplementation(request, isRule) {
+  const declaration = isRule ? request.rule : request.plugin;
   const packageRoot = path.resolve(request.packageRoot);
-  const source = path.resolve(plugin.module || "");
-  if (!source.startsWith(`${packageRoot}${path.sep}`) && source !== packageRoot) {
-    failure("VF_PLUGIN_IMPLEMENTATION", `plugin '${plugin.id}' source escapes package_root`, { source });
-  }
+  const source = path.resolve(declaration.module);
   const tools = await localTools(packageRoot);
-  const jsonCompilerOptions = {
-    allowJs: true,
-    checkJs: true,
-    target: "ES2022",
-    module: "ESNext",
-    moduleResolution: "Bundler",
-    strict: true,
-    noEmit: true,
-    skipLibCheck: true,
-    lib: request.target === "browser"
-      ? ["ES2022", "DOM", "DOM.Iterable"]
-      : ["ES2022"],
-  };
-  let sourceFile;
-  let sourceFiles = [];
-  let checker;
-  let dispose = () => {};
-  let temporaryRoot = null;
-  if (tools.ts.__native) {
-    temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "vibeflow-plugin-ts-"));
-    const configPath = path.join(temporaryRoot, "tsconfig.json");
-    await writeFile(configPath, JSON.stringify({
-      compilerOptions: jsonCompilerOptions,
-      files: [source],
-    }), "utf8");
-    const api = new tools.ts.API({ cwd: packageRoot });
-    let snapshot;
-    try {
-      snapshot = api.updateSnapshot({ openProjects: [configPath] });
-      const project = snapshot.getProject(configPath) || snapshot.getProjects()[0];
-      if (!project) {
-        failure("VF_PLUGIN_TYPECHECK", "TypeScript did not create a plugin project");
-      }
-      const program = project.program;
-      checker = project.checker;
-      sourceFile = program.getSourceFile(source);
-      sourceFiles = program.getSourceFileNames()
-        .map((name) => program.getSourceFile(name))
-        .filter(Boolean);
-    } catch (cause) {
-      snapshot?.dispose();
-      api.close();
-      throw cause;
-    }
-    dispose = () => {
-      snapshot.dispose();
-      api.close();
-    };
-  } else {
-    const compilerOptions = {
-      ...jsonCompilerOptions,
-      target: tools.ts.ScriptTarget.ES2022,
-      module: tools.ts.ModuleKind.ESNext,
-      moduleResolution: tools.ts.ModuleResolutionKind.Bundler,
-      lib: request.target === "browser"
-        ? ["lib.es2022.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"]
-        : ["lib.es2022.d.ts"],
-    };
-    const program = tools.ts.createProgram({ rootNames: [source], options: compilerOptions });
-    checker = program.getTypeChecker();
-    sourceFile = program.getSourceFile(source);
-    sourceFiles = program.getSourceFiles();
-  }
-  try {
-    const packagePrefix = `${packageRoot}${path.sep}`;
-    const localSources = sourceFiles.filter((item) => {
-      const file = path.resolve(item.fileName);
-      return !item.isDeclarationFile
-        && (file === packageRoot || file.startsWith(packagePrefix))
-        && !file.includes(`${path.sep}node_modules${path.sep}`);
-    });
-    const findings = localSources.flatMap(
-      (item) => pluginSourceAudit(tools.ts, item, plugin, checker),
-    );
-    if (sourceFile && !localSources.includes(sourceFile)) {
-      findings.push({
-        code: "VF_PLUGIN_IMPORT_POLICY",
-        message: `plugin '${plugin.id}' source is outside package_root`,
-        owner: plugin.id,
-        file: path.resolve(sourceFile.fileName),
-        line: 1,
-        column: 1,
-      });
-    }
-    if (findings.length) {
-      failure("VF_PLUGIN_TYPECHECK", `plugin '${plugin.id}' failed static validation`, {
-        diagnostics: findings,
-      });
-    }
-  } finally {
-    dispose();
-    if (temporaryRoot) await rm(temporaryRoot, { recursive: true, force: true });
-  }
   let bundled;
   try {
-    const result = await tools.esbuild.build({
-      absWorkingDir: packageRoot,
-      entryPoints: [source],
-      bundle: true,
-      write: false,
-      format: "esm",
-      platform: request.target === "browser" ? "browser" : "node",
-      target: ["es2022"],
-      sourcemap: "inline",
-      legalComments: "none",
-      logLevel: "silent",
-    });
-    bundled = result.outputFiles?.find((item) => item.path.endsWith(".js"))?.text
-      || result.outputFiles?.[0]?.text;
+    const result = await tools.esbuild.build({ absWorkingDir: packageRoot, entryPoints: [source], bundle: true, write: false, format: "esm", platform: isRule || request.target !== "browser" ? "node" : "browser", target: ["es2022"], sourcemap: "inline", legalComments: "none", logLevel: "silent" });
+    bundled = result.outputFiles?.find(item => item.path.endsWith(".js"))?.text || result.outputFiles?.[0]?.text;
   } catch (cause) {
-    failure("VF_PLUGIN_TYPECHECK", `plugin '${plugin.id}' could not be bundled`, {
-      cause: String(cause),
-    });
+    failure(isRule ? "RULE.IMPLEMENTATION" : "VF_PLUGIN_IMPLEMENTATION", `${declaration.id} could not be bundled`, { cause: String(cause), diagnostics: cause?.errors || [] });
   }
-  const url = `data:text/javascript;base64,${Buffer.from(bundled, "utf8").toString("base64")}`;
-  let module;
-  try {
-    module = await import(url);
-  } catch (cause) {
-    failure("VF_PLUGIN_IMPLEMENTATION", `plugin '${plugin.id}' module failed to load`, {
-      cause: String(cause),
-    });
-  }
-  const exported = String(plugin.export || "createPlugin");
-  const factory = module[exported];
-  if (typeof factory !== "function") {
-    failure("VF_PLUGIN_FACTORY", `plugin '${plugin.id}' does not export ${exported}()`);
-  }
+  const module = await import(`data:text/javascript;base64,${Buffer.from(bundled, "utf8").toString("base64")}`);
+  const exported = String(declaration.export || (isRule ? "check" : "createPlugin"));
+  const callback = module[exported];
+  if (typeof callback !== "function") failure(isRule ? "RULE.IMPLEMENTATION" : "VF_PLUGIN_FACTORY", `${declaration.id} does not export ${exported}()`);
   const controller = new AbortController();
-  const context = Object.freeze({
-    abiVersion: PLUGIN_ABI,
-    pluginId: String(plugin.id),
-    pluginType: String(plugin.plugin_type),
-    target: String(request.target),
-    workflowId: String(request.workflowId || ""),
-    config: deepFreeze(jsonValue(plugin.config || {}, "config")),
-    signal: controller.signal,
-  });
-  let instance;
-  try {
-    instance = factory(context);
-  } catch (cause) {
-    failure("VF_PLUGIN_FACTORY", `plugin '${plugin.id}' factory failed`, { cause: String(cause) });
-  }
-  if (!instance || typeof instance !== "object" || Array.isArray(instance)) {
-    failure("VF_PLUGIN_FACTORY", `plugin '${plugin.id}' factory must return an object`);
-  }
-  return { plugin, instance, controller };
+  if (isRule) return { declaration, callback, controller, tools, packageRoot, isRule };
+  const pluginType = String(declaration.type || declaration.plugin_type);
+  if (!["compiler", "runtime"].includes(pluginType)) failure("VF_PLUGIN_ABI", "Policy plugins were replaced by Rule resources");
+  const context = Object.freeze({ abiVersion: PLUGIN_ABI, pluginId: String(declaration.id), pluginType, target: String(request.target), workflowId: String(request.workflowId || ""), config: deepFreeze(jsonValue(declaration.config || {}, "config")), signal: controller.signal });
+  const instance = callback(context);
+  if (!instance || typeof instance !== "object" || Array.isArray(instance) || typeof instance.then === "function") failure("VF_PLUGIN_FACTORY", `${declaration.id} factory must synchronously return an object`);
+  const removed = ["extendPolicy", "validateNode", "validateGraph", "validateNodeset", "validateCompiledGraph"];
+  if (removed.some(hook => hook in instance)) failure("VF_PLUGIN_ABI", `${declaration.id} uses removed policy hooks; contribute Rules instead`);
+  return { declaration, instance, controller, isRule };
 }
-
 async function dispatch(request) {
   const command = String(request.command || "");
   const sessionId = String(request.sessionId || "");
-  if (!sessionId) failure("VF_PLUGIN_PROCESS", "plugin worker request requires sessionId");
-  if (command === "open") {
-    if (instances.has(sessionId)) failure("VF_PLUGIN_PROCESS", `duplicate plugin session '${sessionId}'`);
-    instances.set(sessionId, await loadPlugin(request));
+  if (!sessionId) failure("VF_PLUGIN_PROCESS", "worker request requires sessionId");
+  if (command === "open" || command === "openRule") {
+    if (instances.has(sessionId)) failure("VF_PLUGIN_PROCESS", `duplicate session '${sessionId}'`);
+    instances.set(sessionId, await loadImplementation(request, command === "openRule"));
     return { opened: true };
   }
   const record = instances.get(sessionId);
-  if (!record) failure("VF_PLUGIN_PROCESS", `unknown plugin session '${sessionId}'`);
-  if (command === "invoke") {
-    const hook = String(request.hook || "");
-    const callback = record.instance[hook];
-    if (callback === undefined) return { implemented: false, result: null };
-    if (typeof callback !== "function") {
-      failure("VF_PLUGIN_HOOK_RESULT", `plugin '${record.plugin.id}' hook '${hook}' is not callable`);
-    }
+  if (!record) failure("VF_PLUGIN_PROCESS", `unknown session '${sessionId}'`);
+  if (command === "evaluateRule") {
+    if (!record.isRule) failure("RULE.IMPLEMENTATION", "session does not contain a Rule");
+    const supplied = deepFreeze(jsonValue(request.context || {}, "context"));
+    const sourceAnalysis = sourceService(record.tools.ts, record.packageRoot, supplied.facts || {});
+    const {dispose, ...publicSources} = sourceAnalysis;
+    const context = Object.freeze({ ...supplied, abiVersion: RULE_ABI, ruleId: String(record.declaration.id), signal: record.controller.signal, sources: Object.freeze(publicSources) });
     try {
-      const result = await callback(deepFreeze(jsonValue(request.payload || {}, "payload")));
+      const result = await record.callback(context, deepFreeze(jsonValue(request.inputs || {}, "inputs")), deepFreeze(jsonValue(request.params || {}, "params")));
       return { implemented: true, result: jsonValue(result, "result") };
-    } catch (cause) {
-      failure("VF_PLUGIN_HOOK_RESULT", `plugin '${record.plugin.id}' hook '${hook}' failed`, {
-        cause: String(cause),
-      });
-    }
+    } finally { dispose(); }
+  }
+  if (command === "invoke") {
+    const hook = String(request.hook || ""); const callback = record.instance[hook];
+    if (callback === undefined) return { implemented: false, result: null };
+    if (typeof callback !== "function") failure("VF_PLUGIN_HOOK_RESULT", `${record.declaration.id}.${hook} is not callable`);
+    let returned;
+    try { returned = callback(deepFreeze(jsonValue(request.payload || {}, "payload"))); }
+    catch (cause) { failure("VF_PLUGIN_HOOK_RESULT", `${record.declaration.id}.${hook} failed: ${cause instanceof Error ? cause.message : cause}`); }
+    if (record.declaration.completion !== "suspend" && returned && typeof returned.then === "function") failure("VF_PLUGIN_COMPLETION", `${record.declaration.id}.${hook} returned a Promise with immediate completion`);
+    const result = await returned;
+    return { implemented: true, result: jsonValue(result, "result") };
   }
   if (command === "close") {
-    record.controller.abort("plugin build session closed");
-    instances.delete(sessionId);
-    return { closed: true };
+    record.controller.abort("session closed");
+    if (typeof record.instance?.dispose === "function") await record.instance.dispose();
+    instances.delete(sessionId); return { closed: true };
   }
-  failure("VF_PLUGIN_PROCESS", `unknown plugin worker command '${command}'`);
+  failure("VF_PLUGIN_PROCESS", `unknown worker command '${command}'`);
 }
-
 const input = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
 for await (const line of input) {
   if (!line.trim()) continue;
-  let request;
   try {
-    request = JSON.parse(line);
-    const result = await dispatch(request);
+    const result = await dispatch(JSON.parse(line));
     process.stdout.write(`${JSON.stringify({ ok: true, result })}\n`);
   } catch (error) {
-    process.stdout.write(`${JSON.stringify({
-      ok: false,
-      error: {
-        code: error?.code || "VF_PLUGIN_PROCESS",
-        message: error instanceof Error ? error.message : String(error),
-        details: error?.details || {},
-      },
-    })}\n`);
+    process.stdout.write(`${JSON.stringify({ ok: false, error: { code: error?.code || "RULE.EXECUTION", message: error instanceof Error ? error.message : String(error), details: error?.details || {} } })}\n`);
   }
 }

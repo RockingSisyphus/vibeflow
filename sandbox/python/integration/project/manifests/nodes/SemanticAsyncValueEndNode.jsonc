@@ -1,0 +1,59 @@
+{
+  "kind": "node",
+  "type_key": "semantic.async_value_end",
+  "display_name": "Semantic Async Value End",
+  "category": "semantic",
+  "description": "Inactive terminal branch that would consume async.value if scheduled.",
+  "version": "0.1.0",
+  "flow_kind": "terminal",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "async.value",
+        "cardinality": "exactly_one",
+        "display_name": "async.value"
+      }
+    ],
+    "provides": [],
+    "input_semantics": {
+      "async.value": [
+        "async result-key value"
+      ]
+    },
+    "output_semantics": {},
+    "examples": [
+      {
+        "inputs": {
+          "async.value": {
+            "key": "async.value",
+            "type": "async.value",
+            "value": 99,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_semantic_nodes.py",
+        "export": "SemanticAsyncValueEndNode"
+      }
+    }
+  ]
+}

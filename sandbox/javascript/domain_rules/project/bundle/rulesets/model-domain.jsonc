@@ -1,0 +1,18 @@
+{
+  "kind": "ruleset",
+  "id": "example.model_domain",
+  "calls": [
+    {
+      "id": "model_definition",
+      "rule_id": "example.model_definition"
+    }
+  ],
+  "entrypoints": {
+    "static": [
+      "model_definition"
+    ],
+    "run": [
+      "model_definition"
+    ]
+  }
+}

@@ -334,7 +334,7 @@ def build_manifest(
     manifest = {
         "format": BUILD_MANIFEST_FORMAT,
         "abi_version": workflow.abi_version,
-        "plugin_abi_version": "vibeflow.plugin.v1",
+        "plugin_abi_version": "vibeflow.plugin.v2",
         "project_target": "javascript",
         "workflow_id": workflow.workflow_id,
         "entry_mode": workflow.entry_mode,
@@ -355,7 +355,6 @@ def build_manifest(
             "annotations": [],
             "declared": [],
             "planned": [],
-            "relaxations": [],
         }
     return manifest
 

@@ -62,33 +62,15 @@ def validate_config_path(path: Path, *, policy_path: Path | None = None) -> Heal
         graph = parse_graph_config(document.data, project_root=project_root_for_config(path))
     except GraphConfigError as exc:
         return graph_config_error_report(exc, path=path, effective_policy=effective_policy)
-    depth_findings = validate_nodeset_depth(graph, max_depth=_configured_nodeset_depth(path))
-    if depth_findings:
-        return HealthReport(
-            status="FAIL",
-            errors=depth_findings,
-            warnings=schema_warnings,
-            effective_policy=effective_policy,
-        )
-    try:
-        compiled = GraphCompiler().compile(graph)
-    except GraphCompileError as exc:
-        return fail_report(exc.rule_id, str(exc), "pipeline", "pipeline", "topology", effective_policy=effective_policy)
-    return HealthReport(
-        status="CONCERNS" if schema_warnings else "PASS",
-        warnings=schema_warnings,
-        info={
-            "nodes": len(graph.nodes),
-            "nodesets": sorted(graph.nodesets),
-            "nodeset_imports": [dict(item) for item in document.nodeset_imports],
-            "explicit_edges": [edge.pair for edge in compiled.explicit_edges],
-            "data_edges": [edge.pair for edge in compiled.data_edges],
-            "effective_edges": [edge.pair for edge in compiled.effective_edges],
-            "resources": resources.to_dict(),
-            "available_resources": registry_context.available_resources.to_dict(),
-        },
-        effective_policy=effective_policy,
-    )
+    from dataclasses import replace
+    from vibeflow.tooling.project.workspace_loader import load_project_workspace, find_project_config
+    if find_project_config(path) is not None:
+        from vibeflow.tooling.application.python.workspace_service import validate_workspace_config_path
+        workspace = load_project_workspace(path)
+        workspace = replace(workspace, policy=policy_result.effective_policy.data)
+        return validate_workspace_config_path(path, workspace=workspace)
+    from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
+    return validate_graph_health(graph, plugin_registry=plugin_registry, effective_policy=policy_result.effective_policy)
 
 
 def _configured_nodeset_depth(path: Path) -> int:

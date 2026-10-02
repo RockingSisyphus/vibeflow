@@ -161,8 +161,7 @@ def _base_lib_resources(
         prefix = f"base_lib.modules[{index}]"
         registered = _registered_base_lib_resource(item, registry=base_lib_registry, prefix=prefix, findings=findings)
         if registered is not None:
-            info = _load_base_lib_info(registered.module, paths=paths, findings=findings, object_id=prefix)
-            resources.append(replace(registered, status=STATUS_IMPLEMENTED, info=info))
+            resources.append(replace(registered, status=STATUS_IMPLEMENTED))
             continue
         spec = _base_lib_spec(item, prefix=prefix, findings=findings)
         if spec is None:
@@ -172,8 +171,6 @@ def _base_lib_resources(
         module, status, metadata = spec
         _append_missing_resource_metadata_warnings(metadata, prefix, "base_lib", findings)
         info = None
-        if status == STATUS_IMPLEMENTED:
-            info = _load_base_lib_info(module, paths=paths, findings=findings, object_id=prefix)
         resources.append(
             BaseLibResource(
                 id=str(item.get("id", "")).strip() if isinstance(item, Mapping) else "",
@@ -244,30 +241,6 @@ def _overlay_base_lib_metadata(resource: BaseLibResource, item: object) -> BaseL
         description=metadata["description"] or resource.description,
         version=metadata["version"] or resource.version,
     )
-
-
-def _load_base_lib_info(
-    module_name: str,
-    *,
-    paths: tuple[str, ...],
-    findings: list[HealthFinding],
-    object_id: str,
-) -> BaseLibInfo | None:
-    try:
-        with _module_search_path(module_name, paths):
-            module = importlib.import_module(module_name)
-    except Exception as exc:
-        findings.append(_finding("BASE_LIB.LOAD", f"base_lib load failed: {exc}", object_id, "base_lib"))
-        return None
-    raw = getattr(module, "BASE_LIB_INFO", None)
-    if raw is None:
-        findings.append(_finding("BASE_LIB.INFO.MISSING", f"implemented base_lib must define BASE_LIB_INFO: {module_name}", object_id, "base_lib"))
-        return None
-    try:
-        return _normalize_base_lib_info(raw, fallback_module=module_name)
-    except ValueError as exc:
-        findings.append(_finding("BASE_LIB.INFO.INVALID", str(exc), object_id, "base_lib"))
-        return None
 
 
 def _empty_resource_metadata() -> dict[str, str]:

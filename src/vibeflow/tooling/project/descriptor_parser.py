@@ -35,6 +35,7 @@ from vibeflow.core.descriptors.models import (
 )
 from vibeflow.core.config.node import normalize_node_config_spec
 from vibeflow.core.descriptors.categories import ContributionBundle, NodeCategoryDescriptor
+from vibeflow.core.rules.models import RuleDescriptor, RulesetDescriptor
 
 
 def parse_descriptor_manifest(
@@ -48,6 +49,10 @@ def parse_descriptor_manifest(
     | CapabilityDescriptor
     | HostExtensionDescriptor
     | PluginDescriptor
+    | NodeCategoryDescriptor
+    | ContributionBundle
+    | RuleDescriptor
+    | RulesetDescriptor
 ):
     """Parse one already-decoded manifest object."""
 

@@ -1,4 +1,7 @@
 {
+  // This transfer-only side branch exercises native edge behavior without
+  // selecting the conventional scheduling-path-to-end review constraint.
+  "rulesets": [],
   "pipeline": {
     "inputs": [
       {

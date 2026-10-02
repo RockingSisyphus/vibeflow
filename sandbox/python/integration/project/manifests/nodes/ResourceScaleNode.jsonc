@@ -1,0 +1,77 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.resource_scale",
+  "display_name": "Resource Scale",
+  "category": "sandbox",
+  "description": "Scales calc.resource by a configured factor for nodeset config propagation tests.",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "calc.resource",
+        "cardinality": "exactly_one",
+        "display_name": "calc.resource"
+      }
+    ],
+    "provides": [
+      {
+        "key": "calc.scaled",
+        "type": "calc.scaled",
+        "display_name": "calc.scaled"
+      }
+    ],
+    "input_semantics": {
+      "calc.resource": [
+        "resource arithmetic value to scale"
+      ]
+    },
+    "output_semantics": {
+      "calc.scaled": [
+        "calc.resource multiplied by factor"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "calc.resource": {
+            "key": "calc.resource",
+            "type": "calc.resource",
+            "value": 50,
+            "source_node": "example"
+          }
+        },
+        "params": {
+          "factor": 4
+        }
+      }
+    ],
+    "params_schema": {
+      "factor": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "factor": 1
+    }
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_math_nodes.py",
+        "export": "ResourceScaleNode"
+      }
+    }
+  ]
+}

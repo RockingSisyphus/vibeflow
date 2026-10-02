@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.fanout_subtract",
   "display_name": "Fanout subtract",
   "category": "sandbox",

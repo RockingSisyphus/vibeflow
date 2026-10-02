@@ -23,7 +23,6 @@ _EXPORTS = {
     "NodeRegistryError": ("vibeflow.targets.python.project", "NodeRegistryError"),
     "PluginDescriptor": ("vibeflow.targets.python.project", "PluginDescriptor"),
     "PluginRegistry": ("vibeflow.targets.python.project", "PluginRegistry"),
-    "PolicyPlugin": ("vibeflow.targets.python.project", "PolicyPlugin"),
     "PureNode": ("vibeflow.targets.python.project", "PureNode"),
     "PythonBindingPlan": ("vibeflow.targets.python.project", "PythonBindingPlan"),
     "RuntimePlugin": ("vibeflow.targets.python.project", "RuntimePlugin"),
@@ -35,17 +34,9 @@ _EXPORTS = {
     "NodeMetrics": ("vibeflow.targets.python.quality", "NodeMetrics"),
     "PurityPolicy": ("vibeflow.targets.python.quality", "PurityPolicy"),
     "PurityViolation": ("vibeflow.targets.python.quality", "PurityViolation"),
-    "collect_node_metrics": (
-        "vibeflow.targets.python.quality",
-        "collect_node_metrics",
-    ),
     "validate_graph_health": (
         "vibeflow.targets.python.quality",
         "validate_graph_health",
-    ),
-    "validate_node_class": (
-        "vibeflow.targets.python.quality",
-        "validate_node_class",
     ),
     # Runtime.
     "ExecutionPlan": ("vibeflow.targets.python.runtime", "ExecutionPlan"),

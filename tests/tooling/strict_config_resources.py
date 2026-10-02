@@ -1,21 +1,22 @@
+from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
 
 
-class GlobalParamNode:
-    NODE_INFO = NodeInfo(
+GlobalParamNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.global_param",
         display_name="Global Param",
         category="test",
         description="Reads global config from params.",
         version="0.1.0",
         flow_kind="process",
-    )
-    CONTRACT = NodeContract(
+    ), NodeContract(
         provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
         output_semantics={"value.out": ("global config value",)},
 
         examples=({"inputs": {}, "params": {"_global": {"offset": 1}}},),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class GlobalParamNode:
 
     def run_pure(self, inputs, params):
         return {"value.out": params["_global"]["offset"]}
@@ -40,7 +41,7 @@ def test_config_resource_schema_rejects_invalid_status_and_plugin_config() -> No
         for finding in collect_config_schema_findings(
             {
                 "base_lib": {"modules": [{"module": "base_lib.math", "display_name": 1}]},
-                "plugins": [{"id": "bad", "status": "planned", "type": "policy", "description": 2}],
+                "plugins": [{"id": "bad", "status": "planned", "type": "runtime", "description": 2}],
                 "pipeline": _seed_only_pipeline(),
             }
         )
@@ -230,7 +231,7 @@ class RuntimePlugin:
         encoding="utf-8",
     )
     registry = _registry()
-    register_node(registry, "test.global_param", GlobalParamNode)
+    register_node(registry, GlobalParamNode_DECLARATION, GlobalParamNode)
 
     result = run_checked(config_path, registry=registry, run_root=tmp_path / "runs", run_id="resources")
 
@@ -278,13 +279,13 @@ def test_config_resource_metadata_missing_fields_warn_without_blocking(tmp_path)
 
     config = {
         "base_lib": {"modules": [{"module": "base_lib.future_tools", "status": "planned"}]},
-        "plugins": [{"name": "future_policy", "type": "policy", "status": "planned"}],
+        "plugins": [{"name": "future_runtime", "type": "runtime", "status": "planned"}],
         "pipeline": _seed_only_pipeline(),
     }
 
     resources, findings = load_config_resources(config, base_path=tmp_path)
 
-    assert resources.to_dict()["plugins"][0]["name"] == "future_policy"
+    assert resources.to_dict()["plugins"][0]["name"] == "future_runtime"
     rule_ids = {finding.rule_id for finding in findings}
     assert "CONFIG.SMELL.MISSING_BASE_LIB_DISPLAY_NAME" in rule_ids
     assert "CONFIG.SMELL.MISSING_BASE_LIB_DESCRIPTION" in rule_ids
@@ -294,6 +295,9 @@ def test_config_resource_metadata_missing_fields_warn_without_blocking(tmp_path)
 
     config_path = tmp_path / "workflow.json"
     config_path.write_text(json.dumps(config), encoding="utf-8")
+    from tests.fixtures.support.declarations import write_node_manifests
+    write_node_manifests(tmp_path, [("test.start", "StartNode", {}, {}), ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}), ("test.in_end", "InEndNode", {}, {})])
+    (tmp_path / "vibeflow_project.jsonc").write_text(json.dumps({"project_target": "python", "descriptors": {"nodes": ["manifests/nodes"]}}))
     report = validate_config_path(config_path)
     assert report.status == "CONCERNS"
     assert {finding.rule_id for finding in report.warnings} >= rule_ids
@@ -435,10 +439,10 @@ def test_registered_plugin_reference_preserves_planned_status(tmp_path) -> None:
 
     registry = PluginResourceRegistry()
     registry.register(
-        "future_policy",
+        "future_runtime",
         module="project.plugins.future_policy",
         class_name="FuturePolicy",
-        plugin_type="policy",
+        plugin_type="runtime",
         display_name="Future Policy",
         description="Planned policy plugin.",
     )
@@ -447,7 +451,7 @@ def test_registered_plugin_reference_preserves_planned_status(tmp_path) -> None:
         {
             "plugins": [
                 {
-                    "id": "future_policy",
+                    "id": "future_runtime",
                     "status": "planned",
                     "config": {"mode": "review"},
                 }
@@ -460,9 +464,9 @@ def test_registered_plugin_reference_preserves_planned_status(tmp_path) -> None:
     assert findings == ()
     assert resources.to_dict()["plugins"] == [
         {
-            "id": "future_policy",
-            "name": "future_policy",
-            "type": "policy",
+            "id": "future_runtime",
+            "name": "future_runtime",
+            "type": "runtime",
             "status": "planned",
             "module": "project.plugins.future_policy",
             "class": "FuturePolicy",
@@ -609,8 +613,8 @@ class Plugin:
                     ],
                 },
                 "plugins": [
-                    {"module": str(plugin_path), "type": "policy"},
-                    {"name": "future_policy", "status": "planned", "description": "Future policy."},
+                    {"module": str(plugin_path), "type": "runtime"},
+                    {"name": "future_runtime", "status": "planned", "description": "Future policy."},
                 ],
                 "pipeline": _seed_only_pipeline(),
             }
@@ -630,17 +634,14 @@ class Plugin:
 from vibeflow.targets.python.project import PluginInfo
 
 class Plugin:
-    PLUGIN_INFO = PluginInfo("with_info", "policy", "With Info", "test", "Valid policy metadata.", "0.1.0")
+    PLUGIN_INFO = PluginInfo("with_info", "runtime", "With Info", "test", "Valid policy metadata.", "0.1.0")
     name = "with_info"
 """.strip(),
         encoding="utf-8",
     )
-    with pytest.raises(CheckedRunError) as exc_info:
-        run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="missing_base_lib_metadata")
-
-    rule_ids = {error.rule_id for error in exc_info.value.result.health.errors}
-    assert "BASE_LIB.INFO.MISSING" in rule_ids
-    assert "BASE_LIB.LOAD" not in rule_ids
+    result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="declared_metadata")
+    assert result.context is not None
+    assert not any(error.rule_id == "BASE_LIB.INFO.MISSING" for error in result.health.errors)
 
 
 def test_planned_base_lib_does_not_satisfy_node_import_allowlist(tmp_path, monkeypatch) -> None:
@@ -652,16 +653,7 @@ def test_planned_base_lib_does_not_satisfy_node_import_allowlist(tmp_path, monke
     node_path = tmp_path / "future_node.py"
     node_path.write_text(
         """
-from vibeflow.core import DataProvider
-from vibeflow.targets.python.project import NodeContract, NodeInfo
-
 class FutureNode:
-    NODE_INFO = NodeInfo("test.future", "Future", "test", "Imports a planned base_lib.", "0.1.0", "process")
-    CONTRACT = NodeContract(
-        provides=(DataProvider("value.out", "value.out", display_name="Value Out"),),
-        output_semantics={"value.out": ("future value",)},
-        examples=({"inputs": {}, "params": {}},),
-    )
 
     def run_pure(self, inputs, params):
         from base_lib.future_tools import helper
@@ -671,7 +663,7 @@ class FutureNode:
     )
     module = _load_module_from_path(node_path, "_future_node")
     registry = _registry()
-    register_node(registry, "test.future", module.FutureNode)
+    register_node(registry, node_declaration(NodeInfo("test.future", "Future", "test", "Imports a planned helper.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.out", "value.out", display_name="Value Out"),), output_semantics={"value.out": ("future value",)})), module.FutureNode)
     config_path = tmp_path / "workflow.json"
     config_path.write_text(
         json.dumps(
@@ -699,7 +691,7 @@ class FutureNode:
     with pytest.raises(CheckedRunError) as exc_info:
         run_checked(config_path, registry=registry, run_root=tmp_path / "runs", run_id="planned_base_lib_import")
 
-    assert any(error.details.get("legacy_code") == "base_lib_undeclared" for error in exc_info.value.result.health.errors)
+    assert any(error.code == "NODE.BASE_LIB.BASE_LIB_UNDECLARED" for error in exc_info.value.result.health.errors)
     assert exc_info.value.result.health.effective_policy["base_lib"]["allowed_modules"] == ["base_lib.math_tools"]
 
 

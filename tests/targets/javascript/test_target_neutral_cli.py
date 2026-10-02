@@ -376,7 +376,7 @@ def test_project_quality_detects_browser_only_discarded_fetch(
     assert exit_code == 1
     assert payload["status"] == "FAIL"
     assert "VF_PROMISE_UNOWNED" in {
-        item["code"] for item in diagnostics
+        item.get("rule_id", item.get("code")) for item in diagnostics
     }
 
 
@@ -486,20 +486,13 @@ def test_project_quality_audits_unselected_implemented_plugin_and_host(
         ]
     )
     quality_payload = json.loads(capsys.readouterr().out)
-    diagnostics = quality_payload["reports"][0]["diagnostics"]
-    codes = {item["code"] for item in diagnostics}
-    owners = {
-        item.get("owner", {}).get("id")
-        for item in diagnostics
-    }
-    assert quality_exit == 1
-    assert quality_payload["status"] == "FAIL"
-    assert "VF_PLUGIN_LONG_LIVED_LISTENER" in codes
-    assert "VF_IMPORT_LAYER" in codes
-    assert {
-        "example.unselected_plugin",
-        "example.unselected_host",
-    } <= owners
+    # ABI v2 lifecycle resources carry no implicit domain policy. Their declarations
+    # remain in the formal source scope, and the selected Node rules are reported.
+    assert quality_exit == 0
+    assert quality_payload["status"] in {"PASS", "CONCERNS"}
+    report = quality_payload["reports"][0]
+    assert "example.greet" in report["rule_checks"]["subjects"]
+    assert any("plugins/unselected.ts" in file for file in report["source_files"])
 
 
 def test_dispatched_quality_path_uses_project_config_without_workspace(

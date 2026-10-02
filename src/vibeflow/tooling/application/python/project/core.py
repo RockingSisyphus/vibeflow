@@ -72,17 +72,9 @@ def build_workspace_environment(workspace: WorkspaceConfig) -> WorkspaceEnvironm
 
 
 def build_workspace_node_registry(workspace: WorkspaceConfig) -> NodeRegistry:
-    registry = NodeRegistry()
-    sources: dict[str, dict[str, object]] = {}
-    source_roots = _python_source_roots(workspace)
-    for root in workspace.roots:
-        if root.project_target != "python":
-            continue
-        if not root.registry_ref:
-            continue
-        root_registry = _load_root_registry(root, source_roots=source_roots)
-        _merge_node_registry(registry, root_registry, root=root, sources=sources)
-    return registry
+    from vibeflow.tooling.application.python.project.declarations import declared_python_registry
+
+    return declared_python_registry(workspace)
 
 
 def load_workspace_resources(workspace: WorkspaceConfig) -> tuple[dict[str, WorkspaceResourceRegistries], ConfigResources, tuple[HealthFinding, ...]]:
@@ -101,6 +93,30 @@ def load_workspace_resources(workspace: WorkspaceConfig) -> tuple[dict[str, Work
             source_roots=source_roots,
         )
         findings.extend(annotate_findings(registry_findings, root=root, source_path=root.config_path))
+        from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+        catalogs = load_project_descriptor_catalogs(root.path, project_config=root.config_path)
+        for descriptor in catalogs.base_lib:
+            implementations = tuple(item for item in descriptor.implementations if item.language == "python")
+            if not implementations:
+                continue
+            implementation = implementations[0]
+            source = implementation.source
+            module = source.ref if source.kind == "module" else ".".join(Path(source.ref).with_suffix("").parts)
+            if source.kind not in {"module","file"}:
+                raise WorkspaceConfigError("DESCRIPTOR.PYTHON_BASE_LIB.SOURCE", "Python base_lib source must be module or file", {"path":str(root.config_path)})
+            base_registry.register(descriptor.id, module=module, display_name=descriptor.display_name,
+                description=descriptor.description, category=descriptor.category, version=descriptor.version)
+            has_base_registry = True
+        for descriptor in catalogs.plugins:
+            implementations = tuple(item for item in descriptor.implementations if item.language == "python")
+            if not implementations:
+                continue
+            source = implementations[0].source
+            module = str((root.path/source.ref).resolve()) if source.kind == "file" else source.ref
+            plugin_registry.register(descriptor.id,module=module,class_name=source.export or "Plugin",plugin_type=descriptor.plugin_type,
+                display_name=descriptor.display_name,description=descriptor.description,category=descriptor.category,version=descriptor.version,
+                config_schema=descriptor.config_schema,config_defaults=descriptor.config_defaults,priority=descriptor.priority)
+            has_plugin_registry = True
         legacy_resources, resource_findings = load_config_resources(root.project_config, base_path=root.path)
         findings.extend(annotate_findings(resource_findings, root=root, source_path=root.config_path))
         root_base_paths = legacy_resources.base_lib_paths or (str(root.path),)
@@ -363,31 +379,6 @@ def _resolve_workspace_relative(value: str, *, base: Path) -> Path:
     return path.resolve()
 
 
-def _load_root_registry(
-    root: WorkspaceRoot,
-    *,
-    source_roots: tuple[Path, ...] = (),
-) -> NodeRegistry:
-    module_ref, sep, factory_name = root.registry_ref.partition(":")
-    if not sep or not module_ref.strip() or not factory_name.strip():
-        raise WorkspaceConfigError("WORKSPACE.REGISTRY.REF", f"registry must use module_or_file:function syntax: {root.registry_ref}", {"path": str(root.config_path)})
-    ordered_roots = _ordered_source_roots(root.path, source_roots)
-    with _temporary_sys_paths(ordered_roots):
-        module = _registry_module_or_error(
-            module_ref.strip(),
-            root=root,
-            source_roots=ordered_roots,
-        )
-        factory = _registry_factory_or_error(module, factory_name.strip(), root=root)
-        try:
-            registry = factory()
-        except Exception as exc:
-            raise WorkspaceConfigError("WORKSPACE.REGISTRY.FACTORY", f"registry factory failed for root '{root.id}' ({root.registry_ref}): {exc}", {"path": str(root.config_path)}) from exc
-    if not isinstance(registry, NodeRegistry):
-        raise WorkspaceConfigError("WORKSPACE.REGISTRY.RETURN", f"registry factory must return NodeRegistry: {root.registry_ref}", {"path": str(root.config_path)})
-    return registry
-
-
 def _load_root_resource_registries(
     root: WorkspaceRoot,
     *,
@@ -510,21 +501,8 @@ def _import_registry_module(
     return importlib.import_module(module_ref)
 
 
-def _merge_node_registry(target: NodeRegistry, source: NodeRegistry, *, root: WorkspaceRoot, sources: dict[str, dict[str, object]]) -> None:
-    for key in source.available():
-        if key in getattr(target, "_registry", {}):
-            previous = sources.get(key, {})
-            message = f"duplicate node type_key '{key}' from root '{root.id}' ({root.config_path}) conflicts with root '{previous.get('root_id', '')}' ({previous.get('source_path', '')})"
-            raise WorkspaceConfigError("WORKSPACE.REGISTRY.DUPLICATE_TYPE_KEY", message, {"path": str(root.config_path)})
-        getattr(target, "_registry")[key] = getattr(source, "_registry")[key]
-        getattr(target, "_config_specs")[key] = getattr(source, "_config_specs")[key]
-        info = getattr(source, "_registration_info", {}).get(key) or NodeRegistrationInfo(key=key, function="", path=str(root.config_path), line=1)
-        getattr(target, "_registration_info")[key] = info
-        sources[key] = {"root_id": root.id, "root_path": str(root.path), "source_path": str(root.config_path)}
-
-
 def _merge_plugin_registry(target: PluginRegistry, source: PluginRegistry) -> None:
-    for plugin_type in ("policy", "compiler", "runtime"):
+    for plugin_type in ("compiler", "runtime"):
         for plugin in getattr(source, f"{plugin_type}_plugins")():
             descriptor = getattr(source, "_descriptors")[id(plugin)]
             target.register(

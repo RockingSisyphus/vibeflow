@@ -1,0 +1,18 @@
+{
+  "kind": "ruleset",
+  "id": "sandbox.domain",
+  "calls": [
+    {
+      "id": "audit",
+      "rule_id": "sandbox.domain_audit"
+    }
+  ],
+  "entrypoints": {
+    "static": [
+      "audit"
+    ],
+    "run": [
+      "audit"
+    ]
+  }
+}

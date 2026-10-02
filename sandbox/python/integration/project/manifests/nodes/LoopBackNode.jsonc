@@ -1,0 +1,69 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.loop_back",
+  "display_name": "回环输入改写",
+  "category": "sandbox",
+  "description": "把本轮核心计算结果写回 value.in，作为下一轮准备阶段的输入；该节点用于验证显式回环边不会绕过 decision。",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one",
+        "display_name": "value.out"
+      }
+    ],
+    "provides": [
+      {
+        "key": "value.in.loop",
+        "type": "value.in",
+        "display_name": "value.in.loop"
+      }
+    ],
+    "input_semantics": {
+      "value.out": [
+        "本轮核心计算的结果，将被作为下一轮循环的原始输入。"
+      ]
+    },
+    "output_semantics": {
+      "value.in.loop": [
+        "写回后的下一轮输入值，沿显式回环边重新进入准备节点。"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "value.out": {
+            "key": "value.out",
+            "type": "value.out",
+            "value": 8,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_comprehensive_nodes.py",
+        "export": "LoopBackNode"
+      }
+    }
+  ]
+}

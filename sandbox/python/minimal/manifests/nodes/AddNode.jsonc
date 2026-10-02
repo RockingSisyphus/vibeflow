@@ -1,0 +1,77 @@
+{
+  "kind": "node",
+  "type_key": "example.add",
+  "display_name": "Add",
+  "category": "example",
+  "description": "Adds a configured delta using a pure base_lib helper.",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "value.in",
+        "cardinality": "exactly_one",
+        "display_name": "value.in"
+      }
+    ],
+    "provides": [
+      {
+        "key": "value.out",
+        "type": "value.out",
+        "display_name": "value.out"
+      }
+    ],
+    "input_semantics": {
+      "value.in": [
+        "input numeric value"
+      ]
+    },
+    "output_semantics": {
+      "value.out": [
+        "output numeric value"
+      ]
+    },
+    "params_schema": {
+      "delta": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "delta": 1
+    },
+    "examples": [
+      {
+        "inputs": {
+          "value.in": {
+            "key": "value.in",
+            "type": "value.in",
+            "value": 2,
+            "source_node": "example"
+          }
+        },
+        "params": {
+          "delta": 3
+        }
+      }
+    ]
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes.py",
+        "export": "AddNode"
+      }
+    }
+  ]
+}

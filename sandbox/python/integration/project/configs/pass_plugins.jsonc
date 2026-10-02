@@ -1,24 +1,6 @@
 {
   "plugins": [
     {
-      "module": "../plugins/policy_plugins.py",
-      "class": "PolicyPlugin",
-      "type": "policy",
-      "display_name": "Policy Plugin",
-      "category": "sandbox",
-      "description": "Extends sandbox policy checks for the plugin fixture.",
-      "version": "0.1.0"
-    },
-    {
-      "module": "../plugins/policy_plugins.py",
-      "class": "FindingPlugin",
-      "type": "policy",
-      "display_name": "Finding Plugin",
-      "category": "sandbox",
-      "description": "Adds a sandbox graph finding through the policy plugin interface.",
-      "version": "0.1.0"
-    },
-    {
       "module": "../plugins/hook_plugins.py",
       "class": "CompilerPlugin",
       "type": "compiler",
@@ -53,15 +35,12 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "input",
         "type_used": "sandbox.io_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-
         "value": 1,
         "id": "request",
         "type_used": "sandbox.effect_request",
@@ -69,8 +48,6 @@
         "description": "Runs request."
       },
       {
-
-
         "delta": 1,
         "id": "add_result",
         "type_used": "sandbox.io_result_input",
@@ -78,15 +55,12 @@
         "description": "Runs add_result."
       },
       {
-
-
         "id": "add_one",
         "type_used": "math.add_one",
         "display_name": "Add One",
         "description": "Runs add_one."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.out_value_end",
         "display_name": "End",
@@ -131,5 +105,9 @@
     {
       "path": "nodesets/pass_plugins/math_add_one.jsonc"
     }
+  ],
+  "rulesets": [
+    "vibeflow.workflow",
+    "sandbox.findings"
   ]
 }

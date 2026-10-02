@@ -1,0 +1,18 @@
+{
+  "kind": "ruleset",
+  "id": "sandbox.missing-record",
+  "calls": [
+    {
+      "id": "check",
+      "rule_id": "sandbox.missing-record"
+    }
+  ],
+  "entrypoints": {
+    "static": [
+      "check"
+    ],
+    "run": [
+      "check"
+    ]
+  }
+}

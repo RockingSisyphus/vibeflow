@@ -15,6 +15,7 @@ from vibeflow.targets.javascript.build.toolchain import (
     DriverBuildResult,
     ToolchainInfo,
     probe_toolchain,
+    run_rule_check_driver,
 )
 from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
 from vibeflow.targets.javascript.frontend.errors import AotBuildError
@@ -35,6 +36,36 @@ REAL_TOOLCHAIN_ROOT = (
         )
     ).resolve()
 )
+
+
+def _build_with_selected_source_rules(request: BuildRequest):
+    """Select builtin source topics explicitly, then exercise the native build.
+
+    These tests cover the fact service called by Rule handlers. Build itself
+    retains its portable ABI, typechecking and publication responsibilities.
+    """
+    policy = dict(request.import_policy)
+    owners = [dict(item) for item in policy.get("owners", ())]
+    for owner in owners:
+        owner.setdefault("effect_scope", "none" if owner.get("kind") in {"node", "base_lib"} else "unconstrained")
+        if owner.get("kind") in {"node", "host_extension"}:
+            owner.setdefault("export", "run" if owner["kind"] == "node" else "createHostExtension")
+            owner.setdefault("completion", "immediate")
+    policy["owners"] = owners
+    for snake, camel in (("node_base_libs", "nodeBaseLibs"), ("base_lib_dependencies", "baseLibDependencies"),
+                         ("host_extension_dependencies", "hostExtensionDependencies")):
+        if snake in policy:
+            policy[camel] = policy.pop(snake)
+    policy["allowed_external_packages"] = list({*policy.get("allowed_external_packages", ()), *request.external_packages})
+    checked = run_rule_check_driver({
+        "typecheckFiles": sorted({str(item["path"]) for item in owners}),
+        "ruleTopics": ["imports", "purity", "ownership", "completion", "module_state", "host_io"],
+        "importPolicy": policy,
+    }, package_root=request.package_root, node_command=request.node_command)
+    errors = tuple(item for item in checked.findings if item.get("severity", "error") == "error")
+    if errors:
+        raise AotBuildError(str(errors[0]["code"]), str(errors[0]["message"]), diagnostics=errors)
+    return build_aot(request)
 
 
 def _provider(key: str, type_key: str) -> dict[str, str]:
@@ -1590,7 +1621,7 @@ def test_real_typescript_rejects_mutable_state_and_side_effect_imports(
     module = project / "node.ts"
     module.write_text(source, encoding="utf-8")
     with pytest.raises(AotBuildError) as caught:
-        build_aot(
+        _build_with_selected_source_rules(
             BuildRequest(
                 plan=_empty_real_plan(module),
                 project_root=project,
@@ -1626,7 +1657,7 @@ def test_real_typescript_allows_recursively_frozen_module_constants(
         ),
         encoding="utf-8",
     )
-    result = build_aot(
+    result = _build_with_selected_source_rules(
         BuildRequest(
             plan=_empty_real_plan(module),
             project_root=project,
@@ -1672,7 +1703,7 @@ def test_real_typescript_rejects_unowned_barrel_and_cross_node_imports(
             {"path": str(barrel), "kind": "node", "id": "test.other"}
         )
     with pytest.raises(AotBuildError) as caught:
-        build_aot(
+        _build_with_selected_source_rules(
             BuildRequest(
                 plan=_empty_real_plan(first),
                 project_root=project,
@@ -1709,7 +1740,7 @@ def test_real_typescript_rejects_base_lib_host_io(
         encoding="utf-8",
     )
     with pytest.raises(AotBuildError) as caught:
-        build_aot(
+        _build_with_selected_source_rules(
             BuildRequest(
                 plan=_empty_real_plan(module),
                 project_root=project,
@@ -1808,7 +1839,7 @@ def test_real_typescript_rejects_base_lib_nondeterminism_and_host_observation(
         encoding="utf-8",
     )
     with pytest.raises(AotBuildError) as caught:
-        build_aot(
+        _build_with_selected_source_rules(
             BuildRequest(
                 plan=_empty_real_plan(module),
                 project_root=project,
@@ -1887,7 +1918,7 @@ def test_real_typescript_allows_pure_math_base_lib_and_fake_capability(
             },
         }
     ]
-    result = build_aot(
+    result = _build_with_selected_source_rules(
         BuildRequest(
             plan=plan,
             project_root=project,
@@ -1939,7 +1970,7 @@ def test_real_typescript_rejects_base_lib_host_io_module(
         encoding="utf-8",
     )
     with pytest.raises(AotBuildError) as caught:
-        build_aot(
+        _build_with_selected_source_rules(
             BuildRequest(
                 plan=_empty_real_plan(module),
                 project_root=project,
@@ -1985,7 +2016,7 @@ def test_real_typescript_allows_pure_node_builtin_for_node_target(
         encoding="utf-8",
     )
 
-    built = build_aot(
+    built = _build_with_selected_source_rules(
         BuildRequest(
             plan=_empty_real_plan(module),
             project_root=project,
@@ -2329,7 +2360,7 @@ def test_real_typescript_rejects_runtime_string_evaluation(
         encoding="utf-8",
     )
     with pytest.raises(AotBuildError) as caught:
-        build_aot(
+        _build_with_selected_source_rules(
             BuildRequest(
                 plan=_empty_real_plan(module),
                 project_root=project,
@@ -2377,7 +2408,7 @@ def test_real_typescript_rejects_module_binding_state_mutation(
         encoding="utf-8",
     )
     with pytest.raises(AotBuildError) as caught:
-        build_aot(
+        _build_with_selected_source_rules(
             BuildRequest(
                 plan=_empty_real_plan(module),
                 project_root=project,
@@ -2418,7 +2449,7 @@ def test_real_typescript_rejects_module_scoped_stateful_regexp(
         encoding="utf-8",
     )
     with pytest.raises(AotBuildError) as caught:
-        build_aot(
+        _build_with_selected_source_rules(
             BuildRequest(
                 plan=_empty_real_plan(module),
                 project_root=project,
@@ -2469,7 +2500,7 @@ def test_real_typescript_function_local_regexp_is_isolated_between_runs(
     )
     for node in plan["nodes"]:
         node["implementation"]["ref"] = str(module)
-    result = build_aot(
+    result = _build_with_selected_source_rules(
         BuildRequest(
             plan=plan,
             project_root=project,
@@ -2538,7 +2569,7 @@ def test_real_typescript_rejects_builtin_prototype_mutation(
         encoding="utf-8",
     )
     with pytest.raises(AotBuildError) as caught:
-        build_aot(
+        _build_with_selected_source_rules(
             BuildRequest(
                 plan=_empty_real_plan(module),
                 project_root=project,
@@ -2597,7 +2628,7 @@ def test_real_typescript_rejects_builtin_object_mutation(
         encoding="utf-8",
     )
     with pytest.raises(AotBuildError) as caught:
-        build_aot(
+        _build_with_selected_source_rules(
             BuildRequest(
                 plan=_empty_real_plan(module),
                 project_root=project,
@@ -2651,7 +2682,7 @@ def test_real_typescript_local_builtin_name_is_isolated_between_runs(
     )
     for node in plan["nodes"]:
         node["implementation"]["ref"] = str(module)
-    result = build_aot(
+    result = _build_with_selected_source_rules(
         BuildRequest(
             plan=plan,
             project_root=project,
@@ -2722,7 +2753,7 @@ def test_real_typescript_rejects_class_definition_side_effects(
     module = project / "node.ts"
     module.write_text(source, encoding="utf-8")
     with pytest.raises(AotBuildError) as caught:
-        build_aot(
+        _build_with_selected_source_rules(
             BuildRequest(
                 plan=_empty_real_plan(module),
                 project_root=project,
@@ -2832,7 +2863,7 @@ def test_real_typescript_rejects_async_host_extension_factory(
     project = _real_toolchain_project(tmp_path)
 
     with pytest.raises(AotBuildError) as caught:
-        build_aot(
+        _build_with_selected_source_rules(
             _host_extension_build_request(
                 project,
                 factory_source=factory_source,
@@ -2855,7 +2886,7 @@ def test_real_typescript_allows_async_host_extension_start_and_stop(
 ) -> None:
     project = _real_toolchain_project(tmp_path)
 
-    result = build_aot(
+    result = _build_with_selected_source_rules(
         _host_extension_build_request(
             project,
             factory_source=(

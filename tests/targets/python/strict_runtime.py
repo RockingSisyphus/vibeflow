@@ -1,4 +1,6 @@
+from tests.fixtures.support.declarations import node_declaration, configured_declaration
 import threading
+from dataclasses import replace
 
 from tests.fixtures.support.strict_support import *
 
@@ -35,8 +37,8 @@ def test_checked_run_refuses_failed_health_before_runtime(tmp_path) -> None:
     assert (result.run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8") == ""
 
 
-def test_node_registration_requires_config_spec() -> None:
-    with pytest.raises(Exception, match="config_schema"):
+def test_node_registration_requires_canonical_declaration() -> None:
+    with pytest.raises(Exception, match="requires a NodeDescriptor"):
         NodeRegistry().register("test.seed", SeedNode)
 
 
@@ -285,147 +287,147 @@ class NoDeepcopyObject:
         raise AssertionError("should not deepcopy runtime objects")
 
 
-class LoopCopyNode:
-    NODE_INFO = NodeInfo("test.loop_copy", "Loop Copy", "test", "Copies value.out into the next value.in slot.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+LoopCopyNode_DECLARATION = node_declaration(NodeInfo("test.loop_copy", "Loop Copy", "test", "Copies value.out into the next value.in slot.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
         provides=(DataProvider("value.loop", "value.in", display_name="value.loop"),),
         input_semantics={"value.out": ("output value",)},
         output_semantics={"value.loop": ("next loop input",)},
 
-    )
+    ), rulesets=("vibeflow.process",))
+
+class LoopCopyNode:
 
     def run_pure(self, inputs, params):
         return {"value.loop": inputs["value.out"]["value"]}
 
 
-class BranchCopyNode:
-    NODE_INFO = NodeInfo("test.branch_copy", "Branch Copy", "test", "Copies value.out into a distinct value.in-compatible key.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+BranchCopyNode_DECLARATION = node_declaration(NodeInfo("test.branch_copy", "Branch Copy", "test", "Copies value.out into a distinct value.in-compatible key.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("value.out", "exactly_one", display_name="Value Out"),),
         provides=(DataProvider("value.copy", "value.in", display_name="Value Copy"),),
         input_semantics={"value.out": ("output value selected by the route",)},
         output_semantics={"value.copy": ("copied value compatible with value.in",)},
-    )
+    ), rulesets=("vibeflow.process",))
+
+class BranchCopyNode:
 
     def run_pure(self, inputs, params):
         return {"value.copy": inputs["value.out"]["value"]}
 
 
-class LoopAddItemNode:
-    NODE_INFO = NodeInfo("test.loop_add_item", "Loop Add Item", "test", "Adds one loop item into a running total.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+LoopAddItemNode_DECLARATION = node_declaration(NodeInfo("test.loop_add_item", "Loop Add Item", "test", "Adds one loop item into a running total.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("total.current", "exactly_one", display_name="total.current"), DataRequirement("item.value", "exactly_one", display_name="item.value")),
         provides=(DataProvider("total.next", "total.next", display_name="total.next"), DataProvider("item.metric", "item.metric", display_name="item.metric")),
 
-    )
+    ), rulesets=("vibeflow.process",))
+
+class LoopAddItemNode:
 
     def run_pure(self, inputs, params):
         item = inputs["item.value"]["value"]
         return {"total.next": inputs["total.current"]["value"] + item, "item.metric": item}
 
 
-class LoopStepUntilNode:
-    NODE_INFO = NodeInfo("test.loop_step_until", "Loop Step Until", "test", "Increments loop.current until it reaches target.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+LoopStepUntilNode_DECLARATION = node_declaration(NodeInfo("test.loop_step_until", "Loop Step Until", "test", "Increments loop.current until it reaches target.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("loop.current", "exactly_one", display_name="loop.current"),),
         provides=(DataProvider("loop.next", "loop.next", display_name="loop.next"), DataProvider("loop.done", "loop.done", display_name="loop.done")),
 
 
-    )
+    ), rulesets=("vibeflow.process",))
+
+class LoopStepUntilNode:
 
     def run_pure(self, inputs, params):
         value = inputs["loop.current"]["value"] + 1
         return {"loop.next": value, "loop.done": value >= params.get("target", 3)}
 
 
-class LoopNextEndNode:
-    NODE_INFO = NodeInfo("test.loop_next_end", "Loop Next End", "test", "Ends one loop body after loop.next is ready.", "0.1.0", "terminal")
-    CONTRACT = NodeContract(
+LoopNextEndNode_DECLARATION = node_declaration(NodeInfo("test.loop_next_end", "Loop Next End", "test", "Ends one loop body after loop.next is ready.", "0.1.0", "terminal"), NodeContract(
         requires=(DataRequirement("loop.next", "exactly_one", display_name="Loop Next"),),
         input_semantics={"loop.next": ("next loop value",)},
-    )
+    ), rulesets=("vibeflow.process",))
+
+class LoopNextEndNode:
 
     def run_pure(self, inputs, params):
         return {}
 
 
-class LoopFinalEndNode:
-    NODE_INFO = NodeInfo("test.loop_final_end", "Loop Final End", "test", "Ends a loop workflow after loop.final is ready.", "0.1.0", "terminal")
-    CONTRACT = NodeContract(
+LoopFinalEndNode_DECLARATION = node_declaration(NodeInfo("test.loop_final_end", "Loop Final End", "test", "Ends a loop workflow after loop.final is ready.", "0.1.0", "terminal"), NodeContract(
         requires=(DataRequirement("loop.final", "exactly_one", display_name="Loop Final"),),
         input_semantics={"loop.final": ("final loop value",)},
-    )
+    ), rulesets=("vibeflow.process",))
+
+class LoopFinalEndNode:
 
     def run_pure(self, inputs, params):
         return {}
 
 
-class JoinPassthroughNode:
-    NODE_INFO = NodeInfo("test.join_passthrough", "Join Passthrough", "test", "Copies value.in to value.out.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+JoinPassthroughNode_DECLARATION = node_declaration(NodeInfo("test.join_passthrough", "Join Passthrough", "test", "Copies value.in to value.out.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"),),
         provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
 
-    )
+    ), rulesets=("vibeflow.process",))
+
+class JoinPassthroughNode:
 
     def run_pure(self, inputs, params):
         return {"value.out": inputs["value.in"]["value"]}
 
 
-class ConditionalValueNode:
-    NODE_INFO = NodeInfo("test.conditional_value", "Conditional Value", "test", "Provides value.in and a branch flag.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+ConditionalValueNode_DECLARATION = node_declaration(NodeInfo("test.conditional_value", "Conditional Value", "test", "Provides value.in and a branch flag.", "0.1.0", "process"), NodeContract(
         provides=(DataProvider("value.alt", "value.in", display_name="value.alt"), DataProvider("flow.use_alt", "flow.use_alt", display_name="flow.use_alt")),
 
-    )
+    ), rulesets=("vibeflow.process",))
+
+class ConditionalValueNode:
 
     def run_pure(self, inputs, params):
         return {"value.alt": 99, "flow.use_alt": True}
 
 
+LeftValueNode_DECLARATION = node_declaration(NodeInfo("test.left_value", "Left Value", "test", "Produces left value.in.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.left", "value.in", display_name="value.left"),)), rulesets=("vibeflow.process",))
+
 class LeftValueNode:
-    NODE_INFO = NodeInfo("test.left_value", "Left Value", "test", "Produces left value.in.", "0.1.0", "process")
-    CONTRACT = NodeContract(provides=(DataProvider("value.left", "value.in", display_name="value.left"),))
 
     def run_pure(self, inputs, params):
         return {"value.left": 1}
 
 
+RightValueNode_DECLARATION = node_declaration(NodeInfo("test.right_value", "Right Value", "test", "Produces right value.in.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.right", "value.in", display_name="value.right"),)), rulesets=("vibeflow.process",))
+
 class RightValueNode:
-    NODE_INFO = NodeInfo("test.right_value", "Right Value", "test", "Produces right value.in.", "0.1.0", "process")
-    CONTRACT = NodeContract(provides=(DataProvider("value.right", "value.in", display_name="value.right"),))
 
     def run_pure(self, inputs, params):
         return {"value.right": 2}
 
 
+OtherValueNode_DECLARATION = node_declaration(NodeInfo("test.other_value", "Other Value", "test", "Produces other.in.", "0.1.0", "process"), NodeContract(provides=(DataProvider("other.in", "other.in", display_name="other.in"),)), rulesets=("vibeflow.process",))
+
 class OtherValueNode:
-    NODE_INFO = NodeInfo("test.other_value", "Other Value", "test", "Produces other.in.", "0.1.0", "process")
-    CONTRACT = NodeContract(provides=(DataProvider("other.in", "other.in", display_name="other.in"),))
 
     def run_pure(self, inputs, params):
         return {"other.in": 10}
 
 
-class TwoInputJoinNode:
-    NODE_INFO = NodeInfo("test.two_input_join", "Two Input Join", "test", "Adds value.in and other.in.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+TwoInputJoinNode_DECLARATION = node_declaration(NodeInfo("test.two_input_join", "Two Input Join", "test", "Adds value.in and other.in.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"), DataRequirement("other.in", "exactly_one", display_name="other.in")),
         provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
 
-    )
+    ), rulesets=("vibeflow.process",))
+
+class TwoInputJoinNode:
 
     def run_pure(self, inputs, params):
         return {"value.out": inputs["value.in"]["value"] + inputs["other.in"]["value"]}
 
 
-class InactiveRouteNode:
-    NODE_INFO = NodeInfo("test.inactive_route", "Inactive Route", "test", "Produces a false route flag.", "0.1.0", "decision")
-    CONTRACT = NodeContract(
+InactiveRouteNode_DECLARATION = node_declaration(NodeInfo("test.inactive_route", "Inactive Route", "test", "Produces a false route flag.", "0.1.0", "decision"), NodeContract(
         provides=(DataProvider("flow.route", "flow.route", display_name="flow.route"),),
 
-    )
+    ), rulesets=("vibeflow.process",))
+
+class InactiveRouteNode:
 
     def run_pure(self, inputs, params):
         return {"flow.route": False}
@@ -433,17 +435,17 @@ class InactiveRouteNode:
 
 def _loop_registry() -> NodeRegistry:
     registry = _registry()
-    register_node(registry, "test.loop_add_item", LoopAddItemNode)
-    register_node(registry, "test.loop_step_until", LoopStepUntilNode, {"target": {"type": "number"}}, {"target": 3})
-    register_node(registry, "test.loop_next_end", LoopNextEndNode)
-    register_node(registry, "test.loop_final_end", LoopFinalEndNode)
-    register_node(registry, "test.join_passthrough", JoinPassthroughNode)
-    register_node(registry, "test.conditional_value", ConditionalValueNode)
-    register_node(registry, "test.left_value", LeftValueNode)
-    register_node(registry, "test.right_value", RightValueNode)
-    register_node(registry, "test.other_value", OtherValueNode)
-    register_node(registry, "test.two_input_join", TwoInputJoinNode)
-    register_node(registry, "test.inactive_route", InactiveRouteNode)
+    register_node(registry, LoopAddItemNode_DECLARATION, LoopAddItemNode)
+    register_node(registry, LoopStepUntilNode_DECLARATION, LoopStepUntilNode, {"target": {"type": "number"}}, {"target": 3})
+    register_node(registry, LoopNextEndNode_DECLARATION, LoopNextEndNode)
+    register_node(registry, LoopFinalEndNode_DECLARATION, LoopFinalEndNode)
+    register_node(registry, JoinPassthroughNode_DECLARATION, JoinPassthroughNode)
+    register_node(registry, ConditionalValueNode_DECLARATION, ConditionalValueNode)
+    register_node(registry, LeftValueNode_DECLARATION, LeftValueNode)
+    register_node(registry, RightValueNode_DECLARATION, RightValueNode)
+    register_node(registry, OtherValueNode_DECLARATION, OtherValueNode)
+    register_node(registry, TwoInputJoinNode_DECLARATION, TwoInputJoinNode)
+    register_node(registry, InactiveRouteNode_DECLARATION, InactiveRouteNode)
     return registry
 
 
@@ -1168,8 +1170,8 @@ def test_runtime_options_compiled_failure_records_node_and_block_failed() -> Non
 
 def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
     registry = _registry()
-    register_node(registry, "test.route", RouteNode)
-    register_node(registry, "test.branch_copy", BranchCopyNode)
+    register_node(registry, RouteNode_DECLARATION, RouteNode)
+    register_node(registry, BranchCopyNode_DECLARATION, BranchCopyNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1208,21 +1210,21 @@ def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
 
 
 def test_runtime_options_compiled_rejects_decision_loop() -> None:
-    class DoneCheckNode:
-        NODE_INFO = NodeInfo("test.done_check", "Done Check", "test", "Checks loop completion.", "0.1.0", "decision")
-        CONTRACT = NodeContract(
+    DoneCheckNode_DECLARATION = node_declaration(NodeInfo("test.done_check", "Done Check", "test", "Checks loop completion.", "0.1.0", "decision"), NodeContract(
             requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
             provides=(DataProvider("loop.done", "loop.done", display_name="loop.done"), DataProvider("value.loop", "value.in", display_name="value.loop")),
 
 
-        )
+        ), rulesets=("vibeflow.process",))
+
+    class DoneCheckNode:
 
         def run_pure(self, inputs, params):
             value = inputs["value.out"]["value"]
             return {"loop.done": value >= params.get("target", 3), "value.loop": value}
 
     registry = _registry()
-    register_node(registry, "test.done_check", DoneCheckNode, {"target": {"type": "number"}}, {"target": 3})
+    register_node(registry, DoneCheckNode_DECLARATION, DoneCheckNode, {"target": {"type": "number"}}, {"target": 3})
     graph = _decision_loop_graph(target=3)
 
     with pytest.raises(GraphCompileError) as exc_info:
@@ -1231,19 +1233,19 @@ def test_runtime_options_compiled_rejects_decision_loop() -> None:
 
 
 def test_runtime_options_block_rejects_decision_loop_before_max_steps() -> None:
-    class NeverDoneNode:
-        NODE_INFO = NodeInfo("test.never_done", "Never Done", "test", "Never exits loop.", "0.1.0", "decision")
-        CONTRACT = NodeContract(
+    NeverDoneNode_DECLARATION = node_declaration(NodeInfo("test.never_done", "Never Done", "test", "Never exits loop.", "0.1.0", "decision"), NodeContract(
             requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
             provides=(DataProvider("loop.done", "loop.done", display_name="loop.done"), DataProvider("value.loop", "value.in", display_name="value.loop")),
 
-        )
+        ), rulesets=("vibeflow.process",))
+
+    class NeverDoneNode:
 
         def run_pure(self, inputs, params):
             return {"loop.done": False, "value.loop": inputs["value.out"]["value"]}
 
     registry = _registry()
-    register_node(registry, "test.done_check", NeverDoneNode, {"target": {"type": "number"}}, {"target": 3})
+    register_node(registry, replace(NeverDoneNode_DECLARATION, type_key="test.done_check"), NeverDoneNode, {"target": {"type": "number"}}, {"target": 3})
     graph = _decision_loop_graph(target=3, max_steps=1)
 
     with pytest.raises(GraphCompileError) as exc_info:
@@ -1252,26 +1254,26 @@ def test_runtime_options_block_rejects_decision_loop_before_max_steps() -> None:
 
 
 def test_runtime_options_compiled_generates_block_with_async_barrier() -> None:
-    class OutToNextNode:
-        NODE_INFO = NodeInfo("test.out_to_next", "Out To Next", "test", "Copies value.out to value.next.", "0.1.0", "process")
-        CONTRACT = NodeContract(
+    OutToNextNode_DECLARATION = node_declaration(NodeInfo("test.out_to_next", "Out To Next", "test", "Copies value.out to value.next.", "0.1.0", "process"), NodeContract(
             requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
             provides=(DataProvider("value.next", "value.next", display_name="value.next"),),
-        )
+        ), rulesets=("vibeflow.process",))
+
+    class OutToNextNode:
 
         def run_pure(self, inputs, params):
             return {"value.next": inputs["value.out"]["value"]}
 
+    NextEndNode_DECLARATION = node_declaration(NodeInfo("test.next_end", "Next End", "test", "Ends after value.next.", "0.1.0", "terminal"), NodeContract(requires=(DataRequirement("value.next", "exactly_one", display_name="value.next"),)), rulesets=("vibeflow.process",))
+
     class NextEndNode:
-        NODE_INFO = NodeInfo("test.next_end", "Next End", "test", "Ends after value.next.", "0.1.0", "terminal")
-        CONTRACT = NodeContract(requires=(DataRequirement("value.next", "exactly_one", display_name="value.next"),))
 
         def run_pure(self, inputs, params):
             return {}
 
     registry = _registry()
-    register_node(registry, "test.out_to_next", OutToNextNode)
-    register_node(registry, "test.next_end", NextEndNode)
+    register_node(registry, OutToNextNode_DECLARATION, OutToNextNode)
+    register_node(registry, NextEndNode_DECLARATION, NextEndNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1333,8 +1335,8 @@ def _decision_loop_graph(*, target: int, max_steps: int = 20):
 
 def test_runtime_options_block_executes_simple_conditional_route() -> None:
     registry = _registry()
-    register_node(registry, "test.route", RouteNode)
-    register_node(registry, "test.branch_copy", BranchCopyNode)
+    register_node(registry, RouteNode_DECLARATION, RouteNode)
+    register_node(registry, BranchCopyNode_DECLARATION, BranchCopyNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1439,11 +1441,11 @@ def test_runtime_options_default_nodeset_max_depth_is_four() -> None:
     assert RuntimeOptions().nodeset_max_depth == 4
 
 
-def test_pipeline_runtime_rejects_depth_five_and_allows_explicit_override() -> None:
+def test_pipeline_runtime_has_no_second_implicit_depth_limit() -> None:
     graph = _runtime_nodeset_depth_graph(5)
 
-    with pytest.raises(PipelineRuntimeError, match="nodeset nesting depth 5.*maximum 4"):
-        PipelineRuntime(graph, registry=_registry())
+    runtime = PipelineRuntime(graph, registry=_registry())
+    assert runtime._plan.frames["top"].subplan is not None
 
     runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(nodeset_max_depth=5))
     assert runtime._plan.frames["top"].subplan is not None
@@ -1561,16 +1563,16 @@ def test_async_result_key_joins_when_required() -> None:
 
 
 def test_async_result_key_not_joined_when_unconsumed() -> None:
+    SlowResultNode_DECLARATION = node_declaration(NodeInfo("test.slow_result", "Slow Result", "test", "Slow result-key async task.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.async", "value.async", display_name="value.async"),), examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+
     class SlowResultNode:
-        NODE_INFO = NodeInfo("test.slow_result", "Slow Result", "test", "Slow result-key async task.", "0.1.0", "process")
-        CONTRACT = NodeContract(provides=(DataProvider("value.async", "value.async", display_name="value.async"),), examples=({"inputs": {}, "params": {}},))
 
         def run_pure(self, inputs, params):
             time.sleep(0.2)
             return {"value.async": 99}
 
     registry = _registry()
-    register_node(registry, "test.slow_result", SlowResultNode)
+    register_node(registry, SlowResultNode_DECLARATION, SlowResultNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1702,16 +1704,16 @@ def test_async_nodeset_result_key_joins_when_required() -> None:
 
 
 def test_async_detached_timeout_records_warning_and_does_not_block() -> None:
+    SlowNode_DECLARATION = node_declaration(NodeInfo("test.slow", "Slow", "test", "Slow detached task.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.out", "value.out", display_name="value.out"),), examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+
     class SlowNode:
-        NODE_INFO = NodeInfo("test.slow", "Slow", "test", "Slow detached task.", "0.1.0", "process")
-        CONTRACT = NodeContract(provides=(DataProvider("value.out", "value.out", display_name="value.out"),), examples=({"inputs": {}, "params": {}},))
 
         def run_pure(self, inputs, params):
             time.sleep(0.05)
             return {"value.out": 1}
 
     registry = _registry()
-    register_node(registry, "test.slow", SlowNode)
+    register_node(registry, SlowNode_DECLARATION, SlowNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1869,7 +1871,7 @@ def test_checked_run_trace_records_nodeset_enter_exit(tmp_path) -> None:
 
 def test_checked_run_output_summary_does_not_expand_large_prediction_mapping(tmp_path) -> None:
     registry = _registry()
-    register_node(registry, "test.large_prediction", LargePredictionNode)
+    register_node(registry, LargePredictionNode_DECLARATION, LargePredictionNode)
     config_path = tmp_path / "large_prediction.json"
     config_path.write_text(
         json.dumps(
@@ -2140,62 +2142,57 @@ def test_cli_run_uses_checked_run_and_refuses_without_registered_nodes(tmp_path,
     assert (run_dir / "health_report.json").exists()
     assert payload["health"]["errors"][0]["rule_id"] == "NODE.TYPE.UNKNOWN"
 
-def test_cli_run_succeeds_with_global_registry_and_writes_artifacts(tmp_path, capsys) -> None:
-    from vibeflow.targets.python.project.registry import GLOBAL_NODE_REGISTRY
-
-    original = dict(getattr(GLOBAL_NODE_REGISTRY, "_registry"))
-    original_config_specs = dict(getattr(GLOBAL_NODE_REGISTRY, "_config_specs"))
-    register_node(GLOBAL_NODE_REGISTRY, "test.start", StartNode, overwrite=True)
-    register_node(GLOBAL_NODE_REGISTRY, "test.in_end", InEndNode, overwrite=True)
-    register_node(GLOBAL_NODE_REGISTRY, "test.seed", SeedNode, {"value": {"type": "number"}}, {"value": 1}, overwrite=True)
-    try:
-        config_path = tmp_path / "workflow.json"
-        input_path = tmp_path / "input.json"
-        config_path.write_text(
-            json.dumps({"pipeline": _seed_only_pipeline(seed={"value": 9})}),
-            encoding="utf-8",
-        )
-        input_path.write_text("{}", encoding="utf-8")
-        code = cli_main(
-            [
-                "run",
-                "--config",
-                str(config_path),
-                "--input",
-                str(input_path),
-                "--run-root",
-                str(tmp_path / "runs"),
-                "--run-id",
-                "cli_ok",
-                "--runtime-profile",
-                "train",
-            ]
-        )
-        payload = json.loads(capsys.readouterr().out)
-        plan_code = cli_main(
-            [
-                "run",
-                "--config",
-                str(config_path),
-                "--input",
-                str(input_path),
-                "--run-root",
-                str(tmp_path / "runs"),
-                "--run-id",
-                "cli_plan_override",
-                "--runtime-profile",
-                "train",
-                "--execution",
-                "plan",
-            ]
-        )
-        plan_payload = json.loads(capsys.readouterr().out)
-    finally:
-        getattr(GLOBAL_NODE_REGISTRY, "_registry").clear()
-        getattr(GLOBAL_NODE_REGISTRY, "_registry").update(original)
-        getattr(GLOBAL_NODE_REGISTRY, "_config_specs").clear()
-        getattr(GLOBAL_NODE_REGISTRY, "_config_specs").update(original_config_specs)
-    assert code == 0
+def test_cli_run_succeeds_with_declarations_and_writes_artifacts(tmp_path, capsys) -> None:
+    from tests.fixtures.support.declarations import write_node_manifests
+    write_node_manifests(tmp_path, [
+        ("test.start", "StartNode", {}, {}),
+        ("test.in_end", "InEndNode", {}, {}),
+        ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}),
+    ])
+    (tmp_path / "vibeflow_project.jsonc").write_text(json.dumps({
+        "project_target": "python", "descriptors": {"nodes": ["manifests/nodes"]}}))
+    config_path = tmp_path / "workflow.json"
+    input_path = tmp_path / "input.json"
+    config_path.write_text(
+        json.dumps({"pipeline": _seed_only_pipeline(seed={"value": 9})}),
+        encoding="utf-8",
+    )
+    input_path.write_text("{}", encoding="utf-8")
+    code = cli_main(
+        [
+            "run",
+            "--config",
+            str(config_path),
+            "--input",
+            str(input_path),
+            "--run-root",
+            str(tmp_path / "runs"),
+            "--run-id",
+            "cli_ok",
+            "--runtime-profile",
+            "train",
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+    plan_code = cli_main(
+        [
+            "run",
+            "--config",
+            str(config_path),
+            "--input",
+            str(input_path),
+            "--run-root",
+            str(tmp_path / "runs"),
+            "--run-id",
+            "cli_plan_override",
+            "--runtime-profile",
+            "train",
+            "--execution",
+            "plan",
+        ]
+    )
+    plan_payload = json.loads(capsys.readouterr().out)
+    assert code == 0, payload
     assert payload["status"] in {"PASS", "CONCERNS"}
     run_dir = Path(payload["run_dir"])
     for name in ("compiled_graph.json", "health_report.json", "graph.txt", "graph.mmd", "runtime_trace.jsonl", "output_summary.json"):
@@ -2264,7 +2261,7 @@ def test_distribution_build_is_deterministic_without_wall_clock_metadata(tmp_pat
     }
     assert first_files == second_files
     metadata = json.loads((first / "DISTRIBUTION.json").read_text(encoding="utf-8"))
-    assert metadata["version"] == "0.14.2"
+    assert metadata["version"] == "0.15.0"
     assert metadata["development_profile"] == "collaborative"
 
 

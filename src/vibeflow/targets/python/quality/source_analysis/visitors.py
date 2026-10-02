@@ -30,7 +30,6 @@ from vibeflow.targets.python.quality.source_analysis.effects import (
 from vibeflow.targets.python.quality.source_analysis.helpers import (
     _assigns_resource_field,
     _call_name,
-    _class_looks_like_node,
     _is_base_lib_module,
     _is_boundary_import,
     _is_node_module,
@@ -222,10 +221,10 @@ class _PurityImportVisitor(ast.NodeVisitor):
             self._add("effect_import", "process sys.argv is forbidden; use the declared cli.argv input", node, suggested_fix_type="fix_contract")
             return
         if terminal_stream_import_is_forbidden(module, imported_names, effect_scope=effect_scope):
-            self._add("effect_import", "terminal streams require flow_kind='io'", node, suggested_fix_type="move_to_boundary")
+            self._add("effect_import", "terminal streams are forbidden by the selected effect policy", node, suggested_fix_type="fix_ruleset")
             return
         if from_import_effect_is_forbidden(module, imported_names, effect_scope=effect_scope):
-            self._add("effect_import", f"Python IO import requires flow_kind='document' or 'data_store': {module}", node, suggested_fix_type="fix_contract")
+            self._add("effect_import", f"Python IO import is forbidden by the selected effect policy: {module}", node, suggested_fix_type="fix_ruleset")
             return
         self._check_import(module, node)
 
@@ -252,6 +251,7 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
         initial_aliases: dict[str, str] | None = None,
         imported_roots: set[str] | None = None,
         module_state_names: set[str] | None = None,
+        input_parameters: dict[str, set[str]] | None = None,
     ) -> None:
         self.policy = policy
         self.source = source
@@ -262,6 +262,7 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
         self.effect_scope = effect_scope
         self.violations: list[PurityViolation] = []
         self._input_aliases: set[str] = set()
+        self._input_parameters = input_parameters or {}
         self._output_dicts: dict[str, set[str]] = {}
         self._current_function = ""
         self._import_aliases: dict[str, str] = {
@@ -291,6 +292,8 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         previous = self._current_function
+        previous_inputs = self._input_aliases
+        self._input_aliases = set(self._input_parameters.get(node.name,()))
         previous_aliases = dict(self._import_aliases)
         previous_locals = self._current_local_names
         previous_imports = self._current_import_names
@@ -304,6 +307,7 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
                     self._add("generator_run_pure", "run_pure must not yield values", child, suggested_fix_type="fix_contract")
         self.generic_visit(node)
         self._current_function = previous
+        self._input_aliases = previous_inputs
         self._current_local_names = previous_locals
         self._current_import_names = previous_imports
         self._import_aliases = previous_aliases
@@ -378,7 +382,7 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         root = _root_name(node)
-        if root in self.known_node_class_names and node.attr in {"NODE_INFO", "CONTRACT"}:
+        if root in self.known_node_class_names and (node.attr.startswith("_")):
             self._add("node_internal_read", f"node must not read another node internals: {root}.{node.attr}", node, suggested_fix_type="move_to_nodeset")
         argv_reference = process_argv_reference(node, self._import_aliases)
         if argv_reference:
@@ -401,7 +405,7 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
             return
         keys, dynamic = self._return_keys(node.value)
         if dynamic:
-            self._add("dynamic_output_key", "run_pure output keys must be string literals declared in CONTRACT.provides", node, suggested_fix_type="fix_contract")
+            self._add("dynamic_output_key", "run_pure output keys must be string literals declared in descriptor contract.provides", node, suggested_fix_type="fix_contract")
         elif keys is not None:
             provides = set(provider_keys(self.contract.provides))
             extra = keys - provides
@@ -500,6 +504,7 @@ class ModulePurityVisitor(_PurityImportVisitor):
         known_node_class_names: tuple[str, ...],
         effect_scope: str = EFFECT_SCOPE_NONE,
         audit_all_definitions: bool = False,
+        input_parameters: dict[str,set[str]] | None = None,
     ) -> None:
         self.policy = policy
         self.source = source
@@ -513,6 +518,7 @@ class ModulePurityVisitor(_PurityImportVisitor):
         self._imported_module_roots: set[str] = set()
         self._module_state_names: set[str] = set()
         self._helper_input_parameters: dict[str, set[str]] = {}
+        self._input_parameters = input_parameters
         self._current_input_aliases: set[str] = set()
         self._current_local_names: set[str] = set()
         self._current_import_names: set[str] = set()
@@ -527,10 +533,7 @@ class ModulePurityVisitor(_PurityImportVisitor):
                     self._module_state_names.update(_bound_names(target))
             elif isinstance(stmt, ast.AnnAssign):
                 self._module_state_names.update(_bound_names(stmt.target))
-        self._module_state_names.difference_update(
-            {"BASE_LIB_INFO", "CONTRACT", "NODE_INFO", "PLUGIN_INFO"}
-        )
-        self._helper_input_parameters = _trace_helper_input_parameters(node, self.node_class_name)
+        self._helper_input_parameters = self._input_parameters if self._input_parameters is not None else _trace_helper_input_parameters(node, self.node_class_name)
         reachable_helpers = (
             {
                 statement.name
@@ -612,8 +615,6 @@ class ModulePurityVisitor(_PurityImportVisitor):
         elif isinstance(stmt, ast.ClassDef):
             if self.audit_all_definitions:
                 self.generic_visit(stmt)
-            else:
-                self._record_module_class(stmt)
         elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)) and stmt.name in reachable_helpers:
             self.visit(stmt)
         elif kind == "assignment":
@@ -697,10 +698,6 @@ class ModulePurityVisitor(_PurityImportVisitor):
         violation_code = import_violation_code(module, effect_scope=self.effect_scope, policy=self.policy)
         if violation_code:
             self._add(violation_code, f"banned import: {module}", node, suggested_fix_type="move_to_boundary")
-
-    def _record_module_class(self, node: ast.ClassDef) -> None:
-        if node.name != self.node_class_name and _class_looks_like_node(node):
-            self.known_node_class_names.add(node.name)
 
     def _check_module_assignment(self, node: ast.Assign | ast.AnnAssign) -> None:
         if not _module_assignment_is_allowed(node) and not (

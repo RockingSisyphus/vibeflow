@@ -512,6 +512,7 @@ def expect_build_failure(
     builder: Callable[[], ProjectBuildResult],
     *,
     expected_code: str,
+    expected_definition_id: str | None = None,
     expected_owner_id: str | None = None,
     expected_owner_kind: str | None = None,
     expected_file: Path | None = None,
@@ -535,6 +536,7 @@ def expect_build_failure(
             value is not None
             for value in (
                 expected_owner_id,
+                expected_definition_id,
                 expected_owner_kind,
                 expected_file,
                 expected_line,
@@ -546,7 +548,14 @@ def expect_build_failure(
                     f"{expected_code} did not include a structured diagnostic"
                 ) from exc
             diagnostic = matching[0]
-            owner = diagnostic.get("owner")
+            location = diagnostic.get("source_location", diagnostic)
+            details = diagnostic.get("details", {})
+            owner = details.get("source_owner", diagnostic.get("owner"))
+            if expected_definition_id is not None and diagnostic.get("definition_id") != expected_definition_id:
+                raise AssertionError(
+                    f"{expected_code} Rule definition: expected {expected_definition_id!r}, "
+                    f"got {diagnostic.get('definition_id')!r}"
+                ) from exc
             if expected_owner_id is not None:
                 if not isinstance(owner, dict) or owner.get("id") != expected_owner_id:
                     raise AssertionError(
@@ -560,7 +569,7 @@ def expect_build_failure(
                         f"got {owner!r}"
                     ) from exc
             if expected_file is not None:
-                actual_file = diagnostic.get("file")
+                actual_file = location.get("path", location.get("file"))
                 actual_resolved = (
                     Path(actual_file).resolve()
                     if isinstance(actual_file, str)
@@ -571,24 +580,26 @@ def expect_build_failure(
                         f"{expected_code} file: expected {expected_file.resolve()}, "
                         f"got {actual_file!r}"
                     ) from exc
-            if expected_line is not None and diagnostic.get("line") != expected_line:
+            if expected_line is not None and location.get("line") != expected_line:
                 raise AssertionError(
                     f"{expected_code} line: expected {expected_line}, "
-                    f"got {diagnostic.get('line')!r}"
+                    f"got {location.get('line')!r}"
                 ) from exc
-            if expected_column is not None and diagnostic.get("column") != expected_column:
+            if expected_column is not None and location.get("column") != expected_column:
                 raise AssertionError(
                     f"{expected_code} column: expected {expected_column}, "
-                    f"got {diagnostic.get('column')!r}"
+                    f"got {location.get('column')!r}"
                 ) from exc
+        location = matching[0].get("source_location", matching[0]) if matching else {}
         return {
             "code": expected_code,
             "diagnostics": sorted(codes),
+            "definition_id": matching[0].get("definition_id") if matching else None,
             "location": (
                 {
-                    "file": matching[0].get("file"),
-                    "line": matching[0].get("line"),
-                    "column": matching[0].get("column"),
+                    "file": location.get("path", location.get("file")),
+                    "line": location.get("line"),
+                    "column": location.get("column"),
                 }
                 if matching
                 else None

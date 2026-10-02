@@ -91,9 +91,9 @@ _REMOVED_DOCUMENT_TOKENS = (
 )
 
 _STALE_DOCUMENT_TOKENS = {
-    "0.9.0": "Replace the obsolete public release version with 0.10.1.",
-    "0.10.0": "Replace the obsolete public release version with 0.10.1.",
-    "vibeflow.runtime": "Use the owning 0.10 layered API instead of the removed runtime facade.",
+    "0.9.0": "Replace the obsolete public release version with 0.15.0.",
+    "0.10.0": "Replace the obsolete public release version with 0.15.0.",
+    "vibeflow.runtime": "Use the owning layered API instead of the removed runtime facade.",
     "vibeflow.aot": "Use vibeflow.targets.javascript instead of the removed AOT facade.",
     "vibeflow.portable": "Use vibeflow.block_compiler instead of the removed portable facade.",
     "examples/": "Use the canonical sandbox/ path.",
@@ -122,6 +122,7 @@ _DOCUMENT_COMMAND_PATTERNS = (
                 "quality",
                 "quality-check",
                 "review",
+                "review-rules",
                 "run",
                 "svg",
                 "validate",
@@ -144,6 +145,7 @@ _DOCUMENT_COMMAND_PATTERNS = (
                 "inspect-node",
                 "quality-check",
                 "review",
+                "review-rules",
                 "run",
                 "validate",
             }
@@ -164,6 +166,7 @@ _DOCUMENT_COMMAND_PATTERNS = (
                 "inspect-node",
                 "quality-check",
                 "review",
+                "review-rules",
                 "run",
                 "validate",
             }
@@ -464,7 +467,7 @@ def _documentation_findings(root: Path) -> list[Finding]:
                         root,
                         path,
                         f"Documentation uses unknown {command_kind} command {command!r}.",
-                        "Replace it with a command exposed by the current 0.10 CLI or remove the example.",
+                        "Replace it with a command exposed by the current CLI or remove the example.",
                         line=line_number,
                         details={"command": command, "kind": command_kind},
                     )

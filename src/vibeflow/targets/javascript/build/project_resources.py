@@ -589,10 +589,10 @@ def target_neutral_import_policy(
             return
         if implementation.source.kind != "file":
             raise ProjectBuildError(
-                "VF_AOT_CONTRACT_INVALID",
+                "VF_AOT_IMPLEMENTATION_SOURCE",
                 (
-                    f"{kind} '{resource_id}' uses non-file JavaScript source "
-                    f"kind '{implementation.source.kind}'"
+                    f"{kind} '{resource_id}' only accepts audited project files; "
+                    f"source kind '{implementation.source.kind}' is unsupported"
                 ),
             )
         source = safe_project_path(

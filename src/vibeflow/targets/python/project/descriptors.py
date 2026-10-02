@@ -59,74 +59,9 @@ class PythonBaseLibAdapterResult:
             ) from exc
 
 
-def node_descriptor_from_registry(
-    registry: NodeRegistry,
-    type_key: str,
-) -> NodeDescriptor:
-    """Convert one legacy NodeRegistry entry without retaining its class."""
-
-    normalized = str(type_key).strip()
-    node_cls = registry.get(normalized)
-    info = getattr(node_cls, "NODE_INFO", None)
-    contract = getattr(node_cls, "CONTRACT", None)
-    if info is None or contract is None:
-        raise LegacyDescriptorError(
-            code="DESCRIPTOR.LEGACY_NODE.SHAPE",
-            message=(
-                f"registered node '{normalized}' must declare NODE_INFO "
-                "and CONTRACT"
-            ),
-            descriptor_id=normalized,
-        )
-    info_type_key = str(getattr(info, "type_key", "") or "").strip()
-    if info_type_key != normalized:
-        raise LegacyDescriptorError(
-            code="DESCRIPTOR.LEGACY_NODE.TYPE_KEY",
-            message=(
-                f"registry key '{normalized}' does not match "
-                f"NODE_INFO.type_key '{info_type_key}'"
-            ),
-            descriptor_id=normalized,
-        )
-    config_spec = registry.get_config_spec(normalized)
-    try:
-        descriptor_contract = NodeContractDescriptor(
-            requires=tuple(getattr(contract, "requires", ())),
-            provides=tuple(getattr(contract, "provides", ())),
-            input_semantics=getattr(contract, "input_semantics", {}),
-            output_semantics=getattr(contract, "output_semantics", {}),
-            params_schema=config_spec.schema,
-            params_defaults=config_spec.defaults,
-            examples=tuple(getattr(contract, "examples", ())),
-        )
-        implementation = ImplementationDescriptor(
-            language="python",
-            targets=("python",),
-            source=SourceLocator(
-                kind="module",
-                ref=str(getattr(node_cls, "__module__", "")),
-                export=str(getattr(node_cls, "__qualname__", "")),
-            ),
-        )
-        return NodeDescriptor(
-            type_key=normalized,
-            display_name=str(getattr(info, "display_name", "") or ""),
-            category=str(getattr(info, "category", "") or ""),
-            description=str(getattr(info, "description", "") or ""),
-            version=str(getattr(info, "version", "") or ""),
-            flow_kind=str(getattr(info, "flow_kind", "") or ""),
-            author=getattr(info, "author", None),
-            tags=tuple(getattr(info, "tags", ())),
-            external=getattr(info, "external", False),
-            contract=descriptor_contract,
-            implementations=(implementation,),
-        )
-    except DescriptorModelError as exc:
-        raise LegacyDescriptorError(
-            code="DESCRIPTOR.LEGACY_NODE.INVALID",
-            message=f"node '{normalized}' cannot be described: {exc}",
-            descriptor_id=normalized,
-        ) from exc
+def node_descriptor_from_registry(registry: NodeRegistry, type_key: str) -> NodeDescriptor:
+    """Return the sole authoritative declaration; never inspect class metadata."""
+    return registry.descriptor(type_key)
 
 
 def base_lib_descriptor_from_registry(
@@ -167,35 +102,22 @@ def base_lib_descriptor_from_registry(
         ) from exc
 
 
-def adapt_node_registry(
-    registry: NodeRegistry,
-    *,
-    static_catalog: NodeCatalog | None = None,
-) -> PythonNodeAdapterResult:
-    """Merge legacy Python bindings into static, language-neutral metadata."""
-
+def adapt_node_registry(registry: NodeRegistry, *, static_catalog: NodeCatalog | None = None) -> PythonNodeAdapterResult:
+    """Bind declared Python implementations beside a portable metadata catalog."""
     catalog = NodeCatalog()
     if static_catalog is not None:
         for descriptor in static_catalog:
-            catalog.register(
-                descriptor,
-                source=static_catalog.source_for(descriptor.type_key),
-            )
-    bindings: dict[str, type] = {}
+            catalog.register(descriptor, source=static_catalog.source_for(descriptor.type_key))
+    bindings = {}
     for type_key in registry.available():
-        legacy = node_descriptor_from_registry(registry, type_key)
-        static = catalog.get(type_key)
-        if static is None:
-            catalog.register(legacy, source="python:NodeRegistry")
-        else:
-            _assert_node_contract_match(static, legacy)
-            merged = _merge_python_node_implementation(static, legacy)
-            catalog = _replace_node(catalog, merged)
+        descriptor = registry.descriptor(type_key)
+        existing = catalog.get(type_key)
+        if existing is None:
+            catalog.register(descriptor, source=registry.source_info(type_key).path)
+        elif existing != descriptor:
+            raise LegacyDescriptorError("DESCRIPTOR.PYTHON_DECLARATION.CONFLICT", f"conflicting authoritative Node declaration '{type_key}'", type_key)
         bindings[type_key] = registry.get(type_key)
-    return PythonNodeAdapterResult(
-        catalog=catalog,
-        bindings=MappingProxyType(bindings),
-    )
+    return PythonNodeAdapterResult(catalog, MappingProxyType(bindings))
 
 
 def adapt_base_lib_registry(
@@ -229,38 +151,6 @@ def adapt_base_lib_registry(
     )
 
 
-def _assert_node_contract_match(
-    static: NodeDescriptor,
-    legacy: NodeDescriptor,
-) -> None:
-    fields = (
-        "type_key",
-        "display_name",
-        "category",
-        "description",
-        "version",
-        "flow_kind",
-        "author",
-        "tags",
-        "external",
-        "contract",
-    )
-    mismatches = [
-        field
-        for field in fields
-        if getattr(static, field) != getattr(legacy, field)
-    ]
-    if mismatches:
-        raise LegacyDescriptorError(
-            code="DESCRIPTOR.STATIC_PYTHON.CONFLICT",
-            message=(
-                f"static descriptor and Python registry disagree for "
-                f"node '{static.type_key}': {mismatches}"
-            ),
-            descriptor_id=static.type_key,
-        )
-
-
 def _assert_base_lib_metadata_match(
     static: BaseLibDescriptor,
     legacy: BaseLibDescriptor,
@@ -280,31 +170,6 @@ def _assert_base_lib_metadata_match(
             ),
             descriptor_id=static.id,
         )
-
-
-def _merge_python_node_implementation(
-    static: NodeDescriptor,
-    legacy: NodeDescriptor,
-) -> NodeDescriptor:
-    python_impl = legacy.implementations[0]
-    existing = [
-        item for item in static.implementations if "python" in item.targets
-    ]
-    if existing:
-        if existing != [python_impl]:
-            raise LegacyDescriptorError(
-                code="DESCRIPTOR.STATIC_PYTHON.SOURCE_CONFLICT",
-                message=(
-                    f"static Python source for node '{static.type_key}' "
-                    "does not match its registered class"
-                ),
-                descriptor_id=static.type_key,
-            )
-        return static
-    return replace(
-        static,
-        implementations=(*static.implementations, python_impl),
-    )
 
 
 def _merge_python_base_lib_implementation(
@@ -330,21 +195,6 @@ def _merge_python_base_lib_implementation(
         static,
         implementations=(*static.implementations, python_impl),
     )
-
-
-def _replace_node(catalog: NodeCatalog, replacement: NodeDescriptor) -> NodeCatalog:
-    out = NodeCatalog()
-    for descriptor in catalog:
-        selected = (
-            replacement
-            if descriptor.type_key == replacement.type_key
-            else descriptor
-        )
-        out.register(
-            selected,
-            source=catalog.source_for(descriptor.type_key),
-        )
-    return out
 
 
 def _replace_base_lib(

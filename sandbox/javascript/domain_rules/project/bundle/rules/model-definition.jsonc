@@ -1,0 +1,19 @@
+{
+  "kind": "rule",
+  "id": "example.model_definition",
+  "description": "modelForward belongs to model_block and each block defines one modelForward.",
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": [
+        "browser",
+        "node"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "rules/model_definition.ts",
+        "export": "check"
+      }
+    }
+  ]
+}

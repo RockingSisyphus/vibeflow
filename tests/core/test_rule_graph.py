@@ -112,6 +112,33 @@ def test_call_scoped_rule_executes_each_instance_and_source_scope_requires_ident
     assert result.aliases == {}
 
 
+def test_source_context_exposes_all_source_calls_and_no_current_call_identity():
+    descriptor = RulesetDescriptor("context", (RuleCall("source", "size"), RuleCall("call", "call-check")))
+    resources = {**rules(), "call-check": RuleDescriptor("call-check")}
+    context = RuleContext(facts={"call": {"params": {"size": 3}}, "source": "node.py"},
+        subject={"owner": "workflow", "call_id": "first", "call_path": ["first"], "call_paths": [["first"]],
+                 "call_spec": {"params": {"size": 3}}, "source_call_paths": [["first"], ["second"]]},
+        scope={"workflow": "first-workflow", "workflows": ["first-workflow", "second-workflow"]})
+    observed = {}
+    def handler(current, *_):
+        observed["source" if "rule_call_id" not in current.subject else "call"] = current
+        return RuleResult()
+    result = execute_rule_plan(compile_ruleset(descriptor, rules=resources), context,
+                               handlers={"size": handler, "call-check": handler})
+    assert result.status == "PASS"
+    source = observed["source"]
+    assert "call" not in source.facts
+    assert not {"owner", "call_id", "call_spec", "call_path", "rule_call_id"} & source.subject.keys()
+    assert source.subject["call_paths"] == (("first",), ("second",))
+    assert "workflow" not in source.scope
+    assert source.scope["workflows"] == ("first-workflow", "second-workflow")
+    call = observed["call"]
+    assert call.facts["call"]["params"]["size"] == 3
+    assert call.subject["call_id"] == "first"
+    assert call.subject["rule_call_id"] == "call"
+    assert call.scope["workflow"] == "first-workflow"
+
+
 def test_checker_replacement_preserves_instance_and_validates_consumed_interface():
     descriptor = RulesetDescriptor("replace", (RuleCall("symbols", "discover"), RuleCall("owner", "check")),
         (RuleRelation("owner", "symbols", "requires", bindings={"symbols": "symbols"}),
@@ -219,3 +246,140 @@ def test_source_cache_belongs_to_check_session_and_preserves_fact_identity():
     assert len(seen) == 2
     execute_rule_plan(plan, first_context, handlers=handlers, source_cache={})
     assert len(seen) == 3
+
+
+def test_cached_source_diagnostics_preserve_execution_status_without_duplicate_findings():
+    plan = compile_ruleset(RulesetDescriptor("diagnostic-cache", (RuleCall("size", "size"),)), rules=rules())
+    context = RuleContext(subject={"source_identity": "node.py:Node@version"})
+    cache = {}
+    handlers = {"size": lambda *_: {"findings": [{"code": "MODEL.BLOCK.COUNT", "message": "multiple blocks"}]}}
+    first = execute_rule_plan(plan, context, handlers=handlers, source_cache=cache)
+    cached = execute_rule_plan(plan, context, handlers=handlers, source_cache=cache)
+    assert first.status == cached.status == "FAIL"
+    assert cached.executed == ()
+    assert cached.findings == ()
+    assert cached.results["size"].findings[0].definition_id == "size"
+    assert cached.aliases == {"size": "session:diagnostic-cache/size"}
+
+
+def test_rule_context_freezes_graph_compiled_and_result_dataclass_fields():
+    from vibeflow.core.compiler import CompiledGraph
+    from vibeflow.core.flow import GraphConfig, NodeSpec
+    from vibeflow.core.findings import HealthFinding
+
+    graph = GraphConfig(nodes=(NodeSpec("one", "example.one", params={"nested": {"values": [1]}}),))
+    compiled = CompiledGraph(order=("one",), explicit_edges=(), data_edges=(), effective_edges=(),
+                             providers={"value": "one"}, consumers={}, flow_kinds={"one": "process"})
+    context = RuleContext(facts={"graph": graph, "compiled": compiled})
+    with pytest.raises(TypeError):
+        context.facts["graph"].nodes[0].params["nested"]["values"] = (2,)
+    with pytest.raises(TypeError):
+        context.facts["compiled"].providers["value"] = "other"
+    assert context.facts["graph"] is not graph
+    assert isinstance(context.facts["graph"], GraphConfig)
+    assert isinstance(context.facts["compiled"], CompiledGraph)
+    graph.nodes[0].params["nested"]["values"].append(2)
+    compiled.providers["value"] = "changed original"
+    assert context.facts["graph"].nodes[0].params["nested"]["values"] == (1,)
+    assert context.facts["compiled"].providers["value"] == "one"
+    details = {"nested": {"values": [1]}}
+    result = RuleResult(findings=(HealthFinding(rule_id="TEST", details=details),))
+    details["nested"]["values"].append(2)
+    assert result.findings[0].details["nested"]["values"] == (1,)
+    with pytest.raises(TypeError):
+        result.findings[0].details["nested"]["values"] = ()
+
+
+def test_readonly_preserves_cyclic_dataclass_fact_identity_without_shared_maps():
+    from dataclasses import dataclass, field
+    from vibeflow.core.rules.models import readonly
+
+    @dataclass(frozen=True)
+    class Fact:
+        children: dict = field(default_factory=dict)
+
+    fact = Fact()
+    fact.children["self"] = fact
+    frozen = readonly(fact)
+    assert frozen.children["self"] is frozen
+    with pytest.raises(TypeError):
+        frozen.children["other"] = fact
+    assert "other" not in fact.children
+
+
+@pytest.mark.parametrize("entrypoints", [
+    {"statci": []}, {"static": "check"}, {"static": {"check": True}},
+    {"static": None}, {"static": [1]}, {"static": [""]}, {"run": [" "]},
+])
+def test_ruleset_rejects_invalid_entrypoint_names_and_values(entrypoints):
+    with pytest.raises(ValueError, match="entrypoint"):
+        RulesetDescriptor("invalid", entrypoints=entrypoints)
+
+
+def test_explicit_empty_entrypoints_are_valid_and_unknown_compile_phase_fails():
+    descriptor = RulesetDescriptor("empty", (RuleCall("size", "size"),),
+                                   entrypoints={"import": [], "static": [], "run": []})
+    for phase in ("import", "static", "run"):
+        assert compile_ruleset(descriptor, rules=rules(), entrypoint=phase).order == ()
+    with pytest.raises(RuleGraphError, match="RULE.ENTRYPOINT.INVALID"):
+        compile_ruleset(descriptor, rules=rules(), entrypoint="statci")
+
+
+def test_record_snapshots_frozen_dataclass_fields_and_keeps_query_services_in_facts():
+    from dataclasses import dataclass
+
+    @dataclass(frozen=True)
+    class Evidence:
+        details: dict
+
+    original = Evidence({"values": [1], "names": {"one"}})
+    record = RuleRecord("evidence.v1", original)
+    original.details["values"].append(2)
+    assert isinstance(record.value, Evidence)
+    assert record.value.details["values"] == (1,)
+    assert record.value.details["names"] == frozenset({"one"})
+    with pytest.raises(TypeError):
+        record.value.details["values"] = ()
+
+    class QueryService:
+        pass
+
+    service = QueryService()
+    assert RuleContext(facts={"service": service}).facts["service"] is service
+    with pytest.raises(ValueError, match="portable data"):
+        RuleRecord("evidence.v1", {"nested": service})
+
+
+def test_mutable_dataclass_or_opaque_outputs_fail_before_consumers_run():
+    from dataclasses import dataclass
+
+    @dataclass
+    class MutableEvidence:
+        value: int = 1
+
+    descriptor = RulesetDescriptor("data", (RuleCall("owner", "check"), RuleCall("symbols", "discover")),
+        (RuleRelation("owner", "symbols", "requires", bindings={"symbols": "symbols"}),))
+    for value in (MutableEvidence(), object(), float("nan")):
+        consumed = []
+        result = execute_rule_plan(compile_ruleset(descriptor, rules=rules()), RuleContext(), handlers={
+            "discover": lambda *args: RuleResult({"symbols": RuleRecord("symbols.v1", value)}),
+            "check": lambda *args: consumed.append(True),
+        })
+        assert not consumed
+        assert result.results["symbols"].state == "failed"
+        assert result.results["owner"].state == "unavailable"
+        assert any(finding.code == "RULE.EXECUTION" for finding in result.findings)
+
+
+def test_builtin_planned_records_preserve_frozen_event_types():
+    from vibeflow.core.flow import GraphConfig, NodeSpec
+    from vibeflow.core.planned import PlannedBehavior
+    from vibeflow.core.quality.workflow_rules.planned import PlannedImplementationCheck
+    from vibeflow.core.rules.builtin.workflow import evaluate_workflow_topic
+
+    graph = GraphConfig(nodes=(NodeSpec("future", "example.future", status="planned",
+        planned_behavior=PlannedBehavior("python_stub", "stubs/future.py")),))
+    result = evaluate_workflow_topic("planned", graph=graph)
+    assert result.state == "completed"
+    assert any(isinstance(event, PlannedImplementationCheck) for event in result.records["events"].value)
+    json.dumps(result.to_dict())

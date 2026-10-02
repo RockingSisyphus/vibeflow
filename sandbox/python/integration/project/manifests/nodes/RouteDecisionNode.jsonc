@@ -1,0 +1,90 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.route_decision",
+  "display_name": "循环或退出决策",
+  "category": "sandbox",
+  "description": "根据核心计算结果选择继续回环还是进入外部后处理；它是综合图中的菱形判断节点，所有出口都必须声明 when 条件并能通向结束节点。",
+  "version": "0.1.0",
+  "flow_kind": "decision",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one",
+        "display_name": "value.out"
+      }
+    ],
+    "provides": [
+      {
+        "key": "flow.route",
+        "type": "flow.route",
+        "display_name": "flow.route"
+      }
+    ],
+    "input_semantics": {
+      "value.out": [
+        "核心计算输出的中间数值，用来和阈值比较决定流程走向。"
+      ]
+    },
+    "output_semantics": {
+      "flow.route": [
+        "决策路由枚举；again 表示沿回环边继续处理，external 表示沿退出边进入外部后处理。"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "value.out": {
+            "key": "value.out",
+            "type": "value.out",
+            "value": 8,
+            "source_node": "example"
+          }
+        },
+        "params": {
+          "threshold": 10
+        }
+      },
+      {
+        "inputs": {
+          "value.out": {
+            "key": "value.out",
+            "type": "value.out",
+            "value": 18,
+            "source_node": "example"
+          }
+        },
+        "params": {
+          "threshold": 10
+        }
+      }
+    ],
+    "params_schema": {
+      "threshold": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "threshold": 10
+    }
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_comprehensive_nodes.py",
+        "export": "RouteDecisionNode"
+      }
+    }
+  ]
+}

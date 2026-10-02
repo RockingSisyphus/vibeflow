@@ -1,7 +1,18 @@
+from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
 from copy import deepcopy
 
 from vibeflow.targets.python.project.policy import EffectivePolicy
+from tests.fixtures.support.rule_inspection import _inspect_node_source, _valid_node_source, node_document
+from vibeflow.targets.python.quality.workflow.validation import validate_graph_health as _validate_graph_health
+from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
+
+
+def validate_graph_health(graph, *, registry=None, **kwargs):
+    if registry is not None:
+        kwargs.setdefault("source_context", collect_workflow_source_context(registry, graph))
+    return _validate_graph_health(graph, registry=registry, **kwargs)
+
 
 
 def parse_graph_config(config):
@@ -38,38 +49,32 @@ def parse_graph_config(config):
     return raw_parse_graph_config(migrated)
 
 
-class DuplicateThreeNode:
-    NODE_INFO = NodeInfo("test.duplicate_three", "Duplicate Three", "test", "Duplicates output for an unclaimed comparison.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+DuplicateThreeNode_DECLARATION = node_declaration(NodeInfo("test.duplicate_three", "Duplicate Three", "test", "Duplicates output for an unclaimed comparison.", "0.1.0", "process"), NodeContract(
         provides=(DataProvider("dup.three", "dup.three", display_name="Duplicate Three"),),
         output_semantics={"dup.three": ("third duplicate fixture value",)},
-    )
+    ), rulesets=("vibeflow.process",))
+
+class DuplicateThreeNode:
 
     def run_pure(self, inputs, params):
         return {"dup.three": 1}
 
 def test_architecture_smells_warn_for_mismatched_metadata_and_unstable_keys(tmp_path, capsys) -> None:
-    info = VALID_NODE_INFO.replace('description="Demo node."', 'description="Calculates invoice total."')
-    contract = """
-    CONTRACT = NodeContract(
-        provides=(PROV("Tmp Key"),),
-        output_semantics={"Tmp Key": ("scratch debug value",)},
-        examples=({"inputs": {}, "params": {}},),
-    )
-""".rstrip()
-    source = _valid_node_source(info=info, contract=contract, run_body='        return {"Tmp Key": 1}')
-    code, payload = _inspect_node_source(tmp_path, capsys, source)
+    descriptor = node_document(contract={"provides":[PROV_SPEC("Tmp Key")],
+        "output_semantics":{"Tmp Key":["scratch debug value"]},"examples":[{"inputs":{},"params":{}}]})
+    source = _valid_node_source(run_body='        return {"Tmp Key": 1}')
+    code, payload = _inspect_node_source(tmp_path, capsys, source, descriptor=descriptor)
     assert code == 0
-    warnings = {warning["details"].get("legacy_code") for warning in payload["health"]["warnings"]}
-    assert "responsibility_mismatch" not in warnings
-    assert "temporary_key" in warnings
-    assert "confusing_key_name" in warnings
+    warnings = {warning["code"] for warning in payload["health"]["warnings"]}
+    assert "NODE.MAINTAINABILITY.TEMPORARY_KEY" in warnings
+    assert "NODE.MAINTAINABILITY.CONFUSING_KEY_NAME" in warnings
+
 
 def test_graph_health_reports_node_metrics_duplicate_logic_and_confusing_node_names() -> None:
     registry = NodeRegistry()
-    register_node(registry, "test.duplicate_one", DuplicateOneNode)
-    register_node(registry, "test.duplicate_two", DuplicateTwoNode)
-    register_node(registry, "test.duplicate_three", DuplicateThreeNode)
+    register_node(registry, DuplicateOneNode_DECLARATION, DuplicateOneNode)
+    register_node(registry, DuplicateTwoNode_DECLARATION, DuplicateTwoNode)
+    register_node(registry, DuplicateThreeNode_DECLARATION, DuplicateThreeNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -101,8 +106,8 @@ def test_graph_health_reports_node_metrics_duplicate_logic_and_confusing_node_na
 
 def test_graph_health_suppresses_declared_similar_duplicate_logic_pairs() -> None:
     registry = NodeRegistry()
-    register_node(registry, "test.duplicate_one", DuplicateOneNode)
-    register_node(registry, "test.duplicate_two", DuplicateTwoNode)
+    register_node(registry, DuplicateOneNode_DECLARATION, DuplicateOneNode)
+    register_node(registry, DuplicateTwoNode_DECLARATION, DuplicateTwoNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -204,16 +209,18 @@ def test_graph_health_keeps_same_node_problem_separate_by_owner() -> None:
     graph = parse_graph_config(
         {
             "nodesets": [
-                _bad_leaf_nodeset("left.leaf"),
-                _bad_leaf_nodeset("right.leaf"),
+                {**_bad_leaf_nodeset("left.leaf"), "provides":[]},
+                {**_bad_leaf_nodeset("right.leaf"), "provides":[]},
             ],
             "pipeline": {
                     "inputs": [PROV_SPEC("value.in")],
                     "nodes": [
                         _node_call("start", "test.start", "Starts the owner aggregation fixture."),
+                        _node_call("left", "left.leaf", "Exercises the first declared bad leaf.",requires=[REQ_SPEC("value.in")],provides=[PROV_SPEC("left.out","value.out")]),
+                        _node_call("right", "right.leaf", "Exercises the second declared bad leaf.",requires=[REQ_SPEC("value.in")],provides=[PROV_SPEC("right.out","value.out")]),
                         _node_call("end", "test.start", "Ends the owner aggregation fixture."),
                     ],
-                    "edges": [{"from": "start", "to": "end"}],
+                    "edges": _edge_chain("start","left","right","end"),
             },
         }
     )
@@ -352,50 +359,52 @@ def test_node_config_override_path_still_rejects_traversing_plain_node() -> None
 
 
 def test_health_report_aggregates_duplicate_findings_but_not_different_direct_sources() -> None:
-    class DuplicateFindingPlugin:
-        name = "duplicate_finding"
-
-        def validate_graph(self, graph, compiled):
-            duplicate = HealthFinding(
-                rule_id="PLUGIN.DUPLICATE",
-                severity="warning",
-                object_type="pipeline",
-                object_id="pipeline",
-                failure_layer="plugin",
-                message="same plugin warning",
+    from types import SimpleNamespace
+    from dataclasses import replace
+    from vibeflow.core.rules import RuleDescriptor, RuleCall, RulesetDescriptor, RuleResult
+    def duplicates(context, inputs, params):
+        duplicate = HealthFinding(
+            rule_id="PLUGIN.DUPLICATE",
+            severity="warning",
+            object_type="pipeline",
+            object_id="pipeline",
+            failure_layer="plugin",
+            message="same plugin warning",
+            suggested_fix_type="fix_config",
+            details={"owner": "pipeline", "node": "seed"},
+        )
+        return RuleResult(findings=(
+            duplicate,
+            duplicate,
+            HealthFinding(
+                rule_id="GRAPH.DATA.MISSING_DIRECT_PROVIDER",
+                severity="error",
+                object_type="contract_key",
+                object_id="value.in",
+                failure_layer="topology",
+                message="simulated missing provider",
                 suggested_fix_type="fix_config",
-                details={"owner": "pipeline", "node": "seed"},
-            )
-            return [
-                duplicate,
-                duplicate,
-                HealthFinding(
-                    rule_id="GRAPH.DATA.MISSING_DIRECT_PROVIDER",
-                    severity="error",
-                    object_type="contract_key",
-                    object_id="value.in",
-                    failure_layer="topology",
-                    message="simulated missing provider",
-                    suggested_fix_type="fix_config",
-                    details={"owner": "pipeline", "node": "join", "required_type": "value.in", "direct_sources": ["left"]},
-                ),
-                HealthFinding(
-                    rule_id="GRAPH.DATA.MISSING_DIRECT_PROVIDER",
-                    severity="error",
-                    object_type="contract_key",
-                    object_id="value.in",
-                    failure_layer="topology",
-                    message="simulated missing provider",
-                    suggested_fix_type="fix_config",
-                    details={"owner": "pipeline", "node": "join", "required_type": "value.in", "direct_sources": ["right"]},
-                ),
-            ]
+                details={"owner": "pipeline", "node": "join", "required_type": "value.in", "direct_sources": ["left"]},
+            ),
+            HealthFinding(
+                rule_id="GRAPH.DATA.MISSING_DIRECT_PROVIDER",
+                severity="error",
+                object_type="contract_key",
+                object_id="value.in",
+                failure_layer="topology",
+                message="simulated missing provider",
+                suggested_fix_type="fix_config",
+                details={"owner": "pipeline", "node": "join", "required_type": "value.in", "direct_sources": ["right"]},
+            ),
+        ))
 
-    plugin_registry = PluginRegistry()
-    plugin_registry.register(DuplicateFindingPlugin(), plugin_type="policy")
-    graph = parse_graph_config({"pipeline": _seed_only_pipeline()})
-
-    report = validate_graph_health(graph, registry=_registry(), plugin_registry=plugin_registry, purity_policy=PurityPolicy(max_source_lines=1000))
+    registry = _registry()
+    rule = RuleDescriptor("test.duplicates")
+    ruleset = RulesetDescriptor("test.duplicates",calls=(RuleCall("check",rule_id=rule.id),))
+    registry.rule_catalogs = (SimpleNamespace(rules=(rule,),rulesets=(ruleset,)),)
+    registry.rule_handler_loader = lambda plan: {rule.id:duplicates}
+    graph = replace(parse_graph_config({"pipeline":_seed_only_pipeline()}),rulesets=("test.duplicates",))
+    report = validate_graph_health(graph,registry=registry,purity_policy=PurityPolicy(max_source_lines=1000))
     duplicate = next(warning for warning in report.warnings if warning.rule_id == "PLUGIN.DUPLICATE")
     simulated_missing = [error for error in report.errors if error.rule_id == "GRAPH.DATA.MISSING_DIRECT_PROVIDER" and error.details.get("node") == "join"]
 
@@ -551,8 +560,8 @@ def _findings(findings, rule_id: str, **details):
 
 def test_graph_health_suppresses_duplicate_logic_when_nodes_share_declared_base() -> None:
     registry = _registry()
-    register_node(registry, "test.duplicate_one", DuplicateOneNode)
-    register_node(registry, "test.duplicate_two", DuplicateTwoNode)
+    register_node(registry, DuplicateOneNode_DECLARATION, DuplicateOneNode)
+    register_node(registry, DuplicateTwoNode_DECLARATION, DuplicateTwoNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -584,9 +593,9 @@ def test_graph_health_suppresses_duplicate_logic_when_nodes_share_declared_base(
 
 def test_graph_health_keeps_unclaimed_duplicate_logic_pairs() -> None:
     registry = NodeRegistry()
-    register_node(registry, "test.duplicate_one", DuplicateOneNode)
-    register_node(registry, "test.duplicate_two", DuplicateTwoNode)
-    register_node(registry, "test.duplicate_three", DuplicateThreeNode)
+    register_node(registry, DuplicateOneNode_DECLARATION, DuplicateOneNode)
+    register_node(registry, DuplicateTwoNode_DECLARATION, DuplicateTwoNode)
+    register_node(registry, DuplicateThreeNode_DECLARATION, DuplicateThreeNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -612,7 +621,7 @@ def test_graph_health_keeps_unclaimed_duplicate_logic_pairs() -> None:
     assert {"base,unclaimed", "unclaimed,variant"} <= duplicate_object_ids
 
 
-def test_graph_health_policy_can_exempt_findings() -> None:
+def test_graph_health_explicit_empty_ruleset_omits_review() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -625,32 +634,13 @@ def test_graph_health_policy_can_exempt_findings() -> None:
             }
         }
     )
-    policy = EffectivePolicy(
-        {
-            "rules": {
-                "exemptions": [
-                    {
-                        "rule_id": "GRAPH.SMELL.CONFUSING_NODE_NAME",
-                        "scope": {"object_id": "BadName"},
-                        "reason": "legacy fixture",
-                        "expires": "2026-12-31",
-                    }
-                ]
-            }
-        },
-        ("test",),
-    )
-
-    report = validate_graph_health(
-        graph,
-        registry=_registry(),
-        purity_policy=PurityPolicy(max_source_lines=1000),
-        effective_policy=policy,
-    )
-
+    from dataclasses import replace
+    baseline = validate_graph_health(graph, registry=_registry())
+    assert any(warning.rule_id == "GRAPH.SMELL.CONFUSING_NODE_NAME" for warning in baseline.warnings)
+    report = validate_graph_health(replace(graph,rulesets=()),registry=_registry())
     assert not any(warning.rule_id == "GRAPH.SMELL.CONFUSING_NODE_NAME" for warning in report.warnings)
-    skipped = [finding for finding in report.skipped if finding.rule_id == "GRAPH.SMELL.CONFUSING_NODE_NAME"]
-    assert skipped[0].details["policy_override"]["reason"] == "legacy fixture"
+    assert report.info["workflow_rulesets"] == []
+    assert report.skipped == ()
 
 
 def test_graph_health_warns_for_duplicate_explicit_edges() -> None:
@@ -882,8 +872,8 @@ def test_nodeset_depth_limit_checks_unused_planned_definitions() -> None:
 def test_graph_health_rejects_invalid_nodeset_max_depth(value) -> None:
     graph = parse_graph_config({"pipeline": _seed_only_pipeline()})
 
-    with pytest.raises(ValueError, match="nodeset max depth"):
-        validate_graph_health(graph, registry=_registry(), nodeset_max_depth=value)
+    report = validate_graph_health(graph, registry=_registry(), nodeset_max_depth=value)
+    assert any(item.failure_layer == "rule" for item in report.errors)
 
 
 def test_nodeset_health_rejects_export_and_internal_key_leak() -> None:
@@ -1074,7 +1064,7 @@ def helper():
     )
     code, payload = _inspect_node_source(tmp_path, capsys, source)
     assert code == 1
-    assert any(error["details"].get("legacy_code") == "base_lib_undeclared" for error in payload["health"]["errors"])
+    assert any(error["code"] == "NODE.BASE_LIB.BASE_LIB_UNDECLARED" for error in payload["health"]["errors"])
 
     policy_path = tmp_path / "kernel_policy.jsonc"
     policy_path.write_text(
@@ -1084,7 +1074,7 @@ def helper():
     code, payload = _inspect_node_source(tmp_path, capsys, source, extra_args=["--policy", str(policy_path)])
     assert code == 0
     assert payload["health"]["status"] == "PASS"
-    assert "base_lib.good" in {module["module"] for module in payload["base_lib"]["modules"]}
+    assert "base_lib.good" in payload["node"]["metrics"]["imported_base_lib_modules"]
 
 def test_node_importing_unhealthy_base_lib_reports_indirect_violation(tmp_path, capsys, monkeypatch) -> None:
     monkeypatch.syspath_prepend(str(tmp_path))

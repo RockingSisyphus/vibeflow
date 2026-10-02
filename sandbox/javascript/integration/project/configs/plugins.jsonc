@@ -1,48 +1,84 @@
 {
   "plugins": [
-    {
-      "id": "sandbox.policy_audit",
-      "config": {"expectedNodes": 4}
-    },
     "sandbox.compiler_audit",
     {
       "id": "sandbox.runtime_audit",
-      "config": {"expectedNodes": 4}
+      "config": {
+        "expectedNodes": 4
+      }
     },
     {
       "id": "sandbox.future_runtime",
       "status": "planned",
       "type": "runtime",
-      "targets": ["node"],
-      "config": {"purpose": "architecture-only"}
+      "targets": [
+        "node"
+      ],
+      "config": {
+        "purpose": "architecture-only"
+      }
     }
   ],
   "pipeline": {
     "inputs": [
-      {"key": "x", "type": "sandbox.x", "display_name": "X", "required": true},
-      {"key": "a", "type": "sandbox.addend", "display_name": "Addend", "required": true},
-      {"key": "b", "type": "sandbox.subtrahend", "display_name": "Subtrahend", "required": true}
+      {
+        "key": "x",
+        "type": "sandbox.x",
+        "display_name": "X",
+        "required": true
+      },
+      {
+        "key": "a",
+        "type": "sandbox.addend",
+        "display_name": "Addend",
+        "required": true
+      },
+      {
+        "key": "b",
+        "type": "sandbox.subtrahend",
+        "display_name": "Subtrahend",
+        "required": true
+      }
     ],
     "nodes": [
-      {"id": "start", "type_used": "sandbox.terminal", "display_name": "Start", "description": "Starts the plugin integration workflow."},
+      {
+        "id": "start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts the plugin integration workflow."
+      },
       {
         "id": "add",
         "type_used": "sandbox.add",
         "display_name": "Add",
         "description": "Adds the configured input value in this workflow instance."
-              },
+      },
       {
         "id": "subtract",
         "type_used": "sandbox.subtract",
         "display_name": "Subtract",
         "description": "Subtracts the configured input value in this workflow instance."
-              },
-      {"id": "end", "type_used": "sandbox.terminal", "display_name": "End", "description": "Ends the plugin integration workflow."}
+      },
+      {
+        "id": "end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Ends the plugin integration workflow."
+      }
     ],
     "edges": [
-      {"from": "start", "to": "add"},
-      {"from": "add", "to": "subtract"},
-      {"from": "subtract", "to": "end"}
+      {
+        "from": "start",
+        "to": "add"
+      },
+      {
+        "from": "add",
+        "to": "subtract"
+      },
+      {
+        "from": "subtract",
+        "to": "end"
+      }
     ],
     "outputs": [
       {

@@ -21,7 +21,7 @@ from vibeflow.targets.javascript.frontend.model_types import (
 )
 
 
-PLUGIN_TYPES = frozenset({"policy", "compiler", "runtime"})
+PLUGIN_TYPES = frozenset({"compiler", "runtime"})
 PLUGIN_STATUSES = frozenset({"implemented", "planned"})
 
 
@@ -74,7 +74,7 @@ class JavascriptPluginBinding:
         config = _portable_object(self.config, "plugin config")
         if self.completion not in COMPLETIONS:
             raise ValueError(f"completion must be one of {sorted(COMPLETIONS)}")
-        if plugin_type in {"policy", "compiler"} and self.completion != "immediate":
+        if plugin_type == "compiler" and self.completion != "immediate":
             raise ValueError(
                 f"{plugin_type} plugin factory must use immediate completion"
             )

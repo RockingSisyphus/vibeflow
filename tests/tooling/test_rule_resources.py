@@ -69,3 +69,14 @@ def test_nested_bundle_cycle_is_reported(tmp_path):
     write(tmp_path / "other/b.jsonc", {"kind": "bundle", "id": "b", "resources": {"bundles": ["../entry/a.jsonc"]}})
     with pytest.raises(DescriptorLoadError, match="BUNDLE.CYCLE"):
         load_descriptor_catalogs(tmp_path, {"bundles": ["entry"]})
+
+
+@pytest.mark.parametrize("selection,valid", [([], True), (["domain.blocks"], True), ("domain.blocks", False), ([3], False)])
+def test_workflow_ruleset_selection_is_validated_without_loading_implementations(selection, valid):
+    from vibeflow.tooling.project.config_schema import collect_config_schema_findings
+    document = {"rulesets": selection, "pipeline": {"nodes": [{
+        "id": "block", "type_used": "model.block", "display_name": "Block",
+        "description": "A declaration-only schema check.",
+    }]}}
+    findings = collect_config_schema_findings(document)
+    assert (not any(item.code == "CONFIG.SCHEMA.RULESETS" for item in findings)) == valid

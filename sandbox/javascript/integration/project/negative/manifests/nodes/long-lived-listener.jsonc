@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.invalid.long_lived_listener",
   "display_name": "Invalid long-lived listener",
   "category": "sandbox-negative",

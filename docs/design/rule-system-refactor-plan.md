@@ -75,6 +75,8 @@ static 入口执行选中的审查；run 保留原有执行检查集合，新领
 
 真实验收包括 Python/JS 数值计算和原生串行、分支、Nodeset、Loop，实际 Mermaid/SVG 的颜色、形状、语义与来源，wheel、两个发行 profile、发行入口与 verify-kernel。
 
+领域示例位于 `sandbox/python/domain_rules` 和 `sandbox/javascript/domain_rules`。两者用明确的 `model_forward` / `modelForward` 约定检查模型定义归属，并通过原生连边组合模型乘法块和数据变换加法块，真实计算 `3 × 2 + 1 = 7`。
+
 ```bash
 npm_config_cache=/tmp/vibeflow-npm-cache python tools/verify_project.py --full
 python quality/test.py

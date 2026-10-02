@@ -13,6 +13,7 @@ JavaScript Target 使用静态 descriptor 记录资源信息，并把 workflow �
   "description": "Normalizes whitespace in supplied text.",
   "version": "1.0.0",
   "flow_kind": "process",
+  "rulesets": ["vibeflow.process"],
   "contract": {
     "requires": [
       {"type": "text.raw", "cardinality": "exactly_one", "display_name": "Raw text"}
@@ -36,6 +37,8 @@ JavaScript Target 使用静态 descriptor 记录资源信息，并把 workflow �
   "capabilities": []
 }
 ```
+
+Node descriptor 与 Python 共用声明模型。`rulesets` 明确选择审查约束；未填写时继承分类默认，显式 `[]` 表示未约束，`flow_kind` 不授予副作用权限。分类可提供默认颜色、形状、图标和 Ruleset，插件可通过 bundle 批量登记，见 [规则与分类](rules-and-categories.md)。
 
 Node descriptor 的端口和语义必须完整。`params_schema` / `params_defaults` 描述调用实例 `config`；输出结构不在 Node 上覆盖，provider 的 `type` 对应独立 Data Schema。
 

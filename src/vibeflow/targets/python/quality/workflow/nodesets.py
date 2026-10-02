@@ -33,7 +33,7 @@ def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry | None) -> t
         errors.extend(_validate_nodeset_contract(nodeset))
         errors.extend(_validate_nodeset_key_scope(nodeset))
         try:
-            GraphCompiler().compile(nodeset.graph, owner=f"nodeset:{nodeset.type_key}")
+            GraphCompiler().compile(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.type_key}")
         except GraphCompileError as exc:
             errors.append(
                 _nodeset_finding(
@@ -111,7 +111,7 @@ def _validate_node_types_in_scope(nodes, nodesets, *, registry: NodeRegistry, ow
         if node.type_used in nodesets:
             continue
         try:
-            registry.get(node.type_used)
+            registry.descriptor(node.type_used)
         except NodeRegistryError as exc:
             findings.append(
                 HealthFinding(

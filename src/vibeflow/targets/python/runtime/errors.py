@@ -25,7 +25,13 @@ class DelegateCliExit(BaseException):
         self.source = source
 
 
-def normalize_delegate_cli_system_exit(exc: SystemExit, *, source: str) -> DelegateCliExit:
+def normalize_delegate_cli_system_exit(
+    exc: SystemExit, *, source: str, effect_scope: str = "unconstrained"
+) -> DelegateCliExit:
+    if effect_scope not in {"terminal", "python_io", "unconstrained"}:
+        raise PipelineRuntimeError(
+            f"node '{source}' with effect_scope '{effect_scope}' cannot control delegate CLI exit"
+        )
     value = exc.code
     if value is None:
         return DelegateCliExit(0, source=source)

@@ -155,9 +155,19 @@ class RuntimeNodeMixin:
             self._call_runtime_plugins("after_node", frame.name, frame.node_type, summarize_mapping(outputs))
             return outputs
         except SystemExit as exc:
-            failure = PipelineRuntimeError(
-                f"planned python_stub node '{frame.name}' attempted SystemExit; planned stubs use effect scope none"
-            )
+            if self.delegate_cli:
+                try:
+                    exit_signal = normalize_delegate_cli_system_exit(
+                        exc, source=frame.name, effect_scope=frame.effect_scope
+                    )
+                except PipelineRuntimeError as denied:
+                    failure = denied
+                else:
+                    raise exit_signal from exc
+            else:
+                failure = PipelineRuntimeError(
+                    f"planned python_stub node '{frame.name}' attempted SystemExit outside delegate CLI mode"
+                )
             self._record_runtime_event(
                 "node_failed",
                 frame.name,
@@ -200,10 +210,11 @@ class RuntimeNodeMixin:
                 )
                 self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(failure))
                 raise failure from exc
-            if frame.flow_kind not in {"io", "document", "data_store"}:
-                failure = PipelineRuntimeError(
-                    f"node '{frame.name}' with flow_kind '{frame.flow_kind}' cannot control delegate CLI exit"
+            try:
+                exit_signal = normalize_delegate_cli_system_exit(
+                    exc, source=frame.name, effect_scope=frame.effect_scope
                 )
+            except PipelineRuntimeError as failure:
                 self._record_runtime_event(
                     "node_failed",
                     frame.name,
@@ -214,7 +225,7 @@ class RuntimeNodeMixin:
                 )
                 self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(failure))
                 raise failure from exc
-            raise normalize_delegate_cli_system_exit(exc, source=frame.name) from exc
+            raise exit_signal from exc
         except NodeRegistryError as exc:
             failure = PipelineRuntimeError(str(exc))
             self._record_runtime_event("node_failed", frame.name, frame.node_type, failure=str(failure), elapsed_ms=elapsed_ms(started))

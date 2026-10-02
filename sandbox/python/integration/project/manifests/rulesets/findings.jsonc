@@ -1,0 +1,18 @@
+{
+  "kind": "ruleset",
+  "id": "sandbox.findings",
+  "calls": [
+    {
+      "id": "check",
+      "rule_id": "sandbox.findings"
+    }
+  ],
+  "entrypoints": {
+    "static": [
+      "check"
+    ],
+    "run": [
+      "check"
+    ]
+  }
+}

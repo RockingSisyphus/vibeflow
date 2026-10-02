@@ -3,23 +3,41 @@
   "$id": "https://vibeflow.local/schema/health_report.schema.json",
   "title": "VibeFlow HealthReport",
   "type": "object",
-  "required": ["status", "errors", "warnings", "skipped", "info", "effective_policy"],
+  "required": [
+    "status",
+    "errors",
+    "warnings",
+    "skipped",
+    "info",
+    "effective_policy"
+  ],
   "properties": {
     "status": {
       "type": "string",
-      "enum": ["PASS", "CONCERNS", "FAIL", "ERROR"]
+      "enum": [
+        "PASS",
+        "CONCERNS",
+        "FAIL",
+        "ERROR"
+      ]
     },
     "errors": {
       "type": "array",
-      "items": { "$ref": "#/$defs/finding" }
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
     },
     "warnings": {
       "type": "array",
-      "items": { "$ref": "#/$defs/finding" }
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
     },
     "skipped": {
       "type": "array",
-      "items": { "$ref": "#/$defs/finding" }
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
     },
     "info": {
       "type": "object"
@@ -41,19 +59,55 @@
         "failure_layer",
         "message",
         "suggested_fix_type",
-        "details"
+        "details",
+        "code"
       ],
       "properties": {
-        "rule_id": { "type": "string", "minLength": 1 },
-        "severity": { "type": "string", "enum": ["error", "warning", "info"] },
-        "object_type": { "type": "string" },
-        "object_id": { "type": "string" },
-        "source_location": { "type": "object" },
-        "rule_source": { "type": "string" },
-        "failure_layer": { "type": "string" },
-        "message": { "type": "string", "minLength": 1 },
-        "suggested_fix_type": { "type": "string" },
-        "details": { "type": "object" }
+        "rule_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "info"
+          ]
+        },
+        "object_type": {
+          "type": "string"
+        },
+        "object_id": {
+          "type": "string"
+        },
+        "source_location": {
+          "type": "object"
+        },
+        "rule_source": {
+          "type": "string"
+        },
+        "failure_layer": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "suggested_fix_type": {
+          "type": "string"
+        },
+        "details": {
+          "type": "object"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "definition_id": {
+          "type": "string",
+          "description": "Stable Rule resource ID; code identifies its diagnostic."
+        }
       }
     }
   }

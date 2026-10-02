@@ -1,0 +1,39 @@
+{
+  "kind": "ruleset",
+  "id": "example.model_domain",
+  "calls": [
+    {
+      "id": "native",
+      "ruleset_id": "vibeflow.process"
+    },
+    {
+      "id": "definition",
+      "rule_id": "example.model_definition"
+    }
+  ],
+  "entrypoints": {
+    "import": [
+      "native"
+    ],
+    "static": [
+      "native",
+      "definition"
+    ],
+    "run": [
+      "native",
+      "definition"
+    ]
+  },
+  "relations": [
+    {
+      "source": "$self",
+      "target": "native/interface",
+      "kind": "overrides",
+      "params": {
+        "allowed_methods": [
+          "model_forward"
+        ]
+      }
+    }
+  ]
+}

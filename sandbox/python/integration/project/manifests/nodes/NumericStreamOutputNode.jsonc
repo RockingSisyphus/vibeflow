@@ -1,0 +1,83 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.numeric_stream_output",
+  "display_name": "通过 stream 写出结果",
+  "category": "sandbox",
+  "description": "在 document.output_written 后通过 sys streams 写 number.total，并提供 cli.exit_code。",
+  "version": "0.1.0",
+  "flow_kind": "io",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "number.total",
+        "cardinality": "exactly_one",
+        "display_name": "number.total"
+      },
+      {
+        "type": "document.output_written",
+        "cardinality": "exactly_one",
+        "display_name": "document.output_written"
+      }
+    ],
+    "provides": [
+      {
+        "key": "cli.exit_code",
+        "type": "cli.exit_code",
+        "display_name": "cli.exit_code"
+      }
+    ],
+    "input_semantics": {
+      "number.total": [
+        "需要显示的最终求和结果。"
+      ],
+      "document.output_written": [
+        "用于保证文件写入已完成的路径回执。"
+      ]
+    },
+    "output_semantics": {
+      "cli.exit_code": [
+        "成功时返回的业务退出码。"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "number.total": {
+            "key": "number.total",
+            "type": "number.total",
+            "value": 41,
+            "source_node": "example"
+          },
+          "document.output_written": {
+            "key": "document.output_written",
+            "type": "document.output_written",
+            "value": "sum.txt",
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.io"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_delegate_numeric_nodes.py",
+        "export": "NumericStreamOutputNode"
+      }
+    }
+  ]
+}

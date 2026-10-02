@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Mapping
 
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.flow import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, LoopSpec, NodeSpec, NodesetSpec, STATUS_PLANNED
-from vibeflow.targets.python.project.node import EFFECT_SCOPE_NONE, effective_effect_scope
 from vibeflow.core.constants import (
     EFFECT_SCOPE_GLOBAL_STATE,
     FLOW_KIND_GLOBAL_STATE,
@@ -100,21 +99,19 @@ def node_flow_kind(node: NodeSpec, compiled: CompiledGraph) -> str:
     return compiled.flow_kinds.get(node.id, "")
 
 
-def node_review_effect_scope(graph: GraphConfig, node: NodeSpec, registry: NodeRegistry | None) -> str:
-    """Return a review-safe scope; planned and composite calls never gain effects."""
+def node_review_effect_scope(graph: GraphConfig, node: NodeSpec, registry: NodeRegistry | None, *, compiled: CompiledGraph | None = None) -> str:
+    """Report selected rule constraints separately from native execution identity."""
 
-    if node.status == STATUS_PLANNED:
-        return (
-            EFFECT_SCOPE_GLOBAL_STATE
-            if node.flow_kind == FLOW_KIND_GLOBAL_STATE
-            else EFFECT_SCOPE_NONE
-        )
-    if node.type_used in LOOP_NODE_TYPES or invocation_for_node(graph, node) is not None:
-        return EFFECT_SCOPE_NONE
-    if node.type_used == IO_NODE_TYPE:
-        return "terminal"
-    node_cls = registry_node_class(registry, node.type_used)
-    return effective_effect_scope(getattr(node_cls, "NODE_INFO", None)) if node_cls is not None else EFFECT_SCOPE_NONE
+    invocation = invocation_for_node(graph, node)
+    if node.status == STATUS_PLANNED or invocation is not None and invocation.nodeset.status == STATUS_PLANNED:
+        return "unavailable"
+    if compiled is not None and node.id in compiled.effect_scopes:
+        return compiled.effect_scopes[node.id]
+    if node.type_used in LOOP_NODE_TYPES or invocation is not None or node.type_used == IO_NODE_TYPE:
+        return "unconstrained"
+    if registry is not None and node.type_used in registry.available():
+        return registry.effect_scope(node.type_used)
+    return "unconstrained"
 
 
 def registry_node_class(registry: NodeRegistry | None, type_key: str) -> type | None:

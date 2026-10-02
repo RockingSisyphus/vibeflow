@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.invalid.indirect_node_builtin",
   "display_name": "Invalid indirect Node builtin",
   "category": "sandbox-negative",

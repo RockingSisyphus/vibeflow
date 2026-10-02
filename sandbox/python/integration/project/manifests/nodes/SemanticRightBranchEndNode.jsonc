@@ -1,0 +1,59 @@
+{
+  "kind": "node",
+  "type_key": "semantic.right_branch_end",
+  "display_name": "Semantic Right Branch End",
+  "category": "semantic",
+  "description": "Terminates a semantic branch flow after calc.right_branch is available.",
+  "version": "0.1.0",
+  "flow_kind": "terminal",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "calc.right_branch",
+        "cardinality": "exactly_one",
+        "display_name": "calc.right_branch"
+      }
+    ],
+    "provides": [],
+    "input_semantics": {
+      "calc.right_branch": [
+        "final right branch arithmetic output"
+      ]
+    },
+    "output_semantics": {},
+    "examples": [
+      {
+        "inputs": {
+          "calc.right_branch": {
+            "key": "calc.right_branch",
+            "type": "calc.right_branch",
+            "value": 15,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_semantic_nodes.py",
+        "export": "SemanticRightBranchEndNode"
+      }
+    }
+  ]
+}

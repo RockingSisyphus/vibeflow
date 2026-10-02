@@ -1,6 +1,7 @@
 """Isolation and behavior checks for the Python frontend."""
 
 from __future__ import annotations
+from tests.fixtures.support.declarations import node_declaration, configured_declaration
 
 import os
 from pathlib import Path
@@ -71,28 +72,23 @@ def test_registration_provenance_still_points_to_caller() -> None:
     from vibeflow.targets.python.project.node import NodeContract, NodeInfo
     from vibeflow.targets.python.project.registry import NodeRegistry
 
-    class ExampleNode:
-        NODE_INFO = NodeInfo(
+    ExampleNode_DECLARATION = node_declaration(NodeInfo(
             "test.provenance",
             "Provenance",
             "test",
             "Captures registration provenance.",
             "1",
             "process",
-        )
-        CONTRACT = NodeContract()
+        ), NodeContract(), rulesets=("vibeflow.process",))
+
+    class ExampleNode:
 
         def run_pure(self, inputs, params):
             return {}
 
     registry = NodeRegistry()
     expected_line = sys._getframe().f_lineno + 1
-    registry.register(
-        "test.provenance",
-        ExampleNode,
-        config_schema={},
-        config_defaults={},
-    )
+    registry.register(configured_declaration(ExampleNode_DECLARATION, {}, {}), ExampleNode)
     info = registry.registration_info()[0]
     assert Path(info.path).resolve() == Path(__file__).resolve()
     assert info.function == "test_registration_provenance_still_points_to_caller"

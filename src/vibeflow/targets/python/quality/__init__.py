@@ -6,11 +6,21 @@ from importlib import import_module
 
 
 _EXPORTS = {
+    "PythonSourceContext": ("vibeflow.targets.python.quality.source_context", "PythonSourceContext"),
+    "PythonSourceFile": ("vibeflow.targets.python.quality.source_context", "PythonSourceFile"),
+    "PythonSourceNode": ("vibeflow.targets.python.quality.source_context", "PythonSourceNode"),
+    "PythonSourceCall": ("vibeflow.targets.python.quality.source_context", "PythonSourceCall"),
+    "PythonSourceReference": ("vibeflow.targets.python.quality.source_context", "PythonSourceReference"),
+    "PythonSourceImport": ("vibeflow.targets.python.quality.source_context", "PythonSourceImport"),
+    "PythonSourceOwnership": ("vibeflow.targets.python.quality.source_context", "PythonSourceOwnership"),
+    "PythonSymbol": ("vibeflow.targets.python.quality.source_context", "PythonSymbol"),
     "PythonSource": ("vibeflow.targets.python.quality.source", "PythonSource"),
     "PythonSourceQuality": (
         "vibeflow.targets.python.quality.source",
         "PythonSourceQuality",
     ),
+    "source_context_quality_facts": ("vibeflow.targets.python.quality.project_context", "source_context_quality_facts"),
+    "analyze_python_source_tree": ("vibeflow.targets.python.quality.source", "analyze_python_source_tree"),
     "analyze_python_source": (
         "vibeflow.targets.python.quality.source",
         "analyze_python_source",
@@ -35,14 +45,6 @@ _EXPORTS = {
         "vibeflow.targets.python.quality.source_analysis",
         "PurityViolation",
     ),
-    "collect_node_metrics": (
-        "vibeflow.targets.python.quality.source_analysis",
-        "collect_node_metrics",
-    ),
-    "validate_node_class": (
-        "vibeflow.targets.python.quality.source_analysis",
-        "validate_node_class",
-    ),
     "HealthFinding": (
         "vibeflow.targets.python.quality.workflow",
         "HealthFinding",
@@ -50,10 +52,6 @@ _EXPORTS = {
     "HealthReport": (
         "vibeflow.targets.python.quality.workflow",
         "HealthReport",
-    ),
-    "PythonNodeQualityFacts": (
-        "vibeflow.targets.python.quality.workflow",
-        "PythonNodeQualityFacts",
     ),
     "validate_graph_health": (
         "vibeflow.targets.python.quality.workflow",

@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.branch_join",
   "display_name": "Branch join",
   "category": "sandbox",

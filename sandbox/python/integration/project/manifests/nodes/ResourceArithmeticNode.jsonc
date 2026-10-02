@@ -1,0 +1,92 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.resource_arithmetic",
+  "display_name": "Resource Arithmetic",
+  "category": "sandbox",
+  "description": "Uses declared base_lib arithmetic helpers and the configured plugin shift to produce calc.resource.",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "calc.sum",
+        "cardinality": "exactly_one",
+        "display_name": "calc.sum"
+      }
+    ],
+    "provides": [
+      {
+        "key": "calc.resource",
+        "type": "calc.resource",
+        "display_name": "calc.resource"
+      }
+    ],
+    "input_semantics": {
+      "calc.sum": [
+        "numeric sum produced by the preceding arithmetic node"
+      ]
+    },
+    "output_semantics": {
+      "calc.resource": [
+        "result after base_lib arithmetic and plugin value shift"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "calc.sum": {
+            "key": "calc.sum",
+            "type": "calc.sum",
+            "value": 10,
+            "source_node": "example"
+          }
+        },
+        "params": {
+          "addend": 5,
+          "multiplier": 3,
+          "subtrahend": 4,
+          "divisor": 1
+        }
+      }
+    ],
+    "params_schema": {
+      "addend": {
+        "type": "number"
+      },
+      "multiplier": {
+        "type": "number"
+      },
+      "subtrahend": {
+        "type": "number"
+      },
+      "divisor": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "addend": 0,
+      "multiplier": 1,
+      "subtrahend": 0,
+      "divisor": 1
+    }
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_math_nodes.py",
+        "export": "ResourceArithmeticNode"
+      }
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.value_input",
+  "display_name": "读取数值输入",
+  "category": "sandbox",
+  "description": "在流程内部读取由运行初始上下文提供的 value.in；该节点用于表达标准流程图中的输入动作，而不是程序开始节点。",
+  "version": "0.1.0",
+  "flow_kind": "io",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "value.in",
+        "cardinality": "exactly_one",
+        "display_name": "value.in"
+      }
+    ],
+    "provides": [
+      {
+        "key": "value.in.input",
+        "type": "value.in",
+        "display_name": "value.in.input"
+      }
+    ],
+    "input_semantics": {
+      "value.in": [
+        "由调用方注入的原始数值，后续准备节点会基于它进行初始化。"
+      ]
+    },
+    "output_semantics": {
+      "value.in.input": [
+        "pass-through value.in envelope from pipeline input"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "value.in": {
+            "key": "value.in",
+            "type": "value.in",
+            "value": 1,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.io"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_math_nodes.py",
+        "export": "ValueInputNode"
+      }
+    }
+  ]
+}

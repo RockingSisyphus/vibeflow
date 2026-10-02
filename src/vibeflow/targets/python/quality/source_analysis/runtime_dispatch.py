@@ -33,7 +33,6 @@ _CALLABLE = "callable"
 
 _READ_ONLY_MAPPING_METHODS = frozenset({"get", "items", "keys", "values"})
 _INPUT_VALUE_FIELDS = frozenset({"value", "values"})
-_METADATA_NAMES = frozenset({"BASE_LIB_INFO", "CONTRACT", "NODE_INFO", "PLUGIN_INFO"})
 _STATIC_BUILTINS = frozenset(dir(builtins))
 _VALUE_PRESERVING_BUILTINS = frozenset({"anext", "next"})
 _ITERATOR_BUILTINS = frozenset({"aiter", "iter"})
@@ -158,6 +157,21 @@ def analyze_runtime_dispatch(node_cls: type[Any]) -> RuntimeDispatchAnalysis | N
     parameters = _bind_initial_parameters(run_node)
     analyzer.analyze(unit, parameters)
     return RuntimeDispatchAnalysis(tuple(analyzer.sites))
+
+
+def analyze_source_runtime_dispatch(sources, node) -> RuntimeDispatchAnalysis | None:
+    """Analyse a declaration's snapshot without binding or importing its class."""
+    symbol = sources.symbol(node.path, node.symbol)
+    if symbol is None or not isinstance(symbol.node, ast.ClassDef):
+        return None
+    run = next((item for item in symbol.node.body if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == "run_pure"), None)
+    if run is None:
+        return RuntimeDispatchAnalysis()
+    analyzer = _SourceDispatchAnalyzer(sources, node)
+    unit = _FunctionUnit(f"{node.path}:{node.symbol}.run_pure", run, node.path, 0, None, node.symbol)
+    analyzer.analyze(unit, _bind_initial_parameters(run))
+    return RuntimeDispatchAnalysis(tuple(analyzer.sites))
+
 
 
 class _RuntimeDispatchAnalyzer:
@@ -638,6 +652,24 @@ class _RuntimeDispatchAnalyzer:
         return tree
 
 
+class _SourceDispatchAnalyzer(_RuntimeDispatchAnalyzer):
+    def __init__(self, sources, node):
+        super().__init__(root_path=node.path, root_tree=sources.file(node.path).tree, root_module=None, owner_class=node.symbol)
+        self.sources = sources
+        self._module_trees = {file.path: file.tree for file in sources.files if file.tree is not None}
+
+    def _helper_unit(self, expression, function, frame):
+        source_id = frame.unit.key
+        target_id = next((reference.target for reference in self.sources.references
+                          if reference.source == source_id and reference.kind == "call" and reference.line == getattr(expression, "lineno", 0)
+                          and reference.column == getattr(expression,"col_offset",0)+1), None)
+        target = next((symbol for symbol in self.sources.symbols if symbol.id == target_id), None)
+        if target is not None and isinstance(target.node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            owner = target.name.rpartition(".")[0] if isinstance(expression, ast.Attribute) and isinstance(expression.value, ast.Name) and expression.value.id in {"self", "cls"} else ""
+            return _FunctionUnit(target.id, target.node, target.path, 0, None, owner)
+        return super()._helper_unit(expression, function, frame)
+
+
 def _bind_initial_parameters(node: ast.FunctionDef | ast.AsyncFunctionDef) -> dict[str, _Value]:
     parameters = _parameters(node)
     values: dict[str, _Value] = {}
@@ -713,7 +745,7 @@ def _mutable_module_state_names(tree: ast.Module) -> set[str]:
                 names.update(targets)
             else:
                 static_names.update(targets)
-    return names - _METADATA_NAMES
+    return names
 
 
 def _module_value_is_runtime_state(value: ast.AST, static_names: set[str]) -> bool:
@@ -879,4 +911,5 @@ __all__ = [
     "RuntimeDispatchAnalysis",
     "RuntimeDispatchSite",
     "analyze_runtime_dispatch",
+    "analyze_source_runtime_dispatch",
 ]

@@ -24,31 +24,6 @@ from vibeflow.core.contracts import DataProvider, DataRequirement
 EFFECT_SCOPE_TERMINAL = "terminal"
 EFFECT_SCOPE_PYTHON_IO = "python_io"
 
-# Effect authorization is derived from semantic node metadata.
-_EFFECT_SCOPE_BY_FLOW_KIND: Mapping[str, str] = MappingProxyType(
-    {
-        FLOW_KIND_TERMINAL: EFFECT_SCOPE_NONE,
-        FLOW_KIND_PROCESS: EFFECT_SCOPE_NONE,
-        FLOW_KIND_DECISION: EFFECT_SCOPE_NONE,
-        FLOW_KIND_IO: EFFECT_SCOPE_TERMINAL,
-        FLOW_KIND_PREDEFINED: EFFECT_SCOPE_NONE,
-        FLOW_KIND_DATA_STORE: EFFECT_SCOPE_PYTHON_IO,
-        FLOW_KIND_DOCUMENT: EFFECT_SCOPE_PYTHON_IO,
-        FLOW_KIND_PREPARATION: EFFECT_SCOPE_NONE,
-        FLOW_KIND_GLOBAL_STATE: EFFECT_SCOPE_GLOBAL_STATE,
-    }
-)
-
-
-def effective_effect_scope(info: NodeInfo | None) -> str:
-    """Derive the sole fail-closed effect authorization from NodeInfo."""
-
-    if getattr(info, "external", False) is True:
-        return EFFECT_SCOPE_TRUSTED
-    flow_kind = str(getattr(info, "flow_kind", "") or "")
-    return _EFFECT_SCOPE_BY_FLOW_KIND.get(flow_kind, EFFECT_SCOPE_NONE)
-
-
 @dataclass(frozen=True)
 class NodeInfo:
     type_key: str
@@ -72,8 +47,5 @@ class NodeContract:
 
 
 class PureNode(Protocol):
-    NODE_INFO: NodeInfo
-    CONTRACT: NodeContract
-
     def run_pure(self, inputs: Mapping[str, Any], params: Mapping[str, Any]) -> Mapping[str, Any]:
         ...

@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.invalid.global_state",
   "display_name": "Invalid global state",
   "category": "sandbox-negative",

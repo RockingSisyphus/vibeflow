@@ -66,6 +66,46 @@ def _project_case(tmp_path: Path) -> tuple[Path, Path, Path]:
     return workspace / "vibeflow_config.jsonc", project, project / "configs/greeting.jsonc"
 
 
+def _configure_rule_policy(project: Path, policy: dict[str, object]) -> None:
+    """Select numeric review parameters through an explicit Ruleset override."""
+    directory = project / "manifests/rulesets"
+    directory.mkdir(exist_ok=True)
+    (directory / "numeric.jsonc").write_text(json.dumps({
+        "kind": "ruleset", "id": "test.numeric", "calls": [{"id": "base", "ruleset_id": "vibeflow.process"}],
+        "relations": [{"source": "$self", "target": "base/maintainability", "kind": "overrides", "params": {"policy": policy}}],
+        "entrypoints": {"static": ["base"], "run": ["base"], "import": ["base"]},
+    }), encoding="utf-8")
+    file = project / "vibeflow_project.jsonc"
+    data = json.loads(file.read_text(encoding="utf-8"))
+    data["descriptors"]["rulesets"] = ["manifests/rulesets"]
+    file.write_text(json.dumps(data), encoding="utf-8")
+    file = project / "manifests/nodes/greet.jsonc"
+    data = json.loads(file.read_text(encoding="utf-8"))
+    data["rulesets"] = ["test.numeric"]
+    file.write_text(json.dumps(data), encoding="utf-8")
+
+
+def _formal_findings(payload: dict[str, object], severity: str) -> list[dict[str, object]]:
+    result = list(payload.get("source_quality", {}).get("errors" if severity == "error" else "warnings", ()))
+    for report in payload.get("reports", ()):
+        result.extend(item for item in report.get("diagnostics", report.get("warnings", ())) if item.get("severity", "error") == severity)
+    return result
+
+
+def _registered_rule_report(project: Path, *, policy_data=None, **_):
+    """Exercise selected formal implementation rules without a workflow."""
+    from vibeflow.core.flow import GraphConfig
+    from vibeflow.targets.javascript.quality.rules import run_javascript_rules
+    from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
+    from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+    if policy_data is not None:
+        _configure_rule_policy(project, policy_data)
+    catalogs = load_project_descriptor_catalogs(project, project_config=project / "vibeflow_project.jsonc")
+    import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set())
+    return run_javascript_rules(GraphConfig(nodes=(), rulesets=()), catalogs, project_root=project,
+                                package_root=project, import_policy=import_policy, include_registered=True)
+
+
 def _add_planned_chain(project: Path, config: Path, depth: int) -> None:
     nodesets = project / "nodesets"
     nodesets.mkdir(exist_ok=True)
@@ -403,23 +443,22 @@ def test_registered_node_uses_config_schema_keys_and_static_call_chain(tmp_path:
     payload = json.loads(capsys.readouterr().out)
     assert code == 1 and payload["code"] == "NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN"
     source.write_text(source.read_text(encoding="utf-8").replace("function h4() { return h1(); }", "function h4() { return 1; }").replace("function h3() { return h4(); }\nfunction h4() { return 1; }", "function h3() { return 1; }"), encoding="utf-8")
-    policy = project / "explicit_policy.jsonc"
-    policy.write_text('{"complexity":{"max_params":1}}', encoding="utf-8")
-    code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--policy", str(policy), "--json"])
+    _configure_rule_policy(project, {"complexity": {"max_params": 1}})
+    code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
     assert code == 0
     capsys.readouterr()
-    policy.write_text('{"complexity":{"max_params":0}}', encoding="utf-8")
-    code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--policy", str(policy), "--json"])
+    _configure_rule_policy(project, {"complexity": {"max_params": 0}})
+    code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert code == 1
-    assert payload["code"] == "CONFIG.SCHEMA.POLICY_POSITIVE_INT"
-    policy.write_text('{"complexity":{"max_params":1}}', encoding="utf-8")
+    assert payload["code"] == "NODE.MAINTAINABILITY.COMPLEXITY_MAX_PARAMS"
+    _configure_rule_policy(project, {"complexity": {"max_params": 1}})
     manifest = project / "manifests/nodes/greet.jsonc"
     data = json.loads(manifest.read_text(encoding="utf-8"))
     data["contract"]["params_schema"]["suffix"] = {"type": "string"}
     data["contract"]["params_defaults"]["suffix"] = "!"
     manifest.write_text(json.dumps(data), encoding="utf-8")
-    code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--policy", str(policy), "--json"])
+    code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert code == 1 and payload["code"] == "NODE.MAINTAINABILITY.COMPLEXITY_MAX_PARAMS"
 
@@ -444,12 +483,11 @@ def test_registered_node_optional_limits_reach_javascript_quality_cli(
         + "\nfunction extra(a: number) { if (a) { if (a > 1) return a; } return 0; }\n",
         encoding="utf-8",
     )
-    policy = project / "optional-policy.jsonc"
     rule = f"NODE.MAINTAINABILITY.COMPLEXITY_{field.upper()}"
 
     def check(limit: int | None) -> dict[str, object]:
-        policy.write_text(json.dumps({"complexity": {field: limit}}), encoding="utf-8")
-        main(["quality-check", "--workspace", str(workspace), "--policy", str(policy), "--json"])
+        _configure_rule_policy(project, {"complexity": {field: limit}})
+        main(["quality-check", "--workspace", str(workspace), "--json"])
         return json.loads(capsys.readouterr().out)["source_quality"]
 
     baseline = check(None)
@@ -566,8 +604,8 @@ def test_nodeset_depth_project_setting_reaches_validate_quality_and_build(tmp_pa
     code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
     validated = json.loads(capsys.readouterr().out)
     assert code == 1 and validated["code"] == "NODESET.NESTING.DEPTH_EXCEEDED"
-    assert validated["diagnostics"][0]["actual_depth"] == 5
-    assert len(validated["diagnostics"][0]["calls"]) == 4
+    assert validated["diagnostics"][0]["details"]["actual_depth"] == 5
+    assert len(validated["diagnostics"][0]["details"]["calls"]) == 4
     code = main(["quality-check", "--workspace", str(workspace), "--config", str(config), "--json"])
     checked = json.loads(capsys.readouterr().out)
     assert code == 1 and checked["reports"][0]["code"] == "NODESET.NESTING.DEPTH_EXCEEDED"
@@ -648,7 +686,7 @@ def test_registered_base_lib_size_reaches_quality_and_validate(tmp_path: Path, c
     code = main(["quality-check", "--workspace", str(workspace), "--config", str(config), "--json"])
     checked = json.loads(capsys.readouterr().out)
     assert code == 1
-    assert any(item["rule_id"] == "BASE_LIB.SOURCE.MAX_LINES" for item in checked["source_quality"]["errors"])
+    assert any(item["rule_id"] == "BASE_LIB.SOURCE.MAX_LINES" for item in _formal_findings(checked, "error"))
     source.write_text(original + "\n// " + "中" * ((60000 - len(original.encode("utf-8")) - 4) // 3), encoding="utf-8")
     exact_bytes = len(source.read_bytes())
     source.write_bytes(source.read_bytes() + b"x" * (60000 - exact_bytes))
@@ -700,9 +738,8 @@ def test_registered_node_base_lib_dependency_chain_uses_shared_policy(tmp_path: 
                 json.dumps(descriptor), encoding="utf-8",
             )
         catalogs = load_project_descriptor_catalogs(project, project_config=project / "vibeflow_project.jsonc")
-        return scan_javascript_quality(
-            project, package_root=project, registered_catalogs=catalogs,
-            policy_data=COMMON_POLICY_DATA,
+        return _registered_rule_report(
+            project, policy_data=COMMON_POLICY_DATA,
         )
 
     warning = [item for item in check(3).findings
@@ -713,7 +750,7 @@ def test_registered_node_base_lib_dependency_chain_uses_shared_policy(tmp_path: 
     checked = json.loads(capsys.readouterr().out)
     assert code == 0 and any(
         item["rule_id"] == "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP"
-        for item in checked["source_quality"]["warnings"]
+        for item in _formal_findings(checked, "warning")
     )
     code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
     validated_warning = json.loads(capsys.readouterr().out)
@@ -730,18 +767,17 @@ def test_registered_node_base_lib_dependency_chain_uses_shared_policy(tmp_path: 
         item["rule_id"] == "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP"
         for item in built_warning["warnings"]
     )
-    policy = project / "chain-policy.jsonc"
-    policy.write_text(json.dumps({"maintainability": {
+    _configure_rule_policy(project, {"maintainability": {
         "warn_dependency_chain_length": 5, "max_dependency_chain_length": 6,
-    }}), encoding="utf-8")
+    }})
     code = main([
         "quality-check", "--workspace", str(workspace), "--config", str(config),
-        "--policy", str(policy), "--json",
+        "--json",
     ])
     customized = json.loads(capsys.readouterr().out)
     assert code == 0 and not any(
         item["rule_id"] == "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP"
-        for item in customized["source_quality"]["warnings"]
+        for item in _formal_findings(customized, "warning")
     )
     error = [item for item in check(5).findings
              if item.rule_id == "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP"]
@@ -792,9 +828,8 @@ def test_registered_node_source_limits_preserve_exact_boundaries(tmp_path: Path)
 
     def findings(text: str):
         source.write_text(text, encoding="utf-8")
-        report = scan_javascript_quality(
-            project, package_root=project, registered_catalogs=catalogs,
-            policy_data=COMMON_POLICY_DATA,
+        report = _registered_rule_report(
+            project, policy_data=COMMON_POLICY_DATA,
         )
         return {item.rule_id: item for item in report.findings if item.object_type == "node"}
 
@@ -843,9 +878,8 @@ def test_registered_base_lib_optional_limits_reach_javascript_quality(
     def check(limit: int | None):
         policy = deepcopy(COMMON_POLICY_DATA)
         policy["complexity"][field] = limit
-        return scan_javascript_quality(
-            project, package_root=project, registered_catalogs=catalogs,
-            policy_data=policy,
+        return _registered_rule_report(
+            project, policy_data=policy,
         )
 
     assert not any(item.rule_id == rule for item in check(None).findings)
@@ -891,8 +925,8 @@ def test_registered_metrics_without_workflow_keep_one_file_and_descriptor_attrib
     assert sum(item["path"] == "nodes/greet.ts" for item in files) == 1
     node_errors = [item for item in payload["source_quality"]["errors"] if item["rule_id"] == "NODE.PURITY.SOURCE_TOO_LARGE"]
     assert {item["object_id"] for item in node_errors} == {
-        "example.greet:nodes/greet.ts:run",
-        "example.greet.second:nodes/greet.ts:run",
+        "example.greet",
+        "example.greet.second",
     }
     shutil.copy2(SANDBOX / "project/configs/greeting.jsonc", config)
     code = main(["quality-check", "--workspace", str(workspace), "--config", str(config), "--json"])

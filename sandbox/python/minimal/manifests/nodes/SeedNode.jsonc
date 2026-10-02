@@ -1,0 +1,60 @@
+{
+  "kind": "node",
+  "type_key": "example.seed",
+  "display_name": "Seed",
+  "category": "example",
+  "description": "Produces the initial value for the example workflow.",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [],
+    "provides": [
+      {
+        "key": "value.in",
+        "type": "value.in",
+        "display_name": "value.in"
+      }
+    ],
+    "input_semantics": {},
+    "output_semantics": {
+      "value.in": [
+        "initial numeric value"
+      ]
+    },
+    "params_schema": {
+      "value": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "value": 1
+    },
+    "examples": [
+      {
+        "inputs": {},
+        "params": {
+          "value": 2
+        }
+      }
+    ]
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes.py",
+        "export": "SeedNode"
+      }
+    }
+  ]
+}

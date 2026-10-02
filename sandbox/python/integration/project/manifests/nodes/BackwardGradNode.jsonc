@@ -1,0 +1,83 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.backward_grad",
+  "display_name": "Backward Grad",
+  "category": "training",
+  "description": "Computes a gradient through a runtime-provided model callback.",
+  "version": "0.1.0",
+  "flow_kind": "global_state",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "train.model",
+        "cardinality": "exactly_one",
+        "display_name": "train.model"
+      },
+      {
+        "type": "train.loss",
+        "cardinality": "exactly_one",
+        "display_name": "train.loss"
+      }
+    ],
+    "provides": [
+      {
+        "key": "train.grad",
+        "type": "train.grad",
+        "display_name": "train.grad"
+      }
+    ],
+    "input_semantics": {
+      "train.model": [
+        "model object"
+      ],
+      "train.loss": [
+        "numeric loss"
+      ]
+    },
+    "output_semantics": {
+      "train.grad": [
+        "numeric gradient"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "train.model": {
+            "key": "train.model",
+            "type": "train.model",
+            "value": {},
+            "source_node": "example"
+          },
+          "train.loss": {
+            "key": "train.loss",
+            "type": "train.loss",
+            "value": 1,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.global_state"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_training_nodes.py",
+        "export": "BackwardGradNode"
+      }
+    }
+  ]
+}

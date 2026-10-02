@@ -17,7 +17,7 @@ class AotBuildError(RuntimeError):
         self.diagnostics = diagnostics
 
 
-@dataclass(frozen=True)
+@dataclass
 class ProjectBuildError(RuntimeError):
     code: str
     message: str

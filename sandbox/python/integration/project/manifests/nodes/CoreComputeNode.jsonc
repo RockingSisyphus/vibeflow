@@ -1,0 +1,77 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.core_compute",
+  "display_name": "核心业务计算",
+  "category": "sandbox",
+  "description": "在预定义子流程中执行主要计算逻辑；综合示例把它放进 nodeset，验证预定义过程节点与内部流程图的一致性。",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "value.prepared",
+        "cardinality": "exactly_one",
+        "display_name": "value.prepared"
+      }
+    ],
+    "provides": [
+      {
+        "key": "value.out",
+        "type": "value.out",
+        "display_name": "value.out"
+      }
+    ],
+    "input_semantics": {
+      "value.prepared": [
+        "准备阶段输出的数值，已经满足核心计算的输入前置条件。"
+      ]
+    },
+    "output_semantics": {
+      "value.out": [
+        "核心计算得到的中间业务结果，后续会进入决策节点判断是否继续循环。"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "value.prepared": {
+            "key": "value.prepared",
+            "type": "value.prepared",
+            "value": 4,
+            "source_node": "example"
+          }
+        },
+        "params": {
+          "factor": 2
+        }
+      }
+    ],
+    "params_schema": {
+      "factor": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "factor": 2
+    }
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_comprehensive_nodes.py",
+        "export": "CoreComputeNode"
+      }
+    }
+  ]
+}

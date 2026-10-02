@@ -1,0 +1,17 @@
+{
+  "kind": "rule",
+  "id": "sandbox.bad-shape",
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "rules/checks.py",
+        "export": "bad_shape"
+      }
+    }
+  ]
+}

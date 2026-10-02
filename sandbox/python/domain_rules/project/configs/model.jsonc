@@ -1,0 +1,63 @@
+{
+  "rulesets": [
+    "vibeflow.workflow"
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "value",
+        "type": "example.input",
+        "required": true,
+        "display_name": "Input"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "example.boundary",
+        "display_name": "Start",
+        "description": "Start the native workflow."
+      },
+      {
+        "id": "model",
+        "type_used": "example.model",
+        "display_name": "Model",
+        "description": "Execute one model block."
+      },
+      {
+        "id": "transform",
+        "type_used": "example.transform",
+        "display_name": "Transform",
+        "description": "Apply the data transformation."
+      },
+      {
+        "id": "end",
+        "type_used": "example.boundary",
+        "display_name": "End",
+        "description": "End the native workflow."
+      }
+    ],
+    "edges": [
+      {
+        "source": "start",
+        "target": "model"
+      },
+      {
+        "source": "model",
+        "target": "transform"
+      },
+      {
+        "source": "transform",
+        "target": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "example.output",
+        "cardinality": "exactly_one",
+        "as": "result",
+        "display_name": "Result"
+      }
+    ]
+  }
+}

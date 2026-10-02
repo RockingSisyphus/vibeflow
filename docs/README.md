@@ -13,6 +13,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [Python Node 与 BaseLib](user/python-development.md)
 - [JavaScript/TypeScript Node 与 AOT](user/javascript-development.md)
 - [Nodeset 与 Loop](user/nodesets-and-loops.md)
+- [Rule、Ruleset 与业务分类](user/rules-and-categories.md)
 - [Plugin 与宿主集成](user/plugins-and-integrations.md)
 - [命令、产物与检查范围](user/commands-and-results.md)
 - [人机协同协议](user/profiles/collaborative.md)
@@ -22,7 +23,8 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 - [系统架构](design/system-architecture.md)
 - [执行模型](design/execution-model.md)
-- [业务节点分类与领域源码检查实施方案](design/domain-node-extensions-plan.md)
+- [Rule/Ruleset、Node 分类与插件重构](design/rule-system-refactor-plan.md)
+- [业务分类与领域规则旧方案](design/domain-node-extensions-plan.md)：已由 Rule/Ruleset 方案替代。
 
 ## 内核维护
 

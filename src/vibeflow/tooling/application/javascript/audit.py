@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from html import escape as escape_xml
 import json
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any, Mapping
 
 from vibeflow.block_compiler import WorkflowPlan, compile_graph_plan
@@ -18,6 +18,7 @@ from vibeflow.core import (
 )
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
 from vibeflow.core.descriptors import DescriptorCatalogs, PluginSelectionError
+from vibeflow.core.descriptors.categories import selected_node_rulesets
 from vibeflow.core.flow import (
     IO_NODE_TYPE,
     LOOP_NODE_TYPES,
@@ -26,10 +27,11 @@ from vibeflow.core.flow import (
 )
 from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE
 from vibeflow.core.inspection import build_architecture_report
+from vibeflow.core.quality import QualityPolicy
+from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
 from vibeflow.targets.javascript.build.project_graph import (
     require_explicit_inputs,
 )
-from vibeflow.targets.javascript.build.nodeset_limits import check_nodeset_depth, nodeset_width_warnings
 from vibeflow.targets.javascript.build.project_paths import (
     javascript_options,
     safe_project_path,
@@ -45,7 +47,7 @@ from vibeflow.targets.javascript.build.toolchain import (
     DriverQualityResult,
     run_audit_driver,
 )
-from vibeflow.targets.javascript.quality.implementation import inspect_registered_implementations
+from vibeflow.targets.javascript.quality.rules import JavascriptRuleReport, node_type_calls, run_javascript_rules, run_javascript_workflow_rules
 from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
 from vibeflow.targets.javascript.frontend.facts import (
     JavascriptImplementationFactsError,
@@ -65,7 +67,7 @@ from vibeflow.tooling.project.host_extensions import host_extension_resources
 from vibeflow.tooling.project.plugin_review import load_plugin_review_resources
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
 from vibeflow.tooling.project.workspace_model import WorkspaceConfig, WorkspaceRoot
-from vibeflow.tooling.project.quality_policy import resolve_shared_quality_policy
+from vibeflow.tooling.presentation.node_presentation import resolve_presentation
 from vibeflow.tooling.application.mermaid_shapes import (
     mermaid_shape_for_flow_kind,
 )
@@ -78,8 +80,8 @@ class JavascriptAuditRequest:
     node_command: str = "node"
     audit_sources: bool = True
     audit_registered_resources: bool = False
-    policy_path: Path | None = None
     quality_facts_by_root: Mapping[str, DriverQualityResult] | None = None
+    quality_policy: QualityPolicy | None = None
 
 
 @dataclass(frozen=True)
@@ -101,6 +103,8 @@ class JavascriptAuditResult:
     plugin_records: tuple[Mapping[str, object], ...] = ()
     host_records: tuple[Mapping[str, object], ...] = ()
     toolchain: AuditToolchainInfo | None = None
+    rule_report: JavascriptRuleReport | None = None
+    rule_facts: Mapping[str, Any] | None = None
 
     @property
     def config_path(self) -> Path:
@@ -152,18 +156,6 @@ def audit_javascript_project(
     except JavascriptImplementationFactsError as exc:
         raise ProjectBuildError(exc.code, exc.message) from exc
     document = load_workspace_config_document(config_path, workspace=workspace)
-    policy_data, _, policy_findings = resolve_shared_quality_policy(
-        document.data,
-        config_path=config_path,
-        explicit_policy_path=request.policy_path,
-    )
-    if policy_findings:
-        first = policy_findings[0]
-        raise ProjectBuildError(
-            first.rule_id,
-            first.message,
-            diagnostics=tuple(item.to_dict() for item in policy_findings),
-        )
     graph = parse_graph_config(
         document.data,
         project_root=root.path,
@@ -171,9 +163,31 @@ def audit_javascript_project(
         root_path=root.path,
         source_path=config_path,
     )
-    width_warnings = nodeset_width_warnings(graph)
     javascript = javascript_options(root)
-    check_nodeset_depth(graph, max_depth=javascript["nodeset_max_depth"])
+    package_root = safe_project_path(root.path, javascript["package_root"], subject="javascript.package_root", require_directory=True)
+    rule_plugin_records, rule_plugin_ids = _plugin_records(document.data, catalogs=catalogs)
+    rule_host_records, rule_host_ids = _host_extension_records(document.data, root=root, catalogs=catalogs)
+    rule_import_policy, _ = target_neutral_import_policy(
+        catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]),
+        node_ids=None if request.audit_registered_resources else frozenset(node_type_calls(graph)), host_extension_ids=frozenset(rule_host_ids), plugin_ids=frozenset(rule_plugin_ids),
+    )
+    rule_report = run_javascript_rules(graph, catalogs, project_root=root.path, package_root=package_root,
+                                     phase="static", import_policy=rule_import_policy, node_command=request.node_command, evaluate_sources=request.audit_sources, include_registered=request.audit_registered_resources, prefetched_quality=(request.quality_facts_by_root or {}).get(str(root.path)),
+                                     quality_policy=request.quality_policy or javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
+    rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")
+    if rule_errors:
+        first = rule_errors[0]
+        raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in rule_report.findings))
+    rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={}, node_report=rule_report, project_root=root.path, package_root=package_root, phase="import", node_command=request.node_command, evaluate_sources=request.audit_sources,
+        rule_defaults={"vibeflow.workflow": {"nodeset_max_depth": javascript["nodeset_max_depth"]}, "vibeflow.graph.nodesets": {"nodeset_max_depth": javascript["nodeset_max_depth"]}},
+        quality_policy=request.quality_policy or javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
+    rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")
+    if rule_errors:
+        first = rule_errors[0]
+        raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in rule_report.findings))
+    facts = target_neutral_implementation_facts_from_catalog(catalogs.nodes, effect_policies=rule_report.policies)
+    width_warnings = ()
+    javascript = javascript_options(root)
     require_explicit_inputs(graph, path=())
     compiled_by_path: dict[tuple[str, ...], CompiledGraph] = {}
     used_node_types: set[str] = set()
@@ -273,30 +287,18 @@ def audit_javascript_project(
                 node_command=request.node_command,
             )
             toolchain = audited.toolchain
-            implementation_findings = inspect_registered_implementations(
-                catalogs,
-                project_root=root.path,
-                package_root=package_root,
-                selected_files=source_files,
-                policy_data=policy_data,
-                node_command=request.node_command,
-                prefetched_facts=(request.quality_facts_by_root or {}).get(str(root.path)),
-            )
-            implementation_errors = tuple(item for item in implementation_findings if item.severity == "error")
-            implementation_warnings = tuple(item.to_dict() for item in implementation_findings if item.severity == "warning")
-            if implementation_errors:
-                first = implementation_errors[0]
-                raise ProjectBuildError(
-                    first.rule_id,
-                    first.message,
-                    diagnostics=(*tuple(item.to_dict() for item in implementation_errors), *width_warnings),
-                )
         except AotToolchainError as exc:
             raise ProjectBuildError(
                 exc.code,
                 str(exc),
                 diagnostics=(*exc.diagnostics, *width_warnings),
             ) from exc
+    rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **compiled_by_path}, node_report=rule_report, project_root=root.path, package_root=package_root, rule_defaults={"vibeflow.workflow": {"nodeset_max_depth": javascript["nodeset_max_depth"]}, "vibeflow.graph.nodesets": {"nodeset_max_depth": javascript["nodeset_max_depth"]}}, node_command=request.node_command, evaluate_sources=request.audit_sources,
+                                                 quality_policy=request.quality_policy or javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
+    workflow_errors = tuple(item for item in rule_report.findings if item.severity == "error")
+    if workflow_errors:
+        first = workflow_errors[0]
+        raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in rule_report.findings))
     architecture = _architecture_payload(
         graph,
         compiled=compiled,
@@ -313,6 +315,8 @@ def audit_javascript_project(
         root_id=root.id,
         source_path=config_path.relative_to(root.path).as_posix(),
     )
+    architecture["rule_checks"] = _relative_rule_checks(rule_report.to_dict(), root.path)
+    architecture["node_categories"] = catalogs.categories.to_dict()
     return JavascriptAuditResult(
         workspace=workspace,
         root=root,
@@ -327,11 +331,26 @@ def audit_javascript_project(
         architecture=architecture,
         import_policy=import_policy,
         source_files=source_files,
-        warnings=(*width_warnings, *implementation_warnings),
+        warnings=(*width_warnings, *implementation_warnings, *(item.to_dict() for item in rule_report.findings if item.severity == "warning")),
         plugin_records=plugin_records,
         host_records=host_records,
         toolchain=toolchain,
+        rule_report=rule_report, rule_facts=rule_report.facts,
     )
+
+
+def _relative_rule_checks(value: Any, project_root: Path) -> Any:
+    """Keep canonical artifacts portable while live Rule diagnostics keep paths."""
+    if isinstance(value, Mapping):
+        return {key: _relative_rule_checks(item, project_root) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_relative_rule_checks(item, project_root) for item in value]
+    if isinstance(value, str):
+        try:
+            return PurePath(value).relative_to(project_root).as_posix()
+        except ValueError:
+            pass
+    return value
 
 
 def render_architecture(result: JavascriptAuditResult) -> str:
@@ -459,7 +478,7 @@ def _effect_scope_label(
 ) -> str:
     return compiled.effect_scopes.get(
         node_id,
-        "global_state" if flow_kind == FLOW_KIND_GLOBAL_STATE else "none",
+        "unconstrained",
     )
 
 
@@ -800,6 +819,7 @@ def _architecture_payload(
             compiled,
             source={"root_id": root_id, "path": source_path},
             graph_lock_scope="root",
+            catalogs=catalogs,
         ),
         "nodesets": {
             key: {
@@ -809,7 +829,8 @@ def _architecture_payload(
                 "description": value.description,
                 "status": value.status,
                 "flow_kind": value.flow_kind,
-                "effect_scope": "none",
+                "effect_scope": "unavailable" if value.status == STATUS_PLANNED else "unconstrained",
+                "rulesets": list(value.graph.rulesets),
                 "reachable_from_workflow": key in _reachable_javascript_nodesets(graph),
                 "requires": requirements_to_dicts(value.requires),
                 "provides": providers_to_dicts(value.provides),
@@ -820,6 +841,7 @@ def _architecture_payload(
                         compiled_nodesets[key],
                         source=_javascript_source_reference(value),
                         graph_lock_scope="block",
+                        catalogs=catalogs,
                     )
                     if value.graph.nodes
                     else None
@@ -828,17 +850,8 @@ def _architecture_payload(
             for key, value in sorted(graph.nodesets.items())
         },
         "node_types": {
-            descriptor.type_key: {
-                "display_name": descriptor.display_name,
-                "description": descriptor.description,
-                "category": descriptor.category,
-                "version": descriptor.version,
-                "flow_kind": descriptor.flow_kind,
-                "contract": descriptor.contract.to_dict(),
-                "implementations": [
-                    item.to_dict() for item in descriptor.implementations
-                    if item.language in {"javascript", "typescript"}
-                ],
+            descriptor.type_key: {**descriptor.to_dict(),
+                "effective_presentation": resolve_presentation(descriptor, catalogs.categories.get(descriptor.category)).to_dict(),
             }
             for descriptor in catalogs.nodes
         },
@@ -894,10 +907,12 @@ def _javascript_graph_document(
     *,
     source: Mapping[str, str],
     graph_lock_scope: str,
+    catalogs: DescriptorCatalogs,
 ) -> dict[str, object]:
     report = build_architecture_report(graph, compiled=compiled)
     return {
         "source": dict(source),
+        "rulesets": list(graph.rulesets),
         "inputs": providers_to_dicts(graph.inputs),
         "outputs": requirements_to_dicts(graph.outputs),
         "max_steps": graph.max_steps,
@@ -921,6 +936,7 @@ def _javascript_graph_document(
                 node,
                 source=source,
                 graph_lock_scope=graph_lock_scope,
+                catalogs=catalogs,
             )
             for node in graph.nodes
         ],
@@ -938,6 +954,7 @@ def _javascript_node_document(
     *,
     source: Mapping[str, str],
     graph_lock_scope: str,
+    catalogs: DescriptorCatalogs,
 ) -> dict[str, object]:
     node_id = str(getattr(node, "id", ""))
     type_used = str(getattr(node, "type_used", ""))
@@ -977,14 +994,23 @@ def _javascript_node_document(
         if nodeset is not None
         else "node_type"
     )
+    descriptor = catalogs.nodes.get(type_used)
+    category = catalogs.categories.get(descriptor.category) if descriptor else None
+    native_class = "externalDependency" if descriptor is not None and descriptor.external and nodeset is None else "loopNode" if is_loop else "nodesetNode" if nodeset is not None else "documentNode" if flow_kind == "document" else "defaultNode"
+    planned = status == STATUS_PLANNED or nodeset is not None and nodeset.status == STATUS_PLANNED
+    presentation = resolve_presentation(descriptor, category, native_class=native_class, status_class="plannedNode" if planned else "", call_style=getattr(node, "style", None), flow_kind=flow_kind)
     return {
         "id": node_id,
         "type_used": type_used,
         "source": dict(source),
         "role": getattr(node, "metadata").to_dict(),
+        "category": descriptor.category if descriptor else "",
+        "presentation": presentation.to_dict(),
+        "rulesets": list(nodeset.graph.rulesets) if nodeset is not None else list(descriptor.rulesets) if descriptor and descriptor.rulesets is not None else None,
+        "selected_rulesets": list(nodeset.graph.rulesets) if nodeset is not None else list(selected_node_rulesets(descriptor, catalogs.categories)) if descriptor else [],
         "contract_source": contract_source,
         "flow_kind": flow_kind,
-        "effect_scope": _effect_scope_label(compiled, node_id, flow_kind),
+        "effect_scope": "unavailable" if planned else _effect_scope_label(compiled, node_id, flow_kind),
         "runtime_dispatch": _runtime_dispatch_label(compiled, node_id),
         "execution_lock": (
             {"key": lock.key, "scope": "block" if invokes else "node"}

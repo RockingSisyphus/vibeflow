@@ -1,4 +1,22 @@
+from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
+
+from dataclasses import replace
+import inspect
+
+from vibeflow.core.descriptors.models import DescriptorModelError
+from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rules
+from vibeflow.targets.python.quality.source_context import PythonSourceFile, PythonSourceNode, build_python_source_context
+
+
+def _review_node(descriptor, implementation, *, policy):
+    """Exercise the public Rule path against the fixture's actual source."""
+    path = Path(inspect.getsourcefile(implementation))
+    node = PythonSourceNode(descriptor, str(path), implementation.__qualname__.replace(".<locals>.", "."))
+    facts = build_python_source_context((node,), (PythonSourceFile.parse(str(path), implementation.__module__, path.read_text()),))
+    registry = NodeRegistry()
+    registry.register(descriptor, implementation)
+    return execute_python_node_rules(registry, facts, purity_policy=policy)
 
 
 class ProviderPlanningBoundary(DemoBoundary):
@@ -10,129 +28,124 @@ class ProviderPlanningBoundary(DemoBoundary):
         return {}
 
 
-class TwoRouteNode:
-    NODE_INFO = NodeInfo("test.two_route", "Two Route", "test", "Routes flow.", "0.1.0", "decision")
-    CONTRACT = NodeContract(
+TwoRouteNode_DECLARATION = node_declaration(NodeInfo("test.two_route", "Two Route", "test", "Routes flow.", "0.1.0", "decision"), NodeContract(
         requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"),),
         provides=(DataProvider("flow.route", "flow.route", display_name="flow.route"),),
         input_semantics={"value.in": ("input",)},
         output_semantics={"flow.route": ("route",)},
 
         examples=({"inputs": {"value.in": 1}, "params": {}},),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class TwoRouteNode:
 
     def run_pure(self, inputs, params):
         return {"flow.route": "done"}
 
 
-class BodyRouteNode:
-    NODE_INFO = NodeInfo("test.body_route", "Body Route", "test", "Routes inside a loop body.", "0.1.0", "decision")
-    CONTRACT = NodeContract(
+BodyRouteNode_DECLARATION = node_declaration(NodeInfo("test.body_route", "Body Route", "test", "Routes inside a loop body.", "0.1.0", "decision"), NodeContract(
         requires=(DataRequirement("flow.route", "exactly_one", display_name="flow.route"),),
         provides=(DataProvider("flow.inner", "flow.inner", display_name="flow.inner"),),
         input_semantics={"flow.route": ("outer loop route",)},
         output_semantics={"flow.inner": ("body branch route",)},
 
         examples=({"inputs": {"flow.route": "again"}, "params": {}},),
-    )
+    ), rulesets=("vibeflow.process",))
+
+class BodyRouteNode:
 
     def run_pure(self, inputs, params):
         return {"flow.inner": "left"}
 
 
+EmptyProcessNode_DECLARATION = node_declaration(NodeInfo("test.empty_process", "Empty Process", "test", "Keeps a structural branch in progress.", "0.1.0", "process"), NodeContract(), rulesets=("vibeflow.process",))
+
 class EmptyProcessNode:
-    NODE_INFO = NodeInfo("test.empty_process", "Empty Process", "test", "Keeps a structural branch in progress.", "0.1.0", "process")
-    CONTRACT = NodeContract()
 
     def run_pure(self, inputs, params):
         return {}
 
 
-class BypassSourceNode:
-    NODE_INFO = NodeInfo("test.bypass_source", "Bypass Source", "test", "Produces a disconnected bypass value.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+BypassSourceNode_DECLARATION = node_declaration(NodeInfo("test.bypass_source", "Bypass Source", "test", "Produces a disconnected bypass value.", "0.1.0", "process"), NodeContract(
         provides=(DataProvider("source.value", "value.in", display_name="Source Value"),),
         output_semantics={"source.value": ("source bypass value",)},
-    )
+    ), rulesets=("vibeflow.process",))
+
+class BypassSourceNode:
 
     def run_pure(self, inputs, params):
         return {"source.value": 1}
 
 
-class BypassMiddleNode:
-    NODE_INFO = NodeInfo("test.bypass_middle", "Bypass Middle", "test", "Forwards a disconnected bypass value.", "0.1.0", "process")
-    CONTRACT = NodeContract(
+BypassMiddleNode_DECLARATION = node_declaration(NodeInfo("test.bypass_middle", "Bypass Middle", "test", "Forwards a disconnected bypass value.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("value.in", "exactly_one", display_name="Value In"),),
         provides=(DataProvider("middle.value", "value.in", display_name="Middle Value"),),
         input_semantics={"value.in": ("source bypass value",)},
         output_semantics={"middle.value": ("forwarded bypass value",)},
-    )
+    ), rulesets=("vibeflow.process",))
+
+class BypassMiddleNode:
 
     def run_pure(self, inputs, params):
         return {"middle.value": inputs["value.in"]["value"]}
 
 
 def _register_fulltext_nodes(registry: NodeRegistry) -> None:
-    registry.register("literature.rank_records", SeedNode, config_schema={"value": {"type": "number"}}, config_defaults={"value": 1})
+    registry.register(configured_declaration(SeedNode_DECLARATION, {"value": {"type": "number"}}, {"value": 1}, type_key="literature.rank_records"), SeedNode)
 
-def test_pure_node_metadata_and_static_check() -> None:
-    assert validate_node_class(SeedNode, policy=PurityPolicy(max_source_lines=1000)) == []
-    violations = validate_node_class(BadIoNode, policy=PurityPolicy(max_source_lines=1000))
-    assert any(item.code == "effect_call" and item.rule_id == "NODE.EFFECT.CALL_FORBIDDEN" for item in violations)
-
-def test_source_size_limit_is_enforced() -> None:
-    violations = validate_node_class(SeedNode, policy=PurityPolicy(max_source_lines=1))
-    assert any(item.code == "source_too_large" for item in violations)
+def test_selected_rules_check_pure_node_source() -> None:
+    report = _review_node(SeedNode_DECLARATION, SeedNode, policy=PurityPolicy(max_source_lines=1000))
+    assert report.findings == ()
+    violations = _review_node(BadIoNode_DECLARATION, BadIoNode, policy=PurityPolicy(max_source_lines=1000)).findings
+    assert any(item.rule_id == "NODE.EFFECT.CALL_FORBIDDEN" for item in violations)
 
 
-def test_flow_kind_rule_ids_are_strict() -> None:
-    class MissingFlowKindNode(SeedNode):
-        NODE_INFO = NodeInfo("bad.missing_flow", "Bad", "test", "Bad node.", "0.1.0", "")
-
-    class InvalidFlowKindNode(SeedNode):
-        NODE_INFO = NodeInfo("bad.invalid_flow", "Bad", "test", "Bad node.", "0.1.0", "branch")
-
-    assert any(item.rule_id == "NODE.FLOW_KIND.MISSING" for item in validate_node_class(MissingFlowKindNode, policy=PurityPolicy(max_source_lines=1000)))
-    assert any(item.rule_id == "NODE.FLOW_KIND.INVALID" for item in validate_node_class(InvalidFlowKindNode, policy=PurityPolicy(max_source_lines=1000)))
+def test_selected_maintainability_rule_enforces_source_size() -> None:
+    violations = _review_node(SeedNode_DECLARATION, SeedNode, policy=PurityPolicy(max_source_lines=1)).findings
+    assert any(item.rule_id == "NODE.PURITY.SOURCE_TOO_LARGE" for item in violations)
 
 
-def test_external_flag_keeps_contract_but_skips_source_quality() -> None:
+def test_declaration_rejects_missing_and_invalid_flow_kind() -> None:
+    for value in ("", "branch"):
+        with pytest.raises(DescriptorModelError, match="node.flow_kind"):
+            replace(SeedNode_DECLARATION, flow_kind=value)
+
+
+def test_external_flag_does_not_override_explicit_rule_selection() -> None:
+    declaration = node_declaration(
+        NodeInfo("test.external", "External", "test", "Calls external package.", "0.1.0", "process", external=True),
+        NodeContract(provides=(DataProvider("external.out", "external.out", display_name="external.out"),),
+                     output_semantics={"external.out": ("external output",)}),
+        rulesets=(),
+    )
+
     class ExternalNode:
-        NODE_INFO = NodeInfo("test.external", "External", "test", "Calls external package.", "0.1.0", "process", external=True)
-        CONTRACT = NodeContract(
-            provides=(DataProvider("external.out", "external.out", display_name="external.out"),),
-            output_semantics={"external.out": ("external output",)},
-
-            examples=({"inputs": {}, "params": {}},),
-        )
-
-        def run_pure(self, inputs, params):
-            import os
-
-            return {"external.out": "ok" if os.name else "ok"}
-
-    class InvalidExternalFlagNode(ExternalNode):
-        NODE_INFO = NodeInfo("test.external_invalid", "External", "test", "Calls external package.", "0.1.0", "process", external="yes")
-
-    external_violations = validate_node_class(ExternalNode, policy=PurityPolicy(max_source_lines=1, max_functions=0))
-    assert not any(item.code in {"banned_import", "source_too_large", "complexity_max_functions"} for item in external_violations)
-    assert any(item.rule_id == "NODE.EXTERNAL.INVALID" for item in validate_node_class(InvalidExternalFlagNode, policy=PurityPolicy(max_source_lines=1000)))
-
-
-def test_external_flag_does_not_require_route_output() -> None:
-    class ExternalProcessNode:
-        NODE_INFO = NodeInfo("test.external_ok", "External", "test", "Calls external package.", "0.1.0", "process", external=True)
-        CONTRACT = NodeContract(
-            provides=(DataProvider("external.out", "external.out", display_name="external.out"),),
-            output_semantics={"external.out": ("external output",)},
-
-            examples=({"inputs": {}, "params": {}},),
-        )
-
         def run_pure(self, inputs, params):
             return {"external.out": 1}
 
-    assert validate_node_class(ExternalProcessNode, policy=PurityPolicy(max_source_lines=1000)) == []
+    policy = PurityPolicy(max_source_lines=1, max_functions=0)
+    unselected = _review_node(declaration, ExternalNode, policy=policy)
+    assert unselected.findings == ()
+    assert unselected.executions == ()
+    selected = _review_node(replace(declaration, rulesets=("vibeflow.process",)), ExternalNode, policy=policy)
+    assert any(item.rule_id == "NODE.PURITY.SOURCE_TOO_LARGE" for item in selected.findings)
+    with pytest.raises(DescriptorModelError, match="node.external must be a boolean"):
+        replace(declaration, external="yes")
+
+
+def test_external_process_contract_does_not_require_route_output() -> None:
+    declaration = node_declaration(
+        NodeInfo("test.external_ok", "External", "test", "Calls external package.", "0.1.0", "process", external=True),
+        NodeContract(provides=(DataProvider("external.out", "external.out", display_name="external.out"),),
+                     output_semantics={"external.out": ("external output",)}),
+        rulesets=("vibeflow.process",),
+    )
+
+    class ExternalProcessNode:
+        def run_pure(self, inputs, params):
+            return {"external.out": 1}
+
+    assert _review_node(declaration, ExternalProcessNode, policy=PurityPolicy(max_source_lines=1000)).findings == ()
 
 
 def test_edge_when_syntax_is_static_config_error() -> None:
@@ -152,7 +165,7 @@ def test_edge_when_syntax_is_static_config_error() -> None:
 
 def test_decision_branch_value_is_not_inferred_from_an_output_schema() -> None:
     registry = _registry()
-    register_node(registry, "test.two_route", TwoRouteNode)
+    register_node(registry, TwoRouteNode_DECLARATION, TwoRouteNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -177,8 +190,8 @@ def test_decision_branch_value_is_not_inferred_from_an_output_schema() -> None:
 
 def test_decision_branch_must_reach_end_in_acyclic_graph() -> None:
     registry = _registry()
-    register_node(registry, "test.two_route", TwoRouteNode)
-    register_node(registry, "test.empty_process", EmptyProcessNode)
+    register_node(registry, TwoRouteNode_DECLARATION, TwoRouteNode)
+    register_node(registry, EmptyProcessNode_DECLARATION, EmptyProcessNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -202,14 +215,14 @@ def test_decision_branch_must_reach_end_in_acyclic_graph() -> None:
     )
 
     report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
-    assert any(item.rule_id == "GRAPH.DECISION.BRANCH_CANNOT_REACH_END" for item in report.errors)
+    assert any(item.rule_id == "GRAPH.DECISION.BRANCH_CANNOT_REACH_END" for item in report.errors), [item.message for item in report.errors]
 
 
 def test_decision_cycle_is_forbidden_even_with_exit() -> None:
     registry = _registry()
-    register_node(registry, "test.two_route", TwoRouteNode)
-    register_node(registry, "test.body_route", BodyRouteNode)
-    register_node(registry, "test.empty_process", EmptyProcessNode)
+    register_node(registry, TwoRouteNode_DECLARATION, TwoRouteNode)
+    register_node(registry, BodyRouteNode_DECLARATION, BodyRouteNode)
+    register_node(registry, EmptyProcessNode_DECLARATION, EmptyProcessNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -341,8 +354,8 @@ def test_explicit_shortcut_edge_is_data_bypass_and_does_not_trigger_target() -> 
 
 def test_mainline_data_bypass_without_trigger_has_actionable_details() -> None:
     registry = _registry()
-    register_node(registry, "test.bypass_source", BypassSourceNode)
-    register_node(registry, "test.bypass_middle", BypassMiddleNode)
+    register_node(registry, BypassSourceNode_DECLARATION, BypassSourceNode)
+    register_node(registry, BypassMiddleNode_DECLARATION, BypassMiddleNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -364,19 +377,20 @@ def test_mainline_data_bypass_without_trigger_has_actionable_details() -> None:
     )
 
     report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
-    warning = next(item for item in report.warnings if item.rule_id == "GRAPH.MAINLINE.DATA_BYPASS_WITHOUT_MAINLINE_TRIGGER")
+    warning = next((item for item in report.warnings if item.rule_id == "GRAPH.MAINLINE.DATA_BYPASS_WITHOUT_MAINLINE_TRIGGER"), None)
+    assert warning is not None, [item.message for item in report.errors]
 
     assert warning.details["owner"] == "pipeline"
     assert warning.details["source"] == "source"
     assert warning.details["target"] == "target"
     assert warning.details["edge"] == {"from": "source", "to": "target"}
-    assert warning.details["branch_nodes"] == ["target"]
+    assert warning.to_dict()["details"]["branch_nodes"] == ["target"]
     assert warning.details["suggested_fixes"]
 
 
 def test_mainline_unexpected_sync_fanout_warning_has_actionable_details() -> None:
     registry = _registry()
-    register_node(registry, "test.empty_process", EmptyProcessNode)
+    register_node(registry, EmptyProcessNode_DECLARATION, EmptyProcessNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -398,11 +412,12 @@ def test_mainline_unexpected_sync_fanout_warning_has_actionable_details() -> Non
     )
 
     report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
-    warning = next(item for item in report.warnings if item.rule_id == "GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT")
+    warning = next((item for item in report.warnings if item.rule_id == "GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT"), None)
+    assert warning is not None, [item.message for item in report.errors]
 
     assert warning.details["owner"] == "pipeline"
     assert warning.details["source"] == "source"
-    assert warning.details["branch_nodes"] == ["end", "side"]
+    assert warning.to_dict()["details"]["branch_nodes"] == ["end", "side"]
     assert {"from": "source", "to": "side"} in warning.details["branch_edges"]
     assert {"from": "source", "to": "end"} in warning.details["branch_edges"]
     assert warning.details["suggested_fixes"]
@@ -447,8 +462,8 @@ def test_mainline_sync_fanout_with_explicit_all_join_is_allowed() -> None:
 
 def test_mainline_decision_dead_end_warning_has_actionable_details() -> None:
     registry = _registry()
-    register_node(registry, "test.two_route", TwoRouteNode)
-    register_node(registry, "test.empty_process", EmptyProcessNode)
+    register_node(registry, TwoRouteNode_DECLARATION, TwoRouteNode)
+    register_node(registry, EmptyProcessNode_DECLARATION, EmptyProcessNode)
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -472,13 +487,14 @@ def test_mainline_decision_dead_end_warning_has_actionable_details() -> None:
     )
 
     report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
-    warning = next(item for item in report.warnings if item.rule_id == "GRAPH.MAINLINE.DECISION_BRANCH_DEAD_END")
+    warning = next((item for item in report.warnings if item.rule_id == "GRAPH.MAINLINE.DECISION_BRANCH_DEAD_END"), None)
+    assert warning is not None, [item.message for item in report.errors]
 
     assert warning.details["owner"] == "pipeline"
     assert warning.details["source"] == "route"
     assert warning.details["target"] == "dead"
     assert warning.details["edge"] == {"from": "route", "to": "dead", "when": "flow.route == 'again'"}
-    assert warning.details["branch_nodes"] == ["dead", "sink"]
+    assert warning.to_dict()["details"]["branch_nodes"] == ["dead", "sink"]
     assert warning.details["suggested_fixes"]
 
 def test_undeclared_cycle_is_rejected() -> None:
@@ -532,12 +548,14 @@ def test_boundary_config_is_removed() -> None:
             }
         )
 
-def test_registry_namespace_mismatch_is_warning() -> None:
+def test_selected_workflow_rule_reports_registration_namespace_warning() -> None:
     registry = NodeRegistry()
     _register_fulltext_nodes(registry)
-    graph = parse_graph_config({"pipeline": {"nodes": [_node_call("rank", "literature.rank_records", "Ranks records.", provides=[PROV_SPEC("value.in")])]}})
+    descriptor = registry.descriptor("literature.rank_records")
+    assert descriptor.type_key == "literature.rank_records"
+    graph = parse_graph_config({"pipeline": {"nodes": [_node_call("rank", descriptor.type_key, "Ranks records.", provides=[PROV_SPEC("value.in")])]}})
     report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
-    warnings = [warning for warning in report.warnings if warning.rule_id == "REGISTRY.SMELL.NAMESPACE_MISMATCH"]
+    warnings = [item for item in report.warnings if item.rule_id == "REGISTRY.SMELL.NAMESPACE_MISMATCH"]
     assert len(warnings) == 1
     assert warnings[0].details["expected_namespace"] == "fulltext"
 
@@ -556,8 +574,12 @@ def test_boundary_schema_and_node_registry_isolation() -> None:
     )
     rule_ids = {finding.rule_id for finding in findings}
     assert "CONFIG.BOUNDARY.REMOVED" in rule_ids
-    with pytest.raises(Exception, match="boundary class cannot be registered as a node"):
-        NodeRegistry().register("test.boundary", DemoBoundary, config_schema={}, config_defaults={})
+    declaration = node_declaration(
+        NodeInfo("test.boundary", "Boundary", "test", "A host boundary cannot implement the Node ABI.", "0.1.0", "process"),
+        NodeContract(), rulesets=("vibeflow.process",),
+    )
+    report = _review_node(declaration, DemoBoundary, policy=PurityPolicy(max_source_lines=1000))
+    assert any(item.rule_id == "NODE.CONTRACT.MISSING_RUN_PURE" for item in report.findings)
 
 def test_checked_run_writes_reproducible_artifacts_without_raw_inputs(tmp_path) -> None:
     config_path = tmp_path / "workflow.json"

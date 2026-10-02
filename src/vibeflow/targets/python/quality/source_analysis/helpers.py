@@ -96,18 +96,6 @@ def _assigns_resource_field(node: ast.AST) -> bool:
     return False
 
 
-def _class_looks_like_node(node: ast.ClassDef) -> bool:
-    names = set()
-    for stmt in node.body:
-        if isinstance(stmt, ast.Assign):
-            for target in stmt.targets:
-                if isinstance(target, ast.Name):
-                    names.add(target.id)
-        elif isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
-            names.add(stmt.target.id)
-    return {"NODE_INFO", "CONTRACT"} <= names
-
-
 def _is_node_module(module: str) -> bool:
     return _module_has_part(module, "nodes")
 

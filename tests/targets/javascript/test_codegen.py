@@ -18,20 +18,11 @@ SOURCE_ROOT = PROJECT_ROOT / "src"
 TARGET_ROOT = SOURCE_ROOT / "vibeflow" / "targets" / "javascript"
 FRONTEND_ROOT = TARGET_ROOT / "frontend"
 
-RESOURCE_SHA256 = {
-    "plugin_abi.d.ts": (
-        "20b4ee4f6a69c6dcdbde0d72a4b5a4edb1d01015b3a39e1f70b37ad814201ddf"
-    ),
-    "plugin_worker.mjs": (
-        "4a2e92555a7b761517ad141e0cf5068af01e4fde8b56751fcae7ce2bed2e918f"
-    ),
-    "runtime_helpers.mjs": (
-        "c44adbc170890ec536d1b5f73a3f4d17831475b149044c34098e42877f577d2b"
-    ),
-    "toolchain_driver.mjs": (
-        "b8b991c5f3210bb119184ffeb2da1b8b4e5dd924a4ffd5f9e13d186339dca0cd"
-    ),
-}
+RESOURCE_SHA256 = {'plugin_abi.d.ts': '6f0da3fbf7570a77ef4bd940fcfbb93f112e3e866a2c0d989c9d51cf7f76f811',
+ 'plugin_worker.mjs': 'd98381808c5f1a2dd6cccd65447944e6fb12270540c990ffedbe28ba59f3d2db',
+ 'rule_abi.d.ts': 'aaeba26699c078d6340b0e243cbe0f3e7fc53eea167956e99f85155f2574f2bb',
+ 'runtime_helpers.mjs': 'b29392f9f9795cdb6a0cbf00098a20971c7006c332be35d4ab1c0217ed78ce62',
+ 'toolchain_driver.mjs': '5b36a20dbf662e138acba835c6e34955e12646887a2475ffd9ed4c78f8a0f808'}
 
 
 def _run_isolated(source: str) -> None:

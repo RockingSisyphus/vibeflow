@@ -248,7 +248,7 @@ class _ExecutionPlanAdapter:
 
 
 def execution_plan_effect_scope(frame: Any) -> str:
-    return "global_state" if frame.flow_kind == "global_state" else "none"
+    return str(getattr(frame, "effect_scope", "unconstrained"))
 
 
 __all__ = ["build_workflow_plan", "workflow_plan_from_execution_plan"]

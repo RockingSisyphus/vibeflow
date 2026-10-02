@@ -1,0 +1,77 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.io_result_input",
+  "display_name": "IO Result Input",
+  "category": "sandbox",
+  "description": "Converts an external IO result into value.in for a downstream nodeset.",
+  "version": "0.1.0",
+  "flow_kind": "io",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "io.result",
+        "cardinality": "exactly_one",
+        "display_name": "io.result"
+      }
+    ],
+    "provides": [
+      {
+        "key": "value.in",
+        "type": "value.in",
+        "display_name": "value.in"
+      }
+    ],
+    "input_semantics": {
+      "io.result": [
+        "external numeric result"
+      ]
+    },
+    "output_semantics": {
+      "value.in": [
+        "numeric input for downstream flow"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "io.result": {
+            "key": "io.result",
+            "type": "io.result",
+            "value": 7,
+            "source_node": "example"
+          }
+        },
+        "params": {
+          "delta": 1
+        }
+      }
+    ],
+    "params_schema": {
+      "delta": {
+        "type": "number"
+      }
+    },
+    "params_defaults": {
+      "delta": 1
+    }
+  },
+  "rulesets": [
+    "vibeflow.io"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_external_nodes.py",
+        "export": "IoResultInputNode"
+      }
+    }
+  ]
+}

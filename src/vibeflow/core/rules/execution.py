@@ -32,9 +32,10 @@ class RuleExecutionResult:
     def status(self) -> str:
         if any(item.state != "completed" for item in self.results.values()):
             return "ERROR"
-        if any(item.severity == "error" for item in self.findings):
+        findings = (*self.findings, *(item for result in self.results.values() for item in result.findings))
+        if any(item.severity == "error" for item in findings):
             return "FAIL"
-        return "CONCERNS" if any(item.severity == "warning" for item in self.findings) else "PASS"
+        return "CONCERNS" if any(item.severity == "warning" for item in findings) else "PASS"
 
     @property
     def records(self) -> Mapping[str, Mapping[str, RuleRecord]]:
@@ -157,6 +158,16 @@ class _Execution:
         return handler, readonly(inputs), cache_key
 
     def context_for(self, invocation: RuleInvocation) -> RuleContext:
+        if invocation.rule.scope == "source":
+            # Shared source results must not depend on the current call.
+            subject = {key: value for key, value in self.context.subject.items()
+                       if key not in {"owner", "call_id", "call_spec", "call_path", "rule_call_id"}}
+            if "source_call_paths" in subject:
+                subject["call_paths"] = subject["source_call_paths"]
+            elif "call_paths" in subject:
+                del subject["call_paths"]
+            return replace(self.context, facts={key: value for key, value in self.context.facts.items() if key != "call"},
+                           subject=subject, scope={key: value for key, value in self.context.scope.items() if key != "workflow"})
         return replace(self.context, subject={**self.context.subject, "rule_call_id": invocation.id})
 
     def accept(self, invocation: RuleInvocation, result: RuleResult, cache_key: str | None = None, *, executed: bool = False) -> None:

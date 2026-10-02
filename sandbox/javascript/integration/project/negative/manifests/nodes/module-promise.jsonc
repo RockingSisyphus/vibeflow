@@ -1,5 +1,5 @@
 {
-  "kind": "node",
+  "kind": "node", "rulesets": ["vibeflow.process"],
   "type_key": "sandbox.invalid.module_promise",
   "display_name": "Invalid module Promise",
   "category": "sandbox-negative",

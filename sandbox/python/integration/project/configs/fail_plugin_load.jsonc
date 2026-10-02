@@ -2,7 +2,7 @@
   "plugins": [
     {
       "module": "../plugins/missing.py",
-      "type": "policy"
+      "type": "runtime"
     }
   ],
   "pipeline": {

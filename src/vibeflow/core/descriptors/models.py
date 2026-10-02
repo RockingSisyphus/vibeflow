@@ -268,6 +268,8 @@ class NodeContractDescriptor:
             _freeze_mapping(item, field_name=f"contract.examples[{index}]")
             for index, item in enumerate(self.examples)
         )
+        if any("outputs" in item for item in examples):
+            raise DescriptorModelError("contract.examples.outputs is removed; examples document inputs and params")
         object.__setattr__(self, "requires", requires)
         object.__setattr__(self, "provides", provides)
         object.__setattr__(self, "input_semantics", input_semantics)

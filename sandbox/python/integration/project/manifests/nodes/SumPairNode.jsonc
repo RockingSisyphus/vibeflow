@@ -1,0 +1,83 @@
+{
+  "kind": "node",
+  "type_key": "sandbox.sum_pair",
+  "display_name": "Sum Pair",
+  "category": "sandbox",
+  "description": "Sums two free branch values.",
+  "version": "0.1.0",
+  "flow_kind": "process",
+  "author": null,
+  "tags": [],
+  "external": false,
+  "contract": {
+    "requires": [
+      {
+        "type": "branch.left",
+        "cardinality": "exactly_one",
+        "display_name": "branch.left"
+      },
+      {
+        "type": "branch.right",
+        "cardinality": "exactly_one",
+        "display_name": "branch.right"
+      }
+    ],
+    "provides": [
+      {
+        "key": "value.in",
+        "type": "value.in",
+        "display_name": "value.in"
+      }
+    ],
+    "input_semantics": {
+      "branch.left": [
+        "left value"
+      ],
+      "branch.right": [
+        "right value"
+      ]
+    },
+    "output_semantics": {
+      "value.in": [
+        "summed value"
+      ]
+    },
+    "examples": [
+      {
+        "inputs": {
+          "branch.left": {
+            "key": "branch.left",
+            "type": "branch.left",
+            "value": 4,
+            "source_node": "example"
+          },
+          "branch.right": {
+            "key": "branch.right",
+            "type": "branch.right",
+            "value": 6,
+            "source_node": "example"
+          }
+        },
+        "params": {}
+      }
+    ],
+    "params_schema": {},
+    "params_defaults": {}
+  },
+  "rulesets": [
+    "vibeflow.process"
+  ],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "nodes/legal_math_nodes.py",
+        "export": "SumPairNode"
+      }
+    }
+  ]
+}

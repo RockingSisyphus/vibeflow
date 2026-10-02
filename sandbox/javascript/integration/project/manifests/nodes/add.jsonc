@@ -1,5 +1,9 @@
 {
   "kind": "node",
+  "rulesets": [
+    "vibeflow.process",
+    "sandbox.domain"
+  ],
   "type_key": "sandbox.add",
   "display_name": "Add",
   "category": "sandbox",

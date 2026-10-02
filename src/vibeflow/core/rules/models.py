@@ -7,6 +7,8 @@ Targets supply callables; Tooling supplies the exact check scope.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, fields, is_dataclass
+from copy import copy
+from math import isfinite
 from types import MappingProxyType
 from typing import Any, Mapping
 
@@ -14,14 +16,27 @@ from vibeflow.core.descriptors.models import ImplementationDescriptor
 from vibeflow.core.findings import Finding
 
 
-def readonly(value: Any) -> Any:
+def readonly(value: Any, _memo: dict[int, Any] | None = None) -> Any:
     """Freeze containers while retaining opaque Target services as supplied."""
+    memo = {} if _memo is None else _memo
+    if id(value) in memo:
+        return memo[id(value)]
     if isinstance(value, Mapping):
-        return MappingProxyType({key: readonly(item) for key, item in value.items()})
+        contents = {}
+        snapshot = MappingProxyType(contents)
+        memo[id(value)] = snapshot
+        contents.update({key: readonly(item, memo) for key, item in value.items()})
+        return snapshot
     if isinstance(value, (tuple, list)):
-        return tuple(readonly(item) for item in value)
+        return tuple(readonly(item, memo) for item in value)
     if isinstance(value, (set, frozenset)):
-        return frozenset(readonly(item) for item in value)
+        return frozenset(readonly(item, memo) for item in value)
+    if is_dataclass(value) and not isinstance(value, type):
+        snapshot = copy(value)
+        memo[id(value)] = snapshot
+        for item in fields(value):
+            object.__setattr__(snapshot, item.name, readonly(getattr(value, item.name), memo))
+        return snapshot
     return value
 
 
@@ -37,6 +52,41 @@ def plain(value: Any) -> Any:
     if is_dataclass(value) and not isinstance(value, type):
         return {item.name: plain(getattr(value, item.name)) for item in fields(value)}
     return value
+
+
+def _record_snapshot(value: Any, active: set[int] | None = None) -> Any:
+    """Output ports contain data, while Target services stay in context facts."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return str(value)
+    if isinstance(value, bool):
+        return bool(value)
+    if isinstance(value, int):
+        return int(value)
+    if isinstance(value, float) and isfinite(value):
+        return float(value)
+    visiting = set() if active is None else active
+    if id(value) in visiting:
+        raise ValueError("record.value cannot contain cyclic data")
+    visiting.add(id(value))
+    try:
+        if isinstance(value, Mapping):
+            if any(not isinstance(key, str) for key in value):
+                raise ValueError("record.value object keys must be strings")
+            return MappingProxyType({str(key): _record_snapshot(item, visiting) for key, item in value.items()})
+        if isinstance(value, (tuple, list)):
+            return tuple(_record_snapshot(item, visiting) for item in value)
+        if isinstance(value, (set, frozenset)):
+            return frozenset(_record_snapshot(item, visiting) for item in value)
+        if is_dataclass(value) and not isinstance(value, type) and type(value).__dataclass_params__.frozen:
+            snapshot = copy(value)
+            for item in fields(value):
+                object.__setattr__(snapshot, item.name, _record_snapshot(getattr(value, item.name), visiting))
+            return snapshot
+        raise ValueError(f"record.value must contain portable data or frozen dataclasses, got {type(value).__name__}")
+    finally:
+        visiting.remove(id(value))
 
 
 def _text(value: object, name: str) -> str:
@@ -158,9 +208,12 @@ class RulesetDescriptor:
         object.__setattr__(self, "relations", relations)
         if not isinstance(self.entrypoints, Mapping):
             raise ValueError("ruleset.entrypoints must be an object")
-        if any(isinstance(value, str) for value in self.entrypoints.values()):
-            raise ValueError("entrypoint must contain a list of local call IDs")
-        object.__setattr__(self, "entrypoints", readonly({str(key): tuple(value) for key, value in self.entrypoints.items()}))
+        if set(self.entrypoints) - {"import", "static", "run"}:
+            raise ValueError("ruleset.entrypoints keys must be import, static or run")
+        for value in self.entrypoints.values():
+            if not isinstance(value, (list, tuple)) or any(not isinstance(item, str) or not item.strip() for item in value):
+                raise ValueError("entrypoint must contain a list of non-empty local call IDs")
+        object.__setattr__(self, "entrypoints", readonly({key: tuple(value) for key, value in self.entrypoints.items()}))
 
     def to_dict(self) -> dict[str, object]:
         return {"kind": "ruleset", "id": self.id, "calls": [item.to_dict() for item in self.calls],
@@ -175,7 +228,7 @@ class RuleRecord:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "type_id", _text(self.type_id, "record.type_id"))
-        object.__setattr__(self, "value", readonly(self.value))
+        object.__setattr__(self, "value", _record_snapshot(self.value))
 
     def to_dict(self) -> dict[str, object]:
         return {"type_id": self.type_id, "value": plain(self.value)}
@@ -197,7 +250,7 @@ class RuleResult:
         if not all(isinstance(item, Finding) for item in findings):
             raise ValueError("rule result findings must contain Finding")
         object.__setattr__(self, "records", MappingProxyType(records))
-        object.__setattr__(self, "findings", findings)
+        object.__setattr__(self, "findings", tuple(readonly(item) for item in findings))
 
     def to_dict(self) -> dict[str, object]:
         return {"state": self.state, "records": {key: value.to_dict() for key, value in self.records.items()},
