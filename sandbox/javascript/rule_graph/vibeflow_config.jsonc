@@ -1,0 +1,8 @@
+{
+  "roots": [
+    {
+      "id": "javascript-rule-graph",
+      "path": "project"
+    }
+  ]
+}

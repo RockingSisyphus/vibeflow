@@ -7,7 +7,7 @@ from vibeflow.core.findings import HealthFinding
 from vibeflow.core.flow import LOOP_NODE_TYPES, STATUS_PLANNED
 from vibeflow.core.rules import RuleContext, RuleGraphError, compile_ruleset, execute_rule_plan
 from vibeflow.targets.python.quality.project_context import project_rule_facts
-from vibeflow.targets.python.quality.rule_adapter import rule_resources
+from vibeflow.targets.python.quality.rule_adapter import rule_resources, graph_error_finding
 from vibeflow.targets.python.quality.rules import python_rule_handlers
 
 
@@ -48,7 +48,11 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
     from types import SimpleNamespace
 
     resources = registry if registry is not None else SimpleNamespace(rule_catalogs=())
-    rules, rulesets = rule_resources(resources, purity_policy=purity_policy, quality_policy=quality_policy)
+    try:
+        rules, rulesets = rule_resources(resources, purity_policy=purity_policy, quality_policy=quality_policy)
+    except RuleGraphError as exc:
+        _append_findings(state, (graph_error_finding(registry,exc,object_type="workflow",object_id="pipeline",fallback_path=graph.source_path),))
+        return
     for rule_id in ("vibeflow.workflow", "vibeflow.graph.nodesets"):
         descriptor = rules.get(rule_id)
         if descriptor is not None:
@@ -115,8 +119,12 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
                         elif owner in mainline:
                             state.mainline[owner] = mainline[owner]
             except RuleGraphError as exc:
-                _append_findings(state, (HealthFinding(rule_id=exc.code, severity="error", object_type="workflow", object_id=owner,
-                    failure_layer="rule", message=exc.message, details={**exc.details, "owner": owner, "call_path": path, "phase": phase}),))
+                item = graph_error_finding(registry, exc, object_type="workflow", object_id=owner, fallback_path=current.source_path)
+                _append_findings(state, (replace(item, details={**item.details,"owner":owner,"call_path":path,"phase":phase}),))
+            except Exception as exc:
+                if not getattr(exc,"findings",()):
+                    raise
+                _append_findings(state, exc.findings)
 
 
 __all__ = ["WorkflowInvocation", "workflow_invocations", "execute_workflow_rules"]

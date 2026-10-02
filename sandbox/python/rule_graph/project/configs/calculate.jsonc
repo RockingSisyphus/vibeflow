@@ -1,0 +1,51 @@
+{
+  "rulesets": [],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "value",
+        "type": "example.input",
+        "required": true,
+        "display_name": "Input"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "example.boundary",
+        "display_name": "Start",
+        "description": "Begin."
+      },
+      {
+        "id": "calculate",
+        "type_used": "example.calculate",
+        "display_name": "Calculate",
+        "description": "Compute twice the input plus one."
+      },
+      {
+        "id": "end",
+        "type_used": "example.boundary",
+        "display_name": "End",
+        "description": "Finish."
+      }
+    ],
+    "edges": [
+      {
+        "source": "start",
+        "target": "calculate"
+      },
+      {
+        "source": "calculate",
+        "target": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "example.output",
+        "cardinality": "exactly_one",
+        "as": "result",
+        "display_name": "Result"
+      }
+    ]
+  }
+}

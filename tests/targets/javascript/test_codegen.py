@@ -22,7 +22,7 @@ RESOURCE_SHA256 = {'plugin_abi.d.ts': '6f0da3fbf7570a77ef4bd940fcfbb93f112e3e866
  'plugin_worker.mjs': 'd98381808c5f1a2dd6cccd65447944e6fb12270540c990ffedbe28ba59f3d2db',
  'rule_abi.d.ts': 'aaeba26699c078d6340b0e243cbe0f3e7fc53eea167956e99f85155f2574f2bb',
  'runtime_helpers.mjs': 'b29392f9f9795cdb6a0cbf00098a20971c7006c332be35d4ab1c0217ed78ce62',
- 'toolchain_driver.mjs': '5b36a20dbf662e138acba835c6e34955e12646887a2475ffd9ed4c78f8a0f808'}
+ 'toolchain_driver.mjs': '33d8552c140e9e54f82ad47de83b714b755f7931bd234ef2ee25db9038276d26'}
 
 
 def _run_isolated(source: str) -> None:

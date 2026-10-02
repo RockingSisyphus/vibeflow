@@ -1547,7 +1547,7 @@ function auditBaseLibHostIo(ts, sourceFile, checker, project, policy) {
     "fetch", "XMLHttpRequest", "WebSocket", "EventSource", "document",
     "window", "self", "global", "globalThis", "localStorage",
     "sessionStorage", "indexedDB", "caches", "navigator", "location",
-    "process",
+    "process", "console",
   ]);
   const nondeterministicGlobals = new Set([
     "Date",

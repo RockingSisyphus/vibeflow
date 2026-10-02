@@ -1,3 +1,4 @@
+from tests.fixtures.support.strict_support_runtime_implementations import SinkNode
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 import re
 import xml.etree.ElementTree as ET
@@ -81,10 +82,6 @@ SinkNode_DECLARATION = node_declaration(NodeInfo(
         examples=({"inputs": {"value.in": 1}, "params": {}},),
     ), rulesets=("vibeflow.process",))
 
-class SinkNode:
-
-    def run_pure(self, inputs, params):
-        return {}
 
 
 def test_compiler_and_runtime_plugins_are_hooked(tmp_path) -> None:

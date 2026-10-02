@@ -413,9 +413,9 @@ def test_run_workspace_checked_uses_one_effective_root_runtime_options_object(tm
         seen["refuse"] = kwargs["runtime_options"]
         return original_refuse(*args, **kwargs)
 
-    def record_execute(graph, registry, plugin_registry, initial, run_dir, runtime_options, resources):
+    def record_execute(graph, registry, plugin_registry, initial, run_dir, runtime_options, resources, **kwargs):
         seen["execute"] = runtime_options
-        return original_execute(graph, registry, plugin_registry, initial, run_dir, runtime_options, resources)
+        return original_execute(graph, registry, plugin_registry, initial, run_dir, runtime_options, resources, **kwargs)
 
     monkeypatch.setattr(runner_module, "_refuse_on_planned_run", record_refuse)
     monkeypatch.setattr(runner_module, "_execute_runtime", record_execute)

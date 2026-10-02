@@ -1,0 +1,34 @@
+{
+  "kind": "rule",
+  "id": "example.number_checker",
+  "description": "Consume facts bound by the requires relation.",
+  "scope": "call",
+  "params_schema": {
+    "marker": {
+      "type": "string"
+    }
+  },
+  "params_defaults": {
+    "marker": ""
+  },
+  "inputs": {
+    "numbers": "example.numbers.v1"
+  },
+  "outputs": {
+    "proof": "example.proof.v1"
+  },
+  "implementations": [
+    {
+      "language": "typescript",
+      "targets": [
+        "browser",
+        "node"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "rules/checker.ts",
+        "export": "check"
+      }
+    }
+  ]
+}

@@ -832,15 +832,34 @@ def _print_quality_payload(payload: Mapping[str, object], *, as_json: bool) -> N
             )
             for item in (*source.get("errors", ()), *source.get("warnings", ()))[:20]:
                 if isinstance(item, Mapping):
-                    location = item.get("source_location", {})
-                    location_text = str(location.get("path", "")) if isinstance(location, Mapping) else ""
-                    lines.append(f"  {item.get('rule_id', '')}: {location_text} {item.get('message', '')}")
+                    lines.append(_diagnostic_text(item))
         elif source.get("error"):
             lines.append(str(source["error"]))
+        lines.extend(_diagnostic_text(item) for item in source.get("diagnostics", ()) if isinstance(item, Mapping))
     for report in payload.get("reports", ()):
         if isinstance(report, Mapping):
             lines.append(f"Workflow: {report.get('status', 'ERROR')} {report.get('config', '')}")
+            lines.extend(_diagnostic_text(item) for item in report.get("diagnostics", ()) if isinstance(item, Mapping))
     print("\n".join(lines))
+
+
+def _diagnostic_text(finding: Mapping[str, object]) -> str:
+    code = str(finding.get("code", finding.get("rule_id", "")))
+    definition = str(finding.get("definition_id", ""))
+    identity = f"{code} [{definition}]" if definition else code
+    location = finding.get("source_location", {})
+    position = ""
+    if isinstance(location, Mapping):
+        position = str(location.get("path", ""))
+        for field in ("line", "column"):
+            if location.get(field) is not None:
+                position += f":{location[field]}"
+    details = finding.get("details", {})
+    owner = str(details.get("node_type", "")) if isinstance(details, Mapping) else ""
+    if not owner:
+        owner = str(finding.get("object_id", ""))
+    owner_text = f" (owner: {owner})" if owner else ""
+    return f"  {identity}: {position}{owner_text} {finding.get('message', '')}"
 
 
 def _standalone_package_root(source_path: Path) -> Path:
@@ -1140,6 +1159,10 @@ def _finish_review_failure(
             "suggested_fix_type": "fix_config",
         },
     )
+    diagnostics = _error_payload(error)
+    for field in ("diagnostics", "warnings", "source_location", "field"):
+        if field in diagnostics:
+            payload[field] = diagnostics[field]
     print(json.dumps(add_result_scope(payload, "vibeflow_review_artifact", checked_ids=()), ensure_ascii=False, indent=2))
     return 1
 
@@ -1232,6 +1255,10 @@ def _error_payload(error: Exception, *, config: Path | None = None) -> dict[str,
     }
     if config is not None:
         payload["config"] = str(config)
+    if getattr(error, "path", ""):
+        payload["source_location"] = {"path": str(error.path)}
+    if getattr(error, "field", ""):
+        payload["field"] = str(error.field)
     if diagnostics:
         payload["diagnostics"] = [
             dict(item) if isinstance(item, Mapping) else str(item)
@@ -1260,6 +1287,9 @@ def _print_error(
     else:
         print(format_result_scope(payload))
         print(f"ERROR {payload['code']}: {payload['error']}")
+        for finding in payload.get("diagnostics", ()):
+            if isinstance(finding, Mapping):
+                print(_diagnostic_text(finding))
 
 
 __all__ = [

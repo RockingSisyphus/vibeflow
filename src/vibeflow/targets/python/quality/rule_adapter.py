@@ -8,7 +8,7 @@ import json
 from typing import Mapping
 
 from vibeflow.core.findings import Finding, HealthFinding
-from vibeflow.core.rules import RuleContext, RuleGraphError, compile_ruleset, execute_rule_plan
+from vibeflow.core.rules import RuleContext, RuleGraphError, compile_ruleset, execute_rule_plan, rule_graph_error_finding
 from vibeflow.core.rules.builtin import builtin_rule_resources
 from vibeflow.targets.python.quality.rules import python_rule_handlers
 
@@ -28,12 +28,18 @@ def rule_resources(registry, *, purity_policy=None, quality_policy=None):
     built_rules, built_sets = builtin_rule_resources()
     rules = {item.id: item for item in built_rules}
     rulesets = {item.id: item for item in built_sets}
+    origins = {(kind, item.id): f"builtin:{item.id}" for kind, items in (("rule", built_rules), ("ruleset", built_sets)) for item in items}
     for catalogs in registry.rule_catalogs or ():
-        for catalog, target in ((catalogs.rules, rules), (catalogs.rulesets, rulesets)):
+        for kind, catalog, target in (("rule", catalogs.rules, rules), ("ruleset", catalogs.rulesets, rulesets)):
             for descriptor in catalog:
+                source_for = getattr(catalog, "source_for", None)
+                source = source_for(descriptor.id) if callable(source_for) else ""
                 if descriptor.id in target and target[descriptor.id] != descriptor:
-                    raise RuleGraphError("RULE.RESOURCE.CONFLICT", f"rule resource '{descriptor.id}' has conflicting definitions")
+                    raise RuleGraphError("RULE.RESOURCE.CONFLICT", f"{kind} resource '{descriptor.id}' has conflicting definitions",
+                        {"resource_id":descriptor.id,"resource_kind":kind,"source":source,
+                         "previous_source":origins.get((kind,descriptor.id),"")})
                 target[descriptor.id] = descriptor
+                origins.setdefault((kind,descriptor.id),source)
     from vibeflow.core.rules.builtin.project_quality import project_quality_rule_defaults
     from vibeflow.targets.python.quality.project_context import source_quality_policy
     for rule_id,defaults in project_quality_rule_defaults(quality_policy or source_quality_policy(purity_policy)).items():
@@ -44,19 +50,48 @@ def rule_resources(registry, *, purity_policy=None, quality_policy=None):
 
 def selected_effect_scope(registry, type_key: str) -> str:
     """Describe explicit selected effect-rule parameters without granting IO."""
-    rules, rulesets = rule_resources(registry)
+    try:
+        rules, rulesets = rule_resources(registry)
+    except RuleGraphError:
+        return "unavailable"
     scopes = set()
     for selected in registry.rulesets(type_key):
-        plan = compile_ruleset(selected, rules=rules, rulesets=rulesets, entrypoint="static")
+        try:
+            plan = compile_ruleset(selected, rules=rules, rulesets=rulesets, entrypoint="static")
+        except RuleGraphError:
+            return "unavailable"
         for invocation in plan.invocations:
             if invocation.rule.id == "vibeflow.no_side_effects":
                 scopes.add(str(invocation.params["effect_scope"]))
     return next(iter(scopes)) if len(scopes) == 1 else "mixed" if scopes else "unconstrained"
 
 
+def graph_error_finding(registry, error, *, object_type, object_id, fallback_path=""):
+    source = str(error.details.get("source", ""))
+    if source and not source.startswith("builtin:"):
+        resource = str(error.details.get("resource_id", ""))
+        kind = str(error.details.get("resource_kind", "ruleset"))
+        return HealthFinding(rule_id=error.code,severity="error",object_type=object_type,object_id=object_id,
+            message=error.message,failure_layer="rule",source_location={"path":source,"line":1,"column":1},
+            source_path=source,details=dict(error.details),rule_source=f"{kind}:{resource}",
+            definition_id=resource if kind == "rule" else "")
+    key = error.details.get("ruleset_id", "")
+    catalog = next((item.rulesets for item in registry.rule_catalogs or ()
+                    if callable(getattr(item.rulesets,"get",None)) and item.rulesets.get(key) is not None
+                    and callable(getattr(item.rulesets,"source_for",None))), None) if registry is not None else None
+    finding = rule_graph_error_finding(error, rulesets=catalog, object_type=object_type, object_id=object_id)
+    if not finding.source_location.get("path") and fallback_path:
+        finding = replace(finding, source_location={"path":fallback_path,"line":1,"column":1}, source_path=fallback_path)
+    return finding
+
+
 def execute_python_node_rules(registry, source_context, *, phase="static", purity_policy=None, quality_policy=None, extra_handlers=None, extra_facts=None):
     registry.configure_rule_defaults(purity_policy=purity_policy,quality_policy=quality_policy)
-    rules, rulesets = rule_resources(registry,purity_policy=purity_policy,quality_policy=quality_policy)
+    try:
+        rules, rulesets = rule_resources(registry,purity_policy=purity_policy,quality_policy=quality_policy)
+    except RuleGraphError as exc:
+        finding = graph_error_finding(registry,exc,object_type="rule",object_id=str(exc.details.get("resource_id","")))
+        return PythonRuleReport(findings=(finding,),effect_scopes={node.type_key:"unavailable" for node in source_context.nodes})
     handlers = {**python_rule_handlers(), **dict(extra_handlers or {})}
     custom = getattr(registry, "rule_handler_loader", None)
     findings = []
@@ -68,6 +103,7 @@ def execute_python_node_rules(registry, source_context, *, phase="static", purit
     call_policy_scopes = {}
     call_policies = {}
     call_scoped_types = set()
+    unavailable_types = set()
     source_cache = {}
     project_fact_cache = {}
     from vibeflow.targets.python.quality.project_context import project_rule_facts
@@ -85,11 +121,24 @@ def execute_python_node_rules(registry, source_context, *, phase="static", purit
             try:
                 plan = compile_ruleset(selected_id, rules=rules, rulesets=rulesets, entrypoint=phase)
             except RuleGraphError as exc:
-                findings.append(HealthFinding(rule_id=exc.code,severity="error",object_type="node",object_id=node.type_key,
-                    message=exc.message,failure_layer="rule",details=dict(exc.details)))
+                findings.append(graph_error_finding(registry,exc,object_type="node",object_id=node.type_key,
+                    fallback_path=registry.source_info(node.type_key).path))
+                unavailable_types.add(node.type_key)
+                continue
+            if not plan.invocations:
                 continue
             if callable(custom):
-                handlers.update(custom(plan))
+                try:
+                    handlers.update(custom(plan))
+                except Exception as exc:
+                    failure = getattr(exc,"findings",())
+                    if not failure:
+                        failure = (HealthFinding(rule_id="RULE.IMPLEMENTATION.LOAD",severity="error",object_type="node",
+                            object_id=node.type_key,message=str(exc),failure_layer="rule",
+                            source_location={"path":registry.source_info(node.type_key).path,"line":1,"column":1}),)
+                    findings.extend(failure)
+                    unavailable_types.add(node.type_key)
+                    continue
             facts = {**project_rule_facts(plan,source_context,project_fact_cache),"source_context":source_context, "node_catalog":tuple(registry.descriptor(key) for key in registry.available()), **dict(extra_facts or {})}
             if purity_policy is not None:
                 facts["purity_policy"] = purity_policy
@@ -132,7 +181,7 @@ def execute_python_node_rules(registry, source_context, *, phase="static", purit
                                     "ruleset_id":selected_id,"rule_call_id":invocation_id,"scope":invocation.rule.scope,
                                     "value":plain(record.value),"call_path":call.call_path if call is not None else ()})
         selected_scopes = policy_scopes.get(node.type_key,set())
-        scopes[node.type_key] = "mixed" if node.type_key in call_scoped_types else next(iter(selected_scopes)) if len(selected_scopes) == 1 else "mixed" if selected_scopes else "unconstrained"
+        scopes[node.type_key] = "unavailable" if node.type_key in unavailable_types else "mixed" if node.type_key in call_scoped_types else next(iter(selected_scopes)) if len(selected_scopes) == 1 else "mixed" if selected_scopes else "unconstrained"
         if phase in {"static","run"}:
             registry.record_effect_policy(node.type_key,scopes[node.type_key])
     call_scopes = {key:next(iter(value)) if len(value) == 1 else "mixed" for key,value in call_policy_scopes.items()}

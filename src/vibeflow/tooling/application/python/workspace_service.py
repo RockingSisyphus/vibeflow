@@ -160,6 +160,7 @@ def run_workspace_checked(
         run_dir,
         effective_runtime_options,
         resources,
+        health=health,
         **execute_kwargs,
     )
     _write_json(run_dir / "output_summary.json", _summarize_run_result(context))

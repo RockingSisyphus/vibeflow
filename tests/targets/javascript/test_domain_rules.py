@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -68,6 +69,213 @@ def test_domain_rule_rejects_helper_model_definition_with_precise_ownership(doma
     assert finding["source_location"]["line"] == 2
     assert finding["details"]["call_paths"] == [["transform"]]
     assert finding["details"]["ownership"]["node_types"] == ["example.transform"]
+
+
+def _wrong_domain_location(project: Path, location: str) -> tuple[Path, int]:
+    """Keep native contracts valid while placing a model in a transform's scope."""
+    transform = project / "nodes/transform.ts"
+    if location == "shared_file":
+        source = project / "nodes/model.ts"
+        source.write_text(source.read_text() + '\nexport function transformRun(inputs: Readonly<{"example.feature": Readonly<{value: number}>}>) { return {output: inputs["example.feature"].value + 1}; }\n')
+        declaration = project / "bundle/nodes/transform.jsonc"
+        data = json.loads(declaration.read_text())
+        data["implementations"][0]["source"].update({"ref": "nodes/model.ts", "export": "transformRun"})
+        declaration.write_text(json.dumps(data))
+    elif location == "transform":
+        source = transform
+        source.write_text('// A model definition directly in an ordinary transform.\nexport function modelForward(value: number): number { return value + 1; }\nexport function run(inputs: Readonly<{"example.feature": Readonly<{value: number}>}>) { return {output: modelForward(inputs["example.feature"].value)}; }\n')
+    else:
+        assert location == "helper"
+        source = project / "nodes/transform_helper.ts"
+        source.write_text('// A model definition in a transform helper.\nexport function modelForward(value: number): number { return value + 1; }\n')
+        transform.write_text('import {modelForward} from "./transform_helper.js";\nexport function run(inputs: Readonly<{"example.feature": Readonly<{value: number}>}>) { return {output: modelForward(inputs["example.feature"].value)}; }\n')
+        declaration = project / "bundle/nodes/transform.jsonc"
+        data = json.loads(declaration.read_text()); data["base_libs"] = ["example.transform_helper"]
+        declaration.write_text(json.dumps(data))
+        directory = project / "manifests/base_lib"; directory.mkdir()
+        (directory / "helper.jsonc").write_text(json.dumps({"kind": "base_lib", "id": "example.transform_helper",
+            "display_name": "Transform helper", "description": "A helper attributed to the transform.",
+            "implementations": [{"language": "typescript", "targets": ["node", "browser"],
+                "source": {"kind": "file", "ref": "nodes/transform_helper.ts"}}]}))
+        config = project / "vibeflow_project.jsonc"
+        data = json.loads(config.read_text()); data["descriptors"]["base_lib"] = ["manifests/base_lib"]
+        config.write_text(json.dumps(data))
+    return source, 2
+
+
+def _domain_commands(project: Path) -> None:
+    config = project / "vibeflow_project.jsonc"
+    data = json.loads(config.read_text())
+    data.update({"quality_enabled": True, "architecture": {"documents": [
+        {"workflow": "configs/model.jsonc", "document": "Architecture.jsonc"}]}})
+    config.write_text(json.dumps(data))
+
+
+def _domain_cli(workspace: Path, project: Path, command: str, *options: str):
+    environment = {**os.environ, "PYTHONPATH": str(ROOT / "src"), "PYTHONNOUSERSITE": "1", "PYTHONDONTWRITEBYTECODE": "1"}
+    return subprocess.run([sys.executable, "-m", "vibeflow", command, "--workspace", str(workspace),
+        "--config", str(project / "configs/model.jsonc"), *options], cwd=project, env=environment,
+        check=False, capture_output=True, text=True, timeout=60)
+
+
+def _domain_diagnostic(diagnostics, source: Path, line: int):
+    finding = next(item for item in diagnostics if item.get("code") == "EXAMPLE.MODEL.LOCATION")
+    assert finding["definition_id"] == "example.model_definition"
+    assert finding["object_id"] == "example.transform"
+    assert finding["source_location"] == {"path": str(source), "line": line, "column": 1}
+    assert finding["details"]["node_type"] == "example.transform"
+    assert finding["details"]["call_paths"] == [["transform"]]
+    assert "example.transform" in finding["details"]["ownership"]["node_types"]
+    return finding
+
+
+@pytest.mark.parametrize("location", ["shared_file", "transform", "helper"])
+def test_domain_locations_are_rejected_by_formal_commands_without_publishing(domain_project, tmp_path, location) -> None:
+    workspace, project = domain_project
+    source, line = _wrong_domain_location(project, location)
+    _domain_commands(project)
+    config = project / "configs/model.jsonc"
+    with pytest.raises(ProjectBuildError) as audit_error:
+        audit_javascript_project(JavascriptAuditRequest(workspace, config))
+    expected = _domain_diagnostic(audit_error.value.diagnostics, source, line)
+    with pytest.raises(ProjectBuildError) as build_error:
+        build_project_aot(ProjectBuildRequest(workspace, config, tmp_path / "dist", "node", "single-esm"))
+    assert _domain_diagnostic(build_error.value.diagnostics, source, line) == expected
+    assert not (tmp_path / "dist").exists()
+
+    for command in ("validate", "quality-check"):
+        result = _domain_cli(workspace, project, command, "--json")
+        assert result.returncode == 1, result.stderr or result.stdout
+        payload = json.loads(result.stdout)
+        assert payload["status"] in {"ERROR", "FAIL"}
+        diagnostics = payload["reports"][0]["diagnostics"] if command == "quality-check" else payload["diagnostics"]
+        assert _domain_diagnostic(diagnostics, source, line) == expected
+        result = _domain_cli(workspace, project, command)
+        assert result.returncode == 1, result.stderr or result.stdout
+        for fragment in ("EXAMPLE.MODEL.LOCATION", "example.model_definition", f"{source}:{line}:1", "example.transform"):
+            assert fragment in result.stdout
+
+    architecture, output = project / "Architecture.jsonc", tmp_path / "review.svg"
+    architecture.write_text("previous Architecture", encoding="utf-8")
+    output.write_text("previous SVG", encoding="utf-8")
+    reviewed = _domain_cli(workspace, project, "review", "--output", str(output))
+    assert reviewed.returncode == 1, reviewed.stderr or reviewed.stdout
+    payload = json.loads(reviewed.stdout)
+    assert payload["status"] == "FAIL" and payload["failed_stage"] == "preflight" and payload["published"] is False
+    assert _domain_diagnostic(payload["diagnostics"], source, line) == expected
+    assert architecture.read_text() == "previous Architecture" and output.read_text() == "previous SVG"
+    assert not list(tmp_path.glob("*.tmp.svg"))
+
+
+def test_allowed_top_level_model_passes_formal_checks_build_and_actual_execution(domain_project, tmp_path) -> None:
+    workspace, project = domain_project
+    _domain_commands(project)
+    # JS Node implementations are exports; this top-level function belongs to the model Node's declared source.
+    assert "export function modelForward" in (project / "nodes/model.ts").read_text()
+    for command in ("validate", "quality-check"):
+        result = _domain_cli(workspace, project, command, "--json")
+        assert result.returncode == 0, result.stderr or result.stdout
+        payload = json.loads(result.stdout)
+        assert payload["status"] in {"PASS", "CONCERNS"}
+        rule_checks = payload["reports"][0]["rule_checks"] if command == "quality-check" else payload["rule_checks"]
+        selected = rule_checks["subjects"]["example.model"]
+        assert any(item["plan"]["entrypoint"] == "static" and item["executed"] == ["model_definition"] for item in selected)
+    built = build_project_aot(ProjectBuildRequest(workspace, project / "configs/model.jsonc", tmp_path / "dist", "node", "single-esm"))
+    result = subprocess.run(["node", "--input-type=module", "--eval", f"import {{pathToFileURL}} from 'node:url'; const workflow=await import(pathToFileURL({json.dumps(str(built.entry))})); console.log(JSON.stringify(workflow.runWorkflow({{value:3}})));"], capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"result": 7}
+
+
+def test_run_only_domain_rule_is_explicit_and_does_not_become_a_build_check(domain_project, tmp_path) -> None:
+    from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
+    from vibeflow.targets.javascript.quality.rules import run_javascript_rules
+    from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+
+    workspace, project = domain_project
+    source, line = _wrong_domain_location(project, "transform")
+    rule = project / "bundle/rulesets/model-domain.jsonc"
+    data = json.loads(rule.read_text()); data["entrypoints"] = {"import": [], "static": [], "run": ["model_definition"]}
+    rule.write_text(json.dumps(data))
+    audited = audit_javascript_project(JavascriptAuditRequest(workspace, project / "configs/model.jsonc"))
+    assert not any(execution.executed for executions in audited.rule_report.results.values() for execution in executions if execution.plan.ruleset_id == "example.model_domain")
+    built = build_project_aot(ProjectBuildRequest(workspace, project / "configs/model.jsonc", tmp_path / "dist", "node", "single-esm"))
+    result = subprocess.run(["node", "--input-type=module", "--eval", f"import {{pathToFileURL}} from 'node:url'; const workflow=await import(pathToFileURL({json.dumps(str(built.entry))})); console.log(JSON.stringify(workflow.runWorkflow({{value:3}})));"], capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"result": 7}
+    # The public Target checker can explicitly select run; no JS run command or implicit runtime scan is introduced.
+    catalogs = load_project_descriptor_catalogs(project, project_config=project / "vibeflow_project.jsonc")
+    policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set())
+    checked = run_javascript_rules(audited.graph, catalogs, project_root=project, package_root=project, target="node", phase="run", import_policy=policy)
+    _domain_diagnostic([finding.to_dict() for finding in checked.findings], source, line)
+    assert any(execution.plan.entrypoint == "run" and execution.executed == ("model_definition",) for execution in checked.results["example.transform"])
+
+
+@pytest.mark.parametrize("selection", ["default", "terminal", "empty"])
+def test_process_console_policy_is_checked_at_build_and_actual_runtime(domain_project, tmp_path, selection) -> None:
+    workspace, project = domain_project
+    source = project / "nodes/transform.ts"
+    source.write_text(source.read_text().replace('  return {output: inputs["example.feature"].value + 1};',
+        '  console.log("domain transform result", inputs["example.feature"].value + 1);\n'
+        '  return {output: inputs["example.feature"].value + 1};'))
+    manifest = project / "bundle/nodes/transform.jsonc"
+    descriptor = json.loads(manifest.read_text())
+    assert descriptor["flow_kind"] == "process"
+    if selection == "empty":
+        descriptor["rulesets"] = []
+        manifest.write_text(json.dumps(descriptor))
+    elif selection == "terminal":
+        resource = project / "bundle/rulesets/data-terminal.jsonc"
+        resource.write_text(json.dumps({"kind": "ruleset", "id": "example.data_terminal",
+            "calls": [{"id": "native", "ruleset_id": "vibeflow.process"},
+                      {"id": "domain", "ruleset_id": "example.model_domain"}],
+            "relations": [{"source": "$self", "target": "native/effects", "kind": "overrides",
+                "params": {"effect_scope": "terminal"}}],
+            "entrypoints": {"import": ["native"], "static": ["native", "domain"], "run": ["native", "domain"]}}))
+        bundle = project / "bundles/domain.jsonc"
+        data = json.loads(bundle.read_text()); data["resources"]["rulesets"].append("../bundle/rulesets/data-terminal.jsonc")
+        bundle.write_text(json.dumps(data))
+        descriptor["rulesets"] = ["example.data_terminal"]
+        manifest.write_text(json.dumps(descriptor))
+    request = ProjectBuildRequest(workspace, project / "configs/model.jsonc", tmp_path / "dist", "node", "single-esm")
+    if selection == "default":
+        with pytest.raises(ProjectBuildError) as error:
+            build_project_aot(request)
+        finding = next(item for item in error.value.diagnostics if item.get("definition_id") == "vibeflow.no_side_effects")
+        assert finding["code"] == "VF_BASE_LIB_HOST_IO"
+        assert finding["source_location"] == {"path": str(source), "line": 3, "column": 3}
+        assert finding["details"]["node_type"] == "example.transform"
+        assert finding["details"]["call_paths"] == [["transform"]]
+        assert not request.out_dir.exists()
+        return
+    built = build_project_aot(request)
+    report = built.prepared.rule_report
+    assert built.prepared.compiled.effect_scopes["transform"] == ("terminal" if selection == "terminal" else "unconstrained")
+    if selection == "terminal":
+        execution = next(item for item in report.results["example.transform"] if item.plan.entrypoint == "static")
+        invocation = next(item for item in execution.plan.invocations if item.id == "native/effects")
+        assert invocation.params["effect_scope"] == "terminal"
+        assert invocation.parameter_sources["effect_scope"] == "override:$self"
+        assert report.policies["example.transform"]["records"][0]["definition_id"] == "vibeflow.no_side_effects"
+    else:
+        assert report.results["example.transform"] == ()
+        assert "example.transform" in report.to_dict()["unconstrained"]
+    result = subprocess.run(["node", "--input-type=module", "--eval", f"import {{pathToFileURL}} from 'node:url'; const workflow=await import(pathToFileURL({json.dumps(str(built.entry))})); console.log(JSON.stringify(workflow.runWorkflow({{value:3}})));"], capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == 'domain transform result 7\n{"result":7}\n'
+    assert json.loads(manifest.read_text())["flow_kind"] == "process"
+
+
+def test_process_console_name_shadowing_keeps_local_object_pure(domain_project, tmp_path) -> None:
+    workspace, project = domain_project
+    source = project / "nodes/transform.ts"
+    source.write_text('export function run(inputs: Readonly<{"example.feature": Readonly<{value: number}>}>) {\n'
+        '  const console = {log: (value: number) => value + 1};\n'
+        '  return {output: console.log(inputs["example.feature"].value)};\n}\n')
+    built = build_project_aot(ProjectBuildRequest(workspace, project / "configs/model.jsonc", tmp_path / "dist", "node", "single-esm"))
+    assert built.prepared.compiled.effect_scopes["transform"] == "none"
+    result = subprocess.run(["node", "--input-type=module", "--eval", f"import {{pathToFileURL}} from 'node:url'; const workflow=await import(pathToFileURL({json.dumps(str(built.entry))})); console.log(JSON.stringify(workflow.runWorkflow({{value:3}})));"], capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == '{"result":7}\n'
 
 
 def test_explicit_empty_node_rulesets_is_reported_unconstrained(domain_project) -> None:

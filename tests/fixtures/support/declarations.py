@@ -30,11 +30,12 @@ def configured_declaration(descriptor, schema=None, defaults=None, **values):
 def write_node_manifests(root, registrations):
     """Write canonical test resources and the selected, ordinary Node classes."""
     from tests.fixtures.support import strict_support_runtime_nodes as nodes
+    from tests.fixtures.support import strict_support_runtime_implementations as implementations
 
     root = Path(root)
     manifests = root / "manifests" / "nodes"
     manifests.mkdir(parents=True, exist_ok=True)
-    source = ast.parse(Path(nodes.__file__).read_text(encoding="utf-8"))
+    source = ast.parse(Path(implementations.__file__).read_text(encoding="utf-8"))
     selected = {name for _, name, _, _ in registrations}
     body = [item for item in source.body if
             isinstance(item, ast.ClassDef) and item.name in selected or

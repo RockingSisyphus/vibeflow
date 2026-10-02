@@ -1,0 +1,24 @@
+{
+  "kind": "node",
+  "type_key": "example.boundary",
+  "display_name": "Boundary",
+  "category": "rule_graph",
+  "description": "An executable Node in the typed Rule graph example.",
+  "version": "0.15.0",
+  "flow_kind": "terminal",
+  "contract": {},
+  "rulesets": [],
+  "implementations": [
+    {
+      "language": "python",
+      "targets": [
+        "python"
+      ],
+      "source": {
+        "kind": "file",
+        "ref": "rule_graph_nodes.py",
+        "export": "Boundary"
+      }
+    }
+  ]
+}
