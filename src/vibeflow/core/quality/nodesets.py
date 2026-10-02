@@ -12,15 +12,15 @@ from vibeflow.core.nodeset_dependencies import (
 )
 
 
-def nodeset_quality_findings(
-    graph: GraphConfig, *, max_depth: int = 4
+def _nodeset_quality_facts(
+    graph: GraphConfig, *, max_depth: int = 4, warn_width: int = NODESET_WIDTH_WARNING
 ) -> tuple[HealthFinding, ...]:
     """Measure width, recursion and nesting without choosing a command gate."""
 
     findings: list[HealthFinding] = []
     for nodeset in sorted(graph.nodesets.values(), key=lambda item: item.type_key):
         count = len(nodeset.graph.nodes)
-        if count > NODESET_WIDTH_WARNING:
+        if count > warn_width:
             findings.append(
                 HealthFinding(
                     rule_id="NODESET.SMELL.TOO_WIDE",
@@ -30,7 +30,7 @@ def nodeset_quality_findings(
                     failure_layer="topology",
                     message=f"nodeset has {count} internal nodes; consider splitting it",
                     suggested_fix_type="fix_nodeset",
-                    details={"node_count": count, "limit": NODESET_WIDTH_WARNING},
+                    details={"node_count": count, "limit": warn_width},
                 )
             )
     dependencies = analyze_nodeset_dependencies(graph)
@@ -64,6 +64,11 @@ def nodeset_quality_findings(
             )
         )
     return tuple(findings)
+
+
+def nodeset_quality_findings(graph: GraphConfig, *, max_depth: int = 4, warn_width: int = NODESET_WIDTH_WARNING) -> tuple[HealthFinding, ...]:
+    from vibeflow.core.rules.builtin.workflow import evaluate_workflow_topic
+    return evaluate_workflow_topic("nodesets", graph=graph, params={"nodeset_max_depth": max_depth, "nodeset_warn_width": warn_width}).findings
 
 
 __all__ = ["nodeset_quality_findings"]

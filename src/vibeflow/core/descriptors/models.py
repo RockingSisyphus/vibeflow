@@ -346,6 +346,9 @@ class NodeDescriptor:
     author: str | None = None
     tags: tuple[str, ...] = ()
     external: bool = False
+    rulesets: tuple[str, ...] | None = None
+    presentation: Mapping[str, Any] = field(default_factory=dict)
+    metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -419,6 +422,11 @@ class NodeDescriptor:
             "tags",
             _string_tuple(self.tags, field_name="node.tags"),
         )
+        if self.rulesets is not None:
+            object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="node.rulesets"))
+        from vibeflow.core.descriptors.categories import normalize_presentation
+        object.__setattr__(self, "presentation", normalize_presentation(self.presentation, field_name="node.presentation"))
+        object.__setattr__(self, "metadata", _freeze_mapping(self.metadata, field_name="node.metadata"))
 
     @property
     def id(self) -> str:
@@ -454,6 +462,10 @@ class NodeDescriptor:
         }
         if self.author is not None:
             payload["author"] = self.author
+        if self.rulesets is not None:
+            payload["rulesets"] = list(self.rulesets)
+        payload["presentation"] = _thaw_json(self.presentation)
+        payload["metadata"] = _thaw_json(self.metadata)
         return payload
 
 def _validate_implementation_coverage(

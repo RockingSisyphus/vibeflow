@@ -3,21 +3,63 @@
   "$id": "https://vibeflow.local/schema/nodeset.schema.json",
   "title": "VibeFlow Nodeset",
   "type": "object",
-  "required": ["type_key", "display_name", "description", "requires", "provides"],
+  "required": [
+    "type_key",
+    "display_name",
+    "description",
+    "requires",
+    "provides"
+  ],
   "properties": {
-    "type_key": { "type": "string", "minLength": 1 },
-    "display_name": { "type": "string", "minLength": 1 },
-    "description": { "type": "string", "minLength": 1 },
-    "status": { "enum": ["planned", "implemented"] },
-    "flow_kind": { "enum": ["terminal", "process", "decision", "io", "predefined", "data_store", "document", "preparation", "global_state"] },
+    "type_key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "implemented"
+      ]
+    },
+    "flow_kind": {
+      "enum": [
+        "terminal",
+        "process",
+        "decision",
+        "io",
+        "predefined",
+        "data_store",
+        "document",
+        "preparation",
+        "global_state"
+      ]
+    },
     "planned_behavior": {
       "oneOf": [
-        { "enum": ["blocking", "transparent"] },
+        {
+          "enum": [
+            "blocking",
+            "transparent"
+          ]
+        },
         {
           "type": "object",
-          "required": ["kind", "stub_module"],
+          "required": [
+            "kind",
+            "stub_module"
+          ],
           "properties": {
-            "kind": { "const": "python_stub" },
+            "kind": {
+              "const": "python_stub"
+            },
             "stub_module": {
               "type": "string",
               "pattern": "^project/stubs/[^.][^\\n\\r]*\\.py$"
@@ -27,66 +69,159 @@
         }
       ]
     },
-    "requires": { "$ref": "#/$defs/requires" },
-    "provides": { "$ref": "#/$defs/provides" },
+    "requires": {
+      "$ref": "#/$defs/requires"
+    },
+    "provides": {
+      "$ref": "#/$defs/provides"
+    },
     "global_config": {
       "type": "object",
       "properties": {
-        "config": { "type": "object" },
-        "values": { "type": "object" },
-        "allow_config_override": { "type": "boolean" },
-        "override_child_config": { "type": "boolean" }
+        "config": {
+          "type": "object"
+        },
+        "values": {
+          "type": "object"
+        },
+        "allow_config_override": {
+          "type": "boolean"
+        },
+        "override_child_config": {
+          "type": "boolean"
+        }
       }
     },
     "nodeset_imports": {
       "type": "array",
       "items": {
         "anyOf": [
-          { "type": "string", "minLength": 1 },
+          {
+            "type": "string",
+            "minLength": 1
+          },
           {
             "type": "object",
-            "required": ["path"],
+            "required": [
+              "path"
+            ],
             "properties": {
-              "path": { "type": "string", "minLength": 1 }
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
             },
             "additionalProperties": false
           }
         ]
       }
     },
-    "pipeline": { "$ref": "config.schema.json#/$defs/pipeline" }
+    "pipeline": {
+      "$ref": "config.schema.json#/$defs/pipeline"
+    },
+    "rulesets": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    }
   },
   "$defs": {
     "dataProvider": {
       "type": "object",
-      "required": ["key", "type", "display_name"],
+      "required": [
+        "key",
+        "type",
+        "display_name"
+      ],
       "properties": {
-        "key": { "type": "string", "minLength": 1 },
-        "type": { "type": "string", "minLength": 1 },
-        "display_name": { "type": "string", "minLength": 1 }
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "additionalProperties": false
     },
     "dataRequirement": {
       "type": "object",
-      "required": ["type", "cardinality", "display_name"],
+      "required": [
+        "type",
+        "cardinality",
+        "display_name"
+      ],
       "properties": {
-        "type": { "type": "string", "minLength": 1 },
-        "cardinality": { "enum": ["exactly_one", "optional_one", "all"] },
-        "display_name": { "type": "string", "minLength": 1 }
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cardinality": {
+          "enum": [
+            "exactly_one",
+            "optional_one",
+            "all"
+          ]
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "additionalProperties": false
     },
-    "requires": { "type": "array", "items": { "$ref": "#/$defs/dataRequirement" } },
-    "provides": { "type": "array", "items": { "$ref": "#/$defs/dataProvider" } }
+    "requires": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dataRequirement"
+      }
+    },
+    "provides": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dataProvider"
+      }
+    }
   },
-  "if": { "properties": { "status": { "const": "planned" } }, "required": ["status"] },
+  "if": {
+    "properties": {
+      "status": {
+        "const": "planned"
+      }
+    },
+    "required": [
+      "status"
+    ]
+  },
   "then": {
-    "not": { "required": ["pipeline"] }
+    "not": {
+      "required": [
+        "pipeline"
+      ]
+    }
   },
   "else": {
-    "required": ["type_key", "display_name", "description", "requires", "provides", "pipeline"],
-    "not": { "required": ["planned_behavior"] }
+    "required": [
+      "type_key",
+      "display_name",
+      "description",
+      "requires",
+      "provides",
+      "pipeline"
+    ],
+    "not": {
+      "required": [
+        "planned_behavior"
+      ]
+    }
   },
   "additionalProperties": false
 }

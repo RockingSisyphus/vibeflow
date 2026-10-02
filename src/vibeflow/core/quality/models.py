@@ -139,6 +139,7 @@ class QualityFinding(Finding):
         subject_type: str | None = None,
         subject_id: str | None = None,
         suggested_fix: str | None = None,
+        definition_id: str = "",
     ) -> None:
         resolved_code = code if rule_id is _UNSET else str(rule_id)
         if resolved_code is None:
@@ -161,6 +162,7 @@ class QualityFinding(Finding):
         object.__setattr__(self, "root_id", root_id)
         object.__setattr__(self, "root_path", root_path)
         object.__setattr__(self, "source_path", source_path)
+        object.__setattr__(self, "definition_id", definition_id)
 
     def to_dict(self) -> dict[str, object]:
         return self.common_dict()

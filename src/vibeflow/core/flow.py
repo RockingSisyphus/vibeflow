@@ -60,9 +60,11 @@ class NodeStyle:
     fill: str = ""
     stroke: str = ""
     text: str = ""
+    shape: str = ""
+    icon: str = ""
 
     def to_dict(self) -> dict[str, str]:
-        return {key: value for key, value in (("fill", self.fill), ("stroke", self.stroke), ("text", self.text)) if value}
+        return {key: value for key, value in (("fill", self.fill), ("stroke", self.stroke), ("text", self.text), ("shape", self.shape), ("icon", self.icon)) if value}
 
 @dataclass(frozen=True)
 class NodeSimilarity:
@@ -246,8 +248,14 @@ class GraphConfig:
     root_path: str = ""
     source_path: str = ""
     execution_lock: ExecutionLockSpec | None = None
+    rulesets: tuple[str, ...] = ("vibeflow.workflow",)
 
     def __post_init__(self) -> None:
+        if isinstance(self.rulesets, str) or not all(isinstance(item, str) and item.strip() for item in self.rulesets):
+            raise ValueError("graph.rulesets must be a list of non-empty IDs")
+        if len(set(self.rulesets)) != len(self.rulesets):
+            raise ValueError("graph.rulesets contains duplicate IDs")
+        object.__setattr__(self, "rulesets", tuple(self.rulesets))
         if self.execution_lock is not None and not isinstance(
             self.execution_lock, ExecutionLockSpec
         ):

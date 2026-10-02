@@ -11,6 +11,8 @@ import re
 
 
 NODE_STYLE_FIELDS = ("fill", "stroke", "text")
+NODE_PRESENTATION_FIELDS = (*NODE_STYLE_FIELDS, "shape", "icon")
+NODE_SHAPES = frozenset({"rect", "rounded", "stadium", "diamond", "lean-r", "lean-l", "fr-rect", "cyl", "doc", "hex", "cloud", "circle", "dbl-circ"})
 
 # These colours are reserved by the public VibeFlow visual contract.  Keeping
 # the values in Core lets an in-memory workflow be validated without loading a

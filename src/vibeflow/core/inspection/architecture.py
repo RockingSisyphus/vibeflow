@@ -32,6 +32,7 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
         else any(declared_global_state.values())
     )
     return {
+        "rulesets": list(graph.rulesets),
         "summary": {
             "nodes": len(nodes),
             "nodesets": len(graph.nodesets),
@@ -154,11 +155,7 @@ def _effective_effect_scope(
     node_id = str(getattr(node, "id", ""))
     if compiled is not None and node_id in compiled.effect_scopes:
         return compiled.effect_scopes[node_id]
-    return (
-        EFFECT_SCOPE_GLOBAL_STATE
-        if _effective_flow_kind(node, compiled) == FLOW_KIND_GLOBAL_STATE
-        else EFFECT_SCOPE_NONE
-    )
+    return "unavailable" if getattr(node, "status", "") == STATUS_PLANNED else "unconstrained"
 
 
 def _declared_global_state_by_node(graph: GraphConfig) -> dict[str, bool]:

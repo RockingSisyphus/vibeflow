@@ -9,11 +9,26 @@ compatibility subclasses below only translate those names to the common model.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, is_dataclass
 from typing import Mapping
 
 
 _UNSET = object()
+
+
+def _plain(value: object) -> object:
+    """Serialize immutable fact containers without importing the Rule engine."""
+    if isinstance(value, Mapping):
+        return {str(key): _plain(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_plain(item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        return [_plain(item) for item in sorted(value, key=str)]
+    if hasattr(value, "to_dict"):
+        return value.to_dict()
+    if is_dataclass(value) and not isinstance(value, type):
+        return {item.name: _plain(getattr(value, item.name)) for item in fields(value)}
+    return value
 
 
 @dataclass(frozen=True)
@@ -31,6 +46,7 @@ class Finding:
     root_id: str = ""
     root_path: str = ""
     source_path: str = ""
+    definition_id: str = ""
 
     @property
     def rule_id(self) -> str:
@@ -54,14 +70,15 @@ class Finding:
 
     def common_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
+            "code": self.code,
             "rule_id": self.code,
             "severity": self.severity,
             "object_type": self.subject_type,
             "object_id": self.subject_id,
-            "source_location": dict(self.source_location),
+            "source_location": _plain(self.source_location),
             "message": self.message,
             "suggested_fix_type": self.suggested_fix,
-            "details": dict(self.details),
+            "details": _plain(self.details),
         }
         if self.root_id:
             payload["root_id"] = self.root_id
@@ -69,7 +86,12 @@ class Finding:
             payload["root_path"] = self.root_path
         if self.source_path:
             payload["source_path"] = self.source_path
+        if self.definition_id:
+            payload["definition_id"] = self.definition_id
         return payload
+
+    def to_dict(self) -> dict[str, object]:
+        return self.common_dict()
 
 
 @dataclass(frozen=True, init=False)
@@ -97,6 +119,7 @@ class HealthFinding(Finding):
         subject_type: str | None = None,
         subject_id: str | None = None,
         suggested_fix: str | None = None,
+        definition_id: str = "",
     ) -> None:
         resolved_code = code if rule_id is _UNSET else str(rule_id)
         if resolved_code is None:
@@ -121,10 +144,12 @@ class HealthFinding(Finding):
         object.__setattr__(self, "source_path", source_path)
         object.__setattr__(self, "rule_source", rule_source)
         object.__setattr__(self, "failure_layer", failure_layer)
+        object.__setattr__(self, "definition_id", definition_id)
 
     def to_dict(self) -> dict[str, object]:
         common = self.common_dict()
         payload = {
+            "code": common["code"],
             "rule_id": common["rule_id"],
             "severity": common["severity"],
             "object_type": common["object_type"],
@@ -142,6 +167,8 @@ class HealthFinding(Finding):
             payload["root_path"] = self.root_path
         if self.source_path:
             payload["source_path"] = self.source_path
+        if self.definition_id:
+            payload["definition_id"] = self.definition_id
         return payload
 
 
@@ -160,8 +187,8 @@ class HealthReport:
             "errors": [finding.to_dict() for finding in self.errors],
             "warnings": [finding.to_dict() for finding in self.warnings],
             "skipped": [finding.to_dict() for finding in self.skipped],
-            "info": self.info,
-            "effective_policy": self.effective_policy,
+            "info": _plain(self.info),
+            "effective_policy": _plain(self.effective_policy),
         }
 
     def to_json(self, *, indent: int | None = 2) -> str:

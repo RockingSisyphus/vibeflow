@@ -21,7 +21,7 @@ class _DecisionFlow:
     can_reach_end: set[str]
 
 
-def append_flowchart_health(
+def _flowchart_health_facts(
     graph,
     compiled,
     state,
@@ -66,6 +66,21 @@ def append_flowchart_health(
         _append_decision_branch_health(graph, compiled, state, decision_flow, owner=owner)
     _append_explicit_edge_duplicate_warnings(graph, state, owner=owner)
     _append_orphan_findings(active_names, incoming_edges, outgoing_edges, incoming, outgoing, state, owner=owner)
+
+
+def _append_rule_topic(topic, graph, compiled, state, *, owner="pipeline"):
+    from vibeflow.core.rules.builtin.workflow import evaluate_workflow_topic
+    result = evaluate_workflow_topic(topic, graph=graph, compiled=compiled, owner=owner)
+    for finding in result.findings:
+        (state.warnings if finding.severity == "warning" else state.errors).append(finding)
+
+
+def append_flowchart_health(graph, compiled, state, *, owner="pipeline"):
+    _append_rule_topic("flow", graph, compiled, state, owner=owner)
+
+
+def append_join_policy_health(graph, compiled, state, *, owner="pipeline"):
+    _append_rule_topic("join", graph, compiled, state, owner=owner)
 
 
 def _flow_maps(compiled, active_names: set[str]) -> tuple[dict[str, list[str]], dict[str, list[str]], dict[str, list[object]], dict[str, list[object]]]:
@@ -195,7 +210,7 @@ def _append_orphan_findings(
             )
 
 
-def append_join_policy_health(graph, compiled, state, *, owner: str = "pipeline") -> None:
+def _join_policy_facts(graph, compiled, state, *, owner: str = "pipeline") -> None:
     nodes_by_name = {node.name: node for node in graph.nodes}
     schedule_edges = tuple(compiled.resolved_schedule_edges)
     transfer_edges = tuple(compiled.resolved_transfer_edges)

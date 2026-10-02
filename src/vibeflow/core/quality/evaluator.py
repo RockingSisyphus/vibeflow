@@ -22,73 +22,34 @@ def evaluate_project_quality(
     facts: ProjectQualityFacts,
     policy: QualityPolicy | None = None,
 ) -> SourceQualityReport:
-    """Evaluate already-extracted facts without source, AST, paths or I/O."""
+    """Run the selected built-in project rules over already-extracted facts."""
+    from vibeflow.core.rules import RuleContext, compile_ruleset, execute_rule_plan
+    from vibeflow.core.rules.models import plain
+    from vibeflow.core.rules.builtin.project_quality import project_quality_handlers, project_quality_resources
 
     active = policy or QualityPolicy()
     files = tuple(sorted(facts.files, key=lambda item: item.path))
-    modules = {file.module for file in files}
-    dependency_graph = _build_dependency_graph(files, modules)
-    import_sites = _import_sites_by_edge(files, modules)
-    findings: list[QualityFinding] = []
-    target_findings = list(facts.findings)
-    for file in files:
-        owned = [
-            finding
-            for finding in target_findings
-            if _finding_belongs_to_file(finding, file)
-        ]
-        target_findings = [
-            finding for finding in target_findings if finding not in owned
-        ]
-        if not any(
-            finding.rule_id.startswith("QUALITY.SYNTAX.")
-            for finding in owned
-        ):
-            findings.extend(_file_findings(file, facts.root, active))
-        findings.extend(owned)
-    findings.extend(target_findings)
-
-    directories, clusters, structure_summary, structure_findings = (
-        analyze_directory_structure(
-            files,
-            dependency_graph,
-            import_sites,
-            active.thresholds,
-            active.structure_conventions,
-        )
-    )
-    findings.extend(structure_findings)
-    root_summary, root_findings = analyze_root_structure(
-        files,
-        dependency_graph,
-        import_sites,
-        active.structure_limits,
-        roles=active.structure_roles,
-        conventions=active.structure_conventions,
-    )
-    structure_summary.update(root_summary)
-    findings.extend(root_findings)
-    graph_findings, longest_chain = dependency_findings(
-        dependency_graph,
-        import_sites,
-        active.thresholds,
-    )
-    findings.extend(graph_findings)
-    findings.extend(duplicate_function_findings(files))
-    findings = _dedupe_findings(findings)
+    normalized = ProjectQualityFacts(facts.root, files, facts.findings)
+    rules, ruleset = project_quality_resources()
+    plan = compile_ruleset(ruleset, rules={item.id: item for item in rules})
+    execution = execute_rule_plan(plan, RuleContext(facts={"project_facts": normalized, "quality_policy": active}),
+                                  handlers=project_quality_handlers())
+    dependency_result = execution.results["dependencies"]
+    structure_result = execution.results["structure"]
+    if dependency_result.state != "completed" or structure_result.state != "completed":
+        raise ValueError("project-quality facts are unavailable: " + "; ".join(item.message for item in execution.findings))
+    dependency_records = dependency_result.records
+    structure_records = structure_result.records
+    findings = _dedupe_findings((*execution.findings, *facts.findings))
     has_error = any(finding.severity == "error" for finding in findings)
     status = "FAIL" if has_error else ("CONCERNS" if findings else "PASS")
     return SourceQualityReport(
-        status=status,
-        root=facts.root,
-        thresholds=active.thresholds,
-        files=files,
-        dependency_graph=dependency_graph,
-        longest_dependency_chain=tuple(longest_chain),
-        findings=tuple(findings),
-        directory_graph=directories,
-        prefix_clusters=clusters,
-        structure_summary=structure_summary,
+        status=status, root=facts.root, thresholds=active.thresholds, files=files,
+        dependency_graph={key: tuple(value) for key, value in dependency_records["graph"].value.items()},
+        longest_dependency_chain=tuple(dependency_records["chain"].value),
+        findings=tuple(findings), directory_graph=tuple(structure_records["directories"].value),
+        prefix_clusters=tuple(structure_records["clusters"].value),
+        structure_summary=plain(structure_records["summary"].value),
     )
 
 
