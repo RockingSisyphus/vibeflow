@@ -1,6 +1,6 @@
 {
   "kind": "node", "type_key": "minimal.process_payload", "display_name": "Process payload", "category": "business",
-  "description": "Contains the project-specific business transformation.", "version": "0.14.1", "flow_kind": "process",
+  "description": "Contains the project-specific business transformation.", "version": "0.14.2", "flow_kind": "process",
   "contract": {
     "requires": [{"type": "payload.internal", "cardinality": "exactly_one", "display_name": "Internal payload"}],
     "provides": [{"key": "processed_payload", "type": "payload.processed", "display_name": "Processed payload"}],

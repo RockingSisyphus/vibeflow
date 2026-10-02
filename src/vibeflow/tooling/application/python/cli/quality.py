@@ -92,8 +92,12 @@ def _python_quality_workflow_reports(args: argparse.Namespace) -> list[dict[str,
     from vibeflow.tooling.project.workflow_discovery import workflow_configs_for_root
     from vibeflow.tooling.project.workspace_loader import find_project_config, load_project_workspace, load_workspace_config
 
-    if args.workspace and args.path is None:
+    if args.workspace:
         workspace = load_workspace_config(args.workspace)
+        roots = workspace.roots
+        if args.path is not None:
+            selected = Path(args.path).resolve()
+            roots = tuple(root for root in roots if root.path == selected)
     else:
         selected = Path(args.path or ".").resolve()
         if not selected.is_dir():
@@ -102,8 +106,9 @@ def _python_quality_workflow_reports(args: argparse.Namespace) -> list[dict[str,
         if project is None or project.parent != selected:
             return []
         workspace = load_project_workspace(project)
+        roots = workspace.roots
     reports = []
-    for root in workspace.roots:
+    for root in roots:
         if root.project_target != "python" or not root.quality_enabled:
             continue
         for config in workflow_configs_for_root(root):

@@ -1008,6 +1008,7 @@ def _run_sandbox(work_root: Path) -> int:
         _prepare_environment()
         _reset_outputs()
         results = [
+            _run_workspace_quality_case(),
             *_run_review_cases(),
             *_run_delegate_cli_cases(),
             *_run_execution_model_cases(),
@@ -1129,6 +1130,28 @@ def _reset_outputs() -> None:
     SVG_DIR.mkdir(parents=True, exist_ok=True)
     REVIEW_DIR.mkdir(parents=True, exist_ok=True)
     RUN_ROOT.mkdir(parents=True, exist_ok=True)
+
+
+def _run_workspace_quality_case() -> CaseResult:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "tools/run_tests.py"),
+            "--",
+            str(REPO_ROOT / "tests/targets/python/test_quality_workspace_sandbox.py"),
+        ],
+        cwd=WORK_ROOT,
+        env=dict(os.environ),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    output = completed.stdout + completed.stderr
+    return CaseResult(
+        "quality:cross_root_workspace",
+        "PASS" if completed.returncode == 0 else "FAIL",
+        output.strip(),
+    )
 
 
 def _run_review_cases() -> list[CaseResult]:

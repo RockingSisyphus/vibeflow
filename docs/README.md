@@ -22,6 +22,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 - [系统架构](design/system-architecture.md)
 - [执行模型](design/execution-model.md)
+- [业务节点分类与领域源码检查实施方案](design/domain-node-extensions-plan.md)
 
 ## 内核维护
 

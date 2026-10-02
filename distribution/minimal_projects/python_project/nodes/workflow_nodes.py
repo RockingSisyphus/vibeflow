@@ -22,7 +22,7 @@ class StartNode:
         display_name="Workflow start",
         category="boundary",
         description="Marks the structural start of the minimal workflow.",
-        version="0.14.1",
+        version="0.14.2",
         flow_kind="terminal",
     )
     CONTRACT = NodeContract()
@@ -37,7 +37,7 @@ class InputBoundaryNode:
         display_name="Input boundary",
         category="boundary",
         description="Adapts the public request into the workflow's internal payload.",
-        version="0.14.1",
+        version="0.14.2",
         flow_kind="io",
     )
     CONTRACT = NodeContract(
@@ -57,7 +57,7 @@ class ProcessPayloadNode:
         display_name="Process payload",
         category="business",
         description="Contains the project-specific business transformation.",
-        version="0.14.1",
+        version="0.14.2",
         flow_kind="process",
     )
     CONTRACT = NodeContract(
@@ -78,7 +78,7 @@ class OutputBoundaryNode:
         display_name="Output boundary",
         category="boundary",
         description="Adapts the processed payload to the public response.",
-        version="0.14.1",
+        version="0.14.2",
         flow_kind="io",
     )
     CONTRACT = NodeContract(
@@ -98,7 +98,7 @@ class EndNode:
         display_name="Workflow end",
         category="boundary",
         description="Marks the structural end after the response is available.",
-        version="0.14.1",
+        version="0.14.2",
         flow_kind="terminal",
     )
     CONTRACT = NodeContract()
