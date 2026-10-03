@@ -12,7 +12,7 @@ def plugin_manifest_case(result: object) -> dict[str, Any]:
     plugins = manifest["plugins"]
     active = plugins["active"]
     declared = plugins["declared"]
-    assert manifest["plugin_abi_version"] == "vibeflow.plugin.v2"
+    assert manifest["plugin_abi_version"] == "vibeflow.plugin.v3"
     assert [item["id"] for item in active] == [
         "sandbox.compiler_audit",
         "sandbox.runtime_audit",

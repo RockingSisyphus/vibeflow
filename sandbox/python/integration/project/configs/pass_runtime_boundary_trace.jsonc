@@ -15,23 +15,18 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "input",
         "type_used": "sandbox.value_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-
-
         "id": "add_one",
         "type_used": "math.add_one",
         "display_name": "Add One",
         "description": "Runs add_one."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.out_value_end",
         "display_name": "End",
@@ -63,6 +58,15 @@
   "nodeset_imports": [
     {
       "path": "nodesets/pass_runtime_boundary_trace/math_add_one.jsonc"
+    }
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
     }
   ]
 }

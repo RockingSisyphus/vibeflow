@@ -10,7 +10,6 @@
       {
         "display_name": "Fanout Source",
         "description": "Branches synchronously without being a decision node.",
-
         "value": 1,
         "id": "source",
         "type_used": "sandbox.constant"
@@ -18,8 +17,6 @@
       {
         "display_name": "Unjoined Side Branch",
         "description": "Looks like synchronous side work but never rejoins the mainline and is not async.",
-
-
         "delta": 99,
         "id": "side",
         "type_used": "sandbox.add_out"
@@ -27,8 +24,6 @@
       {
         "display_name": "Finalize",
         "description": "Produces the final output on the mainline.",
-
-
         "delta": 4,
         "id": "add",
         "type_used": "sandbox.add"
@@ -36,7 +31,6 @@
       {
         "display_name": "End",
         "description": "Ends after value.out is available.",
-
         "id": "end",
         "type_used": "sandbox.out_value_end"
       }
@@ -66,5 +60,14 @@
         "display_name": "Value Out"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

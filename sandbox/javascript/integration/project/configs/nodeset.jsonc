@@ -37,7 +37,7 @@
         "type_used": "sandbox.arithmetic_nodeset",
         "display_name": "Run arithmetic nodeset",
         "description": "Computes (x + a) - b inside a nested block."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -46,8 +46,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "arithmetic"},
-      {"from": "arithmetic", "to": "end"}
+      {
+        "from": "start",
+        "to": "arithmetic"
+      },
+      {
+        "from": "arithmetic",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -57,5 +63,14 @@
         "as": "result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

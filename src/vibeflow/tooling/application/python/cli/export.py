@@ -29,9 +29,9 @@ def handle_export_graph(args, *, export_kind: str) -> int:
         render_mermaid_svg,
     )
     from vibeflow.tooling.application.python.project.effective_policy import default_effective_policy
-    from vibeflow.targets.python.project.plugin_loader import load_plugins_from_config
+    from vibeflow.tooling.project.workspace_loader import find_project_config
 
-    if getattr(args, "workspace", None):
+    if getattr(args, "workspace", None) or find_project_config(Path(args.config)) is not None:
         loaded = _workspace_graph_or_report(args, validate_health=export_kind == "architecture")
         if isinstance(loaded, HealthReport):
             print(loaded.to_json())
@@ -40,7 +40,7 @@ def handle_export_graph(args, *, export_kind: str) -> int:
     else:
         registry = None
         try:
-            graph, compiled, resources = _load_legacy_graph(args, validate_health=export_kind == "architecture")
+            graph, compiled, resources = _load_unowned_graph(args, validate_health=export_kind == "architecture")
         except ConfigLoadError as exc:
             report = config_load_error_report(exc, object_type="config", object_id=str(args.config))
             print(report.to_json())
@@ -163,7 +163,11 @@ def _workspace_graph_or_report(args, *, validate_health: bool = False):
     from vibeflow.core.findings import HealthReport
     from vibeflow.tooling.application.python.workspace_service import load_workspace_graph_for_export
 
-    workspace = _load_workspace_for_export(Path(args.workspace))
+    if getattr(args, "workspace", None):
+        workspace = _load_workspace_for_export(Path(args.workspace))
+    else:
+        from vibeflow.tooling.project.workspace_loader import load_project_workspace
+        workspace = load_project_workspace(Path(args.config))
     if isinstance(workspace, HealthReport):
         return workspace
     graph, compiled, registry, resources, error = load_workspace_graph_for_export(
@@ -200,35 +204,32 @@ def _load_workspace_for_export(path: Path):
         )
 
 
-def _load_legacy_graph(args, *, validate_health: bool = False):
+def _load_unowned_graph(args, *, validate_health: bool = False):
     from vibeflow.tooling.application.python.reports import dedupe_findings
     from vibeflow.targets.python.project.compiler import GraphCompiler
     from vibeflow.tooling.project.config_loader import load_config_document
-    from vibeflow.tooling.application.python.project.resource_registries import discover_config_resource_registry_context
     from vibeflow.tooling.application.python.project.resources import load_config_resources
     from vibeflow.tooling.project.config_schema import collect_config_schema_findings
     from vibeflow.tooling.project.graph_config import parse_graph_config, project_root_for_config
     from vibeflow.core.findings import HealthReport
     from vibeflow.tooling.application.python.project.effective_policy import default_effective_policy
-    from vibeflow.targets.python.project.plugin_loader import load_plugins_from_config
+    from vibeflow.targets.python.project.plugins import PluginRegistry
+    from vibeflow.core.findings import HealthFinding
 
     config_path = Path(args.config)
     document = load_config_document(config_path)
-    registry_context = discover_config_resource_registry_context(document.data, config_path=config_path)
-    plugin_registry, plugin_findings = load_plugins_from_config(
-        document.data,
-        base_path=registry_context.base_path,
-        plugin_resource_registry=registry_context.plugin_resource_registry,
-    )
+    plugin_registry = PluginRegistry()
+    if document.data.get("plugins"):
+        raise _SchemaExportError(HealthReport(status="ERROR", errors=(HealthFinding(
+            rule_id="PLUGIN.CONFIG.ROOT", severity="error", object_type="config", object_id=str(config_path),
+            source_location={"path": str(config_path)}, failure_layer="plugin",
+            message="custom plugins require an owning vibeflow_project.jsonc"),)))
     resources, resource_findings = load_config_resources(
         document.data,
-        base_path=registry_context.base_path,
+        base_path=config_path.parent,
         plugin_registry=plugin_registry,
-        base_lib_registry=registry_context.base_lib_registry,
-        plugin_resource_registry=registry_context.plugin_resource_registry,
-        base_lib_paths=registry_context.base_lib_paths,
     )
-    schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *registry_context.findings, *plugin_findings, *resource_findings))
+    schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *resource_findings))
     schema_errors = tuple(finding for finding in schema_findings if finding.severity == "error")
     if schema_errors:
         status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin", "base_lib"} for finding in schema_errors) else "FAIL"

@@ -37,8 +37,6 @@
         "type_used": "sandbox.math",
         "display_name": "Affine transform",
         "description": "Uses defaults unless a qualified call-site override is supplied.",
-
-
         "config": {
           "scale": 2,
           "offset": 1
@@ -52,8 +50,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "math"},
-      {"from": "math", "to": "end"}
+      {
+        "from": "start",
+        "to": "math"
+      },
+      {
+        "from": "math",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -63,5 +67,14 @@
         "as": "result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

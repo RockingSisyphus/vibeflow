@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from vibeflow.tooling.application.python.project.resource_registries import BaseLibRegistry
+from vibeflow.targets.python.project.resources import BaseLibRegistry
 from vibeflow.core.contracts import DataProvider
 from vibeflow.core.descriptors import (
     JSON_SCHEMA_2020_12,
@@ -24,8 +24,8 @@ from vibeflow.targets.python.project.descriptors import (
 )
 from vibeflow.tooling.project.descriptor_loader import (
     DescriptorLoadError,
-    load_descriptor_catalogs,
 )
+from tests.fixtures.support.contributions import collected_fixture_catalogs as load_descriptor_catalogs
 from vibeflow.targets.python.project.registry import NodeRegistry
 
 
@@ -184,7 +184,7 @@ def test_loader_scans_recursively_and_builds_all_catalogs(tmp_path: Path) -> Non
         "demo.storage_host",
     )
     assert catalogs.nodes.require("demo.add").contract.params_defaults["delta"] == 1
-    assert [path.relative_to(root).as_posix() for path in catalogs.source_files] == [
+    assert [Path(path).relative_to(root).as_posix() for path in catalogs.source_files] == [
         "manifests/nodes/nested/add.jsonc",
         "manifests/base_lib/math.jsonc",
         "manifests/data/value.jsonc",
@@ -219,24 +219,21 @@ def test_loader_reports_duplicate_and_conflicting_ids(
     assert "b.jsonc" in str(captured.value)
 
 
-def test_loader_rejects_root_escape_and_symlink(tmp_path: Path) -> None:
-    root = tmp_path / "root"
-    outside = tmp_path / "outside"
-    root.mkdir()
-    outside.mkdir()
-
-    with pytest.raises(DescriptorLoadError) as escaped:
-        load_descriptor_catalogs(root, {"nodes": ["../outside"]})
-    assert escaped.value.code == "DESCRIPTOR.PATH.ESCAPE"
-
-    link = root / "linked"
-    try:
-        link.symlink_to(outside, target_is_directory=True)
-    except OSError:
-        pytest.skip("symlinks are not available")
-    with pytest.raises(DescriptorLoadError) as linked:
-        load_descriptor_catalogs(root, {"nodes": ["linked"]})
-    assert linked.value.code == "DESCRIPTOR.PATH.SYMLINK"
+def test_selected_plugin_rejects_file_escape_and_symlink(tmp_path: Path) -> None:
+    from vibeflow.tooling.project.descriptor_loader import load_workflow_plugins
+    from vibeflow.tooling.project.workspace_loader import load_workspace_config
+    root, outside = tmp_path / "root", tmp_path / "outside"
+    root.mkdir(); outside.mkdir()
+    (root / "vibeflow_project.jsonc").write_text('{"project_target":"python"}')
+    (root / "vibeflow_config.jsonc").write_text('{"roots":[{"id":"p","path":"."}]}')
+    (outside / "plugin.py").write_text('raise RuntimeError("escaped plugin was loaded")')
+    (root / "linked.py").symlink_to(outside / "plugin.py")
+    workspace = load_workspace_config(root / "vibeflow_config.jsonc")
+    for ref in ("../outside/plugin.py", "linked.py"):
+        config = root / "workflow.jsonc"
+        config.write_text(json.dumps({"plugins":[{"source":{"kind":"file","ref":ref}}]}))
+        with pytest.raises(DescriptorLoadError, match="selected workspace root"):
+            load_workflow_plugins(workspace, config)
 
 
 def test_catalogs_sort_ids_and_preserve_source_diagnostics() -> None:

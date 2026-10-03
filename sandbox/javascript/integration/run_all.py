@@ -430,11 +430,13 @@ def _browser_platform_rejection_case(cache: BuildCache) -> dict[str, Any]:
         expected_line=line,
         expected_column=column,
     )
-    manifest = PROJECT_ROOT / "negative/manifests/nodes/node-builtin-browser.jsonc"
-    original = manifest.read_text(encoding="utf-8")
-    declaration = json.loads(original)
-    declaration["rulesets"] = []
-    manifest.write_text(json.dumps(declaration), encoding="utf-8")
+    plugin = PROJECT_ROOT / "code_plugin.ts"
+    original = plugin.read_text(encoding="utf-8")
+    lines = original.splitlines(keepends=True)
+    index = next(index for index, line in enumerate(lines) if '"type_key": "sandbox.invalid.node_builtin_browser"' in line)
+    import re
+    lines[index] = re.sub(r'"rulesets": \[[^\]]*\]', '"rulesets": []', lines[index])
+    plugin.write_text("".join(lines), encoding="utf-8")
     try:
         platform = expect_build_failure(
             lambda: cache.build("negative_node_builtin_browser_unconstrained", "negative/node_builtin_browser.jsonc", target="browser"),
@@ -442,7 +444,7 @@ def _browser_platform_rejection_case(cache: BuildCache) -> dict[str, Any]:
         )
         assert_equal(platform["diagnostics"], ["ESBUILD", "VF_ESBUILD"], label="native browser platform diagnostics")
     finally:
-        manifest.write_text(original, encoding="utf-8")
+        plugin.write_text(original, encoding="utf-8")
     return {"selected_rule": selected, "unconstrained_platform": platform}
 
 

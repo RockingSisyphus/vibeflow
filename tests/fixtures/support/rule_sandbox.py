@@ -1,4 +1,4 @@
-"""Copy the runnable Rule graph example; tests edit ordinary JSONC resources."""
+"""Copy the runnable graph and restore frozen mutation inputs for regression."""
 
 from dataclasses import dataclass
 import json
@@ -41,6 +41,8 @@ class RuleGraphSandbox:
 
     def write(self, path, document):
         path.write_text(json.dumps(document, indent=2) + "\n")
+        from tests.fixtures.support.code_plugins import migrate_fixture
+        migrate_fixture(self.project)
 
     def events(self):
         return [json.loads(line) for line in self.marker.read_text().splitlines()] if self.marker.exists() else []
@@ -57,6 +59,8 @@ def create_rule_graph_sandbox(tmp_path, target, *, toolchain_root=None):
     """
     root = tmp_path / target
     shutil.copytree(ROOT / "sandbox" / target / "rule_graph", root)
+    from tests.fixtures.support.code_plugins import copy_archival_inputs
+    copy_archival_inputs(ROOT / "sandbox" / target / "rule_graph", root)
     sandbox = RuleGraphSandbox(target, root)
     if target == "javascript":
         toolchain = Path(toolchain_root or os.environ.get("VIBEFLOW_TEST_TOOLCHAIN_ROOT", ROOT / "sandbox/javascript/minimal/project"))

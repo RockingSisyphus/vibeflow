@@ -3,7 +3,9 @@
     {
       "id": "sandbox.math_host",
       "status": "implemented",
-      "config": {"channel": "sandbox"}
+      "config": {
+        "channel": "sandbox"
+      }
     },
     {
       "id": "sandbox.future_host",
@@ -12,8 +14,12 @@
       "description": "Represents a future host connection for architecture review.",
       "category": "host",
       "version": "0.1.0",
-      "targets": ["node"],
-      "provides": ["sandbox.future_port"],
+      "targets": [
+        "node"
+      ],
+      "provides": [
+        "sandbox.future_port"
+      ],
       "dependencies": []
     }
   ],
@@ -39,7 +45,7 @@
         "type_used": "sandbox.host_double",
         "display_name": "Host double",
         "description": "Calls the Capability provided by the Host Extension."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -48,8 +54,14 @@
       }
     ],
     "edges": [
-      ["start", "double"],
-      ["double", "end"]
+      [
+        "start",
+        "double"
+      ],
+      [
+        "double",
+        "end"
+      ]
     ],
     "outputs": [
       {
@@ -59,5 +71,14 @@
         "as": "result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

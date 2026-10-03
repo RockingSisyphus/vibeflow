@@ -21,6 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
     validate.add_argument("--json", action="store_true", help="emit full HealthReport JSON")
 
     inspect_node = sub.add_parser("inspect-node", help="inspect a node class and static purity findings")
+    inspect_node.add_argument("--config", required=True, help="workflow selecting the resource plugins")
     inspect_node.add_argument("--type", required=True, dest="node_type")
     inspect_node.add_argument("--module", required=False, help="Python file containing the node class")
     inspect_node.add_argument("--class", required=False, dest="class_name", help="Class name to inspect inside --module")
@@ -200,7 +201,7 @@ def _handle_inspect_node(args: argparse.Namespace) -> int:
     from vibeflow.tooling.application.python.cli.node import inspect_node_payload
 
     payload, status = inspect_node_payload(
-        node_type=args.node_type,
+        node_type=args.node_type, config_path=Path(args.config),
         module_path=Path(args.module) if args.module else None,
         class_name=args.class_name,
         policy_path=Path(args.policy) if args.policy else None,
@@ -252,7 +253,7 @@ def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
 
 def _handle_run(args: argparse.Namespace) -> int:
     from vibeflow.core.result_scope import add_result_scope
-    from vibeflow.targets.python.project.registry import GLOBAL_NODE_REGISTRY
+    from vibeflow.targets.python.project.registry import NodeRegistry
     from vibeflow.tooling.application.python.runner import CheckedRunError, run_checked
 
     try:
@@ -296,7 +297,7 @@ def _handle_run(args: argparse.Namespace) -> int:
         else:
             result = run_checked(
                 Path(args.config),
-                registry=GLOBAL_NODE_REGISTRY,
+                registry=NodeRegistry(),
                 initial=initial,
                 policy_path=Path(args.policy) if args.policy else None,
                 run_root=Path(args.run_root) if args.run_root else None,

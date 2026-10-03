@@ -15,8 +15,6 @@
         "type_used": "example.greet",
         "display_name": "Build greeting",
         "description": "Formats a greeting with an injected clock.",
-
-
         "config": {
           "prefix": "Hello"
         }
@@ -31,5 +29,14 @@
         "as": "greeting"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

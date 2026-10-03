@@ -11,7 +11,6 @@ from vibeflow.core.descriptors.models import (
     NodeDescriptor,
     PluginDescriptor,
 )
-from vibeflow.core.descriptors.bundles import ContributionBundle
 
 
 DescriptorT = TypeVar(
@@ -22,17 +21,17 @@ DescriptorT = TypeVar(
     CapabilityDescriptor,
     HostExtensionDescriptor,
     PluginDescriptor,
-    ContributionBundle,
 )
 
 
-@dataclass(frozen=True)
+@dataclass
 class DescriptorCatalogError(ValueError):
     code: str
     message: str
     descriptor_id: str = ""
     source: str = ""
     previous_source: str = ""
+    details: object = field(default_factory=dict)
 
     def __str__(self) -> str:
         locations = [
@@ -49,6 +48,9 @@ class _DescriptorCatalog(Generic[DescriptorT]):
     def __init__(self, descriptors: Iterable[DescriptorT] = ()) -> None:
         self._descriptors: dict[str, DescriptorT] = {}
         self._sources: dict[str, str] = {}
+        self._frozen = False
+        self._locations = {}
+        self.source_roots: tuple[str, ...] = ()
         for descriptor in descriptors:
             self.register(descriptor)
 
@@ -57,7 +59,10 @@ class _DescriptorCatalog(Generic[DescriptorT]):
         descriptor: DescriptorT,
         *,
         source: str | None = None,
+        source_location=None,
     ) -> None:
+        if self._frozen:
+            raise DescriptorCatalogError("DESCRIPTOR.FROZEN", "contributed catalogs are read-only")
         if not isinstance(descriptor, self.descriptor_type):
             raise DescriptorCatalogError(
                 code="DESCRIPTOR.TYPE",
@@ -72,14 +77,15 @@ class _DescriptorCatalog(Generic[DescriptorT]):
         source_text = str(source) if source is not None else ""
         previous = self._descriptors.get(descriptor_id)
         if previous is not None:
+            prefix = "RULE.RESOURCE" if self.descriptor_label in {"rule", "ruleset"} else "DESCRIPTOR"
             code = (
-                "DESCRIPTOR.DUPLICATE"
+                prefix + ".DUPLICATE"
                 if previous == descriptor
-                else "DESCRIPTOR.CONFLICT"
+                else prefix + ".CONFLICT"
             )
             description = (
                 f"duplicate {self.descriptor_label} id '{descriptor_id}'"
-                if code == "DESCRIPTOR.DUPLICATE"
+                if code.endswith(".DUPLICATE")
                 else f"conflicting {self.descriptor_label} id '{descriptor_id}'"
             )
             raise DescriptorCatalogError(
@@ -91,6 +97,10 @@ class _DescriptorCatalog(Generic[DescriptorT]):
             )
         self._descriptors[descriptor_id] = descriptor
         self._sources[descriptor_id] = source_text
+        self._locations[descriptor_id] = dict(source_location or {"path": source_text})
+
+    def freeze(self) -> None:
+        self._frozen = True
 
     def get(self, descriptor_id: str) -> DescriptorT | None:
         return self._descriptors.get(str(descriptor_id).strip())
@@ -113,6 +123,9 @@ class _DescriptorCatalog(Generic[DescriptorT]):
         return tuple(
             self._descriptors[key] for key in self.available()
         )
+
+    def location_for(self, descriptor_id):
+        return dict(self._locations.get(str(descriptor_id).strip(), {}))
 
     def source_for(self, descriptor_id: str) -> str:
         return self._sources.get(str(descriptor_id).strip(), "")
@@ -164,11 +177,6 @@ class PluginCatalog(_DescriptorCatalog[PluginDescriptor]):
     descriptor_type = PluginDescriptor
 
 
-class BundleCatalog(_DescriptorCatalog[ContributionBundle]):
-    descriptor_label = "contribution bundle"
-    descriptor_type = ContributionBundle
-
-
 class RuleCatalog(_DescriptorCatalog):
     descriptor_label = "rule"
 
@@ -195,9 +203,15 @@ class DescriptorCatalogs:
     capabilities: CapabilityCatalog
     host_extensions: HostExtensionCatalog
     plugins: PluginCatalog = field(default_factory=PluginCatalog)
-    bundles: BundleCatalog = field(default_factory=BundleCatalog)
     rules: RuleCatalog = field(default_factory=RuleCatalog)
     rulesets: RulesetCatalog = field(default_factory=RulesetCatalog)
+    origins: object = field(default_factory=dict, repr=False, compare=False)
+    plugin_settings: object = field(default_factory=dict, repr=False, compare=False)
+    source_files: tuple[str, ...] = ()
+    plugin_records: tuple = ()
+    lifecycle_selections: tuple = ()
+    source_load_states: object = field(default_factory=dict, repr=False, compare=False)
+    source_roots: tuple[str, ...] = ()
     @classmethod
     def empty(cls) -> DescriptorCatalogs:
         return cls(
@@ -217,7 +231,6 @@ class DescriptorCatalogs:
             "capabilities": self.capabilities.to_dict(),
             "host_extensions": self.host_extensions.to_dict(),
             "plugins": self.plugins.to_dict(),
-            "bundles": self.bundles.to_dict(),
             "rules": self.rules.to_dict(),
             "rulesets": self.rulesets.to_dict(),
         }

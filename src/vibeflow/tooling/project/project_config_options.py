@@ -8,56 +8,6 @@ from typing import Any, Mapping
 from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
 
 
-def project_descriptor_paths(
-    data: Mapping[str, Any],
-    path: Path,
-) -> Mapping[str, tuple[str, ...]]:
-    raw = data.get("descriptors")
-    if raw in (None, {}):
-        return {}
-    if not isinstance(raw, Mapping):
-        raise WorkspaceConfigError(
-            "WORKSPACE.PROJECT_CONFIG.DESCRIPTORS",
-            "project config descriptors must be an object",
-            {"path": str(path)},
-        )
-    allowed = {
-        "nodes",
-        "rules",
-        "rulesets",
-        "bundles",
-        "base_lib",
-        "data_schemas",
-        "capabilities",
-        "host_extensions",
-        "plugins",
-    }
-    unknown = set(raw) - allowed
-    if unknown:
-        raise WorkspaceConfigError(
-            "WORKSPACE.PROJECT_CONFIG.DESCRIPTORS",
-            "project config descriptors contains unknown fields: "
-            f"{sorted(unknown)}",
-            {"path": str(path)},
-        )
-    result: dict[str, tuple[str, ...]] = {}
-    for name, value in raw.items():
-        if (
-            not isinstance(value, list)
-            or not all(isinstance(item, str) and item.strip() for item in value)
-        ):
-            raise WorkspaceConfigError(
-                "WORKSPACE.PROJECT_CONFIG.DESCRIPTORS",
-                f"descriptors.{name} must be a list of non-empty "
-                "root-relative paths",
-                {"path": str(path)},
-            )
-        result[str(name)] = tuple(
-            dict.fromkeys(item.strip() for item in value)
-        )
-    return result
-
-
 def project_javascript_options(
     data: Mapping[str, Any],
     path: Path,
@@ -138,4 +88,4 @@ def project_javascript_options(
     }
 
 
-__all__ = ["project_descriptor_paths", "project_javascript_options"]
+__all__ = ["project_javascript_options"]

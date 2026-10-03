@@ -26,8 +26,6 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "add_pair",
         "type_used": "semantic.add_pair",
         "display_name": "Add Pair",
@@ -55,23 +53,19 @@
         },
         "planned_behavior": {
           "kind": "python_stub",
-          "stub_module": "project/stubs/runtime_control_stub.py"
+          "stub_module": "stubs/runtime_control_stub.py"
         },
         "id": "planned_scale",
         "display_name": "Planned Scale",
         "description": "Runs planned_scale."
       },
       {
-
-
         "id": "use_scaled",
         "type_used": "semantic.use_scaled",
         "display_name": "Use Scaled",
         "description": "Runs use_scaled."
       },
       {
-
-
         "config": {
           "offset": 6
         },
@@ -81,7 +75,6 @@
         "description": "Runs finalize."
       },
       {
-
         "id": "end",
         "type_used": "semantic.final_end",
         "display_name": "End",
@@ -132,5 +125,14 @@
         "display_name": "Calc Sum"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

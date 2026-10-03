@@ -15,16 +15,12 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "input",
         "type_used": "sandbox.value_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-
-
         "node_configs": {
           "first.add": {
             "delta": 4
@@ -39,7 +35,6 @@
         "description": "Runs add_two."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.final_value_end",
         "display_name": "End",
@@ -74,6 +69,15 @@
     },
     {
       "path": "nodesets/pass_nodeset_nested/math_add_two.jsonc"
+    }
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
     }
   ]
 }

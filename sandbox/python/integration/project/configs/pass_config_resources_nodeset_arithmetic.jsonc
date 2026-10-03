@@ -23,7 +23,18 @@
   },
   "plugins": [
     {
-      "id": "value_shift",
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    },
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugins/value_plugin.py",
+        "export": "plugin"
+      },
       "config": {
         "shift": 9
       }
@@ -50,16 +61,12 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "add_pair",
         "type_used": "semantic.add_pair",
         "display_name": "Add Pair",
         "description": "Runs add_pair."
       },
       {
-
-
         "addend": 999,
         "multiplier": 999,
         "subtrahend": 999,
@@ -70,8 +77,6 @@
         "description": "Runs resource_calc."
       },
       {
-
-
         "config": {
           "factor": 4,
           "offset": 3
@@ -83,7 +88,6 @@
         "description": "Runs configured_finalize."
       },
       {
-
         "id": "end",
         "type_used": "semantic.final_end",
         "display_name": "End",

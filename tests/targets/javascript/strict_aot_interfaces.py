@@ -138,19 +138,13 @@ def test_graph_compiler_accepts_language_neutral_node_catalog() -> None:
     assert compiled.flow_kinds == {"end": "terminal"}
 
 
-def test_workspace_project_config_accepts_descriptor_and_javascript_sections(tmp_path) -> None:
+def test_workspace_project_config_accepts_target_options_without_resource_registration(tmp_path) -> None:
     project = tmp_path / "project"
     project.mkdir()
     (project / "vibeflow_project.jsonc").write_text(
         json.dumps(
             {
                 "project_target": "javascript",
-                "descriptors": {
-                    "nodes": ["manifests/nodes"],
-                    "base_lib": ["manifests/base_lib"],
-                    "data_schemas": ["manifests/data"],
-                    "capabilities": ["manifests/capabilities"],
-                },
                 "javascript": {
                     "package_root": ".",
                     "external_packages": ["example-package"],

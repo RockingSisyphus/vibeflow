@@ -16,16 +16,12 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "input",
         "type_used": "sandbox.value_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-
-
         "offset": 1,
         "id": "prepare",
         "type_used": "sandbox.prepare_value",
@@ -33,8 +29,6 @@
         "description": "Runs prepare."
       },
       {
-
-
         "factor": 2,
         "id": "compute",
         "type_used": "sandbox.core_compute",
@@ -42,8 +36,6 @@
         "description": "Runs compute."
       },
       {
-
-
         "threshold": 10,
         "id": "route",
         "type_used": "sandbox.route_decision",
@@ -51,8 +43,6 @@
         "description": "Runs route."
       },
       {
-
-
         "bonus": 5,
         "id": "external",
         "type_used": "sandbox.external_boost",
@@ -60,7 +50,6 @@
         "description": "Runs external."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.final_value_end",
         "display_name": "End",
@@ -121,5 +110,14 @@
         "display_name": "Flow Route"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

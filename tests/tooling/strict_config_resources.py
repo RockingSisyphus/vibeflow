@@ -240,12 +240,13 @@ class RuntimePlugin:
     assert result.health.info["production_ready"] is False
     assert result.health.info["plugins"]["plugins"] == [
         {
-            "name": "configured_runtime",
+            "name": "configured_runtime.runtime",
             "type": "runtime",
             "priority": 100,
             "scope": "project",
-            "source": str(plugin_path),
+            "source": str(tmp_path / "selected_lifecycle_0.py"),
             "rulesets": [],
+            "source_path": str(tmp_path / "selected_lifecycle_0.py"),
         }
     ]
     graph_payload = json.loads((result.run_dir / "compiled_graph.json").read_text(encoding="utf-8"))
@@ -293,6 +294,11 @@ def test_config_resource_metadata_missing_fields_warn_without_blocking(tmp_path)
     from tests.fixtures.support.declarations import write_node_manifests
     write_node_manifests(tmp_path, [("test.start", "StartNode", {}, {}), ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}), ("test.in_end", "InEndNode", {}, {})])
     (tmp_path / "vibeflow_project.jsonc").write_text(json.dumps({"project_target": "python", "descriptors": {"nodes": ["manifests/nodes"]}}))
+    from tests.fixtures.support.code_plugins import migrate_fixture
+    data = json.loads(config_path.read_text())
+    data["plugins"][0]["id"] = data["plugins"][0].pop("name")
+    config_path.write_text(json.dumps(data))
+    migrate_fixture(tmp_path)
     report = validate_config_path(config_path)
     assert report.status == "CONCERNS"
     assert {finding.rule_id for finding in report.warnings} >= rule_ids
@@ -355,7 +361,7 @@ def test_host_extension_resources_resolve_registered_descriptor_metadata(
         resolve_host_extension_resources,
     )
     from vibeflow.core.descriptors import HostExtensionCatalog
-    from vibeflow.tooling.project.descriptor_parser import parse_descriptor_manifest
+    from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor_manifest
 
     catalog = HostExtensionCatalog()
     catalog.register(
@@ -449,6 +455,9 @@ def test_registered_plugin_reference_preserves_planned_status(tmp_path) -> None:
                     "id": "future_runtime",
                     "status": "planned",
                     "config": {"mode": "review"},
+                    "display_name": "Future Policy",
+                    "description": "Planned policy plugin.",
+                    "type": "runtime",
                 }
             ]
         },
@@ -463,14 +472,17 @@ def test_registered_plugin_reference_preserves_planned_status(tmp_path) -> None:
             "name": "future_runtime",
             "type": "runtime",
             "status": "planned",
-            "module": "project.plugins.future_policy",
-            "class": "FuturePolicy",
+            "module": "",
+            "class": "",
             "display_name": "Future Policy",
             "category": "",
             "description": "Planned policy plugin.",
             "version": "",
             "config_keys": ["mode"],
             "rulesets": [],
+            "targets": [],
+            "priority": 100,
+            "config": {"mode": "review"},
         }
     ]
 
@@ -583,7 +595,7 @@ def test_imported_nodeset_file_global_config_is_used_for_inner_nodes(tmp_path) -
     assert result.context.get("value.out")["value"] == 6
 
 
-def test_implemented_resources_require_metadata_but_planned_resources_skip_load(tmp_path) -> None:
+def test_sdk_metadata_is_authoritative_and_planned_resources_skip_load(tmp_path) -> None:
     base_dir = tmp_path / "base_lib"
     base_dir.mkdir()
     (base_dir / "__init__.py").write_text("", encoding="utf-8")
@@ -617,12 +629,9 @@ class Plugin:
         encoding="utf-8",
     )
 
-    with pytest.raises(CheckedRunError) as exc_info:
-        run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="missing_metadata")
-
-    rule_ids = {error.rule_id for error in exc_info.value.result.health.errors}
-    assert "PLUGIN.LOAD" in rule_ids
-    assert "BASE_LIB.INFO.MISSING" not in rule_ids
+    result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="missing_metadata")
+    assert result.context is not None
+    assert not result.health.errors
 
     plugin_path.write_text(
         """
@@ -711,3 +720,10 @@ def helper():
 """.strip(),
         encoding="utf-8",
     )
+
+
+_native_run_checked = run_checked
+def run_checked(config_path, *, registry, **options):
+    from tests.fixtures.support.code_plugins import publish_runtime_fixture
+    publish_runtime_fixture(config_path, registry)
+    return _native_run_checked(config_path, registry=registry, **options)

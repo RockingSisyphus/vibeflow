@@ -30,16 +30,12 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "add_pair",
         "type_used": "semantic.add_pair",
         "display_name": "Add Pair",
         "description": "Runs add_pair."
       },
       {
-
-
         "factor": 3,
         "id": "scale",
         "type_used": "semantic.scale",
@@ -47,16 +43,12 @@
         "description": "Runs scale."
       },
       {
-
-
         "id": "compare",
         "type_used": "semantic.compare_gt",
         "display_name": "Compare",
         "description": "Runs compare."
       },
       {
-
-
         "bonus": 10,
         "id": "left_adjust",
         "type_used": "semantic.left_key_adjust",
@@ -64,8 +56,6 @@
         "description": "Runs left_adjust."
       },
       {
-
-
         "penalty": 6,
         "id": "right_adjust",
         "type_used": "semantic.right_key_adjust",
@@ -73,14 +63,12 @@
         "description": "Runs right_adjust."
       },
       {
-
         "id": "left_end",
         "type_used": "semantic.left_branch_end",
         "display_name": "Left End",
         "description": "Runs left_end."
       },
       {
-
         "id": "right_end",
         "type_used": "semantic.right_branch_end",
         "display_name": "Right End",
@@ -154,5 +142,14 @@
         "display_name": "Route Branch"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

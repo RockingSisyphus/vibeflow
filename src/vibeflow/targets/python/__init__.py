@@ -26,10 +26,6 @@ _EXPORTS = {
     "PureNode": ("vibeflow.targets.python.project", "PureNode"),
     "PythonBindingPlan": ("vibeflow.targets.python.project", "PythonBindingPlan"),
     "RuntimePlugin": ("vibeflow.targets.python.project", "RuntimePlugin"),
-    "load_plugins_from_config": (
-        "vibeflow.targets.python.project",
-        "load_plugins_from_config",
-    ),
     # Quality.
     "NodeMetrics": ("vibeflow.targets.python.quality", "NodeMetrics"),
     "PurityPolicy": ("vibeflow.targets.python.quality", "PurityPolicy"),

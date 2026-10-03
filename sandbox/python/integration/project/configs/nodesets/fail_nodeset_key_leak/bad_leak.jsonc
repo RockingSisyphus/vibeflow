@@ -30,8 +30,6 @@
     ],
     "nodes": [
       {
-
-
         "delta": 1,
         "id": "add",
         "type_used": "sandbox.add",
@@ -39,8 +37,6 @@
         "description": "Runs add."
       },
       {
-
-
         "delta": 2,
         "id": "tmp",
         "type_used": "sandbox.add",
@@ -56,5 +52,14 @@
       }
     ]
   },
-  "type_key": "bad.leak"
+  "type_key": "bad.leak",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

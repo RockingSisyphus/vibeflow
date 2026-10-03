@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from html import escape as escape_xml
 import json
-from pathlib import Path, PurePath
+from pathlib import Path
 from typing import Any, Mapping
 
 from vibeflow.block_compiler import WorkflowPlan, compile_graph_plan
@@ -58,7 +58,7 @@ from vibeflow.tooling.project.config_loader import (
     load_workspace_config_document,
 )
 from vibeflow.tooling.project.descriptor_loader import (
-    load_project_descriptor_catalogs,
+    load_workflow_catalogs,
 )
 from vibeflow.tooling.project.document_kinds import ARCHITECTURE_DOCUMENT_HEADER
 from vibeflow.tooling.project.graph_config import parse_graph_config
@@ -81,6 +81,7 @@ class JavascriptAuditRequest:
     audit_registered_resources: bool = False
     quality_facts_by_root: Mapping[str, DriverQualityResult] | None = None
     quality_policy: QualityPolicy | None = None
+    catalogs: DescriptorCatalogs | None = None
 
 
 @dataclass(frozen=True)
@@ -143,9 +144,9 @@ def audit_javascript_project(
             f"workflow config does not exist: {config_path}",
         )
 
-    catalogs = load_project_descriptor_catalogs(
+    catalogs = request.catalogs or load_workflow_catalogs(
         root.path,
-        project_config=root.config_path,
+        project_config=root.config_path, workflow_config=config_path, workspace=workspace, node_command=request.node_command,
     )
     try:
         validate_javascript_descriptor_catalogs(catalogs)
@@ -166,6 +167,11 @@ def audit_javascript_project(
     package_root = safe_project_path(root.path, javascript["package_root"], subject="javascript.package_root", require_directory=True)
     rule_plugin_records, rule_plugin_ids = _plugin_records(document.data, catalogs=catalogs)
     rule_host_records, rule_host_ids = _host_extension_records(document.data, root=root, catalogs=catalogs)
+    if request.audit_registered_resources:
+        planned_plugins = {item["id"] for item in rule_plugin_records if item.get("status") == "planned"}
+        planned_hosts = {item["id"] for item in rule_host_records if item.get("status") == "planned"}
+        rule_plugin_ids = tuple(item.id for item in catalogs.plugins if item.id not in planned_plugins)
+        rule_host_ids = tuple(item.id for item in catalogs.host_extensions if item.id not in planned_hosts)
     rule_import_policy, _ = target_neutral_import_policy(
         catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]),
         node_ids=None if request.audit_registered_resources else frozenset(node_type_calls(graph)), host_extension_ids=frozenset(rule_host_ids), plugin_ids=frozenset(rule_plugin_ids),
@@ -314,7 +320,9 @@ def audit_javascript_project(
         root_id=root.id,
         source_path=config_path.relative_to(root.path).as_posix(),
     )
-    architecture["rule_checks"] = _relative_rule_checks(rule_report.to_dict(), root.path)
+    architecture["rule_checks"] = rule_report.to_dict()
+    from vibeflow.tooling.presentation.portable_paths import portable_paths
+    architecture = portable_paths(architecture, roots={item.id:item.path for item in workspace.roots}, primary_root=root.path)
     return JavascriptAuditResult(
         workspace=workspace,
         root=root,
@@ -335,20 +343,6 @@ def audit_javascript_project(
         toolchain=toolchain,
         rule_report=rule_report, rule_facts=rule_report.facts,
     )
-
-
-def _relative_rule_checks(value: Any, project_root: Path) -> Any:
-    """Keep canonical artifacts portable while live Rule diagnostics keep paths."""
-    if isinstance(value, Mapping):
-        return {key: _relative_rule_checks(item, project_root) for key, item in value.items()}
-    if isinstance(value, (tuple, list)):
-        return [_relative_rule_checks(item, project_root) for item in value]
-    if isinstance(value, str):
-        try:
-            return PurePath(value).relative_to(project_root).as_posix()
-        except ValueError:
-            pass
-    return value
 
 
 def render_architecture(result: JavascriptAuditResult) -> str:
@@ -631,7 +625,7 @@ def _plugin_records(
 ) -> tuple[tuple[Mapping[str, object], ...], tuple[str, ...]]:
     try:
         records = load_plugin_review_resources(
-            config,
+            {**config, "plugins": list(catalogs.lifecycle_selections)},
             catalog=catalogs.plugins,
         )
     except PluginSelectionError as exc:

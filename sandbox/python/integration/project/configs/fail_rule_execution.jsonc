@@ -12,5 +12,14 @@
   "rulesets": [
     "vibeflow.workflow",
     "sandbox.fail"
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
   ]
 }

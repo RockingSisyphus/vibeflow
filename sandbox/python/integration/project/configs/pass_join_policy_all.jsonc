@@ -10,7 +10,6 @@
       {
         "display_name": "Left Value",
         "description": "Provides the primary join value.",
-
         "value": 3,
         "id": "left_value",
         "type_used": "semantic.left_value"
@@ -18,7 +17,6 @@
       {
         "display_name": "Other Value",
         "description": "Provides the secondary join value.",
-
         "value": 5,
         "id": "other_value",
         "type_used": "semantic.other_value"
@@ -27,15 +25,12 @@
         "display_name": "All Join",
         "description": "Runs only after both incoming providers have activated.",
         "join_policy": "all",
-
-
         "id": "join",
         "type_used": "semantic.two_input_join"
       },
       {
         "display_name": "End",
         "description": "Ends after the all join result is available.",
-
         "id": "end",
         "type_used": "semantic.value_end"
       }
@@ -69,5 +64,14 @@
         "display_name": "Value Out"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

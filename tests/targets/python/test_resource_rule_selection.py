@@ -3,7 +3,6 @@ import json
 
 import pytest
 
-from vibeflow.targets.python.project.plugin_loader import load_plugins_from_config
 from vibeflow.targets.python.project.resources import PluginResourceRegistry
 from vibeflow.tooling.application.python.workspace_service import validate_workspace_config_path
 from vibeflow.tooling.project.workspace_loader import load_project_workspace
@@ -14,20 +13,27 @@ def test_plugin_import_rule_is_selected_and_blocks_the_actual_write(tmp_path, se
     marker = tmp_path / "loaded"
     path = tmp_path / "extension.py"
     path.write_text(f'from pathlib import Path\nPath({str(marker)!r}).write_text("loaded")\nclass Plugin: pass\n')
-    resources = PluginResourceRegistry()
-    resources.register("extension",module=str(path),display_name="Extension",description="Selected source",
-                       rulesets=selection)
-    registry, findings = load_plugins_from_config({"plugins":["extension"]},base_path=tmp_path,
-                                                  plugin_resource_registry=resources)
-    assert marker.exists() == (not selection)
-    assert bool(registry.runtime_plugins()) == (not selection)
-    assert [item.code for item in findings] == (["NODE.IMPORT.SIDE_EFFECT"] if selection else [])
+    (tmp_path / "vibeflow_project.jsonc").write_text('{"project_target":"python"}')
+    with path.open("a") as handle:
+        handle.write("\ndef create(context): return Plugin()\n")
+    (tmp_path / "plugin.py").write_text("from vibeflow.targets.python.sdk import Plugin, SourceLocator\n" +
+        f"plugin=Plugin(id='extension',runtime=SourceLocator(kind='file',ref='extension.py',export='create'),rulesets={selection!r})\n")
+    config = tmp_path / "main.jsonc"
+    config.write_text(json.dumps({"plugins":[{"source":{"kind":"file","ref":"plugin.py"}}],"rulesets":[],"pipeline":{"nodes":[{"id":"stub","type_used":"planned.stub","status":"planned","flow_kind":"process","requires":[],"provides":[],"display_name":"Stub","description":"Native planned call"}]}}))
+    report = validate_workspace_config_path(config,workspace=load_project_workspace(config))
+    assert not marker.exists()
+    if not selection:
+        from vibeflow.tooling.application.python.project.declarations import declared_python_registry
+        from vibeflow.tooling.application.python.project.contributions import lifecycle_registry, release_runtime_plugins
+        registry = declared_python_registry(load_project_workspace(config), config)
+        instances = lifecycle_registry(registry, workflow_id="test", config_path=config, plugin_types=("runtime",))
+        release_runtime_plugins(instances)
+        assert marker.exists()
+    assert ("NODE.IMPORT.SIDE_EFFECT" in [item.code for item in report.errors]) == bool(selection)
+    assert not report.errors if not selection else all(item.object_id == "extension.runtime" for item in report.errors)
     if selection:
-        assert findings[0].object_type == "plugin"
-        assert findings[0].object_id == "extension"
-    else:
-        assert registry.to_dict()["plugins"][0]["rulesets"] == []
-        assert "effect_scope" not in registry.to_dict()["plugins"][0]
+        assert report.errors[0].object_type == "plugin"
+        assert report.errors[0].object_id == "extension.runtime"
 
 
 def test_declared_library_rule_checks_only_its_reached_sources_before_binding(tmp_path):
@@ -60,6 +66,8 @@ def check(context, inputs, params):
         "descriptors":{group:["manifests/"+group] for group in ("nodes","base_lib","rules","rulesets")}})
     write("main.jsonc",{"rulesets":[],"pipeline":{"nodes":[{"id":"leaf","type_used":"leaf",
         "display_name":"Leaf","description":"One real call"}]}})
+    from tests.fixtures.support.code_plugins import migrate_fixture
+    migrate_fixture(tmp_path)
     report = validate_workspace_config_path(tmp_path / "main.jsonc",workspace=load_project_workspace(tmp_path / "main.jsonc"))
     finding = next(item for item in report.errors if item.code == "TEST.LIBRARY.REJECT")
     assert finding.object_type == "base_lib" and finding.object_id == "library"
@@ -68,7 +76,7 @@ def check(context, inputs, params):
     preview = effective_rule_plans(tmp_path / "main.jsonc",phase="import")
     selected = next(item for item in preview["resources"] if item["id"] == "library")
     assert selected["rulesets"] == ["test.library"]
-    assert selected["selection_source"] == str(tmp_path / "manifests/base_lib/library.jsonc")
+    assert selected["selection_source"] == str(tmp_path / "code_plugin.py")
     assert not marker.exists()
 
 

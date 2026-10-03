@@ -2,12 +2,20 @@
   "pipeline": {
     "nodes": [
       {
-
         "id": "missing",
         "type_used": "sandbox.missing",
         "display_name": "Missing",
         "description": "Runs missing."
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

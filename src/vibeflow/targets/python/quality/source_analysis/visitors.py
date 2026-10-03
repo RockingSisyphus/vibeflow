@@ -524,6 +524,8 @@ class ModulePurityVisitor(_PurityImportVisitor):
         self._current_import_names: set[str] = set()
 
     def visit_Module(self, node: ast.Module) -> None:
+        from vibeflow.targets.python.quality.source_analysis.sdk_declarations import declaration_calls
+        self._sdk_calls = declaration_calls(node)
         for stmt in node.body:
             if isinstance(stmt, (ast.Import, ast.ImportFrom)):
                 self._import_aliases.update(import_aliases_from_node(stmt))
@@ -700,6 +702,9 @@ class ModulePurityVisitor(_PurityImportVisitor):
             self._add(violation_code, f"banned import: {module}", node, suggested_fix_type="move_to_boundary")
 
     def _check_module_assignment(self, node: ast.Assign | ast.AnnAssign) -> None:
+        if node.value in getattr(self, "_sdk_calls", ()):
+            self.visit(node.value)
+            return
         if not _module_assignment_is_allowed(node) and not (
             self.effect_scope == EFFECT_SCOPE_GLOBAL_STATE
             and _is_literal_process_state(node.value)

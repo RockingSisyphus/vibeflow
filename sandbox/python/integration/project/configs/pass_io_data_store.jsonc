@@ -15,15 +15,12 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "input",
         "type_used": "sandbox.io_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-
         "value": 5,
         "id": "request",
         "type_used": "sandbox.effect_request",
@@ -31,8 +28,6 @@
         "description": "Runs request."
       },
       {
-
-
         "delta": 1,
         "id": "add_result",
         "type_used": "sandbox.io_result_add",
@@ -40,7 +35,6 @@
         "description": "Runs add_result."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.final_value_end",
         "display_name": "End",
@@ -76,5 +70,14 @@
         "display_name": "Value Final"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

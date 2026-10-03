@@ -295,41 +295,59 @@ def _validate_string_list_policy(value: Any, prefix: str, fields: tuple[str, ...
             )
 
 
+def collect_plugin_selection_findings(value: Any) -> list[HealthFinding]:
+    """Validate only selection fields before loading trusted entry modules."""
+    findings: list[HealthFinding] = []
+    _validate_plugins(value, findings)
+    return findings
+
+
 def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
     if not isinstance(value, list):
         findings.append(_error("CONFIG.SCHEMA.PLUGINS_LIST", "plugins must be a list", "plugins"))
         return
+    allowed = {"id", "source", "root", "config", "enabled", "status"}
+    planned_fields = {"type", "targets", "display_name", "description", "version", "priority"}
     for index, item in enumerate(value):
         prefix = f"plugins[{index}]"
-        if isinstance(item, str):
-            if not item.strip():
-                findings.append(_error("CONFIG.SCHEMA.PLUGIN_MODULE", f"{prefix} must be a non-empty module string", prefix))
-            continue
         if not isinstance(item, Mapping):
-            findings.append(_error("CONFIG.SCHEMA.PLUGIN_OBJECT", f"{prefix} must be a string or object", prefix))
+            findings.append(_error("PLUGIN.SELECTION.MIGRATION", "plugins require explicit SDK entry sources", prefix))
             continue
-        status = str(item.get("status", "implemented")).strip() or "implemented"
-        if status not in STATUSES:
-            findings.append(_error("CONFIG.SCHEMA.RESOURCE_STATUS", f"{prefix}.status must be implemented or planned", f"{prefix}.status"))
-        if status == "implemented" and not (_non_empty_string(item.get("id")) or _non_empty_string(item.get("module", item.get("path")))):
-            findings.append(_error("CONFIG.SCHEMA.PLUGIN_MODULE", f"{prefix}.id, module, or path must be a non-empty string", f"{prefix}.module"))
-        if status == "planned" and not (_non_empty_string(item.get("id")) or _non_empty_string(item.get("module", item.get("path"))) or _non_empty_string(item.get("name"))):
-            findings.append(_error("CONFIG.SCHEMA.PLUGIN_PLANNED_ID", f"{prefix} planned plugin must define id, module/path, or name", prefix))
-        if "class" in item and not _non_empty_string(item["class"]):
-            findings.append(_error("CONFIG.SCHEMA.PLUGIN_CLASS", f"{prefix}.class must be a non-empty string", f"{prefix}.class"))
-        if item.get("type", "runtime") == "boundary":
-            findings.append(_error("CONFIG.BOUNDARY.REMOVED", f"{prefix}.type boundary is removed; use runtime plugins", f"{prefix}.type"))
-        elif item.get("type", "runtime") not in {"compiler", "runtime"}:
-            findings.append(_error("CONFIG.SCHEMA.PLUGIN_TYPE", f"{prefix}.type must be compiler or runtime; review checks use Rule resources", f"{prefix}.type"))
-        if "priority" in item:
-            _validate_positive_int(item["priority"], f"{prefix}.priority", findings, "CONFIG.SCHEMA.PLUGIN_PRIORITY")
-        if item.get("conflict", "error") not in {"error", "replace"}:
-            findings.append(_error("CONFIG.SCHEMA.PLUGIN_CONFLICT", f"{prefix}.conflict must be error or replace", f"{prefix}.conflict"))
+        if "enabled" in item and not isinstance(item["enabled"], bool):
+            findings.append(_error("PLUGIN.SELECTION.SHAPE", "enabled must be boolean", prefix + ".enabled"))
+        status = item.get("status", "implemented")
+        if not isinstance(status, str) or status not in {"implemented", "planned"}:
+            findings.append(_error("CONFIG.SCHEMA.RESOURCE_STATUS", "plugin status must be implemented or planned", prefix + ".status"))
+        unknown = set(item) - allowed - (planned_fields if status == "planned" else set())
+        if unknown:
+            findings.append(_error("PLUGIN.SELECTION.MIGRATION", f"unsupported plugin fields: {sorted(unknown)}; use an SDK plugin source", prefix))
+        for field in ("id", "root"):
+            if field in item and not _non_empty_string(item[field]):
+                findings.append(_error("PLUGIN.SELECTION.SHAPE", f"{field} must be a non-empty string", prefix + "." + field))
         if "config" in item and not isinstance(item["config"], Mapping):
-            findings.append(_error("CONFIG.SCHEMA.PLUGIN_CONFIG", f"{prefix}.config must be an object", f"{prefix}.config"))
-        if "settings" in item and not isinstance(item["settings"], Mapping):
-            findings.append(_error("CONFIG.SCHEMA.PLUGIN_CONFIG", f"{prefix}.settings must be an object", f"{prefix}.settings"))
-        _validate_resource_metadata_strings(item, prefix, findings)
+            findings.append(_error("CONFIG.SCHEMA.PLUGIN_CONFIG", "plugin config must be an object", prefix + ".config"))
+        if status == "planned":
+            if not _non_empty_string(item.get("id")):
+                findings.append(_error("CONFIG.SCHEMA.PLUGIN_PLANNED_ID", "planned plugins require an id", prefix))
+            for field in ("display_name", "description", "version"):
+                if field in item and not isinstance(item[field], str):
+                    findings.append(_error("CONFIG.SCHEMA.RESOURCE_METADATA_STRING", f"{field} must be a string", prefix + "." + field))
+            if "priority" in item and (isinstance(item["priority"], bool) or not isinstance(item["priority"], int)):
+                findings.append(_error("PLUGIN.SELECTION.PRIORITY", "priority must be an integer", prefix + ".priority"))
+            if "type" in item and item["type"] not in ("compiler", "runtime"):
+                findings.append(_error("CONFIG.SCHEMA.PLUGIN_TYPE", "planned plugin type must be compiler or runtime", prefix + ".type"))
+            if "targets" in item:
+                _validate_string_list(item["targets"], prefix + ".targets", findings, "CONFIG.SCHEMA.PLUGIN_TARGETS")
+        source = item.get("source")
+        if source is None and (status == "planned" or item.get("enabled") is False):
+            continue
+        if not isinstance(source, Mapping):
+            findings.append(_error("PLUGIN.SELECTION.SOURCE", "implemented plugins require an explicit source", prefix + ".source"))
+            continue
+        if set(source) - {"kind", "ref", "export"} or source.get("kind") not in ("file", "module", "package") or not _non_empty_string(source.get("ref")):
+            findings.append(_error("PLUGIN.SELECTION.SOURCE", "source requires kind (file/module/package), ref and optional export", prefix + ".source"))
+        if "export" in source and not _non_empty_string(source["export"]):
+            findings.append(_error("PLUGIN.SELECTION.SOURCE", "export must be a non-empty string", prefix + ".source.export"))
 
 
 def _validate_host_extensions(

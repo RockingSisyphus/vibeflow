@@ -49,13 +49,16 @@ def build_architecture_document(
     else:
         actual_compiled = compile_for_render(graph, compiled, registry)
     roots = _root_paths(graph)
-    return {
+    payload = {
         "project_target": "python",
         "workflow": _workflow_document(graph, actual_compiled, registry=registry, resources=resources),
         "nodesets": _nodesets_document(graph, registry=registry),
         "node_types": _node_types_document(graph, registry=registry, roots=roots),
         "resources": _resources_document(graph, resources, roots=roots),
     }
+    from vibeflow.tooling.presentation.portable_paths import portable_paths
+    known_roots = {str(root_id):str(path) for path,root_id in getattr(registry,"source_root_ids",{}).items()}
+    return portable_paths(payload, roots={**roots, **known_roots}, primary_root=graph.root_path)
 
 
 def render_architecture_document(

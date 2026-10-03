@@ -15,15 +15,12 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "metrics",
         "type_used": "sandbox.batch_metrics",
         "display_name": "Metrics",
         "description": "Runs metrics."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.training_metrics_end",
         "display_name": "End",
@@ -47,5 +44,14 @@
         "display_name": "Train Metrics"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

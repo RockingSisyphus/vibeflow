@@ -40,6 +40,10 @@ def _copy_minimal(
             "*.pyc",
         ),
     )
+    from tests.fixtures.support.code_plugins import copy_archival_inputs
+    copy_archival_inputs(SANDBOX, sandbox)
+    from tests.fixtures.support.code_plugins import resource_inputs
+    resource_inputs(sandbox / "project")
     project_config_path = sandbox / "project/vibeflow_project.jsonc"
     project_config = json.loads(
         project_config_path.read_text(encoding="utf-8")
@@ -173,6 +177,8 @@ def test_validate_audits_only_selected_node_and_base_lib_sources(
         "audit_sources": False,
     }
 
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(sandbox / "vibeflow_config.jsonc")
     selected = audit_javascript_project(JavascriptAuditRequest(**request))
     complete = audit_javascript_project(
         JavascriptAuditRequest(
@@ -380,7 +386,7 @@ def test_project_quality_detects_browser_only_discarded_fetch(
     }
 
 
-def test_project_quality_audits_unselected_implemented_plugin_and_host(
+def test_project_quality_does_not_register_unselected_plugin_files(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -393,8 +399,8 @@ def test_project_quality_audits_unselected_implemented_plugin_and_host(
     project_config = json.loads(
         project_config_path.read_text(encoding="utf-8")
     )
-    project_config["descriptors"]["plugins"] = ["manifests/plugins"]
-    project_config["descriptors"]["host_extensions"] = [
+    project_config.setdefault("descriptors", {})["plugins"] = ["manifests/plugins"]
+    project_config.setdefault("descriptors", {})["host_extensions"] = [
         "manifests/host_extensions"
     ]
     _write_json(project_config_path, project_config)
@@ -486,13 +492,14 @@ def test_project_quality_audits_unselected_implemented_plugin_and_host(
         ]
     )
     quality_payload = json.loads(capsys.readouterr().out)
-    # ABI v2 lifecycle resources carry no implicit domain policy. Their declarations
-    # remain in the formal source scope, and the selected Node rules are reported.
+    # Files remain in project source metrics, but an unselected plugin is not a
+    # contributed resource. There is no project-wide resource registration.
     assert quality_exit == 0
     assert quality_payload["status"] in {"PASS", "CONCERNS"}
     report = quality_payload["reports"][0]
     assert "example.greet" in report["rule_checks"]["subjects"]
-    assert any("plugins/unselected.ts" in file for file in report["source_files"])
+    assert not any("plugins/unselected.ts" in file for file in report["source_files"])
+    assert any(file["path"] == "plugins/unselected.ts" for file in quality_payload["source_quality"]["files"])
 
 
 def test_dispatched_quality_path_uses_project_config_without_workspace(
@@ -517,7 +524,33 @@ def test_dispatched_quality_path_uses_project_config_without_workspace(
 
     payload = json.loads(capsys.readouterr().out)
     assert exit_code == 0
-    assert payload["status"] == "PASS"
+    assert payload["status"] == "CONCERNS"
+    assert [item["code"] for item in payload["source_quality"]["warnings"]] == ["QUALITY.STRUCTURE.ROOT_LEVEL_CODE_FILE"]
+    assert payload["source_quality"]["warnings"][0]["details"]["files"] == ["code_plugin.ts"]
     assert payload["project_target"] == "javascript"
     assert payload["reports"]
     assert not (project / "vibeflow_config.jsonc").exists()
+
+
+# Publish controlled case inputs as fixed SDK plugins before formal entrypoints.
+from vibeflow.tooling.application.javascript.audit import audit_javascript_project
+_native_audit_javascript_project = audit_javascript_project
+def audit_javascript_project(request, **options):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(request.workspace)
+    return _native_audit_javascript_project(request, **options)
+
+
+
+_native_main, _native_dispatch_main = main, dispatch_main
+def _publish_for_arguments(args):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture, prepare_config_fixture
+    if "--workspace" in args: prepare_workspace_fixture(args[args.index("--workspace")+1])
+    elif "--config" in args: prepare_config_fixture(args[args.index("--config")+1])
+    elif "--path" in args: prepare_config_fixture(args[args.index("--path")+1])
+def main(args):
+    _publish_for_arguments(args)
+    return _native_main(args)
+def dispatch_main(args):
+    _publish_for_arguments(args)
+    return _native_dispatch_main(args)

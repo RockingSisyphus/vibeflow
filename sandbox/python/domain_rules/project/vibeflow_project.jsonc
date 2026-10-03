@@ -1,11 +1,3 @@
 {
-  "project_target": "python",
-  "descriptors": {
-    "bundles": [
-      "bundles"
-    ],
-    "data_schemas": [
-      "manifests/data"
-    ]
-  }
+  "project_target": "python"
 }

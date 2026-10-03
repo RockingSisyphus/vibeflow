@@ -17,8 +17,6 @@
       {
         "display_name": "Prepare Value",
         "description": "Produces value.out for the route decision.",
-
-
         "delta": 1,
         "id": "prepare",
         "type_used": "sandbox.add"
@@ -26,8 +24,6 @@
       {
         "display_name": "Route",
         "description": "Routes either to the valid end branch or to a dead end.",
-
-
         "threshold": 10,
         "id": "route",
         "type_used": "sandbox.route_decision"
@@ -35,8 +31,6 @@
       {
         "display_name": "Dead Branch",
         "description": "A decision branch that cannot reach an end terminal.",
-
-
         "delta": 1,
         "id": "dead",
         "type_used": "sandbox.add_out"
@@ -44,8 +38,6 @@
       {
         "display_name": "Dead Sink",
         "description": "Continues the dead branch without ever reaching an end terminal.",
-
-
         "delta": 1,
         "id": "sink",
         "type_used": "sandbox.add_final_to_dead"
@@ -53,7 +45,6 @@
       {
         "display_name": "End",
         "description": "Ends the valid external branch.",
-
         "id": "end",
         "type_used": "sandbox.out_value_end"
       }
@@ -89,5 +80,14 @@
         "display_name": "Value Out"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

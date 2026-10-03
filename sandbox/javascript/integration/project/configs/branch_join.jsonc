@@ -20,26 +20,26 @@
         "type_used": "sandbox.route",
         "display_name": "Route by sign",
         "description": "Selects the non-negative or negative branch."
-              },
+      },
       {
         "id": "positive",
         "type_used": "sandbox.positive",
         "display_name": "Format non-negative",
         "description": "Formats the value only on the non-negative branch."
-              },
+      },
       {
         "id": "negative",
         "type_used": "sandbox.negative",
         "display_name": "Format negative",
         "description": "Formats the value only on the negative branch."
-              },
+      },
       {
         "id": "join",
         "type_used": "sandbox.branch_join",
         "display_name": "Join selected branch",
         "description": "Consumes exactly the one active branch message.",
         "join_policy": "any_active"
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -48,12 +48,32 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "route"},
-      {"from": "route", "to": "positive", "when": "positive == true"},
-      {"from": "route", "to": "negative", "when": "positive == false"},
-      {"from": "positive", "to": "join"},
-      {"from": "negative", "to": "join"},
-      {"from": "join", "to": "end"}
+      {
+        "from": "start",
+        "to": "route"
+      },
+      {
+        "from": "route",
+        "to": "positive",
+        "when": "positive == true"
+      },
+      {
+        "from": "route",
+        "to": "negative",
+        "when": "positive == false"
+      },
+      {
+        "from": "positive",
+        "to": "join"
+      },
+      {
+        "from": "negative",
+        "to": "join"
+      },
+      {
+        "from": "join",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -63,5 +83,14 @@
         "as": "message"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

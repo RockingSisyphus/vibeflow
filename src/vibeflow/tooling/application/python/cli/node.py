@@ -7,10 +7,10 @@ from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rul
 from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
 
 
-def inspect_node_payload(*, node_type, module_path=None, class_name=None, policy_path=None):
+def inspect_node_payload(*, node_type, config_path, module_path=None, class_name=None, policy_path=None):
     try:
-        workspace = load_project_workspace(module_path or Path.cwd())
-        registry = declared_python_registry(workspace)
+        workspace = load_project_workspace(config_path)
+        registry = declared_python_registry(workspace, config_path)
         descriptor = registry.descriptor(node_type)
         path, symbol, _, _ = registry.source_locations[node_type]
         if module_path is not None and module_path.resolve() != path:

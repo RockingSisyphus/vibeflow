@@ -26,7 +26,10 @@ PLUGIN = {"kind": "plugin", "id": "parity.plugin", "type": "runtime", "targets":
 
 def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None) -> list[dict]:
     from vibeflow.core.descriptors.models import DescriptorModelError
-    from vibeflow.tooling.project.descriptor_parser import parse_descriptor_manifest
+    if variant == "baseline":
+        from vibeflow.tooling.project.descriptor_loader import parse_descriptor_manifest
+    else:
+        from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor_manifest
 
     rows = []
 

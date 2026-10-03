@@ -31,8 +31,6 @@
         "type_used": "sandbox.affine_outer",
         "display_name": "Run nested transform",
         "description": "Overrides only the qualified inner math node.",
-
-
         "node_configs": {
           "inner.math": {
             "scale": 3,
@@ -48,8 +46,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "outer"},
-      {"from": "outer", "to": "end"}
+      {
+        "from": "start",
+        "to": "outer"
+      },
+      {
+        "from": "outer",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -65,5 +69,14 @@
         "as": "defaultResult"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

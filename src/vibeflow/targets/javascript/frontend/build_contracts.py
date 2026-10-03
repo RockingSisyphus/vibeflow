@@ -150,7 +150,7 @@ def node_contract_check(
                             f"params: {params_type}, "
                             f"context: {context_type}"
                             f") => {output_type} | Promise<{output_type}> = "
-                            f"{namespace}[{json.dumps(exported)}];"
+                            f"{namespace}" + "".join(f"[{json.dumps(part)}]" for part in exported.split(".")) + ";"
                         ),
                         f"void __vf_checked_{check_index};",
                     ]
@@ -175,7 +175,7 @@ def runtime_plugin_contract_check(bindings: object) -> str:
     checks: list[str] = [
         ABORT_SIGNAL_DECLARATION.rstrip(),
         "type Json = null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json };",
-        "type Context = Readonly<{ abiVersion: 'vibeflow.plugin.v2'; pluginId: string; pluginType: 'runtime'; target: 'node' | 'browser'; workflowId: string; config: Readonly<Record<string, Json>>; signal: VibeFlowAbortSignal }> ;",
+        "type Context = Readonly<{ abiVersion: 'vibeflow.plugin.v3'; pluginId: string; pluginType: 'runtime'; target: 'node' | 'browser'; workflowId: string; config: Readonly<Record<string, Json>>; signal: VibeFlowAbortSignal }> ;",
         "type RuntimePlugin = Readonly<Record<string, unknown>>;",
         "type Factory = (context: Context) => RuntimePlugin;",
     ]
@@ -186,7 +186,7 @@ def runtime_plugin_contract_check(bindings: object) -> str:
         imports.append(f"import * as {namespace} from {json.dumps(module)};")
         checks.extend(
             [
-                f"const __vf_runtime_factory_{index}: Factory = {namespace}[{json.dumps(exported)}];",
+                f"const __vf_runtime_factory_{index}: Factory = {namespace}" + "".join(f"[{json.dumps(part)}]" for part in exported.split(".")) + ";",
                 f"void __vf_runtime_factory_{index};",
             ]
         )

@@ -9,7 +9,7 @@ import sys
 
 import pytest
 
-from vibeflow.tooling.application.cli import main
+from tests.fixtures.support.strict_support import cli_main as main
 from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
 
@@ -22,6 +22,8 @@ EXAMPLE = ROOT / "sandbox/python/domain_rules"
 def domain_project(tmp_path):
     example = tmp_path / "example"
     shutil.copytree(EXAMPLE, example)
+    from tests.fixtures.support.code_plugins import copy_archival_inputs
+    copy_archival_inputs(EXAMPLE, example)
     for name in tuple(sys.modules):
         if name == "domain_nodes" or name.startswith("domain_helpers"):
             sys.modules.pop(name)
@@ -350,6 +352,14 @@ def test_module_rule_binding_uses_resolved_source_provenance(domain_project, cap
         assert code == 1, payload
         finding = next(item for item in payload["errors"] if item["code"] == "RULE.IMPLEMENTATION.LOAD")
         assert finding["definition_id"] == "example.model_definition"
-        assert finding["source_location"] == {"path":str(manifest),"line":1,"column":1}
+        assert finding["source_location"]["path"] == str(project / "code_plugin.py")
+        assert finding["source_location"]["line"] > 0
         assert finding["details"]["implementation"] == {"kind":"module","ref":"rules.model_definition",
             "export":export,"path":str(project / "rules/model_definition.py")}
+
+
+from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+_fixture_native_load_workspace_config = load_workspace_config
+def load_workspace_config(path, **options):
+    prepare_workspace_fixture(path)
+    return _fixture_native_load_workspace_config(path, **options)

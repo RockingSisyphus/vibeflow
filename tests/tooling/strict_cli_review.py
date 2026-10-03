@@ -181,6 +181,8 @@ def test_review_rejects_output_that_would_overwrite_a_source(
         "workflow": workflow_path,
         "architecture": architecture_path,
     }
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(workspace_path)
     before = {name: path.read_bytes() for name, path in protected.items()}
 
     def fail_renderer(*args, **kwargs):

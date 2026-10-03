@@ -16,11 +16,11 @@ def source_rule_defaults(document, *, workspace=None):
     return project_quality_rule_defaults(policy)
 
 
-def declared_rule_resources(workspace):
+def declared_rule_resources(workspace, config_path, *, loaded_plugins=None):
     """Target-owned declaration assembly, shared by preview and formal checks."""
     from vibeflow.tooling.application.python.project.declarations import declared_python_registry
     from vibeflow.targets.python.quality.rule_adapter import rule_resources
-    registry = declared_python_registry(workspace)
+    registry = declared_python_registry(workspace, config_path, loaded_plugins=loaded_plugins)
     rules, rulesets = rule_resources(registry)
     return registry, rules, rulesets
 

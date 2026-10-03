@@ -1,25 +1,7 @@
 {
   "base_lib": {
-    "paths": [
-      "base_lib"
-    ],
     "modules": [
-      {
-        "module": "base_lib.math_tools",
-        "status": "implemented",
-        "display_name": "Math Tools",
-        "category": "example",
-        "description": "Arithmetic helper functions used by the imported-nodeset example.",
-        "version": "0.1.0"
-      },
-      {
-        "name": "base_lib.future_tools",
-        "status": "planned",
-        "display_name": "Future Tools",
-        "category": "example",
-        "description": "Planned helper library.",
-        "version": "0.1.0"
-      }
+      "base_lib.math_tools"
     ]
   },
   "nodeset_imports": [
@@ -76,5 +58,13 @@
         "display_name": "Value Out"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py"
+      }
+    }
+  ]
 }

@@ -36,7 +36,7 @@ PLUGIN_ERROR_CODES = {
         "VF_AOT_PLUGIN_PLANNED_DEPENDENCY"
     ),
 }
-PLUGIN_ABI_VERSION = "vibeflow.plugin.v2"
+PLUGIN_ABI_VERSION = "vibeflow.plugin.v3"
 
 
 class JavascriptPluginError(ValueError):
@@ -141,7 +141,7 @@ def parse_javascript_plugin_descriptor(
         )
     plugin_id = _required_string(data.get("id"), field="plugin.id")
     if data.get("type") not in {"compiler", "runtime"}:
-        raise JavascriptPluginError("VF_AOT_PLUGIN_TYPE", "Plugin ABI v2 supports compiler/runtime; domain checks use Rule resources", plugin_id)
+        raise JavascriptPluginError("VF_AOT_PLUGIN_TYPE", "Plugin ABI v3 supports compiler/runtime; domain checks use Rule resources", plugin_id)
     config = _mapping(data.get("config", {}), field="plugin.config")
     _check_fields(
         config,
@@ -296,6 +296,7 @@ def resolve_javascript_plugins(
         entry_mode=entry_mode,
         project_root=project_root,
         source_hashes=source_hashes,
+        source_roots=catalog.source_roots,
     )
 
 
@@ -306,6 +307,7 @@ def build_javascript_plugin_binding_plan(
     entry_mode: str,
     project_root: Path | None = None,
     source_hashes: Mapping[str, str] | None = None,
+    source_roots: tuple[str, ...] = (),
 ) -> JavascriptPluginBindingPlan:
     if not isinstance(resolution, PluginResolution):
         raise TypeError("resolution must be a PluginResolution")
@@ -317,6 +319,7 @@ def build_javascript_plugin_binding_plan(
             entry_mode=entry_mode,
             project_root=project_root,
             source_hash=str(hashes.get(item.id, "")),
+            source_roots=source_roots,
         )
         for item in resolution.active
     )
@@ -347,6 +350,7 @@ def _binding_from_resolved(
     target: str,
     entry_mode: str,
     project_root: Path | None,
+    source_roots: tuple[str, ...] = (),
     source_hash: str,
 ) -> JavascriptPluginBinding:
     implementation = resolved.implementation
@@ -393,6 +397,7 @@ def _binding_from_resolved(
         source,
         plugin_id=resolved.id,
         project_root=project_root,
+        source_roots=source_roots,
     )
     return JavascriptPluginBinding(
         id=resolved.id,
@@ -497,6 +502,7 @@ def _javascript_source_ref(
     *,
     plugin_id: str,
     project_root: Path | None,
+    source_roots: tuple[str, ...] = (),
 ) -> SourceRef:
     ref = source.ref
     if source.kind == "file" and project_root is None:
@@ -515,7 +521,8 @@ def _javascript_source_ref(
             else (root / candidate).resolve()
         )
         try:
-            resolved.relative_to(root)
+            if not any(resolved.is_relative_to(Path(value)) for value in (str(root), *source_roots)):
+                raise ValueError("outside selected roots")
         except ValueError as exc:
             raise JavascriptPluginError(
                 "VF_AOT_PLUGIN_SOURCE",

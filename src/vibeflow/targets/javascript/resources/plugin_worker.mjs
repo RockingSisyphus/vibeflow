@@ -6,7 +6,9 @@ import process from "node:process";
 import readline from "node:readline";
 import { pathToFileURL } from "node:url";
 
-const PLUGIN_ABI = "vibeflow.plugin.v2";
+import {sdkPlugin} from "./sdk_loader.mjs";
+
+const PLUGIN_ABI = "vibeflow.plugin.v3";
 const RULE_ABI = "vibeflow.rule.v1";
 const instances = new Map();
 // Keep trusted implementations' ordinary logging outside the JSONL protocol.
@@ -166,21 +168,25 @@ function sourceService(ts, packageRoot, facts) {
     },
   });
 }
+const contributionCallbacks = new Map();
 async function loadImplementation(request, isRule) {
   const declaration = isRule ? request.rule : request.plugin;
   const packageRoot = path.resolve(request.packageRoot);
   const source = path.resolve(declaration.module);
   const tools = await localTools(packageRoot);
+  const exported = String(declaration.export || (isRule ? "check" : "createPlugin"));
+  let callback = contributionCallbacks.get(`${isRule ? "rule" : "plugin"}:${declaration.id}`);
   let bundled;
+  if (!callback) {
   try {
-    const result = await tools.esbuild.build({ absWorkingDir: packageRoot, entryPoints: [source], bundle: true, write: false, format: "esm", platform: isRule || request.target !== "browser" ? "node" : "browser", target: ["es2022"], sourcemap: "inline", legalComments: "none", logLevel: "silent" });
+    const result = await tools.esbuild.build({ absWorkingDir: packageRoot, entryPoints: [source], bundle: true, write: false, format: "esm", platform: "node", target: ["es2022"], sourcemap: "inline", legalComments: "none", logLevel: "silent", plugins: [sdkPlugin(tools.ts)] });
     bundled = result.outputFiles?.find(item => item.path.endsWith(".js"))?.text || result.outputFiles?.[0]?.text;
   } catch (cause) {
     failure(isRule ? "RULE.IMPLEMENTATION" : "VF_PLUGIN_IMPLEMENTATION", `${declaration.id} could not be bundled`, { cause: String(cause), diagnostics: cause?.errors || [] });
   }
   const module = await import(`data:text/javascript;base64,${Buffer.from(bundled, "utf8").toString("base64")}`);
-  const exported = String(declaration.export || (isRule ? "check" : "createPlugin"));
-  const callback = module[exported];
+  callback = exported.split(".").reduce((value, key) => value?.[key], module);
+  }
   if (typeof callback !== "function") failure(isRule ? "RULE.IMPLEMENTATION" : "VF_PLUGIN_FACTORY", `${declaration.id} does not export ${exported}()`);
   const controller = new AbortController();
   if (isRule) return { declaration, callback, controller, tools, packageRoot, isRule };
@@ -193,8 +199,33 @@ async function loadImplementation(request, isRule) {
   if (removed.some(hook => hook in instance)) failure("VF_PLUGIN_ABI", `${declaration.id} uses removed policy hooks; contribute Rules instead`);
   return { declaration, instance, controller, isRule };
 }
+async function declarations(request) {
+  const packageRoot = path.resolve(request.packageRoot);
+  const tools = await localTools(packageRoot);
+  const result = await tools.esbuild.build({absWorkingDir: packageRoot, entryPoints: [request.module], bundle: true,
+    write: false, metafile: true, format: "esm", platform: "node", target: ["es2022"], sourcemap: "inline", logLevel: "silent",
+    plugins: [sdkPlugin(tools.ts)]});
+  const text = result.outputFiles[0].text;
+  const module = await import(`data:text/javascript;base64,${Buffer.from(text).toString("base64")}`);
+  const plugin = module[request.export || "plugin"];
+  if (!plugin || typeof plugin !== "object" || plugin.abi !== PLUGIN_ABI || !Array.isArray(plugin.resources)) {
+    failure("PLUGIN.DECLARATION.EXPORT", "plugin export must be a fixed SDK plugin object");
+  }
+  for (const resource of plugin.resources) {
+    const descriptor = resource.descriptor;
+    const callback = descriptor.kind === "rule" ? resource.check :
+      descriptor.kind === "plugin" ? plugin[descriptor.type] : undefined;
+    if (typeof callback === "function") contributionCallbacks.set(`${descriptor.kind}:${descriptor.id}`, callback);
+  }
+  return ruleJsonValue({id: plugin.id, abi: plugin.abi, config_schema: plugin.config_schema,
+    config_defaults: plugin.config_defaults, origin: plugin.origin,
+    included_sources: Object.keys(result.metafile.inputs).map(file => path.resolve(packageRoot,file)),
+    loaded_sources: [...new Set([path.resolve(request.module), ...plugin.resources.map(resource => resource.origin?.path).filter(Boolean)])],
+    resources: plugin.resources.map(resource => ({descriptor: resource.descriptor, origin: resource.origin}))});
+}
 async function dispatch(request) {
   const command = String(request.command || "");
+  if (command === "declarations") return declarations(request);
   const sessionId = String(request.sessionId || "");
   if (!sessionId) failure("VF_PLUGIN_PROCESS", "worker request requires sessionId");
   if (command === "open" || command === "openRule") {

@@ -26,7 +26,7 @@
         "type_used": "sandbox.optional_add",
         "display_name": "Add optional offset",
         "description": "Adds offset when supplied and otherwise adds zero."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -35,8 +35,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "add"},
-      {"from": "add", "to": "end"}
+      {
+        "from": "start",
+        "to": "add"
+      },
+      {
+        "from": "add",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -46,5 +52,14 @@
         "as": "result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

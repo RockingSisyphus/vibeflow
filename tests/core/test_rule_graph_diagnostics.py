@@ -17,6 +17,6 @@ def test_graph_error_maps_loaded_catalog_origin_to_formal_finding(tmp_path):
     assert error.details == {"ruleset_id": "recursive", "entrypoint": "static"}
     finding = rule_graph_error_finding(error, rulesets=catalog, object_type="node", object_id="calculate")
     assert finding.code == "RULE.INCLUDES.CYCLE"
-    assert finding.source_location == {"path": str(resource), "line": 1, "column": 1}
+    assert finding.source_location == {"path": str(resource)}
     assert finding.rule_source == "ruleset:recursive"
     assert not resource.exists()

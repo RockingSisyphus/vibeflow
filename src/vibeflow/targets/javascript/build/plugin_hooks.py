@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields, is_dataclass
+from contextlib import ExitStack
 from pathlib import PurePath
 import sys
 from types import MappingProxyType
@@ -46,6 +47,7 @@ class JavascriptBuildPluginRunner:
         target: str,
         workflow_id: str,
         node_command: str = "node",
+        catalogs: Any = None,
     ) -> None:
         if not isinstance(plan, JavascriptPluginBindingPlan):
             raise TypeError("plan must be a JavascriptPluginBindingPlan")
@@ -54,19 +56,24 @@ class JavascriptBuildPluginRunner:
         self.target = str(target)
         self.workflow_id = str(workflow_id)
         self.node_command = str(node_command)
+        self.catalogs = catalogs
+        self._stack = ExitStack()
+        self._workers = {}
         self._session: JavascriptPluginSession | None = None
         self._ids: dict[str, str] = {}
         self._annotations: list[Mapping[str, object]] = []
 
     def __enter__(self) -> JavascriptBuildPluginRunner:
-        session = JavascriptPluginSession(
-            node_command=self.node_command
-        ).__enter__()
-        self._session = session
         try:
             bindings = self.plan.compiler_plugins
             for index, binding in enumerate(bindings):
-                session_id = f"{binding.plugin_type}:{index}:{binding.id}"
+                from vibeflow.targets.javascript.sdk.loading import contribution_session
+                session = contribution_session(self.catalogs, "plugins", binding.id) if self.catalogs is not None else None
+                if session is None:
+                    if self._session is None:
+                        self._session = self._stack.enter_context(JavascriptPluginSession(node_command=self.node_command))
+                    session = self._session
+                session_id = f"{binding.plugin_type}:{id(self)}:{index}:{binding.id}"
                 session.open(
                     session_id,
                     plugin=binding.to_dict(),
@@ -75,8 +82,10 @@ class JavascriptBuildPluginRunner:
                     workflow_id=self.workflow_id,
                 )
                 self._ids[binding.id] = session_id
+                self._workers[binding.id] = session
+                self._stack.callback(session.close, session_id)
         except Exception:
-            session.__exit__(*sys.exc_info())
+            self._stack.__exit__(*sys.exc_info())
             self._session = None
             raise
         return self
@@ -104,10 +113,8 @@ class JavascriptBuildPluginRunner:
         )
 
     def __exit__(self, exc_type, exc, traceback) -> None:
-        session = self._session
         self._session = None
-        if session is not None:
-            session.__exit__(exc_type, exc, traceback)
+        self._stack.__exit__(exc_type, exc, traceback)
 
     def _invoke(
         self,
@@ -115,7 +122,7 @@ class JavascriptBuildPluginRunner:
         hook: str,
         payload: Mapping[str, object],
     ) -> None:
-        session = self._session
+        session = self._workers.get(binding.id)
         if session is None:
             raise JavascriptPluginError(
                 "VF_PLUGIN_PROCESS",

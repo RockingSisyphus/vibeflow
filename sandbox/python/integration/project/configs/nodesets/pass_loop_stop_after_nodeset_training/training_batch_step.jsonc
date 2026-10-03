@@ -73,15 +73,12 @@
       {
         "display_name": "Train Step",
         "description": "Runs one full training update for the current loop carry state.",
-
-
         "id": "train_step",
         "type_used": "sandbox.training_batch_step"
       },
       {
         "display_name": "Body End",
         "description": "Ends the loop body once metrics are available.",
-
         "id": "end",
         "type_used": "sandbox.training_metrics_end"
       }
@@ -124,5 +121,14 @@
       }
     ]
   },
-  "type_key": "training.batch_step"
+  "type_key": "training.batch_step",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

@@ -1,8 +1,17 @@
 """A consumer receives the engine-bound typed record, never fake empty facts."""
+
+from vibeflow.targets.python.sdk import rule
 import json
 from pathlib import Path
 
 
+@rule(**{'id': 'example.number_checker',
+ 'description': 'Consume facts bound by the requires relation.',
+ 'scope': 'call',
+ 'params_schema': {'marker': {'type': 'string'}},
+ 'params_defaults': {'marker': ''},
+ 'inputs': {'numbers': 'example.numbers.v1'},
+ 'outputs': {'proof': 'example.proof.v1'}})
 def check(context, inputs, params):
     record = inputs["numbers"]
     proof = {"handler": "checker", "phase": context.phase,

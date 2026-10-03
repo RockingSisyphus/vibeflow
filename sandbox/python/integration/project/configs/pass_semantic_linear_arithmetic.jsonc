@@ -20,16 +20,12 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "add_pair",
         "type_used": "semantic.add_pair",
         "display_name": "Add Pair",
         "description": "Runs add_pair."
       },
       {
-
-
         "factor": 3,
         "id": "scale",
         "type_used": "semantic.scale",
@@ -37,16 +33,12 @@
         "description": "Runs scale."
       },
       {
-
-
         "id": "use_scaled",
         "type_used": "semantic.use_scaled",
         "display_name": "Use Scaled",
         "description": "Runs use_scaled."
       },
       {
-
-
         "offset": -4,
         "id": "finalize",
         "type_used": "semantic.finalize",
@@ -54,7 +46,6 @@
         "description": "Runs finalize."
       },
       {
-
         "id": "end",
         "type_used": "semantic.final_end",
         "display_name": "End",
@@ -105,5 +96,14 @@
         "display_name": "Calc Sum"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

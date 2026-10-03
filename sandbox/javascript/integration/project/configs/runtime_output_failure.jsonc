@@ -20,8 +20,6 @@
         "type_used": "sandbox.runtime_failure",
         "display_name": "Return invalid output",
         "description": "Returns a value that violates the declared numeric Schema.",
-
-
         "config": {
           "mode": "bad_output"
         }
@@ -34,8 +32,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "invalid"},
-      {"from": "invalid", "to": "end"}
+      {
+        "from": "start",
+        "to": "invalid"
+      },
+      {
+        "from": "invalid",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -45,5 +49,14 @@
         "as": "result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

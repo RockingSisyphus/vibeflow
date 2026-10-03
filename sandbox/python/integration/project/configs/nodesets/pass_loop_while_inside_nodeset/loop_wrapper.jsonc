@@ -134,5 +134,14 @@
       }
     ]
   },
-  "type_key": "loop.wrapper"
+  "type_key": "loop.wrapper",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

@@ -124,7 +124,7 @@ def test_python_plugin_loader_imports_no_outer_configuration_layer() -> None:
     _run_isolated(
         """
 import sys
-import vibeflow.targets.python.project.plugin_loader
+import vibeflow.targets.python.sdk.loading
 
 forbidden_prefixes = (
     'vibeflow.config',

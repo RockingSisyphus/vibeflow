@@ -29,13 +29,13 @@
         "description": "Doubles x through a Promise-returning node.",
         "async": "result_key",
         "result_key": "doubled"
-              },
+      },
       {
         "id": "read",
         "type_used": "sandbox.storage_read",
         "display_name": "Read storage",
         "description": "Reads from the per-run injected storage Capability."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -45,10 +45,22 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "double"},
-      {"from": "start", "to": "read"},
-      {"from": "double", "to": "end"},
-      {"from": "read", "to": "end"}
+      {
+        "from": "start",
+        "to": "double"
+      },
+      {
+        "from": "start",
+        "to": "read"
+      },
+      {
+        "from": "double",
+        "to": "end"
+      },
+      {
+        "from": "read",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -64,5 +76,14 @@
         "as": "value"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

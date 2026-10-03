@@ -10,7 +10,6 @@
       {
         "display_name": "Left Value",
         "description": "Provides one active value.in source.",
-
         "value": 3,
         "id": "left_value",
         "type_used": "semantic.left_value"
@@ -18,7 +17,6 @@
       {
         "display_name": "Right Value",
         "description": "Provides a second active value.in source.",
-
         "value": 4,
         "id": "right_value",
         "type_used": "semantic.right_value"
@@ -26,15 +24,12 @@
       {
         "display_name": "Conflicting Join",
         "description": "Requires exactly one value.in but receives two active providers.",
-
-
         "id": "join",
         "type_used": "semantic.join_passthrough"
       },
       {
         "display_name": "End",
         "description": "Would end if the join had one selected value.",
-
         "id": "end",
         "type_used": "semantic.value_end"
       }
@@ -68,5 +63,14 @@
         "display_name": "Value Out"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

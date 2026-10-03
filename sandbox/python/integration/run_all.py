@@ -630,11 +630,11 @@ VALID_RUN_CASES = [
         ],
         "expected_mermaid_contains": [
             "planned python_stub",
-            "project/stubs/runtime_control_stub.py",
+            "stubs/runtime_control_stub.py",
         ],
         "expected_run_mermaid_contains": [
             "planned python_stub",
-            "project/stubs/runtime_control_stub.py",
+            "stubs/runtime_control_stub.py",
         ],
     },
     {
@@ -960,7 +960,7 @@ INVALID_CASES = [
         "runtime_options": {"allow_planned_stub": True},
         "absent": ["GRAPH.FLOW.ORPHAN_NODE", "GRAPH.FLOW.UNREACHABLE_FROM_START", "GRAPH.FLOW.CANNOT_REACH_END"],
     },
-    {"kind": "config", "config": "fail_plugin_load.jsonc", "expect": "PLUGIN.LOAD"},
+    {"kind": "config", "config": "fail_plugin_load.jsonc", "expect": "PLUGIN.DECLARATION.LOAD"},
     {"kind": "run", "config": "fail_rule_missing_record.jsonc", "expect": "RULE.EXECUTION"},
     {"kind": "run", "config": "fail_rule_execution.jsonc", "expect": "RULE.EXECUTION"},
     {"kind": "config", "config": "fail_rule_bad_shape.jsonc", "expect": "RULE.EXECUTION"},
@@ -1924,7 +1924,7 @@ def _node_declaration(info, contract, *, schema=None, defaults=None):
 def _project_registry():
     from vibeflow.tooling.project.workspace_loader import load_workspace_config
     from vibeflow.tooling.application.python.project.declarations import declared_python_registry
-    return declared_python_registry(load_workspace_config(WORKSPACE_PATH))
+    return declared_python_registry(load_workspace_config(WORKSPACE_PATH),config_path=PROJECT_DIR / 'configs/pass_nodeset_nested.jsonc')
 
 
 def _node_source_report(type_key, *, policy=None):
@@ -1945,6 +1945,7 @@ def _run_valid_cases() -> list[CaseResult]:
         except Exception as exc:
             result = CaseResult(f"valid:{case['name']}", "FAIL", str(exc))
         results.append(result)
+        print(f"{result.status} {result.name}", flush=True)
     return results
 
 
@@ -2604,7 +2605,7 @@ def _run_python_thread_pool_boundary_case() -> CaseResult:
 
 
 def _run_valid_case(case: dict[str, Any]) -> CaseResult:
-    from vibeflow.targets.python.project import GraphCompiler, load_plugins_from_config
+    from vibeflow.targets.python.project import GraphCompiler
     from vibeflow.targets.python.quality.workflow import validate_graph_health
     from vibeflow.targets.python.runtime.options import RuntimeOptions
     from vibeflow.targets.python.runtime.planning import build_execution_plan
@@ -2622,10 +2623,7 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     from vibeflow.tooling.project.config_schema import collect_config_schema_findings
     from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
     from vibeflow.tooling.project.graph_config import parse_graph_config
-    from vibeflow.tooling.application.python.project.resource_registries import (
-        discover_config_resource_registry_context,
-    )
-    from vibeflow.tooling.application.python.project.resources import load_config_resources
+
 
 
     name = str(case["name"])
@@ -2638,34 +2636,18 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     schema_findings = collect_config_schema_findings(document.data)
     if schema_findings:
         raise AssertionError(f"schema findings: {[finding.rule_id for finding in schema_findings]}")
-    registry_context = discover_config_resource_registry_context(document.data, config_path=config_path)
-    plugin_registry, plugin_findings = load_plugins_from_config(
-        document.data,
-        base_path=registry_context.base_path,
-        plugin_resource_registry=registry_context.plugin_resource_registry,
-    )
-    if plugin_findings:
-        raise AssertionError(f"plugin findings: {[finding.rule_id for finding in plugin_findings]}")
-    resources, resource_findings = load_config_resources(
-        document.data,
-        base_path=registry_context.base_path,
-        plugin_registry=plugin_registry,
-        base_lib_registry=registry_context.base_lib_registry,
-        plugin_resource_registry=registry_context.plugin_resource_registry,
-        base_lib_paths=registry_context.base_lib_paths,
-    )
-    if resource_findings:
-        raise AssertionError(f"resource findings: {[finding.rule_id for finding in resource_findings]}")
-    policy_result = resolve_effective_policy(document.data, config_path=config_path, explicit_policy_path=POLICY_PATH, plugin_registry=plugin_registry)
-    graph = parse_graph_config(document.data)
-    node_registry = _project_registry()
-    compilation = GraphCompiler().compile_with_findings(
-        graph,
-        registry=node_registry,
-        plugin_registry=plugin_registry,
-    )
-    graph = compilation.workflow.graph
-    compiled = compilation.compiled_graph
+    from vibeflow.tooling.project.workspace_loader import load_workspace_config
+    from vibeflow.tooling.application.python.project.core import build_workspace_environment
+    from vibeflow.tooling.application.python.workspace_service import _prepare_workspace_graph
+    from vibeflow.core.findings import HealthReport
+    workspace = load_workspace_config(WORKSPACE_PATH)
+    environment = build_workspace_environment(workspace, config_path=config_path)
+    policy_result = resolve_effective_policy(document.data, config_path=config_path, explicit_policy_path=POLICY_PATH)
+    prepared = _prepare_workspace_graph(config_path, workspace=workspace, env=environment, policy_override=policy_result)
+    if isinstance(prepared, HealthReport):
+        raise AssertionError(f"assembly failed: {prepared.to_dict()}")
+    document, graph, compiled, resources, plugin_registry, effective_policy, _ = prepared
+    node_registry = environment.registry
     runtime_options = RuntimeOptions(**case["runtime_options"]) if "runtime_options" in case else None
     plan = build_execution_plan(graph, compiled, registry=node_registry, runtime_options=runtime_options, global_config=resources.global_config)
     _assert_execution_plan(case, plan)
@@ -2690,7 +2672,7 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     )
     allowed = set(case.get("expected_status", {"PASS", "CONCERNS"}))
     if health.status not in allowed:
-        raise AssertionError(f"health status {health.status}, expected {sorted(allowed)}")
+        raise AssertionError(f"health status {health.status}, expected {sorted(allowed)}: {[item.to_dict() for item in health.errors]}")
     _assert_health_warnings(case, health)
     collapsed = export_mermaid(graph, compiled=compiled, registry=node_registry, health_report=health, resources=resources)
     expanded = export_mermaid(graph, compiled=compiled, registry=node_registry, expand_nodesets=True, health_report=health, resources=resources)
@@ -3248,16 +3230,19 @@ def _run_invalid_case(case: dict[str, Any], base_lib_report):
 
 def _inspect_invalid_node(case: dict[str, Any], kind: str) -> CaseResult:
     from vibeflow.targets.python.quality.source_analysis import PurityPolicy
-    from vibeflow.tooling.project.descriptor_parser import parse_descriptor_manifest
-    negative = PROJECT_DIR / "negative_declarations" / (str(case["class"]) + ".jsonc")
+    from vibeflow.tooling.project.descriptor_loader import load_workflow_plugins, DescriptorLoadError
+    from vibeflow.tooling.project.workspace_loader import load_workspace_config
+    negative = PROJECT_DIR / "negative_plugins" / (str(case["class"]) + ".py")
     if negative.exists():
+        config = negative.with_suffix(".workflow.jsonc")
+        config.write_text(json.dumps({"plugins":[{"source":{"kind":"file","ref":negative.relative_to(PROJECT_DIR).as_posix()}}]}))
         try:
-            parse_descriptor_manifest(json.loads(negative.read_text()))
-        except ValueError as exc:
+            load_workflow_plugins(load_workspace_config(WORKSPACE_PATH), config)
+        except DescriptorLoadError as exc:
             if str(case["expect"]).lower() not in str(exc).lower():
                 raise AssertionError(f"expected declaration error {case['expect']}: {exc}") from exc
-            return CaseResult(f"invalid:declaration:{case['class']}", "PASS", str(exc))
-        raise AssertionError("invalid canonical declaration was accepted")
+            return CaseResult(f"invalid:inspect_node:{case['class']}", "PASS", str(exc))
+        raise AssertionError("invalid SDK declaration was accepted")
     policy = PurityPolicy(max_source_lines=500, warn_source_lines=None, allowed_base_lib_modules=("base_lib",))
     if kind == "inspect_node_small_source":
         policy = PurityPolicy(max_source_lines=10, allowed_base_lib_modules=("base_lib",))
@@ -3359,48 +3344,8 @@ def _invalid_config(case: dict[str, Any]) -> CaseResult:
 
 
 def _concern_config(case: dict[str, Any]) -> CaseResult:
-    from vibeflow.targets.python.quality.workflow import validate_graph_health
-    from vibeflow.tooling.project.config_loader import load_config_document
-    from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
-    from vibeflow.tooling.project.graph_config import parse_graph_config
-    from vibeflow.tooling.application.python.project.resource_registries import (
-        discover_config_resource_registry_context,
-    )
-    from vibeflow.tooling.application.python.project.resources import load_config_resources
-    from vibeflow.targets.python.project import load_plugins_from_config
-
-    config_path = CONFIG_DIR / str(case["config"])
-    document = load_config_document(config_path)
-    registry_context = discover_config_resource_registry_context(document.data, config_path=config_path)
-    plugin_registry, plugin_findings = load_plugins_from_config(
-        document.data,
-        base_path=registry_context.base_path,
-        plugin_resource_registry=registry_context.plugin_resource_registry,
-    )
-    if plugin_findings:
-        raise AssertionError(f"plugin findings: {[finding.rule_id for finding in plugin_findings]}")
-    resources, resource_findings = load_config_resources(
-        document.data,
-        base_path=registry_context.base_path,
-        plugin_registry=plugin_registry,
-        base_lib_registry=registry_context.base_lib_registry,
-        plugin_resource_registry=registry_context.plugin_resource_registry,
-        base_lib_paths=registry_context.base_lib_paths,
-    )
-    if resource_findings:
-        raise AssertionError(f"resource findings: {[finding.rule_id for finding in resource_findings]}")
-    policy_result = resolve_effective_policy(document.data, config_path=config_path, explicit_policy_path=POLICY_PATH, plugin_registry=plugin_registry)
-    graph = parse_graph_config(document.data)
-    from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
-    registry = _project_registry()
-    report = validate_graph_health(
-        graph,
-        registry=registry,
-        source_context=collect_workflow_source_context(registry, graph),
-        plugin_registry=plugin_registry,
-        global_config=resources.global_config,
-        purity_policy=policy_result.effective_policy.to_purity_policy(),
-    )
+    from vibeflow.tooling.application.python.cli.config import validate_config_path
+    report = validate_config_path(CONFIG_DIR / str(case["config"]), policy_path=POLICY_PATH)
     if report.status not in {"CONCERNS", "FAIL", "ERROR"}:
         raise AssertionError(f"concern case had status {report.status}")
     findings = [item.to_dict() for item in (*report.errors, *report.warnings)]

@@ -25,47 +25,36 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "input",
         "type_used": "sandbox.training_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-
-
         "id": "forward",
         "type_used": "sandbox.forward_loss",
         "display_name": "Forward",
         "description": "Runs forward."
       },
       {
-
-
         "id": "backward",
         "type_used": "sandbox.backward_grad",
         "display_name": "Backward",
         "description": "Runs backward."
       },
       {
-
-
         "id": "step",
         "type_used": "sandbox.optimizer_step",
         "display_name": "Step",
         "description": "Runs step."
       },
       {
-
-
         "id": "metrics",
         "type_used": "sandbox.training_metrics",
         "display_name": "Metrics",
         "description": "Runs metrics."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.training_metrics_end",
         "display_name": "End",
@@ -142,5 +131,14 @@
         "display_name": "Train Optimizer After"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

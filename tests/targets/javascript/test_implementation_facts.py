@@ -4,7 +4,7 @@ from vibeflow.core.descriptors import NodeCatalog, NodeDescriptor
 from vibeflow.targets.javascript.frontend.facts import (
     implementation_facts_from_catalog,
 )
-from vibeflow.tooling.project.descriptor_loader import parse_descriptor_manifest
+from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor_manifest
 
 
 def _descriptor(*, completion: str = "immediate") -> NodeDescriptor:

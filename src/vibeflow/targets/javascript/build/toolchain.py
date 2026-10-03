@@ -399,8 +399,9 @@ def _run_driver(
         handle.write(request_text)
         request_path = Path(handle.name)
     try:
-        driver = resource("toolchain_driver.mjs")
-        with as_file(driver) as driver_path:
+        from vibeflow.targets.javascript.resources import materialized_resources
+        with materialized_resources() as resource_directory:
+            driver_path = resource_directory / "toolchain_driver.mjs"
             try:
                 completed = subprocess.run(
                     [node_command, str(driver_path), str(request_path)],

@@ -10,7 +10,6 @@
       {
         "display_name": "Seed Value",
         "description": "Produces value.in for both the mainline preparation step and the explicit bypass edge.",
-
         "value": 4,
         "id": "seed",
         "type_used": "sandbox.constant"
@@ -18,16 +17,12 @@
       {
         "display_name": "Prepare Timing Step",
         "description": "Consumes value.in as a mainline timing step before the final add runs.",
-
-
         "id": "prepare",
         "type_used": "sandbox.effect_request"
       },
       {
         "display_name": "Final Add",
         "description": "Consumes value.in delivered by the explicit data bypass edge after prepare triggers it.",
-
-
         "delta": 10,
         "id": "add",
         "type_used": "sandbox.add"
@@ -35,8 +30,6 @@
       {
         "display_name": "Finalize Value",
         "description": "Converts value.out into value.final for the end node.",
-
-
         "factor": 1,
         "id": "multiply",
         "type_used": "sandbox.multiply"
@@ -44,7 +37,6 @@
       {
         "display_name": "End",
         "description": "Ends after the final value is available.",
-
         "id": "end",
         "type_used": "sandbox.final_value_end"
       }
@@ -82,5 +74,14 @@
         "display_name": "Value Final"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

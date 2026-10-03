@@ -21,7 +21,7 @@
         "type_used": "sandbox.async_double",
         "display_name": "Suspending node in sync workflow",
         "description": "Must fail because a sync entry cannot contain a suspending node."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -30,8 +30,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "invalid"},
-      {"from": "invalid", "to": "end"}
+      {
+        "from": "start",
+        "to": "invalid"
+      },
+      {
+        "from": "invalid",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -41,5 +47,14 @@
         "as": "doubled"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

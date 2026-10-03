@@ -60,6 +60,7 @@ PROTECTED_FILES = (
 PROTECTED_DIRS = (
     "kernel/docs",
     "kernel/vibeflow",
+    "kernel/javascript",
 )
 
 
@@ -383,6 +384,7 @@ def _populate_distribution(output: Path, *, profile: DistributionProfile | None 
     _copy_mermaid_renderer_config(output)
     _copy_license(output)
     _copy_third_party_notices(output)
+    _copy_javascript_sdk(output)
     _write_kernel_archive(ROOT / "src" / "vibeflow", output / KERNEL_ZIP_RELATIVE)
     _ensure_standard_project_dirs(output)
     _write_workspace_config(output)
@@ -728,6 +730,15 @@ def _copy_tree(
             destination.write_bytes(path.read_bytes())
 
 
+def _copy_javascript_sdk(output: Path) -> None:
+    """Publish the canonical SDK for editors without unpacking the kernel ZIP."""
+    source = ROOT / "src/vibeflow/targets/javascript/resources"
+    target = output / "kernel/javascript"
+    target.mkdir(parents=True, exist_ok=True)
+    for name in ("sdk.mjs", "sdk.d.ts", "rule_abi.d.ts", "plugin_abi.d.ts"):
+        (target / name).write_bytes((source / name).read_bytes())
+
+
 def _copy_mermaid_renderer_config(output: Path) -> None:
     source = ROOT / "tools" / "mermaid-renderer"
     target = output / "kernel" / "tools" / "mermaid-renderer"
@@ -899,7 +910,28 @@ def _write_workspace_config(output: Path) -> None:
 
 
 def _write_javascript_architecture(output: Path) -> None:
-    """Generate the canonical JS Architecture view without platform selection."""
+    """Load the fixed TS plugin using a temporary, locked declaration toolchain."""
+
+    project = output / "javascript_project"
+    with tempfile.TemporaryDirectory(prefix="vibeflow-declaration-tools-") as directory:
+        tools = Path(os.environ.get("VIBEFLOW_TEST_TOOLCHAIN_ROOT", directory))
+        if not (tools / "node_modules").is_dir():
+            import shutil
+            for name in ("package.json", "package-lock.json"):
+                shutil.copy2(project / name, tools / name)
+            installed = subprocess.run(["npm", "ci", "--no-audit", "--no-fund"], cwd=tools,
+                capture_output=True, text=True, check=False)
+            if installed.returncode:
+                raise BuildDistributionError("declaration toolchain install failed: " + installed.stderr)
+        link = project / "node_modules"
+        link.symlink_to(tools / "node_modules", target_is_directory=True)
+        try:
+            _render_javascript_architecture(output)
+        finally:
+            link.unlink()
+
+
+def _render_javascript_architecture(output: Path) -> None:
 
     script = """
 import os

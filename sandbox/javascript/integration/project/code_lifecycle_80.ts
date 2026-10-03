@@ -1,0 +1,4 @@
+import {definePlugin,defineNode,defineRule,defineRuleset,defineDataSchema,defineBaseLib,defineCapability,defineHostExtension,defineResource} from "@vibeflow/plugin";
+export const resource_0 = defineResource({"kind": "plugin", "id": "sandbox.runtime_audit", "type": "runtime", "targets": ["browser", "node"], "priority": 30, "implementations": [{"language": "typescript", "targets": ["browser", "node"], "completion": "immediate", "source": {"kind": "file", "ref": "plugins/runtime_audit.ts", "export": "createPlugin"}}], "config": {"schema": {"type": "object", "properties": {"expectedNodes": {"type": "integer", "minimum": 1}}, "required": ["expectedNodes"], "additionalProperties": false}, "defaults": {"expectedNodes": 4}}, "rulesets": ["vibeflow.plugin"]});
+
+export const plugin = definePlugin({id:"sandbox.runtime_audit", resources:[resource_0]});

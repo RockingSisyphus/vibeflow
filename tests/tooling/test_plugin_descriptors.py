@@ -6,10 +6,8 @@ import json
 from pathlib import Path
 
 from vibeflow.core.descriptors import PluginDescriptor
-from vibeflow.tooling.project.descriptor_loader import (
-    load_descriptor_catalogs,
-    parse_descriptor_manifest,
-)
+from tests.fixtures.support.contributions import collected_fixture_catalogs as load_descriptor_catalogs
+from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor_manifest
 
 
 def _manifest() -> dict[str, object]:

@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from importlib.resources import as_file
 import json
 from pathlib import Path
 import subprocess
 import tempfile
 from typing import Any, Mapping
 
-from vibeflow.targets.javascript.resources import resource
+from vibeflow.targets.javascript.resources import materialized_resources
 from vibeflow.targets.javascript.frontend.plugin_descriptors import (
     JavascriptPluginError,
 )
@@ -33,8 +32,8 @@ class JavascriptPluginSession:
         self._stderr = None
 
     def __enter__(self) -> JavascriptPluginSession:
-        context = as_file(resource("plugin_worker.mjs"))
-        worker_path = context.__enter__()
+        context = materialized_resources()
+        worker_path = context.__enter__() / "plugin_worker.mjs"
         self._resource_context = context
         self._stderr = tempfile.TemporaryFile(mode="w+t", encoding="utf-8")
         try:
@@ -54,6 +53,10 @@ class JavascriptPluginSession:
             self._stderr = None
             raise
         return self
+
+    def declarations(self, *, module, package_root, export="plugin"):
+        return self._request({"command": "declarations", "module": str(module),
+                              "packageRoot": str(package_root), "export": export})
 
     def open(
         self,

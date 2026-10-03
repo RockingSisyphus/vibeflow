@@ -80,10 +80,6 @@ _export(
     "validate_python_stub_file",
 )
 _export(
-    "vibeflow.targets.python.project.plugin_loader",
-    "load_plugins_from_config",
-)
-_export(
     "vibeflow.targets.python.project.plugins",
     "CompilerPlugin",
     "PluginDescriptor",
@@ -101,7 +97,6 @@ _export(
 )
 _export(
     "vibeflow.targets.python.project.registry",
-    "GLOBAL_NODE_REGISTRY",
     "NodeRegistrationInfo",
     "NodeRegistry",
     "NodeRegistryError",

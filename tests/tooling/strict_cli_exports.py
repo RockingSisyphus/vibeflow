@@ -148,6 +148,8 @@ class Plugin:
         encoding="utf-8",
     )
 
+    from tests.fixtures.support.code_plugins import publish_runtime_fixture
+    publish_runtime_fixture(config_path, _registry())
     code = cli_main(["export-mermaid", "--config", str(config_path)])
     output = capsys.readouterr().out
 

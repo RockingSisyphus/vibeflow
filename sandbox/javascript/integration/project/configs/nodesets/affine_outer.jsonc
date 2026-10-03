@@ -42,20 +42,20 @@
         "type_used": "sandbox.affine_inner",
         "display_name": "Call overridden transform",
         "description": "Calls the sibling whose qualified math node is overridden."
-              },
+      },
       {
         "id": "sibling",
         "type_used": "sandbox.affine_inner_default",
         "display_name": "Call default transform",
         "description": "Calls the sibling whose math node must retain descriptor defaults."
-              },
+      },
       {
         "id": "join",
         "type_used": "sandbox.override_join",
         "display_name": "Join sibling results",
         "description": "Waits for both sibling paths before exposing the overridden result.",
         "join_policy": "all"
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -64,11 +64,26 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "inner"},
-      {"from": "start", "to": "sibling"},
-      {"from": "inner", "to": "join"},
-      {"from": "sibling", "to": "join"},
-      {"from": "join", "to": "end"}
+      {
+        "from": "start",
+        "to": "inner"
+      },
+      {
+        "from": "start",
+        "to": "sibling"
+      },
+      {
+        "from": "inner",
+        "to": "join"
+      },
+      {
+        "from": "sibling",
+        "to": "join"
+      },
+      {
+        "from": "join",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -84,5 +99,14 @@
         "as": "default_result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

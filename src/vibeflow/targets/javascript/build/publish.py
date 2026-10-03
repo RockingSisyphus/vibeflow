@@ -98,7 +98,7 @@ def validate_owned_build_directory(
         _invalid_manifest("project_target must be 'javascript'")
     _require_text(manifest, "workflow_id")
     if "plugin_abi_version" in manifest:
-        if manifest.get("plugin_abi_version") != "vibeflow.plugin.v2":
+        if manifest.get("plugin_abi_version") != "vibeflow.plugin.v3":
             _invalid_manifest("plugin_abi_version is invalid")
         _validate_plugins(manifest.get("plugins"))
     if manifest.get("entry_mode") not in {"sync", "async"}:

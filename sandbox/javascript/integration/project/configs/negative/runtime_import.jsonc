@@ -20,7 +20,7 @@
         "type_used": "sandbox.invalid.runtime_import",
         "display_name": "Runtime import",
         "description": "Must fail because the local helper is not a registered resource owner."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -29,8 +29,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "invalid"},
-      {"from": "invalid", "to": "end"}
+      {
+        "from": "start",
+        "to": "invalid"
+      },
+      {
+        "from": "invalid",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -40,5 +46,14 @@
         "as": "result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

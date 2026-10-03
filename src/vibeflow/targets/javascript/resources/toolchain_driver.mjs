@@ -6,6 +6,8 @@ import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 
+import {sdkPlugin, sdkTypes} from "./sdk_loader.mjs";
+
 function fail(code, message, details = {}) {
   const error = new Error(message);
   error.code = code;
@@ -14,6 +16,10 @@ function fail(code, message, details = {}) {
 }
 
 function visitChildren(ts, node, visitor) {
+  if (node.implementationStatements) {
+    for (const statement of node.implementationStatements) visitor(statement);
+    return;
+  }
   if (typeof ts.forEachChild === "function") ts.forEachChild(node, visitor);
   else node.forEachChild(visitor);
 }
@@ -289,6 +295,7 @@ function normalizeImportPolicy(raw, packageRoot) {
   return {
     owners,
     packageRoot: normalizedRealPath({ sys: null }, packageRoot),
+    sourceRoots: (policy.sourceRoots || []).map(value => normalizedRealPath({ sys: null }, value)),
     derivedOwners: new Map(),
     nodeBaseLibs: policy.nodeBaseLibs && typeof policy.nodeBaseLibs === "object"
       ? policy.nodeBaseLibs : {},
@@ -469,7 +476,7 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
     // Explicit Node builtin imports are platform facts.  esbuild decides
     // whether the selected build target can resolve them; they do not affect
     // VibeFlow ownership between nodes/base_lib/plugins/extensions.
-    if (isBuiltin(specifier)) continue;
+    if (isBuiltin(specifier) || specifier === "@vibeflow/plugin") continue;
     const bare = !specifier.startsWith(".") && !path.isAbsolute(specifier);
     const resolvedFileName = resolvedImportFile(
       ts,
@@ -501,7 +508,7 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
       }
       continue;
     }
-    if (!isWithinPath(policy.packageRoot, resolvedFile)) {
+    if (![policy.packageRoot, ...policy.sourceRoots].some(root => isWithinPath(root, resolvedFile))) {
       findings.push(importFinding(
         sourceFile,
         imported.node,
@@ -798,6 +805,32 @@ function importDeclarationHasRuntimeBindings(ts, statement) {
   return false;
 }
 
+function isSdkDeclaration(ts, sourceFile, value) {
+  if (!value || !ts.isCallExpression(value)) return false;
+  const expression = value.expression, imports = new Map();
+  for (const statement of sourceFile.statements) {
+    if (statement.moduleSpecifier?.text !== "@vibeflow/plugin") continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (bindings?.elements) for (const item of bindings.elements) imports.set(item.name.text, (item.propertyName || item.name).text);
+    else if (bindings?.name) imports.set(bindings.name.text, "*");
+  }
+  const names = new Set(["defineNode", "defineRule", "defineRuleset", "definePlugin", "defineDataSchema", "defineBaseLib", "defineCapability", "defineHostExtension"]);
+  const identified = names.has(imports.get(expression.text)) ||
+    (imports.get(expression.expression?.text) === "*" && names.has(expression.name?.text));
+  // Constructor arguments remain ordinary expressions. Inline implementations
+  // are declarations; calls inside their bodies are checked by their own Rules.
+  function data(argument) {
+    if (ts.isIdentifier(argument) || ts.isFunctionExpression(argument) || ts.isArrowFunction(argument)) return true;
+    if (ts.isArrayLiteralExpression(argument)) return argument.elements.every(data);
+    if (ts.isObjectLiteralExpression(argument)) return argument.properties.every(item =>
+      ts.isMethodDeclaration(item) || ts.isShorthandPropertyAssignment(item)
+      || (ts.isSpreadAssignment(item) && data(item.expression))
+      || (ts.isPropertyAssignment(item) && data(item.initializer)));
+    return isPureInitializer(ts, argument);
+  }
+  return identified && value.arguments.every(data);
+}
+
 function auditTopLevelPurity(ts, sourceFile, policy) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (!owner
@@ -825,7 +858,7 @@ function auditTopLevelPurity(ts, sourceFile, policy) {
     } else if (ts.isVariableStatement(statement)) {
       const immutable = Boolean(statement.declarationList.flags & ts.NodeFlags.Const);
       allowed = immutable && statement.declarationList.declarations.every(
-        (declaration) => isImmutableModuleInitializer(ts, declaration.initializer),
+        (declaration) => isSdkDeclaration(ts, sourceFile, declaration.initializer) || isImmutableModuleInitializer(ts, declaration.initializer),
       );
     } else if (ts.isExportAssignment(statement)) {
       allowed = isImmutableModuleInitializer(ts, statement.expression);
@@ -850,20 +883,41 @@ function hasModifier(ts, node, kind) {
 }
 
 function implementationDeclaration(ts, sourceFile, exportName) {
+  const [name, member] = exportName.split(".");
   for (const statement of sourceFile.statements) {
-    if (ts.isFunctionDeclaration(statement)
-        && statement.name?.text === exportName) {
-      return statement;
-    }
+    if (ts.isFunctionDeclaration(statement) && statement.name?.text === name && !member) return statement;
     if (!ts.isVariableStatement(statement)) continue;
     for (const declaration of statement.declarationList.declarations) {
-      if (ts.isIdentifier(declaration.name)
-          && declaration.name.text === exportName
-          && declaration.initializer
-          && (ts.isArrowFunction(declaration.initializer)
-            || ts.isFunctionExpression(declaration.initializer))) {
-        return declaration.initializer;
+      if (!ts.isIdentifier(declaration.name) || declaration.name.text !== name || !declaration.initializer) continue;
+      let value = declaration.initializer;
+      if (member && ts.isCallExpression(value)) {
+        const property = declarationProperty(ts, sourceFile, value.arguments[0], member);
+        if (property && ts.isShorthandPropertyAssignment(property)) return implementationDeclaration(ts, sourceFile, member);
+        value = property?.initializer || property;
       }
+      if (value && ts.isIdentifier(value) && value.text !== name) return implementationDeclaration(ts, sourceFile, value.text);
+      if (value && (ts.isArrowFunction(value) || ts.isFunctionExpression(value) || ts.isMethodDeclaration(value))) return value;
+    }
+  }
+  return null;
+}
+
+function declarationProperty(ts, sourceFile, expression, member, seen = new Set()) {
+  if (!expression || seen.has(expression)) return null;
+  seen.add(expression);
+  if (ts.isIdentifier(expression)) {
+    for (const statement of sourceFile.statements) {
+      for (const declaration of statement.declarationList?.declarations || []) {
+        if (declaration.name?.text === expression.text) return declarationProperty(ts, sourceFile, declaration.initializer, member, seen);
+      }
+    }
+  }
+  if (expression.expression && !ts.isCallExpression(expression)) return declarationProperty(ts, sourceFile, expression.expression, member, seen);
+  for (const property of [...(expression.properties || [])].reverse()) {
+    if ((property.name?.text || property.name?.getText(sourceFile)) === member) return property;
+    if (ts.isSpreadAssignment(property)) {
+      const found = declarationProperty(ts, sourceFile, property.expression, member, seen);
+      if (found) return found;
     }
   }
   return null;
@@ -1172,6 +1226,54 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
   }
   visit(declaration);
   return findings;
+}
+
+function implementationScope(ts, sourceFile, checker, project, policy) {
+  const owner = ownerFor(ts, sourceFile.fileName, policy);
+  if (!owner?.export?.includes(".")) return sourceFile;
+  const implementation = implementationDeclaration(ts, sourceFile, owner.export);
+  if (!implementation) return sourceFile;
+  const reachable = new Set([implementation]), pending = [implementation], referencedImports = new Set();
+  while (pending.length) {
+    const current = pending.pop();
+    function visit(node) {
+      if (ts.isIdentifier(node) && identifierIsReference(ts, node)) {
+        for (const declaration of symbolDeclarationNodes(checker.getSymbolAtLocation(node), project)) {
+          if (declaration.getSourceFile() !== sourceFile) continue;
+          let statement = declaration;
+          while (statement.parent && statement.parent !== sourceFile) statement = statement.parent;
+          if (ts.isImportDeclaration(statement) || ts.isImportEqualsDeclaration(statement)) referencedImports.add(statement);
+          let callable = declaration;
+          if (ts.isVariableDeclaration(callable)) callable = unwrapExpression(ts, callable.initializer);
+          if (!callable || ![ts.isFunctionDeclaration, ts.isFunctionExpression, ts.isArrowFunction, ts.isClassDeclaration].some(test => test(callable))) continue;
+          if (!reachable.has(callable)) {reachable.add(callable); pending.push(callable);}
+        }
+      }
+      visitChildren(ts, node, visit);
+    }
+    visit(current);
+  }
+  const globals = sourceFile.statements.filter(statement => {
+    if (ts.isImportDeclaration(statement)) {
+      const clause = statement.importClause;
+      if (!clause) return true;
+      return referencedImports.has(statement);
+    }
+    if (ts.isImportEqualsDeclaration(statement)) return referencedImports.has(statement);
+    if (!ts.isVariableStatement(statement)) return false;
+    return statement.declarationList.declarations.every(declaration => {
+      const value = unwrapExpression(ts, declaration.initializer);
+      return !value || (!isSdkDeclaration(ts, sourceFile, value)
+        && !ts.isFunctionExpression(value) && !ts.isArrowFunction(value));
+    });
+  });
+  // Preserve the original nodes and positions; only traversal is scoped to the
+  // selected implementation and its local callable references.
+  const statements = [...globals, ...reachable];
+  return Object.create(sourceFile, {
+    statements: {value: statements, enumerable: true},
+    implementationStatements: {value: statements},
+  });
 }
 
 function auditModuleRegExpState(ts, sourceFile, policy) {
@@ -1881,6 +1983,8 @@ function qualityFunctions(ts, sourceFile) {
       nextScope = [...scope, name];
     } else if (classNode) {
       nextScope = [...scope, qualityFunctionName(ts, node, sourceFile)];
+    } else if (ts.isVariableDeclaration(node) && node.name?.text && isSdkDeclaration(ts, sourceFile, node.initializer)) {
+      nextScope = [...scope, node.name.text];
     }
     visitChildren(ts, node, (child) => visit(child, nextScope));
   }
@@ -1947,10 +2051,12 @@ function qualityCallGraph(ts, sourceFile, exportName) {
       visitChildren(ts, node, (child) => collect(child, className));
       return;
     }
-    if (ts.isVariableDeclaration(node) && node.name?.text
-        && node.initializer && ts.isObjectLiteralExpression(node.initializer)) {
-      visitChildren(ts, node.initializer, (child) => collect(child, node.name.text));
-      return;
+    if (ts.isVariableDeclaration(node) && node.name?.text && node.initializer) {
+      const value = isSdkDeclaration(ts, sourceFile, node.initializer) ? node.initializer.arguments[0] : node.initializer;
+      if (ts.isObjectLiteralExpression(value)) {
+        visitChildren(ts, value, (child) => collect(child, node.name.text));
+        return;
+      }
     }
     visitChildren(ts, node, (child) => collect(child, owner));
   }
@@ -2084,6 +2190,7 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
   );
   const findings = [];
   const jsonCompilerOptions = {
+    paths: {"@vibeflow/plugin": [sdkTypes]},
     allowJs: true,
     checkJs: true,
     noEmit: true,
@@ -2205,6 +2312,8 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
       request.importPolicy,
       request.packageRoot,
     );
+    const selectedOwner = policy.owners.find(owner => owner.id === request.ruleSubjectId && owner.kind === request.ruleSubjectKind);
+    if (selectedOwner) policy.owners = [selectedOwner, ...policy.owners.filter(owner => owner !== selectedOwner)];
     deriveTransitiveOwners(
       ts,
       sourceFiles,
@@ -2218,6 +2327,7 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
       const owned = ownerFor(ts, sourceFile.fileName, policy);
       if (!owned && !rootFiles.has(path.resolve(sourceFile.fileName))) continue;
       const topics = new Set(request.ruleTopics || []);
+      const implementationFile = implementationScope(ts, sourceFile, checker, project, policy);
       if (request.profile === "single-esm") findings.push(...auditSingleEsmConstraints(ts, sourceFile));
       if (topics.has("imports")) {
         findings.push(...auditParsedSource(ts, sourceFile, ""));
@@ -2227,16 +2337,16 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
       if (topics.has("completion")) findings.push(...auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy));
       if (topics.has("module_state")) {
         findings.push(...auditModuleRegExpState(ts, sourceFile, policy));
-        findings.push(...auditModuleStateWrites(ts, sourceFile, checker, project, policy));
+        findings.push(...auditModuleStateWrites(ts, implementationFile, checker, project, policy));
       }
       if (topics.has("host_io")) {
         const ioPolicy = request.ruleSubjectKind === "node" ? {
           ...policy, owners: policy.owners.map(owner => owner.kind === "node" && owner.id === request.ruleSubjectId ? {...owner, kind: "base_lib"} : owner),
         } : policy;
-        findings.push(...auditBaseLibHostIo(ts, sourceFile, checker, project, ioPolicy));
-        findings.push(...auditPluginHostIo(ts, sourceFile, checker, project, policy));
+        findings.push(...auditBaseLibHostIo(ts, implementationFile, checker, project, ioPolicy));
+        findings.push(...auditPluginHostIo(ts, implementationFile, checker, project, policy));
       }
-      if (topics.has("ownership")) findings.push(...auditUnclassifiedHiddenWork(ts, sourceFile, checker, policy));
+      if (topics.has("ownership")) findings.push(...auditUnclassifiedHiddenWork(ts, implementationFile, checker, policy));
       const sharedOwners = policy.owners.filter(
         (item) => path.resolve(item.path) === path.resolve(sourceFile.fileName),
       );
@@ -2359,7 +2469,7 @@ async function build(request, tools) {
     metafile: true,
     logLevel: "silent",
     write: true,
-    plugins: [workflowVirtualPlugin(request.workflowEntry)],
+    plugins: [workflowVirtualPlugin(request.workflowEntry), sdkPlugin(tools.typescript, {runtimeBindings: request.runtimeBindings})],
   };
   let result;
   try {

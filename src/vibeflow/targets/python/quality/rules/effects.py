@@ -20,20 +20,28 @@ def no_side_effects(context, inputs, params):
         source = context.require("base_lib_file")
         if source.tree is None:
             return RuleResult(state="unavailable")
+        tree = context.require("source_context").implementation_tree(source.path, context.facts.get("resource_symbol", ""))
+        if tree is None:
+            return RuleResult(state="unavailable")
         scanner = _BaseLibAstScanner(path=source.path,module=source.module,policy=source_policy(context,params),effect_scope=scope)
-        scanner.visit(source.tree)
+        scanner.visit(tree)
         return RuleResult(records={"effect_policy":policy_record},findings=tuple(finding(context,item.rule_id,item.message,
             path=source.path,line=int(item.source_location.get("line",1)),column=int(item.source_location.get("column",1)),
             details=item.details) for item in scanner.findings))
     if context.subject.get("kind") == "plugin":
         findings = []
-        for source in context.require("source_context").files:
+        sources = context.require("source_context")
+        for source in sources.files:
             if source.tree is None:
+                return RuleResult(state="unavailable")
+            selected = source.path == context.require("resource_source_file").path
+            tree = sources.implementation_tree(source.path, context.facts.get("resource_symbol", "")) if selected else source.tree
+            if tree is None:
                 return RuleResult(state="unavailable")
             visitor = ModulePurityVisitor(policy=source_policy(context,params), source=source_info(source),
                 node_class_name="", known_node_modules=(), known_node_class_names=(),
                 audit_all_definitions=True, effect_scope=scope)
-            visitor.visit(source.tree)
+            visitor.visit(tree)
             findings.extend(violation_finding(context,item) for item in visitor.violations)
         return RuleResult(records={"effect_policy":policy_record},findings=tuple(findings))
     sources, node, symbol = source_subject(context)
@@ -42,7 +50,10 @@ def no_side_effects(context, inputs, params):
     source = sources.file(node.path)
     other_nodes = tuple(item for item in context.facts.get("node_catalog",()) if item.type_key != node.type_key)
     known_classes = tuple(implementation.source.export.split(".")[-1] for item in other_nodes for implementation in item.implementations if implementation.language == "python" and implementation.source.export)
-    known_modules = tuple(implementation.source.ref.removesuffix(".py").replace("/",".") for item in other_nodes for implementation in item.implementations if implementation.language == "python")
+    modules_by_path = {item.path: item.module for item in sources.files}
+    known_modules = tuple(modules_by_path.get(implementation.source.ref,
+        implementation.source.ref.removesuffix(".py").replace("/", "."))
+        for item in other_nodes for implementation in item.implementations if implementation.language == "python")
     from vibeflow.targets.python.quality.source_analysis.input_tracking import source_input_parameters
     input_parameters = source_input_parameters(sources,node)
     visitor = NodePurityVisitor(

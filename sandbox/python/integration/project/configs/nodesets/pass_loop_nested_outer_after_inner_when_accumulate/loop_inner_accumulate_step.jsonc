@@ -68,8 +68,6 @@
       {
         "display_name": "Accumulate",
         "description": "Adds outer plus inner plus one into the running total and advances the inner counter.",
-
-
         "inner_limit": 2,
         "id": "accumulate",
         "type_used": "semantic.inner_accumulate"
@@ -114,5 +112,14 @@
       }
     ]
   },
-  "type_key": "loop.inner_accumulate_step"
+  "type_key": "loop.inner_accumulate_step",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

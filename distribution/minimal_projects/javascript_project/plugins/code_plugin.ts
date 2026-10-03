@@ -1,0 +1,11 @@
+import {definePlugin,defineDataSchema} from "@vibeflow/plugin";
+import {endNode} from "../nodes/end.ts";
+import {input_boundaryNode} from "../nodes/input_boundary.ts";
+import {output_boundaryNode} from "../nodes/output_boundary.ts";
+import {process_payloadNode} from "../nodes/process_payload.ts";
+import {startNode} from "../nodes/start.ts";
+const schema0=defineDataSchema({"type_key": "payload.internal", "representation": "json", "schema": {}});
+const schema1=defineDataSchema({"type_key": "payload.processed", "representation": "json", "schema": {}});
+const schema2=defineDataSchema({"type_key": "payload.request", "representation": "json", "schema": {}});
+const schema3=defineDataSchema({"type_key": "payload.response", "representation": "json", "schema": {}});
+export const plugin=definePlugin({id:"minimal.javascript",resources:[endNode,input_boundaryNode,output_boundaryNode,process_payloadNode,startNode,schema0,schema1,schema2,schema3]});

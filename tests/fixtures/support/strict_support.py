@@ -70,7 +70,15 @@ def _provider_specs(values: list[str] | None) -> list[dict[str, str]]:
 
 
 def cli_main(args):
-    from vibeflow.tooling.application.python.cli import main
+    from tests.fixtures.support.code_plugins import prepare_config_fixture, prepare_workspace_fixture
+    if "--config" in args:
+        prepare_config_fixture(args[args.index("--config") + 1])
+    elif "--workspace" in args:
+        prepare_workspace_fixture(args[args.index("--workspace") + 1])
+    if args and args[0] == "review-rules":
+        from vibeflow.tooling.application.cli import main
+    else:
+        from vibeflow.tooling.application.python.cli import main
 
     return main(args)
 

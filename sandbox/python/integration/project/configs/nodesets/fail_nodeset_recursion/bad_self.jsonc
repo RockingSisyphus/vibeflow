@@ -25,8 +25,6 @@
     ],
     "nodes": [
       {
-
-
         "id": "self",
         "type_used": "bad.self",
         "display_name": "Self",
@@ -41,5 +39,14 @@
       }
     ]
   },
-  "type_key": "bad.self"
+  "type_key": "bad.self",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

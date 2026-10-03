@@ -17,6 +17,8 @@ def project(tmp_path):
 
 
 def call(capsys, arguments):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(arguments[arguments.index("--workspace")+1])
     code = main(arguments)
     return code, json.loads(capsys.readouterr().out)
 
@@ -42,9 +44,11 @@ def test_cross_root_resource_conflicts_are_formal_diagnostics_with_both_origins(
     assert code == 1, payload
     finding = next(item for item in payload["errors"] if item["code"] == "RULE.RESOURCE.CONFLICT")
     assert finding["details"]["resource_id"] == document["id"]
-    assert finding["details"]["source"] == str(conflict)
-    assert finding["details"]["previous_source"] == str(original)
-    assert finding["source_location"] == {"path": str(conflict), "line": 1, "column": 1}
+    assert finding["details"]["source"] == str(other / "code_plugin.py")
+    assert finding["details"]["previous_source"] == str(project.project / "code_plugin.py")
+    assert finding["source_location"]["path"] == str(other / "code_plugin.py")
+    assert finding["source_location"]["line"] > 0
+    assert finding["details"]["origins"]["previous"]["plugin_id"] != finding["details"]["origins"]["current"]["plugin_id"]
     assert not project.events()
 
 

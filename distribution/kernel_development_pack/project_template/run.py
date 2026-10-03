@@ -13,6 +13,7 @@ KERNEL_ARCHIVE_PATH = KERNEL_ROOT / "vibeflow-kernel.zip"
 PROTECTED_DIRS = (
     "kernel/docs",
     "kernel/vibeflow",
+    "kernel/javascript",
 )
 PROTECTED_PREFIXES = tuple(f"{path}/" for path in PROTECTED_DIRS)
 PROTECTED_FILES = {
@@ -164,6 +165,7 @@ WORKSPACE_COMMANDS = {
     "export-mermaid",
     "export-svg",
     "inspect-config",
+    "inspect-resources",
     "quality-check",
     "review",
     "review-rules",

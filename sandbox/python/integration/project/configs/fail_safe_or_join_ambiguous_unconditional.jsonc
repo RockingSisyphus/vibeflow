@@ -10,7 +10,6 @@
       {
         "display_name": "Unconditional Value",
         "description": "Always provides value.in before the conditional provider has been selected.",
-
         "value": 3,
         "id": "left_value",
         "type_used": "semantic.left_value"
@@ -18,7 +17,6 @@
       {
         "display_name": "Conditional Value",
         "description": "Also provides value.in but only through a conditional incoming edge.",
-
         "value": 9,
         "id": "alt_value",
         "type_used": "semantic.conditional_value"
@@ -26,15 +24,12 @@
       {
         "display_name": "Ambiguous Join",
         "description": "Would consume value.in from either an unconditional or conditional source.",
-
-
         "id": "join",
         "type_used": "semantic.join_passthrough"
       },
       {
         "display_name": "End",
         "description": "Would end after the ambiguous join.",
-
         "id": "end",
         "type_used": "semantic.value_end"
       }
@@ -69,5 +64,14 @@
         "display_name": "Value Out"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

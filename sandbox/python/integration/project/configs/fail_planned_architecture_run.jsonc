@@ -17,5 +17,14 @@
     {
       "path": "nodesets/fail_planned_architecture_run/a.jsonc"
     }
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
   ]
 }

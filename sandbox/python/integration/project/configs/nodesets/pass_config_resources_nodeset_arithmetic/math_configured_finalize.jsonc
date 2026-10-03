@@ -38,8 +38,6 @@
         "description": "Runs start."
       },
       {
-
-
         "factor": 100,
         "id": "scale",
         "type_used": "sandbox.resource_scale",
@@ -47,16 +45,12 @@
         "description": "Runs scale."
       },
       {
-
-
         "id": "use_scaled",
         "type_used": "semantic.use_scaled",
         "display_name": "Use Scaled",
         "description": "Runs use_scaled."
       },
       {
-
-
         "offset": -100,
         "id": "finalize",
         "type_used": "semantic.finalize",
@@ -64,7 +58,6 @@
         "description": "Runs finalize."
       },
       {
-
         "id": "end",
         "type_used": "semantic.final_end",
         "display_name": "End",
@@ -97,5 +90,14 @@
       }
     ]
   },
-  "type_key": "math.configured_finalize"
+  "type_key": "math.configured_finalize",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

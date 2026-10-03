@@ -1,9 +1,5 @@
 {
   "project_target": "javascript",
-  "descriptors": {
-    "nodes": ["manifests/nodes"],
-    "data_schemas": ["manifests/data"]
-  },
   "javascript": {
     "package_root": ".",
     "external_packages": []

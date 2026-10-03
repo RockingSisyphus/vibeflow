@@ -47,11 +47,11 @@ VibeFlow 命令不检查：
 
 `quality-check` 检查当前根的手写源码与找到的工作流；即使没有工作流，也会输出 `source_quality`。JSON 同时包含 `source_quality`、逐工作流的 `reports` 和顶层状态；Python 原有的源码报告字段仍保留在顶层。警告产生 `CONCERNS`、退出码 0，错误产生 `FAIL`、退出码 1。
 
-在已选择的 workspace 中，`quality --path <root>` 只扫描该 root 的源码与工作流。Python 工作流依赖解析保留完整 workspace 的声明与规则资源，支持兄弟 root 的 BaseLib 与 Node。发行包装器会自动选用同目录的 `vibeflow_config.jsonc`；直接调用内核 CLI 时用 `--workspace` 指定。没有 workspace 的独立项目仍按自身 `vibeflow_project.jsonc` 加载。
+在已选择的 workspace 中，`quality --path <root>` 只扫描该 root 的源码与工作流。依赖定位保留完整 workspace 的 root 解析上下文，资源来自当前 workflow 选中的插件；兄弟 root 的 BaseLib 与 Node 通过显式插件 source 和 root 接入。发行包装器会自动选用同目录的 `vibeflow_config.jsonc`；直接调用内核 CLI 时用 `--workspace` 指定。没有 workspace 的独立项目仍按自身 `vibeflow_project.jsonc` 加载。
 
 JavaScript/TypeScript 扫描 `.js`、`.jsx`、`.ts`、`.tsx`、`.mjs`、`.cjs`、`.mts`、`.cts` 及声明源码，包括未注册的手写文件和测试文件；自动排除 `generated`、`dist`、`build`、`node_modules` 等产物目录。可重复使用 `--exclude-dir NAME` 和 `--exclude-path ROOT_RELATIVE_PATH` 排除其他目录或文件。独立 `--path` 源码扫描需要项目本地安装的 TypeScript；`--enable-structure-limits` 可为独立扫描启用根目录结构上限。
 
-Node/helper 的源码大小、复杂度和依赖链由所选 Ruleset 中的规则检查。默认依赖链包含 Node 本身，长度超过 4 为警告、超过 6 为错误；仅计入可解析的项目内导入。现有 `policy` 数值配置作为内置 Rule 的默认参数，显式规则参数和覆盖关系优先；旧 `policy.rules` 豁免和降级改为规则组合及覆盖。`validate`、`review`、`build` 执行当前范围的静态入口；`run` 只执行运行入口，新增领域规则默认进入静态入口。`review-rules --config CONFIG --node CALL_PATH` 可查看该调用的有效规则及参数来源，生成 JSON、Mermaid 或 SVG，过程不加载业务实现。规则接口与迁移示例见 [规则与分类](rules-and-nodes.md)。
+Node/helper 的源码大小、复杂度和依赖链由所选 Ruleset 中的规则检查。默认依赖链包含 Node 本身，长度超过 4 为警告、超过 6 为错误；仅计入可解析的项目内导入。现有 `policy` 数值配置作为内置 Rule 的默认参数，显式规则参数和覆盖关系优先；旧 `policy.rules` 豁免和降级改为规则组合及覆盖。`validate`、`review`、`build` 执行当前范围的静态入口；`run` 只执行运行入口，新增领域规则默认进入静态入口。`review-rules --config CONFIG --node CALL_PATH` 可查看该调用的有效规则及参数来源，生成 JSON、Mermaid 或 SVG，过程加载受信插件取得固定定义，框架不调用 Rule、Node 或生命周期工厂。规则接口与迁移示例见 [Rule 与 Node](rules-and-nodes.md)。
 
 ## 工作流执行探针
 

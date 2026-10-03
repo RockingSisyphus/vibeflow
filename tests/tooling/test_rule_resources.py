@@ -7,7 +7,8 @@ import pytest
 
 from vibeflow.core.descriptors import RuleImplementationDescriptor, SourceLocator
 from vibeflow.core.rules import RuleDescriptor
-from vibeflow.tooling.project.descriptor_loader import DescriptorLoadError, load_descriptor_catalogs, parse_descriptor_manifest
+from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor_manifest
+from vibeflow.core.descriptors import ContributionBuilder, ResourceOrigin, compose_contributions
 from vibeflow.tooling.presentation.node_presentation import resolve_presentation
 
 
@@ -54,26 +55,24 @@ def test_node_default_colors_keep_the_system_palette_reserved():
     assert node(presentation={"fill":"#cceeff"}).presentation["fill"] == "#cceeff"
 
 
-def test_bundle_loads_resources_and_retains_source(tmp_path):
-    write(tmp_path / "package/rule.jsonc", {"kind": "rule", "id": "model.block", "handler": "test.block", "outputs": {"blocks": "model.blocks.v1"}})
-    write(tmp_path / "package/ruleset.jsonc", {"kind": "ruleset", "id": "model.blocks", "calls": [{"id": "block", "rule_id": "model.block"}], "entrypoints": {"static": ["block"]}})
-    write(tmp_path / "package/node.jsonc", node(rulesets=["model.blocks"]).to_dict())
-    write(tmp_path / "entry/bundle.jsonc", {"kind": "bundle", "id": "model.package", "resources": {
-        "nodes": ["../package/node.jsonc"],
-        "rules": ["../package/rule.jsonc"], "rulesets": ["../package/ruleset.jsonc"],
-    }})
-    catalogs = load_descriptor_catalogs(tmp_path, {"bundles": ["entry"]})
+def test_code_contributions_retain_resource_selection_and_source(tmp_path):
+    definitions = [
+        {"kind":"rule", "id":"model.block", "handler":"test.block", "outputs":{"blocks":"model.blocks.v1"}},
+        {"kind":"ruleset", "id":"model.blocks", "calls":[{"id":"block", "rule_id":"model.block"}], "entrypoints":{"static":["block"]}},
+        node(rulesets=["model.blocks"]).to_dict(),
+    ]
+    builder = ContributionBuilder("model.package")
+    for index, value in enumerate(definitions):
+        builder.add(parse_descriptor_manifest(value), origin=ResourceOrigin("model.package", str(tmp_path / "model.py"), index + 1))
+    catalogs = compose_contributions((builder.finish(),))
     assert catalogs.rules.require("model.block").outputs["blocks"] == "model.blocks.v1"
     assert catalogs.nodes.require("model.affine").rulesets == ("model.blocks",)
-    assert catalogs.nodes.source_for("model.affine") == str(tmp_path / "package/node.jsonc")
-    assert len(catalogs.source_files) == 4
+    assert catalogs.origins[("nodes", "model.affine")].line == 3
 
 
-def test_nested_bundle_cycle_is_reported(tmp_path):
-    write(tmp_path / "entry/a.jsonc", {"kind": "bundle", "id": "a", "resources": {"bundles": ["../other/b.jsonc"]}})
-    write(tmp_path / "other/b.jsonc", {"kind": "bundle", "id": "b", "resources": {"bundles": ["../entry/a.jsonc"]}})
-    with pytest.raises(DescriptorLoadError, match="BUNDLE.CYCLE"):
-        load_descriptor_catalogs(tmp_path, {"bundles": ["entry"]})
+def test_removed_bundle_is_not_a_resource_declaration():
+    with pytest.raises(ValueError, match="kind must be one of"):
+        parse_descriptor_manifest({"kind":"bundle", "id":"old", "resources":{}})
 
 
 def test_rule_has_one_implementation_per_execution_family():

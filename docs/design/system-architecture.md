@@ -35,11 +35,11 @@ Python 和 JavaScript Target 使用相同 Core 语义，但分别声明可执行
 
 ## 规则与 Node 声明
 
-公开规则模型位于 `vibeflow.core.rules`，完整 Node 声明和 bundle 位于 `vibeflow.core.descriptors`。Node 自己声明规则和默认展示；省略 `rulesets` 与显式 `[]` 都表示不选择 Node 审查规则。workflow 与 Nodeset 的顶层 `rulesets` 默认选择 `vibeflow.workflow`。自由 tags/metadata 可供领域规则识别业务含义，不改变原生 Node/Nodeset/Loop 的组合与执行。
+公开规则模型位于 `vibeflow.core.rules`，完整 Node 声明和 ContributionBuilder/PluginContributions 位于 `vibeflow.core.descriptors`。Node 自己声明规则和默认展示；省略 `rulesets` 与显式 `[]` 都表示不选择 Node 审查规则。workflow 与 Nodeset 的顶层 `rulesets` 默认选择 `vibeflow.workflow`。自由 tags/metadata 可供领域规则识别业务含义，不改变原生 Node/Nodeset/Loop 的组合与执行。
 
 Rule 图使用独立的 includes/requires/overrides 关系，不使用业务边的调度和数据传递语义。Core 先展开组合、解析显式覆盖，再按具名资料依赖执行选中规则。覆盖链决定优先级，文件加载顺序不决定结果；规则不能删除其他规则的诊断。
 
-Target 提供当前检查范围的源码、符号、导入、实际实现和 helper 归属，选中的 Rule 消费这些事实作判断。Rule ABI 为 `vibeflow.rule.v1`，接口是 `check(context, inputs, params)`；Plugin ABI 为 `vibeflow.plugin.v2`，仅保留 compiler/runtime 生命周期与变换。公开上下文提供只读视图，受信扩展代码仍可访问文件系统，不构成操作系统沙箱。
+Target 提供当前检查范围的源码、符号、导入、实际实现和 helper 归属，选中的 Rule 消费这些事实作判断。Rule ABI 为 `vibeflow.rule.v1`，接口是 `check(context, inputs, params)`；Plugin ABI 为 `vibeflow.plugin.v3`。固定插件经 Python/JS SDK 贡献资源，并可提供 compiler/runtime 生命周期与变换；workflow 的 plugins 是自定义资源唯一启用入口。公开上下文提供只读视图，受信扩展代码仍可访问文件系统，不构成操作系统沙箱。
 
 ## 架构事实
 

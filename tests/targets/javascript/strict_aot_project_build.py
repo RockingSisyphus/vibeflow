@@ -425,6 +425,12 @@ def test_javascript_root_rejects_foreign_implementation_languages_even_when_unus
         raw["targets"] = ["python"]
     _write(manifest, raw)
 
+    if resource_kind == "plugin":
+        # Resource packages are enabled solely by workflow selection.
+        document = json.loads(Path(request.config).read_text())
+        document["plugins"] = [{"id": "demo.unused"}]
+        _write(Path(request.config), document)
+
     with pytest.raises(ProjectBuildError) as captured:
         prepare_project_build(request)
 
@@ -733,8 +739,8 @@ def test_prepare_project_build_rejects_python_registry_metadata(
     with pytest.raises(WorkspaceConfigError) as invalid:
         prepare_project_build(request)
 
-    assert invalid.value.rule_id == "WORKSPACE.PROJECT_TARGET.FIELD_CONFLICT"
-    assert invalid.value.source_location["field"] == "registry"
+    assert invalid.value.rule_id == "PLUGIN.REGISTRATION.MIGRATION"
+    assert "registry" in invalid.value.source_location["fields"]
 
 
 def test_prepare_project_build_rejects_ambiguous_input_requiredness(
@@ -861,7 +867,7 @@ def test_target_neutral_audit_never_loads_planned_plugin_or_host_source(
     )
     project_config = project / "vibeflow_project.jsonc"
     project_data = json.loads(project_config.read_text(encoding="utf-8"))
-    project_data["descriptors"]["plugins"] = ["manifests/plugins"]
+    project_data.setdefault("descriptors", {})["plugins"] = ["manifests/plugins"]
     _write(project_config, project_data)
     workflow = json.loads(Path(request.config).read_text(encoding="utf-8"))
     workflow["plugins"] = [
@@ -1199,8 +1205,8 @@ def test_prepare_project_build_rejects_python_plugin_fields(
     with pytest.raises(WorkspaceConfigError) as invalid:
         prepare_project_build(request)
 
-    assert invalid.value.rule_id == "WORKSPACE.PROJECT_TARGET.FIELD_CONFLICT"
-    assert invalid.value.source_location["field"] == "plugins"
+    assert invalid.value.rule_id == "PLUGIN.REGISTRATION.MIGRATION"
+    assert "plugins" in invalid.value.source_location["fields"]
 
 
 def test_build_project_aot_forwards_prepared_request(
@@ -1256,3 +1262,23 @@ def test_build_project_aot_forwards_prepared_request(
         "demo.add": ["demo.math"],
         "demo.start": [],
     }
+
+
+# Publish controlled case inputs as fixed SDK plugins before formal entrypoints.
+_native_prepare_project_build = prepare_project_build
+def prepare_project_build(request, **options):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(request.workspace)
+    return _native_prepare_project_build(request, **options)
+
+_native_build_project_aot = build_project_aot
+def build_project_aot(request, **options):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(request.workspace)
+    return _native_build_project_aot(request, **options)
+
+_native_audit_javascript_project = audit_javascript_project
+def audit_javascript_project(request, **options):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(request.workspace)
+    return _native_audit_javascript_project(request, **options)

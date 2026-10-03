@@ -30,7 +30,6 @@
         "description": "Runs start."
       },
       {
-
         "async": "result_key",
         "result_key": "async.value",
         "config": {
@@ -42,16 +41,12 @@
         "description": "Runs slow_async."
       },
       {
-
-
         "id": "add_pair",
         "type_used": "semantic.add_pair",
         "display_name": "Add Pair",
         "description": "Runs add_pair."
       },
       {
-
-
         "config": {
           "factor": 3
         },
@@ -61,24 +56,18 @@
         "description": "Runs scale."
       },
       {
-
-
         "id": "compare",
         "type_used": "semantic.compare_gt",
         "display_name": "Compare",
         "description": "Runs compare."
       },
       {
-
-
         "id": "use_scaled",
         "type_used": "semantic.use_scaled",
         "display_name": "Use Scaled",
         "description": "Runs use_scaled."
       },
       {
-
-
         "config": {
           "offset": -4
         },
@@ -88,7 +77,6 @@
         "description": "Runs finalize."
       },
       {
-
         "id": "end",
         "type_used": "semantic.final_end",
         "display_name": "End",
@@ -172,5 +160,14 @@
         "display_name": "Route Branch"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

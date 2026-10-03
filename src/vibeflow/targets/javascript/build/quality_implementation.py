@@ -76,7 +76,7 @@ def registered_implementation_requests(
                 continue
             if str((project_root / implementation.source.ref).resolve()) not in selected:
                 continue
-            source = safe_project_path(project_root, implementation.source.ref, subject=f"node '{descriptor.type_key}' source", require_file=True)
+            source = safe_project_path(project_root, implementation.source.ref, subject=f"node '{descriptor.type_key}' source", require_file=True, allowed_roots=catalogs.source_roots)
             if str(source) not in selected:
                 continue
             export = implementation.source.export or "run"
@@ -90,7 +90,7 @@ def registered_implementation_requests(
                 continue
             if str((project_root / implementation.source.ref).resolve()) not in selected:
                 continue
-            source = safe_project_path(project_root, implementation.source.ref, subject=f"base_lib '{descriptor.id}' source", require_file=True)
+            source = safe_project_path(project_root, implementation.source.ref, subject=f"base_lib '{descriptor.id}' source", require_file=True, allowed_roots=catalogs.source_roots)
             if str(source) not in selected:
                 continue
             export = implementation.source.export or ""

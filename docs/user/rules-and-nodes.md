@@ -4,35 +4,26 @@
 
 ## 完整 Node 声明
 
-在项目配置中登记声明目录或一个插件包 bundle：
+在所属语言的插件中声明资源，并由 workflow 显式选择。例如 Python 的模型功能块：
 
-```jsonc
-{
-  "project_target": "python",
-  "descriptors": {
-    "nodes": ["manifests/nodes"],
-    "rules": ["manifests/rules"],
-    "rulesets": ["manifests/rulesets"],
-    "bundles": ["packages/bundles"]
-  }
-}
+```python
+from vibeflow.targets.python.sdk import Plugin, node
+
+@node(
+    type_key="ml.model_block", display_name="模型功能块", description="一个明确的模型功能",
+    flow_kind="process", tags=["model_block"], rulesets=["ml.model_block"],
+    presentation={"fill": "#dbeafe", "shape": "rect", "icon": "M"},
+    contract={},
+)
+class ModelBlock:
+    def run_pure(self, inputs, params):
+        return {}
+
+# model_rules 是同插件或显式选中的另一插件贡献的 Ruleset。
+plugin = Plugin(id="ml", resources=[ModelBlock, model_rules])
 ```
 
-每个 Node 直接声明自己的规则与展示。例如模型功能块声明包含：
-
-```jsonc
-{
-  "kind": "node", "type_key": "ml.model_block",
-  "display_name": "模型功能块", "description": "一个明确的模型功能",
-  "version": "1.0", "flow_kind": "process", "tags": ["model_block"],
-  "rulesets": ["ml.model_block"],
-  "presentation": {"fill": "#dbeafe", "shape": "rect", "icon": "M"},
-  "contract": {"requires": [], "provides": [], "input_semantics": {}, "output_semantics": {}},
-  "implementations": [{"language": "python",
-    "source": {"kind": "file", "ref": "nodes/model.py", "export": "ModelBlock"}}],
-  "metadata": {}
-}
-```
+SDK 自动保存 Descriptor、实现和源码位置，普通导入不修改 Catalog。workflow 使用 `plugins: [{"source": {"kind": "file", "ref": "plugins/model.py"}}]` 后才能通过 `type_used` 引用这些资源。
 
 NodeDescriptor 是唯一权威声明，保存契约、参数、实现、Ruleset 与展示。省略 `rulesets` 或指定 `[]` 都表示未选择 Node 审查规则。默认 Process 项目明确选中 `vibeflow.process`，其中包含无副作用规则；核心不按 flow_kind 隐式补回它。tags/metadata 是供领域规则解释的自由资料，不提供分类继承或权限。
 
@@ -40,36 +31,38 @@ NodeDescriptor 是唯一权威声明，保存契约、参数、实现、Ruleset 
 
 ## 一条规则
 
-```jsonc
-{
-  "kind": "rule", "id": "example.limit",
-  "description": "检查当前范围内的领域约束",
-  "params_schema": {"limit": {"type": "integer", "minimum": 1}},
-  "params_defaults": {"limit": 3},
-  "inputs": {}, "outputs": {"count": "example.count.v1"},
-  "implementations": [{
-    "language": "python",
-    "source": {"kind": "file", "ref": "rules/limit.py", "export": "check"}
-  }]
-}
-```
-
 ```python
+from vibeflow.targets.python.sdk import rule
 from vibeflow.core import Finding
 from vibeflow.core.rules import RuleRecord, RuleResult
 
-
+@rule(
+    id="example.limit", description="检查当前范围内的领域约束",
+    params_schema={"limit": {"type": "integer", "minimum": 1}},
+    params_defaults={"limit": 3}, outputs={"count": "example.count.v1"},
+)
 def check(context, inputs, params):
-    count = len(context.facts["source_context"].nodes)
+    count = len(context.require("source_context").nodes)
     findings = ()
     if count > params["limit"]:
         findings = (Finding(
             code="EXAMPLE.COUNT.EXCEEDED", severity="error",
             subject_type="node", subject_id=context.subject["type_key"],
-            message="当前检查范围内的功能块数量超过限制。",
-            details={"count": count},
+            message="当前检查范围内的功能块数量超过限制。", details={"count": count},
         ),)
     return RuleResult(records={"count": RuleRecord("example.count.v1", count)}, findings=findings)
+```
+
+把 `check` 放入固定插件的 `resources`。JS/TS 使用相同的具名 records：
+
+```ts
+import {defineRule} from "@vibeflow/plugin";
+export const count = defineRule({
+  id: "example.count", outputs: {count: "example.count.v1"},
+  check(context, inputs, params) {
+    return {records: {count: {type_id: "example.count.v1", value: 1}}, findings: []};
+  },
+});
 ```
 
 JavaScript/TypeScript 使用相同的 `check(context, inputs, params)` 顺序，允许 Promise，返回严格 JSON；Map、Date、undefined、非有限数值和循环对象被拒绝，不会悄悄转换；类型契约见发行内核 `targets/javascript/resources/rule_abi.d.ts`。Rule ABI 是 `vibeflow.rule.v1`。正式诊断的 `definition_id` 是稳定规则资源 ID，`code` 是诊断码；一个规则可以产生多种诊断码。`rule_id` 仍是通用 Finding 中诊断码的别名。
@@ -80,17 +73,19 @@ Rule 的 `scope` 默认为 `call`，每个调用分别检查；`source` 用于�
 
 ## Ruleset 与局部覆盖
 
-```jsonc
-{
-  "kind": "ruleset", "id": "example.console_process",
-  "calls": [{"id": "base", "ruleset_id": "vibeflow.process"}],
-  "relations": [{
-    "source": "$self", "target": "base/effects", "kind": "overrides",
-    "params": {"effect_scope": "terminal"}
-  }],
-  "entrypoints": {"static": ["base"], "run": ["base"], "import": ["base"]}
-}
+```python
+from vibeflow.targets.python.sdk import ruleset, RuleCall, RuleRelation
+
+console_process = ruleset(
+    id="example.console_process",
+    calls=[RuleCall(id="base", ruleset_id="vibeflow.process")],
+    relations=[RuleRelation(source="$self", target="base/effects", kind="overrides",
+                            params={"effect_scope": "terminal"})],
+    entrypoints={"static": ["base"], "run": ["base"], "import": ["base"]},
+)
 ```
+
+JS `defineRuleset` 使用同样的 `calls/relations/entrypoints` 字段；字典形式和 Python `RuleCall/RuleRelation` 使用同一 Core 图模型，不另建组合语言。
 
 保持 Node 的 flow_kind 为 process，只把声明的 Ruleset 改成这个组合，就能允许其运行方法访问终端 print。顶层导入约束是另一个调用 `base/imports`，要允许模块初始化行为也需明确覆盖它；运行授权不会自动放开模块初始化。
 
@@ -106,9 +101,9 @@ workflow 和 Nodeset 文件顶层也可选择 `rulesets`，默认 `vibeflow.work
 
 ## 入口、范围与源码归属
 
-import 在实现导入前执行；static 用于正式静态检查；run 保留运行入口所选规则。新领域 Ruleset 未填写 run/import 时，这两个入口为空；未填写 static 时执行其静态组合。选择同包规则不自动开启 compiler/runtime 生命周期插件。
+插件固定定义先加载。import 在后续实现绑定前执行，对于尚未加载的独立延迟实现可以阻止导入；不能撤销插件受信入口及直接导入模块已经发生的初始化。static 用于正式静态检查；run 保留运行入口所选规则。新领域 Ruleset 未填写 run/import 时，这两个入口为空；未填写 static 时执行其静态组合。选择 Ruleset 不创建生命周期实例；选中插件可以同时贡献资源和 compiler/runtime 工厂，工厂仍在各自原生阶段调用。
 
-Workflow 及实际调用的 Nodeset/Loop 也执行所选 import 入口。此时提供已读取的图、声明和当前源码资料，尚未完成的绑定或编译结果不提供；需要这些结果的检查应放入后续入口。import 返回错误、failed 或 unavailable 时停止后续绑定或构建。已经加载但未调用的 Nodeset 仍检查声明和真实可得资料，上下文标记为 `nodeset_definition`，不提供虚构的调用路径。
+Workflow 及实际调用的 Nodeset/Loop 也执行所选 import 入口。此时提供已读取的图、声明和当前源码资料，尚未完成的绑定或编译结果不提供；需要这些结果的检查应放入后续入口。import 返回错误、failed 或 unavailable 时停止后续绑定或构建；报告区分已加载、未加载和未知源码状态。已经加载但未调用的 Nodeset 仍检查声明和真实可得资料，上下文标记为 `nodeset_definition`，不提供虚构的调用路径。
 
 上下文覆盖当前命令实际范围中的声明、调用、实现与相关辅助源码。Python 提供 SourceContext 的符号、导入、helper 引用和归属；JS 提供只读文本、符号、导入与 AST 查询。源码只在本次检查内复用。引用 helper 不等于归属，共享 helper 不继承调用者中最宽权限。
 
@@ -139,31 +134,23 @@ python run.py review-rules --config python_project/configs/main.jsonc --node pro
 python run.py review-rules --config python_project/configs/main.jsonc --output rules.svg
 ```
 
-review-rules 只展开声明和有效计划，不执行业务 Node。
+review-rules 加载选中插件的受信固定定义，再展开有效计划；框架不调用 Rule、Node 或生命周期工厂。
 
 ## 插件包与迁移
 
-```jsonc
-{
-  "kind": "bundle", "id": "example.package",
-  "resources": {
-    "nodes": ["../node.jsonc"],
-    "rules": ["../rule.jsonc"], "rulesets": ["../ruleset.jsonc"]
-  }
-}
-```
+插件导出固定资源列表：Python `Plugin(id="example.package", resources=[MyNode, check, my_rules])`；JS/TS `definePlugin({id: "example.package", resources: [myNode, check, myRules]})`。跨模块定义可以普通导入，只有列入选中插件的资源才注册。配置只影响参数及上下文，不能生成不同契约或规则组合。
 
-引用相对 bundle 文件，实现 file ref 相对项目 root。已有 Catalog 检查 ID 冲突并记录声明来源，不增加自动包发现或全局包管理。
-
-| 0.14 写法 | 0.15 写法 |
+| 旧接入 | 代码插件接入 |
 |---|---|
-| 类内 NODE_INFO/CONTRACT、registry.register 的配置 | JSONC NodeDescriptor；实现只保留调用协议 |
+| JSONC Node/Rule 文件、descriptors 目录和 bundle | SDK 声明与实现，固定插件 resources |
+| registry.py 与项目级注册 | workflow.plugins 显式 source |
+| 类内 NODE_INFO/CONTRACT | @node 声明，类保留 run_pure |
 | flow_kind 或 external 隐式放行 | 显式 Ruleset 与副作用参数 |
-| policy 插件 validate hooks | Rule handler 和 Ruleset 组合 |
-| policy downgrades/exemptions | 局部 overrides 参数或兼容实现替换 |
-| 每个调用手写颜色 | Node presentation 默认，调用 style 按需覆盖 |
+| policy validate hooks | @rule/defineRule 与 Ruleset |
+| 生命周期 module/class 选择 | Plugin/definePlugin 的 compiler/runtime 工厂 |
+| 调用点逐个配置颜色 | Node presentation 默认，调用 style 覆盖 |
 
-Plugin ABI 升为 v2，仅保留 compiler/runtime 生命周期及变换；Workflow ABI v4 和原生执行组合不变。
+Plugin ABI 为 v3，Rule ABI v1 和 Workflow ABI v4 不变。旧登记入口明确报告迁移错误，不继续扫描或加载。
 
 领域示例展示插件包同时贡献完整 Node 和规则的用法：模型功能块乘以 `2`，数据变换节点加 `1`，整个工作流计算 `3 × 2 + 1 = 7`。Node 自己声明展示和规则选择，领域规则通过参数化 tags 识别归属，并以 `model_forward` / `modelForward` 作为明确代码约定；诊断包含错误定义的位置和行号，原生连边负责实际数据传递。
 

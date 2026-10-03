@@ -32,16 +32,12 @@
       {
         "display_name": "Add Pair",
         "description": "Adds the two arithmetic inputs before branch adjustment.",
-
-
         "id": "add_pair",
         "type_used": "semantic.add_pair"
       },
       {
         "display_name": "Scale",
         "description": "Scales calc.sum for both mutually exclusive branch bodies.",
-
-
         "factor": 3,
         "id": "scale",
         "type_used": "semantic.scale"
@@ -49,16 +45,12 @@
       {
         "display_name": "Compare Route",
         "description": "Chooses whether the left or right branch is active.",
-
-
         "id": "compare",
         "type_used": "semantic.compare_gt"
       },
       {
         "display_name": "Left Adjust",
         "description": "Runs only when the left branch is selected.",
-
-
         "bonus": 10,
         "id": "left_adjust",
         "type_used": "semantic.left_adjust"
@@ -66,8 +58,6 @@
       {
         "display_name": "Right Adjust",
         "description": "Runs only when the right branch is selected.",
-
-
         "penalty": 6,
         "id": "right_adjust",
         "type_used": "semantic.right_adjust"
@@ -76,15 +66,12 @@
         "display_name": "Consume Selected Branch",
         "description": "Consumes whichever mutually exclusive branch produced a branch_result value.",
         "join_policy": "any_active",
-
-
         "id": "consume_branch",
         "type_used": "semantic.branch_type_consumer"
       },
       {
         "display_name": "End",
         "description": "Ends after the selected branch result is finalized.",
-
         "id": "end",
         "type_used": "semantic.branch_final_end"
       }
@@ -140,5 +127,14 @@
         "display_name": "Final Result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

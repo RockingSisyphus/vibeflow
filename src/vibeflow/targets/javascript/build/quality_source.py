@@ -68,14 +68,14 @@ def scan_javascript_quality(
     selected = Path(root).expanduser().resolve()
     files = tuple(_iter_source_files(selected, set(excluded_dirs)))
     project_root = selected if selected.is_dir() else selected.parent
-    ownership, _ = (
-        registered_implementation_requests(
-            registered_catalogs,
-            project_root=project_root,
-            selected_files=tuple(str(path) for path in files),
-        )
-        if registered_catalogs is not None else ([], {})
-    )
+    ownership = []
+    catalogs = registered_catalogs if isinstance(registered_catalogs, tuple) else (registered_catalogs,)
+    for catalog in catalogs:
+        if catalog is None:
+            continue
+        rows, _ = registered_implementation_requests(catalog, project_root=project_root,
+            selected_files=tuple(str(path) for path in files))
+        ownership.extend(row for row in rows if row not in ownership)
     facts = run_quality_facts_driver(
         {
             "qualityRoot": str(project_root),

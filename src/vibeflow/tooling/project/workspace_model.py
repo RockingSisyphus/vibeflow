@@ -28,7 +28,6 @@ class WorkspaceRoot:
     config_path: Path
     project_config: Mapping[str, Any]
     project_target: ProjectTarget
-    registry_ref: str = ""
     quality_enabled: bool = True
     quality_structure: QualityStructureLimits = field(
         default_factory=QualityStructureLimits

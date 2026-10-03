@@ -8,7 +8,6 @@
         "description": "Runs start."
       },
       {
-
         "value": 4,
         "id": "left",
         "type_used": "sandbox.branch_left",
@@ -16,7 +15,6 @@
         "description": "Runs left."
       },
       {
-
         "value": 6,
         "id": "right",
         "type_used": "sandbox.branch_right",
@@ -24,23 +22,18 @@
         "description": "Runs right."
       },
       {
-
-
         "id": "sum",
         "type_used": "sandbox.sum_pair",
         "display_name": "Sum",
         "description": "Runs sum."
       },
       {
-
-
         "id": "add",
         "type_used": "sandbox.add_three",
         "display_name": "Add",
         "description": "Runs add."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.out_value_end",
         "display_name": "End",
@@ -80,5 +73,14 @@
         "display_name": "Value Out"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

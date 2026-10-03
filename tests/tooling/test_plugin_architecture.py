@@ -70,16 +70,8 @@ def test_implemented_static_plugin_architecture_uses_only_review_facts(
         tmp_path,
         include_planned=False,
     )
-    source_path.parent.mkdir(exist_ok=True)
-    source_path.write_text("throw new Error('must not be read');\n", encoding="utf-8")
-    original_read_text = Path.read_text
-
-    def guarded_read_text(path: Path, *args, **kwargs):
-        if path.resolve() == source_path.resolve():
-            raise AssertionError("Plugin source was read during architecture review")
-        return original_read_text(path, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "read_text", guarded_read_text)
+    # Loading a trusted fixed SDK declaration is allowed; its runtime factory
+    # must remain untouched during review.
     graph, compiled, registry, resources, error = load_workspace_graph_for_export(
         workflow_path,
         workspace=load_workspace_config(workspace_path),
@@ -88,11 +80,11 @@ def test_implemented_static_plugin_architecture_uses_only_review_facts(
     assert error is None
     resource = resources.to_dict()["plugins"][0]
     assert resource["type"] == "runtime"
-    assert resource["targets"] == ["browser", "node"]
+    assert resource["targets"] == ["python"]
     assert resource["config"] == {"label": "selected", "mode": "audit"}
     assert "implementation" not in resource
-    assert "module" not in resource
-    assert "class" not in resource
+    assert resource["module"] == str(source_path)
+    assert resource["class"] == "runtime"
 
     document = build_architecture_document(
         graph,
@@ -101,11 +93,11 @@ def test_implemented_static_plugin_architecture_uses_only_review_facts(
         resources=resources,
     )
     plugin = document["resources"]["plugins"][0]
-    assert plugin["targets"] == ["browser", "node"]
+    assert plugin["targets"] == ["python"]
     assert plugin["config"] == {"label": "selected", "mode": "audit"}
     assert plugin["priority"] == 20
-    assert "module" not in plugin and "class" not in plugin
-    assert "plugins/runtime_audit.ts" not in json.dumps(document)
+    assert plugin["module"] == "plugins/runtime_audit.py" and plugin["class"] == "runtime"
+    assert "plugins/runtime_audit.py" in json.dumps(document)
 
 
 def test_planned_static_plugin_marks_workspace_and_payload_not_production_ready(
@@ -162,7 +154,7 @@ def test_static_plugins_render_in_mermaid_with_planned_status(
     assert "resource_plugins" in mermaid
     assert "Runtime Audit" in mermaid
     assert "Future Compiler" in mermaid
-    assert "targets: browser, node" in mermaid
+    assert "targets: python" in mermaid
     assert "config: label, mode" in mermaid
     assert "class resource_plugins_1 plannedResource;" in mermaid
 
@@ -207,7 +199,7 @@ def _write_plugin_workspace(
                 "kind": "plugin",
                 "id": "demo.runtime_audit",
                 "type": "runtime",
-                "targets": ["browser", "node"],
+                "targets": ["python"],
                 "display_name": "Runtime Audit",
                 "category": "review",
                 "description": "Audits one workflow invocation.",
@@ -216,7 +208,7 @@ def _write_plugin_workspace(
                 "implementations": [
                     {
                         "language": "typescript",
-                        "targets": ["browser", "node"],
+                        "targets": ["python"],
                         "completion": "immediate",
                         "source": {
                             "kind": "file",
@@ -260,4 +252,17 @@ def _write_plugin_workspace(
         json.dumps({"plugins": plugins, "pipeline": _seed_add_pipeline()}),
         encoding="utf-8",
     )
+    from tests.fixtures.support.code_plugins import migrate_fixture
+    # The actual SDK package is Python; native callbacks are delayed until run.
+    project_document = json.loads((project / "vibeflow_project.jsonc").read_text())
+    project_document["descriptors"].pop("plugins")
+    (project / "vibeflow_project.jsonc").write_text(json.dumps(project_document))
+    migrate_fixture(project)
+    source_path = project / "plugins/runtime_audit.py"
+    source_path.parent.mkdir(exist_ok=True)
+    source_path.write_text('from vibeflow.targets.python.sdk import Plugin\ndef runtime(context):\n    raise AssertionError("runtime factory invoked during review")\nplugin = Plugin(id="demo.runtime_audit", runtime=runtime, priority=20, display_name="Runtime Audit", description="Audits one invocation", config_schema={"type":"object","properties":{"mode":{"type":"string"},"label":{"type":"string"}}},config_defaults={"mode":"audit"})\n')
+    workflow = json.loads(workflow_path.read_text())
+    workflow["plugins"] = [item for item in workflow["plugins"] if item.get("status") == "planned" or item.get("source")]
+    workflow["plugins"].append({"source":{"kind":"file","ref":"plugins/runtime_audit.py"},"config":{"label":"selected"}})
+    workflow_path.write_text(json.dumps(workflow))
     return workspace_path, workflow_path, source_path

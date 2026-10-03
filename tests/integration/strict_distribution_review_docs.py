@@ -22,6 +22,9 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 def built_distribution(tmp_path_factory: pytest.TempPathFactory) -> Path:
     output = tmp_path_factory.mktemp("review-docs") / "distribution"
     build_distribution(output, run_self_check=False)
+    import os
+    toolchain = Path(os.environ["VIBEFLOW_TEST_TOOLCHAIN_ROOT"])
+    (output / "javascript_project/node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
     return output
 
 
@@ -164,7 +167,8 @@ def test_distribution_has_two_isolated_minimal_projects(
     python_config = json.loads((python_project / "vibeflow_project.jsonc").read_text(encoding="utf-8"))
     javascript_config = json.loads((javascript_project / "vibeflow_project.jsonc").read_text(encoding="utf-8"))
     assert python_config["project_target"] == "python"
-    assert set(javascript_config["descriptors"]) == {"nodes", "data_schemas"}
+    assert "descriptors" not in javascript_config
+    assert (javascript_project / "plugins/code_plugin.ts").is_file()
     assert javascript_config["project_target"] == "javascript"
 
     for project in (python_project, javascript_project):
@@ -180,7 +184,7 @@ def test_distribution_has_two_isolated_minimal_projects(
         assert sum(node["id"] == "process_payload" for node in nodes) == 1
         assert (project / "ARCHITECTURE.jsonc").is_file()
     assert not (built_distribution / "sandbox").exists()
-    assert not any((javascript_project / name).exists() for name in ("plugins", "host_extensions", "web"))
+    assert not any((javascript_project / name).exists() for name in ("host_extensions", "web"))
 
 
 def test_minimal_projects_validate_and_python_probe_reports_scope(

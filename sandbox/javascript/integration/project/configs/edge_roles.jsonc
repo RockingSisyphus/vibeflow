@@ -1,6 +1,4 @@
 {
-  // This transfer-only side branch exercises native edge behavior without
-  // selecting the conventional scheduling-path-to-end review constraint.
   "rulesets": [],
   "pipeline": {
     "inputs": [
@@ -23,7 +21,7 @@
         "type_used": "sandbox.fanout_add",
         "display_name": "Seed payload",
         "description": "Adds one to x and transfers the result without scheduling the consumer."
-              },
+      },
       {
         "id": "delay",
         "type_used": "sandbox.terminal",
@@ -35,7 +33,6 @@
         "type_used": "sandbox.edge_poison",
         "display_name": "Produce sentinel",
         "description": "Produces a same-typed sentinel that must not reach the consumer.",
-
         "value": 999
       },
       {
@@ -43,7 +40,7 @@
         "type_used": "sandbox.edge_consume",
         "display_name": "Consume transferred payload",
         "description": "Runs only after poison schedules it, then doubles the seed payload."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -52,12 +49,32 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "seed"},
-      {"from": "start", "to": "delay"},
-      {"from": "seed", "to": "consume", "schedule": false},
-      {"from": "delay", "to": "poison"},
-      {"from": "poison", "to": "consume", "transfer": false},
-      {"from": "consume", "to": "end"}
+      {
+        "from": "start",
+        "to": "seed"
+      },
+      {
+        "from": "start",
+        "to": "delay"
+      },
+      {
+        "from": "seed",
+        "to": "consume",
+        "schedule": false
+      },
+      {
+        "from": "delay",
+        "to": "poison"
+      },
+      {
+        "from": "poison",
+        "to": "consume",
+        "transfer": false
+      },
+      {
+        "from": "consume",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -67,5 +84,14 @@
         "as": "result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

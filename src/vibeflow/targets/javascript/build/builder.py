@@ -201,6 +201,10 @@ def build_aot(request: BuildRequest) -> BuildResult:
             "entryName": entry_name,
             "sourcemap": sourcemap,
             "external": sorted(set(request.external_packages)),
+            "runtimeBindings": [{"module": module, "export": exported} for module, exported in emitted.implementation_bindings]
+                + ([{"module": item.to_value()["module"], "export": item.to_value()["export"]} for item in request.javascript_bindings.host_extensions]
+                   + [{"module": item.implementation.ref, "export": item.implementation.export} for item in request.javascript_bindings.runtime_plugins]
+                   if request.javascript_bindings is not None else []),
             "typecheckFiles": [
                 str(contract_check),
                 *(

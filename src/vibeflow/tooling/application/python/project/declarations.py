@@ -13,50 +13,54 @@ from vibeflow.core.flow import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, STATU
 from vibeflow.targets.python.project.registry import NodeRegistry, NodeRegistryError
 from vibeflow.targets.python.quality.source_context import PythonSourceFile, PythonSourceNode, PythonSourceCall, build_python_source_context
 from vibeflow.tooling.application.python.project.source_preflight import collect_python_source_facts, resolve_local_module_path
-from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+from vibeflow.tooling.project.descriptor_loader import load_workflow_plugins
 
 
-def declared_python_registry(workspace) -> NodeRegistry:
-    """Load every resource identity without executing a registry or Node file."""
+def declared_python_registry(workspace, config_path=None, *, loaded_plugins=None) -> NodeRegistry:
+    """Bind only resources contributed by this workflow's selected plugins."""
+    from vibeflow.core.descriptors.contributions import builtin_contributions, compose_contributions
+    from vibeflow.tooling.project.descriptor_loader import LoadedPlugins
+    loaded = loaded_plugins or (load_workflow_plugins(workspace, config_path) if config_path else
+        LoadedPlugins(compose_contributions((builtin_contributions(),)), {}, (), ()))
     registry = NodeRegistry()
-    catalogs = []
-    locations: dict[str, tuple[Path, str, str, Path]] = {}
-    origins = {}
+    catalog = loaded.catalogs
     source_roots = tuple(root.path for root in workspace.roots if root.project_target == "python")
-    for root in workspace.roots:
-        if root.project_target != "python":
-            continue
-        catalog = load_project_descriptor_catalogs(root.path, project_config=root.config_path)
-        catalogs.append(catalog)
-        for descriptor in catalog.nodes:
-            implementations = tuple(item for item in descriptor.implementations if item.language == "python")
-            if not implementations:
+    locations = {}
+    bindings = {(kind, key): value for (_, kind, key), value in loaded.bindings.items()}
+    resource_roots = {}
+    for group in ("nodes", "rules", "base_libs", "plugins"):
+        for descriptor in getattr(catalog, group):
+            origin = catalog.origins.get((group, descriptor.id))
+            if origin is None or origin.plugin_id == "vibeflow.core":
                 continue
-            if len(implementations) != 1:
-                raise NodeRegistryError(f"node '{descriptor.type_key}' must select one Python implementation")
-            if descriptor.type_key in origins:
-                from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
-                previous = origins[descriptor.type_key]
-                raise WorkspaceConfigError("WORKSPACE.REGISTRY.DUPLICATE_TYPE_KEY",
-                    f"duplicate node type_key '{descriptor.type_key}' from root '{root.id}' ({root.config_path}) conflicts with root '{previous.id}' ({previous.config_path})",
-                    {"path":str(root.config_path), "previous_root":previous.id, "current_root":root.id})
-            origins[descriptor.type_key] = root
-            source = implementations[0].source
-            path = _implementation_path(source.kind, source.ref, root.path, source_roots)
-            symbol = str(source.export or "").strip()
-            if not symbol:
-                raise NodeRegistryError(f"node '{descriptor.type_key}' Python source must name its exported class")
-            location = (path, symbol, root.id, root.path)
-            locations[descriptor.type_key] = location
-            registry.register(descriptor, loader=lambda key=descriptor.type_key: _bind_node(registry, key, source_roots), source=catalog.nodes.source_for(descriptor.type_key))
+            record = next(item for item in loaded.records if item.get("id") == origin.plugin_id)
+            resource_roots[(group, descriptor.id)] = workspace.root_by_id(record["root"])
+    for descriptor in catalog.nodes:
+        implementations = tuple(item for item in descriptor.implementations if item.language == "python")
+        if not implementations:
+            continue
+        if len(implementations) != 1:
+            raise NodeRegistryError(f"node '{descriptor.type_key}' must select one Python implementation")
+        root = resource_roots[("nodes", descriptor.id)]
+        source = implementations[0].source
+        path = _implementation_path(source.kind, source.ref, root.path, source_roots)
+        symbol = str(source.export or "").strip()
+        if not symbol:
+            raise NodeRegistryError(f"node '{descriptor.type_key}' Python source must name its exported class")
+        analysis_root = root.path if path.is_relative_to(root.path) else path.parent
+        locations[descriptor.type_key] = (path, symbol, root.id, analysis_root)
+        registry.register(descriptor, loader=lambda key=descriptor.type_key: _bind_node(registry, key, source_roots),
+                          source=catalog.nodes.source_for(descriptor.type_key), source_line=catalog.origins[("nodes",descriptor.id)].line)
     registry.source_locations = locations
+    registry.resource_roots = resource_roots
+    registry.direct_bindings = bindings
+    registry.loaded_plugins = loaded
     registry.source_root_ids = {root.path:root.id for root in workspace.roots}
     registry.source_roots = source_roots
     registry.source_context_loader = lambda key: collect_node_source_context(registry, (key,))
     registry.rule_handler_loader = lambda plan: _load_rule_handlers(registry, plan, workspace)
-    registry.rule_catalogs = tuple(catalogs)
+    registry.rule_catalogs = (catalog,)
     from vibeflow.targets.python.quality.rule_adapter import selected_effect_scope
-
     registry.rule_policy_resolver = lambda key: selected_effect_scope(registry, key)
     return registry
 
@@ -115,6 +119,10 @@ def collect_node_source_context(registry: NodeRegistry, type_keys: tuple[str, ..
                 module = module[:-9]
             files[fact.path] = PythonSourceFile(fact.path, module, fact.source, getattr(registry, "source_root_ids", {}).get(owner, root_id), fact._tree, fact.parse_error,fact.parse_line,fact.parse_column)
     context = build_python_source_context(nodes, files.values())
+    loaded_paths = {str(Path(filename).resolve()) for module in tuple(sys.modules.values())
+                    if isinstance(filename := getattr(module, "__file__", None), str)}
+    from types import MappingProxyType
+    registry.source_load_states = MappingProxyType({path: "loaded" if path in loaded_paths else "not_loaded" for path in files})
     registry.source_context_snapshot = context
     return context
 
@@ -151,11 +159,14 @@ def _load_rule_handlers(registry, plan, workspace):
         if len(implementations) != 1:
             raise NodeRegistryError(f"rule '{rule.id}' must select one Python implementation")
         source = implementations[0].source
-        owner = next((root for root,catalog in zip(roots,registry.rule_catalogs) if catalog.rules.get(rule.id) == rule and not catalog.rules.source_for(rule.id).startswith("builtin:")), None)
+        direct = getattr(registry, "direct_bindings", {}).get(("rule", rule.id))
+        if direct is not None:
+            handlers[rule.id] = direct
+            continue
+        owner = getattr(registry, "resource_roots", {}).get(("rules", rule.id))
         if owner is None:
-            raise NodeRegistryError(f"rule '{rule.id}' has no declaring Python project")
-        # Trusted rule code has normal process capabilities; Node effect Rules do not sandbox it.
-        manifest = next(catalog.rules.source_for(rule.id) for root,catalog in zip(roots,registry.rule_catalogs) if root is owner)
+            raise NodeRegistryError(f"rule '{rule.id}' has no contributing plugin")
+        manifest = registry.rule_catalogs[0].rules.source_for(rule.id)
         symbol = source.export or rule.handler
         if not symbol:
             raise NodeRegistryError(f"rule '{rule.id}' must name its exported handler")
@@ -167,7 +178,8 @@ def _load_rule_handlers(registry, plan, workspace):
             implementation = {"kind":source.kind,"ref":source.ref,"export":symbol}
             if path is not None or source.kind == "file":
                 implementation["path"] = str(path or (owner.path / source.ref).resolve())
-            raise PythonRuleBindingError(rule.id, manifest, implementation, exc) from exc
+            raise PythonRuleBindingError(rule.id, manifest, implementation, exc,
+                registry.rule_catalogs[0].rules.location_for(rule.id)) from exc
     return handlers
 
 
@@ -196,13 +208,13 @@ def _load_rule_handler(path, symbol, owner, registry):
 
 class PythonRuleBindingError(NodeRegistryError):
     """A declaration-backed Rule implementation could not be loaded."""
-    def __init__(self, rule_id, manifest, implementation, cause):
+    def __init__(self, rule_id, manifest, implementation, cause, location=None):
         from vibeflow.core.findings import HealthFinding
         symbol = implementation["export"]
         message = f"rule '{rule_id}' handler '{symbol}' could not be bound: {cause}"
         self.findings = (HealthFinding(rule_id="RULE.IMPLEMENTATION.LOAD", severity="error",
             object_type="rule", object_id=rule_id, definition_id=rule_id, failure_layer="rule",
-            message=message, source_location={"path":str(manifest),"line":1,"column":1},
+            message=message, source_location=location or {"path":str(manifest)},
             details={"implementation":implementation}),)
         super().__init__(message)
 
@@ -210,12 +222,16 @@ class PythonRuleBindingError(NodeRegistryError):
 def _implementation_path(kind: str, reference: str, root: Path, roots: tuple[Path, ...]) -> Path:
     if kind == "file":
         path = (root / reference).resolve()
-        if not path.is_relative_to(root.resolve()):
-            raise NodeRegistryError("implementation file must remain under its declaring project root")
-    elif kind == "module":
+
+    elif kind in {"module", "package"}:
         path = next((value for candidate in (root, *roots) if (value := resolve_local_module_path(reference, project_root=candidate)) is not None), None)
         if path is None:
-            raise NodeRegistryError(f"cannot resolve declared Python module '{reference}'")
+            import importlib.util
+            with _source_paths((root, *roots)):
+                spec = importlib.util.find_spec(reference)
+            if spec is None or not spec.origin:
+                raise NodeRegistryError(f"cannot resolve declared Python module '{reference}'")
+            path = Path(spec.origin).resolve()
     else:
         raise NodeRegistryError(f"Python implementation source kind '{kind}' is not supported")
     if not path.is_file():
@@ -236,6 +252,9 @@ def _bind_node(registry: NodeRegistry, key: str, roots: tuple[Path, ...]) -> typ
     findings = tuple(item for item in results.findings if item.severity == "error")
     if findings:
         raise PythonSourceRuleError(findings)
+    direct = getattr(registry, "direct_bindings", {}).get(("node", key))
+    if direct is not None:
+        return direct
     path, symbol, _, root = registry.source_locations[key]
     relative = path.relative_to(root).with_suffix("")
     module_name = ".".join(relative.parts)
@@ -263,7 +282,7 @@ def _bind_node(registry: NodeRegistry, key: str, roots: tuple[Path, ...]) -> typ
         error = NodeRegistryError(f"node '{key}' implementation '{symbol}' could not be bound: {exc}")
         error.findings = (HealthFinding(rule_id="NODE.IMPLEMENTATION.BINDING",severity="error",
             object_type="node",object_id=key,failure_layer="implementation",message=str(error),
-            source_location={"path":registry.source_info(key).path,"line":1,"column":1},
+            source_location={"path":registry.source_info(key).path, **({"line":registry.source_info(key).line} if registry.source_info(key).line else {})},
             details={"implementation":{"path":str(path),"export":symbol}}),)
         raise error from exc
     return implementation

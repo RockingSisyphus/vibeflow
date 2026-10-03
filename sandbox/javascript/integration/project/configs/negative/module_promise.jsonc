@@ -20,7 +20,7 @@
         "type_used": "sandbox.invalid.module_promise",
         "display_name": "module promise",
         "description": "This negative fixture must fail during the JavaScript project audit."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -46,5 +46,14 @@
         "as": "result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

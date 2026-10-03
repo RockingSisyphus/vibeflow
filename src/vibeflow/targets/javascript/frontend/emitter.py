@@ -280,7 +280,7 @@ def _implementation_imports(
     expressions = {
         binding: (
             f"{namespaces[module]}"
-            f"[{json.dumps(exported, ensure_ascii=False)}]"
+            + "".join(f"[{json.dumps(part, ensure_ascii=False)}]" for part in exported.split("."))
         )
         for (module, exported), binding in bindings.items()
     }
@@ -304,7 +304,7 @@ def _host_extension_imports(
             f"{json.dumps(module, ensure_ascii=False)};"
         )
         factories.append(
-            f"{namespace}[{json.dumps(exported, ensure_ascii=False)}]"
+            namespace + "".join(f"[{json.dumps(part, ensure_ascii=False)}]" for part in exported.split("."))
         )
     return lines, factories
 
@@ -350,7 +350,7 @@ def _runtime_plugin_imports(
             f"{json.dumps(module, ensure_ascii=False)};"
         )
         factories.append(
-            f"{namespace}[{json.dumps(exported, ensure_ascii=False)}]"
+            namespace + "".join(f"[{json.dumps(part, ensure_ascii=False)}]" for part in exported.split("."))
         )
     return lines, factories
 

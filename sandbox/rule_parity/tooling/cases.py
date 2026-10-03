@@ -96,8 +96,10 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         ("host_enabled", {"host_extensions": [{"id": "parity.host", "enabled": "yes"}]}, "CONFIG.SCHEMA.HOST_EXTENSION_ENABLED"),
         ("host_duplicate", {"host_extensions": ["parity.host", "parity.host"]}, "CONFIG.SCHEMA.HOST_EXTENSION_DUPLICATE"),
     ]:
-        emit(name, {**pipeline(), **extra}, (code,), family="config.resources")
-    emit("resources.normal", {**pipeline(), "plugins": ["parity.plugin"], "host_extensions": ["parity.host"],
+        if variant == "current" and name == "plugin_object":
+            code = "PLUGIN.SELECTION.MIGRATION"
+        emit(name, {**pipeline(), **extra}, (code,), family="config.resources", classification="approved_change" if name == "plugin_object" and variant == "current" else "preserved")
+    emit("resources.normal", {**pipeline(), "plugins": ([{"source":{"kind":"file","ref":"plugin.py"}}] if variant == "current" else ["parity.plugin"]), "host_extensions": ["parity.host"],
                              "base_lib": {"paths": ["support"], "modules": ["support.math"]}, "global_config": {"values": {"size": 1}}}, family="config.resources")
     io = {**NODE, "type_used": "vibeflow.io", "requires": [],
           "provides": [{"key": "value", "type": "parity.value", "display_name": "Value"}], "io": {"operation": "receive"}}

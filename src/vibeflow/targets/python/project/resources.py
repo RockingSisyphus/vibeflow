@@ -116,6 +116,8 @@ class PluginResource:
     root_path: str = ""
     source_path: str = ""
     rulesets: tuple[str, ...] = ()
+    targets: tuple[str, ...] = ("python",)
+    config: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="plugin.rulesets"))
@@ -134,6 +136,9 @@ class PluginResource:
             "version": self.version,
             "config_keys": list(self.config_keys),
             "rulesets": list(self.rulesets),
+            "targets": list(self.targets),
+            "priority": self.priority,
+            "config": dict(self.config),
         }
         if self.info is not None:
             payload["info"] = self.info.to_dict()
@@ -160,6 +165,9 @@ class BaseLibRegistry:
         category: str = "",
         version: str = "",
         rulesets: tuple[str, ...] = (),
+        root_id: str = "",
+        root_path: str = "",
+        source_path: str = "",
     ) -> None:
         resource_id = _required_id(id, "base_lib id")
         if resource_id in self._resources:
@@ -173,6 +181,7 @@ class BaseLibRegistry:
             description=str(description).strip(),
             version=str(version).strip(),
             rulesets=rulesets,
+            root_id=root_id, root_path=root_path, source_path=source_path,
         )
 
     def get(self, id: str) -> BaseLibResource | None:
@@ -204,6 +213,9 @@ class PluginResourceRegistry:
         config_defaults: Mapping[str, Any] | None = None,
         priority: int = 100,
         rulesets: tuple[str, ...] = (),
+        root_id: str = "",
+        root_path: str = "",
+        source_path: str = "",
     ) -> None:
         resource_id = _required_id(id, "plugin id")
         if resource_id in self._resources:
@@ -221,6 +233,7 @@ class PluginResourceRegistry:
             version=str(version).strip(),
             config_schema=dict(config_schema or {}), config_defaults=dict(config_defaults or {}), priority=priority,
             rulesets=rulesets,
+            root_id=root_id, root_path=root_path, source_path=source_path,
         )
 
     def get(self, id: str) -> PluginResource | None:

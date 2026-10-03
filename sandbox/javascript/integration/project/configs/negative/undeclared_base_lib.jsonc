@@ -20,7 +20,7 @@
         "type_used": "sandbox.invalid.undeclared_base_lib",
         "display_name": "Undeclared base_lib import",
         "description": "Must fail because the imported base_lib is not in the node descriptor allowlist."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -29,8 +29,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "invalid"},
-      {"from": "invalid", "to": "end"}
+      {
+        "from": "start",
+        "to": "invalid"
+      },
+      {
+        "from": "invalid",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -40,5 +46,14 @@
         "as": "result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }
