@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.invalid.long_lived_listener",
   "display_name": "Invalid long-lived listener",
-  "category": "sandbox-negative",
   "description": "Registers a long-lived host listener from a normal node.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -48,5 +50,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox-negative"
+  ]
 }

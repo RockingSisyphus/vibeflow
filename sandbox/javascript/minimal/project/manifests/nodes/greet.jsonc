@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "example.greet",
   "display_name": "Build greeting",
-  "category": "example",
   "description": "Builds a greeting from a name and an injected clock.",
   "version": "1.0.0",
   "flow_kind": "terminal",
@@ -65,5 +67,8 @@
         "now"
       ]
     }
+  ],
+  "tags": [
+    "example"
   ]
 }

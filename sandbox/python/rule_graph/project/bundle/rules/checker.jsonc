@@ -20,9 +20,6 @@
   "implementations": [
     {
       "language": "python",
-      "targets": [
-        "python"
-      ],
       "source": {
         "kind": "file",
         "ref": "rules/checker.py",

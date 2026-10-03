@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.branch_right",
   "display_name": "Branch Right",
-  "category": "sandbox",
   "description": "Produces the right value for a free branch.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [],

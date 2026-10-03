@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "example.seed",
   "display_name": "Seed",
-  "category": "example",
   "description": "Produces the initial value for the example workflow.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "example"
+  ],
   "external": false,
   "contract": {
     "requires": [],

@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.resource_scale",
   "display_name": "Resource Scale",
-  "category": "sandbox",
   "description": "Scales calc.resource by a configured factor for nodeset config propagation tests.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

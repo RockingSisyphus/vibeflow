@@ -6,7 +6,7 @@ from pathlib import Path
 
 def node_document(*, type_key="demo.node", class_name="DemoNode", contract=None, rulesets=None):
     return {
-        "kind": "node", "type_key": type_key, "display_name": "Demo", "category": "demo",
+        "kind": "node", "type_key": type_key, "display_name": "Demo",
         "description": "A fixture Node with one declared result.", "version": "1.0", "flow_kind": "process",
         "rulesets": ["vibeflow.process"] if rulesets is None else rulesets,
         "contract": contract if contract is not None else {

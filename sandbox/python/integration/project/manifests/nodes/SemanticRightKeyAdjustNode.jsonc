@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.right_key_adjust",
   "display_name": "Semantic Right Key Adjust",
-  "category": "semantic",
   "description": "Subtracts a configured penalty and exposes the result with the calc.right_branch data type.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

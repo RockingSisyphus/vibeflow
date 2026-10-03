@@ -240,8 +240,10 @@ class PluginReviewRecord:
     category: str = ""
     description: str = ""
     version: str = ""
+    rulesets: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        object.__setattr__(self,"rulesets",_string_tuple(self.rulesets,field_name="plugin review rulesets"))
         object.__setattr__(
             self,
             "config",
@@ -266,6 +268,7 @@ class PluginReviewRecord:
             "category": self.category,
             "description": self.description,
             "version": self.version,
+            "rulesets": list(self.rulesets),
         }
 
 
@@ -347,6 +350,7 @@ def review_plugin_selections(
                     selection.version
                     or (descriptor.version if descriptor is not None else "")
                 ),
+                rulesets=descriptor.rulesets if descriptor is not None else (),
             )
         )
     return tuple(records)

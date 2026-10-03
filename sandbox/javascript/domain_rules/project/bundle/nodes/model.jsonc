@@ -2,7 +2,6 @@
   "kind": "node",
   "type_key": "example.model",
   "display_name": "Model",
-  "category": "model_block",
   "description": "One explicitly named function block.",
   "version": "0.15.0",
   "flow_kind": "process",
@@ -45,5 +44,16 @@
         "export": "run"
       }
     }
+  ],
+  "rulesets": [
+    "vibeflow.process",
+    "example.model_domain"
+  ],
+  "presentation": {
+    "fill": "#cceeff",
+    "shape": "rect"
+  },
+  "tags": [
+    "model_block"
   ]
 }

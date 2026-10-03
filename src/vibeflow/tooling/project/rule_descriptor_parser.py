@@ -4,21 +4,20 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from vibeflow.core.descriptors.models import DescriptorModelError
+from vibeflow.core.descriptors.models import DescriptorModelError, RuleImplementationDescriptor, SourceLocator
 from vibeflow.core.rules.models import RuleCall, RuleDescriptor, RuleRelation, RulesetDescriptor
 from vibeflow.tooling.project.descriptor_values import (
-    check_fields, mapping_or_empty, object_list, optional_string, required_string, string_list,
+    check_fields, mapping_or_empty, object_list, optional_string, required_string, string_list, required_mapping,
 )
 
 
 def parse_rule(data: Mapping[str, Any]) -> RuleDescriptor:
-    from vibeflow.tooling.project.descriptor_parser import _parse_implementations
     check_fields(data, allowed={"kind", "id", "display_name", "description", "implementations", "inputs", "outputs", "params_schema", "params_defaults", "handler", "scope"}, field="rule")
     return _construct(RuleDescriptor,
         id=required_string(data.get("id"), field="rule.id"),
         display_name=optional_string(data.get("display_name")),
         description=optional_string(data.get("description")),
-        implementations=_parse_implementations(data.get("implementations", ()), field="rule.implementations", default_export="check"),
+        implementations=_parse_rule_implementations(data.get("implementations", ())),
         inputs=mapping_or_empty(data.get("inputs"), field="rule.inputs"),
         outputs=mapping_or_empty(data.get("outputs"), field="rule.outputs"),
         params_schema=mapping_or_empty(data.get("params_schema"), field="rule.params_schema"),
@@ -26,6 +25,23 @@ def parse_rule(data: Mapping[str, Any]) -> RuleDescriptor:
         handler=optional_string(data.get("handler")),
         scope=optional_string(data.get("scope")) or "call",
     )
+
+
+def _parse_rule_implementations(value: object) -> tuple[RuleImplementationDescriptor, ...]:
+    implementations = []
+    for index, item in enumerate(object_list(value, field="rule.implementations")):
+        field = f"rule.implementations[{index}]"
+        check_fields(item, allowed={"language", "source"}, field=field)
+        source = required_mapping(item.get("source"), field=f"{field}.source")
+        check_fields(source, allowed={"kind", "ref", "export"}, field=f"{field}.source")
+        implementations.append(RuleImplementationDescriptor(
+            language=required_string(item.get("language"), field=f"{field}.language"),
+            source=SourceLocator(
+                kind=required_string(source.get("kind"), field=f"{field}.source.kind"),
+                ref=required_string(source.get("ref"), field=f"{field}.source.ref"),
+                export=optional_string(source.get("export")) or "check"),
+        ))
+    return tuple(implementations)
 
 
 def parse_ruleset(data: Mapping[str, Any]) -> RulesetDescriptor:

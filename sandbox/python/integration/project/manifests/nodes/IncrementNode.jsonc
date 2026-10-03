@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.increment",
   "display_name": "Increment",
-  "category": "sandbox",
   "description": "Increments value.in by one.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.loop_done",
   "display_name": "Semantic Loop Done",
-  "category": "semantic",
   "description": "Compares loop.next with target and emits loop.done for loop routing.",
   "version": "0.1.0",
   "flow_kind": "decision",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

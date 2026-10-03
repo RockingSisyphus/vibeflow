@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.audit_store",
   "display_name": "审计请求数据存储",
-  "category": "sandbox",
   "description": "构造一条需要持久化的审计请求；在新内核中它只是数据存储形状的纯节点，不直接访问文件、数据库或网络。",
   "version": "0.1.0",
   "flow_kind": "data_store",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

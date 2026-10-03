@@ -34,7 +34,7 @@ from vibeflow.core.descriptors.models import (
     SourceLocator,
 )
 from vibeflow.core.config.node import normalize_node_config_spec
-from vibeflow.core.descriptors.categories import ContributionBundle, NodeCategoryDescriptor
+from vibeflow.core.descriptors.bundles import ContributionBundle
 from vibeflow.core.rules.models import RuleDescriptor, RulesetDescriptor
 
 
@@ -49,7 +49,6 @@ def parse_descriptor_manifest(
     | CapabilityDescriptor
     | HostExtensionDescriptor
     | PluginDescriptor
-    | NodeCategoryDescriptor
     | ContributionBundle
     | RuleDescriptor
     | RulesetDescriptor
@@ -76,7 +75,6 @@ def parse_descriptor_manifest(
         "capability": _parse_capability,
         "host_extension": _parse_host_extension,
         "plugin": _parse_plugin,
-        "node_category": _parse_category,
         "bundle": _parse_bundle,
     }
     try:
@@ -96,7 +94,6 @@ def _parse_node(data: Mapping[str, Any]) -> NodeDescriptor:
             "kind",
             "type_key",
             "display_name",
-            "category",
             "description",
             "version",
             "flow_kind",
@@ -120,7 +117,6 @@ def _parse_node(data: Mapping[str, Any]) -> NodeDescriptor:
             data.get("display_name"),
             field="node.display_name",
         ),
-        category=_optional_string(data.get("category")),
         description=_required_string(
             data.get("description"),
             field="node.description",
@@ -145,21 +141,9 @@ def _parse_node(data: Mapping[str, Any]) -> NodeDescriptor:
         capabilities=_parse_capability_requirements(
             data.get("capabilities", ()),
         ),
-        rulesets=_string_list(data["rulesets"], field="node.rulesets") if "rulesets" in data else None,
+        rulesets=_string_list(data.get("rulesets", ()), field="node.rulesets"),
         presentation=_mapping_or_empty(data.get("presentation"), field="node.presentation"),
         metadata=_mapping_or_empty(data.get("metadata"), field="node.metadata"),
-    )
-
-
-def _parse_category(data: Mapping[str, Any]) -> NodeCategoryDescriptor:
-    _check_fields(data, allowed={"kind", "id", "display_name", "description", "default_rulesets", "presentation", "metadata"}, field="category")
-    return NodeCategoryDescriptor(
-        id=_required_string(data.get("id"), field="category.id"),
-        display_name=_optional_string(data.get("display_name")),
-        description=_optional_string(data.get("description")),
-        default_rulesets=_string_list(data.get("default_rulesets", ()), field="category.default_rulesets"),
-        presentation=_mapping_or_empty(data.get("presentation"), field="category.presentation"),
-        metadata=_mapping_or_empty(data.get("metadata"), field="category.metadata"),
     )
 
 
@@ -362,6 +346,7 @@ def _parse_base_lib(data: Mapping[str, Any]) -> BaseLibDescriptor:
     _check_fields(
         data,
         allowed={
+            "rulesets",
             "kind",
             "id",
             "display_name",
@@ -375,6 +360,7 @@ def _parse_base_lib(data: Mapping[str, Any]) -> BaseLibDescriptor:
         field="base_lib",
     )
     return BaseLibDescriptor(
+        rulesets=_string_list(data.get("rulesets", ()), field="base_lib.rulesets"),
         id=_required_string(data.get("id"), field="base_lib.id"),
         display_name=_required_string(
             data.get("display_name"),
@@ -493,6 +479,7 @@ def _parse_host_extension(
     _check_fields(
         data,
         allowed={
+            "rulesets",
             "kind",
             "id",
             "targets",
@@ -507,6 +494,7 @@ def _parse_host_extension(
         field="host_extension",
     )
     return HostExtensionDescriptor(
+        rulesets=_string_list(data.get("rulesets", ()), field="host_extension.rulesets"),
         id=_required_string(
             data.get("id"),
             field="host_extension.id",
@@ -541,6 +529,7 @@ def _parse_plugin(data: Mapping[str, Any]) -> PluginDescriptor:
     _check_fields(
         data,
         allowed={
+            "rulesets",
             "kind",
             "id",
             "type",
@@ -567,6 +556,7 @@ def _parse_plugin(data: Mapping[str, Any]) -> PluginDescriptor:
     if isinstance(raw_priority, bool) or not isinstance(raw_priority, int):
         raise DescriptorModelError("plugin.priority must be an integer")
     return PluginDescriptor(
+        rulesets=_string_list(data.get("rulesets", ()), field="plugin.rulesets"),
         id=_required_string(data.get("id"), field="plugin.id"),
         plugin_type=_required_string(data.get("type"), field="plugin.type"),
         targets=_string_list(data.get("targets"), field="plugin.targets"),

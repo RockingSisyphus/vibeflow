@@ -123,7 +123,7 @@ def test_graph_compiler_accepts_language_neutral_node_catalog() -> None:
             NodeDescriptor(
                 type_key="example.end",
                 display_name="End",
-                category="example",
+
                 description="Ends the workflow.",
                 version="1.0.0",
                 flow_kind="terminal",

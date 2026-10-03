@@ -23,7 +23,7 @@ from vibeflow.targets.python.runtime.support.portable_adapter import build_workf
 
 
 _TerminalNode_DECLARATION = NodeDescriptor(
-    'test.terminal', 'Terminal', 'test', 'Starts or ends a flow.', '1', 'terminal',
+    'test.terminal', 'Terminal', 'Starts or ends a flow.', '1', 'terminal',
     contract=NodeContractDescriptor(params_schema={}, params_defaults={}),
     rulesets=(),
 )
@@ -36,7 +36,7 @@ class _TerminalNode:
 
 
 _StepNode_DECLARATION = NodeDescriptor(
-    'test.step', 'Step', 'test', 'Updates a loop value.', '1', 'process',
+    'test.step', 'Step', 'Updates a loop value.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('value.current', 'exactly_one', display_name='value.current'),), provides=(DataProvider('value.next', 'value.next', display_name='value.next'), DataProvider('loop.done', 'loop.done', display_name='loop.done')), params_schema={'delta': {'type': 'number'}}, params_defaults={'delta': 1}, input_semantics={'value.current': ('Conformance input value.current.',)}, output_semantics={'value.next': ('Conformance output value.next.',), 'loop.done': ('Conformance output loop.done.',)}),
     rulesets=('vibeflow.process',),
 )
@@ -49,7 +49,7 @@ class _StepNode:
 
 
 _GlobalStateNode_DECLARATION = NodeDescriptor(
-    'test.global_state', 'Global State', 'test', 'Changes audited ambient state.', '1', 'global_state',
+    'test.global_state', 'Global State', 'Changes audited ambient state.', '1', 'global_state',
     contract=NodeContractDescriptor(params_schema={}, params_defaults={}),
     rulesets=('vibeflow.global_state',),
 )

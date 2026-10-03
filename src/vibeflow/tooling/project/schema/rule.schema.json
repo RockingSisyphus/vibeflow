@@ -57,7 +57,24 @@
     "implementations": {
       "type": "array",
       "items": {
-        "$ref": "node.schema.json#/$defs/implementation"
+        "type": "object",
+        "required": [
+          "language",
+          "source"
+        ],
+        "properties": {
+          "language": {
+            "enum": [
+              "python",
+              "javascript",
+              "typescript"
+            ]
+          },
+          "source": {
+            "$ref": "node.schema.json#/$defs/implementation/properties/source"
+          }
+        },
+        "additionalProperties": false
       }
     }
   },

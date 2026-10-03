@@ -5,7 +5,7 @@ from tests.fixtures.support.strict_support import *
 CliExternalNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.cli_external",
         display_name="CLI External",
-        category="test",
+
         description="Exercises workspace registry metadata during CLI export.",
         version="0.1.0",
         flow_kind="process",

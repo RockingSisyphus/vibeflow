@@ -114,6 +114,7 @@ def _inline_plugin_resource(spec: Mapping[str, object], *, module: str, class_na
         description=metadata["description"],
         version=metadata["version"],
         config_keys=config_keys,
+        rulesets=spec.get("rulesets", ()),
     )
 
 

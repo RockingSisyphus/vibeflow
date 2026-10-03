@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Mapping
 
 from vibeflow.tooling.project.resource_helpers import _finding
-from vibeflow.core.constants import EFFECT_SCOPE_TRUSTED
+from vibeflow.core.descriptors.models import _string_tuple
 from vibeflow.core.flow import STATUS_IMPLEMENTED, STATUS_PLANNED
 from vibeflow.core.findings import HealthFinding
 
@@ -32,6 +32,10 @@ class HostExtensionResource:
     root_id: str = ""
     root_path: str = ""
     source_path: str = ""
+    rulesets: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="host_extension.rulesets"))
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -45,7 +49,7 @@ class HostExtensionResource:
             "provides": list(self.provides),
             "dependencies": list(self.dependencies),
             "config_keys": sorted(self.config),
-            "effect_scope": EFFECT_SCOPE_TRUSTED,
+            "rulesets": list(self.rulesets),
         }
         if self.root_id:
             payload["root_id"] = self.root_id
@@ -347,6 +351,7 @@ def _resolved_resource(
         targets=contract["targets"],
         provides=contract["provides"],
         dependencies=contract["dependencies"],
+        rulesets=tuple(getattr(descriptor, "rulesets", ())),
         source_path=descriptor_source or resource.source_path,
     )
 

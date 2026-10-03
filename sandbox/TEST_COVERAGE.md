@@ -1,14 +1,18 @@
-# Rule、Ruleset、Node 分类与插件沙箱验收
+# Rule、Ruleset、Node 声明与插件沙箱验收
 
 沙箱分为可直接运行的项目和基于临时副本的自动测试。正常项目不会混入故意无效的声明；自动测试在副本中制造失败，检查正式命令的诊断、退出码、导入边界和发布行为。
 
 这里的覆盖范围是当前公开契约及已确定的验收场景，不表示能穷举任意插件代码。Rule 是受信代码；只读上下文测试验证共享资料不会被普通 API 修改，不把它当成操作系统沙箱。
 
+原矩阵侧重新 API 的功能验收。[f169429 基线能力盘点](../docs/design/baseline-rule-inventory.md) 和 [两版本对照沙箱](rule_parity/README.md) 补充了旧源码审查保留能力，既检测漏报，也检测误拒。修复前的 51 项不匹配保留在 [历史对照结果](rule_parity/RESULTS.md)；当前 1219 项均通过，完整门禁直接运行这组检测。
+
+[第二轮覆盖审计](../docs/design/baseline-rule-coverage-second-audit.md) 发现了规则选择范围、JS records 运输/动态导入资料、公开规则与正式入口等缺口。[持久补测](rule_gaps/README.md) 保留合法对照、真实数值、状态与来源；修复前 68 项不匹配保留在 [历史补测记录](rule_gaps/RESULTS.md)。当前新增 205 项均通过。两组共 1424 项的实际观察、27 个主题与修复或批准迁移的对应见 [机器报告](rule_repair_report.json) 和 [修复验收](../docs/design/rule-system-repair-results.md)。
+
 ## 可运行项目
 
 | 项目 | 业务与接入方式 |
 | --- | --- |
-| `python/domain_rules`、`javascript/domain_rules` | bundle 注册模型功能块和数据变换分类、Node、领域 Rule/Ruleset；原生工作流计算 `3 × 2 + 1 = 7` |
+| `python/domain_rules`、`javascript/domain_rules` | bundle 注册模型功能块和数据变换 Node、领域 Rule/Ruleset；Node 声明自己的规则与展示，原生工作流计算 `3 × 2 + 1 = 7` |
 | `python/rule_graph`、`javascript/rule_graph` | 两个普通语言 Rule 模块通过 JSONC `requires` 自动传递具名 typed records；共享、嵌套与替换规则资源可单独检查 |
 | `python/integration` | Python 原生执行、路由、Nodeset、Loop、副作用授权及完整 CLI 回归 |
 | `javascript/integration` | TypeScript AOT、分支、Nodeset、Loop、插件生命周期、Capability、Host Extension、Node/browser 真实执行 |
@@ -27,9 +31,11 @@
 | JS 公开源码 API | 真实 TS Rule 调用 `text/ast/nodes/symbols/imports/reachable/ownership`；精确位置与 helper 归属；两个 Rule 尝试修改上下文、AST、查询结果及依赖输入，后续资料保持正确 | `tests/targets/javascript/test_rule_source_api.py` |
 | 领域错误进入正式流程 | 模型允许位置、普通变换和 helper 的非法定义、共享源码归属；JSON/text 诊断、规则 ID、文件/行号、退出码；review 失败保留已有正式文件 | 两个 Target 的 `test_domain_rules.py` |
 | 权限由规则选择决定 | 默认 Process 拒绝终端输出；相同 `flow_kind` 通过 Ruleset/覆盖允许输出；显式 `[]` 如实报告未约束；真实 stdout 和业务结果 | 两个 Target 的 `test_domain_rules.py`；Python `test_delegate_rule_permissions.py` 补充委托场景 |
-| 正式业务 SVG | 两个 Target 实际 Mermaid/浏览器渲染；分类/Node/状态/调用样式顺序；浅蓝模型、绿色变换、形状、图标、原生身份与规则选择；Architecture 保存展示来源与分类元数据 | `tests/integration/test_domain_svg_sandbox.py` |
+| 正式业务 SVG | 两个 Target 实际 Mermaid/浏览器渲染；原生/Node/状态/调用样式顺序；浅蓝模型、绿色变换、形状、图标、原生身份与规则选择；Architecture 保存展示来源和 Node tags/metadata | `tests/integration/test_domain_svg_sandbox.py` |
 | 正式规则 SVG | `review-rules` 生成真实 SVG；依赖/覆盖边、参数来源、实例来源；实现文件主动抛异常仍能展示声明图，证明未执行业务或 Rule 实现 | 同上 |
 | 完整交付 | 仓库独立质量、全部 pytest、两 Target 集成、浏览器、wheel 隔离、两个发行 profile 及真实发行入口 | `tools/verify_project.py --full` |
+| 基线审查保留 | 通用阈值/依赖/结构、原生事实、配置/声明模型、Python Node/helper/BaseLib 与真实源码指标、JS Node/BaseLib/Plugin/Host 的正式入口和 worker；包含数值边界、语法变体、遮蔽、所有权与嵌套调用；批准迁移及正式不可达分支单独说明 | `sandbox/rule_parity/run_all.py`，独立执行并报告失败；比较器的 pytest 只验证报告机制 |
+| 第二轮接口与组合补齐 | Node 规则范围、records 真实性、导入边/位置、跨 Target/跨 root、非法声明运输、替换来源、公开 leaf、平台入口、原生 bundle 组、缓存及 findings；领域分支/Nodeset/Loop 的真实业务与 SVG | `sandbox/rule_gaps/run_all.py`，独立执行并报告不匹配；`tests/integration/test_rule_gaps_reporting.py` 只验证报告可靠性 |
 
 Python 的模型定义约定是声明类中的 `model_forward`；TS 示例允许实现文件的 `modelForward`。领域判断由各自插件实现，测试不会把这两种语言约定强行混成一种。
 
@@ -68,3 +74,20 @@ VIBEFLOW_MERMAID_RENDERER_ROOT=/path/to/renderer \
 ```
 
 测试默认使用临时工作区。检查范围仍遵循各命令的当前配置、已使用实现及其源码闭包，不增加孤立源码扫描或持久检查资格。
+
+基线 current-only 对照和新接口沙箱已接入完整门禁；独立重跑如下。历史观察冻结，不匹配及观察错误均返回非零：
+
+```bash
+python sandbox/rule_parity/run_all.py \
+  --current-only \
+  --work /tmp/vibeflow-rule-parity-run \
+  --report /tmp/vibeflow-rule-parity-run.json
+```
+
+第二轮接口与组合补测单独执行，按锁文件准备工具链和实际 SVG 渲染器；存在当前实现问题时返回非零：
+
+```bash
+npm_config_cache=/tmp/vibeflow-npm-cache python sandbox/rule_gaps/run_all.py \
+  --work /tmp/vibeflow-rule-gaps-run \
+  --report /tmp/vibeflow-rule-gaps-run.json
+```

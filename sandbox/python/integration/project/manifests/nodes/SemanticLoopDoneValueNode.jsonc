@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.loop_done_value",
   "display_name": "Semantic Loop Done Value",
-  "category": "semantic",
   "description": "Compares loop.next with target and emits loop.done as data for while-loop stop_when.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

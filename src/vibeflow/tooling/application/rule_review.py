@@ -8,7 +8,6 @@ import json
 from pathlib import Path
 from typing import Mapping
 
-from vibeflow.core.descriptors.categories import selected_node_rulesets
 from vibeflow.core.rules import RuleGraphError, compile_ruleset
 from vibeflow.core.rules.builtin import builtin_rule_resources
 from vibeflow.tooling.project.config_loader import load_config_document, load_workspace_config_document
@@ -30,24 +29,19 @@ def effective_rule_plans(config: Path, *, workspace=None, node_path: str = "", p
     rulesets = {item.id: item for item in builtin_sets}
     _merge_definitions(rules, catalogs.rules, "Rule")
     _merge_definitions(rulesets, catalogs.rulesets, "Ruleset")
-    # Keep the complete workspace for sibling resolution, without scanning unused source.
-    if workspace:
-        for root in workspace.roots:
-            if root.path == project_config.parent:
-                continue
-            sibling = load_project_descriptor_catalogs(root.path, project_config=root.config_path)
-            _merge_definitions(rules, sibling.rules, "Rule")
-            _merge_definitions(rulesets, sibling.rulesets, "Ruleset")
-            for category in sibling.categories:
-                existing = catalogs.categories.get(category.id)
-                if existing is None:
-                    catalogs.categories.register(category, source=sibling.categories.source_for(category.id))
-                elif existing != category:
-                    raise ValueError(f"conflicting category declaration '{category.id}'")
-            for descriptor in sibling.nodes:
-                if catalogs.nodes.get(descriptor.id) is not None:
-                    raise ValueError(f"duplicate Node declaration '{descriptor.id}' in workspace")
-                catalogs.nodes.register(descriptor, source=sibling.nodes.source_for(descriptor.id))
+    if owner.project_target == "python":
+        from vibeflow.tooling.application.python.rule_defaults import declared_rule_resources
+        active_workspace = workspace or load_project_workspace(project_config)
+        registry, rules, rulesets = declared_rule_resources(active_workspace)
+        for key in registry.available():
+            if catalogs.nodes.get(key) is None:
+                catalogs.nodes.register(registry.descriptor(key), source=registry.source_info(key).path)
+        for registered in registry.rule_catalogs:
+            for kind in ("base_libs", "plugins", "host_extensions"):
+                destination, source = getattr(catalogs,kind), getattr(registered,kind)
+                for descriptor in source:
+                    if destination.get(descriptor.id) is None:
+                        destination.register(descriptor,source=source.source_for(descriptor.id))
     defaults = _project_rule_defaults(owner, document=document, workspace=workspace)
     for rule_id, params in defaults.items():
         rule = rules[rule_id]
@@ -63,15 +57,21 @@ def effective_rule_plans(config: Path, *, workspace=None, node_path: str = "", p
         descriptor = catalogs.nodes.get(type_key)
         if descriptor is None:
             continue
-        selection = selected_node_rulesets(descriptor, catalogs.categories)
+        selection = descriptor.rulesets
         plans = []
         for selected in selection:
             if selected not in rulesets:
                 raise RuleGraphError("RULE.RESOURCE.UNKNOWN", f"unknown ruleset '{selected}'")
             plans.append(compile_ruleset(rulesets[selected], rules=rules, rulesets=rulesets, entrypoint=phase).to_dict())
-        output.append({"call": path, "type_key": type_key, "category": descriptor.category,
-                       "selection_source": "node" if descriptor.rulesets is not None else "category",
+        output.append({"call": path, "type_key": type_key,
+                       "selection_source": "node",
                        "rulesets": list(selection), "constraint_state": "selected" if selection else "unconstrained", "plans": plans})
+    reached_libraries = set()
+    if owner.project_target == "python":
+        from vibeflow.tooling.application.python.rule_defaults import reached_library_ids
+        reached_libraries = reached_library_ids(registry, {call.get("type_used") for _, call in calls if call.get("status") != "planned"})
+    resources = _resource_plans(catalogs, calls=calls, data=document.data, project=owner.project_config,
+        rules=rules, rulesets=rulesets, phase=phase, reached_libraries=reached_libraries)
     workflow = []
     for selected in document.data.get("rulesets", ("vibeflow.workflow",)):
         if selected not in rulesets:
@@ -88,7 +88,35 @@ def effective_rule_plans(config: Path, *, workspace=None, node_path: str = "", p
         scopes.append({"call": owner, "rulesets": list(selection), "plans": plans,
                        "constraint_state": "selected" if selection else "unconstrained"})
     return {"config": str(config.resolve()), "phase": phase, "workflow": workflow, "scopes": scopes, "nodes": output,
-            "project_rule_defaults": defaults}
+            "resources":resources, "project_rule_defaults": defaults}
+
+
+def _resource_plans(catalogs, *, calls, data, project, rules, rulesets, phase, reached_libraries):
+    def ids(values):
+        return {value if isinstance(value,str) else value.get("id") for value in values
+                if isinstance(value,str) or isinstance(value,Mapping) and value.get("enabled",True) is not False}
+    selected = {"base_lib":set(reached_libraries), "plugin":ids(data.get("plugins",())),
+                "host_extension":ids(data.get("host_extensions",project.get("javascript",{}).get("host_extensions",())))}
+    for _, call in calls:
+        descriptor = catalogs.nodes.get(call.get("type_used", ""))
+        if descriptor is not None and call.get("status") != "planned":
+            selected["base_lib"].update(descriptor.base_libs)
+    output = []
+    for kind, catalog in (("base_lib",catalogs.base_libs),("plugin",catalogs.plugins),("host_extension",catalogs.host_extensions)):
+        pending, visited = list(selected[kind]), set()
+        while pending:
+            key = pending.pop()
+            if key in visited:
+                continue
+            visited.add(key)
+            descriptor = catalog.get(key)
+            if descriptor is None:
+                continue
+            pending.extend(descriptor.dependencies)
+            output.append({"kind":kind,"id":key,"selection_source":catalog.source_for(key),
+                "rulesets":list(descriptor.rulesets), "constraint_state":"selected" if descriptor.rulesets else "unconstrained",
+                "plans":[compile_ruleset(selection,rules=rules,rulesets=rulesets,entrypoint=phase).to_dict() for selection in descriptor.rulesets]})
+    return sorted(output,key=lambda item:(item["kind"],item["id"]))
 
 
 def _project_rule_defaults(root, *, document, workspace):
@@ -149,6 +177,9 @@ def rule_plans_mermaid(payload: Mapping[str, object]) -> str:
     for node in payload["nodes"]:
         for plan in node["plans"]:
             groups.append((node["call"], plan))
+    for resource in payload.get("resources", ()):
+        for plan in resource["plans"]:
+            groups.append((resource["kind"] + ":" + resource["id"], plan))
     for index, (owner, plan) in enumerate(groups):
         prefix = f"g{index}_"
         lines.append(f'  subgraph g{index}["{_label(owner)} · {_label(plan["ruleset_id"])}"]')
@@ -215,5 +246,7 @@ def main(argv=None) -> int:
             print(text, end="")
         return 0
     except (OSError, ValueError) as exc:
-        print(json.dumps({"status": "ERROR", "code": getattr(exc, "code", getattr(exc, "rule_id", "RULE.REVIEW.FAILED")), "error": str(exc)}, ensure_ascii=False))
+        print(json.dumps({"status": "ERROR", "code": getattr(exc, "code", getattr(exc, "rule_id", "RULE.REVIEW.FAILED")),
+            "error": str(exc), "details": dict(getattr(exc, "details", {})),
+            "diagnostics": list(getattr(exc, "diagnostics", ()))}, ensure_ascii=False))
         return 1

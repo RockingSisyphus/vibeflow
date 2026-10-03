@@ -15,7 +15,7 @@ Node 使用独立声明描述身份、契约、规则与实现。实现类只负
 ```jsonc
 {
   "kind": "node", "type_key": "example.normalize_text",
-  "display_name": "Normalize text", "category": "text",
+  "display_name": "Normalize text", "tags": ["text"],
   "description": "Normalizes whitespace in supplied text.", "version": "1.0.0",
   "flow_kind": "process", "rulesets": ["vibeflow.process"],
   "contract": {
@@ -46,7 +46,7 @@ class NormalizeTextNode:
 
 ## 业务分类与规则
 
-`category/tags` 表达业务身份，`flow_kind` 表达原生执行身份。Node 的约束来自所选 Ruleset；分类默认颜色、形状、图标和规则选择见 [Rule、Ruleset 与业务分类](rules-and-categories.md)。模型功能块不需要固定连接方式，可以使用原生串行、分支、Nodeset 和 Loop。
+`tags/metadata` 提供业务身份资料，`flow_kind` 表达原生执行身份。Node 的约束来自所选 Ruleset；Node 默认颜色、形状、图标和规则选择见 [Rule、Ruleset 与 Node 声明](rules-and-nodes.md)。模型功能块不需要固定连接方式，可以使用原生串行、分支、Nodeset 和 Loop。
 
 ## BaseLib
 

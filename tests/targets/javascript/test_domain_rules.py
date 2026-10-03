@@ -38,8 +38,8 @@ def test_domain_bundle_category_defaults_and_actual_numerical_execution(domain_p
     audited = audit_javascript_project(JavascriptAuditRequest(workspace, config))
     node = next(item for item in audited.architecture["workflow"]["nodes"] if item["id"] == "model")
     assert node["presentation"]["values"]["fill"] == "#cceeff"
-    assert node["presentation"]["sources"]["fill"] == "category"
-    assert node["category"] == "model_block"
+    assert node["presentation"]["sources"]["fill"] == "node"
+    assert "model_block" in node["tags"]
     assert "#cceeff" in render_mermaid(audited)
     assert audited.rule_report.results["example.model"][-1].plan.ruleset_id == "example.model_domain"
     built = build_project_aot(ProjectBuildRequest(workspace, config, tmp_path / "dist", "node", "single-esm"))
@@ -323,7 +323,7 @@ def test_call_effect_policy_keeps_actual_call_config_and_findings(domain_project
     _, project = domain_project
     (project / "rules/call_policy.ts").write_text('export function check(context) { const io=context.subject.call_spec.params.io; return {records:{policy:{type_id:"vibeflow.effect_policy.v1",value:{effect_scope:io?"terminal":"none",allowed_effects:io?["terminal"]:[]}}},findings:io?[]:[{code:"EXAMPLE.STRICT",severity:"error",message:"Strict constraint stays visible"}]}; }\n')
     directory = project / "manifests/rules"; directory.mkdir()
-    (directory / "call.jsonc").write_text(json.dumps({"kind": "rule", "id": "test.call_policy", "outputs": {"policy": "vibeflow.effect_policy.v1"}, "implementations": [{"language": "typescript", "targets": ["node"], "source": {"kind": "file", "ref": "rules/call_policy.ts", "export": "check"}}]}))
+    (directory / "call.jsonc").write_text(json.dumps({"kind": "rule", "id": "test.call_policy", "outputs": {"policy": "vibeflow.effect_policy.v1"}, "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/call_policy.ts", "export": "check"}}]}))
     directory = project / "manifests/rulesets"; directory.mkdir()
     (directory / "call.jsonc").write_text(json.dumps({"kind": "ruleset", "id": "test.call_policy", "calls": [{"id": "effect", "rule_id": "test.call_policy"}], "entrypoints": {"static": ["effect"]}}))
     file = project / "vibeflow_project.jsonc"
@@ -362,7 +362,7 @@ def _select_scoped_file_rule(project: Path, scope: str, *, implementation: str =
             declaration["handler"] = "vibeflow.quality.files"
         else:
             (project / "rules/files.ts").write_text('export function check(context, inputs, params) { return {findings:context.facts.project_facts.files.filter(file=>file.lines>params.max_file_lines).map(file=>({code:"TEST.CLOSURE.LINES",severity:"error",message:"Reached helper exceeds the chosen limit",source_location:{path:context.facts.project_facts.root+"/"+file.path,line:1},details:{limit:params.max_file_lines}}))}; }\n')
-            declaration["implementations"] = [{"language": "typescript", "targets": ["node"], "source": {"kind": "file", "ref": "rules/files.ts", "export": "check"}}]
+            declaration["implementations"] = [{"language": "typescript", "source": {"kind": "file", "ref": "rules/files.ts", "export": "check"}}]
         (directory / "files.jsonc").write_text(json.dumps(declaration))
     ruleset = {"kind": "ruleset", "id": "test.scope", "calls": [{"id": "files", "rule_id": "vibeflow.quality.files", "params": {"max_file_lines": 8, "warn_file_lines": 8}}],
                "entrypoints": {"static": ["files"], "import": [], "run": []}}
@@ -447,7 +447,7 @@ def test_formal_rule_state_failure_is_rejected_before_later_entrances(domain_pro
     model.write_text('import {writeFileSync} from "node:fs"; writeFileSync(' + json.dumps(str(business_marker)) + ',"ran");\n' + model.read_text())
     (project / "rules/status.ts").write_text('import {writeFileSync} from "node:fs"; export function check(context) { if(context.phase===' + json.dumps(phase) + ') return {state:' + json.dumps(state) + ',findings:' + ('[{code:"EXAMPLE.STATUS.WARNING",severity:"warning",message:"Incomplete with warning"}]' if state == "failed" else '[]') + '}; writeFileSync(' + json.dumps(str(static_marker)) + ',"later phase ran"); return {findings:[]}; }\n')
     directory = project / "manifests/rules"; directory.mkdir()
-    (directory / "status.jsonc").write_text(json.dumps({"kind": "rule", "id": "test.status", "implementations": [{"language": "typescript", "targets": ["node"], "source": {"kind": "file", "ref": "rules/status.ts", "export": "check"}}]}))
+    (directory / "status.jsonc").write_text(json.dumps({"kind": "rule", "id": "test.status", "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/status.ts", "export": "check"}}]}))
     directory = project / "manifests/rulesets"; directory.mkdir()
     (directory / "status.jsonc").write_text(json.dumps({"kind": "ruleset", "id": "test.status", "calls": [{"id": "check", "rule_id": "test.status"}], "entrypoints": {"import": ["check"] if phase == "import" else [], "static": ["check"]}}))
     file = project / "vibeflow_project.jsonc"
@@ -499,9 +499,9 @@ def test_rule_scope_keeps_call_identity_and_caches_source_snapshots(domain_proje
 
     _, project = domain_project
     rule = project / "rules/scope.ts"
-    rule.write_text('let count=0; export function check(context) { console.log("Rule log"); return {records:{count:{type_id:"example.count.v1",value:{count:++count, call:context.subject.call_spec?.id ?? null, rule:context.subject.rule_call_id}}},findings:[{code:"EXAMPLE.SCOPE",severity:"warning",message:"Scope proof",source_location:{path:context.facts.source_files[0],line:1}}]}; }\n', encoding="utf-8")
+    rule.write_text('let count=0; export function check(context) { console.log("Rule log"); return {records:{count:{type_id:"example.count.v1",value:{count:++count, call:context.subject.call_spec?.id ?? null, rule:context.subject.rule_call_id ?? null}}},findings:[{code:"EXAMPLE.SCOPE",severity:"warning",message:"Scope proof",source_location:{path:context.facts.source_files[0],line:1}}]}; }\n', encoding="utf-8")
     directory = project / "manifests/rules"; directory.mkdir()
-    (directory / "scope.jsonc").write_text(json.dumps({"kind": "rule", "id": "test.scope", "scope": scope, "outputs": {"count": "example.count.v1"}, "implementations": [{"language": "typescript", "targets": ["node"], "source": {"kind": "file", "ref": "rules/scope.ts", "export": "check"}}]}))
+    (directory / "scope.jsonc").write_text(json.dumps({"kind": "rule", "id": "test.scope", "scope": scope, "outputs": {"count": "example.count.v1"}, "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/scope.ts", "export": "check"}}]}))
     directory = project / "manifests/rulesets"; directory.mkdir()
     (directory / "scope.jsonc").write_text(json.dumps({"kind": "ruleset", "id": "test.scope", "calls": [{"id": "check", "rule_id": "test.scope"}], "entrypoints": {"static": ["check"]}}))
     file = project / "vibeflow_project.jsonc"

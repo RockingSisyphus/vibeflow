@@ -5,7 +5,6 @@
   ],
   "type_key": "minimal.end",
   "display_name": "Workflow end",
-  "category": "boundary",
   "description": "Marks the structural end after the response is available.",
   "version": "0.15.0",
   "flow_kind": "terminal",
@@ -32,5 +31,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "boundary"
+  ]
 }

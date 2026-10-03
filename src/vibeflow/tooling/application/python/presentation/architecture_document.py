@@ -9,8 +9,7 @@ from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
 from vibeflow.core.flow import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, LoopSpec, NodeSpec, STATUS_PLANNED
 from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE
 from vibeflow.core.planned import effective_planned_behavior
-from vibeflow.targets.python.project.node import EFFECT_SCOPE_TRUSTED
-from vibeflow.tooling.presentation.node_presentation import registry_descriptor, registry_category, resolve_presentation
+from vibeflow.tooling.presentation.node_presentation import registry_descriptor, resolve_presentation
 from vibeflow.tooling.application.python.presentation.helpers import compile_for_render
 from vibeflow.tooling.application.python.presentation.review_model import (
     edge_roles,
@@ -50,13 +49,11 @@ def build_architecture_document(
     else:
         actual_compiled = compile_for_render(graph, compiled, registry)
     roots = _root_paths(graph)
-    categories = getattr(registry, "categories", None)
     return {
         "project_target": "python",
         "workflow": _workflow_document(graph, actual_compiled, registry=registry, resources=resources),
         "nodesets": _nodesets_document(graph, registry=registry),
         "node_types": _node_types_document(graph, registry=registry, roots=roots),
-        "node_categories": categories.to_dict() if categories is not None else {},
         "resources": _resources_document(graph, resources, roots=roots),
     }
 
@@ -224,11 +221,12 @@ def _node_document(
         "type_used": node.type_used,
         "source": source,
         "role": node_review_metadata(graph, node, registry),
-        "category": getattr(descriptor, "category", ""),
         "flow_kind": node_flow_kind(node, compiled),
         "rulesets": selected_rulesets,
         "selected_rulesets": selected_rulesets,
-        "presentation": resolve_presentation(registry_descriptor(registry, node.type_used), registry_category(registry, registry_descriptor(registry, node.type_used)), flow_kind=node_flow_kind(node, compiled), native_class=("loopNode" if node.type_used in LOOP_NODE_TYPES else "nodesetNode") if invocation is not None else "", status_class="plannedNode" if planned else "", call_style=node.style).to_dict(),
+        "tags": list(descriptor.tags) if descriptor is not None else [],
+        "metadata": dict(descriptor.metadata) if descriptor is not None else {},
+        "presentation": resolve_presentation(registry_descriptor(registry, node.type_used), flow_kind=node_flow_kind(node, compiled), native_class=("loopNode" if node.type_used in LOOP_NODE_TYPES else "nodesetNode") if invocation is not None else "", status_class="plannedNode" if planned else "", call_style=node.style).to_dict(),
         "effect_scope": node_review_effect_scope(graph, node, registry, compiled=compiled),
         "runtime_dispatch": _runtime_dispatch_label(node, compiled),
         "execution_lock": (
@@ -426,7 +424,7 @@ def _node_type_document(
         "info": {**_node_info_document(descriptor), "effect_scope": registry.effect_scope(type_key) if has_implemented_occurrence else "unavailable"},
         "contract": _node_contract_document(descriptor.contract),
         "rulesets": list(registry.rulesets(type_key)),
-        "presentation": resolve_presentation(descriptor, registry_category(registry, descriptor)).to_dict(),
+        "presentation": resolve_presentation(descriptor).to_dict(),
         "config": _node_config_document(registry, type_key),
     }
 
@@ -445,7 +443,6 @@ def _loop_node_type_document(type_key: str, *, roots: Mapping[str, str]) -> dict
         },
         "info": {
             "display_name": "While Loop",
-            "category": "control_flow",
             "description": "Repeats one nodeset body with optional termination, carried state, collected values, and exposed outputs; an unbounded loop is valid when max_iterations is null.",
             "version": "",
             "flow_kind": "predefined",
@@ -498,7 +495,6 @@ def _io_node_type_document(type_key: str) -> dict[str, object]:
         },
         "info": {
             "display_name": "VibeFlow Port IO",
-            "category": "io",
             "description": (
                 "Receives from or sends to a host-provided vibeflow.port "
                 "Capability."
@@ -532,7 +528,6 @@ def _io_node_type_document(type_key: str) -> dict[str, object]:
 def _node_info_document(info: object) -> dict[str, object]:
     return {
         "display_name": str(getattr(info, "display_name", "") or ""),
-        "category": str(getattr(info, "category", "") or ""),
         "description": str(getattr(info, "description", "") or ""),
         "version": str(getattr(info, "version", "") or ""),
         "flow_kind": str(getattr(info, "flow_kind", "") or ""),
@@ -607,13 +602,13 @@ def _resource_document(item: Mapping[str, object], *, kind: str, roots: Mapping[
         "category": _resource_value(item, info_map, "category"),
         "description": _resource_value(item, info_map, "description"),
         "version": _resource_value(item, info_map, "version"),
+        "rulesets": list(item.get("rulesets", ())),
         "source": source_reference(root_id, root_path, item.get("source_path", "")),
     }
     if kind == "base_lib":
         return {"module": str(item.get("module", "") or ""), **common}
     if kind == "host_extension":
         return {
-            "effect_scope": EFFECT_SCOPE_TRUSTED,
             "targets": sorted(
                 str(value)
                 for value in item.get("targets", ())
@@ -639,7 +634,6 @@ def _resource_document(item: Mapping[str, object], *, kind: str, roots: Mapping[
     plugin_document: dict[str, object] = {
         "name": str(item.get("name", "") or ""),
         "type": str(item.get("type", info_map.get("type", "")) or ""),
-        "effect_scope": EFFECT_SCOPE_TRUSTED,
         "targets": sorted(
             str(value)
             for value in item.get("targets", ())

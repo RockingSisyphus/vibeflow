@@ -42,11 +42,11 @@ def ENV(key: str, data_type: str, value):
 
 
 
-StartNode_DECLARATION = node_declaration(NodeInfo("test.start", "Start", "test", "Starts a test flow.", "0.1.0", "terminal"), NodeContract(examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+StartNode_DECLARATION = node_declaration(NodeInfo("test.start", "Start", "Starts a test flow.", "0.1.0", "terminal"), NodeContract(examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
 
 
 
-ValueInputNode_DECLARATION = node_declaration(NodeInfo("test.value_input", "Value Input", "test", "Reads value.in.", "0.1.0", "io"), NodeContract(
+ValueInputNode_DECLARATION = node_declaration(NodeInfo("test.value_input", "Value Input", "Reads value.in.", "0.1.0", "io"), NodeContract(
         requires=(REQ("value.in"),),
         input_semantics={"value.in": ("input value",)},
         examples=({"inputs": {"value.in": ENV("value.in", "value.in", 1)}, "params": {}},),
@@ -54,7 +54,7 @@ ValueInputNode_DECLARATION = node_declaration(NodeInfo("test.value_input", "Valu
 
 
 
-OutEndNode_DECLARATION = node_declaration(NodeInfo("test.out_end", "Out End", "test", "Ends after value.out.", "0.1.0", "terminal"), NodeContract(
+OutEndNode_DECLARATION = node_declaration(NodeInfo("test.out_end", "Out End", "Ends after value.out.", "0.1.0", "terminal"), NodeContract(
         requires=(REQ("value.out"),),
         input_semantics={"value.out": ("output value",)},
         examples=({"inputs": {"value.out": ENV("value.out", "value.out", 1)}, "params": {}},),
@@ -62,7 +62,7 @@ OutEndNode_DECLARATION = node_declaration(NodeInfo("test.out_end", "Out End", "t
 
 
 
-InEndNode_DECLARATION = node_declaration(NodeInfo("test.in_end", "In End", "test", "Ends after value.in.", "0.1.0", "terminal"), NodeContract(
+InEndNode_DECLARATION = node_declaration(NodeInfo("test.in_end", "In End", "Ends after value.in.", "0.1.0", "terminal"), NodeContract(
         requires=(REQ("value.in"),),
         input_semantics={"value.in": ("input value",)},
         examples=({"inputs": {"value.in": ENV("value.in", "value.in", 1)}, "params": {}},),
@@ -70,7 +70,7 @@ InEndNode_DECLARATION = node_declaration(NodeInfo("test.in_end", "In End", "test
 
 
 
-SeedNode_DECLARATION = node_declaration(NodeInfo("test.seed", "Seed", "test", "Produces a seed value.", "0.1.0", "process"), NodeContract(
+SeedNode_DECLARATION = node_declaration(NodeInfo("test.seed", "Seed", "Produces a seed value.", "0.1.0", "process"), NodeContract(
         provides=(PROV("value.in"),),
         output_semantics={"value.in": ("seed value",)},
 
@@ -80,7 +80,7 @@ SeedNode_DECLARATION = node_declaration(NodeInfo("test.seed", "Seed", "test", "P
 
 
 
-LargePredictionNode_DECLARATION = node_declaration(NodeInfo("test.large_prediction", "Large Prediction", "test", "Produces many prediction rows.", "0.1.0", "process"), NodeContract(
+LargePredictionNode_DECLARATION = node_declaration(NodeInfo("test.large_prediction", "Large Prediction", "Produces many prediction rows.", "0.1.0", "process"), NodeContract(
         provides=(PROV("value.out"),),
         output_semantics={"value.out": ("prediction mapping",)},
 
@@ -89,7 +89,7 @@ LargePredictionNode_DECLARATION = node_declaration(NodeInfo("test.large_predicti
 
 
 
-AddNode_DECLARATION = node_declaration(NodeInfo("test.add", "Add", "test", "Adds delta to input.", "0.1.0", "process"), NodeContract(
+AddNode_DECLARATION = node_declaration(NodeInfo("test.add", "Add", "Adds delta to input.", "0.1.0", "process"), NodeContract(
         requires=(REQ("value.in"),),
         provides=(PROV("value.out"),),
         input_semantics={"value.in": ("input value",)},
@@ -101,7 +101,7 @@ AddNode_DECLARATION = node_declaration(NodeInfo("test.add", "Add", "test", "Adds
 
 
 
-CopyNode_DECLARATION = node_declaration(NodeInfo("test.copy", "Copy", "test", "Copies a value.", "0.1.0", "process"), NodeContract(
+CopyNode_DECLARATION = node_declaration(NodeInfo("test.copy", "Copy", "Copies a value.", "0.1.0", "process"), NodeContract(
         requires=(REQ("value.out"),),
         provides=(PROV("value.in"),),
         input_semantics={"value.out": ("output value",)},
@@ -112,7 +112,7 @@ CopyNode_DECLARATION = node_declaration(NodeInfo("test.copy", "Copy", "test", "C
 
 
 
-RouteNode_DECLARATION = node_declaration(NodeInfo("test.route", "Route", "test", "Routes the next step.", "0.1.0", "decision"), NodeContract(
+RouteNode_DECLARATION = node_declaration(NodeInfo("test.route", "Route", "Routes the next step.", "0.1.0", "decision"), NodeContract(
         requires=(REQ("value.out"),),
         provides=(PROV("flow.route"),),
         input_semantics={"value.out": ("output value",)},
@@ -123,7 +123,7 @@ RouteNode_DECLARATION = node_declaration(NodeInfo("test.route", "Route", "test",
 
 
 
-NanOutputNode_DECLARATION = node_declaration(NodeInfo("test.nan_output", "NaN Output", "test", "Returns a runtime-invalid JSON value.", "0.1.0", "process"), NodeContract(
+NanOutputNode_DECLARATION = node_declaration(NodeInfo("test.nan_output", "NaN Output", "Returns a runtime-invalid JSON value.", "0.1.0", "process"), NodeContract(
         provides=(PROV("value.out"),),
         output_semantics={"value.out": ("output value",)},
 
@@ -131,7 +131,7 @@ NanOutputNode_DECLARATION = node_declaration(NodeInfo("test.nan_output", "NaN Ou
 
 
 
-EffectRequestNode_DECLARATION = node_declaration(NodeInfo("test.effect_request", "Effect Request", "test", "Emits a structured effect request.", "0.1.0", "data_store"), NodeContract(
+EffectRequestNode_DECLARATION = node_declaration(NodeInfo("test.effect_request", "Effect Request", "Emits a structured effect request.", "0.1.0", "data_store"), NodeContract(
         requires=(REQ("value.in"),),
         provides=(PROV("effects.request"),),
         input_semantics={"value.in": ("input value",)},
@@ -144,7 +144,7 @@ EffectRequestNode_DECLARATION = node_declaration(NodeInfo("test.effect_request",
 SetOutputNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.set_output",
         display_name="Set Output",
-        category="test",
+
         description="Returns a non-json output.",
         version="0.1.0",
         flow_kind="process",
@@ -159,7 +159,7 @@ SetOutputNode_DECLARATION = node_declaration(NodeInfo(
 OpaqueOutputNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.opaque_output",
         display_name="Opaque Output",
-        category="test",
+
         description="Returns an explicitly opaque output.",
         version="0.1.0",
         flow_kind="process",
@@ -174,7 +174,7 @@ OpaqueOutputNode_DECLARATION = node_declaration(NodeInfo(
 MutatingInputNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.mutating_input",
         display_name="Mutating Input",
-        category="test",
+
         description="Mutates its input.",
         version="0.1.0",
         flow_kind="process",
@@ -191,7 +191,7 @@ MutatingInputNode_DECLARATION = node_declaration(NodeInfo(
 IdentityObjectNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.identity_object",
         display_name="Identity Object",
-        category="test",
+
         description="Passes an object through unchanged.",
         version="0.1.0",
         flow_kind="process",
@@ -207,7 +207,7 @@ IdentityObjectNode_DECLARATION = node_declaration(NodeInfo(
 RuntimeFailNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.runtime_fail",
         display_name="Runtime Fail",
-        category="test",
+
         description="Fails during runtime.",
         version="0.1.0",
         flow_kind="process",
@@ -221,7 +221,7 @@ RuntimeFailNode_DECLARATION = node_declaration(NodeInfo(
 
 
 
-CountingInitNode_DECLARATION = node_declaration(NodeInfo("test.counting_init", "Counting Init", "test", "Counts construction for execution plan tests.", "0.1.0", "process"), NodeContract(
+CountingInitNode_DECLARATION = node_declaration(NodeInfo("test.counting_init", "Counting Init", "Counts construction for execution plan tests.", "0.1.0", "process"), NodeContract(
         provides=(PROV("value.out"),),
         output_semantics={"value.out": ("configured output",)},
 
@@ -231,7 +231,7 @@ CountingInitNode_DECLARATION = node_declaration(NodeInfo("test.counting_init", "
 
 
 
-DuplicateOneNode_DECLARATION = node_declaration(NodeInfo("test.duplicate_one", "Duplicate One", "test", "Duplicates output.", "0.1.0", "process"), NodeContract(
+DuplicateOneNode_DECLARATION = node_declaration(NodeInfo("test.duplicate_one", "Duplicate One", "Duplicates output.", "0.1.0", "process"), NodeContract(
         provides=(PROV("dup.one"),),
         output_semantics={"dup.one": ("duplicate value",)},
 
@@ -240,7 +240,7 @@ DuplicateOneNode_DECLARATION = node_declaration(NodeInfo("test.duplicate_one", "
 
 
 
-DuplicateTwoNode_DECLARATION = node_declaration(NodeInfo("test.duplicate_two", "Duplicate Two", "test", "Duplicates output.", "0.1.0", "process"), NodeContract(
+DuplicateTwoNode_DECLARATION = node_declaration(NodeInfo("test.duplicate_two", "Duplicate Two", "Duplicates output.", "0.1.0", "process"), NodeContract(
         provides=(PROV("dup.two"),),
         output_semantics={"dup.two": ("duplicate value",)},
 

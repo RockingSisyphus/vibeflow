@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.add_three",
   "display_name": "Add Three",
-  "category": "sandbox",
   "description": "Adds three through a short legal base_lib dependency chain.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

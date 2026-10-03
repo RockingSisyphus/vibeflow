@@ -28,12 +28,6 @@ def declared_python_registry(workspace) -> NodeRegistry:
             continue
         catalog = load_project_descriptor_catalogs(root.path, project_config=root.config_path)
         catalogs.append(catalog)
-        for category in getattr(catalog, "categories", ()):
-            existing = registry.categories.get(category.id)
-            if existing is None:
-                registry.categories.register(category, source=catalog.categories.source_for(category.id))
-            elif existing != category:
-                raise NodeRegistryError(f"conflicting category declaration '{category.id}'")
         for descriptor in catalog.nodes:
             implementations = tuple(item for item in descriptor.implementations if item.language == "python")
             if not implementations:

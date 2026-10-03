@@ -1,10 +1,18 @@
 """Review the declared Python implementation ABI from an isolated AST view."""
 import ast
+from typing import Mapping
 from vibeflow.core.rules import RuleResult
 from vibeflow.targets.python.quality.rules.helpers import finding, source_subject
 
 
 def node_interface(context, inputs, params):
+    if context.subject.get("kind") == "plugin":
+        source = context.require("resource_source_file")
+        symbol = context.require("source_context").symbol(source.path, context.require("resource_symbol"))
+        if symbol is None or not isinstance(symbol.node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            return RuleResult(findings=(finding(context,"PLUGIN.IMPLEMENTATION.SYMBOL",
+                "declared Python plugin must name a class or factory",path=source.path),))
+        return RuleResult()
     _, node, symbol = source_subject(context)
     if symbol is None or not isinstance(symbol.node, ast.ClassDef):
         return RuleResult(findings=(finding(context,"NODE.IMPLEMENTATION.SYMBOL","declared Python implementation must name a class",path=node.path),))
@@ -28,7 +36,35 @@ def node_interface(context, inputs, params):
     for name,method in methods.items():
         if not name.startswith("_") and name not in allowed:
             report("public_callable",f"node must not expose public callable method: {name}",method)
+    callable_names = set(methods)
+    for statement in symbol.node.body:
+        if not isinstance(statement, (ast.Assign, ast.AnnAssign)):
+            continue
+        value = statement.value
+        callable_value = isinstance(value, ast.Lambda) or isinstance(value, ast.Name) and value.id in callable_names
+        if not callable_value:
+            continue
+        targets = statement.targets if isinstance(statement, ast.Assign) else (statement.target,)
+        for target in targets:
+            if isinstance(target, ast.Name):
+                callable_names.add(target.id)
+                if not target.id.startswith("_") and target.id not in allowed:
+                    report("public_callable", f"node must not expose public callable method: {target.id}", statement)
     contract=node.descriptor.contract
+    if set(item.type for item in contract.requires) & set(item.key for item in contract.provides):
+        report("contract_overlap", "CONTRACT.requires types and CONTRACT.provides keys must not overlap")
+    if node.descriptor.flow_kind == "decision":
+        if not any(_looks_route_key(item.key) for item in contract.provides):
+            findings.append(finding(context, "NODE.DECISION.MISSING_ROUTE_OUTPUT",
+                "decision nodes must provide a route/decision/branch output key", path=node.path, line=symbol.line))
+    for index, example in enumerate(contract.examples):
+        malformed = next((name for name in ("inputs", "params") if not isinstance(example.get(name), Mapping)), None)
+        if malformed:
+            findings.append(finding(context, "NODE.MAINTAINABILITY.EXAMPLE_SHAPE",
+                f"CONTRACT.examples[{index}].{malformed} must be a mapping", path=node.path, line=symbol.line, severity="warning"))
+        elif "outputs" in example:
+            findings.append(finding(context, "NODE.PURITY.EXAMPLE_OUTPUTS_REMOVED",
+                f"CONTRACT.examples[{index}].outputs is removed; Python examples only declare inputs and params", path=node.path, line=symbol.line))
     for label,keys,semantics in (("input_semantics",tuple(item.type for item in contract.requires),contract.input_semantics),
                                 ("output_semantics",tuple(item.key for item in contract.provides),contract.output_semantics)):
         missing=set(keys)-set(semantics)
@@ -43,3 +79,8 @@ def node_interface(context, inputs, params):
 def _signature(method,names):
     args=method.args
     return tuple(item.arg for item in (*args.posonlyargs,*args.args)) == names and not args.vararg and not args.kwarg and not args.kwonlyargs
+
+
+def _looks_route_key(key):
+    leaf = key.rsplit(".", 1)[-1].rsplit("_", 1)[-1]
+    return leaf in {"route", "decision", "branch", "selected", "done", "should_retry"} or key.endswith("selected_branch")

@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "bad.node_import",
   "display_name": "Bad",
-  "category": "bad",
   "description": "Bad node importing another node.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "bad"
+  ],
   "external": false,
   "contract": {
     "requires": [],

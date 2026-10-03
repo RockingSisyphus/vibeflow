@@ -1,11 +1,17 @@
 {
   "kind": "host_extension",
   "id": "sandbox.math_host",
-  "targets": ["browser", "node"],
+  "targets": [
+    "browser",
+    "node"
+  ],
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "source": {
         "kind": "file",
         "ref": "host_extensions/math_host.ts",
@@ -13,7 +19,12 @@
       }
     }
   ],
-  "provides": ["sandbox.host_math"],
+  "provides": [
+    "sandbox.host_math"
+  ],
   "dependencies": [],
-  "external_packages": []
+  "external_packages": [],
+  "rulesets": [
+    "vibeflow.host_extension"
+  ]
 }

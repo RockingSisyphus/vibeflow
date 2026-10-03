@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.training_input",
   "display_name": "Training Input",
-  "category": "training",
   "description": "Reads model, batch, and optimizer objects.",
   "version": "0.1.0",
   "flow_kind": "io",
   "author": null,
-  "tags": [],
+  "tags": [
+    "training"
+  ],
   "external": false,
   "contract": {
     "requires": [

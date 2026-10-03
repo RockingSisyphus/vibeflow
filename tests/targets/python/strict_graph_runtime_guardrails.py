@@ -27,7 +27,7 @@ def _prov(key: str) -> DataProvider:
     return DataProvider(key, key, display_name=key)
 
 
-GuideStart_DECLARATION = node_declaration(NodeInfo("guide.start", "Start", "guide", "Starts a neutral guide flow.", "1.0.0", "terminal"), NodeContract(examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+GuideStart_DECLARATION = node_declaration(NodeInfo("guide.start", "Start", "Starts a neutral guide flow.", "1.0.0", "terminal"), NodeContract(examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
 
 class GuideStart:
 
@@ -35,7 +35,7 @@ class GuideStart:
         return {}
 
 
-GuardSecond_DECLARATION = node_declaration(NodeInfo("guard.second", "Guard Second", "test", "Requires both the original and first result for a guardrail fixture.", "1.0.0", "process"), NodeContract(
+GuardSecond_DECLARATION = node_declaration(NodeInfo("guard.second", "Guard Second", "Requires both the original and first result for a guardrail fixture.", "1.0.0", "process"), NodeContract(
         requires=(_req("value.in"), _req("value.out")),
         provides=(DataProvider("value.final", "value.in", display_name="Value Final"),),
         input_semantics={"value.in": ("original value",), "value.out": ("first result",)},
@@ -48,7 +48,7 @@ class GuardSecond:
         return {"value.final": _env(inputs, "value.out")}
 
 
-GuardNormalize_DECLARATION = node_declaration(NodeInfo("guard.normalize", "Guard Normalize", "test", "Normalizes value.out into a value.in-compatible key.", "1.0.0", "process"), NodeContract(
+GuardNormalize_DECLARATION = node_declaration(NodeInfo("guard.normalize", "Guard Normalize", "Normalizes value.out into a value.in-compatible key.", "1.0.0", "process"), NodeContract(
         requires=(_req("value.out"),),
         provides=(DataProvider("value.normalized", "value.in", display_name="Value Normalized"),),
         input_semantics={"value.out": ("value to normalize",)},
@@ -61,7 +61,7 @@ class GuardNormalize:
         return {"value.normalized": _env(inputs, "value.out")}
 
 
-GuardConsume_DECLARATION = node_declaration(NodeInfo("guard.consume", "Guard Consume", "test", "Consumes a mainline and bypassed value.", "1.0.0", "process"), NodeContract(
+GuardConsume_DECLARATION = node_declaration(NodeInfo("guard.consume", "Guard Consume", "Consumes a mainline and bypassed value.", "1.0.0", "process"), NodeContract(
         requires=(_req("value.in"), _req("value.out")),
         provides=(DataProvider("value.final", "value.out", display_name="Value Final"),),
         input_semantics={"value.in": ("mainline normalized value",), "value.out": ("bypassed result",)},
@@ -74,7 +74,7 @@ class GuardConsume:
         return {"value.final": _env(inputs, "value.in")}
 
 
-GuideEnd_DECLARATION = node_declaration(NodeInfo("guide.end", "End", "guide", "Ends a neutral guide flow.", "1.0.0", "terminal"), NodeContract(examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+GuideEnd_DECLARATION = node_declaration(NodeInfo("guide.end", "End", "Ends a neutral guide flow.", "1.0.0", "terminal"), NodeContract(examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
 
 class GuideEnd:
 
@@ -82,7 +82,7 @@ class GuideEnd:
         return {}
 
 
-GuideRoute_DECLARATION = node_declaration(NodeInfo("guide.route", "Route", "guide", "Selects a neutral branch.", "1.0.0", "decision"), NodeContract(
+GuideRoute_DECLARATION = node_declaration(NodeInfo("guide.route", "Route", "Selects a neutral branch.", "1.0.0", "decision"), NodeContract(
         provides=(_prov("flow.route"),),
         output_semantics={"flow.route": ("selected branch",)},
 
@@ -95,7 +95,7 @@ class GuideRoute:
         return {"flow.route": "left"}
 
 
-GuideSource_DECLARATION = node_declaration(NodeInfo("guide.source", "Source", "guide", "Produces two neutral values.", "1.0.0", "io"), NodeContract(
+GuideSource_DECLARATION = node_declaration(NodeInfo("guide.source", "Source", "Produces two neutral values.", "1.0.0", "io"), NodeContract(
         provides=(_prov("record.original"), _prov("record.current")),
         output_semantics={"record.original": ("original record",), "record.current": ("current record",)},
 
@@ -108,7 +108,7 @@ class GuideSource:
         return {"record.original": " Alpha ", "record.current": " Alpha "}
 
 
-GuideNormalize_DECLARATION = node_declaration(NodeInfo("guide.normalize", "Normalize", "guide", "Normalizes one value.", "1.0.0", "process"), NodeContract(
+GuideNormalize_DECLARATION = node_declaration(NodeInfo("guide.normalize", "Normalize", "Normalizes one value.", "1.0.0", "process"), NodeContract(
         requires=(_req("record.current"),),
         provides=(_prov("record.normalized"),),
         input_semantics={"record.current": ("current record",)},
@@ -123,7 +123,7 @@ class GuideNormalize:
         return {"record.normalized": str(_env(inputs, "record.current")).strip().lower()}
 
 
-GuideCombine_DECLARATION = node_declaration(NodeInfo("guide.combine", "Combine", "guide", "Combines two values.", "1.0.0", "process"), NodeContract(
+GuideCombine_DECLARATION = node_declaration(NodeInfo("guide.combine", "Combine", "Combines two values.", "1.0.0", "process"), NodeContract(
         requires=(_req("record.original"), _req("record.normalized")),
         provides=(_prov("semantic.combined"),),
         input_semantics={"record.original": ("original record",), "record.normalized": ("normalized record",)},
@@ -138,7 +138,7 @@ class GuideCombine:
         return {"semantic.combined": [_env(inputs, "record.original"), _env(inputs, "record.normalized")]}
 
 
-GuideOutputValue_DECLARATION = node_declaration(NodeInfo("guide.output_value", "Output Value", "guide", "Adapts a combined value.", "1.0.0", "io"), NodeContract(
+GuideOutputValue_DECLARATION = node_declaration(NodeInfo("guide.output_value", "Output Value", "Adapts a combined value.", "1.0.0", "io"), NodeContract(
         requires=(_req("semantic.combined"),),
         provides=(_prov("response.value"),),
         input_semantics={"semantic.combined": ("combined record",)},
@@ -153,7 +153,7 @@ class GuideOutputValue:
         return {"response.value": _env(inputs, "semantic.combined")}
 
 
-GuideLeft_DECLARATION = node_declaration(NodeInfo("guide.left", "Left", "guide", "Produces the left branch.", "1.0.0", "process"), NodeContract(provides=(_prov("branch.left"),), output_semantics={"branch.left": ("left value",)}, examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+GuideLeft_DECLARATION = node_declaration(NodeInfo("guide.left", "Left", "Produces the left branch.", "1.0.0", "process"), NodeContract(provides=(_prov("branch.left"),), output_semantics={"branch.left": ("left value",)}, examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
 
 class GuideLeft:
 
@@ -161,7 +161,7 @@ class GuideLeft:
         return {"branch.left": 2}
 
 
-GuideRight_DECLARATION = node_declaration(NodeInfo("guide.right", "Right", "guide", "Produces the right branch.", "1.0.0", "process"), NodeContract(provides=(_prov("branch.right"),), output_semantics={"branch.right": ("right value",)}, examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+GuideRight_DECLARATION = node_declaration(NodeInfo("guide.right", "Right", "Produces the right branch.", "1.0.0", "process"), NodeContract(provides=(_prov("branch.right"),), output_semantics={"branch.right": ("right value",)}, examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
 
 class GuideRight:
 
@@ -169,7 +169,7 @@ class GuideRight:
         return {"branch.right": 3}
 
 
-GuideMerge_DECLARATION = node_declaration(NodeInfo("guide.merge", "Merge", "guide", "Merges two branches.", "1.0.0", "process"), NodeContract(
+GuideMerge_DECLARATION = node_declaration(NodeInfo("guide.merge", "Merge", "Merges two branches.", "1.0.0", "process"), NodeContract(
         requires=(_req("branch.left"), _req("branch.right")),
         provides=(_prov("semantic.merged"),),
         input_semantics={"branch.left": ("left value",), "branch.right": ("right value",)},
@@ -184,7 +184,7 @@ class GuideMerge:
         return {"semantic.merged": _env(inputs, "branch.left") + _env(inputs, "branch.right")}
 
 
-GuideOutputMerged_DECLARATION = node_declaration(NodeInfo("guide.output_merged", "Output Merged", "guide", "Adapts a merged value.", "1.0.0", "io"), NodeContract(
+GuideOutputMerged_DECLARATION = node_declaration(NodeInfo("guide.output_merged", "Output Merged", "Adapts a merged value.", "1.0.0", "io"), NodeContract(
         requires=(_req("semantic.merged"),),
         provides=(_prov("response.value"),),
         input_semantics={"semantic.merged": ("merged value",)},
@@ -199,7 +199,7 @@ class GuideOutputMerged:
         return {"response.value": _env(inputs, "semantic.merged")}
 
 
-GuideInput_DECLARATION = node_declaration(NodeInfo("guide.input", "Input", "guide", "Decodes an external value.", "1.0.0", "io"), NodeContract(
+GuideInput_DECLARATION = node_declaration(NodeInfo("guide.input", "Input", "Decodes an external value.", "1.0.0", "io"), NodeContract(
         requires=(_req("request.raw"),),
         provides=(_prov("input.text"),),
         input_semantics={"request.raw": ("raw request",)},
@@ -214,7 +214,7 @@ class GuideInput:
         return {"input.text": str(_env(inputs, "request.raw"))}
 
 
-GuideSemantic_DECLARATION = node_declaration(NodeInfo("guide.semantic", "Semantic", "guide", "Builds a typed value.", "1.0.0", "process"), NodeContract(
+GuideSemantic_DECLARATION = node_declaration(NodeInfo("guide.semantic", "Semantic", "Builds a typed value.", "1.0.0", "process"), NodeContract(
         requires=(_req("input.text"),),
         provides=(_prov("semantic.number"),),
         input_semantics={"input.text": ("decoded text",)},
@@ -229,7 +229,7 @@ class GuideSemantic:
         return {"semantic.number": int(_env(inputs, "input.text"))}
 
 
-GuideOutputNumber_DECLARATION = node_declaration(NodeInfo("guide.output_number", "Output Number", "guide", "Adapts a typed number.", "1.0.0", "io"), NodeContract(
+GuideOutputNumber_DECLARATION = node_declaration(NodeInfo("guide.output_number", "Output Number", "Adapts a typed number.", "1.0.0", "io"), NodeContract(
         requires=(_req("semantic.number"),),
         provides=(_prov("response.number"),),
         input_semantics={"semantic.number": ("typed number",)},

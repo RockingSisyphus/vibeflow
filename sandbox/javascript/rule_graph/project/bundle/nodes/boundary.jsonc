@@ -2,7 +2,6 @@
   "kind": "node",
   "type_key": "example.boundary",
   "display_name": "Boundary",
-  "category": "rule_graph",
   "description": "An executable Node in the typed Rule graph example.",
   "version": "0.15.0",
   "flow_kind": "terminal",
@@ -21,5 +20,8 @@
         "export": "boundary"
       }
     }
+  ],
+  "tags": [
+    "rule_graph"
   ]
 }

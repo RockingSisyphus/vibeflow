@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.final_end",
   "display_name": "Semantic Final End",
-  "category": "semantic",
   "description": "Terminates a semantic flow after calc.final is available.",
   "version": "0.1.0",
   "flow_kind": "terminal",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

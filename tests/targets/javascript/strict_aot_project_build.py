@@ -83,7 +83,7 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
             "kind": "node",
             "type_key": "demo.add",
             "display_name": "Add",
-            "category": "demo",
+
             "description": "Adds a configured value.",
             "version": "1.0.0",
             "flow_kind": "terminal",
@@ -118,7 +118,7 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
             "kind": "node",
             "type_key": "demo.start",
             "display_name": "Start",
-            "category": "demo",
+
             "description": "Starts the nested workflow.",
             "version": "1.0.0",
             "flow_kind": "terminal",
@@ -1025,19 +1025,19 @@ def test_javascript_mermaid_composes_planned_custom_and_external_styles(
     )
     descriptors = {
         "demo.custom": SimpleNamespace(
-            category="",
+            rulesets=(),
             display_name="Custom",
             description="Shows custom colours.",
             external=False,
         ),
         "demo.external": SimpleNamespace(
-            category="",
+            rulesets=(),
             display_name="External",
             description="Shows the external boundary.",
             external=True,
         ),
         "demo.external_custom": SimpleNamespace(
-            category="",
+            rulesets=(),
             display_name="External Custom",
             description="Combines custom colours and the external boundary.",
             external=True,

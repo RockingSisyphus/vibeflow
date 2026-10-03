@@ -17,6 +17,7 @@ class WorkflowInvocation:
     graph: object
     call_path: tuple[str, ...] = ()
     call: object | None = None
+    declaration_only: bool = False
 
 
 def workflow_invocations(graph):
@@ -35,6 +36,15 @@ def workflow_invocations(graph):
                 walk(nested, definitions, path, (*active, key))
 
     walk(graph, {})
+    visited = {id(item.graph) for item in found}
+    definitions = list(graph.nodesets.values())
+    while definitions:
+        definition = definitions.pop()
+        if id(definition.graph) in visited or definition.status == STATUS_PLANNED:
+            continue
+        visited.add(id(definition.graph))
+        found.append(WorkflowInvocation("nodeset:" + definition.type_key, definition.graph, declaration_only=True))
+        definitions.extend(definition.graph.nodesets.values())
     return tuple(found)
 
 
@@ -62,6 +72,8 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
     invocations = workflow_invocations(graph)
     for invocation in invocations:
         owner, current, path = invocation.owner, invocation.graph, invocation.call_path
+        association = {"owner":owner, "phase":phase,
+            **({"kind":"nodeset_definition"} if invocation.declaration_only else {"call_path":path})}
         current_compiled = compiled
         if compiled is not None and current is not graph:
             try:
@@ -89,28 +101,33 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
                     "runtime_flow_kinds": {spec.id: registry.descriptor(spec.type_used).flow_kind for spec in current.nodes
                         if registry is not None and spec.type_used in registry.available()},
                     "node_similarities": {spec.id: spec.similar_to.to_dict() for spec in current.nodes if spec.similar_to.node},
-                    "call": invocation.call}
+                    }
+                if not invocation.declaration_only:
+                    facts["call"] = invocation.call
                 if current_compiled is not None:
                     facts.update(compiled=current_compiled, compilation_findings=compilation_findings)
                 if source_report is not None:
                     metrics = {spec.id: source_report.node_metrics[spec.type_used] for spec in current.nodes if spec.type_used in source_report.node_metrics}
                     facts.update(node_metrics=metrics, fingerprints={key: str(value["run_pure_fingerprint"])
                         for key, value in metrics.items() if value.get("run_pure_fingerprint")})
+                subject = {"kind": "nodeset_definition" if invocation.declaration_only else "workflow", "id": owner, "owner": owner}
+                if not invocation.declaration_only:
+                    subject.update(call_id="/".join(path), call_path=path)
                 result = execute_rule_plan(plan, RuleContext(facts=facts,
-                    subject={"kind": "workflow", "id": owner, "owner": owner, "call_id": "/".join(path), "call_path": path},
+                    subject=subject,
                     scope={"workflow": owner, "workflows": tuple(item.owner for item in invocations),
                         "files": tuple(item.path for item in source_context.files) if source_context is not None else ()},
                     phase=phase, target="python"), handlers=handlers)
                 state.rule_executions.append(result)
                 _append_findings(state, (replace(item, details={
-                    **({} if item.details.get("definition_review") else {"owner":owner,"call_path":path,"phase":phase}),
-                    **item.details, "rule_contexts":[{"owner":owner,"call_path":path,"phase":phase}]}) for item in result.findings))
+                    **({} if item.details.get("definition_review") else association),
+                    **item.details, "rule_contexts":[association]}) for item in result.findings))
                 for invocation_id, value in result.results.items():
                     if value.state != "completed" and not any(item.severity == "error" for item in value.findings):
                         _append_findings(state, (HealthFinding(rule_id="RULE.EXECUTION.UNAVAILABLE", severity="error", object_type="workflow", object_id=owner,
                             message=f"rule '{invocation_id}' did not complete ({value.state})", failure_layer="rule",
                             definition_id=next(item.rule.id for item in plan.invocations if item.id == invocation_id),
-                            details={"state": value.state, "owner": owner, "call_path": path, "phase": phase}),))
+                            details={"state": value.state, **association}),))
                     review = value.records.get("workflow_review")
                     if value.state == "completed" and review is not None:
                         mainline = review.value.get("mainline", {})
@@ -120,7 +137,7 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
                             state.mainline[owner] = mainline[owner]
             except RuleGraphError as exc:
                 item = graph_error_finding(registry, exc, object_type="workflow", object_id=owner, fallback_path=current.source_path)
-                _append_findings(state, (replace(item, details={**item.details,"owner":owner,"call_path":path,"phase":phase}),))
+                _append_findings(state, (replace(item, details={**item.details,**association}),))
             except Exception as exc:
                 if not getattr(exc,"findings",()):
                     raise

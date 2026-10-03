@@ -5,15 +5,19 @@
   "implementations": [
     {
       "language": "typescript",
-      "targets": [
-        "browser",
-        "node"
-      ],
       "source": {
         "kind": "file",
         "ref": "rules/model_definition.ts",
         "export": "check"
       }
     }
-  ]
+  ],
+  "params_schema": {
+    "model_tag": {
+      "type": "string"
+    }
+  },
+  "params_defaults": {
+    "model_tag": "model_block"
+  }
 }

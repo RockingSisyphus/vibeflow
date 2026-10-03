@@ -59,7 +59,7 @@ def validate_node_config_health(
         stack=(),
     )
     for nodeset in graph.nodesets.values():
-        if nodeset.type_key in called_nodesets:
+        if nodeset.type_key in called_nodesets or not nodeset.graph.rulesets:
             continue
         _validate_graph_node_configs(
             nodeset.graph,
@@ -149,7 +149,7 @@ def _validate_nodeset_call_config(
 ) -> None:
     nodeset_name = nodeset_name or node.type_used
     nodeset = graph.nodesets.get(nodeset_name)
-    if nodeset is None or nodeset_name in stack:
+    if nodeset is None or nodeset_name in stack or not nodeset.graph.rulesets:
         return
     called_nodesets.add(nodeset_name)
     _append_override_warning(

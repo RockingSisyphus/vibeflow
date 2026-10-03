@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.report_end",
   "display_name": "报告流程结束",
-  "category": "sandbox",
   "description": "当 io.output 已经生成后终止整个综合流程；该节点证明所有非计划节点都能抵达明确的结束 Terminal。",
   "version": "0.1.0",
   "flow_kind": "terminal",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

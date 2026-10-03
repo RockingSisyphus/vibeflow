@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.route",
   "display_name": "Sign router",
-  "category": "sandbox",
   "description": "Forwards a number and emits a boolean branch key.",
   "version": "1.0.0",
   "flow_kind": "decision",
@@ -59,5 +61,8 @@
   "base_libs": [
     "sandbox.math"
   ],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox"
+  ]
 }

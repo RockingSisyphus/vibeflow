@@ -14,3 +14,19 @@ def source_rule_defaults(document, *, workspace=None):
         raise ValueError("; ".join(errors))
     policy = source_quality_policy(resolved.effective_policy.to_purity_policy())
     return project_quality_rule_defaults(policy)
+
+
+def declared_rule_resources(workspace):
+    """Target-owned declaration assembly, shared by preview and formal checks."""
+    from vibeflow.tooling.application.python.project.declarations import declared_python_registry
+    from vibeflow.targets.python.quality.rule_adapter import rule_resources
+    registry = declared_python_registry(workspace)
+    rules, rulesets = rule_resources(registry)
+    return registry, rules, rulesets
+
+
+def reached_library_ids(registry, type_keys):
+    from vibeflow.tooling.application.python.project.declarations import collect_node_source_context
+    from vibeflow.targets.python.project.resource_rules import reached_base_lib_sources
+    sources = collect_node_source_context(registry, tuple(key for key in type_keys if key in registry.available()))
+    return {descriptor.id for descriptor, _, _ in reached_base_lib_sources(registry, sources)}

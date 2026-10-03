@@ -12,7 +12,9 @@ from vibeflow.core.planned import (
 from vibeflow.targets.python.project.planned import (
     planned_stub_finding,
     validate_python_stub_source,
+    _validate_stub_ast,
 )
+from vibeflow.targets.python.project.source_closure import collect_python_source_facts
 from vibeflow.targets.python.runtime.support.planned import (
     resolve_stub_module_path,
 )
@@ -58,11 +60,25 @@ def validate_python_stub_file(
                 object_id,
             ),
         )
-    return validate_python_stub_source(
+    findings = list(validate_python_stub_source(
         source_text,
         path=str(path),
         object_type=object_type,
         object_id=object_id,
-    )
+    ))
+    root = Path(project_root or path.parent).resolve()
+    import ast
+    from dataclasses import replace
+    for source in collect_python_source_facts(path, project_root=root):
+        if source.path == str(path):
+            continue
+        if source.load_error or source.parse_error:
+            findings.append(replace(planned_stub_finding("GRAPH.PLANNED.STUB_SYNTAX",
+                source.load_error or source.parse_error, object_type, object_id),
+                source_location={"path": source.path, "line": source.parse_line or 1, "column": source.parse_column or 1}))
+            continue
+        findings.extend(_validate_stub_ast(ast.parse(source.source, filename=source.path),
+            path=source.path, object_type=object_type, object_id=object_id))
+    return tuple(findings)
 
 __all__ = ["validate_python_stub_file"]

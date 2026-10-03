@@ -6,7 +6,7 @@ from tests.fixtures.support.strict_support_runtime_implementations import Global
 GlobalParamNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.global_param",
         display_name="Global Param",
-        category="test",
+
         description="Reads global config from params.",
         version="0.1.0",
         flow_kind="process",
@@ -236,7 +236,7 @@ class RuntimePlugin:
     assert resources["global_config"] == {"offset": 7}
     assert [item["status"] for item in resources["base_lib"]["modules"]] == ["implemented", "planned"]
     assert [item["status"] for item in resources["plugins"]] == ["implemented", "planned"]
-    assert {item["effect_scope"] for item in resources["plugins"]} == {"trusted"}
+    assert all(item["rulesets"] == [] for item in resources["plugins"])
     assert result.health.info["production_ready"] is False
     assert result.health.info["plugins"]["plugins"] == [
         {
@@ -245,7 +245,7 @@ class RuntimePlugin:
             "priority": 100,
             "scope": "project",
             "source": str(plugin_path),
-            "effect_scope": "trusted",
+            "rulesets": [],
         }
     ]
     graph_payload = json.loads((result.run_dir / "compiled_graph.json").read_text(encoding="utf-8"))
@@ -470,7 +470,7 @@ def test_registered_plugin_reference_preserves_planned_status(tmp_path) -> None:
             "description": "Planned policy plugin.",
             "version": "",
             "config_keys": ["mode"],
-            "effect_scope": "trusted",
+            "rulesets": [],
         }
     ]
 
@@ -658,7 +658,7 @@ class FutureNode:
     )
     module = _load_module_from_path(node_path, "_future_node")
     registry = _registry()
-    register_node(registry, node_declaration(NodeInfo("test.future", "Future", "test", "Imports a planned helper.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.out", "value.out", display_name="Value Out"),), output_semantics={"value.out": ("future value",)})), module.FutureNode)
+    register_node(registry, node_declaration(NodeInfo("test.future", "Future", "Imports a planned helper.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.out", "value.out", display_name="Value Out"),), output_semantics={"value.out": ("future value",)})), module.FutureNode)
     config_path = tmp_path / "workflow.json"
     config_path.write_text(
         json.dumps(

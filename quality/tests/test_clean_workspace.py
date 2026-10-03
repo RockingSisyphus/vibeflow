@@ -80,6 +80,12 @@ class CleanerDiscoveryTests(unittest.TestCase):
         subjects = {target.path.relative_to(self.root).as_posix() for target in targets}
         self.assertEqual(subjects, {"distribution/cache/node_modules"})
 
+    def test_mounted_metadata_is_environment_state(self) -> None:
+        self.mkdir(".agents")
+        with mock.patch.object(clean_workspace, "ROOT", self.root), mock.patch.object(Path, "is_mount", return_value=True):
+            targets = clean_workspace.discover_targets()
+        self.assertNotIn(self.root / ".agents", {item.path for item in targets})
+
     def test_validation_rejects_tracked_content(self) -> None:
         target = self.mkdir("build")
         tracked = target / "tracked.txt"

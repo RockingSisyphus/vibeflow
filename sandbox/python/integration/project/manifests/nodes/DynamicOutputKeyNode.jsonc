@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "bad.dynamic_output",
   "display_name": "Bad",
-  "category": "bad",
   "description": "Bad contract I/O node.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "bad"
+  ],
   "external": false,
   "contract": {
     "requires": [],

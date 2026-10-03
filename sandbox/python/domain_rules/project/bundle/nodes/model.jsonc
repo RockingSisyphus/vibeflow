@@ -2,7 +2,6 @@
   "kind": "node",
   "type_key": "example.model",
   "display_name": "ModelBlock",
-  "category": "model_block",
   "description": "One model_block block in the example workflow.",
   "version": "0.15.0",
   "flow_kind": "process",
@@ -64,5 +63,15 @@
         "export": "ModelBlock"
       }
     }
+  ],
+  "rulesets": [
+    "example.model_domain"
+  ],
+  "presentation": {
+    "fill": "#cceeff",
+    "shape": "rect"
+  },
+  "tags": [
+    "model_block"
   ]
 }

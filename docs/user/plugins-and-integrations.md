@@ -4,7 +4,7 @@ Plugin 扩展治理、编译或单次运行 hook；BaseLib 提供纯 helper；Ja
 
 ## 领域规则与资源包
 
-审查扩展使用 Rule/Ruleset，不再提供 policy validate hooks。插件包可以同时贡献分类、Node、Rule 和 Ruleset，Node 选中即按需加载；参考 [Rule、Ruleset 与业务分类](rules-and-categories.md)。
+审查扩展使用 Rule/Ruleset，不再提供 policy validate hooks。插件包可以同时贡献完整 Node、Rule、Ruleset 和原生资源，Node 选中规则即按需加载；参考 [Rule、Ruleset 与 Node 声明](rules-and-nodes.md)。
 
 ## Python Plugin
 

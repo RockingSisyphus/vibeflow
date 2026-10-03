@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.prepare_value",
   "display_name": "初始化并准备业务数值",
-  "category": "sandbox",
   "description": "把原始输入数值转换为后续核心计算可以直接使用的准备态数据；该节点模拟真实程序中读取配置、补默认值、做轻量初始化的准备阶段。",
   "version": "0.1.0",
   "flow_kind": "preparation",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

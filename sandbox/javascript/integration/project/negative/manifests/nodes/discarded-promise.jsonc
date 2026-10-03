@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.invalid.discarded_promise",
   "display_name": "Invalid discarded Promise",
-  "category": "sandbox-negative",
   "description": "Starts Promise work that is not owned by the workflow call or a TaskPlan.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -50,5 +52,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox-negative"
+  ]
 }

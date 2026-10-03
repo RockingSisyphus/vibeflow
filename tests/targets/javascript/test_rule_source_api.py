@@ -58,7 +58,7 @@ def _rule(project: Path, name: str, source: str, *, inputs=None, outputs=None) -
     (project / "rules" / (name + ".ts")).write_text(source, encoding="utf-8")
     (project / "manifests/rules" / (name + ".jsonc")).write_text(json.dumps({
         "kind": "rule", "id": "test." + name, "inputs": inputs or {}, "outputs": outputs or {},
-        "implementations": [{"language": "typescript", "targets": ["node"],
+        "implementations": [{"language": "typescript",
             "source": {"kind": "file", "ref": "rules/" + name + ".ts", "export": "check"}}]}), encoding="utf-8")
 
 

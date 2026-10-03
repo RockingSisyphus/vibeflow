@@ -74,7 +74,7 @@ def test_category_rules_public_ast_helpers_and_actual_numerical_run(domain_proje
     code, payload = _call(capsys, ["validate", *_common(workspace, project), "--json"])
     assert code == 0, payload
     evidence = _evidence(payload, "example.model")
-    assert evidence["category"] == "model_block"
+    assert "model_block" in evidence["tags"]
     assert evidence["ast_kind"] == "ClassDef"
     assert [item["symbol"] for item in evidence["definitions"]] == ["ModelBlock.model_forward"]
     assert {"symbol": "scale", "path": str(project / "domain_helpers/arithmetic.py"),
@@ -109,7 +109,7 @@ def test_category_style_and_call_override_enter_formal_review(domain_project, ca
     from vibeflow.tooling.project.config_loader import strip_jsonc_comments
     architecture = json.loads(strip_jsonc_comments((project / "ARCHITECTURE.jsonc").read_text()))
     model = next(item for item in architecture["workflow"]["nodes"] if item["id"] == "model")
-    assert architecture["node_types"]["example.model"]["info"]["category"] == "model_block"
+    assert "model_block" in architecture["node_types"]["example.model"]["info"]["tags"]
     assert model["presentation"]["values"]["fill"] == "#ddeeff"
     assert model["presentation"]["sources"]["fill"] == "call"
     assert main(["export-mermaid", *_common(workspace, project), "--output", str(output)]) == 0
@@ -345,7 +345,7 @@ def test_module_rule_binding_uses_resolved_source_provenance(domain_project, cap
     code, payload = _call(capsys, ["validate", *_common(workspace, project), "--json"])
     if export == "check":
         assert code == 0, payload
-        assert _evidence(payload,"example.model")["category"] == "model_block"
+        assert "model_block" in _evidence(payload,"example.model")["tags"]
     else:
         assert code == 1, payload
         finding = next(item for item in payload["errors"] if item["code"] == "RULE.IMPLEMENTATION.LOAD")

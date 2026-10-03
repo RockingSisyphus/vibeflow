@@ -25,6 +25,17 @@ def no_side_effects(context, inputs, params):
         return RuleResult(records={"effect_policy":policy_record},findings=tuple(finding(context,item.rule_id,item.message,
             path=source.path,line=int(item.source_location.get("line",1)),column=int(item.source_location.get("column",1)),
             details=item.details) for item in scanner.findings))
+    if context.subject.get("kind") == "plugin":
+        findings = []
+        for source in context.require("source_context").files:
+            if source.tree is None:
+                return RuleResult(state="unavailable")
+            visitor = ModulePurityVisitor(policy=source_policy(context,params), source=source_info(source),
+                node_class_name="", known_node_modules=(), known_node_class_names=(),
+                audit_all_definitions=True, effect_scope=scope)
+            visitor.visit(source.tree)
+            findings.extend(violation_finding(context,item) for item in visitor.violations)
+        return RuleResult(records={"effect_policy":policy_record},findings=tuple(findings))
     sources, node, symbol = source_subject(context)
     if symbol is None or not isinstance(symbol.node, ast.ClassDef):
         return RuleResult(records={"effect_policy": policy_record}, state="unavailable")

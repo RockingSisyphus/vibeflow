@@ -2,12 +2,18 @@
   "kind": "plugin",
   "id": "sandbox.runtime_audit",
   "type": "runtime",
-  "targets": ["browser", "node"],
+  "targets": [
+    "browser",
+    "node"
+  ],
   "priority": 30,
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "completion": "immediate",
       "source": {
         "kind": "file",
@@ -20,11 +26,21 @@
     "schema": {
       "type": "object",
       "properties": {
-        "expectedNodes": {"type": "integer", "minimum": 1}
+        "expectedNodes": {
+          "type": "integer",
+          "minimum": 1
+        }
       },
-      "required": ["expectedNodes"],
+      "required": [
+        "expectedNodes"
+      ],
       "additionalProperties": false
     },
-    "defaults": {"expectedNodes": 4}
-  }
+    "defaults": {
+      "expectedNodes": 4
+    }
+  },
+  "rulesets": [
+    "vibeflow.plugin"
+  ]
 }

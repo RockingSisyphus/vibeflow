@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.review_join_end",
   "display_name": "Review Join End",
-  "category": "sandbox",
   "description": "Terminates the review fixture after the external result and every repeated worker result have joined.",
   "version": "0.1.0",
   "flow_kind": "terminal",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

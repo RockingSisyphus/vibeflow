@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.ordinary_callback",
   "display_name": "Ordinary Callback Warning",
-  "category": "training",
   "description": "Deliberately invokes an envelope callback from an ordinary node so the advisory runtime-dispatch warning remains executable.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "training"
+  ],
   "external": false,
   "contract": {
     "requires": [

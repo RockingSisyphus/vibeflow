@@ -10,7 +10,7 @@ from vibeflow.core.descriptors import NodeContractDescriptor, NodeDescriptor
 
 def node_declaration(info, contract, *, rulesets=("vibeflow.process",)):
     return NodeDescriptor(
-        type_key=info.type_key, display_name=info.display_name, category=info.category,
+        type_key=info.type_key, display_name=info.display_name,
         description=info.description, version=info.version, flow_kind=info.flow_kind,
         author=info.author, tags=info.tags, external=info.external, rulesets=rulesets,
         contract=NodeContractDescriptor(

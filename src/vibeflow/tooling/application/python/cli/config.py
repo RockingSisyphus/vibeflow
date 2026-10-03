@@ -34,7 +34,7 @@ def validate_config_path(path: Path, *, policy_path: Path | None = None) -> Heal
         base_path=registry_context.base_path,
         plugin_resource_registry=registry_context.plugin_resource_registry,
     )
-    if plugin_findings:
+    if any(item.severity == "error" for item in plugin_findings):
         return HealthReport(status="ERROR", errors=tuple(plugin_findings), effective_policy=default_effective_policy().to_dict())
     resources, resource_findings = load_config_resources(
         document.data,

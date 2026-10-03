@@ -22,7 +22,7 @@ def _rule_project(root, *, handler_source=None, outputs=None):
             "kind": "rule", "id": "project.review", "outputs": outputs or {},
             "params_schema": {"severity": {"type": "string", "enum": ["error", "warning"]}},
             "params_defaults": {"severity": "warning"},
-            "implementations": [{"language": "python", "targets": ["python"],
+            "implementations": [{"language": "python",
                 "source": {"kind": "file", "ref": "review_rule.py", "export": "check"}}],
         }))
     _refresh_bundle(root)

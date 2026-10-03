@@ -21,7 +21,9 @@ class DescriptorModelError(ValueError):
 
 
 def _required_text(value: object, *, field_name: str) -> str:
-    text = str(value or "").strip()
+    if not isinstance(value, str):
+        raise DescriptorModelError(f"{field_name} must be a non-empty string")
+    text = value.strip()
     if not text:
         raise DescriptorModelError(f"{field_name} must be a non-empty string")
     return text
@@ -30,7 +32,9 @@ def _required_text(value: object, *, field_name: str) -> str:
 def _optional_text(value: object | None) -> str | None:
     if value is None:
         return None
-    text = str(value).strip()
+    if not isinstance(value, str):
+        raise DescriptorModelError("optional text must be a string or null")
+    text = value.strip()
     return text or None
 
 
@@ -204,6 +208,34 @@ class ImplementationDescriptor:
 
 
 @dataclass(frozen=True)
+class RuleImplementationDescriptor:
+    """A checker executes in its language runtime, independent of the program platform."""
+
+    language: str
+    source: SourceLocator
+
+    def __post_init__(self) -> None:
+        language = _required_text(self.language, field_name="rule implementation.language")
+        language = {"js": "javascript", "ts": "typescript"}.get(language, language)
+        if language not in IMPLEMENTATION_LANGUAGES:
+            raise DescriptorModelError("rule implementation.language must be python, javascript or typescript")
+        if not isinstance(self.source, SourceLocator):
+            raise DescriptorModelError("rule implementation.source must be a SourceLocator")
+        object.__setattr__(self, "language", language)
+
+    @property
+    def execution_family(self) -> str:
+        return "python" if self.language == "python" else "javascript"
+
+    @property
+    def source_locator(self) -> SourceLocator:
+        return self.source
+
+    def to_dict(self) -> dict[str, object]:
+        return {"language": self.language, "source": self.source.to_dict()}
+
+
+@dataclass(frozen=True)
 class NodeContractDescriptor:
     requires: tuple[DataRequirement, ...] = ()
     provides: tuple[DataProvider, ...] = ()
@@ -268,8 +300,6 @@ class NodeContractDescriptor:
             _freeze_mapping(item, field_name=f"contract.examples[{index}]")
             for index, item in enumerate(self.examples)
         )
-        if any("outputs" in item for item in examples):
-            raise DescriptorModelError("contract.examples.outputs is removed; examples document inputs and params")
         object.__setattr__(self, "requires", requires)
         object.__setattr__(self, "provides", provides)
         object.__setattr__(self, "input_semantics", input_semantics)
@@ -337,7 +367,6 @@ class CapabilityRequirementDescriptor:
 class NodeDescriptor:
     type_key: str
     display_name: str
-    category: str
     description: str
     version: str
     flow_kind: str
@@ -348,7 +377,7 @@ class NodeDescriptor:
     author: str | None = None
     tags: tuple[str, ...] = ()
     external: bool = False
-    rulesets: tuple[str, ...] | None = None
+    rulesets: tuple[str, ...] = ()
     presentation: Mapping[str, Any] = field(default_factory=dict)
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
@@ -363,7 +392,6 @@ class NodeDescriptor:
             "display_name",
             _required_text(self.display_name, field_name="node.display_name"),
         )
-        object.__setattr__(self, "category", str(self.category or "").strip())
         object.__setattr__(
             self,
             "description",
@@ -424,9 +452,8 @@ class NodeDescriptor:
             "tags",
             _string_tuple(self.tags, field_name="node.tags"),
         )
-        if self.rulesets is not None:
-            object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="node.rulesets"))
-        from vibeflow.core.descriptors.categories import normalize_presentation
+        object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="node.rulesets"))
+        from vibeflow.core.descriptors.presentation import normalize_presentation
         object.__setattr__(self, "presentation", normalize_presentation(self.presentation, field_name="node.presentation"))
         object.__setattr__(self, "metadata", _freeze_mapping(self.metadata, field_name="node.metadata"))
 
@@ -449,7 +476,6 @@ class NodeDescriptor:
             "kind": "node",
             "type_key": self.type_key,
             "display_name": self.display_name,
-            "category": self.category,
             "description": self.description,
             "version": self.version,
             "flow_kind": self.flow_kind,

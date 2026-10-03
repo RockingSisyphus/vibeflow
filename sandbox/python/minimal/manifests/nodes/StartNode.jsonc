@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "example.start",
   "display_name": "Start",
-  "category": "example",
   "description": "Starts the example workflow.",
   "version": "0.1.0",
   "flow_kind": "terminal",
   "author": null,
-  "tags": [],
+  "tags": [
+    "example"
+  ],
   "external": false,
   "contract": {
     "requires": [],

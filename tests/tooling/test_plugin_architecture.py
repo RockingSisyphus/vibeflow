@@ -57,6 +57,7 @@ def test_planned_static_plugin_is_complete_without_descriptor() -> None:
             "category": "",
             "description": "Provides a future runtime extension.",
             "version": "",
+            "rulesets": [],
         }
     ]
 

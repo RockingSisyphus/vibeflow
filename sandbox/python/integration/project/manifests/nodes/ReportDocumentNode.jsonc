@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.report_document",
   "display_name": "生成中文报告文档",
-  "category": "sandbox",
   "description": "把最终数值和审计请求组合成可输出的报告文档内容；该节点用于验证标准流程图中的 Document 文档形状。",
   "version": "0.1.0",
   "flow_kind": "document",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

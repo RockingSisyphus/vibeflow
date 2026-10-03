@@ -299,6 +299,7 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
         root_path=str(root.path),
         source_path=str(config_path),
         plugin_resource_registry=root_registries.plugins if root_registries and root_registries.has_plugin_registry else None,
+        rule_registry=env.registry,
     )
     preflight_findings.extend(annotate_findings(plugin_findings, root=root, source_path=config_path))
     resources, resource_findings = load_config_resources(
@@ -528,6 +529,12 @@ def _environment_or_report(workspace: WorkspaceConfig) -> WorkspaceEnvironment |
     except WorkspaceConfigError as exc:
         path = Path(str(exc.source_location.get("path", workspace.path)))
         return _workspace_error_report(exc.rule_id, exc.message, path, default_effective_policy())
+    except DescriptorLoadError as exc:
+        from vibeflow.core.findings import HealthFinding, HealthReport
+        return HealthReport(status="ERROR", errors=(HealthFinding(rule_id=exc.code, severity="error",
+            object_type="descriptor", object_id=str(exc.details.get("resource_id", "")), message=exc.message,
+            source_location={"path":exc.path,"line":1,"column":1}, failure_layer="descriptor",
+            details={"field":exc.field, "source":exc.path, **exc.details}),))
     except Exception as exc:
         return _workspace_error_report("WORKSPACE.LOAD", str(exc), workspace.path, default_effective_policy())
 

@@ -1,0 +1,43 @@
+# 第二轮 Rule、Node 与插件接口补测
+
+这组测试将 [第二轮审计](../../docs/design/baseline-rule-coverage-second-audit.md) 的临时探针变为可重复验收，并补齐正常组合。它检查当前实现，保留 [基线对照](../rule_parity/README.md) 的案例 ID 和历史观察。当前声明按已确认的完整 Node 和通用 Rule 接口迁移，理由见 [迁移说明](../../docs/user/rule-system-migration.md)。两组真实沙箱都已接入完整门禁。
+
+测试复制仓库中的正常项目，在临时副本中修改声明或源码，执行真实命令、Target handler、worker 和数值业务。Core finding 案例单独验证语言无关结果契约；其余场景保留实际 Target 资料。用人工指标调用内核，不能替代这里的公开 implementation Rule 组合测试。
+
+## 测试组
+
+| 组 | 覆盖与实际证据 |
+| --- | --- |
+| `python` | 独立文件的明确空 Ruleset 与启用规则的邻居；同模块自身规则；实际共享/非共享 helper 与调用归属；planned stub 主文件和 helper 的真实导入及 marker |
+| `javascript` | typed records 的合法数组、空值、对象和 async；非法 Map/Date/undefined/非有限数字/bigint/循环值；provider 状态和 requires consumer；静态、动态、require 导入；双平台实现的 validate/quality/review/build；Bundle 的五类原生资源、冲突与悬空引用 |
+| `graph` | 不同默认值和新增参数的实现替换及来源；显式 includes；未绑定/冲突输入、参数 schema；源码 consumer 的 typed inputs/有效参数缓存和新 session；直接选择公开 implementation leaf 的真实正常/超限源码；合法和非法 findings 的 Core/Python/JS 边界 |
+| `tooling` | 完整 Node shape、已移除分类资源的明确诊断、Rule 端口类型；正式单个 JSON、资源位置和实现尚未执行；混合语言同 ID、跨 root 引用及双方冲突来源；预览选择一致 |
+| `composition` | 领域 Bundle 的模型 Node 在分支、Nodeset、Loop 中实际计算；参数化 tags 归属、非法 helper 模型定义、完整调用路径；Node 自己声明浅蓝色，验证 Architecture、Mermaid 和真实 SVG |
+
+Bundle 正常例将 BaseLib、DataSchema、Capability、Host Extension、Runtime Plugin 全部经贡献资源装配，检查数值结果及完整生命周期。两平台纯数值构建产物在 Node 中实际执行；已有浏览器沙箱继续负责真实浏览器验收。
+
+## 运行
+
+从仓库根目录执行；`--work` 必须是尚不存在的目录：
+
+```bash
+npm_config_cache=/tmp/vibeflow-npm-cache python sandbox/rule_gaps/run_all.py \
+  --work /tmp/vibeflow-rule-gaps-run \
+  --report /tmp/vibeflow-rule-gaps-run.json
+```
+
+默认按仓库锁文件准备 TypeScript/esbuild 和 Mermaid/Puppeteer。可通过 `--toolchain /path/to/project-toolchain`、`--renderer /path/to/mermaid-renderer` 复用已按对应锁文件安装的目录；不需要修改测试源码。`--group python` 等参数可重复使用，只运行所选组。
+
+每组使用独立进程和临时项目，保存命令输出、handler 事件、实际产物和 `observations.json`。最终 JSON 列出每项期待、实际资料和具体不匹配原因。退出码为：全部满足 `0`，存在不匹配 `1`，观察进程或环境失败 `2`。空观察组、重复 ID 或残缺记录不能作为通过的覆盖。
+
+正例需要目标 handler 或业务实际执行；负例需要目标诊断与原因，不能由无关异常代替。资料运输测试需要依赖消费者是否执行的证据；非法声明测试需要诊断指向实际资源。正式 CLI 未返回完整 Rule 状态时，同项目另走公开 Target API 取得状态，文件中明确记录证据入口，保留 CLI 的原始结果。
+
+已知问题仍按期望契约报告不匹配，不使用 `xfail`、忽略失败或降低阈值。这组是独立的产品验收入口；报告机制的 pytest 通过，只表示它能正确区分通过、不匹配和观察失败：
+
+```bash
+npm_config_cache=/tmp/vibeflow-npm-cache python tools/run_tests.py -- \
+  tests/integration/test_rule_gaps_reporting.py \
+  tests/integration/test_rule_parity_reporting.py
+```
+
+结果与修复边界见 [本轮结果](RESULTS.md)。本次补测保持各命令的既有扫描范围，生产实现、规则权限和工作流机制不在测试中替换。

@@ -9,6 +9,7 @@ from typing import Any, Mapping
 from vibeflow.targets.python.project.resources import (
     PluginInfo,
     PluginResourceRegistry,
+    PluginResource,
     normalize_plugin_config,
     normalize_plugin_info,
     plugin_status,
@@ -30,6 +31,8 @@ def load_plugins_from_config(
     root_path: str = "",
     source_path: str = "",
     plugin_resource_registry: PluginResourceRegistry | None = None,
+    rule_registry: object | None = None,
+    rule_phase: str = "static",
 ) -> tuple[PluginRegistry, tuple[object, ...]]:
     registry = PluginRegistry()
     findings: list[object] = []
@@ -63,6 +66,20 @@ def load_plugins_from_config(
             findings.append(_plugin_finding("PLUGIN.CONFIG.SCHEMA", str(exc), object_id))
             continue
         try:
+            from vibeflow.targets.python.project.resource_rules import review_python_resource
+            resource = PluginResource(name=str(spec.get("name", spec.get("id", object_id))),
+                id=str(spec.get("id", spec.get("name", object_id))), module=str(spec.get("module", spec.get("path", ""))),
+                class_name=str(spec.get("class", spec.get("factory", "Plugin"))), rulesets=spec.get("rulesets", ()),
+                source_path=source_path, root_id=root_id)
+            reviewed = []
+            for phase in dict.fromkeys(("import", rule_phase)):
+                checked = review_python_resource(resource, base_path=base_path, registry=rule_registry, phase=phase)
+                reviewed.extend(checked)
+                if any(item.severity == "error" for item in checked):
+                    break
+            findings.extend(reviewed)
+            if any(item.severity == "error" for item in reviewed):
+                continue
             plugin, info, config_keys = _load_plugin(spec, base_path=base_path)
             registry.register(
                 plugin,
@@ -78,9 +95,11 @@ def load_plugins_from_config(
                 root_path=root_path,
                 source_path=source_path,
                 conflict=str(spec.get("conflict", "error")),
+                rulesets=resource.rulesets,
             )
         except Exception as exc:
             findings.append(_plugin_finding("PLUGIN.LOAD", f"plugin load failed: {exc}", object_id))
+    registry.review_findings = tuple(findings)
     return registry, tuple(findings)
 
 
@@ -109,6 +128,7 @@ def _resolve_registered_plugin_spec(
     resolved.setdefault("category", registered.category)
     resolved.setdefault("version", registered.version)
     resolved.setdefault("priority", registered.priority)
+    resolved.setdefault("rulesets", registered.rulesets)
     if registered.config_schema or registered.config_defaults:
         from vibeflow.core.config.node import normalize_node_config_spec, merge_node_config
         merged = merge_node_config(normalize_node_config_spec(registered.config_schema,registered.config_defaults), normalize_plugin_config(spec))

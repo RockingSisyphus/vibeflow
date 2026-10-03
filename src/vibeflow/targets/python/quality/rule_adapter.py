@@ -185,6 +185,11 @@ def execute_python_node_rules(registry, source_context, *, phase="static", purit
         if phase in {"static","run"}:
             registry.record_effect_policy(node.type_key,scopes[node.type_key])
     call_scopes = {key:next(iter(value)) if len(value) == 1 else "mixed" for key,value in call_policy_scopes.items()}
+    from vibeflow.targets.python.project.resource_rules import review_reached_base_libs
+    library_findings, library_executions = review_reached_base_libs(registry,source_context,rules=rules,rulesets=rulesets,
+        handlers=handlers,phase=phase,purity_policy=purity_policy)
+    findings.extend(library_findings)
+    executions.extend(library_executions)
     return PythonRuleReport(tuple(findings),tuple(executions),metrics,scopes,call_scopes,{key:tuple(value) for key,value in call_policies.items()},call_metrics)
 
 __all__ = ["PythonRuleReport","execute_python_node_rules","rule_resources","selected_effect_scope"]

@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.training_metrics_end",
   "display_name": "Training Metrics End",
-  "category": "training",
   "description": "Ends after training metrics are available.",
   "version": "0.1.0",
   "flow_kind": "terminal",
   "author": null,
-  "tags": [],
+  "tags": [
+    "training"
+  ],
   "external": false,
   "contract": {
     "requires": [

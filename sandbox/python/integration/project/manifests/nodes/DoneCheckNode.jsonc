@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.done_check",
   "display_name": "Done Check",
-  "category": "sandbox",
   "description": "Checks whether the loop reached its target.",
   "version": "0.1.0",
   "flow_kind": "decision",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from vibeflow.core.descriptors.catalogs import (
     BaseLibCatalog,
-    BundleCatalog, NodeCategoryCatalog, RuleCatalog, RulesetCatalog,
+    BundleCatalog, RuleCatalog, RulesetCatalog,
     CapabilityCatalog,
     DataSchemaRegistry,
     DescriptorCatalogError,
@@ -33,7 +33,7 @@ class DescriptorCatalogs(CoreDescriptorCatalogs):
 
 __all__ = [
     "BaseLibCatalog",
-    "BundleCatalog", "NodeCategoryCatalog", "RuleCatalog", "RulesetCatalog",
+    "BundleCatalog", "RuleCatalog", "RulesetCatalog",
     "CapabilityCatalog",
     "DataSchemaRegistry",
     "DescriptorCatalogError",

@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.constant",
   "display_name": "Constant",
-  "category": "sandbox",
   "description": "Produces a configured numeric value.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [],

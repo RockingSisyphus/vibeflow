@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.report_output",
   "display_name": "报告输出接口",
-  "category": "sandbox",
   "description": "把报告文档转换为程序对外输出；该节点验证 I/O 不是开始或结束，而是流程中的输入输出动作。",
   "version": "0.1.0",
   "flow_kind": "io",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

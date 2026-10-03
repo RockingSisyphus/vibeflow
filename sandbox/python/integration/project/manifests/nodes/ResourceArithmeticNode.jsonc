@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.resource_arithmetic",
   "display_name": "Resource Arithmetic",
-  "category": "sandbox",
   "description": "Uses declared base_lib arithmetic helpers and the configured plugin shift to produce calc.resource.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from typing import Mapping, Protocol
 
 from vibeflow.core.findings import HealthFinding
-from vibeflow.targets.python.project.node import EFFECT_SCOPE_TRUSTED
 from vibeflow.targets.python.project.resources import PluginInfo, PluginResource
 
 
@@ -38,6 +37,7 @@ class PluginDescriptor:
     root_id: str = ""
     root_path: str = ""
     source_path: str = ""
+    rulesets: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         payload = {
@@ -46,7 +46,7 @@ class PluginDescriptor:
             "priority": self.priority,
             "scope": self.scope,
             "source": self.source,
-            "effect_scope": EFFECT_SCOPE_TRUSTED,
+            "rulesets": list(self.rulesets),
         }
         if self.root_id:
             payload["root_id"] = self.root_id
@@ -83,6 +83,7 @@ class PluginRegistry:
         root_path: str = "",
         source_path: str = "",
         conflict: str = "error",
+        rulesets: tuple[str, ...] = (),
     ) -> None:
         normalized_type = _normalize_type(plugin_type)
         plugin_name = str(
@@ -130,6 +131,7 @@ class PluginRegistry:
             root_id,
             root_path,
             source_path,
+            tuple(rulesets),
         )
 
     def compiler_plugins(self) -> tuple[object, ...]:
@@ -175,6 +177,7 @@ class PluginRegistry:
                 root_id=descriptor.root_id,
                 root_path=descriptor.root_path,
                 source_path=descriptor.source_path,
+                rulesets=descriptor.rulesets,
             )
         return resources
 

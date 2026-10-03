@@ -131,7 +131,7 @@ def test_validate_audits_only_selected_node_and_base_lib_sources(
             "kind": "node",
             "type_key": "example.unused",
             "display_name": "Unused node",
-            "category": "example",
+
             "description": "Not selected by greeting.jsonc.",
             "version": "1.0.0",
             "flow_kind": "process",

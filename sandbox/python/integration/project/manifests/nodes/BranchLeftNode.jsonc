@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.branch_left",
   "display_name": "Branch Left",
-  "category": "sandbox",
   "description": "Produces the left value for a free branch.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [],

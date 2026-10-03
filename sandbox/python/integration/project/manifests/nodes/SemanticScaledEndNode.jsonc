@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.scaled_end",
   "display_name": "Semantic Scaled End",
-  "category": "semantic",
   "description": "Terminates a nested semantic flow after calc.scaled is available.",
   "version": "0.1.0",
   "flow_kind": "terminal",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

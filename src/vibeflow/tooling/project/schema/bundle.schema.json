@@ -21,16 +21,33 @@
     "resources": {
       "type": "object",
       "properties": {
-        "categories": {"$ref": "#/$defs/references"},
-        "nodes": {"$ref": "#/$defs/references"},
-        "rules": {"$ref": "#/$defs/references"},
-        "rulesets": {"$ref": "#/$defs/references"},
-        "base_lib": {"$ref": "#/$defs/references"},
-        "data_schemas": {"$ref": "#/$defs/references"},
-        "capabilities": {"$ref": "#/$defs/references"},
-        "host_extensions": {"$ref": "#/$defs/references"},
-        "plugins": {"$ref": "#/$defs/references"},
-        "bundles": {"$ref": "#/$defs/references"}
+        "nodes": {
+          "$ref": "#/$defs/references"
+        },
+        "rules": {
+          "$ref": "#/$defs/references"
+        },
+        "rulesets": {
+          "$ref": "#/$defs/references"
+        },
+        "base_lib": {
+          "$ref": "#/$defs/references"
+        },
+        "data_schemas": {
+          "$ref": "#/$defs/references"
+        },
+        "capabilities": {
+          "$ref": "#/$defs/references"
+        },
+        "host_extensions": {
+          "$ref": "#/$defs/references"
+        },
+        "plugins": {
+          "$ref": "#/$defs/references"
+        },
+        "bundles": {
+          "$ref": "#/$defs/references"
+        }
       },
       "additionalProperties": false
     }
@@ -38,7 +55,10 @@
   "$defs": {
     "references": {
       "type": "array",
-      "items": {"type": "string", "minLength": 1}
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   },
   "additionalProperties": false

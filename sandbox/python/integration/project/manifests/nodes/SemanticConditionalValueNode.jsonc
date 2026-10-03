@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.conditional_value",
   "display_name": "Semantic Conditional Value",
-  "category": "semantic",
   "description": "Produces a value.in-compatible branch value plus an active route flag.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [],

@@ -33,9 +33,9 @@ Workflow ABI 为 `vibeflow.workflow.v4`。公共计划只保存稳定 ID、可�
 
 Python 和 JavaScript Target 使用相同 Core 语义，但分别声明可执行 feature。Target 不支持的 implemented 语义以稳定 finding 拒绝；planned 内容仍可进入架构审核。
 
-## 规则与业务分类
+## 规则与 Node 声明
 
-公开规则模型位于 `vibeflow.core.rules`，分类和 bundle 位于 `vibeflow.core.descriptors`。Node 的 `rulesets` 未填写时继承分类默认值，显式 `[]` 表示不选择 Node 审查规则。workflow 与 Nodeset 的顶层 `rulesets` 默认选择 `vibeflow.workflow`。业务分类不改变原生 Node/Nodeset/Loop 的组合与执行。
+公开规则模型位于 `vibeflow.core.rules`，完整 Node 声明和 bundle 位于 `vibeflow.core.descriptors`。Node 自己声明规则和默认展示；省略 `rulesets` 与显式 `[]` 都表示不选择 Node 审查规则。workflow 与 Nodeset 的顶层 `rulesets` 默认选择 `vibeflow.workflow`。自由 tags/metadata 可供领域规则识别业务含义，不改变原生 Node/Nodeset/Loop 的组合与执行。
 
 Rule 图使用独立的 includes/requires/overrides 关系，不使用业务边的调度和数据传递语义。Core 先展开组合、解析显式覆盖，再按具名资料依赖执行选中规则。覆盖链决定优先级，文件加载顺序不决定结果；规则不能删除其他规则的诊断。
 
@@ -45,6 +45,6 @@ Target 提供当前检查范围的源码、符号、导入、实际实现和 hel
 
 Architecture 从真实 Config、Nodeset、Node 类型、资源登记和编译事实确定性生成。生成文档不是可执行配置，也不是可编辑 source。新鲜度检查通过重新生成并比较 canonical bytes 完成。
 
-分类、Node 和调用点的图形默认值按 native → category → Node → status → call 合并，每个字段保留来源。Architecture 与两个 Target 的 Mermaid presenter 使用同一个展示解析器；自定义颜色和形状不替代独立的 flow_kind、效果约束与状态标记。`review-rules` 只读取声明和展开有效规则计划，不导入业务 Node 或执行 Rule 实现。
+Node 和调用点的图形默认值按 native → Node → status → call 合并，每个字段保留来源。Architecture 与两个 Target 的 Mermaid presenter 使用同一个展示解析器；自定义颜色和形状不替代独立的 flow_kind、效果约束与状态标记。`review-rules` 只读取声明和展开有效规则计划，不导入业务 Node 或执行 Rule 实现。
 
 公开状态范围模型位于 Core/Tooling 共享边界，使 Python 与 JavaScript presenter 使用相同 coverage ID，同时只报告本次命令实际完成的检查。

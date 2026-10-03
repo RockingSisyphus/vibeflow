@@ -19,7 +19,7 @@ TARGET_ROOT = SOURCE_ROOT / "vibeflow" / "targets" / "javascript"
 FRONTEND_ROOT = TARGET_ROOT / "frontend"
 
 RESOURCE_SHA256 = {'plugin_abi.d.ts': '6f0da3fbf7570a77ef4bd940fcfbb93f112e3e866a2c0d989c9d51cf7f76f811',
- 'plugin_worker.mjs': 'd98381808c5f1a2dd6cccd65447944e6fb12270540c990ffedbe28ba59f3d2db',
+ 'plugin_worker.mjs': '6ec42f83a6a8efe13f50b21d87ae40ff9727ca932fc95f07535b48283365dbd8',
  'rule_abi.d.ts': 'aaeba26699c078d6340b0e243cbe0f3e7fc53eea167956e99f85155f2574f2bb',
  'runtime_helpers.mjs': 'b29392f9f9795cdb6a0cbf00098a20971c7006c332be35d4ab1c0217ed78ce62',
  'toolchain_driver.mjs': '33d8552c140e9e54f82ad47de83b714b755f7931bd234ef2ee25db9038276d26'}

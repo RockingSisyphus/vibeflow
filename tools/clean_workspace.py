@@ -158,7 +158,7 @@ def discover_targets(*, include_release: bool = False) -> tuple[CleanupTarget, .
             found[candidate] = "workspace"
     for relative in EMPTY_METADATA_DIRS:
         candidate = ROOT / relative
-        if candidate.is_dir() and not any(candidate.iterdir()):
+        if candidate.is_dir() and not candidate.is_mount() and not any(candidate.iterdir()):
             found[candidate] = "empty-metadata"
     for relative in LEGACY_DIRECTORIES:
         candidate = ROOT / relative

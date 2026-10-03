@@ -9,7 +9,7 @@ JavaScript Target 使用静态 descriptor 记录资源信息，并把 workflow �
   "kind": "node",
   "type_key": "example.normalize_text",
   "display_name": "Normalize text",
-  "category": "text",
+  "tags": ["text"],
   "description": "Normalizes whitespace in supplied text.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -38,7 +38,7 @@ JavaScript Target 使用静态 descriptor 记录资源信息，并把 workflow �
 }
 ```
 
-Node descriptor 与 Python 共用声明模型。`rulesets` 明确选择审查约束；未填写时继承分类默认，显式 `[]` 表示未约束，`flow_kind` 不授予副作用权限。分类可提供默认颜色、形状、图标和 Ruleset，插件可通过 bundle 批量登记，见 [规则与分类](rules-and-categories.md)。
+Node descriptor 与 Python 共用声明模型。`rulesets` 明确选择审查约束；省略与显式 `[]` 都表示未选择 Node 审查规则，`flow_kind` 不授予副作用权限。每个 Node 自己声明默认颜色、形状、图标和 Ruleset，插件可通过 bundle 批量登记，见 [规则与 Node 声明](rules-and-nodes.md)。
 
 Node descriptor 的端口和语义必须完整。`params_schema` / `params_defaults` 描述调用实例 `config`；输出结构不在 Node 上覆盖，provider 的 `type` 对应独立 Data Schema。
 

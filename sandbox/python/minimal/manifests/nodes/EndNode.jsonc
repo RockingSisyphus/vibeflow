@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "example.end",
   "display_name": "End",
-  "category": "example",
   "description": "Ends after value.out is produced.",
   "version": "0.1.0",
   "flow_kind": "terminal",
   "author": null,
-  "tags": [],
+  "tags": [
+    "example"
+  ],
   "external": false,
   "contract": {
     "requires": [

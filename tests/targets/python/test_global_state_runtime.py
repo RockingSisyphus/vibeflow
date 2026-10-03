@@ -94,7 +94,6 @@ class _ProtectedTaskState:
 NormalGateNode_DECLARATION = node_declaration(NodeInfo(
         "test.normal_gate",
         "Normal Gate",
-        "test",
         "Blocks a normal root for lock coordination tests.",
         "0.1.0",
         "process",
@@ -111,7 +110,6 @@ class NormalGateNode:
 ParallelProbeNode_DECLARATION = node_declaration(NodeInfo(
         "test.parallel_probe",
         "Parallel Probe",
-        "test",
         "Measures overlapping root execution.",
         "0.1.0",
         "process",
@@ -128,7 +126,6 @@ class ParallelProbeNode:
 GlobalProbeNode_DECLARATION = node_declaration(NodeInfo(
         "test.global_probe",
         "Global Probe",
-        "test",
         "Touches ambient interpreter state for runtime lock tests.",
         "0.1.0",
         "global_state",
@@ -145,7 +142,6 @@ class GlobalProbeNode:
 BlockingNormalNode_DECLARATION = node_declaration(NodeInfo(
         "test.blocking_normal",
         "Blocking Normal",
-        "test",
         "Holds one shared root admission.",
         "0.1.0",
         "process",
@@ -163,7 +159,6 @@ class BlockingNormalNode:
 HoldingGlobalNode_DECLARATION = node_declaration(NodeInfo(
         "test.holding_global",
         "Holding Global",
-        "test",
         "Holds the exclusive global-state admission.",
         "0.1.0",
         "global_state",
@@ -181,7 +176,6 @@ class HoldingGlobalNode:
 FollowingNormalNode_DECLARATION = node_declaration(NodeInfo(
         "test.following_normal",
         "Following Normal",
-        "test",
         "Attempts shared admission behind a waiting writer.",
         "0.1.0",
         "process",
@@ -198,7 +192,6 @@ class FollowingNormalNode:
 GlobalFailureNode_DECLARATION = node_declaration(NodeInfo(
         "test.global_failure",
         "Global Failure",
-        "test",
         "Fails after ambient state may have changed.",
         "0.1.0",
         "global_state",
@@ -214,7 +207,6 @@ class GlobalFailureNode:
 GlobalInterruptNode_DECLARATION = node_declaration(NodeInfo(
         "test.global_interrupt",
         "Global Interrupt",
-        "test",
         "Simulates cancellation after ambient state may have changed.",
         "0.1.0",
         "global_state",
@@ -230,7 +222,6 @@ class GlobalInterruptNode:
 GlobalNoopNode_DECLARATION = node_declaration(NodeInfo(
         "test.global_noop",
         "Global Noop",
-        "test",
         "Marks a root as global-state protected without delaying it.",
         "0.1.0",
         "global_state",
@@ -246,7 +237,6 @@ class GlobalNoopNode:
 GlobalWorkerLeftNode_DECLARATION = node_declaration(NodeInfo(
         "test.global_worker_left",
         "Global Worker Left",
-        "test",
         "Runs one managed global-state worker.",
         "0.1.0",
         "global_state",
@@ -265,7 +255,6 @@ class GlobalWorkerLeftNode:
 GlobalWorkerRightNode_DECLARATION = node_declaration(NodeInfo(
         "test.global_worker_right",
         "Global Worker Right",
-        "test",
         "Runs another managed global-state worker.",
         "0.1.0",
         "global_state",
@@ -284,7 +273,6 @@ class GlobalWorkerRightNode:
 OrdinaryWorkerNode_DECLARATION = node_declaration(NodeInfo(
         "test.ordinary_worker",
         "Ordinary Worker",
-        "test",
         "Runs one ordinary managed result worker.",
         "0.1.0",
         "process",
@@ -302,7 +290,6 @@ class OrdinaryWorkerNode:
 WorkerLeftJoinNode_DECLARATION = node_declaration(NodeInfo(
         "test.worker_left_join",
         "Worker Left Join",
-        "test",
         "Joins one ordinary worker result.",
         "0.1.0",
         "terminal",
@@ -320,7 +307,6 @@ class WorkerLeftJoinNode:
 ProtectedSlowResultNode_DECLARATION = node_declaration(NodeInfo(
         "test.protected_slow_result",
         "Protected Slow Result",
-        "test",
         "Waits so failure cleanup must retain an inherited lease.",
         "0.1.0",
         "process",
@@ -343,7 +329,6 @@ class ProtectedSlowResultNode:
 ProtectedJoinNode_DECLARATION = node_declaration(NodeInfo(
         "test.protected_join",
         "Protected Join",
-        "test",
         "Joins a protected result and a second branch.",
         "0.1.0",
         "terminal",
@@ -364,7 +349,6 @@ class ProtectedJoinNode:
 CoordinatedFailureNode_DECLARATION = node_declaration(NodeInfo(
         "test.coordinated_failure",
         "Coordinated Failure",
-        "test",
         "Fails only after the sibling protected worker has started.",
         "0.1.0",
         "process",
@@ -383,7 +367,6 @@ class CoordinatedFailureNode:
 UnrelatedDetachedNode_DECLARATION = node_declaration(NodeInfo(
         "test.unrelated_detached",
         "Unrelated Detached",
-        "test",
         "Waits outside a sibling node's named lock scope.",
         "0.1.0",
         "process",
@@ -404,7 +387,6 @@ class UnrelatedDetachedNode:
 WorkerJoinNode_DECLARATION = node_declaration(NodeInfo(
         "test.worker_join",
         "Worker Join",
-        "test",
         "Joins both managed worker results before root completion.",
         "0.1.0",
         "terminal",
@@ -425,7 +407,6 @@ class WorkerJoinNode:
 DelayedResultNode_DECLARATION = node_declaration(NodeInfo(
         "test.delayed_result",
         "Delayed Result",
-        "test",
         "Occupies the sole managed worker before a late global task.",
         "0.1.0",
         "process",
@@ -444,7 +425,6 @@ class DelayedResultNode:
 LateGlobalResultNode_DECLARATION = node_declaration(NodeInfo(
         "test.late_global_result",
         "Late Global Result",
-        "test",
         "Starts only while failure cleanup drains managed work.",
         "0.1.0",
         "global_state",
@@ -462,7 +442,6 @@ class LateGlobalResultNode:
 LateJoinNode_DECLARATION = node_declaration(NodeInfo(
         "test.late_join",
         "Late Join",
-        "test",
         "Provides a provable join path for cleanup tasks.",
         "0.1.0",
         "terminal",
@@ -484,7 +463,6 @@ class LateJoinNode:
 EarlyQuickResultNode_DECLARATION = node_declaration(NodeInfo(
         "test.early_quick_result",
         "Early Quick Result",
-        "test",
         "Completes the branch whose terminal ends the root early.",
         "0.1.0",
         "process",
@@ -503,7 +481,6 @@ class EarlyQuickResultNode:
 EarlySlowResultNode_DECLARATION = node_declaration(NodeInfo(
         "test.early_slow_result",
         "Early Slow Result",
-        "test",
         "Keeps an unselected result branch active during early termination.",
         "0.1.0",
         "process",
@@ -526,7 +503,6 @@ class EarlySlowResultNode:
 EarlyQuickEndNode_DECLARATION = node_declaration(NodeInfo(
         "test.early_quick_end",
         "Early Quick End",
-        "test",
         "Ends the root after consuming only the quick branch.",
         "0.1.0",
         "terminal",
@@ -544,7 +520,6 @@ class EarlyQuickEndNode:
 EarlySlowEndNode_DECLARATION = node_declaration(NodeInfo(
         "test.early_slow_end",
         "Early Slow End",
-        "test",
         "Provides the statically visible join path for the slow branch.",
         "0.1.0",
         "terminal",
@@ -1352,7 +1327,6 @@ def test_dynamic_nested_runtime_rejects_a_different_user_lock_and_releases(
     DynamicNestedRuntimeNode_DECLARATION = node_declaration(NodeInfo(
             "test.dynamic_nested_runtime",
             "Dynamic Nested Runtime",
-            "test",
             "Attempts to acquire another user domain through a nested runtime.",
             "0.1.0",
             "process",

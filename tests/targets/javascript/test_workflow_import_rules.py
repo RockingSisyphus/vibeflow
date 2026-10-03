@@ -40,9 +40,9 @@ def _select_import_rule(project, scope, outcome):
     declaration = json.loads(owner.read_text())
     declaration["rulesets"] = ["test.workflow_import"]
     owner.write_text(json.dumps(declaration))
-    # Unused definitions must never introduce their own import checks or source reads.
+    # A loaded unused declaration can opt out of review without adding source reads.
     unused = {"type_key": "unused.block", "display_name": "Unused block", "description": "Outside the actual workflow closure.",
-              "requires": [], "provides": [], "rulesets": ["test.unregistered"], "pipeline": declaration["pipeline"]}
+              "requires": [], "provides": [], "rulesets": [], "pipeline": declaration["pipeline"]}
     (project / "configs/nodesets/unused.jsonc").write_text(json.dumps(unused))
     document = json.loads(config.read_text())
     document.setdefault("nodeset_imports", []).append({"path": "nodesets/unused.jsonc"})
@@ -64,7 +64,7 @@ def _select_import_rule(project, scope, outcome):
         ' return ' + returned + ';\n}\n')
     manifest = project / "manifests/rules/workflow-import.jsonc"
     manifest.write_text(json.dumps({"kind": "rule", "id": "test.workflow_import", "outputs": {"evidence": "test.workflow_import.v1"} if outcome == "completed" else {},
-        "implementations": [{"language": "typescript", "targets": ["node", "browser"], "source": {"kind": "file", "ref": "rules/workflow_import.ts", "export": "check"}}]}))
+        "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/workflow_import.ts", "export": "check"}}]}))
     (project / "manifests/rulesets/workflow-import.jsonc").write_text(json.dumps({"kind": "ruleset", "id": "test.workflow_import",
         "calls": [{"id": "check", "rule_id": "test.workflow_import"}], "entrypoints": {"import": ["check"], "static": ["check"] if outcome == "completed" else [], "run": []}}))
     return config, owner
@@ -133,6 +133,20 @@ def test_declaration_only_preview_keeps_import_unavailable_without_executing_rul
     assert imported.results["check"].state == "unavailable"
 
 
+def test_loaded_unused_nodeset_keeps_its_rule_selection_without_fake_calls(import_project):
+    workspace, project = import_project
+    config, _ = _select_import_rule(project, "root", "completed")
+    unused = project / "configs/nodesets/unused.jsonc"
+    declaration = json.loads(unused.read_text())
+    declaration["rulesets"] = ["test.unregistered"]
+    unused.write_text(json.dumps(declaration))
+    with pytest.raises(ProjectBuildError) as error:
+        audit_javascript_project(JavascriptAuditRequest(workspace, config))
+    finding = next(item for item in error.value.diagnostics if item["code"] == "RULE.RESOURCE.UNKNOWN")
+    assert finding["source_location"]["path"] == str(unused)
+    assert not finding["details"].get("call_paths")
+
+
 def test_workflow_import_builtin_reads_actual_scoped_source_ownership(import_project):
     workspace, project = import_project
     config, _ = _select_import_rule(project, "root", "completed")
@@ -170,3 +184,15 @@ def test_architecture_normalizes_import_and_static_records_without_mutating_live
             assert all(Path(path).is_relative_to(actual_project) for path in source_paths)
         assert all(Path(owner["path"]).is_relative_to(actual_project)
                    for owner in result.rule_report.facts["import_policy"]["owners"])
+
+
+def test_business_types_remain_outside_health_review(import_project, tmp_path):
+    workspace, project = import_project
+    source = project / "nodes/add.ts"
+    source.write_text('const invalidBusinessType: number = "text";\n' + source.read_text())
+    audited = audit_javascript_project(JavascriptAuditRequest(workspace, project / "configs/linear.jsonc"))
+    assert not any(item.severity == "error" for item in audited.rule_report.findings)
+    # The native target transpiles TypeScript; health rules do not silently add
+    # a whole-program type checker to that existing compilation capability.
+    built = build_project_aot(ProjectBuildRequest(workspace,project / "configs/linear.jsonc",tmp_path / "dist","node","single-esm"))
+    assert built.out_dir.is_dir()

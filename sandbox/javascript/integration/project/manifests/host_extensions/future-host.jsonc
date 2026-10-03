@@ -1,14 +1,18 @@
 {
   "kind": "host_extension",
   "id": "sandbox.future_host",
-  "targets": ["node"],
+  "targets": [
+    "node"
+  ],
   "display_name": "Future Sandbox Host",
   "description": "Represents a future host connection for architecture review.",
   "version": "0.1.0",
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["node"],
+      "targets": [
+        "node"
+      ],
       "source": {
         "kind": "file",
         "ref": "host_extensions/future_host.ts",
@@ -16,7 +20,12 @@
       }
     }
   ],
-  "provides": ["sandbox.future_port"],
+  "provides": [
+    "sandbox.future_port"
+  ],
   "dependencies": [],
-  "external_packages": []
+  "external_packages": [],
+  "rulesets": [
+    "vibeflow.host_extension"
+  ]
 }

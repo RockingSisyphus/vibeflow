@@ -43,7 +43,6 @@ EXECUTION_MODES = ("plan", "block", "compiled")
 _DoubleNode_DECLARATION = node_declaration(NodeInfo(
         "integration.double",
         "Double",
-        "integration",
         "Doubles a received number.",
         "1.0.0",
         "process",

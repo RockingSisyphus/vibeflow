@@ -16,7 +16,7 @@ def check(context, inputs, params):
     current = next(node for node in sources.nodes if node.type_key == descriptor.type_key)
     implementation = sources.symbol(current.path, current.symbol)
     marker = params["marker_method"]
-    category = params["model_category"]
+    model_tag = params["model_tag"]
     owned = {symbol.id for symbol in sources.helpers(descriptor.type_key)}
     definitions = tuple(symbol for symbol in sources.symbols
                         if symbol.name.rsplit(".", 1)[-1] == marker
@@ -26,24 +26,24 @@ def check(context, inputs, params):
                    if symbol.path == current.path and symbol.name == current.symbol + "." + marker)
     findings = []
     for symbol in definitions:
-        allowed = descriptor.category == category and symbol in direct
+        allowed = model_tag in descriptor.tags and symbol in direct
         if allowed:
             continue
         owners = sources.owners(symbol.id)
         findings.append(HealthFinding(
             rule_id="EXAMPLE.MODEL.LOCATION", severity="error", object_type="node",
             object_id=descriptor.type_key, failure_layer="implementation",
-            message=f"{marker} must be defined directly in a {category} Node; referencing a helper does not grant model ownership.",
+            message=f"{marker} must be defined directly in a {model_tag} Node; referencing a helper does not grant model ownership.",
             source_location={"path": symbol.path, "line": symbol.line, "column": 1},
             details={"symbol": symbol.name, "ownership": [
                 {"node_type": owner.type_key, "relation": owner.relation} for owner in owners]},
         ))
-    if descriptor.category == category and len(direct) != 1:
+    if model_tag in descriptor.tags and len(direct) != 1:
         line = implementation.line if implementation is not None else 1
         findings.append(HealthFinding(
             rule_id="EXAMPLE.MODEL.ONE_BLOCK", severity="error", object_type="node",
             object_id=descriptor.type_key, failure_layer="implementation",
-            message=f"A {category} Node must contain exactly one direct {marker} method; found {len(direct)}.",
+            message=f"A {model_tag} Node must contain exactly one direct {marker} method; found {len(direct)}.",
             source_location={"path": current.path, "line": line, "column": 1},
             details={"count": len(direct)},
         ))
@@ -54,7 +54,7 @@ def check(context, inputs, params):
                         "owners": [owner.type_key for owner in sources.owners(symbol.id)]}
                        for symbol in sources.helpers(descriptor.type_key)
                        if symbol.path != current.path]
-    evidence = {"node_type": descriptor.type_key, "category": descriptor.category,
+    evidence = {"node_type": descriptor.type_key, "tags": list(descriptor.tags),
                 "ast_kind": type(class_ast).__name__ if isinstance(class_ast, ast.AST) else "unavailable",
                 "definitions": [{"symbol": symbol.name, "path": symbol.path, "line": symbol.line}
                                 for symbol in definitions], "helpers": helper_evidence}

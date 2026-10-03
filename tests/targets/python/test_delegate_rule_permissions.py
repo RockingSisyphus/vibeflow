@@ -43,12 +43,12 @@ def _runtime(tmp_path, *, selection, async_mode, flow_kind="process", delegate_c
         input_semantics={"cli.argv":("business arguments",)},
         output_semantics={"cli.exit_code":("business status",)},
     )
-    descriptor = node_declaration(NodeInfo("test.exit", "Exit", "test", "Ends the delegated application.", "1", flow_kind),
+    descriptor = node_declaration(NodeInfo("test.exit", "Exit", "Ends the delegated application.", "1", flow_kind),
                                   contract, rulesets=selected)
-    end = node_declaration(NodeInfo("test.end", "End", "test", "Consumes application status.", "1", "terminal"),
+    end = node_declaration(NodeInfo("test.end", "End", "Consumes application status.", "1", "terminal"),
                           NodeContract(requires=(DataRequirement("cli.exit_code", "exactly_one", display_name="CLI exit code"),)), rulesets=())
     registry = NodeRegistry()
-    start = node_declaration(NodeInfo("test.start", "Start", "test", "Starts the application.", "1", "terminal"),
+    start = node_declaration(NodeInfo("test.start", "Start", "Starts the application.", "1", "terminal"),
                             NodeContract(), rulesets=())
     registry.register(start, namespace["StartNode"])
     registry.register(descriptor, namespace["ExitNode"])

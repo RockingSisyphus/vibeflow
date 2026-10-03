@@ -75,7 +75,7 @@ def _assert_shape(element, shape):
 
 
 @pytest.mark.parametrize("level,fill,shape,icon", [
-    ("category", "#cceeff", "hex", "MODEL_ICON"),
+    ("default", "#cceeff", "hex", "MODEL_ICON"),
     ("node", "#fff2aa", "diam", "NODE_ICON"),
     ("call", "#ffe6ee", "circle", "CALL_ICON"),
     ("status", "#fef08a", "diam", "NODE_ICON"),
@@ -85,14 +85,14 @@ def test_formal_domain_svg_preserves_effective_styles_and_native_identity(svg_pr
     target, workspace, project = svg_project
     _edit(project / "vibeflow_project.jsonc", lambda data: data.update(architecture={"documents": [
         {"workflow": "configs/model.jsonc", "document": "ARCHITECTURE.jsonc"}]}))
-    _edit(project / "bundle/categories/model.jsonc", lambda data: data.update(
+    _edit(project / "bundle/nodes/model.jsonc", lambda data: data.update(
         presentation={"fill": "#cceeff", "shape": "hex", "icon": "MODEL_ICON"},
         metadata={"domain": "example", "purpose": "svg acceptance"}))
-    _edit(project / "bundle/categories/transform.jsonc", lambda data: data.update(
+    _edit(project / "bundle/nodes/transform.jsonc", lambda data: data.update(
         presentation={"fill": "#dff7df", "shape": "rounded", "icon": "TRANSFORM_ICON"}))
     def declaration(data):
         data["external"] = True
-        if level != "category":
+        if level != "default":
             data["presentation"] = {"fill": "#fff2aa", "shape": "diamond", "icon": "NODE_ICON"}
     _edit(project / "bundle/nodes/model.jsonc", declaration)
     def calls(data):
@@ -114,13 +114,13 @@ def test_formal_domain_svg_preserves_effective_styles_and_native_identity(svg_pr
     model = records["model"]
     assert model["presentation"]["values"]["fill"] == fill
     assert model["presentation"]["values"]["shape"] == shape
-    assert model["presentation"]["sources"]["fill"] == ("call" if level == "planned" else level)
-    assert model["presentation"]["sources"]["icon"] == ("call" if level == "planned" else "node" if level == "status" else level)
+    assert model["presentation"]["sources"]["fill"] == ("call" if level == "planned" else "node" if level == "default" else level)
+    assert model["presentation"]["sources"]["icon"] == ("call" if level == "planned" else "node" if level == "status" else "node" if level == "default" else level)
     assert model["flow_kind"] == "process"
-    assert model["category"] == "model_block"
-    expected = json.loads((project / "bundle/categories/model.jsonc").read_text())["default_rulesets"]
+    assert "model_block" in model["tags"]
+    expected = json.loads((project / "bundle/nodes/model.jsonc").read_text())["rulesets"]
     assert model["selected_rulesets"] == expected
-    assert document["node_categories"]["model_block"]["metadata"]["purpose"] == "svg acceptance"
+    assert model["metadata"]["purpose"] == "svg acceptance"
     root = ET.parse(output).getroot()
     assert root.get("aria-roledescription") == "flowchart-review-columns"
     actual = _node(root, target, "model")

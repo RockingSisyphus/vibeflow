@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.delegate_business",
   "display_name": "处理 CLI 业务",
-  "category": "sandbox",
   "description": "在普通 process 节点中处理由 document 节点读取的内容。",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

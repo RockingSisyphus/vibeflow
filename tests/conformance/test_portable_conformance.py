@@ -21,7 +21,7 @@ from vibeflow.block_compiler import SourceRef
 
 
 _TerminalNode_DECLARATION = NodeDescriptor(
-    'fixture.terminal', 'Terminal', 'conformance', 'Starts or ends a conformance workflow.', '1', 'terminal',
+    'fixture.terminal', 'Terminal', 'Starts or ends a conformance workflow.', '1', 'terminal',
     contract=NodeContractDescriptor(params_schema={}, params_defaults={}),
     rulesets=(),
 )
@@ -34,7 +34,7 @@ class _TerminalNode:
 
 
 _AliasNode_DECLARATION = NodeDescriptor(
-    'fixture.alias', 'Alias values', 'conformance', 'Produces values for every pipeline output cardinality.', '1', 'process',
+    'fixture.alias', 'Alias values', 'Produces values for every pipeline output cardinality.', '1', 'process',
     contract=NodeContractDescriptor(provides=(DataProvider('exact', 'value.exact', display_name='exact'), DataProvider('optional', 'value.optional', display_name='optional'), DataProvider('item', 'value.item', display_name='item')), params_schema={}, params_defaults={}, output_semantics={'exact': ('Conformance output exact.',), 'optional': ('Conformance output optional.',), 'item': ('Conformance output item.',)}),
     rulesets=('vibeflow.process',),
 )
@@ -47,7 +47,7 @@ class _AliasNode:
 
 
 _AddNode_DECLARATION = NodeDescriptor(
-    'fixture.add', 'Add', 'conformance', 'Adds a configured delta.', '1', 'process',
+    'fixture.add', 'Add', 'Adds a configured delta.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('number', 'exactly_one', display_name='number'),), provides=(DataProvider('answer', 'answer', display_name='answer'),), params_schema={'delta': {'type': 'number'}}, params_defaults={'delta': 1}, input_semantics={'number': ('Conformance input number.',)}, output_semantics={'answer': ('Conformance output answer.',)}),
     rulesets=('vibeflow.process',),
 )
@@ -60,7 +60,7 @@ class _AddNode:
 
 
 _RouteNode_DECLARATION = NodeDescriptor(
-    'fixture.route', 'Route', 'conformance', 'Chooses a branch from the input sign.', '1', 'decision',
+    'fixture.route', 'Route', 'Chooses a branch from the input sign.', '1', 'decision',
     contract=NodeContractDescriptor(requires=(DataRequirement('number', 'exactly_one', display_name='number'),), provides=(DataProvider('number.branch', 'number', display_name='number.branch'), DataProvider('branch.left', 'branch.left', display_name='branch.left')), input_semantics={'number': ('Conformance input number.',)}, output_semantics={'number.branch': ('Conformance output number.branch.',), 'branch.left': ('Conformance output branch.left.',)}),
     rulesets=('vibeflow.process',),
 )
@@ -74,7 +74,7 @@ class _RouteNode:
 
 
 _AsyncRouteNode_DECLARATION = NodeDescriptor(
-    'fixture.async_route', 'Async route', 'conformance', 'Chooses a branch after resolving a result-key future.', '1', 'decision',
+    'fixture.async_route', 'Async route', 'Chooses a branch after resolving a result-key future.', '1', 'decision',
     contract=_RouteNode_DECLARATION.contract,
     rulesets=('vibeflow.process',),
 )
@@ -88,7 +88,7 @@ class _AsyncRouteNode:
 
 
 _NumericTruthRouteNode_DECLARATION = NodeDescriptor(
-    'fixture.numeric_truth_route', 'Numeric truth route', 'conformance', 'Produces numeric one to verify strict portable condition equality.', '1', 'decision',
+    'fixture.numeric_truth_route', 'Numeric truth route', 'Produces numeric one to verify strict portable condition equality.', '1', 'decision',
     contract=_RouteNode_DECLARATION.contract,
     rulesets=('vibeflow.process',),
 )
@@ -104,7 +104,7 @@ class _NumericTruthRouteNode:
 
 
 _LeftNode_DECLARATION = NodeDescriptor(
-    'fixture.left', 'Left', 'conformance', 'Runs the true branch.', '1', 'process',
+    'fixture.left', 'Left', 'Runs the true branch.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('number', 'exactly_one', display_name='number'),), provides=(DataProvider('left.answer', 'answer', display_name='left.answer'),), input_semantics={'number': ('Conformance input number.',)}, output_semantics={'left.answer': ('Conformance output left.answer.',)}),
     rulesets=('vibeflow.process',),
 )
@@ -117,7 +117,7 @@ class _LeftNode:
 
 
 _RightNode_DECLARATION = NodeDescriptor(
-    'fixture.right', 'Right', 'conformance', 'Runs the false branch.', '1', 'process',
+    'fixture.right', 'Right', 'Runs the false branch.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('number', 'exactly_one', display_name='number'),), provides=(DataProvider('right.answer', 'answer', display_name='right.answer'),), input_semantics={'number': ('Conformance input number.',)}, output_semantics={'right.answer': ('Conformance output right.answer.',)}),
     rulesets=('vibeflow.process',),
 )
@@ -130,7 +130,7 @@ class _RightNode:
 
 
 _OptionalLeftNode_DECLARATION = NodeDescriptor(
-    'fixture.optional_left', 'Optional left', 'conformance', 'Runs the selected optional-data left branch.', '1', 'process',
+    'fixture.optional_left', 'Optional left', 'Runs the selected optional-data left branch.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('number', 'optional_one', display_name='number'),), provides=(DataProvider('left.answer', 'answer', display_name='left.answer'),), input_semantics={'number': ('Conformance input number.',)}, output_semantics={'left.answer': ('Conformance output left.answer.',)}),
     rulesets=('vibeflow.process',),
 )
@@ -145,7 +145,7 @@ class _OptionalLeftNode:
 
 
 _OptionalRightNode_DECLARATION = NodeDescriptor(
-    'fixture.optional_right', 'Optional right', 'conformance', 'Runs the selected optional-data right branch.', '1', 'process',
+    'fixture.optional_right', 'Optional right', 'Runs the selected optional-data right branch.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('number', 'optional_one', display_name='number'),), provides=(DataProvider('right.answer', 'answer', display_name='right.answer'),), input_semantics={'number': ('Conformance input number.',)}, output_semantics={'right.answer': ('Conformance output right.answer.',)}),
     rulesets=('vibeflow.process',),
 )
@@ -160,7 +160,7 @@ class _OptionalRightNode:
 
 
 _LeftItemNode_DECLARATION = NodeDescriptor(
-    'fixture.left_item', 'Left item', 'conformance', 'Produces the first fan-in item.', '1', 'process',
+    'fixture.left_item', 'Left item', 'Produces the first fan-in item.', '1', 'process',
     contract=NodeContractDescriptor(provides=(DataProvider('left', 'item', display_name='left'),), output_semantics={'left': ('Conformance output left.',)}),
     rulesets=('vibeflow.process',),
 )
@@ -173,7 +173,7 @@ class _LeftItemNode:
 
 
 _RightItemNode_DECLARATION = NodeDescriptor(
-    'fixture.right_item', 'Right item', 'conformance', 'Produces the second fan-in item.', '1', 'process',
+    'fixture.right_item', 'Right item', 'Produces the second fan-in item.', '1', 'process',
     contract=NodeContractDescriptor(provides=(DataProvider('right', 'item', display_name='right'),), output_semantics={'right': ('Conformance output right.',)}),
     rulesets=('vibeflow.process',),
 )
@@ -186,7 +186,7 @@ class _RightItemNode:
 
 
 _ItemJoinNode_DECLARATION = NodeDescriptor(
-    'fixture.item_join', 'Item Join', 'conformance', 'Consumes one active fan-in item.', '1', 'terminal',
+    'fixture.item_join', 'Item Join', 'Consumes one active fan-in item.', '1', 'terminal',
     contract=NodeContractDescriptor(requires=(DataRequirement('item', 'exactly_one', display_name='Item'),), input_semantics={'item': ('selected fan-in item',)}),
     rulesets=(),
 )
@@ -199,7 +199,7 @@ class _ItemJoinNode:
 
 
 _DoubleNode_DECLARATION = NodeDescriptor(
-    'fixture.double', 'Double', 'conformance', 'Doubles a number inside a nodeset.', '1', 'process',
+    'fixture.double', 'Double', 'Doubles a number inside a nodeset.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('number', 'exactly_one', display_name='number'),), provides=(DataProvider('answer', 'answer', display_name='answer'),), input_semantics={'number': ('Conformance input number.',)}, output_semantics={'answer': ('Conformance output answer.',)}),
     rulesets=('vibeflow.process',),
 )
@@ -212,7 +212,7 @@ class _DoubleNode:
 
 
 _AsyncDoubleNode_DECLARATION = NodeDescriptor(
-    'fixture.async_double', 'Async double', 'conformance', 'Doubles a number through a deferred nested task.', '1', 'process',
+    'fixture.async_double', 'Async double', 'Doubles a number through a deferred nested task.', '1', 'process',
     contract=_DoubleNode_DECLARATION.contract,
     rulesets=('vibeflow.process',),
 )
@@ -225,7 +225,7 @@ class _AsyncDoubleNode:
 
 
 _IncrementNode_DECLARATION = NodeDescriptor(
-    'fixture.increment', 'Increment', 'conformance', 'Advances one bounded-loop iteration.', '1', 'process',
+    'fixture.increment', 'Increment', 'Advances one bounded-loop iteration.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('loop.current', 'exactly_one', display_name='loop.current'),), provides=(DataProvider('loop.next', 'loop.next', display_name='loop.next'),), input_semantics={'loop.current': ('Conformance input loop.current.',)}, output_semantics={'loop.next': ('Conformance output loop.next.',)}),
     rulesets=('vibeflow.process',),
 )
@@ -238,7 +238,7 @@ class _IncrementNode:
 
 
 _IncrementUntilNode_DECLARATION = NodeDescriptor(
-    'fixture.increment_until', 'Increment until', 'conformance', 'Advances a loop and reports its stop condition.', '1', 'process',
+    'fixture.increment_until', 'Increment until', 'Advances a loop and reports its stop condition.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('loop.current', 'exactly_one', display_name='loop.current'),), provides=(DataProvider('loop.next', 'loop.next', display_name='loop.next'), DataProvider('loop.done', 'loop.done', display_name='loop.done')), params_schema={'target': {'type': 'number'}}, params_defaults={'target': 3}, input_semantics={'loop.current': ('Conformance input loop.current.',)}, output_semantics={'loop.next': ('Conformance output loop.next.',), 'loop.done': ('Conformance output loop.done.',)}),
     rulesets=('vibeflow.process',),
 )
@@ -255,7 +255,7 @@ class _IncrementUntilNode:
 
 
 _AdvanceOuterNode_DECLARATION = NodeDescriptor(
-    'fixture.advance_outer', 'Advance outer loop', 'conformance', 'Maps an inner-loop result into the outer carry and stop values.', '1', 'process',
+    'fixture.advance_outer', 'Advance outer loop', 'Maps an inner-loop result into the outer carry and stop values.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('inner.final', 'exactly_one', display_name='inner.final'),), provides=(DataProvider('loop.next', 'loop.next', display_name='loop.next'), DataProvider('loop.done', 'loop.done', display_name='loop.done')), params_schema={'target': {'type': 'number'}}, params_defaults={'target': 3}, input_semantics={'inner.final': ('Conformance input inner.final.',)}, output_semantics={'loop.next': ('Conformance output loop.next.',), 'loop.done': ('Conformance output loop.done.',)}),
     rulesets=('vibeflow.process',),
 )
@@ -272,7 +272,7 @@ class _AdvanceOuterNode:
 
 
 _FailNode_DECLARATION = NodeDescriptor(
-    'fixture.fail', 'Fail', 'conformance', 'Raises the shared conformance error.', '1', 'process',
+    'fixture.fail', 'Fail', 'Raises the shared conformance error.', '1', 'process',
     contract=NodeContractDescriptor(),
     rulesets=('vibeflow.process',),
 )
@@ -285,7 +285,7 @@ class _FailNode:
 
 
 _DetachedAuditNode_DECLARATION = NodeDescriptor(
-    'fixture.detached_audit', 'Detached audit', 'conformance', 'Completes a delayed side task before workflow cleanup returns.', '1', 'process',
+    'fixture.detached_audit', 'Detached audit', 'Completes a delayed side task before workflow cleanup returns.', '1', 'process',
     contract=NodeContractDescriptor(),
     rulesets=('vibeflow.process',),
 )

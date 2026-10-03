@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.sum_pair",
   "display_name": "Sum Pair",
-  "category": "sandbox",
   "description": "Sums two free branch values.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

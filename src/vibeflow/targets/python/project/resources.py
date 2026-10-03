@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 from vibeflow.core.flow import STATUS_IMPLEMENTED, STATUS_PLANNED
-from vibeflow.targets.python.project.node import EFFECT_SCOPE_TRUSTED
+from vibeflow.core.descriptors.models import _string_tuple
 
 
 STATUSES = frozenset({STATUS_IMPLEMENTED, STATUS_PLANNED})
@@ -68,6 +68,10 @@ class BaseLibResource:
     root_id: str = ""
     root_path: str = ""
     source_path: str = ""
+    rulesets: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="base_lib.rulesets"))
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -78,6 +82,7 @@ class BaseLibResource:
             "category": self.category,
             "description": self.description,
             "version": self.version,
+            "rulesets": list(self.rulesets),
         }
         if self.info is not None:
             payload["info"] = self.info.to_dict()
@@ -110,6 +115,10 @@ class PluginResource:
     root_id: str = ""
     root_path: str = ""
     source_path: str = ""
+    rulesets: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="plugin.rulesets"))
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -124,7 +133,7 @@ class PluginResource:
             "description": self.description,
             "version": self.version,
             "config_keys": list(self.config_keys),
-            "effect_scope": EFFECT_SCOPE_TRUSTED,
+            "rulesets": list(self.rulesets),
         }
         if self.info is not None:
             payload["info"] = self.info.to_dict()
@@ -150,6 +159,7 @@ class BaseLibRegistry:
         description: str,
         category: str = "",
         version: str = "",
+        rulesets: tuple[str, ...] = (),
     ) -> None:
         resource_id = _required_id(id, "base_lib id")
         if resource_id in self._resources:
@@ -162,6 +172,7 @@ class BaseLibRegistry:
             category=str(category).strip(),
             description=str(description).strip(),
             version=str(version).strip(),
+            rulesets=rulesets,
         )
 
     def get(self, id: str) -> BaseLibResource | None:
@@ -192,6 +203,7 @@ class PluginResourceRegistry:
         config_schema: Mapping[str, Any] | None = None,
         config_defaults: Mapping[str, Any] | None = None,
         priority: int = 100,
+        rulesets: tuple[str, ...] = (),
     ) -> None:
         resource_id = _required_id(id, "plugin id")
         if resource_id in self._resources:
@@ -208,6 +220,7 @@ class PluginResourceRegistry:
             description=str(description).strip(),
             version=str(version).strip(),
             config_schema=dict(config_schema or {}), config_defaults=dict(config_defaults or {}), priority=priority,
+            rulesets=rulesets,
         )
 
     def get(self, id: str) -> PluginResource | None:

@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.copy_next",
   "display_name": "Semantic Copy Next",
-  "category": "semantic",
   "description": "Copies loop.next back into loop.current for the next loop iteration.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

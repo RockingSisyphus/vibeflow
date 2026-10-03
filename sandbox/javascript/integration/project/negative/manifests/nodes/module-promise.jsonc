@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.invalid.module_promise",
   "display_name": "Invalid module Promise",
-  "category": "sandbox-negative",
   "description": "Creates Promise work during module import.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -49,5 +51,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox-negative"
+  ]
 }

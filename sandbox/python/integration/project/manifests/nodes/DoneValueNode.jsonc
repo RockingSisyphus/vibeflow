@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.done_value",
   "display_name": "Done Value",
-  "category": "sandbox",
   "description": "Emits loop.done as ordinary data for while-loop stop_when.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

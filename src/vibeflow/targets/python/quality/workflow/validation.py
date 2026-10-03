@@ -26,6 +26,7 @@ def validate_graph_health(graph, *, registry=None, boundary_registry=None, plugi
     source_context=None, rule_phase="static", quality_policy=None):
     from vibeflow.targets.python.project.compiler import GraphCompiler, GraphCompileError
     state = _HealthValidationState()
+    _append_findings(state, getattr(plugin_registry, "review_findings", ()))
     if registry is not None:
         registry.configure_rule_defaults(purity_policy=purity_policy,quality_policy=quality_policy)
     execute_workflow_rules(graph, state, registry=registry, source_context=source_context, phase="import",

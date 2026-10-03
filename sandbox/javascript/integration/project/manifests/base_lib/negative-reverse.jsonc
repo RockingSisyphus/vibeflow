@@ -6,7 +6,10 @@
   "implementations": [
     {
       "language": "typescript",
-      "targets": ["browser", "node"],
+      "targets": [
+        "browser",
+        "node"
+      ],
       "source": {
         "kind": "file",
         "ref": "negative/base_lib/reverse.ts"
@@ -14,5 +17,8 @@
     }
   ],
   "dependencies": [],
-  "external_packages": []
+  "external_packages": [],
+  "rulesets": [
+    "vibeflow.base_lib"
+  ]
 }

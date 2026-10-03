@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.add_final_to_dead",
   "display_name": "Add Final To Dead",
-  "category": "sandbox",
   "description": "Extends the deliberately dead decision branch using a distinct, type-owned contract.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [
