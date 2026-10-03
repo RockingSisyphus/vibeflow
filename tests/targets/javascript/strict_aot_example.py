@@ -42,3 +42,11 @@ def test_minimal_js_aot_example_prepares_without_importing_business_modules(
     assert prepared.import_policy["node_base_libs"] == {
         "example.greet": ["example.text"]
     }
+
+
+# Publish controlled case inputs as fixed SDK plugins before formal entrypoints.
+_native_prepare_project_build = prepare_project_build
+def prepare_project_build(request, **options):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(request.workspace)
+    return _native_prepare_project_build(request, **options)

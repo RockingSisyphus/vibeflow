@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from vibeflow.targets.python.project import PluginInfo
+from vibeflow.targets.python.sdk import Plugin, RuleCall, ruleset
 
 
 def _record(value):
@@ -14,32 +14,12 @@ def _record(value):
 
 
 class CompilerPlugin:
-    PLUGIN_INFO = PluginInfo(
-        name="sandbox_compiler_hook",
-        plugin_type="compiler",
-        display_name="Sandbox Compiler Hook",
-        category="compiler",
-        description="Records compiler hook calls in the sandbox.",
-        version="0.1.0",
-    )
-    name = "sandbox_compiler_hook"
-    priority = 10
 
     def after_compile(self, graph, compiled):
         _record({"hook": "after_compile", "nodes": len(graph.nodes)})
 
 
 class RuntimePlugin:
-    PLUGIN_INFO = PluginInfo(
-        name="sandbox_runtime_hook",
-        plugin_type="runtime",
-        display_name="Sandbox Runtime Hook",
-        category="runtime",
-        description="Records runtime hook calls in the sandbox.",
-        version="0.1.0",
-    )
-    name = "sandbox_runtime_hook"
-    priority = 10
 
     def before_node(self, name, node_type, input_summary):
         _record({"hook": "before_node", "name": name, "type": node_type})
@@ -52,3 +32,27 @@ class RuntimePlugin:
 
     def after_run(self, state, trace):
         _record({"hook": "after_run", "event_count": trace.get("event_count"), "trace_path": trace.get("trace_path")})
+
+
+def create_compiler(context):
+    return CompilerPlugin()
+
+
+def create_runtime(context):
+    return RuntimePlugin()
+
+
+review = ruleset(
+    id="sandbox.hook_plugin",
+    calls=[
+        RuleCall("imports", rule_id="vibeflow.import_side_effects"),
+        RuleCall("effects", rule_id="vibeflow.no_side_effects", params={"effect_scope": "python_io"}),
+        RuleCall("interface", rule_id="vibeflow.node_interface"),
+    ],
+    entrypoints={"import": ["imports"], "static": ["effects", "interface"], "run": ["effects", "interface"]},
+)
+plugin = Plugin(
+    id="sandbox.hooks", resources=[review], compiler=create_compiler, runtime=create_runtime,
+    rulesets=["sandbox.hook_plugin"], priority=10,
+    display_name="Sandbox Hook Recorder", description="Records compiler and runtime hook calls.",
+)

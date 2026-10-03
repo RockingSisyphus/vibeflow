@@ -226,7 +226,7 @@ def test_python_application_run_succeeds_when_javascript_target_is_blocked(
         spec.loader.exec_module(module)
 
         registry = NodeRegistry()
-        from vibeflow.tooling.project.descriptor_parser import parse_descriptor_manifest
+        from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor_manifest
         for data in DECLARATIONS:
             descriptor = parse_descriptor_manifest(data)
             registry.register(descriptor, getattr(module, data["implementations"][0]["source"]["export"]))
@@ -261,3 +261,18 @@ def test_python_application_run_succeeds_when_javascript_target_is_blocked(
         '''
     )
     _run_import_guard(script, arguments=(tmp_path / "python-run",))
+
+
+# Publish controlled case inputs as fixed SDK plugins before formal entrypoints.
+from vibeflow.tooling.application.javascript.build import prepare_project_build, build_project_aot
+_native_prepare_project_build = prepare_project_build
+def prepare_project_build(request, **options):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(request.workspace)
+    return _native_prepare_project_build(request, **options)
+
+_native_build_project_aot = build_project_aot
+def build_project_aot(request, **options):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(request.workspace)
+    return _native_build_project_aot(request, **options)

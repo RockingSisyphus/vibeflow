@@ -38,7 +38,6 @@ def workspace_case(tmp_path: Path, distribution_seed: Path) -> Path:
     (framework / "vibeflow_project.jsonc").write_text(
         json.dumps({
             "project_target": "python",
-            "base_lib": {"paths": ["base_lib"]},
             "quality_enabled": True,
         }),
         encoding="utf-8",
@@ -53,28 +52,23 @@ def workspace_case(tmp_path: Path, distribution_seed: Path) -> Path:
     project_config = project / "vibeflow_project.jsonc"
     data = json.loads(project_config.read_text(encoding="utf-8"))
     data.pop("architecture")
-    data["registry"] = "resources.py:build_base_lib_registry"
     project_config.write_text(json.dumps(data), encoding="utf-8")
     node_source = project / "nodes/workflow_nodes.py"
     source = node_source.read_text(encoding="utf-8")
-    source = 'from base_lib.shared_math import identity\n' + source.replace(
+    source = source.replace('from __future__ import annotations\n', 'from __future__ import annotations\nfrom base_lib.shared_math import identity\n').replace(
         '_value(inputs, "payload.internal")',
         'identity(_value(inputs, "payload.internal"))',
     )
     node_source.write_text(source, encoding="utf-8")
-    registry = project / "resources.py"
-    with registry.open("a", encoding="utf-8") as handle:
-        handle.write(
-            '\nfrom vibeflow.targets.python.project import BaseLibRegistry\n'
-            '\ndef build_base_lib_registry():\n'
-            '    registry = BaseLibRegistry()\n'
-            '    registry.register("shared_math", module="base_lib.shared_math", '
-            'display_name="Shared math", description="Sibling helper.")\n'
-            '    return registry\n'
-        )
+    (framework / "plugin.py").write_text(
+        'from vibeflow.targets.python.sdk import Plugin,base_lib,SourceLocator\n'
+        'library = base_lib(id="shared_math", display_name="Shared math", description="Sibling helper.", '
+        'source=SourceLocator(kind="module",ref="base_lib.shared_math"),rulesets=["vibeflow.base_lib"])\n'
+        'plugin = Plugin(id="framework", resources=[library])\n', encoding="utf-8")
     config = project / "configs/main.jsonc"
     data = json.loads(config.read_text(encoding="utf-8"))
     data["base_lib"] = {"modules": ["shared_math"]}
+    data["plugins"].append({"root":"framework","source":{"kind":"file","ref":"plugin.py"}})
     config.write_text(json.dumps(data), encoding="utf-8")
     return case
 
@@ -115,7 +109,7 @@ def test_root_quality_retains_sibling_base_lib_context(workspace_case: Path, ent
     assert report["effective_policy"]["base_lib"]["allowed_modules"] == ["base_lib.shared_math"]
     assert {root["id"] for root in report["info"]["workspace"]["roots"]} == {"framework", "project"}
     assert {item["path"] for item in quality["source_quality"]["files"]} == {
-        "__init__.py", "resources.py", "nodes/__init__.py", "nodes/workflow_nodes.py",
+        "__init__.py", "plugins/code_plugin.py", "nodes/__init__.py", "nodes/workflow_nodes.py",
     }
 
 

@@ -136,114 +136,79 @@
     "plugins": {
       "type": "array",
       "items": {
-        "anyOf": [
-          {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
             "type": "string",
             "minLength": 1
           },
-          {
+          "source": {
             "type": "object",
+            "required": [
+              "kind",
+              "ref"
+            ],
+            "additionalProperties": false,
             "properties": {
-              "module": {
-                "type": "string",
-                "minLength": 1
-              },
-              "path": {
-                "type": "string",
-                "minLength": 1
-              },
-              "id": {
-                "type": "string",
-                "minLength": 1
-              },
-              "name": {
-                "type": "string",
-                "minLength": 1
-              },
-              "class": {
-                "type": "string",
-                "minLength": 1
-              },
-              "factory": {
-                "type": "string",
-                "minLength": 1
-              },
-              "type": {
+              "kind": {
                 "enum": [
-                  "compiler",
-                  "runtime"
+                  "file",
+                  "module",
+                  "package"
                 ]
               },
-              "status": {
-                "enum": [
-                  "planned",
-                  "implemented"
-                ]
+              "ref": {
+                "type": "string",
+                "minLength": 1
               },
-              "priority": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "enabled": {
-                "type": "boolean"
-              },
-              "conflict": {
-                "enum": [
-                  "error",
-                  "replace"
-                ]
-              },
-              "scope": {
-                "type": "string"
-              },
-              "display_name": {
-                "type": "string"
-              },
-              "category": {
-                "type": "string"
-              },
-              "description": {
-                "type": "string"
-              },
-              "version": {
-                "type": "string"
-              },
-              "config": {
-                "type": "object"
-              },
-              "settings": {
-                "type": "object"
+              "export": {
+                "type": "string",
+                "minLength": 1
               }
-            },
-            "anyOf": [
-              {
-                "required": [
-                  "id"
-                ]
-              },
-              {
-                "required": [
-                  "module"
-                ]
-              },
-              {
-                "required": [
-                  "path"
-                ]
-              },
-              {
-                "required": [
-                  "name"
-                ],
-                "properties": {
-                  "status": {
-                    "const": "planned"
-                  }
-                }
-              }
+            }
+          },
+          "root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "config": {
+            "type": "object"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "implemented",
+              "planned"
             ]
+          },
+          "type": {
+            "enum": [
+              "compiler",
+              "runtime"
+            ]
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
           }
-        ]
+        }
       }
     },
     "host_extensions": {

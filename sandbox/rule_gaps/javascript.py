@@ -51,10 +51,10 @@ def _check_states(s, project, payload):
     # complete execution report. Verify states through the actual public Target
     # entrance with the same JSONC scope, not reconstructed/fake handler inputs.
     from vibeflow.targets.javascript.quality.rules import run_javascript_rules
-    from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
     from vibeflow.tooling.project.graph_config import parse_graph_config
     graph = parse_graph_config(s.read_json(project.config), project_root=project.project)
-    catalogs = load_project_descriptor_catalogs(project.project)
+    catalogs = load_workflow_catalogs(project.project,workflow_config=project.config)
     report = run_javascript_rules(graph, catalogs, project_root=project.project, package_root=project.project, target="node")
     s.write_json(project.root / "target-state-report.json", report.to_dict())
     return {**_result_states(report.to_dict()), "state_probe":"public_target_api"}
@@ -215,10 +215,12 @@ def _bundle_cases(s, work: Path, tools: Path | None) -> list[dict[str, Any]]:
             s.write_json(project.project/"bundles/extra.jsonc",{"kind":"bundle","id":"gaps.extra","resources":{group:["../"+changed.relative_to(project.project).as_posix()]}})
             actual, _ = s.command(project,"build","--target","node","--profile","single-esm","--out-dir",str(project.root/"dist"))
             actual["metrics"].update(business_executed=False,build_published=(project.root/"dist").exists())
-            reason = [str(changed)] + ([str(original)] if failure=="conflict" else [])
+            origin_path = str(project.project / ("code_lifecycle_" if group == "plugins" else "code_plugin.ts"))
+            reason = [origin_path, '"origins"', '"previous"', '"current"'] if failure == "conflict" else [changed.with_suffix(".ts").name]
             rows.append(_row("bundle."+group+"."+failure, "Bundle "+group+" 的 "+failure+" 必须正式拒绝",
-                "javascript.bundle.native_resources", {"should_accept":False,"codes":["DESCRIPTOR.CONFLICT" if failure=="conflict" else "DESCRIPTOR.PATH.MISSING"],
-                 "message_contains":reason,"metrics":{"exit_code":1,"build_published":False,"business_executed":False}},actual))
+                "javascript.bundle.native_resources", {"should_accept":False,"codes":["DESCRIPTOR.CONFLICT" if failure=="conflict" else "PLUGIN.DECLARATION.LOAD"],
+                 "message_contains":reason,"metrics":{"exit_code":1,"build_published":False,"business_executed":False}},actual,
+                 "SDK migration: fixed code contributions replace bundle files; conflicts retain both actual declaration origins, and a missing direct import fails trusted plugin bootstrap."))
     return rows
 
 

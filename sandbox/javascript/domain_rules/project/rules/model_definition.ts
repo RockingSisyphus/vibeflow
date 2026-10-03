@@ -1,3 +1,4 @@
+import {defineRule} from "@vibeflow/plugin";
 type SymbolInfo = Readonly<{kind: string; name: string; path: string; line: number; column: number}>;
 type Context = Readonly<{
   subject: {descriptor: {type_key: string; tags: readonly string[]}};
@@ -21,3 +22,5 @@ export function check(context: Context, inputs: unknown, params: {model_tag: str
   });
   return {findings};
 }
+
+export const resource_3Definition=defineRule({...{"id": "example.model_definition", "description": "modelForward belongs to model_block and each block defines one modelForward.", "params_schema": {"model_tag": {"type": "string"}}, "params_defaults": {"model_tag": "model_block"}},check:check});

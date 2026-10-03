@@ -256,8 +256,10 @@ def test_selected_project_file_rule_has_real_cli_params_and_current_source_scope
     code = cli_main(["validate","--config",str(workflow),"--json"])
     report = json.loads(capsys.readouterr().out)
     assert code == 0 and report["errors"] == []
+    from tests.fixtures.support.code_plugins import prepare_config_fixture
+    prepare_config_fixture(workflow)
     workspace = load_project_workspace(workflow)
-    registry = build_workspace_node_registry(workspace)
+    registry = build_workspace_node_registry(workspace, config_path=workflow)
     graph = parse_graph_config(json.loads(workflow.read_text()))
     snapshot = collect_workflow_source_context(registry,graph)
     from vibeflow.targets.python.quality.workflow.validation import validate_graph_health

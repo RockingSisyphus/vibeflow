@@ -582,7 +582,8 @@ def handle_quality_check(args: argparse.Namespace) -> int:
         _print_error(exc, as_json=True, validation_scope="vibeflow_quality")
         return 1
     facts_cache: dict[str, object] = {}
-    source_reports = _project_source_quality(workspace, args, configs, facts_cache=facts_cache)
+    catalog_cache: dict[Path, object] = {}
+    source_reports = _project_source_quality(workspace, args, configs, facts_cache=facts_cache, catalog_cache=catalog_cache)
     reports: list[dict[str, object]] = []
     for config in configs:
         from vibeflow.core.quality import QualityThresholds
@@ -603,6 +604,7 @@ def handle_quality_check(args: argparse.Namespace) -> int:
             audit_registered_resources=True,
             workspace_config=workspace,
             quality_facts_by_root=facts_cache,
+            catalogs=catalog_cache.get(config),
             quality_policy=javascript_quality_policy(thresholds=_quality_thresholds(args, QualityThresholds), structure_limits=limits),
         )
         result, error = _audit(namespace)
@@ -680,13 +682,13 @@ def _handle_standalone_quality(
     return 1 if report.status == "FAIL" else 0
 
 
-def _project_source_quality(workspace, args: argparse.Namespace, configs: Sequence[Path], *, facts_cache: dict[str, object] | None = None) -> list[dict[str, object]]:
+def _project_source_quality(workspace, args: argparse.Namespace, configs: Sequence[Path], *, facts_cache: dict[str, object] | None = None, catalog_cache=None) -> list[dict[str, object]]:
     from dataclasses import replace
 
     from vibeflow.core.quality import QualityStructureLimits, QualityThresholds
     from vibeflow.targets.javascript.quality.source import DEFAULT_EXCLUDED_DIRS, scan_javascript_quality
     from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
-    from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
 
     selected = Path(args.path).resolve() if args.path else None
     configured = Path(args.config).resolve() if args.config else None
@@ -719,14 +721,27 @@ def _project_source_quality(workspace, args: argparse.Namespace, configs: Sequen
         elif overrides:
             limits = replace(limits if limits is not None else QualityStructureLimits(), **overrides)
         try:
-            catalogs = load_project_descriptor_catalogs(root.path, project_config=root.config_path)
+            from vibeflow.core.descriptors.contributions import builtin_contributions, compose_contributions
+            scoped_catalogs = []
+            for config in configs:
+                if root.path not in config.parents:
+                    continue
+                catalog = load_workflow_catalogs(root.path, project_config=root.config_path, workflow_config=config, workspace=workspace, node_command=args.node_command)
+                scoped_catalogs.append(catalog)
+                if catalog_cache is not None:
+                    catalog_cache[config] = catalog
+            catalogs = scoped_catalogs[0] if scoped_catalogs else compose_contributions((builtin_contributions(),))
+            roles = _javascript_structure_roles(root, catalogs)
+            for catalog in scoped_catalogs[1:]:
+                extra = _javascript_structure_roles(root, catalog)
+                roles = replace(roles, module_roles={**roles.module_roles, **extra.module_roles})
             report = scan_javascript_quality(
                 scan_path,
                 package_root=package_root,
                 thresholds=_quality_thresholds(args, QualityThresholds),
                 structure_limits=_javascript_structure_limits(limits),
-                structure_roles=_javascript_structure_roles(root, catalogs),
-                registered_catalogs=catalogs if scan_path == root.path else None,
+                structure_roles=roles,
+                registered_catalogs=tuple(scoped_catalogs) if scan_path == root.path else None,
                 excluded_dirs=_javascript_exclusions(args, DEFAULT_EXCLUDED_DIRS),
                 node_command=args.node_command,
                 facts_cache=facts_cache if scan_path == root.path else None,
@@ -894,6 +909,7 @@ def _audit(args: argparse.Namespace):
                     ),
                     quality_facts_by_root=getattr(args, "quality_facts_by_root", None),
                     quality_policy=getattr(args, "quality_policy", None),
+                    catalogs=getattr(args, "catalogs", None),
                 )
             ),
             None,

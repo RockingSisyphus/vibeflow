@@ -88,6 +88,8 @@ def javascript_project(
         root,
         ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc"),
     )
+    from tests.fixtures.support.code_plugins import copy_archival_inputs
+    copy_archival_inputs(SANDBOX_PROJECT, root)
     (root / "node_modules").symlink_to(
         javascript_toolchain_root / "node_modules",
         target_is_directory=True,
@@ -1048,7 +1050,7 @@ def test_runtime_plugin_and_host_extension_share_lifecycle_without_coupling(
     host_project = _read_json(
         javascript_project.root / "vibeflow_host_project.jsonc"
     )
-    host_project["descriptors"]["plugins"] = ["manifests/plugins"]
+    host_project.setdefault("descriptors", {})["plugins"] = ["manifests/plugins"]
     _write_json(
         javascript_project.root / "vibeflow_host_project.jsonc",
         host_project,
@@ -1087,3 +1089,11 @@ process.stdout.write(JSON.stringify({
     assert payload["afterImport"] == {"host": []}
     assert payload["value"] == {"result": 10}
     assert payload["hostCalls"] == ["create", "start", "stop"]
+
+
+# Publish controlled case inputs as fixed SDK plugins before formal entrypoints.
+_native_build_project_aot = build_project_aot
+def build_project_aot(request, **options):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(request.workspace)
+    return _native_build_project_aot(request, **options)

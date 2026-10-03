@@ -27,8 +27,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "state"},
-      {"from": "state", "to": "end"}
+      {
+        "from": "start",
+        "to": "state"
+      },
+      {
+        "from": "state",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -37,5 +43,14 @@
         "display_name": "Value Out"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

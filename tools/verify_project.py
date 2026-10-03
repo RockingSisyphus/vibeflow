@@ -276,7 +276,6 @@ root.mkdir(parents=True, exist_ok=True)
 project_config = root / "vibeflow_project.jsonc"
 project_config.write_text(json.dumps({
     "project_target": "python",
-    "descriptors": {"nodes": ["manifests/nodes"]},
 }), encoding="utf-8")
 workspace = root / "vibeflow_config.jsonc"
 workspace.write_text(json.dumps({
@@ -284,13 +283,22 @@ workspace.write_text(json.dumps({
 }), encoding="utf-8")
 node_path = root / "isolation_nodes.py"
 node_path.write_text(NODE_SOURCE, encoding="utf-8")
-declaration_dir = root / "manifests/nodes"
-declaration_dir.mkdir(parents=True)
-for descriptor in DECLARATIONS:
-    (declaration_dir / (descriptor["type_key"] + ".jsonc")).write_text(json.dumps(descriptor), encoding="utf-8")
+plugin_source = "from vibeflow.targets.python.sdk import Plugin,node,SourceLocator\n"
+resources = []
+for index, descriptor in enumerate(DECLARATIONS):
+    options = dict(descriptor)
+    options.pop("kind")
+    implementation = options.pop("implementations")[0]
+    options["source"] = implementation["source"]
+    resource = "resource_" + str(index)
+    resources.append(resource)
+    plugin_source += resource + "=node(**" + repr(options) + ")\n"
+plugin_source += "plugin=Plugin(id='isolation',resources=[" + ",".join(resources) + "])\n"
+(root / "plugin.py").write_text(plugin_source, encoding="utf-8")
 
 config = root / "workflow.jsonc"
 config.write_text(json.dumps({
+    "plugins": [{"source": {"kind": "file", "ref": "plugin.py"}}],
     "pipeline": {
         "nodes": [
             {"id": "start", "type_used": "isolation.start", "display_name": "Start", "description": "Starts the isolation workflow."},
@@ -364,12 +372,13 @@ def _wheel_smoke(scratch: Path) -> None:
             "from vibeflow.block_compiler import WorkflowPlan",
             "from vibeflow.targets.python.project import NodeRegistry",
             "from vibeflow.targets.python.runtime import PipelineRuntime",
+            "from vibeflow.targets.python.sdk import Plugin, node, rule, ruleset",
             "from vibeflow.targets.javascript import WorkflowSpec",
             "from vibeflow.tooling.project.config_loader import load_config_document",
             "root = files('vibeflow')",
-            "for name in ('config.schema.json', 'health_report.schema.json', 'node.schema.json', 'nodeset.schema.json', 'policy.schema.json', 'rule.schema.json', 'ruleset.schema.json', 'bundle.schema.json'):",
+            "for name in ('config.schema.json', 'health_report.schema.json', 'node.schema.json', 'nodeset.schema.json', 'policy.schema.json', 'rule.schema.json', 'ruleset.schema.json'):",
             "    assert root.joinpath('tooling/project/schema', name).is_file()",
-            "for name in ('runtime_helpers.mjs', 'toolchain_driver.mjs', 'plugin_worker.mjs', 'plugin_abi.d.ts', 'rule_abi.d.ts'):",
+            "for name in ('runtime_helpers.mjs', 'toolchain_driver.mjs', 'plugin_worker.mjs', 'plugin_abi.d.ts', 'rule_abi.d.ts', 'sdk.mjs', 'sdk.d.ts', 'sdk_loader.mjs'):",
             "    assert root.joinpath('targets/javascript/resources', name).is_file()",
             "for removed in ('aot', 'runtime', 'portable', 'config', 'health', 'purity', 'devtools', 'rendering', 'workspace'):",
             "    assert not root.joinpath(removed).is_dir(), removed",

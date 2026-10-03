@@ -9,16 +9,12 @@
     ],
     "nodes": [
       {
-
-
         "id": "increment",
         "type_used": "sandbox.increment",
         "display_name": "Increment",
         "description": "Runs increment."
       },
       {
-
-
         "id": "copy",
         "type_used": "sandbox.copy_back",
         "display_name": "Copy",
@@ -49,5 +45,14 @@
         "display_name": "Value Next"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

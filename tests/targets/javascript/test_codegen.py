@@ -18,11 +18,15 @@ SOURCE_ROOT = PROJECT_ROOT / "src"
 TARGET_ROOT = SOURCE_ROOT / "vibeflow" / "targets" / "javascript"
 FRONTEND_ROOT = TARGET_ROOT / "frontend"
 
-RESOURCE_SHA256 = {'plugin_abi.d.ts': '6f0da3fbf7570a77ef4bd940fcfbb93f112e3e866a2c0d989c9d51cf7f76f811',
- 'plugin_worker.mjs': '6ec42f83a6a8efe13f50b21d87ae40ff9727ca932fc95f07535b48283365dbd8',
+# Plugin ABI v3 ships the code SDK and its binding loader.
+RESOURCE_SHA256 = {'plugin_abi.d.ts': '1e3536feb02310d31f5f58cd95ce57f40d6f1c5814651107655df600739f08cb',
+ 'plugin_worker.mjs': '1c424fdb2eac74309c748cd0ba7c5afc9039dfd509cf1e385b150317d190b698',
  'rule_abi.d.ts': 'aaeba26699c078d6340b0e243cbe0f3e7fc53eea167956e99f85155f2574f2bb',
- 'runtime_helpers.mjs': 'b29392f9f9795cdb6a0cbf00098a20971c7006c332be35d4ab1c0217ed78ce62',
- 'toolchain_driver.mjs': '33d8552c140e9e54f82ad47de83b714b755f7931bd234ef2ee25db9038276d26'}
+ 'runtime_helpers.mjs': '77747ef8c71c76054639bedcb4852836ec72920ec9f3f88c09dcbdd1bc3b1bcd',
+ 'sdk.d.ts': '2095b92ce510f2596bed8a269ab5d424a719597510139b047be8b1582a06bbf6',
+ 'sdk.mjs': 'e6a93d5f5cf5e2af4e7a1c0295bc29ee445ce249abdc8f499b46c51b806ae728',
+ 'sdk_loader.mjs': 'd9a5f18235a5d881fc0abff6683887c0400c18e621f041bbfbdae16df596d2d9',
+ 'toolchain_driver.mjs': 'de6b73fe8ed46d375fa9c1c85df63fde616de3ca70aab36dbb6de659434922c6'}
 
 
 def _run_isolated(source: str) -> None:

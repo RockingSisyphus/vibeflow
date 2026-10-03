@@ -158,6 +158,7 @@ def prepare_graph(
         source_ref, implementation_mapping = implementation_source(
             implementation,
             project_root=state.project_root,
+            source_roots=state.catalog.source_roots,
             subject=f"node '{descriptor.type_key}'",
             path=call_path,
         )
@@ -269,6 +270,7 @@ def implementation_source(
     project_root: Path,
     subject: str,
     path: tuple[str, ...] = (),
+    source_roots: tuple[str, ...] = (),
 ) -> tuple[SourceRef, dict[str, str]]:
     source = implementation.source
     if source.kind != "file":
@@ -285,6 +287,7 @@ def implementation_source(
         source.ref,
         subject=f"{subject} source",
         require_file=True,
+        allowed_roots=source_roots,
     )
     module = str(resolved)
     export = source.export or "run"

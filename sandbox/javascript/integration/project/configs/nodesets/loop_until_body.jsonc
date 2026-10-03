@@ -42,14 +42,12 @@
         "type_used": "sandbox.loop_increment",
         "display_name": "Increment",
         "description": "Adds one to the carried loop value."
-              },
+      },
       {
         "id": "done",
         "type_used": "sandbox.loop_done",
         "display_name": "Check target",
         "description": "Stops once the incremented value reaches four.",
-
-
         "target": 4
       },
       {
@@ -60,9 +58,18 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "increment"},
-      {"from": "increment", "to": "done"},
-      {"from": "done", "to": "end"}
+      {
+        "from": "start",
+        "to": "increment"
+      },
+      {
+        "from": "increment",
+        "to": "done"
+      },
+      {
+        "from": "done",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -78,5 +85,14 @@
         "as": "done"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

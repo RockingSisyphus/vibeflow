@@ -1113,9 +1113,15 @@ def test_cli_inspect_node_with_module_reports_metadata_and_contract(tmp_path, ca
     ]
     assert payload["node"]["metrics"]["source_lines"] > 0
 
-def test_cli_inspect_node_requires_declared_project(capsys) -> None:
-    code = cli_main(["inspect-node", "--type", "demo.node"])
-    payload = json.loads(capsys.readouterr().out)
-    assert code == 1
-    assert payload["health"]["status"] == "ERROR"
-    assert payload["health"]["errors"][0]["rule_id"] == "NODE.INSPECT.LOAD_ERROR"
+def test_cli_inspect_node_requires_explicit_workflow(capsys) -> None:
+    with pytest.raises(SystemExit) as error:
+        cli_main(["inspect-node", "--type", "demo.node"])
+    assert error.value.code == 2
+    assert "--config" in capsys.readouterr().err
+
+
+_native_run_checked = run_checked
+def run_checked(config_path, *, registry, **options):
+    from tests.fixtures.support.code_plugins import publish_runtime_fixture
+    publish_runtime_fixture(config_path, registry)
+    return _native_run_checked(config_path, registry=registry, **options)

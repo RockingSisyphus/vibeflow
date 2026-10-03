@@ -70,8 +70,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "loop"},
-      {"from": "loop", "to": "end"}
+      {
+        "from": "start",
+        "to": "loop"
+      },
+      {
+        "from": "loop",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -81,5 +87,14 @@
         "as": "result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

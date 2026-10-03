@@ -36,7 +36,11 @@ def _inspect_node_source(tmp_path, capsys, source, *, node_type="demo.node", cla
     for index, declaration in enumerate(additional_nodes):
         (manifests / f"other-{index}.jsonc").write_text(json.dumps(declaration), encoding="utf-8")
     (tmp_path / "vibeflow_project.jsonc").write_text(json.dumps({"project_target": "python", "descriptors": {"nodes": ["manifests/nodes"]}}), encoding="utf-8")
-    args = ["inspect-node", "--type", node_type, "--module", str(module_path), "--class", class_name, *(extra_args or ())]
+    config = tmp_path / "inspect.jsonc"
+    config.write_text(json.dumps({"rulesets": [], "pipeline": {"nodes": [{"id":"inspect", "type_used":node_type, "display_name":"Inspect", "description":"Inspect one resource"}]}}))
+    from tests.fixtures.support.code_plugins import migrate_fixture
+    migrate_fixture(tmp_path)
+    args = ["inspect-node", "--config", str(config), "--type", node_type, "--module", str(module_path), "--class", class_name, *(extra_args or ())]
     code = cli_main(args)
     return code, json.loads(capsys.readouterr().out)
 

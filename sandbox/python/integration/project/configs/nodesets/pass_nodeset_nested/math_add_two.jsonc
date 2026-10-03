@@ -31,24 +31,18 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "input",
         "type_used": "sandbox.value_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-
-
         "id": "first",
         "type_used": "math.add_one",
         "display_name": "First",
         "description": "Runs first."
       },
       {
-
-
         "delta": 1,
         "id": "second",
         "type_used": "sandbox.add_out",
@@ -56,7 +50,6 @@
         "description": "Runs second."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.final_value_end",
         "display_name": "End",
@@ -89,5 +82,14 @@
       }
     ]
   },
-  "type_key": "math.add_two"
+  "type_key": "math.add_two",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

@@ -25,23 +25,18 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "input",
         "type_used": "sandbox.training_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-
-
         "id": "train",
         "type_used": "training.step",
         "display_name": "Train",
         "description": "Runs train."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.training_metrics_end",
         "display_name": "End",
@@ -88,6 +83,15 @@
   "nodeset_imports": [
     {
       "path": "nodesets/pass_training_nodeset_object_flow/training_step.jsonc"
+    }
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
     }
   ]
 }

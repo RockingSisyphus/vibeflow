@@ -1,89 +1,53 @@
-# JavaScript/TypeScript Node 与 AOT
+# JavaScript/TypeScript 资源与 AOT
 
-JavaScript Target 使用静态 descriptor 记录资源信息，并把 workflow 构建为普通 ESM。生成物不读取原始 Config，也不依赖 Python Runtime。
+用户资源从 `@vibeflow/plugin` 的 SDK 定义。声明与执行代码可以放在一起；workflow 显式选择固定插件对象。JS/TS 属于同一执行族，生成物继续是普通 ESM，使用原生 Workflow ABI v4。
 
-## Node descriptor
+## Node 与固定插件
 
-```jsonc
-{
-  "kind": "node",
-  "type_key": "example.normalize_text",
-  "display_name": "Normalize text",
-  "tags": ["text"],
-  "description": "Normalizes whitespace in supplied text.",
-  "version": "1.0.0",
-  "flow_kind": "process",
-  "rulesets": ["vibeflow.process"],
-  "contract": {
-    "requires": [
-      {"type": "text.raw", "cardinality": "exactly_one", "display_name": "Raw text"}
-    ],
-    "provides": [
-      {"key": "normalized_text", "type": "text.normalized", "display_name": "Normalized text"}
-    ],
-    "params_schema": {},
-    "params_defaults": {},
-    "input_semantics": {"text.raw": ["Text before normalization."]},
-    "output_semantics": {"normalized_text": ["Text with normalized whitespace."]}
-  },
-  "implementations": [
-    {
-      "language": "typescript",
-      "targets": ["browser", "node"],
-      "source": {"kind": "file", "ref": "nodes/normalize_text.ts", "export": "run"}
-    }
-  ],
-  "base_libs": [],
-  "capabilities": []
-}
-```
-
-Node descriptor 与 Python 共用声明模型。`rulesets` 明确选择审查约束；省略与显式 `[]` 都表示未选择 Node 审查规则，`flow_kind` 不授予副作用权限。每个 Node 自己声明默认颜色、形状、图标和 Ruleset，插件可通过 bundle 批量登记，见 [规则与 Node 声明](rules-and-nodes.md)。
-
-Node descriptor 的端口和语义必须完整。`params_schema` / `params_defaults` 描述调用实例 `config`；输出结构不在 Node 上覆盖，provider 的 `type` 对应独立 Data Schema。
-
-## 实现 ABI
+`plugins/text.ts`：
 
 ```ts
-export function run(
-  inputs: Readonly<Record<string, unknown>>,
-  params: Readonly<Record<string, unknown>>,
-  context: Readonly<Record<string, unknown>>,
-) {
-  const raw = inputs["text.raw"] as { value: string };
-  return { normalized_text: raw.value.trim().replace(/\s+/g, " ") };
-}
-```
+import {definePlugin, defineNode, defineDataSchema} from "@vibeflow/plugin";
 
-实现返回普通对象，key 与 `provides[].key` 一致。`completion: "immediate"` 使用同步返回；`completion: "suspend"` 返回 Promise，并要求 `pipeline.entry_mode: "async"`。Promise 必须返回给当前调用或交给显式 TaskPlan。
-
-## Data Schema
-
-```jsonc
-{
-  "kind": "data_schema",
-  "type_key": "text.normalized",
-  "representation": "json",
-  "schema": {"type": "string"}
-}
-```
-
-公共输入、Node 输出、Capability 边界和公共输出使用 `type_key` 查找 Data Schema。缺失所需 Schema 时 AOT 构建失败。
-
-项目 root 在 `vibeflow_project.jsonc` 中登记 descriptor 目录和工具链根：
-
-```jsonc
-{
-  "project_target": "javascript",
-  "descriptors": {
-    "nodes": ["manifests/nodes"],
-    "data_schemas": ["manifests/data"]
+export const normalize = defineNode({
+  type_key: "example.normalize_text",
+  display_name: "Normalize text", description: "Normalizes supplied text.",
+  rulesets: ["vibeflow.process"],
+  contract: {
+    requires: [{type: "text.raw", cardinality: "exactly_one", display_name: "Raw text"}],
+    provides: [{key: "normalized_text", type: "text.normalized", display_name: "Normalized text"}],
+    input_semantics: {"text.raw": ["Text before normalization."]},
+    output_semantics: {normalized_text: ["Normalized whitespace."]},
   },
-  "javascript": {"package_root": ".", "external_packages": []}
-}
+  run(inputs, params) {
+    return {normalized_text: inputs["text.raw"].value.trim().replace(/\s+/g, " ")};
+  },
+});
+export const normalized = defineDataSchema({type_key: "text.normalized", schema: {type: "string"}});
+export const plugin = definePlugin({id: "example.text", resources: [normalize, normalized]});
 ```
 
-## 构建和调用
+可绑定执行代码的资源使用具名导出。SDK 自动记录原始声明、实现符号和位置；函数保留在 Target worker 中，不经过 JSON 序列化。Rule 使用 `defineRule({id, check(...) {...}})`，Ruleset 使用 `defineRuleset`。BaseLib 可用 `defineBaseLib({id, implementation(...) {...}})` 定位同文件函数，也可声明整个独立辅助模块。HostExtension 使用 `defineHostExtension({id, targets, provides, createHost(context) {...}})`，Capability 使用 `defineCapability`。
+
+`vibeflow_project.jsonc` 只保存项目及工具链信息：
+
+```jsonc
+{"project_target": "javascript", "javascript": {"package_root": ".", "external_packages": []}}
+```
+
+workflow 显式启用：
+
+```jsonc
+{"plugins": [{"source": {"kind": "file", "ref": "plugins/text.ts"}}], "pipeline": { /* 原生 type_used 与连边 */ }}
+```
+
+支持已安装模块/包、显式导出和已登记的 workspace `root`，不自动安装或发现。Node 自己选择 `rulesets` 和默认 `presentation`；省略或 `[]` 表示未选择 Node 审查规则。Data Schema 也必须由选中插件贡献，供公共输入输出、Node 和 Capability 查找。
+
+## SDK 解析与运行协议
+
+发行包和 wheel 包含 SDK 运行文件及类型声明。VibeFlow worker、分析器和构建器统一解析 `@vibeflow/plugin`。发行模板的 `tsconfig.json` 将 TypeScript 的 `paths["@vibeflow/plugin"]` 指向 `../kernel/javascript/sdk.d.ts`。这些文件由内核的同一 SDK 复制生成，受到发行清单保护。源码沙箱的 tsconfig 直接引用内核资源目录；wheel 用户可以通过 `importlib.resources.files("vibeflow.targets.javascript.resources")` 定位同一文件。无需另装一个同名 npm SDK。
+
+Node 返回普通对象，key 对应 `provides`。`completion: "immediate"` 使用同步返回；`"suspend"` 返回 Promise，并要求 workflow 的 `pipeline.entry_mode: "async"`。调度、TaskPlan、Capability 和 Host 协议保持原有机制。
 
 ```bash
 npm ci --prefix javascript_project
@@ -91,11 +55,13 @@ python run.py validate --config javascript_project/configs/main.jsonc
 python run.py build --config javascript_project/configs/main.jsonc --target node --profile esm-module --out-dir javascript_project/build/node
 ```
 
-同步 workflow 导出 `runWorkflow(inputs, options)`，异步 workflow 导出 `runWorkflowAsync(inputs, options)`：
+同步 workflow 导出 `runWorkflow(inputs, options)`；异步导出 `runWorkflowAsync(inputs, options)`。例如：
 
 ```js
-import { runWorkflow } from "./build/node/workflow.js";
-const result = runWorkflow({ request: { message: "hello" } });
+import {runWorkflow} from "./build/node/workflow.js";
+const result = runWorkflow({request: {message: "hello"}});
 ```
 
-Browser/Node 平台由本次 `build --target` 选择，不写进 workflow Config。项目自己的 `tsc`、ESLint 和业务测试继续由项目显式运行。
+Browser/Node 平台由 `build --target` 选择。Rule 始终在 Node worker 环境检查，业务平台只是规则上下文资料。浏览器产物保留执行所需的 Node、helper、Host 和 runtime hook，不打包 Rule 或 compiler hook 的专用 Node 依赖。需要不同执行环境时可以分模块，每个资源仍可与自己的实现放在一起。
+
+项目自己的 TypeScript、ESLint 与业务测试仍需显式运行。健康审查不代替业务正确性检查。插件受信入口先初始化，已发生的初始化不能由规则提前阻断或撤销。

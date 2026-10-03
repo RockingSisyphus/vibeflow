@@ -279,7 +279,7 @@ def run_variants(work_root: Path, variant: str, toolchain: Path, *, fixture: Any
             else:
                 project_path = root / 'vibeflow_project.jsonc'
                 project = json.loads(project_path.read_text())
-                project['descriptors']['rulesets'] = ['manifests/rulesets']
+                project.setdefault('descriptors', {})['rulesets'] = ['manifests/rulesets']
                 fixture._write_json(project_path, project)
                 fixture._write_json(root / 'manifests/rulesets/numeric.jsonc', {
                     'kind': 'ruleset', 'id': 'parity.numeric', 'calls': [{'id': 'native', 'ruleset_id': 'vibeflow.process'}],
@@ -287,6 +287,9 @@ def run_variants(work_root: Path, variant: str, toolchain: Path, *, fixture: Any
                 })
                 descriptor['rulesets'] = ['parity.numeric']
                 fixture._write_json(node_path, descriptor)
+        if variant == 'current':
+            import runpy
+            runpy.run_path(str(Path(__file__).resolve().parents[3] / 'tests/fixtures/support/code_plugins.py'))['migrate_fixture'](root)
         if (case.entrypoint == 'build' and (item.target != 'node' or item.profile != 'single-esm')) or (case.entrypoint == 'build-run' and case.id.startswith('js.variant.task.')):
             from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, build_project_aot
             try:

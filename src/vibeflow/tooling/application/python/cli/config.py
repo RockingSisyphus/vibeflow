@@ -10,16 +10,14 @@ from vibeflow.tooling.application.python.reports import (
 )
 from vibeflow.targets.python.project.compiler import GraphCompiler, GraphCompileError
 from vibeflow.tooling.project.config_loader import ConfigLoadError, load_config_document
-from vibeflow.tooling.application.python.project.resource_registries import discover_config_resource_registry_context
 from vibeflow.tooling.application.python.project.resources import load_config_resources
 from vibeflow.tooling.project.config_schema import collect_config_schema_findings
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
 from vibeflow.core.flow import GraphConfigError
-from vibeflow.core.findings import HealthReport
+from vibeflow.core.findings import HealthReport, HealthFinding
 from vibeflow.targets.python.quality.workflow.nodesets import validate_nodeset_depth
 from vibeflow.tooling.project.graph_config import parse_graph_config, project_root_for_config
 from vibeflow.tooling.application.python.project.effective_policy import default_effective_policy, resolve_effective_policy
-from vibeflow.targets.python.project.plugin_loader import load_plugins_from_config
 
 
 def validate_config_path(path: Path, *, policy_path: Path | None = None) -> HealthReport:
@@ -28,49 +26,30 @@ def validate_config_path(path: Path, *, policy_path: Path | None = None) -> Heal
     except ConfigLoadError as exc:
         return config_load_error_report(exc, object_type="config", object_id=str(path))
 
-    registry_context = discover_config_resource_registry_context(document.data, config_path=path)
-    plugin_registry, plugin_findings = load_plugins_from_config(
-        document.data,
-        base_path=registry_context.base_path,
-        plugin_resource_registry=registry_context.plugin_resource_registry,
-    )
-    if any(item.severity == "error" for item in plugin_findings):
-        return HealthReport(status="ERROR", errors=tuple(plugin_findings), effective_policy=default_effective_policy().to_dict())
-    resources, resource_findings = load_config_resources(
-        document.data,
-        base_path=registry_context.base_path,
-        plugin_registry=plugin_registry,
-        base_lib_registry=registry_context.base_lib_registry,
-        plugin_resource_registry=registry_context.plugin_resource_registry,
-        base_lib_paths=registry_context.base_lib_paths,
-    )
-    policy_result = resolve_effective_policy(document.data, config_path=path, explicit_policy_path=policy_path, plugin_registry=plugin_registry)
-    effective_policy = policy_result.effective_policy.to_dict()
-    schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *registry_context.findings, *resource_findings, *policy_result.findings))
-    schema_errors = tuple(finding for finding in schema_findings if finding.severity == "error")
-    schema_warnings = tuple(finding for finding in schema_findings if finding.severity == "warning")
-    if schema_errors:
-        status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin", "base_lib"} for finding in schema_errors) else "FAIL"
-        return HealthReport(
-            status=status,
-            errors=schema_errors,
-            warnings=schema_warnings,
-            effective_policy=effective_policy,
-        )
-
-    try:
-        graph = parse_graph_config(document.data, project_root=project_root_for_config(path))
-    except GraphConfigError as exc:
-        return graph_config_error_report(exc, path=path, effective_policy=effective_policy)
     from dataclasses import replace
     from vibeflow.tooling.project.workspace_loader import load_project_workspace, find_project_config
+    policy_result = resolve_effective_policy(document.data, config_path=path, explicit_policy_path=policy_path)
+    if policy_result.findings:
+        return HealthReport(status="FAIL", errors=tuple(policy_result.findings))
     if find_project_config(path) is not None:
         from vibeflow.tooling.application.python.workspace_service import validate_workspace_config_path
         workspace = load_project_workspace(path)
         workspace = replace(workspace, policy=policy_result.effective_policy.data)
         return validate_workspace_config_path(path, workspace=workspace)
+    schema_findings = collect_config_schema_findings(document.data)
+    errors = tuple(item for item in schema_findings if item.severity == "error")
+    if errors:
+        return HealthReport(status="FAIL", errors=errors)
+    if document.data.get("plugins"):
+        return HealthReport(status="ERROR", errors=(HealthFinding(
+            rule_id="PLUGIN.CONFIG.ROOT", severity="error", object_type="config", object_id=str(path),
+            message="custom plugins require an owning vibeflow_project.jsonc", failure_layer="workspace"),))
+    try:
+        graph = parse_graph_config(document.data, project_root=project_root_for_config(path))
+    except GraphConfigError as exc:
+        return graph_config_error_report(exc, path=path, effective_policy=policy_result.effective_policy.to_dict())
     from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
-    return validate_graph_health(graph, plugin_registry=plugin_registry, effective_policy=policy_result.effective_policy)
+    return validate_graph_health(graph, effective_policy=policy_result.effective_policy)
 
 
 def _configured_nodeset_depth(path: Path) -> int:
@@ -84,13 +63,35 @@ def _configured_nodeset_depth(path: Path) -> int:
 
 
 def inspect_config_payload(path: Path, *, policy_path: Path | None = None) -> tuple[dict[str, object], int]:
-    report = validate_config_path(path, policy_path=policy_path)
+    from dataclasses import replace
+    from vibeflow.tooling.project.workspace_loader import find_project_config, load_project_workspace
+    compiled = None
+    if find_project_config(path) is not None:
+        from vibeflow.tooling.application.python.workspace_service import (
+            _environment_or_report, _prepare_workspace_graph, _validate_prepared_workspace_graph,
+            _workspace_runtime_options,
+        )
+        document = load_config_document(path)
+        policy = resolve_effective_policy(document.data, config_path=path, explicit_policy_path=policy_path)
+        workspace = replace(load_project_workspace(path), policy=policy.effective_policy.data)
+        env = _environment_or_report(workspace, path) if not policy.findings else HealthReport(status="FAIL", errors=tuple(policy.findings))
+        prepared = env if isinstance(env, HealthReport) else _prepare_workspace_graph(path, workspace=workspace, env=env)
+        if isinstance(prepared, HealthReport):
+            report = prepared
+        else:
+            report = _validate_prepared_workspace_graph(prepared, env=env, workspace=workspace,
+                runtime_options=_workspace_runtime_options(path, workspace=workspace))
+            document, graph = prepared[:2]
+            compiled = GraphCompiler().compile(graph, registry=env.registry)
+    else:
+        report = validate_config_path(path, policy_path=policy_path)
     payload: dict[str, object] = {"health": report.to_dict()}
     if report.status not in {"PASS", "CONCERNS"}:
         return payload, 1
-    document = load_config_document(path)
-    graph = parse_graph_config(document.data, project_root=project_root_for_config(path))
-    compiled = GraphCompiler().compile(graph)
+    if compiled is None:
+        document = load_config_document(path)
+        graph = parse_graph_config(document.data, project_root=project_root_for_config(path))
+        compiled = GraphCompiler().compile(graph)
     payload["config"] = {
         "inputs": providers_to_dicts(graph.inputs),
         "outputs": requirements_to_dicts(graph.outputs),

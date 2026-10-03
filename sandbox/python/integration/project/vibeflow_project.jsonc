@@ -1,6 +1,5 @@
 {
   "project_target": "python",
-  "registry": "registry.py:resources",
   "quality_enabled": false,
   "architecture": {
     "documents": [
@@ -20,17 +19,6 @@
         "workflow": "configs/pass_delegate_cli_numeric_streams.jsonc",
         "document": "review_artifacts/NUMERIC_STREAMS_CLI_ARCHITECTURE.jsonc"
       }
-    ]
-  },
-  "descriptors": {
-    "nodes": [
-      "manifests/nodes"
-    ],
-    "rules": [
-      "manifests/rules"
-    ],
-    "rulesets": [
-      "manifests/rulesets"
     ]
   }
 }

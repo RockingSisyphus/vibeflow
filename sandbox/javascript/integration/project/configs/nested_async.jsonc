@@ -1,7 +1,11 @@
 {
   "nodeset_imports": [
-    {"path": "nodesets/nested_async_inner.jsonc"},
-    {"path": "nodesets/nested_async_outer.jsonc"}
+    {
+      "path": "nodesets/nested_async_inner.jsonc"
+    },
+    {
+      "path": "nodesets/nested_async_outer.jsonc"
+    }
   ],
   "pipeline": {
     "entry_mode": "async",
@@ -25,7 +29,7 @@
         "type_used": "sandbox.nested_async_outer",
         "display_name": "Run nested async blocks",
         "description": "Runs the two-level deferred and detached test graph."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -34,8 +38,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "outer"},
-      {"from": "outer", "to": "end"}
+      {
+        "from": "start",
+        "to": "outer"
+      },
+      {
+        "from": "outer",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -45,5 +55,14 @@
         "as": "doubled"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

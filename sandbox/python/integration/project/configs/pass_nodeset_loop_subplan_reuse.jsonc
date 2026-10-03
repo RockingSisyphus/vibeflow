@@ -17,8 +17,6 @@
       {
         "display_name": "Input",
         "description": "Reads the initial loop value.",
-
-
         "id": "input",
         "type_used": "sandbox.value_input"
       },
@@ -84,7 +82,6 @@
       {
         "display_name": "End",
         "description": "Ends after value.next is produced.",
-
         "id": "end",
         "type_used": "sandbox.next_value_end"
       }
@@ -127,6 +124,15 @@
     },
     {
       "path": "nodesets/pass_nodeset_loop_subplan_reuse/loop_reuse_body.jsonc"
+    }
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
     }
   ]
 }

@@ -303,7 +303,7 @@ root=Path(sys.argv[1]);workspace=load_workspace_config(root.parent/'vibeflow_con
 document=load_workspace_config_document(root/'configs/model.jsonc',workspace=workspace)
 graph=parse_graph_config(document.data,project_root=root,source_path=root/'configs/model.jsonc')
 if sys.argv[2]=='python':
-    registry=declared_python_registry(workspace)
+    registry=declared_python_registry(workspace,config_path=root/'configs/model.jsonc')
     sources=collect_workflow_source_context(registry,graph)
     paths=[list(call.call_path) for call in sources.calls if call.type_key=='example.model']
 else:

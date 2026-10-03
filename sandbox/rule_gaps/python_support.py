@@ -56,7 +56,7 @@ from vibeflow.tooling.project.workspace_loader import load_workspace_config
 from vibeflow.tooling.project.config_loader import load_config_document
 from vibeflow.tooling.project.graph_config import parse_graph_config
 root=Path(sys.argv[1])
-registry=declared_python_registry(load_workspace_config(root/'workspace.jsonc'))
+registry=declared_python_registry(load_workspace_config(root/'workspace.jsonc'),config_path=root/'workflow.jsonc')
 graph=parse_graph_config(load_config_document(root/'workflow.jsonc').data,project_root=root)
 context=collect_workflow_source_context(registry,graph)
 relative=lambda path: str(Path(path).relative_to(root)) if path else ''

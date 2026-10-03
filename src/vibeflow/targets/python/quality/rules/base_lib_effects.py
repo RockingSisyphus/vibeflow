@@ -56,6 +56,8 @@ class _BaseLibAstScanner(ast.NodeVisitor):
         self.imported_module_roots: set[str] = set()
 
     def visit_Module(self, node: ast.Module) -> None:
+        from vibeflow.targets.python.quality.source_analysis.sdk_declarations import declaration_calls
+        self._sdk_calls = declaration_calls(node)
         for stmt in node.body:
             kind = module_statement_kind(stmt)
             if kind in {"import", "definition"}:
@@ -166,7 +168,7 @@ class _BaseLibAstScanner(ast.NodeVisitor):
         )
 
     def _visit_module_assignment(self, node: ast.Assign | ast.AnnAssign) -> None:
-        if self.effect_scope != "global_state" and not module_assignment_is_allowed(node):
+        if self.effect_scope != "global_state" and not module_assignment_is_allowed(node) and node.value not in getattr(self, "_sdk_calls", ()):
             self._add(
                 "BASE_LIB.GLOBAL_STATE",
                 "base_lib must not hold mutable module-level state",

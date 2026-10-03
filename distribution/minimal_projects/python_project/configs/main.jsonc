@@ -45,10 +45,22 @@
       }
     ],
     "edges": [
-      ["start", "input_boundary"],
-      ["input_boundary", "process_payload"],
-      ["process_payload", "output_boundary"],
-      ["output_boundary", "end"]
+      [
+        "start",
+        "input_boundary"
+      ],
+      [
+        "input_boundary",
+        "process_payload"
+      ],
+      [
+        "process_payload",
+        "output_boundary"
+      ],
+      [
+        "output_boundary",
+        "end"
+      ]
     ],
     "outputs": [
       {
@@ -57,5 +69,13 @@
         "display_name": "Public response"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugins/code_plugin.py"
+      }
+    }
+  ]
 }

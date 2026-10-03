@@ -8,7 +8,6 @@
         "description": "Runs start."
       },
       {
-
         "value": 4,
         "id": "seed",
         "type_used": "sandbox.constant",
@@ -16,8 +15,6 @@
         "description": "Runs seed."
       },
       {
-
-
         "config": {
           "delta": 3
         },
@@ -27,8 +24,6 @@
         "description": "Runs add."
       },
       {
-
-
         "config": {
           "factor": 2
         },
@@ -38,7 +33,6 @@
         "description": "Runs multiply."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.final_value_end",
         "display_name": "End",
@@ -70,5 +64,14 @@
         "display_name": "Value Final"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

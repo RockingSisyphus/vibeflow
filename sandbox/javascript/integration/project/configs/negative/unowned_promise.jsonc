@@ -21,7 +21,7 @@
         "type_used": "sandbox.invalid.unowned_promise",
         "display_name": "Unowned Promise",
         "description": "Must fail because Promise work is discarded instead of awaited or assigned to a TaskPlan."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -30,8 +30,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "invalid"},
-      {"from": "invalid", "to": "end"}
+      {
+        "from": "start",
+        "to": "invalid"
+      },
+      {
+        "from": "invalid",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -41,5 +47,14 @@
         "as": "result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

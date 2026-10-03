@@ -25,6 +25,8 @@ def import_project(tmp_path):
     shutil.copytree(ROOT / "sandbox/javascript/integration", sandbox,
                     ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc", ".artifacts"))
     project = sandbox / "project"
+    from tests.fixtures.support.code_plugins import copy_archival_inputs
+    copy_archival_inputs(ROOT / "sandbox/javascript/integration", sandbox)
     (project / "node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
     # Workflow Rules receive actual source scopes even when Node Rules are unselected.
     for file in (project / "manifests/nodes").glob("*.jsonc"):
@@ -196,3 +198,15 @@ def test_business_types_remain_outside_health_review(import_project, tmp_path):
     # a whole-program type checker to that existing compilation capability.
     built = build_project_aot(ProjectBuildRequest(workspace,project / "configs/linear.jsonc",tmp_path / "dist","node","single-esm"))
     assert built.out_dir.is_dir()
+
+# Historic input mutations are published explicitly before the formal operation.
+_native_audit = audit_javascript_project
+_native_build = build_project_aot
+def audit_javascript_project(request, **options):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(request.workspace)
+    return _native_audit(request, **options)
+def build_project_aot(request, **options):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(request.workspace)
+    return _native_build(request, **options)

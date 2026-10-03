@@ -137,9 +137,22 @@ def test_rule_bundle_contributes_node_and_workflow_findings_to_normal_run(tmp_pa
 def test_missing_lifecycle_plugin_refuses_formal_validation(tmp_path, capsys):
     config = _rule_project(tmp_path)
     data = json.loads(config.read_text())
-    data["plugins"] = [{"module": str(tmp_path / "missing.py"), "type": "runtime"}]
+    data["plugins"] = [{"source":{"kind":"file","ref":"missing.py"}}]
     config.write_text(json.dumps(data))
     assert cli_main(["validate", "--config", str(config), "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "ERROR"
-    assert any(item["code"] == "PLUGIN.LOAD" for item in payload["errors"])
+    assert any(item["code"] == "PLUGIN.DECLARATION.LOAD" for item in payload["errors"])
+
+
+_load_project = load_project_workspace
+def load_project_workspace(config):
+    from tests.fixtures.support.code_plugins import prepare_config_fixture
+    prepare_config_fixture(config)
+    return _load_project(config)
+
+_validate_config = validate_config_path
+def validate_config_path(config, **options):
+    from tests.fixtures.support.code_plugins import prepare_config_fixture
+    prepare_config_fixture(config)
+    return _validate_config(config, **options)

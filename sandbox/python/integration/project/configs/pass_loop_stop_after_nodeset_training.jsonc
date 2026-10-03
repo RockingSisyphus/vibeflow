@@ -192,5 +192,14 @@
     {
       "path": "nodesets/pass_loop_stop_after_nodeset_training/training_batch_step.jsonc"
     }
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
   ]
 }

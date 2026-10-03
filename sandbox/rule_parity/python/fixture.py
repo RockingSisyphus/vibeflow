@@ -180,14 +180,26 @@ def _chain_files(options):
 
 def _command(root, variant, spec):
     entrypoint = spec.get("entrypoints", {}).get(variant, spec.get("entrypoint", "cli.inspect-node"))
+    if entrypoint == "cli.quality-check" and variant == "current":
+        import runpy
+        runpy.run_path(str(Path(__file__).resolve().parents[3] / "tests/fixtures/support/code_plugins.py"))["migrate_fixture"](root)
     if entrypoint == "cli.quality-check":
         return [sys.executable, "-m", "vibeflow", "quality-check", "--path", str(root / "source.py"), "--json", *spec.get("cli_args", [])]
+    if entrypoint == "cli.run" and variant == "current":
+        import runpy
+        runpy.run_path(str(Path(__file__).resolve().parents[3] / "tests/fixtures/support/code_plugins.py"))["migrate_fixture"](root)
     if entrypoint == "cli.run":
         return [sys.executable, "-m", "vibeflow", "run", "--config", str(root / "workflow.jsonc"),
             "--workspace", str(root / "workspace.jsonc"), "--run-root", str(root / "runs"), "--run-id", "import-marker"]
+    if variant == "current":
+        import runpy
+        migrate = runpy.run_path(str(Path(__file__).resolve().parents[3] / "tests/fixtures/support/code_plugins.py"))["migrate_fixture"]
+        if not (root / "workflow.jsonc").is_file():
+            (root / "workflow.jsonc").write_text(json.dumps({"rulesets": [], "pipeline": {"nodes": [{"id":"demo", "type_used":"parity.node", "display_name":"Demo", "description":"Source rule observation"}]}}))
+        migrate(root)
     if entrypoint == "cli.inspect-node":
         return [sys.executable, "-m", "vibeflow", "inspect-node", "--type", "parity.node", "--module", str(root / "node.py"),
-            "--class", "DemoNode", "--policy", str(root / "policy.jsonc")]
+            "--class", "DemoNode", "--policy", str(root / "policy.jsonc"), *(["--config", str(root / "workflow.jsonc")] if variant == "current" else [])]
     scripts = {"target.scan_base_lib": _base_lib_script, "target.analyze_python_source": _source_script,
         "target.validate_node_class": _class_validation_script}
     script = scripts[entrypoint]() if entrypoint in scripts else _graph_script(variant)
@@ -241,7 +253,7 @@ if other_path.exists():
 report=validate_graph_health(graph,registry=registry,purity_policy=policy)
 ''' if variant == "baseline" else '''from vibeflow.tooling.application.python.project.declarations import declared_python_registry,collect_workflow_source_context
 from vibeflow.tooling.project.workspace_loader import load_project_workspace
-registry=declared_python_registry(load_project_workspace(root/'node.py'))
+registry=declared_python_registry(load_project_workspace(root/'node.py'),config_path=root/'workflow.jsonc')
 report=validate_graph_health(graph,registry=registry,purity_policy=policy,source_context=collect_workflow_source_context(registry,graph))
 '''
     return '''import json,sys

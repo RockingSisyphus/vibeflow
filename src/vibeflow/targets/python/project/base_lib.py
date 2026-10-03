@@ -85,11 +85,13 @@ def analyze_base_lib_source(
     from vibeflow.core.rules import RuleContext, compile_ruleset, execute_rule_plan
     from vibeflow.core.rules.builtin import builtin_rule_resources
     from vibeflow.targets.python.quality.rules import python_rule_handlers
-    from vibeflow.targets.python.quality.source_context import PythonSourceFile
+    from vibeflow.targets.python.quality.source_context import PythonSourceFile, build_python_source_context
     rules, rulesets = builtin_rule_resources()
     plan = compile_ruleset("vibeflow.base_lib", rules={item.id:item for item in rules},
         rulesets={item.id:item for item in rulesets}, entrypoint="static")
-    context = RuleContext(facts={"base_lib_file":PythonSourceFile(path,module,source_text,_tree=tree),"purity_policy":policy},
+    source = PythonSourceFile(path,module,source_text,_tree=tree)
+    sources = build_python_source_context((), (source,))
+    context = RuleContext(facts={"source_context":sources,"base_lib_file":source,"purity_policy":policy},
         subject={"kind":"base_lib","id":module,"source_identity":("python",path,source_text)},target="python")
     result = execute_rule_plan(plan,context,handlers=python_rule_handlers())
     findings = tuple(BaseLibFinding(rule_id=item.code,message=item.message,severity=item.severity,

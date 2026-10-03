@@ -68,8 +68,26 @@ class _ImportExecutionVisitor(ast.NodeVisitor):
 
     def _decorators(self, node):
         for expression in node.decorator_list:
-            if not self._builtin_decorator(expression):
+            if self._sdk_call(expression):
+                for argument in (*expression.args, *(item.value for item in expression.keywords)):
+                    self.visit(argument)
+            elif not self._builtin_decorator(expression):
                 self.violations.append((expression, "a decorator executes code while importing source"))
+
+    def _sdk_call(self, expression):
+        if not isinstance(expression, ast.Call):
+            return False
+        def name(value):
+            if isinstance(value, ast.Name):
+                return self.bindings.get(value.id, "")
+            if isinstance(value, ast.Attribute):
+                return name(value.value) + "." + value.attr
+            return ""
+        prefix = "vibeflow.targets.python.sdk."
+        return name(expression.func) in {prefix + item for item in (
+            "Plugin", "node", "rule", "ruleset", "data_schema", "base_lib", "capability",
+            "host_extension", "SourceLocator", "RuleCall", "RuleRelation", "DataProvider",
+            "DataRequirement", "NodeContractDescriptor")}
 
     def visit_FunctionDef(self, node):
         self._decorators(node)
@@ -99,7 +117,11 @@ class _ImportExecutionVisitor(ast.NodeVisitor):
             self.bindings = previous
 
     def visit_Call(self, node):
-        self.violations.append((node, "a call executed while importing source must be removed or covered by a replacement import rule"))
+        if self._sdk_call(node):
+            for argument in (*node.args, *(item.value for item in node.keywords)):
+                self.visit(argument)
+        else:
+            self.violations.append((node, "a call executed while importing source must be removed or covered by a replacement import rule"))
 
     def visit_Await(self, node):
         self.violations.append((node, "import-time await is not allowed by the selected import rule"))

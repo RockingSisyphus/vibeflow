@@ -154,3 +154,16 @@ def test_rule_review_source_defaults_match_target_and_local_parameters(tmp_path,
     assert conventions["source_extension"] == (".py" if target == "python" else ".ts")
     assert payload["workflow"][0]["calls"][0]["params"]["max_file_lines"] == 13
     assert not marker.exists()
+
+
+_preview = effective_rule_plans
+def effective_rule_plans(config, **options):
+    from tests.fixtures.support.code_plugins import prepare_config_fixture
+    prepare_config_fixture(config)
+    return _preview(config, **options)
+
+_cli = main
+def main(args):
+    from tests.fixtures.support.code_plugins import prepare_config_fixture
+    prepare_config_fixture(args[args.index("--config") + 1])
+    return _cli(args)

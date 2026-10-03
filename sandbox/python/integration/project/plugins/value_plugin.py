@@ -1,22 +1,34 @@
 from __future__ import annotations
 
-from vibeflow.targets.python.project import PluginInfo
+from vibeflow.targets.python.sdk import Plugin, RuleCall, ruleset
 from plugins import value_state
 
 
-PLUGIN_INFO = PluginInfo(
-    name="sandbox_value_shift",
-    plugin_type="runtime",
-    display_name="Sandbox Value Shift",
-    category="runtime",
-    description="Configures a pure value shift helper used by sandbox resource arithmetic.",
-    version="0.1.0",
-)
-
 class ValueShiftPlugin:
-    name = "sandbox_value_shift"
-    priority = 5
-    PLUGIN_INFO = PLUGIN_INFO
-
     def configure(self, config):
         value_state.SHIFT_BY = config.get("shift", 0)
+
+
+def create(context):
+    instance = ValueShiftPlugin()
+    instance.configure(context["config"])
+    return instance
+
+
+review = ruleset(
+    id="sandbox.value_plugin",
+    calls=[
+        RuleCall("imports", rule_id="vibeflow.import_side_effects"),
+        RuleCall("effects", rule_id="vibeflow.no_side_effects", params={"effect_scope": "global_state"}),
+        RuleCall("interface", rule_id="vibeflow.node_interface"),
+    ],
+    entrypoints={"import": ["imports"], "static": ["effects", "interface"], "run": ["effects", "interface"]},
+)
+plugin = Plugin(
+    id="value_shift", resources=[review], runtime=create, priority=5,
+    rulesets=["sandbox.value_plugin"],
+    display_name="Sandbox Value Shift",
+    description="Configures a value shift helper used by sandbox resource arithmetic.",
+    config_schema={"type": "object", "properties": {"shift": {"type": "number"}}, "additionalProperties": False},
+    config_defaults={"shift": 0}, version="0.1.0",
+)

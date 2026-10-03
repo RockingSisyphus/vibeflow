@@ -8,7 +8,6 @@
         "description": "Runs start."
       },
       {
-
         "async": "result_key",
         "result_key": "value.in",
         "value": 7,
@@ -18,8 +17,6 @@
         "description": "Runs seed."
       },
       {
-
-
         "delta": 5,
         "id": "add",
         "type_used": "sandbox.add",
@@ -27,7 +24,6 @@
         "description": "Runs add."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.out_value_end",
         "display_name": "End",
@@ -55,5 +51,14 @@
         "display_name": "Value Out"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

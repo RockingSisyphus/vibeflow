@@ -4,12 +4,23 @@ The convention recognizes methods/functions named ``model_forward``. It does
 not claim to recognize arbitrary machine learning code or infer a topology.
 """
 
+from vibeflow.targets.python.sdk import rule
+
 import ast
 
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.rules import RuleRecord, RuleResult
 
 
+@rule(**{'id': 'example.model_definition',
+ 'description': 'One direct model_forward method per model_block; helpers do '
+                'not inherit legal model-definition ownership.',
+ 'scope': 'source',
+ 'params_schema': {'marker_method': {'type': 'string'},
+                   'model_tag': {'type': 'string'}},
+ 'params_defaults': {'marker_method': 'model_forward',
+                     'model_tag': 'model_block'},
+ 'outputs': {'evidence': 'example.model_definition.v1'}})
 def check(context, inputs, params):
     sources = context.require("source_context")
     descriptor = context.subject["descriptor"]

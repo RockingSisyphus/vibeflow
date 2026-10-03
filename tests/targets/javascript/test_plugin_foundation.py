@@ -196,6 +196,6 @@ def test_plugin_abi_declaration_is_packaged_with_the_target() -> None:
     )
     source = declaration.read_text(encoding="utf-8")
 
-    assert '"vibeflow.plugin.v2"' in source
+    assert '"vibeflow.plugin.v3"' in source
     assert "interface RuntimePlugin" in source
     assert "type CreateRuntimePlugin" in source

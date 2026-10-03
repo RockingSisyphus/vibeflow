@@ -26,25 +26,25 @@
         "type_used": "sandbox.delegate_argv",
         "display_name": "Parse argv",
         "description": "Parses the business argv injected by delegate-cli."
-              },
+      },
       {
         "id": "read_document",
         "type_used": "sandbox.delegate_document",
         "display_name": "Read document",
         "description": "Reads the requested input document through a document node."
-              },
+      },
       {
         "id": "process_message",
         "type_used": "sandbox.delegate_business",
         "display_name": "Process message",
         "description": "Runs the core business transformation."
-              },
+      },
       {
         "id": "write_output",
         "type_used": "sandbox.delegate_output",
         "display_name": "Write output",
         "description": "Writes business streams and returns cli.exit_code."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.delegate_end",
@@ -53,12 +53,39 @@
       }
     ],
     "edges": [
-      ["start", "parse_argv"],
-      ["parse_argv", "read_document"],
-      ["parse_argv", "write_output"],
-      ["read_document", "process_message"],
-      ["process_message", "write_output"],
-      ["write_output", "end"]
+      [
+        "start",
+        "parse_argv"
+      ],
+      [
+        "parse_argv",
+        "read_document"
+      ],
+      [
+        "parse_argv",
+        "write_output"
+      ],
+      [
+        "read_document",
+        "process_message"
+      ],
+      [
+        "process_message",
+        "write_output"
+      ],
+      [
+        "write_output",
+        "end"
+      ]
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

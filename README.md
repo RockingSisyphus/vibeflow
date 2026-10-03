@@ -13,6 +13,7 @@ terminal start → input I/O → process / nodeset → output I/O → terminal e
 ## 主要能力
 
 - Python Runtime 与 JavaScript/TypeScript AOT；
+- Python 和 JS/TS 插件 SDK，以代码声明 Node、Rule、Ruleset 等资源，由 workflow 显式选择；
 - Node、Nodeset、Loop、Plugin、Capability 与显式副作用边界；
 - 确定性 Architecture、Mermaid、ASCII 和 SVG；
 - 配置、契约、可达性、控制流、质量、构建与执行证据检查；

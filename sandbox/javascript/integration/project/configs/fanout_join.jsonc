@@ -20,20 +20,20 @@
         "type_used": "sandbox.fanout_add",
         "display_name": "Add one",
         "description": "Computes x + 1 on the upper branch."
-              },
+      },
       {
         "id": "subtract_one",
         "type_used": "sandbox.fanout_subtract",
         "display_name": "Subtract one",
         "description": "Computes x - 1 on the lower branch."
-              },
+      },
       {
         "id": "join",
         "type_used": "sandbox.fanout_join",
         "display_name": "Join both branches",
         "description": "Waits for both arithmetic branches.",
         "join_policy": "all"
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -42,11 +42,26 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "add_one"},
-      {"from": "start", "to": "subtract_one"},
-      {"from": "add_one", "to": "join"},
-      {"from": "subtract_one", "to": "join"},
-      {"from": "join", "to": "end"}
+      {
+        "from": "start",
+        "to": "add_one"
+      },
+      {
+        "from": "start",
+        "to": "subtract_one"
+      },
+      {
+        "from": "add_one",
+        "to": "join"
+      },
+      {
+        "from": "subtract_one",
+        "to": "join"
+      },
+      {
+        "from": "join",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -62,5 +77,14 @@
         "as": "subtracted"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

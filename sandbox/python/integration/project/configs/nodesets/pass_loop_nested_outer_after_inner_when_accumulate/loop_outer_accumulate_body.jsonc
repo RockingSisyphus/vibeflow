@@ -58,8 +58,6 @@
       {
         "display_name": "Init Inner",
         "description": "Copies outer state into inner-loop scoped keys and resets the inner counter.",
-
-
         "inner_start": 0,
         "id": "init_inner",
         "type_used": "semantic.inner_loop_init"
@@ -146,8 +144,6 @@
       {
         "display_name": "Advance Outer",
         "description": "Carries the inner total back to outer state and advances the outer counter.",
-
-
         "outer_limit": 99,
         "id": "advance_outer",
         "type_used": "semantic.outer_advance"
@@ -200,5 +196,14 @@
       }
     ]
   },
-  "type_key": "loop.outer_accumulate_body"
+  "type_key": "loop.outer_accumulate_body",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

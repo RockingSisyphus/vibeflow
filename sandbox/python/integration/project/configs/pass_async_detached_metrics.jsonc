@@ -15,8 +15,6 @@
         "description": "Runs start."
       },
       {
-
-
         "async": "detached",
         "id": "metrics",
         "type_used": "sandbox.batch_metrics",
@@ -24,7 +22,6 @@
         "description": "Runs metrics."
       },
       {
-
         "value": 4,
         "id": "seed",
         "type_used": "sandbox.constant",
@@ -32,8 +29,6 @@
         "description": "Runs seed."
       },
       {
-
-
         "delta": 6,
         "id": "add",
         "type_used": "sandbox.add",
@@ -41,7 +36,6 @@
         "description": "Runs add."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.out_value_end",
         "display_name": "End",
@@ -73,5 +67,14 @@
         "display_name": "Value Out"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

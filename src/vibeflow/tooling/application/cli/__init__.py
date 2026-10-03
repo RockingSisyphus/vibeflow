@@ -43,6 +43,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not raw_args or raw_args[0] in {"-h", "--help"}:
         return _show_root_help(raw_args)
     command = raw_args[0]
+    if command == "inspect-resources":
+        from vibeflow.tooling.application.resource_query import main as resource_main
+        return resource_main(raw_args[1:])
     if command == "review-rules":
         from vibeflow.tooling.application.rule_review import main as rule_main
         return rule_main(raw_args[1:])
@@ -98,6 +101,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("build", "compile a JavaScript workflow into AOT output"),
         ("validate", "validate a workflow configuration"),
         ("inspect-node", "inspect a Python node implementation"),
+        ("inspect-resources", "inspect resources selected by one workflow"),
         ("inspect-config", "inspect a workflow configuration"),
         ("export-mermaid", "export a workflow as Mermaid"),
         ("export-architecture", "export a workflow architecture document"),

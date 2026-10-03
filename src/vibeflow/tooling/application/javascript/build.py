@@ -43,7 +43,7 @@ from vibeflow.targets.javascript.frontend.facts import (
     implementation_facts_from_catalog,
     validate_javascript_descriptor_catalogs,
 )
-from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
 from vibeflow.core.flow import GraphConfig
 from vibeflow.tooling.project.graph_config import parse_graph_config
 from vibeflow.block_compiler import WorkflowPlan, compile_graph_plan
@@ -182,9 +182,9 @@ def prepare_project_build(
             f"workflow config does not exist: {config_path}",
         )
 
-    catalogs = load_project_descriptor_catalogs(
+    catalogs = load_workflow_catalogs(
         root.path,
-        project_config=root.config_path,
+        project_config=root.config_path, workflow_config=config_path, workspace=workspace, node_command=request.node_command,
     )
     try:
         validate_javascript_descriptor_catalogs(catalogs)
@@ -252,6 +252,7 @@ def prepare_project_build(
                 target=request.target,
                 workflow_id=request.workflow_id or config_path.stem,
                 node_command=request.node_command,
+                catalogs=catalogs,
             ) as plugin_runner:
                 plugin_runner.before_compile(graph)
                 compilation = _compile_core_compilation(
@@ -615,7 +616,7 @@ def _javascript_plugin_plan(
     entry_mode: str,
     project_root: Path,
 ) -> JavascriptPluginBindingPlan:
-    raw = config.get("plugins", ())
+    raw = list(catalogs.lifecycle_selections)
     if raw in (None, ()):
         raw = []
     if not isinstance(raw, list):

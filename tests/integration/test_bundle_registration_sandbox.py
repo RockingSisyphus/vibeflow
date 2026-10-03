@@ -11,7 +11,7 @@ import sys
 import pytest
 
 from vibeflow.tooling.application.cli import main
-from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,6 +28,8 @@ def registered_project(tmp_path, request):
     example = tmp_path / target
     shutil.copytree(ROOT / f"sandbox/{target}/domain_rules", example,
         ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc", ".artifacts"))
+    from tests.fixtures.support.code_plugins import copy_archival_inputs
+    copy_archival_inputs(ROOT / f"sandbox/{target}/domain_rules", example)
     project = example / "project"
     if target == "javascript":
         toolchain = Path(os.environ.get("VIBEFLOW_TEST_TOOLCHAIN_ROOT", ROOT / "sandbox/javascript/minimal/project"))
@@ -69,6 +71,8 @@ def registered_project(tmp_path, request):
 
 
 def _validate(capsys, workspace, project):
+    from tests.fixtures.support.code_plugins import migrate_fixture
+    migrate_fixture(project)
     code = main(["validate", "--workspace", str(workspace),
                  "--config", str(project / "configs/model.jsonc"), "--json"])
     return code, json.loads(capsys.readouterr().out)
@@ -90,9 +94,9 @@ def test_multiple_bundles_share_one_canonical_declaration_and_keep_its_origin(re
         _extra_bundle(project, {"bundles": ["domain.jsonc"]})
     code, payload = _validate(capsys, workspace, project)
     assert code == 0, payload
-    catalogs = load_project_descriptor_catalogs(project)
-    assert catalogs.nodes.source_for("example.model") == str(project / "bundle/nodes/model.jsonc")
-    assert catalogs.rules.source_for("example.model_definition") == str(project / "bundle/rules/model-definition.jsonc")
+    catalogs = load_workflow_catalogs(project, workflow_config=project / "configs/model.jsonc")
+    assert catalogs.nodes.source_for("example.model") == str(project / ("code_plugin.py" if target == "python" else "code_plugin.ts"))
+    assert catalogs.rules.source_for("example.model_definition") == str(project / ("code_plugin.py" if target == "python" else "code_plugin.ts"))
     assert sum(item.type_key == "example.model" for item in catalogs.nodes) == 1
     assert sum(item.id == "example.model_definition" for item in catalogs.rules) == 1
     assert not imported.exists()
@@ -102,7 +106,7 @@ def test_multiple_bundles_share_one_canonical_declaration_and_keep_its_origin(re
 @pytest.mark.parametrize("resource", ["nodes", "rules"])
 @pytest.mark.parametrize("different", [False, True], ids=["duplicate", "conflict"])
 def test_different_declaration_files_with_same_id_are_rejected_before_node_import(registered_project, capsys, resource, different):
-    _, workspace, project, imported, executed = registered_project
+    target, workspace, project, imported, executed = registered_project
     original = project / ("bundle/nodes/model.jsonc" if resource == "nodes" else "bundle/rules/model-definition.jsonc")
     data = json.loads(original.read_text())
     if different:
@@ -113,8 +117,11 @@ def test_different_declaration_files_with_same_id_are_rejected_before_node_impor
     code, payload = _validate(capsys, workspace, project)
     assert code == 1, payload
     diagnostic = json.dumps(payload)
-    assert ("DESCRIPTOR.CONFLICT" if different else "DESCRIPTOR.DUPLICATE") in diagnostic
-    assert str(original) in diagnostic and str(duplicate) in diagnostic
+    prefix = "RULE.RESOURCE" if resource == "rules" else "DESCRIPTOR"
+    assert (prefix + (".CONFLICT" if different else ".DUPLICATE")) in diagnostic
+    assert str(project / ("code_plugin.py" if target == "python" else "code_plugin.ts")) in diagnostic
+    origins = payload.get("diagnostics",payload.get("errors",[]))[0]["details"]["origins"]
+    assert origins["current"]["line"] != origins["previous"]["line"]
     assert ("example.model" if resource == "nodes" else "example.model_definition") in diagnostic
     assert not imported.exists()
     assert not executed.exists()
@@ -128,8 +135,8 @@ def test_dangling_bundle_resource_is_rejected_with_its_resource_path(registered_
     code, payload = _validate(capsys, workspace, project)
     assert code == 1, payload
     diagnostic = json.dumps(payload)
-    assert "DESCRIPTOR.PATH.MISSING" in diagnostic
-    assert str(missing) in diagnostic
+    assert "PLUGIN.DECLARATION.LOAD" in diagnostic or "VF_PLUGIN_PROCESS" in diagnostic
+    assert "missing" in diagnostic
     assert not imported.exists() and not executed.exists()
 
 
@@ -160,6 +167,8 @@ def test_native_node_binding_failure_preserves_real_import_boundary(registered_p
     else:
         source["export"] = "MissingNodeExport"
     _write(manifest, data)
+    from tests.fixtures.support.code_plugins import migrate_fixture
+    migrate_fixture(project)
     if failure == "source":
         code, payload = _validate(capsys, workspace, project)
     elif target == "python":

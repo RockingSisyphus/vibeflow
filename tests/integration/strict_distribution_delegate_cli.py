@@ -311,6 +311,8 @@ def test_built_run_keeps_javascript_roots_out_of_lazy_python_imports(
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     environment.pop("PYTHONPATH", None)
 
+    from tests.fixtures.support.code_plugins import prepare_config_fixture
+    prepare_config_fixture(config_path)
     completed = subprocess.run(
         [
             sys.executable,
@@ -442,6 +444,8 @@ def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_co
     env = dict(os.environ)
     env["VIBEFLOW_CONFIG_TRACE"] = "1"
 
+    from tests.fixtures.support.code_plugins import prepare_config_fixture
+    prepare_config_fixture(config)
     completed = subprocess.run(
         [
             sys.executable,

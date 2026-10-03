@@ -24,9 +24,10 @@ def resolve_workspace_effective_policy(
     workspace_path: Path,
     base_lib_policies: tuple[Mapping[str, tuple[str, ...]], ...] = (),
     plugin_registry: PluginRegistry | None = None,
+    base_effective: EffectivePolicy | None = None,
 ) -> PolicyResolveResult:
-    effective = deepcopy(DEFAULT_POLICY_DATA)
-    sources: list[str] = ["kernel.default_policy"]
+    effective = deepcopy(DEFAULT_POLICY_DATA if base_effective is None else base_effective.data)
+    sources: list[str] = ["kernel.default_policy"] if base_effective is None else list(base_effective.sources)
     findings: list[HealthFinding] = []
     if workspace_policy is not None:
         if not isinstance(workspace_policy, Mapping):

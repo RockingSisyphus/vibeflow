@@ -1,6 +1,8 @@
 """JavaScript Rule implementations hosted beside the language-neutral engine."""
 from __future__ import annotations
 
+from vibeflow.core.descriptors.contributions import contribution_facts
+
 from contextlib import ExitStack
 from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
@@ -377,21 +379,26 @@ class _RuleSession:
                         implementations = [item for item in rule.implementations if item.execution_family == "javascript"]
                         if len(implementations) != 1:
                             raise ValueError(f"Rule '{rule.id}' requires exactly one compatible JavaScript/TypeScript implementation")
-                        if self.worker is None:
-                            self.worker = self.stack.enter_context(JavascriptPluginSession(node_command=self.node_command))
+                        from vibeflow.targets.javascript.sdk.loading import contribution_session
+                        worker = contribution_session(self.catalogs, "rules", rule.id)
+                        if worker is None:
+                            if self.worker is None:
+                                self.worker = self.stack.enter_context(JavascriptPluginSession(node_command=self.node_command))
+                            worker = self.worker
                         source = implementations[0].source
                         module = str((self.project_root / source.ref).resolve())
                         try:
                             if rule.id not in self.sessions:
-                                session_id = f"rule:{rule.id}"
-                                self.worker.open_rule(session_id, rule={"id": rule.id, "module": module, "export": source.export or "check"}, package_root=self.package_root, target="node")
+                                session_id = f"rule:{id(self)}:{rule.id}"
+                                worker.open_rule(session_id, rule={"id": rule.id, "module": module, "export": source.export or "check"}, package_root=self.package_root, target="node")
+                                self.stack.callback(worker.close, session_id)
                                 self.sessions[rule.id] = session_id
-                            returned = self.worker.evaluate_rule(self.sessions[rule.id], context={"facts": _rule_wire_facts(ctx.facts), "subject": plain(ctx.subject), "scope": plain(ctx.scope), "phase": ctx.phase, "target": ctx.target}, params=plain(params), inputs={key: item.to_dict() for key, item in inputs.items()})
+                            returned = worker.evaluate_rule(self.sessions[rule.id], context={"facts": _rule_wire_facts(ctx.facts), "subject": plain(ctx.subject), "scope": plain(ctx.scope), "phase": ctx.phase, "target": ctx.target}, params=plain(params), inputs={key: item.to_dict() for key, item in inputs.items()})
                         except JavascriptPluginError as error:
                             declaration = self.catalogs.rules.source_for(rule.id)
                             # Resource provenance has no syntax span: identify the containing declaration.
                             finding = _finding({"code": "RULE.EXECUTION", "message": f"rule '{rule.id}' failed: {error}",
-                                "source_location": {"path": declaration or module, "line": 1, "column": 1},
+                                "source_location": self.catalogs.rules.location_for(rule.id) or {"path": declaration or module},
                                 "details": {"implementation": {"path": module, "export": source.export or "check"},
                                             "cause_code": error.code, "cause_details": error.details}}, rule.id, ctx)
                             return RuleResult(findings=(finding,), state="failed")
@@ -432,7 +439,7 @@ def run_javascript_rules(
     if include_registered:
         used.update({item.type_key: used.get(item.type_key, []) for item in catalogs.nodes})
     snapshot = {key: catalogs.nodes.require(key).to_dict() for key in sorted(used) if catalogs.nodes.get(key) is not None}
-    report_facts = {"node_types": snapshot, "import_policy": plain(import_policy or {})}
+    report_facts = {**contribution_facts(catalogs), "node_types": snapshot, "import_policy": plain(import_policy or {})}
     results: dict[str, tuple[Any, ...]] = {}
     findings: list[Finding] = []
     policies: dict[str, Mapping[str, Any]] = {}
@@ -471,7 +478,7 @@ def run_javascript_rules(
                 sources.extend(plain(item) for item in extracted.sources if item["path"] not in known)
             # Ownership is catalog metadata; only the reached source closure is read.
             source_policy = _closure_import_policy(import_policy or {}, catalogs, sources, project_root=project_root, target=target)
-            facts = {"node_types": snapshot, "sources": sources, "source_files": source_files,
+            facts = {**contribution_facts(catalogs), "node_types": snapshot, "sources": sources, "source_files": source_files,
                      "source_owners": plain(source_policy.get("owners", ())),
                      "package_root": str(package_root), "project_root": str(project_root), "node_command": node_command,
                      "rule_defaults": rule_defaults,
@@ -539,7 +546,7 @@ def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path
                 owners = {json.dumps(owner, sort_keys=True): owner for scope in selected_scopes for owner in scope["source_owners"] if str(Path(owner["path"]).resolve()) in source_paths}
                 import_policy = {**node_report.facts.get("import_policy", {}), "owners": list(owners.values())}
                 defaults = {**project_quality_rule_defaults(quality_policy or javascript_quality_policy()), **(rule_defaults or {})}
-                facts = {"graph": block, "node_types": node_report.facts.get("node_types", {}), "node_metrics": metrics, "sources": list(sources.values()), "source_files": source_files, "source_owners": list(owners.values()), "import_policy": driver_import_policy(import_policy), "catalogs": catalogs,
+                facts = {**contribution_facts(catalogs), "graph": block, "node_types": node_report.facts.get("node_types", {}), "node_metrics": metrics, "sources": list(sources.values()), "source_files": source_files, "source_owners": list(owners.values()), "import_policy": driver_import_policy(import_policy), "catalogs": catalogs,
                     "project_root": str(project_root), "package_root": str(package_root), "node_command": node_command, "evaluate_sources": evaluate_sources, "rule_defaults": defaults, "analysis_cache": session.analysis_cache}
                 if compiled is not None:
                     facts["compiled"] = compiled

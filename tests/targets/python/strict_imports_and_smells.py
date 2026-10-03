@@ -1,6 +1,6 @@
 from tests.fixtures.support.strict_support import *
 from tests.fixtures.support.rule_inspection import _valid_node_source, _inspect_node_source, node_document
-from vibeflow.tooling.project.descriptor_parser import parse_descriptor_manifest
+from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor_manifest
 
 
 def test_urllib_parse_is_allowed_but_urllib_request_is_banned_for_nodes(tmp_path, capsys) -> None:

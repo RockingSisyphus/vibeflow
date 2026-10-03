@@ -66,11 +66,13 @@ def safe_project_path(
     subject: str,
     require_file: bool = False,
     require_directory: bool = False,
+    allowed_roots: tuple[str, ...] = (),
 ) -> Path:
     raw = Path(value).expanduser()
     candidate = raw if raw.is_absolute() else project_root / raw
     resolved = candidate.resolve()
-    if resolved != project_root and project_root not in resolved.parents:
+    if not any(resolved == root or root in resolved.parents
+               for root in (project_root, *(Path(value).resolve() for value in allowed_roots))):
         raise ProjectBuildError(
             "VF_AOT_PATH",
             f"{subject} escapes the project root: {resolved}",

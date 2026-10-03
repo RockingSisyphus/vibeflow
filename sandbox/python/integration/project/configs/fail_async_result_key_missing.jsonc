@@ -14,7 +14,6 @@
         "description": "Declares a result_key that is absent from provides.",
         "async": "result_key",
         "result_key": "value.missing",
-
         "config": {
           "value": 4
         }
@@ -27,8 +26,23 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "invalid"},
-      {"from": "invalid", "to": "end"}
+      {
+        "from": "start",
+        "to": "invalid"
+      },
+      {
+        "from": "invalid",
+        "to": "end"
+      }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

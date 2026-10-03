@@ -43,15 +43,24 @@ def handle_quality_check(args: argparse.Namespace) -> int:
     excluded_dirs.update(f"./{path}" for path in args.exclude_path)
     structure_overrides = _quality_structure_overrides(args)
     structure_enabled = _quality_structure_enabled(args, bool(structure_overrides))
+    catalogs_by_root = {}
+    workflow_reports = _python_quality_workflow_reports(args, catalogs_by_root=catalogs_by_root)
     if getattr(args, "workspace", None) and args.path is None:
-        report = _workspace_quality_report(args, thresholds, structure_overrides, structure_enabled, excluded_dirs)
+        report = _workspace_quality_report(args, thresholds, structure_overrides, structure_enabled, excluded_dirs, catalogs_by_root)
     else:
+        scope = _quality_workspace_scope(args)
+        roles = None
+        if scope is not None and len(scope[1]) == 1:
+            from vibeflow.tooling.application.python.project.quality import structure_roles_for_root
+            root = scope[1][0]
+            roles = structure_roles_for_root(root, catalogs_by_root.get(root.id, ()))
         report = scan_code_quality(
             Path(args.path or "."),
             thresholds=thresholds,
             structure_limits=QualityStructureLimits(**structure_overrides) if structure_enabled is True else None,
             excluded_dirs=excluded_dirs,
             check_side_effects=bool(args.check_side_effects),
+            structure_roles=roles,
         )
     if isinstance(report, HealthReport):
         source_payload = report.to_dict()
@@ -67,7 +76,6 @@ def handle_quality_check(args: argparse.Namespace) -> int:
         )
         return 0 if report.status in {"PASS", "CONCERNS"} else 1
     source_payload = report.to_dict()
-    workflow_reports = _python_quality_workflow_reports(args)
     statuses = {str(item.get("status", "ERROR")) for item in workflow_reports}
     status = (
         "FAIL" if report.status == "FAIL" or statuses.intersection({"FAIL", "ERROR"})
@@ -87,9 +95,7 @@ def handle_quality_check(args: argparse.Namespace) -> int:
     return 0 if status in {"PASS", "CONCERNS"} else 1
 
 
-def _python_quality_workflow_reports(args: argparse.Namespace) -> list[dict[str, object]]:
-    from vibeflow.tooling.application.python.workspace_service import validate_workspace_config_path
-    from vibeflow.tooling.project.workflow_discovery import workflow_configs_for_root
+def _quality_workspace_scope(args):
     from vibeflow.tooling.project.workspace_loader import find_project_config, load_project_workspace, load_workspace_config
 
     if args.workspace:
@@ -101,23 +107,41 @@ def _python_quality_workflow_reports(args: argparse.Namespace) -> list[dict[str,
     else:
         selected = Path(args.path or ".").resolve()
         if not selected.is_dir():
-            return []
+            return None
         project = find_project_config(selected)
         if project is None or project.parent != selected:
-            return []
+            return None
         workspace = load_project_workspace(project)
         roots = workspace.roots
+    return workspace, roots
+
+
+def _python_quality_workflow_reports(args: argparse.Namespace, *, catalogs_by_root=None) -> list[dict[str, object]]:
+    from vibeflow.core.findings import HealthReport
+    from vibeflow.tooling.application.python.workspace_service import _environment_or_report, validate_workspace_config_path
+    from vibeflow.tooling.project.workflow_discovery import workflow_configs_for_root
+    from vibeflow.tooling.project.workspace_loader import WorkspaceConfigError
+    try:
+        scope = _quality_workspace_scope(args)
+    except WorkspaceConfigError:
+        return []  # The ordinary workspace report retains this root cause.
+    if scope is None:
+        return []
+    workspace, roots = scope
     reports = []
     for root in roots:
         if root.project_target != "python" or not root.quality_enabled:
             continue
         for config in workflow_configs_for_root(root):
-            result = validate_workspace_config_path(config, workspace=workspace)
+            environment = _environment_or_report(workspace, config)
+            result = validate_workspace_config_path(config, workspace=workspace, environment=environment)
+            if catalogs_by_root is not None and not isinstance(environment, HealthReport):
+                catalogs_by_root.setdefault(root.id, []).append(environment.registry.loaded_plugins.catalogs)
             reports.append({"config": str(config), **result.to_dict()})
     return reports
 
 
-def _workspace_quality_report(args, thresholds, structure_overrides, structure_enabled, excluded_dirs):
+def _workspace_quality_report(args, thresholds, structure_overrides, structure_enabled, excluded_dirs, catalogs_by_root=None):
     from vibeflow.core.findings import HealthReport
     from vibeflow.tooling.application.python.workspace_service import scan_workspace_code_quality
 
@@ -131,6 +155,7 @@ def _workspace_quality_report(args, thresholds, structure_overrides, structure_e
         structure_enabled=structure_enabled,
         excluded_dirs=excluded_dirs,
         check_side_effects=bool(args.check_side_effects),
+        catalogs_by_root=catalogs_by_root,
     )
 
 

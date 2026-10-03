@@ -230,11 +230,11 @@ def _project(root: Path, variant: str, toolchain: Path, case: Case) -> tuple[Pat
     selected_source = case.source
     if variant == 'current' and case.id == 'js.plugin.module-write.worker':
         selected_source = 'const shared = Object.freeze({count:0});\n' + _body(PLUGIN, '(shared as {count:number}).count += 1')
-    sources[selected_file] = selected_source.replace('ABI', 'vibeflow.plugin.v1' if variant == 'baseline' else 'vibeflow.plugin.v2')
+    sources[selected_file] = selected_source.replace('ABI', 'vibeflow.plugin.v1' if variant == 'baseline' else 'vibeflow.plugin.v3')
     for name, text in sources.items():
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text.replace('ABI', 'vibeflow.plugin.v1' if variant == 'baseline' else 'vibeflow.plugin.v2'), encoding='utf-8')
+        path.write_text(text.replace('ABI', 'vibeflow.plugin.v1' if variant == 'baseline' else 'vibeflow.plugin.v3'), encoding='utf-8')
     if case.role == 'base_lib' or case.id == 'js.node.undeclared-base':
         _write_json(root / 'manifests/base_lib/math.jsonc', {'kind': 'base_lib', 'id': 'parity.math', 'display_name': 'Increment helper',
             'description': 'Pure numeric helper.', 'implementations': [_implementation('base_lib/math.ts', '')], 'dependencies': [], 'external_packages': []})
@@ -269,6 +269,9 @@ def _project(root: Path, variant: str, toolchain: Path, case: Case) -> tuple[Pat
                 _write_json(manifest, resource)
     config_path = root / 'workflow.jsonc'
     _write_json(config_path, config)
+    if variant == 'current':
+        import runpy
+        runpy.run_path(str(Path(__file__).resolve().parents[3] / 'tests/fixtures/support/code_plugins.py'))['migrate_fixture'](root)
     return workspace, config_path, root / selected_file
 
 

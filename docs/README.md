@@ -21,6 +21,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 ## 系统设计
 
+- [代码声明与统一插件接入重构](design/code-plugin-refactor-plan.md)
 - [系统架构](design/system-architecture.md)
 - [执行模型](design/execution-model.md)
 - [Rule/Ruleset、Node 分类与插件重构](design/rule-system-refactor-plan.md)
@@ -28,6 +29,8 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 - [完整修复计划](design/rule-system-repair-plan.md)
 - [完整修复验收与问题矩阵](design/rule-system-repair-results.md)
+- [代码插件重构与验收](design/code-plugin-refactor-results.md)
+- [代码插件案例迁移对应表](design/code-plugin-case-migrations.md)
 - [0.15 声明与规则迁移](user/rule-system-migration.md)
 - [基线规则总表](design/baseline-rule-inventory.md)
 - [Core 规则盘点](design/baseline-rule-inventory-core.md)

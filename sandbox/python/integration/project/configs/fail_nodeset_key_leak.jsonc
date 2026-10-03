@@ -9,8 +9,6 @@
     ],
     "nodes": [
       {
-
-
         "id": "leak",
         "type_used": "bad.leak",
         "display_name": "Leak",
@@ -28,6 +26,15 @@
   "nodeset_imports": [
     {
       "path": "nodesets/fail_nodeset_key_leak/bad_leak.jsonc"
+    }
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
     }
   ]
 }

@@ -119,7 +119,7 @@ def _invalid_graph(s, case, target, mode):
     metrics = {"handler_events": len(case.events()),
                "resource_path": next((item.get("source_location", {}).get("path") for item in positions if item.get("source_location", {}).get("path")), None)}
     return [s.row("invalid." + mode, target, "图编译错误在正式命令中保留诊断、资源位置且先于 handler", "invalid_graph",
-                  s.rejection(wanted, located=True, metrics={"handler_events": 0, "resource_path": str(case.graph)}),
+                  s.rejection(wanted, located=True, metrics={"handler_events": 0, "resource_path": str(case.project / ("code_plugin.py" if target == "python" else "code_plugin.ts"))}),
                   s.observation(code, payload, metrics=metrics))]
 
 

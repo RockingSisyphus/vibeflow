@@ -274,6 +274,7 @@ def driver_import_policy(
             ).items()
         },
         "allowedExternalPackages": sorted(allowed),
+        "sourceRoots": list(policy.get("source_roots", ())),
     }
 
 
@@ -334,7 +335,7 @@ def build_manifest(
     manifest = {
         "format": BUILD_MANIFEST_FORMAT,
         "abi_version": workflow.abi_version,
-        "plugin_abi_version": "vibeflow.plugin.v2",
+        "plugin_abi_version": "vibeflow.plugin.v3",
         "project_target": "javascript",
         "workflow_id": workflow.workflow_id,
         "entry_mode": workflow.entry_mode,

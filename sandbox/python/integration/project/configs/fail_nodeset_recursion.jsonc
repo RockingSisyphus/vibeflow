@@ -9,8 +9,6 @@
     ],
     "nodes": [
       {
-
-
         "id": "self",
         "type_used": "bad.self",
         "display_name": "Self",
@@ -28,6 +26,15 @@
   "nodeset_imports": [
     {
       "path": "nodesets/fail_nodeset_recursion/bad_self.jsonc"
+    }
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
     }
   ]
 }

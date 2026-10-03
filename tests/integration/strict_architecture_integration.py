@@ -438,3 +438,10 @@ def test_workspace_run_writes_canonical_architecture_artifact(tmp_path) -> None:
         "node_types",
         "resources",
     ]
+
+
+from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+_fixture_native_load_workspace_config = load_workspace_config
+def load_workspace_config(path, **options):
+    prepare_workspace_fixture(path)
+    return _fixture_native_load_workspace_config(path, **options)

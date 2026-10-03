@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from vibeflow.core.findings import HealthFinding, HealthReport
 from vibeflow.core.flow import GraphConfig
-from vibeflow.targets.python.project.plugin_loader import load_plugins_from_config
+from vibeflow.targets.python.project.plugins import PluginRegistry
 from vibeflow.targets.python.project.registry import NodeRegistry, NodeRegistryError
 from vibeflow.targets.python.runtime.options import (
     RuntimeOptions,
@@ -32,9 +32,6 @@ from vibeflow.tooling.project.config_loader import (
 )
 from vibeflow.tooling.project.config_schema import (
     collect_config_schema_findings,
-)
-from vibeflow.tooling.application.python.project.resource_registries import (
-    discover_config_resource_registry_context,
 )
 from vibeflow.tooling.application.python.project.resources import (
     ConfigResources,
@@ -73,6 +70,17 @@ def run_checked(
     delegate_cli: bool = False,
 ) -> CheckedRunResult:
     path = Path(config_path)
+    from vibeflow.tooling.project.workspace_loader import find_project_config, load_project_workspace
+    if find_project_config(path) is not None:
+        from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
+        document = load_config_document(path)
+        policy = resolve_effective_policy(document.data, config_path=path,
+            explicit_policy_path=Path(policy_path) if policy_path else None)
+        workspace = load_project_workspace(path)
+        return run_workspace_checked(path, workspace=workspace,
+            initial=initial, run_root=run_root, run_id=run_id,
+            runtime_options=runtime_options, capabilities=capabilities,
+            delegate_cli=delegate_cli, _policy_result=policy)
     actual_run_id = _new_run_id() if run_id is None else validate_run_id(run_id)
     if boundary_registry is not None:
         raise ValueError("boundary_registry is removed; use flowchart nodes")
@@ -81,15 +89,18 @@ def run_checked(
     _write_json(run_dir / "input_summary.json", summarize_mapping(dict(initial or {})))
 
     document = _load_document_or_refuse(path, run_dir, actual_run_id)
-    registry_context = discover_config_resource_registry_context(document.data, config_path=path)
-    plugin_registry = _load_plugins_or_refuse(document.data, path, run_dir, actual_run_id, registry_context=registry_context, rule_registry=registry)
+    plugin_registry = PluginRegistry()
+    if document.data.get("plugins"):
+        health = HealthReport(status="ERROR", errors=(HealthFinding(
+            rule_id="PLUGIN.CONFIG.ROOT", severity="error", object_type="config", object_id=str(path),
+            source_location={"path": str(path)}, failure_layer="plugin",
+            message="custom plugins require an owning vibeflow_project.jsonc"),))
+        _write_refused_artifacts(run_dir, health, include_effective_policy=True)
+        raise CheckedRunError("run refused: plugin configuration has no project", CheckedRunResult(actual_run_id, run_dir, health))
     resources, resource_findings = load_config_resources(
         document.data,
-        base_path=registry_context.base_path,
+        base_path=path.parent,
         plugin_registry=plugin_registry,
-        base_lib_registry=registry_context.base_lib_registry,
-        plugin_resource_registry=registry_context.plugin_resource_registry,
-        base_lib_paths=registry_context.base_lib_paths,
     )
     policy_result = resolve_effective_policy(
         document.data,
@@ -100,7 +111,7 @@ def run_checked(
     registry.configure_rule_defaults(purity_policy=policy_result.effective_policy.to_purity_policy())
     effective_policy = policy_result.effective_policy.to_dict()
     _write_json(run_dir / "effective_policy.json", effective_policy)
-    preflight_warnings = _refuse_on_schema_findings(document.data, (*registry_context.findings, *resource_findings, *policy_result.findings), effective_policy, run_dir, actual_run_id)
+    preflight_warnings = _refuse_on_schema_findings(document.data, (*resource_findings, *policy_result.findings), effective_policy, run_dir, actual_run_id)
     graph, compiled = _compile_or_refuse(
         document.data,
         plugin_registry,
@@ -121,19 +132,13 @@ def run_checked(
         preflight_warnings=preflight_warnings,
         delegate_cli=delegate_cli,
     )
-    if health.info.get("rule_phase") == "import" and health.status in {"FAIL", "ERROR"}:
+    if health.status in {"FAIL", "ERROR"}:
         _write_refused_artifacts(run_dir, health)
         _refuse_on_health_failure(health, run_dir, actual_run_id)
     from vibeflow.targets.python.project.compiler import GraphCompiler
     compiled = GraphCompiler().compile(graph, registry=registry)
     _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources, runtime_options=effective_runtime_options)
-    try:
-        _write_preflight_artifacts(run_dir, graph, compiled, health, registry=registry, resources=resources)
-    except Exception:
-        if health.status in {"FAIL", "ERROR"}:
-            _write_refused_artifacts(run_dir, health)
-            _refuse_on_health_failure(health, run_dir, actual_run_id)
-        raise
+    _write_preflight_artifacts(run_dir, graph, compiled, health, registry=registry, resources=resources)
     _refuse_on_health_failure(health, run_dir, actual_run_id)
     context = _execute_runtime(
         graph, registry, plugin_registry, initial, run_dir, effective_runtime_options, resources,
@@ -153,26 +158,6 @@ def _load_document_or_refuse(path: Path, run_dir: Path, run_id: str):
         _write_refused_artifacts(run_dir, health, include_effective_policy=True)
         result = CheckedRunResult(run_id, run_dir, health)
         raise CheckedRunError("run refused: config load failed", result) from exc
-
-
-def _load_plugins_or_refuse(config_data: Mapping[str, Any], path: Path, run_dir: Path, run_id: str, *, registry_context=None, rule_registry=None):
-    plugin_registry, plugin_findings = load_plugins_from_config(
-        config_data,
-        base_path=registry_context.base_path if registry_context is not None else path.parent,
-        plugin_resource_registry=registry_context.plugin_resource_registry if registry_context is not None else None,
-        rule_registry=rule_registry,
-        rule_phase="run",
-    )
-    if any(item.severity == "error" for item in plugin_findings):
-        health = HealthReport(
-            status="ERROR",
-            errors=tuple(plugin_findings),
-            effective_policy=default_effective_policy().to_dict(),
-        )
-        _write_refused_artifacts(run_dir, health, include_effective_policy=True)
-        result = CheckedRunResult(run_id, run_dir, health)
-        raise CheckedRunError("run refused: plugin load failed", result)
-    return plugin_registry
 
 
 def _refuse_on_schema_findings(

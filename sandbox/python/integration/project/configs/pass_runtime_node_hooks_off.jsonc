@@ -1,22 +1,18 @@
 {
   "plugins": [
     {
-      "module": "../plugins/hook_plugins.py",
-      "class": "CompilerPlugin",
-      "type": "compiler",
-      "display_name": "Compiler Hook Plugin",
-      "category": "sandbox",
-      "description": "Compiler hook plugin used while runtime node hooks are disabled.",
-      "version": "0.1.0"
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
     },
     {
-      "module": "../plugins/hook_plugins.py",
-      "class": "RuntimePlugin",
-      "type": "runtime",
-      "display_name": "Runtime Hook Plugin",
-      "category": "sandbox",
-      "description": "Runtime hook plugin used while node-level hook execution is disabled.",
-      "version": "0.1.0"
+      "source": {
+        "kind": "file",
+        "ref": "plugins/hook_plugins.py",
+        "export": "plugin"
+      }
     }
   ],
   "pipeline": {
@@ -28,7 +24,6 @@
         "description": "Runs start."
       },
       {
-
         "value": 4,
         "id": "seed",
         "type_used": "sandbox.constant",
@@ -36,8 +31,6 @@
         "description": "Runs seed."
       },
       {
-
-
         "delta": 2,
         "id": "add",
         "type_used": "sandbox.add",
@@ -45,7 +38,6 @@
         "description": "Runs add."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.out_value_end",
         "display_name": "End",

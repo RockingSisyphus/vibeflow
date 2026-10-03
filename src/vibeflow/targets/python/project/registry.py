@@ -51,7 +51,7 @@ class NodeRegistry:
     def rule_defaults(self) -> Mapping[str, object]:
         return dict(self._rule_defaults)
 
-    def register(self, descriptor: NodeDescriptor, implementation: type | None = None, *, loader: Callable[[], type] | None = None, source: str = "", overwrite: bool = False) -> NodeDescriptor:
+    def register(self, descriptor: NodeDescriptor, implementation: type | None = None, *, loader: Callable[[], type] | None = None, source: str = "", source_line: int | None = None, overwrite: bool = False) -> NodeDescriptor:
         if not isinstance(descriptor, NodeDescriptor):
             raise NodeRegistryError("registration requires a NodeDescriptor; class metadata and registry factories are not declarations")
         key = descriptor.type_key
@@ -70,7 +70,7 @@ class NodeRegistry:
             self._loaders[key] = loader
         self._config_specs[key] = config_spec
         frame = sys._getframe(1)
-        self._registration_info[key] = NodeRegistrationInfo(key, "declaration" if source else frame.f_code.co_name, source or frame.f_code.co_filename, 1 if source else frame.f_lineno)
+        self._registration_info[key] = NodeRegistrationInfo(key, "declaration" if source else frame.f_code.co_name, source or frame.f_code.co_filename, (source_line or 1) if source else frame.f_lineno)
         return descriptor
 
     def descriptor(self, key: str) -> NodeDescriptor:
@@ -131,7 +131,6 @@ class NodeRegistry:
         return tuple(self._registration_info[key] for key in self.available())
 
 
-GLOBAL_NODE_REGISTRY = NodeRegistry()
 
 
 @dataclass(frozen=True, init=False)

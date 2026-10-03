@@ -11,7 +11,7 @@ import pytest
 from vibeflow.core.flow import GraphConfig, NodeSpec
 from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
 from vibeflow.targets.javascript.quality.rules import run_javascript_rules
-from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
 
 ROOT = Path(__file__).resolve().parents[3]
 MODEL = ('import {multiply} from "./model_helper.js";\n'
@@ -31,6 +31,8 @@ def source_project(tmp_path: Path) -> Path:
         pytest.skip("requires the pinned TypeScript/esbuild toolchain")
     project = tmp_path / "project"
     shutil.copytree(ROOT / "sandbox/javascript/domain_rules/project", project)
+    from tests.fixtures.support.code_plugins import copy_archival_inputs
+    copy_archival_inputs(ROOT / "sandbox/javascript/domain_rules/project", project)
     (project / "node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
     (project / "nodes/model.ts").write_text(MODEL, encoding="utf-8")
     (project / "nodes/model_helper.ts").write_text(HELPER, encoding="utf-8")
@@ -43,7 +45,7 @@ def source_project(tmp_path: Path) -> Path:
             "source": {"kind": "file", "ref": "nodes/model_helper.ts"}}]}), encoding="utf-8")
     config = project / "vibeflow_project.jsonc"
     data = json.loads(config.read_text())
-    data["descriptors"].update({"base_lib": ["manifests/base_lib"], "rules": ["manifests/rules"], "rulesets": ["manifests/rulesets"]})
+    data.setdefault("descriptors", {"bundles": ["bundles"], "data_schemas": ["manifests/data"]}).update({"base_lib": ["manifests/base_lib"], "rules": ["manifests/rules"], "rulesets": ["manifests/rulesets"]})
     config.write_text(json.dumps(data), encoding="utf-8")
     for directory in ("rules", "rulesets"):
         (project / "manifests" / directory).mkdir()
@@ -66,7 +68,9 @@ def _execute(project: Path, calls, relations=(), *, completed: bool = True):
     (project / "manifests/rulesets/source.jsonc").write_text(json.dumps({
         "kind": "ruleset", "id": "test.source", "calls": calls, "relations": relations,
         "entrypoints": {"static": [calls[-1]["id"]], "import": [], "run": []}}), encoding="utf-8")
-    catalogs = load_project_descriptor_catalogs(project, project_config=project / "vibeflow_project.jsonc")
+    from tests.fixtures.support.code_plugins import migrate_fixture
+    migrate_fixture(project)
+    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/model.jsonc")
     import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set(), node_ids=frozenset({"example.model"}))
     report = run_javascript_rules(GraphConfig(nodes=(NodeSpec("model", "example.model"),), rulesets=()),
                                   catalogs, project_root=project, package_root=project, target="node", import_policy=import_policy)
@@ -175,7 +179,10 @@ def test_real_rule_binding_errors_keep_declaration_implementation_and_owner(sour
     assert execution.results["check"].state == "failed"
     finding = execution.findings[0].to_dict()
     assert finding["code"] == "RULE.EXECUTION" and finding["definition_id"] == "test.missing"
-    assert finding["source_location"] == {"path": str(manifest), "line": 1, "column": 1}
+    assert finding["source_location"]["path"] == str(source_project / "code_plugin.ts")
+    declaration_line = next(index for index, text in enumerate((source_project / "code_plugin.ts").read_text().splitlines(), 1) if '"id": "test.missing"' in text)
+    assert finding["source_location"]["line"] == declaration_line
+    assert finding["source_location"]["column"] == 14
     assert finding["object_id"] == "example.model"
     assert finding["details"]["call_paths"] == [["model"]]
     assert finding["details"]["implementation"] == {"path": str(module), "export": "check" if failure == "source" else "missing_check"}

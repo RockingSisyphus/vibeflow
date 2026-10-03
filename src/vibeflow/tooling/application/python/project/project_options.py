@@ -11,7 +11,6 @@ from vibeflow.targets.python.runtime.options import (
 )
 from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
 from vibeflow.tooling.project.project_config_options import (
-    project_descriptor_paths,
     project_javascript_options,
 )
 from vibeflow.tooling.project.workspace_model import WorkspaceConfig
@@ -44,6 +43,5 @@ def _workspace_runtime_options(
 
 
 __all__ = [
-    "project_descriptor_paths",
     "project_javascript_options",
 ]

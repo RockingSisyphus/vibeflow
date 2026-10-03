@@ -17,8 +17,6 @@
       {
         "display_name": "Wrapper",
         "description": "Calls a nodeset that contains a first-class while loop node.",
-
-
         "id": "wrapper",
         "type_used": "loop.wrapper"
       },
@@ -63,6 +61,15 @@
     },
     {
       "path": "nodesets/pass_loop_while_inside_nodeset/loop_wrapper.jsonc"
+    }
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
     }
   ]
 }

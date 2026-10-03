@@ -266,7 +266,7 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
     monkeypatch.syspath_prepend(str(project))
     from vibeflow.tooling.project.workspace_loader import load_project_workspace
     from vibeflow.tooling.application.python.project.declarations import declared_python_registry
-    registry = declared_python_registry(load_project_workspace(project))
+    registry = declared_python_registry(load_project_workspace(project), project / "config.jsonc")
 
     result = run_checked(
         project / "config.jsonc",

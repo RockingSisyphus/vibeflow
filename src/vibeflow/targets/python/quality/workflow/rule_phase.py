@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.flow import LOOP_NODE_TYPES, STATUS_PLANNED
 from vibeflow.core.rules import RuleContext, RuleGraphError, compile_ruleset, execute_rule_plan
+from vibeflow.core.descriptors.contributions import contribution_facts
 from vibeflow.targets.python.quality.project_context import project_rule_facts
 from vibeflow.targets.python.quality.rule_adapter import rule_resources, graph_error_finding
 from vibeflow.targets.python.quality.rules import python_rule_handlers
@@ -92,7 +93,9 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
                 custom = getattr(registry, "rule_handler_loader", None)
                 if callable(custom):
                     handlers.update(custom(plan))
-                facts = {**project_rule_facts(plan, source_context, project_fact_cache), "graph": current,
+                contributions = contribution_facts(registry.loaded_plugins.catalogs) if hasattr(registry, "loaded_plugins") else {}
+                facts = {**contributions, **project_rule_facts(plan, source_context, project_fact_cache), "graph": current,
+                    "source_load_states": getattr(registry, "source_load_states", {}),
                     "registry": registry_queries, "source_context": source_context,
                     "node_catalog": tuple(registry.descriptor(key) for key in registry.available()) if registry is not None else (),
                     "rule_invocations": {item.id: item.rule for item in plan.invocations},

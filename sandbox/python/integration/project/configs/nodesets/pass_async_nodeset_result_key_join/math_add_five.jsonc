@@ -31,16 +31,12 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "input",
         "type_used": "sandbox.value_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-
-
         "config": {
           "delta": 5
         },
@@ -50,7 +46,6 @@
         "description": "Runs add."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.out_value_end",
         "display_name": "End",
@@ -79,5 +74,14 @@
       }
     ]
   },
-  "type_key": "math.add_five"
+  "type_key": "math.add_five",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

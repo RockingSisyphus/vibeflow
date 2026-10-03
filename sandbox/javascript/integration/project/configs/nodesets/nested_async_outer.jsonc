@@ -37,7 +37,7 @@
         "type_used": "sandbox.nested_async_inner",
         "display_name": "Run async inner block",
         "description": "Runs deferred and detached work one level deeper."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -46,8 +46,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "inner"},
-      {"from": "inner", "to": "end"}
+      {
+        "from": "start",
+        "to": "inner"
+      },
+      {
+        "from": "inner",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -57,5 +63,14 @@
         "as": "doubled"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

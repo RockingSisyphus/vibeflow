@@ -57,12 +57,16 @@ def _project_case(tmp_path: Path) -> tuple[Path, Path, Path]:
         pytest.skip("pinned JavaScript sandbox toolchain is not installed")
     workspace = tmp_path / "workspace"
     shutil.copytree(SANDBOX, workspace, ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc"))
+    from tests.fixtures.support.code_plugins import copy_archival_inputs
+    copy_archival_inputs(SANDBOX, workspace)
     project = workspace / "project"
     (project / "node_modules").symlink_to(TOOLCHAIN / "node_modules", target_is_directory=True)
     config = project / "vibeflow_project.jsonc"
     data = json.loads(config.read_text(encoding="utf-8"))
     data["quality_enabled"] = True
     config.write_text(json.dumps(data), encoding="utf-8")
+    from tests.fixtures.support.code_plugins import resource_inputs
+    resource_inputs(project)
     return workspace / "vibeflow_config.jsonc", project, project / "configs/greeting.jsonc"
 
 
@@ -77,7 +81,7 @@ def _configure_rule_policy(project: Path, policy: dict[str, object]) -> None:
     }), encoding="utf-8")
     file = project / "vibeflow_project.jsonc"
     data = json.loads(file.read_text(encoding="utf-8"))
-    data["descriptors"]["rulesets"] = ["manifests/rulesets"]
+    data.setdefault("descriptors", {})["rulesets"] = ["manifests/rulesets"]
     file.write_text(json.dumps(data), encoding="utf-8")
     file = project / "manifests/nodes/greet.jsonc"
     data = json.loads(file.read_text(encoding="utf-8"))
@@ -97,10 +101,12 @@ def _registered_rule_report(project: Path, *, policy_data=None, **_):
     from vibeflow.core.flow import GraphConfig
     from vibeflow.targets.javascript.quality.rules import run_javascript_rules
     from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
-    from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
     if policy_data is not None:
         _configure_rule_policy(project, policy_data)
-    catalogs = load_project_descriptor_catalogs(project, project_config=project / "vibeflow_project.jsonc")
+    from tests.fixtures.support.code_plugins import migrate_fixture
+    migrate_fixture(project)
+    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/greeting.jsonc")
     import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set())
     return run_javascript_rules(GraphConfig(nodes=(), rulesets=()), catalogs, project_root=project,
                                 package_root=project, import_policy=import_policy, include_registered=True)
@@ -378,8 +384,9 @@ def test_project_no_workflow_and_multiple_workflows_scan_source_once(tmp_path: P
     payload = json.loads(capsys.readouterr().out)
     assert code == 1 and len(payload["reports"]) == 2
     assert sum(item["path"] == "unregistered.ts" for item in payload["source_quality"]["files"]) == 1
-    config.unlink()
+    # SDK resource scope is supplied by this explicit workflow.
     second.unlink()
+    config.unlink()
     code = main(["quality-check", "--workspace", str(workspace), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert code == 1 and payload["reports"] == []
@@ -476,7 +483,7 @@ def test_registered_node_optional_limits_reach_javascript_quality_cli(
     tmp_path: Path, capsys, field: str, metric: str,
 ) -> None:
     workspace, project, config = _project_case(tmp_path)
-    config.unlink()
+    # SDK resource scope is supplied by this explicit workflow.
     source = project / "nodes/greet.ts"
     source.write_text(
         source.read_text(encoding="utf-8")
@@ -488,14 +495,17 @@ def test_registered_node_optional_limits_reach_javascript_quality_cli(
     def check(limit: int | None) -> dict[str, object]:
         _configure_rule_policy(project, {"complexity": {field: limit}})
         main(["quality-check", "--workspace", str(workspace), "--json"])
-        return json.loads(capsys.readouterr().out)["source_quality"]
+        payload = json.loads(capsys.readouterr().out)
+        return {**payload["source_quality"], "errors": _formal_findings(payload,"error")}
 
     baseline = check(None)
     assert not any(item["rule_id"] == rule for item in baseline["errors"])
-    from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
     from vibeflow.targets.javascript.quality.implementation import registered_implementation_requests
 
-    catalogs = load_project_descriptor_catalogs(project, project_config=project / "vibeflow_project.jsonc")
+    from tests.fixtures.support.code_plugins import migrate_fixture
+    migrate_fixture(project)
+    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/greeting.jsonc")
     owners, _ = registered_implementation_requests(
         catalogs, project_root=project, selected_files=(str(source),),
     )
@@ -709,7 +719,7 @@ def test_registered_node_base_lib_dependency_chain_uses_shared_policy(tmp_path: 
         encoding="utf-8",
     )
     from vibeflow.core.quality.policy_data import COMMON_POLICY_DATA
-    from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
 
     def check(steps: int):
         text_manifest = project / "manifests/base_lib/text.jsonc"
@@ -737,7 +747,9 @@ def test_registered_node_base_lib_dependency_chain_uses_shared_policy(tmp_path: 
             (project / f"manifests/base_lib/step{index}.jsonc").write_text(
                 json.dumps(descriptor), encoding="utf-8",
             )
-        catalogs = load_project_descriptor_catalogs(project, project_config=project / "vibeflow_project.jsonc")
+        from tests.fixtures.support.code_plugins import migrate_fixture
+        migrate_fixture(project)
+        catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/greeting.jsonc")
         return _registered_rule_report(
             project, policy_data=COMMON_POLICY_DATA,
         )
@@ -798,7 +810,7 @@ def test_registered_node_direct_recursion_reaches_javascript_quality_cli(
     tmp_path: Path, capsys,
 ) -> None:
     workspace, project, config = _project_case(tmp_path)
-    config.unlink()
+    # SDK resource scope is supplied by this explicit workflow.
     source = project / "nodes/greet.ts"
     source.write_text(
         source.read_text(encoding="utf-8").replace(
@@ -812,19 +824,21 @@ def test_registered_node_direct_recursion_reaches_javascript_quality_cli(
     assert any(
         item["rule_id"] == "NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN"
         and item["details"]["path"] == ["run", "run"]
-        for item in payload["source_quality"]["errors"]
+        for item in _formal_findings(payload, "error")
     )
 
 
 def test_registered_node_source_limits_preserve_exact_boundaries(tmp_path: Path) -> None:
     _, project, config = _project_case(tmp_path)
-    config.unlink()
+    # SDK resource scope is supplied by this explicit workflow.
     source = project / "nodes/greet.ts"
     original = source.read_text(encoding="utf-8")
     from vibeflow.core.quality.policy_data import COMMON_POLICY_DATA
-    from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
 
-    catalogs = load_project_descriptor_catalogs(project, project_config=project / "vibeflow_project.jsonc")
+    from tests.fixtures.support.code_plugins import migrate_fixture
+    migrate_fixture(project)
+    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/greeting.jsonc")
 
     def findings(text: str):
         source.write_text(text, encoding="utf-8")
@@ -856,7 +870,7 @@ def test_registered_base_lib_optional_limits_reach_javascript_quality(
     tmp_path: Path, field: str, metric: str,
 ) -> None:
     _, project, config = _project_case(tmp_path)
-    config.unlink()
+    # SDK resource scope is supplied by this explicit workflow.
     source = project / "base_lib/text.ts"
     source.write_text(
         source.read_text(encoding="utf-8")
@@ -865,9 +879,11 @@ def test_registered_base_lib_optional_limits_reach_javascript_quality(
     )
     from copy import deepcopy
     from vibeflow.core.quality.policy_data import COMMON_POLICY_DATA
-    from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
 
-    catalogs = load_project_descriptor_catalogs(project, project_config=project / "vibeflow_project.jsonc")
+    from tests.fixtures.support.code_plugins import migrate_fixture
+    migrate_fixture(project)
+    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/greeting.jsonc")
     facts = run_quality_facts_driver({
         "qualityRoot": str(project), "qualityFiles": [str(source)],
     }, package_root=project)
@@ -908,9 +924,9 @@ def test_structure_roles_use_descriptor_ownership_not_directory_name(tmp_path: P
     assert structural[0]["source_location"]["line"] == 1
 
 
-def test_registered_metrics_without_workflow_keep_one_file_and_descriptor_attribution(tmp_path: Path, capsys) -> None:
+def test_selected_metrics_keep_one_file_and_sdk_declaration_attribution(tmp_path: Path, capsys) -> None:
     workspace, project, config = _project_case(tmp_path)
-    config.unlink()
+    # SDK resource scope is supplied by this explicit workflow.
     manifest = project / "manifests/nodes/greet.jsonc"
     second = project / "manifests/nodes/greet-second.jsonc"
     data = json.loads(manifest.read_text(encoding="utf-8"))
@@ -920,10 +936,10 @@ def test_registered_metrics_without_workflow_keep_one_file_and_descriptor_attrib
     source.write_text(source.read_text(encoding="utf-8") + "\n" * 501, encoding="utf-8")
     code = main(["quality-check", "--workspace", str(workspace), "--json"])
     payload = json.loads(capsys.readouterr().out)
-    assert code == 1 and payload["reports"] == []
+    assert code == 1 and len(payload["reports"]) == 1
     files = payload["source_quality"]["files"]
     assert sum(item["path"] == "nodes/greet.ts" for item in files) == 1
-    node_errors = [item for item in payload["source_quality"]["errors"] if item["rule_id"] == "NODE.PURITY.SOURCE_TOO_LARGE"]
+    node_errors = [item for item in _formal_findings(payload,"error") if item["rule_id"] == "NODE.PURITY.SOURCE_TOO_LARGE"]
     assert {item["object_id"] for item in node_errors} == {
         "example.greet",
         "example.greet.second",
@@ -935,9 +951,9 @@ def test_registered_metrics_without_workflow_keep_one_file_and_descriptor_attrib
     assert payload["reports"][0]["code"] == "NODE.PURITY.SOURCE_TOO_LARGE"
 
 
-def test_registered_ownership_is_checked_even_without_workflow(tmp_path: Path, capsys) -> None:
+def test_selected_plugin_ownership_is_checked(tmp_path: Path, capsys) -> None:
     workspace, project, config = _project_case(tmp_path)
-    config.unlink()
+    # SDK resource scope is supplied by this explicit workflow.
     manifest = project / "manifests/nodes/greet.jsonc"
     data = json.loads(manifest.read_text(encoding="utf-8"))
     data["implementations"][0]["targets"] = ["browser"]
@@ -946,5 +962,21 @@ def test_registered_ownership_is_checked_even_without_workflow(tmp_path: Path, c
     source.write_text(source.read_text(encoding="utf-8").replace("  const name =", "  void fetch('https://example.invalid/test');\n  const name ="), encoding="utf-8")
     code = main(["quality-check", "--workspace", str(workspace), "--json"])
     payload = json.loads(capsys.readouterr().out)
-    assert code == 1 and payload["reports"] == []
-    assert any(item["rule_id"] == "VF_PROMISE_UNOWNED" for item in payload["source_quality"]["errors"])
+    assert code == 1 and len(payload["reports"]) == 1
+    assert any(item["rule_id"] == "VF_PROMISE_UNOWNED" for item in _formal_findings(payload,"error"))
+
+# Publish controlled definitions before each formal operation.
+_native_main, _native_dispatch = main, dispatch_main
+def _fixture_cli(entry,args):
+    from tests.fixtures.support.code_plugins import prepare_config_fixture,prepare_workspace_fixture
+    if "--workspace" in args:
+        prepare_workspace_fixture(args[args.index("--workspace")+1])
+    elif "--config" in args:
+        prepare_config_fixture(args[args.index("--config")+1])
+    elif "--path" in args:
+        prepare_config_fixture(args[args.index("--path")+1])
+    return entry(args)
+def main(args):
+    return _fixture_cli(_native_main,args)
+def dispatch_main(args):
+    return _fixture_cli(_native_dispatch,args)

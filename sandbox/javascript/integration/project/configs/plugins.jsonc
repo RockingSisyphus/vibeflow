@@ -1,8 +1,25 @@
 {
   "plugins": [
-    "sandbox.compiler_audit",
     {
-      "id": "sandbox.runtime_audit",
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    },
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_lifecycle_79.ts",
+        "export": "plugin"
+      }
+    },
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_lifecycle_80.ts",
+        "export": "plugin"
+      },
       "config": {
         "expectedNodes": 4
       }

@@ -15,7 +15,6 @@ from vibeflow.tooling.project.project_architecture import (
     project_architecture_documents,
 )
 from vibeflow.tooling.project.project_config_options import (
-    project_descriptor_paths,
     project_javascript_options,
 )
 from vibeflow.tooling.project.workspace_model import (
@@ -207,7 +206,6 @@ def _workspace_root_from_project_config(
         config_path=config_path,
         project_config=project_config,
         project_target=_project_target(project_config, config_path),
-        registry_ref=str(project_config.get("registry", "")).strip(),
         quality_enabled=bool(project_config.get("quality_enabled", True)),
         quality_structure=_project_quality_structure(
             project_config,
@@ -237,16 +235,17 @@ def _load_project_config(
             exc.failure_layer,
         ) from exc
     data = document.data
+    removed = set(data) & {"registry", "descriptors", "base_lib", "plugins"}
+    if removed:
+        raise WorkspaceConfigError("PLUGIN.REGISTRATION.MIGRATION",
+            f"project resource registration was removed: {sorted(removed)}; define fixed SDK plugins and select workflow.plugins",
+            {"path": str(path), "field": sorted(removed)[0], "fields": sorted(removed)})
     unknown = set(data) - {
         "project_target",
-        "registry",
         "quality_enabled",
         "quality",
         "runtime",
         "architecture",
-        "base_lib",
-        "plugins",
-        "descriptors",
         "javascript",
     }
     if unknown:
@@ -257,12 +256,6 @@ def _load_project_config(
         )
     target = _project_target(data, path)
     _validate_project_target_fields(data, target=target, path=path)
-    if "registry" in data and not isinstance(data["registry"], str):
-        raise WorkspaceConfigError(
-            "WORKSPACE.PROJECT_CONFIG.REGISTRY",
-            "project config registry must be a string",
-            {"path": str(path)},
-        )
     if "quality_enabled" in data and not isinstance(
         data["quality_enabled"],
         bool,
@@ -274,7 +267,6 @@ def _load_project_config(
         )
     _project_quality_structure(data, path)
     _project_runtime_options(data, path)
-    project_descriptor_paths(data, path)
     project_javascript_options(data, path)
     project_architecture_documents(data, root_path=root_path, path=path)
     return data
@@ -314,13 +306,10 @@ def _validate_project_target_fields(
     if target == "python":
         if "javascript" in data:
             conflicts.append("javascript")
-        descriptors = data.get("descriptors")
-        if isinstance(descriptors, Mapping) and "host_extensions" in descriptors:
-            conflicts.append("descriptors.host_extensions")
     else:
         conflicts.extend(
             field
-            for field in ("registry", "runtime", "base_lib", "plugins")
+            for field in ("runtime",)
             if field in data
         )
     if not conflicts:

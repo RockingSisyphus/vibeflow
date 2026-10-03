@@ -235,3 +235,11 @@ def test_all_profiles_build_deterministically_from_binding_plan(
         first.files,
     )
     assert second.manifest.read_bytes() == first.manifest.read_bytes()
+
+
+# Publish controlled case inputs as fixed SDK plugins before formal entrypoints.
+_native_prepare_project_build = prepare_project_build
+def prepare_project_build(request, **options):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(request.workspace)
+    return _native_prepare_project_build(request, **options)

@@ -10,7 +10,6 @@
       {
         "display_name": "Seed Value",
         "description": "Produces value.in for the mainline and the async side nodeset.",
-
         "value": 4,
         "id": "seed",
         "type_used": "sandbox.constant"
@@ -18,7 +17,6 @@
       {
         "display_name": "Async Side Task",
         "description": "Runs the side nodeset as detached async work.",
-
         "async": "detached",
         "id": "side_task",
         "type_used": "side.async_value"
@@ -26,8 +24,6 @@
       {
         "display_name": "Main Add",
         "description": "Continues the synchronous mainline without waiting for side_task.",
-
-
         "delta": 6,
         "id": "main_add",
         "type_used": "sandbox.add"
@@ -35,7 +31,6 @@
       {
         "display_name": "End",
         "description": "Ends after the mainline output is available.",
-
         "id": "end",
         "type_used": "sandbox.out_value_end"
       }
@@ -69,6 +64,15 @@
   "nodeset_imports": [
     {
       "path": "nodesets/pass_mainline_async_nodeset_side_task/side_async_value.jsonc"
+    }
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
     }
   ]
 }

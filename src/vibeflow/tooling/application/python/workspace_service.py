@@ -17,7 +17,6 @@ from vibeflow.core.descriptors import PluginSelectionError
 from vibeflow.core.flow import GraphConfigError
 from vibeflow.targets.python.project.compiler import GraphCompileError, GraphCompiler
 from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
-from vibeflow.targets.python.project.plugin_loader import load_plugins_from_config
 from vibeflow.targets.python.project.policy import default_effective_policy
 from vibeflow.targets.python.runtime.options import RuntimeOptions
 from vibeflow.targets.python.runtime.summaries import summarize_mapping
@@ -34,7 +33,7 @@ from vibeflow.tooling.project.config_schema import (
 )
 from vibeflow.tooling.project.descriptor_loader import (
     DescriptorLoadError,
-    load_project_descriptor_catalogs,
+    load_workflow_catalogs,
 )
 from vibeflow.tooling.project.plugin_review import (
     load_plugin_review_resources,
@@ -60,7 +59,6 @@ from vibeflow.tooling.application.python.project.core import (
 from vibeflow.tooling.application.python.project.policy import resolve_workspace_effective_policy
 from vibeflow.tooling.application.python.project.project_options import (
     _workspace_runtime_options,
-    project_descriptor_paths,
     project_javascript_options,
 )
 from vibeflow.tooling.application.python.project.quality import scan_workspace_code_quality
@@ -76,8 +74,8 @@ from vibeflow.tooling.application.python.project.types import (
 )
 
 
-def validate_workspace_config_path(path: Path, *, workspace: WorkspaceConfig) -> HealthReport:
-    env = _environment_or_report(workspace)
+def validate_workspace_config_path(path: Path, *, workspace: WorkspaceConfig, environment=None) -> HealthReport:
+    env = environment if environment is not None else _environment_or_report(workspace, path)
     if isinstance(env, HealthReport):
         return env
     prepared = _prepare_workspace_graph(path, workspace=workspace, env=env)
@@ -101,7 +99,9 @@ def run_workspace_checked(
     run_id: str | None = None,
     runtime_options: object | None = None,
     delegate_cli: bool = False,
+    capabilities: Mapping[str, object] | None = None,
     _prepared_run_dir: Path | None = None,
+    _policy_result=None,
 ) -> CheckedRunResult:
     from vibeflow.tooling.application.python.runner import (
         _execute_runtime,
@@ -124,11 +124,16 @@ def run_workspace_checked(
         if run_dir != expected_run_dir or not run_dir.is_dir():
             raise ValueError("_prepared_run_dir must be the already claimed directory for this checked run")
     _write_json(run_dir / "input_summary.json", summarize_mapping(dict(initial or {})))
-    env = _environment_or_report(workspace)
+    env = _environment_or_report(workspace, Path(config_path))
     if isinstance(env, HealthReport):
         _write_refused_artifacts(run_dir, env, include_effective_policy=True)
         raise CheckedRunError("run refused: workspace load failed", CheckedRunResult(actual_run_id, run_dir, env))
-    prepared = _prepare_workspace_graph(Path(config_path), workspace=workspace, env=env)
+    if _policy_result is not None:
+        env = replace(env, effective_policy=_policy_result.effective_policy,
+                      findings=(*env.findings, *_policy_result.findings))
+        env.registry.configure_rule_defaults(purity_policy=_policy_result.effective_policy.to_purity_policy())
+    prepared = _prepare_workspace_graph(Path(config_path), workspace=workspace, env=env,
+                                       policy_override=_policy_result)
     if isinstance(prepared, HealthReport):
         _write_refused_artifacts(run_dir, prepared, include_effective_policy=True)
         raise CheckedRunError(f"run refused: health status {prepared.status}", CheckedRunResult(actual_run_id, run_dir, prepared))
@@ -144,7 +149,7 @@ def run_workspace_checked(
         rule_phase="run",
         **validation_kwargs,
     )
-    if health.info.get("rule_phase") == "import" and health.status in {"FAIL", "ERROR"}:
+    if health.status in {"FAIL", "ERROR"}:
         _write_refused_artifacts(run_dir, health)
         _refuse_on_health_failure(health, run_dir, actual_run_id)
     compiled = GraphCompiler().compile(graph, registry=env.registry)
@@ -152,17 +157,34 @@ def run_workspace_checked(
     _write_preflight_artifacts(run_dir, graph, compiled, health, registry=env.registry, resources=resources)
     _refuse_on_health_failure(health, run_dir, actual_run_id)
     execute_kwargs = {"delegate_cli": True} if delegate_cli else {}
-    context = _execute_runtime(
+    if capabilities is not None:
+        execute_kwargs["capabilities"] = capabilities
+    from vibeflow.tooling.application.python.project.contributions import lifecycle_registry, release_runtime_plugins
+    try:
+        runtime_registry = lifecycle_registry(env.registry, workflow_id=str(config_path), config_path=config_path,
+                                             plugin_types=("runtime",))
+    except Exception as exc:
+        failed = _workspace_error_report("PLUGIN.FACTORY.LOAD", str(exc), Path(config_path), effective_policy)
+        _write_refused_artifacts(run_dir, failed)
+        raise CheckedRunError("run refused: runtime plugin creation failed", CheckedRunResult(actual_run_id, run_dir, failed)) from exc
+    health = replace(health, info={**health.info, "plugins": {"plugins": [
+        *plugin_registry.to_dict()["plugins"], *runtime_registry.to_dict()["plugins"]]}})
+    _write_json(run_dir / "health_report.json", health.to_dict())
+    context = None
+    try:
+        context = _execute_runtime(
         graph,
         env.registry,
-        plugin_registry,
+        runtime_registry,
         initial,
         run_dir,
         effective_runtime_options,
         resources,
         health=health,
         **execute_kwargs,
-    )
+        )
+    finally:
+        release_runtime_plugins(runtime_registry)
     _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
     return CheckedRunResult(actual_run_id, run_dir, health, context)
 
@@ -173,7 +195,7 @@ def load_workspace_graph_for_export(
     workspace: WorkspaceConfig,
     validate_health: bool = False,
 ) -> tuple[object, object, object, ConfigResources, HealthReport | None]:
-    env = _environment_or_report(workspace)
+    env = _environment_or_report(workspace, path)
     if isinstance(env, HealthReport):
         return None, None, None, ConfigResources(), env
     prepared = _prepare_workspace_graph(path, workspace=workspace, env=env)
@@ -190,7 +212,8 @@ def load_workspace_graph_for_export(
     if validate_health:
         if health.status in {"FAIL", "ERROR"}:
             return None, None, None, ConfigResources(), health
-    compiled = GraphCompiler().compile(graph, registry=env.registry)
+    if health.status not in {"FAIL", "ERROR"}:
+        compiled = GraphCompiler().compile(graph, registry=env.registry)
     return graph, compiled, env.registry, resources, None
 
 
@@ -217,7 +240,8 @@ def _validate_prepared_workspace_graph(
         source_context=collect_workflow_source_context(env.registry, graph),
         rule_phase=rule_phase,
     )
-    compiled = GraphCompiler().compile(graph, registry=env.registry)
+    if health.status not in {"FAIL", "ERROR"}:
+        compiled = GraphCompiler().compile(graph, registry=env.registry)
     info = dict(health.info)
     info["nodeset_imports"] = [dict(item) for item in document.nodeset_imports]
     info["resources"] = resources.to_dict()
@@ -258,7 +282,7 @@ def _validate_prepared_workspace_graph(
     )
 
 
-def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: WorkspaceEnvironment):
+def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: WorkspaceEnvironment, policy_override=None):
     config_path = path.resolve()
     root = workspace.root_for_path(config_path)
     if root is None:
@@ -277,188 +301,84 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
         document = load_workspace_config_document(config_path, workspace=workspace)
     except ConfigLoadError as exc:
         return config_load_error_report(exc, object_type="config", object_id=str(config_path))
-    preflight_findings = [*_forbidden_config_findings(document.data, root=root, source_path=config_path), *annotate_findings(env.findings, root=root, source_path=config_path)]
+    forbidden = _forbidden_config_findings(document.data, root=root, source_path=config_path) if workspace.path.name == WORKSPACE_CONFIG_NAME else ()
+    preflight_findings = [*forbidden, *annotate_findings(env.findings, root=root, source_path=config_path)]
     root_registries = env.resource_registries.get(root.id)
-    descriptor_groups = project_descriptor_paths(
-        root.project_config,
-        root.config_path,
-    )
-    python_config, static_plugin_config = _partition_plugin_config(
-        document.data,
-        plugin_resource_registry=(
-            root_registries.plugins
-            if root_registries and root_registries.has_plugin_registry
-            else None
-        ),
-        static_plugins=bool(descriptor_groups.get("plugins")),
-    )
-    plugin_registry, plugin_findings = load_plugins_from_config(
-        python_config,
-        base_path=root.path,
-        root_id=root.id,
-        root_path=str(root.path),
-        source_path=str(config_path),
-        plugin_resource_registry=root_registries.plugins if root_registries and root_registries.has_plugin_registry else None,
-        rule_registry=env.registry,
-    )
-    preflight_findings.extend(annotate_findings(plugin_findings, root=root, source_path=config_path))
-    resources, resource_findings = load_config_resources(
-        python_config,
-        base_path=root.path,
-        plugin_registry=plugin_registry,
-        base_lib_registry=root_registries.base_libs if root_registries and root_registries.has_base_lib_registry else None,
-        plugin_resource_registry=root_registries.plugins if root_registries and root_registries.has_plugin_registry else None,
-        base_lib_paths=root_registries.base_lib_paths if root_registries else (str(root.path),),
-    )
-    descriptor_catalogs = None
-    descriptor_catalog_error = False
-    if static_plugin_config.get("plugins"):
-        try:
-            descriptor_catalogs = load_project_descriptor_catalogs(
-                root.path,
-                project_config=root.config_path,
-            )
-        except DescriptorLoadError as exc:
-            descriptor_catalog_error = True
-            preflight_findings.append(
-                workspace_finding(
-                    exc.code,
-                    exc.message,
-                    root=root,
-                    source_path=Path(exc.path or root.config_path),
-                    object_id="descriptors.plugins",
-                    failure_layer="descriptor",
-                )
-            )
-        else:
-            try:
-                static_plugins = load_plugin_review_resources(
-                    static_plugin_config,
-                    catalog=descriptor_catalogs.plugins,
-                )
-            except PluginSelectionError as exc:
-                preflight_findings.append(
-                    workspace_finding(
-                        exc.code,
-                        exc.message,
-                        root=root,
-                        source_path=config_path,
-                        object_id=exc.plugin_id or "plugins",
-                        failure_layer="plugin",
-                    )
-                )
-            else:
-                resources = replace(
-                    resources,
-                    plugins=(*resources.plugins, *static_plugins),
-                )
-    if "host_extensions" not in document.data:
-        javascript = project_javascript_options(
-            root.project_config,
-            root.config_path,
-        )
-        legacy_extension_ids = tuple(
-            javascript.get("host_extensions", ())
-        )
-        if legacy_extension_ids:
-            resources = replace(
-                resources,
-                host_extensions=tuple(
-                    HostExtensionResource(
-                        id=str(extension_id),
-                        root_id=root.id,
-                        root_path=str(root.path),
-                        source_path=str(root.config_path),
-                    )
-                    for extension_id in legacy_extension_ids
-                ),
-            )
-            preflight_findings.append(
-                workspace_finding(
-                    "CONFIG.SMELL.LEGACY_HOST_EXTENSION_SELECTION",
-                    (
-                        "javascript.host_extensions is deprecated; select "
-                        "host extensions in the workflow-level "
-                        "host_extensions list"
-                    ),
-                    root=root,
-                    source_path=root.config_path,
-                    object_id="javascript.host_extensions",
-                    failure_layer="host_extension",
-                    severity="warning",
-                )
-            )
-    if resources.host_extensions:
-        if descriptor_catalogs is None and not descriptor_catalog_error:
-            try:
-                descriptor_catalogs = load_project_descriptor_catalogs(
-                    root.path,
-                    project_config=root.config_path,
-                )
-            except DescriptorLoadError as exc:
-                descriptor_catalog_error = True
-                preflight_findings.append(
-                    workspace_finding(
-                        exc.code,
-                        exc.message,
-                        root=root,
-                        source_path=Path(exc.path or root.config_path),
-                        object_id="descriptors",
-                        failure_layer="descriptor",
-                    )
-                )
-        if descriptor_catalogs is not None:
-            resolved_extensions, extension_findings = (
-                resolve_host_extension_resources(
-                    resources.host_extensions,
-                    catalog=descriptor_catalogs.host_extensions,
-                )
-            )
-            resources = replace(
-                resources,
-                host_extensions=resolved_extensions,
-            )
-            resource_findings = (*resource_findings, *extension_findings)
-    resources = replace(
-        resources,
-        base_libs=_with_effective_resource_source(resources.base_libs, root=root, source_path=config_path),
-        plugins=_with_effective_resource_source(resources.plugins, root=root, source_path=config_path),
-        host_extensions=_with_effective_resource_source(
-            resources.host_extensions,
-            root=root,
-            source_path=config_path,
-        ),
-    )
-    preflight_findings.extend(annotate_findings(resource_findings, root=root, source_path=config_path))
-    policy_result = resolve_workspace_effective_policy(
-        workspace.policy,
-        workspace_path=workspace.path,
-        base_lib_policies=(config_base_lib_policy(resources.to_dict(), base_path=root.path),),
-        plugin_registry=plugin_registry,
-    )
-    preflight_findings.extend(annotate_findings(policy_result.findings, root=root, source_path=config_path))
-    effective_policy = policy_result.effective_policy
-    env.registry.configure_rule_defaults(purity_policy=effective_policy.to_purity_policy())
-    schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *preflight_findings))
-    errors = tuple(finding for finding in schema_findings if finding.severity == "error")
-    warnings = tuple(finding for finding in schema_findings if finding.severity == "warning")
-    if errors:
-        status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin", "base_lib", "workspace"} for finding in errors) else "FAIL"
-        return HealthReport(status=status, errors=errors, warnings=warnings, effective_policy=effective_policy.to_dict())
+    from vibeflow.tooling.application.python.project.contributions import lifecycle_registry
+    from vibeflow.targets.python.project.resource_rules import review_python_resource
+    descriptor_catalogs = env.registry.rule_catalogs[0]
+    # Libraries are reviewed when reached by the Node source closure. Lifecycle
+    # factories are the resources about to bind at this stage.
+    for resource in descriptor_catalogs.plugins:
+        owner = env.registry.resource_roots.get(("plugins" if resource.to_dict()["kind"] == "plugin" else "base_libs", resource.id))
+        if owner is not None:
+            for phase in ("import", "static"):
+                preflight_findings.extend(review_python_resource(resource, base_path=owner.path, registry=env.registry, phase=phase))
+    if any(item.severity == "error" for item in preflight_findings):
+        return HealthReport(status="FAIL", errors=tuple(item for item in preflight_findings if item.severity == "error"),
+                            warnings=tuple(item for item in preflight_findings if item.severity != "error"),
+                            effective_policy=env.effective_policy.to_dict())
     try:
-        graph = parse_graph_config(document.data, project_root=root.path, root_id=root.id, root_path=root.path, source_path=config_path)
-        compilation = GraphCompiler().compile_with_findings(
-            graph,
-            registry=env.registry,
+        plugin_registry = lifecycle_registry(env.registry, workflow_id=str(config_path), config_path=config_path,
+                                             plugin_types=("compiler",))
+    except Exception as exc:
+        return _workspace_error_report("PLUGIN.FACTORY.LOAD", str(exc), config_path, env.effective_policy)
+    try:
+        selected_config = {**document.data, "plugins": list(env.registry.loaded_plugins.lifecycle_selections)}
+        resources, resource_findings = load_config_resources(selected_config, base_path=root.path,
             plugin_registry=plugin_registry,
+            base_lib_registry=root_registries.base_libs if root_registries else None,
+            plugin_resource_registry=root_registries.plugins if root_registries else None,
+            base_lib_paths=root_registries.base_lib_paths if root_registries else (str(root.path),))
+        if resources.host_extensions:
+            resolved_extensions, extension_findings = resolve_host_extension_resources(resources.host_extensions,
+                catalog=descriptor_catalogs.host_extensions)
+            resources = replace(resources, host_extensions=resolved_extensions)
+            resource_findings = (*resource_findings, *extension_findings)
+        resources = replace(
+            resources,
+            base_libs=_with_effective_resource_source(resources.base_libs, root=root, source_path=config_path),
+            plugins=_with_effective_resource_source(resources.plugins, root=root, source_path=config_path),
+            host_extensions=_with_effective_resource_source(
+                resources.host_extensions,
+                root=root,
+                source_path=config_path,
+            ),
         )
-        graph = compilation.workflow.graph
-        compiled = compilation.compiled_graph
-    except GraphConfigError as exc:
-        return fail_report("CONFIG.SCHEMA.PARSE", str(exc), "config", str(config_path), "schema", effective_policy=effective_policy.to_dict())
-    except GraphCompileError as exc:
-        return fail_report(exc.rule_id, str(exc), "pipeline", "pipeline", "topology", effective_policy=effective_policy.to_dict())
-    return document, graph, compiled, resources, plugin_registry, effective_policy, warnings
+        preflight_findings.extend(annotate_findings(resource_findings, root=root, source_path=config_path))
+        policy_result = resolve_workspace_effective_policy(
+            workspace.policy if policy_override is None else None,
+            workspace_path=workspace.path,
+            base_lib_policies=(config_base_lib_policy(resources.to_dict(), base_path=root.path),),
+            plugin_registry=plugin_registry,
+            base_effective=None if policy_override is None else policy_override.effective_policy,
+        )
+        preflight_findings.extend(annotate_findings(policy_result.findings, root=root, source_path=config_path))
+        effective_policy = policy_result.effective_policy
+        env.registry.configure_rule_defaults(purity_policy=effective_policy.to_purity_policy())
+        schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *preflight_findings))
+        errors = tuple(finding for finding in schema_findings if finding.severity == "error")
+        warnings = tuple(finding for finding in schema_findings if finding.severity == "warning")
+        if errors:
+            status = "ERROR" if any(finding.failure_layer in {"source", "syntax", "plugin", "base_lib", "workspace"} for finding in errors) else "FAIL"
+            return HealthReport(status=status, errors=errors, warnings=warnings, effective_policy=effective_policy.to_dict())
+        try:
+            graph = parse_graph_config(document.data, project_root=root.path, root_id=root.id, root_path=root.path, source_path=config_path)
+            compilation = GraphCompiler().compile_with_findings(
+                graph,
+                registry=env.registry,
+                plugin_registry=plugin_registry,
+            )
+            graph = compilation.workflow.graph
+            compiled = compilation.compiled_graph
+        except GraphConfigError as exc:
+            return fail_report("CONFIG.SCHEMA.PARSE", str(exc), "config", str(config_path), "schema", effective_policy=effective_policy.to_dict())
+        except GraphCompileError as exc:
+            return fail_report(exc.rule_id, str(exc), "pipeline", "pipeline", "topology", effective_policy=effective_policy.to_dict())
+        return document, graph, compiled, resources, plugin_registry, effective_policy, warnings
+    finally:
+        from vibeflow.tooling.application.python.project.contributions import release_plugins
+        release_plugins(plugin_registry, plugin_type="compiler")
 
 
 def _with_effective_resource_source(resources, *, root: WorkspaceRoot, source_path: Path) -> tuple[object, ...]:
@@ -473,59 +393,16 @@ def _with_effective_resource_source(resources, *, root: WorkspaceRoot, source_pa
     )
 
 
-def _partition_plugin_config(
-    config: Mapping[str, Any],
-    *,
-    plugin_resource_registry: object | None,
-    static_plugins: bool,
-) -> tuple[Mapping[str, Any], Mapping[str, Any]]:
-    """Split Python bindings from static descriptor-backed review entries."""
-
-    raw = config.get("plugins", [])
-    if not static_plugins or not isinstance(raw, list):
-        return config, {**config, "plugins": []}
-    python_items: list[object] = []
-    static_items: list[object] = []
-    for item in raw:
-        if _is_python_plugin_selection(
-            item,
-            plugin_resource_registry=plugin_resource_registry,
-        ):
-            python_items.append(item)
-        else:
-            static_items.append(item)
-    return (
-        {**config, "plugins": python_items},
-        {**config, "plugins": static_items},
-    )
-
-
-def _is_python_plugin_selection(
-    item: object,
-    *,
-    plugin_resource_registry: object | None,
-) -> bool:
-    if isinstance(item, Mapping) and (
-        str(item.get("module", item.get("path", ""))).strip()
-    ):
-        return True
-    resource_id = (
-        item.strip()
-        if isinstance(item, str)
-        else str(item.get("id", "")).strip()
-        if isinstance(item, Mapping)
-        else ""
-    )
-    if resource_id and plugin_resource_registry is not None:
-        getter = getattr(plugin_resource_registry, "get", None)
-        if callable(getter) and getter(resource_id) is not None:
-            return True
-    return not resource_id
-
-
-def _environment_or_report(workspace: WorkspaceConfig) -> WorkspaceEnvironment | HealthReport:
+def _environment_or_report(workspace: WorkspaceConfig, config_path=None) -> WorkspaceEnvironment | HealthReport:
+    root = workspace.root_for_path(Path(config_path).resolve()) if config_path else None
+    if root is not None and root.project_target != "python":
+        return _workspace_error_report(
+            "CLI.PROJECT_TARGET.MISMATCH",
+            f"Python Application requires project_target='python'; root {root.id!r} declares {root.project_target!r}",
+            Path(config_path), default_effective_policy(),
+        )
     try:
-        return build_workspace_environment(workspace)
+        return build_workspace_environment(workspace, config_path=config_path)
     except WorkspaceConfigError as exc:
         path = Path(str(exc.source_location.get("path", workspace.path)))
         return _workspace_error_report(exc.rule_id, exc.message, path, default_effective_policy())
@@ -533,7 +410,7 @@ def _environment_or_report(workspace: WorkspaceConfig) -> WorkspaceEnvironment |
         from vibeflow.core.findings import HealthFinding, HealthReport
         return HealthReport(status="ERROR", errors=(HealthFinding(rule_id=exc.code, severity="error",
             object_type="descriptor", object_id=str(exc.details.get("resource_id", "")), message=exc.message,
-            source_location={"path":exc.path,"line":1,"column":1}, failure_layer="descriptor",
+            source_location={"path":exc.path, **exc.details.get("location", {})}, failure_layer="descriptor",
             details={"field":exc.field, "source":exc.path, **exc.details}),))
     except Exception as exc:
         return _workspace_error_report("WORKSPACE.LOAD", str(exc), workspace.path, default_effective_policy())

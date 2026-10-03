@@ -59,13 +59,13 @@
         "type_used": "sandbox.add",
         "display_name": "Add x and a",
         "description": "Computes x + a."
-              },
+      },
       {
         "id": "subtract",
         "type_used": "sandbox.subtract",
         "display_name": "Subtract b",
         "description": "Computes (x + a) - b."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -74,9 +74,18 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "add"},
-      {"from": "add", "to": "subtract"},
-      {"from": "subtract", "to": "end"}
+      {
+        "from": "start",
+        "to": "add"
+      },
+      {
+        "from": "add",
+        "to": "subtract"
+      },
+      {
+        "from": "subtract",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -86,5 +95,14 @@
         "as": "result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

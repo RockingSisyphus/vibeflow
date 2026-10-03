@@ -7,7 +7,6 @@ from vibeflow.tooling.project.resource_helpers import _finding
 from vibeflow.tooling.application.python.project.resources import (
     PluginResource,
     PluginResourceRegistry,
-    _append_legacy_resource_warning,
     _append_missing_resource_metadata_warnings,
     _resource_metadata,
     normalize_plugin_config,
@@ -35,22 +34,14 @@ def plugin_resources(config: Mapping[str, Any], *, plugin_registry: object | Non
         prefix = f"plugins[{index}]"
         registered_resource = _registered_plugin_resource(spec, item, registry=plugin_resource_registry, prefix=prefix, findings=findings)
         if registered_resource is not None:
-            resources.append(replace(registered_resource, config_keys=_plugin_config_keys(spec, prefix, findings) or registered_resource.config_keys))
+            resources.append(replace(registered_resource, config_keys=_plugin_config_keys(spec, prefix, findings) or registered_resource.config_keys,
+                config=normalize_plugin_config(spec)))
             continue
-        module = str(spec.get("module", spec.get("path", ""))).strip()
-        class_name = str(spec.get("class", spec.get("factory", "Plugin"))).strip() or "Plugin"
-        plugin_type = str(spec.get("type", "runtime")).strip() or "runtime"
-        registered = registry_resources.get((module, class_name, plugin_type))
-        config_keys = _plugin_config_keys(spec, prefix, findings)
-        if registered is not None:
-            metadata = _resource_metadata(spec)
-            _append_missing_resource_metadata_warnings(metadata, prefix, "plugin", findings)
-            resources.append(replace(registered, display_name=metadata["display_name"], category=metadata["category"], description=metadata["description"], version=metadata["version"], config_keys=config_keys or registered.config_keys))
-            continue
-        if plugin_resource_registry is not None:
-            _append_legacy_resource_warning(prefix, "plugin", findings)
-        _append_missing_resource_metadata_warnings(_resource_metadata(spec), prefix, "plugin", findings)
-        resources.append(_inline_plugin_resource(spec, module=module, class_name=class_name, plugin_type=plugin_type, config_keys=config_keys))
+        if spec.get("status") == STATUS_PLANNED:
+            _append_missing_resource_metadata_warnings(_resource_metadata(spec), prefix, "plugin", findings)
+            resources.append(_inline_plugin_resource(spec, module="", class_name="", plugin_type=str(spec.get("type", "runtime")), config_keys=_plugin_config_keys(spec, prefix, findings), targets=tuple(spec.get("targets", ())), priority=spec.get("priority",100)))
+        else:
+            findings.append(_finding("PLUGIN.SELECTION.MIGRATION", "select a fixed SDK plugin source; inline lifecycle registration was removed", prefix, "plugin"))
     return resources
 
 
@@ -71,7 +62,7 @@ def _plugin_config_keys(spec: Mapping[str, object], prefix: str, findings: list[
 
 
 def _registered_plugin_resource(spec: Mapping[str, object], item: object, *, registry: PluginResourceRegistry | None, prefix: str, findings: list[HealthFinding]) -> PluginResource | None:
-    if registry is None:
+    if registry is None or spec.get("status") == STATUS_PLANNED:
         return None
     resource_id = item.strip() if isinstance(item, str) else str(spec.get("id", "")).strip() if "id" in spec and "module" not in spec and "path" not in spec else ""
     if not resource_id:
@@ -99,12 +90,12 @@ def _overlay_plugin_metadata(resource: PluginResource, spec: Mapping[str, object
     )
 
 
-def _inline_plugin_resource(spec: Mapping[str, object], *, module: str, class_name: str, plugin_type: str, config_keys: tuple[str, ...]) -> PluginResource:
+def _inline_plugin_resource(spec: Mapping[str, object], *, module: str, class_name: str, plugin_type: str, config_keys: tuple[str, ...], targets=(), priority=100) -> PluginResource:
     metadata = _resource_metadata(spec)
     status = str(spec.get("status", STATUS_IMPLEMENTED)).strip() or STATUS_IMPLEMENTED
     return PluginResource(
         id=str(spec.get("id", "")).strip(),
-        name=str(spec.get("name", "")).strip() or module or class_name,
+        name=str(spec.get("name", "")).strip() or str(spec.get("id", "")).strip() or module or class_name,
         plugin_type=plugin_type,
         status=status if status in STATUSES else STATUS_IMPLEMENTED,
         module=module,
@@ -114,7 +105,7 @@ def _inline_plugin_resource(spec: Mapping[str, object], *, module: str, class_na
         description=metadata["description"],
         version=metadata["version"],
         config_keys=config_keys,
-        rulesets=spec.get("rulesets", ()),
+        rulesets=spec.get("rulesets", ()), targets=targets, priority=priority, config=normalize_plugin_config(spec),
     )
 
 

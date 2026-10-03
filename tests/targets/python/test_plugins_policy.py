@@ -11,7 +11,6 @@ import pytest
 
 from vibeflow.targets.python.project import plugins as target_plugins
 from vibeflow.targets.python.project import policy as target_policy
-from vibeflow.targets.python.project.plugin_loader import load_plugins_from_config
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -103,22 +102,14 @@ def test_planned_plugin_is_not_imported_instantiated_or_registered(
         encoding="utf-8",
     )
 
-    registry, findings = load_plugins_from_config(
-        {
-            "plugins": [
-                {
-                    "path": str(source),
-                    "class": "Plugin",
-                    "type": "runtime",
-                    "status": "planned",
-                }
-            ]
-        },
-        base_path=tmp_path,
-    )
-
-    assert findings == ()
-    assert registry.descriptors() == ()
+    from vibeflow.tooling.project.workspace_loader import load_project_workspace
+    from vibeflow.tooling.project.descriptor_loader import load_workflow_plugins
+    (tmp_path / "vibeflow_project.jsonc").write_text('{"project_target":"python"}')
+    config = tmp_path / "main.jsonc"
+    config.write_text(__import__("json").dumps({"plugins":[{"source":{"kind":"file","ref":"planned_plugin.py"},"status":"planned","id":"future"}], "pipeline":{"nodes":[]}}))
+    loaded = load_workflow_plugins(load_project_workspace(config),config)
+    assert loaded.catalogs.plugins.available() == ()
+    assert loaded.records[0]["loaded"] is False
     assert not marker.exists()
 
 
@@ -153,7 +144,7 @@ def test_selected_ruleset_can_allow_print_without_changing_process_identity() ->
     from vibeflow.targets.python.quality.source_context import (
         PythonSourceFile, PythonSourceNode, build_python_source_context,
     )
-    from vibeflow.tooling.project.descriptor_parser import parse_descriptor_manifest
+    from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor_manifest
 
     source = PythonSourceFile.parse("/fixture/demo_node.py", "demo_node", '''
 class DemoNode:

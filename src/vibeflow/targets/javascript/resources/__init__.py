@@ -4,11 +4,15 @@ from __future__ import annotations
 
 from importlib.resources import files
 from importlib.resources.abc import Traversable
+from contextlib import contextmanager
+from pathlib import Path
+import tempfile
 
 
 RESOURCE_NAMES = frozenset(
     {
         "runtime_helpers.mjs",
+        "sdk.mjs", "sdk.d.ts", "sdk_loader.mjs",
         "plugin_worker.mjs",
         "plugin_abi.d.ts",
         "rule_abi.d.ts",
@@ -27,4 +31,18 @@ def read_text(name: str) -> str:
     return resource(name).read_text(encoding="utf-8")
 
 
-__all__ = ["RESOURCE_NAMES", "read_text", "resource"]
+@contextmanager
+def materialized_resources():
+    """Keep relative SDK imports together, including inside wheel/zip kernels."""
+    directory = files(__package__)
+    if isinstance(directory, Path):
+        yield directory
+        return
+    with tempfile.TemporaryDirectory(prefix="vibeflow-js-resources-") as temporary:
+        path = Path(temporary)
+        for name in RESOURCE_NAMES:
+            (path / name).write_bytes(directory.joinpath(name).read_bytes())
+        yield path
+
+
+__all__ = ["RESOURCE_NAMES", "read_text", "resource", "materialized_resources"]

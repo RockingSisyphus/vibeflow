@@ -159,11 +159,14 @@ def test_platform_module_failures_remain_native_when_rules_are_unselected(
         prepare_project_build(request)
     assert any(item["definition_id"] in {"vibeflow.no_side_effects", "vibeflow.import_side_effects"}
                for item in governed.value.diagnostics)
-    manifest = project / "negative/manifests/nodes" / config_name.replace("_", "-")
-    original = manifest.read_text(encoding="utf-8")
-    declaration = json.loads(original)
-    declaration["rulesets"] = []
-    manifest.write_text(json.dumps(declaration), encoding="utf-8")
+    plugin = project / "code_plugin.ts"
+    original = plugin.read_text(encoding="utf-8")
+    lines = original.splitlines(keepends=True)
+    type_key = f"sandbox.invalid.{Path(config_name).stem}"
+    index = next(index for index, line in enumerate(lines) if f'"type_key": "{type_key}"' in line)
+    import re
+    lines[index] = re.sub(r'"rulesets": \[[^\]]*\]', '"rulesets": []', lines[index])
+    plugin.write_text("".join(lines), encoding="utf-8")
     try:
         prepared = prepare_project_build(request)
         assert prepared.used_node_types == (f"sandbox.invalid.{Path(config_name).stem}", "sandbox.terminal")
@@ -172,7 +175,7 @@ def test_platform_module_failures_remain_native_when_rules_are_unselected(
         assert platform.value.code == "VF_ESBUILD"
         assert any(item["code"] == "ESBUILD" and "node:fs" in item["message"] for item in platform.value.diagnostics)
     finally:
-        manifest.write_text(original, encoding="utf-8")
+        plugin.write_text(original, encoding="utf-8")
 
 
 @pytest.mark.parametrize(
@@ -244,3 +247,15 @@ def test_typescript_sandbox_toolchain_is_project_owned_and_locked() -> None:
     assert '"typescript": "7.0.2"' in package
     assert '"esbuild": "0.28.1"' in package
     assert '"lockfileVersion": 3' in lock
+
+
+_native_prepare_project_build = prepare_project_build
+_native_build_project_aot = build_project_aot
+def prepare_project_build(request, **options):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(request.workspace)
+    return _native_prepare_project_build(request, **options)
+def build_project_aot(request, **options):
+    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+    prepare_workspace_fixture(request.workspace)
+    return _native_build_project_aot(request, **options)

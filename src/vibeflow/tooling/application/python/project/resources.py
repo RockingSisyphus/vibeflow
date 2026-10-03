@@ -159,15 +159,20 @@ def _base_lib_resources(
     resources: list[BaseLibResource] = []
     for index, item in enumerate(modules):
         prefix = f"base_lib.modules[{index}]"
+        planned = isinstance(item, Mapping) and item.get("status") == STATUS_PLANNED
         registered = _registered_base_lib_resource(item, registry=base_lib_registry, prefix=prefix, findings=findings)
         if registered is not None:
             resources.append(replace(registered, status=STATUS_IMPLEMENTED))
             continue
+        if not planned:
+            if not any(finding.object_id == prefix for finding in findings):
+                findings.append(_finding("CONFIG.RESOURCE.REGISTRATION_REMOVED",
+                    "base_lib entries must reference IDs contributed by selected SDK plugins; inline module registration was removed",
+                    prefix, "base_lib"))
+            continue
         spec = _base_lib_spec(item, prefix=prefix, findings=findings)
         if spec is None:
             continue
-        if base_lib_registry is not None:
-            _append_legacy_resource_warning(prefix, "base_lib", findings)
         module, status, metadata = spec
         _append_missing_resource_metadata_warnings(metadata, prefix, "base_lib", findings)
         info = None
@@ -281,22 +286,6 @@ def _append_missing_resource_metadata_warnings(
                 details={"field": field, "resource_kind": label},
             )
         )
-
-
-def _append_legacy_resource_warning(object_id: str, resource_kind: str, findings: list[HealthFinding]) -> None:
-    label = "plugin" if resource_kind == "plugin" else "base_lib"
-    findings.append(
-        HealthFinding(
-            rule_id="CONFIG.SMELL.LEGACY_INLINE_RESOURCE",
-            severity="warning",
-            object_type=label,
-            object_id=object_id,
-            failure_layer=resource_kind,
-            message=f"inline {label} declarations are legacy in registry-backed configs; use an id registered in project/registry.py",
-            suggested_fix_type="fix_config",
-            details={"resource_kind": label},
-        )
-    )
 
 
 def _string_list(value: object) -> tuple[str, ...]:

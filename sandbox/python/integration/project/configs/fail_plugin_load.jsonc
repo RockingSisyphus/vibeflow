@@ -1,14 +1,22 @@
 {
   "plugins": [
     {
-      "module": "../plugins/missing.py",
-      "type": "runtime"
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    },
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugins/missing.py"
+      }
     }
   ],
   "pipeline": {
     "nodes": [
       {
-
         "id": "seed",
         "type_used": "sandbox.constant",
         "display_name": "Seed",

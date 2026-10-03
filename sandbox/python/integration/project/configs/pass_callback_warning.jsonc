@@ -19,7 +19,7 @@
         "type_used": "sandbox.ordinary_callback",
         "display_name": "Ordinary Callback",
         "description": "Invokes an envelope Callback without hiding or blocking it."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.out_value_end",
@@ -28,8 +28,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "callback"},
-      {"from": "callback", "to": "end"}
+      {
+        "from": "start",
+        "to": "callback"
+      },
+      {
+        "from": "callback",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -38,5 +44,14 @@
         "display_name": "Callback Result"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

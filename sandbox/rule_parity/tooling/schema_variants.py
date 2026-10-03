@@ -143,17 +143,33 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         schema("global." + field, {**pipeline(), "global_config": {field: "yes"}}, "CONFIG_OVERRIDE_FLAG")
     for kind, key in (("plugin", "plugins"), ("host", "host_extensions"), ("base", "base_lib")):
         def resource(item):
+            if kind == "plugin" and variant == "current":
+                item = {"status":"planned", **item}
             return {**pipeline(), key: {"modules": [item]} if kind == "base" else [item]}
-        schema("resource." + kind + ".status", resource({"id": "parity.resource", "status": "unfinished"}), "RESOURCE_STATUS")
+        schema("resource." + kind + ".status", resource({"id": "parity.resource", "status": "unfinished", **({"source":{"kind":"file","ref":"plugin.py"}} if kind == "plugin" and variant == "current" else {})}), "RESOURCE_STATUS")
         for field in ("display_name", "category", "description", "version"):
-            schema("resource." + kind + ".metadata_" + field, resource({"id": "parity.resource", field: 1}), "RESOURCE_METADATA_STRING")
+            if kind == "plugin" and variant == "current" and field == "category":
+                emit("resource.plugin.metadata_category",resource({"id":"parity.resource","category":1}),("PLUGIN.SELECTION.MIGRATION",),classification="approved_change")
+            else:
+                schema("resource." + kind + ".metadata_" + field, resource({"id": "parity.resource", field: 1}), "RESOURCE_METADATA_STRING",classification="approved_change" if kind == "plugin" and variant == "current" else "preserved")
         emit("resource." + kind + ".planned", resource({"id": "parity.resource", "status": "planned"}))
     for label, item, suffix in (("empty", {}, "PLUGIN_MODULE"), ("planned_id", {"status": "planned"}, "PLUGIN_PLANNED_ID"),
                                ("class", {"id": "p", "class": ""}, "PLUGIN_CLASS"), ("type", {"id": "p", "type": "other"}, "PLUGIN_TYPE"),
                                ("priority", {"id": "p", "priority": True}, "PLUGIN_PRIORITY"),
                                ("conflict", {"id": "p", "conflict": "merge"}, "PLUGIN_CONFLICT"),
                                ("config", {"id": "p", "config": []}, "PLUGIN_CONFIG"), ("settings", {"id": "p", "settings": []}, "PLUGIN_CONFIG")):
-        schema("plugin." + label, {**pipeline(), "plugins": [item]}, suffix)
+        if variant == "current" and label != "planned_id":
+            source = {"kind":"file","ref":"plugin.py"}
+            if label == "class": source["export"] = ""
+            elif label == "type": source["kind"] = "other"
+            elif label == "empty": source = None
+            item = {"source":source, **({"config":[]} if label == "config" else {})}
+            if label == "priority": item = {"id":"p","status":"planned","priority":True}
+            elif label in {"settings","conflict"}: item[label] = [] if label == "settings" else "merge"
+            code = "CONFIG.SCHEMA.PLUGIN_CONFIG" if label == "config" else "PLUGIN.SELECTION.PRIORITY" if label == "priority" else "PLUGIN.SELECTION.MIGRATION" if label in {"settings","conflict"} else "PLUGIN.SELECTION.SOURCE"
+            emit("plugin."+label,{**pipeline(),"plugins":[item]},(code,),classification="approved_change")
+        else:
+            schema("plugin." + label, {**pipeline(), "plugins": [item]}, suffix)
     for field in ("config", "settings"):
         schema("host." + field, {**pipeline(), "host_extensions": [{"id": "h", field: []}]}, "HOST_EXTENSION_CONFIG")
     for field in ("targets", "provides", "dependencies"):

@@ -178,6 +178,34 @@ class PythonSourceContext:
         owned = {item.symbol_id for item in self.ownership if item.type_key == type_key and item.relation == "helper_reference"}
         return tuple(item for item in self.symbols if item.id in owned)
 
+    def implementation_tree(self, path: str, name: str) -> ast.Module | None:
+        """Isolate an exported implementation and its resolved local helpers."""
+        source = self.file(path)
+        if not name:
+            return source.tree
+        symbol = self.symbol(path, name)
+        if symbol is None:
+            return None
+        selected, pending = set(), [symbol.id]
+        pending.extend(item.id for item in self.symbols
+                       if item.path == path and item.name.startswith(name + "."))
+        while pending:
+            current = pending.pop()
+            if current in selected:
+                continue
+            selected.add(current)
+            pending.extend(item.target for item in self.references if item.source == current)
+        local = [item for item in self.symbols if item.path == path and item.id in selected]
+        # A selected class already contains its methods; do not traverse twice.
+        classes = {item.name for item in local if item.kind == "class"}
+        nodes = [item.node for item in local
+                 if not any(item.name.startswith(owner + ".") for owner in classes)]
+        used = {item.id for node in nodes for item in ast.walk(node) if isinstance(item, ast.Name)}
+        imports = [item for item in (source.tree.body if source.tree else ())
+                   if isinstance(item, (ast.Import, ast.ImportFrom))
+                   and any((alias.asname or alias.name.split(".")[0]) in used for alias in item.names)]
+        return ast.Module(body=[*imports, *nodes], type_ignores=[])
+
 
 def build_python_source_context(nodes: Iterable[PythonSourceNode], files: Iterable[PythonSourceFile], *, calls: Iterable[PythonSourceCall] = ()) -> PythonSourceContext:
     selected_nodes = tuple(sorted(nodes, key=lambda item: (item.type_key, item.path, item.symbol)))

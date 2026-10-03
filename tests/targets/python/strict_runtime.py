@@ -2345,3 +2345,10 @@ def test_distribution_self_check_uses_standalone_quality_project(monkeypatch) ->
     assert captured["cwd"] == distribution_builder.ROOT
     assert captured["env"]["PYTHONDONTWRITEBYTECODE"] == "1"
     assert captured["check"] is False
+
+
+_native_run_checked = run_checked
+def run_checked(config_path, *, registry, **options):
+    from tests.fixtures.support.code_plugins import publish_runtime_fixture
+    publish_runtime_fixture(config_path, registry)
+    return _native_run_checked(config_path, registry=registry, **options)

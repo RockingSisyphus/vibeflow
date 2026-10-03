@@ -1,60 +1,15 @@
+"""Workflow-selected plugin loading. No project resource discovery."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dataclass_field
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 from typing import Any, Mapping
 
-from vibeflow.tooling.project.config_loader import ConfigLoadError, load_raw_config_document
-from vibeflow.tooling.project.descriptor_parser import (
-    parse_descriptor_manifest as _parse_descriptor_manifest,
-)
-from vibeflow.tooling.project.descriptor_catalogs import (
-    BaseLibCatalog,
-    CapabilityCatalog,
-    DescriptorCatalogError,
-    DescriptorCatalogs,
-    HostExtensionCatalog,
-    NodeCatalog,
-    PluginCatalog,
-    SchemaRegistry,
-)
-from vibeflow.core.descriptors.models import (
-    BaseLibDescriptor,
-    CapabilityDescriptor,
-    DataSchemaDescriptor,
-    DescriptorModelError,
-    HostExtensionDescriptor,
-    NodeDescriptor,
-    PluginDescriptor,
-)
-from vibeflow.core.config.node import NodeConfigError
-from vibeflow.core.descriptors.catalogs import BundleCatalog, RuleCatalog, RulesetCatalog
-from vibeflow.core.descriptors.bundles import ContributionBundle
-
-
-_CONFIG_KEYS = (
-    "nodes",
-    "rules",
-    "rulesets",
-    "bundles",
-    "base_lib",
-    "data_schemas",
-    "capabilities",
-    "host_extensions",
-    "plugins",
-)
-_MANIFEST_KINDS = {
-    "nodes": "node",
-    "rules": "rule",
-    "rulesets": "ruleset",
-    "bundles": "bundle",
-    "base_lib": "base_lib",
-    "data_schemas": "data_schema",
-    "capabilities": "capability",
-    "host_extensions": "host_extension",
-    "plugins": "plugin",
-}
-
+from vibeflow.core.descriptors.models import SourceLocator, DescriptorModelError, _thaw_json
+from vibeflow.core.descriptors.contributions import builtin_contributions, compose_contributions
+from vibeflow.core.descriptors.catalogs import DescriptorCatalogError
+from vibeflow.core.descriptors.plugin_selection import _validate_plugin_config
+from vibeflow.tooling.project.config_loader import load_raw_config_document
 
 @dataclass
 class DescriptorLoadError(ValueError):
@@ -67,7 +22,7 @@ class DescriptorLoadError(ValueError):
     @property
     def diagnostics(self) -> tuple[Mapping[str, Any], ...]:
         return ({"code": self.code, "severity": "error", "message": self.message,
-                 "source_location": {"path": self.path, "line": 1, "column": 1},
+                 "source_location": {"path": self.path, **self.details.get("location", {})},
                  "details": {"field": self.field, "source": self.path, **self.details}},)
 
     def __str__(self) -> str:
@@ -86,443 +41,156 @@ class DescriptorLoadError(ValueError):
         )
 
 
-def load_project_descriptor_catalogs(
-    project_root: Path,
-    *,
-    project_config: Path | None = None,
-) -> DescriptorCatalogs:
-    """Load catalogs from the ``descriptors`` section of project config."""
+@dataclass(frozen=True)
+class LoadedPlugins:
+    catalogs: Any
+    bindings: Mapping
+    records: tuple[Mapping, ...]
+    lifecycle_selections: tuple[Mapping, ...]
 
-    root = _project_root(project_root)
-    config_path = _safe_project_file(
-        root,
-        project_config or Path("vibeflow_project.jsonc"),
-        label="project config",
-        require_exists=True,
-    )
+
+def load_workflow_plugins(workspace, config_path, *, node_command="node") -> LoadedPlugins:
+    definitions = {}
     try:
-        document = load_raw_config_document(config_path)
-    except ConfigLoadError as exc:
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.PROJECT_CONFIG",
-            message=str(exc),
-            path=str(config_path),
-        ) from exc
-    raw = document.data.get("descriptors", {})
-    if raw is None:
-        raw = {}
-    if not isinstance(raw, Mapping):
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.CONFIG.SHAPE",
-            message="project descriptors must be an object",
-            path=str(config_path),
-            field="descriptors",
-        )
-    return load_descriptor_catalogs(root, raw)
+        return _load_workflow_plugins(workspace, config_path, node_command=node_command, definitions=definitions)
+    except Exception:
+        for values in definitions.values():
+            for definition in values:
+                close = getattr(definition, "close", None)
+                if close is not None:
+                    close()
+        raise
 
 
-def load_descriptor_catalogs(
-    project_root: Path,
-    descriptor_paths: Mapping[str, object],
-) -> DescriptorCatalogs:
-    """Recursively load one JSONC descriptor per file.
-
-    Scan order is stable: descriptor category order is fixed, configured
-    directories retain their declared order, and files are sorted by their
-    project-relative POSIX path.
-    """
-
-    root = _project_root(project_root)
-    if not isinstance(descriptor_paths, Mapping):
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.CONFIG.SHAPE",
-            message="descriptor paths must be an object",
-            path=str(root),
-        )
-    unknown = sorted(
-        str(key) for key in descriptor_paths if str(key) not in _CONFIG_KEYS
-    )
-    if unknown:
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.CONFIG.UNKNOWN_FIELD",
-            message=f"unknown descriptor path groups: {unknown}",
-            path=str(root),
-        )
-
-    nodes = NodeCatalog()
-    base_libs = BaseLibCatalog()
-    schemas = SchemaRegistry()
-    capabilities = CapabilityCatalog()
-    host_extensions = HostExtensionCatalog()
-    plugins = PluginCatalog()
-    bundles = BundleCatalog()
-    rules = RuleCatalog()
-    rulesets = RulesetCatalog()
-    from vibeflow.core.rules.builtin import builtin_rule_resources
-    builtin_rules, builtin_rulesets = builtin_rule_resources()
-    for descriptor in builtin_rules:
-        rules.register(descriptor, source="builtin:" + descriptor.id)
-    for descriptor in builtin_rulesets:
-        rulesets.register(descriptor, source="builtin:" + descriptor.id)
-    catalogs = {
-        "nodes": nodes,
-        "base_lib": base_libs,
-        "data_schemas": schemas,
-        "capabilities": capabilities,
-        "host_extensions": host_extensions,
-        "plugins": plugins,
-        "bundles": bundles,
-        "rules": rules,
-        "rulesets": rulesets,
-    }
-    parsed_files: set[Path] = set()
-    source_files: list[Path] = []
-
-    for config_key in _CONFIG_KEYS:
-        entries = _directory_entries(
-            descriptor_paths.get(config_key, ()),
-            root=root,
-            field=f"descriptors.{config_key}",
-        )
-        for entry in entries:
-            directory = _safe_descriptor_directory(root, entry)
-            for manifest_path in _manifest_files(root, directory):
-                if manifest_path in parsed_files:
-                    raise DescriptorLoadError(
-                        code="DESCRIPTOR.FILE.DUPLICATE_SCAN",
-                        message=(
-                            "descriptor file is included by more than one "
-                            f"configured directory: {manifest_path}"
-                        ),
-                        path=str(manifest_path),
-                    )
-                parsed_files.add(manifest_path)
-                descriptor = _load_manifest(
-                    manifest_path,
-                    expected_kind=_MANIFEST_KINDS[config_key],
-                    project_root=root,
-                )
-                try:
-                    catalogs[config_key].register(
-                        descriptor,
-                        source=str(manifest_path),
-                    )
-                except DescriptorCatalogError as exc:
-                    raise DescriptorLoadError(
-                        code=exc.code,
-                        message=exc.message,
-                        path=exc.source,
-                        field="id", details={"resource_id": exc.descriptor_id,
-                            "source": exc.source, "previous_source": exc.previous_source},
-                    ) from exc
-                source_files.append(manifest_path)
-
-    _load_bundle_resources(root, catalogs, parsed_files, source_files)
-
-    return DescriptorCatalogs(
-        nodes=nodes,
-        base_libs=base_libs,
-        schemas=schemas,
-        capabilities=capabilities,
-        host_extensions=host_extensions,
-        plugins=plugins,
-        bundles=bundles,
-        rules=rules,
-        rulesets=rulesets,
-        source_files=tuple(source_files),
-    )
-
-
-def _load_bundle_resources(root: Path, catalogs: Mapping[str, object], parsed_files: set[Path], source_files: list[Path]) -> None:
-    visiting: list[Path] = []
-    expanded: set[Path] = set()
-
-    def expand(bundle: ContributionBundle, bundle_path: Path) -> None:
-        if bundle_path in visiting:
-            raise DescriptorLoadError("DESCRIPTOR.BUNDLE.CYCLE", "bundle reference cycle: " + " -> ".join(str(path) for path in (*visiting, bundle_path)), str(bundle_path))
-        if bundle_path in expanded:
-            return
-        visiting.append(bundle_path)
-        for group, references in bundle.resources.items():
-            for reference in references:
-                raw = Path(reference)
-                if _looks_absolute(raw):
-                    raise DescriptorLoadError("DESCRIPTOR.PATH.ABSOLUTE", "bundle resource refs must be relative", str(bundle_path), reference)
-                resource_path = _safe_project_file(root, bundle_path.parent / raw, label="bundle resource", require_exists=True)
-                descriptor = _load_manifest(resource_path, expected_kind=_MANIFEST_KINDS[group], project_root=root)
-                if resource_path not in parsed_files:
-                    try:
-                        catalogs[group].register(descriptor, source=str(resource_path))
-                    except DescriptorCatalogError as exc:
-                        raise DescriptorLoadError(exc.code, exc.message, exc.source, "id",
-                            {"resource_id": exc.descriptor_id, "source": exc.source, "previous_source": exc.previous_source}) from exc
-                    parsed_files.add(resource_path)
-                    source_files.append(resource_path)
-                if isinstance(descriptor, ContributionBundle):
-                    expand(descriptor, resource_path)
-        visiting.pop()
-        expanded.add(bundle_path)
-
-    for bundle in tuple(catalogs["bundles"]):
-        expand(bundle, Path(catalogs["bundles"].source_for(bundle.id)))
-
-
-def parse_descriptor_manifest(
-    data: Mapping[str, Any],
-    *,
-    expected_kind: str | None = None,
-) -> (
-    NodeDescriptor
-    | BaseLibDescriptor
-    | DataSchemaDescriptor
-    | CapabilityDescriptor
-    | HostExtensionDescriptor
-    | PluginDescriptor
-):
-    """Parse one already-decoded manifest object."""
-
-    return _parse_descriptor_manifest(data, expected_kind=expected_kind)
-
-
-def _load_manifest(
-    path: Path,
-    *,
-    expected_kind: str,
-    project_root: Path,
-) -> (
-    NodeDescriptor
-    | BaseLibDescriptor
-    | DataSchemaDescriptor
-    | CapabilityDescriptor
-    | HostExtensionDescriptor
-    | PluginDescriptor
-):
-    try:
-        document = load_raw_config_document(path)
-        descriptor = parse_descriptor_manifest(
-            document.data,
-            expected_kind=expected_kind,
-        )
-        _validate_source_locators(descriptor, root=project_root, path=path)
-        return descriptor
-    except ConfigLoadError as exc:
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.JSONC",
-            message=str(exc),
-            path=str(path),
-            field=str(exc).split(" ", 1)[0],
-        ) from exc
-    except (DescriptorModelError, NodeConfigError) as exc:
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.INVALID",
-            message=str(exc),
-            path=str(path),
-            field=str(exc).split(" ", 1)[0],
-        ) from exc
-
-
-def _directory_entries(
-    value: object,
-    *,
-    root: Path,
-    field: str,
-) -> tuple[Path, ...]:
-    if value in (None, ()):
-        return ()
-    if isinstance(value, str) or not isinstance(value, (list, tuple)):
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.CONFIG.PATHS",
-            message=f"{field} must be a list of project-relative directories",
-            path=str(root),
-            field=field,
-        )
-    entries: list[Path] = []
-    for index, item in enumerate(value):
-        if not isinstance(item, str) or not item.strip():
-            raise DescriptorLoadError(
-                code="DESCRIPTOR.CONFIG.PATH",
-                message=f"{field}[{index}] must be a non-empty string",
-                path=str(root),
-                field=f"{field}[{index}]",
-            )
-        entries.append(Path(item))
-    return tuple(entries)
-
-
-def _project_root(project_root: Path) -> Path:
-    raw = Path(project_root)
-    try:
-        root = raw.resolve(strict=True)
-    except OSError as exc:
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.PROJECT_ROOT",
-            message=str(exc),
-            path=str(raw),
-        ) from exc
-    if not root.is_dir():
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.PROJECT_ROOT",
-            message="project root must be a directory",
-            path=str(root),
-        )
-    return root
-
-
-def _safe_descriptor_directory(root: Path, relative: Path) -> Path:
-    if _looks_absolute(relative):
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.PATH.ABSOLUTE",
-            message="descriptor directory must be project-relative",
-            path=str(relative),
-        )
-    candidate = root / relative
-    _reject_symlink_components(root, candidate)
-    try:
-        resolved = candidate.resolve(strict=True)
-    except OSError as exc:
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.PATH.MISSING",
-            message=str(exc),
-            path=str(candidate),
-        ) from exc
-    _assert_within_root(root, resolved, path=candidate)
-    if not resolved.is_dir():
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.PATH.NOT_DIRECTORY",
-            message="configured descriptor path must be a directory",
-            path=str(candidate),
-        )
-    return resolved
-
-
-def _safe_project_file(
-    root: Path,
-    value: Path,
-    *,
-    label: str,
-    require_exists: bool,
-) -> Path:
-    raw = Path(value)
-    if _looks_absolute(raw):
-        candidate = raw
-    else:
-        candidate = root / raw
-    _reject_symlink_components(root, candidate)
-    try:
-        resolved = candidate.resolve(strict=require_exists)
-    except OSError as exc:
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.PATH.MISSING",
-            message=str(exc),
-            path=str(candidate),
-        ) from exc
-    _assert_within_root(root, resolved, path=candidate)
-    if require_exists and not resolved.is_file():
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.PATH.NOT_FILE",
-            message=f"{label} must be a file",
-            path=str(candidate),
-        )
-    return resolved
-
-
-def _manifest_files(root: Path, directory: Path) -> tuple[Path, ...]:
-    paths = sorted(
-        directory.rglob("*"),
-        key=lambda item: item.relative_to(root).as_posix(),
-    )
-    manifests: list[Path] = []
-    for path in paths:
-        if path.is_symlink():
-            raise DescriptorLoadError(
-                code="DESCRIPTOR.PATH.SYMLINK",
-                message="symlinks are not allowed in descriptor directories",
-                path=str(path),
-            )
-        resolved = path.resolve(strict=True)
-        _assert_within_root(root, resolved, path=path)
-        if resolved.is_file() and resolved.suffix.lower() == ".jsonc":
-            manifests.append(resolved)
-    return tuple(manifests)
-
-
-def _validate_source_locators(
-    descriptor: object,
-    *,
-    root: Path,
-    path: Path,
-) -> None:
-    implementations = getattr(descriptor, "implementations", ())
-    for implementation in implementations:
-        source = implementation.source
-        if source.kind != "file":
+def _load_workflow_plugins(workspace, config_path, *, node_command, definitions) -> LoadedPlugins:
+    config_path = Path(config_path).resolve()
+    root = workspace.root_for_path(config_path)
+    if root is None:
+        raise DescriptorLoadError("PLUGIN.CONFIG.ROOT", "workflow must belong to a registered root", str(config_path))
+    raw = load_raw_config_document(config_path).data
+    selections = raw.get("plugins", [])
+    if not isinstance(selections, list):
+        raise DescriptorLoadError("PLUGIN.SELECTION.SHAPE", "plugins must be a list", str(config_path), "plugins")
+    from vibeflow.tooling.project.config_schema import collect_plugin_selection_findings
+    selection_errors = collect_plugin_selection_findings(selections)
+    if selection_errors:
+        issue = selection_errors[0]
+        raise DescriptorLoadError(issue.rule_id, issue.message, str(config_path), str(issue.source_location.get("field", issue.object_id)), {"selection_errors": [item.to_dict() for item in selection_errors]})
+    contributions = [builtin_contributions()]
+    bindings, records, lifecycle, load_states = {}, [], [], {}
+    for index, spec in enumerate(selections):
+        field = f"plugins[{index}]"
+        if not isinstance(spec, Mapping):
+            raise DescriptorLoadError("PLUGIN.SELECTION.MIGRATION", "select plugins by explicit source; ID-only registration was removed", str(config_path), field)
+        if not isinstance(spec.get("enabled", True), bool):
+            raise DescriptorLoadError("PLUGIN.SELECTION.SHAPE", "enabled must be boolean", str(config_path), field)
+        if not spec.get("enabled", True):
             continue
-        raw = Path(source.ref)
-        if _looks_absolute(raw):
-            raise DescriptorLoadError(
-                code="DESCRIPTOR.SOURCE.ABSOLUTE",
-                message="file source refs must be project-relative",
-                path=str(path),
-                field=source.ref,
-            )
-        candidate = root / raw
+        unknown = set(spec) - {"id", "source", "root", "config", "enabled", "status", "display_name", "description", "type", "targets", "priority", "version"}
+        if unknown:
+            raise DescriptorLoadError("PLUGIN.SELECTION.MIGRATION", f"unsupported plugin fields: {sorted(unknown)}; use an SDK plugin source", str(config_path), field)
+        status = spec.get("status", "implemented")
+        if status not in {"implemented", "planned"}:
+            raise DescriptorLoadError("PLUGIN.SELECTION.STATUS", "status must be implemented or planned", str(config_path), field)
+        if status == "planned":
+            records.append({**dict(spec), "loaded": False, "status": status})
+            continue
         try:
-            _reject_symlink_components(root, candidate)
-            resolved = candidate.resolve(strict=False)
-            _assert_within_root(root, resolved, path=candidate)
-        except DescriptorLoadError as exc:
-            raise DescriptorLoadError(
-                code="DESCRIPTOR.SOURCE.UNSAFE",
-                message=exc.message,
-                path=str(path),
-                field=source.ref,
-            ) from exc
-        if resolved.exists() and not resolved.is_file():
-            raise DescriptorLoadError(
-                code="DESCRIPTOR.SOURCE.NOT_FILE",
-                message="file source ref must identify a regular file",
-                path=str(path),
-                field=source.ref,
-            )
-
-
-def _reject_symlink_components(root: Path, candidate: Path) -> None:
+            owner = workspace.root_by_id(spec["root"]) if spec.get("root") else root
+        except (KeyError, ValueError) as exc:
+            raise DescriptorLoadError("PLUGIN.SELECTION.ROOT", f"unknown workspace root: {spec.get('root')}", str(config_path), field + ".root") from exc
+        source_data = spec.get("source")
+        if not isinstance(source_data, Mapping) or set(source_data) - {"kind", "ref", "export"}:
+            raise DescriptorLoadError("PLUGIN.SELECTION.SOURCE", "implemented plugins require a source with kind, ref and optional export", str(config_path), field + ".source")
+        try:
+            source = SourceLocator(**source_data)
+            if source.kind == "file" and not (owner.path / source.ref).resolve().is_relative_to(owner.path):
+                raise ValueError("plugin file must belong to its selected workspace root")
+            from vibeflow.tooling.application.plugin_definitions import load_plugin_definition
+            plugin = load_plugin_definition(source, owner=owner, workspace=workspace, node_command=node_command)
+            definitions.setdefault(owner.project_target, []).append(plugin)
+            plugin_id, schema, defaults = plugin.id, plugin.config_schema, plugin.config_defaults
+            plugin_bindings = plugin.bindings() if hasattr(plugin, "bindings") else {}
+            load_states.update(getattr(plugin, "load_states", {}))
+            make_contributions = plugin.contributions
+            if spec.get("id") and spec["id"] != plugin_id:
+                raise ValueError(f"selected plugin ID '{spec['id']}' does not match exported ID '{plugin_id}'")
+            overrides = spec.get("config", {})
+            if not isinstance(overrides, Mapping):
+                raise ValueError("plugin config must be an object")
+            config = {**_thaw_json(defaults), **dict(overrides)}
+            _validate_plugin_config(config, schema, plugin_id=plugin_id)
+            contribution = _resolved_contributions(make_contributions(config), owner.path)
+            contributions.append(contribution)
+            bindings.update({(plugin_id, *key): value for key, value in plugin_bindings.items()})
+            records.append({"id": plugin_id, "source": source.to_dict(), "root": owner.id,
+                            "config": config, "loaded": True, "status": status})
+            for resource in contribution.resources:
+                if resource.descriptor.to_dict()["kind"] == "plugin":
+                    lifecycle.append({"id": resource.descriptor.id, "config": config})
+        except DescriptorLoadError:
+            raise
+        except Exception as exc:
+            details = {"plugin_source": dict(source_data), "root": owner.id}
+            if getattr(exc, "location", None):
+                details["location"] = dict(exc.location)
+            if isinstance(exc, DescriptorCatalogError):
+                details.update({"source": exc.source, "previous_source": exc.previous_source, **exc.details})
+            code = "DESCRIPTOR.INVALID" if isinstance(exc, DescriptorModelError) else getattr(exc, "code", "DESCRIPTOR.INVALID" if isinstance(exc, ValueError) else "PLUGIN.DECLARATION.LOAD")
+            raise DescriptorLoadError(code, str(exc),
+                                      str((owner.path / source_data.get("ref", "")).resolve()) if source_data.get("kind") == "file" else str(config_path), field, details) from exc
     try:
-        relative = candidate.relative_to(root)
-    except ValueError:
-        resolved = candidate.resolve(strict=False)
-        _assert_within_root(root, resolved, path=candidate)
-        relative = resolved.relative_to(root)
-    current = root
-    for part in relative.parts:
-        current = current / part
-        if current.is_symlink():
-            raise DescriptorLoadError(
-                code="DESCRIPTOR.PATH.SYMLINK",
-                message="symlinks are not allowed in descriptor paths",
-                path=str(current),
-            )
+        catalogs = compose_contributions(tuple(contributions))
+    except DescriptorCatalogError as exc:
+        raise DescriptorLoadError(exc.code, exc.message, exc.source, details={"resource_id": exc.descriptor_id,
+                                  "previous_source": exc.previous_source, **exc.details}) from exc
+    lifecycle.extend({key:value for key,value in record.items() if key not in {"source","root","enabled","loaded"}} for record in records if record.get("status") == "planned")
+    from dataclasses import replace
+    from vibeflow.core.descriptors.models import _freeze_json
+    source_roots = tuple(str(item.path) for item in workspace.roots)
+    for name in ("nodes", "base_libs", "host_extensions", "plugins", "rules"):
+        getattr(catalogs, name).source_roots = source_roots
+    catalogs = replace(catalogs, plugin_records=_freeze_json(records, field_name="plugins"),
+                       lifecycle_selections=_freeze_json(lifecycle, field_name="plugins.lifecycle"),
+                       source_load_states=_freeze_json(load_states, field_name="plugins.sources"),
+                       source_roots=source_roots)
+    from vibeflow.tooling.application.plugin_definitions import attach_plugin_definitions
+    attach_plugin_definitions(catalogs, definitions)
+    from types import MappingProxyType
+    return LoadedPlugins(catalogs, MappingProxyType(bindings), catalogs.plugin_records, catalogs.lifecycle_selections)
 
 
-def _assert_within_root(root: Path, resolved: Path, *, path: Path) -> None:
-    try:
-        resolved.relative_to(root)
-    except ValueError as exc:
-        raise DescriptorLoadError(
-            code="DESCRIPTOR.PATH.ESCAPE",
-            message="descriptor path escapes the project root",
-            path=str(path),
-        ) from exc
+def _resolved_contributions(contribution, root):
+    """Resolve relative locators in the selected plugin's root, once."""
+    from dataclasses import replace
+    resources = []
+    for resource in contribution.resources:
+        descriptor = resource.descriptor
+        implementations = getattr(descriptor, "implementations", None)
+        if implementations is not None:
+            values = []
+            for implementation in implementations:
+                source = implementation.source
+                if source.kind == "file":
+                    source = replace(source, ref=str((root / source.ref).resolve()))
+                values.append(replace(implementation, source=source))
+            descriptor = replace(descriptor, implementations=tuple(values))
+        resources.append(replace(resource, descriptor=descriptor))
+    return replace(contribution, resources=tuple(resources))
 
 
-def _looks_absolute(path: Path) -> bool:
-    text = str(path)
-    return path.is_absolute() or bool(PureWindowsPath(text).drive)
-
-
-__all__ = [
-    "DescriptorLoadError",
-    "load_descriptor_catalogs",
-    "load_project_descriptor_catalogs",
-    "parse_descriptor_manifest",
-]
+def load_workflow_catalogs(project_root, *, workflow_config, workspace=None, project_config=None, node_command="node"):
+    if workspace is None:
+        from vibeflow.tooling.project.workspace_loader import load_workspace_config
+        root = Path(project_root).resolve()
+        workspace_file = next((directory / "vibeflow_config.jsonc" for directory in (root, *root.parents)
+                               if (directory / "vibeflow_config.jsonc").is_file()), None)
+        if workspace_file is None:
+            from vibeflow.tooling.project.workspace_model import WorkspaceConfig, WorkspaceRoot
+            from vibeflow.tooling.project.workspace_loader import load_project_target
+            path = Path(project_config or root / "vibeflow_project.jsonc")
+            data = load_raw_config_document(path).data
+            workspace = WorkspaceConfig(path, root, {}, (WorkspaceRoot("project", root, path, data, load_project_target(path)),))
+        else:
+            workspace = load_workspace_config(workspace_file)
+    return load_workflow_plugins(workspace, workflow_config, node_command=node_command).catalogs

@@ -299,7 +299,7 @@ def test_training_sandbox_declares_runtime_model_and_optimizer_calls_as_global_s
     from vibeflow.tooling.application.python.project.declarations import declared_python_registry,collect_node_source_context
     from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rules
     project=Path(__file__).resolve().parents[3]/"sandbox/python/integration/project"
-    registry=declared_python_registry(load_project_workspace(project))
+    registry=declared_python_registry(load_project_workspace(project), project / "configs/pass_training_nodeset_object_flow.jsonc")
     keys=("sandbox.forward_loss","sandbox.backward_grad","sandbox.optimizer_step","sandbox.training_batch_step")
     context=collect_node_source_context(registry,keys)
     from vibeflow.targets.python.quality.source_analysis.runtime_dispatch import analyze_source_runtime_dispatch
@@ -360,7 +360,7 @@ def _global_state_health(*, lock_scope: str = ""):
     from vibeflow.tooling.application.python.project.declarations import declared_python_registry,collect_workflow_source_context
     from tests.fixtures.support.strict_support_runtime_nodes import OutEndNode,OutEndNode_DECLARATION,StartNode,StartNode_DECLARATION
     project=Path(__file__).resolve().parents[3]/"sandbox/python/integration/project"
-    registry=declared_python_registry(load_project_workspace(project))
+    registry=declared_python_registry(load_project_workspace(project), project / "configs/pass_training_nodeset_object_flow.jsonc")
     registry.register(StartNode_DECLARATION,StartNode)
     registry.register(OutEndNode_DECLARATION,OutEndNode)
     graph=_global_state_graph(lock_scope=lock_scope)

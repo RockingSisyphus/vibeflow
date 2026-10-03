@@ -126,6 +126,7 @@ def base_lib_closure(
         _source, mapping = implementation_source(
             selected,
             project_root=project_root,
+            source_roots=catalog.source_roots,
             subject=f"base_lib '{descriptor.id}'",
         )
         implementations[descriptor.id] = mapping
@@ -272,6 +273,7 @@ def host_extension_closure(
         _source, mapping = implementation_source(
             selected,
             project_root=project_root,
+            source_roots=catalogs.source_roots,
             subject=f"host_extension '{descriptor.id}'",
         )
         ordered.append(
@@ -453,18 +455,6 @@ def import_policy(
         current = (kind, resource_id)
         if current in previous:
             return
-        if previous and not all(
-            prior_kind == kind == "node"
-            and node_catalog.get(prior_id).base_libs == node_catalog.get(resource_id).base_libs
-            for prior_kind, prior_id in previous
-        ):
-            raise ProjectBuildError(
-                "VF_AOT_IMPORT_OWNER",
-                (
-                    f"source '{resolved}' is claimed by both "
-                    f"{previous[0][0]} '{previous[0][1]}' and {kind} '{resource_id}'"
-                ),
-            )
         previous.append(current)
 
     for descriptor in node_catalog:
@@ -479,6 +469,7 @@ def import_policy(
                 project_root,
                 implementation.source.ref,
                 subject=f"node '{descriptor.type_key}' source",
+                allowed_roots=node_catalog.source_roots,
             )
             if source.is_file():
                 add_owner(source, kind="node", resource_id=descriptor.type_key)
@@ -494,6 +485,7 @@ def import_policy(
                 project_root,
                 implementation.source.ref,
                 subject=f"base_lib '{descriptor.id}' source",
+                allowed_roots=base_lib_catalog.source_roots,
             )
             if source.is_file():
                 add_owner(source, kind="base_lib", resource_id=descriptor.id)
@@ -557,6 +549,7 @@ def import_policy(
             for extension in host_extensions
         },
         "allowed_external_packages": sorted(allowed_external),
+        "source_roots": [value for value in node_catalog.source_roots if Path(value) != project_root],
     }
 
 
@@ -600,6 +593,7 @@ def target_neutral_import_policy(
             implementation.source.ref,
             subject=f"{kind} '{resource_id}' source",
             require_file=True,
+            allowed_roots=catalogs.source_roots,
         )
         owner = {
             "path": str(source),
@@ -611,15 +605,6 @@ def target_neutral_import_policy(
         previous = owners_by_path.setdefault(source, [])
         if owner in previous:
             return
-        if previous and not all(
-            item["kind"] == kind == "node"
-            and catalogs.nodes.get(item["id"]).base_libs == catalogs.nodes.get(resource_id).base_libs
-            for item in previous
-        ):
-            raise ProjectBuildError(
-                "VF_AOT_IMPORT_OWNER",
-                f"source '{source}' has incompatible VibeFlow owners or contracts",
-            )
         previous.append(owner)
 
     selected_nodes = tuple(
@@ -735,6 +720,7 @@ def target_neutral_import_policy(
                 if descriptor.id in plugin_ids
             },
             "allowed_external_packages": sorted(allowed_external),
+            "source_roots": [value for value in catalogs.source_roots if Path(value) != project_root],
         },
         tuple(sorted({str(item["path"]) for item in owners})),
     )
@@ -750,6 +736,7 @@ def driver_import_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
         "hostExtensionDependencies": dict(policy.get("host_extension_dependencies", {})),
         "pluginDependencies": dict(policy.get("plugin_dependencies", {})),
         "allowedExternalPackages": list(policy.get("allowed_external_packages", ())),
+        "sourceRoots": list(policy.get("source_roots", ())),
     }
 
 

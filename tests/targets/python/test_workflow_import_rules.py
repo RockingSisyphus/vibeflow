@@ -76,7 +76,7 @@ def test_workflow_import_file_rule_rejects_actual_closure_before_node_marker(tmp
     data = json.loads(config.read_text())
     data["policy"] = {"node_source":{"max_lines":2}}
     config.write_text(json.dumps(data))
-    registry = build_workspace_node_registry(load_project_workspace(config))
+    registry = build_workspace_node_registry(load_project_workspace(config), config_path=config)
     with pytest.raises(CheckedRunError) as rejected:
         run_checked(config, registry=registry, run_root=tmp_path / "runs", run_id="rejected")
     report = rejected.value.result.health
@@ -119,7 +119,7 @@ def test_workflow_import_completed_error_and_missing_compiled_are_not_fake_succe
 
 @pytest.mark.parametrize("command", ["validate", "review"])
 def test_formal_cli_checks_import_entrypoint_before_publication(tmp_path, capsys, command):
-    from vibeflow.tooling.application.cli import main
+    from tests.fixtures.support.strict_support import cli_main as main
     config, marker, _ = _project(tmp_path, error=True)
     output = tmp_path / "review.svg"
     arguments = [command, "--config", str(config)]
@@ -169,3 +169,22 @@ def test_repeated_nodeset_workflow_import_keeps_actual_call_paths_and_preview_de
     assert report.status == "PASS" and not marker.exists()
     assert [json.loads(line)["path"] for line in observations.read_text().splitlines()] == [["first"],["second"]]
     assert all(next(call for call in item["plan"]["calls"] if call["rule_id"] == "vibeflow.quality.files")["params"]["max_file_lines"] == 25 for item in report.info["rule_executions"])
+
+
+from tests.fixtures.support.code_plugins import prepare_workspace_fixture
+_fixture_native_load_workspace_config = load_workspace_config
+def load_workspace_config(path, **options):
+    prepare_workspace_fixture(path)
+    return _fixture_native_load_workspace_config(path, **options)
+
+
+from tests.fixtures.support.code_plugins import prepare_config_fixture
+_fixture_native_load_project_workspace = load_project_workspace
+def load_project_workspace(path, **options):
+    prepare_config_fixture(path)
+    return _fixture_native_load_project_workspace(path, **options)
+
+_native_validation = validate_workspace_config_path
+def validate_workspace_config_path(config, **options):
+    prepare_config_fixture(config)
+    return _native_validation(config, **options)

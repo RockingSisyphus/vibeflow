@@ -31,16 +31,12 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "input",
         "type_used": "sandbox.value_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-
-
         "delta": 1,
         "id": "add",
         "type_used": "sandbox.add",
@@ -48,7 +44,6 @@
         "description": "Runs add."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.out_value_end",
         "display_name": "End",
@@ -77,5 +72,14 @@
       }
     ]
   },
-  "type_key": "math.add_one"
+  "type_key": "math.add_one",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

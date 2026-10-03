@@ -13,6 +13,7 @@ terminal start → input I/O → process / nodeset → output I/O → terminal e
 ## Main capabilities
 
 - Python Runtime and JavaScript/TypeScript AOT;
+- Python and JS/TS plugin SDKs for code-defined Nodes, Rules, Rulesets, and other resources explicitly selected by each workflow;
 - Nodes, Nodesets, Loops, Plugins, Capabilities, and explicit effect boundaries;
 - deterministic Architecture, Mermaid, ASCII, and SVG views;
 - config, contract, reachability, control-flow, quality, build, and execution-evidence checks;

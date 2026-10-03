@@ -38,8 +38,6 @@
       {
         "display_name": "Increment",
         "description": "Moves the nested retry value toward the target.",
-
-
         "step": 2,
         "id": "increment",
         "type_used": "semantic.increment_until"
@@ -47,8 +45,6 @@
       {
         "display_name": "Done Check",
         "description": "Checks whether loop.next has reached the nested retry target.",
-
-
         "target": 7,
         "id": "done",
         "type_used": "semantic.loop_done_value"
@@ -87,5 +83,14 @@
       }
     ]
   },
-  "type_key": "loop.retry_step"
+  "type_key": "loop.retry_step",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

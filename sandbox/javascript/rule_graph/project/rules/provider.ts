@@ -1,3 +1,4 @@
+import {defineRule} from "@vibeflow/plugin";
 import {appendFileSync} from "node:fs";
 
 export function check(context, inputs, params) {
@@ -14,3 +15,9 @@ export function check(context, inputs, params) {
 export function replacement(context, inputs, params) {
   return check(context, inputs, {...params, value:params.value+10});
 }
+
+export const resource_3Definition=defineRule({...{"id": "example.number_provider", "description": "Produce a typed list independently from audit findings.", "scope": "call", "params_schema": {"mode": {"type": "string", "enum": ["valid", "empty", "warning", "error", "missing", "wrong_type", "failed", "unavailable"]}, "value": {"type": "integer"}, "marker": {"type": "string"}, "source": {"type": "string"}}, "params_defaults": {"mode": "valid", "value": 3, "marker": "", "source": "rules/provider.ts"}, "outputs": {"numbers": "example.numbers.v1"}},check:check});
+
+export const resource_4Definition=defineRule({...{"id": "example.replacement_provider", "description": "Produce a typed list independently from audit findings.", "scope": "call", "params_schema": {"mode": {"type": "string", "enum": ["valid", "empty", "warning", "error", "missing", "wrong_type", "failed", "unavailable"]}, "value": {"type": "integer"}, "marker": {"type": "string"}, "source": {"type": "string"}}, "params_defaults": {"mode": "valid", "value": 3, "marker": "", "source": "rules/provider.ts"}, "outputs": {"numbers": "example.numbers.v1"}},check:replacement});
+
+export const resource_5Definition=defineRule({...{"id": "example.wrong_provider", "description": "Produce a typed list independently from audit findings.", "scope": "call", "params_schema": {"mode": {"type": "string", "enum": ["valid", "empty", "warning", "error", "missing", "wrong_type", "failed", "unavailable"]}, "value": {"type": "integer"}, "marker": {"type": "string"}, "source": {"type": "string"}}, "params_defaults": {"mode": "valid", "value": 3, "marker": "", "source": "rules/provider.ts"}, "outputs": {"numbers": "example.wrong.v1"}},check:replacement});

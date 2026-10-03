@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from vibeflow.core.rules.models import plain
+
 import argparse
 from dataclasses import replace
 import json
@@ -11,7 +13,7 @@ from typing import Mapping
 from vibeflow.core.rules import RuleGraphError, compile_ruleset
 from vibeflow.core.rules.builtin import builtin_rule_resources
 from vibeflow.tooling.project.config_loader import load_config_document, load_workspace_config_document
-from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
+from vibeflow.tooling.project.descriptor_loader import load_workflow_plugins
 from vibeflow.tooling.project.workspace_loader import find_project_config, load_project_workspace, load_workspace_config
 
 
@@ -23,7 +25,9 @@ def effective_rule_plans(config: Path, *, workspace=None, node_path: str = "", p
         raise ValueError(f"workflow has no owning project: {config}")
     if owner is None:
         owner = load_project_workspace(project_config).roots[0]
-    catalogs = load_project_descriptor_catalogs(project_config.parent, project_config=project_config)
+    active_workspace = workspace or load_project_workspace(project_config)
+    loaded = load_workflow_plugins(active_workspace, config)
+    catalogs = loaded.catalogs
     builtin_rules, builtin_sets = builtin_rule_resources()
     rules = {item.id: item for item in builtin_rules}
     rulesets = {item.id: item for item in builtin_sets}
@@ -31,17 +35,7 @@ def effective_rule_plans(config: Path, *, workspace=None, node_path: str = "", p
     _merge_definitions(rulesets, catalogs.rulesets, "Ruleset")
     if owner.project_target == "python":
         from vibeflow.tooling.application.python.rule_defaults import declared_rule_resources
-        active_workspace = workspace or load_project_workspace(project_config)
-        registry, rules, rulesets = declared_rule_resources(active_workspace)
-        for key in registry.available():
-            if catalogs.nodes.get(key) is None:
-                catalogs.nodes.register(registry.descriptor(key), source=registry.source_info(key).path)
-        for registered in registry.rule_catalogs:
-            for kind in ("base_libs", "plugins", "host_extensions"):
-                destination, source = getattr(catalogs,kind), getattr(registered,kind)
-                for descriptor in source:
-                    if destination.get(descriptor.id) is None:
-                        destination.register(descriptor,source=source.source_for(descriptor.id))
+        registry, rules, rulesets = declared_rule_resources(active_workspace, config, loaded_plugins=loaded)
     defaults = _project_rule_defaults(owner, document=document, workspace=workspace)
     for rule_id, params in defaults.items():
         rule = rules[rule_id]
@@ -65,6 +59,7 @@ def effective_rule_plans(config: Path, *, workspace=None, node_path: str = "", p
             plans.append(compile_ruleset(rulesets[selected], rules=rules, rulesets=rulesets, entrypoint=phase).to_dict())
         output.append({"call": path, "type_key": type_key,
                        "selection_source": "node",
+                       "origin": catalogs.origins[("nodes",type_key)].to_dict(),
                        "rulesets": list(selection), "constraint_state": "selected" if selection else "unconstrained", "plans": plans})
     reached_libraries = set()
     if owner.project_target == "python":
@@ -88,14 +83,15 @@ def effective_rule_plans(config: Path, *, workspace=None, node_path: str = "", p
         scopes.append({"call": owner, "rulesets": list(selection), "plans": plans,
                        "constraint_state": "selected" if selection else "unconstrained"})
     return {"config": str(config.resolve()), "phase": phase, "workflow": workflow, "scopes": scopes, "nodes": output,
-            "resources":resources, "project_rule_defaults": defaults}
+            "resources":resources, "project_rule_defaults": defaults,
+            "plugins":plain(catalogs.plugin_records)}
 
 
 def _resource_plans(catalogs, *, calls, data, project, rules, rulesets, phase, reached_libraries):
     def ids(values):
         return {value if isinstance(value,str) else value.get("id") for value in values
                 if isinstance(value,str) or isinstance(value,Mapping) and value.get("enabled",True) is not False}
-    selected = {"base_lib":set(reached_libraries), "plugin":ids(data.get("plugins",())),
+    selected = {"base_lib":set(reached_libraries), "plugin":ids(catalogs.lifecycle_selections),
                 "host_extension":ids(data.get("host_extensions",project.get("javascript",{}).get("host_extensions",())))}
     for _, call in calls:
         descriptor = catalogs.nodes.get(call.get("type_used", ""))

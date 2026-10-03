@@ -34,8 +34,8 @@ from vibeflow.core.descriptors.models import (
     SourceLocator,
 )
 from vibeflow.core.descriptors._resource_models import PLUGIN_TYPES
-from vibeflow.core.descriptors.bundles import ContributionBundle
-from vibeflow.core.descriptors.catalogs import BundleCatalog, RuleCatalog, RulesetCatalog
+from vibeflow.core.descriptors.catalogs import RuleCatalog, RulesetCatalog
+from vibeflow.core.descriptors.contributions import ContributionBuilder, PluginContributions, ResourceOrigin, compose_contributions
 from vibeflow.core.descriptors.plugin_selection import (
     PluginResolution,
     PluginReviewRecord,
@@ -47,8 +47,7 @@ from vibeflow.core.descriptors.plugin_selection import (
 )
 
 __all__ = [
-    "ContributionBundle",
-    "BundleCatalog",
+    "ContributionBuilder", "PluginContributions", "ResourceOrigin", "compose_contributions",
     "RuleCatalog", "RulesetCatalog",
     "IMPLEMENTATION_COMPLETIONS",
     "IMPLEMENTATION_LANGUAGES",

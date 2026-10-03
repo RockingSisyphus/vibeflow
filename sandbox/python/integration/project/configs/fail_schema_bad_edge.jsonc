@@ -2,7 +2,6 @@
   "pipeline": {
     "nodes": [
       {
-
         "id": "seed",
         "type_used": "sandbox.constant",
         "display_name": "Seed",
@@ -14,5 +13,14 @@
         "seed"
       ]
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

@@ -1,5 +1,5 @@
 export const VIBEFLOW_WORKFLOW_ABI = "vibeflow.workflow.v4";
-export const VIBEFLOW_PLUGIN_ABI = "vibeflow.plugin.v2";
+export const VIBEFLOW_PLUGIN_ABI = "vibeflow.plugin.v3";
 
 export class VibeFlowWorkflowError extends Error {
   constructor(code, message, details = {}) {

@@ -37,7 +37,7 @@
         "type_used": "sandbox.loop_increment",
         "display_name": "Increment",
         "description": "Adds one to the carry value."
-              },
+      },
       {
         "id": "end",
         "type_used": "sandbox.terminal",
@@ -46,8 +46,14 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "increment"},
-      {"from": "increment", "to": "end"}
+      {
+        "from": "start",
+        "to": "increment"
+      },
+      {
+        "from": "increment",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -57,5 +63,14 @@
         "as": "next"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

@@ -39,7 +39,7 @@
         "description": "Resolves the nested business result.",
         "async": "result_key",
         "result_key": "doubled"
-              },
+      },
       {
         "id": "audit",
         "type_used": "sandbox.detached_audit",
@@ -58,9 +58,18 @@
       }
     ],
     "edges": [
-      {"from": "start", "to": "double"},
-      {"from": "start", "to": "audit"},
-      {"from": "double", "to": "end"}
+      {
+        "from": "start",
+        "to": "double"
+      },
+      {
+        "from": "start",
+        "to": "audit"
+      },
+      {
+        "from": "double",
+        "to": "end"
+      }
     ],
     "outputs": [
       {
@@ -70,5 +79,14 @@
         "as": "doubled"
       }
     ]
-  }
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
 }

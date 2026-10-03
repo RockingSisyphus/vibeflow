@@ -98,14 +98,15 @@ def _resource_case(rows, work, target, label, group, value, toolchain):
     for entry in ("review-rules", "validate"):
         marker.unlink(missing_ok=True)
         observed = cli(project, entry, name=label + "-" + entry)
-        located = str(resource) in json.dumps(observed["payload"], ensure_ascii=False) or str(resource) in observed["message"]
+        declaration_source = project / ("code_plugin.py" if target == "python" else "code_plugin.ts")
+        located = str(declaration_source) in json.dumps(observed["payload"], ensure_ascii=False) or str(declaration_source) in observed["message"]
         observed["metrics"].update(handler_called=marker.exists(), resource_located=located)
         metrics = {"exit_code": 0 if valid else 1, "json_output": True,
                    "handler_called": valid and entry == "validate"}
         expected = {"should_accept": valid, "metrics": metrics}
         if not valid:
             code = "DESCRIPTOR.INVALID"
-            expected.update(codes=[code], message_contains=("node_category" if group == "category" else group if group == "node" else "outputs" if group == "output" else "inputs"))
+            expected.update(codes=[code], message_contains=("category" if group == "category" else group if group == "node" else "outputs" if group == "output" else "inputs"))
             expected["metrics"]["resource_located"] = True
         rows.append(row(f"tooling.gaps.{target}.{label}.{entry}", "Declared " + group + " type via " + entry,
                         "declaration_contract", observed, expected))
@@ -118,10 +119,33 @@ def _sibling_project(work, toolchain, *, conflict=False):
         data = _read(path)
         data["type_key"] = "sibling." + data["type_key"]
         write(path, data)
+    for folder in ("manifests/data", "manifests/data_schemas"):
+        for path in (sibling / folder).glob("*.jsonc"):
+            path.unlink()
+    for path in (sibling / "bundle").rglob("*.jsonc"):
+        data = _read(path)
+        if data.get("kind") == "base_lib":
+            data["id"] = "sibling." + data["id"]
+            write(path,data)
+        elif data.get("kind") == "node" and data.get("base_libs"):
+            data["base_libs"] = ["sibling."+value for value in data["base_libs"]]
+            write(path,data)
     config = project / "configs/model.jsonc"
     graph = _read(config)
     graph["pipeline"]["nodes"][1]["type_used"] = "sibling.example.model"
     write(config, graph)
+    # The sibling Node must select one shared, explicitly enabled definition.
+    # The non-conflict case contributes only sibling Nodes/helpers, referencing
+    # main's rules. The conflict case intentionally contributes both definitions.
+    if not conflict:
+        for folder in ("rules", "rulesets"):
+            for file in (sibling / "bundle" / folder).glob("*.jsonc"):
+                file.unlink()
+        bundle_path = sibling / "bundles/domain.jsonc"
+        bundle = _read(bundle_path)
+        bundle["resources"]["rules"] = []
+        bundle["resources"]["rulesets"] = []
+        write(bundle_path, bundle)
     if conflict:
         path = sibling / "bundle/rules/model-definition.jsonc"
         data = _read(path)
@@ -152,7 +176,7 @@ def _workspace_cases(rows, work, toolchain):
             expected = {"should_accept": not conflict, "metrics": {"exit_code": int(conflict), "json_output": True}}
             if conflict:
                 observed["metrics"]["both_origins"] = all(str(path) in json.dumps(observed["payload"]) for path in
-                    (project / "bundle/rules/model-definition.jsonc", sibling / "bundle/rules/model-definition.jsonc"))
+                    (project / "code_plugin.py", sibling / "code_plugin.py"))
                 expected["metrics"]["both_origins"] = True
                 expected["message_contains"] = "conflict"
                 if entry == "validate":

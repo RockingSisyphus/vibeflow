@@ -1,7 +1,7 @@
 """Small real projects for the JavaScript public Rule/API gap sandbox.
 
 Only standard-library modules are imported before the isolated runner chooses
-the kernel. Projects contain ordinary JSONC resources and TS/JS implementations.
+the kernel. Frozen mutation inputs are converted into fixed SDK plugins.
 """
 from __future__ import annotations
 
@@ -63,6 +63,8 @@ def new_project(work_root: Path, name: str, toolchain_root: Path | None) -> Proj
     root = work_root / name
     shutil.copytree(ROOT / "sandbox/javascript/rule_graph", root,
                     ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc", ".artifacts", "dist", "runs"))
+    import runpy
+    runpy.run_path(str(ROOT / "tests/fixtures/support/code_plugins.py"))["copy_archival_inputs"](ROOT / "sandbox/javascript/rule_graph", root)
     result = Project(root)
     toolchain = Path(toolchain_root or os.environ.get("VIBEFLOW_TEST_TOOLCHAIN_ROOT", ROOT / "sandbox/javascript/minimal/project"))
     if not (toolchain / "node_modules/typescript").is_dir():
@@ -144,6 +146,8 @@ def actual(payload: dict[str, Any], *, exit_code: int) -> dict[str, Any]:
 
 
 def command(project: Project, name: str, *options: str, label: str | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+    import runpy
+    runpy.run_path(str(ROOT / "tests/fixtures/support/code_plugins.py"))["migrate_fixture"](project.project)
     from vibeflow.tooling.application.cli import main
     output, errors = StringIO(), StringIO()
     try:
@@ -254,7 +258,7 @@ export function calculate(inputs, params, context) {
 }
 ''')
     (project.project / "plugins/runtime.ts").write_text('''export function createPlugin(context) {
-  if(context.abiVersion!=="vibeflow.plugin.v2") throw new Error("Wrong Plugin ABI");
+  if(context.abiVersion!=="vibeflow.plugin.v3") throw new Error("Wrong Plugin ABI");
   const events=(globalThis as unknown as {__gapEvents:string[]}).__gapEvents;
   events.push("plugin:create");
   return {beforeRun(){events.push("plugin:beforeRun");},afterRun(){events.push("plugin:afterRun");},
@@ -294,10 +298,10 @@ export function calculate(inputs, params, context) {
 
 
 def loaded_native_groups(project: Project) -> dict[str, Any]:
-    from vibeflow.tooling.project.descriptor_loader import load_project_descriptor_catalogs
-    catalogs = load_project_descriptor_catalogs(project.project)
+    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+    catalogs = load_workflow_catalogs(project.project,workflow_config=project.config)
     checks = {"base_lib":catalogs.base_libs.get("gaps.helper"), "data_schemas":catalogs.schemas.get("example.input"),
               "capabilities":catalogs.capabilities.get("gaps.math"), "host_extensions":catalogs.host_extensions.get("gaps.host"),
               "plugins":catalogs.plugins.get("gaps.runtime")}
     return {"native_groups_loaded":all(checks.values()),
-            "bundle_only":set(read_json(project.project / "vibeflow_project.jsonc")["descriptors"])=={"bundles"}}
+            "bundle_only":"descriptors" not in read_json(project.project / "vibeflow_project.jsonc") and any(item.get("source",{}).get("ref")=="code_plugin.ts" for item in read_json(project.config).get("plugins",[]))}

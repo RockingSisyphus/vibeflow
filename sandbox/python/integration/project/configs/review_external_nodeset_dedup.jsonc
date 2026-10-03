@@ -237,5 +237,14 @@
     {
       "path": "nodesets/review_external_nodeset_dedup/visual_reusable_worker.jsonc"
     }
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
   ]
 }

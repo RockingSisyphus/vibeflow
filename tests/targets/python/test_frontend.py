@@ -57,12 +57,13 @@ def test_core_descriptor_identity_and_file_provenance_boundary() -> None:
         NodeDescriptor as CoreNodeDescriptor,
     )
     from vibeflow.core.descriptors.models import NodeDescriptor
-    from vibeflow.tooling.project.descriptor_catalogs import DescriptorCatalogs
+    from vibeflow.core.descriptors.catalogs import DescriptorCatalogs
 
     assert NodeDescriptor is CoreNodeDescriptor
     assert CoreNodeDescriptor.__module__ == "vibeflow.core.descriptors.models"
     assert issubclass(DescriptorCatalogs, CoreDescriptorCatalogs)
-    assert "source_files" not in CoreDescriptorCatalogs.__dataclass_fields__
+    # Core carries portable source identities, never filesystem readers.
+    assert "source_files" in CoreDescriptorCatalogs.__dataclass_fields__
     catalogs = DescriptorCatalogs.empty()
     assert isinstance(catalogs.nodes, CoreNodeCatalog)
     assert catalogs.source_files == ()

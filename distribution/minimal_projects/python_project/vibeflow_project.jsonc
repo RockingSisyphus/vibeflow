@@ -13,10 +13,5 @@
         "document": "ARCHITECTURE.jsonc"
       }
     ]
-  },
-  "descriptors": {
-    "nodes": [
-      "manifests/nodes"
-    ]
   }
 }

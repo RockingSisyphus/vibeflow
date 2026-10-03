@@ -43,10 +43,16 @@ class PythonSourceAnalysis:
             source = context.require("base_lib_file")
             if source.tree is None:
                 return None
-            key = ("base_lib", source.path, source.text)
+            name = context.facts.get("resource_symbol", "")
+            tree = context.require("source_context").implementation_tree(source.path, name)
+            if tree is None:
+                return None
+            symbol = context.require("source_context").symbol(source.path, name) if name else None
+            text = "\n".join(source.text.splitlines()[symbol.line-1:symbol.end_line]) if symbol else source.text
+            key = ("base_lib", source.path, source.text, name)
             if key not in self._cache:
-                metrics, counter = measure_tree(source.tree, source.text)
-                self._cache[key] = SourceMeasurements(metrics, source.path, 1,
+                metrics, counter = measure_tree(tree, text)
+                self._cache[key] = SourceMeasurements(metrics, source.path, symbol.line if symbol else 1,
                     function_names=tuple(counter.function_names), fingerprint=counter.run_pure_fingerprint,
                     shape=counter.run_pure_shape)
             return self._cache[key]

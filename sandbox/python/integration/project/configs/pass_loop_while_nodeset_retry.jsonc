@@ -77,7 +77,6 @@
       {
         "display_name": "End",
         "description": "Ends after the while loop produces loop.next.",
-
         "id": "end",
         "type_used": "semantic.loop_end"
       }
@@ -113,6 +112,15 @@
   "nodeset_imports": [
     {
       "path": "nodesets/pass_loop_while_nodeset_retry/loop_retry_step.jsonc"
+    }
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
     }
   ]
 }

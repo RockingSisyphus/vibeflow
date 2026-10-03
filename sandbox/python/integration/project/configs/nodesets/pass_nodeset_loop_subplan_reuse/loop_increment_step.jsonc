@@ -33,23 +33,18 @@
       {
         "display_name": "Input",
         "description": "Reads the current loop value.",
-
-
         "id": "input",
         "type_used": "sandbox.value_input"
       },
       {
         "display_name": "Increment",
         "description": "Increments the current loop value by one.",
-
-
         "id": "increment",
         "type_used": "sandbox.increment"
       },
       {
         "display_name": "End",
         "description": "Ends after value.next is produced.",
-
         "id": "end",
         "type_used": "sandbox.next_value_end"
       }
@@ -76,5 +71,14 @@
       }
     ]
   },
-  "type_key": "loop.increment_step"
+  "type_key": "loop.increment_step",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
 }

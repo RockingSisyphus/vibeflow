@@ -10,7 +10,6 @@
       {
         "display_name": "Seed",
         "description": "Creates initial outer and total values for nested loop accumulation.",
-
         "outer_start": 0,
         "total_start": 0,
         "id": "seed",
@@ -161,6 +160,15 @@
     },
     {
       "path": "nodesets/pass_loop_nested_outer_after_inner_when_accumulate/loop_outer_accumulate_body.jsonc"
+    }
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
     }
   ]
 }

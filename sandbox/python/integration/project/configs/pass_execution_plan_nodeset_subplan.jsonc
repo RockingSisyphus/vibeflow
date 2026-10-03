@@ -15,16 +15,12 @@
         "description": "Runs start."
       },
       {
-
-
         "id": "input",
         "type_used": "sandbox.value_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
-
-
         "node_configs": {
           "add": {
             "delta": 8
@@ -36,7 +32,6 @@
         "description": "Runs add_one."
       },
       {
-
         "id": "end",
         "type_used": "sandbox.out_value_end",
         "display_name": "End",
@@ -68,6 +63,15 @@
   "nodeset_imports": [
     {
       "path": "nodesets/pass_execution_plan_nodeset_subplan/math_add_one.jsonc"
+    }
+  ],
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
     }
   ]
 }

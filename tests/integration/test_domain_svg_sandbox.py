@@ -1,4 +1,4 @@
-"""Real formal SVG publication for category, Node, status and call styles."""
+"""Real formal SVG publication for Node, status and call styles."""
 from __future__ import annotations
 
 import json
@@ -27,6 +27,8 @@ def svg_project(request, tmp_path):
     target = request.param
     example = tmp_path / target
     shutil.copytree(ROOT / "sandbox" / target / "domain_rules", example)
+    from tests.fixtures.support.code_plugins import copy_archival_inputs
+    copy_archival_inputs(ROOT / "sandbox" / target / "domain_rules", example)
     project = example / "project"
     if target == "javascript":
         toolchain = Path(os.environ["VIBEFLOW_TEST_TOOLCHAIN_ROOT"])
@@ -104,6 +106,10 @@ def test_formal_domain_svg_preserves_effective_styles_and_native_identity(svg_pr
             node.update(status="planned", flow_kind="process", planned_behavior="transparent",
                 requires=declaration["contract"]["requires"], provides=declaration["contract"]["provides"])
     _edit(project / "configs/model.jsonc", calls)
+    # Historical mutation data is explicitly published as fixed SDK resources.
+    # The production command never reads these JSONC declaration inputs.
+    from tests.fixtures.support.code_plugins import migrate_fixture
+    migrate_fixture(project)
     output = tmp_path / "domain.svg"
     code = main(["review", "--workspace", str(workspace), "--config", str(project / "configs/model.jsonc"),
         "--output", str(output)])
@@ -147,6 +153,8 @@ def test_review_rules_renders_real_svg_without_importing_implementations(svg_pro
     node_file.write_text("raise RuntimeError('must not import')\n" if target == "python" else "throw new Error('must not import');\n")
     rule_file = project / ("rules/model_definition.py" if target == "python" else "rules/model_definition.ts")
     rule_file.write_text("raise RuntimeError('must not import')\n" if target == "python" else "throw new Error('must not import');\n")
+    from tests.fixtures.support.code_plugins import migrate_fixture
+    migrate_fixture(project)
     output = tmp_path / "rules.svg"
     assert main(["review-rules", "--workspace", str(workspace), "--config", str(project / "configs/model.jsonc"),
         "--node", "model", "--output", str(output)]) == 0, capsys.readouterr().out
