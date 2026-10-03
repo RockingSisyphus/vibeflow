@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.invalid.runtime_import",
   "display_name": "Invalid runtime import",
-  "category": "sandbox-negative",
   "description": "Intentionally imports an unregistered local runtime helper.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -49,5 +51,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox-negative"
+  ]
 }

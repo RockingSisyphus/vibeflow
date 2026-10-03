@@ -42,7 +42,7 @@ def check(context, inputs, params):
     rule = {"kind":"rule", "id":"test.domain.import", "params_schema":{"state":{"type":"string"},
         "error":{"type":"boolean"}, "needs_compiled":{"type":"boolean"}},
         "params_defaults":{"state":state,"error":error,"needs_compiled":needs_compiled},
-        "implementations":[{"language":"python","targets":["python"],"source":{"kind":"file","ref":"domain.py","export":"check"}}]}
+        "implementations":[{"language":"python","source":{"kind":"file","ref":"domain.py","export":"check"}}]}
     (root / "manifests/rules/domain.jsonc").write_text(json.dumps(rule))
     selection = {"kind":"ruleset", "id":"test.before_bind", "calls":[
         {"id":"files","rule_id":"vibeflow.quality.files","params":{"warn_file_lines":1000}},
@@ -57,7 +57,7 @@ def check(context, inputs, params):
         child = {"type_key":"test.stage", "display_name":"Stage", "description":"The actual child scope.",
             "rulesets":[selection["id"]], "requires":[], "provides":[], "pipeline":{"nodes":[leaf]}}
         (root / "stage.jsonc").write_text(json.dumps(child))
-        unused = {**child,"type_key":"test.unused","rulesets":["not.registered"]}
+        unused = {**child,"type_key":"test.unused","rulesets":[]}
         (root / "unused.jsonc").write_text(json.dumps(unused))
         data["nodeset_imports"] = ["stage.jsonc","unused.jsonc"]
         call = {"id":"stage", "type_used":"test.stage", "display_name":"Stage", "description":"Call the child."}

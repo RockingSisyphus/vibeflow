@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.io_input",
   "display_name": "读取外部结果输入",
-  "category": "sandbox",
   "description": "在流程中读取外部系统已经准备好的 io.result，用来验证边界被移除后 IO 节点如何承接外部数据。",
   "version": "0.1.0",
   "flow_kind": "io",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

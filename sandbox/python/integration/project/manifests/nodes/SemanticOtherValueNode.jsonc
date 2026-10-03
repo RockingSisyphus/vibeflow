@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.other_value",
   "display_name": "Semantic Other Value",
-  "category": "semantic",
   "description": "Produces other.in for explicit all-join tests.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [],

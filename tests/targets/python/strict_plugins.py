@@ -72,7 +72,7 @@ def _review_title_positions(svg_text: str) -> dict[str, tuple[float, float]]:
 SinkNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.sink",
         display_name="Sink",
-        category="test",
+
         description="Consumes a value.",
         version="0.1.0",
         flow_kind="process",
@@ -161,7 +161,7 @@ def test_plugin_registry_priority_scope_and_conflict_strategy() -> None:
             "priority": 10,
             "scope": "nodeset",
             "source": "manual",
-            "effect_scope": "trusted",
+            "rulesets": [],
         }
     ]
 

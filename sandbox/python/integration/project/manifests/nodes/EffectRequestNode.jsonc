@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.effect_request",
   "display_name": "Effect Request",
-  "category": "sandbox",
   "description": "Expresses an external effect request as data.",
   "version": "0.1.0",
   "flow_kind": "data_store",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [],

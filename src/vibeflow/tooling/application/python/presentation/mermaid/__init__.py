@@ -1,5 +1,5 @@
 from __future__ import annotations
-from vibeflow.tooling.presentation.node_presentation import registry_descriptor, registry_category, resolve_presentation
+from vibeflow.tooling.presentation.node_presentation import registry_descriptor, resolve_presentation
 
 import textwrap
 from typing import TYPE_CHECKING
@@ -471,7 +471,7 @@ class _MermaidRenderer:
 
     def _presentation(self, node: NodeSpec, node_id: str, *, native_class: str, status_class: str, flow_kind: str):
         descriptor = registry_descriptor(self.registry, node.type_used)
-        return resolve_presentation(descriptor, registry_category(self.registry, descriptor), native_class=native_class, status_class=status_class if status_class in {"healthError", "healthWarning", "plannedNode"} else "", call_style=node.style, flow_kind=flow_kind)
+        return resolve_presentation(descriptor, native_class=native_class, status_class=status_class if status_class in {"healthError", "healthWarning", "plannedNode"} else "", call_style=node.style, flow_kind=flow_kind)
 
     def _node_is_external(self, node: NodeSpec) -> bool:
         return node_is_external(node, self.registry)
@@ -504,14 +504,15 @@ class _MermaidRenderer:
     ) -> str:
         sections: list[list[str]] = [[self._node_title(node, is_external=is_external)], [f"id: {node.id}", f"type_used: {node.type_used}"]]
         descriptor = registry_descriptor(self.registry, node.type_used)
-        category = registry_category(self.registry, descriptor)
-        presentation = resolve_presentation(descriptor, category, call_style=node.style)
+        presentation = resolve_presentation(descriptor, call_style=node.style)
         icon = presentation.values.get("icon", "")
         if icon:
             sections[0][0] = f"{icon} {sections[0][0]}"
         if descriptor is not None:
             selections = self.registry.rulesets(node.type_used)
-            sections.append([f"category: {descriptor.category}", f"rulesets: {', '.join(selections) or 'unconstrained'}"])
+            sections.append([f"rulesets: {', '.join(selections) or 'unconstrained'}"])
+            if descriptor.tags:
+                sections.append([f"tags: {', '.join(descriptor.tags)}"])
         source_lines = _source_lines(graph.root_id, graph.root_path, graph.source_path)
         if source_lines:
             sections.append([_section_label("source"), *source_lines])
@@ -670,7 +671,6 @@ class _MermaidRenderer:
             info = registry_descriptor(self.registry, node.type_used)
             if info is not None and not lines:
                 for label, value in (
-                    ("category", getattr(info, "category", "")),
                     ("version", getattr(info, "version", "")),
                     ("desc", getattr(info, "description", "")),
                 ):

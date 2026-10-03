@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.outer_advance",
   "display_name": "Semantic Outer Advance",
-  "category": "semantic",
   "description": "Passes the inner-loop total out, advances the outer counter, and emits the outer bool stop signal.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

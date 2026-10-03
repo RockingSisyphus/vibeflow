@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.delegate_argv",
   "display_name": "解析受让的 CLI 参数",
-  "category": "sandbox",
   "description": "使用普通 argparse 解析 VibeFlow 原样注入的 cli.argv。",
   "version": "0.1.0",
   "flow_kind": "io",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

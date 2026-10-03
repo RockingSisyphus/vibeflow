@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.fanout_add",
   "display_name": "Fanout add",
-  "category": "sandbox",
   "description": "Adds one on the fanout's upper branch.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -51,5 +53,8 @@
   "base_libs": [
     "sandbox.math"
   ],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox"
+  ]
 }

@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.runtime_failure",
   "display_name": "Runtime failure fixture",
-  "category": "sandbox",
   "description": "Produces a controlled node exception or invalid runtime output.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -59,5 +61,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox"
+  ]
 }

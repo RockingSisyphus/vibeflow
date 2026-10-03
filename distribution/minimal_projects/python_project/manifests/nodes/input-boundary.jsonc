@@ -5,7 +5,6 @@
   ],
   "type_key": "minimal.input_boundary",
   "display_name": "Input boundary",
-  "category": "boundary",
   "description": "Adapts the public request into the workflow's internal payload.",
   "version": "0.15.0",
   "flow_kind": "io",
@@ -52,5 +51,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "boundary"
+  ]
 }

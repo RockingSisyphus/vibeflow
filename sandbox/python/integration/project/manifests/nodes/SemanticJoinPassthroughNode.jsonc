@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.join_passthrough",
   "display_name": "Semantic Join Passthrough",
-  "category": "semantic",
   "description": "Consumes one value.in envelope and emits value.out without changing the selected branch value.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

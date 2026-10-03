@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.compare_gt",
   "display_name": "Semantic Compare Greater Than",
-  "category": "semantic",
   "description": "Compares calc.c and calc.d and emits route.branch for left or right branch selection.",
   "version": "0.1.0",
   "flow_kind": "decision",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

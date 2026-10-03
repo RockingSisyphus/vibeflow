@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.invalid.node_builtin_browser",
   "display_name": "Invalid browser Node builtin",
-  "category": "sandbox-negative",
   "description": "Intentionally imports node:fs for a browser target.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -48,5 +50,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox-negative"
+  ]
 }

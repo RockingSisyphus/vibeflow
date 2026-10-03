@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.value_input",
   "display_name": "读取数值输入",
-  "category": "sandbox",
   "description": "在流程内部读取由运行初始上下文提供的 value.in；该节点用于表达标准流程图中的输入动作，而不是程序开始节点。",
   "version": "0.1.0",
   "flow_kind": "io",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

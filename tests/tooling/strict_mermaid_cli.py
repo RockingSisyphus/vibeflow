@@ -609,7 +609,8 @@ def test_example_outputs_field_is_removed(tmp_path, capsys) -> None:
     declaration["contract"]["examples"][0]["outputs"] = {"demo.out": 1}
     code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(), descriptor=declaration)
     assert code == 1
-    assert payload["health"]["status"] == "ERROR"
+    assert payload["health"]["status"] == "FAIL"
+    assert payload["health"]["errors"][0]["code"] == "NODE.PURITY.EXAMPLE_OUTPUTS_REMOVED"
     assert "outputs" in payload["health"]["errors"][0]["message"]
 
 

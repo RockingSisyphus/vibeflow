@@ -22,7 +22,6 @@ def project_descriptor_paths(
             {"path": str(path)},
         )
     allowed = {
-        "categories",
         "nodes",
         "rules",
         "rulesets",

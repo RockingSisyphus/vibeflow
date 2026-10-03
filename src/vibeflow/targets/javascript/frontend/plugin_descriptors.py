@@ -128,6 +128,7 @@ def parse_javascript_plugin_descriptor(
             "category",
             "description",
             "version",
+            "rulesets",
         },
         field="plugin",
     )
@@ -184,6 +185,7 @@ def parse_javascript_plugin_descriptor(
             category=_optional_string(data.get("category")),
             description=_optional_string(data.get("description")),
             version=_optional_string(data.get("version")),
+            rulesets=_string_tuple(data.get("rulesets", ()), field="plugin.rulesets"),
         )
     except JavascriptPluginError:
         raise

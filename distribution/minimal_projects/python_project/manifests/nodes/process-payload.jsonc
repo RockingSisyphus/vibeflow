@@ -5,7 +5,6 @@
   ],
   "type_key": "minimal.process_payload",
   "display_name": "Process payload",
-  "category": "business",
   "description": "Contains the project-specific business transformation.",
   "version": "0.15.0",
   "flow_kind": "process",
@@ -52,5 +51,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "business"
+  ]
 }

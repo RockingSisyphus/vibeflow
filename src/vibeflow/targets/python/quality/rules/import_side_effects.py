@@ -9,7 +9,14 @@ from vibeflow.targets.python.quality.rules.helpers import finding, source_subjec
 def import_side_effects(context, inputs, params):
     sources = context.require("source_context")
     findings = []
-    for source in sources.files:
+    if context.subject.get("type_key"):
+        _, node, _ = source_subject(context)
+        files = sources.import_closure(node.path)
+    elif context.facts.get("base_lib_file") is not None:
+        files = sources.import_closure(context.require("base_lib_file").path)
+    else:
+        files = sources.files
+    for source in files:
         if source.tree is None:
             findings.append(finding(context, "QUALITY.SYNTAX.PYTHON", source.parse_error, path=source.path))
             continue
@@ -27,10 +34,41 @@ class _ImportExecutionVisitor(ast.NodeVisitor):
         self.violations = []
         self.allow_mutable_state = allow_mutable_state
         self.classes = {item.name:item for item in (tree.body if tree else ()) if isinstance(item,ast.ClassDef)}
+        self.bindings = {name: "builtins." + name for name in ("staticmethod", "classmethod", "property")}
+        self.module_bindings = dict(self.bindings)
+        self._collect_bindings(tree.body if tree else (), self.module_bindings)
+        self.bindings = dict(self.module_bindings)
+
+    @staticmethod
+    def _collect_bindings(body, bindings):
+        for statement in body:
+            if isinstance(statement, ast.Import):
+                for alias in statement.names:
+                    bindings[alias.asname or alias.name.split(".")[0]] = alias.name
+            elif isinstance(statement, ast.ImportFrom):
+                for alias in statement.names:
+                    bindings[alias.asname or alias.name] = (statement.module or "") + "." + alias.name if not statement.level else ""
+            elif isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                bindings[statement.name] = ""
+            elif isinstance(statement, (ast.Assign, ast.AnnAssign)):
+                targets = statement.targets if isinstance(statement, ast.Assign) else (statement.target,)
+                for target in targets:
+                    for item in ast.walk(target):
+                        if isinstance(item, ast.Name):
+                            bindings[item.id] = ""
+
+    def _builtin_decorator(self, expression):
+        if isinstance(expression, ast.Name):
+            name = self.bindings.get(expression.id, "")
+        elif isinstance(expression, ast.Attribute) and isinstance(expression.value, ast.Name):
+            name = self.bindings.get(expression.value.id, "") + "." + expression.attr
+        else:
+            name = ""
+        return name in {"builtins.staticmethod", "builtins.classmethod", "builtins.property"}
 
     def _decorators(self, node):
         for expression in node.decorator_list:
-            if not (isinstance(expression,ast.Name) and expression.id in {"staticmethod","classmethod"}):
+            if not self._builtin_decorator(expression):
                 self.violations.append((expression, "a decorator executes code while importing source"))
 
     def visit_FunctionDef(self, node):
@@ -51,8 +89,14 @@ class _ImportExecutionVisitor(ast.NodeVisitor):
                 self.violations.append((keyword.value,"a custom metaclass executes code while importing source"))
         for expression in (*node.bases, *(item.value for item in node.keywords)):
             self.visit(expression)
-        for statement in node.body:
-            self.visit(statement)
+        previous = self.bindings
+        self.bindings = dict(self.module_bindings)
+        self._collect_bindings(node.body, self.bindings)
+        try:
+            for statement in node.body:
+                self.visit(statement)
+        finally:
+            self.bindings = previous
 
     def visit_Call(self, node):
         self.violations.append((node, "a call executed while importing source must be removed or covered by a replacement import rule"))
@@ -70,6 +114,12 @@ class _ImportExecutionVisitor(ast.NodeVisitor):
 
     visit_AsyncFor = visit_For
     visit_While = visit_For
+
+    def visit_Try(self, node):
+        self.violations.append((node, "import-time try control flow is not allowed by the selected import rule"))
+
+    visit_TryStar = visit_Try
+    visit_Match = visit_Try
 
     def visit_If(self, node):
         # TYPE_CHECKING is a static annotation convention, not an execution branch.

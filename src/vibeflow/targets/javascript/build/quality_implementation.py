@@ -108,6 +108,7 @@ def evaluate_registered_facts(
     *,
     project_root: Path,
     policy_data: Mapping[str, Any],
+    topic: str = "all",
 ) -> tuple[HealthFinding, ...]:
     """Apply the shared Core rules to one already extracted Program result."""
 
@@ -176,12 +177,12 @@ def evaluate_registered_facts(
                 "contract_key_count": (len(contract.requires) + len(contract.provides)) if contract is not None else 0,
             },
         )
-        evaluated = (
-            evaluate_node_implementation(metrics, limits)
-            if kind == "node"
-            else evaluate_base_lib_implementation(metrics, limits)
-        )
-        if kind == "node":
+        evaluated = ()
+        if kind == "node" and topic in {"all", "node"}:
+            evaluated = evaluate_node_implementation(metrics, limits)
+        elif kind == "base_lib" and topic in {"all", "base_lib"}:
+            evaluated = evaluate_base_lib_implementation(metrics, limits)
+        if kind == "node" and topic in {"all", "dependency_chain"}:
             starts: set[str] = set()
             visited = {relative}
             pending = [relative]

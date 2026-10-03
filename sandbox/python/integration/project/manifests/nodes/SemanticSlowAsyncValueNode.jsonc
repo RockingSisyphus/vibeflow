@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.slow_async_value",
   "display_name": "Semantic Slow Async Value",
-  "category": "semantic",
   "description": "Produces a value used to prove inactive result-key async consumers are not joined.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [],

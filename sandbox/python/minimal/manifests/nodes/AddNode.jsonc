@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "example.add",
   "display_name": "Add",
-  "category": "example",
   "description": "Adds a configured delta using a pure base_lib helper.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "example"
+  ],
   "external": false,
   "contract": {
     "requires": [

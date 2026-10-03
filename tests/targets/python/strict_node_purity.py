@@ -50,7 +50,7 @@ def parse_graph_config(config):
     return raw_parse_graph_config(migrated)
 
 
-DuplicateThreeNode_DECLARATION = node_declaration(NodeInfo("test.duplicate_three", "Duplicate Three", "test", "Duplicates output for an unclaimed comparison.", "0.1.0", "process"), NodeContract(
+DuplicateThreeNode_DECLARATION = node_declaration(NodeInfo("test.duplicate_three", "Duplicate Three", "Duplicates output for an unclaimed comparison.", "0.1.0", "process"), NodeContract(
         provides=(DataProvider("dup.three", "dup.three", display_name="Duplicate Three"),),
         output_semantics={"dup.three": ("third duplicate fixture value",)},
     ), rulesets=("vibeflow.process",))

@@ -13,7 +13,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [Python Node 与 BaseLib](user/python-development.md)
 - [JavaScript/TypeScript Node 与 AOT](user/javascript-development.md)
 - [Nodeset 与 Loop](user/nodesets-and-loops.md)
-- [Rule、Ruleset 与业务分类](user/rules-and-categories.md)
+- [Rule、Ruleset 与 Node 声明](user/rules-and-nodes.md)
 - [Plugin 与宿主集成](user/plugins-and-integrations.md)
 - [命令、产物与检查范围](user/commands-and-results.md)
 - [人机协同协议](user/profiles/collaborative.md)
@@ -25,6 +25,16 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [执行模型](design/execution-model.md)
 - [Rule/Ruleset、Node 分类与插件重构](design/rule-system-refactor-plan.md)
 - [业务分类与领域规则旧方案](design/domain-node-extensions-plan.md)：已由 Rule/Ruleset 方案替代。
+
+- [完整修复计划](design/rule-system-repair-plan.md)
+- [完整修复验收与问题矩阵](design/rule-system-repair-results.md)
+- [0.15 声明与规则迁移](user/rule-system-migration.md)
+- [基线规则总表](design/baseline-rule-inventory.md)
+- [Core 规则盘点](design/baseline-rule-inventory-core.md)
+- [Python 规则盘点](design/baseline-rule-inventory-python.md)
+- [JavaScript 规则盘点](design/baseline-rule-inventory-javascript.md)
+- [Tooling 规则盘点](design/baseline-rule-inventory-tooling.md)
+- [第二次覆盖审计](design/baseline-rule-coverage-second-audit.md)
 
 ## 内核维护
 

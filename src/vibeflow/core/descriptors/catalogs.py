@@ -11,7 +11,7 @@ from vibeflow.core.descriptors.models import (
     NodeDescriptor,
     PluginDescriptor,
 )
-from vibeflow.core.descriptors.categories import ContributionBundle, NodeCategoryDescriptor
+from vibeflow.core.descriptors.bundles import ContributionBundle
 
 
 DescriptorT = TypeVar(
@@ -22,7 +22,6 @@ DescriptorT = TypeVar(
     CapabilityDescriptor,
     HostExtensionDescriptor,
     PluginDescriptor,
-    NodeCategoryDescriptor,
     ContributionBundle,
 )
 
@@ -165,11 +164,6 @@ class PluginCatalog(_DescriptorCatalog[PluginDescriptor]):
     descriptor_type = PluginDescriptor
 
 
-class NodeCategoryCatalog(_DescriptorCatalog[NodeCategoryDescriptor]):
-    descriptor_label = "node category"
-    descriptor_type = NodeCategoryDescriptor
-
-
 class BundleCatalog(_DescriptorCatalog[ContributionBundle]):
     descriptor_label = "contribution bundle"
     descriptor_type = ContributionBundle
@@ -201,7 +195,6 @@ class DescriptorCatalogs:
     capabilities: CapabilityCatalog
     host_extensions: HostExtensionCatalog
     plugins: PluginCatalog = field(default_factory=PluginCatalog)
-    categories: NodeCategoryCatalog = field(default_factory=NodeCategoryCatalog)
     bundles: BundleCatalog = field(default_factory=BundleCatalog)
     rules: RuleCatalog = field(default_factory=RuleCatalog)
     rulesets: RulesetCatalog = field(default_factory=RulesetCatalog)
@@ -224,7 +217,6 @@ class DescriptorCatalogs:
             "capabilities": self.capabilities.to_dict(),
             "host_extensions": self.host_extensions.to_dict(),
             "plugins": self.plugins.to_dict(),
-            "categories": self.categories.to_dict(),
             "bundles": self.bundles.to_dict(),
             "rules": self.rules.to_dict(),
             "rulesets": self.rulesets.to_dict(),

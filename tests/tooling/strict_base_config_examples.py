@@ -8,7 +8,7 @@ from vibeflow.core.inspection import build_architecture_report
 from vibeflow.targets.python.quality.source_analysis.ast_rules import import_aliases, import_roots, qualified_call_name
 
 
-CycleCopyNode_DECLARATION = node_declaration(NodeInfo("test.copy_alt", "Cycle Copy", "test", "Copies value.out into a distinct value.in-compatible key.", "0.1.0", "process"), NodeContract(
+CycleCopyNode_DECLARATION = node_declaration(NodeInfo("test.copy_alt", "Cycle Copy", "Copies value.out into a distinct value.in-compatible key.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("value.out", "exactly_one", display_name="Value Out"),),
         provides=(DataProvider("value.copy", "value.in", display_name="Value Copy"),),
         input_semantics={"value.out": ("value to copy around the cycle",)},

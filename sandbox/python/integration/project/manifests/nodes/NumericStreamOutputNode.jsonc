@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.numeric_stream_output",
   "display_name": "通过 stream 写出结果",
-  "category": "sandbox",
   "description": "在 document.output_written 后通过 sys streams 写 number.total，并提供 cli.exit_code。",
   "version": "0.1.0",
   "flow_kind": "io",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

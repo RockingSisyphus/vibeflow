@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.inactive_route",
   "display_name": "Semantic Inactive Route",
-  "category": "semantic",
   "description": "Emits an inactive boolean route used to verify explicit any_active join behavior.",
   "version": "0.1.0",
   "flow_kind": "decision",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [],

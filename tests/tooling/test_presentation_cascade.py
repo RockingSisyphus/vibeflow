@@ -17,7 +17,7 @@ class Empty:
 
 
 def test_external_composite_loop_and_planned_styles_match_canonical_facts():
-    descriptor = NodeDescriptor("external", "External", "demo", "External block", "1.0", "process",
+    descriptor = NodeDescriptor("external", "External", "External block", "1.0", "process",
                                 external=True, rulesets=(), contract=NodeContractDescriptor())
     registry = NodeRegistry()
     registry.register(descriptor, Empty)

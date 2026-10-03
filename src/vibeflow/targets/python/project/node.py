@@ -28,7 +28,6 @@ EFFECT_SCOPE_PYTHON_IO = "python_io"
 class NodeInfo:
     type_key: str
     display_name: str
-    category: str
     description: str
     version: str
     flow_kind: str

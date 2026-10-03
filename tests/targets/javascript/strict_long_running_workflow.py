@@ -82,7 +82,6 @@ def _empty_sync_plan(node_module: Path) -> dict[str, object]:
 _DoubleNode_DECLARATION = node_declaration(NodeInfo(
         "test.double",
         "Double",
-        "test",
         "Doubles a number.",
         "1",
         "process",

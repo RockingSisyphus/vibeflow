@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "bad.global_state.thread",
   "display_name": "Forbidden Global State Effect",
-  "category": "sandbox",
   "description": "Verifies that global_state does not grant unrelated effects.",
   "version": "0.1.0",
   "flow_kind": "global_state",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [],

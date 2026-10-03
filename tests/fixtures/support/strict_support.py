@@ -82,7 +82,7 @@ def register_node(registry: NodeRegistry, descriptor, node_cls: type, schema: di
 BadIoNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.bad_io",
         display_name="Bad IO",
-        category="test",
+
         description="Illegally performs IO.",
         version="0.1.0",
         flow_kind="process",

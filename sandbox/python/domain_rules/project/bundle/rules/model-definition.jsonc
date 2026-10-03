@@ -4,16 +4,16 @@
   "description": "One direct model_forward method per model_block; helpers do not inherit legal model-definition ownership.",
   "scope": "source",
   "params_schema": {
-    "model_category": {
+    "marker_method": {
       "type": "string"
     },
-    "marker_method": {
+    "model_tag": {
       "type": "string"
     }
   },
   "params_defaults": {
-    "model_category": "model_block",
-    "marker_method": "model_forward"
+    "marker_method": "model_forward",
+    "model_tag": "model_block"
   },
   "outputs": {
     "evidence": "example.model_definition.v1"
@@ -21,9 +21,6 @@
   "implementations": [
     {
       "language": "python",
-      "targets": [
-        "python"
-      ],
       "source": {
         "kind": "file",
         "ref": "rules/model_definition.py",

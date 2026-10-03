@@ -222,12 +222,14 @@ def _effective_calls(expansion: _Expansion, selected: set[str]) -> dict[str, tup
                 values["$checker"] = relation.replace_rule
             for key, value in values.items():
                 candidates.setdefault(key, []).append((relation.source, value))
-        updates, sources = {}, {key: f"default:{original.id}" for key in original.params_defaults}
-        sources.update({key: f"call:{call_id}" for key in call.params})
+        updates, override_sources = {}, {}
         for key, choices in candidates.items():
-            updates[key], sources[key] = _winner(call_id, key, choices, precedence)
+            updates[key], override_sources[key] = _winner(call_id, key, choices, precedence)
         replacement = updates.pop("$checker", original.id)
         rule = _lookup(expansion.rules, replacement, "replacement rule")
+        sources = {key: f"default:{rule.id}" for key in rule.params_defaults}
+        sources.update({key: f"call:{call_id}" for key in call.params})
+        sources.update(override_sources)
         if replacement != original.id:
             for port, record_type in original.outputs.items():
                 if rule.outputs.get(port) != record_type:

@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.scale",
   "display_name": "Semantic Scale",
-  "category": "semantic",
   "description": "Multiplies calc.sum by a configured factor into calc.scaled.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

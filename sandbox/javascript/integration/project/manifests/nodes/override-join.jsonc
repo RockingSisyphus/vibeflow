@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.override_join",
   "display_name": "Join override siblings",
-  "category": "sandbox",
   "description": "Waits for the overridden and default sibling results.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -57,5 +59,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox"
+  ]
 }

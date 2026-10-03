@@ -13,7 +13,7 @@ def _descriptor(*, completion: str = "immediate") -> NodeDescriptor:
             "kind": "node",
             "type_key": "demo.fetch",
             "display_name": "Fetch",
-            "category": "demo",
+
             "description": "Fetch one value.",
             "version": "1.0.0",
             "flow_kind": "terminal",

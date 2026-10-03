@@ -2,7 +2,6 @@
   "kind": "node",
   "type_key": "example.boundary",
   "display_name": "Workflow boundary",
-  "category": "boundary",
   "description": "A native terminal boundary around the example graph.",
   "version": "0.15.0",
   "flow_kind": "terminal",
@@ -26,5 +25,8 @@
         "export": "run"
       }
     }
+  ],
+  "tags": [
+    "boundary"
   ]
 }

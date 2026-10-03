@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.copy_back",
   "display_name": "Copy Back",
-  "category": "sandbox",
   "description": "Copies value.next back to value.in for the next loop iteration.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

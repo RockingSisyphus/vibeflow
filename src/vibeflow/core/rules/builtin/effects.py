@@ -34,6 +34,12 @@ def builtin_effect_resources() -> tuple[tuple[RuleDescriptor, ...], tuple[Rulese
                         entrypoints={"static": review_calls, "run": review_calls, "import": ("imports",)}))
     rulesets.append(RulesetDescriptor("vibeflow.workflow", calls=(RuleCall("workflow", rule_id="vibeflow.workflow"),),
                     entrypoints={"static": ("workflow",), "run": ("workflow",)}))
+    for name, scope in (("plugin", "none"), ("host_extension", "python_io")):
+        rulesets.append(RulesetDescriptor("vibeflow." + name, calls=(
+            RuleCall("imports", rule_id="vibeflow.import_side_effects"),
+            RuleCall("effects", rule_id="vibeflow.no_side_effects", params={"effect_scope":scope}),
+            RuleCall("interface", rule_id="vibeflow.node_interface")),
+            entrypoints={"import":("imports",), "static":("effects","interface"), "run":("effects","interface")}))
     return rules, tuple(rulesets)
 
 

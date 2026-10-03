@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.storage_read",
   "display_name": "Read storage",
-  "category": "sandbox",
   "description": "Reads a value from a per-run injected storage Capability.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -57,5 +59,8 @@
         "read"
       ]
     }
+  ],
+  "tags": [
+    "sandbox"
   ]
 }

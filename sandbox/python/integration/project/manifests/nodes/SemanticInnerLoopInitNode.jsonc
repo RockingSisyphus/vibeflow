@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.inner_loop_init",
   "display_name": "Semantic Inner Loop Init",
-  "category": "semantic",
   "description": "Passes outer state through and initializes the inner counter before a nested inner loop.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.route_decision",
   "display_name": "循环或退出决策",
-  "category": "sandbox",
   "description": "根据核心计算结果选择继续回环还是进入外部后处理；它是综合图中的菱形判断节点，所有出口都必须声明 when 条件并能通向结束节点。",
   "version": "0.1.0",
   "flow_kind": "decision",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

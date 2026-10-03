@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.finalize",
   "display_name": "Semantic Finalize",
-  "category": "semantic",
   "description": "Adds a configured offset to calc.branch into calc.final.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

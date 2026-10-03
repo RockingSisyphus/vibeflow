@@ -27,16 +27,15 @@ from vibeflow.core.descriptors.models import (
     DescriptorModelError,
     HostExtensionDescriptor,
     ImplementationDescriptor,
+    RuleImplementationDescriptor,
     NodeContractDescriptor,
     NodeDescriptor,
     PluginDescriptor,
     SourceLocator,
 )
 from vibeflow.core.descriptors._resource_models import PLUGIN_TYPES
-from vibeflow.core.descriptors.categories import (
-    ContributionBundle, NodeCategoryDescriptor, selected_node_rulesets,
-)
-from vibeflow.core.descriptors.catalogs import BundleCatalog, NodeCategoryCatalog, RuleCatalog, RulesetCatalog
+from vibeflow.core.descriptors.bundles import ContributionBundle
+from vibeflow.core.descriptors.catalogs import BundleCatalog, RuleCatalog, RulesetCatalog
 from vibeflow.core.descriptors.plugin_selection import (
     PluginResolution,
     PluginReviewRecord,
@@ -48,8 +47,8 @@ from vibeflow.core.descriptors.plugin_selection import (
 )
 
 __all__ = [
-    "ContributionBundle", "NodeCategoryDescriptor", "NodeCategoryCatalog",
-    "BundleCatalog", "selected_node_rulesets",
+    "ContributionBundle",
+    "BundleCatalog",
     "RuleCatalog", "RulesetCatalog",
     "IMPLEMENTATION_COMPLETIONS",
     "IMPLEMENTATION_LANGUAGES",
@@ -72,6 +71,7 @@ __all__ = [
     "HostExtensionCatalog",
     "HostExtensionDescriptor",
     "ImplementationDescriptor",
+    "RuleImplementationDescriptor",
     "NodeCatalog",
     "NodeContractDescriptor",
     "NodeDescriptor",

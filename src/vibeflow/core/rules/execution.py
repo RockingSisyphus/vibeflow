@@ -64,7 +64,7 @@ def _coerce_finding(value: Any, rule_id: str) -> Finding:
         location = {"path": value["file"], "line": value.get("line", 1), "column": value.get("column", 1)}
     definition_id = str(value.get("definition_id", value.get("rule_id", rule_id) if "code" in value else rule_id))
     return HealthFinding(rule_id=str(value.get("code", value.get("rule_id", rule_id))),
-                         severity=str(value.get("severity", "error")),
+                         severity=value.get("severity", "error"),
                          object_type=str(value.get("object_type", value.get("subject_type", "rule"))),
                          object_id=str(value.get("object_id", value.get("subject_id", value.get("owner", rule_id)))),
                          message=str(value.get("message", "")), source_location=location,
@@ -84,7 +84,12 @@ def coerce_rule_result(value: Any, rule: Any) -> RuleResult:
         if not isinstance(value, Mapping):
             raise TypeError("rule handler must return RuleResult or a result object")
         records = {}
-        for name, record in value.get("records", {}).items():
+        raw_records = value.get("records", {})
+        if not isinstance(raw_records, Mapping):
+            raise TypeError("rule result records must be an object")
+        for name, record in raw_records.items():
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("output port names must be non-empty strings")
             if isinstance(record, RuleRecord):
                 records[name] = record
             elif isinstance(record, Mapping) and "type_id" in record and "value" in record:
@@ -95,7 +100,10 @@ def coerce_rule_result(value: Any, rule: Any) -> RuleResult:
                     raise ValueError(f"undeclared output record '{name}'")
                 records[name] = RuleRecord(record_type, record)
         result = RuleResult(records, tuple(_coerce_finding(item, rule.id) for item in value.get("findings", ())),
-                            str(value.get("state", "completed")))
+                            value.get("state", "completed"))
+    for finding in result.findings:
+        if not isinstance(finding.severity, str) or finding.severity not in {"error", "warning", "info"}:
+            raise ValueError("finding severity must be error, warning or info")
     unknown = set(result.records) - set(rule.outputs)
     if unknown:
         raise ValueError(f"undeclared output records: {sorted(unknown)}")

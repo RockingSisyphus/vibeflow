@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.left_adjust",
   "display_name": "Semantic Left Adjust",
-  "category": "semantic",
   "description": "Adds a configured bonus to calc.scaled after the left decision branch is selected.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

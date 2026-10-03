@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.optional_add",
   "display_name": "Optional add",
-  "category": "sandbox",
   "description": "Adds an optional offset to x through the registered TypeScript base_lib.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -59,5 +61,8 @@
   "base_libs": [
     "sandbox.math"
   ],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox"
+  ]
 }

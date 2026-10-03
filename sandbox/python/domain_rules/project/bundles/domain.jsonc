@@ -2,10 +2,6 @@
   "kind": "bundle",
   "id": "example.python_domain",
   "resources": {
-    "categories": [
-      "../bundle/categories/model.jsonc",
-      "../bundle/categories/transform.jsonc"
-    ],
     "nodes": [
       "../bundle/nodes/model.jsonc",
       "../bundle/nodes/transform.jsonc",

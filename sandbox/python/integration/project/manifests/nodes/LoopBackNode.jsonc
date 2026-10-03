@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.loop_back",
   "display_name": "回环输入改写",
-  "category": "sandbox",
   "description": "把本轮核心计算结果写回 value.in，作为下一轮准备阶段的输入；该节点用于验证显式回环边不会绕过 decision。",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

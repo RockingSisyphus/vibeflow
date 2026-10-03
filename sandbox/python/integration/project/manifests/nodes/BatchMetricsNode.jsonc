@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.batch_metrics",
   "display_name": "Batch Metrics",
-  "category": "training",
   "description": "Emits metrics directly from a non-JSON batch object.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "training"
+  ],
   "external": false,
   "contract": {
     "requires": [

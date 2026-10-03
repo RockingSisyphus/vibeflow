@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.fanout_join",
   "display_name": "Fanout join",
-  "category": "sandbox",
   "description": "Collects both fanout branches after an all join.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -65,5 +67,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox"
+  ]
 }

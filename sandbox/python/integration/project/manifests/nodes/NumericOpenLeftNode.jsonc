@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.numeric_open_left",
   "display_name": "通过 open 读取左数值",
-  "category": "sandbox",
   "description": "使用 builtins.open().read() 读取左侧整数文件。",
   "version": "0.1.0",
   "flow_kind": "document",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

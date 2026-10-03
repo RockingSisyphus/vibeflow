@@ -125,6 +125,42 @@ class PythonSourceContext:
     ownership: tuple[PythonSourceOwnership, ...]
     calls: tuple[PythonSourceCall, ...] = ()
     imports: tuple[PythonSourceImport, ...] = ()
+    _analysis: object = field(default=None, init=False, compare=False, repr=False)
+
+    def __post_init__(self):
+        from vibeflow.targets.python.quality.analysis_metrics import PythonSourceAnalysis
+        object.__setattr__(self, "_analysis", PythonSourceAnalysis())
+
+    def metrics(self, type_key: str) -> Mapping[str, object]:
+        """Read the same immutable measurements consumed by built-in Rules."""
+        from dataclasses import asdict
+        from vibeflow.core.rules import RuleContext
+        from vibeflow.core.rules.models import readonly
+        measured = self._analysis.measurements(RuleContext(facts={"source_context": self},
+            subject={"type_key": type_key, "kind": "node"}, target="python"))
+        if measured is None:
+            raise ValueError(f"implementation measurements unavailable for {type_key}")
+        return readonly(asdict(measured))
+
+    def import_closure(self, path: str) -> tuple[PythonSourceFile, ...]:
+        """Actual local module imports, including Python package initializers."""
+        by_path = {source.path: source for source in self.files}
+        by_module = {source.module: source for source in self.files}
+        visited, pending = set(), [path]
+        while pending:
+            current = pending.pop()
+            if current in visited or current not in by_path:
+                continue
+            visited.add(current)
+            source = by_path[current]
+            parts = source.module.split(".")
+            for size in range(1, len(parts)):
+                package = by_module.get(".".join(parts[:size]))
+                if package is not None and package.path.endswith("/__init__.py"):
+                    pending.append(package.path)
+            pending.extend(item.resolved_path for item in self.imports
+                           if item.path == current and item.resolved_path)
+        return tuple(source for source in self.files if source.path in visited)
 
     def file(self, path: str) -> PythonSourceFile:
         return next(item for item in self.files if item.path == path)

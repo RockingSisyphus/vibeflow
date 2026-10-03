@@ -28,7 +28,7 @@ class ProviderPlanningBoundary(DemoBoundary):
         return {}
 
 
-TwoRouteNode_DECLARATION = node_declaration(NodeInfo("test.two_route", "Two Route", "test", "Routes flow.", "0.1.0", "decision"), NodeContract(
+TwoRouteNode_DECLARATION = node_declaration(NodeInfo("test.two_route", "Two Route", "Routes flow.", "0.1.0", "decision"), NodeContract(
         requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"),),
         provides=(DataProvider("flow.route", "flow.route", display_name="flow.route"),),
         input_semantics={"value.in": ("input",)},
@@ -43,7 +43,7 @@ class TwoRouteNode:
         return {"flow.route": "done"}
 
 
-BodyRouteNode_DECLARATION = node_declaration(NodeInfo("test.body_route", "Body Route", "test", "Routes inside a loop body.", "0.1.0", "decision"), NodeContract(
+BodyRouteNode_DECLARATION = node_declaration(NodeInfo("test.body_route", "Body Route", "Routes inside a loop body.", "0.1.0", "decision"), NodeContract(
         requires=(DataRequirement("flow.route", "exactly_one", display_name="flow.route"),),
         provides=(DataProvider("flow.inner", "flow.inner", display_name="flow.inner"),),
         input_semantics={"flow.route": ("outer loop route",)},
@@ -58,7 +58,7 @@ class BodyRouteNode:
         return {"flow.inner": "left"}
 
 
-EmptyProcessNode_DECLARATION = node_declaration(NodeInfo("test.empty_process", "Empty Process", "test", "Keeps a structural branch in progress.", "0.1.0", "process"), NodeContract(), rulesets=("vibeflow.process",))
+EmptyProcessNode_DECLARATION = node_declaration(NodeInfo("test.empty_process", "Empty Process", "Keeps a structural branch in progress.", "0.1.0", "process"), NodeContract(), rulesets=("vibeflow.process",))
 
 class EmptyProcessNode:
 
@@ -66,7 +66,7 @@ class EmptyProcessNode:
         return {}
 
 
-BypassSourceNode_DECLARATION = node_declaration(NodeInfo("test.bypass_source", "Bypass Source", "test", "Produces a disconnected bypass value.", "0.1.0", "process"), NodeContract(
+BypassSourceNode_DECLARATION = node_declaration(NodeInfo("test.bypass_source", "Bypass Source", "Produces a disconnected bypass value.", "0.1.0", "process"), NodeContract(
         provides=(DataProvider("source.value", "value.in", display_name="Source Value"),),
         output_semantics={"source.value": ("source bypass value",)},
     ), rulesets=("vibeflow.process",))
@@ -77,7 +77,7 @@ class BypassSourceNode:
         return {"source.value": 1}
 
 
-BypassMiddleNode_DECLARATION = node_declaration(NodeInfo("test.bypass_middle", "Bypass Middle", "test", "Forwards a disconnected bypass value.", "0.1.0", "process"), NodeContract(
+BypassMiddleNode_DECLARATION = node_declaration(NodeInfo("test.bypass_middle", "Bypass Middle", "Forwards a disconnected bypass value.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("value.in", "exactly_one", display_name="Value In"),),
         provides=(DataProvider("middle.value", "value.in", display_name="Middle Value"),),
         input_semantics={"value.in": ("source bypass value",)},
@@ -113,7 +113,7 @@ def test_declaration_rejects_missing_and_invalid_flow_kind() -> None:
 
 def test_external_flag_does_not_override_explicit_rule_selection() -> None:
     declaration = node_declaration(
-        NodeInfo("test.external", "External", "test", "Calls external package.", "0.1.0", "process", external=True),
+        NodeInfo("test.external", "External", "Calls external package.", "0.1.0", "process", external=True),
         NodeContract(provides=(DataProvider("external.out", "external.out", display_name="external.out"),),
                      output_semantics={"external.out": ("external output",)}),
         rulesets=(),
@@ -135,7 +135,7 @@ def test_external_flag_does_not_override_explicit_rule_selection() -> None:
 
 def test_external_process_contract_does_not_require_route_output() -> None:
     declaration = node_declaration(
-        NodeInfo("test.external_ok", "External", "test", "Calls external package.", "0.1.0", "process", external=True),
+        NodeInfo("test.external_ok", "External", "Calls external package.", "0.1.0", "process", external=True),
         NodeContract(provides=(DataProvider("external.out", "external.out", display_name="external.out"),),
                      output_semantics={"external.out": ("external output",)}),
         rulesets=("vibeflow.process",),
@@ -575,7 +575,7 @@ def test_boundary_schema_and_node_registry_isolation() -> None:
     rule_ids = {finding.rule_id for finding in findings}
     assert "CONFIG.BOUNDARY.REMOVED" in rule_ids
     declaration = node_declaration(
-        NodeInfo("test.boundary", "Boundary", "test", "A host boundary cannot implement the Node ABI.", "0.1.0", "process"),
+        NodeInfo("test.boundary", "Boundary", "A host boundary cannot implement the Node ABI.", "0.1.0", "process"),
         NodeContract(), rulesets=("vibeflow.process",),
     )
     report = _review_node(declaration, DemoBoundary, policy=PurityPolicy(max_source_lines=1000))

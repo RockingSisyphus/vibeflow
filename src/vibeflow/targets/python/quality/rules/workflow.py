@@ -16,7 +16,7 @@ def workflow(context, inputs, params, *, definition_cache=None):
     state = _HealthValidationState()
     # Nested workflows select their own rules; caller rules may inspect call declarations.
     scoped = replace(graph, nodesets={key: value for key, value in graph.nodesets.items() if value.graph.rulesets})
-    core_context = replace(context, facts={**context.facts, "graph": scoped})
+    core_context = context
     topics = workflow_topic_handlers()
     local = [topics["vibeflow.graph." + name](core_context, inputs, params) for name in ("flow", "join")]
     if "fingerprints" in core_context.facts and "node_metrics" in core_context.facts:
@@ -25,14 +25,15 @@ def workflow(context, inputs, params, *, definition_cache=None):
     definitions = definition_cache.get(identity) if identity is not None else None
     reused = definitions is not None
     if definitions is None:
-        nodesets = topics["vibeflow.graph.nodesets"](core_context, inputs, params)
-        planned = topics["vibeflow.graph.planned"](core_context, inputs, params)
+        definition_context = replace(context, facts={**context.facts, "graph": scoped})
+        nodesets = topics["vibeflow.graph.nodesets"](definition_context, inputs, params)
+        planned = topics["vibeflow.graph.planned"](definition_context, inputs, params)
         for item in planned.records["events"].value:
             if isinstance(item, PlannedImplementationCheck):
                 _append_python_stub_findings(item, state)
         if registry is not None:
-            state.errors.extend(validate_node_config_health(scoped, registry=registry, global_config=context.facts.get("global_config")))
-            errors, warnings = validate_nodesets(scoped, registry=registry)
+            state.errors.extend(validate_node_config_health(graph, registry=registry, global_config=context.facts.get("global_config")))
+            errors, warnings = validate_nodesets(graph, registry=registry, selected_only=True)
             state.errors.extend(errors)
             state.warnings.extend(warnings)
             from vibeflow.targets.python.quality.workflow.registry import registry_namespace_findings

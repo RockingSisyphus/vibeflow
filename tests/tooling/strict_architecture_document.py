@@ -132,7 +132,6 @@ def test_architecture_document_is_deterministic_and_keeps_planned_and_unused_bod
         "workflow",
         "nodesets",
         "node_types",
-        "node_categories",
         "resources",
     ]
     assert payload["project_target"] == "python"
@@ -290,7 +289,7 @@ def test_architecture_and_mermaid_keep_implemented_and_planned_host_extensions(
 
     assert payload["resources"]["host_extensions"] == [
         {
-            "effect_scope": "trusted",
+            "rulesets": [],
             "targets": ["browser"],
             "provides": ["app.port"],
             "dependencies": [],
@@ -307,7 +306,7 @@ def test_architecture_and_mermaid_keep_implemented_and_planned_host_extensions(
             },
         },
         {
-            "effect_scope": "trusted",
+            "rulesets": [],
             "targets": ["node"],
             "provides": ["app.future_port"],
             "dependencies": ["app.browser_host"],

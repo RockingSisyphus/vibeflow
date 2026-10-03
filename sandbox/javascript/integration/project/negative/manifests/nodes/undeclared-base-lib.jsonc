@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.invalid.undeclared_base_lib",
   "display_name": "Invalid undeclared base_lib import",
-  "category": "sandbox-negative",
   "description": "Intentionally imports a registered base_lib without declaring it.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -49,5 +51,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox-negative"
+  ]
 }

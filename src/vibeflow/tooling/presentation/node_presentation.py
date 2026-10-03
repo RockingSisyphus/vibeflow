@@ -29,14 +29,13 @@ class EffectivePresentation:
 
 def resolve_presentation(
     descriptor: object | None,
-    category: object | None = None,
     *,
     native_class: str = "",
     status_class: str = "",
     call_style: object | None = None,
     flow_kind: str = "",
 ) -> EffectivePresentation:
-    """Native → category → Node → status → call, with per-field provenance."""
+    """Native → Node → status → call, with per-field provenance."""
     identity = flow_kind or _get(descriptor, "flow_kind", "process")
     native_class = native_class or ("externalDependency" if _get(descriptor, "external", False)
                                     else "documentNode" if identity == "document" else "defaultNode")
@@ -54,7 +53,6 @@ def resolve_presentation(
                     values[str(key)] = str(value)
                     sources[str(key)] = origin
 
-    apply(_get(category, "presentation", {}), "category")
     apply(_get(descriptor, "presentation", {}), "node")
     if status_class in SYSTEM_STYLE_COLORS:
         status = SYSTEM_STYLE_COLORS[status_class]
@@ -74,12 +72,6 @@ def registry_descriptor(registry: object | None, type_key: str) -> object | None
         except (KeyError, ValueError):
             return None
     return None
-
-
-def registry_category(registry: object | None, descriptor: object | None) -> object | None:
-    catalogs = getattr(registry, "catalogs", None)
-    categories = getattr(catalogs, "categories", getattr(registry, "categories", None))
-    return categories.get(_get(descriptor, "category", "")) if categories is not None else None
 
 
 def _get(value: object, key: str, default: object) -> object:

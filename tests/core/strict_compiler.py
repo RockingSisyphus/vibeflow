@@ -11,7 +11,7 @@ from vibeflow.core.flow import NodeSpec
 RouteNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.route",
         display_name="Route",
-        category="test",
+
         description="Routes the next step.",
         version="0.1.0",
         flow_kind="decision",
@@ -33,7 +33,7 @@ class RouteNode:
 ExternalVisualNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.external_visual",
         display_name="External Visual",
-        category="test",
+
         description="Exercises external review styling.",
         version="0.1.0",
         flow_kind="process",
@@ -49,7 +49,7 @@ class ExternalVisualNode:
 ExternalResultVisualNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.external_result_visual",
         display_name="External Result Visual",
-        category="test",
+
         description="Exercises an external result-key boundary.",
         version="0.1.0",
         flow_kind="process",
@@ -65,7 +65,7 @@ class ExternalResultVisualNode(ExternalVisualNode):
         return {"external.result": 1}
 
 
-BackgroundVisualNode_DECLARATION = node_declaration(NodeInfo("test.background_visual", "Background Visual", "test", "Produces a detached background value.", "0.1.0", "process"), NodeContract(
+BackgroundVisualNode_DECLARATION = node_declaration(NodeInfo("test.background_visual", "Background Visual", "Produces a detached background value.", "0.1.0", "process"), NodeContract(
         provides=(DataProvider("background.value", "background.value", display_name="Background Value"),),
         output_semantics={"background.value": ("detached background value",)},
     ), rulesets=("vibeflow.process",))
@@ -79,7 +79,7 @@ class BackgroundVisualNode:
 GlobalVisualNode_DECLARATION = node_declaration(NodeInfo(
         type_key="test.global_visual",
         display_name="Global Visual",
-        category="test",
+
         description="Exercises global-state cloud styling.",
         version="0.1.0",
         flow_kind="global_state",
@@ -908,7 +908,6 @@ def test_python_runtime_separates_schedule_and_transfer_edges(
     GatePoisonNode_DECLARATION = node_declaration(NodeInfo(
             "test.edge_gate",
             "Edge Gate",
-            "test",
             "Produces a same-typed value that must not cross a schedule-only edge.",
             "0.1.0",
             "process",
@@ -926,7 +925,6 @@ def test_python_runtime_separates_schedule_and_transfer_edges(
     MixedEdgeConsumerNode_DECLARATION = node_declaration(NodeInfo(
             "test.edge_consumer",
             "Edge Consumer",
-            "test",
             "Consumes only the transfer-only payload.",
             "0.1.0",
             "process",
@@ -1032,7 +1030,6 @@ def test_terminal_records_outputs_and_transfer_before_completion(
     TerminalProducerNode_DECLARATION = node_declaration(NodeInfo(
             "test.terminal_producer",
             "Terminal Producer",
-            "test",
             "Produces a final value before completing the workflow.",
             "0.1.0",
             "terminal",
@@ -1049,7 +1046,6 @@ def test_terminal_records_outputs_and_transfer_before_completion(
     TransferSinkNode_DECLARATION = node_declaration(NodeInfo(
             "test.transfer_sink",
             "Transfer Sink",
-            "test",
             "Accepts a transfer-only terminal value without being scheduled.",
             "0.1.0",
             "process",
@@ -1224,7 +1220,7 @@ def test_mermaid_renders_while_loop_shape_class_and_stop_condition() -> None:
 
 
 def test_mermaid_edge_contract_labels_summarize_provider_key_type_mapping() -> None:
-    MappingProducerNode_DECLARATION = node_declaration(NodeInfo("test.mapping_producer", "Mapping Producer", "test", "Produces three mapped values.", "0.1.0", "process"), NodeContract(
+    MappingProducerNode_DECLARATION = node_declaration(NodeInfo("test.mapping_producer", "Mapping Producer", "Produces three mapped values.", "0.1.0", "process"), NodeContract(
             provides=(
                 DataProvider("value.copy", "value.in", display_name="Value Copy"),
                 DataProvider("other.copy", "other.in", display_name="Other Copy"),
@@ -1242,7 +1238,7 @@ def test_mermaid_edge_contract_labels_summarize_provider_key_type_mapping() -> N
         def run_pure(self, inputs, params):
             return {"value.copy": 1, "other.copy": 2, "extra.copy": 3}
 
-    MappingConsumerNode_DECLARATION = node_declaration(NodeInfo("test.mapping_consumer", "Mapping Consumer", "test", "Consumes three mapped values.", "0.1.0", "process"), NodeContract(
+    MappingConsumerNode_DECLARATION = node_declaration(NodeInfo("test.mapping_consumer", "Mapping Consumer", "Consumes three mapped values.", "0.1.0", "process"), NodeContract(
             requires=(
                 DataRequirement("value.in", "exactly_one", display_name="Value In"),
                 DataRequirement("other.in", "exactly_one", display_name="Other In"),

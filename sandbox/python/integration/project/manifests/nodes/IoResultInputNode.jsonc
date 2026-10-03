@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.io_result_input",
   "display_name": "IO Result Input",
-  "category": "sandbox",
   "description": "Converts an external IO result into value.in for a downstream nodeset.",
   "version": "0.1.0",
   "flow_kind": "io",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

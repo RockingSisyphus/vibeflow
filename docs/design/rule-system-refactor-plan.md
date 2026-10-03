@@ -1,4 +1,4 @@
-# Rule/Ruleset、Node 分类与插件系统重构
+# Rule/Ruleset、Node 与插件系统重构
 
 基线 `f169429`，目标版本 `0.15.0`。本文记录已确认的设计与迁移清单；实际完成情况以测试和发行验证为准。
 
@@ -6,7 +6,7 @@
 
 用户项目的审查约束全部成为 Rule，包括副作用、声明、源码、架构和领域判断。首版按完整主题组织，每条规则可以产生多个诊断码。规则稳定 ID 与诊断码分离，例如 `vibeflow.no_side_effects` 产生相关 `NODE.EFFECT.*` 诊断。
 
-Node 的声明与 Ruleset 选择决定约束。`flow_kind` 保留原生执行身份，`category/tags` 表达业务分类；不再由身份隐式授予副作用权限。默认 Process 明确选择无副作用规则，空规则选择如实表示未约束。external/trusted 不自动绕过审查。
+Node 的完整声明与 Ruleset 选择决定约束。`flow_kind` 保留原生执行身份；Node 自己声明 ID、契约、实现、规则和展示，不再提供 category 资源或默认值继承。自由的 tags/metadata 由领域规则解释，不再由身份隐式授予副作用权限。默认 Process 明确选择无副作用规则，空规则选择如实表示未约束。external/trusted 不自动绕过审查。
 
 Python 和 JS 使用同一种 JSONC Node 声明，先读取声明和规则，再绑定实现。声明是元数据、契约、配置、实现定位和规则选择的唯一权威，实施类只承担原生调用协议。本次允许断代迁移，不保留长期兼容桥；compiler/runtime 的生命周期与变换保留。
 
@@ -30,17 +30,17 @@ Python 和 JS 使用同一种 JSONC Node 声明，先读取声明和规则，再
 
 ## 资源与公开接口
 
-项目 `descriptors` 增加 `categories/rules/rulesets/bundles`，复用原有目录与 Catalog。
+项目 `descriptors` 提供 `rules/rulesets/bundles`，复用原有目录与 Catalog。2026年10月03日决定移除 category 机制，具体修复与验收见 [完整修复计划](rule-system-repair-plan.md)。
 
 | 资源 | 内容 |
 |---|---|
 | RuleDescriptor | ID、说明、实现位置、具名 inputs/outputs、参数 schema/defaults |
+| RuleImplementationDescriptor | 执行语言与源码位置，不包含用户程序的业务 targets |
 | RulesetDescriptor | 局部 calls、typed relations、import/static/run entrypoints |
-| NodeCategoryDescriptor | ID、默认 Ruleset、颜色、形状、图标和 JSON metadata |
-| NodeDescriptor | 原生身份、业务分类、契约、配置、实现、Ruleset、展示覆盖 |
+| NodeDescriptor | ID、原生身份、契约、配置、实现、Ruleset、默认展示与 tags/metadata |
 | ContributionBundle | 资源文件引用，相对 bundle 文件解析，复用 Catalog 的冲突及来源记录 |
 
-Node 的 `rulesets` 未填写时继承分类 `default_rulesets`，填写时明确选择该列表，`[]` 表示不应用 Node 审查规则。资源选择不自动开启同包 compiler/runtime hooks。
+Node 的 `rulesets` 未填写或明确为 `[]` 都表示不应用 Node 审查规则。BaseLib、Plugin、HostExtension 使用同一明确选择机制；内置和示例资源声明自己的默认 Ruleset。资源选择不自动开启同包 compiler/runtime hooks。
 
 ```python
 def check(context, inputs, params) -> RuleResult:
@@ -48,6 +48,10 @@ def check(context, inputs, params) -> RuleResult:
 ```
 
 RuleContext 只读提供当前范围、声明、调用、源码、符号、导入、实际实现与 helper 归属。AST 留在 Target 查询服务中，只在本次检查复用。规则是受信扩展代码，公共只读契约不是操作系统沙箱。helper 被引用不等于获得归属，共享 helper 不继承最宽权限。
+
+VibeFlow 审查只负责源码和架构健康度，不增加通用业务代码正确性检查。真实解析、编译、原生协议绑定仍由实际 Target/工具链完成；缺失分析或执行事实不能通过覆盖制造。Python 默认导入 Rule 保留模块声明结构约束，包括拒绝模块级 try/match；放宽通过替换 Rule 完成。
+
+Rule 的执行实现按 Target 能执行的语言族选择，JS/TS 属于同一族且至多一个实现。用户程序的 Node.js/Browser 目标作为资料提供，由规则自身决定检查方式；核心不注入双平台审查策略。
 
 RuleResult.state 是 completed/failed/unavailable；records 保存具名且有类型的事实；findings 保留规则、诊断码、对象、文件、行号、原因及严重度。有诊断也可能提供有效 records，有效空列表也算可用资料；失败或缺失输出不能伪造成功。
 
@@ -68,7 +72,7 @@ static 入口执行选中的审查；run 保留原有执行检查集合，新领
 3. 两个 Target 声明装配，Python 延迟绑定替换 registry discovery，导入前审查；保留全 workspace 用于兄弟 root 解析。
 4. 迁移全部内置审查主题，删除隐式 effect、external/trusted 绕过和不可覆盖分支。
 5. bundle、Rule ABI v1、Plugin ABI v2、quality/validate/review/build 接入，run 使用明确入口；Workflow ABI v4 不变。
-6. native → category → Node → status → call 展示级联及来源，模型浅蓝色，review-rules、Python/JS 真实数值与数据变换示例。
+6. native → Node → status → call 展示级联及来源，模型 Node 自己声明浅蓝色，review-rules、Python/JS 真实数值与数据变换示例。
 7. 迁移仓库项目、插件、测试、文档与 0.15.0 发行资源，完成全量验证。
 
 验收包括嵌套、多路径共享、局部覆盖、无序冲突、替换接口、独立循环；有效空输出、有诊断但资料可用、解析失败和缺失输出；同 flow_kind 只改规则组合允许 print，显式空选择未约束；导入违规时顶层副作用尚未发生；同文件不同符号、共享/未知 helper、Nodeset/Loop、多次调用与跨 root CLI 范围；正式诊断、退出码和 review 失败不发布图；新静态领域规则不扩大 run。

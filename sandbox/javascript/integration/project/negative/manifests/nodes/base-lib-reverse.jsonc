@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.invalid.base_lib_reverse",
   "display_name": "Invalid base lib reverse import",
-  "category": "sandbox-negative",
   "description": "Uses a base library that imports a node implementation.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -51,5 +53,8 @@
   "base_libs": [
     "sandbox.negative.reverse"
   ],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox-negative"
+  ]
 }

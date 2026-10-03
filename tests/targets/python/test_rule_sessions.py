@@ -21,7 +21,7 @@ from vibeflow.tooling.application.python.project.declarations import collect_wor
 def _registry(tmp_path, rules, ruleset):
     path = tmp_path / "nodes.py"
     path.write_text('class Leaf:\n    def run_pure(self, inputs, params):\n        return {}\n')
-    descriptor = node_declaration(NodeInfo("test.leaf", "Leaf", "test", "Checks one leaf.", "1", "process"),
+    descriptor = node_declaration(NodeInfo("test.leaf", "Leaf", "Checks one leaf.", "1", "process"),
         NodeContract(), rulesets=(ruleset.id,))
     registry = NodeRegistry()
     registry.register(descriptor)
@@ -146,7 +146,7 @@ def test_public_imports_resolve_alias_relative_and_package_module_without_new_sc
     monkeypatch.setattr(ast,"parse",parse)
     files = (PythonSourceFile.parse(str(node_file),"pkg.node",text),
         PythonSourceFile.parse(str(helper_file),"pkg.helpers","def transform(value):\n    return value\n"))
-    descriptor = node_declaration(NodeInfo("test.leaf","Leaf","test","A source Node.","1","process"),NodeContract())
+    descriptor = node_declaration(NodeInfo("test.leaf","Leaf","A source Node.","1","process"),NodeContract())
     context = build_python_source_context((PythonSourceNode(descriptor,str(node_file),"Leaf"),),files)
     assert len(parses) == 2
     assert all(isinstance(item,PythonSourceImport) for item in context.imports)

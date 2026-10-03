@@ -44,7 +44,7 @@ def _node_payload(
         "kind": "node",
         "type_key": type_key,
         "display_name": display_name,
-        "category": "demo",
+
         "description": "Adds one.",
         "version": "1.0.0",
         "flow_kind": "process",
@@ -244,7 +244,7 @@ def test_catalogs_sort_ids_and_preserve_source_diagnostics() -> None:
     first = NodeDescriptor(
         type_key="demo.z",
         display_name="Z",
-        category="demo",
+
         description="Z.",
         version="1",
         flow_kind="process",
@@ -267,7 +267,7 @@ class _DeclaredNode:
 def test_declared_metadata_is_authoritative_for_python_bindings() -> None:
     registry = NodeRegistry()
     descriptor = NodeDescriptor(
-        type_key="demo.declared", display_name="Declared", category="demo",
+        type_key="demo.declared", display_name="Declared",
         description="A declared node.", version="1.0.0", flow_kind="process",
         rulesets=("vibeflow.process",),
         contract=NodeContractDescriptor(

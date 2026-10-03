@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.value_end",
   "display_name": "Semantic Value End",
-  "category": "semantic",
   "description": "Terminates a semantic join flow after value.out is available.",
   "version": "0.1.0",
   "flow_kind": "terminal",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

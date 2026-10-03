@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.increment_until",
   "display_name": "Semantic Increment Until",
-  "category": "semantic",
   "description": "Adds a configured step to loop.current into loop.next.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

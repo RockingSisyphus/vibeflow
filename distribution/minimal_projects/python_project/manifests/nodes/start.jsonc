@@ -5,7 +5,6 @@
   ],
   "type_key": "minimal.start",
   "display_name": "Workflow start",
-  "category": "boundary",
   "description": "Marks the structural start of the minimal workflow.",
   "version": "0.15.0",
   "flow_kind": "terminal",
@@ -32,5 +31,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "boundary"
+  ]
 }

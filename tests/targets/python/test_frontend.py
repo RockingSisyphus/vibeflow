@@ -75,7 +75,6 @@ def test_registration_provenance_still_points_to_caller() -> None:
     ExampleNode_DECLARATION = node_declaration(NodeInfo(
             "test.provenance",
             "Provenance",
-            "test",
             "Captures registration provenance.",
             "1",
             "process",

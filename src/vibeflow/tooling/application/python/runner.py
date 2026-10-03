@@ -82,7 +82,7 @@ def run_checked(
 
     document = _load_document_or_refuse(path, run_dir, actual_run_id)
     registry_context = discover_config_resource_registry_context(document.data, config_path=path)
-    plugin_registry = _load_plugins_or_refuse(document.data, path, run_dir, actual_run_id, registry_context=registry_context)
+    plugin_registry = _load_plugins_or_refuse(document.data, path, run_dir, actual_run_id, registry_context=registry_context, rule_registry=registry)
     resources, resource_findings = load_config_resources(
         document.data,
         base_path=registry_context.base_path,
@@ -155,13 +155,15 @@ def _load_document_or_refuse(path: Path, run_dir: Path, run_id: str):
         raise CheckedRunError("run refused: config load failed", result) from exc
 
 
-def _load_plugins_or_refuse(config_data: Mapping[str, Any], path: Path, run_dir: Path, run_id: str, *, registry_context=None):
+def _load_plugins_or_refuse(config_data: Mapping[str, Any], path: Path, run_dir: Path, run_id: str, *, registry_context=None, rule_registry=None):
     plugin_registry, plugin_findings = load_plugins_from_config(
         config_data,
         base_path=registry_context.base_path if registry_context is not None else path.parent,
         plugin_resource_registry=registry_context.plugin_resource_registry if registry_context is not None else None,
+        rule_registry=rule_registry,
+        rule_phase="run",
     )
-    if plugin_findings:
+    if any(item.severity == "error" for item in plugin_findings):
         health = HealthReport(
             status="ERROR",
             errors=tuple(plugin_findings),

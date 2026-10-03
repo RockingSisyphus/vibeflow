@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.host_double",
   "display_name": "Host double",
-  "category": "sandbox",
   "description": "Doubles a number with a Host Extension Capability.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -57,5 +59,8 @@
         "double"
       ]
     }
+  ],
+  "tags": [
+    "sandbox"
   ]
 }

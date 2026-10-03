@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.add",
   "display_name": "Add",
-  "category": "sandbox",
   "description": "Adds a configured delta to value.in.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

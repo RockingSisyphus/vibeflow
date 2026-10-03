@@ -6,7 +6,6 @@
   ],
   "type_key": "sandbox.add",
   "display_name": "Add",
-  "category": "sandbox",
   "description": "Adds x and a through the registered TypeScript base_lib.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -79,5 +78,8 @@
   "base_libs": [
     "sandbox.math"
   ],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox"
+  ]
 }

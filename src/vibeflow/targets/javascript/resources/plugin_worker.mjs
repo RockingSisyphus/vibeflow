@@ -35,6 +35,29 @@ function jsonValue(value, pathName = "result") {
   }
   failure("RULE.RESULT.INVALID", `${pathName} must contain portable JSON values`);
 }
+function ruleJsonValue(value, pathName = "result", active = new Set()) {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (value && typeof value === "object") {
+    const proto = Object.getPrototypeOf(value);
+    if ((!Array.isArray(value) && proto !== Object.prototype && proto !== null) || active.has(value)) {
+      failure("RULE.RESULT.INVALID", `${pathName} must contain acyclic plain JSON data`);
+    }
+    active.add(value);
+    try {
+      if (Array.isArray(value)) {
+        return Array.from(value, (item, index) => ruleJsonValue(item, `${pathName}[${index}]`, active));
+      }
+      if (Reflect.ownKeys(value).some(key => typeof key !== "string")) {
+        failure("RULE.RESULT.INVALID", `${pathName} must have string keys`);
+      }
+      const output = Object.create(null);
+      for (const [key, item] of Object.entries(value)) output[key] = ruleJsonValue(item, `${pathName}.${key}`, active);
+      return output;
+    } finally { active.delete(value); }
+  }
+  failure("RULE.RESULT.INVALID", `${pathName} must contain portable JSON values`);
+}
 async function localTools(packageRoot) {
   const require = createRequire(path.join(packageRoot, "package.json"));
   const version = require("typescript");
@@ -94,7 +117,18 @@ function sourceService(ts, packageRoot, facts) {
   }
   function imports(file) {
     const {tree} = parsed(file);
-    return tree.statements.filter(node => node.moduleSpecifier).map(node => ({ specifier: node.moduleSpecifier.text, resolved_path: resolvedImport(tree.fileName, node.moduleSpecifier.text), ...location(tree, node) }));
+    const result = [];
+    function visit(node) {
+      const argument = node.moduleSpecifier || (ts.SyntaxKind[node.kind] === "CallExpression" &&
+        (ts.SyntaxKind[node.expression.kind] === "ImportKeyword" || node.expression.getText(tree) === "require")
+        ? node.arguments?.[0] : null);
+      if (argument && ["StringLiteral", "NoSubstitutionTemplateLiteral"].includes(ts.SyntaxKind[argument.kind])) {
+        result.push({specifier: argument.text, resolved_path: resolvedImport(tree.fileName, argument.text), ...location(tree, node)});
+      }
+      for (const child of children(node)) visit(child);
+    }
+    visit(tree);
+    return result;
   }
   function reachable(file) {
     const found = new Set();
@@ -178,7 +212,7 @@ async function dispatch(request) {
     const context = Object.freeze({ ...supplied, abiVersion: RULE_ABI, ruleId: String(record.declaration.id), signal: record.controller.signal, sources: Object.freeze(publicSources) });
     try {
       const result = await record.callback(context, deepFreeze(jsonValue(request.inputs || {}, "inputs")), deepFreeze(jsonValue(request.params || {}, "params")));
-      return { implemented: true, result: jsonValue(result, "result") };
+      return { implemented: true, result: ruleJsonValue(result, "result") };
     } finally { dispose(); }
   }
   if (command === "invoke") {

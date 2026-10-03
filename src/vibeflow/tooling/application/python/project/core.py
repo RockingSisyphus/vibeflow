@@ -105,7 +105,7 @@ def load_workspace_resources(workspace: WorkspaceConfig) -> tuple[dict[str, Work
             if source.kind not in {"module","file"}:
                 raise WorkspaceConfigError("DESCRIPTOR.PYTHON_BASE_LIB.SOURCE", "Python base_lib source must be module or file", {"path":str(root.config_path)})
             base_registry.register(descriptor.id, module=module, display_name=descriptor.display_name,
-                description=descriptor.description, category=descriptor.category, version=descriptor.version)
+                description=descriptor.description, category=descriptor.category, version=descriptor.version, rulesets=descriptor.rulesets)
             has_base_registry = True
         for descriptor in catalogs.plugins:
             implementations = tuple(item for item in descriptor.implementations if item.language == "python")
@@ -115,7 +115,7 @@ def load_workspace_resources(workspace: WorkspaceConfig) -> tuple[dict[str, Work
             module = str((root.path/source.ref).resolve()) if source.kind == "file" else source.ref
             plugin_registry.register(descriptor.id,module=module,class_name=source.export or "Plugin",plugin_type=descriptor.plugin_type,
                 display_name=descriptor.display_name,description=descriptor.description,category=descriptor.category,version=descriptor.version,
-                config_schema=descriptor.config_schema,config_defaults=descriptor.config_defaults,priority=descriptor.priority)
+                config_schema=descriptor.config_schema,config_defaults=descriptor.config_defaults,priority=descriptor.priority, rulesets=descriptor.rulesets)
             has_plugin_registry = True
         legacy_resources, resource_findings = load_config_resources(root.project_config, base_path=root.path)
         findings.extend(annotate_findings(resource_findings, root=root, source_path=root.config_path))
@@ -518,6 +518,7 @@ def _merge_plugin_registry(target: PluginRegistry, source: PluginRegistry) -> No
                 root_id=descriptor.root_id,
                 root_path=descriptor.root_path,
                 source_path=descriptor.source_path,
+                rulesets=descriptor.rulesets,
                 conflict="error",
             )
 

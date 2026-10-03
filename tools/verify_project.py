@@ -151,6 +151,14 @@ def _javascript_integration(scratch: Path) -> None:
     )
 
 
+def _rule_sandboxes(scratch: Path) -> None:
+    toolchain = scratch / "pytest/javascript-toolchain"
+    _run((PYTHON, "sandbox/rule_parity/run_all.py", "--current-only", "--toolchain", toolchain,
+          "--work", scratch / "rule-parity", "--report", scratch / "rule-parity.json"))
+    _run((PYTHON, "sandbox/rule_gaps/run_all.py", "--toolchain", toolchain,
+          "--renderer", _puppeteer_root(scratch), "--work", scratch / "rule-gaps", "--report", scratch / "rule-gaps.json"))
+
+
 def _venv_python(root: Path) -> Path:
     relative = Path("Scripts/python.exe") if os.name == "nt" else Path("bin/python")
     return root / relative
@@ -183,7 +191,7 @@ def _isolation_declarations() -> list[dict[str, object]]:
             contract = {"requires": [{"type": "value.out", "cardinality": "exactly_one", "display_name": "Result"}],
                         "input_semantics": {"value.out": ["Isolation result"]}}
         declarations.append({"kind": "node", "type_key": "isolation." + key, "display_name": key.title(),
-            "category": "isolation", "description": "Isolated " + key + " implementation.", "version": "1.0.0",
+             "description": "Isolated " + key + " implementation.", "version": "1.0.0",
             "flow_kind": kind, "rulesets": ["vibeflow.process"], "contract": contract,
             "implementations": [{"language": "python", "targets": ["python"], "source": {"kind": "file", "ref": "isolation_nodes.py", "export": symbol}}]})
     return declarations
@@ -359,7 +367,7 @@ def _wheel_smoke(scratch: Path) -> None:
             "from vibeflow.targets.javascript import WorkflowSpec",
             "from vibeflow.tooling.project.config_loader import load_config_document",
             "root = files('vibeflow')",
-            "for name in ('config.schema.json', 'health_report.schema.json', 'node.schema.json', 'nodeset.schema.json', 'policy.schema.json', 'rule.schema.json', 'ruleset.schema.json', 'node_category.schema.json', 'bundle.schema.json'):",
+            "for name in ('config.schema.json', 'health_report.schema.json', 'node.schema.json', 'nodeset.schema.json', 'policy.schema.json', 'rule.schema.json', 'ruleset.schema.json', 'bundle.schema.json'):",
             "    assert root.joinpath('tooling/project/schema', name).is_file()",
             "for name in ('runtime_helpers.mjs', 'toolchain_driver.mjs', 'plugin_worker.mjs', 'plugin_abi.d.ts', 'rule_abi.d.ts'):",
             "    assert root.joinpath('targets/javascript/resources', name).is_file()",
@@ -573,6 +581,7 @@ def _steps(*, full: bool) -> tuple[Step, ...]:
         Step("python-sandbox", _python_sandbox),
         Step("javascript-minimal", _javascript_minimal),
         Step("javascript-integration", _javascript_integration),
+        Step("rule-regression-sandboxes", _rule_sandboxes),
         Step("wheel-isolation", _wheel_smoke),
         Step("generated-artifact-cleanup", _cleanup_generated_artifacts),
         Step("distribution", _distribution_smoke),

@@ -2,7 +2,6 @@
   "kind": "node",
   "type_key": "example.transform",
   "display_name": "Transform",
-  "category": "data_transform",
   "description": "One explicitly named function block.",
   "version": "0.15.0",
   "flow_kind": "process",
@@ -45,5 +44,16 @@
         "export": "run"
       }
     }
+  ],
+  "rulesets": [
+    "vibeflow.process",
+    "example.model_domain"
+  ],
+  "presentation": {
+    "fill": "#dff7df",
+    "shape": "rounded"
+  },
+  "tags": [
+    "data_transform"
   ]
 }

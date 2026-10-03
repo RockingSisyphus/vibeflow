@@ -149,7 +149,6 @@ _CONTRACT = NodeContract(
 OrdinaryCallbackNode_DECLARATION = node_declaration(NodeInfo(
         "test.callback.ordinary",
         "Ordinary Callback",
-        "test",
         "Invokes a runtime callback from an ordinary process node.",
         "0.1.0",
         "process",
@@ -166,7 +165,6 @@ class OrdinaryCallbackNode:
 GlobalStateCallbackNode_DECLARATION = node_declaration(NodeInfo(
         "test.callback.global",
         "Global Callback",
-        "test",
         "Declares a visible runtime callback boundary.",
         "0.1.0",
         "global_state",
@@ -183,7 +181,6 @@ class GlobalStateCallbackNode:
 IoCallbackNode_DECLARATION = node_declaration(NodeInfo(
         "test.callback.io",
         "IO Callback",
-        "test",
         "Invokes a runtime callback inside an existing IO boundary.",
         "0.1.0",
         "io",
@@ -200,7 +197,6 @@ class IoCallbackNode:
 ExternalCallbackNode_DECLARATION = node_declaration(NodeInfo(
         "test.callback.external",
         "External Callback",
-        "test",
         "Represents an unavailable external callback adapter.",
         "0.1.0",
         "process",

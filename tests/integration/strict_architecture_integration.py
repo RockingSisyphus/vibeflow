@@ -132,7 +132,6 @@ def test_architecture_cli_stdout_contains_canonical_document(tmp_path, capsys) -
         "workflow",
         "nodesets",
         "node_types",
-        "node_categories",
         "resources",
     ]
     assert not document_path.exists()
@@ -437,6 +436,5 @@ def test_workspace_run_writes_canonical_architecture_artifact(tmp_path) -> None:
         "workflow",
         "nodesets",
         "node_types",
-        "node_categories",
         "resources",
     ]

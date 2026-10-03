@@ -1913,7 +1913,7 @@ def _xml_local_name(tag: str) -> str:
 def _node_declaration(info, contract, *, schema=None, defaults=None):
     from vibeflow.core.descriptors.models import NodeContractDescriptor, NodeDescriptor
     return NodeDescriptor(type_key=info.type_key, display_name=info.display_name,
-        category=info.category, description=info.description, version=info.version,
+         description=info.description, version=info.version,
         flow_kind=info.flow_kind, rulesets=(), contract=NodeContractDescriptor(
             requires=contract.requires, provides=contract.provides,
             input_semantics=contract.input_semantics or {item.type:("Fixture input.",) for item in contract.requires},
@@ -2031,7 +2031,7 @@ def _import_rule_findings(entry: Path, *, project_root: Path, source_roots=()):
     from vibeflow.tooling.application.python.project.source_preflight import collect_python_source_facts
 
     descriptor = NodeDescriptor(type_key="sandbox.preflight", display_name="Preflight",
-        category="sandbox", description="Import-rule acceptance fixture.", version="0.1.0",
+         description="Import-rule acceptance fixture.", version="0.1.0",
         flow_kind="process", rulesets=("vibeflow.process",), contract=NodeContractDescriptor())
     facts = collect_python_source_facts(entry, project_root=project_root, source_roots=tuple(source_roots))
     context = build_python_source_context(
@@ -2415,7 +2415,7 @@ def _thread_probe_registry():
     ThreadProbeNode_DECLARATION = _node_declaration(NodeInfo(
             type_key="sandbox.thread_probe",
             display_name="Thread probe",
-            category="sandbox",
+
             description="Reports the current Python thread.",
             version="0.1.0",
             flow_kind="process",
@@ -2432,7 +2432,7 @@ def _thread_probe_registry():
     ThreadStartNode_DECLARATION = _node_declaration(NodeInfo(
             type_key="sandbox.thread_start",
             display_name="Thread probe start",
-            category="sandbox",
+
             description="Starts the thread execution fixture.",
             version="0.1.0",
             flow_kind="terminal",
@@ -2446,7 +2446,7 @@ def _thread_probe_registry():
     ThreadEndNode_DECLARATION = _node_declaration(NodeInfo(
             type_key="sandbox.thread_end",
             display_name="Thread probe end",
-            category="sandbox",
+
             description="Ends after joining a thread probe result.",
             version="0.1.0",
             flow_kind="terminal",
@@ -3273,13 +3273,13 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
     from vibeflow.targets.python.project import NodeContract, NodeInfo, NodeRegistry
     from vibeflow.targets.python.runtime.engine import PipelineRuntime
 
-    RuntimeStartNode_DECLARATION = _node_declaration(NodeInfo("sandbox.runtime_start", "Runtime Start", "sandbox", "runtime test start", "0.1.0", "terminal"), NodeContract(examples=({"inputs": {}, "params": {}},)))
+    RuntimeStartNode_DECLARATION = _node_declaration(NodeInfo("sandbox.runtime_start", "Runtime Start", "runtime test start", "0.1.0", "terminal"), NodeContract(examples=({"inputs": {}, "params": {}},)))
     class RuntimeStartNode:
 
         def run_pure(self, inputs, params):
             return {}
 
-    RuntimeEndNode_DECLARATION = _node_declaration(NodeInfo("sandbox.runtime_end", "Runtime End", "sandbox", "runtime test end", "0.1.0", "terminal"), NodeContract(requires=(DataRequirement("bad.out", "exactly_one", display_name="bad.out"),), input_semantics={"bad.out": ("bad output",)}, examples=({"inputs": {"bad.out": 1}, "params": {}},)))
+    RuntimeEndNode_DECLARATION = _node_declaration(NodeInfo("sandbox.runtime_end", "Runtime End", "runtime test end", "0.1.0", "terminal"), NodeContract(requires=(DataRequirement("bad.out", "exactly_one", display_name="bad.out"),), input_semantics={"bad.out": ("bad output",)}, examples=({"inputs": {"bad.out": 1}, "params": {}},)))
     class RuntimeEndNode:
 
         def run_pure(self, inputs, params):

@@ -18,7 +18,6 @@ from vibeflow.core import (
 )
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
 from vibeflow.core.descriptors import DescriptorCatalogs, PluginSelectionError
-from vibeflow.core.descriptors.categories import selected_node_rulesets
 from vibeflow.core.flow import (
     IO_NODE_TYPE,
     LOOP_NODE_TYPES,
@@ -293,7 +292,7 @@ def audit_javascript_project(
                 str(exc),
                 diagnostics=(*exc.diagnostics, *width_warnings),
             ) from exc
-    rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **compiled_by_path}, node_report=rule_report, project_root=root.path, package_root=package_root, rule_defaults={"vibeflow.workflow": {"nodeset_max_depth": javascript["nodeset_max_depth"]}, "vibeflow.graph.nodesets": {"nodeset_max_depth": javascript["nodeset_max_depth"]}}, node_command=request.node_command, evaluate_sources=request.audit_sources,
+    rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **compiled_by_path}, compiled_nodesets=compiled_nodesets, node_report=rule_report, project_root=root.path, package_root=package_root, rule_defaults={"vibeflow.workflow": {"nodeset_max_depth": javascript["nodeset_max_depth"]}, "vibeflow.graph.nodesets": {"nodeset_max_depth": javascript["nodeset_max_depth"]}}, node_command=request.node_command, evaluate_sources=request.audit_sources,
                                                  quality_policy=request.quality_policy or javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
     workflow_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if workflow_errors:
@@ -316,7 +315,6 @@ def audit_javascript_project(
         source_path=config_path.relative_to(root.path).as_posix(),
     )
     architecture["rule_checks"] = _relative_rule_checks(rule_report.to_dict(), root.path)
-    architecture["node_categories"] = catalogs.categories.to_dict()
     return JavascriptAuditResult(
         workspace=workspace,
         root=root,
@@ -851,7 +849,7 @@ def _architecture_payload(
         },
         "node_types": {
             descriptor.type_key: {**descriptor.to_dict(),
-                "effective_presentation": resolve_presentation(descriptor, catalogs.categories.get(descriptor.category)).to_dict(),
+                "effective_presentation": resolve_presentation(descriptor).to_dict(),
             }
             for descriptor in catalogs.nodes
         },
@@ -995,19 +993,19 @@ def _javascript_node_document(
         else "node_type"
     )
     descriptor = catalogs.nodes.get(type_used)
-    category = catalogs.categories.get(descriptor.category) if descriptor else None
     native_class = "externalDependency" if descriptor is not None and descriptor.external and nodeset is None else "loopNode" if is_loop else "nodesetNode" if nodeset is not None else "documentNode" if flow_kind == "document" else "defaultNode"
     planned = status == STATUS_PLANNED or nodeset is not None and nodeset.status == STATUS_PLANNED
-    presentation = resolve_presentation(descriptor, category, native_class=native_class, status_class="plannedNode" if planned else "", call_style=getattr(node, "style", None), flow_kind=flow_kind)
+    presentation = resolve_presentation(descriptor, native_class=native_class, status_class="plannedNode" if planned else "", call_style=getattr(node, "style", None), flow_kind=flow_kind)
     return {
         "id": node_id,
         "type_used": type_used,
         "source": dict(source),
         "role": getattr(node, "metadata").to_dict(),
-        "category": descriptor.category if descriptor else "",
         "presentation": presentation.to_dict(),
         "rulesets": list(nodeset.graph.rulesets) if nodeset is not None else list(descriptor.rulesets) if descriptor and descriptor.rulesets is not None else None,
-        "selected_rulesets": list(nodeset.graph.rulesets) if nodeset is not None else list(selected_node_rulesets(descriptor, catalogs.categories)) if descriptor else [],
+        "selected_rulesets": list(nodeset.graph.rulesets) if nodeset is not None else list(descriptor.rulesets) if descriptor else [],
+        "tags": list(descriptor.tags) if descriptor else [],
+        "metadata": dict(descriptor.metadata) if descriptor else {},
         "contract_source": contract_source,
         "flow_kind": flow_kind,
         "effect_scope": "unavailable" if planned else _effect_scope_label(compiled, node_id, flow_kind),

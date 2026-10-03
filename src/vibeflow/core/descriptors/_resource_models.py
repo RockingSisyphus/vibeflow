@@ -30,7 +30,10 @@ class BaseLibDescriptor:
     category: str = ""
     version: str = ""
 
+    rulesets: tuple[str, ...] = ()
+
     def __post_init__(self) -> None:
+        object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="base_lib.rulesets"))
         object.__setattr__(
             self,
             "id",
@@ -93,6 +96,7 @@ class BaseLibDescriptor:
     def to_dict(self) -> dict[str, object]:
         return {
             "kind": "base_lib",
+            "rulesets": list(self.rulesets),
             "id": self.id,
             "display_name": self.display_name,
             "description": self.description,
@@ -297,7 +301,10 @@ class HostExtensionDescriptor:
     description: str = ""
     version: str = ""
 
+    rulesets: tuple[str, ...] = ()
+
     def __post_init__(self) -> None:
+        object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="host_extension.rulesets"))
         object.__setattr__(
             self,
             "id",
@@ -377,6 +384,7 @@ class HostExtensionDescriptor:
     def to_dict(self) -> dict[str, object]:
         return {
             "kind": "host_extension",
+            "rulesets": list(self.rulesets),
             "id": self.id,
             "targets": list(self.targets),
             "display_name": self.display_name,
@@ -414,7 +422,10 @@ class PluginDescriptor:
     description: str = ""
     version: str = ""
 
+    rulesets: tuple[str, ...] = ()
+
     def __post_init__(self) -> None:
+        object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="plugin.rulesets"))
         plugin_id = _required_text(self.id, field_name="plugin.id")
         plugin_type = _required_text(
             self.plugin_type,
@@ -504,6 +515,7 @@ class PluginDescriptor:
     def to_dict(self) -> dict[str, object]:
         return {
             "kind": "plugin",
+            "rulesets": list(self.rulesets),
             "id": self.id,
             "type": self.plugin_type,
             "targets": list(self.targets),

@@ -18,7 +18,7 @@ from vibeflow.core.contracts import provider_keys, providers_to_dicts, requireme
 from vibeflow.targets.python.project.registry import NodeRegistry, NodeRegistryError
 
 
-def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry | None) -> tuple[tuple[HealthFinding, ...], tuple[HealthFinding, ...]]:
+def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry | None, selected_only: bool = False) -> tuple[tuple[HealthFinding, ...], tuple[HealthFinding, ...]]:
     errors: list[HealthFinding] = []
     warnings: list[HealthFinding] = []
     dependencies = analyze_nodeset_dependencies(graph)
@@ -27,7 +27,7 @@ def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry | None) -> t
         for name, items in dependencies.nodesets.items()
     }
     for nodeset in graph.nodesets.values():
-        if nodeset.status == STATUS_PLANNED:
+        if nodeset.status == STATUS_PLANNED or (selected_only and not nodeset.graph.rulesets):
             continue
         errors.extend(_validate_nodeset_metadata(nodeset))
         errors.extend(_validate_nodeset_contract(nodeset))
@@ -61,6 +61,8 @@ def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry | None) -> t
     )
     errors.extend(_validate_nodeset_usages(graph.nodes, graph.nodesets, owner="pipeline"))
     for nodeset in graph.nodesets.values():
+        if selected_only and not nodeset.graph.rulesets:
+            continue
         errors.extend(_validate_nodeset_usages(nodeset.graph.nodes, graph.nodesets, owner=f"nodeset:{nodeset.type_key}"))
     return tuple(errors), tuple(warnings)
 

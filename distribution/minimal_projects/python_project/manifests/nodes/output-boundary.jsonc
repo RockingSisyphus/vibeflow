@@ -5,7 +5,6 @@
   ],
   "type_key": "minimal.output_boundary",
   "display_name": "Output boundary",
-  "category": "boundary",
   "description": "Adapts the processed payload to the public response.",
   "version": "0.15.0",
   "flow_kind": "io",
@@ -52,5 +51,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "boundary"
+  ]
 }

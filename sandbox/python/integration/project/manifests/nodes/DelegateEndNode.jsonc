@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.delegate_end",
   "display_name": "CLI 流程结束",
-  "category": "sandbox",
   "description": "消费 cli.exit_code 并结束让渡 CLI graph。",
   "version": "0.1.0",
   "flow_kind": "terminal",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

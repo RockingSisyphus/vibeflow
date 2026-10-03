@@ -2,7 +2,6 @@
   "kind": "node",
   "type_key": "example.calculate",
   "display_name": "Calculate",
-  "category": "rule_graph",
   "description": "An executable Node in the typed Rule graph example.",
   "version": "0.15.0",
   "flow_kind": "process",
@@ -48,5 +47,8 @@
         "export": "calculate"
       }
     }
+  ],
+  "tags": [
+    "rule_graph"
   ]
 }

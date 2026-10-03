@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.next_value_end",
   "display_name": "循环结果结束",
-  "category": "sandbox",
   "description": "用于较小循环示例的结束节点，表示循环判断完成后已经得到最终的 value.next。",
   "version": "0.1.0",
   "flow_kind": "terminal",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

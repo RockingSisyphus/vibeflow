@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.invalid.package_root_escape",
   "display_name": "Invalid package root escape",
-  "category": "sandbox-negative",
   "description": "Imports a local source outside the JavaScript package root.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -49,5 +51,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox-negative"
+  ]
 }

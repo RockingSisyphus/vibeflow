@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.delegate_document",
   "display_name": "读取 CLI 文档输入",
-  "category": "sandbox",
   "description": "由 document 节点执行真实文件读取并形成业务文档内容。",
   "version": "0.1.0",
   "flow_kind": "document",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.numeric_path_writer",
   "display_name": "通过 Path 写入结果",
-  "category": "sandbox",
   "description": "使用 Path.write_text 将 number.total 写入 cli.output_path，并提供 document.output_written。",
   "version": "0.1.0",
   "flow_kind": "document",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

@@ -63,7 +63,12 @@ class JavascriptPluginSession:
         package_root: str | Path,
         target: str,
         workflow_id: str,
+        rule_catalogs: Any = None,
     ) -> None:
+        if plugin.get("rulesets"):
+            from vibeflow.targets.javascript.build.rule_extensions import check_plugin_rules
+            check_plugin_rules(plugin, package_root=Path(package_root), target=target,
+                               catalogs=rule_catalogs, node_command=self.node_command)
         self._request(
             {
                 "command": "open",

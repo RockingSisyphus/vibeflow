@@ -12,7 +12,7 @@ from math import isfinite
 from types import MappingProxyType
 from typing import Any, Mapping
 
-from vibeflow.core.descriptors.models import ImplementationDescriptor
+from vibeflow.core.descriptors.models import RuleImplementationDescriptor
 from vibeflow.core.findings import Finding
 
 
@@ -90,7 +90,9 @@ def _record_snapshot(value: Any, active: set[int] | None = None) -> Any:
 
 
 def _text(value: object, name: str) -> str:
-    text = str(value or "").strip()
+    if not isinstance(value, str):
+        raise ValueError(f"{name} must be a non-empty string")
+    text = value.strip()
     if not text:
         raise ValueError(f"{name} must be a non-empty string")
     return text
@@ -101,7 +103,7 @@ class RuleDescriptor:
     id: str
     display_name: str = ""
     description: str = ""
-    implementations: tuple[ImplementationDescriptor, ...] = ()
+    implementations: tuple[RuleImplementationDescriptor, ...] = ()
     inputs: Mapping[str, str] = field(default_factory=dict)
     outputs: Mapping[str, str] = field(default_factory=dict)
     params_schema: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
@@ -111,7 +113,7 @@ class RuleDescriptor:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "id", _text(self.id, "rule.id"))
-        if self.scope not in {"call", "source"}:
+        if not isinstance(self.scope, str) or self.scope not in {"call", "source"}:
             raise ValueError("rule.scope must be 'call' or 'source'")
         for name in ("inputs", "outputs"):
             value = getattr(self, name)
@@ -123,8 +125,11 @@ class RuleDescriptor:
                 raise ValueError(f"rule.{name} must be an object")
             object.__setattr__(self, name, readonly(getattr(self, name)))
         implementations = tuple(self.implementations)
-        if not all(isinstance(item, ImplementationDescriptor) for item in implementations):
-            raise ValueError("rule.implementations must contain ImplementationDescriptor")
+        if not all(isinstance(item, RuleImplementationDescriptor) for item in implementations):
+            raise ValueError("rule.implementations must contain RuleImplementationDescriptor")
+        families = [item.execution_family for item in implementations]
+        if len(set(families)) != len(families):
+            raise ValueError("rule.implementations contains duplicate execution families")
         object.__setattr__(self, "implementations", implementations)
 
     def to_dict(self) -> dict[str, object]:
@@ -170,7 +175,7 @@ class RuleRelation:
     def __post_init__(self) -> None:
         object.__setattr__(self, "source", _text(self.source, "relation.source"))
         object.__setattr__(self, "target", _text(self.target, "relation.target"))
-        if self.kind not in {"includes", "requires", "overrides"}:
+        if not isinstance(self.kind, str) or self.kind not in {"includes", "requires", "overrides"}:
             raise ValueError(f"unknown rule relation kind: {self.kind}")
         if not isinstance(self.bindings, Mapping) or not isinstance(self.params, Mapping):
             raise ValueError("relation bindings/params must be objects")
@@ -178,6 +183,11 @@ class RuleRelation:
             raise ValueError("only requires relations can bind records")
         if self.kind != "overrides" and (self.params or self.replace_rule):
             raise ValueError("only overrides relations can replace params/checker")
+        for port, output in self.bindings.items():
+            _text(port, "relation.bindings port")
+            _text(output, "relation.bindings output")
+        if self.replace_rule:
+            _text(self.replace_rule, "relation.replace_rule")
         object.__setattr__(self, "bindings", readonly(self.bindings))
         object.__setattr__(self, "params", readonly(self.params))
 
@@ -241,11 +251,11 @@ class RuleResult:
     state: str = "completed"
 
     def __post_init__(self) -> None:
-        if self.state not in {"completed", "failed", "unavailable"}:
+        if not isinstance(self.state, str) or self.state not in {"completed", "failed", "unavailable"}:
             raise ValueError(f"unknown rule result state: {self.state}")
         if not isinstance(self.records, Mapping):
             raise ValueError("rule result records must be an object")
-        records = {str(key): value if isinstance(value, RuleRecord) else RuleRecord(**value) for key, value in self.records.items()}
+        records = {_text(key, "result port"): value if isinstance(value, RuleRecord) else RuleRecord(**value) for key, value in self.records.items()}
         findings = tuple(self.findings)
         if not all(isinstance(item, Finding) for item in findings):
             raise ValueError("rule result findings must contain Finding")

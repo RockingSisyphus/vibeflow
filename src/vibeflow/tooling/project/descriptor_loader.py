@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path, PureWindowsPath
 from typing import Any, Mapping
 
@@ -28,12 +28,11 @@ from vibeflow.core.descriptors.models import (
     PluginDescriptor,
 )
 from vibeflow.core.config.node import NodeConfigError
-from vibeflow.core.descriptors.catalogs import BundleCatalog, NodeCategoryCatalog, RuleCatalog, RulesetCatalog
-from vibeflow.core.descriptors.categories import ContributionBundle
+from vibeflow.core.descriptors.catalogs import BundleCatalog, RuleCatalog, RulesetCatalog
+from vibeflow.core.descriptors.bundles import ContributionBundle
 
 
 _CONFIG_KEYS = (
-    "categories",
     "nodes",
     "rules",
     "rulesets",
@@ -45,7 +44,6 @@ _CONFIG_KEYS = (
     "plugins",
 )
 _MANIFEST_KINDS = {
-    "categories": "node_category",
     "nodes": "node",
     "rules": "rule",
     "rulesets": "ruleset",
@@ -64,19 +62,27 @@ class DescriptorLoadError(ValueError):
     message: str
     path: str = ""
     field: str = ""
+    details: Mapping[str, Any] = dataclass_field(default_factory=dict)
+
+    @property
+    def diagnostics(self) -> tuple[Mapping[str, Any], ...]:
+        return ({"code": self.code, "severity": "error", "message": self.message,
+                 "source_location": {"path": self.path, "line": 1, "column": 1},
+                 "details": {"field": self.field, "source": self.path, **self.details}},)
 
     def __str__(self) -> str:
         location = self.path
         if self.field:
             location = f"{location}:{self.field}" if location else self.field
+        previous = self.details.get("previous_source", "")
         return f"{self.code}: {self.message}" + (
             f" ({location})" if location else ""
-        )
+        ) + (f"; previous declaration: {previous}" if previous else "")
 
     def __reduce__(self):
         return (
             type(self),
-            (self.code, self.message, self.path, self.field),
+            (self.code, self.message, self.path, self.field, self.details),
         )
 
 
@@ -149,7 +155,6 @@ def load_descriptor_catalogs(
     capabilities = CapabilityCatalog()
     host_extensions = HostExtensionCatalog()
     plugins = PluginCatalog()
-    categories = NodeCategoryCatalog()
     bundles = BundleCatalog()
     rules = RuleCatalog()
     rulesets = RulesetCatalog()
@@ -166,7 +171,6 @@ def load_descriptor_catalogs(
         "capabilities": capabilities,
         "host_extensions": host_extensions,
         "plugins": plugins,
-        "categories": categories,
         "bundles": bundles,
         "rules": rules,
         "rulesets": rulesets,
@@ -208,11 +212,8 @@ def load_descriptor_catalogs(
                         code=exc.code,
                         message=exc.message,
                         path=exc.source,
-                        field=(
-                            f"previous_source={exc.previous_source}"
-                            if exc.previous_source
-                            else ""
-                        ),
+                        field="id", details={"resource_id": exc.descriptor_id,
+                            "source": exc.source, "previous_source": exc.previous_source},
                     ) from exc
                 source_files.append(manifest_path)
 
@@ -225,7 +226,6 @@ def load_descriptor_catalogs(
         capabilities=capabilities,
         host_extensions=host_extensions,
         plugins=plugins,
-        categories=categories,
         bundles=bundles,
         rules=rules,
         rulesets=rulesets,
@@ -254,7 +254,8 @@ def _load_bundle_resources(root: Path, catalogs: Mapping[str, object], parsed_fi
                     try:
                         catalogs[group].register(descriptor, source=str(resource_path))
                     except DescriptorCatalogError as exc:
-                        raise DescriptorLoadError(exc.code, exc.message, exc.source, exc.previous_source) from exc
+                        raise DescriptorLoadError(exc.code, exc.message, exc.source, "id",
+                            {"resource_id": exc.descriptor_id, "source": exc.source, "previous_source": exc.previous_source}) from exc
                     parsed_files.add(resource_path)
                     source_files.append(resource_path)
                 if isinstance(descriptor, ContributionBundle):
@@ -309,12 +310,14 @@ def _load_manifest(
             code="DESCRIPTOR.JSONC",
             message=str(exc),
             path=str(path),
+            field=str(exc).split(" ", 1)[0],
         ) from exc
     except (DescriptorModelError, NodeConfigError) as exc:
         raise DescriptorLoadError(
             code="DESCRIPTOR.INVALID",
             message=str(exc),
             path=str(path),
+            field=str(exc).split(" ", 1)[0],
         ) from exc
 
 

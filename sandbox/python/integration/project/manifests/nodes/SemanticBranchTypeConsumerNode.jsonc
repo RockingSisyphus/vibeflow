@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.branch_type_consumer",
   "display_name": "Semantic Branch Type Consumer",
-  "category": "semantic",
   "description": "Consumes one branch_result envelope and uses its source key to produce a source-aware final value.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

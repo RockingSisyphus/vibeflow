@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "sandbox.delegate_output",
   "display_name": "写出 CLI 结果",
-  "category": "sandbox",
   "description": "把业务结果写入真实 stdout/stderr，并形成保留的 cli.exit_code。",
   "version": "0.1.0",
   "flow_kind": "io",
   "author": null,
-  "tags": [],
+  "tags": [
+    "sandbox"
+  ],
   "external": false,
   "contract": {
     "requires": [

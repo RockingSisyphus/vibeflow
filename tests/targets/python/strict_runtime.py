@@ -287,7 +287,7 @@ class NoDeepcopyObject:
         raise AssertionError("should not deepcopy runtime objects")
 
 
-LoopCopyNode_DECLARATION = node_declaration(NodeInfo("test.loop_copy", "Loop Copy", "test", "Copies value.out into the next value.in slot.", "0.1.0", "process"), NodeContract(
+LoopCopyNode_DECLARATION = node_declaration(NodeInfo("test.loop_copy", "Loop Copy", "Copies value.out into the next value.in slot.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
         provides=(DataProvider("value.loop", "value.in", display_name="value.loop"),),
         input_semantics={"value.out": ("output value",)},
@@ -301,7 +301,7 @@ class LoopCopyNode:
         return {"value.loop": inputs["value.out"]["value"]}
 
 
-BranchCopyNode_DECLARATION = node_declaration(NodeInfo("test.branch_copy", "Branch Copy", "test", "Copies value.out into a distinct value.in-compatible key.", "0.1.0", "process"), NodeContract(
+BranchCopyNode_DECLARATION = node_declaration(NodeInfo("test.branch_copy", "Branch Copy", "Copies value.out into a distinct value.in-compatible key.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("value.out", "exactly_one", display_name="Value Out"),),
         provides=(DataProvider("value.copy", "value.in", display_name="Value Copy"),),
         input_semantics={"value.out": ("output value selected by the route",)},
@@ -314,7 +314,7 @@ class BranchCopyNode:
         return {"value.copy": inputs["value.out"]["value"]}
 
 
-LoopAddItemNode_DECLARATION = node_declaration(NodeInfo("test.loop_add_item", "Loop Add Item", "test", "Adds one loop item into a running total.", "0.1.0", "process"), NodeContract(
+LoopAddItemNode_DECLARATION = node_declaration(NodeInfo("test.loop_add_item", "Loop Add Item", "Adds one loop item into a running total.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("total.current", "exactly_one", display_name="total.current"), DataRequirement("item.value", "exactly_one", display_name="item.value")),
         provides=(DataProvider("total.next", "total.next", display_name="total.next"), DataProvider("item.metric", "item.metric", display_name="item.metric")),
 
@@ -327,7 +327,7 @@ class LoopAddItemNode:
         return {"total.next": inputs["total.current"]["value"] + item, "item.metric": item}
 
 
-LoopStepUntilNode_DECLARATION = node_declaration(NodeInfo("test.loop_step_until", "Loop Step Until", "test", "Increments loop.current until it reaches target.", "0.1.0", "process"), NodeContract(
+LoopStepUntilNode_DECLARATION = node_declaration(NodeInfo("test.loop_step_until", "Loop Step Until", "Increments loop.current until it reaches target.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("loop.current", "exactly_one", display_name="loop.current"),),
         provides=(DataProvider("loop.next", "loop.next", display_name="loop.next"), DataProvider("loop.done", "loop.done", display_name="loop.done")),
 
@@ -341,7 +341,7 @@ class LoopStepUntilNode:
         return {"loop.next": value, "loop.done": value >= params.get("target", 3)}
 
 
-LoopNextEndNode_DECLARATION = node_declaration(NodeInfo("test.loop_next_end", "Loop Next End", "test", "Ends one loop body after loop.next is ready.", "0.1.0", "terminal"), NodeContract(
+LoopNextEndNode_DECLARATION = node_declaration(NodeInfo("test.loop_next_end", "Loop Next End", "Ends one loop body after loop.next is ready.", "0.1.0", "terminal"), NodeContract(
         requires=(DataRequirement("loop.next", "exactly_one", display_name="Loop Next"),),
         input_semantics={"loop.next": ("next loop value",)},
     ), rulesets=("vibeflow.process",))
@@ -352,7 +352,7 @@ class LoopNextEndNode:
         return {}
 
 
-LoopFinalEndNode_DECLARATION = node_declaration(NodeInfo("test.loop_final_end", "Loop Final End", "test", "Ends a loop workflow after loop.final is ready.", "0.1.0", "terminal"), NodeContract(
+LoopFinalEndNode_DECLARATION = node_declaration(NodeInfo("test.loop_final_end", "Loop Final End", "Ends a loop workflow after loop.final is ready.", "0.1.0", "terminal"), NodeContract(
         requires=(DataRequirement("loop.final", "exactly_one", display_name="Loop Final"),),
         input_semantics={"loop.final": ("final loop value",)},
     ), rulesets=("vibeflow.process",))
@@ -363,7 +363,7 @@ class LoopFinalEndNode:
         return {}
 
 
-JoinPassthroughNode_DECLARATION = node_declaration(NodeInfo("test.join_passthrough", "Join Passthrough", "test", "Copies value.in to value.out.", "0.1.0", "process"), NodeContract(
+JoinPassthroughNode_DECLARATION = node_declaration(NodeInfo("test.join_passthrough", "Join Passthrough", "Copies value.in to value.out.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"),),
         provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
 
@@ -375,7 +375,7 @@ class JoinPassthroughNode:
         return {"value.out": inputs["value.in"]["value"]}
 
 
-ConditionalValueNode_DECLARATION = node_declaration(NodeInfo("test.conditional_value", "Conditional Value", "test", "Provides value.in and a branch flag.", "0.1.0", "process"), NodeContract(
+ConditionalValueNode_DECLARATION = node_declaration(NodeInfo("test.conditional_value", "Conditional Value", "Provides value.in and a branch flag.", "0.1.0", "process"), NodeContract(
         provides=(DataProvider("value.alt", "value.in", display_name="value.alt"), DataProvider("flow.use_alt", "flow.use_alt", display_name="flow.use_alt")),
 
     ), rulesets=("vibeflow.process",))
@@ -386,7 +386,7 @@ class ConditionalValueNode:
         return {"value.alt": 99, "flow.use_alt": True}
 
 
-LeftValueNode_DECLARATION = node_declaration(NodeInfo("test.left_value", "Left Value", "test", "Produces left value.in.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.left", "value.in", display_name="value.left"),)), rulesets=("vibeflow.process",))
+LeftValueNode_DECLARATION = node_declaration(NodeInfo("test.left_value", "Left Value", "Produces left value.in.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.left", "value.in", display_name="value.left"),)), rulesets=("vibeflow.process",))
 
 class LeftValueNode:
 
@@ -394,7 +394,7 @@ class LeftValueNode:
         return {"value.left": 1}
 
 
-RightValueNode_DECLARATION = node_declaration(NodeInfo("test.right_value", "Right Value", "test", "Produces right value.in.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.right", "value.in", display_name="value.right"),)), rulesets=("vibeflow.process",))
+RightValueNode_DECLARATION = node_declaration(NodeInfo("test.right_value", "Right Value", "Produces right value.in.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.right", "value.in", display_name="value.right"),)), rulesets=("vibeflow.process",))
 
 class RightValueNode:
 
@@ -402,7 +402,7 @@ class RightValueNode:
         return {"value.right": 2}
 
 
-OtherValueNode_DECLARATION = node_declaration(NodeInfo("test.other_value", "Other Value", "test", "Produces other.in.", "0.1.0", "process"), NodeContract(provides=(DataProvider("other.in", "other.in", display_name="other.in"),)), rulesets=("vibeflow.process",))
+OtherValueNode_DECLARATION = node_declaration(NodeInfo("test.other_value", "Other Value", "Produces other.in.", "0.1.0", "process"), NodeContract(provides=(DataProvider("other.in", "other.in", display_name="other.in"),)), rulesets=("vibeflow.process",))
 
 class OtherValueNode:
 
@@ -410,7 +410,7 @@ class OtherValueNode:
         return {"other.in": 10}
 
 
-TwoInputJoinNode_DECLARATION = node_declaration(NodeInfo("test.two_input_join", "Two Input Join", "test", "Adds value.in and other.in.", "0.1.0", "process"), NodeContract(
+TwoInputJoinNode_DECLARATION = node_declaration(NodeInfo("test.two_input_join", "Two Input Join", "Adds value.in and other.in.", "0.1.0", "process"), NodeContract(
         requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"), DataRequirement("other.in", "exactly_one", display_name="other.in")),
         provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
 
@@ -422,7 +422,7 @@ class TwoInputJoinNode:
         return {"value.out": inputs["value.in"]["value"] + inputs["other.in"]["value"]}
 
 
-InactiveRouteNode_DECLARATION = node_declaration(NodeInfo("test.inactive_route", "Inactive Route", "test", "Produces a false route flag.", "0.1.0", "decision"), NodeContract(
+InactiveRouteNode_DECLARATION = node_declaration(NodeInfo("test.inactive_route", "Inactive Route", "Produces a false route flag.", "0.1.0", "decision"), NodeContract(
         provides=(DataProvider("flow.route", "flow.route", display_name="flow.route"),),
 
     ), rulesets=("vibeflow.process",))
@@ -1210,7 +1210,7 @@ def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
 
 
 def test_runtime_options_compiled_rejects_decision_loop() -> None:
-    DoneCheckNode_DECLARATION = node_declaration(NodeInfo("test.done_check", "Done Check", "test", "Checks loop completion.", "0.1.0", "decision"), NodeContract(
+    DoneCheckNode_DECLARATION = node_declaration(NodeInfo("test.done_check", "Done Check", "Checks loop completion.", "0.1.0", "decision"), NodeContract(
             requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
             provides=(DataProvider("loop.done", "loop.done", display_name="loop.done"), DataProvider("value.loop", "value.in", display_name="value.loop")),
 
@@ -1233,7 +1233,7 @@ def test_runtime_options_compiled_rejects_decision_loop() -> None:
 
 
 def test_runtime_options_block_rejects_decision_loop_before_max_steps() -> None:
-    NeverDoneNode_DECLARATION = node_declaration(NodeInfo("test.never_done", "Never Done", "test", "Never exits loop.", "0.1.0", "decision"), NodeContract(
+    NeverDoneNode_DECLARATION = node_declaration(NodeInfo("test.never_done", "Never Done", "Never exits loop.", "0.1.0", "decision"), NodeContract(
             requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
             provides=(DataProvider("loop.done", "loop.done", display_name="loop.done"), DataProvider("value.loop", "value.in", display_name="value.loop")),
 
@@ -1254,7 +1254,7 @@ def test_runtime_options_block_rejects_decision_loop_before_max_steps() -> None:
 
 
 def test_runtime_options_compiled_generates_block_with_async_barrier() -> None:
-    OutToNextNode_DECLARATION = node_declaration(NodeInfo("test.out_to_next", "Out To Next", "test", "Copies value.out to value.next.", "0.1.0", "process"), NodeContract(
+    OutToNextNode_DECLARATION = node_declaration(NodeInfo("test.out_to_next", "Out To Next", "Copies value.out to value.next.", "0.1.0", "process"), NodeContract(
             requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
             provides=(DataProvider("value.next", "value.next", display_name="value.next"),),
         ), rulesets=("vibeflow.process",))
@@ -1264,7 +1264,7 @@ def test_runtime_options_compiled_generates_block_with_async_barrier() -> None:
         def run_pure(self, inputs, params):
             return {"value.next": inputs["value.out"]["value"]}
 
-    NextEndNode_DECLARATION = node_declaration(NodeInfo("test.next_end", "Next End", "test", "Ends after value.next.", "0.1.0", "terminal"), NodeContract(requires=(DataRequirement("value.next", "exactly_one", display_name="value.next"),)), rulesets=("vibeflow.process",))
+    NextEndNode_DECLARATION = node_declaration(NodeInfo("test.next_end", "Next End", "Ends after value.next.", "0.1.0", "terminal"), NodeContract(requires=(DataRequirement("value.next", "exactly_one", display_name="value.next"),)), rulesets=("vibeflow.process",))
 
     class NextEndNode:
 
@@ -1563,7 +1563,7 @@ def test_async_result_key_joins_when_required() -> None:
 
 
 def test_async_result_key_not_joined_when_unconsumed() -> None:
-    SlowResultNode_DECLARATION = node_declaration(NodeInfo("test.slow_result", "Slow Result", "test", "Slow result-key async task.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.async", "value.async", display_name="value.async"),), examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+    SlowResultNode_DECLARATION = node_declaration(NodeInfo("test.slow_result", "Slow Result", "Slow result-key async task.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.async", "value.async", display_name="value.async"),), examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
 
     class SlowResultNode:
 
@@ -1704,7 +1704,7 @@ def test_async_nodeset_result_key_joins_when_required() -> None:
 
 
 def test_async_detached_timeout_records_warning_and_does_not_block() -> None:
-    SlowNode_DECLARATION = node_declaration(NodeInfo("test.slow", "Slow", "test", "Slow detached task.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.out", "value.out", display_name="value.out"),), examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+    SlowNode_DECLARATION = node_declaration(NodeInfo("test.slow", "Slow", "Slow detached task.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.out", "value.out", display_name="value.out"),), examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
 
     class SlowNode:
 

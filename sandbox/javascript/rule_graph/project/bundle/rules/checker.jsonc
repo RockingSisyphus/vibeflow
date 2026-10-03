@@ -20,10 +20,6 @@
   "implementations": [
     {
       "language": "typescript",
-      "targets": [
-        "browser",
-        "node"
-      ],
       "source": {
         "kind": "file",
         "ref": "rules/checker.ts",

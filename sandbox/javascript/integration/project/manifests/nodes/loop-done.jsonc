@@ -1,8 +1,10 @@
 {
-  "kind": "node", "rulesets": ["vibeflow.process"],
+  "kind": "node",
+  "rulesets": [
+    "vibeflow.process"
+  ],
   "type_key": "sandbox.loop_done",
   "display_name": "Loop done",
-  "category": "sandbox",
   "description": "Reports whether the incremented loop value reached the configured target.",
   "version": "1.0.0",
   "flow_kind": "process",
@@ -55,5 +57,8 @@
     }
   ],
   "base_libs": [],
-  "capabilities": []
+  "capabilities": [],
+  "tags": [
+    "sandbox"
+  ]
 }

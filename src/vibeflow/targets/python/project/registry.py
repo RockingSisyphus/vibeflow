@@ -8,8 +8,6 @@ from typing import Any, Callable, Mapping
 
 from vibeflow.core.config.node import NodeConfigError, NodeConfigSpec, merge_node_config, normalize_node_config_spec
 from vibeflow.core.descriptors.models import NodeDescriptor
-from vibeflow.core.descriptors.catalogs import NodeCategoryCatalog
-from vibeflow.core.descriptors.categories import selected_node_rulesets
 
 
 @dataclass
@@ -41,7 +39,6 @@ class NodeRegistry:
         self._loaders: dict[str, Callable[[], type]] = {}
         self._registration_info: dict[str, NodeRegistrationInfo] = {}
         self._config_specs: dict[str, NodeConfigSpec] = {}
-        self.categories = NodeCategoryCatalog()
         self.rule_catalogs: object | None = None
         self._effect_policies: dict[str, str] = {}
         self.rule_policy_resolver: Callable[[str], str] | None = None
@@ -98,7 +95,7 @@ class NodeRegistry:
         return sorted(self._descriptors)
 
     def rulesets(self, key: str) -> tuple[str, ...]:
-        return selected_node_rulesets(self.descriptor(key), self.categories)
+        return self.descriptor(key).rulesets
 
     def source_info(self, key: str) -> NodeRegistrationInfo:
         return self._registration_info[self.descriptor(key).type_key]

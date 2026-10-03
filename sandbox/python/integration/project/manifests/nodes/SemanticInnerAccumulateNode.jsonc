@@ -2,12 +2,13 @@
   "kind": "node",
   "type_key": "semantic.inner_accumulate",
   "display_name": "Semantic Inner Accumulate",
-  "category": "semantic",
   "description": "Adds one nested outer/inner contribution, advances the inner counter, and emits a bool stop signal.",
   "version": "0.1.0",
   "flow_kind": "process",
   "author": null,
-  "tags": [],
+  "tags": [
+    "semantic"
+  ],
   "external": false,
   "contract": {
     "requires": [

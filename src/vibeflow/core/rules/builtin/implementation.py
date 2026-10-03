@@ -8,7 +8,8 @@ from vibeflow.core.rules.models import plain
 
 
 def _result(context, items):
-    return RuleResult({"diagnostics": RuleRecord("vibeflow.implementation_diagnostics.v1", [asdict(item) for item in items])},
+    return RuleResult({"diagnostics": RuleRecord("vibeflow.implementation_diagnostics.v1", [
+        {**asdict(item), "code": item.rule_id, "internal_code": item.code} for item in items])},
         tuple(HealthFinding(rule_id=item.rule_id, severity=item.severity, object_type="implementation",
                             object_id=str(context.subject.get("id", "")), message=item.message,
                             suggested_fix_type=item.suggested_fix_type, details=item.details) for item in items))
@@ -32,6 +33,7 @@ def _chain(context, inputs, params):
 
 def implementation_resources():
     return tuple(RuleDescriptor("vibeflow.implementation." + name,
+                               params_schema={"policy": {"type": "object"}}, params_defaults={"policy": {}},
                                outputs={"diagnostics": "vibeflow.implementation_diagnostics.v1"})
                  for name in ("node", "base_lib", "dependency_chain"))
 
@@ -51,7 +53,12 @@ def evaluate_implementation_rule(name, **facts):
     value = result.results["check"]
     if value.state != "completed":
         raise ValueError(value.findings[0].message)
-    return tuple(ImplementationFinding(**plain(item)) for item in value.records["diagnostics"].value)
+    findings = []
+    for item in value.records["diagnostics"].value:
+        values = plain(item)
+        values["code"] = values.pop("internal_code")
+        findings.append(ImplementationFinding(**values))
+    return tuple(findings)
 
 
 __all__ = ["evaluate_implementation_rule", "implementation_handlers", "implementation_resources"]
