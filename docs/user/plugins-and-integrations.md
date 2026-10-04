@@ -1,6 +1,6 @@
 # 统一插件与宿主集成
 
-所有自定义 Node、Rule、Ruleset、DataSchema、BaseLib、Capability、HostExtension 都由固定插件贡献。Python 用 `Plugin`，JS/TS 用 `definePlugin`；workflow 的 `plugins` 是唯一启用入口。普通模块导入、项目中的声明文件和资源 ID 本身不产生注册效果。
+固定插件贡献自定义 Node、Rule、Ruleset、DataSchema、BaseLib、Capability 和 HostExtension。Python 用 `Plugin`，JS/TS 用 `definePlugin`；workflow 的 `plugins` 显式选择本次使用的插件及资源。
 
 ## 选择与配置
 
@@ -8,22 +8,33 @@
 {
   "plugins": [{
     "id": "example.model",
-    "root": "python_project",
+    "root": "python-project",
     "source": {"kind": "file", "ref": "plugins/model.py", "export": "plugin"},
     "config": {"mode": "review"}
   }]
 }
 ```
 
-`id` 可选，用来核对插件导出身份。`root` 可选，必须是已登记 workspace root。文件相对该 root；`module/package` 显式定位 Target 已安装的模块。资源列表、契约、规则组合固定，插件配置不生成资源。配置按插件 schema/defaults 校验与合并，并以只读 `context.facts["plugins"]` 提供给 Rule，提供给生命周期工厂；Node 调用 `params` 与 Ruleset 参数独立。
+`id` 可选，用来核对插件导出身份。`root` 可选，取已登记的 workspace root ID。文件相对该 root；`module/package` 显式定位 Target 已安装的模块。插件导出固定资源列表、契约和规则组合；`config` 按插件 schema/defaults 合并，提供给 Rule 的只读 `context.facts["plugins"]` 及生命周期工厂。Node 调用 `params` 和 Ruleset 参数分别配置。
 
-先加载选中插件，再冻结资源集合，之后解析工作流资源引用和有效规则。不同 workflow 的 Catalog、配置与生命周期实例隔离。加载或声明失败直接报告根因，不继续装配未知 Node。禁用项 `enabled: false` 完全不加载；`status: "planned"` 只提供规划记录，不贡献可执行资源。Nodeset 导入文件不能隐式启用插件，所需插件由顶层 workflow 选择。
+不同 workflow 拥有独立的资源集合、插件配置和生命周期实例。`enabled: false` 跳过加载；`status: "planned"` 保存规划记录。Nodeset 的结构由导入文件提供，所需插件统一在顶层 workflow 选择。
 
-插件入口及其直接导入模块是受信初始化；规则可诊断已发生的顶层副作用，不能提前阻断或撤销。延迟源码引用的尚未加载实现仍可先检查。只读上下文是维护契约，不是操作系统沙箱。
+## 加载与检查
+
+VibeFlow 按以下顺序装配当前 workflow：
+
+1. 读取插件选择，加载受信入口及其直接导入，取得固定定义。
+2. 校验资源、配置和冲突，冻结本次资源集合。
+3. 解析工作流引用和有效 Ruleset，再执行对应阶段的检查。
+4. 绑定延迟实现，进入原生构建或运行；生命周期工厂在各自阶段创建实例。
+
+加载或声明失败时，报告该根因并停止后续装配。已初始化源码仍接受所选规则审查，诊断描述已经发生的行为；它不会撤销初始化。尚未加载的延迟实现及闭包在所选 import 检查失败后保持未加载。规则与插件是受信扩展代码；只读上下文保证公共分析资料的使用约定，执行进程仍具有普通代码的文件系统能力。
+
+资源查询与 `review-rules` 取得声明并展示选择，框架不调用检查函数、业务执行入口或生命周期工厂。
 
 ## 生命周期
 
-一个插件可以同时贡献资源并提供 compiler/runtime 工厂。审查使用 Rule，不恢复 policy hooks。声明、查询和 `review-rules` 不由框架调用生命周期工厂。
+一个插件可以同时贡献资源并提供 compiler/runtime 工厂。`declaration_rulesets` 检查插件声明源码，`rulesets` 检查生命周期实现；两者分别明确选择。常用选择是 `vibeflow.plugin_declaration` 与 `vibeflow.plugin`。
 
 ```python
 from vibeflow.targets.python.sdk import Plugin
@@ -37,15 +48,18 @@ class Audit:
 def create_runtime(context):
     return Audit()  # context["config"] 为本次 workflow 的只读参数
 
-plugin = Plugin(id="example.audit", resources=[], runtime=create_runtime)
+plugin = Plugin(id="example.audit", resources=[], runtime=create_runtime,
+                rulesets=["vibeflow.plugin"],
+                declaration_rulesets=["vibeflow.plugin_declaration"])
 ```
 
-Python hooks 的名称和参数沿用原生 PluginRegistry 协议。JS/TS 采用 Plugin ABI v3：
+Python 实例使用 snake_case hooks，如 `before_run(inputs)`、`after_run(result, trace)`、`before_compile(graph)` 和 `after_compile(graph, compiled)`，通过 `dispose()` 释放资源。JS/TS 采用 Plugin ABI v3，使用 camelCase hooks：
 
 ```ts
 import {definePlugin} from "@vibeflow/plugin";
 export const plugin = definePlugin({
   id: "example.audit", resources: [], priority: 30,
+  rulesets: ["vibeflow.plugin"], declaration_rulesets: ["vibeflow.plugin_declaration"],
   runtime(context) {
     return {beforeRun() {}, afterRun() {}, dispose() {}};
   },
@@ -53,6 +67,8 @@ export const plugin = definePlugin({
 ```
 
 JS 工厂同步返回实例，runtime hooks 可以按原协议异步完成。每次 workflow 调用创建并释放独立实例；长期宿主职责由原生 HostExtension 承担。compiler 的 beforeCompile/afterCompile 保留原来的编译变换职责。
+
+Plugin 可以通过 `implementation_files` 登记支撑源码，通过 `base_libs` 引用独立库，并设置默认 `presentation`。独立生命周期工厂可以各自声明这些字段。具体代码形式见[插件声明与生命周期](multifile-resources.md#插件声明与生命周期)。
 
 ## Capability 与 Host
 
@@ -66,9 +82,11 @@ export const clock = defineCapability({
 
 把此资源放入插件，并贡献其输入输出 DataSchema。Node 显式声明使用的 Capability，宿主通过 options 注入实现，或由启用的 JS HostExtension 提供。`defineHostExtension` 使用 `createHost` 回调或显式延迟源码；固定声明不改变原生 Host 协议。
 
+Host 在 `host_extensions` 中选择，通常明确使用 `vibeflow.host_extension` Ruleset。入口及支撑文件共同实现一个 Host；每次创建时持有独立会话状态。`implementation_files` 登记内部文件，`base_libs` 引用共享库，`dependencies` 表达其他 Host 实例依赖。多文件示例、逐文件检查和架构资源区见[一个 Host，多个实现文件](multifile-resources.md#一个-host多个实现文件)。
+
 ```bash
 python run.py inspect-resources --config <root>/configs/main.jsonc --json
 python run.py review-rules --config <root>/configs/main.jsonc --json
 ```
 
-旧 JSONC 声明扫描、bundle、registry 和生命周期的 module/class 选择不再加载；参见 [一次迁移说明](rule-system-migration.md)。
+升级已有项目时，按[一次迁移说明](rule-system-migration.md)把旧登记改为代码插件与显式选择。

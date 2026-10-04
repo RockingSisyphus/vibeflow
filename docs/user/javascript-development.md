@@ -24,7 +24,9 @@ export const normalize = defineNode({
   },
 });
 export const normalized = defineDataSchema({type_key: "text.normalized", schema: {type: "string"}});
-export const plugin = definePlugin({id: "example.text", resources: [normalize, normalized]});
+export const raw = defineDataSchema({type_key: "text.raw", schema: {type: "string"}});
+export const plugin = definePlugin({id: "example.text", resources: [normalize, raw, normalized],
+  declaration_rulesets: ["vibeflow.plugin_declaration"]});
 ```
 
 可绑定执行代码的资源使用具名导出。SDK 自动记录原始声明、实现符号和位置；函数保留在 Target worker 中，不经过 JSON 序列化。Rule 使用 `defineRule({id, check(...) {...}})`，Ruleset 使用 `defineRuleset`。BaseLib 可用 `defineBaseLib({id, implementation(...) {...}})` 定位同文件函数，也可声明整个独立辅助模块。HostExtension 使用 `defineHostExtension({id, targets, provides, createHost(context) {...}})`，Capability 使用 `defineCapability`。
@@ -41,7 +43,13 @@ workflow 显式启用：
 {"plugins": [{"source": {"kind": "file", "ref": "plugins/text.ts"}}], "pipeline": { /* 原生 type_used 与连边 */ }}
 ```
 
-支持已安装模块/包、显式导出和已登记的 workspace `root`，不自动安装或发现。Node 自己选择 `rulesets` 和默认 `presentation`；省略或 `[]` 表示未选择 Node 审查规则。Data Schema 也必须由选中插件贡献，供公共输入输出、Node 和 Capability 查找。
+支持已安装模块/包、显式导出和已登记的 workspace `root`。Node 自己选择 `rulesets` 和默认 `presentation`；省略或 `[]` 表示未选择 Node 审查规则。DataSchema 由选中插件贡献，供公共输入输出、Node 和 Capability 查找。
+
+## 多文件资源
+
+`defineNode`、`defineBaseLib`、`defineHostExtension` 和 `definePlugin` 接受 `implementation_files`，逐一登记支撑文件；路径相对调用 SDK 的声明模块。支撑文件可以包含运行实现、纯工具或类型。共享库使用 BaseLib，并由使用它的资源明确填写 `base_libs`。
+
+`presentation` 为四类资源设置颜色、形状和图标，正式 Architecture 与 SVG 保存有效值及来源。默认可维护性规则逐文件检查 500 行上限。Host 保留一个工厂和实例，支撑对象共享该实例持有的状态。type-only 导入、生命周期分文件及使用处颜色覆盖见[多文件资源](multifile-resources.md)。
 
 ## SDK 解析与运行协议
 
@@ -64,4 +72,4 @@ const result = runWorkflow({request: {message: "hello"}});
 
 Browser/Node 平台由 `build --target` 选择。Rule 始终在 Node worker 环境检查，业务平台只是规则上下文资料。浏览器产物保留执行所需的 Node、helper、Host 和 runtime hook，不打包 Rule 或 compiler hook 的专用 Node 依赖。需要不同执行环境时可以分模块，每个资源仍可与自己的实现放在一起。
 
-项目自己的 TypeScript、ESLint 与业务测试仍需显式运行。健康审查不代替业务正确性检查。插件受信入口先初始化，已发生的初始化不能由规则提前阻断或撤销。
+项目的 TypeScript、ESLint 和业务测试分别验证类型、编码约定和业务结果。插件入口的初始化与延迟实现的检查时机见[加载与检查](plugins-and-integrations.md#加载与检查)。

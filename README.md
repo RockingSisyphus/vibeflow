@@ -14,12 +14,13 @@ terminal start → input I/O → process / nodeset → output I/O → terminal e
 
 - Python Runtime 与 JavaScript/TypeScript AOT；
 - Python 和 JS/TS 插件 SDK，以代码声明 Node、Rule、Ruleset 等资源，由 workflow 显式选择；
-- Node、Nodeset、Loop、Plugin、Capability 与显式副作用边界；
-- 确定性 Architecture、Mermaid、ASCII 和 SVG；
+- 可组合的 Rule/Ruleset，以及 Node、Nodeset、Loop、Capability 与显式副作用边界；
+- Node、BaseLib、Plugin 与 Host 的多文件实现、源码归属、逐文件审查和默认图形样式；
+- 确定性 Architecture JSONC、Mermaid、ASCII 和包含资源依赖的展开 SVG；
 - 配置、契约、可达性、控制流、质量、构建与执行证据检查；
 - collaborative 与 autonomous 两种开发协议，共享同一 Core 和机器规则。
 
-VibeFlow 检查工程结构，不代替项目的业务测试、需求验收或外部接口语义验证。
+VibeFlow 检查工程结构、源码健康度和所选领域约束；项目测试与真实环境验收验证业务结果及外部接口行为。
 
 ## 开始使用
 
@@ -49,6 +50,7 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 
 - [项目概览](docs/overview.md)
 - [使用者开发文档](docs/README.md#使用者开发)
+- [多文件资源与展示](docs/user/multifile-resources.md)
 - [系统设计](docs/README.md#系统设计)
 - [内核维护](docs/README.md#内核维护)
 

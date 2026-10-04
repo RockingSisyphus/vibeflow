@@ -10,8 +10,8 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 - [快速开始](user/quickstart.md)
 - [Workflow 与 Config](user/workflow-and-config.md)
-- [Python Node 与 BaseLib](user/python-development.md)
-- [JavaScript/TypeScript Node 与 AOT](user/javascript-development.md)
+- [Python 资源与插件 SDK](user/python-development.md)
+- [JavaScript/TypeScript 资源与 AOT](user/javascript-development.md)
 - [Nodeset 与 Loop](user/nodesets-and-loops.md)
 - [Rule、Ruleset 与 Node 声明](user/rules-and-nodes.md)
 - [Plugin 与宿主集成](user/plugins-and-integrations.md)
@@ -22,19 +22,23 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 ## 系统设计
 
-- [代码声明与统一插件接入重构](design/code-plugin-refactor-plan.md)
+- [系统架构](design/system-architecture.md)：当前内核分层、插件装配与共享架构资料。
+- [执行模型](design/execution-model.md)：原生路由、任务、规则入口与宿主生命周期。
+
+## 设计演进与验收记录
+
+以下记录保留各阶段基线、决定与验证资料。当前使用接口以使用者手册为准，当前内核机制见系统设计。
+
 - [多文件资源、统一展示与沙箱验收](design/multifile-resources-plan.md)
 - [多文件资源案例与迁移对应表](design/multifile-resource-cases.md)
 - [多文件资源实现与验收](design/multifile-resources-results.md)
-- [系统架构](design/system-architecture.md)
-- [执行模型](design/execution-model.md)
-- [Rule/Ruleset、Node 分类与插件重构](design/rule-system-refactor-plan.md)
-- [业务分类与领域规则旧方案](design/domain-node-extensions-plan.md)：已由 Rule/Ruleset 方案替代。
-
-- [完整修复计划](design/rule-system-repair-plan.md)
-- [完整修复验收与问题矩阵](design/rule-system-repair-results.md)
+- [代码声明与统一插件接入重构](design/code-plugin-refactor-plan.md)
 - [代码插件重构与验收](design/code-plugin-refactor-results.md)
 - [代码插件案例迁移对应表](design/code-plugin-case-migrations.md)
+- [Rule/Ruleset 初期重构](design/rule-system-refactor-plan.md)：JSONC 接入已演进为代码插件。
+- [完整修复计划](design/rule-system-repair-plan.md)
+- [完整修复验收与问题矩阵](design/rule-system-repair-results.md)
+- [业务分类与领域规则旧方案](design/domain-node-extensions-plan.md)：业务含义现由完整 Node 与领域 Rule 表达。
 - [0.15 声明与规则迁移](user/rule-system-migration.md)
 - [基线规则总表](design/baseline-rule-inventory.md)
 - [Core 规则盘点](design/baseline-rule-inventory-core.md)

@@ -32,10 +32,11 @@ Nodeset 把多个调用组合成一个可复用流程块。Loop 重复执行一�
 }
 ```
 
-在 workflow 中导入并调用：
+在 workflow 中选择提供 `example.*` Node 的代码插件，再导入并调用 Nodeset：
 
 ```jsonc
 {
+  "plugins": [{"source": {"kind": "file", "ref": "plugins/text.py"}}],
   "nodeset_imports": [{"path": "nodesets/prepare_text.jsonc"}],
   "pipeline": {
     "nodes": [
@@ -88,9 +89,9 @@ planned Nodeset 保留 `type_key`、名称、说明和契约，可以暂时省�
 
 普通 graph 和 Nodeset body 保持无环；重复执行由 Loop 表达。Nodeset 调用和 `loop.body` 都参与递归与最大嵌套深度检查。
 
-JavaScript Target 的 `validate`、`quality-check`、`review` 和 `build` 默认拒绝超过 4 层的 Nodeset/Loop body 依赖链。顶层 pipeline 为 0 层，循环迭代不增加层数。确需更深结构时，可在 JavaScript root 的 `vibeflow_project.jsonc` 中设置 `javascript.nodeset_max_depth` 为正整数。超过 10 个内部节点的 Nodeset 会产生 `NODESET.SMELL.TOO_WIDE` 警告和 `CONCERNS` 状态；该宽度提示不会阻止构建。
+workflow 与 Nodeset 默认选择 `vibeflow.workflow` Ruleset，其中深度上限为 4、宽度警告阈值为 10。顶层 pipeline 为 0 层，循环迭代不增加层数；深度超限报错，宽度超限产生 `NODESET.SMELL.TOO_WIDE` 警告及 `CONCERNS` 状态。Ruleset 参数与局部覆盖可以调整这些值；显式空选择取消相应审查，原生解析与执行计划仍照常生成。
 
-Python 的 `runtime.nodeset_max_depth` 与 JavaScript 的 `javascript.nodeset_max_depth` 都传给同一套宽度与深度规则。`0`、布尔值和非整数配置会指出对应字段。超过深度上限的发现项包含实际深度、调用链 `chain` 及逐步调用 `calls`；planned 定义和 loop body 按同一套依赖遍历计数。
+Python root 的 `runtime.nodeset_max_depth` 与 JavaScript root 的 `javascript.nodeset_max_depth` 提供内置规则的默认参数，取正整数。规则的显式参数及 overrides 优先。深度诊断包含实际深度、调用链 `chain` 和逐步调用 `calls`；planned 定义和 loop body 按同一套依赖遍历计数。规则组合见[Ruleset 与局部覆盖](rules-and-nodes.md#ruleset-与局部覆盖)。
 
 验证：
 

@@ -12,7 +12,7 @@
 2. 所选 root 的 README 和 `vibeflow_project.jsonc`；
 3. 目标目录及其上级目录中更具体的项目 `AGENTS.md`；
 4. 已登记的 `ARCHITECTURE.jsonc`；
-5. 架构文档所指向的真实 Config、Nodeset 和 Node source；
+5. 架构文档所指向的真实 Config、Nodeset、插件声明和资源实现；
 6. 与任务对应的使用者文档。
 
 Architecture 是生成的审查视图。结构变更落在真实 source 中，然后重新生成 Architecture。
@@ -28,7 +28,7 @@ python run.py run --config python_project/configs/main.jsonc --input python_proj
 python run.py quality --path python_project
 ```
 
-Node、Registry 和 BaseLib 接口见 [Python 开发](python-development.md)。
+Node、Rule 和 BaseLib 使用 Python 插件 SDK 声明，见 [Python 开发](python-development.md)。最小项目的固定插件在 `python_project/plugins/code_plugin.py`，由 workflow 的 `plugins` 选择。
 
 ## JavaScript 最短路径
 
@@ -42,7 +42,7 @@ python run.py build --config javascript_project/configs/main.jsonc --target node
 node javascript_project/scripts/workflow_execution_probe.mjs
 ```
 
-Descriptor、Data Schema 和生成入口见 [JavaScript/TypeScript 开发](javascript-development.md)。
+Node、DataSchema 和生成入口见 [JavaScript/TypeScript 开发](javascript-development.md)。最小项目的固定插件在 `javascript_project/plugins/code_plugin.ts`，资源使用 `@vibeflow/plugin` 声明。
 
 ## 按任务继续阅读
 
@@ -52,5 +52,7 @@ Descriptor、Data Schema 和生成入口见 [JavaScript/TypeScript 开发](javas
 | 开发 Python Node 或 BaseLib | [Python 开发](python-development.md) |
 | 开发 JS/TS Node 或 AOT 入口 | [JavaScript 开发](javascript-development.md) |
 | 开发 Nodeset 或 Loop | [Nodeset 与 Loop](nodesets-and-loops.md) |
+| 编写 Rule、组合 Ruleset 或选择检查约束 | [Rule 与 Node](rules-and-nodes.md) |
 | 开发 Plugin 或宿主能力 | [Plugin 与集成](plugins-and-integrations.md) |
+| 拆分实现文件、设置样式或查看资源依赖 | [多文件资源](multifile-resources.md) |
 | 选择命令或解释结果 | [命令与检查范围](commands-and-results.md) |
