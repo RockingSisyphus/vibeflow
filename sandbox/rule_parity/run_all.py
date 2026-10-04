@@ -16,11 +16,16 @@ import tempfile
 
 # Running this standalone sandbox should not generate repository artifacts.
 sys.dont_write_bytecode = True
-from results import compare, summarize, mismatch
+if __package__:
+    from .results import compare, summarize, mismatch
+else:
+    from results import compare, summarize, mismatch
 
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
+sys.path.insert(0, str(ROOT))
+from tools.test_parallel import DEFAULT_WORKERS, add_worker_argument
 TARGETS = ("core", "tooling", "python", "javascript")
 
 
@@ -91,7 +96,7 @@ def _observe(target, variant, kernel, work, toolchain):
     return json.loads(output.read_text(encoding="utf-8"))
 
 
-def run(work, targets, revision, report):
+def run(work, targets, revision, report, *, workers=DEFAULT_WORKERS):
     work.mkdir(parents=True, exist_ok=True)
     baseline = _snapshot(work, revision)
     baseline_commit = subprocess.check_output(["git", "rev-parse", revision], cwd=ROOT, text=True).strip()
@@ -99,7 +104,7 @@ def run(work, targets, revision, report):
     toolchains = _toolchain(work, baseline) if "javascript" in targets else {}
     observations = {}
     print(f"baseline {baseline_commit[:12]}; current {current_commit[:12]} plus working files", flush=True)
-    with ThreadPoolExecutor(max_workers=len(targets) * 2) as pool:
+    with ThreadPoolExecutor(max_workers=workers) as pool:
         jobs = {pool.submit(_observe, target, variant, kernel, work, toolchains.get(variant)): (target, variant)
                 for target in targets for variant, kernel in (("baseline", baseline), ("current", ROOT))}
         for future in as_completed(jobs):
@@ -110,7 +115,7 @@ def run(work, targets, revision, report):
     for target in targets:
         findings.extend(compare(observations[target, "baseline"], observations[target, "current"]))
     result = {"baseline": baseline_commit, "current": current_commit, "current_includes_working_files": True,
-              "targets": list(targets), "summary": summarize(findings), "cases": findings}
+              "targets": list(targets), "workers": workers, "summary": summarize(findings), "cases": findings}
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result["summary"], ensure_ascii=False, indent=2), flush=True)
@@ -122,14 +127,14 @@ def run(work, targets, revision, report):
     return int(any(row["outcome"] != "matched" for row in findings))
 
 
-def run_current(work, targets, report, toolchain=None):
+def run_current(work, targets, report, toolchain=None, *, workers=DEFAULT_WORKERS):
     """Check the current checkout; frozen observations remain audit evidence."""
     work.mkdir(parents=True, exist_ok=True)
     reference = json.loads((HERE / "reference.json").read_text(encoding="utf-8"))
     if "javascript" in targets and toolchain is None:
         toolchain = _toolchain(work, ROOT)["current"]
     rows, errors = [], []
-    with ThreadPoolExecutor(max_workers=min(4, len(targets))) as pool:
+    with ThreadPoolExecutor(max_workers=workers) as pool:
         jobs = {pool.submit(_observe, target, "current", ROOT, work, toolchain): target for target in targets}
         for future in as_completed(jobs):
             target = jobs[future]
@@ -159,7 +164,7 @@ def run_current(work, targets, report, toolchain=None):
                "unmatched": sum(bool(row["mismatches"]) for row in rows), "process_errors": len(errors)}
     result = {"baseline": reference["baseline"], "original_current": reference["original_current"],
               "current_includes_working_files": True, "mode": "current", "targets": list(targets),
-              "summary": summary, "cases": rows, "errors": errors}
+              "workers": workers, "summary": summary, "cases": rows, "errors": errors}
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(summary), flush=True)
@@ -173,6 +178,7 @@ def run_current(work, targets, report, toolchain=None):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    add_worker_argument(parser)
     parser.add_argument("--target", choices=TARGETS, action="append", help="repeatable; default all")
     parser.add_argument("--baseline", default="f169429")
     parser.add_argument("--current-only", action="store_true", help="use frozen historical observations; run only the working checkout")
@@ -185,11 +191,11 @@ def main(argv=None):
         if args.work:
             if args.work.exists():
                 parser.error("--work must be a new directory")
-            return (run_current(args.work.resolve(), targets, args.report.resolve(), args.toolchain)
-                    if args.current_only else run(args.work.resolve(), targets, args.baseline, args.report.resolve()))
+            return (run_current(args.work.resolve(), targets, args.report.resolve(), args.toolchain, workers=args.workers)
+                    if args.current_only else run(args.work.resolve(), targets, args.baseline, args.report.resolve(), workers=args.workers))
         with tempfile.TemporaryDirectory(prefix="vibeflow-rule-parity-") as scratch:
-            return (run_current(Path(scratch), targets, args.report.resolve(), args.toolchain)
-                    if args.current_only else run(Path(scratch), targets, args.baseline, args.report.resolve()))
+            return (run_current(Path(scratch), targets, args.report.resolve(), args.toolchain, workers=args.workers)
+                    if args.current_only else run(Path(scratch), targets, args.baseline, args.report.resolve(), workers=args.workers))
     except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
         print("sandbox execution error: " + str(error), file=sys.stderr)
         return 2

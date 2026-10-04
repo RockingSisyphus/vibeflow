@@ -48,6 +48,8 @@ workflow 保留 JSONC 和原生连边，下面是插件选择与 Node 调用片�
 
 返回对象的 key 与 `provides[].key` 一致；调用点 `params` 使用声明的参数 schema/defaults。`@node` 保存契约、规则选择、默认展示以及实现类的源码位置。
 
+默认值支持 JSON 数组、对象及其嵌套组合。SDK 保存只读声明；`run_pure` 每次调用收到原生 `list/dict` 参数副本。默认值和调用点覆盖分别复制，修改本次参数不会影响保存的默认值、调用者的容器或后续运行。
+
 Node 通过 `rulesets` 选择审查约束。省略和 `[]` 都表示未选择 Node 审查规则；`flow_kind` 表达执行身份。自由 `tags/metadata` 和 `presentation` 由 Node 自己声明，见 [规则与 Node](rules-and-nodes.md)。
 
 ## 规则与其他资源

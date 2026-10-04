@@ -24,6 +24,7 @@ if str(ROOT) not in sys.path:
     # The full gate also reuses repository-owned Sandbox test helpers, which
     # are deliberately not packaged in the wheel.
     sys.path.insert(0, str(ROOT))
+from tools.test_parallel import DEFAULT_WORKERS, add_worker_argument
 PYTHON = sys.executable
 TEST_GROUPS = (
     "tests/core",
@@ -104,11 +105,12 @@ def _compileall(scratch: Path) -> None:
     )
 
 
-def _pytest(scratch: Path, *, with_renderer: bool = False) -> None:
+def _pytest(scratch: Path, *, with_renderer: bool = False, workers: int = DEFAULT_WORKERS) -> None:
     _run(
         (
             PYTHON,
             "tools/run_tests.py",
+            "--workers", str(workers),
             "--scratch",
             scratch / "pytest",
             "--",
@@ -151,11 +153,11 @@ def _javascript_integration(scratch: Path) -> None:
     )
 
 
-def _rule_sandboxes(scratch: Path) -> None:
+def _rule_sandboxes(scratch: Path, *, workers: int = DEFAULT_WORKERS) -> None:
     toolchain = scratch / "pytest/javascript-toolchain"
-    _run((PYTHON, "sandbox/rule_parity/run_all.py", "--current-only", "--toolchain", toolchain,
+    _run((PYTHON, "sandbox/rule_parity/run_all.py", "--workers", str(workers), "--current-only", "--toolchain", toolchain,
           "--work", scratch / "rule-parity", "--report", scratch / "rule-parity.json"))
-    _run((PYTHON, "sandbox/rule_gaps/run_all.py", "--toolchain", toolchain,
+    _run((PYTHON, "sandbox/rule_gaps/run_all.py", "--workers", str(workers), "--toolchain", toolchain,
           "--renderer", _puppeteer_root(scratch), "--work", scratch / "rule-gaps", "--report", scratch / "rule-gaps.json"))
 
 
@@ -577,11 +579,11 @@ def _clean_tree_check(_scratch: Path) -> None:
         raise VerificationError("verification left repository artifacts behind")
 
 
-def _steps(*, full: bool) -> tuple[Step, ...]:
+def _steps(*, full: bool, workers: int = DEFAULT_WORKERS) -> tuple[Step, ...]:
     base = (
         Step("repository-quality", _repository_quality),
         Step("compileall", _compileall),
-        Step("pytest", lambda scratch: _pytest(scratch, with_renderer=full)),
+        Step("pytest", lambda scratch: _pytest(scratch, with_renderer=full, workers=workers)),
     )
     if not full:
         return base
@@ -590,7 +592,7 @@ def _steps(*, full: bool) -> tuple[Step, ...]:
         Step("python-sandbox", _python_sandbox),
         Step("javascript-minimal", _javascript_minimal),
         Step("javascript-integration", _javascript_integration),
-        Step("rule-regression-sandboxes", _rule_sandboxes),
+        Step("rule-regression-sandboxes", lambda scratch: _rule_sandboxes(scratch, workers=workers)),
         Step("wheel-isolation", _wheel_smoke),
         Step("generated-artifact-cleanup", _cleanup_generated_artifacts),
         Step("distribution", _distribution_smoke),
@@ -611,6 +613,7 @@ def _run_steps(steps: Sequence[Step], *, scratch: Path) -> None:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    add_worker_argument(parser)
     parser.add_argument("--full", action="store_true", help="include Sandboxes and packaging")
     parser.add_argument(
         "--scratch",
@@ -626,10 +629,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.scratch is not None:
             scratch = args.scratch.resolve()
             scratch.mkdir(parents=True, exist_ok=True)
-            _run_steps(_steps(full=args.full), scratch=scratch)
+            _run_steps(_steps(full=args.full, workers=args.workers), scratch=scratch)
         else:
             with tempfile.TemporaryDirectory(prefix="vibeflow-verify-") as raw:
-                _run_steps(_steps(full=args.full), scratch=Path(raw))
+                _run_steps(_steps(full=args.full, workers=args.workers), scratch=Path(raw))
     except VerificationError as exc:
         print(str(exc), file=sys.stderr)
         return 1

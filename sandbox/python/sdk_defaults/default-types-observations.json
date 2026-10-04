@@ -1,0 +1,788 @@
+{
+  "schema": "vibeflow.sdk-defaults-observation.v1",
+  "revision": "2ed8fc024c73450a5bf3e326871145c09af6e92e",
+  "python": "3.13.13 | packaged by conda-forge | (main, Apr  8 2026, 02:00:33) [GCC 14.3.0]",
+  "implementation": "/home/rockingsisyphus/projects/VibeFlow/src",
+  "exit_code_meaning": "0 means observations completed; inspect every case status",
+  "summary": {
+    "cases": 14,
+    "registered": 5,
+    "registration_failures": 9
+  },
+  "cases": [
+    {
+      "id": "string",
+      "schema_type": "string",
+      "original": "a",
+      "expected_registration": "PASS",
+      "sdk_types": {
+        "type": "str"
+      },
+      "descriptor_json_roundtrip": true,
+      "status": "PASS",
+      "registered_config": {
+        "status": "PASS",
+        "default_types": {
+          "type": "str"
+        },
+        "override_types": {
+          "type": "str"
+        }
+      },
+      "native_json_control": {
+        "status": "PASS",
+        "default_types": {
+          "type": "str"
+        },
+        "override_types": {
+          "type": "str"
+        }
+      }
+    },
+    {
+      "id": "integer",
+      "schema_type": "integer",
+      "original": 1,
+      "expected_registration": "PASS",
+      "sdk_types": {
+        "type": "int"
+      },
+      "descriptor_json_roundtrip": true,
+      "status": "PASS",
+      "registered_config": {
+        "status": "PASS",
+        "default_types": {
+          "type": "int"
+        },
+        "override_types": {
+          "type": "int"
+        }
+      },
+      "native_json_control": {
+        "status": "PASS",
+        "default_types": {
+          "type": "int"
+        },
+        "override_types": {
+          "type": "int"
+        }
+      }
+    },
+    {
+      "id": "boolean",
+      "schema_type": "boolean",
+      "original": true,
+      "expected_registration": "PASS",
+      "sdk_types": {
+        "type": "bool"
+      },
+      "descriptor_json_roundtrip": true,
+      "status": "PASS",
+      "registered_config": {
+        "status": "PASS",
+        "default_types": {
+          "type": "bool"
+        },
+        "override_types": {
+          "type": "bool"
+        }
+      },
+      "native_json_control": {
+        "status": "PASS",
+        "default_types": {
+          "type": "bool"
+        },
+        "override_types": {
+          "type": "bool"
+        }
+      }
+    },
+    {
+      "id": "empty_array",
+      "schema_type": "array",
+      "original": [],
+      "expected_registration": "PASS",
+      "sdk_types": {
+        "type": "tuple",
+        "items": []
+      },
+      "descriptor_json_roundtrip": true,
+      "status": "FAIL",
+      "error_type": "NodeConfigError",
+      "error": "node config 'value' must match schema type 'array'",
+      "registered_config": {
+        "status": "BLOCKED_BY_REGISTRATION"
+      },
+      "native_json_control": {
+        "status": "PASS",
+        "default_types": {
+          "type": "list",
+          "items": []
+        },
+        "override_types": {
+          "type": "list",
+          "items": []
+        },
+        "default_isolation": {
+          "status": "FAIL",
+          "same_container": true,
+          "second_before": [],
+          "second_after": [
+            "first-invocation-mutation"
+          ],
+          "scope": "two Core merge_node_config calls; not two completed workflow runs"
+        }
+      }
+    },
+    {
+      "id": "array",
+      "schema_type": "array",
+      "original": [
+        "a"
+      ],
+      "expected_registration": "PASS",
+      "sdk_types": {
+        "type": "tuple",
+        "items": [
+          {
+            "type": "str"
+          }
+        ]
+      },
+      "descriptor_json_roundtrip": true,
+      "status": "FAIL",
+      "error_type": "NodeConfigError",
+      "error": "node config 'value' must match schema type 'array'",
+      "registered_config": {
+        "status": "BLOCKED_BY_REGISTRATION"
+      },
+      "native_json_control": {
+        "status": "PASS",
+        "default_types": {
+          "type": "list",
+          "items": [
+            {
+              "type": "str"
+            }
+          ]
+        },
+        "override_types": {
+          "type": "list",
+          "items": [
+            {
+              "type": "str"
+            }
+          ]
+        },
+        "default_isolation": {
+          "status": "FAIL",
+          "same_container": true,
+          "second_before": [
+            "a"
+          ],
+          "second_after": [
+            "a",
+            "first-invocation-mutation"
+          ],
+          "scope": "two Core merge_node_config calls; not two completed workflow runs"
+        }
+      }
+    },
+    {
+      "id": "empty_object",
+      "schema_type": "object",
+      "original": {},
+      "expected_registration": "PASS",
+      "sdk_types": {
+        "type": "mappingproxy",
+        "fields": {}
+      },
+      "descriptor_json_roundtrip": true,
+      "status": "FAIL",
+      "error_type": "NodeConfigError",
+      "error": "node config 'defaults.value' must be JSON snapshot safe: Object of type mappingproxy is not JSON serializable",
+      "registered_config": {
+        "status": "BLOCKED_BY_REGISTRATION"
+      },
+      "native_json_control": {
+        "status": "PASS",
+        "default_types": {
+          "type": "dict",
+          "fields": {}
+        },
+        "override_types": {
+          "type": "dict",
+          "fields": {}
+        },
+        "default_isolation": {
+          "status": "FAIL",
+          "same_container": true,
+          "second_before": {},
+          "second_after": {
+            "first-invocation-mutation": true
+          },
+          "scope": "two Core merge_node_config calls; not two completed workflow runs"
+        }
+      }
+    },
+    {
+      "id": "object",
+      "schema_type": "object",
+      "original": {
+        "a": 1
+      },
+      "expected_registration": "PASS",
+      "sdk_types": {
+        "type": "mappingproxy",
+        "fields": {
+          "a": {
+            "type": "int"
+          }
+        }
+      },
+      "descriptor_json_roundtrip": true,
+      "status": "FAIL",
+      "error_type": "NodeConfigError",
+      "error": "node config 'defaults.value' must be JSON snapshot safe: Object of type mappingproxy is not JSON serializable",
+      "registered_config": {
+        "status": "BLOCKED_BY_REGISTRATION"
+      },
+      "native_json_control": {
+        "status": "PASS",
+        "default_types": {
+          "type": "dict",
+          "fields": {
+            "a": {
+              "type": "int"
+            }
+          }
+        },
+        "override_types": {
+          "type": "dict",
+          "fields": {
+            "a": {
+              "type": "int"
+            }
+          }
+        },
+        "default_isolation": {
+          "status": "FAIL",
+          "same_container": true,
+          "second_before": {
+            "a": 1
+          },
+          "second_after": {
+            "a": 1,
+            "first-invocation-mutation": true
+          },
+          "scope": "two Core merge_node_config calls; not two completed workflow runs"
+        }
+      }
+    },
+    {
+      "id": "number",
+      "schema_type": "number",
+      "original": 1.5,
+      "expected_registration": "PASS",
+      "sdk_types": {
+        "type": "float"
+      },
+      "descriptor_json_roundtrip": true,
+      "status": "PASS",
+      "registered_config": {
+        "status": "PASS",
+        "default_types": {
+          "type": "float"
+        },
+        "override_types": {
+          "type": "float"
+        }
+      },
+      "native_json_control": {
+        "status": "PASS",
+        "default_types": {
+          "type": "float"
+        },
+        "override_types": {
+          "type": "float"
+        }
+      }
+    },
+    {
+      "id": "null",
+      "schema_type": "null",
+      "original": null,
+      "expected_registration": "PASS",
+      "sdk_types": {
+        "type": "NoneType"
+      },
+      "descriptor_json_roundtrip": true,
+      "status": "PASS",
+      "registered_config": {
+        "status": "PASS",
+        "default_types": {
+          "type": "NoneType"
+        },
+        "override_types": {
+          "type": "NoneType"
+        }
+      },
+      "native_json_control": {
+        "status": "PASS",
+        "default_types": {
+          "type": "NoneType"
+        },
+        "override_types": {
+          "type": "NoneType"
+        }
+      }
+    },
+    {
+      "id": "nested_array",
+      "schema_type": "array",
+      "original": [
+        [
+          "a"
+        ],
+        []
+      ],
+      "expected_registration": "PASS",
+      "sdk_types": {
+        "type": "tuple",
+        "items": [
+          {
+            "type": "tuple",
+            "items": [
+              {
+                "type": "str"
+              }
+            ]
+          },
+          {
+            "type": "tuple",
+            "items": []
+          }
+        ]
+      },
+      "descriptor_json_roundtrip": true,
+      "status": "FAIL",
+      "error_type": "NodeConfigError",
+      "error": "node config 'value' must match schema type 'array'",
+      "registered_config": {
+        "status": "BLOCKED_BY_REGISTRATION"
+      },
+      "native_json_control": {
+        "status": "PASS",
+        "default_types": {
+          "type": "list",
+          "items": [
+            {
+              "type": "list",
+              "items": [
+                {
+                  "type": "str"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "items": []
+            }
+          ]
+        },
+        "override_types": {
+          "type": "list",
+          "items": [
+            {
+              "type": "list",
+              "items": [
+                {
+                  "type": "str"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "items": []
+            }
+          ]
+        },
+        "default_isolation": {
+          "status": "FAIL",
+          "same_container": true,
+          "second_before": [
+            [
+              "a"
+            ],
+            []
+          ],
+          "second_after": [
+            [
+              "a"
+            ],
+            [],
+            "first-invocation-mutation"
+          ],
+          "scope": "two Core merge_node_config calls; not two completed workflow runs"
+        }
+      }
+    },
+    {
+      "id": "array_of_objects",
+      "schema_type": "array",
+      "original": [
+        {
+          "a": 1
+        }
+      ],
+      "expected_registration": "PASS",
+      "sdk_types": {
+        "type": "tuple",
+        "items": [
+          {
+            "type": "mappingproxy",
+            "fields": {
+              "a": {
+                "type": "int"
+              }
+            }
+          }
+        ]
+      },
+      "descriptor_json_roundtrip": true,
+      "status": "FAIL",
+      "error_type": "NodeConfigError",
+      "error": "node config 'defaults.value' must be JSON snapshot safe: Object of type mappingproxy is not JSON serializable",
+      "registered_config": {
+        "status": "BLOCKED_BY_REGISTRATION"
+      },
+      "native_json_control": {
+        "status": "PASS",
+        "default_types": {
+          "type": "list",
+          "items": [
+            {
+              "type": "dict",
+              "fields": {
+                "a": {
+                  "type": "int"
+                }
+              }
+            }
+          ]
+        },
+        "override_types": {
+          "type": "list",
+          "items": [
+            {
+              "type": "dict",
+              "fields": {
+                "a": {
+                  "type": "int"
+                }
+              }
+            }
+          ]
+        },
+        "default_isolation": {
+          "status": "FAIL",
+          "same_container": true,
+          "second_before": [
+            {
+              "a": 1
+            }
+          ],
+          "second_after": [
+            {
+              "a": 1
+            },
+            "first-invocation-mutation"
+          ],
+          "scope": "two Core merge_node_config calls; not two completed workflow runs"
+        }
+      }
+    },
+    {
+      "id": "object_with_array",
+      "schema_type": "object",
+      "original": {
+        "a": [
+          "x"
+        ]
+      },
+      "expected_registration": "PASS",
+      "sdk_types": {
+        "type": "mappingproxy",
+        "fields": {
+          "a": {
+            "type": "tuple",
+            "items": [
+              {
+                "type": "str"
+              }
+            ]
+          }
+        }
+      },
+      "descriptor_json_roundtrip": true,
+      "status": "FAIL",
+      "error_type": "NodeConfigError",
+      "error": "node config 'defaults.value' must be JSON snapshot safe: Object of type mappingproxy is not JSON serializable",
+      "registered_config": {
+        "status": "BLOCKED_BY_REGISTRATION"
+      },
+      "native_json_control": {
+        "status": "PASS",
+        "default_types": {
+          "type": "dict",
+          "fields": {
+            "a": {
+              "type": "list",
+              "items": [
+                {
+                  "type": "str"
+                }
+              ]
+            }
+          }
+        },
+        "override_types": {
+          "type": "dict",
+          "fields": {
+            "a": {
+              "type": "list",
+              "items": [
+                {
+                  "type": "str"
+                }
+              ]
+            }
+          }
+        },
+        "default_isolation": {
+          "status": "FAIL",
+          "same_container": true,
+          "second_before": {
+            "a": [
+              "x"
+            ]
+          },
+          "second_after": {
+            "a": [
+              "x"
+            ],
+            "first-invocation-mutation": true
+          },
+          "scope": "two Core merge_node_config calls; not two completed workflow runs"
+        }
+      }
+    },
+    {
+      "id": "object_with_object",
+      "schema_type": "object",
+      "original": {
+        "a": {
+          "b": 1
+        }
+      },
+      "expected_registration": "PASS",
+      "sdk_types": {
+        "type": "mappingproxy",
+        "fields": {
+          "a": {
+            "type": "mappingproxy",
+            "fields": {
+              "b": {
+                "type": "int"
+              }
+            }
+          }
+        }
+      },
+      "descriptor_json_roundtrip": true,
+      "status": "FAIL",
+      "error_type": "NodeConfigError",
+      "error": "node config 'defaults.value' must be JSON snapshot safe: Object of type mappingproxy is not JSON serializable",
+      "registered_config": {
+        "status": "BLOCKED_BY_REGISTRATION"
+      },
+      "native_json_control": {
+        "status": "PASS",
+        "default_types": {
+          "type": "dict",
+          "fields": {
+            "a": {
+              "type": "dict",
+              "fields": {
+                "b": {
+                  "type": "int"
+                }
+              }
+            }
+          }
+        },
+        "override_types": {
+          "type": "dict",
+          "fields": {
+            "a": {
+              "type": "dict",
+              "fields": {
+                "b": {
+                  "type": "int"
+                }
+              }
+            }
+          }
+        },
+        "default_isolation": {
+          "status": "FAIL",
+          "same_container": true,
+          "second_before": {
+            "a": {
+              "b": 1
+            }
+          },
+          "second_after": {
+            "a": {
+              "b": 1
+            },
+            "first-invocation-mutation": true
+          },
+          "scope": "two Core merge_node_config calls; not two completed workflow runs"
+        }
+      }
+    },
+    {
+      "id": "mixed_nested",
+      "schema_type": "array",
+      "original": [
+        {
+          "a": [
+            1,
+            {
+              "b": []
+            }
+          ]
+        }
+      ],
+      "expected_registration": "PASS",
+      "sdk_types": {
+        "type": "tuple",
+        "items": [
+          {
+            "type": "mappingproxy",
+            "fields": {
+              "a": {
+                "type": "tuple",
+                "items": [
+                  {
+                    "type": "int"
+                  },
+                  {
+                    "type": "mappingproxy",
+                    "fields": {
+                      "b": {
+                        "type": "tuple",
+                        "items": []
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "descriptor_json_roundtrip": true,
+      "status": "FAIL",
+      "error_type": "NodeConfigError",
+      "error": "node config 'defaults.value' must be JSON snapshot safe: Object of type mappingproxy is not JSON serializable",
+      "registered_config": {
+        "status": "BLOCKED_BY_REGISTRATION"
+      },
+      "native_json_control": {
+        "status": "PASS",
+        "default_types": {
+          "type": "list",
+          "items": [
+            {
+              "type": "dict",
+              "fields": {
+                "a": {
+                  "type": "list",
+                  "items": [
+                    {
+                      "type": "int"
+                    },
+                    {
+                      "type": "dict",
+                      "fields": {
+                        "b": {
+                          "type": "list",
+                          "items": []
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "override_types": {
+          "type": "list",
+          "items": [
+            {
+              "type": "dict",
+              "fields": {
+                "a": {
+                  "type": "list",
+                  "items": [
+                    {
+                      "type": "int"
+                    },
+                    {
+                      "type": "dict",
+                      "fields": {
+                        "b": {
+                          "type": "list",
+                          "items": []
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "default_isolation": {
+          "status": "FAIL",
+          "same_container": true,
+          "second_before": [
+            {
+              "a": [
+                1,
+                {
+                  "b": []
+                }
+              ]
+            }
+          ],
+          "second_after": [
+            {
+              "a": [
+                1,
+                {
+                  "b": []
+                }
+              ]
+            },
+            "first-invocation-mutation"
+          ],
+          "scope": "two Core merge_node_config calls; not two completed workflow runs"
+        }
+      }
+    }
+  ]
+}

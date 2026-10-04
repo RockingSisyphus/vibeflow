@@ -18,6 +18,9 @@ import tempfile
 sys.dont_write_bytecode = True
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
+sys.path.insert(0, str(ROOT))
+from tools.test_parallel import DEFAULT_WORKERS, WORKER_ENVIRONMENT, add_worker_argument
+from sandbox.rule_gaps.resources import FAMILIES, validate_counts
 GROUPS = ("python", "javascript", "graph", "tooling", "composition", "resources")
 spec = importlib.util.spec_from_file_location("parity_results", HERE.parent / "rule_parity/results.py")
 _results = importlib.util.module_from_spec(spec)
@@ -55,19 +58,24 @@ def install(work, name, source):
     return destination
 
 
-def observe(group, work, toolchain, renderer):
+def observe(group, work, toolchain, renderer, resource_family=None, *, workers=DEFAULT_WORKERS):
     directory = work / group
-    directory.mkdir()
-    output = directory / "observations.json"
+    directory.mkdir(exist_ok=True)
+    prefix = resource_family + "-" if resource_family else ""
+    output = directory / (prefix + "observations.json")
     cmd = [sys.executable, str(HERE / "worker.py"), "--group", group,
            "--work", str(directory / "projects"), "--output", str(output)]
     if toolchain:
         cmd.extend(("--toolchain", str(toolchain)))
-    with (directory / "process.log").open("w") as log:
-        process = subprocess.run(cmd, cwd=directory, env=environment(toolchain, renderer),
+    env = {**environment(toolchain, renderer), WORKER_ENVIRONMENT: str(workers)}
+    if resource_family:
+        env["VIBEFLOW_RESOURCE_CASE_GROUP"] = resource_family
+    process_log = directory / (prefix + "process.log")
+    with process_log.open("w") as log:
+        process = subprocess.run(cmd, cwd=directory, env=env,
                                  stdout=log, stderr=subprocess.STDOUT, check=False)
     if process.returncode or not output.exists():
-        raise RuntimeError(f"{group} observation process failed; see {directory / 'process.log'}")
+        raise RuntimeError(f"{group} observation process failed; see {process_log}")
     rows = json.loads(output.read_text(encoding="utf-8"))
     if not isinstance(rows, list) or not rows:
         raise ValueError(f"{group} must return a nonempty observation list")
@@ -78,7 +86,7 @@ def observe(group, work, toolchain, renderer):
     return rows
 
 
-def run(work, groups, report, *, toolchain=None, renderer=None):
+def run(work, groups, report, *, toolchain=None, renderer=None, workers=DEFAULT_WORKERS):
     work.mkdir(parents=True, exist_ok=True)
     needs_js = any(group != "python" for group in groups)
     if needs_js and toolchain is None:
@@ -86,8 +94,10 @@ def run(work, groups, report, *, toolchain=None, renderer=None):
     if any(group in {"javascript", "composition", "resources"} for group in groups) and renderer is None:
         renderer = install(work, "mermaid-renderer", ROOT / "tools/mermaid-renderer")
     rows, errors = [], []
-    with ThreadPoolExecutor(max_workers=min(3, len(groups))) as pool:
-        jobs = {pool.submit(observe, group, work, toolchain, renderer): group for group in groups}
+    tasks = [(group, family) for group in groups for family in (FAMILIES if group == "resources" else (None,))]
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        jobs = {pool.submit(observe, group, work, toolchain, renderer, family, workers=workers):
+                group + ("/" + family if family else "") for group, family in tasks}
         for future in as_completed(jobs):
             group = jobs[future]
             try:
@@ -97,13 +107,15 @@ def run(work, groups, report, *, toolchain=None, renderer=None):
             except (OSError, RuntimeError, subprocess.CalledProcessError, ValueError) as exc:
                 errors.append({"group": group, "error": str(exc)})
                 print(f"{group}: {exc}", flush=True)
+    if "resources" in groups and not errors:
+        validate_counts(rows)
     cases = assess(rows)
     cases.sort(key=lambda value: value["id"])
     summary = {"cases": len(cases), "matched": sum(not row["mismatches"] for row in cases),
                "unmatched": sum(bool(row["mismatches"]) for row in cases), "process_errors": len(errors),
                "families": dict(Counter(row["family"] for row in cases))}
     result = {"current": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-              "current_includes_working_files": True, "groups": list(groups), "summary": summary,
+              "current_includes_working_files": True, "groups": list(groups), "workers": workers, "summary": summary,
               "cases": cases, "errors": errors}
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -117,6 +129,7 @@ def run(work, groups, report, *, toolchain=None, renderer=None):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    add_worker_argument(parser)
     parser.add_argument("--group", choices=GROUPS, action="append")
     parser.add_argument("--work", type=Path)
     parser.add_argument("--report", type=Path, default=Path("/tmp/vibeflow-rule-gaps.json"))
@@ -126,7 +139,8 @@ def main(argv=None):
     groups = tuple(dict.fromkeys(args.group or GROUPS))
     try:
         options = {"toolchain": args.toolchain.resolve() if args.toolchain else None,
-                   "renderer": args.renderer.resolve() if args.renderer else None}
+                   "renderer": args.renderer.resolve() if args.renderer else None,
+                   "workers": args.workers}
         if args.work:
             if args.work.exists():
                 parser.error("--work must be a new directory")

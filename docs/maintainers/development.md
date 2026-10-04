@@ -14,6 +14,8 @@
 
 ## 验证层级
 
+开发测试依赖通过 `python -m pip install -e '.[test]'` 安装，包括 pytest 与 pytest-xdist。
+
 快速回归运行相关 pytest 文件。完整验收使用：
 
 ```bash
@@ -27,7 +29,21 @@ python tools/run_tests.py -- tests/core/test_result_scope.py
 python tools/run_tests.py
 ```
 
-该入口在临时工作目录执行测试，固定本仓 `src`、关闭用户站点和自动加载的第三方 pytest 插件，并在结束后移除临时目录。这样运行时默认的 `runs/vibeflow` 与测试缓存不会污染工作树。
+测试调度默认最多使用 8 个 worker。以下入口都接受 `--workers`：
+
+```bash
+python tools/verify_project.py --full --workers 4
+python tools/run_tests.py --workers 2 -- tests/core
+python sandbox/rule_parity/run_all.py --current-only --workers 8
+python sandbox/rule_gaps/run_all.py --workers 8
+VIBEFLOW_TEST_WORKERS=4 python tools/verify_project.py --full
+```
+
+优先级为命令行、`VIBEFLOW_TEST_WORKERS`、默认值 8；`--workers 1` 使用串行调度，0、负数和非整数报参数错误。该设置控制验收调度，与业务 Runtime 的线程池设置分别配置。
+
+pytest 使用独立进程，并按文件分组；同一文件内的测试按顺序执行。每个 worker 有自己的工作目录和临时资料。沙箱使用线程池调度隔离子进程；接口组及资源的六个子组进入同一个队列，避免嵌套线程池叠加并发数。组内的修改、验证、恢复步骤保持顺序；完整验收各阶段及共享一套产物的旧集成场景也保留原先顺序。
+
+该入口固定本仓 `src`、关闭用户站点和自动加载的第三方 pytest 插件，并明确加载 xdist 与工作目录适配器，在结束后移除临时目录。这样运行时默认的 `runs/vibeflow` 与测试缓存不会污染工作树。
 
 完整入口覆盖仓库质量、pytest、Python sandbox、JavaScript integration、真实浏览器、基线规则对照、接口与多文件资源沙箱、wheel 隔离、双发行 smoke、确定性归档及清洁工作树检查。
 

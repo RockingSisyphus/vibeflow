@@ -240,7 +240,13 @@ class RuntimeNodeMixin:
         node = frame.node
         if node is None:
             raise PipelineRuntimeError(f"node '{frame.name}' has no bound callable")
-        outputs = node.run_pure(inputs, frame.params)
+        params = self.registry.merge_config(frame.type_used, {
+            key: value for key, value in frame.params.items() if key != "_global"
+        })
+        # Runtime globals retain their reference semantics; Node config is JSON.
+        if "_global" in frame.params:
+            params["_global"] = frame.params["_global"]
+        outputs = node.run_pure(inputs, params)
         return self._validate_outputs(frame, outputs)
 
     def _execute_planned_stub_outputs(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:

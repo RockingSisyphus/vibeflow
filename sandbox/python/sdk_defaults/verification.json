@@ -1,0 +1,45 @@
+{
+  "schema": "vibeflow.sdk-defaults-fix-verification.v1",
+  "status": "PASS",
+  "base_revision": "2ed8fc024c73450a5bf3e326871145c09af6e92e",
+  "tested_working_tree": true,
+  "source_sha256": {
+    "src/vibeflow/core/config/node.py": "9617b972bdb35cd86b22987843fc186c0a80a1d92cc7c3779743bdafd8abc747",
+    "src/vibeflow/targets/python/runtime/node_mixin.py": "9d593ef4a82bd2b062c31dc981c93f086bc7f8629e3cc1e5ab3a40a9e1f56d7a"
+  },
+  "full_validation": {
+    "command": "npm_config_cache=/tmp/vibeflow-npm-cache python -B tools/verify_project.py --full --scratch /tmp/vf-sdk-defaults-full",
+    "exit_code": 0,
+    "steps": [
+      "repository-quality",
+      "compileall",
+      "pytest",
+      "python-sandbox",
+      "javascript-minimal",
+      "javascript-integration",
+      "rule-regression-sandboxes",
+      "wheel-isolation",
+      "generated-artifact-cleanup",
+      "distribution",
+      "repository-quality-final",
+      "clean-tree"
+    ],
+    "pytest_passed": 1672,
+    "python_integration_passed": 138,
+    "javascript_integration_passed": 67,
+    "historical_cases_matched": 1219,
+    "interface_and_resource_cases_matched": 680,
+    "log": "/tmp/vf-sdk-defaults-full.log"
+  },
+  "quality_tests": {
+    "command": "python -B quality/test.py",
+    "passed": 46,
+    "exit_code": 0
+  },
+  "sdk_sandbox": {
+    "registered": 14,
+    "cli_validation_and_execution": 9,
+    "runtime_isolation": 9
+  },
+  "distribution_report": "distribution-fixed.json"
+}
