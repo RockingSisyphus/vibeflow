@@ -14,8 +14,8 @@ class NodeConfigSpec:
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "schema": {str(key): dict(value) for key, value in self.schema.items()},
-            "defaults": dict(self.defaults),
+            "schema": _json_snapshot(self.schema, object_id="schema"),
+            "defaults": _json_snapshot(self.defaults, object_id="defaults"),
         }
 
 
@@ -46,8 +46,8 @@ def normalize_node_config_spec(
             f"node config defaults contain undeclared keys: {extra_defaults}"
         )
     for key, value in normalized_defaults.items():
-        _assert_json_snapshot(value, object_id=f"defaults.{key}")
-        _assert_schema_value(key, value, normalized_schema[key])
+        normalized_defaults[key] = _json_snapshot(value, object_id=f"defaults.{key}")
+        _assert_schema_value(key, normalized_defaults[key], normalized_schema[key])
     return NodeConfigSpec(schema=normalized_schema, defaults=normalized_defaults)
 
 
@@ -67,8 +67,8 @@ def merge_node_config(
         )
     merged = {**dict(spec.defaults), **normalized_overrides}
     for key, value in merged.items():
-        _assert_json_snapshot(value, object_id=key)
-        _assert_schema_value(key, value, spec.schema[key])
+        merged[key] = _json_snapshot(value, object_id=key)
+        _assert_schema_value(key, merged[key], spec.schema[key])
     return merged
 
 
@@ -97,7 +97,7 @@ def _normalize_schema(schema: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]
             raise NodeConfigError(
                 f"node config schema for '{text_key}' must declare type"
             )
-        out[text_key] = dict(value)
+        out[text_key] = _json_snapshot(value, object_id=f"schema.{text_key}")
     return out
 
 
@@ -134,13 +134,20 @@ def _is_integer(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
-def _assert_json_snapshot(value: Any, *, object_id: str) -> None:
+def _json_snapshot(value: Any, *, object_id: str) -> Any:
+    """Materialize read-only JSON views as independent native containers."""
     try:
-        json.dumps(value, allow_nan=False, sort_keys=True)
+        return json.loads(json.dumps(value, allow_nan=False, sort_keys=True, default=_json_mapping))
     except (TypeError, ValueError) as exc:
         raise NodeConfigError(
             f"node config '{object_id}' must be JSON snapshot safe: {exc}"
         ) from exc
+
+
+def _json_mapping(value: Any) -> dict[str, Any]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 __all__ = [

@@ -18,6 +18,11 @@ import subprocess
 import sys
 import tempfile
 
+if __package__:
+    from .test_parallel import DEFAULT_WORKERS, WORKER_ENVIRONMENT, add_worker_argument
+else:
+    from test_parallel import DEFAULT_WORKERS, WORKER_ENVIRONMENT, add_worker_argument
+
 
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON = sys.executable
@@ -26,6 +31,7 @@ DEFAULT_TEST_PATHS = (ROOT / "tests",)
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    add_worker_argument(parser)
     parser.add_argument(
         "--scratch",
         type=Path,
@@ -43,7 +49,7 @@ def _environment(*, toolchain_root: Path) -> dict[str, str]:
     environment = os.environ.copy()
     # Do not inherit a caller's project checkout or user packages into a
     # framework verification process.
-    environment["PYTHONPATH"] = str(ROOT / "src")
+    environment["PYTHONPATH"] = os.pathsep.join((str(ROOT / "src"), str(ROOT / "tools")))
     environment["PYTHONNOUSERSITE"] = "1"
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     environment["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
@@ -76,12 +82,16 @@ def _resolve_paths(arguments: list[str]) -> list[str]:
     return resolved
 
 
-def run_tests(scratch: Path, pytest_args: list[str]) -> int:
+def run_tests(scratch: Path, pytest_args: list[str], *, workers: int = DEFAULT_WORKERS) -> int:
     scratch.mkdir(parents=True, exist_ok=True)
     bootstrap_environment = _environment(toolchain_root=scratch / "javascript-toolchain")
     toolchain_root = _prepare_toolchain(scratch, environment=bootstrap_environment)
     work_root = scratch / "work"
     work_root.mkdir()
+    environment = _environment(toolchain_root=toolchain_root)
+    environment[WORKER_ENVIRONMENT] = str(workers)
+    environment["VIBEFLOW_PYTEST_WORK_ROOT"] = str(work_root)
+    parallel = workers > 1 and not any(value in {"--collect-only", "--co", "--help", "-h", "--version"} for value in pytest_args)
     command = (
         PYTHON,
         "-m",
@@ -89,13 +99,15 @@ def run_tests(scratch: Path, pytest_args: list[str]) -> int:
         "-q",
         "-p",
         "no:cacheprovider",
+        "-p", "pytest_workdirs",
+        *(("-p", "xdist.plugin", "-n", str(workers), "--dist", "loadfile") if parallel else ()),
         *_resolve_paths(pytest_args),
     )
     print("$ " + " ".join(command), flush=True)
     return subprocess.run(
         command,
         cwd=work_root,
-        env=_environment(toolchain_root=toolchain_root),
+        env=environment,
         check=False,
     ).returncode
 
@@ -106,9 +118,9 @@ def main(argv: list[str] | None = None) -> int:
     if pytest_args[:1] == ["--"]:
         pytest_args.pop(0)
     if args.scratch is not None:
-        return run_tests(args.scratch.resolve(), pytest_args)
+        return run_tests(args.scratch.resolve(), pytest_args, workers=args.workers)
     with tempfile.TemporaryDirectory(prefix="vibeflow-pytest-") as temporary:
-        return run_tests(Path(temporary), pytest_args)
+        return run_tests(Path(temporary), pytest_args, workers=args.workers)
 
 
 if __name__ == "__main__":

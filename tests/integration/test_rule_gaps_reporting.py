@@ -69,7 +69,7 @@ def test_empty_or_incomplete_group_is_an_observation_error(tmp_path, monkeypatch
 
 @pytest.mark.parametrize("broken_group", [False, True])
 def test_report_distinguishes_acceptance_failure_from_observation_failure(tmp_path, monkeypatch, broken_group):
-    def observe(*args):
+    def observe(*args, **kwargs):
         if broken_group:
             raise RuntimeError("worker did not produce observations")
         return [case("normal"), case("broken", handler_called=False)]

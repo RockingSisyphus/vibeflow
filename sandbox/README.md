@@ -6,6 +6,9 @@ Runnable fixtures are grouped by target and scope:
 - `python/integration`: the complete Python runtime and CLI sandbox.
 - `python/domain_rules`: model/data tags, domain source ownership, and numerical execution.
 - `python/rule_graph`: external Rule providers/checkers, typed `requires`, and local overrides.
+- `python/sdk_defaults`: independent SDK JSON-default registration probes,
+  formal CLI observations, and native-container isolation controls; see
+  [its README](python/sdk_defaults/README.md) for the reproduced failures.
 - `javascript/minimal`: minimal JavaScript/TypeScript AOT end-to-end build.
 - `javascript/integration`: the complete TypeScript AOT, Capability, Host
   Extension, and browser sandbox.
