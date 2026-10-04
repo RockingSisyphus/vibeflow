@@ -24,9 +24,17 @@ effect scope 来自选中 Rule 的有效 `vibeflow.effect_policy.v1` 资料，�
 
 ## 检查与执行入口
 
-import 规则在业务实现导入前执行；static 用于 quality、validate、review 和源码构建审查；run 只执行明确选择的运行入口。规则判断与原生解析、符号绑定、契约和执行计划的成功事实分开：空规则选择不创造 Target 尚不支持的执行能力。新领域规则未声明 run/import 时不会自动扩大这两个入口。
+固定插件入口及直接导入先初始化以提供资源定义。import 检查在后续绑定前执行：已加载源码接受诊断，尚未加载的延迟实现及闭包在检查失败后保持未加载。static 用于 quality、validate、review 和构建审查；Python run 执行选定运行入口，JS AOT 产物按原生计划执行业务。新领域 Ruleset 未声明 run/import 时，这两个入口为空。
+
+规则结果记录健康判断，解析、符号绑定和执行计划提供原生成功或失败事实；两者分别汇入正式报告。资源查询和 review-rules 加载声明，框架不调用检查函数、业务入口或生命周期工厂。装配职责见[系统架构的插件装配与多文件源码](system-architecture.md#插件装配与多文件源码)。
 
 source 范围的规则只能按本次检查内明确的源码快照、声明、参数和类型化输入复用，公共视图不暴露某一个业务调用的可变配置；call 范围逐调用执行。规则允许同时返回诊断和有效资料，依赖只消费完成且满足输出契约的资料。
+
+## 宿主与多文件实现
+
+JS/TS Host 由一个 createHost 工厂创建一个具有 capabilities/start/stop 的实例。入口及 implementation_files 中的支撑实现共同服务该实例；订阅、FIFO、取消、计时器、IO 与回执保留即时处理时机。会话状态在工厂内建立或显式传给支撑对象，各 createWorkflowHost 调用持有独立状态。Host dependencies 表达其他宿主实例依赖，base_libs 表达独立辅助库引用。
+
+AOT 打包实际运行依赖，TS 类型在构建时擦除；Rule 和 compiler 专用代码留在检查与编译环境。多文件登记提供完整审查资料，文件是否初始化仍由真实运行引用决定。
 
 ## Trace 与执行证据
 

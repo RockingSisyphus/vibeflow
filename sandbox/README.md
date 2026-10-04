@@ -4,13 +4,19 @@ Runnable fixtures are grouped by target and scope:
 
 - `python/minimal`: compact Python Node, base_lib, Plugin, and config fixture.
 - `python/integration`: the complete Python runtime and CLI sandbox.
-- `python/domain_rules`: model/data categories, domain source ownership, and numerical execution.
+- `python/domain_rules`: model/data tags, domain source ownership, and numerical execution.
 - `python/rule_graph`: external Rule providers/checkers, typed `requires`, and local overrides.
 - `javascript/minimal`: minimal JavaScript/TypeScript AOT end-to-end build.
 - `javascript/integration`: the complete TypeScript AOT, Capability, Host
   Extension, and browser sandbox.
-- `javascript/domain_rules`: the same domain bundle through TypeScript analysis and native AOT execution.
+- `javascript/domain_rules`: code-plugin domain resources through TypeScript analysis and native AOT execution.
 - `javascript/rule_graph`: the same declarative Rule graph through the JavaScript worker.
+- `resources/python` and `resources/javascript`: multi-file Node, BaseLib, Plugin,
+  and JS/TS Host implementations, with formal SVG and Architecture JSONC examples.
+
+The formal CLI resource matrix covers registration, ownership, rules, edits,
+presentation, and runtime behavior. Its commands and evidence are listed in
+[resources/README.md](resources/README.md).
 
 The runnable projects are the baseline fixtures. Automated tests copy them and
 exercise invalid declarations, unavailable records, graph conflicts, source

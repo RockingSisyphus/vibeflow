@@ -11,13 +11,15 @@ VibeFlow 的公开命令分别报告结构、质量、构建、审核产物或�
 | 静态结构检查 | `python run.py validate --config <config>` |
 | 项目质量检查 | `python run.py quality --path <root>` |
 | 正式审核图 | `python run.py review --config <config> --output reports/workflow.svg` |
+| 查看有效规则图 | `python run.py review-rules --config <config> --json` |
+| 查询当前资源与来源 | `python run.py inspect-resources --config <config> --json` |
 | Python 执行 | `python run.py run --config <config> --input <input.json>` |
 | JavaScript AOT | `python run.py build --config <config> --target node --profile esm-module --out-dir <dir>` |
 | 内核完整性 | `python run.py verify-kernel` |
 
 `review` 生成并校验审核产物。collaborative profile 中，产物成功仍需后续人工批准；autonomous profile 按任务直接完成适用门禁。
 
-正式审核必须对真实 Config 的完整工作流执行 `review`。工具生成成功不能证明配置就是实际生产流程；局部、概念性或脱离真实调用的配置不能凭 PASS 作为批准依据。协同模式对原位 planned 变更及新增工作流的具体要求见其 profile 文档。
+对实际 Config 的完整工作流执行 `review`，得到一张展开 SVG，并更新已登记的 `ARCHITECTURE.jsonc`。SVG 展示工作流与资源区，JSONC 保存声明、入口与支撑文件、真实依赖、有效规则和展示来源。审核失败时保留已有正式产物。多文件图形内容见[图形与 Architecture](multifile-resources.md#图形与-architecture)。
 
 ## 检查范围
 
@@ -32,16 +34,17 @@ VibeFlow 的公开命令分别报告结构、质量、构建、审核产物或�
 
 quality、build 和 review 会增加各自实际完成的检查。失败或无法取得证据的阶段不会写入 `checked`。
 
-VibeFlow 命令不检查：
+按本次源码和输入报告各层证据：
 
-- 业务结果正确性；
-- 项目需求符合性；
-- 外部接口业务语义；
-- 领域数据正确性。
+| 证据 | 可以报告的结果 |
+| --- | --- |
+| `validate` / `quality-check` | `checked` 范围内的结构、源码健康度及所选领域约束 |
+| `build` | 指定 Target 的产物已生成 |
+| 工作流执行探针 | 指定输入的实际执行路径及声明输出 |
+| 项目测试 | 业务结果正确性、需求符合性及领域数据约定 |
+| 真实环境验收 | 实际宿主与外部接口行为 |
 
-这些结论由项目测试、集成测试和真实环境验收提供。
-
-报告完成状态时，按本次任务实际执行的证据区分：`validate`／`quality-check` 说明其 `checked` 范围内的静态结果；`build` 说明目标产物已构建；执行探针说明指定输入走过的执行路径；业务测试和真实环境验收才支持相应的业务结论。局部 PASS、产物存在或旧报告不能代替当前代码对应的顶层结果。任务要求的检查失败时，先读失败项并修复原因；代码和输入未变化时，无需反复运行同一失败检查。
+检查失败时，依据当次诊断修复源码、配置或输入，再重新执行相关检查。
 
 ### Python 与 JavaScript 项目质量
 
@@ -51,7 +54,9 @@ VibeFlow 命令不检查：
 
 JavaScript/TypeScript 扫描 `.js`、`.jsx`、`.ts`、`.tsx`、`.mjs`、`.cjs`、`.mts`、`.cts` 及声明源码，包括未注册的手写文件和测试文件；自动排除 `generated`、`dist`、`build`、`node_modules` 等产物目录。可重复使用 `--exclude-dir NAME` 和 `--exclude-path ROOT_RELATIVE_PATH` 排除其他目录或文件。独立 `--path` 源码扫描需要项目本地安装的 TypeScript；`--enable-structure-limits` 可为独立扫描启用根目录结构上限。
 
-Node/helper 的源码大小、复杂度和依赖链由所选 Ruleset 中的规则检查。默认依赖链包含 Node 本身，长度超过 4 为警告、超过 6 为错误；仅计入可解析的项目内导入。现有 `policy` 数值配置作为内置 Rule 的默认参数，显式规则参数和覆盖关系优先；旧 `policy.rules` 豁免和降级改为规则组合及覆盖。`validate`、`review`、`build` 执行当前范围的静态入口；`run` 只执行运行入口，新增领域规则默认进入静态入口。`review-rules --config CONFIG --node CALL_PATH` 可查看该调用的有效规则及参数来源，生成 JSON、Mermaid 或 SVG，过程加载受信插件取得固定定义，框架不调用 Rule、Node 或生命周期工厂。规则接口与迁移示例见 [Rule 与 Node](rules-and-nodes.md)。
+Node、BaseLib、Plugin 和 Host 的入口与支撑文件由各自所选 Ruleset 检查。默认可维护性规则逐文件检查 500 行上限；默认依赖链包含入口本身，长度超过 4 为警告、超过 6 为错误，仅计入可解析的项目内导入。`policy` 数值配置提供内置 Rule 的默认参数，显式规则参数和覆盖关系优先。参数组合见[Rule 与 Node](rules-and-nodes.md#ruleset-与局部覆盖)，旧写法调整见[声明迁移](rule-system-migration.md)。
+
+`validate`、`review`、`build` 执行当前范围的静态入口；Python `run` 执行运行入口，新增领域规则默认进入静态入口。`review-rules --config CONFIG --node CALL_PATH` 展示该调用的有效规则及参数来源，支持 JSON、Mermaid 或 SVG。查询和预览的加载顺序见[加载与检查](plugins-and-integrations.md#加载与检查)。
 
 ## 工作流执行探针
 

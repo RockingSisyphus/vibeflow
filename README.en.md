@@ -14,12 +14,13 @@ terminal start → input I/O → process / nodeset → output I/O → terminal e
 
 - Python Runtime and JavaScript/TypeScript AOT;
 - Python and JS/TS plugin SDKs for code-defined Nodes, Rules, Rulesets, and other resources explicitly selected by each workflow;
-- Nodes, Nodesets, Loops, Plugins, Capabilities, and explicit effect boundaries;
-- deterministic Architecture, Mermaid, ASCII, and SVG views;
+- composable Rules and Rulesets, plus Nodes, Nodesets, Loops, Capabilities, and explicit effect boundaries;
+- explicit multi-file implementations, source ownership, per-file reviews, and default presentation for Nodes, BaseLibs, Plugins, and Hosts;
+- deterministic Architecture JSONC, Mermaid, ASCII, and expanded SVG views with resource dependencies;
 - config, contract, reachability, control-flow, quality, build, and execution-evidence checks;
 - collaborative and autonomous development protocols over the same Core and machine rules.
 
-VibeFlow validates engineering structure. Project tests remain responsible for business results, requirements, external semantics, and domain-data correctness.
+VibeFlow reviews engineering structure, source health, and selected domain constraints. Project tests and production-environment acceptance verify business results and external behavior.
 
 ## Getting started
 
@@ -49,6 +50,7 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 
 - [Project overview](docs/overview.md)
 - [User development guides](docs/README.md#使用者开发)
+- [Multi-file resources and presentation](docs/user/multifile-resources.md)
 - [System design](docs/README.md#系统设计)
 - [Kernel maintenance](docs/README.md#内核维护)
 

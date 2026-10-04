@@ -55,7 +55,9 @@ python quality/test.py
 
 ## 完整分发包
 
-通过 `python distribution/build.py` 构建 `0.15.0` 的 collaborative 和 autonomous 两个完整包。构建器自检和两份发布目录的 `verify-kernel` 均通过；新 ZIP 与上述完整验证生成的对应 ZIP 逐字节一致，共享 kernel 也完全一致。
+此节保留多文件资源验收时首次构建的记录及归档哈希。后续文档修订可按相同版本重新构建，归档以对应构建记录追踪。
+
+当次通过 `python distribution/build.py` 构建 `0.15.0` 的 collaborative 和 autonomous 两个完整包。构建器自检和两份发布目录的 `verify-kernel` 均通过；ZIP 与上述完整验证生成的对应 ZIP 逐字节一致，共享 kernel 也完全一致。
 
 | 包 | SHA-256 |
 | --- | --- |
