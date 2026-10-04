@@ -266,7 +266,7 @@ def _parse_implementations(
         item_field = f"{field}[{index}]"
         _check_fields(
             item,
-            allowed={"language", "targets", "source", "completion"},
+            allowed={"language", "targets", "source", "completion", "implementation_files"},
             field=item_field,
         )
         source = _required_mapping(
@@ -305,6 +305,8 @@ def _parse_implementations(
                 completion=_optional_string(
                     item.get("completion")
                 ) or "immediate",
+                implementation_files=tuple(SourceLocator(**part) for part in
+                    _object_list(item.get("implementation_files", ()), field=f"{item_field}.implementation_files")),
             )
         )
     return tuple(implementations)
@@ -335,6 +337,7 @@ def _parse_base_lib(data: Mapping[str, Any]) -> BaseLibDescriptor:
         data,
         allowed={
             "rulesets",
+            "presentation",
             "kind",
             "id",
             "display_name",
@@ -348,6 +351,7 @@ def _parse_base_lib(data: Mapping[str, Any]) -> BaseLibDescriptor:
         field="base_lib",
     )
     return BaseLibDescriptor(
+        presentation=_mapping_or_empty(data.get("presentation"), field="base_lib.presentation"),
         rulesets=_string_list(data.get("rulesets", ()), field="base_lib.rulesets"),
         id=_required_string(data.get("id"), field="base_lib.id"),
         display_name=_required_string(
@@ -468,6 +472,8 @@ def _parse_host_extension(
         data,
         allowed={
             "rulesets",
+            "presentation",
+            "base_libs",
             "kind",
             "id",
             "targets",
@@ -482,6 +488,8 @@ def _parse_host_extension(
         field="host_extension",
     )
     return HostExtensionDescriptor(
+        presentation=_mapping_or_empty(data.get("presentation"), field="host_extension.presentation"),
+        base_libs=_string_list(data.get("base_libs", ()), field="host_extension.base_libs"),
         rulesets=_string_list(data.get("rulesets", ()), field="host_extension.rulesets"),
         id=_required_string(
             data.get("id"),
@@ -518,6 +526,8 @@ def _parse_plugin(data: Mapping[str, Any]) -> PluginDescriptor:
         data,
         allowed={
             "rulesets",
+            "presentation",
+            "base_libs",
             "kind",
             "id",
             "type",
@@ -544,6 +554,8 @@ def _parse_plugin(data: Mapping[str, Any]) -> PluginDescriptor:
     if isinstance(raw_priority, bool) or not isinstance(raw_priority, int):
         raise DescriptorModelError("plugin.priority must be an integer")
     return PluginDescriptor(
+        presentation=_mapping_or_empty(data.get("presentation"), field="plugin.presentation"),
+        base_libs=_string_list(data.get("base_libs", ()), field="plugin.base_libs"),
         rulesets=_string_list(data.get("rulesets", ()), field="plugin.rulesets"),
         id=_required_string(data.get("id"), field="plugin.id"),
         plugin_type=_required_string(data.get("type"), field="plugin.type"),

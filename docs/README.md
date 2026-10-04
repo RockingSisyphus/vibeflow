@@ -15,6 +15,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [Nodeset 与 Loop](user/nodesets-and-loops.md)
 - [Rule、Ruleset 与 Node 声明](user/rules-and-nodes.md)
 - [Plugin 与宿主集成](user/plugins-and-integrations.md)
+- [多文件资源、源码归属与展示](user/multifile-resources.md)
 - [命令、产物与检查范围](user/commands-and-results.md)
 - [人机协同协议](user/profiles/collaborative.md)
 - [无人值守协议](user/profiles/autonomous.md)
@@ -22,6 +23,9 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 ## 系统设计
 
 - [代码声明与统一插件接入重构](design/code-plugin-refactor-plan.md)
+- [多文件资源、统一展示与沙箱验收](design/multifile-resources-plan.md)
+- [多文件资源案例与迁移对应表](design/multifile-resource-cases.md)
+- [多文件资源实现与验收](design/multifile-resources-results.md)
 - [系统架构](design/system-architecture.md)
 - [执行模型](design/execution-model.md)
 - [Rule/Ruleset、Node 分类与插件重构](design/rule-system-refactor-plan.md)

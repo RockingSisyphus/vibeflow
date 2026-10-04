@@ -38,8 +38,13 @@ def builtin_effect_resources() -> tuple[tuple[RuleDescriptor, ...], tuple[Rulese
         rulesets.append(RulesetDescriptor("vibeflow." + name, calls=(
             RuleCall("imports", rule_id="vibeflow.import_side_effects"),
             RuleCall("effects", rule_id="vibeflow.no_side_effects", params={"effect_scope":scope}),
-            RuleCall("interface", rule_id="vibeflow.node_interface")),
-            entrypoints={"import":("imports",), "static":("effects","interface"), "run":("effects","interface")}))
+            RuleCall("interface", rule_id="vibeflow.node_interface"),
+            RuleCall("maintainability", rule_id="vibeflow.maintainability")),
+            entrypoints={"import":("imports",), "static":("effects","interface","maintainability"), "run":("effects","interface","maintainability")}))
+    rulesets.append(RulesetDescriptor("vibeflow.plugin_declaration", calls=(
+        RuleCall("imports", rule_id="vibeflow.import_side_effects"),
+        RuleCall("maintainability", rule_id="vibeflow.maintainability")),
+        entrypoints={"import":("imports",), "static":("maintainability",), "run":("maintainability",)}))
     return rules, tuple(rulesets)
 
 

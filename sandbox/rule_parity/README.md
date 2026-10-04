@@ -2,7 +2,7 @@
 
 这组测试保留 `f169429` 和修复前 `15adf51` 的冻结观察，检查当前工作区是否漏掉旧规则或错误拒绝合法输入。它与领域插件、规则图及图形沙箱互补，已接入 `verify_project.py --full`。
 
-规则清单见 [基线盘点](../../docs/design/baseline-rule-inventory.md)。这里按能力组织场景，不把一个诊断码等同于一条独立 Rule。测试夹具在临时目录生成；Python 的基线使用旧类声明，当前版本使用 JSONC 声明。适配只发生在测试中。
+规则清单见 [基线盘点](../../docs/design/baseline-rule-inventory.md)。这里按能力组织场景，不把一个诊断码等同于一条独立 Rule。测试夹具在临时目录生成；Python 的基线使用旧类声明，当前版本使用选中插件的代码声明及显式源码登记。历史输入的适配只发生在测试中。
 
 ```bash
 python sandbox/rule_parity/run_all.py \

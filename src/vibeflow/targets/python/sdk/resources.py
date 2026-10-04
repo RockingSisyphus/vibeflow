@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import inspect
+from pathlib import Path
 from typing import Any, Mapping
 
 from vibeflow.core.descriptors.decode import decode_resource
-from vibeflow.core.descriptors.models import SourceLocator
+from vibeflow.core.descriptors.models import SourceLocator, DescriptorModelError
 from vibeflow.core.rules.models import RuleCall, RuleRelation, RulesetDescriptor
 
 
@@ -31,10 +32,11 @@ def definition(value: Any) -> ResourceDefinition:
 
 def _location(value=None):
     if value is not None:
-        path = inspect.getsourcefile(value) or ""
         try:
+            path = inspect.getsourcefile(value) or ""
             line = inspect.getsourcelines(value)[1]
         except (OSError, TypeError):
+            path = ""
             line = None
         return path, line, value.__qualname__
     frame = inspect.currentframe()
@@ -58,18 +60,50 @@ def _json(value):
 def _declare(kind, options, value=None, source=None):
     path, line, symbol = _location(value)
     data = {"kind": kind, **_json(options)}
+    declaration_path, declaration_line, _ = _location()
+    file_values = data.pop("implementation_files", ())
+    try:
+        files = _implementation_files(file_values, declaration_path)
+    except ValueError as error:
+        error.location = {"path":declaration_path, "field":"implementation_files",
+                          **({"line":declaration_line} if declaration_line is not None else {})}
+        raise
     if kind in {"node", "rule", "base_lib", "host_extension", "plugin"} and not (kind == "rule" and options.get("handler") and value is None and source is None):
         locator = _json(source) if source is not None else {"kind": "file", "ref": path, "export": symbol}
         implementation = {"language": "python", "source": locator}
         if kind != "rule":
             implementation["targets"] = ["python"]
+            if files:
+                implementation["implementation_files"] = [item.to_dict() for item in files]
         data.setdefault("implementations", [implementation])
+        if kind != "rule" and options.get("implementations") and isinstance(data["implementations"], (list, tuple)):
+            for item in data["implementations"]:
+                if isinstance(item, dict):
+                    parts = _implementation_files(item.get("implementation_files", ()), declaration_path)
+                    item["implementation_files"] = [part.to_dict() for part in (*parts, *files)]
     try:
         descriptor = decode_resource(data)
     except ValueError as error:
         error.location = {"path":path, **({"line":line} if line is not None else {})}
         raise
-    return ResourceDefinition(descriptor, value, path, line, symbol)
+    return ResourceDefinition(descriptor, value, declaration_path, declaration_line, symbol)
+
+
+def _implementation_files(values, declaration_path):
+    if isinstance(values, str) or not isinstance(values, (tuple, list)):
+        raise DescriptorModelError("implementation_files must be a list of explicit file paths")
+    result = []
+    for value in values:
+        if not isinstance(value,(SourceLocator,str,Mapping)):
+            raise DescriptorModelError("implementation_files accepts file paths or source locators")
+        locator = value if isinstance(value, SourceLocator) else SourceLocator("file", value) if isinstance(value, str) else SourceLocator(**value)
+        if locator.kind != "file":
+            raise DescriptorModelError("implementation_files accepts only file sources")
+        ref = Path(declaration_path).parent / locator.ref
+        result.append(SourceLocator("file", str(ref.resolve()), locator.export))
+    # Apply the same pure validation as other Target declarations.
+    from vibeflow.core.descriptors.models import ImplementationDescriptor
+    return ImplementationDescriptor("python", ("python",), SourceLocator("file", declaration_path or "."), implementation_files=tuple(result)).implementation_files
 
 
 def _decorator(kind, options, source=None):
@@ -114,9 +148,14 @@ def base_lib(*, id: str, source=None, **options):
     return _decorator("base_lib", {"id": id, "display_name": id, "description": id, **options}, source)
 
 
+def lifecycle(*, id: str, type: str, source=None, **options):
+    """Declare a compiler/runtime factory with its own rules and source bundle."""
+    return _decorator("plugin", {"id": id, "type": type, "targets": ["python"], **options}, source)
+
+
 def host_extension(*, id: str, **options):
     return _declare("host_extension", {"id": id, **options})
 
 
 __all__ = ["ResourceDefinition", "node", "rule", "ruleset", "data_schema", "capability",
-           "base_lib", "host_extension", "RuleCall", "RuleRelation", "SourceLocator", "RulesetDescriptor"]
+           "base_lib", "lifecycle", "host_extension", "RuleCall", "RuleRelation", "SourceLocator", "RulesetDescriptor"]

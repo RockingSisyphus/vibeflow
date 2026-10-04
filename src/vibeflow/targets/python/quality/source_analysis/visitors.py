@@ -249,6 +249,7 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
         line_offset: int,
         effect_scope: str = EFFECT_SCOPE_NONE,
         initial_aliases: dict[str, str] | None = None,
+        authorized_resource_imports: set[tuple[int, str]] | None = None,
         imported_roots: set[str] | None = None,
         module_state_names: set[str] | None = None,
         input_parameters: dict[str, set[str]] | None = None,
@@ -257,6 +258,7 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
         self.source = source
         self.contract = contract
         self.known_node_modules = set(known_node_modules)
+        self.authorized_resource_imports = authorized_resource_imports or set()
         self.known_node_class_names = set(known_node_class_names)
         self.line_offset = line_offset
         self.effect_scope = effect_scope
@@ -435,7 +437,7 @@ class NodePurityVisitor(_NodeDataTrackingMixin, _PurityImportVisitor):
         if _is_boundary_import(module):
             self._add("boundary_import", f"node must not import boundary APIs: {module}", node, suggested_fix_type="move_to_boundary")
             return
-        if _is_node_module(module) or module in self.known_node_modules:
+        if (_is_node_module(module) or module in self.known_node_modules) and (getattr(node, "lineno", 0), module) not in self.authorized_resource_imports:
             self._add("node_import", f"node must not import another node module: {module}", node, suggested_fix_type="move_to_nodeset")
             return
         if _is_base_lib_module(module):
@@ -505,11 +507,13 @@ class ModulePurityVisitor(_PurityImportVisitor):
         effect_scope: str = EFFECT_SCOPE_NONE,
         audit_all_definitions: bool = False,
         input_parameters: dict[str,set[str]] | None = None,
+        authorized_resource_imports: set[tuple[int, str]] | None = None,
     ) -> None:
         self.policy = policy
         self.source = source
         self.node_class_name = node_class_name
         self.known_node_modules = set(known_node_modules)
+        self.authorized_resource_imports = authorized_resource_imports or set()
         self.known_node_class_names = set(known_node_class_names)
         self.effect_scope = effect_scope
         self.audit_all_definitions = audit_all_definitions
@@ -694,7 +698,7 @@ class ModulePurityVisitor(_PurityImportVisitor):
         if _is_boundary_import(module):
             self._add("boundary_import", f"node must not import boundary APIs: {module}", node, suggested_fix_type="move_to_boundary")
             return
-        if _is_node_module(module) or module in self.known_node_modules:
+        if (_is_node_module(module) or module in self.known_node_modules) and (getattr(node, "lineno", 0), module) not in self.authorized_resource_imports:
             self._add("node_import", f"node must not import another node module: {module}", node, suggested_fix_type="move_to_nodeset")
             return
         violation_code = import_violation_code(module, effect_scope=self.effect_scope, policy=self.policy)

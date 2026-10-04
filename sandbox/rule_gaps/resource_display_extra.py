@@ -1,0 +1,53 @@
+"""Invalid styles, status provenance and nonpublication of failed formal reviews."""
+import hashlib
+
+from resource_support import project,cli,documents,observe,KINDS,IDS,PARTS,mutate_presentation,config,rgb,replace
+
+
+def run_cases(work,toolchain):
+    rows=[]
+    for kind in KINDS:
+        for field,value in (("fill","blue"),("stroke","#abc"),("text",True),("shape","triangle"),("icon",""),("fill","#fee2e2")):
+            case=f"display.{kind}.invalid.{field}.{str(value).replace('#','')}";root=project(work/case,toolchain=toolchain)
+            mutate_presentation(root,kind,{field:value})
+            actual=cli(root,"inspect-resources",name="invalid")
+            rows.append(observe(case,"resource-display",actual,accept=False,code="DESCRIPTOR.INVALID"))
+        for override in (False,True):
+            case=f"display.{kind}.warning.{'override' if override else 'status'}";root=project(work/case,toolchain=toolchain)
+            path=root/PARTS[kind];text=path.read_text();path.write_text(text+"// reviewed support\n"*(450-len(text.splitlines())))
+            if override and kind!="node":
+                if kind=="host_extension":config(root,lambda x:x["host_extensions"][0].update(style={"fill":"#ffeebb"}))
+                elif kind=="plugin":config(root,lambda x:x["plugins"][0].update(style={"fill":"#ffeebb"}))
+                else:config(root,lambda x:x.update(base_lib={"modules":[{"id":"demo.math","style":{"fill":"#ffeebb"}}]}))
+            actual,architecture,_,browser=documents(root,name="warning",screenshot=True)
+            resource=architecture.get("implementation_graph",{}).get("resources",{}).get(kind+":"+IDS[kind],{})
+            presentation=resource.get("effective_presentation",{})
+            fields=presentation.get("values",{});sources=presentation.get("sources",{})
+            nodes=[item for item in browser.get("nodes",()) if kind+": "+IDS[kind] in item["text"]]
+            actual["metrics"].update(marker="warning" in resource.get("markers",()),
+                diagnostic=any(item.get("severity")=="warning" for item in resource.get("diagnostics",())),
+                fill_origin=sources.get("fill"),status_fill=fields.get("fill"),
+                matches_svg=any(shape["fill"]==rgb(fields["fill"]) for node in nodes for shape in node["shapes"]))
+            rows.append(observe(case,"resource-display",actual,metrics={"marker":True,"diagnostic":True,
+                "fill_origin":"call" if override and kind!="node" else "status",
+                "status_fill":"#ffeebb" if override and kind!="node" else "#fef3c7","matches_svg":True,"browser_exit_code":0}))
+        case=f"display.{kind}.failed_review_keeps_previous";root=project(work/case,toolchain=toolchain)
+        before,_,_,_=documents(root,name="formal")
+        svg=root/"evidence/formal.svg";document=root/"ARCHITECTURE.jsonc"
+        originals=[hashlib.sha256(path.read_bytes()).hexdigest() for path in (svg,document)]
+        path=root/PARTS[kind];text=path.read_text();path.write_text(text+"// invalid support\n"*(501-len(text.splitlines())))
+        actual=cli(root,"review",name="failed-review",extra=["--output",svg])
+        actual["metrics"].update(initial_review=before["metrics"]["exit_code"],artifacts_preserved=originals==[hashlib.sha256(path.read_bytes()).hexdigest() for path in (svg,document)])
+        rows.append(observe(case,"resource-display",actual,accept=False,code="NODE.PURITY.SOURCE_TOO_LARGE" if kind=="node" else "BASE_LIB.SOURCE.MAX_LINES",metrics={"initial_review":0,"artifacts_preserved":True}))
+    for kind in ("host_extension","plugin_declaration","node_external"):
+        case=f"display.{kind}.state";root=project(work/case,toolchain=toolchain)
+        if kind=="host_extension":config(root,lambda x:x["host_extensions"][0].update(status="planned"))
+        elif kind=="plugin_declaration":config(root,lambda x:x["plugins"].append({"id":"pending","status":"planned","type":"runtime","targets":["node","browser"],"display_name":"Pending","description":"Not loaded","source":{"kind":"file","ref":"never-loaded.ts"}}))
+        else:replace(root,"node.ts",'type_key:"demo.model",','type_key:"demo.model",external:true,')
+        actual,architecture,_,browser=documents(root,name="status",screenshot=True)
+        key="node:demo.model" if kind=="node_external" else "plugin_declaration:pending" if kind=="plugin_declaration" else "host_extension:demo.host"
+        resource=architecture.get("implementation_graph",{}).get("resources",{}).get(key,{})
+        actual["metrics"].update(marker=("external" if kind=="node_external" else "planned") in resource.get("markers",()),
+            fill_origin=resource.get("effective_presentation",{}).get("sources",{}).get("fill"),has_sources=bool(resource.get("sources")))
+        rows.append(observe(case,"resource-display",actual,metrics={"marker":True,"fill_origin":"status","has_sources":kind!="plugin_declaration","browser_exit_code":0}))
+    return rows

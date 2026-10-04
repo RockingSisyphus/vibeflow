@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
+from os.path import relpath
 from typing import Any
 
 from vibeflow.core.descriptors import DescriptorCatalogs
@@ -18,6 +19,11 @@ from vibeflow.core.quality.implementation import (
 )
 from vibeflow.targets.javascript.build.project_paths import safe_project_path
 from vibeflow.targets.javascript.build.toolchain import DriverQualityResult, run_quality_facts_driver
+
+
+def relative_source_path(path, root):
+    """Match Target file identities, including registered sibling roots."""
+    return Path(relpath(path, root)).as_posix()
 
 
 def inspect_registered_implementations(
@@ -38,7 +44,7 @@ def inspect_registered_implementations(
     if not ownership:
         return ()
     expected_paths = {
-        Path(item["path"]).relative_to(project_root).as_posix() for item in ownership
+        relative_source_path(item["path"], project_root) for item in ownership
     }
     if prefetched_facts is not None and not expected_paths.issubset(
         {str(item["path"]) for item in prefetched_facts.files}
@@ -70,34 +76,21 @@ def registered_implementation_requests(
     selected = {str(Path(value).resolve()) for value in selected_files}
     ownership: list[dict[str, str]] = []
     descriptors: dict[tuple[str, str, str], object] = {}
-    for descriptor in catalogs.nodes:
+    from vibeflow.core.descriptors.source_bundle import source_resources, implementation_sources
+    for kind, descriptor in source_resources(catalogs):
         for implementation in descriptor.implementations:
             if implementation.language not in {"javascript", "typescript"} or implementation.source.kind != "file":
                 continue
-            if str((project_root / implementation.source.ref).resolve()) not in selected:
-                continue
-            source = safe_project_path(project_root, implementation.source.ref, subject=f"node '{descriptor.type_key}' source", require_file=True, allowed_roots=catalogs.source_roots)
-            if str(source) not in selected:
-                continue
-            export = implementation.source.export or "run"
-            key = (descriptor.type_key, str(source), export)
-            if key not in descriptors:
-                descriptors[key] = descriptor
-                ownership.append({"type_key": descriptor.type_key, "path": str(source), "export": export, "kind": "node"})
-    for descriptor in catalogs.base_libs:
-        for implementation in descriptor.implementations:
-            if implementation.language not in {"javascript", "typescript"} or implementation.source.kind != "file":
-                continue
-            if str((project_root / implementation.source.ref).resolve()) not in selected:
-                continue
-            source = safe_project_path(project_root, implementation.source.ref, subject=f"base_lib '{descriptor.id}' source", require_file=True, allowed_roots=catalogs.source_roots)
-            if str(source) not in selected:
-                continue
-            export = implementation.source.export or ""
-            key = (descriptor.id, str(source), export)
-            if key not in descriptors:
-                descriptors[key] = descriptor
-                ownership.append({"type_key": descriptor.id, "path": str(source), "export": export, "kind": "base_lib"})
+            for role, locator in implementation_sources(implementation):
+                if str((project_root / locator.ref).resolve()) not in selected:
+                    continue
+                source = safe_project_path(project_root, locator.ref, subject=f"{kind} '{descriptor.id}' {role}", require_file=True, allowed_roots=catalogs.source_roots)
+                export = (locator.export or ("run" if kind == "node" else "")) if role == "entry" else ""
+                key = (descriptor.id, str(source), export)
+                if key not in descriptors:
+                    descriptors[key] = descriptor
+                    ownership.append({"type_key":descriptor.id, "path":str(source), "export":export,
+                                      "kind":kind, "role":role})
     return ownership, descriptors
 
 
@@ -118,7 +111,7 @@ def evaluate_registered_facts(
         for path, item in files.items()
     }
     base_roots = {
-        Path(item["path"]).relative_to(project_root).as_posix()
+        relative_source_path(item["path"], project_root)
         for item in ownership if item["kind"] == "base_lib"
     }
     base_modules = set(base_roots)
@@ -144,7 +137,7 @@ def evaluate_registered_facts(
             message=str(item.get("message", "JavaScript syntax error")),
             suggested_fix_type="fix_syntax",
         ))
-    expected = {Path(item["path"]).relative_to(project_root).as_posix() for item in ownership}
+    expected = {relative_source_path(item["path"], project_root) for item in ownership}
     if not expected.issubset(files):
         raise ValueError("JavaScript parser omitted registered implementation source")
     for fact in result.implementations:
@@ -180,7 +173,7 @@ def evaluate_registered_facts(
         evaluated = ()
         if kind == "node" and topic in {"all", "node"}:
             evaluated = evaluate_node_implementation(metrics, limits)
-        elif kind == "base_lib" and topic in {"all", "base_lib"}:
+        elif (kind != "node" or not fact["export"]) and topic in {"all", "base_lib"}:
             evaluated = evaluate_base_lib_implementation(metrics, limits)
         if kind == "node" and topic in {"all", "dependency_chain"}:
             starts: set[str] = set()

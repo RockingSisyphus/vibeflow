@@ -9,13 +9,10 @@ from vibeflow.targets.python.quality.rules.helpers import finding, source_subjec
 def import_side_effects(context, inputs, params):
     sources = context.require("source_context")
     findings = []
-    if context.subject.get("type_key"):
-        _, node, _ = source_subject(context)
-        files = sources.import_closure(node.path)
-    elif context.facts.get("base_lib_file") is not None:
-        files = sources.import_closure(context.require("base_lib_file").path)
-    else:
-        files = sources.files
+    from vibeflow.targets.python.project.source_membership import subject_files
+    from vibeflow.targets.python.quality.rules.source_ownership import ownership_findings
+    files = subject_files(context)
+    findings.extend(ownership_findings(context))
     for source in files:
         if source.tree is None:
             findings.append(finding(context, "QUALITY.SYNTAX.PYTHON", source.parse_error, path=source.path))
@@ -85,7 +82,7 @@ class _ImportExecutionVisitor(ast.NodeVisitor):
             return ""
         prefix = "vibeflow.targets.python.sdk."
         return name(expression.func) in {prefix + item for item in (
-            "Plugin", "node", "rule", "ruleset", "data_schema", "base_lib", "capability",
+            "Plugin", "node", "rule", "ruleset", "data_schema", "base_lib", "lifecycle", "capability",
             "host_extension", "SourceLocator", "RuleCall", "RuleRelation", "DataProvider",
             "DataRequirement", "NodeContractDescriptor")}
 

@@ -155,7 +155,14 @@ def _build_columns(
             )
         ]
     ]
-    columns.extend(_resource_columns(graph, resources, temp_dir, theme=theme, background=background, max_text_size=max_text_size, max_edges=max_edges))
+    if hasattr(registry,"loaded_plugins") and graph.source_path and Path(graph.source_path).is_file():
+        from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document
+        from vibeflow.tooling.presentation.resource_mermaid import render_resource_graph
+        architecture = build_architecture_document(graph,compiled=compiled,registry=registry,resources=resources)
+        columns.append([_render_fragment("resources and implementation files", render_resource_graph(architecture["implementation_graph"]),
+            temp_dir,theme=theme,background=background,max_text_size=max_text_size,max_edges=max_edges)])
+    else:
+        columns.extend(_resource_columns(graph, resources, temp_dir, theme=theme, background=background, max_text_size=max_text_size, max_edges=max_edges))
     if expand_nodesets:
         nodeset_fragments = _nodeset_fragments(
             graph,

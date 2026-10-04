@@ -125,7 +125,9 @@ function sourceService(ts, packageRoot, facts) {
         (ts.SyntaxKind[node.expression.kind] === "ImportKeyword" || node.expression.getText(tree) === "require")
         ? node.arguments?.[0] : null);
       if (argument && ["StringLiteral", "NoSubstitutionTemplateLiteral"].includes(ts.SyntaxKind[argument.kind])) {
-        result.push({specifier: argument.text, resolved_path: resolvedImport(tree.fileName, argument.text), ...location(tree, node)});
+        const typeOnly = Boolean(node.importClause?.isTypeOnly || node.isTypeOnly
+          || (node.importClause?.namedBindings?.elements?.length && node.importClause.namedBindings.elements.every(item=>item.isTypeOnly)));
+        result.push({specifier: argument.text, resolved_path: resolvedImport(tree.fileName, argument.text), type_only: typeOnly, ...location(tree, node)});
       }
       for (const child of children(node)) visit(child);
     }
@@ -158,7 +160,7 @@ function sourceService(ts, packageRoot, facts) {
       const absolute = path.resolve(packageRoot, file);
       const declared = (facts.source_owners || []).filter(item => path.resolve(item.path) === absolute);
       const nodeTypes = new Set();
-      for (const source of facts.sources || []) if (source.owner && (facts.source_files || []).includes(source.path) && reachable(source.path).includes(absolute)) nodeTypes.add(source.owner);
+      for (const source of facts.sources || []) if (facts.node_types?.[source.owner] && (facts.source_files || []).includes(source.path) && reachable(source.path).includes(absolute)) nodeTypes.add(source.owner);
       return deepFreeze({path: absolute, declared, node_types: [...nodeTypes]});
     },
     nodes(file, kind) {
@@ -218,7 +220,7 @@ async function declarations(request) {
     if (typeof callback === "function") contributionCallbacks.set(`${descriptor.kind}:${descriptor.id}`, callback);
   }
   return ruleJsonValue({id: plugin.id, abi: plugin.abi, config_schema: plugin.config_schema,
-    config_defaults: plugin.config_defaults, origin: plugin.origin,
+    config_defaults: plugin.config_defaults, origin: plugin.origin, declaration: plugin.declaration,
     included_sources: Object.keys(result.metafile.inputs).map(file => path.resolve(packageRoot,file)),
     loaded_sources: [...new Set([path.resolve(request.module), ...plugin.resources.map(resource => resource.origin?.path).filter(Boolean)])],
     resources: plugin.resources.map(resource => ({descriptor: resource.descriptor, origin: resource.origin}))});

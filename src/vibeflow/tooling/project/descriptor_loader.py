@@ -86,7 +86,7 @@ def _load_workflow_plugins(workspace, config_path, *, node_command, definitions)
             raise DescriptorLoadError("PLUGIN.SELECTION.SHAPE", "enabled must be boolean", str(config_path), field)
         if not spec.get("enabled", True):
             continue
-        unknown = set(spec) - {"id", "source", "root", "config", "enabled", "status", "display_name", "description", "type", "targets", "priority", "version"}
+        unknown = set(spec) - {"id", "source", "root", "config", "enabled", "status", "display_name", "description", "type", "targets", "priority", "version", "style"}
         if unknown:
             raise DescriptorLoadError("PLUGIN.SELECTION.MIGRATION", f"unsupported plugin fields: {sorted(unknown)}; use an SDK plugin source", str(config_path), field)
         status = spec.get("status", "implemented")
@@ -121,10 +121,19 @@ def _load_workflow_plugins(workspace, config_path, *, node_command, definitions)
             config = {**_thaw_json(defaults), **dict(overrides)}
             _validate_plugin_config(config, schema, plugin_id=plugin_id)
             contribution = _resolved_contributions(make_contributions(config), owner.path)
+            if contribution.declaration:
+                from dataclasses import replace
+                declaration = _thaw_json(contribution.declaration)
+                for implementation in declaration["implementations"]:
+                    # The selected export is the actual declaration entry.
+                    implementation["source"]["export"] = source.export or "plugin"
+                contribution = replace(contribution, declaration=declaration)
+            _validate_support_sources(contribution, workspace)
             contributions.append(contribution)
             bindings.update({(plugin_id, *key): value for key, value in plugin_bindings.items()})
             records.append({"id": plugin_id, "source": source.to_dict(), "root": owner.id,
-                            "config": config, "loaded": True, "status": status})
+                            "config": config, "loaded": True, "status": status,
+                            "declaration": dict(contribution.declaration), "style": dict(spec.get("style", {}))})
             for resource in contribution.resources:
                 if resource.descriptor.to_dict()["kind"] == "plugin":
                     lifecycle.append({"id": resource.descriptor.id, "config": config})
@@ -173,11 +182,29 @@ def _resolved_contributions(contribution, root):
                 source = implementation.source
                 if source.kind == "file":
                     source = replace(source, ref=str((root / source.ref).resolve()))
-                values.append(replace(implementation, source=source))
+                files = tuple(replace(part, ref=str((root / part.ref).resolve())) for part in getattr(implementation, "implementation_files", ()))
+                values.append(replace(implementation, source=source, **({"implementation_files":files} if hasattr(implementation,"implementation_files") else {})))
             descriptor = replace(descriptor, implementations=tuple(values))
         resources.append(replace(resource, descriptor=descriptor))
     return replace(contribution, resources=tuple(resources))
 
+
+
+def _validate_support_sources(contribution, workspace):
+    from vibeflow.core.descriptors.source_bundle import declaration_descriptor
+    descriptors = [(entry.descriptor,entry.origin) for entry in contribution.resources]
+    if contribution.declaration:
+        descriptors.append((declaration_descriptor(contribution.declaration),None))
+    for descriptor,origin in descriptors:
+        for implementation in getattr(descriptor,"implementations", ()):
+            for index,source in enumerate(getattr(implementation,"implementation_files", ())):
+                path = Path(source.ref)
+                field = f"{descriptor.to_dict()['kind']}.{descriptor.id}.implementation_files[{index}]"
+                if not any(path.is_relative_to(root.path) for root in workspace.roots):
+                    raise DescriptorLoadError("RESOURCE.SOURCE.ROOT","support source must belong to a registered workspace root",str(path),field)
+                if not path.is_file():
+                    raise DescriptorLoadError("RESOURCE.SOURCE.UNAVAILABLE","registered support source is not a file",str(path),field,
+                        {"declaration":origin.to_dict() if origin else {"path":contribution.source}})
 
 def load_workflow_catalogs(project_root, *, workflow_config, workspace=None, project_config=None, node_command="node"):
     if workspace is None:

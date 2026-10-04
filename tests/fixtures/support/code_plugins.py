@@ -125,6 +125,10 @@ def write_plugin(project, values, *, target, filename=None, plugin_id="fixture.r
     filename = filename or ("code_plugin.py" if target == "python" else "code_plugin.ts")
     constructors = {"node": "node", "rule": "rule", "ruleset": "ruleset", "data_schema": "data_schema",
                     "base_lib": "base_lib", "capability": "capability", "host_extension": "host_extension"}
+    if target == "python":
+        import runpy
+        explicit_python_files = runpy.run_path(str(Path(__file__).with_name("source_membership.py")))["explicit_python_files"]
+        values = explicit_python_files(project, values)
     lines, names = [], []
     for index, entry in enumerate(values):
         payload = dict(entry[1] if isinstance(entry, tuple) else entry)
@@ -175,6 +179,10 @@ def migrate_fixture(project, *, configs=None):
     document = dict(load_raw_config_document(path).data)
     inputs = resource_inputs(project)
     target = document["project_target"]
+    if target == "python":
+        import runpy
+        explicit_python_files = runpy.run_path(str(Path(__file__).with_name("source_membership.py")))["explicit_python_files"]
+        inputs = explicit_python_files(project, inputs)
     toolchain = os.environ.get("VIBEFLOW_TEST_TOOLCHAIN_ROOT")
     if target == "javascript" and toolchain and not (project / "node_modules").exists():
         (project / "node_modules").symlink_to(Path(toolchain) / "node_modules", target_is_directory=True)
@@ -192,7 +200,10 @@ def migrate_fixture(project, *, configs=None):
                 module_name = factory["ref"].removesuffix(".py").replace("/", ".")
                 body = f"    from {module_name} import {factory['export']}\n    instance = {factory['export']}()\n"
             text = 'from vibeflow.targets.python.sdk import Plugin\n\ndef create(context):\n' + body + '    if hasattr(instance, "configure"):\n        instance.configure(context["config"])\n    return instance\n\n'
-            text += f"plugin = Plugin(id={descriptor['id']!r}, {descriptor['type']}=create, rulesets={tuple(descriptor.get('rulesets', []))!r}, display_name={descriptor.get('display_name',descriptor['id'])!r}, description={descriptor.get('description','')!r}, version={descriptor.get('version','')!r})\n"
+            implementation = descriptor["implementations"][0]
+            entry_file = factory['ref'] if factory['kind'] == 'file' else factory['ref'].replace('.', '/') + '.py'
+            files = [entry_file, *(part['ref'] for part in implementation.get('implementation_files', ()))]
+            text += f"plugin = Plugin(id={descriptor['id']!r}, {descriptor['type']}=create, rulesets={tuple(descriptor.get('rulesets', []))!r}, implementation_files={files!r}, base_libs={descriptor.get('base_libs', [])!r}, display_name={descriptor.get('display_name',descriptor['id'])!r}, description={descriptor.get('description','')!r}, version={descriptor.get('version','')!r})\n"
             (project / name).write_text(text)
             lifecycle_sources.setdefault(descriptor["id"], []).append({"source": {"kind":"file", "ref":name, "export":"plugin"}})
         else:

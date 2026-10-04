@@ -105,6 +105,9 @@
                   },
                   "version": {
                     "type": "string"
+                  },
+                  "style": {
+                    "$ref": "#/$defs/nodeStyle"
                   }
                 },
                 "anyOf": [
@@ -207,6 +210,9 @@
           },
           "version": {
             "type": "string"
+          },
+          "style": {
+            "$ref": "#/$defs/nodeStyle"
           }
         }
       }
@@ -280,6 +286,9 @@
               },
               "settings": {
                 "type": "object"
+              },
+              "style": {
+                "$ref": "#/$defs/nodeStyle"
               }
             },
             "anyOf": [

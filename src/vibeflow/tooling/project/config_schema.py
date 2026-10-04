@@ -306,7 +306,7 @@ def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
     if not isinstance(value, list):
         findings.append(_error("CONFIG.SCHEMA.PLUGINS_LIST", "plugins must be a list", "plugins"))
         return
-    allowed = {"id", "source", "root", "config", "enabled", "status"}
+    allowed = {"id", "source", "root", "config", "enabled", "status", "style"}
     planned_fields = {"type", "targets", "display_name", "description", "version", "priority"}
     for index, item in enumerate(value):
         prefix = f"plugins[{index}]"
@@ -315,6 +315,14 @@ def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
             continue
         if "enabled" in item and not isinstance(item["enabled"], bool):
             findings.append(_error("PLUGIN.SELECTION.SHAPE", "enabled must be boolean", prefix + ".enabled"))
+        if "style" in item:
+            from vibeflow.core.descriptors.presentation import normalize_presentation
+            try:
+                if not isinstance(item["style"], Mapping) or set(item["style"]) - {"fill","stroke","text"}:
+                    raise ValueError("resource style only accepts fill/stroke/text")
+                normalize_presentation(item["style"],field_name=prefix + ".style")
+            except ValueError as exc:
+                findings.append(_error("CONFIG.SCHEMA.RESOURCE_STYLE", str(exc), prefix + ".style"))
         status = item.get("status", "implemented")
         if not isinstance(status, str) or status not in {"implemented", "planned"}:
             findings.append(_error("CONFIG.SCHEMA.RESOURCE_STATUS", "plugin status must be implemented or planned", prefix + ".status"))
@@ -495,6 +503,14 @@ def _validate_global_config(value: Any, prefix: str, findings: list[HealthFindin
 
 
 def _validate_resource_metadata_strings(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
+    if "style" in value:
+        from vibeflow.core.descriptors.presentation import normalize_presentation
+        try:
+            if not isinstance(value["style"], Mapping) or set(value["style"]) - {"fill", "stroke", "text"}:
+                raise ValueError("resource style only accepts fill/stroke/text")
+            normalize_presentation(value["style"], field_name=prefix + ".style")
+        except ValueError as error:
+            findings.append(_error("CONFIG.SCHEMA.RESOURCE_STYLE", str(error), prefix + ".style"))
     for field in ("display_name", "category", "description", "version"):
         if field in value and not isinstance(value[field], str):
             findings.append(_error("CONFIG.SCHEMA.RESOURCE_METADATA_STRING", f"{prefix}.{field} must be a string", f"{prefix}.{field}"))

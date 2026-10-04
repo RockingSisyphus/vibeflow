@@ -105,7 +105,7 @@ def test_real_rule_reads_all_public_source_services_and_exact_locations(source_p
     assert forward["text"] == MODEL.splitlines()[2]
     assert any(symbol["qualname"] == "DomainTools.forward" and symbol["kind"] == "MethodDeclaration" for symbol in value["symbols"])
     assert value["imports"] == [{"specifier": "./model_helper.js", "resolved_path": helper, "path": model,
-                                  "line": 1, "column": 1, "end_line": 1, "end_column": 44}]
+                                  "line": 1, "column": 1, "end_line": 1, "end_column": 44, "type_only": False}]
     assert value["reachable"] == [model, helper]
     assert value["functions"] == [{key: item for key, item in symbol.items() if key != "qualname"}
                                   for symbol in value["symbols"] if symbol["kind"] == "FunctionDeclaration"]

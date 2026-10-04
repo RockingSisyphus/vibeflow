@@ -134,6 +134,11 @@ def _base_lib_implementation_facts(
     ):
         if actual > limit:
             findings.append(ImplementationFinding(rule_id.lower(), rule_id, "error", f"base_lib file has {actual} {field} > {limit}", "split_module", {field: actual, "limit": limit}))
+    for field, actual, limit, maximum in (("lines",metrics.source_lines,limits.warn_source_lines,limits.max_source_lines),
+                                         ("bytes",metrics.source_bytes,limits.warn_source_bytes,limits.max_source_bytes)):
+        if limit is not None and limit <= actual <= maximum:
+            findings.append(ImplementationFinding("base_lib.source_near_limit", "BASE_LIB.SOURCE.NEAR_LIMIT", "warning",
+                f"base_lib file has {actual} {field} >= warning threshold {limit}","split_module",{field:actual,"limit":limit}))
     for name, key, actual in (
         ("MAX_FUNCTIONS", "function_count", metrics.function_count),
         ("MAX_BRANCHES", "branch_count", metrics.branch_count),

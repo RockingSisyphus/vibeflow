@@ -22,7 +22,6 @@ from vibeflow.targets.javascript.build.project_resources import (
     base_lib_closure as _base_lib_closure,
     enriched_payload as _enriched_payload,
     host_extension_closure as _host_extension_closure,
-    import_policy as _import_policy,
     target_neutral_import_policy,
     required_capabilities as _required_capabilities,
     schemas_for_types as _schemas_for_types,
@@ -400,18 +399,10 @@ def prepare_project_build(
         allowed_external.update(extension["external_packages"])
     for binding in _active_plugin_bindings(plugin_plan):
         allowed_external.update(binding.external_packages)
-    import_policy = _import_policy(
-        nodes=state.used_nodes,
-        base_libs=base_lib_order,
-        node_catalog=catalogs.nodes,
-        base_lib_catalog=catalogs.base_libs,
-        target=request.target,
-        project_root=root.path,
-        allowed_external=allowed_external,
-        implementations=state.implementations,
-        host_extensions=host_extensions,
-    )
-    import_policy = _plugin_import_policy(import_policy, plugin_plan)
+    import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=root.path,
+        allowed_external=allowed_external, node_ids=frozenset(state.used_nodes),
+        host_extension_ids=frozenset(extension["id"] for extension in host_extensions),
+        plugin_ids=frozenset(item.id for item in _active_plugin_bindings(plugin_plan)))
     javascript_bindings = build_javascript_binding_plan(
         plan,
         implementations=state.implementations,
@@ -695,34 +686,6 @@ def _with_plugin_source_hashes(
         runtime_plugins=tuple(hashed(item) for item in plan.runtime_plugins),
         planned_plugins=plan.planned_plugins,
     )
-
-
-def _plugin_import_policy(
-    supplied: Mapping[str, Any],
-    plan: JavascriptPluginBindingPlan,
-) -> Mapping[str, Any]:
-    policy = dict(supplied)
-    owners = [
-        dict(item)
-        for item in policy.get("owners", ())
-        if isinstance(item, Mapping)
-    ]
-    for binding in _active_plugin_bindings(plan):
-        owners.append(
-            {
-                "path": binding.module,
-                "kind": "plugin",
-                "id": binding.id,
-                "export": binding.export,
-                "completion": binding.completion,
-            }
-        )
-    policy["owners"] = owners
-    policy["plugin_dependencies"] = {
-        item.id: list(item.dependencies)
-        for item in _active_plugin_bindings(plan)
-    }
-    return policy
 
 
 def _declared_host_extensions(

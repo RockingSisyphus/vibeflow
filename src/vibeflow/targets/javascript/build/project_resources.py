@@ -22,9 +22,9 @@ from vibeflow.core.descriptors import (
     DescriptorCatalogs,
     HostExtensionDescriptor,
     ImplementationDescriptor,
-    NodeCatalog,
     NodeDescriptor,
 )
+from vibeflow.core.descriptors.source_bundle import implementation_sources, source_resources
 from vibeflow.core.flow import GraphConfig
 from vibeflow.block_compiler import WorkflowPlan
 
@@ -434,125 +434,6 @@ def enriched_payload(
     return payload
 
 
-def import_policy(
-    *,
-    nodes: Mapping[str, NodeDescriptor],
-    base_libs: tuple[BaseLibDescriptor, ...],
-    node_catalog: NodeCatalog,
-    base_lib_catalog: BaseLibCatalog,
-    target: str,
-    project_root: Path,
-    allowed_external: set[str],
-    implementations: Mapping[str, Mapping[str, str]],
-    host_extensions: tuple[Mapping[str, Any], ...] = (),
-) -> dict[str, Any]:
-    owners: list[dict[str, Any]] = []
-    owner_by_path: dict[Path, list[tuple[str, str]]] = {}
-
-    def add_owner(path: Path, *, kind: str, resource_id: str) -> None:
-        resolved = path.resolve()
-        previous = owner_by_path.setdefault(resolved, [])
-        current = (kind, resource_id)
-        if current in previous:
-            return
-        previous.append(current)
-
-    for descriptor in node_catalog:
-        for implementation in descriptor.implementations:
-            if (
-                target not in implementation.targets
-                or implementation.language not in {"javascript", "typescript"}
-                or implementation.source.kind != "file"
-            ):
-                continue
-            source = safe_project_path(
-                project_root,
-                implementation.source.ref,
-                subject=f"node '{descriptor.type_key}' source",
-                allowed_roots=node_catalog.source_roots,
-            )
-            if source.is_file():
-                add_owner(source, kind="node", resource_id=descriptor.type_key)
-    for descriptor in base_lib_catalog:
-        for implementation in descriptor.implementations:
-            if (
-                target not in implementation.targets
-                or implementation.language not in {"javascript", "typescript"}
-                or implementation.source.kind != "file"
-            ):
-                continue
-            source = safe_project_path(
-                project_root,
-                implementation.source.ref,
-                subject=f"base_lib '{descriptor.id}' source",
-                allowed_roots=base_lib_catalog.source_roots,
-            )
-            if source.is_file():
-                add_owner(source, kind="base_lib", resource_id=descriptor.id)
-    for extension in host_extensions:
-        source = Path(str(extension["module"]))
-        if source.is_file():
-            add_owner(
-                source,
-                kind="host_extension",
-                resource_id=str(extension["id"]),
-            )
-    for path, claims in sorted(
-        owner_by_path.items(),
-        key=lambda item: item[0].as_posix(),
-    ):
-        for kind, resource_id in claims:
-            owner: dict[str, Any] = {
-                "path": str(path),
-                "kind": kind,
-                "id": resource_id,
-            }
-            if kind == "node":
-                selected = implementations.get(resource_id)
-                if (
-                    selected is not None
-                    and Path(str(selected.get("module", ""))).resolve() == path
-                ):
-                    owner["export"] = str(selected.get("export", "run"))
-                    owner["completion"] = str(selected.get("completion", "immediate"))
-            elif kind == "host_extension":
-                selected = next(
-                    (
-                        extension
-                        for extension in host_extensions
-                        if str(extension.get("id", "")) == resource_id
-                        and Path(str(extension.get("module", ""))).resolve() == path
-                    ),
-                    None,
-                )
-                if selected is not None:
-                    owner["export"] = str(selected.get("export", "createHostExtension"))
-                    owner["completion"] = "immediate"
-            owners.append(owner)
-    return {
-        "owners": owners,
-        "node_base_libs": {
-            key: list(descriptor.base_libs)
-            for key, descriptor in sorted(nodes.items())
-        },
-        "base_lib_dependencies": {
-            str(getattr(descriptor, "id")): list(
-                getattr(descriptor, "dependencies")
-            )
-            for descriptor in base_libs
-        },
-        "host_extension_dependencies": {
-            str(extension["id"]): [
-                str(item)
-                for item in extension.get("dependencies", ())
-            ]
-            for extension in host_extensions
-        },
-        "allowed_external_packages": sorted(allowed_external),
-        "source_roots": [value for value in node_catalog.source_roots if Path(value) != project_root],
-    }
-
-
 def target_neutral_import_policy(
     *,
     catalogs: DescriptorCatalogs,
@@ -588,24 +469,16 @@ def target_neutral_import_policy(
                     f"source kind '{implementation.source.kind}' is unsupported"
                 ),
             )
-        source = safe_project_path(
-            project_root,
-            implementation.source.ref,
-            subject=f"{kind} '{resource_id}' source",
-            require_file=True,
-            allowed_roots=catalogs.source_roots,
-        )
-        owner = {
-            "path": str(source),
-            "kind": kind,
-            "id": resource_id,
-            "export": implementation.source.export or default_export,
-            "completion": implementation.completion,
-        }
-        previous = owners_by_path.setdefault(source, [])
-        if owner in previous:
-            return
-        previous.append(owner)
+        for role, locator in implementation_sources(implementation):
+            source = safe_project_path(project_root, locator.ref,
+                subject=f"{kind} '{resource_id}' {role}", require_file=True,
+                allowed_roots=catalogs.source_roots)
+            owner = {"path":str(source), "kind":kind, "id":resource_id,
+                     "export":(locator.export or default_export) if role == "entry" else "",
+                     "role":role, "completion":getattr(implementation,"completion","immediate")}
+            previous = owners_by_path.setdefault(source, [])
+            if owner not in previous:
+                previous.append(owner)
 
     selected_nodes = tuple(
         descriptor
@@ -643,7 +516,11 @@ def target_neutral_import_policy(
             visiting.pop()
             selected_base_lib_ids.add(resource_id)
 
-        for descriptor in selected_nodes:
+        dependent_resources = (*selected_nodes,
+            *(item for item in catalogs.host_extensions if item.id in host_extension_ids),
+            *(item for item in catalogs.plugins if item.id in plugin_ids),
+            *(item for kind,item in source_resources(catalogs) if kind == "plugin_declaration"))
+        for descriptor in dependent_resources:
             for resource_id in descriptor.base_libs:
                 visit_base_lib(resource_id)
 
@@ -693,6 +570,20 @@ def target_neutral_import_policy(
                 default_export="createPlugin",
             )
 
+    for kind, descriptor in source_resources(catalogs):
+        if kind == "plugin_declaration":
+            for implementation in descriptor.implementations:
+                add_implementation(implementation, kind=kind, resource_id=descriptor.id, default_export="plugin")
+    # Contributed checker code belongs to its fixed package declaration. It is
+    # ordinary extension code, never a lifecycle factory or business Node.
+    for descriptor in catalogs.rules:
+        origin = catalogs.origins.get(("rules",descriptor.id))
+        if origin is None:
+            continue
+        for implementation in descriptor.implementations:
+            if implementation.source.kind == "file" and (project_root/implementation.source.ref).is_file():
+                add_implementation(implementation, kind="plugin_declaration",resource_id=origin.plugin_id,default_export="check")
+
     owners = [
         owner
         for path in sorted(owners_by_path, key=lambda item: item.as_posix())
@@ -714,6 +605,13 @@ def target_neutral_import_policy(
                 for descriptor in catalogs.host_extensions
                 if descriptor.id in host_extension_ids
             },
+            "resource_base_libs": {kind + ":" + item.id:list(item.base_libs)
+                for kind,item in source_resources(catalogs) if hasattr(item,"base_libs")},
+            "plugin_contributions": {record["id"]:[{"kind":kind,"id":item.id}
+                for kind,group in (("node","nodes"),("base_lib","base_libs"),("plugin","plugins"),("host_extension","host_extensions"),("rule","rules"))
+                for item in getattr(catalogs,group)
+                if catalogs.origins.get((group,item.id)) and catalogs.origins[(group,item.id)].plugin_id == record["id"]]
+                for record in catalogs.plugin_records if record.get("loaded")},
             "plugin_dependencies": {
                 descriptor.id: list(descriptor.dependencies)
                 for descriptor in catalogs.plugins
@@ -735,6 +633,8 @@ def driver_import_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
         "baseLibDependencies": dict(policy.get("base_lib_dependencies", {})),
         "hostExtensionDependencies": dict(policy.get("host_extension_dependencies", {})),
         "pluginDependencies": dict(policy.get("plugin_dependencies", {})),
+        "resourceBaseLibs": dict(policy.get("resource_base_libs", {})),
+        "pluginContributions": dict(policy.get("plugin_contributions", {})),
         "allowedExternalPackages": list(policy.get("allowed_external_packages", ())),
         "sourceRoots": list(policy.get("source_roots", ())),
     }
@@ -743,7 +643,6 @@ def driver_import_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
 __all__ = [
     "base_lib_closure",
     "enriched_payload",
-    "import_policy",
     "driver_import_policy",
     "host_extension_closure",
     "required_capabilities",

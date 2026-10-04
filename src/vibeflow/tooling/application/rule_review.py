@@ -97,7 +97,24 @@ def _resource_plans(catalogs, *, calls, data, project, rules, rulesets, phase, r
         descriptor = catalogs.nodes.get(call.get("type_used", ""))
         if descriptor is not None and call.get("status") != "planned":
             selected["base_lib"].update(descriptor.base_libs)
-    output = []
+    for kind,catalog in (("plugin",catalogs.plugins),("host_extension",catalogs.host_extensions)):
+        pending, visited = list(selected[kind]), set()
+        while pending:
+            key = pending.pop()
+            descriptor = catalog.get(key)
+            if descriptor is None or key in visited:
+                continue
+            visited.add(key)
+            selected["base_lib"].update(descriptor.base_libs)
+            pending.extend(descriptor.dependencies)
+    from vibeflow.core.descriptors.source_bundle import source_resources
+    declarations = [item for kind,item in source_resources(catalogs) if kind == "plugin_declaration"]
+    for item in declarations:
+        selected["base_lib"].update(item.base_libs)
+    output = [{"kind":"plugin_declaration","id":item.id,"selection_source":item.implementations[0].source.ref,
+        "rulesets":list(item.rulesets),"constraint_state":"selected" if item.rulesets else "unconstrained",
+        "plans":[compile_ruleset(selection,rules=rules,rulesets=rulesets,entrypoint=phase).to_dict() for selection in item.rulesets]}
+        for item in declarations]
     for kind, catalog in (("base_lib",catalogs.base_libs),("plugin",catalogs.plugins),("host_extension",catalogs.host_extensions)):
         pending, visited = list(selected[kind]), set()
         while pending:

@@ -54,11 +54,16 @@ class PluginContributions:
     resources: tuple[ResourceDeclaration, ...]
     config: Mapping[str, Any] = field(default_factory=dict)
     source: str = ""
+    declaration: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "id", _required_text(self.id, field_name="plugin.id"))
         object.__setattr__(self, "resources", tuple(self.resources))
         object.__setattr__(self, "config", _freeze_mapping(self.config, field_name="plugin.config"))
+        object.__setattr__(self, "declaration", _freeze_mapping(self.declaration, field_name="plugin.declaration"))
+        if self.declaration:
+            from vibeflow.core.descriptors.source_bundle import declaration_descriptor
+            declaration_descriptor(self.declaration)
         checker = ContributionBuilder(self.id, source=self.source)
         for entry in self.resources:
             if not isinstance(entry, ResourceDeclaration):

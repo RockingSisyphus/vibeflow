@@ -4,10 +4,12 @@ from vibeflow.targets.javascript.build.quality_implementation import (
     evaluate_registered_facts,
     inspect_registered_implementations,
     registered_implementation_requests,
+    relative_source_path,
 )
 
 __all__ = [
     "evaluate_registered_facts",
     "inspect_registered_implementations",
     "registered_implementation_requests",
+    "relative_source_path",
 ]

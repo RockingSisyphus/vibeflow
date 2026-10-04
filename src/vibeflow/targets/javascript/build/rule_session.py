@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from vibeflow.core.descriptors.contributions import contribution_facts
+from vibeflow.core.descriptors.source_bundle import source_resources, implementation_sources
 
 from contextlib import ExitStack
 from dataclasses import dataclass, field, fields, replace
@@ -167,27 +168,26 @@ def _closure_import_policy(policy: Mapping[str, Any], catalogs: Any, sources: li
     owners = [dict(item) for item in policy.get("owners", ())]
     node_base_libs = dict(policy.get("node_base_libs", {}))
     base_dependencies = dict(policy.get("base_lib_dependencies", {}))
-    for kind, resources in (("node", catalogs.nodes), ("base_lib", catalogs.base_libs),
-                            ("host_extension", catalogs.host_extensions), ("plugin", catalogs.plugins)):
-        for descriptor in resources:
-            for implementation in descriptor.implementations:
-                if implementation.language not in {"javascript", "typescript"} or implementation.source.kind != "file":
-                    continue
-                if target != "javascript" and target not in implementation.targets:
-                    continue
-                path = str((project_root / implementation.source.ref).resolve())
+    for kind, descriptor in source_resources(catalogs):
+        for implementation in descriptor.implementations:
+            if implementation.language not in {"javascript", "typescript"} or implementation.source.kind != "file":
+                continue
+            if target != "javascript" and target not in implementation.targets:
+                continue
+            resource_id = descriptor.id
+            for role, locator in implementation_sources(implementation):
+                path = str((project_root / locator.ref).resolve())
                 if path not in reached:
                     continue
-                resource_id = descriptor.type_key if kind == "node" else descriptor.id
-                owner = {"path": path, "kind": kind, "id": resource_id,
-                         "export": implementation.source.export or ("run" if kind == "node" else ""),
-                         "completion": implementation.completion}
-                if not any(item["path"] == path and item["kind"] == kind and item["id"] == resource_id for item in owners):
+                owner = {"path":path, "kind":kind, "id":resource_id, "role":role,
+                         "export":(locator.export or ("run" if kind == "node" else "")) if role == "entry" else "",
+                         "completion":implementation.completion}
+                if owner not in owners:
                     owners.append(owner)
-                if kind == "node":
-                    node_base_libs[resource_id] = list(descriptor.base_libs)
-                elif kind == "base_lib":
-                    base_dependencies[resource_id] = list(descriptor.dependencies)
+            if kind == "node":
+                node_base_libs[resource_id] = list(descriptor.base_libs)
+            elif kind == "base_lib":
+                base_dependencies[resource_id] = list(descriptor.dependencies)
     return {**policy, "owners": owners, "node_base_libs": node_base_libs, "base_lib_dependencies": base_dependencies}
 
 
@@ -289,7 +289,7 @@ def builtin_javascript_handlers() -> Mapping[str, Any]:
             return RuleResult(state="unavailable")
         kind = context.subject.get("kind", "node")
         resource_id = context.subject.get("type_key", context.subject.get("id", ""))
-        descriptor = (facts["catalogs"].base_libs if kind == "base_lib" else facts["catalogs"].nodes).require(resource_id)
+        descriptor = next(item for owner,item in source_resources(facts["catalogs"]) if owner == kind and item.id == resource_id)
         base_ids: set[str] = set()
         def visit(resource_id: str) -> None:
             if resource_id in base_ids:
@@ -301,7 +301,7 @@ def builtin_javascript_handlers() -> Mapping[str, Any]:
                     visit(dependency)
         for resource_id in getattr(descriptor, "base_libs", getattr(descriptor, "dependencies", ())) :
             visit(resource_id)
-        selected_files = set(facts["source_files"])
+        selected_files = {item["path"] for item in facts.get("sources", ())}
         for source in facts.get("source_owners", ()):
             if source.get("kind") == "base_lib" and source.get("id") in base_ids:
                 selected_files.add(source["path"])
@@ -311,7 +311,8 @@ def builtin_javascript_handlers() -> Mapping[str, Any]:
         descriptors = {key: value for key, value in descriptors.items() if key[0] in selected_ids}
         extracted = facts.get("prefetched_quality") or facts["analysis_cache"].quality_facts({"qualityRoot": facts["project_root"], "qualityFiles": sorted({item["path"] for item in ownership}), "qualityImplementations": ownership}, package_root=facts["package_root"], node_command=str(facts.get("node_command", "node")))
         found = evaluate_registered_facts(extracted, ownership, descriptors, project_root=Path(facts["project_root"]), policy_data=plain(params.get("policy", {})), topic=topic)
-        relative_files = {Path(item["path"]).relative_to(facts["project_root"]).as_posix() for item in ownership}
+        from vibeflow.targets.javascript.quality.implementation import relative_source_path
+        relative_files = {relative_source_path(item["path"], facts["project_root"]) for item in ownership}
         metrics = {"files": [plain(item) for item in extracted.files if item["path"] in relative_files],
                    "implementations": [plain(item) for item in extracted.implementations if item["type_key"] in selected_ids]}
         return found, metrics
@@ -432,6 +433,7 @@ def run_javascript_rules(
     phase: str = "static", target: str = "javascript", import_policy: Mapping[str, Any] | None = None,
     node_command: str = "node", evaluate_sources: bool = True, include_registered: bool = False, prefetched_quality: Any = None,
     quality_policy: QualityPolicy | None = None,
+    collect_sources: bool = False,
 ) -> JavascriptRuleReport:
     """Evaluate descriptor selections; an empty selection remains unconstrained."""
     used = node_type_calls(graph)
@@ -455,8 +457,8 @@ def run_javascript_rules(
         session = _RuleSession(stack, catalogs=catalogs, project_root=project_root, package_root=package_root, node_command=node_command, target=target)
         subjects = [("node", key, catalogs.nodes.get(key), calls) for key, calls in sorted(used.items())]
         selected_resources = {(owner.get("kind"), owner.get("id")) for owner in (import_policy or {}).get("owners", ())}
-        for kind, catalog in (("base_lib", catalogs.base_libs), ("plugin", catalogs.plugins), ("host_extension", catalogs.host_extensions)):
-            subjects.extend((kind, kind + ":" + item.id, item, []) for item in catalog if (kind,item.id) in selected_resources)
+        subjects.extend((kind, kind + ":" + item.id, item, []) for kind,item in source_resources(catalogs)
+                        if kind != "node" and (kind,item.id) in selected_resources)
         for kind, type_key, descriptor, calls in subjects:
             if descriptor is None:
                 continue
@@ -465,16 +467,20 @@ def run_javascript_rules(
             for implementation in descriptor.implementations:
                 source = implementation.source
                 if implementation.language in {"javascript", "typescript"} and source.kind == "file" and (target == "javascript" or target in implementation.targets):
-                    file = (project_root / source.ref).resolve()
-                    if file.is_file():
-                        sources.append({"path": str(file), "text": file.read_text(encoding="utf-8"), "export": source.export or "run", "owner": type_key})
+                    for role, locator in implementation_sources(implementation):
+                        file = (project_root / locator.ref).resolve()
+                        if file.is_file():
+                            sources.append({"path":str(file), "text":file.read_text(encoding="utf-8"),
+                                "export":(locator.export or "run") if role == "entry" else "", "role":role, "owner":type_key})
             source_files = [item["path"] for item in sources]
             selected = descriptor.rulesets
-            if evaluate_sources and source_files and (selected or workflow_import_sources):
+            if evaluate_sources and source_files and (collect_sources or selected or workflow_import_sources):
                 # Freeze the real import closure before any trusted Rule executes.
                 # Fact extraction with no selected topics performs no review judgement.
                 extracted = session.analysis_cache.source_check({"typecheckFiles": source_files, "ruleTopics": []}, package_root=str(package_root), node_command=node_command)
                 known = {item["path"] for item in sources}
+                extracted_by_path = {item["path"]:plain(item) for item in extracted.sources}
+                sources = [{**extracted_by_path.get(item["path"],{}), **item} for item in sources]
                 sources.extend(plain(item) for item in extracted.sources if item["path"] not in known)
             # Ownership is catalog metadata; only the reached source closure is read.
             source_policy = _closure_import_policy(import_policy or {}, catalogs, sources, project_root=project_root, target=target)

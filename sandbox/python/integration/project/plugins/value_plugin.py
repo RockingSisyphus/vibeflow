@@ -27,6 +27,7 @@ review = ruleset(
 plugin = Plugin(
     id="value_shift", resources=[review], runtime=create, priority=5,
     rulesets=["sandbox.value_plugin"],
+    implementation_files=["value_state.py"],
     display_name="Sandbox Value Shift",
     description="Configures a value shift helper used by sandbox resource arithmetic.",
     config_schema={"type": "object", "properties": {"shift": {"type": "number"}}, "additionalProperties": False},

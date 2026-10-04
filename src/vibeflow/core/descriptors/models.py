@@ -142,6 +142,7 @@ class ImplementationDescriptor:
     targets: tuple[str, ...]
     source: SourceLocator
     completion: str = "immediate"
+    implementation_files: tuple[SourceLocator, ...] = ()
 
     def __post_init__(self) -> None:
         language = _required_text(self.language, field_name="implementation.language")
@@ -193,6 +194,16 @@ class ImplementationDescriptor:
         object.__setattr__(self, "language", language)
         object.__setattr__(self, "targets", targets)
         object.__setattr__(self, "completion", completion)
+        if not isinstance(self.implementation_files, (list, tuple)):
+            raise DescriptorModelError("implementation.implementation_files must be a list of file source locators")
+        files = tuple(self.implementation_files)
+        if not all(isinstance(item, SourceLocator) and item.kind == "file" for item in files):
+            raise DescriptorModelError("implementation.implementation_files must contain file source locators")
+        if len({item.ref for item in files}) != len(files):
+            raise DescriptorModelError("implementation.implementation_files contains duplicate files")
+        if any(any(char in item.ref for char in "*?[]") for item in files):
+            raise DescriptorModelError("implementation.implementation_files requires explicit files, not glob patterns")
+        object.__setattr__(self, "implementation_files", files)
 
     @property
     def source_locator(self) -> SourceLocator:
@@ -204,6 +215,7 @@ class ImplementationDescriptor:
             "targets": list(self.targets),
             "source": self.source.to_dict(),
             "completion": self.completion,
+            **({"implementation_files": [item.to_dict() for item in self.implementation_files]} if self.implementation_files else {}),
         }
 
 

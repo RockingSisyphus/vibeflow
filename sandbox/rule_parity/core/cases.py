@@ -153,7 +153,8 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         for amount in (limit,limit+1):
             emit(f"implementation.library.{field}.{amount}", f"BaseLib {field}={amount}", "implementation.base_lib",
                 lambda field=field, amount=amount: evaluate_base_lib_implementation(ImplementationMetrics(**{field:amount}),ImplementationLimits()),
-                codes(*((diagnostic,"error"),) if amount > limit else ()), evidence=implementation_evidence)
+                codes(*((diagnostic,"error"),) if amount > limit else (("BASE_LIB.SOURCE.NEAR_LIMIT","warning"),) if variant == "current" and amount == limit else ()), evidence=implementation_evidence,
+                notes="Current explicit per-file limits retain the warning interval at the upper boundary." if variant == "current" and amount == limit else "")
     for field, metric in [("max_functions","function_count"),("max_branches","branch_count"),("max_nesting_depth","max_nesting_depth")]:
         emit("implementation.library." + field, "BaseLib可配置 " + field, "implementation.base_lib",
             lambda field=field, metric=metric: evaluate_base_lib_implementation(ImplementationMetrics(**{metric:2}),replace(ImplementationLimits(),**{field:1})),

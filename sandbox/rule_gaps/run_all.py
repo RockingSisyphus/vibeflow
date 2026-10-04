@@ -18,7 +18,7 @@ import tempfile
 sys.dont_write_bytecode = True
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
-GROUPS = ("python", "javascript", "graph", "tooling", "composition")
+GROUPS = ("python", "javascript", "graph", "tooling", "composition", "resources")
 spec = importlib.util.spec_from_file_location("parity_results", HERE.parent / "rule_parity/results.py")
 _results = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_results)
@@ -83,7 +83,7 @@ def run(work, groups, report, *, toolchain=None, renderer=None):
     needs_js = any(group != "python" for group in groups)
     if needs_js and toolchain is None:
         toolchain = install(work, "javascript-toolchain", ROOT / "sandbox/javascript/minimal/project")
-    if any(group in {"javascript", "composition"} for group in groups) and renderer is None:
+    if any(group in {"javascript", "composition", "resources"} for group in groups) and renderer is None:
         renderer = install(work, "mermaid-renderer", ROOT / "tools/mermaid-renderer")
     rows, errors = [], []
     with ThreadPoolExecutor(max_workers=min(3, len(groups))) as pool:

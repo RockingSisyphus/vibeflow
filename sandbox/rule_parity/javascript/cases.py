@@ -373,6 +373,9 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         severity = 'warning' if case.id == 'js.quality.function-duplicate' else 'error'
         expected: dict[str, Any] = {'should_accept': not code or severity == 'warning',
             'codes': [{'code': code, 'severity': severity}] if code else [], 'metrics': dict(case.metrics)}
+        if variant == 'current' and 'source_files' in expected['metrics']:
+            # The selected code-plugin declaration is now a recorded source.
+            expected['metrics']['source_files'] += 1
         if case.entrypoint == 'quality-cli':
             expected['metrics'].setdefault('exit_code', 0 if expected['should_accept'] else 1)
         if code and case.entrypoint != 'worker' and case.id not in {'js.node.abi-output', 'js.quality.function-duplicate'}:

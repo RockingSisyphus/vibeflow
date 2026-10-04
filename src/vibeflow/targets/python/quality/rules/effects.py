@@ -25,13 +25,22 @@ def no_side_effects(context, inputs, params):
             return RuleResult(state="unavailable")
         scanner = _BaseLibAstScanner(path=source.path,module=source.module,policy=source_policy(context,params),effect_scope=scope)
         scanner.visit(tree)
+        diagnostics = list(scanner.findings)
+        from vibeflow.targets.python.project.source_membership import subject_files
+        for helper in subject_files(context):
+            if helper.path != source.path and helper.tree is not None:
+                support_scanner = _BaseLibAstScanner(path=helper.path,module=helper.module,
+                    policy=source_policy(context,params),effect_scope=scope)
+                support_scanner.visit(helper.tree)
+                diagnostics.extend(support_scanner.findings)
         return RuleResult(records={"effect_policy":policy_record},findings=tuple(finding(context,item.rule_id,item.message,
-            path=source.path,line=int(item.source_location.get("line",1)),column=int(item.source_location.get("column",1)),
-            details=item.details) for item in scanner.findings))
+            path=str(item.source_location.get("path",source.path)),line=int(item.source_location.get("line",1)),column=int(item.source_location.get("column",1)),
+            details=item.details) for item in diagnostics))
     if context.subject.get("kind") == "plugin":
         findings = []
         sources = context.require("source_context")
-        for source in sources.files:
+        from vibeflow.targets.python.project.source_membership import implementation_review_files
+        for source in implementation_review_files(context):
             if source.tree is None:
                 return RuleResult(state="unavailable")
             selected = source.path == context.require("resource_source_file").path
@@ -54,20 +63,29 @@ def no_side_effects(context, inputs, params):
     known_modules = tuple(modules_by_path.get(implementation.source.ref,
         implementation.source.ref.removesuffix(".py").replace("/", "."))
         for item in other_nodes for implementation in item.implementations if implementation.language == "python")
+    other_ids = {item.type_key for item in other_nodes}
+    other_paths = {item["path"] for item in context.facts.get("source_owners", ())
+                   if item["kind"] == "node" and item["id"] in other_ids and item["role"] == "entry"}
+    known_modules += tuple(item.module for item in sources.imports if item.resolved_path in other_paths)
     from vibeflow.targets.python.quality.source_analysis.input_tracking import source_input_parameters
     input_parameters = source_input_parameters(sources,node)
     visitor = NodePurityVisitor(
         policy=source_policy(context,params), source=source_info(source, symbol), contract=node.descriptor.contract,
         known_node_modules=known_modules, known_node_class_names=known_classes, line_offset=0, effect_scope=scope,
         initial_aliases=import_aliases(source.tree),
+        authorized_resource_imports=_authorized_library_imports(context, source.path, node),
         imported_roots={module.split(".", 1)[0] for item in ast.walk(source.tree) if isinstance(item, (ast.Import, ast.ImportFrom)) for module in import_modules(item)},
         module_state_names={target.id for item in source.tree.body if isinstance(item,(ast.Assign,ast.AnnAssign)) for target in (item.targets if isinstance(item,ast.Assign) else (item.target,)) if isinstance(target, ast.Name)},
         input_parameters={item.name.rsplit(".",1)[-1]:input_parameters.get(item.id,set()) for item in sources.helpers(node.type_key) if item.path == node.path and item.name.startswith(node.symbol+".")},
     )
+    referenced_names = {item.id for item in ast.walk(symbol.node) if isinstance(item,ast.Name)}
+    package_file = any(item["path"] == source.path and item["kind"] == "plugin_declaration"
+                       for item in context.facts.get("source_owners", ()))
     for statement in source.tree.body:
         if isinstance(statement,(ast.Import,ast.ImportFrom)):
             for module in import_modules(statement):
-                if module in known_modules:
+                if module in known_modules and (not package_file or any(
+                    (alias.asname or alias.name.split(".")[0]) in referenced_names for alias in statement.names)):
                     visitor._check_import(module,statement)
     visitor.visit(ast.Module(body=[symbol.node], type_ignores=[]))
     violations = list(visitor.violations)
@@ -75,7 +93,8 @@ def no_side_effects(context, inputs, params):
     for helper_source in sources.files:
         selected = {helper.name for helper in helpers if helper.path == helper_source.path and "." not in helper.name}
         globals_ = {helper.name for helper in helpers if helper.path == helper_source.path and helper.kind == "global"}
-        if not selected or helper_source.tree is None:
+        support = any(item["kind"] == "node" and item["id"] == node.type_key and item["role"] == "support" and item["path"] == helper_source.path for item in context.facts.get("source_owners", ()))
+        if (not selected and not support) or helper_source.tree is None:
             continue
         selected_functions = [item for item in helper_source.tree.body if isinstance(item,(ast.FunctionDef,ast.AsyncFunctionDef)) and item.name in selected]
         used = {name.id for function in selected_functions for name in ast.walk(function) if isinstance(name,ast.Name)}
@@ -87,8 +106,9 @@ def no_side_effects(context, inputs, params):
         helper_visitor = ModulePurityVisitor(policy=source_policy(context,params), source=source_info(helper_source),
                                             node_class_name="", known_node_modules=known_modules, known_node_class_names=known_classes,
                                             effect_scope=scope, audit_all_definitions=True,
+                                            authorized_resource_imports=_authorized_library_imports(context, helper_source.path, node),
                                             input_parameters={helper.name:input_parameters.get(helper.id,set()) for helper in helpers if helper.path == helper_source.path})
-        helper_visitor.visit(ast.Module(body=body, type_ignores=[]))
+        helper_visitor.visit(helper_source.tree if support else ast.Module(body=body, type_ignores=[]))
         violations.extend(helper_visitor.violations)
     findings = [violation_finding(context, item) for item in violations]
     from vibeflow.targets.python.quality.rules.base_lib_effects import _BaseLibAstScanner
@@ -114,3 +134,22 @@ def no_side_effects(context, inputs, params):
                 path=first.path, line=first.line, column=first.column, severity="warning",
                 details={"site_count":len(dispatch.sites), "sites":[site.to_dict() for site in dispatch.sites]}))
     return RuleResult(records={"effect_policy": policy_record}, findings=tuple(findings))
+
+
+def _authorized_library_imports(context, path, node):
+    """Named library exports do not become Nodes because they share a file."""
+    owners = context.facts.get("source_owners", ())
+    selected = set(node.descriptor.base_libs)
+    imports = {}
+    for imported in context.require("source_context").imports:
+        if imported.path != path:
+            continue
+        token = imported.symbol.split(".")[0]
+        candidates = [item for item in owners if item["path"] == imported.resolved_path]
+        foreign_node = any(item["kind"] == "node" and item["id"] != node.type_key and item.get("symbol", "").split(".")[0] == token for item in candidates)
+        allowed = bool(token and token != "*" and not foreign_node and any(
+            item["kind"] == "base_lib" and item["id"] in selected and
+            (not item.get("symbol") or item["symbol"].split(".")[0] == token) for item in candidates))
+        key = (imported.line, imported.module)
+        imports[key] = imports.get(key, True) and allowed
+    return {key for key, allowed in imports.items() if allowed}

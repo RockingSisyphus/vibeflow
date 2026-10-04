@@ -1805,8 +1805,10 @@ def _run_external_nodeset_dedup_review_case() -> CaseResult:
         if _xml_local_name(element.tag) == "g"
         and "review-inline-fragment" in element.attrib.get("class", "").split()
     ]
-    if len(fragments) != 2:
-        raise AssertionError(f"expected main graph plus one deduplicated detail fragment, got {len(fragments)}")
+    if len(fragments) != 3:
+        raise AssertionError(f"expected main graph, one deduplicated detail and the resource graph, got {len(fragments)}")
+    if not any("resources and implementation files" in title for title in review_titles):
+        raise AssertionError("expanded review is missing its resource implementation region")
 
     return CaseResult(
         "review:external_nodeset_dedup_visual",

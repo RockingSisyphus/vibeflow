@@ -133,7 +133,12 @@ def test_architecture_cli_stdout_contains_canonical_document(tmp_path, capsys) -
         "nodesets",
         "node_types",
         "resources",
+        "implementation_graph",
     ]
+    graph = json.loads(output.removeprefix(ARCHITECTURE_DOCUMENT_HEADER))["implementation_graph"]
+    assert set(graph) == {"resources", "files", "relations"}
+    assert "node:test.seed" in graph["resources"]
+    assert graph["resources"]["node:test.seed"]["sources"][0]["role"] == "entry"
     assert not document_path.exists()
 
 
@@ -437,6 +442,7 @@ def test_workspace_run_writes_canonical_architecture_artifact(tmp_path) -> None:
         "nodesets",
         "node_types",
         "resources",
+        "implementation_graph",
     ]
 
 
