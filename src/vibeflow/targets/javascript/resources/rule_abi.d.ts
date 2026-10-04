@@ -17,7 +17,7 @@ export interface SourceAnalysis {
   text(path: string): string;
   ast(path: string): SourceNode;
   symbols(path: string): readonly SourceNode[];
-  imports(path: string): readonly Readonly<{specifier: string; resolved_path: string | null; path: string; line: number; column: number}>[];
+  imports(path: string): readonly Readonly<{specifier: string; resolved_path: string | null; path: string; line: number; column: number; type_only: boolean}>[];
   reachable(path: string): readonly string[];
   ownership(path: string): Readonly<{path: string; declared: readonly JsonValue[]; node_types: readonly string[]}>;
   nodes(path: string, kind: string): readonly SourceNode[];

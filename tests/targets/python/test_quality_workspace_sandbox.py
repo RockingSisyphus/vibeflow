@@ -60,10 +60,12 @@ def workspace_case(tmp_path: Path, distribution_seed: Path) -> Path:
         'identity(_value(inputs, "payload.internal"))',
     )
     node_source.write_text(source, encoding="utf-8")
+    # Library authorization belongs to each resource, not workflow visibility.
+    node_source.write_text(source.replace("'base_libs': []", "'base_libs': ['shared_math']"), encoding="utf-8")
     (framework / "plugin.py").write_text(
         'from vibeflow.targets.python.sdk import Plugin,base_lib,SourceLocator\n'
         'library = base_lib(id="shared_math", display_name="Shared math", description="Sibling helper.", '
-        'source=SourceLocator(kind="module",ref="base_lib.shared_math"),rulesets=["vibeflow.base_lib"])\n'
+        'source=SourceLocator(kind="module",ref="base_lib.shared_math"),implementation_files=["base_lib/__init__.py"],rulesets=["vibeflow.base_lib"])\n'
         'plugin = Plugin(id="framework", resources=[library])\n', encoding="utf-8")
     config = project / "configs/main.jsonc"
     data = json.loads(config.read_text(encoding="utf-8"))
@@ -139,6 +141,7 @@ def test_root_quality_preserves_real_undeclared_base_lib_error(workspace_case: P
         "        # BUSINESS CODE:",
         "        from base_lib.shared_math import identity\n        # BUSINESS CODE:",
     ), encoding="utf-8")
+    source.write_text(source.read_text(encoding="utf-8").replace("'base_libs': ['shared_math']", "'base_libs': []"), encoding="utf-8")
     config = case / "project/configs/main.jsonc"
     data = json.loads(config.read_text(encoding="utf-8"))
     data.pop("base_lib")
@@ -150,7 +153,7 @@ def test_root_quality_preserves_real_undeclared_base_lib_error(workspace_case: P
         code, payload = _cli(case, *args)
         assert code == 1 and payload["status"] == "FAIL", payload
         report = payload.get("reports", [payload])[0]
-        assert "NODE.BASE_LIB.BASE_LIB_UNDECLARED" in {item["rule_id"] for item in report["errors"]}
+        assert "VF_IMPORT_LAYER" in {item["rule_id"] for item in report["errors"]}
 
 
 def test_root_quality_preserves_workspace_policy(workspace_case: Path) -> None:

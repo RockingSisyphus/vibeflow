@@ -177,7 +177,7 @@ def audit_javascript_project(
         node_ids=None if request.audit_registered_resources else frozenset(node_type_calls(graph)), host_extension_ids=frozenset(rule_host_ids), plugin_ids=frozenset(rule_plugin_ids),
     )
     rule_report = run_javascript_rules(graph, catalogs, project_root=root.path, package_root=package_root,
-                                     phase="static", import_policy=rule_import_policy, node_command=request.node_command, evaluate_sources=request.audit_sources, include_registered=request.audit_registered_resources, prefetched_quality=(request.quality_facts_by_root or {}).get(str(root.path)),
+                                     phase="static", import_policy=rule_import_policy, node_command=request.node_command, evaluate_sources=request.audit_sources, collect_sources=True, include_registered=request.audit_registered_resources, prefetched_quality=(request.quality_facts_by_root or {}).get(str(root.path)),
                                      quality_policy=request.quality_policy or javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
     rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if rule_errors:
@@ -321,6 +321,11 @@ def audit_javascript_project(
         source_path=config_path.relative_to(root.path).as_posix(),
     )
     architecture["rule_checks"] = rule_report.to_dict()
+    from vibeflow.tooling.presentation.resource_architecture import resource_architecture
+    architecture["implementation_graph"] = resource_architecture(catalogs, project_root=root.path,
+        source_facts=tuple(item for scope in rule_report.source_scopes.values() for item in scope["sources"]),
+        selections=document.data, selected_nodes=used_node_types, findings=rule_report.findings,
+        roots={item.id:item.path for item in workspace.roots})
     from vibeflow.tooling.presentation.portable_paths import portable_paths
     architecture = portable_paths(architecture, roots={item.id:item.path for item in workspace.roots}, primary_root=root.path)
     return JavascriptAuditResult(

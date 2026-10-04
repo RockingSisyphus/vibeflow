@@ -236,6 +236,8 @@ def driver_import_policy(
     allowed.update(str(item) for item in external_packages)
     return {
         "owners": owners,
+        "resourceBaseLibs": dict(policy.get("resource_base_libs",policy.get("resourceBaseLibs", {}))),
+        "pluginContributions": dict(policy.get("plugin_contributions",policy.get("pluginContributions", {}))),
         "nodeBaseLibs": {
             str(key): [str(item) for item in value]
             for key, value in (

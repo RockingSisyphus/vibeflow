@@ -39,20 +39,24 @@ class PythonSourceAnalysis:
         self._cache = {}
 
     def measurements(self, context):
-        if context.subject.get("kind") == "base_lib":
-            source = context.require("base_lib_file")
+        if context.subject.get("kind") != "node":
+            source = context.facts.get("resource_source_file") or context.require("base_lib_file")
             if source.tree is None:
                 return None
             name = context.facts.get("resource_symbol", "")
-            tree = context.require("source_context").implementation_tree(source.path, name)
+            tree = source.tree if context.subject.get("kind") == "plugin_declaration" else context.require("source_context").implementation_tree(source.path, name)
             if tree is None:
                 return None
             symbol = context.require("source_context").symbol(source.path, name) if name else None
-            text = "\n".join(source.text.splitlines()[symbol.line-1:symbol.end_line]) if symbol else source.text
-            key = ("base_lib", source.path, source.text, name)
+            text = source.text
+            from vibeflow.targets.python.project.source_membership import implementation_review_files
+            closure = implementation_review_files(context)
+            key = (context.subject.get("kind"), source.path, source.text, name,
+                   tuple((file.path, file.text) for file in closure))
             if key not in self._cache:
                 metrics, counter = measure_tree(tree, text)
-                self._cache[key] = SourceMeasurements(metrics, source.path, symbol.line if symbol else 1,
+                helpers = tuple((file.path,measure_tree(file.tree,file.text)[0]) for file in closure if file.path != source.path and file.tree is not None)
+                self._cache[key] = SourceMeasurements(metrics, source.path, 1, helpers=helpers,
                     function_names=tuple(counter.function_names), fingerprint=counter.run_pure_fingerprint,
                     shape=counter.run_pure_shape)
             return self._cache[key]
@@ -63,7 +67,8 @@ class PythonSourceAnalysis:
         symbol = sources.symbol(node.path, node.symbol)
         if symbol is None:
             return None
-        closure = sources.import_closure(node.path)
+        from vibeflow.targets.python.project.source_membership import subject_files
+        closure = subject_files(context)
         key = (node.path, node.symbol, json.dumps(node.descriptor.to_dict(), sort_keys=True),
                tuple((file.path, file.module, file.text) for file in closure))
         if key not in self._cache:
@@ -72,6 +77,8 @@ class PythonSourceAnalysis:
             metrics, counter = measure_tree(ast.Module(body=[symbol.node], type_ignores=[]), text,
                 params=len(node.descriptor.contract.params_schema),
                 contract_keys=len(node.descriptor.contract.requires) + len(node.descriptor.contract.provides))
+            from dataclasses import replace
+            metrics = replace(metrics,source_lines=len(source.text.splitlines()),source_bytes=len(source.text.encode()))
             implementation_paths = {item.path for item in sources.nodes}
             helpers = tuple(file for file in closure if file.path not in implementation_paths and file.tree is not None)
             by_path = {file.path: file for file in helpers}

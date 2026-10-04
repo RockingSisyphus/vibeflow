@@ -141,7 +141,8 @@ def execute_python_node_rules(registry, source_context, *, phase="static", purit
                     continue
             from vibeflow.core.descriptors.contributions import contribution_facts
             contributions = contribution_facts(registry.loaded_plugins.catalogs) if hasattr(registry, "loaded_plugins") else {}
-            facts = {**contributions, "source_load_states":getattr(registry, "source_load_states", {}),
+            from vibeflow.targets.python.project.source_membership import source_ownership
+            facts = {**contributions, **source_ownership(registry), "source_load_states":getattr(registry, "source_load_states", {}),
                      **project_rule_facts(plan,source_context,project_fact_cache),"source_context":source_context,
                      "node_catalog":tuple(registry.descriptor(key) for key in registry.available()), **dict(extra_facts or {})}
             if purity_policy is not None:

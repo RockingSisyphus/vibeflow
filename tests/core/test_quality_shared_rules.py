@@ -131,7 +131,7 @@ def test_optional_node_complexity_limits(field, metric) -> None:
 
 def test_shared_base_lib_source_size_boundaries() -> None:
     limits = ImplementationLimits()
-    assert not evaluate_base_lib_implementation(ImplementationMetrics(source_lines=500, source_bytes=60000), limits)
+    assert {item.severity for item in evaluate_base_lib_implementation(ImplementationMetrics(source_lines=500, source_bytes=60000), limits)} == {"warning"}
     findings = evaluate_base_lib_implementation(ImplementationMetrics(source_lines=501, source_bytes=60001), limits)
     assert {item.rule_id for item in findings} == {"BASE_LIB.SOURCE.MAX_LINES", "BASE_LIB.SOURCE.MAX_BYTES"}
 

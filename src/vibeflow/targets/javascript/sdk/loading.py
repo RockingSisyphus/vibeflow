@@ -1,6 +1,6 @@
 """Load fixed JS/TS definitions through the existing Target worker."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 import weakref
@@ -20,13 +20,14 @@ class JavascriptPluginDefinition:
     source: str
     load_states: Any
     session: Any
+    declaration: Any = None
 
     def contributions(self, config=None):
         builder = ContributionBuilder(self.id, source=self.source)
         for descriptor, location in self.resources:
             builder.add(descriptor, origin=ResourceOrigin(self.id, location.get("path", self.source),
                 location.get("line"), location.get("column"), location.get("symbol", "")))
-        return builder.finish(config=config)
+        return replace(builder.finish(config=config), declaration=self.declaration or {})
 
     def close(self):
         self.session.__exit__(None, None, None)
@@ -91,6 +92,9 @@ process.stdout.write(entry);
     except Exception as exc:
         session.__exit__(None, None, None)
         from vibeflow.targets.javascript.frontend.plugin_descriptors import JavascriptPluginError
+        if getattr(exc,"code","") == "DESCRIPTOR.INVALID":
+            exc.location = dict(exc.details.get("location", {}))
+            raise
         raise JavascriptPluginError("PLUGIN.DECLARATION.LOAD", f"could not load fixed plugin {module}: {exc}", details=getattr(exc,"details",{})) from exc
     resources = []
     for item in result["resources"]:
@@ -105,5 +109,10 @@ process.stdout.write(entry);
     resources = tuple(resources)
     states = {str(path):"unknown" for path in result.get("included_sources", ())}
     states.update({str(path):"loaded" for path in result.get("loaded_sources", ())})
+    for descriptor,_ in resources:
+        for implementation in getattr(descriptor,"implementations",()):
+            for member in getattr(implementation,"implementation_files",()):
+                if member.ref.endswith((".d.ts",".d.mts",".d.cts")):
+                    states[member.ref]="not_loaded"
     return JavascriptPluginDefinition(result["id"], resources, result.get("config_schema", {}),
-                                      result.get("config_defaults", {}), str(module), states, session)
+                                      result.get("config_defaults", {}), str(module), states, session, result.get("declaration", {}))

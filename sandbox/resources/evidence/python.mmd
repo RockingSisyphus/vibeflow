@@ -1,0 +1,40 @@
+flowchart LR
+  vf_resource_36539d6c65a064c6@{ shape: rounded, label: "M demo.model\nnode: demo.model\nstatus: implemented\nflow_kind: process\nrulesets: vibeflow.process" }
+  style vf_resource_36539d6c65a064c6 fill:#add8e6,stroke:#1a5276,color:#123456;
+  vf_resource_06f9e444a925c8fd@{ shape: stadium, label: "demo.start\nnode: demo.start\nstatus: implemented\nflow_kind: terminal\nrulesets: unconstrained" }
+  style vf_resource_06f9e444a925c8fd fill:#ECECFF,stroke:#9370DB,color:#333333;
+  vf_resource_db355611037f5c55@{ shape: cyl, label: "Σ demo.math\nbase_lib: demo.math\nstatus: implemented\nrulesets: vibeflow.base_lib" }
+  style vf_resource_db355611037f5c55 fill:#c8e4ff,stroke:#059669,color:#064e3b;
+  vf_resource_10c0bac219b67a66@{ shape: cloud, label: "P demo\nplugin: demo.runtime\nstatus: implemented\nrulesets: vibeflow.plugin" }
+  style vf_resource_10c0bac219b67a66 fill:#ecd4ff,stroke:#2563eb,color:#1e3a8a;
+  class vf_resource_10c0bac219b67a66 vibeflowCloudNode;
+  vf_resource_dc5b75f6b7f88b8c@{ shape: cloud, label: "P demo\nplugin_declaration: demo\nstatus: implemented\nrulesets: vibeflow.plugin_declaration" }
+  style vf_resource_dc5b75f6b7f88b8c fill:#ecd4ff,stroke:#2563eb,color:#1e3a8a;
+  class vf_resource_dc5b75f6b7f88b8c vibeflowCloudNode;
+  vf_resource_c01a7e2eda727ede@{ shape: doc, label: "node_resource.py\nentry\nloaded" }
+  vf_resource_d10cb6917a0adeb7@{ shape: doc, label: "node_support.py\nsupport\nloaded" }
+  vf_resource_9240a55528eb0c2f@{ shape: doc, label: "math_resource.py\nentry\nloaded" }
+  vf_resource_9c42ab01d8426fd0@{ shape: doc, label: "math_support.py\nsupport\nloaded" }
+  vf_resource_ea513b3ebce8466d@{ shape: doc, label: "plugin.py\nentry\nloaded" }
+  vf_resource_3c367e4d18ad93fd@{ shape: doc, label: "plugin_support.py\nsupport\nloaded" }
+  vf_resource_36539d6c65a064c6 -. "entry" .-> vf_resource_c01a7e2eda727ede
+  vf_resource_36539d6c65a064c6 -. "support" .-> vf_resource_d10cb6917a0adeb7
+  vf_resource_06f9e444a925c8fd -. "entry" .-> vf_resource_c01a7e2eda727ede
+  vf_resource_db355611037f5c55 -. "entry" .-> vf_resource_9240a55528eb0c2f
+  vf_resource_db355611037f5c55 -. "support" .-> vf_resource_9c42ab01d8426fd0
+  vf_resource_10c0bac219b67a66 -. "entry" .-> vf_resource_ea513b3ebce8466d
+  vf_resource_10c0bac219b67a66 -. "support" .-> vf_resource_3c367e4d18ad93fd
+  vf_resource_dc5b75f6b7f88b8c -. "entry" .-> vf_resource_ea513b3ebce8466d
+  vf_resource_dc5b75f6b7f88b8c -. "support" .-> vf_resource_3c367e4d18ad93fd
+  vf_resource_9240a55528eb0c2f -. "import" .-> vf_resource_9c42ab01d8426fd0
+  vf_resource_c01a7e2eda727ede -. "import" .-> vf_resource_9240a55528eb0c2f
+  vf_resource_c01a7e2eda727ede -. "import" .-> vf_resource_d10cb6917a0adeb7
+  vf_resource_ea513b3ebce8466d -. "import" .-> vf_resource_c01a7e2eda727ede
+  vf_resource_ea513b3ebce8466d -. "import" .-> vf_resource_c01a7e2eda727ede
+  vf_resource_ea513b3ebce8466d -. "import" .-> vf_resource_9240a55528eb0c2f
+  vf_resource_ea513b3ebce8466d -. "import" .-> vf_resource_3c367e4d18ad93fd
+  vf_resource_36539d6c65a064c6 -. "base_lib" .-> vf_resource_db355611037f5c55
+  vf_resource_dc5b75f6b7f88b8c -. "contributes" .-> vf_resource_36539d6c65a064c6
+  vf_resource_dc5b75f6b7f88b8c -. "contributes" .-> vf_resource_06f9e444a925c8fd
+  vf_resource_dc5b75f6b7f88b8c -. "contributes" .-> vf_resource_db355611037f5c55
+  vf_resource_dc5b75f6b7f88b8c -. "contributes" .-> vf_resource_10c0bac219b67a66

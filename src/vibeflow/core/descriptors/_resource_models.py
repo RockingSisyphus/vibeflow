@@ -31,8 +31,11 @@ class BaseLibDescriptor:
     version: str = ""
 
     rulesets: tuple[str, ...] = ()
+    presentation: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        from vibeflow.core.descriptors.presentation import normalize_presentation
+        object.__setattr__(self, "presentation", normalize_presentation(self.presentation, field_name="base_lib.presentation"))
         object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="base_lib.rulesets"))
         object.__setattr__(
             self,
@@ -96,6 +99,7 @@ class BaseLibDescriptor:
     def to_dict(self) -> dict[str, object]:
         return {
             "kind": "base_lib",
+            **({"presentation": _thaw_json(self.presentation)} if self.presentation else {}),
             "rulesets": list(self.rulesets),
             "id": self.id,
             "display_name": self.display_name,
@@ -302,8 +306,13 @@ class HostExtensionDescriptor:
     version: str = ""
 
     rulesets: tuple[str, ...] = ()
+    base_libs: tuple[str, ...] = ()
+    presentation: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        from vibeflow.core.descriptors.presentation import normalize_presentation
+        object.__setattr__(self, "presentation", normalize_presentation(self.presentation, field_name="host_extension.presentation"))
+        object.__setattr__(self, "base_libs", _string_tuple(self.base_libs, field_name="host_extension.base_libs"))
         object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="host_extension.rulesets"))
         object.__setattr__(
             self,
@@ -384,6 +393,8 @@ class HostExtensionDescriptor:
     def to_dict(self) -> dict[str, object]:
         return {
             "kind": "host_extension",
+            **({"presentation": _thaw_json(self.presentation)} if self.presentation else {}),
+            **({"base_libs": list(self.base_libs)} if self.base_libs else {}),
             "rulesets": list(self.rulesets),
             "id": self.id,
             "targets": list(self.targets),
@@ -423,8 +434,13 @@ class PluginDescriptor:
     version: str = ""
 
     rulesets: tuple[str, ...] = ()
+    base_libs: tuple[str, ...] = ()
+    presentation: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        from vibeflow.core.descriptors.presentation import normalize_presentation
+        object.__setattr__(self, "presentation", normalize_presentation(self.presentation, field_name="plugin.presentation"))
+        object.__setattr__(self, "base_libs", _string_tuple(self.base_libs, field_name="plugin.base_libs"))
         object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="plugin.rulesets"))
         plugin_id = _required_text(self.id, field_name="plugin.id")
         plugin_type = _required_text(
@@ -515,6 +531,8 @@ class PluginDescriptor:
     def to_dict(self) -> dict[str, object]:
         return {
             "kind": "plugin",
+            **({"presentation": _thaw_json(self.presentation)} if self.presentation else {}),
+            **({"base_libs": list(self.base_libs)} if self.base_libs else {}),
             "rulesets": list(self.rulesets),
             "id": self.id,
             "type": self.plugin_type,

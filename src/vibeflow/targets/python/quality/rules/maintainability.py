@@ -21,7 +21,7 @@ def maintainability(context, inputs, params, *, analysis=None):
         return RuleResult(state="unavailable")
     metrics = measured.metrics
     limits = ImplementationLimits.from_policy(source_policy(context, params))
-    is_library = context.subject.get("kind") == "base_lib"
+    is_library = context.subject.get("kind") != "node"
     evaluator = evaluate_base_lib_implementation if is_library else evaluate_node_implementation
     findings = [_located(context, item, measured.path, measured.line) for item in evaluator(metrics, limits)]
     if not is_library:
@@ -31,14 +31,15 @@ def maintainability(context, inputs, params, *, analysis=None):
         findings.extend(violation_finding(context, item) for item in _validate_architecture_smells(
             node.descriptor, node.descriptor.contract, source=source_info(sources.file(node.path), symbol),
             metrics=NodeMetrics(contract_key_count=metrics.contract_key_count)))
-        for path, helper_metrics in measured.helpers:
-            findings.extend(_located(context, item, path) for item in evaluate_base_lib_implementation(helper_metrics, limits))
+
         item = evaluate_base_lib_dependency_chain(measured.dependency_chain, limits)
         if item is not None:
             diagnostic = _located(context, item, measured.path, measured.line)
             findings.append(replace(diagnostic, details={**diagnostic.details,
                 "longest_chain_length": measured.dependency_chain.length, "longest_chain": measured.dependency_chain.path,
                 "imported_modules": measured.imported_modules, "recursive_chains": measured.dependency_chain.recursive_paths}))
+    for path, helper_metrics in measured.helpers:
+        findings.extend(_located(context, item, path) for item in evaluate_base_lib_implementation(helper_metrics, limits))
     record = {"source_lines": metrics.source_lines, "source_bytes": metrics.source_bytes,
         "function_count": metrics.function_count, "branch_count": metrics.branch_count,
         "max_nesting_depth": metrics.max_nesting_depth, "param_count": metrics.param_count,

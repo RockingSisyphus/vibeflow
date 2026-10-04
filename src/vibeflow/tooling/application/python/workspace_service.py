@@ -263,6 +263,7 @@ def _validate_prepared_workspace_graph(
         effective_policy=effective_policy.to_dict(),
     )
     report = annotate_health_report(report, graph, workspace=workspace)
+    env.registry.review_findings = (*report.errors, *report.warnings)
     if delegate_cli:
         from vibeflow.tooling.application.python.delegate_contract import (
             validate_delegate_cli_graph_contract,
@@ -304,6 +305,8 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
     forbidden = _forbidden_config_findings(document.data, root=root, source_path=config_path) if workspace.path.name == WORKSPACE_CONFIG_NAME else ()
     preflight_findings = [*forbidden, *annotate_findings(env.findings, root=root, source_path=config_path)]
     root_registries = env.resource_registries.get(root.id)
+    source_policy = env.effective_policy if policy_override is None else policy_override.effective_policy
+    env.registry.configure_rule_defaults(purity_policy=source_policy.to_purity_policy())
     from vibeflow.tooling.application.python.project.contributions import lifecycle_registry
     from vibeflow.targets.python.project.resource_rules import review_python_resource
     descriptor_catalogs = env.registry.rule_catalogs[0]
@@ -312,6 +315,13 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
     for resource in descriptor_catalogs.plugins:
         owner = env.registry.resource_roots.get(("plugins" if resource.to_dict()["kind"] == "plugin" else "base_libs", resource.id))
         if owner is not None:
+            for phase in ("import", "static"):
+                preflight_findings.extend(review_python_resource(resource, base_path=owner.path, registry=env.registry, phase=phase))
+    from vibeflow.core.descriptors.source_bundle import declaration_descriptor
+    for record in descriptor_catalogs.plugin_records:
+        if record.get("loaded") and record.get("declaration"):
+            resource = declaration_descriptor(record["declaration"])
+            owner = workspace.root_by_id(record["root"])
             for phase in ("import", "static"):
                 preflight_findings.extend(review_python_resource(resource, base_path=owner.path, registry=env.registry, phase=phase))
     if any(item.severity == "error" for item in preflight_findings):

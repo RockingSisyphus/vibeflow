@@ -316,6 +316,9 @@ def run_variants(work_root: Path, variant: str, toolchain: Path, *, fixture: Any
             actual = fixture._observe(case, root, workspace, config, source)
         code = case.current_code if variant == 'current' and case.current_code is not None else case.code
         expected = {'should_accept': not code or item.severity == 'warning', 'codes': [{'code': code, 'severity': item.severity}] if code else [], 'metrics': dict(case.metrics)}
+        if variant == 'current' and 'source_files' in expected['metrics']:
+            # The selected code-plugin declaration is now a recorded source.
+            expected['metrics']['source_files'] += 1
         if code and item.located:
             expected['located_codes'] = [code]
         if item.message_contains:

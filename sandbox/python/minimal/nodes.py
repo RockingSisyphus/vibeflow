@@ -96,6 +96,7 @@ class SeedNode:
                                                     'value': 2,
                                                     'source_node': 'example'}},
                             'params': {'delta': 3}}]},
+ 'base_libs':['base_lib.math_tools'],
  'rulesets': ['vibeflow.process']})
 class AddNode:
 

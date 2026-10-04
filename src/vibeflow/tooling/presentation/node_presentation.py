@@ -34,6 +34,7 @@ def resolve_presentation(
     status_class: str = "",
     call_style: object | None = None,
     flow_kind: str = "",
+    resource_kind: str = "node",
 ) -> EffectivePresentation:
     """Native → Node → status → call, with per-field provenance."""
     identity = flow_kind or _get(descriptor, "flow_kind", "process")
@@ -53,7 +54,9 @@ def resolve_presentation(
                     values[str(key)] = str(value)
                     sources[str(key)] = origin
 
-    apply(_get(descriptor, "presentation", {}), "node")
+    if resource_kind != "node":
+        values["shape"] = "fr-rect" if resource_kind == "base_lib" else "hex"
+    apply(_get(descriptor, "presentation", {}), resource_kind)
     if status_class in SYSTEM_STYLE_COLORS:
         status = SYSTEM_STYLE_COLORS[status_class]
         apply({"fill": status.fill, "stroke": status.stroke, "text": status.text}, "status")

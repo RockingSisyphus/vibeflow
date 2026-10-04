@@ -88,6 +88,8 @@ def workflow_node_types(graph: GraphConfig) -> tuple[str, ...]:
 
 
 def collect_node_source_context(registry: NodeRegistry, type_keys: tuple[str, ...], *, calls=None):
+    from vibeflow.targets.python.project.source_membership import resource_paths
+
     nodes: list[PythonSourceNode] = []
     files: dict[str, PythonSourceFile] = {}
     source_facts = {}
@@ -109,7 +111,8 @@ def collect_node_source_context(registry: NodeRegistry, type_keys: tuple[str, ..
             for _ in implementation.__module__.split(".")[:-1]:
                 root = root.parent
         nodes.append(PythonSourceNode(descriptor, str(path), symbol, root_id, tuple((calls or {}).get(key, ()))))
-        for fact in collect_python_source_facts(path, project_root=root, source_roots=getattr(registry, "source_roots", (root,)), _facts=source_facts):
+        entries = (path, *(file for role,file,_ in resource_paths(descriptor, root, getattr(registry,"source_roots",(root,))) if role == "support"))
+        for fact in (fact for entry in entries for fact in collect_python_source_facts(entry, project_root=root, source_roots=getattr(registry, "source_roots", (root,)), _facts=source_facts)):
             if fact.load_error:
                 raise NodeRegistryError(fact.load_error)
             owner = Path(fact.root_path) if fact.root_path else next((item for item in getattr(registry, "source_roots", (root,)) if Path(fact.path).is_relative_to(item)), Path(fact.path).parent)
@@ -118,6 +121,25 @@ def collect_node_source_context(registry: NodeRegistry, type_keys: tuple[str, ..
             if module.endswith(".__init__"):
                 module = module[:-9]
             files[fact.path] = PythonSourceFile(fact.path, module, fact.source, getattr(registry, "source_root_ids", {}).get(owner, root_id), fact._tree, fact.parse_error,fact.parse_line,fact.parse_column)
+    # Inspect explicitly registered parts of libraries already in this scope.
+    for catalog in getattr(registry,"rule_catalogs", ()) or ():
+        for library in getattr(catalog, "base_libs", ()):
+            root_object = getattr(registry,"resource_roots",{}).get(("base_libs",library.id))
+            if root_object is None:
+                continue
+            members = tuple(resource_paths(library,root_object.path,registry.source_roots))
+            if not any(str(path) in files for role,path,_ in members if role == "entry"):
+                continue
+            for role,path,_ in members:
+                if role != "support":
+                    continue
+                for fact in collect_python_source_facts(path,project_root=root_object.path,source_roots=registry.source_roots,_facts=source_facts):
+                    if fact.load_error:
+                        raise NodeRegistryError(fact.load_error)
+                    owner = Path(fact.root_path) if fact.root_path else root_object.path
+                    module = ".".join(Path(fact.path).relative_to(owner).with_suffix("").parts).removesuffix(".__init__")
+                    files[fact.path] = PythonSourceFile(fact.path,module,fact.source,root_object.id,fact._tree,
+                        fact.parse_error,fact.parse_line,fact.parse_column)
     context = build_python_source_context(nodes, files.values())
     loaded_paths = {str(Path(filename).resolve()) for module in tuple(sys.modules.values())
                     if isinstance(filename := getattr(module, "__file__", None), str)}

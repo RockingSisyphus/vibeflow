@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import json
+from pathlib import Path
 from typing import Mapping
 
 from vibeflow.core.compiler import CompiledGraph
@@ -56,6 +57,38 @@ def build_architecture_document(
         "node_types": _node_types_document(graph, registry=registry, roots=roots),
         "resources": _resources_document(graph, resources, roots=roots),
     }
+    if hasattr(registry, "loaded_plugins") and graph.source_path and Path(graph.source_path).is_file():
+        from vibeflow.tooling.presentation.resource_architecture import resource_architecture
+        from vibeflow.tooling.project.config_loader import load_raw_config_document
+        from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
+        sources = collect_workflow_source_context(registry,graph)
+        collected = {file.path:file for file in sources.files}
+        # Lifecycle and package source scopes are measured independently of Nodes.
+        from vibeflow.targets.python.project.source_membership import resource_paths
+        from vibeflow.targets.python.project.source_closure import collect_python_source_facts
+        catalogs = registry.loaded_plugins.catalogs
+        from vibeflow.core.descriptors.source_bundle import source_resources
+        for kind,descriptor in source_resources(catalogs):
+            if kind in {"plugin","plugin_declaration"}:
+                for _,entry,_ in resource_paths(descriptor,graph.root_path,registry.source_roots):
+                    for fact in collect_python_source_facts(entry,project_root=Path(graph.root_path),source_roots=registry.source_roots):
+                        from vibeflow.targets.python.quality.source_context import PythonSourceFile, build_python_source_context
+                        owner = Path(fact.root_path) if fact.root_path else Path(graph.root_path)
+                        module = ".".join(Path(fact.path).relative_to(owner).with_suffix("").parts).removesuffix(".__init__")
+                        file = PythonSourceFile(fact.path,module,fact.source,"",fact._tree,fact.parse_error,fact.parse_line,fact.parse_column)
+                        collected[file.path] = file
+        from vibeflow.targets.python.quality.source_context import build_python_source_context
+        loaded_source = build_python_source_context((),collected.values())
+        import sys
+        loaded_paths = {str(Path(filename).resolve()) for module in tuple(sys.modules.values())
+                        if isinstance(filename := getattr(module,"__file__",None),str)}
+        snapshot = [{"path":file.path,"load_state":"loaded" if file.path in loaded_paths else "not_loaded","imports":[{"path":item.resolved_path,"specifier":item.specifier,"line":item.line}
+            for item in loaded_source.imports if item.path == file.path]} for file in collected.values()]
+        payload["implementation_graph"] = resource_architecture(catalogs,project_root=graph.root_path,
+            source_facts=snapshot,selections=load_raw_config_document(Path(graph.source_path)).data,
+            selected_nodes={item.type_key for item in sources.nodes},
+            findings=getattr(registry,"review_findings",()),
+            roots={str(root_id):str(path) for path,root_id in registry.source_root_ids.items()})
     from vibeflow.tooling.presentation.portable_paths import portable_paths
     known_roots = {str(root_id):str(path) for path,root_id in getattr(registry,"source_root_ids",{}).items()}
     return portable_paths(payload, roots={**roots, **known_roots}, primary_root=graph.root_path)
@@ -427,6 +460,7 @@ def _node_type_document(
         "info": {**_node_info_document(descriptor), "effect_scope": registry.effect_scope(type_key) if has_implemented_occurrence else "unavailable"},
         "contract": _node_contract_document(descriptor.contract),
         "rulesets": list(registry.rulesets(type_key)),
+        "declared_presentation":dict(descriptor.presentation),
         "presentation": resolve_presentation(descriptor).to_dict(),
         "config": _node_config_document(registry, type_key),
     }

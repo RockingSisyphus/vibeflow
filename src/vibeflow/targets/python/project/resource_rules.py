@@ -33,7 +33,9 @@ def review_python_resource(resource, *, base_path, registry=None, phase="import"
             object_id=resource.id, message=f"declared Python source is unavailable: {reference}",
             source_location={"path":source_path or str(root)}),)
     files = []
-    for fact in collect_python_source_facts(path, project_root=root, source_roots=getattr(registry, "source_roots", (root,))):
+    from vibeflow.targets.python.project.source_membership import resource_paths, source_ownership
+    entries = tuple(file for _,file,_ in resource_paths(resource, root, getattr(registry,"source_roots",(root,)))) if implementation else (path,)
+    for fact in (fact for entry in entries for fact in collect_python_source_facts(entry, project_root=root, source_roots=getattr(registry, "source_roots", (root,)))):
         if fact.load_error:
             return (HealthFinding(rule_id="RESOURCE.SOURCE.UNAVAILABLE",severity="error",object_type="plugin",
                 object_id=resource.id,message=fact.load_error,source_location={"path":fact.path,"line":1}),)
@@ -41,14 +43,16 @@ def review_python_resource(resource, *, base_path, registry=None, phase="import"
         module = ".".join(Path(fact.path).relative_to(owner).with_suffix("").parts).removesuffix(".__init__")
         files.append(PythonSourceFile(fact.path, module, fact.source, root_id, fact._tree,
                                      fact.parse_error, fact.parse_line, fact.parse_column))
+    files = list({file.path:file for file in files}.values())
     sources = build_python_source_context((), files)
     contributions = contribution_facts(registry.loaded_plugins.catalogs) if hasattr(registry, "loaded_plugins") else {}
-    facts = {**contributions, "source_load_states":getattr(registry,"source_load_states",{}), "source_context":sources, "resource_source_file":sources.file(str(path)),
+    defaults = registry.rule_defaults() if hasattr(registry,"rule_defaults") else {}
+    facts = {**contributions, **source_ownership(registry), "purity_policy":defaults.get("purity_policy"), "source_load_states":getattr(registry,"source_load_states",{}), "source_context":sources, "resource_source_file":sources.file(str(path)),
              "resource_symbol":symbol_name, "resource":descriptor,
              "base_lib_file":sources.file(str(path)) if kind == "base_lib" else None}
     findings, cache = [], {}
     try:
-        rules, rulesets = rule_resources(registry)
+        rules, rulesets = rule_resources(registry, **defaults)
         handlers = python_rule_handlers()
         for selected in resource.rulesets:
             plan = compile_ruleset(selected, rules=rules, rulesets=rulesets, entrypoint=phase)
@@ -102,7 +106,10 @@ def review_reached_base_libs(registry, sources, *, rules, rulesets, handlers, ph
     from vibeflow.targets.python.quality.project_context import project_rule_facts
     findings, executions = [], []
     for descriptor, source, origin in reached_base_lib_sources(registry, sources):
-        library_sources = build_python_source_context((), sources.import_closure(source.path))
+        from vibeflow.targets.python.project.source_membership import source_ownership
+        members = [item["path"] for item in source_ownership(registry).get("source_owners",()) if item["kind"] == "base_lib" and item["id"] == descriptor.id]
+        library_files = {file.path:file for entry in (members or [source.path]) for file in sources.import_closure(entry)}
+        library_sources = build_python_source_context((),library_files.values())
         symbol = next((item.source.export or "" for item in descriptor.implementations if item.language == "python"), "")
         cache = {}
         for selected in descriptor.rulesets:
@@ -112,11 +119,12 @@ def review_reached_base_libs(registry, sources, *, rules, rulesets, handlers, ph
                 if callable(custom):
                     handlers.update(custom(plan))
                 contributions = contribution_facts(registry.loaded_plugins.catalogs) if hasattr(registry, "loaded_plugins") else {}
-                context = RuleContext(facts={**contributions,"source_load_states":getattr(registry,"source_load_states",{}),"source_context":library_sources,"base_lib_file":source,"resource_symbol":symbol,
+                from vibeflow.targets.python.project.source_membership import source_ownership
+                context = RuleContext(facts={**contributions, **source_ownership(registry),"source_load_states":getattr(registry,"source_load_states",{}),"source_context":library_sources,"resource_source_file":source,"base_lib_file":source,"resource_symbol":symbol,
                     "purity_policy":purity_policy, **project_rule_facts(plan,library_sources,cache)},
                     subject={"kind":"base_lib","id":descriptor.id,"descriptor":descriptor.to_dict(),
-                        "source_identity":("python",source.path,symbol,tuple((file.path,file.text) for file in sources.import_closure(source.path)))},
-                    scope={"files":tuple(file.path for file in sources.import_closure(source.path))}, phase=phase,target="python")
+                        "source_identity":("python",source.path,symbol,tuple((file.path,file.text) for file in library_sources.files))},
+                    scope={"files":tuple(file.path for file in library_sources.files)}, phase=phase,target="python")
                 result = execute_rule_plan(plan,context,handlers=handlers)
                 executions.append(result)
                 findings.extend(replace(item,root_id=item.root_id or source.root_id,source_path=item.source_path or source.path)

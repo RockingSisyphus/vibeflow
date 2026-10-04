@@ -3,7 +3,7 @@
 import ast
 
 
-CONSTRUCTORS = frozenset({"Plugin", "node", "rule", "ruleset", "data_schema", "base_lib",
+CONSTRUCTORS = frozenset({"Plugin", "node", "rule", "ruleset", "data_schema", "base_lib", "lifecycle",
     "capability", "host_extension", "RuleCall", "RuleRelation", "SourceLocator",
     "DataProvider", "DataRequirement", "NodeContractDescriptor"})
 

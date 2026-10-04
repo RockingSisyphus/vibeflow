@@ -286,7 +286,8 @@ function normalizeImportPolicy(raw, packageRoot) {
         realPath: path.resolve(item.path),
         kind: String(item.kind),
         id: String(item.id),
-        export: String(item.export || "run"),
+        export: String(item.export ?? "run"),
+        role: String(item.role || "entry"),
         completion: String(item.completion || "immediate"),
         effectScope: String(item.effect_scope || "unconstrained"),
       }))
@@ -297,6 +298,8 @@ function normalizeImportPolicy(raw, packageRoot) {
     packageRoot: normalizedRealPath({ sys: null }, packageRoot),
     sourceRoots: (policy.sourceRoots || []).map(value => normalizedRealPath({ sys: null }, value)),
     derivedOwners: new Map(),
+    resourceBaseLibs: policy.resourceBaseLibs || {},
+    pluginContributions: policy.pluginContributions || {},
     nodeBaseLibs: policy.nodeBaseLibs && typeof policy.nodeBaseLibs === "object"
       ? policy.nodeBaseLibs : {},
     baseLibDependencies: policy.baseLibDependencies && typeof policy.baseLibDependencies === "object"
@@ -327,8 +330,14 @@ function normalizedRealPath(ts, value) {
   }
 }
 
-function directOwnerFor(ts, fileName, policy) {
+function directOwnerFor(ts, fileName, policy, preferred = null) {
   const candidate = normalizedRealPath(ts, fileName);
+  if (preferred) {
+    const same = policy.owners.find(owner => owner.kind === preferred.kind
+      && owner.id === preferred.id
+      && candidate === normalizedRealPath(ts, owner.path));
+    if (same) return same;
+  }
   for (const owner of policy.owners) {
     const ownerPath = normalizedRealPath(ts, owner.path);
     if (candidate === ownerPath || candidate.startsWith(`${ownerPath}${path.sep}`)) {
@@ -342,6 +351,23 @@ function ownerFor(ts, fileName, policy) {
   const direct = directOwnerFor(ts, fileName, policy);
   if (direct) return direct;
   return policy.derivedOwners.get(normalizedRealPath(ts, fileName)) || null;
+}
+
+function importDestinationOwner(ts, fileName, policy, sourceOwner, imported) {
+  const candidate = normalizedRealPath(ts, fileName);
+  let owners = policy.owners.filter(owner => candidate === normalizedRealPath(ts, owner.path));
+  const bindings = imported.declaration?.importClause?.namedBindings;
+  const names = imported.importedName ? new Set([imported.importedName]) : bindings && ts.isNamedImports(bindings)
+    ? new Set(bindings.elements.map(item => (item.propertyName || item.name).text)) : new Set();
+  const named = owners.filter(owner => names.has(String(owner.export || "").split(".")[0]));
+  if (named.length) owners = named;
+  const same = owners.find(owner => owner.kind === sourceOwner.kind && owner.id === sourceOwner.id);
+  if (same) return same;
+  const libraries = sourceOwner.kind === "node" ? policy.nodeBaseLibs[sourceOwner.id] || []
+    : sourceOwner.kind === "base_lib" ? policy.baseLibDependencies[sourceOwner.id] || []
+    : policy.resourceBaseLibs[`${sourceOwner.kind}:${sourceOwner.id}`] || [];
+  const library = owners.find(owner => owner.kind === "base_lib" && libraries.includes(owner.id));
+  return library || owners[0] || directOwnerFor(ts, fileName, policy, sourceOwner);
 }
 
 function packageName(specifier) {
@@ -469,9 +495,14 @@ function isWithinPath(root, candidate) {
 function auditImportOwnership(ts, sourceFile, checker, project, policy) {
   const sourceOwner = ownerFor(ts, sourceFile.fileName, policy);
   if (!sourceOwner
-      || !["node", "base_lib", "host_extension", "plugin"].includes(sourceOwner.kind)) return [];
+      || !["node", "base_lib", "host_extension", "plugin", "plugin_declaration"].includes(sourceOwner.kind)) return [];
   const findings = [];
-  for (const imported of importSpecifiers(ts, sourceFile)) {
+  const imports = importSpecifiers(ts, sourceFile).flatMap(imported => {
+    const bindings = imported.declaration?.importClause?.namedBindings;
+    return bindings && ts.isNamedImports(bindings) && bindings.elements.length
+      ? bindings.elements.map(item => ({...imported, importedName: (item.propertyName || item.name).text})) : [imported];
+  });
+  for (const imported of imports) {
     const specifier = imported.value;
     // Explicit Node builtin imports are platform facts.  esbuild decides
     // whether the selected build target can resolve them; they do not affect
@@ -517,7 +548,7 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
       ));
       continue;
     }
-    const destination = directOwnerFor(ts, resolvedFile, policy);
+    const destination = importDestinationOwner(ts, resolvedFile, policy, sourceOwner, imported);
     if (!destination) {
       findings.push(importFinding(
         sourceFile,
@@ -527,7 +558,13 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
       ));
       continue;
     }
-    if (sourceOwner.kind === "node") {
+    if (sourceOwner.kind === "plugin_declaration") {
+      const contributed = policy.pluginContributions[sourceOwner.id] || [];
+      if (destination.kind === "plugin_declaration" && destination.id === sourceOwner.id
+          || contributed.some(item => item.kind === destination.kind && item.id === destination.id)
+          || destination.kind === "base_lib" && (policy.resourceBaseLibs[`plugin_declaration:${sourceOwner.id}`] || []).includes(destination.id)) continue;
+      findings.push(importFinding(sourceFile, imported.node, "VF_IMPORT_LAYER", `plugin declaration '${sourceOwner.id}' imports a resource outside its contributions`));
+    } else if (sourceOwner.kind === "node") {
       if (destination.kind === "node" && destination.id !== sourceOwner.id) {
         findings.push(importFinding(
           sourceFile,
@@ -545,7 +582,7 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
             `node '${sourceOwner.id}' imports base_lib '${destination.id}' without enabling it`,
           ));
         }
-      } else if (["plugin", "runtime", "registry", "capability"].includes(destination.kind)) {
+      } else if (["plugin", "plugin_declaration", "host_extension", "runtime", "registry", "capability"].includes(destination.kind)) {
         findings.push(importFinding(
           sourceFile,
           imported.node,
@@ -554,7 +591,7 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
         ));
       }
     } else if (sourceOwner.kind === "base_lib") {
-      if (["node", "plugin", "runtime", "registry", "capability"].includes(destination.kind)) {
+      if (["node", "plugin", "plugin_declaration", "host_extension", "runtime", "registry", "capability"].includes(destination.kind)) {
         findings.push(importFinding(
           sourceFile,
           imported.node,
@@ -573,6 +610,7 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
         }
       }
     } else if (sourceOwner.kind === "host_extension") {
+      if (destination.kind === "base_lib" && (policy.resourceBaseLibs[`host_extension:${sourceOwner.id}`] || []).includes(destination.id)) continue;
       if (destination.kind !== "host_extension") {
         findings.push(importFinding(
           sourceFile,
@@ -594,6 +632,7 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
         }
       }
     } else if (sourceOwner.kind === "plugin") {
+      if (destination.kind === "base_lib" && (policy.resourceBaseLibs[`plugin:${sourceOwner.id}`] || []).includes(destination.id)) continue;
       if (destination.kind !== "plugin") {
         findings.push(importFinding(
           sourceFile,
@@ -834,7 +873,7 @@ function isSdkDeclaration(ts, sourceFile, value) {
 function auditTopLevelPurity(ts, sourceFile, policy) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (!owner
-      || !["node", "base_lib", "host_extension", "plugin", "source"].includes(owner.kind)) return [];
+      || !["node", "base_lib", "host_extension", "plugin", "plugin_declaration", "source"].includes(owner.kind)) return [];
   const findings = [];
   if (hasDecorator(ts, sourceFile)) {
     findings.push(importFinding(
@@ -978,7 +1017,7 @@ function promiseLikeType(ts, checker, type, fallbackText = "") {
 
 function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
-  if (!owner || !["node", "host_extension", "plugin"].includes(owner.kind)) return [];
+  if (!owner || owner.role === "support" || !["node", "host_extension", "plugin"].includes(owner.kind)) return [];
   const declaration = implementationDeclaration(ts, sourceFile, owner.export);
   if (!declaration) return [];
   const findings = [];
@@ -2312,8 +2351,8 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
       request.importPolicy,
       request.packageRoot,
     );
-    const selectedOwner = policy.owners.find(owner => owner.id === request.ruleSubjectId && owner.kind === request.ruleSubjectKind);
-    if (selectedOwner) policy.owners = [selectedOwner, ...policy.owners.filter(owner => owner !== selectedOwner)];
+    const selectedOwners = policy.owners.filter(owner => owner.id === request.ruleSubjectId && owner.kind === request.ruleSubjectKind);
+    policy.owners = [...selectedOwners, ...policy.owners.filter(owner => !selectedOwners.includes(owner))];
     deriveTransitiveOwners(
       ts,
       sourceFiles,
@@ -2323,7 +2362,7 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
     );
     const rootFiles = new Set(files.map((item) => path.resolve(item)));
     for (const sourceFile of sourceFiles) {
-      if (sourceFile.isDeclarationFile) continue;
+      if (sourceFile.isDeclarationFile && sourceFile.fileName.includes(`${path.sep}node_modules${path.sep}`)) continue;
       const owned = ownerFor(ts, sourceFile.fileName, policy);
       if (!owned && !rootFiles.has(path.resolve(sourceFile.fileName))) continue;
       const topics = new Set(request.ruleTopics || []);
@@ -2331,8 +2370,9 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
       if (request.profile === "single-esm") findings.push(...auditSingleEsmConstraints(ts, sourceFile));
       if (topics.has("imports")) {
         findings.push(...auditParsedSource(ts, sourceFile, ""));
-        findings.push(...auditImportOwnership(ts, sourceFile, checker, project, policy));
+        findings.push(...auditImportOwnership(ts, implementationFile, checker, project, policy));
       }
+      if (sourceFile.isDeclarationFile) continue;
       if (topics.has("purity")) findings.push(...auditTopLevelPurity(ts, sourceFile, policy));
       if (topics.has("completion")) findings.push(...auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy));
       if (topics.has("module_state")) {
@@ -2366,7 +2406,11 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
     if (request.command === "rule-check") {
       return {
         findings: findings.map(finding => ({ ...finding, owner: finding.owner || ownerFor(ts, finding.file, policy) })),
-        sources: sourceFiles.filter(file => !file.isDeclarationFile && !file.fileName.includes(`${path.sep}node_modules${path.sep}`)).map(file => ({ path: path.resolve(file.fileName), text: file.text })),
+        sources: sourceFiles.filter(file => !file.fileName.includes(`${path.sep}node_modules${path.sep}`)).map(file => ({ path: path.resolve(file.fileName), text: file.text,
+          imports: importSpecifiers(ts,file).map(imported => ({specifier:imported.value,
+            path:resolvedImportFile(ts,checker,project,imported,file.fileName) || "",
+            line:file.getLineAndCharacterOfPosition(imported.node.getStart(file)).line + 1,
+            type_only:Boolean(imported.declaration.importClause?.isTypeOnly || imported.declaration.isTypeOnly)})) })),
       };
     }
     if (findings.length) {

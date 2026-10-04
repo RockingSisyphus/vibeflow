@@ -28,11 +28,18 @@ def load_plugin(source, *, root, source_roots=()):
             module = importlib.import_module(source.ref)
         elif source.kind == "file":
             path = (Path(root) / source.ref).resolve()
-            name = f"_vibeflow_plugin_{abs(hash(str(path)))}"
+            owner = next((Path(value).resolve() for value in (root,*source_roots)
+                          if path.is_relative_to(Path(value).resolve())), path.parent)
+            parts = path.parent.relative_to(owner).parts
+            package = ".".join(parts) if all(part.isidentifier() for part in parts) else ""
+            name = package if path.name == "__init__.py" and package else f"_vibeflow_plugin_{abs(hash(str(path)))}"
             spec = importlib.util.spec_from_file_location(name, path)
             if spec is None or spec.loader is None:
                 raise ImportError(f"cannot load plugin entry: {path}")
             module = importlib.util.module_from_spec(spec)
+            if package:
+                if path.name != "__init__.py":importlib.import_module(package)
+                module.__package__ = package
             sys.modules[name] = module
             try:
                 # Read current source for this command; Python's coarse .pyc
@@ -53,9 +60,15 @@ def _discard_foreign_project_modules(roots):
     """A prior project must not satisfy a same-named local import."""
     for name, module in tuple(sys.modules.items()):
         filename = getattr(module, "__file__", None)
-        if not filename or name.startswith("vibeflow."):
+        if name.startswith("vibeflow."):
             continue
         relative = Path(*name.split("."))
+        if not filename:
+            expected = next((Path(root)/relative for root in roots if (Path(root)/relative).is_dir()),None)
+            namespace = getattr(module,"__path__",None)
+            if expected is not None and namespace is not None and str(expected.resolve()) not in namespace:
+                sys.modules.pop(name,None)
+            continue
         candidates = (candidate for root in roots
                       for candidate in (Path(root) / relative.with_suffix(".py"), Path(root) / relative / "__init__.py"))
         expected = next((candidate.resolve() for candidate in candidates if candidate.is_file()), None)

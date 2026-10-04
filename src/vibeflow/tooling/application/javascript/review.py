@@ -183,23 +183,24 @@ def write_review_svg(
         )
         coverage.add(("workflow", "", root_target))
         columns: list[list[SvgFragment]] = [[main]]
-        for resource_kind, records in _resource_records(result):
+        implementation_graph = result.architecture.get("implementation_graph")
+        resource_groups = _resource_records(result)
+        if implementation_graph:
+            from vibeflow.tooling.presentation.resource_mermaid import render_resource_graph
+            fragment = _render_fragment("resources and implementation files", render_resource_graph(implementation_graph),
+                temp_dir, kind="resource", owner="workflow", target="implementations",
+                theme=theme,background=background,max_text_size=actual_text_size,max_edges=actual_edges)
+            columns.append([fragment])
+            coverage.add(("resource","workflow","implementations"))
+            resource_groups = tuple((kind,records) for kind,records in resource_groups if kind == "capabilities")
+        for resource_kind, records in resource_groups:
             if not records:
                 continue
-            fragment = _render_fragment(
-                resource_kind,
-                _resource_mermaid(resource_kind, records),
-                temp_dir,
-                kind="resource",
-                owner="workflow",
-                target=resource_kind,
-                theme=theme,
-                background=background,
-                max_text_size=actual_text_size,
-                max_edges=actual_edges,
-            )
+            fragment = _render_fragment(resource_kind, _resource_mermaid(resource_kind, records), temp_dir,
+                kind="resource", owner="workflow", target=resource_kind, theme=theme,background=background,
+                max_text_size=actual_text_size,max_edges=actual_edges)
             columns.append([fragment])
-            coverage.add(("resource", "workflow", resource_kind))
+            coverage.add(("resource","workflow",resource_kind))
         if expand_nodesets:
             details: list[SvgFragment] = []
             for group in _invocation_groups(result.graph):
@@ -250,8 +251,10 @@ def expected_review_coverage(result: object) -> frozenset[ReviewCoverage]:
     expected: set[ReviewCoverage] = set()
     root_target = result.graph.root_id or result.root.id
     expected.add(("workflow", "", root_target))
+    if result.architecture.get("implementation_graph"):
+        expected.add(("resource","workflow","implementations"))
     for resource_kind, records in _resource_records(result):
-        if records:
+        if records and (not result.architecture.get("implementation_graph") or resource_kind == "capabilities"):
             expected.add(("resource", "workflow", resource_kind))
 
     def visit(graph: GraphConfig, *, owner: str, visited: tuple[str, ...]) -> None:

@@ -20,13 +20,13 @@ FRONTEND_ROOT = TARGET_ROOT / "frontend"
 
 # Plugin ABI v3 ships the code SDK and its binding loader.
 RESOURCE_SHA256 = {'plugin_abi.d.ts': '1e3536feb02310d31f5f58cd95ce57f40d6f1c5814651107655df600739f08cb',
- 'plugin_worker.mjs': '1c424fdb2eac74309c748cd0ba7c5afc9039dfd509cf1e385b150317d190b698',
- 'rule_abi.d.ts': 'aaeba26699c078d6340b0e243cbe0f3e7fc53eea167956e99f85155f2574f2bb',
+ 'plugin_worker.mjs': 'efc2595246c395142fd01bbb4822e74a061e161ed4205d57dc7e2e9906138dd1',
+ 'rule_abi.d.ts': '985f229f744ba14ceccc057d0293e460ce9e4661c7b959e4dde2c2e520b1c308',
  'runtime_helpers.mjs': '77747ef8c71c76054639bedcb4852836ec72920ec9f3f88c09dcbdd1bc3b1bcd',
- 'sdk.d.ts': '2095b92ce510f2596bed8a269ab5d424a719597510139b047be8b1582a06bbf6',
- 'sdk.mjs': 'e6a93d5f5cf5e2af4e7a1c0295bc29ee445ce249abdc8f499b46c51b806ae728',
+ 'sdk.d.ts': 'a2615a1b4121b09d75bc665376377c387bbaea305a2920335c0c811c23d543f8',
+ 'sdk.mjs': '7df73ff6c74aec534dfb6eaa9813acf6728dc32a8ff670d61f16888faeb22715',
  'sdk_loader.mjs': 'd9a5f18235a5d881fc0abff6683887c0400c18e621f041bbfbdae16df596d2d9',
- 'toolchain_driver.mjs': 'de6b73fe8ed46d375fa9c1c85df63fde616de3ca70aab36dbb6de659434922c6'}
+ 'toolchain_driver.mjs': '977bf438ef07c3f4a3163b0f9cc52c365c3cb39b15fa88c35be0b1c360c649d7'}
 
 
 def _run_isolated(source: str) -> None:
