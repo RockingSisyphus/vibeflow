@@ -30,23 +30,19 @@ _JAVASCRIPT_APPLICATION_PREFIXES = (
 
 _PYTHON_ONLY_SYMBOLS = frozenset(
     {
-        "BaseLibRegistry",
         "CompiledBlock",
-        "ConfigResources",
         "EffectivePolicy",
         "ExecutionPlan",
-        "NodeContract",
-        "NodeInfo",
         "NodeRegistry",
         "PipelineRuntime",
         "PluginRegistry",
-        "PluginResourceRegistry",
         "PureNode",
         "PythonBindingPlan",
+        "PythonResourceBinding",
+        "PythonResources",
         "PythonCompiledBlock",
         "RuntimeOptions",
         "WorkspaceEnvironment",
-        "WorkspaceResourceRegistries",
     }
 )
 

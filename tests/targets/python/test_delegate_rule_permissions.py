@@ -1,3 +1,4 @@
+from tests.fixtures.support.declarations import native_registry
 """Delegate exit authorization comes from actual Rules, not Node identity."""
 
 from types import SimpleNamespace
@@ -8,7 +9,8 @@ from tests.fixtures.support.declarations import node_declaration
 from vibeflow.core.contracts import DataProvider, DataRequirement, PipelineInputSpec, PipelineOutputSpec
 from vibeflow.core.flow import EdgeSpec, GraphConfig, NodeSpec
 from vibeflow.core.rules import RuleCall, RuleRelation, RulesetDescriptor
-from vibeflow.targets.python.project import NodeContract, NodeInfo, NodeRegistry
+from vibeflow.targets.python.project import NodeRegistry
+from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rules
 from vibeflow.targets.python.runtime import PipelineRuntime
 from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
@@ -37,30 +39,25 @@ def _runtime(tmp_path, *, selection, async_mode, flow_kind="process", delegate_c
         entrypoints={"static":("base",), "run":("base",)},
     )
     selected = {"terminal":(custom.id,), "none":("vibeflow.process",), "unconstrained":()}[selection]
-    contract = NodeContract(
-        requires=(DataRequirement("cli.argv", "exactly_one", display_name="CLI argv"),),
-        provides=(DataProvider("cli.exit_code", "cli.exit_code", display_name="CLI exit code"),),
-        input_semantics={"cli.argv":("business arguments",)},
-        output_semantics={"cli.exit_code":("business status",)},
-    )
-    descriptor = node_declaration(NodeInfo("test.exit", "Exit", "Ends the delegated application.", "1", flow_kind),
+    contract = NodeContractDescriptor(requires=(DataRequirement('cli.argv', 'exactly_one', display_name='CLI argv'),), provides=(DataProvider('cli.exit_code', 'cli.exit_code', display_name='CLI exit code'),), input_semantics={'cli.argv': ('business arguments',)}, output_semantics={'cli.exit_code': ('business status',)})
+    descriptor = node_declaration(NodeDescriptor(type_key='test.exit', display_name='Exit', description='Ends the delegated application.', version='1', flow_kind=flow_kind, contract=NodeContractDescriptor()),
                                   contract, rulesets=selected)
-    end = node_declaration(NodeInfo("test.end", "End", "Consumes application status.", "1", "terminal"),
-                          NodeContract(requires=(DataRequirement("cli.exit_code", "exactly_one", display_name="CLI exit code"),)), rulesets=())
-    registry = NodeRegistry()
-    start = node_declaration(NodeInfo("test.start", "Start", "Starts the application.", "1", "terminal"),
-                            NodeContract(), rulesets=())
+    end = node_declaration(NodeDescriptor(type_key='test.end', display_name='End', description='Consumes application status.', version='1', flow_kind='terminal', contract=NodeContractDescriptor()),
+                          NodeContractDescriptor(requires=(DataRequirement('cli.exit_code', 'exactly_one', display_name='CLI exit code'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('cli.exit_code', 'exactly_one', display_name='CLI exit code'),)}), rulesets=())
+    registry = native_registry()
+    start = node_declaration(NodeDescriptor(type_key='test.start', display_name='Start', description='Starts the application.', version='1', flow_kind='terminal', contract=NodeContractDescriptor()),
+                            NodeContractDescriptor(), rulesets=())
     registry.register(start, namespace["StartNode"])
     registry.register(descriptor, namespace["ExitNode"])
     registry.register(end, namespace["EndNode"])
     registry.source_locations = {"test.start":(path,"StartNode","project",tmp_path), "test.exit":(path,"ExitNode","project",tmp_path), "test.end":(path,"EndNode","project",tmp_path)}
     registry.source_roots = (tmp_path,)
     registry.source_root_ids = {tmp_path:"project"}
-    registry.rule_catalogs = (SimpleNamespace(rules=(),rulesets=(custom,)),)
+    registry.rule_catalogs = (*registry.rule_catalogs, SimpleNamespace(rules=(),rulesets=(custom,)),)
     graph = GraphConfig(
         nodes=(NodeSpec("start","test.start"), NodeSpec("exit","test.exit",async_mode=async_mode,result_key="cli.exit_code" if async_mode else ""),
                NodeSpec("end","test.end")), edges=(EdgeSpec("start","exit"), EdgeSpec("exit","end")),
-        inputs=(PipelineInputSpec("cli.argv","cli.argv",display_name="CLI argv"),),
+        inputs=(PipelineInputSpec("cli.argv","cli.argv",display_name="CLI argv",required=False),),
         outputs=(PipelineOutputSpec("cli.exit_code","exactly_one",display_name="CLI exit code"),), rulesets=(),
     )
     rules = execute_python_node_rules(registry,collect_workflow_source_context(registry,graph),phase="run")

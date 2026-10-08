@@ -13,12 +13,12 @@ from vibeflow.core.nodeset_dependencies import (
     analyze_nodeset_dependencies,
 )
 from vibeflow.core.quality.nodesets import nodeset_quality_findings
-from vibeflow.core.findings import HealthFinding, HealthReport
+from vibeflow.core.findings import HealthFinding
 from vibeflow.core.contracts import provider_keys, providers_to_dicts, requirement_types, requirements_to_dicts
 from vibeflow.targets.python.project.registry import NodeRegistry, NodeRegistryError
 
 
-def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry | None, selected_only: bool = False) -> tuple[tuple[HealthFinding, ...], tuple[HealthFinding, ...]]:
+def nodeset_declaration_findings(graph: GraphConfig, *, registry: NodeRegistry | None, selected_only: bool = False) -> tuple[tuple[HealthFinding, ...], tuple[HealthFinding, ...]]:
     errors: list[HealthFinding] = []
     warnings: list[HealthFinding] = []
     dependencies = analyze_nodeset_dependencies(graph)
@@ -67,40 +67,10 @@ def validate_nodesets(graph: GraphConfig, *, registry: NodeRegistry | None, sele
     return tuple(errors), tuple(warnings)
 
 
-def validate_nodeset_depth(graph: GraphConfig, *, max_depth: int) -> tuple[HealthFinding, ...]:
-    return tuple(
-        finding for finding in nodeset_quality_findings(graph, max_depth=max_depth)
-        if finding.rule_id == "NODESET.NESTING.DEPTH_EXCEEDED"
-    )
 
 
-def nodeset_depth_error_report(graph: GraphConfig, compiled, *, max_depth: int) -> HealthReport | None:
-    findings = validate_nodeset_depth(graph, max_depth=max_depth)
-    if not findings:
-        return None
-    grouped: dict[str, list[dict[str, object]]] = {}
-    for finding in findings:
-        grouped.setdefault(finding.object_id, []).append(finding.to_dict())
-    return HealthReport(
-        status="FAIL",
-        errors=findings,
-        info={
-            "explicit_edges": [edge.pair for edge in compiled.explicit_edges],
-            "data_edges": [edge.pair for edge in compiled.data_edges],
-            "effective_edges": [edge.pair for edge in compiled.effective_edges],
-            "nodeset_findings": grouped,
-        },
-    )
 
 
-def append_nodeset_finding(
-    target: list[HealthFinding],
-    grouped: dict[str, list[dict[str, object]]],
-    finding: HealthFinding,
-) -> None:
-    target.append(finding)
-    nodeset_name = str(finding.details.get("nodeset", finding.object_id))
-    grouped.setdefault(nodeset_name, []).append(finding.to_dict())
 
 
 def _validate_node_types_in_scope(nodes, nodesets, *, registry: NodeRegistry, owner: str) -> tuple[HealthFinding, ...]:
@@ -244,8 +214,5 @@ def _nodeset_finding(
     )
 
 __all__ = [
-    "append_nodeset_finding",
-    "nodeset_depth_error_report",
-    "validate_nodeset_depth",
-    "validate_nodesets",
+    "nodeset_declaration_findings",
 ]

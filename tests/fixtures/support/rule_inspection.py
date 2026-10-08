@@ -30,16 +30,13 @@ def _inspect_node_source(tmp_path, capsys, source, *, node_type="demo.node", cla
     tmp_path.mkdir(parents=True, exist_ok=True)
     module_path = tmp_path / "demo_node.py"
     module_path.write_text(source.strip(), encoding="utf-8")
-    manifests = tmp_path / "manifests/nodes"
-    manifests.mkdir(parents=True, exist_ok=True)
-    (manifests / "node.jsonc").write_text(json.dumps(node_document(class_name=class_name) if descriptor is None else descriptor), encoding="utf-8")
-    for index, declaration in enumerate(additional_nodes):
-        (manifests / f"other-{index}.jsonc").write_text(json.dumps(declaration), encoding="utf-8")
-    (tmp_path / "vibeflow_project.jsonc").write_text(json.dumps({"project_target": "python", "descriptors": {"nodes": ["manifests/nodes"]}}), encoding="utf-8")
+    from tests.fixtures.support.plugins import write_plugin
+    declarations = [node_document(type_key=node_type, class_name=class_name) if descriptor is None else descriptor,
+                    *additional_nodes]
+    selection = write_plugin(tmp_path, declarations, target="python")
+    (tmp_path / "vibeflow_project.jsonc").write_text(json.dumps({"project_target": "python"}), encoding="utf-8")
     config = tmp_path / "inspect.jsonc"
-    config.write_text(json.dumps({"rulesets": [], "pipeline": {"nodes": [{"id":"inspect", "type_used":node_type, "display_name":"Inspect", "description":"Inspect one resource"}]}}))
-    from tests.fixtures.support.code_plugins import migrate_fixture
-    migrate_fixture(tmp_path)
+    config.write_text(json.dumps({"rulesets": [], "plugins": [selection], "pipeline": {"nodes": [{"id":"inspect", "type_used":node_type, "display_name":"Inspect", "description":"Inspect one resource"}]}}))
     args = ["inspect-node", "--config", str(config), "--type", node_type, "--module", str(module_path), "--class", class_name, *(extra_args or ())]
     code = cli_main(args)
     return code, json.loads(capsys.readouterr().out)
@@ -50,16 +47,58 @@ def write_registry_project(root, registry, keys):
     import inspect
     import textwrap
     root.mkdir(parents=True, exist_ok=True)
-    manifests = root / "manifests/nodes"
-    manifests.mkdir(parents=True, exist_ok=True)
-    classes = []
+    from tests.fixtures.support.plugins import write_plugin
+    import ast
+    declarations, modules, selected = [], {}, {}
     for key in keys:
         implementation = registry.get(key)
-        classes.append(textwrap.dedent(inspect.getsource(implementation)))
+        module = inspect.getmodule(implementation)
+        source_path = inspect.getsourcefile(implementation)
+        if source_path not in modules:
+            tree = ast.parse(Path(source_path).read_text())
+            symbols = {}
+            for statement in tree.body:
+                if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    symbols[statement.name] = statement
+                elif isinstance(statement, (ast.Import, ast.ImportFrom)):
+                    for alias in statement.names:
+                        symbols[alias.asname or alias.name.split(".")[0]] = statement
+                elif isinstance(statement, (ast.Assign, ast.AnnAssign)):
+                    targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target]
+                    for target in targets:
+                        if isinstance(target, ast.Name):
+                            symbols[target.id] = statement
+            modules[source_path] = (module, symbols)
+        module, symbols = modules[source_path]
+        if implementation.__name__ not in symbols:
+            symbols[implementation.__name__] = ast.parse(textwrap.dedent(inspect.getsource(implementation))).body[0]
+        pending = [implementation.__name__]
+        while pending:
+            name = pending.pop()
+            statement = symbols.get(name)
+            if statement is None or (source_path, name) in selected:
+                continue
+            # Execution fixtures retain their actual helper functions and imports.
+            selected[(source_path, name)] = statement
+            if not isinstance(statement, (ast.Import, ast.ImportFrom)):
+                pending.extend(node.id for node in ast.walk(statement)
+                               if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load))
         declaration = registry.descriptor(key).to_dict()
         declaration["implementations"] = [{"language": "python", "targets": ["python"],
             "source": {"kind": "file", "ref": "nodes.py", "export": implementation.__name__}}]
-        (manifests / f"{key}.jsonc").write_text(json.dumps(declaration), encoding="utf-8")
-    helpers = 'def V(inputs, data_type):\n    return inputs[data_type]["value"]\n\n'
-    (root / "nodes.py").write_text(helpers + "\n\n".join(classes), encoding="utf-8")
-    (root / "vibeflow_project.jsonc").write_text(json.dumps({"project_target": "python", "descriptors": {"nodes": ["manifests/nodes"]}}), encoding="utf-8")
+        declarations.append(declaration)
+    imports, implementations, seen = [], [], set()
+    for statement in selected.values():
+        code = ast.unparse(statement)
+        if code in seen:
+            continue
+        seen.add(code)
+        (imports if isinstance(statement, (ast.Import, ast.ImportFrom)) else implementations).append(code)
+    # Imported V is the fixed value accessor used by the native runtime fixtures.
+    if any("V" in {node.id for node in ast.walk(statement) if isinstance(node, ast.Name)}
+           for statement in selected.values()) and not any(code.startswith("def V(") for code in implementations):
+        implementations.insert(0, 'def V(inputs, data_type):\n    return inputs[data_type]["value"]')
+        imports = [code for code in imports if not ("strict_support" in code and " V" in code)]
+    (root / "nodes.py").write_text("from __future__ import annotations\n\n" + "\n".join(imports) + "\n\n" + "\n\n".join(implementations) + "\n", encoding="utf-8")
+    (root / "vibeflow_project.jsonc").write_text(json.dumps({"project_target": "python"}), encoding="utf-8")
+    return write_plugin(root, declarations, target="python")

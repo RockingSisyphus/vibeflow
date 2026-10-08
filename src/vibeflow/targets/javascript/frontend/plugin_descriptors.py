@@ -1,4 +1,4 @@
-"""JavaScript Target parsing and static binding for plugin descriptors."""
+"""JavaScript lifecycle selection and native binding over shared descriptors."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from typing import Any, Mapping, Sequence
 from vibeflow.block_compiler import SourceRef
 from vibeflow.core.descriptors import (
     DescriptorModelError,
-    ImplementationDescriptor,
     PluginCatalog,
     PluginDescriptor,
     PluginResolution,
@@ -100,106 +99,6 @@ class JavascriptPluginBindingPlan:
             "runtime": [item.to_dict() for item in self.runtime_plugins],
             "planned": [item.to_dict() for item in self.planned_plugins],
         }
-
-
-def parse_javascript_plugin_descriptor(
-    data: Mapping[str, Any],
-) -> PluginDescriptor:
-    """Parse one decoded plugin manifest without reading or importing source."""
-
-    if not isinstance(data, Mapping):
-        raise JavascriptPluginError(
-            "VF_AOT_PLUGIN_DESCRIPTOR",
-            "plugin descriptor must be an object",
-        )
-    _check_fields(
-        data,
-        {
-            "kind",
-            "id",
-            "type",
-            "targets",
-            "implementations",
-            "dependencies",
-            "external_packages",
-            "config",
-            "priority",
-            "display_name",
-            "category",
-            "description",
-            "version",
-            "rulesets",
-        },
-        field="plugin",
-    )
-    kind = _required_string(data.get("kind"), field="plugin.kind")
-    if kind != "plugin":
-        raise JavascriptPluginError(
-            "VF_AOT_PLUGIN_KIND",
-            "plugin.kind must be 'plugin'",
-            str(data.get("id", "") or "").strip(),
-        )
-    plugin_id = _required_string(data.get("id"), field="plugin.id")
-    if data.get("type") not in {"compiler", "runtime"}:
-        raise JavascriptPluginError("VF_AOT_PLUGIN_TYPE", "Plugin ABI v3 supports compiler/runtime; domain checks use Rule resources", plugin_id)
-    config = _mapping(data.get("config", {}), field="plugin.config")
-    _check_fields(
-        config,
-        {"schema", "defaults"},
-        field="plugin.config",
-    )
-    priority = data.get("priority", 100)
-    if isinstance(priority, bool) or not isinstance(priority, int):
-        raise JavascriptPluginError(
-            "VF_AOT_PLUGIN_CONFIG",
-            "plugin.priority must be an integer",
-            plugin_id,
-        )
-    try:
-        descriptor = PluginDescriptor(
-            id=plugin_id,
-            plugin_type=_required_string(data.get("type"), field="plugin.type"),
-            targets=_string_tuple(data.get("targets"), field="plugin.targets"),
-            implementations=_parse_implementations(
-                data.get("implementations"),
-                plugin_id=plugin_id,
-            ),
-            dependencies=_string_tuple(
-                data.get("dependencies", ()),
-                field="plugin.dependencies",
-            ),
-            external_packages=_string_tuple(
-                data.get("external_packages", ()),
-                field="plugin.external_packages",
-            ),
-            config_schema=_mapping(
-                config.get("schema", {}),
-                field="plugin.config.schema",
-            ),
-            config_defaults=_mapping(
-                config.get("defaults", {}),
-                field="plugin.config.defaults",
-            ),
-            priority=priority,
-            display_name=_optional_string(data.get("display_name")),
-            category=_optional_string(data.get("category")),
-            description=_optional_string(data.get("description")),
-            version=_optional_string(data.get("version")),
-            rulesets=_string_tuple(data.get("rulesets", ()), field="plugin.rulesets"),
-        )
-    except JavascriptPluginError:
-        raise
-    except DescriptorModelError as exc:
-        code = (
-            "VF_AOT_CONTRACT_INVALID"
-            if "target" in str(exc)
-            else "VF_AOT_PLUGIN_CONFIG"
-            if "config" in str(exc) or "priority" in str(exc)
-            else "VF_AOT_PLUGIN_DESCRIPTOR"
-        )
-        raise JavascriptPluginError(code, str(exc), plugin_id) from exc
-    _validate_javascript_descriptor(descriptor)
-    return descriptor
 
 
 def parse_javascript_plugin_selection(
@@ -419,84 +318,6 @@ def _binding_from_resolved(
     )
 
 
-def _parse_implementations(
-    value: object,
-    *,
-    plugin_id: str,
-) -> tuple[ImplementationDescriptor, ...]:
-    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
-        raise JavascriptPluginError(
-            "VF_AOT_PLUGIN_DESCRIPTOR",
-            "plugin.implementations must be a list",
-            plugin_id,
-        )
-    implementations: list[ImplementationDescriptor] = []
-    for index, raw in enumerate(value):
-        field = f"plugin.implementations[{index}]"
-        item = _mapping(raw, field=field)
-        _check_fields(
-            item,
-            {"language", "targets", "source", "completion"},
-            field=field,
-        )
-        source = _mapping(item.get("source"), field=f"{field}.source")
-        _check_fields(
-            source,
-            {"kind", "ref", "export"},
-            field=f"{field}.source",
-        )
-        default_export = "createPlugin"
-        try:
-            implementations.append(
-                ImplementationDescriptor(
-                    language=_required_string(
-                        item.get("language"),
-                        field=f"{field}.language",
-                    ),
-                    targets=_string_tuple(
-                        item.get("targets"),
-                        field=f"{field}.targets",
-                    ),
-                    source=SourceLocator(
-                        kind=_required_string(
-                            source.get("kind"),
-                            field=f"{field}.source.kind",
-                        ),
-                        ref=_required_string(
-                            source.get("ref"),
-                            field=f"{field}.source.ref",
-                        ),
-                        export=(
-                            _optional_string(source.get("export"))
-                            or default_export
-                        ),
-                    ),
-                    completion=str(item.get("completion", "immediate")),
-                )
-            )
-        except DescriptorModelError as exc:
-            raise JavascriptPluginError(
-                "VF_AOT_PLUGIN_DESCRIPTOR",
-                str(exc),
-                plugin_id,
-            ) from exc
-    return tuple(implementations)
-
-
-def _validate_javascript_descriptor(descriptor: PluginDescriptor) -> None:
-    for implementation in descriptor.implementations:
-        if implementation.language == "python":
-            continue
-        if descriptor.plugin_type == "compiler" and (
-            implementation.completion != "immediate"
-        ):
-            raise JavascriptPluginError(
-                "VF_AOT_PLUGIN_FACTORY",
-                f"{descriptor.plugin_type} plugin factory must be immediate",
-                descriptor.id,
-            )
-
-
 def _javascript_source_ref(
     source: SourceLocator,
     *,
@@ -600,7 +421,6 @@ __all__ = [
     "JavascriptPluginBindingPlan",
     "JavascriptPluginError",
     "build_javascript_plugin_binding_plan",
-    "parse_javascript_plugin_descriptor",
     "parse_javascript_plugin_selection",
     "resolve_javascript_plugins",
 ]

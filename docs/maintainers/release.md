@@ -1,6 +1,10 @@
 # 发行与文档装配
 
-VibeFlow 0.15.0 默认发布 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。
+VibeFlow 当前开发版本为 0.16.0，按旧 API 直接退役的破坏性升级准备 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。迁移入口与删除接口见 [统一资源迁移](../user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖归档发行包。
+
+0.15.2 包含用户项目 SVG 展示边界修正：资源目录只展示当前 workflow 使用的 Plugin、BaseLib、Host 等条目，恢复旧版横竖布局，移除内部定义、源码文件和 reference 的 SVG 投影。变更与源码回归见 [展示边界记录](user-svg-boundary-20261006.md)，本版归档与隔离验收见 [0.15.2 构建记录](releases/0.15.2/verification.json)。
+
+[0.15.1 修复构建记录](releases/0.15.1/review-layout-fix-verification.json)与[首次构建验收](releases/0.15.1/verification.json)保留历史哈希，初始包位于 `archive/history/0.15.1-initial-20261006/`。
 
 ## Profile 配置
 
@@ -30,5 +34,7 @@ python distribution/build.py --profile autonomous --output-dir /tmp/vf-autonomou
 完整性检查验证文档集合、字节内容、AGENTS、metadata、manifest 和 kernel hash。两个 profile 的 kernel ZIP、项目模板和机器 policy 必须字节一致。
 
 更新公共接口时，同时核对使用手册、AI 阅读路由、最小项目 README 和当前设计说明。详细 API 放在主题手册，提示词保留导航与执行协议。多文件资源和 Rule/Ruleset 均有公共文档入口。
+
+运行观测接口的业务用法集中在 `docs/user/runtime-observation.md`，Python 与 JS/TS 开发手册在完整 Node 示例中展示更新调用。公共提示词交代调用位置、完整数组替换和发布时机，两个 profile 共用该片段。修订后从生成 ZIP 解压包运行这些示例，确认公开 SDK、业务输出与最终状态资料一致；结果保留在对应开发验收记录。
 
 修改 canonical 文档及 prompt fragments 后重新构建两个 profile，发布目录和 ZIP 中的文档、AGENTS 与清单随构建更新。验收报告中的归档哈希对应当次构建；后续文档修订产生新的归档哈希，历史报告保留原构建记录。

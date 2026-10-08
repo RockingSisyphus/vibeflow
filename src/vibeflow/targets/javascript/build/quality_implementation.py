@@ -13,9 +13,9 @@ from vibeflow.core.quality.implementation import (
     ImplementationLimits,
     ImplementationMetrics,
     analyze_call_graph,
-    evaluate_base_lib_dependency_chain,
-    evaluate_base_lib_implementation,
-    evaluate_node_implementation,
+)
+from vibeflow.builtin.implementation import (
+    check_base_lib_dependency_chain, check_base_lib_implementation, check_node_implementation,
 )
 from vibeflow.targets.javascript.build.project_paths import safe_project_path
 from vibeflow.targets.javascript.build.toolchain import DriverQualityResult, run_quality_facts_driver
@@ -172,9 +172,9 @@ def evaluate_registered_facts(
         )
         evaluated = ()
         if kind == "node" and topic in {"all", "node"}:
-            evaluated = evaluate_node_implementation(metrics, limits)
+            evaluated = check_node_implementation(metrics, limits)
         elif (kind != "node" or not fact["export"]) and topic in {"all", "base_lib"}:
-            evaluated = evaluate_base_lib_implementation(metrics, limits)
+            evaluated = check_base_lib_implementation(metrics, limits)
         if kind == "node" and topic in {"all", "dependency_chain"}:
             starts: set[str] = set()
             visited = {relative}
@@ -191,7 +191,7 @@ def evaluate_registered_facts(
                 for module in base_modules
             }
             graph["node"] = tuple(sorted(starts))
-            dependency = evaluate_base_lib_dependency_chain(
+            dependency = check_base_lib_dependency_chain(
                 analyze_call_graph(graph, entry="node") if starts else analyze_call_graph({}, entry="node"),
                 limits,
             )

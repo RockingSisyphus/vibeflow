@@ -40,12 +40,14 @@
       {
         "key": "outer.current",
         "type": "outer.current",
-        "display_name": "Outer Current"
+        "display_name": "Outer Current",
+        "required": true
       },
       {
         "key": "total.current",
         "type": "total.current",
-        "display_name": "Total Current"
+        "display_name": "Total Current",
+        "required": true
       }
     ],
     "nodes": [

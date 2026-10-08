@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.fixtures.support.plugins import resource as sdk_resource
+
 from hashlib import sha256
 import json
 import os
@@ -110,8 +112,7 @@ def test_bound_emission_preserves_unsorted_nested_schema_member_order(
 ) -> None:
     request = _request(tmp_path)
     schema_path = (
-        Path(request.config).parent
-        / "manifests/data/value.out.jsonc"
+        sdk_resource(Path(request.config).parent, 'data_schema', 'value.out')
     )
     descriptor = json.loads(schema_path.read_text(encoding="utf-8"))
     descriptor["schema"] = {
@@ -157,13 +158,7 @@ def _project_build_request(
         out_dir=out_dir,
         target="browser" if profile == "web-app" else "node",
         profile=profile,
-        implementation_by_type=getattr(
-            prepared,
-            "implementation_by_type",
-        ),
         external_packages=getattr(prepared, "external_packages"),
-        import_policy=getattr(prepared, "import_policy"),
-        host_extensions=getattr(prepared, "host_extensions"),
         html_template=html_template,
         app_entry=app_entry,
         javascript_bindings=getattr(prepared, "javascript_bindings"),
@@ -238,8 +233,15 @@ def test_all_profiles_build_deterministically_from_binding_plan(
 
 
 # Publish controlled case inputs as fixed SDK plugins before formal entrypoints.
-_native_prepare_project_build = prepare_project_build
-def prepare_project_build(request, **options):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(request.workspace)
-    return _native_prepare_project_build(request, **options)
+
+
+def test_public_build_and_emitter_require_canonical_plan_and_bindings(tmp_path: Path) -> None:
+    from tests.targets.javascript.aot_fixtures import plan_fixture
+    plan, bindings = plan_fixture({"workflow_id": "native", "nodes": [], "order": []})
+    with pytest.raises(TypeError, match="javascript_bindings"):
+        emit_workflow_module(plan)
+    with pytest.raises(TypeError, match="WorkflowPlan"):
+        emit_workflow_module(plan.to_dict(), javascript_bindings=bindings)
+    with pytest.raises(TypeError, match="javascript_bindings"):
+        BuildRequest(plan=plan, project_root=tmp_path, package_root=tmp_path, out_dir=tmp_path / "dist", target="node", profile="single-esm")
+    assert emit_workflow_module(plan, javascript_bindings=bindings).source

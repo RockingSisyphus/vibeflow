@@ -3,7 +3,6 @@
 from vibeflow.block_compiler.compiler import (
     compile_graph_plan,
     compile_workflow,
-    legacy_workflow_spec_payload,
     normalize_condition,
 )
 from vibeflow.block_compiler.model import (
@@ -56,6 +55,5 @@ __all__ = [
     "compile_graph_plan",
     "compile_workflow",
     "freeze_json_object",
-    "legacy_workflow_spec_payload",
     "normalize_condition",
 ]

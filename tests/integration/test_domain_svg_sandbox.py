@@ -1,5 +1,6 @@
 """Real formal SVG publication for Node, status and call styles."""
 from __future__ import annotations
+from tests.fixtures.support.plugins import resource as resource_ref
 
 import json
 import os
@@ -27,8 +28,8 @@ def svg_project(request, tmp_path):
     target = request.param
     example = tmp_path / target
     shutil.copytree(ROOT / "sandbox" / target / "domain_rules", example)
-    from tests.fixtures.support.code_plugins import copy_archival_inputs
-    copy_archival_inputs(ROOT / "sandbox" / target / "domain_rules", example)
+    from tests.fixtures.support.plugins import copy_sdk_inputs
+    copy_sdk_inputs(ROOT / "sandbox" / target / "domain_rules", example)
     project = example / "project"
     if target == "javascript":
         toolchain = Path(os.environ["VIBEFLOW_TEST_TOOLCHAIN_ROOT"])
@@ -87,29 +88,25 @@ def test_formal_domain_svg_preserves_effective_styles_and_native_identity(svg_pr
     target, workspace, project = svg_project
     _edit(project / "vibeflow_project.jsonc", lambda data: data.update(architecture={"documents": [
         {"workflow": "configs/model.jsonc", "document": "ARCHITECTURE.jsonc"}]}))
-    _edit(project / "bundle/nodes/model.jsonc", lambda data: data.update(
+    _edit(resource_ref(project, 'node', 'example.model'), lambda data: data.update(
         presentation={"fill": "#cceeff", "shape": "hex", "icon": "MODEL_ICON"},
         metadata={"domain": "example", "purpose": "svg acceptance"}))
-    _edit(project / "bundle/nodes/transform.jsonc", lambda data: data.update(
+    _edit(resource_ref(project, 'node', 'example.transform'), lambda data: data.update(
         presentation={"fill": "#dff7df", "shape": "rounded", "icon": "TRANSFORM_ICON"}))
     def declaration(data):
         data["external"] = True
         if level != "default":
             data["presentation"] = {"fill": "#fff2aa", "shape": "diamond", "icon": "NODE_ICON"}
-    _edit(project / "bundle/nodes/model.jsonc", declaration)
+    _edit(resource_ref(project, 'node', 'example.model'), declaration)
     def calls(data):
         node = next(item for item in data["pipeline"]["nodes"] if item["id"] == "model")
         if level in {"call", "planned"}:
             node["style"] = {"fill": "#ffe6ee", "shape": "circle", "icon": "CALL_ICON"}
         if level in {"planned", "status"}:
-            declaration = json.loads((project / "bundle/nodes/model.jsonc").read_text())
+            declaration = json.loads((resource_ref(project, 'node', 'example.model')).read_text())
             node.update(status="planned", flow_kind="process", planned_behavior="transparent",
                 requires=declaration["contract"]["requires"], provides=declaration["contract"]["provides"])
     _edit(project / "configs/model.jsonc", calls)
-    # Historical mutation data is explicitly published as fixed SDK resources.
-    # The production command never reads these JSONC declaration inputs.
-    from tests.fixtures.support.code_plugins import migrate_fixture
-    migrate_fixture(project)
     output = tmp_path / "domain.svg"
     code = main(["review", "--workspace", str(workspace), "--config", str(project / "configs/model.jsonc"),
         "--output", str(output)])
@@ -124,7 +121,7 @@ def test_formal_domain_svg_preserves_effective_styles_and_native_identity(svg_pr
     assert model["presentation"]["sources"]["icon"] == ("call" if level == "planned" else "node" if level == "status" else "node" if level == "default" else level)
     assert model["flow_kind"] == "process"
     assert "model_block" in model["tags"]
-    expected = json.loads((project / "bundle/nodes/model.jsonc").read_text())["rulesets"]
+    expected = json.loads((resource_ref(project, 'node', 'example.model')).read_text())["rulesets"]
     assert model["selected_rulesets"] == expected
     assert model["metadata"]["purpose"] == "svg acceptance"
     root = ET.parse(output).getroot()
@@ -153,8 +150,6 @@ def test_review_rules_renders_real_svg_without_importing_implementations(svg_pro
     node_file.write_text("raise RuntimeError('must not import')\n" if target == "python" else "throw new Error('must not import');\n")
     rule_file = project / ("rules/model_definition.py" if target == "python" else "rules/model_definition.ts")
     rule_file.write_text("raise RuntimeError('must not import')\n" if target == "python" else "throw new Error('must not import');\n")
-    from tests.fixtures.support.code_plugins import migrate_fixture
-    migrate_fixture(project)
     output = tmp_path / "rules.svg"
     assert main(["review-rules", "--workspace", str(workspace), "--config", str(project / "configs/model.jsonc"),
         "--node", "model", "--output", str(output)]) == 0, capsys.readouterr().out

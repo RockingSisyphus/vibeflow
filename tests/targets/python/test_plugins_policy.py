@@ -1,6 +1,7 @@
 """Python Target plugin and policy behavior boundaries."""
 
 from __future__ import annotations
+from tests.fixtures.support.declarations import native_registry
 
 import os
 from pathlib import Path
@@ -162,9 +163,9 @@ class DemoNode:
     def check(selection):
         descriptor = parse_descriptor_manifest(node_document(rulesets=selection))
         assert descriptor.flow_kind == "process"
-        registry = NodeRegistry()
+        registry = native_registry()
         registry.register(descriptor)
-        registry.rule_catalogs = (catalogs,)
+        registry.rule_catalogs = (*registry.rule_catalogs, catalogs)
         context = build_python_source_context((PythonSourceNode(descriptor, source.path, "DemoNode"),), (source,))
         return execute_python_node_rules(registry, context)
 

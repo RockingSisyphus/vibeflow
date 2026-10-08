@@ -65,7 +65,6 @@ def prepare_graph(
     active_nodesets: tuple[str, ...],
 ) -> None:
     del compiled
-    require_explicit_inputs(graph, path=path)
     state.used_types.update(item.type for item in graph.inputs)
     state.used_types.update(item.type for item in graph.outputs)
     for spec in graph.nodes:
@@ -302,27 +301,11 @@ def implementation_source(
     )
 
 
-def require_explicit_inputs(
-    graph: GraphConfig,
-    *,
-    path: tuple[str, ...],
-) -> None:
-    ambiguous = [item.key for item in graph.inputs if item.required is None]
-    if ambiguous:
-        raise ProjectBuildError(
-            "VF_AOT_INPUT_REQUIRED",
-            (
-                "JS AOT pipeline inputs must explicitly declare required: "
-                f"{ambiguous}"
-            ),
-            path,
-        )
 
 
 __all__ = [
     "PreparationState",
     "implementation_source",
     "prepare_graph",
-    "require_explicit_inputs",
     "select_implementation",
 ]

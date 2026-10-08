@@ -4,7 +4,8 @@
       {
         "key": "request",
         "type": "payload.request",
-        "display_name": "Public request"
+        "display_name": "Public request",
+        "required": true
       }
     ],
     "nodes": [

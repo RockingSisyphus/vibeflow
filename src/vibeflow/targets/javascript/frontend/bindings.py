@@ -13,7 +13,7 @@ from vibeflow.block_compiler.model import (
     WorkflowPlan,
     freeze_json_object,
 )
-from vibeflow.targets.javascript.frontend.model_types import (
+from vibeflow.targets.javascript.frontend.contracts import (
     COMPLETIONS,
     EXECUTORS,
     SCHEDULES,

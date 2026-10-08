@@ -6,22 +6,30 @@ from tests.core.strict_core import _review_node
 from vibeflow.targets.python.quality.source_analysis.types import _default_rule_id
 
 
-def test_mermaid_renderer_prefers_google_chrome_over_snap_chromium(monkeypatch) -> None:
+def test_mermaid_renderer_lists_unique_non_snap_browsers_in_priority_order(monkeypatch) -> None:
     import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
 
     paths = {
         "chromium": "/snap/bin/chromium",
-        "chromium-browser": None,
+        "chromium-browser": "/usr/bin/chromium-browser",
         "google-chrome": "/usr/bin/google-chrome",
-        "google-chrome-stable": "/usr/bin/google-chrome-stable",
+        "google-chrome-stable": "/usr/bin/google-chrome",
     }
 
     monkeypatch.setattr(mermaid_render.shutil, "which", lambda name: paths.get(name))
 
-    assert mermaid_render._find_chromium() == "/usr/bin/google-chrome"
+    assert mermaid_render._system_browser_candidates() == [
+        "/usr/bin/google-chrome",
+        "/usr/bin/chromium-browser",
+    ]
+    assert mermaid_render._puppeteer_launch_options() == [
+        ("Puppeteer bundled browser", None),
+        ("/usr/bin/google-chrome", "/usr/bin/google-chrome"),
+        ("/usr/bin/chromium-browser", "/usr/bin/chromium-browser"),
+    ]
 
 
-def test_mermaid_renderer_defers_snap_chromium_until_no_other_browser(monkeypatch) -> None:
+def test_mermaid_renderer_keeps_non_snap_chromium_candidate(monkeypatch) -> None:
     import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
 
     paths = {
@@ -33,7 +41,11 @@ def test_mermaid_renderer_defers_snap_chromium_until_no_other_browser(monkeypatc
 
     monkeypatch.setattr(mermaid_render.shutil, "which", lambda name: paths.get(name))
 
-    assert mermaid_render._find_chromium() == "/usr/bin/chromium-browser"
+    assert mermaid_render._system_browser_candidates() == ["/usr/bin/chromium-browser"]
+    assert mermaid_render._puppeteer_launch_options() == [
+        ("Puppeteer bundled browser", None),
+        ("/usr/bin/chromium-browser", "/usr/bin/chromium-browser"),
+    ]
 
 
 def test_mermaid_renderer_skips_snap_chromium_as_only_system_browser(monkeypatch) -> None:
@@ -48,7 +60,7 @@ def test_mermaid_renderer_skips_snap_chromium_as_only_system_browser(monkeypatch
 
     monkeypatch.setattr(mermaid_render.shutil, "which", lambda name: paths.get(name))
 
-    assert mermaid_render._find_chromium() is None
+    assert mermaid_render._system_browser_candidates() == []
     assert mermaid_render._puppeteer_launch_options() == [("Puppeteer bundled browser", None)]
 
 
@@ -245,7 +257,8 @@ def test_mermaid_renderer_keeps_distribution_zip_root(tmp_path, monkeypatch) -> 
     assert mermaid_render._repo_root() == tmp_path
 
 
-def test_mermaid_renderer_falls_back_to_non_snap_system_browser(tmp_path, monkeypatch) -> None:
+@pytest.mark.parametrize("failed_attempts", (1, 2))
+def test_mermaid_renderer_falls_back_through_non_snap_system_browsers(tmp_path, monkeypatch, failed_attempts) -> None:
     import subprocess
     import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
 
@@ -257,8 +270,8 @@ def test_mermaid_renderer_falls_back_to_non_snap_system_browser(tmp_path, monkey
         config_path = Path(command[command.index("--puppeteerConfigFile") + 1])
         output_path = Path(command[command.index("--output") + 1])
         calls.append(json.loads(config_path.read_text(encoding="utf-8")))
-        if len(calls) == 1:
-            return subprocess.CompletedProcess(command, 1, stdout="", stderr="missing bundled browser")
+        if len(calls) <= failed_attempts:
+            return subprocess.CompletedProcess(command, 1, stdout="", stderr="browser launch failed")
         output_path.write_text("<svg></svg>", encoding="utf-8")
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
@@ -267,7 +280,11 @@ def test_mermaid_renderer_falls_back_to_non_snap_system_browser(tmp_path, monkey
     monkeypatch.setattr(
         mermaid_render,
         "_puppeteer_launch_options",
-        lambda: [("Puppeteer bundled browser", None), ("/usr/bin/google-chrome", "/usr/bin/google-chrome")],
+        lambda: [
+            ("Puppeteer bundled browser", None),
+            ("/usr/bin/google-chrome", "/usr/bin/google-chrome"),
+            ("/usr/bin/chromium-browser", "/usr/bin/chromium-browser"),
+        ],
     )
     monkeypatch.setattr(mermaid_render, "_snap_chromium_candidates", lambda: ["/snap/bin/chromium"])
     monkeypatch.setattr(mermaid_render.subprocess, "run", fake_run)
@@ -277,11 +294,14 @@ def test_mermaid_renderer_falls_back_to_non_snap_system_browser(tmp_path, monkey
 
     assert "executablePath" not in calls[0]
     assert calls[1]["executablePath"] == "/usr/bin/google-chrome"
+    assert len(calls) == failed_attempts + 1
+    if failed_attempts == 2:
+        assert calls[2]["executablePath"] == "/usr/bin/chromium-browser"
     assert output.read_text(encoding="utf-8") == "<svg></svg>"
 
 
 def test_cli_inspect_node_reports_unmatched_type(tmp_path, capsys) -> None:
-    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(), node_type="demo.missing")
+    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(), node_type="demo.missing", descriptor=node_document())
     assert code == 1
     assert payload["health"]["status"] == "ERROR"
     assert payload["health"]["errors"][0]["code"] == "NODE.INSPECT.LOAD_ERROR"
@@ -335,9 +355,18 @@ def test_inspect_node_rejects_invalid_declarations(tmp_path, capsys, changes, re
     (_valid_node_source(run_body='        compile("1", "<x>", "eval")\n        return {"demo.out": 1}'), "banned_call"),
 ])
 def test_inspect_node_rejects_invalid_node_shapes(tmp_path, capsys, source, diagnostic) -> None:
-    code, payload = _inspect_node_source(tmp_path, capsys, source)
+    additional = ()
+    if diagnostic == "node_import":
+        folder = tmp_path / "nodes"
+        folder.mkdir()
+        (folder / "__init__.py").write_text("")
+        (folder / "other_node.py").write_text('class OtherNode:\n    def run_pure(self, inputs, params):\n        return {"demo.out":1}\n')
+        declaration = node_document(type_key="demo.other",class_name="OtherNode")
+        declaration["implementations"][0]["source"]["ref"] = "nodes/other_node.py"
+        additional = (declaration,)
+    code, payload = _inspect_node_source(tmp_path, capsys, source, additional_nodes=additional)
     assert code == 1
-    expected = "NODE.IMPORT.SIDE_EFFECT" if diagnostic in {"module_global_state", "module_side_effect"} else _default_rule_id(diagnostic)
+    expected = "VF_IMPORT_LAYER" if diagnostic == "node_import" else "NODE.IMPORT.SIDE_EFFECT" if diagnostic in {"module_global_state", "module_side_effect"} else _default_rule_id(diagnostic)
     assert any(error["code"] == expected for error in payload["health"]["errors"]), payload
 
 
@@ -467,7 +496,7 @@ def test_node_internal_call_chain_recursion_fails(tmp_path, capsys) -> None:
     assert recursive["details"]["path"] == ["_a", "_b", "_a"]
 
 def test_graph_health_reports_node_call_chain_metrics() -> None:
-    graph = parse_graph_config({"pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])]}})
+    graph = parse_graph_config({"pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.")]}})
     from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
     registry = _registry()
     source_context = collect_workflow_source_context(registry, graph)
@@ -484,8 +513,8 @@ def test_runtime_allows_non_json_object_output_by_reference() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the runtime fixture."),
-                    _node_call("set_output", "test.set_output", "Produces a non-JSON object output.", provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("set_output", "test.set_output", "Produces a non-JSON object output."),
+                    _node_call("end", "test.out_end", "Consumes value.out at the end."),
                 ],
                 "edges": _edge_chain("start", "set_output", "end"),
                 "outputs": [REQ_SPEC("value.out")],
@@ -503,8 +532,8 @@ def test_runtime_ignores_legacy_snapshot_metadata() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the runtime fixture."),
-                    _node_call("opaque", "test.opaque_output", "Produces an opaque object output.", provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("opaque", "test.opaque_output", "Produces an opaque object output."),
+                    _node_call("end", "test.out_end", "Consumes value.out at the end."),
                 ],
                 "edges": _edge_chain("start", "opaque", "end"),
                 "outputs": [REQ_SPEC("value.out")],
@@ -520,11 +549,11 @@ def test_runtime_allows_input_mutation_by_reference() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the runtime fixture."),
-                    _node_call("mutate", "test.mutating_input", "Mutates the input object by reference.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("mutate", "test.mutating_input", "Mutates the input object by reference."),
+                    _node_call("end", "test.out_end", "Consumes value.out at the end."),
                 ],
                 "edges": _edge_chain("start", "mutate", "end"),
                 "outputs": [REQ_SPEC("value.out")],
@@ -541,7 +570,7 @@ def test_collect_node_metrics_reports_complexity_and_contract_size() -> None:
     payload = report.node_metrics[AddNode_DECLARATION.type_key]
     assert payload["function_count"] == 1
     assert payload["branch_count"] == 0
-    # Python node parameters are owned by Registry metadata, not NodeContract.
+    # Python parameters come from the canonical descriptor contract.
     assert payload["param_count"] == 0
     assert payload["requires_count"] == 1
     assert payload["provides_count"] == 1
@@ -604,7 +633,7 @@ def test_missing_examples_and_example_contract_gap_are_accepted_as_documentation
     assert payload["health"]["status"] == "PASS"
 
 
-def test_example_outputs_field_is_removed(tmp_path, capsys) -> None:
+def test_python_interface_rule_rejects_example_outputs(tmp_path, capsys) -> None:
     declaration = node_document()
     declaration["contract"]["examples"][0]["outputs"] = {"demo.out": 1}
     code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(), descriptor=declaration)

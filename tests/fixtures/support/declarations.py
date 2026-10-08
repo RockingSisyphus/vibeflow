@@ -8,18 +8,15 @@ from pathlib import Path
 from vibeflow.core.descriptors import NodeContractDescriptor, NodeDescriptor
 
 
-def node_declaration(info, contract, *, rulesets=("vibeflow.process",)):
-    return NodeDescriptor(
-        type_key=info.type_key, display_name=info.display_name,
-        description=info.description, version=info.version, flow_kind=info.flow_kind,
-        author=info.author, tags=info.tags, external=info.external, rulesets=rulesets,
-        contract=NodeContractDescriptor(
-            requires=contract.requires, provides=contract.provides,
-            input_semantics=contract.input_semantics or {item.type: (f"Fixture input {item.type}",) for item in contract.requires},
-            output_semantics=contract.output_semantics or {item.key: (f"Fixture output {item.key}",) for item in contract.provides},
-            examples=contract.examples,
-        ),
-    )
+def native_registry():
+    """Explicitly assemble the standard SDK resources for native ABI tests."""
+    from vibeflow.tooling.application.python.project.declarations import default_python_registry
+    return default_python_registry()
+
+
+def node_declaration(descriptor, contract, *, rulesets=("vibeflow.process",)):
+    """Select a canonical contract and rules on an already canonical Node."""
+    return replace(descriptor, contract=contract, rulesets=rulesets)
 
 
 def configured_declaration(descriptor, schema=None, defaults=None, **values):
@@ -27,14 +24,15 @@ def configured_declaration(descriptor, schema=None, defaults=None, **values):
         params_schema=schema or {}, params_defaults=defaults or {}), **values)
 
 
-def write_node_manifests(root, registrations):
+def write_node_plugin(root, registrations):
     """Write canonical test resources and the selected, ordinary Node classes."""
     from tests.fixtures.support import strict_support_runtime_nodes as nodes
     from tests.fixtures.support import strict_support_runtime_implementations as implementations
 
     root = Path(root)
-    manifests = root / "manifests" / "nodes"
-    manifests.mkdir(parents=True, exist_ok=True)
+    root.mkdir(parents=True, exist_ok=True)
+    from tests.fixtures.support.plugins import write_plugin
+    declarations = []
     source = ast.parse(Path(implementations.__file__).read_text(encoding="utf-8"))
     selected = {name for _, name, _, _ in registrations}
     body = [item for item in source.body if
@@ -47,4 +45,5 @@ def write_node_manifests(root, registrations):
         payload = declaration.to_dict()
         payload["implementations"] = [{"language": "python", "targets": ["python"], "completion": "immediate",
                                       "source": {"kind": "file", "ref": "fixture_nodes.py", "export": class_name}}]
-        (manifests / (key.replace(".", "-") + ".jsonc")).write_text(json.dumps(payload), encoding="utf-8")
+        declarations.append(payload)
+    return write_plugin(root, declarations, target="python", plugin_id=f"fixture.{root.name}")

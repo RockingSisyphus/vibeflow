@@ -309,7 +309,7 @@ def rule_graph_error_finding(error: RuleGraphError, *, rulesets: Any = None,
     resource_id = str(error.details.get("ruleset_id", ""))
     source_for = getattr(rulesets, "source_for", None)
     source = str(source_for(resource_id) or "") if callable(source_for) else ""
-    location = (rulesets.location_for(resource_id) if hasattr(rulesets, "location_for") else {"path":source}) if source and not source.startswith("builtin:") else {}
+    location = (rulesets.location_for(resource_id) if hasattr(rulesets, "location_for") else {"path":source}) if source else {}
     return HealthFinding(rule_id=error.code, severity="error", object_type=object_type,
         object_id=object_id or resource_id, message=error.message, failure_layer="rule",
         source_location=location, source_path=source, details=dict(error.details), rule_source=f"ruleset:{resource_id}")

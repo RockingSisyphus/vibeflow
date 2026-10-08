@@ -26,13 +26,15 @@ SOURCE_RUNNER = (
 
 
 def _write_node_declarations(project: Path, source: str, declarations: tuple[tuple, ...]) -> None:
-    manifests = project / "manifests" / "nodes"
-    manifests.mkdir(parents=True)
+    from tests.fixtures.support.plugins import write_plugin
+    values = []
     for key, class_name, flow_kind, contract, rulesets in declarations:
         document = node_document(type_key=key, class_name=class_name, contract=contract, rulesets=rulesets)
         document["flow_kind"] = flow_kind
         document["implementations"][0]["source"]["ref"] = source
-        (manifests / f"{key}.jsonc").write_text(json.dumps(document), encoding="utf-8")
+        document["implementations"][0]["implementation_files"] = ["lazy_helper.py"]
+        values.append(document)
+    return write_plugin(project, values, target="python")
 
 
 def _required(data_type: str) -> dict:
@@ -216,7 +218,6 @@ def test_built_run_keeps_javascript_roots_out_of_lazy_python_imports(
         json.dumps(
             {
                 "project_target": "python",
-                "descriptors": {"nodes": ["manifests/nodes"]},
                 "quality_enabled": False,
             }
         ),
@@ -241,7 +242,7 @@ def test_built_run_keeps_javascript_roots_out_of_lazy_python_imports(
         ).lstrip(),
         encoding="utf-8",
     )
-    _write_node_declarations(python_project, "nodes/lazy_nodes.py", (
+    selection = _write_node_declarations(python_project, "nodes/lazy_nodes.py", (
         ("lazy.start", "StartNode", "terminal", {"examples": [{"inputs": {}, "params": {}}]}, ["vibeflow.process"]),
         ("lazy.value", "LazyNode", "process", {
             "provides": [_provided("response.value")],
@@ -254,6 +255,7 @@ def test_built_run_keeps_javascript_roots_out_of_lazy_python_imports(
     config_path.write_text(
         json.dumps(
             {
+                "plugins": [selection],
                 "pipeline": {
                     "nodes": [
                         {
@@ -311,8 +313,6 @@ def test_built_run_keeps_javascript_roots_out_of_lazy_python_imports(
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     environment.pop("PYTHONPATH", None)
 
-    from tests.fixtures.support.code_plugins import prepare_config_fixture
-    prepare_config_fixture(config_path)
     completed = subprocess.run(
         [
             sys.executable,
@@ -372,7 +372,6 @@ def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_co
         json.dumps(
             {
                 "project_target": "python",
-                "descriptors": {"nodes": ["manifests/nodes"]},
                 "quality_enabled": False,
             }
         ),
@@ -398,7 +397,7 @@ def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_co
         ).lstrip(),
         encoding="utf-8",
     )
-    _write_node_declarations(project, "nodes/cli_nodes.py", (
+    selection = _write_node_declarations(project, "nodes/cli_nodes.py", (
         ("custom.start", "StartNode", "terminal", {"examples": [{"inputs": {}, "params": {}}]}, ["vibeflow.process"]),
         ("custom.exit", "ExitNode", "io", {
             "requires": [_required("cli.argv")], "provides": [_provided("cli.exit_code")],
@@ -416,8 +415,9 @@ def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_co
     config.write_text(
         json.dumps(
             {
+                "plugins": [selection],
                 "pipeline": {
-                    "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                    "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                     "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit"}],
                     "nodes": [
                         {"id": "start", "type_used": "custom.start", "display_name": "Start", "description": "Starts the custom delegated CLI workflow."},
@@ -444,8 +444,6 @@ def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_co
     env = dict(os.environ)
     env["VIBEFLOW_CONFIG_TRACE"] = "1"
 
-    from tests.fixtures.support.code_plugins import prepare_config_fixture
-    prepare_config_fixture(config)
     completed = subprocess.run(
         [
             sys.executable,

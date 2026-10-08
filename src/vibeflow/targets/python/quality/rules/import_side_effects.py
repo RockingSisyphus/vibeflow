@@ -3,10 +3,14 @@
 import ast
 
 from vibeflow.core.rules import RuleResult
-from vibeflow.targets.python.quality.rules.helpers import finding, source_subject
+from vibeflow.targets.python.quality.rules.helpers import finding, rule_effect_scope, source_policy
+from vibeflow.targets.python.quality.source_analysis.ast_rules import import_modules
+from vibeflow.targets.python.quality.source_analysis.effects import policy_import_violation_code
 
 
 def import_side_effects(context, inputs, params):
+    scope = rule_effect_scope(params)
+    policy = source_policy(params, sections=("imports",), effect_defaults=False)
     sources = context.require("source_context")
     findings = []
     from vibeflow.targets.python.project.source_membership import subject_files
@@ -14,11 +18,20 @@ def import_side_effects(context, inputs, params):
     files = subject_files(context)
     findings.extend(ownership_findings(context))
     for source in files:
-        if source.tree is None:
+        if source._tree is None:
             findings.append(finding(context, "QUALITY.SYNTAX.PYTHON", source.parse_error, path=source.path))
             continue
-        visitor = _ImportExecutionVisitor(allow_mutable_state=params.get("effect_scope") == "global_state", tree=source.tree)
-        visitor.visit(source.tree)
+        for statement in ast.walk(source._tree):
+            if not isinstance(statement, (ast.Import, ast.ImportFrom)):
+                continue
+            for module in import_modules(statement):
+                if isinstance(statement, ast.ImportFrom) and module == "urllib" and {alias.name for alias in statement.names} == {"parse"}:
+                    module = "urllib.parse"
+                if policy_import_violation_code(module, policy=policy):
+                    findings.append(finding(context, "NODE.IMPORT.POLICY_FORBIDDEN", f"import forbidden by the selected policy: {module}",
+                        path=source.path, line=statement.lineno, column=statement.col_offset + 1))
+        visitor = _ImportExecutionVisitor(allow_mutable_state=scope == "global_state", tree=source._tree)
+        visitor.visit(source._tree)
         findings.extend(finding(context, "NODE.IMPORT.SIDE_EFFECT", reason, path=source.path, line=item.lineno, column=item.col_offset + 1)
                         for item, reason in visitor.violations)
     return RuleResult(findings=tuple(findings))

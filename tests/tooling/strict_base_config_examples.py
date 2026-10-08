@@ -1,3 +1,4 @@
+from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
 
@@ -8,12 +9,7 @@ from vibeflow.core.inspection import build_architecture_report
 from vibeflow.targets.python.quality.source_analysis.ast_rules import import_aliases, import_roots, qualified_call_name
 
 
-CycleCopyNode_DECLARATION = node_declaration(NodeInfo("test.copy_alt", "Cycle Copy", "Copies value.out into a distinct value.in-compatible key.", "0.1.0", "process"), NodeContract(
-        requires=(DataRequirement("value.out", "exactly_one", display_name="Value Out"),),
-        provides=(DataProvider("value.copy", "value.in", display_name="Value Copy"),),
-        input_semantics={"value.out": ("value to copy around the cycle",)},
-        output_semantics={"value.copy": ("copied value compatible with value.in",)},
-    ), rulesets=("vibeflow.process",))
+CycleCopyNode_DECLARATION = node_declaration(NodeDescriptor('test.copy_alt', 'Cycle Copy', 'Copies value.out into a distinct value.in-compatible key.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='Value Out'),), provides=(DataProvider('value.copy', 'value.in', display_name='Value Copy'),), input_semantics={'value.out': ('value to copy around the cycle',)}, output_semantics={'value.copy': ('copied value compatible with value.in',)}), rulesets=("vibeflow.process",))
 
 class CycleCopyNode:
 
@@ -63,8 +59,30 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         base_dir = tmp_path / str(case["name"]) / "base_lib"
         base_dir.mkdir(parents=True)
         (base_dir / "bad.py").write_text(str(case["module_source"]), encoding="utf-8")
-        report = scan_base_lib(base_dir.parent, policy=PurityPolicy(max_source_lines=1000))
-        rule_ids = {finding.rule_id for finding in report.findings}
+        from tests.fixtures.support.plugins import write_plugin
+        from vibeflow.tooling.project.workspace_loader import load_project_workspace
+        from vibeflow.tooling.application.python.project.declarations import declared_python_registry
+        from vibeflow.tooling.application.python.project.resource_selection import select_python_resources
+        from vibeflow.targets.python.project.resource_rules import review_python_resource
+        (base_dir / "__init__.py").write_text("")
+        nodes = base_dir.parent / "nodes"
+        nodes.mkdir()
+        (nodes / "__init__.py").write_text("")
+        (nodes / "some_node.py").write_text('class SomeNode:\n    def run_pure(self,inputs,params):\n        return {"demo.out":1}\n')
+        declaration = node_document(type_key="demo.other",class_name="SomeNode",rulesets=[])
+        declaration["implementations"][0]["source"]["ref"] = "nodes/some_node.py"
+        selection = write_plugin(base_dir.parent,[declaration,{"kind":"base_lib","id":"bad","display_name":"Bad",
+            "description":"Cross-layer source fixture.","rulesets":["vibeflow.base_lib"],"implementations":[{"language":"python","targets":["python"],
+            "source":{"kind":"file","ref":"base_lib/bad.py"}}]}],target="python")
+        (base_dir.parent / "vibeflow_project.jsonc").write_text('{"project_target":"python"}')
+        config = base_dir.parent / "workflow.jsonc"
+        data = {"plugins":[selection],"rulesets":[],"pipeline":{"nodes":[]}}
+        config.write_text(json.dumps(data))
+        workspace = load_project_workspace(config)
+        registry = declared_python_registry(workspace,config)
+        resources,_ = select_python_resources(data,registry=registry)
+        findings = review_python_resource(resources.base_libs[0],base_path=base_dir.parent,registry=registry,phase="import")
+        rule_ids = {finding.rule_id for finding in findings}
         expected_rule = str(case["expected_rule_id"])
         assert expected_rule in rule_ids
         observed.add(expected_rule)
@@ -78,8 +96,6 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         rule_ids = {finding.rule_id for finding in (*report.errors, *report.warnings)}
         expected_rule = str(case["expected_rule_id"])
         assert expected_rule in rule_ids
-        if expected_rule.startswith("GRAPH.EDGE."):
-            assert expected_rule in report.info["rule_catalog"]
         observed.add(expected_rule)
 
     for case in manifest["rule_cases"]:
@@ -131,7 +147,7 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         "NODE.IMPORT.SIDE_EFFECT",
         "CONFIG.LOOPS.REMOVED",
         "CONFIG.BOUNDARY.REMOVED",
-        "BASE_LIB.FORBIDDEN_PROJECT_IMPORT",
+        "VF_IMPORT_LAYER",
         "GRAPH.CYCLE.FORBIDDEN",
         "GRAPH.EDGE.DUPLICATE",
         "GRAPH.EDGE.CONFLICTING_DUPLICATE",
@@ -164,9 +180,9 @@ def test_mermaid_collapsed_and_expanded_views_share_top_level_compiled_edges() -
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the nodeset fixture."),
-                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
-                    _node_call("flow", "math.add_one", "Calls the add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("seed", "test.seed", "Produces value.in."),
+                    _node_call("flow", "math.add_one", "Calls the add-one nodeset."),
+                    _node_call("end", "test.out_end", "Consumes value.out."),
                 ],
                 "edges": _edge_chain("start", "seed", "flow", "end"),
             },
@@ -318,9 +334,9 @@ def test_optional_architecture_report_is_not_health_gate() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the architecture fixture."),
-                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
-                    _node_call("add", "test.add", "Adds value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("seed", "test.seed", "Produces value.in."),
+                    _node_call("add", "test.add", "Adds value.in."),
+                    _node_call("end", "test.out_end", "Consumes value.out."),
                 ],
                 "edges": _edge_chain("start", "seed", "add", "end"),
             }
@@ -394,14 +410,14 @@ def test_code_quality_report_includes_directory_structure_graph(tmp_path) -> Non
     assert fanin.details["suggested_entry_files"] == ("__init__.py", "api.py")
 
 
-def test_code_quality_root_structure_limits_report_warning_error_and_role_imports(tmp_path) -> None:
+def test_code_quality_root_structure_limits_keep_generic_metrics_without_resource_declarations(tmp_path) -> None:
     nodes = tmp_path / "nodes"
     base_lib = tmp_path / "base_lib"
     plugins = tmp_path / "plugins"
     for directory in (nodes, base_lib, plugins):
         directory.mkdir()
         (directory / "__init__.py").write_text("", encoding="utf-8")
-    (tmp_path / "registry.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (tmp_path / "root_data.py").write_text("VALUE = 1\n", encoding="utf-8")
     (tmp_path / "helper.py").write_text("VALUE = 1\n", encoding="utf-8")
     (nodes / "main.py").write_text("import helper\n", encoding="utf-8")
     (base_lib / "bad.py").write_text("import plugins.policy\n", encoding="utf-8")
@@ -415,9 +431,9 @@ def test_code_quality_root_structure_limits_report_warning_error_and_role_import
     assert report.status == "FAIL"
     assert by_rule["QUALITY.STRUCTURE.DIRECTORY_TOO_MANY_CODE_FILES"].severity == "error"
     assert by_rule["QUALITY.STRUCTURE.ROOT_LEVEL_CODE_FILE"].severity == "warning"
-    assert by_rule["QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT"].object_id == "nodes.main -> helper"
-    assert by_rule["QUALITY.STRUCTURE.BASE_LIB_UPWARD_IMPORT"].object_id == "base_lib.bad -> plugins.policy"
-    assert by_rule["QUALITY.STRUCTURE.PLUGIN_NODE_IMPORT"].object_id == "plugins.policy -> nodes.main"
+    assert not {"QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT",
+                "QUALITY.STRUCTURE.BASE_LIB_UPWARD_IMPORT",
+                "QUALITY.STRUCTURE.PLUGIN_NODE_IMPORT"} & by_rule.keys()
     assert report.structure_summary["root_layout"]["code_files"] == 25
     assert report.structure_summary["root_layout"]["code_dirs"] == 3
 

@@ -1,0 +1,11 @@
+flowchart LR
+  classDef baseLibResource fill:#ecfdf5,stroke:#059669,color:#064e3b;
+  classDef pluginResource fill:#eff6ff,stroke:#2563eb,color:#1e3a8a;
+  classDef hostExtensionResource fill:#f5f3ff,stroke:#7c3aed,color:#3b0764;
+  classDef plannedResource fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;
+  resource_plugins@{ shape: hex, label: "plugins" }
+  class resource_plugins pluginResource;
+  resource_plugins_0@{ shape: hex, label: "Layout lifecycle\n\nid: layout.resources\nstatus: implemented\n\n---------- meta ----------\ndesc: Real compiler and runtime declarations." }
+  resource_plugins -.-> resource_plugins_0
+  class resource_plugins_0 pluginResource;
+  style resource_plugins_0 fill:#d9e6ff,stroke:#2563eb,color:#1e3a8a

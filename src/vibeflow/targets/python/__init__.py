@@ -11,14 +11,10 @@ from importlib import import_module
 
 _EXPORTS = {
     # Project frontend.
-    "BaseLibRegistry": ("vibeflow.targets.python.project", "BaseLibRegistry"),
     "CompilerPlugin": ("vibeflow.targets.python.project", "CompilerPlugin"),
-    "Context": ("vibeflow.targets.python.project", "Context"),
     "EffectivePolicy": ("vibeflow.targets.python.project", "EffectivePolicy"),
     "GraphCompileError": ("vibeflow.targets.python.project", "GraphCompileError"),
     "GraphCompiler": ("vibeflow.targets.python.project", "GraphCompiler"),
-    "NodeContract": ("vibeflow.targets.python.project", "NodeContract"),
-    "NodeInfo": ("vibeflow.targets.python.project", "NodeInfo"),
     "NodeRegistry": ("vibeflow.targets.python.project", "NodeRegistry"),
     "NodeRegistryError": ("vibeflow.targets.python.project", "NodeRegistryError"),
     "PluginDescriptor": ("vibeflow.targets.python.project", "PluginDescriptor"),

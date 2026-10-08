@@ -47,6 +47,8 @@ class _ReviewRunner:
         self.compiled = None
         self.registry = None
         self.resources = None
+        self.health = None
+        self.presentation = None
         self.validation_status = "ERROR"
         self.temporary_path: Path | None = None
 
@@ -158,6 +160,7 @@ class _ReviewRunner:
                 self.config_path,
                 workspace=self.workspace,
                 validate_health=True,
+                _include_presentation=True,
             )
         except Exception as exc:
             finding = _review_finding(
@@ -169,7 +172,7 @@ class _ReviewRunner:
             )
             self._fail_finding("preflight", "ERROR", finding)
             return False
-        self.graph, self.compiled, self.registry, self.resources, report = loaded
+        self.graph, self.compiled, self.registry, self.resources, report, self.health, self.presentation = loaded
         if report is not None:
             self._fail_report("preflight", report)
             return False
@@ -185,6 +188,7 @@ class _ReviewRunner:
                 compiled=self.compiled,
                 registry=self.registry,
                 resources=self.resources,
+                prepared=self.presentation,
             )
             text = render_architecture_payload(payload)
             self.spec.document_path.parent.mkdir(parents=True, exist_ok=True)
@@ -214,12 +218,18 @@ class _ReviewRunner:
         return True
 
     def _validate(self) -> bool:
-        from vibeflow.tooling.application.python.workspace_service import validate_workspace_config_path
+        from vibeflow.tooling.application.python.presentation.architecture_validation import _validate_registered_architecture_document
 
         try:
-            validation = validate_workspace_config_path(
-                self.config_path,
+            validation = _validate_registered_architecture_document(
+                self.health,
+                document_path=self.config_path,
+                graph=self.graph,
+                compiled=self.compiled,
+                registry=self.registry,
+                resources=self.resources,
                 workspace=self.workspace,
+                prepared=self.presentation,
             )
         except Exception as exc:
             finding = _review_finding(
@@ -280,6 +290,7 @@ class _ReviewRunner:
                 self.temporary_path,
                 registry=self.registry,
                 resources=self.resources,
+                prepared=self.presentation,
             )
         except Exception as exc:
             finding = _review_finding(
@@ -343,6 +354,7 @@ def _render_canonical_review_svg(
     graph: object, compiled: object, output_path: Path,
     *,
     registry: object, resources: object,
+    prepared=None,
 ) -> None:
     from vibeflow.tooling.application.python.presentation.mermaid.render import (
         EXPANDED_MERMAID_MAX_EDGES,
@@ -363,6 +375,7 @@ def _render_canonical_review_svg(
         background="transparent",
         max_text_size=EXPANDED_MERMAID_MAX_TEXT_SIZE,
         max_edges=EXPANDED_MERMAID_MAX_EDGES,
+        prepared=prepared,
     )
 
 

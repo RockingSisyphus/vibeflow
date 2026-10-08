@@ -1,14 +1,14 @@
 """Python workflow review; selected through the same Rule graph as source checks."""
 from dataclasses import replace
 from vibeflow.core.rules import RuleRecord, RuleResult
-from vibeflow.core.rules.builtin.workflow import workflow_topic_handlers
+from vibeflow.builtin.workflow import workflow_topic_handlers
 
 
 def workflow(context, inputs, params, *, definition_cache=None):
     from vibeflow.targets.python.quality.workflow.validation import _HealthValidationState
-    from vibeflow.targets.python.quality.workflow.node_config import validate_node_config_health
-    from vibeflow.targets.python.quality.workflow.nodesets import validate_nodesets
-    from vibeflow.targets.python.quality.workflow.planned import _append_python_stub_findings
+    from vibeflow.targets.python.quality.workflow.node_config import node_configuration_findings
+    from vibeflow.targets.python.quality.workflow.nodesets import nodeset_declaration_findings
+    from vibeflow.targets.python.quality.rules.planned_implementation import python_stub_findings
     from vibeflow.core.quality.workflow_rules.planned import PlannedImplementationCheck
     from vibeflow.targets.python.quality.workflow.mainline import append_mainline_health
     graph, compiled = context.require("graph"), context.require("compiled")
@@ -30,14 +30,13 @@ def workflow(context, inputs, params, *, definition_cache=None):
         planned = topics["vibeflow.graph.planned"](definition_context, inputs, params)
         for item in planned.records["events"].value:
             if isinstance(item, PlannedImplementationCheck):
-                _append_python_stub_findings(item, state)
+                for finding in python_stub_findings(item):
+                    (state.warnings if finding.severity == "warning" else state.errors).append(finding)
         if registry is not None:
-            state.errors.extend(validate_node_config_health(graph, registry=registry, global_config=context.facts.get("global_config")))
-            errors, warnings = validate_nodesets(graph, registry=registry, selected_only=True)
+            state.errors.extend(node_configuration_findings(graph, registry=registry, global_config=context.facts.get("global_config")))
+            errors, warnings = nodeset_declaration_findings(graph, registry=registry, selected_only=True)
             state.errors.extend(errors)
             state.warnings.extend(warnings)
-            from vibeflow.targets.python.quality.workflow.registry import registry_namespace_findings
-            state.warnings.extend(registry_namespace_findings(registry))
         definitions = RuleResult(records={"planned_events": planned.records["events"]}, findings=tuple(
             replace(item, details={**item.details, "definition_review": True})
             for item in (*nodesets.findings, *planned.findings, *state.errors, *state.warnings)))

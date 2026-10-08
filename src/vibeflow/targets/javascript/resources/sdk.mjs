@@ -1,5 +1,11 @@
 /** Pure declarations: importing a resource does not register it. */
 const ABI = "vibeflow.plugin.v3";
+const directBindings = new WeakMap();
+// Source references are literal filesystem paths, including %, # and spaces.
+function resolveFileReference(ref, base) {
+  const encodePath = path => String(path).split("/").map(encodeURIComponent).join("/");
+  return decodeURIComponent(new URL(encodePath(ref), `file://${encodePath(base)}`).pathname);
+}
 function freeze(value) {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     for (const item of Object.values(value)) freeze(item);
@@ -8,7 +14,7 @@ function freeze(value) {
   return value;
 }
 function define(kind, options, member) {
-  const {__origin = {}, source, implementation_files = [], [member || "__none"]: callable, ...data} = options;
+  const {__origin = {}, __resolveExport, __sourceRoot, source, implementation_files = [], [member || "__none"]: callable, ...data} = options;
   const files = implementationFiles(implementation_files, __origin);
   if (member && typeof callable !== "function" && !source && !data.implementations && !(kind === "rule" && data.handler)) throw new TypeError(`${kind}.${member} must be a function or use an explicit source`);
   const locator = source || {kind: "file", ref: __origin.path, ...(member ? {export: __origin.symbol + "." + member} : {})};
@@ -34,7 +40,44 @@ function define(kind, options, member) {
     descriptor.version ??= "1.0.0";
     descriptor.flow_kind ??= "process";
   }
-  return freeze({descriptor, origin: __origin, ...(member && callable ? {[member]: callable} : {})});
+  const resource = freeze({descriptor, origin: __origin, ...(member && callable ? {[member]: callable} : {})});
+  if (member && typeof callable === "function") directBindings.set(resource,
+    {member, callable, resolveExport: __resolveExport, sourceRoot: __sourceRoot});
+  return resource;
+}
+function normalizeDirect(resource) {
+  const binding = directBindings.get(resource);
+  if (!binding) return resource;
+  const {descriptor, origin} = resource;
+  const actual = {kind:"file", ref:origin.path, export:`${origin.symbol}.${binding.member}`};
+  const implementations = descriptor.implementations || [];
+  const compatible = implementations.filter(item => ["javascript", "typescript"].includes(item.language));
+  const conflict = (field, declared) => {
+    const error = new TypeError(`declared source for '${descriptor.id || descriptor.type_key}' does not identify its direct JavaScript implementation`);
+    error.code = "RESOURCE.IMPLEMENTATION.CONFLICT";
+    error.details = {location:{...origin, field}, actual:{path:actual.ref, symbol:actual.export}, declared};
+    throw error;
+  };
+  const field = `${descriptor.kind}.${descriptor.id || descriptor.type_key}.implementations`;
+  if (descriptor.kind === "rule" && descriptor.handler) conflict("rule.handler", {handler:descriptor.handler});
+  if (compatible.length !== 1) conflict(field, implementations);
+  const implementation = compatible[0], source = implementation.source;
+  const paths = source?.kind === "file" && typeof source.ref === "string"
+    ? [origin.path, `${binding.sourceRoot || ""}/__source__`].map(base => {
+        try { return resolveFileReference(source.ref, base); }
+        catch { return ""; }
+      }) : [];
+  let matches = paths.includes(actual.ref) && (!source.export || source.export === actual.export);
+  if (!matches && paths.includes(actual.ref) && source.export && binding.resolveExport) {
+    const [name, ...members] = source.export.split(".");
+    try {
+      const exported = members.reduce((value, key) => value?.[key], binding.resolveExport(name));
+      matches = exported === binding.callable;
+    } catch { /* Uninitialized aliases are unavailable, not a different source. */ }
+  }
+  if (!matches) conflict(field + `[${implementations.indexOf(implementation)}].source`, source);
+  return freeze({...resource, descriptor:{...descriptor, implementations:implementations.map(item =>
+    item === implementation ? {...item, source:actual} : item)}});
 }
 function implementationFiles(values, origin) {
   function invalid(message) {
@@ -49,7 +92,7 @@ function implementationFiles(values, origin) {
     if (!source || source.kind !== "file" || typeof source.ref !== "string" || !source.ref.trim()) invalid("implementation_files accepts file source references");
     if (/[*?\[\]]/.test(source.ref)) invalid("implementation_files requires explicit files, not glob patterns");
     const base = String(origin.path || "").replaceAll("\\", "/");
-    const ref = source.ref.startsWith("/") ? source.ref : decodeURIComponent(new URL(source.ref, `file://${base.startsWith("/") ? "" : "/"}${base}`).pathname);
+    const ref = source.ref.startsWith("/") ? source.ref : resolveFileReference(source.ref, `${base.startsWith("/") ? "" : "/"}${base}`);
     return {...source, ref};
   });
 }
@@ -62,7 +105,7 @@ export const defineBaseLib = options => define("base_lib", options, typeof optio
 export const defineHostExtension = options => define("host_extension", options, "createHost");
 /** Low-level fixed Descriptor contribution; callable declarations use defineNode/Rule. */
 export const defineResource = options => {
-  const {__origin = {}, ...descriptor} = options;
+  const {__origin = {}, __resolveExport, __sourceRoot, ...descriptor} = options;
   return freeze({descriptor, origin: __origin});
 };
 export function definePlugin(options) {
@@ -74,7 +117,7 @@ export function definePlugin(options) {
   if (!Array.isArray(resources) || resources.some(value => !value?.descriptor)) {
     throw new TypeError("plugin resources must be fixed SDK resource objects");
   }
-  const contributions = [...resources];
+  const contributions = resources.map(normalizeDirect);
   for (const [type, factory] of [["compiler", compiler], ["runtime", runtime]]) {
     if (factory !== undefined) {
       const delayed = factory && typeof factory === "object" && ["file","module","package"].includes(factory.kind) && typeof factory.ref === "string";

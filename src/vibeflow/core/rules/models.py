@@ -12,12 +12,12 @@ from math import isfinite
 from types import MappingProxyType
 from typing import Any, Mapping
 
-from vibeflow.core.descriptors.models import RuleImplementationDescriptor
+from vibeflow.core.descriptors.models import RuleImplementationDescriptor, ResourceImplementationConflict
 from vibeflow.core.findings import Finding
 
 
 def readonly(value: Any, _memo: dict[int, Any] | None = None) -> Any:
-    """Freeze containers while retaining opaque Target services as supplied."""
+    """Freeze a shared graph while retaining opaque Target services as supplied."""
     memo = {} if _memo is None else _memo
     if id(value) in memo:
         return memo[id(value)]
@@ -28,9 +28,13 @@ def readonly(value: Any, _memo: dict[int, Any] | None = None) -> Any:
         contents.update({key: readonly(item, memo) for key, item in value.items()})
         return snapshot
     if isinstance(value, (tuple, list)):
-        return tuple(readonly(item, memo) for item in value)
+        snapshot = tuple(readonly(item, memo) for item in value)
+        # A back-reference through a mapping/dataclass may have completed this
+        # sequence during recursion. Keep that instance as the shared result.
+        return memo.setdefault(id(value), snapshot)
     if isinstance(value, (set, frozenset)):
-        return frozenset(readonly(item, memo) for item in value)
+        snapshot = frozenset(readonly(item, memo) for item in value)
+        return memo.setdefault(id(value), snapshot)
     if is_dataclass(value) and not isinstance(value, type):
         snapshot = copy(value)
         memo[id(value)] = snapshot
@@ -54,7 +58,7 @@ def plain(value: Any) -> Any:
     return value
 
 
-def _record_snapshot(value: Any, active: set[int] | None = None) -> Any:
+def _record_snapshot(value: Any, active: set[int] | None = None, _memo: dict[int, Any] | None = None) -> Any:
     """Output ports contain data, while Target services stay in context facts."""
     if value is None:
         return None
@@ -67,24 +71,29 @@ def _record_snapshot(value: Any, active: set[int] | None = None) -> Any:
     if isinstance(value, float) and isfinite(value):
         return float(value)
     visiting = set() if active is None else active
+    memo = {} if _memo is None else _memo
     if id(value) in visiting:
         raise ValueError("record.value cannot contain cyclic data")
+    if id(value) in memo:
+        return memo[id(value)]
     visiting.add(id(value))
     try:
         if isinstance(value, Mapping):
             if any(not isinstance(key, str) for key in value):
                 raise ValueError("record.value object keys must be strings")
-            return MappingProxyType({str(key): _record_snapshot(item, visiting) for key, item in value.items()})
-        if isinstance(value, (tuple, list)):
-            return tuple(_record_snapshot(item, visiting) for item in value)
-        if isinstance(value, (set, frozenset)):
-            return frozenset(_record_snapshot(item, visiting) for item in value)
-        if is_dataclass(value) and not isinstance(value, type) and type(value).__dataclass_params__.frozen:
+            snapshot = MappingProxyType({str(key): _record_snapshot(item, visiting, memo) for key, item in value.items()})
+        elif isinstance(value, (tuple, list)):
+            snapshot = tuple(_record_snapshot(item, visiting, memo) for item in value)
+        elif isinstance(value, (set, frozenset)):
+            snapshot = frozenset(_record_snapshot(item, visiting, memo) for item in value)
+        elif is_dataclass(value) and not isinstance(value, type) and type(value).__dataclass_params__.frozen:
             snapshot = copy(value)
             for item in fields(value):
-                object.__setattr__(snapshot, item.name, _record_snapshot(getattr(value, item.name), visiting))
-            return snapshot
-        raise ValueError(f"record.value must contain portable data or frozen dataclasses, got {type(value).__name__}")
+                object.__setattr__(snapshot, item.name, _record_snapshot(getattr(value, item.name), visiting, memo))
+        else:
+            raise ValueError(f"record.value must contain portable data or frozen dataclasses, got {type(value).__name__}")
+        memo[id(value)] = snapshot
+        return snapshot
     finally:
         visiting.remove(id(value))
 
@@ -127,6 +136,8 @@ class RuleDescriptor:
         implementations = tuple(self.implementations)
         if not all(isinstance(item, RuleImplementationDescriptor) for item in implementations):
             raise ValueError("rule.implementations must contain RuleImplementationDescriptor")
+        if self.handler and implementations:
+            raise ResourceImplementationConflict("rule.handler cannot be combined with an implementation", field_name="rule.handler")
         families = [item.execution_family for item in implementations]
         if len(set(families)) != len(families):
             raise ValueError("rule.implementations contains duplicate execution families")
@@ -274,12 +285,21 @@ class RuleContext:
     scope: Mapping[str, Any] = field(default_factory=dict)
     phase: str = "static"
     target: str = "python"
+    _snapshots: tuple[Mapping[str, Any], ...] = field(default=(), repr=False, compare=False)
 
     def __post_init__(self) -> None:
+        memo = {}
+        # dataclasses.replace carries this provenance from the existing context.
+        # Seed only owned snapshots, not raw object IDs or arbitrary proxies.
+        # The shallow index stays proportional to fact fields, not their graphs.
+        for snapshot in self._snapshots:
+            memo[id(snapshot)] = snapshot
+            memo.update((id(value), value) for value in snapshot.values())
         for name in ("facts", "subject", "scope"):
             if not isinstance(getattr(self, name), Mapping):
                 raise ValueError(f"context.{name} must be an object")
-            object.__setattr__(self, name, readonly(getattr(self, name)))
+            object.__setattr__(self, name, readonly(getattr(self, name), memo))
+        object.__setattr__(self, "_snapshots", (self.facts, self.subject, self.scope))
 
     def require(self, name: str) -> Any:
         if name not in self.facts:

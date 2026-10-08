@@ -84,7 +84,7 @@ def _declare(kind, options, value=None, source=None):
     try:
         descriptor = decode_resource(data)
     except ValueError as error:
-        error.location = {"path":path, **({"line":line} if line is not None else {})}
+        error.location = {**getattr(error, "location", {}), "path":path, **({"line":line} if line is not None else {})}
         raise
     return ResourceDefinition(descriptor, value, declaration_path, declaration_line, symbol)
 

@@ -1,4 +1,4 @@
-"""Python runtime options plus neutral project-option compatibility exports."""
+"""Resolve Python workflow runtime options."""
 
 from __future__ import annotations
 
@@ -10,9 +10,6 @@ from vibeflow.targets.python.runtime.options import (
     runtime_options as normalize_runtime_options,
 )
 from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
-from vibeflow.tooling.project.project_config_options import (
-    project_javascript_options,
-)
 from vibeflow.tooling.project.workspace_model import WorkspaceConfig
 
 
@@ -42,6 +39,4 @@ def _workspace_runtime_options(
     return normalize_runtime_options(values)
 
 
-__all__ = [
-    "project_javascript_options",
-]
+__all__ = ["_workspace_runtime_options"]

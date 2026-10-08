@@ -5,7 +5,8 @@ import shutil
 from pathlib import Path
 
 from tests.fixtures.support.strict_support import _nodeset_config, _seed_add_pipeline, _seed_only_pipeline, cli_main
-from tests.fixtures.support.declarations import write_node_manifests
+from tests.fixtures.support.declarations import write_node_plugin
+from tests.fixtures.support.plugins import resource as resource_ref, append_resource
 
 from vibeflow.tooling.project.config_loader import load_raw_config_document
 from vibeflow.tooling.application.python.presentation.architecture_document import ARCHITECTURE_DOCUMENT_HEADER
@@ -37,7 +38,6 @@ def _write_architecture_workspace(
     )
     project_config: dict[str, object] = {
         "project_target": "python",
-        "descriptors": {"nodes": ["manifests/nodes"], "base_lib": ["manifests/base_lib"]},
         "quality_enabled": False,
     }
     if registered:
@@ -50,27 +50,25 @@ def _write_architecture_workspace(
         json.dumps(project_config, indent=2),
         encoding="utf-8",
     )
-    write_node_manifests(project, (
+    selection = write_node_plugin(project, (
         ("test.start", "StartNode", {}, {}),
         ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}),
         ("test.add", "AddNode", {"delta": {"type": "number"}}, {"delta": 1}),
         ("test.out_end", "OutEndNode", {}, {}),
         ("test.in_end", "InEndNode", {}, {}),
     ))
-    resource_manifests = project / "manifests" / "base_lib"
-    resource_manifests.mkdir()
     if include_resource:
         base_lib = project / "base_lib"
         base_lib.mkdir()
         (base_lib / "__init__.py").write_text("", encoding="utf-8")
         (base_lib / "fixture.py").write_text("def value():\n    return 1\n", encoding="utf-8")
-        (resource_manifests / "fixture_lib.jsonc").write_text(json.dumps({
+        append_resource(project, {
             "kind": "base_lib", "id": "fixture_lib", "display_name": "Fixture Lib",
             "category": "test", "description": "Fixture resource one.", "version": "0.1.0",
             "implementations": [{"language": "python", "targets": ["python"],
                                  "source": {"kind": "module", "ref": "base_lib.fixture"}}],
-        }), encoding="utf-8")
-    workflow: dict[str, object] = {"pipeline": _seed_add_pipeline()}
+        })
+    workflow: dict[str, object] = {"pipeline": _seed_add_pipeline(), "plugins": [selection]}
     if include_resource:
         workflow["base_lib"] = {"modules": [{"id": "fixture_lib"}]}
     if include_unused_nodeset:
@@ -278,7 +276,7 @@ def test_workspace_architecture_tracks_unused_imported_nodeset_changes(tmp_path)
 def test_workspace_architecture_tracks_registry_config_default_changes(tmp_path) -> None:
     workspace_path, workflow_path, document_path = _write_architecture_workspace(tmp_path)
     assert _export_registered_document(workspace_path, workflow_path, document_path) == 0
-    declaration_path = document_path.parent / "manifests" / "nodes" / "test-seed.jsonc"
+    declaration_path = resource_ref(document_path.parent, "node", "test.seed")
     declaration = json.loads(declaration_path.read_text(encoding="utf-8"))
     declaration["contract"]["params_defaults"]["value"] = 22
     declaration_path.write_text(json.dumps(declaration), encoding="utf-8")
@@ -299,7 +297,7 @@ def test_workspace_architecture_tracks_active_resource_registration_changes(tmp_
         include_resource=True,
     )
     assert _export_registered_document(workspace_path, workflow_path, document_path) == 0
-    resource_path = document_path.parent / "manifests" / "base_lib" / "fixture_lib.jsonc"
+    resource_path = resource_ref(document_path.parent, "base_lib", "fixture_lib")
     resource = json.loads(resource_path.read_text(encoding="utf-8"))
     resource["description"] = "Fixture resource changed substantially."
     resource_path.write_text(json.dumps(resource), encoding="utf-8")
@@ -444,10 +442,3 @@ def test_workspace_run_writes_canonical_architecture_artifact(tmp_path) -> None:
         "resources",
         "implementation_graph",
     ]
-
-
-from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-_fixture_native_load_workspace_config = load_workspace_config
-def load_workspace_config(path, **options):
-    prepare_workspace_fixture(path)
-    return _fixture_native_load_workspace_config(path, **options)

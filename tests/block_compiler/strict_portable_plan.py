@@ -18,6 +18,7 @@ from vibeflow.block_compiler import (
     normalize_condition,
 )
 from vibeflow.targets.python.project.registry import NodeRegistry
+from tests.fixtures.support.declarations import native_registry
 from vibeflow.targets.python.runtime.planning import build_execution_plan
 from vibeflow.targets.python.runtime.support.portable_adapter import build_workflow_plan
 
@@ -62,17 +63,16 @@ class _GlobalStateNode:
 
 
 def _registry() -> NodeRegistry:
-    registry = NodeRegistry()
+    registry = native_registry()
     registry.register(_TerminalNode_DECLARATION, _TerminalNode)
     registry.register(_StepNode_DECLARATION, _StepNode)
     registry.register(_GlobalStateNode_DECLARATION, _GlobalStateNode)
     return registry
 
 
-def _input(key: str, data_type: str, *, required: bool | None = None) -> dict[str, object]:
+def _input(key: str, data_type: str, *, required: bool = True) -> dict[str, object]:
     value: dict[str, object] = {"key": key, "type": data_type, "display_name": key}
-    if required is not None:
-        value["required"] = required
+    value["required"] = required
     return value
 
 
@@ -262,7 +262,7 @@ def test_python_execution_plan_adapter_preserves_global_state_and_locks() -> Non
     }
 
 
-def test_graph_adapter_normalizes_routes_and_marks_legacy_input_requiredness_unknown() -> None:
+def test_graph_adapter_normalizes_routes_and_preserves_required_inputs() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -284,7 +284,7 @@ def test_graph_adapter_normalizes_routes_and_marks_legacy_input_requiredness_unk
     )
     route = plan.block(plan.entry_block).routes[0]
 
-    assert plan.inputs[0].required is None
+    assert plan.inputs[0].required is True
     assert route.condition is not None
     assert route.condition.to_dict() == {
         "key": "flow.route",
@@ -295,6 +295,17 @@ def test_graph_adapter_normalizes_routes_and_marks_legacy_input_requiredness_unk
     assert plan.block(plan.entry_block).node("route").params.to_value() == {
         "configured": True
     }
+
+
+def test_portable_input_sidecar_cannot_change_required_contract() -> None:
+    graph = _loop_graph()
+    registry = _registry()
+    compiled = GraphCompiler().compile(graph, registry=registry)
+    execution = build_execution_plan(graph, compiled, registry=registry)
+    with pytest.raises(PortablePlanError, match="key/type/required order"):
+        execution.to_workflow_plan(pipeline_inputs=(
+            PipelineInputSpec("value.current", "value.current", required=False),
+        ))
 
 
 def test_adapter_rejects_non_json_python_values_in_effective_params() -> None:

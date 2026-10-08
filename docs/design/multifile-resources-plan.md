@@ -1,5 +1,7 @@
 # 多文件资源与统一展示
 
+本文保留当时的实施计划。将实现文件与导入关系展开到用户 SVG 的部分已撤销；当前图形规范见[系统架构](system-architecture.md#架构事实)。多文件登记、源码审查与 Architecture JSONC 的要求继续有效。
+
 起点：`3ee7396`；版本 `0.15.0`，Plugin ABI v3 / Rule ABI v1 / Workflow ABI v4。
 
 四类资源通过选中插件接入，共用显式 `implementation_files`、源码归属、Ruleset 和 `presentation`。Host 保持一个实例；`dependencies` 仍表示宿主实例依赖，纯库通过 `base_libs` 引用。插件的 `declaration_rulesets` 审查声明，`rulesets` 审查 compiler/runtime。

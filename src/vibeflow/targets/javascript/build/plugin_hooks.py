@@ -19,6 +19,8 @@ from vibeflow.targets.javascript.frontend.bindings import (
 from vibeflow.targets.javascript.frontend.plugin_descriptors import (
     JavascriptPluginBindingPlan,
 )
+from vibeflow.core.flow import GraphConfig
+from vibeflow.targets.javascript.build.graph_wire import graph_wire
 
 
 _GRAPH_MUTATION_KEYS = frozenset(
@@ -62,6 +64,7 @@ class JavascriptBuildPluginRunner:
         self._session: JavascriptPluginSession | None = None
         self._ids: dict[str, str] = {}
         self._annotations: list[Mapping[str, object]] = []
+        self._cleanup_errors: list[BaseException] = []
 
     def __enter__(self) -> JavascriptBuildPluginRunner:
         try:
@@ -83,9 +86,10 @@ class JavascriptBuildPluginRunner:
                 )
                 self._ids[binding.id] = session_id
                 self._workers[binding.id] = session
-                self._stack.callback(session.close, session_id)
-        except Exception:
+                self._stack.callback(self._close, session, session_id)
+        except Exception as error:
             self._stack.__exit__(*sys.exc_info())
+            self._finish_cleanup(error)
             self._session = None
             raise
         return self
@@ -115,6 +119,20 @@ class JavascriptBuildPluginRunner:
     def __exit__(self, exc_type, exc, traceback) -> None:
         self._session = None
         self._stack.__exit__(exc_type, exc, traceback)
+        self._finish_cleanup(exc)
+
+    def _close(self, session, session_id):
+        try:
+            session.close(session_id)
+        except Exception as error:
+            self._cleanup_errors.append(error)
+
+    def _finish_cleanup(self, primary):
+        if not self._cleanup_errors:
+            return
+        from vibeflow.targets.javascript.build.cleanup import finish_cleanup
+        errors, self._cleanup_errors = self._cleanup_errors, []
+        finish_cleanup(primary, errors)
 
     def _invoke(
         self,
@@ -197,6 +215,8 @@ def json_projection(value: object) -> object:
 
     if value is None or isinstance(value, (str, bool, int, float)):
         return value
+    if isinstance(value, GraphConfig):
+        return graph_wire(value, json_projection)
     if isinstance(value, PurePath):
         return str(value)
     if isinstance(value, Mapping):

@@ -1,6 +1,7 @@
 """Integration gates for the Python Target runtime."""
 
 from __future__ import annotations
+from tests.fixtures.support.declarations import native_registry
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 
 from hashlib import sha256
@@ -11,6 +12,7 @@ from typing import Mapping
 import pytest
 
 from tests.fixtures.support.strict_support import (
+    INPUT_SPEC,
     PROV_SPEC,
     REQ_SPEC,
     _edge_chain,
@@ -24,12 +26,8 @@ from tests.targets.python.strict_planned_behavior import _planned_stub_config
 from tests.targets.python.strict_runtime import _loop_registry, _while_loop_graph
 from vibeflow.core import DataProvider, DataRequirement
 from vibeflow.tooling.project.graph_config import parse_graph_config
-from vibeflow.targets.python.project import (
-    NodeContract,
-    NodeInfo,
-    NodeRegistry,
-    PluginRegistry,
-)
+from vibeflow.targets.python.project import NodeRegistry, PluginRegistry
+from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from vibeflow.targets.python.runtime import (
     ExecutionPlan,
     PipelineRuntime,
@@ -40,16 +38,7 @@ from vibeflow.targets.python.runtime import (
 EXECUTION_MODES = ("plan", "block", "compiled")
 
 
-_DoubleNode_DECLARATION = node_declaration(NodeInfo(
-        "integration.double",
-        "Double",
-        "Doubles a received number.",
-        "1.0.0",
-        "process",
-    ), NodeContract(
-        requires=(DataRequirement("number", "exactly_one", display_name="number"),),
-        provides=(DataProvider("answer", "answer", display_name="answer"),),
-    ), rulesets=("vibeflow.process",))
+_DoubleNode_DECLARATION = node_declaration(NodeDescriptor(type_key='integration.double', display_name='Double', description='Doubles a received number.', version='1.0.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('number', 'exactly_one', display_name='number'),), provides=(DataProvider('answer', 'answer', display_name='answer'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('number', 'exactly_one', display_name='number'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('answer', 'answer', display_name='answer'),)}), rulesets=("vibeflow.process",))
 
 class _DoubleNode:
 
@@ -135,21 +124,20 @@ def test_real_binding_sidecar_covers_nodes_nodesets_and_loops(
                     )
                 ],
                 "pipeline": {
-                    "inputs": [PROV_SPEC("value.in")],
+                    "inputs": [INPUT_SPEC("value.in")],
                     "nodes": [
                         _node_call("start", "test.start", "Starts the flow."),
                         _node_call(
                             "composite",
                             "math.add_one",
                             "Runs a nested add.",
-                            requires=[REQ_SPEC("value.in")],
-                            provides=[PROV_SPEC("value.out")],
+
                         ),
                         _node_call(
                             "end",
                             "test.out_end",
                             "Consumes the nested output.",
-                            requires=[REQ_SPEC("value.out")],
+
                         ),
                     ],
                     "edges": _edge_chain("start", "composite", "end"),
@@ -272,7 +260,7 @@ def test_result_key_semantics_and_trace_match_all_execution_modes(
                         "seed",
                         "test.seed",
                         "Produces an asynchronous value.",
-                        provides=[PROV_SPEC("value.in")],
+
                         config={"value": 4},
                         result_key="value.in",
                         **{"async": "result_key"},
@@ -281,15 +269,14 @@ def test_result_key_semantics_and_trace_match_all_execution_modes(
                         "add",
                         "test.add",
                         "Consumes the asynchronous value.",
-                        requires=[REQ_SPEC("value.in")],
-                        provides=[PROV_SPEC("value.out")],
+
                         config={"delta": 3},
                     ),
                     _node_call(
                         "end",
                         "test.out_end",
                         "Consumes the result.",
-                        requires=[REQ_SPEC("value.out")],
+
                     ),
                 ],
                 "edges": _edge_chain("start", "seed", "add", "end"),
@@ -326,7 +313,7 @@ def test_detached_failure_cleanup_and_trace_match_all_execution_modes(
                         "metrics",
                         "test.runtime_fail",
                         "Fails in a detached task.",
-                        provides=[PROV_SPEC("value.out")],
+
                         config={"fail": True},
                         **{"async": "detached"},
                     ),
@@ -334,14 +321,14 @@ def test_detached_failure_cleanup_and_trace_match_all_execution_modes(
                         "seed",
                         "test.seed",
                         "Produces the retained output.",
-                        provides=[PROV_SPEC("value.in")],
+
                         config={"value": 2},
                     ),
                     _node_call(
                         "end",
                         "test.in_end",
                         "Consumes the retained output.",
-                        requires=[REQ_SPEC("value.in")],
+
                     ),
                 ],
                 "edges": _edge_chain("start", "metrics", "seed", "end"),
@@ -390,8 +377,7 @@ def test_python_port_semantics_and_trace_match_all_execution_modes(
                         "double",
                         "integration.double",
                         "Doubles the received number.",
-                        requires=[REQ_SPEC("number")],
-                        provides=[PROV_SPEC("answer")],
+
                     ),
                     {
                         "id": "send",
@@ -408,7 +394,7 @@ def test_python_port_semantics_and_trace_match_all_execution_modes(
             }
         }
     )
-    registry = NodeRegistry()
+    registry = native_registry()
     registry.register(configured_declaration(_DoubleNode_DECLARATION, {}, {}), _DoubleNode)
     sent: list[dict[str, object]] = []
 

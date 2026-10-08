@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Callable, Mapping
 
 
@@ -16,8 +17,15 @@ class RuntimeOptions:
     async_flush_timeout: float | None = None
     nodeset_max_depth: int = 4
     allow_planned_stub: bool = False
+    status_interval: float = 60.0
+    status_file: str | None = None
 
     def __post_init__(self) -> None:
+        if (isinstance(self.status_interval, bool) or not isinstance(self.status_interval, (int, float))
+                or not math.isfinite(self.status_interval) or self.status_interval <= 0):
+            raise ValueError("runtime status_interval must be positive finite seconds")
+        if self.status_file is not None and (not isinstance(self.status_file, str) or not self.status_file):
+            raise ValueError("runtime status_file must be a nonempty path string")
         if self.trace not in {"full", "boundary", "off"}:
             raise ValueError("runtime trace must be one of: full, boundary, off")
         if self.execution not in {"plan", "block", "compiled"}:

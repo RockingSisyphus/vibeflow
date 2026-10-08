@@ -50,17 +50,20 @@
       {
         "key": "train.model",
         "type": "train.model",
-        "display_name": "Train Model"
+        "display_name": "Train Model",
+        "required": true
       },
       {
         "key": "train.batch",
         "type": "train.batch",
-        "display_name": "Train Batch"
+        "display_name": "Train Batch",
+        "required": true
       },
       {
         "key": "train.optimizer",
         "type": "train.optimizer",
-        "display_name": "Train Optimizer"
+        "display_name": "Train Optimizer",
+        "required": true
       }
     ],
     "nodes": [

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Any, Mapping
 
-from vibeflow.core.descriptors.contributions import ContributionBuilder, ResourceOrigin, PLUGIN_ABI
+from vibeflow.core.descriptors.contributions import PluginContributions, ResourceDeclaration, ResourceOrigin, PLUGIN_ABI, resource_kind
 from vibeflow.core.descriptors.models import SourceLocator, _freeze_mapping
 from vibeflow.targets.python.sdk.resources import _declare, _location, definition, _implementation_files
 
@@ -29,6 +29,7 @@ class Plugin:
     presentation: Mapping[str, Any] = field(default_factory=dict)
     abi: str = field(default=PLUGIN_ABI, init=False)
     source: str = field(default="", init=False)
+    _fixed_contributions: PluginContributions = field(init=False, repr=False, compare=False)
 
     def __post_init__(self):
         from vibeflow.core.descriptors.presentation import normalize_presentation
@@ -58,23 +59,21 @@ class Plugin:
         object.__setattr__(self, "source", _location()[0])
         object.__setattr__(self, "config_schema", _freeze_mapping(self.config_schema, field_name="plugin.config_schema"))
         object.__setattr__(self, "config_defaults", _freeze_mapping(self.config_defaults, field_name="plugin.config_defaults"))
-        self.contributions()
-
-    def contributions(self, config=None):
-        builder = ContributionBuilder(self.id, source=self.source)
-        for resource in self.resources:
-            builder.add(resource.descriptor, origin=ResourceOrigin(self.id, resource.path or self.source,
-                        resource.line, symbol=resource.symbol))
+        resources = tuple(ResourceDeclaration(resource.descriptor, ResourceOrigin(self.id, resource.path or self.source,
+                          resource.line, symbol=resource.symbol)) for resource in self.resources)
         declaration = {"kind":"plugin_declaration", "id":self.id, "display_name":self.display_name or self.id,
             "description":self.description, "version":self.version, "rulesets":list(self.declaration_rulesets),
             "presentation":dict(self.presentation), "base_libs":list(self.base_libs),
             "implementations":[{"language":"python", "targets":["python"],
                 "source":{"kind":"file", "ref":self.source, "export":"plugin"},
                 "implementation_files":[item.to_dict() for item in self.implementation_files]}]}
-        return replace(builder.finish(config=config), declaration=declaration)
+        object.__setattr__(self, "_fixed_contributions", PluginContributions(self.id, resources, source=self.source, declaration=declaration))
+
+    def contributions(self, config=None):
+        return self._fixed_contributions._with_config(config)
 
     def bindings(self):
-        return {(resource.descriptor.to_dict()["kind"], resource.descriptor.id): resource.implementation
+        return {(resource_kind(resource.descriptor), resource.descriptor.id): resource.implementation
                 for resource in self.resources if resource.implementation is not None}
 
     @property

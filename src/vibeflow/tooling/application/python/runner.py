@@ -33,10 +33,11 @@ from vibeflow.tooling.project.config_loader import (
 from vibeflow.tooling.project.config_schema import (
     collect_config_schema_findings,
 )
-from vibeflow.tooling.application.python.project.resources import (
-    ConfigResources,
-    load_config_resources,
+from vibeflow.tooling.application.python.project.resource_selection import (
+    PythonResources,
+    select_python_resources,
 )
+from vibeflow.tooling.application.python.run_observation import observed_checked_run
 
 
 @dataclass(frozen=True)
@@ -56,11 +57,11 @@ class CheckedRunError(RuntimeError):
         return self.message
 
 
+@observed_checked_run
 def run_checked(
     config_path: str | Path,
     *,
     registry: NodeRegistry,
-    boundary_registry: object | None = None,
     initial: Mapping[str, Any] | None = None,
     policy_path: str | Path | None = None,
     run_root: str | Path | None = None,
@@ -68,6 +69,7 @@ def run_checked(
     runtime_options: object | None = None,
     capabilities: Mapping[str, object] | None = None,
     delegate_cli: bool = False,
+    _prepared_run_dir: Path | None = None,
 ) -> CheckedRunResult:
     path = Path(config_path)
     from vibeflow.tooling.project.workspace_loader import find_project_config, load_project_workspace
@@ -80,12 +82,10 @@ def run_checked(
         return run_workspace_checked(path, workspace=workspace,
             initial=initial, run_root=run_root, run_id=run_id,
             runtime_options=runtime_options, capabilities=capabilities,
-            delegate_cli=delegate_cli, _policy_result=policy)
+            delegate_cli=delegate_cli, _policy_result=policy, _prepared_run_dir=_prepared_run_dir)
     actual_run_id = _new_run_id() if run_id is None else validate_run_id(run_id)
-    if boundary_registry is not None:
-        raise ValueError("boundary_registry is removed; use flowchart nodes")
     effective_runtime_options = normalize_runtime_options(runtime_options)
-    run_dir = _prepare_run_dir(run_root, actual_run_id)
+    run_dir = _prepared_run_dir if _prepared_run_dir is not None else _prepare_run_dir(run_root, actual_run_id)
     _write_json(run_dir / "input_summary.json", summarize_mapping(dict(initial or {})))
 
     document = _load_document_or_refuse(path, run_dir, actual_run_id)
@@ -97,57 +97,61 @@ def run_checked(
             message="custom plugins require an owning vibeflow_project.jsonc"),))
         _write_refused_artifacts(run_dir, health, include_effective_policy=True)
         raise CheckedRunError("run refused: plugin configuration has no project", CheckedRunResult(actual_run_id, run_dir, health))
-    resources, resource_findings = load_config_resources(
+    resources, resource_findings = select_python_resources(
         document.data,
         base_path=path.parent,
-        plugin_registry=plugin_registry,
+        registry=registry,
     )
     policy_result = resolve_effective_policy(
         document.data,
         config_path=path,
         explicit_policy_path=Path(policy_path) if policy_path else None,
-        plugin_registry=plugin_registry,
     )
-    registry.configure_rule_defaults(purity_policy=policy_result.effective_policy.to_purity_policy())
-    effective_policy = policy_result.effective_policy.to_dict()
-    _write_json(run_dir / "effective_policy.json", effective_policy)
-    preflight_warnings = _refuse_on_schema_findings(document.data, (*resource_findings, *policy_result.findings), effective_policy, run_dir, actual_run_id)
-    graph, compiled = _compile_or_refuse(
-        document.data,
-        plugin_registry,
-        effective_policy,
-        run_dir,
-        actual_run_id,
-        config_path=path,
-        registry=registry,
-    )
-    health = _validate_run_health(
-        graph,
-        registry,
-        plugin_registry,
-        policy_result,
-        document.nodeset_imports,
-        resources,
-        runtime_options=effective_runtime_options,
-        preflight_warnings=preflight_warnings,
-        delegate_cli=delegate_cli,
-    )
-    if health.status in {"FAIL", "ERROR"}:
-        _write_refused_artifacts(run_dir, health)
+    from vibeflow.tooling.application.python.presentation.prepared import python_check_scope
+    with python_check_scope(registry):
+        registry.configure_rule_defaults(purity_policy=policy_result.effective_policy.to_purity_policy())
+        effective_policy = policy_result.effective_policy.to_dict()
+        _write_json(run_dir / "effective_policy.json", effective_policy)
+        preflight_warnings = _refuse_on_schema_findings(document.data, (*resource_findings, *policy_result.findings), effective_policy, run_dir, actual_run_id)
+        graph, compiled = _compile_or_refuse(
+            document.data,
+            plugin_registry,
+            effective_policy,
+            run_dir,
+            actual_run_id,
+            config_path=path,
+            registry=registry,
+        )
+        health = _validate_run_health(
+            graph,
+            registry,
+            plugin_registry,
+            policy_result,
+            document.nodeset_imports,
+            resources,
+            runtime_options=effective_runtime_options,
+            preflight_warnings=preflight_warnings,
+            delegate_cli=delegate_cli,
+        )
+        if health.status in {"FAIL", "ERROR"}:
+            _write_refused_artifacts(run_dir, health)
+            _refuse_on_health_failure(health, run_dir, actual_run_id)
+        from vibeflow.tooling.application.python.presentation.prepared import final_python_compilation, prepare_python_presentation
+        compilation = final_python_compilation(graph, registry)
+        graph, compiled = compilation.workflow.graph, compilation.compiled_graph
+        presentation = prepare_python_presentation(graph, registry=registry, resources=resources, compilation=compilation)
+        _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources,
+                              runtime_options=effective_runtime_options, compiled=compiled, prepared=presentation)
+        _write_preflight_artifacts(run_dir, graph, compiled, health, registry=registry, resources=resources, prepared=presentation)
         _refuse_on_health_failure(health, run_dir, actual_run_id)
-    from vibeflow.targets.python.project.compiler import GraphCompiler
-    compiled = GraphCompiler().compile(graph, registry=registry)
-    _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources, runtime_options=effective_runtime_options)
-    _write_preflight_artifacts(run_dir, graph, compiled, health, registry=registry, resources=resources)
-    _refuse_on_health_failure(health, run_dir, actual_run_id)
-    context = _execute_runtime(
-        graph, registry, plugin_registry, initial, run_dir, effective_runtime_options, resources,
-        capabilities=capabilities,
-        delegate_cli=delegate_cli,
-        health=health,
-    )
-    _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
-    return CheckedRunResult(actual_run_id, run_dir, health, context)
+        context = _execute_runtime(
+            graph, registry, plugin_registry, initial, run_dir, effective_runtime_options, resources,
+            capabilities=capabilities,
+            delegate_cli=delegate_cli,
+            health=health,
+        )
+        _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
+        return CheckedRunResult(actual_run_id, run_dir, health, context)
 
 
 def _load_document_or_refuse(path: Path, run_dir: Path, run_id: str):
@@ -256,7 +260,7 @@ def _validate_run_health(
     plugin_registry,
     policy_result,
     nodeset_imports: tuple[Mapping[str, Any], ...],
-    resources: ConfigResources,
+    resources: PythonResources,
     runtime_options: RuntimeOptions,
     preflight_warnings: tuple[HealthFinding, ...] = (),
     delegate_cli: bool = False,
@@ -271,7 +275,6 @@ def _validate_run_health(
         plugin_registry=plugin_registry,
         global_config=resources.global_config,
         purity_policy=purity_policy,
-        effective_policy=policy_result.effective_policy,
         nodeset_max_depth=runtime_options.nodeset_max_depth,
         source_context=collect_workflow_source_context(registry, graph),
         rule_phase="run",
@@ -301,21 +304,25 @@ def _validate_run_health(
     return report
 
 
-def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None, resources: ConfigResources | None = None) -> None:
+def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None, resources: PythonResources | None = None, prepared=None) -> None:
     from vibeflow.tooling.application.python.presentation.architecture_document import render_architecture_document
     from vibeflow.tooling.application.python.presentation.ascii_flowchart import export_ascii_flowchart
     from vibeflow.tooling.application.python.presentation.mermaid import compiled_graph_payload, export_mermaid
     from vibeflow.tooling.application.python.presentation.mermaid.render import EXPANDED_MERMAID_MAX_EDGES, EXPANDED_MERMAID_MAX_TEXT_SIZE, MermaidRenderError, render_mermaid_svg
     from vibeflow.tooling.application.python.presentation.mermaid.review_svg import render_review_columns_svg
 
+    from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
+    prepared = prepared or prepare_python_presentation(graph, compiled=compiled, registry=registry, resources=resources)
+    graph, compiled = prepared.graph, prepared.compiled
+
     _write_json(run_dir / "health_report.json", health.to_dict())
     _write_json(run_dir / "compiled_graph.json", compiled_graph_payload(graph, compiled, resources=resources))
     (run_dir / "architecture.jsonc").write_text(
-        render_architecture_document(graph, compiled=compiled, registry=registry, resources=resources),
+        render_architecture_document(graph, compiled=compiled, registry=registry, resources=resources, prepared=prepared),
         encoding="utf-8",
     )
-    (run_dir / "graph.txt").write_text(export_ascii_flowchart(graph, compiled=compiled, registry=registry, health_report=health), encoding="utf-8")
-    mermaid_text = export_mermaid(graph, compiled=compiled, registry=registry, health_report=health, resources=resources)
+    (run_dir / "graph.txt").write_text(export_ascii_flowchart(graph, compiled=compiled, registry=registry, health_report=health, prepared=prepared), encoding="utf-8")
+    mermaid_text = export_mermaid(graph, compiled=compiled, registry=registry, health_report=health, resources=resources, prepared=prepared)
     (run_dir / "graph.mmd").write_text(mermaid_text, encoding="utf-8")
     try:
         render_mermaid_svg(mermaid_text, run_dir / "graph.svg")
@@ -331,6 +338,7 @@ def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, heal
             expand_nodesets=True,
             max_text_size=EXPANDED_MERMAID_MAX_TEXT_SIZE,
             max_edges=EXPANDED_MERMAID_MAX_EDGES,
+            prepared=prepared,
         )
     except MermaidRenderError as exc:
         (run_dir / "graph.expanded.svg.error.txt").write_text(str(exc), encoding="utf-8")
@@ -350,10 +358,11 @@ def _refuse_on_planned_run(
     run_id: str,
     *,
     registry: NodeRegistry,
-    resources: ConfigResources,
+    resources: PythonResources,
     runtime_options: object | None,
+    compiled=None,
+    prepared=None,
 ) -> None:
-    from vibeflow.targets.python.project.compiler import GraphCompiler
     from vibeflow.targets.python.runtime.helpers import planned_items
 
     options = normalize_runtime_options(runtime_options)
@@ -378,7 +387,11 @@ def _refuse_on_planned_run(
         details={"planned": [dict(item) for item in planned], "allow_planned_stub": options.allow_planned_stub},
     )
     failed = replace(health, status="FAIL", errors=(*health.errors, error))
-    _write_preflight_artifacts(run_dir, graph, GraphCompiler().compile(graph, registry=registry), failed, registry=registry, resources=resources)
+    if prepared is None:
+        from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
+        prepared = prepare_python_presentation(graph, compiled=compiled, registry=registry, resources=resources)
+    _write_preflight_artifacts(run_dir, graph, prepared.compiled, failed, registry=registry,
+                              resources=resources, prepared=prepared)
     _ensure_trace_files(run_dir)
     result = CheckedRunResult(run_id, run_dir, failed)
     raise CheckedRunError("run refused: planned nodes are not executable", result)
@@ -391,7 +404,7 @@ def _execute_runtime(
     initial: Mapping[str, Any] | None,
     run_dir: Path,
     runtime_options: object | None,
-    resources: ConfigResources,
+    resources: PythonResources,
     *,
     capabilities: Mapping[str, object] | None = None,
     delegate_cli: bool = False,

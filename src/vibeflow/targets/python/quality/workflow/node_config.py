@@ -40,7 +40,7 @@ class _CompositeChild:
     nodeset: NodesetSpec | None
 
 
-def validate_node_config_health(
+def node_configuration_findings(
     graph: GraphConfig,
     *,
     registry: NodeRegistry,
@@ -363,4 +363,4 @@ def _node_config_finding(
         details=dict(details or {}),
     )
 
-__all__ = ["validate_node_config_health"]
+__all__ = ["node_configuration_findings"]

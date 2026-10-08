@@ -21,10 +21,16 @@ class _HealthValidationState:
     call_effect_policies: list = field(default_factory=list)
 
 
-def validate_graph_health(graph, *, registry=None, boundary_registry=None, plugin_registry=None,
-    global_config=None, purity_policy=None, effective_policy=None, nodeset_max_depth=4,
-    source_context=None, rule_phase="static", quality_policy=None):
+def validate_graph_health(graph, *, registry=None, plugin_registry=None,
+    global_config=None, purity_policy=None, nodeset_max_depth=4,
+    source_context=None, rule_phase="static", quality_policy=None, compilation=None):
     from vibeflow.targets.python.project.compiler import GraphCompiler, GraphCompileError
+    from vibeflow.targets.python.project.check_session import current_python_check
+    session = current_python_check(registry) if registry is not None else None
+    if compilation is None and session is not None:
+        compilation = session.compiler_stage(graph)
+    if session is not None:
+        session.compilation = session.compilation_input = None
     state = _HealthValidationState()
     _append_findings(state, getattr(plugin_registry, "review_findings", ()))
     if registry is not None:
@@ -32,7 +38,7 @@ def validate_graph_health(graph, *, registry=None, boundary_registry=None, plugi
     execute_workflow_rules(graph, state, registry=registry, source_context=source_context, phase="import",
         purity_policy=purity_policy, quality_policy=quality_policy, nodeset_max_depth=nodeset_max_depth, global_config=global_config)
     if state.errors:
-        return _build_health_report(graph, None, plugin_registry, state, effective_policy=effective_policy, rule_phase="import")
+        return _build_health_report(graph, None, plugin_registry, state, rule_phase="import")
     source_report = None
     if registry is not None and source_context is not None:
         if rule_phase != "import":
@@ -40,7 +46,7 @@ def validate_graph_health(graph, *, registry=None, boundary_registry=None, plugi
             _append_findings(state, import_report.findings)
             state.rule_executions.extend(import_report.executions)
             if state.errors:
-                return _build_health_report(graph, None, plugin_registry, state, effective_policy=effective_policy, rule_phase="import")
+                return _build_health_report(graph, None, plugin_registry, state, rule_phase="import")
         source_report = execute_python_node_rules(registry, source_context, phase=rule_phase, purity_policy=purity_policy, quality_policy=quality_policy)
         _append_findings(state, source_report.findings)
         state.rule_executions.extend(source_report.executions)
@@ -48,12 +54,19 @@ def validate_graph_health(graph, *, registry=None, boundary_registry=None, plugi
             "effect_scope":source_report.call_effect_scopes.get((owner,call),"unconstrained")}
             for (owner,call),policies in source_report.call_effect_policies.items())
     if rule_phase == "import":
-        return _build_health_report(graph, None, plugin_registry, state, effective_policy=effective_policy, rule_phase="import")
+        return _build_health_report(graph, None, plugin_registry, state, rule_phase="import")
     try:
-        compilation = GraphCompiler().compile_with_findings(graph, registry=registry, plugin_registry=plugin_registry)
+        compiler = GraphCompiler()
+        if compilation is None:
+            compilation = compiler.compile_with_findings(graph, registry=registry, plugin_registry=plugin_registry)
+        elif registry is not None:
+            compilation = compiler._refresh_rule_facts(compilation, registry=registry)
     except GraphCompileError as exc:
         return HealthReport(status="FAIL", errors=(HealthFinding(rule_id=exc.rule_id, severity="error",
             object_type="pipeline", object_id="pipeline", failure_layer="topology", message=str(exc), details=dict(exc.details or {})),))
+    if session is not None:
+        session.compilation_input = graph
+        session.compilation = compilation
     graph, compiled = compilation.workflow.graph, compilation.compiled_graph
     if registry is not None and source_context is not None:
         for call in source_context.calls:
@@ -66,7 +79,7 @@ def validate_graph_health(graph, *, registry=None, boundary_registry=None, plugi
     execute_workflow_rules(graph, state, registry=registry, source_context=source_context, phase=rule_phase,
         purity_policy=purity_policy, quality_policy=quality_policy, nodeset_max_depth=nodeset_max_depth,
         global_config=global_config, compiled=compiled, compilation_findings=compilation.findings, source_report=source_report)
-    return _build_health_report(graph, compiled, plugin_registry, state, effective_policy=effective_policy)
+    return _build_health_report(graph, compiled, plugin_registry, state)
 
 
 def workflow_graphs(graph):

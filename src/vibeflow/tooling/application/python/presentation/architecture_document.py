@@ -37,55 +37,32 @@ def build_architecture_document(
     compiled: CompiledGraph | None = None,
     registry: object | None = None,
     resources: object | None = None,
+    prepared=None,
 ) -> dict[str, object]:
-    if registry is not None:
-        from vibeflow.targets.python.project.compiler import GraphCompiler
+    from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
 
-        compilation = GraphCompiler().compile_with_findings(
-            graph,
-            registry=registry,
-        )
-        graph = compilation.workflow.graph
-        actual_compiled = compilation.compiled_graph
-    else:
-        actual_compiled = compile_for_render(graph, compiled, registry)
+    prepared = prepared or prepare_python_presentation(graph, compiled=compiled, registry=registry, resources=resources)
+    return prepared.architecture()
+
+
+def _build_architecture_document(prepared) -> dict[str, object]:
+    graph, actual_compiled = prepared.graph, prepared.compiled
+    registry, resources = prepared.registry, prepared.resources
     roots = _root_paths(graph)
     payload = {
         "project_target": "python",
-        "workflow": _workflow_document(graph, actual_compiled, registry=registry, resources=resources),
-        "nodesets": _nodesets_document(graph, registry=registry),
+        "workflow": _workflow_document(graph, actual_compiled, registry=registry, resources=resources, prepared=prepared),
+        "nodesets": _nodesets_document(graph, registry=registry, prepared=prepared),
         "node_types": _node_types_document(graph, registry=registry, roots=roots),
         "resources": _resources_document(graph, resources, roots=roots),
     }
     if hasattr(registry, "loaded_plugins") and graph.source_path and Path(graph.source_path).is_file():
         from vibeflow.tooling.presentation.resource_architecture import resource_architecture
         from vibeflow.tooling.project.config_loader import load_raw_config_document
-        from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
-        sources = collect_workflow_source_context(registry,graph)
-        collected = {file.path:file for file in sources.files}
-        # Lifecycle and package source scopes are measured independently of Nodes.
-        from vibeflow.targets.python.project.source_membership import resource_paths
-        from vibeflow.targets.python.project.source_closure import collect_python_source_facts
+        sources = prepared.source_context
         catalogs = registry.loaded_plugins.catalogs
-        from vibeflow.core.descriptors.source_bundle import source_resources
-        for kind,descriptor in source_resources(catalogs):
-            if kind in {"plugin","plugin_declaration"}:
-                for _,entry,_ in resource_paths(descriptor,graph.root_path,registry.source_roots):
-                    for fact in collect_python_source_facts(entry,project_root=Path(graph.root_path),source_roots=registry.source_roots):
-                        from vibeflow.targets.python.quality.source_context import PythonSourceFile, build_python_source_context
-                        owner = Path(fact.root_path) if fact.root_path else Path(graph.root_path)
-                        module = ".".join(Path(fact.path).relative_to(owner).with_suffix("").parts).removesuffix(".__init__")
-                        file = PythonSourceFile(fact.path,module,fact.source,"",fact._tree,fact.parse_error,fact.parse_line,fact.parse_column)
-                        collected[file.path] = file
-        from vibeflow.targets.python.quality.source_context import build_python_source_context
-        loaded_source = build_python_source_context((),collected.values())
-        import sys
-        loaded_paths = {str(Path(filename).resolve()) for module in tuple(sys.modules.values())
-                        if isinstance(filename := getattr(module,"__file__",None),str)}
-        snapshot = [{"path":file.path,"load_state":"loaded" if file.path in loaded_paths else "not_loaded","imports":[{"path":item.resolved_path,"specifier":item.specifier,"line":item.line}
-            for item in loaded_source.imports if item.path == file.path]} for file in collected.values()]
         payload["implementation_graph"] = resource_architecture(catalogs,project_root=graph.root_path,
-            source_facts=snapshot,selections=load_raw_config_document(Path(graph.source_path)).data,
+            source_facts=prepared.implementation_sources,selections=load_raw_config_document(Path(graph.source_path)).data,
             selected_nodes={item.type_key for item in sources.nodes},
             findings=getattr(registry,"review_findings",()),
             roots={str(root_id):str(path) for path,root_id in registry.source_root_ids.items()})
@@ -100,8 +77,9 @@ def render_architecture_document(
     compiled: CompiledGraph | None = None,
     registry: object | None = None,
     resources: object | None = None,
+    prepared=None,
 ) -> str:
-    payload = build_architecture_document(graph, compiled=compiled, registry=registry, resources=resources)
+    payload = build_architecture_document(graph, compiled=compiled, registry=registry, resources=resources, prepared=prepared)
     return render_architecture_payload(payload)
 
 
@@ -115,6 +93,7 @@ def _workflow_document(
     *,
     registry: object | None,
     resources: object | None,
+    prepared=None,
 ) -> dict[str, object]:
     source = source_reference(graph.root_id, graph.root_path, graph.source_path)
     global_config = resources_payload(resources).get("global_config", {})
@@ -126,26 +105,29 @@ def _workflow_document(
             compiled,
             registry=registry,
             graph_lock_scope="root",
+            prepared=prepared,
         ),
     }
 
 
-def _nodesets_document(graph: GraphConfig, *, registry: object | None) -> dict[str, object]:
+def _nodesets_document(graph: GraphConfig, *, registry: object | None, prepared=None) -> dict[str, object]:
     reachable = reachable_nodesets(graph)
     documents: dict[str, object] = {}
     for type_key, nodeset in sorted(graph.nodesets.items()):
         source = source_reference(nodeset.root_id, nodeset.root_path, nodeset.source_path)
         body = None
         if nodeset.graph.nodes:
-            compiled = compile_for_render(nodeset.graph, None, registry)
+            compiled = compile_for_render(nodeset.graph, None, registry, prepared=prepared)
             body = _graph_body_document(
                 nodeset.graph,
                 compiled,
                 registry=registry,
                 graph_lock_scope="block",
+                prepared=prepared,
             )
         documents[type_key] = {
             "type_key": nodeset.type_key,
+            "expand": nodeset.expand,
             "source": source,
             "display_name": nodeset.display_name,
             "description": nodeset.description,
@@ -169,11 +151,13 @@ def _graph_body_document(
     *,
     registry: object | None,
     graph_lock_scope: str,
+    prepared=None,
 ) -> dict[str, object]:
     contains_global_state = _graph_contains_global_state(
         graph,
         compiled,
         registry=registry,
+        prepared=prepared,
     )
     return {
         "rulesets": list(graph.rulesets),
@@ -197,6 +181,7 @@ def _graph_body_document(
                 node,
                 registry=registry,
                 graph_lock_scope=graph_lock_scope,
+                prepared=prepared,
             )
             for node in graph.nodes
         ],
@@ -211,6 +196,7 @@ def _node_document(
     *,
     registry: object | None,
     graph_lock_scope: str,
+    prepared=None,
 ) -> dict[str, object]:
     source = source_reference(graph.root_id, graph.root_path, graph.source_path)
     invocation = invocation_for_node(graph, node)
@@ -242,6 +228,7 @@ def _node_document(
                 invocation.nodeset.graph,
                 None,
                 registry,
+                prepared=prepared,
             )
         except Exception:
             child_compiled = None
@@ -251,6 +238,7 @@ def _node_document(
                 child_compiled,
                 registry=registry,
                 visiting=(invocation.target,),
+                prepared=prepared,
             )
     return {
         "id": node.id,
@@ -358,7 +346,10 @@ def _graph_contains_global_state(
     *,
     registry: object | None,
     visiting: tuple[str, ...] = (),
+    prepared=None,
 ) -> bool:
+    if compiled.contains_global_state:
+        return True
     for node in graph.nodes:
         if node.status == STATUS_PLANNED:
             continue
@@ -374,6 +365,7 @@ def _graph_contains_global_state(
                 invocation.nodeset.graph,
                 None,
                 registry,
+                prepared=prepared,
             )
         except Exception:
             continue
@@ -382,6 +374,7 @@ def _graph_contains_global_state(
             child_compiled,
             registry=registry,
             visiting=(*visiting, invocation.target),
+            prepared=prepared,
         ):
             return True
     return False
@@ -453,7 +446,7 @@ def _node_type_document(
         }
     return {
         "type_key": type_key,
-        "source": _python_source(node_cls, roots=roots) if node_cls is not None else {"implementations": [item.to_dict() for item in descriptor.implementations]},
+        "source": _python_source(node_cls, roots=roots) if node_cls is not None else _declared_python_source(registry, type_key, descriptor, roots=roots),
         "declaration": next((source_reference(root_id, root_path, registry.source_info(type_key).path)
                              for root_id, root_path in sorted(roots.items())
                              if source_reference(root_id, root_path, registry.source_info(type_key).path).get("path")), {}),
@@ -732,6 +725,26 @@ def _python_source(node_cls: type, *, roots: Mapping[str, str]) -> dict[str, obj
             break
     if line:
         payload["line"] = line
+    return payload
+
+
+def _declared_python_source(registry, type_key, descriptor, *, roots):
+    location = getattr(registry, "source_locations", {}).get(type_key)
+    if location is None:
+        return {"implementations": [item.to_dict() for item in descriptor.implementations]}
+    path, name, root_id, root = location
+    context = getattr(registry, "source_context_snapshot", None)
+    source = next((item for item in context.files if item.path == str(path)), None) if context else None
+    symbol = context.symbol(str(path), name) if context else None
+    module = source.module if source else ".".join(Path(path).relative_to(root).with_suffix("").parts).removesuffix(".__init__")
+    payload = {"module": module, "class": name}
+    for known_id, root_path in sorted(roots.items()):
+        reference = source_reference(known_id, root_path, str(path))
+        if reference.get("path"):
+            payload.update(reference)
+            break
+    if symbol is not None:
+        payload["line"] = symbol.line
     return payload
 
 

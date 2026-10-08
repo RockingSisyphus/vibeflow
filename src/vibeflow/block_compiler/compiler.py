@@ -78,6 +78,8 @@ def normalize_condition(expression: str) -> ConditionPlan | None:
 def compile_workflow(
     workflow: ValidatedWorkflow,
     implementation_facts: ImplementationFacts,
+    *,
+    native_execution_facts: ImplementationFacts | None = None,
 ) -> WorkflowPlan:
     """Compile a validated workflow using static Target implementation facts."""
 
@@ -97,6 +99,7 @@ def compile_workflow(
         compiled,
         source_by_type=_sources_from_facts(implementation_facts),
         implementation_facts=implementation_facts,
+        native_execution_facts=native_execution_facts,
         target_features=workflow.target_features,
         compile_nested=True,
     )
@@ -113,6 +116,7 @@ def compile_graph_plan(
     pipeline_inputs: Sequence[PipelineInputSpec] | None = None,
     pipeline_outputs: Sequence[PipelineOutputSpec] | None = None,
     implementation_facts: ImplementationFacts | None = None,
+    native_execution_facts: ImplementationFacts | None = None,
     target_features: TargetFeatureSet | None = None,
     compile_nested: bool = False,
 ) -> WorkflowPlan:
@@ -125,6 +129,7 @@ def compile_graph_plan(
         compiled_by_path=compiled_by_path,
         params_by_path=params_by_path,
         implementation_facts=implementation_facts,
+        native_execution_facts=native_execution_facts,
         target_features=target_features,
         compile_nested=compile_nested,
     )
@@ -158,14 +163,6 @@ def compile_graph_plan(
     )
 
 
-def legacy_workflow_spec_payload(plan: WorkflowPlan) -> dict[str, object]:
-    """Return the deterministic payload consumed by the legacy JS adapter."""
-
-    if not isinstance(plan, WorkflowPlan):
-        raise TypeError("plan must be a WorkflowPlan")
-    return plan.to_dict()
-
-
 class _PlannerState:
     def __init__(
         self,
@@ -174,10 +171,12 @@ class _PlannerState:
         compiled_by_path: Mapping[tuple[str, ...], CompiledGraph] | None = None,
         params_by_path: Mapping[tuple[str, ...], Mapping[str, object]] | None = None,
         implementation_facts: ImplementationFacts | None = None,
+        native_execution_facts: ImplementationFacts | None = None,
         target_features: TargetFeatureSet | None = None,
         compile_nested: bool = False,
     ) -> None:
         self.implementation_facts = implementation_facts or ImplementationFacts()
+        self.native_execution_facts = native_execution_facts or ImplementationFacts()
         self.source_by_type = _sources_from_facts(self.implementation_facts)
         self.source_by_type.update(_normalize_source_map(source_by_type))
         self.compiled_by_path = dict(compiled_by_path or {})
@@ -371,7 +370,7 @@ class _PlannerState:
             or getattr(nodeset, "status", "implemented") == STATUS_PLANNED
             else spec.status
         )
-        completion, schedule, executor = self._execution_semantics(spec)
+        completion, schedule, executor = self._execution_semantics(spec, native=is_nodeset or is_loop)
         effect_scope = compiled.effect_scopes.get(
             spec.id,
             (
@@ -432,20 +431,20 @@ class _PlannerState:
     def _source(self, type_used: str) -> SourceRef:
         return self.source_by_type.get(type_used, SourceRef(kind="catalog", ref=type_used))
 
-    def _execution_semantics(self, spec: NodeSpec) -> tuple[str, str, str]:
+    def _execution_semantics(self, spec: NodeSpec, *, native: bool = False) -> tuple[str, str, str]:
         if spec.type_used == IO_NODE_TYPE:
             if spec.io.operation == "receive":
                 return ("suspend", "inline", "event_loop")
             return ("immediate", "inline", "current")
-        fact = self.implementation_facts.get(spec.type_used)
+        fact = (self.native_execution_facts if native else self.implementation_facts).get(spec.type_used)
         completion = fact.completion if fact is not None else "immediate"
         if spec.async_mode:
             schedule = _schedule(spec.async_mode)
-            executor = (
-                fact.executor
-                if fact is not None and fact.executor != "current"
-                else _executor(spec.async_mode)
-            )
+            executor = _executor(spec.async_mode)
+            if fact is not None:
+                executor = fact.async_executor or (
+                    fact.executor if fact.executor != "current" else executor
+                )
             return (completion, schedule, executor)
         if fact is None:
             return (completion, "inline", "current")
@@ -474,7 +473,7 @@ def _block(
         kind=kind,
         path=path,
         source=_graph_source(graph, _block_id(path)),
-        inputs=_legacy_inputs(graph),
+        inputs=_pipeline_inputs(graph),
         outputs=_legacy_outputs(graph),
         nodes=nodes,
         routes=routes,
@@ -727,12 +726,12 @@ def _requirements(items: Sequence[object]) -> tuple[DataRequirementPlan, ...]:
     )
 
 
-def _legacy_inputs(graph: GraphConfig) -> tuple[PipelineInputSpec, ...]:
+def _pipeline_inputs(graph: GraphConfig) -> tuple[PipelineInputSpec, ...]:
     return tuple(
         PipelineInputSpec(
             key=item.key,
             type=item.type,
-            required=getattr(item, "required", None),
+            required=item.required,
             display_name=item.display_name,
         )
         for item in graph.inputs
@@ -755,11 +754,11 @@ def _root_inputs(
     graph: GraphConfig,
     supplied: Sequence[PipelineInputSpec] | None,
 ) -> tuple[PipelineInputSpec, ...]:
-    values = tuple(supplied) if supplied is not None else _legacy_inputs(graph)
-    expected = tuple((item.key, item.type) for item in graph.inputs)
-    actual = tuple((item.key, item.type) for item in values)
+    values = tuple(supplied) if supplied is not None else _pipeline_inputs(graph)
+    expected = tuple((item.key, item.type, item.required) for item in graph.inputs)
+    actual = tuple((item.key, item.type, item.required) for item in values)
     if actual != expected:
-        raise PortablePlanError("portable pipeline inputs must match GraphConfig input key/type order")
+        raise PortablePlanError("portable pipeline inputs must match GraphConfig input key/type/required order")
     return values
 
 

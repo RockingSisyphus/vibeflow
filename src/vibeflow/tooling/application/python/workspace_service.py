@@ -15,6 +15,7 @@ from vibeflow.tooling.application.python.reports import (
 from vibeflow.core.findings import HealthFinding, HealthReport
 from vibeflow.core.descriptors import PluginSelectionError
 from vibeflow.core.flow import GraphConfigError
+from vibeflow.tooling.application.python.project.prepared_graph import PreparedWorkspaceGraph
 from vibeflow.targets.python.project.compiler import GraphCompileError, GraphCompiler
 from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
 from vibeflow.targets.python.project.policy import default_effective_policy
@@ -38,11 +39,10 @@ from vibeflow.tooling.project.descriptor_loader import (
 from vibeflow.tooling.project.plugin_review import (
     load_plugin_review_resources,
 )
-from vibeflow.tooling.application.python.project.resources import (
-    ConfigResources,
+from vibeflow.tooling.application.python.project.resource_selection import (
+    PythonResources,
     HostExtensionResource,
-    config_base_lib_policy,
-    load_config_resources,
+    select_python_resources,
     resolve_host_extension_resources,
 )
 from vibeflow.tooling.application.python.presentation.architecture_validation import (
@@ -59,7 +59,6 @@ from vibeflow.tooling.application.python.project.core import (
 from vibeflow.tooling.application.python.project.policy import resolve_workspace_effective_policy
 from vibeflow.tooling.application.python.project.project_options import (
     _workspace_runtime_options,
-    project_javascript_options,
 )
 from vibeflow.tooling.application.python.project.quality import scan_workspace_code_quality
 from vibeflow.tooling.application.python.project.types import (
@@ -72,24 +71,35 @@ from vibeflow.tooling.application.python.project.types import (
     WorkspaceEnvironment,
     WorkspaceRoot,
 )
+from vibeflow.tooling.application.python.presentation.prepared import (
+    python_check_scope as _python_check_scope, final_python_compilation as _final_compilation,
+)
 
 
-def validate_workspace_config_path(path: Path, *, workspace: WorkspaceConfig, environment=None) -> HealthReport:
+def validate_workspace_config_path(path: Path, *, workspace: WorkspaceConfig, environment=None, _policy_result=None) -> HealthReport:
     env = environment if environment is not None else _environment_or_report(workspace, path)
     if isinstance(env, HealthReport):
         return env
-    prepared = _prepare_workspace_graph(path, workspace=workspace, env=env)
-    if isinstance(prepared, HealthReport):
-        return prepared
-    effective_runtime_options = _workspace_runtime_options(path, workspace=workspace)
-    return _validate_prepared_workspace_graph(
-        prepared,
-        env=env,
-        workspace=workspace,
-        runtime_options=effective_runtime_options,
-    )
+    with _python_check_scope(env.registry):
+        if _policy_result is not None:
+            env = replace(env, effective_policy=_policy_result.effective_policy,
+                          findings=(*env.findings, *_policy_result.findings))
+        prepared = _prepare_workspace_graph(path, workspace=workspace, env=env, policy_override=_policy_result)
+        if isinstance(prepared, HealthReport):
+            return prepared
+        effective_runtime_options = _workspace_runtime_options(path, workspace=workspace)
+        return _validate_prepared_workspace_graph(
+            prepared,
+            env=env,
+            workspace=workspace,
+            runtime_options=effective_runtime_options,
+        )
 
 
+from vibeflow.tooling.application.python.run_observation import observed_checked_run
+
+
+@observed_checked_run
 def run_workspace_checked(
     config_path: str | Path,
     *,
@@ -128,65 +138,71 @@ def run_workspace_checked(
     if isinstance(env, HealthReport):
         _write_refused_artifacts(run_dir, env, include_effective_policy=True)
         raise CheckedRunError("run refused: workspace load failed", CheckedRunResult(actual_run_id, run_dir, env))
-    if _policy_result is not None:
-        env = replace(env, effective_policy=_policy_result.effective_policy,
-                      findings=(*env.findings, *_policy_result.findings))
-        env.registry.configure_rule_defaults(purity_policy=_policy_result.effective_policy.to_purity_policy())
-    prepared = _prepare_workspace_graph(Path(config_path), workspace=workspace, env=env,
-                                       policy_override=_policy_result)
-    if isinstance(prepared, HealthReport):
-        _write_refused_artifacts(run_dir, prepared, include_effective_policy=True)
-        raise CheckedRunError(f"run refused: health status {prepared.status}", CheckedRunResult(actual_run_id, run_dir, prepared))
-    effective_runtime_options = _workspace_runtime_options(config_path, workspace=workspace, overrides=runtime_options)
-    document, graph, compiled, resources, plugin_registry, effective_policy, warnings = prepared
-    _write_json(run_dir / "effective_policy.json", effective_policy.to_dict())
-    validation_kwargs = {"delegate_cli": True} if delegate_cli else {}
-    health = _validate_prepared_workspace_graph(
-        prepared,
-        env=env,
-        workspace=workspace,
-        runtime_options=effective_runtime_options,
-        rule_phase="run",
-        **validation_kwargs,
-    )
-    if health.status in {"FAIL", "ERROR"}:
-        _write_refused_artifacts(run_dir, health)
-        _refuse_on_health_failure(health, run_dir, actual_run_id)
-    compiled = GraphCompiler().compile(graph, registry=env.registry)
-    _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=env.registry, resources=resources, runtime_options=effective_runtime_options)
-    _write_preflight_artifacts(run_dir, graph, compiled, health, registry=env.registry, resources=resources)
-    _refuse_on_health_failure(health, run_dir, actual_run_id)
-    execute_kwargs = {"delegate_cli": True} if delegate_cli else {}
-    if capabilities is not None:
-        execute_kwargs["capabilities"] = capabilities
-    from vibeflow.tooling.application.python.project.contributions import lifecycle_registry, release_runtime_plugins
-    try:
-        runtime_registry = lifecycle_registry(env.registry, workflow_id=str(config_path), config_path=config_path,
-                                             plugin_types=("runtime",))
-    except Exception as exc:
-        failed = _workspace_error_report("PLUGIN.FACTORY.LOAD", str(exc), Path(config_path), effective_policy)
-        _write_refused_artifacts(run_dir, failed)
-        raise CheckedRunError("run refused: runtime plugin creation failed", CheckedRunResult(actual_run_id, run_dir, failed)) from exc
-    health = replace(health, info={**health.info, "plugins": {"plugins": [
-        *plugin_registry.to_dict()["plugins"], *runtime_registry.to_dict()["plugins"]]}})
-    _write_json(run_dir / "health_report.json", health.to_dict())
-    context = None
-    try:
-        context = _execute_runtime(
-        graph,
-        env.registry,
-        runtime_registry,
-        initial,
-        run_dir,
-        effective_runtime_options,
-        resources,
-        health=health,
-        **execute_kwargs,
+    with _python_check_scope(env.registry):
+        if _policy_result is not None:
+            env = replace(env, effective_policy=_policy_result.effective_policy,
+                          findings=(*env.findings, *_policy_result.findings))
+            env.registry.configure_rule_defaults(purity_policy=_policy_result.effective_policy.to_purity_policy())
+        prepared = _prepare_workspace_graph(Path(config_path), workspace=workspace, env=env,
+                                           policy_override=_policy_result)
+        if isinstance(prepared, HealthReport):
+            _write_refused_artifacts(run_dir, prepared, include_effective_policy=True)
+            raise CheckedRunError(f"run refused: health status {prepared.status}", CheckedRunResult(actual_run_id, run_dir, prepared))
+        effective_runtime_options = _workspace_runtime_options(config_path, workspace=workspace, overrides=runtime_options)
+        graph, resources = prepared.graph, prepared.resources
+        plugin_registry, effective_policy = prepared.plugin_registry, prepared.effective_policy
+        _write_json(run_dir / "effective_policy.json", effective_policy.to_dict())
+        validation_kwargs = {"delegate_cli": True} if delegate_cli else {}
+        health = _validate_prepared_workspace_graph(
+            prepared,
+            env=env,
+            workspace=workspace,
+            runtime_options=effective_runtime_options,
+            rule_phase="run",
+            **validation_kwargs,
         )
-    finally:
-        release_runtime_plugins(runtime_registry)
-    _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
-    return CheckedRunResult(actual_run_id, run_dir, health, context)
+        if health.status in {"FAIL", "ERROR"}:
+            _write_refused_artifacts(run_dir, health)
+            _refuse_on_health_failure(health, run_dir, actual_run_id)
+        compilation = _final_compilation(graph, env.registry)
+        graph, compiled = compilation.workflow.graph, compilation.compiled_graph
+        from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
+        presentation = prepare_python_presentation(graph, registry=env.registry, resources=resources, compilation=compilation)
+        _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=env.registry, resources=resources,
+                              runtime_options=effective_runtime_options, compiled=compiled, prepared=presentation)
+        _write_preflight_artifacts(run_dir, graph, compiled, health, registry=env.registry, resources=resources, prepared=presentation)
+        _refuse_on_health_failure(health, run_dir, actual_run_id)
+        execute_kwargs = {"delegate_cli": True} if delegate_cli else {}
+        if capabilities is not None:
+            execute_kwargs["capabilities"] = capabilities
+        from vibeflow.tooling.application.python.project.contributions import lifecycle_registry, release_runtime_plugins
+        try:
+            runtime_registry = lifecycle_registry(env.registry, workflow_id=str(config_path), config_path=config_path,
+                                                 plugin_types=("runtime",))
+        except Exception as exc:
+            failed = _workspace_error_report("PLUGIN.FACTORY.LOAD", str(exc), Path(config_path), effective_policy)
+            _write_refused_artifacts(run_dir, failed)
+            raise CheckedRunError("run refused: runtime plugin creation failed", CheckedRunResult(actual_run_id, run_dir, failed)) from exc
+        health = replace(health, info={**health.info, "plugins": {"plugins": [
+            *plugin_registry.to_dict()["plugins"], *runtime_registry.to_dict()["plugins"]]}})
+        _write_json(run_dir / "health_report.json", health.to_dict())
+        context = None
+        try:
+            context = _execute_runtime(
+            graph,
+            env.registry,
+            runtime_registry,
+            initial,
+            run_dir,
+            effective_runtime_options,
+            resources,
+            health=health,
+            **execute_kwargs,
+            )
+        finally:
+            release_runtime_plugins(runtime_registry)
+        _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
+        return CheckedRunResult(actual_run_id, run_dir, health, context)
 
 
 def load_workspace_graph_for_export(
@@ -194,27 +210,34 @@ def load_workspace_graph_for_export(
     *,
     workspace: WorkspaceConfig,
     validate_health: bool = False,
-) -> tuple[object, object, object, ConfigResources, HealthReport | None]:
+    _include_presentation: bool = False,
+) -> tuple[object, object, object, PythonResources, HealthReport | None]:
+    result = _load_workspace_graph_for_presentation(path, workspace=workspace, validate_health=validate_health)
+    return result if _include_presentation else result[:5]
+
+
+def _load_workspace_graph_for_presentation(path, *, workspace, validate_health):
     env = _environment_or_report(workspace, path)
     if isinstance(env, HealthReport):
-        return None, None, None, ConfigResources(), env
-    prepared = _prepare_workspace_graph(path, workspace=workspace, env=env)
-    if isinstance(prepared, HealthReport):
-        return None, None, None, ConfigResources(), prepared
-    _, graph, compiled, resources, _, _, _ = prepared
-    health = _validate_prepared_workspace_graph(
-            prepared,
-            env=env,
-            workspace=workspace,
-            runtime_options=_workspace_runtime_options(path, workspace=workspace),
-            check_architecture_document=False,
-        )
-    if validate_health:
-        if health.status in {"FAIL", "ERROR"}:
-            return None, None, None, ConfigResources(), health
-    if health.status not in {"FAIL", "ERROR"}:
-        compiled = GraphCompiler().compile(graph, registry=env.registry)
-    return graph, compiled, env.registry, resources, None
+        return None, None, None, PythonResources(), env, env, None
+    with _python_check_scope(env.registry):
+        prepared = _prepare_workspace_graph(path, workspace=workspace, env=env)
+        if isinstance(prepared, HealthReport):
+            return None, None, None, PythonResources(), prepared, prepared, None
+        graph, compiled, resources = prepared.graph, prepared.compiled, prepared.resources
+        health = _validate_prepared_workspace_graph(prepared, env=env, workspace=workspace,
+            runtime_options=_workspace_runtime_options(path, workspace=workspace), check_architecture_document=False)
+        if validate_health and health.status in {"FAIL", "ERROR"}:
+            return None, None, None, PythonResources(), health, health, None
+        presentation = None
+        if health.status not in {"FAIL", "ERROR"}:
+            from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
+
+            compilation = _final_compilation(graph, env.registry)
+            presentation = prepare_python_presentation(graph, registry=env.registry,
+                resources=resources, compilation=compilation)
+            graph, compiled = presentation.graph, presentation.compiled
+        return graph, compiled, env.registry, resources, None, health, presentation
 
 
 def _validate_prepared_workspace_graph(
@@ -227,7 +250,9 @@ def _validate_prepared_workspace_graph(
     delegate_cli: bool = False,
     rule_phase: str = "static",
 ) -> HealthReport:
-    document, graph, compiled, resources, plugin_registry, effective_policy, warnings = prepared
+    document, graph, compiled = prepared.document, prepared.graph, prepared.compiled
+    resources, plugin_registry = prepared.resources, prepared.plugin_registry
+    effective_policy, warnings = prepared.effective_policy, prepared.warnings
     purity_policy = effective_policy.to_purity_policy()
     health = validate_graph_health(
         graph,
@@ -235,13 +260,15 @@ def _validate_prepared_workspace_graph(
         plugin_registry=plugin_registry,
         global_config=resources.global_config,
         purity_policy=purity_policy,
-        effective_policy=effective_policy,
         nodeset_max_depth=runtime_options.nodeset_max_depth,
         source_context=collect_workflow_source_context(env.registry, graph),
         rule_phase=rule_phase,
+        compilation=prepared.compilation,
     )
     if health.status not in {"FAIL", "ERROR"}:
-        compiled = GraphCompiler().compile(graph, registry=env.registry)
+        compilation = _final_compilation(graph, env.registry)
+        graph, compiled = compilation.workflow.graph, compilation.compiled_graph
+        prepared.graph, prepared.compilation = graph, compilation
     info = dict(health.info)
     info["nodeset_imports"] = [dict(item) for item in document.nodeset_imports]
     info["resources"] = resources.to_dict()
@@ -270,9 +297,13 @@ def _validate_prepared_workspace_graph(
         )
 
         report = validate_delegate_cli_graph_contract(graph, report)
+    prepared.health = report
     if report.status in {"FAIL", "ERROR"} or not check_architecture_document:
         return report
-    return _validate_registered_architecture_document(
+    from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
+    presentation = prepare_python_presentation(graph, registry=env.registry, resources=resources,
+        compilation=compilation)
+    prepared.health = _validate_registered_architecture_document(
         report,
         document_path=document.path,
         graph=graph,
@@ -280,7 +311,9 @@ def _validate_prepared_workspace_graph(
         registry=env.registry,
         resources=resources,
         workspace=workspace,
+        prepared=presentation,
     )
+    return prepared.health
 
 
 def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: WorkspaceEnvironment, policy_override=None):
@@ -304,7 +337,6 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
         return config_load_error_report(exc, object_type="config", object_id=str(config_path))
     forbidden = _forbidden_config_findings(document.data, root=root, source_path=config_path) if workspace.path.name == WORKSPACE_CONFIG_NAME else ()
     preflight_findings = [*forbidden, *annotate_findings(env.findings, root=root, source_path=config_path)]
-    root_registries = env.resource_registries.get(root.id)
     source_policy = env.effective_policy if policy_override is None else policy_override.effective_policy
     env.registry.configure_rule_defaults(purity_policy=source_policy.to_purity_policy())
     from vibeflow.tooling.application.python.project.contributions import lifecycle_registry
@@ -335,11 +367,7 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
         return _workspace_error_report("PLUGIN.FACTORY.LOAD", str(exc), config_path, env.effective_policy)
     try:
         selected_config = {**document.data, "plugins": list(env.registry.loaded_plugins.lifecycle_selections)}
-        resources, resource_findings = load_config_resources(selected_config, base_path=root.path,
-            plugin_registry=plugin_registry,
-            base_lib_registry=root_registries.base_libs if root_registries else None,
-            plugin_resource_registry=root_registries.plugins if root_registries else None,
-            base_lib_paths=root_registries.base_lib_paths if root_registries else (str(root.path),))
+        resources, resource_findings = select_python_resources(document.data, registry=env.registry, base_path=root.path)
         if resources.host_extensions:
             resolved_extensions, extension_findings = resolve_host_extension_resources(resources.host_extensions,
                 catalog=descriptor_catalogs.host_extensions)
@@ -359,8 +387,6 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
         policy_result = resolve_workspace_effective_policy(
             workspace.policy if policy_override is None else None,
             workspace_path=workspace.path,
-            base_lib_policies=(config_base_lib_policy(resources.to_dict(), base_path=root.path),),
-            plugin_registry=plugin_registry,
             base_effective=None if policy_override is None else policy_override.effective_policy,
         )
         preflight_findings.extend(annotate_findings(policy_result.findings, root=root, source_path=config_path))
@@ -385,7 +411,7 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
             return fail_report("CONFIG.SCHEMA.PARSE", str(exc), "config", str(config_path), "schema", effective_policy=effective_policy.to_dict())
         except GraphCompileError as exc:
             return fail_report(exc.rule_id, str(exc), "pipeline", "pipeline", "topology", effective_policy=effective_policy.to_dict())
-        return document, graph, compiled, resources, plugin_registry, effective_policy, warnings
+        return PreparedWorkspaceGraph(document, graph, compilation, resources, plugin_registry, effective_policy, warnings)
     finally:
         from vibeflow.tooling.application.python.project.contributions import release_plugins
         release_plugins(plugin_registry, plugin_type="compiler")

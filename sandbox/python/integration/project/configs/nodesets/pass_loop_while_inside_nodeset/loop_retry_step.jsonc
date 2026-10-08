@@ -25,7 +25,8 @@
       {
         "key": "loop.current",
         "type": "loop.current",
-        "display_name": "Loop Current"
+        "display_name": "Loop Current",
+        "required": true
       }
     ],
     "nodes": [

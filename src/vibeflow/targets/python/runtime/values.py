@@ -2,23 +2,13 @@ from __future__ import annotations
 
 from typing import Mapping
 
-from vibeflow.core.contracts import DataEnvelope, DataProvider, RunResult
+from vibeflow.core.contracts import DataEnvelope, PipelineInputSpec, RunResult
 from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
 
 def _store_output(result: RunResult, result_key: str, envelope: DataEnvelope) -> None:
     result.set(result_key, envelope.to_input())
 
-def _inputs_to_initial(inputs: Mapping[str, object]) -> dict[str, object]:
-    initial: dict[str, object] = {}
-    for value in inputs.values():
-        if isinstance(value, list):
-            for item in value:
-                _copy_input_item(item, initial)
-        else:
-            _copy_input_item(value, initial)
-    return initial
-
-def _nodeset_inputs_to_initial(inputs: Mapping[str, object], graph_inputs: tuple[DataProvider, ...]) -> dict[str, object]:
+def _nodeset_inputs_to_initial(inputs: Mapping[str, object], graph_inputs: tuple[PipelineInputSpec, ...]) -> dict[str, object]:
     initial: dict[str, object] = {}
     input_items = list(_iter_input_items(inputs))
     for provider in graph_inputs:
@@ -133,10 +123,6 @@ def _iter_result_envelopes(value: object, *, prefix: str):
         child = f"{prefix}.{key}" if prefix else str(key)
         yield from _iter_result_envelopes(item, prefix=child)
 
-def _copy_input_item(item: object, initial: dict[str, object]) -> None:
-    if isinstance(item, Mapping) and "key" in item:
-        initial[str(item["key"])] = item.get("value")
-
 def _result_value(item: object) -> object:
     if isinstance(item, Mapping) and {"key", "type", "value", "source_node"} <= set(item):
         return item.get("value")
@@ -150,9 +136,7 @@ def _public_result_value(item: object) -> object:
 
 
 __all__ = [
-    "_copy_input_item",
     "_initial_loop_values",
-    "_inputs_to_initial",
     "_iter_input_items",
     "_iter_result_envelopes",
     "_loop_body_initial",

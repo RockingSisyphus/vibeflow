@@ -1,0 +1,22 @@
+flowchart LR
+  vf_resource_652b902b3d78d7ec@{ shape: hex, label: "BaseLib" }
+  vf_resource_652b902b3d78d7ec -. "catalog" .-> vf_resource_881d43c74247bbc8
+  vf_resource_881d43c74247bbc8@{ shape: hex, label: "layout.helper\nbase_lib: layout.helper\nstatus: implemented\nrulesets: vibeflow.base_lib" }
+  style vf_resource_881d43c74247bbc8 fill:#ffe6b3,stroke:#059669,color:#064e3b;
+  vf_resource_257b6829e46b5417@{ shape: doc, label: "helper.py\nentry\nloaded\nowners: base_lib:layout.helper" }
+  vf_resource_8d9e9be4e44a8cca@{ shape: rect, label: "引用 / reference\nsteps.py\nentry\nloaded\nowners: node:layout.end, node:layout.start, node:layout.step, node:layout.step_right\nsection: node_types" }
+  style vf_resource_8d9e9be4e44a8cca fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray:4 3;
+  vf_resource_47600e6a75b05c46@{ shape: rect, label: "引用 / reference\ncode_plugin.py\nentry\nloaded\nowners: plugin_declaration:layout.resources\nsection: plugins" }
+  style vf_resource_47600e6a75b05c46 fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray:4 3;
+  vf_resource_98598161dbf506ec@{ shape: rect, label: "引用 / reference\nlayout.step\nnode: layout.step\nsection: node_types" }
+  style vf_resource_98598161dbf506ec fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray:4 3;
+  vf_resource_229fdbcff52877ed@{ shape: rect, label: "引用 / reference\nlayout.step_right\nnode: layout.step_right\nsection: node_types" }
+  style vf_resource_229fdbcff52877ed fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray:4 3;
+  vf_resource_3aa1fb8de781ffab@{ shape: rect, label: "引用 / reference\nLayout lifecycle\nplugin_declaration: layout.resources\nsection: plugins" }
+  style vf_resource_3aa1fb8de781ffab fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray:4 3;
+  vf_resource_881d43c74247bbc8 -. "entry" .-> vf_resource_257b6829e46b5417
+  vf_resource_8d9e9be4e44a8cca -. "import" .-> vf_resource_257b6829e46b5417
+  vf_resource_47600e6a75b05c46 -. "import" .-> vf_resource_257b6829e46b5417
+  vf_resource_98598161dbf506ec -. "base_lib" .-> vf_resource_881d43c74247bbc8
+  vf_resource_229fdbcff52877ed -. "base_lib" .-> vf_resource_881d43c74247bbc8
+  vf_resource_3aa1fb8de781ffab -. "contributes" .-> vf_resource_881d43c74247bbc8

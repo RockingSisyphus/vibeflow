@@ -26,7 +26,6 @@ from vibeflow.core.descriptors import (
 )
 from vibeflow.core.descriptors.source_bundle import implementation_sources, source_resources
 from vibeflow.core.flow import GraphConfig
-from vibeflow.block_compiler import WorkflowPlan
 
 
 PORT_CAPABILITY_ID = "vibeflow.port"
@@ -193,36 +192,16 @@ def host_extension_closure(
     project_root: Path,
     configurations: Mapping[str, Mapping[str, Any]] | None = None,
     planned: frozenset[str] = frozenset(),
+    resolved_ids: tuple[str, ...] | None = None,
 ) -> tuple[Mapping[str, Any], ...]:
     ordered: list[Mapping[str, Any]] = []
-    complete: set[str] = set()
-    active: list[str] = []
     extension_config = configurations or {}
 
-    def visit(extension_id: str) -> None:
-        if extension_id in complete:
-            return
-        if extension_id in planned:
-            raise ProjectBuildError(
-                "VF_AOT_HOST_EXTENSION_PLANNED_DEPENDENCY",
-                (
-                    f"implemented host_extension depends on planned "
-                    f"host_extension '{extension_id}'"
-                ),
-            )
-        if extension_id in active:
-            start = active.index(extension_id)
-            cycle = " -> ".join((*active[start:], extension_id))
-            raise ProjectBuildError(
-                "VF_AOT_HOST_EXTENSION_CYCLE",
-                f"host_extension dependency cycle: {cycle}",
-            )
-        descriptor = catalogs.host_extensions.get(extension_id)
-        if descriptor is None:
-            raise ProjectBuildError(
-                "VF_AOT_HOST_EXTENSION_UNKNOWN",
-                f"unknown host_extension '{extension_id}'",
-            )
+    from vibeflow.targets.javascript.build.host_selection import active_host_ids
+    selected_ids = resolved_ids if resolved_ids is not None else active_host_ids(enabled,
+        catalog=catalogs.host_extensions, planned=planned)
+    for extension_id in selected_ids:
+        descriptor = catalogs.host_extensions.require(extension_id)
         if target not in descriptor.targets:
             raise ProjectBuildError(
                 "VF_AOT_TARGET_IMPLEMENTATION_MISSING",
@@ -231,10 +210,6 @@ def host_extension_closure(
                     f"for target '{target}'"
                 ),
             )
-        active.append(extension_id)
-        for dependency in descriptor.dependencies:
-            visit(dependency)
-        active.pop()
         for capability_id in descriptor.provides:
             capability = (
                 port_capability_descriptor({"receive", "send"})
@@ -289,10 +264,6 @@ def host_extension_closure(
                 ),
             }
         )
-        complete.add(extension_id)
-
-    for extension_id in enabled:
-        visit(extension_id)
     return tuple(ordered)
 
 
@@ -348,90 +319,6 @@ def schemas_for_types(
             f"JSON data schemas are required for AOT types: {missing}",
         )
     return schemas
-
-
-def enriched_payload(
-    plan: WorkflowPlan,
-    *,
-    schemas: Mapping[str, Mapping[str, Any]],
-    capabilities: tuple[CapabilityDescriptor, ...],
-    nodes: Mapping[str, NodeDescriptor],
-    implementations: Mapping[str, Mapping[str, str]],
-) -> dict[str, Any]:
-    payload = plan.to_dict()
-    payload["schemas"] = {
-        key: dict(value) for key, value in sorted(schemas.items())
-    }
-    payload["capabilities"] = [
-        {
-            "id": capability.id,
-            "operations": {
-                name: operation.to_dict()
-                for name, operation in sorted(capability.operations.items())
-            },
-        }
-        for capability in capabilities
-    ]
-    for block in payload["blocks"]:
-        loop = block.get("loop")
-        if isinstance(loop, dict):
-            if loop.get("stop_after") is None:
-                loop.pop("stop_after", None)
-            condition = loop.get("stop_when")
-            if isinstance(condition, Mapping):
-                loop["stop_when"] = {
-                    "from": str(condition.get("key", "")),
-                    "equals": bool(condition.get("literal", True)),
-                }
-        for node in block["nodes"]:
-            if node.get("type_used") == "vibeflow.io":
-                operation = str(node.get("io_operation", ""))
-                node["implementation"] = None
-                node["completion"] = (
-                    "suspend" if operation == "receive" else "immediate"
-                )
-                node["executor"] = (
-                    "event_loop" if operation == "receive" else "current"
-                )
-                node["capabilities"] = [
-                    {
-                        "id": PORT_CAPABILITY_ID,
-                        "operations": [operation],
-                    }
-                ]
-                continue
-            if node.get("is_nodeset") or node.get("is_loop"):
-                node["implementation"] = None
-                continue
-            descriptor = nodes.get(str(node.get("type_used", "")))
-            if descriptor is None:
-                continue
-            implementation = implementations.get(descriptor.type_key, {})
-            completion = str(
-                implementation.get("completion", "immediate")
-                or "immediate"
-            )
-            node["completion"] = completion
-            if node.get("schedule") != "inline" or completion == "suspend":
-                node["executor"] = "event_loop"
-            else:
-                node["executor"] = "current"
-            node["capabilities"] = [
-                requirement.to_dict()
-                for requirement in descriptor.capabilities
-            ]
-        task_by_node = {
-            str(task.get("node_id", "")): task
-            for task in block.get("tasks", [])
-            if isinstance(task, dict)
-        }
-        for node in block["nodes"]:
-            task = task_by_node.get(str(node.get("id", "")))
-            if task is not None:
-                task["executor"] = str(
-                    node.get("executor", "event_loop")
-                )
-    return payload
 
 
 def target_neutral_import_policy(
@@ -642,7 +529,6 @@ def driver_import_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
 
 __all__ = [
     "base_lib_closure",
-    "enriched_payload",
     "driver_import_policy",
     "host_extension_closure",
     "required_capabilities",

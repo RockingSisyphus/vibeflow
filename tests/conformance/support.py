@@ -1,8 +1,8 @@
 """Cross-runtime conformance support built around VibeFlow's portable plan.
 
-The Python runtime supplies the reference observation. A conformance case is
-compiled once through its real ``ExecutionPlan`` adapter, then that
-portable plan is emitted and executed as JavaScript.  The observations below
+The Python runtime supplies the reference observation. The same graph is
+compiled with each Target's native execution facts, then the JavaScript
+canonical plan is emitted and executed. The observations below
 intentionally compare the public contract and stable trace facts instead of
 runtime-private event payloads.
 """
@@ -18,13 +18,17 @@ import subprocess
 from typing import Any, Mapping
 
 from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
+from vibeflow.targets.javascript.frontend.bindings import build_javascript_binding_plan
+from vibeflow.targets.javascript.frontend.facts import native_workflow_facts
 from vibeflow.core.contracts import (
     CARDINALITY_ALL,
     DataEnvelope,
     RunResult,
 )
 from vibeflow.core import GraphConfig
-from vibeflow.block_compiler import SourceRef
+from vibeflow.block_compiler import SourceRef, compile_graph_plan
+from vibeflow.core.compiler import compile_core
+from vibeflow.core.models import CoreCompileRequest, ImplementationFact, ImplementationFacts, TargetFeatureSet
 from vibeflow.targets.python.project.registry import NodeRegistry
 from vibeflow.targets.python.runtime import PipelineRuntime, RuntimeOptions
 from vibeflow.tooling.project.graph_config import parse_graph_config
@@ -39,6 +43,7 @@ class PortableConformanceCase:
     javascript_source: str
     javascript_exports: Mapping[str, str]
     port_inputs: Mapping[str, tuple[Any, ...]] = field(default_factory=dict)
+    javascript_completions: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -61,6 +66,7 @@ class RuntimeObservation:
 @dataclass(frozen=True)
 class PortableConformanceResult:
     portable_plan: Mapping[str, Any]
+    javascript_plan: Mapping[str, Any]
     python: RuntimeObservation
     javascript: RuntimeObservation
 
@@ -112,6 +118,33 @@ def run_portable_conformance(
         workflow_id=case.name,
         source_by_type=sources,
     )
+    javascript_facts = ImplementationFacts(tuple(
+        ImplementationFact(
+            type_key=type_key,
+            flow_kind=case.registry.descriptor(type_key).flow_kind,
+            requires=case.registry.descriptor(type_key).contract.requires,
+            provides=case.registry.descriptor(type_key).contract.provides,
+            completion=case.javascript_completions.get(type_key, "immediate"),
+            executor=("event_loop" if case.javascript_completions.get(type_key) == "suspend" else "current"),
+            async_executor="event_loop",
+            source_kind=source.kind,
+            source_ref=source.ref,
+            source_export=source.export,
+        )
+        for type_key, source in sources.items()
+        if type_key in case.registry.available()
+    ), strict=True)
+    javascript_features = TargetFeatureSet(target="javascript")
+    javascript_compilation = compile_core(CoreCompileRequest(
+        graph=graph, implementation_facts=javascript_facts,
+        target_features=javascript_features, known_nodesets=frozenset(graph.nodesets),
+    ))
+    javascript_plan = compile_graph_plan(
+        javascript_compilation.workflow.graph, javascript_compilation.compiled_graph, workflow_id=case.name,
+        source_by_type=sources, implementation_facts=javascript_facts,
+        native_execution_facts=native_workflow_facts(javascript_compilation.workflow.graph),
+        target_features=javascript_features, compile_nested=True,
+    )
 
     python_observation = _run_python(
         runtime,
@@ -120,7 +153,7 @@ def run_portable_conformance(
         port_sends=python_port_sends,
     )
     javascript_observation = _run_javascript(
-        portable_plan,
+        javascript_plan,
         case.javascript_source,
         case.inputs,
         port_inputs=case.port_inputs,
@@ -128,6 +161,7 @@ def run_portable_conformance(
     )
     return PortableConformanceResult(
         portable_plan=portable_plan.to_dict(),
+        javascript_plan=javascript_plan.to_dict(),
         python=python_observation,
         javascript=javascript_observation,
     )
@@ -171,12 +205,9 @@ def _run_javascript(
 ) -> RuntimeObservation:
     work_dir.mkdir(parents=True, exist_ok=True)
     (work_dir / "nodes.mjs").write_text(node_source, encoding="utf-8")
-    emission_plan = (
-        _javascript_plan_with_port_bindings(portable_plan)
-        if port_inputs
-        else portable_plan
+    emitted = emit_workflow_module(
+        portable_plan, javascript_bindings=_javascript_bindings(portable_plan),
     )
-    emitted = emit_workflow_module(emission_plan)
     workflow_path = work_dir / "workflow.mjs"
     workflow_path.write_text(emitted.source, encoding="utf-8")
     entry_name = (
@@ -335,46 +366,20 @@ def _python_port_capabilities(
     }
 
 
-def _javascript_plan_with_port_bindings(portable_plan: object) -> dict[str, Any]:
-    """Attach target binding facts absent from the language-neutral IR.
-
-    ``WorkflowPlan`` intentionally describes IO nodes without embedding a JS
-    Capability catalog.  The real project builder supplies that catalog from
-    descriptors; this test adapter does the same without changing the
-    canonical portable plan returned to assertions.
-    """
-
-    to_dict = getattr(portable_plan, "to_dict", None)
-    if not callable(to_dict):
-        raise TypeError("portable conformance plan must support to_dict()")
-    payload = json.loads(json.dumps(to_dict(), ensure_ascii=False))
-    operations: dict[str, dict[str, str]] = {}
-    blocks = payload.get("blocks", [])
-    for block in blocks:
-        for node in block.get("nodes", []):
-            if node.get("type_used") != "vibeflow.io":
-                continue
-            operation = str(node.get("io_operation", ""))
-            node["implementation"] = None
-            completion = "suspend" if operation == "receive" else "immediate"
-            operations[operation] = {
-                "input_type": f"vibeflow.port.{operation}.request",
-                "output_type": f"vibeflow.port.{operation}.result",
-                "completion": completion,
-            }
-            node["capabilities"] = [
-                {
-                    "id": "vibeflow.port",
-                    "operations": [operation],
+def _javascript_bindings(portable_plan):
+    """Bind JS capabilities without changing the canonical portable plan."""
+    operations = {}
+    for block in portable_plan.blocks:
+        for node in block.nodes:
+            if node.io_operation:
+                operation = node.io_operation
+                operations[operation] = {
+                    "input_type": f"vibeflow.port.{operation}.request",
+                    "output_type": f"vibeflow.port.{operation}.result",
+                    "completion": "suspend" if operation == "receive" else "immediate",
                 }
-            ]
-    payload["capabilities"] = [
-        {
-            "id": "vibeflow.port",
-            "operations": operations,
-        }
-    ]
-    return payload
+    capabilities = {"vibeflow.port": {"operations": operations}} if operations else {}
+    return build_javascript_binding_plan(portable_plan, capabilities=capabilities)
 
 
 _TASK_EVENT_KINDS = frozenset(

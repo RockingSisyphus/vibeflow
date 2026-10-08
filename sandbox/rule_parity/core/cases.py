@@ -14,7 +14,7 @@ from types import SimpleNamespace
 def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None) -> list[dict]:
     from vibeflow.core.compiler import compile_core
     from vibeflow.core.config.graph import parse_graph_config_data
-    from vibeflow.core.contracts import DataProvider, DataRequirement
+    from vibeflow.core.contracts import PipelineInputSpec, DataProvider, DataRequirement
     from vibeflow.core.flow import (
         EdgeSpec, ExecutionLockSpec, GraphConfig, IoSpec, LoopSpec, NodeMetadata,
         NodeSpec, NodesetSpec,
@@ -23,18 +23,25 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     from vibeflow.core.quality import (
         FileQuality, FunctionQuality, ImportSite, ProjectQualityFacts, QualityPolicy,
         QualityStructureLimits, QualityStructureRoles,
-        QualityThresholds, evaluate_project_quality,
+        QualityThresholds,
     )
     from vibeflow.core.quality.implementation import (
         ImplementationLimits, ImplementationMetrics, analyze_call_graph,
-        evaluate_base_lib_dependency_chain, evaluate_base_lib_implementation,
-        evaluate_node_implementation,
     )
     from vibeflow.core.quality.nodesets import nodeset_quality_findings
     from vibeflow.core.quality.workflow_rules.duplicates import duplicate_logic_findings
     from vibeflow.core.quality.workflow_rules.flow import append_flowchart_health, append_join_policy_health
     from vibeflow.core.quality.workflow_rules.flow_data import append_data_contract_warnings
     from vibeflow.core.quality.workflow_rules.planned import planned_health_events
+
+    if variant == "baseline":
+        from vibeflow.core.quality import evaluate_project_quality
+        from vibeflow.core.quality.implementation import (evaluate_node_implementation,
+            evaluate_base_lib_implementation, evaluate_base_lib_dependency_chain)
+    else:
+        from sandbox.rule_parity.core.support import evaluate_standard_project_quality as evaluate_project_quality
+        from vibeflow.builtin.implementation import (check_node_implementation as evaluate_node_implementation,
+            check_base_lib_implementation as evaluate_base_lib_implementation, check_base_lib_dependency_chain as evaluate_base_lib_dependency_chain)
 
     work_root.mkdir(parents=True, exist_ok=True)
     observations = []
@@ -206,10 +213,19 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
                 codes(*(("QUALITY.STRUCTURE."+diagnostic,"error" if amount > 3 else "warning"),) if amount >= 2 else ()), evidence=structure_evidence)
     for source_role,target_role,diagnostic in [("base_lib","nodes","BASE_LIB_UPWARD_IMPORT"),
         ("nodes","plugins","NODE_UNDECLARED_PROJECT_IMPORT"),("plugins","nodes","PLUGIN_NODE_IMPORT"),("nodes","base_lib",None)]:
-        roles=QualityStructureRoles(module_roles={"a":source_role,"b":target_role},infer_roles_from_path=False)
+        if variant == "baseline":
+            # Historical constructor belongs only to the isolated old kernel.
+            roles=QualityStructureRoles(**{"module_roles":{"a":source_role,"b":target_role},"infer_roles_from_path":False})
+        else:
+            kinds={"nodes":"node", "base_lib":"base_lib", "plugins":"plugin"}
+            owners=[{"path":path,"id":resource_id,"kind":kinds[role],"role":"entry",
+                     "base_libs":["b"] if source_role == "nodes" and target_role == "base_lib" and resource_id == "a" else [],
+                     "dependencies":[],"plugin_id":"test"}
+                    for resource_id,path,role in (("a","a.py",source_role),("b","b.py",target_role))]
+            roles=QualityStructureRoles(_resource_scopes=({"id":"selected","owners":owners},))
         policy=QualityPolicy(structure_limits=replace(quiet,enforce_role_imports=True),structure_roles=roles)
-        emit(f"project.roles.{source_role}.{target_role}", f"角色导入 {source_role}→{target_role}", "project.structure",
-            lambda policy=policy:project([file("a.py",imports=("b",)),file("b.py")],policy),
+        emit(f"project.roles.{source_role}.{target_role}", f"声明资源导入 {source_role}→{target_role}", "project.structure",
+            lambda policy=policy:project([file("a.py",imports=("b",),import_sites=(ImportSite("a","b","import b","a.py",1,1),)),file("b.py")],policy),
             codes(*(("QUALITY.STRUCTURE."+diagnostic,"error"),) if diagnostic else ()),evidence=structure_evidence)
     for name,threshold in [("fanout","max_directory_fanout"),("fanin","max_directory_fanin")]:
         files=([file("source/x.py",imports=("a.x","b.x")),file("a/x.py"),file("b/x.py")] if name == "fanout"
@@ -261,7 +277,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         lambda:compile_graph(GraphConfig((node("a",provides=(DataProvider("value","value"),)),node("b",provides=(DataProvider("value","value"),))))),
         codes(("GRAPH.COMPILE","error")),evidence=native_evidence)
     emit("native.input_provider_conflict", "节点输出与Root输入 key冲突", "native.contract",
-        lambda:compile_graph(GraphConfig((node("a",provides=(DataProvider("value","value"),)),),inputs=(DataProvider("value","value"),))),
+        lambda:compile_graph(GraphConfig((node("a",provides=(DataProvider("value","value"),)),),inputs=(PipelineInputSpec("value","value",required=True),))),
         codes(("GRAPH.COMPILE","error")),evidence=native_evidence)
     for role in ("schedule","transfer"):
         kwargs={"schedule":role == "schedule","transfer":role == "transfer"}
@@ -456,11 +472,13 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     # the current loss of Nodeset identity reported during the independent audit.
     def unconstrained_child():
         from vibeflow.targets.python.project.registry import NodeRegistry
+        if variant == "current":
+            from vibeflow.tooling.application.python.project.declarations import default_python_registry as NodeRegistry
         from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
         child=GraphConfig(()) if variant == "baseline" else GraphConfig((),rulesets=())
         definition=NodesetSpec("probe.child","Child","A valid empty source-free child.",(),(),child)
         graph=healthy((NodeSpec("stage","probe.child",metadata=NodeMetadata("Stage","Calls child.")),))
-        graph=replace(graph,nodesets={definition.type_key:definition})
+        graph=replace(graph,nodesets={definition.type_key:definition}, **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
         return validate_graph_health(graph,registry=NodeRegistry())
     emit("workflow.unconstrained_child_identity","父图默认审查仍识别显式[]子Nodeset","workflow.orchestration",unconstrained_child,{"should_accept":True},
         classification="approved_change",notes="baseline无子图Ruleset选择；current明确[]仅免审查，原生Nodeset身份应保留。不得xfail。",
@@ -468,7 +486,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
 
     if variant != "baseline":
         from vibeflow.core.rules import compile_ruleset
-        from vibeflow.core.rules.builtin import builtin_rule_resources
+        from vibeflow.builtin import builtin_rule_resources
         rules,sets=builtin_rule_resources()
         for selected,phase,count in [("vibeflow.workflow","import",0),("vibeflow.workflow","static",1),("vibeflow.workflow","run",1),
             ("vibeflow.quality.project","import",0),("vibeflow.quality.project","static",4),("vibeflow.quality.project","run",0),

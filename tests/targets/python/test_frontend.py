@@ -1,6 +1,7 @@
 """Isolation and behavior checks for the Python frontend."""
 
 from __future__ import annotations
+from tests.fixtures.support.declarations import native_registry
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 
 import os
@@ -70,23 +71,17 @@ def test_core_descriptor_identity_and_file_provenance_boundary() -> None:
 
 
 def test_registration_provenance_still_points_to_caller() -> None:
-    from vibeflow.targets.python.project.node import NodeContract, NodeInfo
+    from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
     from vibeflow.targets.python.project.registry import NodeRegistry
 
-    ExampleNode_DECLARATION = node_declaration(NodeInfo(
-            "test.provenance",
-            "Provenance",
-            "Captures registration provenance.",
-            "1",
-            "process",
-        ), NodeContract(), rulesets=("vibeflow.process",))
+    ExampleNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.provenance', display_name='Provenance', description='Captures registration provenance.', version='1', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.process",))
 
     class ExampleNode:
 
         def run_pure(self, inputs, params):
             return {}
 
-    registry = NodeRegistry()
+    registry = native_registry()
     expected_line = sys._getframe().f_lineno + 1
     registry.register(configured_declaration(ExampleNode_DECLARATION, {}, {}), ExampleNode)
     info = registry.registration_info()[0]

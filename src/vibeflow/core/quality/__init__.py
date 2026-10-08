@@ -25,11 +25,9 @@ from vibeflow.core.quality.workflow import (
     validate_workflow_quality,
 )
 from vibeflow.core.quality.workflow_rules import (
-    RULE_CATALOG,
     append_flowchart_health,
     append_join_policy_health,
     duplicate_logic_findings,
-    rule_catalog,
     schema_finding,
 )
 
@@ -44,7 +42,6 @@ __all__ = [
     "QualityFinding",
     "QualityPolicy",
     "QualityReport",
-    "RULE_CATALOG",
     "QualityStructureLimits",
     "QualityStructureConventions",
     "QualityStructureRoles",
@@ -57,7 +54,6 @@ __all__ = [
     "duplicate_logic_findings",
     "evaluate_project_quality",
     "nodeset_quality_findings",
-    "rule_catalog",
     "schema_finding",
     "validate_workflow_quality",
 ]

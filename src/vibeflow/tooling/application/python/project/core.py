@@ -19,11 +19,11 @@ def load_workspace_config(path: str | Path) -> WorkspaceConfig:
 def build_workspace_environment(workspace: WorkspaceConfig, config_path=None) -> WorkspaceEnvironment:
     registry = build_workspace_node_registry(workspace, config_path=config_path)
     from vibeflow.tooling.application.python.project.contributions import contributed_resources
-    resource_registries, available_resources, resource_findings = contributed_resources(workspace, registry)
+    available_resources, resource_findings = contributed_resources(workspace, registry)
     policy_result = resolve_workspace_effective_policy(workspace.policy, workspace_path=workspace.path)
     return WorkspaceEnvironment(registry=registry, plugin_registry=PluginRegistry(),
         resources=available_resources, available_resources=available_resources,
-        resource_registries=resource_registries, effective_policy=policy_result.effective_policy,
+        effective_policy=policy_result.effective_policy,
         findings=(*resource_findings, *policy_result.findings))
 
 

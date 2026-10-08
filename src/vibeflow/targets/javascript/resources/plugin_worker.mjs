@@ -11,6 +11,7 @@ import {sdkPlugin} from "./sdk_loader.mjs";
 const PLUGIN_ABI = "vibeflow.plugin.v3";
 const RULE_ABI = "vibeflow.rule.v1";
 const instances = new Map();
+const sourceAnalyses = new Map();
 // Keep trusted implementations' ordinary logging outside the JSONL protocol.
 console.log = (...values) => process.stderr.write(format(...values) + "\n");
 
@@ -83,6 +84,7 @@ function sourceService(ts, packageRoot, facts) {
     const text = provided.get(absolute) ?? readFileSync(absolute, "utf8");
     const cached = cache.get(absolute);
     if (cached?.text === text) return cached;
+    if(cached){for(const snapshot of snapshots.splice(0))snapshot.dispose();api?.close();api=null;cache.clear();}
     let tree;
     if (typeof ts.createSourceFile === "function") tree = ts.createSourceFile(absolute, text, ts.ScriptTarget.Latest, true);
     else {
@@ -141,8 +143,8 @@ function sourceService(ts, packageRoot, facts) {
   }
   return Object.freeze({
     dispose() { for (const snapshot of snapshots) snapshot.dispose(); api?.close(); },
-    text(file) { return parsed(file).text; },
-    ast(file) { const {tree} = parsed(file); return deepFreeze(describe(tree, tree, true)); },
+    text(file) { const absolute=path.resolve(packageRoot,file);return provided.get(absolute)??readFileSync(absolute,"utf8"); },
+    ast(file) { const value = parsed(file);return value.description??=deepFreeze(describe(value.tree,value.tree,true)); },
     symbols(file) {
       const {tree} = parsed(file); const result = [];
       function visit(node, owners = []) {
@@ -156,11 +158,11 @@ function sourceService(ts, packageRoot, facts) {
     },
     imports(file) { return deepFreeze(imports(file)); },
     reachable(file) { return Object.freeze(reachable(file)); },
-    ownership(file) {
+    ownership(file, currentFacts = facts) {
       const absolute = path.resolve(packageRoot, file);
-      const declared = (facts.source_owners || []).filter(item => path.resolve(item.path) === absolute);
+      const declared = (currentFacts.source_owners || []).filter(item => path.resolve(item.path) === absolute);
       const nodeTypes = new Set();
-      for (const source of facts.sources || []) if (facts.node_types?.[source.owner] && (facts.source_files || []).includes(source.path) && reachable(source.path).includes(absolute)) nodeTypes.add(source.owner);
+      for (const source of currentFacts.sources || []) if (currentFacts.node_types?.[source.owner] && (currentFacts.source_files || []).includes(source.path) && reachable(source.path).includes(absolute)) nodeTypes.add(source.owner);
       return deepFreeze({path: absolute, declared, node_types: [...nodeTypes]});
     },
     nodes(file, kind) {
@@ -169,6 +171,23 @@ function sourceService(ts, packageRoot, facts) {
       visit(tree); return deepFreeze(result);
     },
   });
+}
+function sharedSourceService(record,facts){
+  const key=JSON.stringify([record.packageRoot,(facts.sources||[]).map(source=>[source.path,source.text]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))]);
+  if(!sourceAnalyses.has(key))sourceAnalyses.set(key,{service:sourceService(record.tools.ts,record.packageRoot,facts),references:0});
+  const analysis=sourceAnalyses.get(key);
+  record.analysisKeys??=new Set();
+  if(!record.analysisKeys.has(key)){record.analysisKeys.add(key);analysis.references+=1;}
+  return analysis.service;
+}
+function releaseSourceServices(record){
+  const errors=[];
+  for(const key of record.analysisKeys||[]){
+    const analysis=sourceAnalyses.get(key);if(!analysis)continue;
+    if(--analysis.references===0){sourceAnalyses.delete(key);try{analysis.service.dispose();}catch(error){errors.push(error);}}
+  }
+  record.analysisKeys?.clear();
+  if(errors.length)throw errors[0];
 }
 const contributionCallbacks = new Map();
 async function loadImplementation(request, isRule) {
@@ -240,13 +259,12 @@ async function dispatch(request) {
   if (command === "evaluateRule") {
     if (!record.isRule) failure("RULE.IMPLEMENTATION", "session does not contain a Rule");
     const supplied = deepFreeze(jsonValue(request.context || {}, "context"));
-    const sourceAnalysis = sourceService(record.tools.ts, record.packageRoot, supplied.facts || {});
-    const {dispose, ...publicSources} = sourceAnalysis;
+    const sourceAnalysis = sharedSourceService(record, supplied.facts || {});
+    const {dispose, ownership, ...syntaxSources} = sourceAnalysis;
+    const publicSources = {...syntaxSources,ownership:file=>ownership(file,supplied.facts||{})};
     const context = Object.freeze({ ...supplied, abiVersion: RULE_ABI, ruleId: String(record.declaration.id), signal: record.controller.signal, sources: Object.freeze(publicSources) });
-    try {
-      const result = await record.callback(context, deepFreeze(jsonValue(request.inputs || {}, "inputs")), deepFreeze(jsonValue(request.params || {}, "params")));
-      return { implemented: true, result: ruleJsonValue(result, "result") };
-    } finally { dispose(); }
+    const result = await record.callback(context, deepFreeze(jsonValue(request.inputs || {}, "inputs")), deepFreeze(jsonValue(request.params || {}, "params")));
+    return { implemented: true, result: ruleJsonValue(result, "result") };
   }
   if (command === "invoke") {
     const hook = String(request.hook || ""); const callback = record.instance[hook];
@@ -261,8 +279,16 @@ async function dispatch(request) {
   }
   if (command === "close") {
     record.controller.abort("session closed");
-    if (typeof record.instance?.dispose === "function") await record.instance.dispose();
-    instances.delete(sessionId); return { closed: true };
+    let error;
+    try {
+      if (typeof record.instance?.dispose === "function") await record.instance.dispose();
+    } catch(cause){error=cause;}
+    finally {
+      instances.delete(sessionId);
+      try{releaseSourceServices(record);}catch(cause){if(!error)error=cause;else error.details={...error.details,cleanup_errors:[{phase:"source-analysis",message:String(cause)}]};}
+    }
+    if(error)throw error;
+    return { closed: true };
   }
   failure("VF_PLUGIN_PROCESS", `unknown worker command '${command}'`);
 }

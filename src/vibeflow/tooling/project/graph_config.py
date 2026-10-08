@@ -32,8 +32,9 @@ def parse_graph_config(
     actual_source_path = (
         str(Path(source_path).resolve()) if source_path is not None else ""
     )
+    from vibeflow.tooling.application.graph_defaults import with_workflow_rule_defaults
     graph = parse_graph_config_data(
-        config,
+        with_workflow_rule_defaults(config),
         project_root=root_text,
         root_id=root_id,
         root_path=actual_root_path,

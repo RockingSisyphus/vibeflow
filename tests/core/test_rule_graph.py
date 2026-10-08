@@ -375,11 +375,50 @@ def test_builtin_planned_records_preserve_frozen_event_types():
     from vibeflow.core.flow import GraphConfig, NodeSpec
     from vibeflow.core.planned import PlannedBehavior
     from vibeflow.core.quality.workflow_rules.planned import PlannedImplementationCheck
-    from vibeflow.core.rules.builtin.workflow import evaluate_workflow_topic
+    from vibeflow.builtin.workflow import workflow_topic_resources, workflow_topic_handlers
 
     graph = GraphConfig(nodes=(NodeSpec("future", "example.future", status="planned",
         planned_behavior=PlannedBehavior("python_stub", "stubs/future.py")),))
-    result = evaluate_workflow_topic("planned", graph=graph)
+    resources = {item.id:item for item in workflow_topic_resources()}
+    plan = compile_ruleset(RulesetDescriptor("planned", (RuleCall("check", "vibeflow.graph.planned"),)), rules=resources)
+    result = execute_rule_plan(plan, RuleContext(facts={"graph":graph}), handlers=workflow_topic_handlers()).results["check"]
     assert result.state == "completed"
     assert any(isinstance(event, PlannedImplementationCheck) for event in result.records["events"].value)
     json.dumps(result.to_dict())
+
+
+@pytest.mark.parametrize("variant",["dataclass","set"])
+def test_native_input_record_types_are_not_merged_by_their_json_projection(variant):
+    from dataclasses import make_dataclass
+    provider = RuleDescriptor("native.provider",scope="call",outputs={"data":"native.v1"})
+    consumer = RuleDescriptor("native.consumer",scope="source",inputs={"data":"native.v1"})
+    selection = RulesetDescriptor("native",calls=(RuleCall("provide",rule_id=provider.id),RuleCall("consume",rule_id=consumer.id)),
+        relations=(RuleRelation("consume","provide","requires",bindings={"data":"data"}),))
+    first = make_dataclass("Payload",[("value",int)],frozen=True)
+    second = make_dataclass("Payload",[("value",int)],frozen=True)
+    values = [first(1),second(1),{"value":1}] if variant == "dataclass" else [[1],frozenset({1})]
+    pending, seen = iter(values), []
+    def provide(*_):
+        return RuleResult(records={"data":RuleRecord("native.v1",next(pending))})
+    def consume(context,inputs,params):
+        seen.append(type(inputs["data"].value))
+        return RuleResult()
+    plan = compile_ruleset(selection,rules={item.id:item for item in (provider,consumer)})
+    context = RuleContext(subject={"source_identity":"unchanged source"})
+    cache = {}
+    results = [execute_rule_plan(plan,context,handlers={provider.id:provide,consumer.id:consume},source_cache=cache) for _ in values]
+    wire = [result.results["provide"].records["data"].to_dict() for result in results]
+    assert all(item == wire[0] for item in wire)
+    assert len(seen) == len(values) and all(result.executed == ("provide","consume") for result in results)
+    # The ordinary JSON input remains cacheable; native values never alias it.
+    assert len(cache) == 1
+
+
+def test_record_cache_eligibility_visits_shared_json_containers_once():
+    from vibeflow.core.rules.execution import _cacheable_record_value
+    shared = 1
+    for _ in range(64):
+        shared = (shared,shared)
+    memo = {}
+    assert _cacheable_record_value(shared,memo)
+    assert len(memo) == 64 and all(memo.values())

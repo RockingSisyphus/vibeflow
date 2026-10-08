@@ -162,13 +162,14 @@ def analyze_runtime_dispatch(node_cls: type[Any]) -> RuntimeDispatchAnalysis | N
 def analyze_source_runtime_dispatch(sources, node) -> RuntimeDispatchAnalysis | None:
     """Analyse a declaration's snapshot without binding or importing its class."""
     symbol = sources.symbol(node.path, node.symbol)
-    if symbol is None or not isinstance(symbol.node, ast.ClassDef):
+    if symbol is None or not isinstance(symbol._node, ast.ClassDef):
         return None
-    run = next((item for item in symbol.node.body if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == "run_pure"), None)
-    if run is None:
+    member = sources.class_members(symbol).get("run_pure")
+    if member is None:
         return RuntimeDispatchAnalysis()
+    run = member._node
     analyzer = _SourceDispatchAnalyzer(sources, node)
-    unit = _FunctionUnit(f"{node.path}:{node.symbol}.run_pure", run, node.path, 0, None, node.symbol)
+    unit = _FunctionUnit(member.id, run, member.path, 0, None, member.name.rpartition(".")[0])
     analyzer.analyze(unit, _bind_initial_parameters(run))
     return RuntimeDispatchAnalysis(tuple(analyzer.sites))
 
@@ -654,19 +655,22 @@ class _RuntimeDispatchAnalyzer:
 
 class _SourceDispatchAnalyzer(_RuntimeDispatchAnalyzer):
     def __init__(self, sources, node):
-        super().__init__(root_path=node.path, root_tree=sources.file(node.path).tree, root_module=None, owner_class=node.symbol)
+        # Target analysis only reads its own parsed trees. Public tree/node
+        # accessors still return isolated copies to extension callers.
+        super().__init__(root_path=node.path, root_tree=sources.file(node.path)._tree, root_module=None, owner_class=node.symbol)
         self.sources = sources
-        self._module_trees = {file.path: file.tree for file in sources.files if file.tree is not None}
+        self._module_trees = {file.path: file._tree for file in sources.files if file._tree is not None}
+        self._call_targets = {(reference.source, reference.line, reference.column): reference.target
+                              for reference in reversed(sources.references) if reference.kind == "call"}
+        self._symbols = {symbol.id: symbol for symbol in reversed(sources.symbols)}
 
     def _helper_unit(self, expression, function, frame):
         source_id = frame.unit.key
-        target_id = next((reference.target for reference in self.sources.references
-                          if reference.source == source_id and reference.kind == "call" and reference.line == getattr(expression, "lineno", 0)
-                          and reference.column == getattr(expression,"col_offset",0)+1), None)
-        target = next((symbol for symbol in self.sources.symbols if symbol.id == target_id), None)
-        if target is not None and isinstance(target.node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        target_id = self._call_targets.get((source_id, getattr(expression, "lineno", 0), getattr(expression, "col_offset", 0) + 1))
+        target = self._symbols.get(target_id)
+        if target is not None and isinstance(target._node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             owner = target.name.rpartition(".")[0] if isinstance(expression, ast.Attribute) and isinstance(expression.value, ast.Name) and expression.value.id in {"self", "cls"} else ""
-            return _FunctionUnit(target.id, target.node, target.path, 0, None, owner)
+            return _FunctionUnit(target.id, target._node, target.path, 0, None, owner)
         return super()._helper_unit(expression, function, frame)
 
 

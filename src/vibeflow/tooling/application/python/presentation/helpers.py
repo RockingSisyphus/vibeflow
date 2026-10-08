@@ -17,7 +17,9 @@ def node_is_external(node: NodeSpec, registry) -> bool:
     return bool(getattr(registry_descriptor(registry, node.type_used), "external", False))
 
 
-def compile_for_render(graph: GraphConfig, compiled: CompiledGraph | None, registry: NodeRegistry | None) -> CompiledGraph:
+def compile_for_render(graph: GraphConfig, compiled: CompiledGraph | None, registry: NodeRegistry | None, *, prepared=None) -> CompiledGraph:
+    if prepared is not None:
+        return prepared.graph_for(graph)[1]
     if compiled is not None:
         return compiled
     from vibeflow.targets.python.project.compiler import GraphCompiler
@@ -29,7 +31,10 @@ def effective_graph_for_render(
     graph: GraphConfig,
     compiled: CompiledGraph | None,
     registry: NodeRegistry | None,
+    *, prepared=None,
 ) -> tuple[GraphConfig, CompiledGraph]:
+    if prepared is not None:
+        return prepared.graph_for(graph)
     if registry is None:
         return graph, compile_for_render(graph, compiled, registry)
     from vibeflow.targets.python.project.compiler import GraphCompiler

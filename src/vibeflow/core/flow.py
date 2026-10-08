@@ -225,6 +225,11 @@ class NodesetSpec:
     root_id: str = ""
     root_path: str = ""
     source_path: str = ""
+    expand: bool = True
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.expand, bool):
+            raise ValueError("nodeset expand must be a boolean")
 
     @property
     def name(self) -> str:
@@ -248,7 +253,7 @@ class GraphConfig:
     root_path: str = ""
     source_path: str = ""
     execution_lock: ExecutionLockSpec | None = None
-    rulesets: tuple[str, ...] = ("vibeflow.workflow",)
+    rulesets: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if isinstance(self.rulesets, str) or not all(isinstance(item, str) and item.strip() for item in self.rulesets):

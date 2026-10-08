@@ -17,6 +17,8 @@ _SOURCE_ERROR_RULES = frozenset(
     }
 )
 _MAX_DIFFERENCE_PATHS = 50
+_LOAD_STATES = frozenset({"loaded", "not_loaded", "unknown"})
+_LOAD_STATE_OBSERVATION = object()
 
 
 def check_architecture_document(
@@ -82,8 +84,10 @@ def check_architecture_document(
             source_location=source_location,
         )
 
-    if actual_payload != expected_payload:
-        difference_paths, difference_count = _difference_paths(expected_payload, actual_payload)
+    expected_structure = _structural_payload(expected_payload)
+    actual_structure = _structural_payload(actual_payload)
+    if actual_structure != expected_structure:
+        difference_paths, difference_count = _difference_paths(expected_structure, actual_structure)
         return _finding(
             "ARCHITECTURE.DOCUMENT.STALE",
             document_path,
@@ -96,7 +100,9 @@ def check_architecture_document(
             },
         )
 
-    if actual_text != expected_text:
+    from vibeflow.tooling.application.python.presentation.architecture_document import render_architecture_payload
+
+    if actual_text != render_architecture_payload(actual_payload):
         return _finding(
             "ARCHITECTURE.DOCUMENT.NON_CANONICAL",
             document_path,
@@ -104,6 +110,37 @@ def check_architecture_document(
             details=_difference_details(details, "$.__canonical_text__"),
         )
     return None
+
+
+def _structural_payload(payload: Mapping[str, object]) -> Mapping[str, object]:
+    """Source load state describes this observation, not architecture freshness."""
+    implementation = payload.get("implementation_graph")
+    if not isinstance(implementation, Mapping):
+        return payload
+    graph = dict(implementation)
+    files = graph.get("files")
+    if isinstance(files, Mapping):
+        graph["files"] = {key: _source_observation(value) for key, value in files.items()}
+    resources = graph.get("resources")
+    if isinstance(resources, Mapping):
+        records = {}
+        for key, value in resources.items():
+            record = dict(value) if isinstance(value, Mapping) else value
+            if isinstance(record, Mapping) and isinstance(record.get("sources"), (list, tuple)):
+                record["sources"] = [_source_observation(item) for item in record["sources"]]
+            records[key] = record
+        graph["resources"] = records
+    return {**payload, "implementation_graph": graph}
+
+
+def _source_observation(value: object) -> object:
+    if not isinstance(value, Mapping):
+        return value
+    record = dict(value)
+    state = record.get("load_state")
+    if isinstance(state, str) and state in _LOAD_STATES:
+        record["load_state"] = _LOAD_STATE_OBSERVATION
+    return record
 
 
 def _validate_registered_architecture_document(
@@ -115,6 +152,7 @@ def _validate_registered_architecture_document(
     registry: object,
     resources: object,
     workspace: object,
+    prepared=None,
 ) -> HealthReport:
     """Validate the generated document registered for one workflow, if any."""
 
@@ -142,6 +180,7 @@ def _validate_registered_architecture_document(
         compiled=compiled,
         registry=registry,
         resources=resources,
+        prepared=prepared,
     )
     expected_text = render_architecture_payload(expected_payload)
     finding = check_architecture_document(

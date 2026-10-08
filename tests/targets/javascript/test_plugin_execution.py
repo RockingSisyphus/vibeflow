@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.fixtures.support.plugins import Resource, write_plugin
+
 from dataclasses import dataclass
 import json
 import os
@@ -88,8 +90,8 @@ def javascript_project(
         root,
         ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc"),
     )
-    from tests.fixtures.support.code_plugins import copy_archival_inputs
-    copy_archival_inputs(SANDBOX_PROJECT, root)
+    from tests.fixtures.support.plugins import copy_sdk_inputs
+    copy_sdk_inputs(SANDBOX_PROJECT, root)
     (root / "node_modules").symlink_to(
         javascript_toolchain_root / "node_modules",
         target_is_directory=True,
@@ -268,7 +270,8 @@ def test_compiler_lifecycle_can_use_module_state(plugin_package: Path) -> None:
 
 
 def _write_json(path: Path, value: object) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    if not isinstance(path, Resource):
+        path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(value, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
@@ -292,9 +295,9 @@ def _install_project_plugin(
     short_name = plugin_id.replace(".", "-")
     source_relative = f"plugins/{short_name}.ts"
     (project.root / source_relative).write_text(source, encoding="utf-8")
-    _write_json(
-        project.root / "manifests/plugins" / f"{short_name}.jsonc",
-        {
+    write_plugin(
+        project.root,
+        [{
             "kind": "plugin",
             "id": plugin_id,
             "type": plugin_type,
@@ -312,7 +315,10 @@ def _install_project_plugin(
                     },
                 }
             ],
-        },
+        }],
+        target="javascript",
+        filename=f"code_lifecycle_{short_name}.ts",
+        plugin_id=plugin_id + ".fixture",
     )
 
 
@@ -323,7 +329,15 @@ def _select_plugins(
 ) -> Path:
     source = project.root / "configs" / config_name
     payload = _read_json(source)
-    payload["plugins"] = plugin_ids
+    payload["plugins"] = [{"source": {"kind": "file", "ref": "code_plugin.ts", "export": "plugin"}}]
+    for selected in plugin_ids:
+        fields = dict(selected) if isinstance(selected, dict) else {"id": selected}
+        plugin_id = str(fields.pop("id"))
+        if fields.get("status") == "planned":
+            payload["plugins"].append({"id": plugin_id, **fields})
+        else:
+            payload["plugins"].append({"source": {"kind": "file",
+                "ref": f"code_lifecycle_{plugin_id.replace('.', '-')}.ts", "export": "plugin"}, **fields})
     target = project.root / "configs" / f"test-{config_name}"
     _write_json(target, payload)
     return target
@@ -672,7 +686,8 @@ def _write_failing_nodeset_config(
         config,
         {
             "nodeset_imports": [{"path": "nodesets/plugin_failure.jsonc"}],
-            "plugins": [plugin_id],
+            "plugins": [{"source": {"kind": "file", "ref": "code_plugin.ts", "export": "plugin"}},
+                        {"source": {"kind": "file", "ref": f"code_lifecycle_{plugin_id.replace('.', '-')}.ts", "export": "plugin"}}],
             "pipeline": {
                 "inputs": [
                     {
@@ -1047,14 +1062,6 @@ def test_runtime_plugin_and_host_extension_share_lifecycle_without_coupling(
             expected_nodes=("start", "double", "end"),
         ),
     )
-    host_project = _read_json(
-        javascript_project.root / "vibeflow_host_project.jsonc"
-    )
-    host_project.setdefault("descriptors", {})["plugins"] = ["manifests/plugins"]
-    _write_json(
-        javascript_project.root / "vibeflow_host_project.jsonc",
-        host_project,
-    )
     config = _select_plugins(
         javascript_project,
         "host_extension.jsonc",
@@ -1092,8 +1099,3 @@ process.stdout.write(JSON.stringify({
 
 
 # Publish controlled case inputs as fixed SDK plugins before formal entrypoints.
-_native_build_project_aot = build_project_aot
-def build_project_aot(request, **options):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(request.workspace)
-    return _native_build_project_aot(request, **options)

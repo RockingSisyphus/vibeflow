@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.targets.javascript.aot_fixtures import emit_fixture, fixture_build_request
+
 from dataclasses import dataclass
 import json
 import os
@@ -271,7 +273,7 @@ def test_project_dependency_negative_has_precise_diagnostic(
         for owner in case.owners
     )
     entry = project / "entry.ts"
-    checked = run_rule_check_driver({"typecheckFiles": [str(entry)], "ruleTopics": ["imports", "purity", "ownership", "completion", "module_state"], "importPolicy": {"owners": owners, "node_base_libs": case.node_base_libs or {}, "base_lib_dependencies": {"test.base": []}}}, package_root=project)
+    checked = run_rule_check_driver({"typecheckFiles": [str(entry)], "ruleTopics": ["imports", "purity", "completion", "module_state"], "importPolicy": {"owners": owners, "node_base_libs": case.node_base_libs or {}, "base_lib_dependencies": {"test.base": []}}}, package_root=project)
     matching = [item for item in checked.findings if item.get("code") == case.code]
     assert matching, [item.get("code") for item in checked.findings]
     diagnostic = matching[0]
@@ -298,7 +300,7 @@ def test_failed_replace_preserves_every_existing_output_byte(tmp_path: Path) -> 
     project = _project(tmp_path)
     entry = project / "entry.ts"
     entry.write_text("export function run() { return {}; }\n", encoding="utf-8")
-    request = BuildRequest(
+    request = fixture_build_request(
         plan=_plan(entry, entry_mode="sync", completion="immediate"),
         project_root=project,
         package_root=project,

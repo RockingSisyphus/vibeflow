@@ -12,16 +12,30 @@ from vibeflow.core.descriptors.models import NodeDescriptor
 from vibeflow.core.flow import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, STATUS_PLANNED
 from vibeflow.targets.python.project.registry import NodeRegistry, NodeRegistryError
 from vibeflow.targets.python.quality.source_context import PythonSourceFile, PythonSourceNode, PythonSourceCall, build_python_source_context
-from vibeflow.tooling.application.python.project.source_preflight import collect_python_source_facts, resolve_local_module_path
+from vibeflow.targets.python.project.source_closure import collect_python_source_facts, resolve_local_module_path
 from vibeflow.tooling.project.descriptor_loader import load_workflow_plugins
+
+
+def default_python_registry() -> NodeRegistry:
+    """Assemble the standard SDK contribution once at the Application boundary."""
+    from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
+    loaded = load_builtin_plugins("python")
+    registry = NodeRegistry()
+    registry.loaded_plugins = loaded
+    registry.rule_catalogs = (loaded.catalogs,)
+    registry.direct_bindings = {(kind, key): value for (_, kind, key), value in loaded.bindings.items()}
+    registry.rule_handler_loader = lambda plan: {
+        key: registry.direct_bindings[("rule", key)]
+        for invocation in plan.invocations for key in (invocation.rule.handler or invocation.rule.id,)
+        if ("rule", key) in registry.direct_bindings}
+    return registry
 
 
 def declared_python_registry(workspace, config_path=None, *, loaded_plugins=None) -> NodeRegistry:
     """Bind only resources contributed by this workflow's selected plugins."""
-    from vibeflow.core.descriptors.contributions import builtin_contributions, compose_contributions
-    from vibeflow.tooling.project.descriptor_loader import LoadedPlugins
+    from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
     loaded = loaded_plugins or (load_workflow_plugins(workspace, config_path) if config_path else
-        LoadedPlugins(compose_contributions((builtin_contributions(),)), {}, (), ()))
+        load_builtin_plugins("python"))
     registry = NodeRegistry()
     catalog = loaded.catalogs
     source_roots = tuple(root.path for root in workspace.roots if root.project_target == "python")
@@ -31,9 +45,11 @@ def declared_python_registry(workspace, config_path=None, *, loaded_plugins=None
     for group in ("nodes", "rules", "base_libs", "plugins"):
         for descriptor in getattr(catalog, group):
             origin = catalog.origins.get((group, descriptor.id))
-            if origin is None or origin.plugin_id == "vibeflow.core":
+            if origin is None:
                 continue
-            record = next(item for item in loaded.records if item.get("id") == origin.plugin_id)
+            record = next((item for item in loaded.records if item.get("id") == origin.plugin_id), None)
+            if record is None:
+                continue
             resource_roots[(group, descriptor.id)] = workspace.root_by_id(record["root"])
     for descriptor in catalog.nodes:
         implementations = tuple(item for item in descriptor.implementations if item.language == "python")
@@ -57,7 +73,7 @@ def declared_python_registry(workspace, config_path=None, *, loaded_plugins=None
     registry.loaded_plugins = loaded
     registry.source_root_ids = {root.path:root.id for root in workspace.roots}
     registry.source_roots = source_roots
-    registry.source_context_loader = lambda key: collect_node_source_context(registry, (key,))
+    registry.source_context_loader = lambda key: analyze_node_source_context(registry, (key,))
     registry.rule_handler_loader = lambda plan: _load_rule_handlers(registry, plan, workspace)
     registry.rule_catalogs = (catalog,)
     from vibeflow.targets.python.quality.rule_adapter import selected_effect_scope
@@ -87,8 +103,13 @@ def workflow_node_types(graph: GraphConfig) -> tuple[str, ...]:
     return tuple(sorted(selected))
 
 
-def collect_node_source_context(registry: NodeRegistry, type_keys: tuple[str, ...], *, calls=None):
+def analyze_node_source_context(registry: NodeRegistry, type_keys: tuple[str, ...], *, calls=None):
+    """Return the requested implementation closure without changing active facts."""
     from vibeflow.targets.python.project.source_membership import resource_paths
+    from vibeflow.targets.python.project.check_session import current_python_check
+    session = current_python_check(registry)
+    parsed = session.parsed_sources if session is not None else None
+    parse_cache = session.parse_cache if session is not None else None
 
     nodes: list[PythonSourceNode] = []
     files: dict[str, PythonSourceFile] = {}
@@ -112,7 +133,7 @@ def collect_node_source_context(registry: NodeRegistry, type_keys: tuple[str, ..
                 root = root.parent
         nodes.append(PythonSourceNode(descriptor, str(path), symbol, root_id, tuple((calls or {}).get(key, ()))))
         entries = (path, *(file for role,file,_ in resource_paths(descriptor, root, getattr(registry,"source_roots",(root,))) if role == "support"))
-        for fact in (fact for entry in entries for fact in collect_python_source_facts(entry, project_root=root, source_roots=getattr(registry, "source_roots", (root,)), _facts=source_facts)):
+        for fact in (fact for entry in entries for fact in collect_python_source_facts(entry, project_root=root, source_roots=getattr(registry, "source_roots", (root,)), _facts=source_facts, _parsed=parsed, _parse_cache=parse_cache)):
             if fact.load_error:
                 raise NodeRegistryError(fact.load_error)
             owner = Path(fact.root_path) if fact.root_path else next((item for item in getattr(registry, "source_roots", (root,)) if Path(fact.path).is_relative_to(item)), Path(fact.path).parent)
@@ -133,20 +154,32 @@ def collect_node_source_context(registry: NodeRegistry, type_keys: tuple[str, ..
             for role,path,_ in members:
                 if role != "support":
                     continue
-                for fact in collect_python_source_facts(path,project_root=root_object.path,source_roots=registry.source_roots,_facts=source_facts):
+                for fact in collect_python_source_facts(path,project_root=root_object.path,source_roots=registry.source_roots,_facts=source_facts,_parsed=parsed,_parse_cache=parse_cache):
                     if fact.load_error:
                         raise NodeRegistryError(fact.load_error)
                     owner = Path(fact.root_path) if fact.root_path else root_object.path
                     module = ".".join(Path(fact.path).relative_to(owner).with_suffix("").parts).removesuffix(".__init__")
                     files[fact.path] = PythonSourceFile(fact.path,module,fact.source,root_object.id,fact._tree,
                         fact.parse_error,fact.parse_line,fact.parse_column)
-    context = build_python_source_context(nodes, files.values())
+    return build_python_source_context(nodes, files.values())
+
+
+def publish_python_source_context(registry, context):
+    """Publish a complete scope and sample its actual module loading state."""
     loaded_paths = {str(Path(filename).resolve()) for module in tuple(sys.modules.values())
                     if isinstance(filename := getattr(module, "__file__", None), str)}
     from types import MappingProxyType
-    registry.source_load_states = MappingProxyType({path: "loaded" if path in loaded_paths else "not_loaded" for path in files})
+    registry.source_load_states = MappingProxyType({file.path: "loaded" if file.path in loaded_paths else "not_loaded" for file in context.files})
     registry.source_context_snapshot = context
+    from vibeflow.targets.python.project.check_session import current_python_check
+    session = current_python_check(registry)
+    if session is not None:
+        session.sources = context
     return context
+
+
+def collect_node_source_context(registry: NodeRegistry, type_keys: tuple[str, ...], *, calls=None):
+    return publish_python_source_context(registry, analyze_node_source_context(registry, type_keys, calls=calls))
 
 
 def collect_workflow_source_context(registry, graph):
@@ -164,10 +197,9 @@ def collect_workflow_source_context(registry, graph):
                 collect(definitions[key].graph,definitions,path,"nodeset:"+key,(*active,key))
     collect(graph,{})
     from dataclasses import replace
-    context = collect_node_source_context(registry, workflow_node_types(graph), calls=calls)
+    context = analyze_node_source_context(registry, workflow_node_types(graph), calls=calls)
     context = replace(context,calls=tuple(call_facts))
-    registry.source_context_snapshot = context
-    return context
+    return publish_python_source_context(registry, context)
 
 
 def _load_rule_handlers(registry, plan, workspace):
@@ -175,16 +207,21 @@ def _load_rule_handlers(registry, plan, workspace):
     roots = tuple(root for root in workspace.roots if root.project_target == "python")
     for invocation in plan.invocations:
         rule = invocation.rule
+        from vibeflow.targets.shared.bindings import native_binding
+        key = rule.handler or rule.id
+        direct = getattr(registry, "direct_bindings", {}).get(("rule", key))
+        if direct is None:
+            direct = native_binding(registry.rule_catalogs[0], "rule", key)
+        if direct is not None:
+            handlers[key] = direct
+            handlers[rule.id] = direct
+            continue
         implementations = tuple(item for item in rule.implementations if item.language == "python")
         if not implementations:
             continue
         if len(implementations) != 1:
             raise NodeRegistryError(f"rule '{rule.id}' must select one Python implementation")
         source = implementations[0].source
-        direct = getattr(registry, "direct_bindings", {}).get(("rule", rule.id))
-        if direct is not None:
-            handlers[rule.id] = direct
-            continue
         owner = getattr(registry, "resource_roots", {}).get(("rules", rule.id))
         if owner is None:
             raise NodeRegistryError(f"rule '{rule.id}' has no contributing plugin")
@@ -262,20 +299,20 @@ def _implementation_path(kind: str, reference: str, root: Path, roots: tuple[Pat
 
 
 def _bind_node(registry: NodeRegistry, key: str, roots: tuple[Path, ...]) -> type:
-    from dataclasses import replace
-    from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rules
+    from vibeflow.targets.python.quality.rule_adapter import review_python_node_binding
 
     snapshot = getattr(registry, "source_context_snapshot", None)
     selected = tuple(node for node in snapshot.nodes if node.type_key == key) if snapshot is not None else ()
     # The checked workflow already supplied its actual calls and ownership.
     # Limit this binding check to its Node without replacing the full snapshot.
-    context = replace(snapshot,nodes=selected) if selected else collect_node_source_context(registry, (key,))
-    results = execute_python_node_rules(registry, context, phase="import",**registry.rule_defaults())
+    context = publish_python_source_context(registry, snapshot) if selected else collect_node_source_context(registry, (key,))
+    results = review_python_node_binding(registry, context, key, **registry.rule_defaults())
     findings = tuple(item for item in results.findings if item.severity == "error")
     if findings:
         raise PythonSourceRuleError(findings)
     direct = getattr(registry, "direct_bindings", {}).get(("node", key))
     if direct is not None:
+        publish_python_source_context(registry, context)
         return direct
     path, symbol, _, root = registry.source_locations[key]
     relative = path.relative_to(root).with_suffix("")
@@ -307,6 +344,7 @@ def _bind_node(registry: NodeRegistry, key: str, roots: tuple[Path, ...]) -> typ
             source_location={"path":registry.source_info(key).path, **({"line":registry.source_info(key).line} if registry.source_info(key).line else {})},
             details={"implementation":{"path":str(path),"export":symbol}}),)
         raise error from exc
+    publish_python_source_context(registry, context)
     return implementation
 
 

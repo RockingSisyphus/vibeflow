@@ -1,0 +1,38 @@
+flowchart LR
+  vf_resource_8828ae20c0722c04@{ shape: hex, label: "Node types" }
+  vf_resource_8828ae20c0722c04 -. "catalog" .-> vf_resource_201270386322ba37
+  vf_resource_8828ae20c0722c04 -. "catalog" .-> vf_resource_286b9861cfcdf05e
+  vf_resource_8828ae20c0722c04 -. "catalog" .-> vf_resource_34eba124b12ad35c
+  vf_resource_8828ae20c0722c04 -. "catalog" .-> vf_resource_136d12bd71b43a38
+  vf_resource_201270386322ba37@{ shape: stadium, label: "layout.end\nnode: layout.end\nstatus: implemented\nflow_kind: terminal\nrulesets: vibeflow.process, layout.health_set" }
+  style vf_resource_201270386322ba37 fill:#ECECFF,stroke:#9370DB,color:#333333;
+  vf_resource_286b9861cfcdf05e@{ shape: stadium, label: "layout.start\nnode: layout.start\nstatus: implemented\nflow_kind: terminal\nrulesets: vibeflow.process, layout.health_set" }
+  style vf_resource_286b9861cfcdf05e fill:#ECECFF,stroke:#9370DB,color:#333333;
+  vf_resource_34eba124b12ad35c@{ shape: rounded, label: "layout.step\nnode: layout.step\nstatus: implemented\nflow_kind: process\nrulesets: vibeflow.process, layout.health_set" }
+  style vf_resource_34eba124b12ad35c fill:#d6eaff,stroke:#425a78,color:#172b45;
+  vf_resource_136d12bd71b43a38@{ shape: rounded, label: "layout.step_right\nnode: layout.step_right\nstatus: implemented\nflow_kind: process\nrulesets: vibeflow.process, layout.health_set" }
+  style vf_resource_136d12bd71b43a38 fill:#d6eaff,stroke:#425a78,color:#172b45;
+  vf_resource_93c9a4897872eb3f@{ shape: doc, label: "steps.py\nentry\nloaded\nowners: node:layout.end, node:layout.start, node:layout.step, node:layout.step_right" }
+  vf_resource_570d017a94ba83bb@{ shape: rect, label: "引用 / reference\nhelper.py\nentry\nloaded\nowners: base_lib:layout.helper\nsection: base_lib" }
+  style vf_resource_570d017a94ba83bb fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray:4 3;
+  vf_resource_5f9cb2be0a22a716@{ shape: rect, label: "引用 / reference\ncode_plugin.py\nentry\nloaded\nowners: plugin_declaration:layout.resources\nsection: plugins" }
+  style vf_resource_5f9cb2be0a22a716 fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray:4 3;
+  vf_resource_e1ed7abbe2c426bc@{ shape: rect, label: "引用 / reference\nLayout lifecycle\nplugin_declaration: layout.resources\nsection: plugins" }
+  style vf_resource_e1ed7abbe2c426bc fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray:4 3;
+  vf_resource_c2362041487afc77@{ shape: rect, label: "引用 / reference\nlayout.helper\nbase_lib: layout.helper\nsection: base_lib" }
+  style vf_resource_c2362041487afc77 fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray:4 3;
+  vf_resource_201270386322ba37 -. "entry" .-> vf_resource_93c9a4897872eb3f
+  vf_resource_286b9861cfcdf05e -. "entry" .-> vf_resource_93c9a4897872eb3f
+  vf_resource_34eba124b12ad35c -. "entry" .-> vf_resource_93c9a4897872eb3f
+  vf_resource_136d12bd71b43a38 -. "entry" .-> vf_resource_93c9a4897872eb3f
+  vf_resource_93c9a4897872eb3f -. "import" .-> vf_resource_570d017a94ba83bb
+  vf_resource_5f9cb2be0a22a716 -. "import" .-> vf_resource_93c9a4897872eb3f
+  vf_resource_5f9cb2be0a22a716 -. "import" .-> vf_resource_93c9a4897872eb3f
+  vf_resource_5f9cb2be0a22a716 -. "import" .-> vf_resource_93c9a4897872eb3f
+  vf_resource_5f9cb2be0a22a716 -. "import" .-> vf_resource_93c9a4897872eb3f
+  vf_resource_e1ed7abbe2c426bc -. "contributes" .-> vf_resource_201270386322ba37
+  vf_resource_e1ed7abbe2c426bc -. "contributes" .-> vf_resource_286b9861cfcdf05e
+  vf_resource_34eba124b12ad35c -. "base_lib" .-> vf_resource_c2362041487afc77
+  vf_resource_e1ed7abbe2c426bc -. "contributes" .-> vf_resource_34eba124b12ad35c
+  vf_resource_136d12bd71b43a38 -. "base_lib" .-> vf_resource_c2362041487afc77
+  vf_resource_e1ed7abbe2c426bc -. "contributes" .-> vf_resource_136d12bd71b43a38

@@ -251,15 +251,20 @@ def _handle_export_graph(args: argparse.Namespace, *, export_kind: str) -> int:
     return handle_export_graph(args, export_kind=export_kind)
 
 
+from vibeflow.tooling.application.python.run_observation import observed_cli_run, print_run_report
+
+
+@observed_cli_run
 def _handle_run(args: argparse.Namespace) -> int:
     from vibeflow.core.result_scope import add_result_scope
     from vibeflow.targets.python.project.registry import NodeRegistry
+    from vibeflow.tooling.application.python.project.declarations import default_python_registry
     from vibeflow.tooling.application.python.runner import CheckedRunError, run_checked
 
     try:
         initial = _load_initial_input(Path(args.input)) if args.input else {}
     except (OSError, json.JSONDecodeError, ValueError) as exc:
-        print(json.dumps({"status": "ERROR", "error": str(exc)}, ensure_ascii=False, indent=2))
+        print_run_report({"status": "ERROR", "error": str(exc)})
         return 1
     try:
         from vibeflow.tooling.project.workspace_loader import find_project_config, load_project_workspace
@@ -272,7 +277,7 @@ def _handle_run(args: argparse.Namespace) -> int:
 
             workspace = _load_workspace_for_cli(Path(args.workspace)) if getattr(args,"workspace",None) else load_project_workspace(project_config)
             if isinstance(workspace, HealthReport):
-                print(json.dumps({"status": workspace.status, "error": "workspace load failed", "health": workspace.to_dict()}, ensure_ascii=False, indent=2))
+                print_run_report({"status": workspace.status, "error": "workspace load failed", "health": workspace.to_dict()})
                 return 1
             if args.policy:
                 from dataclasses import replace
@@ -282,7 +287,7 @@ def _handle_run(args: argparse.Namespace) -> int:
                     config_path=Path(args.config), explicit_policy_path=Path(args.policy))
                 if policy.findings:
                     report = HealthReport(status="FAIL",errors=tuple(policy.findings))
-                    print(json.dumps({"status":report.status,"error":"policy load failed","health":report.to_dict()},ensure_ascii=False,indent=2))
+                    print_run_report({"status":report.status,"error":"policy load failed","health":report.to_dict()})
                     return 1
                 workspace = replace(workspace,policy=policy.effective_policy.data)
 
@@ -293,16 +298,18 @@ def _handle_run(args: argparse.Namespace) -> int:
                 run_root=Path(args.run_root) if args.run_root else None,
                 run_id=args.run_id,
                 runtime_options=_runtime_options_from_args(args),
+                _prepared_run_dir=getattr(args, "_prepared_run_dir", None),
             )
         else:
             result = run_checked(
                 Path(args.config),
-                registry=NodeRegistry(),
+                registry=default_python_registry(),
                 initial=initial,
                 policy_path=Path(args.policy) if args.policy else None,
                 run_root=Path(args.run_root) if args.run_root else None,
                 run_id=args.run_id,
                 runtime_options=_runtime_options_from_args(args),
+                _prepared_run_dir=getattr(args, "_prepared_run_dir", None),
             )
     except CheckedRunError as exc:
         payload = add_result_scope(
@@ -310,7 +317,7 @@ def _handle_run(args: argparse.Namespace) -> int:
             "vibeflow_workflow_execution",
             checked_ids=(),
         )
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        print_run_report(payload)
         return 1
     checked = ["workflow_started", "structural_runtime"]
     context = result.context
@@ -338,10 +345,11 @@ def _handle_run(args: argparse.Namespace) -> int:
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    print_run_report(payload)
     return 0
 
 
+@observed_cli_run
 def _handle_delegate_cli(args: argparse.Namespace) -> int:
     from vibeflow.tooling.application.python.cli.delegate_cli import handle_delegate_cli
 
@@ -355,34 +363,19 @@ def _handle_quality_check(args: argparse.Namespace) -> int:
 
 
 def _inspect_workspace_config_payload(config_path: Path, workspace_path: Path) -> tuple[dict[str, object], int]:
-    from vibeflow.targets.python.project.compiler import GraphCompiler
-    from vibeflow.tooling.project.config_loader import load_workspace_config_document
     from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
-    from vibeflow.tooling.project.graph_config import parse_graph_config
     from vibeflow.core.findings import HealthReport
-    from vibeflow.tooling.application.python.workspace_service import load_workspace_graph_for_export, validate_workspace_config_path
+    from vibeflow.tooling.application.python.cli.config import _inspect_workspace_graph
 
     workspace = _load_workspace_for_cli(workspace_path)
     if isinstance(workspace, HealthReport):
         return {"health": workspace.to_dict()}, 1
-    report = validate_workspace_config_path(config_path, workspace=workspace)
+    prepared = _inspect_workspace_graph(config_path, workspace=workspace)
+    report = prepared if isinstance(prepared, HealthReport) else prepared.health
     payload: dict[str, object] = {"health": report.to_dict(), "workspace": report.info.get("workspace", {})}
     if report.status not in {"PASS", "CONCERNS"}:
         return payload, 1
-    document = load_workspace_config_document(config_path, workspace=workspace)
-    root = workspace.root_for_path(config_path)
-    graph = parse_graph_config(
-        document.data,
-        project_root=root.path if root is not None else config_path.parent,
-        root_id=root.id if root is not None else "",
-        root_path=root.path if root is not None else None,
-        source_path=config_path,
-    )
-    _, compiled, registry, resources, error = load_workspace_graph_for_export(config_path, workspace=workspace)
-    if error is not None:
-        return {"health": error.to_dict(), "workspace": error.info.get("workspace", {})}, 1
-    if compiled is None:
-        compiled = GraphCompiler().compile(graph, registry=registry)
+    document, graph, compiled, resources = prepared.document, prepared.graph, prepared.compiled, prepared.resources
     payload["config"] = {
         "inputs": providers_to_dicts(graph.inputs),
         "outputs": requirements_to_dicts(graph.outputs),
@@ -403,6 +396,7 @@ def _inspect_workspace_config_payload(config_path: Path, workspace_path: Path) -
         "nodesets": [
             {
                 "type_key": nodeset.type_key,
+                "expand": nodeset.expand,
                 "display_name": nodeset.display_name,
                 "description": nodeset.description,
                 "requires": requirements_to_dicts(nodeset.requires),
@@ -470,6 +464,9 @@ def _load_initial_input(path: Path) -> dict[str, object]:
 
 
 def _add_runtime_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--status-interval", type=_positive_finite_float, default=None,
+                        help="seconds between status.json heartbeats (default: 60)")
+    parser.add_argument("--status-file", default=None, help="fixed monitor JSON path (default: run_dir/status.json)")
     parser.add_argument("--runtime-profile", choices=("debug", "train"), default=None, help="runtime option preset")
     parser.add_argument("--trace", choices=("full", "boundary", "off"), default=None, help="runtime trace policy")
     parser.add_argument("--execution", choices=("plan", "block", "compiled"), default=None, help="runtime execution mode")
@@ -486,6 +483,13 @@ def _add_runtime_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--allow-planned-stub", action="store_true", help="development only: execute planned python_stub nodes")
 
 
+def _positive_finite_float(value: str) -> float:
+    parsed = _non_negative_finite_float(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be positive finite seconds")
+    return parsed
+
+
 def _non_negative_finite_float(value: str) -> float:
     try:
         parsed = float(value)
@@ -498,6 +502,10 @@ def _non_negative_finite_float(value: str) -> float:
 
 def _runtime_options_from_args(args: argparse.Namespace):
     values: dict[str, object] = {}
+    if getattr(args, "status_interval", None) is not None:
+        values["status_interval"] = args.status_interval
+    if getattr(args, "status_file", None) is not None:
+        values["status_file"] = args.status_file
     if args.runtime_profile == "train":
         values.update(
             {

@@ -49,6 +49,8 @@ Architecture 严格集成测试增加 `implementation_graph` 字段及资源/入
 
 Python 的展开图去重案例仍要求四次 Nodeset 调用只生成一个细节区；总片区数从主图与细节的 2 个改为 3 个，另一个片区是本轮新增的统一资源区，并检查该区的实际标题。
 
+上述片区数为多文件资源初次验收时的历史期待。当前已撤销把源码归属图直接展开为 SVG 的方案；正式资源区恢复为配置所选资源目录。`resources.display.*` 与 `resources.edits.*` 保留案例 ID，改为公开 CLI 生成真实用户图，并以实际 Node 调用或 Plugin/BaseLib/Host 目录条目核对展示。插件图卡对应选中的包，不把其生命周期定义再作为独立用户选择；实现与健康事实仍在 Architecture JSONC 中分别检查。全部公开形状、颜色和实际浏览器断言继续保留。
+
 ## 复查入口
 
 ```bash

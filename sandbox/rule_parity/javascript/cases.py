@@ -114,8 +114,8 @@ def _cases() -> tuple[Case, ...]:
         ('immediate-async-hook', 'immediate Plugin 包含 async hook', 'completion', normal_plugin.replace('beforeRun()', 'async beforeRun()'), 'VF_COMPLETION_IMMEDIATE_PROMISE'),
     )
     common.extend(Case('js.plugin.' + name, title, family, 'plugin', source, code) for name, title, family, source, code in plugin_negatives)
-    # Build and worker exercise different production entrances.  These are not
-    # substitutions for audit observations or calls to analyzer primitives.
+    # Current worker cases first review the selected SDK resource, then exercise
+    # binding/protocol on success. Historical baseline worker preflight is retained.
     for name in ('host-global', 'module-write', 'discarded-promise', 'timer'):
         selected = next(item for item in plugin_negatives if item[0] == name)
         common.append(Case('js.plugin.' + name + '.build', selected[1] + '（正式 build）', selected[2], 'plugin', selected[3], selected[4], 'build'))
@@ -202,22 +202,36 @@ def _node_descriptor(variant: str, key: str, file: str, case: Case) -> dict[str,
     return result
 
 
+def definition(root, variant, kind, resource_id, historical_path):
+    if variant == "baseline":
+        return root / "manifests" / historical_path
+    from tests.fixtures.support.plugins import resource
+    return resource(root, kind, resource_id)
+
+
+def put_definition(root, variant, declaration, historical_path):
+    path = definition(root, variant, declaration["kind"], declaration.get("type_key", declaration.get("id")), historical_path)
+    _write_json(path, declaration)
+
+
 def _project(root: Path, variant: str, toolchain: Path, case: Case) -> tuple[Path, Path, Path]:
     root.mkdir(parents=True, exist_ok=False)
     for name in ('package.json', 'package-lock.json'):
         shutil.copy2(toolchain / name, root / name)
     (root / 'node_modules').symlink_to(toolchain / 'node_modules', target_is_directory=True)
-    for group in ('nodes', 'base_lib', 'data_schemas', 'plugins', 'host_extensions'):
-        (root / 'manifests' / group).mkdir(parents=True)
-    _write_json(root / 'vibeflow_project.jsonc', {'project_target': 'javascript',
-        'descriptors': {group: ['manifests/' + group] for group in ('nodes', 'base_lib', 'data_schemas', 'plugins', 'host_extensions')},
-        'javascript': {'package_root': '.', 'external_packages': list(case.external_packages)}, 'quality_enabled': True})
+    project = {"project_target": "javascript", "javascript": {"package_root": ".", "external_packages": list(case.external_packages)}, "quality_enabled": True}
+    if variant == "baseline":
+        project["descriptors"] = {group: ["manifests/" + group] for group in ("nodes", "base_lib", "data_schemas", "plugins", "host_extensions")}
+    else:
+        from tests.fixtures.support.plugins import write_plugin
+        write_plugin(root, [], target="javascript", plugin_id="parity.resources")
+    _write_json(root / "vibeflow_project.jsonc", project)
     workspace = root.parent / (root.name + '-workspace.jsonc')
     _write_json(workspace, {'roots': [{'id': 'parity', 'path': root.name, 'config': 'vibeflow_project.jsonc'}]})
     descriptor = _node_descriptor(variant, 'parity.calc', 'nodes/calc.ts', case)
-    _write_json(root / 'manifests/nodes/calc.jsonc', descriptor)
+    put_definition(root, variant, descriptor, 'nodes/calc.jsonc')
     for key in ('value', 'result'):
-        _write_json(root / ('manifests/data_schemas/' + key + '.jsonc'), {'kind': 'data_schema', 'type_key': 'parity.' + key, 'display_name': key, 'schema': {'type': 'number'}})
+        put_definition(root, variant, {'kind': 'data_schema', 'type_key': 'parity.' + key, 'display_name': key, 'schema': {'type': 'number'}}, ('data_schemas/' + key + '.jsonc'))
     sources = {'nodes/calc.ts': _body(NODE), 'base_lib/math.ts': _body(BASE_LIB), **case.extras}
     selected_file = 'nodes/calc.ts'
     if case.role == 'base_lib':
@@ -236,8 +250,7 @@ def _project(root: Path, variant: str, toolchain: Path, case: Case) -> tuple[Pat
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text.replace('ABI', 'vibeflow.plugin.v1' if variant == 'baseline' else 'vibeflow.plugin.v3'), encoding='utf-8')
     if case.role == 'base_lib' or case.id == 'js.node.undeclared-base':
-        _write_json(root / 'manifests/base_lib/math.jsonc', {'kind': 'base_lib', 'id': 'parity.math', 'display_name': 'Increment helper',
-            'description': 'Pure numeric helper.', 'implementations': [_implementation('base_lib/math.ts', '')], 'dependencies': [], 'external_packages': []})
+        put_definition(root, variant, {'kind': 'base_lib', 'id': 'parity.math', 'display_name': 'Increment helper', 'description': 'Pure numeric helper.', 'implementations': [_implementation('base_lib/math.ts', '')], 'dependencies': [], 'external_packages': []}, 'base_lib/math.jsonc')
     pipeline = {'entry_mode': 'async', 'inputs': [{'key': 'value', 'type': 'parity.value', 'display_name': 'Value', 'required': True}],
         'nodes': [{'id': 'calculate', 'type_used': 'parity.calc', 'display_name': 'Calculate', 'description': 'Increment the input.'}], 'edges': [],
         'outputs': [{'type': 'parity.result', 'cardinality': 'exactly_one', 'display_name': 'Result', 'as': 'result'}]}
@@ -248,30 +261,27 @@ def _project(root: Path, variant: str, toolchain: Path, case: Case) -> tuple[Pat
         other_descriptor = _node_descriptor(variant, 'parity.other', 'nodes/other.ts', Case('other', 'Other', 'control'))
         other_descriptor['contract']['provides'] = []
         other_descriptor['contract']['output_semantics'] = {}
-        _write_json(root / 'manifests/nodes/other.jsonc', other_descriptor)
+        put_definition(root, variant, other_descriptor, 'nodes/other.jsonc')
         pipeline['nodes'].append({'id': 'other', 'type_used': 'parity.other', 'display_name': 'Other', 'description': 'Independent implementation.'})
         pipeline['edges'].append({'from': 'calculate', 'to': 'other'})
     if case.role == 'plugin':
-        _write_json(root / 'manifests/plugins/runtime.jsonc', {'kind': 'plugin', 'id': 'parity.plugin', 'type': 'runtime', 'targets': ['node', 'browser'],
-            'implementations': [_implementation(selected_file, 'createPlugin')], 'config': {'schema': {'type': 'object'}, 'defaults': {}}})
+        put_definition(root, variant, {'kind': 'plugin', 'id': 'parity.plugin', 'type': 'runtime', 'targets': ['node', 'browser'], 'implementations': [_implementation(selected_file, 'createPlugin')], 'config': {'schema': {'type': 'object'}, 'defaults': {}}}, 'plugins/runtime.jsonc')
         config['plugins'] = ['parity.plugin', *case.additional_plugins]
     elif case.role == 'host':
-        _write_json(root / 'manifests/host_extensions/host.jsonc', {'kind': 'host_extension', 'id': 'parity.host', 'targets': ['node', 'browser'],
-            'implementations': [_implementation(selected_file, 'createHostExtension')], 'provides': [], 'dependencies': [], 'external_packages': []})
+        put_definition(root, variant, {'kind': 'host_extension', 'id': 'parity.host', 'targets': ['node', 'browser'], 'implementations': [_implementation(selected_file, 'createHostExtension')], 'provides': [], 'dependencies': [], 'external_packages': []}, 'host_extensions/host.jsonc')
         config['host_extensions'] = ['parity.host', *case.additional_hosts]
     for file, descriptor in case.extra_manifests.items():
-        _write_json(root / 'manifests' / file, descriptor)
+        put_definition(root, variant, descriptor, file)
     if variant == "current":
-        for manifest in (root / "manifests").rglob("*.jsonc"):
-            resource = json.loads(manifest.read_text())
-            if resource.get("kind") in {"base_lib", "plugin", "host_extension"}:
-                resource["rulesets"] = ["vibeflow." + resource["kind"]]
-                _write_json(manifest, resource)
+        from tests.fixtures.support.plugins import resource_declarations, update_resources
+        values = resource_declarations(root)
+        for declaration in values:
+            if declaration["kind"] in {"base_lib", "plugin", "host_extension"}:
+                declaration["rulesets"] = ["vibeflow." + declaration["kind"]]
+        update_resources(root, values)
+        config["plugins"] = [{"source": {"kind":"file", "ref":"code_plugin.ts", "export":"plugin"}}]
     config_path = root / 'workflow.jsonc'
     _write_json(config_path, config)
-    if variant == 'current':
-        import runpy
-        runpy.run_path(str(Path(__file__).resolve().parents[3] / 'tests/fixtures/support/code_plugins.py'))['migrate_fixture'](root)
     return workspace, config_path, root / selected_file
 
 
@@ -311,12 +321,16 @@ def _actual(status: str, rows: list[dict[str, Any]], *, message: str = '', metri
     return {'status': status, 'codes': codes, 'positions': positions, 'metrics': metrics, 'message': message}
 
 
-def _observe(case: Case, root: Path, workspace: Path, config: Path, source: Path) -> dict[str, Any]:
+def _observe(case: Case, root: Path, workspace: Path, config: Path, source: Path, *, variant: str) -> dict[str, Any]:
     # Imports occur only after the parent's child selects the kernel via PYTHONPATH.
     from vibeflow.tooling.application.javascript.audit import JavascriptAuditRequest, audit_javascript_project
     from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, build_project_aot
     from vibeflow.targets.javascript.build.plugin_session import JavascriptPluginSession
-    from vibeflow.targets.javascript.quality.source import scan_javascript_quality
+    if variant == "baseline":
+        from vibeflow.targets.javascript.quality.source import scan_javascript_quality
+    else:
+        from vibeflow.tooling.application.javascript.quality_scan import scan_javascript_quality
+    worker_metrics: dict[str, Any] = {}
     try:
         if case.entrypoint == 'quality-cli':
             from vibeflow.tooling.application.javascript.cli import main
@@ -327,9 +341,16 @@ def _observe(case: Case, root: Path, workspace: Path, config: Path, source: Path
             return _actual(str(payload.get('status', 'FAIL' if exit_code else 'PASS')), _finding_rows(payload),
                            metrics={'exit_code': exit_code}, message=str(payload.get('message', '')))
         if case.entrypoint == 'worker':
+            if variant == 'current':
+                # The SDK resource's selected Ruleset owns health decisions.
+                # The raw worker subsequently verifies binding and protocol only.
+                worker_metrics.update(sdk_rules_checked=True, worker_opened=False)
+                audit_javascript_project(JavascriptAuditRequest(workspace=workspace, config=config))
             with JavascriptPluginSession() as session:
-                session.open('parity', plugin={'id': 'parity.plugin', 'type': 'runtime', 'module': str(source), 'export': 'createPlugin', 'completion': case.completion, 'config': {}, **({'rulesets': ['vibeflow.plugin']} if 'rulesets' in json.loads((root / 'manifests/plugins/runtime.jsonc').read_text()) else {})}, package_root=root, target='node', workflow_id='parity')
-            return _actual('PASS', [])
+                if variant == 'current':
+                    worker_metrics['worker_opened'] = True
+                session.open('parity', plugin={'id': 'parity.plugin', 'type': 'runtime', 'module': str(source), 'export': 'createPlugin', 'completion': case.completion, 'config': {}, **({'rulesets': ['vibeflow.plugin']} if 'rulesets' in json.loads(definition(root, variant, 'plugin', 'parity.plugin', 'plugins/runtime.jsonc').read_text()) else {})}, package_root=root, target='node', workflow_id='parity')
+            return _actual('PASS', [], metrics=worker_metrics)
         if case.entrypoint == 'quality':
             report = scan_javascript_quality(source, package_root=root)
             rows = [item.to_dict() for item in report.findings]
@@ -352,7 +373,7 @@ def _observe(case: Case, root: Path, workspace: Path, config: Path, source: Path
     except Exception as error:
         payload = {'code': str(getattr(error, 'code', None) or getattr(error, 'rule_id', None) or type(error).__name__), 'message': str(error),
                    'details': dict(getattr(error, 'details', {}) or {}), 'diagnostics': list(getattr(error, 'diagnostics', ()) or ())}
-        return _actual('FAIL', _finding_rows(payload), message=str(error))
+        return _actual('FAIL', _finding_rows(payload), metrics=worker_metrics, message=str(error))
 
 
 def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None) -> list[dict[str, Any]]:
@@ -368,7 +389,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     for index, case in enumerate(_cases()):
         root = work_root / f'{index:02d}-{case.id}'
         workspace, config, source = _project(root, variant, toolchain, case)
-        actual = _observe(case, root, workspace, config, source)
+        actual = _observe(case, root, workspace, config, source, variant=variant)
         code = case.current_code if variant == 'current' and case.current_code is not None else case.code
         severity = 'warning' if case.id == 'js.quality.function-duplicate' else 'error'
         expected: dict[str, Any] = {'should_accept': not code or severity == 'warning',
@@ -378,11 +399,15 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             expected['metrics']['source_files'] += 1
         if case.entrypoint == 'quality-cli':
             expected['metrics'].setdefault('exit_code', 0 if expected['should_accept'] else 1)
+        if variant == 'current' and case.entrypoint == 'worker':
+            expected['metrics'].update(sdk_rules_checked=True, worker_opened=not bool(code))
+            if code:
+                expected['located_codes'] = [code]
         if code and case.entrypoint != 'worker' and case.id not in {'js.node.abi-output', 'js.quality.function-duplicate'}:
             expected['located_codes'] = [code]
         observations.append({'id': case.id, 'title': case.title, 'family': case.family, 'expected': expected, 'actual': actual,
             'classification': case.classification, 'notes': case.notes,
-            'evidence': {'level': case.entrypoint, 'source': str(source), 'config': str(config), 'workspace': str(workspace)}})
+            'evidence': {'level': 'sdk-rules-then-worker' if variant == 'current' and case.entrypoint == 'worker' else case.entrypoint, 'source': str(source), 'config': str(config), 'workspace': str(workspace)}})
     import importlib.util
     import sys
     spec = importlib.util.spec_from_file_location('javascript_parity_variants', Path(__file__).with_name('variants.py'))

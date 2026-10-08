@@ -2,9 +2,10 @@
 
 from dataclasses import replace
 
-from vibeflow.core.quality.implementation import ImplementationLimits, evaluate_node_implementation, evaluate_base_lib_implementation, evaluate_base_lib_dependency_chain
+from vibeflow.core.quality.implementation import ImplementationLimits
+from vibeflow.builtin.implementation import check_node_implementation, check_base_lib_implementation, check_base_lib_dependency_chain
 from vibeflow.core.rules import RuleRecord, RuleResult
-from vibeflow.core.rules.builtin import implementation_handlers
+from vibeflow.builtin.implementation import implementation_handlers
 from vibeflow.targets.python.quality.analysis_metrics import PythonSourceAnalysis
 from vibeflow.targets.python.quality.rules.helpers import finding, source_policy, source_subject, source_info, violation_finding
 
@@ -20,9 +21,9 @@ def maintainability(context, inputs, params, *, analysis=None):
     if measured is None:
         return RuleResult(state="unavailable")
     metrics = measured.metrics
-    limits = ImplementationLimits.from_policy(source_policy(context, params))
+    limits = ImplementationLimits.from_policy(source_policy(params, sections=("node_source", "complexity", "maintainability")))
     is_library = context.subject.get("kind") != "node"
-    evaluator = evaluate_base_lib_implementation if is_library else evaluate_node_implementation
+    evaluator = check_base_lib_implementation if is_library else check_node_implementation
     findings = [_located(context, item, measured.path, measured.line) for item in evaluator(metrics, limits)]
     if not is_library:
         sources, node, symbol = source_subject(context)
@@ -32,14 +33,14 @@ def maintainability(context, inputs, params, *, analysis=None):
             node.descriptor, node.descriptor.contract, source=source_info(sources.file(node.path), symbol),
             metrics=NodeMetrics(contract_key_count=metrics.contract_key_count)))
 
-        item = evaluate_base_lib_dependency_chain(measured.dependency_chain, limits)
+        item = check_base_lib_dependency_chain(measured.dependency_chain, limits)
         if item is not None:
             diagnostic = _located(context, item, measured.path, measured.line)
             findings.append(replace(diagnostic, details={**diagnostic.details,
                 "longest_chain_length": measured.dependency_chain.length, "longest_chain": measured.dependency_chain.path,
                 "imported_modules": measured.imported_modules, "recursive_chains": measured.dependency_chain.recursive_paths}))
     for path, helper_metrics in measured.helpers:
-        findings.extend(_located(context, item, path) for item in evaluate_base_lib_implementation(helper_metrics, limits))
+        findings.extend(_located(context, item, path) for item in check_base_lib_implementation(helper_metrics, limits))
     record = {"source_lines": metrics.source_lines, "source_bytes": metrics.source_bytes,
         "function_count": metrics.function_count, "branch_count": metrics.branch_count,
         "max_nesting_depth": metrics.max_nesting_depth, "param_count": metrics.param_count,
@@ -61,7 +62,7 @@ def source_implementation_handlers(analysis):
             measured = analysis.measurements(context)
             if measured is None:
                 return RuleResult(state="unavailable")
-            limits = ImplementationLimits.from_policy(source_policy(context, params))
+            limits = ImplementationLimits.from_policy(source_policy(params, sections=("node_source", "complexity", "maintainability")))
             if name == "base_lib" and context.subject.get("kind") != "base_lib":
                 from vibeflow.core.rules.models import plain
                 returned = []

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from vibeflow.targets.javascript.build.driver_session import check_scope
+
 from dataclasses import dataclass, replace
 import hashlib
 from pathlib import Path
@@ -8,10 +10,10 @@ from typing import Any, Callable, Mapping
 from vibeflow.targets.javascript.build.builder import BuildRequest, BuildResult, build_aot
 from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
 from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
+from vibeflow.tooling.application.javascript.rule_defaults import workflow_rule_defaults
 from vibeflow.targets.javascript.build.project_graph import (
     PreparationState as _PreparationState,
     prepare_graph as _prepare_graph,
-    require_explicit_inputs as _require_explicit_inputs,
 )
 from vibeflow.targets.javascript.quality.rules import JavascriptRuleReport, node_type_calls, run_javascript_rules, run_javascript_workflow_rules
 from vibeflow.targets.javascript.build.project_paths import (
@@ -20,7 +22,6 @@ from vibeflow.targets.javascript.build.project_paths import (
 )
 from vibeflow.targets.javascript.build.project_resources import (
     base_lib_closure as _base_lib_closure,
-    enriched_payload as _enriched_payload,
     host_extension_closure as _host_extension_closure,
     target_neutral_import_policy,
     required_capabilities as _required_capabilities,
@@ -35,11 +36,12 @@ from vibeflow.core import (
     compile_core,
 )
 from vibeflow.tooling.project.config_loader import load_workspace_config_document
-from vibeflow.tooling.project.host_extensions import host_extension_resources
+from vibeflow.tooling.application.javascript.host_selection import declared_hosts, active_host_ids
 from vibeflow.core.descriptors import DescriptorCatalogs
 from vibeflow.targets.javascript.frontend.facts import (
     JavascriptImplementationFactsError,
     implementation_facts_from_catalog,
+    native_workflow_facts,
     validate_javascript_descriptor_catalogs,
 )
 from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
@@ -103,8 +105,7 @@ class PreparedProjectBuild:
     compiled: CompiledGraph
     catalogs: DescriptorCatalogs
     plan: WorkflowPlan
-    payload: Mapping[str, Any]
-    implementation_by_type: Mapping[str, object]
+    javascript_bindings: JavascriptBindingPlan
     import_policy: Mapping[str, Any]
     external_packages: tuple[str, ...]
     used_node_types: tuple[str, ...]
@@ -120,7 +121,6 @@ class PreparedProjectBuild:
     plugin_annotations: tuple[Mapping[str, Any], ...] = ()
     plugin_audit_sources: tuple[str, ...] = ()
     warnings: tuple[Mapping[str, object], ...] = ()
-    javascript_bindings: JavascriptBindingPlan | None = None
 
 
 @dataclass(frozen=True)
@@ -148,6 +148,7 @@ class ProjectBuildResult:
 BeforeCompileHook = Callable[[GraphConfig, DescriptorCatalogs], GraphConfig]
 
 
+@check_scope
 def prepare_project_build(
     request: ProjectBuildRequest,
     *,
@@ -224,8 +225,10 @@ def prepare_project_build(
         entry_mode=graph.entry_mode,
         project_root=root.path,
     )
-    selected_hosts = _declared_host_extensions(document.data, legacy_ids=tuple(javascript["host_extensions"]), catalog=catalogs.host_extensions)
-    rule_import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]), node_ids=frozenset(node_type_calls(graph)), host_extension_ids=frozenset(item.id for item in selected_hosts if item.status == "implemented"), plugin_ids=frozenset(item.id for item in _active_plugin_bindings(plugin_plan)))
+    selected_hosts = declared_hosts(document.data, catalog=catalogs.host_extensions)
+    selected_host_ids = active_host_ids(tuple(item.id for item in selected_hosts if item.status == "implemented"),
+        catalog=catalogs.host_extensions, planned=frozenset(item.id for item in selected_hosts if item.status == "planned"))
+    rule_import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]), node_ids=frozenset(node_type_calls(graph)), host_extension_ids=frozenset(selected_host_ids), plugin_ids=frozenset(item.id for item in _active_plugin_bindings(plugin_plan)))
     rule_report = run_javascript_rules(graph, catalogs, project_root=root.path, package_root=package_root, phase="static", target=request.target, import_policy=rule_import_policy, node_command=request.node_command,
                                      quality_policy=javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
     rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")
@@ -233,14 +236,13 @@ def prepare_project_build(
         first = rule_errors[0]
         raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in rule_report.findings))
     rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={}, node_report=rule_report, project_root=root.path, package_root=package_root, phase="import", target=request.target, node_command=request.node_command,
-        rule_defaults={"vibeflow.workflow": {"nodeset_max_depth": javascript["nodeset_max_depth"]}, "vibeflow.graph.nodesets": {"nodeset_max_depth": javascript["nodeset_max_depth"]}},
+        rule_defaults=workflow_rule_defaults(catalogs, javascript["nodeset_max_depth"]),
         quality_policy=javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
     rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if rule_errors:
         first = rule_errors[0]
         raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in rule_report.findings))
     implementation_facts = implementation_facts_from_catalog(node_catalog, target=request.target, effect_policies=rule_report.policies)
-    _require_explicit_inputs(graph, path=())
     plugin_report = JavascriptBuildPluginReport()
     build_plugins = plugin_plan.compiler_plugins
     if build_plugins:
@@ -266,7 +268,7 @@ def prepare_project_build(
                 plugin_runner.after_compile(graph, compiled)
                 plugin_report = plugin_runner.report()
         except JavascriptPluginError as exc:
-            raise ProjectBuildError(exc.code, str(exc)) from exc
+            raise ProjectBuildError(exc.code, str(exc), details=exc.details) from exc
     else:
         compilation = _compile_core_compilation(
             graph,
@@ -322,7 +324,7 @@ def prepare_project_build(
         active_nodesets=(),
     )
 
-    rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **state.compiled_by_path}, node_report=rule_report, project_root=root.path, package_root=package_root, rule_defaults={"vibeflow.workflow": {"nodeset_max_depth": javascript["nodeset_max_depth"]}, "vibeflow.graph.nodesets": {"nodeset_max_depth": javascript["nodeset_max_depth"]}}, target=request.target, node_command=request.node_command,
+    rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **state.compiled_by_path}, node_report=rule_report, project_root=root.path, package_root=package_root, rule_defaults=workflow_rule_defaults(catalogs, javascript["nodeset_max_depth"]), target=request.target, node_command=request.node_command,
                                                  quality_policy=javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
     workflow_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if workflow_errors:
@@ -351,24 +353,10 @@ def prepare_project_build(
         compiled_by_path=state.compiled_by_path,
         params_by_path=state.params_by_path,
         implementation_facts=implementation_facts,
+        native_execution_facts=native_workflow_facts(graph),
         target_features=target_features,
     )
-    payload = _enriched_payload(
-        plan,
-        schemas=schemas,
-        capabilities=capabilities,
-        nodes=state.used_nodes,
-        implementations=state.implementations,
-    )
-    uses_legacy_host_extensions = (
-        "host_extensions" not in document.data
-        and bool(javascript["host_extensions"])
-    )
-    declared_host_extensions = _declared_host_extensions(
-        document.data,
-        legacy_ids=tuple(javascript["host_extensions"]),
-        catalog=catalogs.host_extensions,
-    )
+    declared_host_extensions = selected_hosts
     implemented_host_extensions = tuple(
         item.id
         for item in declared_host_extensions
@@ -390,6 +378,7 @@ def prepare_project_build(
             if item.status == "implemented"
         },
         planned=planned_host_extensions,
+        resolved_ids=selected_host_ids,
     )
     project_external = tuple(javascript["external_packages"])
     allowed_external = set(project_external)
@@ -446,15 +435,6 @@ def prepare_project_build(
         import_policy=import_policy,
     )
     warnings = [*(item.to_dict() for item in rule_report.findings if item.severity == "warning")]
-    if uses_legacy_host_extensions:
-        warnings.append({
-            "code": "VF_AOT_HOST_EXTENSION_LEGACY_SELECTION",
-            "message": (
-                "javascript.host_extensions is deprecated; select "
-                "host extensions in the workflow-level "
-                "host_extensions list"
-            ),
-        })
     return PreparedProjectBuild(
         workspace=workspace,
         root=root,
@@ -465,8 +445,6 @@ def prepare_project_build(
         compiled=compiled,
         catalogs=catalogs,
         plan=plan,
-        payload=payload,
-        implementation_by_type=dict(state.implementations),
         import_policy=import_policy,
         external_packages=project_external,
         used_node_types=tuple(sorted(state.used_nodes)),
@@ -541,6 +519,7 @@ def _compile_core_compilation(
     )
 
 
+@check_scope
 def build_project_aot(request: ProjectBuildRequest) -> ProjectBuildResult:
     prepared = prepare_project_build(request)
     result = build_aot(
@@ -686,75 +665,6 @@ def _with_plugin_source_hashes(
         runtime_plugins=tuple(hashed(item) for item in plan.runtime_plugins),
         planned_plugins=plan.planned_plugins,
     )
-
-
-def _declared_host_extensions(
-    config: Mapping[str, Any],
-    *,
-    legacy_ids: tuple[str, ...],
-    catalog: object,
-):
-    if "host_extensions" not in config:
-        config = {
-            **config,
-            "host_extensions": list(legacy_ids),
-        }
-    findings: list[object] = []
-    resources = host_extension_resources(config, findings=findings)
-    errors = [
-        finding
-        for finding in findings
-        if str(getattr(finding, "severity", "error")) == "error"
-    ]
-    if errors:
-        first = errors[0]
-        raise ProjectBuildError(
-            "VF_AOT_HOST_EXTENSION_CONFIG",
-            (
-                f"{getattr(first, 'rule_id', 'HOST_EXTENSION.CONFIG')}: "
-                f"{getattr(first, 'message', str(first))}"
-            ),
-        )
-    resolved = []
-    for resource in resources:
-        descriptor = catalog.get(resource.id)
-        if descriptor is None:
-            resolved.append(resource)
-            continue
-        contract = {
-            "targets": tuple(descriptor.targets),
-            "provides": tuple(descriptor.provides),
-            "dependencies": tuple(descriptor.dependencies),
-        }
-        for field, expected in contract.items():
-            declared = tuple(getattr(resource, field))
-            if (
-                field in resource.declared_contract_fields
-                and declared != expected
-            ):
-                raise ProjectBuildError(
-                    "VF_AOT_HOST_EXTENSION_CONFIG",
-                    (
-                        f"host_extension '{resource.id}' {field} "
-                        "must match its registered descriptor"
-                    ),
-                )
-        resolved.append(
-            replace(
-                resource,
-                display_name=(
-                    resource.display_name or descriptor.display_name
-                ),
-                description=(
-                    resource.description or descriptor.description
-                ),
-                version=resource.version or descriptor.version,
-                targets=contract["targets"],
-                provides=contract["provides"],
-                dependencies=contract["dependencies"],
-            )
-        )
-    return tuple(resolved)
 
 
 __all__ = [

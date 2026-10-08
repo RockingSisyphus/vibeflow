@@ -7,7 +7,7 @@
 `plugins/text.py`：
 
 ```python
-from vibeflow.targets.python.sdk import Plugin, node, data_schema
+from vibeflow.targets.python.sdk import Plugin, node, data_schema, update_run_info
 
 @node(
     type_key="example.normalize_text",
@@ -23,7 +23,12 @@ from vibeflow.targets.python.sdk import Plugin, node, data_schema
 )
 class NormalizeText:
     def run_pure(self, inputs, params):
-        return {"normalized_text": " ".join(inputs["text.raw"]["value"].split())}
+        normalized_text = " ".join(inputs["text.raw"]["value"].split())
+        update_run_info([{
+            "id": "normalize", "characters": len(normalized_text),
+            "message": "文本规范化完成",
+        }])
+        return {"normalized_text": normalized_text}
 
 raw = data_schema(type_key="text.raw", schema={"type": "string"})
 normalized = data_schema(type_key="text.normalized", schema={"type": "string"})
@@ -48,7 +53,15 @@ workflow 保留 JSONC 和原生连边，下面是插件选择与 Node 调用片�
 
 返回对象的 key 与 `provides[].key` 一致；调用点 `params` 使用声明的参数 schema/defaults。`@node` 保存契约、规则选择、默认展示以及实现类的源码位置。
 
+直接装饰类或检查函数时，该对象决定实际实现和源码位置。通常让 SDK 自动定位即可；显式提供同语言 `source/implementations` 时，它们必须指向同一对象。同文件的导出别名、file/module 的同源定位可以使用。指向其他实际实现对象时，加载返回 `RESOURCE.IMPLEMENTATION.CONFLICT`，并提供声明与实际位置。需要绑定尚未导入的独立实现时，使用下文的延迟源码声明。
+
 默认值支持 JSON 数组、对象及其嵌套组合。SDK 保存只读声明；`run_pure` 每次调用收到原生 `list/dict` 参数副本。默认值和调用点覆盖分别复制，修改本次参数不会影响保存的默认值、调用者的容器或后续运行。
+
+`run_pure` 可以由源码范围内的父类提供。默认规则按 Python 的方法解析顺序检查实际生效的方法，包括其签名和副作用；诊断指向方法所在文件。跨文件父类需按资源归属要求显式登记。Decision 的路由输出可使用 `flow.*` 字段，例如 `flow.backend`，并在原生连边的 `when` 中引用。
+
+纯路径运算可以使用 `from pathlib import PurePath`、`PurePosixPath` 或 `PureWindowsPath`，支持导入别名。默认副作用规则继续检查 Path 的实际 IO 和网络调用；已取得源码的项目 helper 根据函数体检查，reset/close 等名称本身不授予或取消权限。
+
+`contextlib.ExitStack` 可以组织清理操作。默认规则根据源码确认接收对象后检查 `close()`，并按当前资源选择的副作用范围检查可解析的 `callback/push` 回调及其 helper 函数体。空栈清理可用于 Process Node；登记 `print/open` 仍需要相应规则允许，状态恢复需要状态规则允许。BaseLib 按自己的 Ruleset 检查，不继承调用 Node 的更宽权限；文件或连接的 `close()` 继续接受 IO 检查。
 
 Node 通过 `rulesets` 选择审查约束。省略和 `[]` 都表示未选择 Node 审查规则；`flow_kind` 表达执行身份。自由 `tags/metadata` 和 `presentation` 由 Node 自己声明，见 [规则与 Node](rules-and-nodes.md)。
 
@@ -87,3 +100,9 @@ python run.py inspect-resources --config python_project/configs/main.jsonc --jso
 ```
 
 资源查询和规则预览加载固定定义，框架不调用检查函数、业务执行入口或生命周期工厂。
+
+## 在业务 Node 中更新进度
+
+上例在 `run_pure` 中调用 `update_run_info`，同时照常返回契约声明的输出。函数从当前运行上下文取得状态缓存，Node 的方法签名与 `rulesets` 选择沿用原声明。训练 Node 可以在每轮结束后用同一接口提交轮次和指标。
+
+每次调用替换完整 `info` 数组。需要同时保留训练进度和指标时，在一次调用中提供两个对象；`[]` 清空信息。内核在下一次定时刷新、状态变化或结束时写入最新缓存。默认间隔为 60 秒，命令行用 `--status-interval` 调整。完整数据格式、日志位置和监控配置见[运行日志与状态接口](runtime-observation.md)。

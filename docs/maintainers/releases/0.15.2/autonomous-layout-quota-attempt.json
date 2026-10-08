@@ -1,0 +1,37 @@
+{
+  "schema": "vibeflow.review-layout.v1",
+  "kernel": "/tmp/vf-release-0152-isolated/autonomous/installed-kernel",
+  "renderer": "/tmp/vf-adaptation-full-accepted/puppeteer",
+  "expected_cases": [
+    "layout.review.nested_repeat_loop",
+    "layout.expanded_svg.nested_repeat_loop",
+    "layout.mermaid.explicit_resources",
+    "layout.ordinary_svg.explicit_resources"
+  ],
+  "cases": [],
+  "observation_errors": [
+    {
+      "id": "layout.review.nested_repeat_loop",
+      "error": "RuntimeError('CLI instrumentation failed: {\"report\": \"/tmp/vf-release-0152-isolated/autonomous/layout/layout.review.nested_repeat_loop/observation.json\", \"exit_code\": 2, \"error\": \"OSError(122, \\'Disk quota exceeded\\')\"}\\n')"
+    },
+    {
+      "id": "layout.expanded_svg.nested_repeat_loop",
+      "error": "OSError(122, 'Disk quota exceeded')"
+    },
+    {
+      "id": "layout.mermaid.explicit_resources",
+      "error": "OSError(122, 'Disk quota exceeded')"
+    },
+    {
+      "id": "layout.ordinary_svg.explicit_resources",
+      "error": "OSError(122, 'Disk quota exceeded')"
+    }
+  ],
+  "summary": {
+    "cases": 0,
+    "matched": 0,
+    "unmatched": 0,
+    "observation_errors": 4
+  },
+  "matched": false
+}

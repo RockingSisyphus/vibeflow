@@ -1,7 +1,7 @@
+from tests.fixtures.support.declarations import native_registry
 from tests.fixtures.support.strict_support_runtime_implementations import DuplicateThreeNode
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
-from copy import deepcopy
 
 from vibeflow.targets.python.project.policy import EffectivePolicy
 from tests.fixtures.support.rule_inspection import _inspect_node_source, _valid_node_source, node_document
@@ -16,44 +16,9 @@ def validate_graph_health(graph, *, registry=None, **kwargs):
 
 
 
-def parse_graph_config(config):
-    """Migrate legacy inline fixtures to source-owned effective contracts."""
-    from vibeflow.tooling.project.graph_config import parse_graph_config as raw_parse_graph_config
-
-    migrated = deepcopy(config)
-
-    def visit(body):
-        pipeline = body.get("pipeline", body)
-        for node in pipeline.get("nodes", []):
-            node.setdefault("display_name", str(node.get("id", "Node")).replace("_", " ").title())
-            node.setdefault("description", f"Exercises {node.get('id', 'this node')} in the graph-health fixture.")
-            explicit = (
-                node.get("status") == "planned"
-                or node.get("type_used") == "vibeflow.io"
-                or str(node.get("type_used", "")).startswith("vibeflow.loop.")
-            )
-            if explicit:
-                node.setdefault("requires", [])
-                node.setdefault("provides", [])
-            else:
-                node.pop("requires", None)
-                node.pop("provides", None)
-        nested = body.get("nodesets", pipeline.get("nodesets", {}))
-        iterable = nested.values() if isinstance(nested, dict) else nested
-        for nodeset in iterable:
-            if isinstance(nodeset, dict):
-                nodeset.setdefault("display_name", str(nodeset.get("type_key", "Nodeset")))
-                nodeset.setdefault("description", "Defines a nested graph-health fixture.")
-                visit(nodeset)
-
-    visit(migrated)
-    return raw_parse_graph_config(migrated)
 
 
-DuplicateThreeNode_DECLARATION = node_declaration(NodeInfo("test.duplicate_three", "Duplicate Three", "Duplicates output for an unclaimed comparison.", "0.1.0", "process"), NodeContract(
-        provides=(DataProvider("dup.three", "dup.three", display_name="Duplicate Three"),),
-        output_semantics={"dup.three": ("third duplicate fixture value",)},
-    ), rulesets=("vibeflow.process",))
+DuplicateThreeNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.duplicate_three', display_name='Duplicate Three', description='Duplicates output for an unclaimed comparison.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('dup.three', 'dup.three', display_name='Duplicate Three'),), output_semantics={'dup.three': ('third duplicate fixture value',)}), rulesets=("vibeflow.process",))
 
 
 def test_architecture_smells_warn_for_mismatched_metadata_and_unstable_keys(tmp_path, capsys) -> None:
@@ -68,7 +33,7 @@ def test_architecture_smells_warn_for_mismatched_metadata_and_unstable_keys(tmp_
 
 
 def test_graph_health_reports_node_metrics_duplicate_logic_and_confusing_node_names() -> None:
-    registry = NodeRegistry()
+    registry = native_registry()
     register_node(registry, DuplicateOneNode_DECLARATION, DuplicateOneNode)
     register_node(registry, DuplicateTwoNode_DECLARATION, DuplicateTwoNode)
     register_node(registry, DuplicateThreeNode_DECLARATION, DuplicateThreeNode)
@@ -76,8 +41,8 @@ def test_graph_health_reports_node_metrics_duplicate_logic_and_confusing_node_na
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("DuplicateOne", "test.duplicate_one", "Produces the first duplicate fixture value.", provides=[PROV_SPEC("dup.one")]),
-                    _node_call("duplicate_two", "test.duplicate_two", "Produces the second duplicate fixture value.", provides=[PROV_SPEC("dup.two")]),
+                    _node_call("DuplicateOne", "test.duplicate_one", "Produces the first duplicate fixture value."),
+                    _node_call("duplicate_two", "test.duplicate_two", "Produces the second duplicate fixture value."),
                 ]
             }
         }
@@ -102,19 +67,19 @@ def test_graph_health_reports_node_metrics_duplicate_logic_and_confusing_node_na
 
 
 def test_graph_health_suppresses_declared_similar_duplicate_logic_pairs() -> None:
-    registry = NodeRegistry()
+    registry = native_registry()
     register_node(registry, DuplicateOneNode_DECLARATION, DuplicateOneNode)
     register_node(registry, DuplicateTwoNode_DECLARATION, DuplicateTwoNode)
     graph = parse_graph_config(
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("base", "test.duplicate_one", "Produces the base duplicate fixture value.", provides=[PROV_SPEC("dup.base")]),
+                    _node_call("base", "test.duplicate_one", "Produces the base duplicate fixture value."),
                     _node_call(
                         "variant",
                         "test.duplicate_two",
                         "Produces an intentional variant duplicate fixture value.",
-                        provides=[PROV_SPEC("dup.variant")],
+
                         similar_to={"node": "base", "relationship": "variant", "reason": "Same pure shape, different contract semantics."},
                     ),
                 ]
@@ -139,25 +104,24 @@ def test_graph_health_flow_and_data_findings_include_owner_and_provider_context(
                     pipeline={
                         "nodes": [
                             _node_call("start", "test.start", "Starts the nested flow."),
-                            _node_call("add", "test.add", "Adds a missing nested input.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                            _node_call("end", "test.out_end", "Ends after nested value.out.", requires=[REQ_SPEC("value.out")]),
+                            _node_call("add", "test.add", "Adds a missing nested input."),
+                            _node_call("end", "test.out_end", "Ends after nested value.out."),
                         ],
                         "edges": [{"from": "start", "to": "end"}],
                     },
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the top-level flow."),
                     _node_call(
                         "composite",
                         "inner.flow",
                         "Runs the nested flow.",
-                        requires=[REQ_SPEC("value.in")],
-                        provides=[PROV_SPEC("value.out")],
+
                     ),
-                    _node_call("end", "test.out_end", "Ends after composite output.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Ends after composite output."),
                 ],
                 "edges": _edge_chain("start", "composite", "end"),
             },
@@ -210,11 +174,11 @@ def test_graph_health_keeps_same_node_problem_separate_by_owner() -> None:
                 {**_bad_leaf_nodeset("right.leaf"), "provides":[]},
             ],
             "pipeline": {
-                    "inputs": [PROV_SPEC("value.in")],
+                    "inputs": [INPUT_SPEC("value.in")],
                     "nodes": [
                         _node_call("start", "test.start", "Starts the owner aggregation fixture."),
-                        _node_call("left", "left.leaf", "Exercises the first declared bad leaf.",requires=[REQ_SPEC("value.in")],provides=[PROV_SPEC("left.out","value.out")]),
-                        _node_call("right", "right.leaf", "Exercises the second declared bad leaf.",requires=[REQ_SPEC("value.in")],provides=[PROV_SPEC("right.out","value.out")]),
+                        _node_call("left", "left.leaf", "Exercises the first declared bad leaf."),
+                        _node_call("right", "right.leaf", "Exercises the second declared bad leaf."),
                         _node_call("end", "test.start", "Ends the owner aggregation fixture."),
                     ],
                     "edges": _edge_chain("start","left","right","end"),
@@ -241,11 +205,11 @@ def test_nodeset_override_path_errors_are_not_repeated_by_nested_definition_expa
         {
             "nodesets": nodesets,
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the override aggregation fixture."),
-                    _node_call("top", "ns5", "Calls the deepest wrapper.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Ends the override aggregation fixture.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("top", "ns5", "Calls the deepest wrapper."),
+                    _node_call("end", "test.out_end", "Ends the override aggregation fixture."),
                 ],
                 "edges": _edge_chain("start", "top", "end"),
             },
@@ -279,7 +243,7 @@ def test_node_config_override_path_can_pass_through_loop_body() -> None:
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the loop override health fixture."),
                     _node_call(
@@ -297,7 +261,7 @@ def test_node_config_override_path_can_pass_through_loop_body() -> None:
                             "outputs": [{"from": "value.out", "as": "value.out"}],
                         },
                     ),
-                    _node_call("end", "test.out_end", "Ends after value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Ends after value.out."),
                 ],
                 "edges": _edge_chain("start", "loop_call", "end"),
                 "outputs": [REQ_SPEC("value.out")],
@@ -326,18 +290,17 @@ def test_node_config_override_path_still_rejects_traversing_plain_node() -> None
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the invalid override fixture."),
                     _node_call(
                         "composite",
                         "plain.body",
                         "Calls a body with an invalid nested override path.",
-                        requires=[REQ_SPEC("value.in")],
-                        provides=[PROV_SPEC("value.out")],
+
                         node_configs={"add.inner": {"delta": 5}},
                     ),
-                    _node_call("end", "test.out_end", "Ends after value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Ends after value.out."),
                 ],
                 "edges": _edge_chain("start", "composite", "end"),
                 "outputs": [REQ_SPEC("value.out")],
@@ -398,8 +361,9 @@ def test_health_report_aggregates_duplicate_findings_but_not_different_direct_so
     registry = _registry()
     rule = RuleDescriptor("test.duplicates")
     ruleset = RulesetDescriptor("test.duplicates",calls=(RuleCall("check",rule_id=rule.id),))
-    registry.rule_catalogs = (SimpleNamespace(rules=(rule,),rulesets=(ruleset,)),)
-    registry.rule_handler_loader = lambda plan: {rule.id:duplicates}
+    registry.rule_catalogs = (*registry.rule_catalogs, SimpleNamespace(rules=(rule,),rulesets=(ruleset,)),)
+    defaults = registry.rule_handler_loader
+    registry.rule_handler_loader = lambda plan: {**defaults(plan), rule.id:duplicates}
     graph = replace(parse_graph_config({"pipeline":_seed_only_pipeline()}),rulesets=("test.duplicates",))
     report = validate_graph_health(graph,registry=registry,purity_policy=PurityPolicy(max_source_lines=1000))
     duplicate = next(warning for warning in report.warnings if warning.rule_id == "PLUGIN.DUPLICATE")
@@ -426,17 +390,16 @@ def _nested_bad_leaf_graph(*, depth: int):
         {
             "nodesets": nodesets,
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the nested aggregation fixture."),
                     _node_call(
                         "top",
                         f"ns{depth - 1}",
                         "Calls the deepest wrapper.",
-                        requires=[REQ_SPEC("value.in")],
-                        provides=[PROV_SPEC("value.out")],
+
                     ),
-                    _node_call("end", "test.out_end", "Ends the nested aggregation fixture.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Ends the nested aggregation fixture."),
                 ],
                 "edges": _edge_chain("start", "top", "end"),
             },
@@ -460,7 +423,7 @@ def _nodeset_depth_graph(
             provides=["value.out"],
             pipeline={
                 "nodes": [
-                    _node_call("leaf", "test.seed", "Produces the depth fixture output.", provides=[PROV_SPEC("value.out")])
+                    _node_call("leaf", "test.seed", "Produces the depth fixture output.")
                 ]
             },
         )
@@ -481,12 +444,12 @@ def _nodeset_depth_graph(
                 },
             )
         else:
-            call = _node_call("call", child, f"Calls {child}.", provides=[PROV_SPEC("value.out")])
+            call = _node_call("call", child, f"Calls {child}.")
         if index == async_layer:
             call["async"] = "detached"
         calls = [call]
         if branch and index == depth - 1:
-            calls.append(_node_call("branch", "depth.0", "Calls a shallow branch.", provides=[PROV_SPEC("branch.out")]))
+            calls.append(_node_call("branch", "depth.0", "Calls a shallow branch."))
         nodesets.append(
             _nodeset_config(
                 f"depth.{index}",
@@ -498,9 +461,9 @@ def _nodeset_depth_graph(
         for nodeset in nodesets:
             nodeset["status"] = "planned"
     pipeline_node = (
-        _node_call("top", f"depth.{depth - 1}", "Calls the depth fixture.", provides=[PROV_SPEC("value.out")])
+        _node_call("top", f"depth.{depth - 1}", "Calls the depth fixture.")
         if pipeline_uses_chain
-        else _node_call("seed", "test.seed", "Leaves the depth fixture unused.", provides=[PROV_SPEC("value.out")])
+        else _node_call("seed", "test.seed", "Leaves the depth fixture unused.")
     )
     return parse_graph_config({"nodesets": nodesets, "pipeline": {"nodes": [pipeline_node]}})
 
@@ -514,13 +477,8 @@ def _bad_leaf_nodeset(name: str) -> dict:
         pipeline={
             "nodes": [
                 _node_call("start", "test.start", "Starts the bad leaf."),
-                {
-                    "id": "bad",
-                    "type_used": "test.add",
-                    "requires": [REQ_SPEC("value.in")],
-                    "provides": [PROV_SPEC("value.out")],
-                },
-                _node_call("end", "test.out_end", "Ends after value.out.", requires=[REQ_SPEC("value.out")]),
+                {'id': 'bad', 'type_used': 'test.add', 'display_name': 'Bad', 'description': 'Exercises bad in the graph-health fixture.'},
+                _node_call("end", "test.out_end", "Ends after value.out."),
             ],
             "edges": [{"from": "start", "to": "end"}],
         },
@@ -534,11 +492,11 @@ def _wrapper_nodeset(name: str, child: str) -> dict:
         provides=["value.out"],
         exports=["value.out"],
         pipeline={
-            "inputs": [PROV_SPEC("value.in")],
+            "inputs": [INPUT_SPEC("value.in")],
             "nodes": [
                 _node_call("start", "test.start", f"Starts wrapper {name}."),
-                _node_call("call", f"{child}", f"Calls {child}.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                _node_call("end", "test.out_end", f"Ends wrapper {name}.", requires=[REQ_SPEC("value.out")]),
+                _node_call("call", f"{child}", f"Calls {child}."),
+                _node_call("end", "test.out_end", f"Ends wrapper {name}."),
             ],
             "edges": _edge_chain("start", "call", "end"),
         },
@@ -563,19 +521,19 @@ def test_graph_health_suppresses_duplicate_logic_when_nodes_share_declared_base(
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("base", "test.seed", "Produces the shared base fixture value.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("base", "test.seed", "Produces the shared base fixture value."),
                     _node_call(
                         "left",
                         "test.duplicate_one",
                         "Produces the left duplicate fixture value.",
-                        provides=[PROV_SPEC("dup.left")],
+
                         similar_to={"node": "base", "relationship": "variant", "reason": "Variant of the shared fixture base."},
                     ),
                     _node_call(
                         "right",
                         "test.duplicate_two",
                         "Produces the right duplicate fixture value.",
-                        provides=[PROV_SPEC("dup.right")],
+
                         similar_to={"node": "base", "relationship": "variant", "reason": "Variant of the shared fixture base."},
                     ),
                 ]
@@ -589,7 +547,7 @@ def test_graph_health_suppresses_duplicate_logic_when_nodes_share_declared_base(
 
 
 def test_graph_health_keeps_unclaimed_duplicate_logic_pairs() -> None:
-    registry = NodeRegistry()
+    registry = native_registry()
     register_node(registry, DuplicateOneNode_DECLARATION, DuplicateOneNode)
     register_node(registry, DuplicateTwoNode_DECLARATION, DuplicateTwoNode)
     register_node(registry, DuplicateThreeNode_DECLARATION, DuplicateThreeNode)
@@ -597,12 +555,12 @@ def test_graph_health_keeps_unclaimed_duplicate_logic_pairs() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("base", "test.duplicate_one", "Produces the base duplicate fixture value.", provides=[PROV_SPEC("dup.base")]),
+                    _node_call("base", "test.duplicate_one", "Produces the base duplicate fixture value."),
                     _node_call(
                         "variant",
                         "test.duplicate_two",
                         "Produces an intentional variant duplicate fixture value.",
-                        provides=[PROV_SPEC("dup.variant")],
+
                         similar_to={"node": "base", "relationship": "copy", "reason": "Copied implementation for a distinct contract."},
                     ),
                     _node_call("unclaimed", "test.duplicate_three", "Produces an undeclared duplicate fixture value."),
@@ -624,8 +582,8 @@ def test_graph_health_explicit_empty_ruleset_omits_review() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the fixture flow."),
-                    _node_call("BadName", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
-                    _node_call("end", "test.in_end", "Consumes value.in at the end.", requires=[REQ_SPEC("value.in")]),
+                    _node_call("BadName", "test.seed", "Produces value.in."),
+                    _node_call("end", "test.in_end", "Consumes value.in at the end."),
                 ],
                 "edges": _edge_chain("start", "BadName", "end"),
             }
@@ -646,8 +604,8 @@ def test_graph_health_warns_for_duplicate_explicit_edges() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the fixture flow."),
-                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
-                    _node_call("end", "test.in_end", "Consumes value.in at the end.", requires=[REQ_SPEC("value.in")]),
+                    _node_call("seed", "test.seed", "Produces value.in."),
+                    _node_call("end", "test.in_end", "Consumes value.in at the end."),
                 ],
                 "edges": [
                     {"from": "start", "to": "seed"},
@@ -661,7 +619,7 @@ def test_graph_health_warns_for_duplicate_explicit_edges() -> None:
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
 
     assert any(warning.rule_id == "GRAPH.EDGE.DUPLICATE" for warning in report.warnings)
-    assert "GRAPH.EDGE.DUPLICATE" in report.info["rule_catalog"]
+    assert any(call["rule_id"] == "vibeflow.workflow" for execution in report.info["rule_executions"] for call in execution["plan"]["calls"])
 
 
 def test_graph_health_warns_for_overwide_nodeset() -> None:
@@ -674,13 +632,13 @@ def test_graph_health_warns_for_overwide_nodeset() -> None:
                     exports=["wide.out"],
                     pipeline={
                         "nodes": [
-                            _node_call(f"n{index}", "test.seed", f"Produces wide.k{index}.", provides=[PROV_SPEC(f"wide.k{index}")])
+                            _node_call(f"n{index}", "test.seed", f"Produces wide.k{index}.")
                             for index in range(11)
                         ]
                     },
                 )
             ],
-            "pipeline": {"nodes": [_node_call("wide_flow", "wide.flow", "Calls the wide composite.", provides=[PROV_SPEC("wide.out")])]},
+            "pipeline": {"nodes": [_node_call("wide_flow", "wide.flow", "Calls the wide composite.")]},
         }
     )
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
@@ -713,11 +671,11 @@ def test_nodeset_health_accepts_valid_contract_and_groups_no_findings() -> None:
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the composite fixture."),
-                    _node_call("composite", "math.add_one", "Calls the add-one composite.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("composite", "math.add_one", "Calls the add-one composite."),
+                    _node_call("end", "test.out_end", "Consumes value.out at the end."),
                 ],
                 "edges": _edge_chain("start", "composite", "end"),
             },
@@ -736,23 +694,23 @@ def test_nodeset_health_rejects_direct_and_indirect_recursion() -> None:
                     provides=["loop.out"],
                     exports=["loop.out"],
                     pipeline={
-                        "nodes": [_node_call("self", "loop.self", "Calls itself recursively.", provides=[PROV_SPEC("loop.out")])]
+                        "nodes": [_node_call("self", "loop.self", "Calls itself recursively.")]
                     },
                 ),
                 _nodeset_config(
                     "loop.a",
                     provides=["loop.out"],
                     exports=["loop.out"],
-                    pipeline={"nodes": [_node_call("to_b", "loop.b", "Calls loop.b.", provides=[PROV_SPEC("loop.out")])]},
+                    pipeline={"nodes": [_node_call("to_b", "loop.b", "Calls loop.b.")]},
                 ),
                 _nodeset_config(
                     "loop.b",
                     provides=["loop.out"],
                     exports=["loop.out"],
-                    pipeline={"nodes": [_node_call("to_a", "loop.a", "Calls loop.a.", provides=[PROV_SPEC("loop.out")])]},
+                    pipeline={"nodes": [_node_call("to_a", "loop.a", "Calls loop.a.")]},
                 ),
             ],
-            "pipeline": {"nodes": [_node_call("use_self", "loop.self", "Calls the recursive composite.", provides=[PROV_SPEC("loop.out")])]},
+            "pipeline": {"nodes": [_node_call("use_self", "loop.self", "Calls the recursive composite.")]},
         }
     )
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
@@ -882,15 +840,15 @@ def test_nodeset_health_rejects_export_and_internal_key_leak() -> None:
                         provides=["public.out", "missing.out"],
                         pipeline={
                         "nodes": [
-                            _node_call("public", "test.seed", "Produces public output.", provides=[PROV_SPEC("public.out")]),
-                            _node_call("tmp", "test.seed", "Produces internal temporary output.", provides=[PROV_SPEC("tmp.internal")]),
+                            _node_call("public", "test.seed", "Produces public output."),
+                            _node_call("tmp", "test.seed", "Produces internal temporary output."),
                         ]
                     },
                 )
             ],
             "pipeline": {
                 "nodes": [
-                    _node_call("bad_scope", "bad.scope", "Calls a scope-violating composite.", provides=[PROV_SPEC("public.out"), PROV_SPEC("missing.out")])
+                    _node_call("bad_scope", "bad.scope", "Calls a scope-violating composite.")
                 ]
             },
         }
@@ -900,8 +858,6 @@ def test_nodeset_health_rejects_export_and_internal_key_leak() -> None:
     assert "NODESET.PROVIDES.UNKNOWN_KEY" in rule_ids
 
 def test_nodeset_call_rejects_duplicate_external_contract() -> None:
-    from vibeflow.tooling.project.graph_config import parse_graph_config as raw_parse_graph_config
-
     config = {
             "nodesets": [
                 _nodeset_config(
@@ -913,7 +869,7 @@ def test_nodeset_call_rejects_duplicate_external_contract() -> None:
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the mismatch fixture."),
                     {
@@ -930,7 +886,7 @@ def test_nodeset_call_rejects_duplicate_external_contract() -> None:
             },
         }
     with pytest.raises(GraphConfigError, match="derived from type_used"):
-        raw_parse_graph_config(config)
+        parse_graph_config(config)
 
 def test_nodeset_health_rejects_nested_nodeset_unknown_exports() -> None:
     graph = parse_graph_config(
@@ -940,16 +896,16 @@ def test_nodeset_health_rejects_nested_nodeset_unknown_exports() -> None:
                     "inner.flow",
                     provides=["inner.out"],
                     exports=["inner.out"],
-                    pipeline={"nodes": [_node_call("seed", "test.seed", "Produces inner output.", provides=[PROV_SPEC("inner.out")])]},
+                    pipeline={"nodes": [_node_call("seed", "test.seed", "Produces inner output.")]},
                 ),
                 _nodeset_config(
                     "outer.flow",
                     provides=["outer.out"],
                     exports=["outer.out"],
-                    pipeline={"nodes": [_node_call("inner", "inner.flow", "Calls inner flow with a wrong contract.", provides=[PROV_SPEC("outer.out")])]},
+                    pipeline={"nodes": [_node_call("inner", "inner.flow", "Calls inner flow with a wrong contract.")]},
                 ),
             ],
-            "pipeline": {"nodes": [_node_call("outer", "outer.flow", "Calls outer flow.", provides=[PROV_SPEC("outer.out")])]},
+            "pipeline": {"nodes": [_node_call("outer", "outer.flow", "Calls outer flow.")]},
         }
     )
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
@@ -957,149 +913,3 @@ def test_nodeset_health_rejects_nested_nodeset_unknown_exports() -> None:
         error.rule_id == "NODESET.PROVIDES.UNKNOWN_KEY" and error.details.get("nodeset") == "outer.flow"
         for error in report.errors
     )
-
-def test_base_lib_scan_discovers_default_root_and_reports_metrics(tmp_path) -> None:
-    base_dir = tmp_path / "base_lib"
-    base_dir.mkdir()
-    (base_dir / "math_tools.py").write_text(
-        """
-def add_one(value):
-    return value + 1
-""".strip(),
-        encoding="utf-8",
-    )
-    report = scan_base_lib(tmp_path, policy=PurityPolicy(max_source_lines=1000))
-    payload = report.to_dict()
-    assert payload["roots"] == [str(base_dir.resolve())]
-    assert payload["modules"][0]["module"] == "base_lib.math_tools"
-    assert payload["modules"][0]["function_count"] == 1
-    assert payload["findings"] == []
-
-def test_base_lib_scan_reports_size_complexity_imports_side_effects_and_globals(tmp_path) -> None:
-    base_dir = tmp_path / "base_lib"
-    base_dir.mkdir()
-    (base_dir / "bad.py").write_text(
-        """
-import os
-from pathlib import Path
-
-CACHE = {}
-
-def risky(value):
-    path = Path("x.txt")
-    if value:
-        if value > 1:
-            path.write_text("bad")
-            (path / "child").open()
-    return value
-""".strip(),
-        encoding="utf-8",
-    )
-    report = scan_base_lib(
-        tmp_path,
-        policy=PurityPolicy(
-            max_source_lines=3,
-            max_functions=0,
-            max_branches=1,
-            max_nesting_depth=1,
-        ),
-    )
-    rule_ids = {finding.rule_id for finding in report.findings}
-    assert "BASE_LIB.SOURCE.MAX_LINES" in rule_ids
-    assert "BASE_LIB.COMPLEXITY.MAX_FUNCTIONS" in rule_ids
-    assert "BASE_LIB.COMPLEXITY.MAX_BRANCHES" in rule_ids
-    assert "BASE_LIB.COMPLEXITY.MAX_NESTING_DEPTH" in rule_ids
-    assert "BASE_LIB.BANNED_IMPORT" in rule_ids
-    assert "BASE_LIB.GLOBAL_STATE" in rule_ids
-    assert "BASE_LIB.SIDE_EFFECT_CALL" in rule_ids
-
-def test_base_lib_scan_reports_forbidden_project_import_and_dependency_closure(tmp_path) -> None:
-    base_dir = tmp_path / "base_lib"
-    base_dir.mkdir()
-    (base_dir / "bad.py").write_text(
-        """
-from nodes.some_node import SomeNode
-import plugins.policy
-
-def value():
-    return 1
-""".strip(),
-        encoding="utf-8",
-    )
-    (base_dir / "wrapper.py").write_text(
-        """
-import base_lib.bad
-
-def wrapped():
-    return base_lib.bad.value()
-""".strip(),
-        encoding="utf-8",
-    )
-    report = scan_base_lib(tmp_path, policy=PurityPolicy(max_source_lines=1000))
-    rule_ids = {finding.rule_id for finding in report.findings}
-    assert ("base_lib.wrapper", "base_lib.bad") in report.dependency_edges
-    assert "BASE_LIB.FORBIDDEN_PROJECT_IMPORT" in rule_ids
-    assert "BASE_LIB.DEPENDENCY_CLOSURE_VIOLATION" in rule_ids
-
-def test_node_importing_base_lib_requires_policy_declaration(tmp_path, capsys, monkeypatch) -> None:
-    monkeypatch.syspath_prepend(str(tmp_path))
-    base_dir = tmp_path / "base_lib"
-    base_dir.mkdir()
-    (base_dir / "__init__.py").write_text("", encoding="utf-8")
-    (base_dir / "good.py").write_text(
-        """
-def helper():
-    return 1
-""".strip(),
-        encoding="utf-8",
-    )
-    source = _valid_node_source(
-        run_body="""
-        from base_lib.good import helper
-        return {"demo.out": helper()}
-""".rstrip()
-    )
-    code, payload = _inspect_node_source(tmp_path, capsys, source)
-    assert code == 1
-    assert any(error["code"] == "NODE.BASE_LIB.BASE_LIB_UNDECLARED" for error in payload["health"]["errors"])
-
-    policy_path = tmp_path / "kernel_policy.jsonc"
-    policy_path.write_text(
-        '{"base_lib": {"allowed_paths": ["base_lib"], "allowed_modules": ["base_lib.good"]}}',
-        encoding="utf-8",
-    )
-    code, payload = _inspect_node_source(tmp_path, capsys, source, extra_args=["--policy", str(policy_path)])
-    assert code == 0
-    assert payload["health"]["status"] == "PASS"
-    assert "base_lib.good" in payload["node"]["metrics"]["imported_base_lib_modules"]
-
-def test_node_importing_unhealthy_base_lib_reports_indirect_violation(tmp_path, capsys, monkeypatch) -> None:
-    monkeypatch.syspath_prepend(str(tmp_path))
-    base_dir = tmp_path / "base_lib"
-    base_dir.mkdir()
-    (base_dir / "__init__.py").write_text("", encoding="utf-8")
-    (base_dir / "bad.py").write_text(
-        """
-import os
-
-def helper():
-    return 1
-""".strip(),
-        encoding="utf-8",
-    )
-    policy_path = tmp_path / "kernel_policy.jsonc"
-    policy_path.write_text(
-        '{"base_lib": {"allowed_paths": ["base_lib"], "allowed_modules": ["base_lib.bad"]}}',
-        encoding="utf-8",
-    )
-    source = _valid_node_source(
-        run_body="""
-        from base_lib.bad import helper
-        return {"demo.out": helper()}
-""".rstrip()
-    )
-    code, payload = _inspect_node_source(tmp_path, capsys, source, extra_args=["--policy", str(policy_path)])
-    assert code == 1
-    rule_ids = {error["rule_id"] for error in payload["health"]["errors"]}
-    assert "BASE_LIB.BANNED_IMPORT" in rule_ids
-    assert "NODE.BASE_LIB.INDIRECT_VIOLATION" in rule_ids

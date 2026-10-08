@@ -53,9 +53,7 @@ def _duplicate_logic_facts(
 
 
 def duplicate_logic_findings(fingerprints, node_metrics, *, node_types=None, node_similarities=None):
-    from vibeflow.core.rules.builtin.workflow import evaluate_workflow_topic
-    return evaluate_workflow_topic("duplicates", fingerprints=fingerprints, node_metrics=node_metrics,
-                                   node_types=node_types, node_similarities=node_similarities).findings
+    return _duplicate_logic_facts(fingerprints, node_metrics, node_types=node_types, node_similarities=node_similarities)
 
 
 def _fingerprint_groups(fingerprints: Mapping[str, str]) -> dict[str, list[str]]:
@@ -69,18 +67,6 @@ def _is_declared_similar(first: str, second: str, similarities: Mapping[str, Map
     first_target = str(similarities.get(first, {}).get("node", "")).strip()
     second_target = str(similarities.get(second, {}).get("node", "")).strip()
     return first_target == second or second_target == first or (bool(first_target) and first_target == second_target)
-
-
-def _duplicate_fingerprints(fingerprints: dict[str, str]) -> tuple[tuple[str, str], ...]:
-    duplicates: list[tuple[str, str]] = []
-    for names in _fingerprint_groups(fingerprints).values():
-        if len(names) < 2:
-            continue
-        names = sorted(names)
-        for index, first in enumerate(names):
-            for second in names[index + 1:]:
-                duplicates.append((first, second))
-    return tuple(duplicates)
 
 
 __all__ = ["duplicate_logic_findings"]

@@ -1,0 +1,139 @@
+flowchart TD
+  classDef defaultNode fill:#ECECFF,stroke:#9370DB,color:#333333;
+  classDef healthError fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+  classDef healthWarning fill:#fef3c7,stroke:#d97706,color:#78350f;
+  classDef externalDependency fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
+  classDef externalBoundary stroke-width:7px,vector-effect:non-scaling-stroke;
+  classDef documentNode fill:#f0fdf4,stroke:#16a34a,color:#14532d;
+  classDef nodesetNode fill:#ede9fe,stroke:#7c3aed,color:#3b0764;
+  classDef loopNode fill:#f0fdfa,stroke:#0f766e,color:#134e4a;
+  classDef plannedNode fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;
+  classDef baseLibResource fill:#ecfdf5,stroke:#059669,color:#064e3b;
+  classDef pluginResource fill:#eff6ff,stroke:#2563eb,color:#1e3a8a;
+  classDef hostExtensionResource fill:#f5f3ff,stroke:#7c3aed,color:#3b0764;
+  classDef plannedResource fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;
+  start@{ shape: stadium, label: "start\n\nid: start\ntype_used: perf.start\n\nrulesets: vibeflow.io\n\n---------- source ----------\nroot: perf\npath: workflow.jsonc\n\n---------- meta ----------\ndesc: Execute the start resource.\nflow_kind: terminal\neffect_scope: terminal\nruntime_dispatch: none" }
+  class start defaultNode;
+  style start fill:#ECECFF,stroke:#9370DB,color:#333333;
+  step0@{ shape: rounded, label: "step0\n\nid: step0\ntype_used: perf.step.0\n\nrulesets: vibeflow.process, perf.calls\n\n---------- source ----------\nroot: perf\npath: workflow.jsonc\n\n---------- meta ----------\ndesc: Execute the step0 resource.\nflow_kind: process\nruntime_dispatch: none" }
+  class step0 defaultNode;
+  style step0 fill:#d6eaff,stroke:#9370DB,color:#333333;
+  step1@{ shape: rounded, label: "step1\n\nid: step1\ntype_used: perf.step.1\n\nrulesets: vibeflow.process, perf.calls\n\n---------- source ----------\nroot: perf\npath: workflow.jsonc\n\n---------- meta ----------\ndesc: Execute the step1 resource.\nflow_kind: process\nruntime_dispatch: none" }
+  class step1 defaultNode;
+  style step1 fill:#d6eaff,stroke:#9370DB,color:#333333;
+  step2@{ shape: rounded, label: "step2\n\nid: step2\ntype_used: perf.step.2\n\nrulesets: vibeflow.process, perf.calls\n\n---------- source ----------\nroot: perf\npath: workflow.jsonc\n\n---------- meta ----------\ndesc: Execute the step2 resource.\nflow_kind: process\nruntime_dispatch: none" }
+  class step2 defaultNode;
+  style step2 fill:#d6eaff,stroke:#9370DB,color:#333333;
+  step3@{ shape: rounded, label: "step3\n\nid: step3\ntype_used: perf.step.3\n\nrulesets: vibeflow.process, perf.calls\n\n---------- source ----------\nroot: perf\npath: workflow.jsonc\n\n---------- meta ----------\ndesc: Execute the step3 resource.\nflow_kind: process\nruntime_dispatch: none" }
+  class step3 defaultNode;
+  style step3 fill:#d6eaff,stroke:#9370DB,color:#333333;
+  step4@{ shape: rounded, label: "step4\n\nid: step4\ntype_used: perf.step.4\n\nrulesets: vibeflow.process, perf.calls\n\n---------- source ----------\nroot: perf\npath: workflow.jsonc\n\n---------- meta ----------\ndesc: Execute the step4 resource.\nflow_kind: process\nruntime_dispatch: none" }
+  class step4 defaultNode;
+  style step4 fill:#d6eaff,stroke:#9370DB,color:#333333;
+  step5@{ shape: rounded, label: "step5\n\nid: step5\ntype_used: perf.step.5\n\nrulesets: vibeflow.process, perf.calls\n\n---------- source ----------\nroot: perf\npath: workflow.jsonc\n\n---------- meta ----------\ndesc: Execute the step5 resource.\nflow_kind: process\nruntime_dispatch: none" }
+  class step5 defaultNode;
+  style step5 fill:#d6eaff,stroke:#9370DB,color:#333333;
+  step6@{ shape: rounded, label: "step6\n\nid: step6\ntype_used: perf.step.6\n\nrulesets: vibeflow.process, perf.calls\n\n---------- source ----------\nroot: perf\npath: workflow.jsonc\n\n---------- meta ----------\ndesc: Execute the step6 resource.\nflow_kind: process\nruntime_dispatch: none" }
+  class step6 defaultNode;
+  style step6 fill:#d6eaff,stroke:#9370DB,color:#333333;
+  step7@{ shape: rounded, label: "step7\n\nid: step7\ntype_used: perf.step.7\n\nrulesets: vibeflow.process, perf.calls\n\n---------- source ----------\nroot: perf\npath: workflow.jsonc\n\n---------- meta ----------\ndesc: Execute the step7 resource.\nflow_kind: process\nruntime_dispatch: none" }
+  class step7 defaultNode;
+  style step7 fill:#d6eaff,stroke:#9370DB,color:#333333;
+  n_end@{ shape: stadium, label: "end\n\nid: end\ntype_used: perf.end\n\nrulesets: vibeflow.io\n\n---------- source ----------\nroot: perf\npath: workflow.jsonc\n\n---------- meta ----------\ndesc: Execute the end resource.\nflow_kind: terminal\neffect_scope: terminal\nruntime_dispatch: none" }
+  class n_end defaultNode;
+  style n_end fill:#ECECFF,stroke:#9370DB,color:#333333;
+  start --> step0
+  linkStyle 0 stroke-width:4px;
+  step0 --> step1
+  linkStyle 1 stroke-width:4px;
+  step1 --> step2
+  linkStyle 2 stroke-width:4px;
+  step2 --> step3
+  linkStyle 3 stroke-width:4px;
+  step3 --> step4
+  linkStyle 4 stroke-width:4px;
+  step4 --> step5
+  linkStyle 5 stroke-width:4px;
+  step5 --> step6
+  linkStyle 6 stroke-width:4px;
+  step6 --> step7
+  linkStyle 7 stroke-width:4px;
+  step7 --> n_end
+  linkStyle 8 stroke-width:4px;
+
+flowchart LR
+  vf_resource_6838278bc86ccdfc@{ shape: stadium, label: "perf.end\nnode: perf.end\nstatus: implemented\nflow_kind: terminal\nrulesets: vibeflow.io" }
+  style vf_resource_6838278bc86ccdfc fill:#ECECFF,stroke:#9370DB,color:#333333;
+  vf_resource_1f38da602509c841@{ shape: stadium, label: "perf.start\nnode: perf.start\nstatus: implemented\nflow_kind: terminal\nrulesets: vibeflow.io" }
+  style vf_resource_1f38da602509c841 fill:#ECECFF,stroke:#9370DB,color:#333333;
+  vf_resource_a679330414a3ac2b@{ shape: rounded, label: "perf.step.0\nnode: perf.step.0\nstatus: implemented\nflow_kind: process\nrulesets: vibeflow.process, perf.calls" }
+  style vf_resource_a679330414a3ac2b fill:#d6eaff,stroke:#9370DB,color:#333333;
+  vf_resource_54124194fd48f998@{ shape: rounded, label: "perf.step.1\nnode: perf.step.1\nstatus: implemented\nflow_kind: process\nrulesets: vibeflow.process, perf.calls" }
+  style vf_resource_54124194fd48f998 fill:#d6eaff,stroke:#9370DB,color:#333333;
+  vf_resource_31c3e87478378b8f@{ shape: rounded, label: "perf.step.2\nnode: perf.step.2\nstatus: implemented\nflow_kind: process\nrulesets: vibeflow.process, perf.calls" }
+  style vf_resource_31c3e87478378b8f fill:#d6eaff,stroke:#9370DB,color:#333333;
+  vf_resource_1ef0dd8206505685@{ shape: rounded, label: "perf.step.3\nnode: perf.step.3\nstatus: implemented\nflow_kind: process\nrulesets: vibeflow.process, perf.calls" }
+  style vf_resource_1ef0dd8206505685 fill:#d6eaff,stroke:#9370DB,color:#333333;
+  vf_resource_fc13841e58e6d4c7@{ shape: rounded, label: "perf.step.4\nnode: perf.step.4\nstatus: implemented\nflow_kind: process\nrulesets: vibeflow.process, perf.calls" }
+  style vf_resource_fc13841e58e6d4c7 fill:#d6eaff,stroke:#9370DB,color:#333333;
+  vf_resource_f1fe3ccdd036f6c8@{ shape: rounded, label: "perf.step.5\nnode: perf.step.5\nstatus: implemented\nflow_kind: process\nrulesets: vibeflow.process, perf.calls" }
+  style vf_resource_f1fe3ccdd036f6c8 fill:#d6eaff,stroke:#9370DB,color:#333333;
+  vf_resource_c359b5ae0729980c@{ shape: rounded, label: "perf.step.6\nnode: perf.step.6\nstatus: implemented\nflow_kind: process\nrulesets: vibeflow.process, perf.calls" }
+  style vf_resource_c359b5ae0729980c fill:#d6eaff,stroke:#9370DB,color:#333333;
+  vf_resource_924c1f074a589e1d@{ shape: rounded, label: "perf.step.7\nnode: perf.step.7\nstatus: implemented\nflow_kind: process\nrulesets: vibeflow.process, perf.calls" }
+  style vf_resource_924c1f074a589e1d fill:#d6eaff,stroke:#9370DB,color:#333333;
+  vf_resource_5ef62658c9bddad3@{ shape: hex, label: "perf.library.0\nbase_lib: perf.library.0\nstatus: implemented\nrulesets: vibeflow.base_lib" }
+  style vf_resource_5ef62658c9bddad3 fill:#d6eaff,stroke:#059669,color:#064e3b;
+  vf_resource_bacdf966cfaceba0@{ shape: hex, label: "perf.resources\nplugin_declaration: perf.resources\nstatus: implemented\nrulesets: vibeflow.plugin_declaration" }
+  style vf_resource_bacdf966cfaceba0 fill:#eff6ff,stroke:#2563eb,color:#1e3a8a;
+  vf_resource_8e2e06acc8ab7880@{ shape: doc, label: "terminal.py\nentry\nloaded" }
+  vf_resource_31be00b91e9600cd@{ shape: doc, label: "group0.py\nentry\nloaded" }
+  vf_resource_476197c9f4fe2d65@{ shape: doc, label: "lib0.py\nentry\nloaded" }
+  vf_resource_366518403a057622@{ shape: doc, label: "code_plugin.py\nentry\nloaded" }
+  vf_resource_906189a97e3062da@{ shape: doc, label: "__init__.py\nunregistered\nloaded" }
+  vf_resource_d669d8eb89f59370@{ shape: doc, label: "__init__.py\nunregistered\nloaded" }
+  vf_resource_6838278bc86ccdfc -. "entry" .-> vf_resource_8e2e06acc8ab7880
+  vf_resource_1f38da602509c841 -. "entry" .-> vf_resource_8e2e06acc8ab7880
+  vf_resource_a679330414a3ac2b -. "entry" .-> vf_resource_31be00b91e9600cd
+  vf_resource_54124194fd48f998 -. "entry" .-> vf_resource_31be00b91e9600cd
+  vf_resource_31c3e87478378b8f -. "entry" .-> vf_resource_31be00b91e9600cd
+  vf_resource_1ef0dd8206505685 -. "entry" .-> vf_resource_31be00b91e9600cd
+  vf_resource_fc13841e58e6d4c7 -. "entry" .-> vf_resource_31be00b91e9600cd
+  vf_resource_f1fe3ccdd036f6c8 -. "entry" .-> vf_resource_31be00b91e9600cd
+  vf_resource_c359b5ae0729980c -. "entry" .-> vf_resource_31be00b91e9600cd
+  vf_resource_924c1f074a589e1d -. "entry" .-> vf_resource_31be00b91e9600cd
+  vf_resource_5ef62658c9bddad3 -. "entry" .-> vf_resource_476197c9f4fe2d65
+  vf_resource_bacdf966cfaceba0 -. "entry" .-> vf_resource_366518403a057622
+  vf_resource_bacdf966cfaceba0 -. "rule_implementation" .-> vf_resource_366518403a057622
+  vf_resource_31be00b91e9600cd -. "import" .-> vf_resource_476197c9f4fe2d65
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_476197c9f4fe2d65
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_31be00b91e9600cd
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_31be00b91e9600cd
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_31be00b91e9600cd
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_31be00b91e9600cd
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_31be00b91e9600cd
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_31be00b91e9600cd
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_31be00b91e9600cd
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_31be00b91e9600cd
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_8e2e06acc8ab7880
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_8e2e06acc8ab7880
+  vf_resource_bacdf966cfaceba0 -. "contributes" .-> vf_resource_6838278bc86ccdfc
+  vf_resource_bacdf966cfaceba0 -. "contributes" .-> vf_resource_1f38da602509c841
+  vf_resource_a679330414a3ac2b -. "base_lib" .-> vf_resource_5ef62658c9bddad3
+  vf_resource_bacdf966cfaceba0 -. "contributes" .-> vf_resource_a679330414a3ac2b
+  vf_resource_54124194fd48f998 -. "base_lib" .-> vf_resource_5ef62658c9bddad3
+  vf_resource_bacdf966cfaceba0 -. "contributes" .-> vf_resource_54124194fd48f998
+  vf_resource_31c3e87478378b8f -. "base_lib" .-> vf_resource_5ef62658c9bddad3
+  vf_resource_bacdf966cfaceba0 -. "contributes" .-> vf_resource_31c3e87478378b8f
+  vf_resource_1ef0dd8206505685 -. "base_lib" .-> vf_resource_5ef62658c9bddad3
+  vf_resource_bacdf966cfaceba0 -. "contributes" .-> vf_resource_1ef0dd8206505685
+  vf_resource_fc13841e58e6d4c7 -. "base_lib" .-> vf_resource_5ef62658c9bddad3
+  vf_resource_bacdf966cfaceba0 -. "contributes" .-> vf_resource_fc13841e58e6d4c7
+  vf_resource_f1fe3ccdd036f6c8 -. "base_lib" .-> vf_resource_5ef62658c9bddad3
+  vf_resource_bacdf966cfaceba0 -. "contributes" .-> vf_resource_f1fe3ccdd036f6c8
+  vf_resource_c359b5ae0729980c -. "base_lib" .-> vf_resource_5ef62658c9bddad3
+  vf_resource_bacdf966cfaceba0 -. "contributes" .-> vf_resource_c359b5ae0729980c
+  vf_resource_924c1f074a589e1d -. "base_lib" .-> vf_resource_5ef62658c9bddad3
+  vf_resource_bacdf966cfaceba0 -. "contributes" .-> vf_resource_924c1f074a589e1d
+  vf_resource_bacdf966cfaceba0 -. "contributes" .-> vf_resource_5ef62658c9bddad3
+

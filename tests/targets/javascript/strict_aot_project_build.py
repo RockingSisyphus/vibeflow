@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+from tests.fixtures.support.plugins import Resource, resource as sdk_resource, write_plugin
+
 import builtins
 import json
+import os
+import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from vibeflow.targets.javascript.build.builder import BuildResult
-from vibeflow.targets.javascript.frontend.model import normalize_workflow_plan
+from vibeflow.targets.javascript.frontend.emission_view import bound_workflow_view
 from vibeflow.tooling.application.javascript.build import (
     ProjectBuildError,
     ProjectBuildRequest,
@@ -37,7 +41,8 @@ from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
 
 
 def _write(path: Path, payload: object) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    if not isinstance(path, Resource):
+        path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
@@ -60,6 +65,11 @@ def _provider(key: str, type_key: str | None = None) -> dict[str, str]:
 def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
     project = tmp_path / "project"
     project.mkdir(parents=True)
+    write_plugin(project, [], target="javascript")
+    toolchain = Path(os.environ["VIBEFLOW_TEST_TOOLCHAIN_ROOT"])
+    (project / "node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
+    for filename in ("package.json", "package-lock.json"):
+        shutil.copy2(toolchain / filename, project / filename)
     (project / "src").mkdir()
     (project / "src/add.ts").write_text(
         "export function run(inputs, params) { return {'value.out': params.delta}; }\n",
@@ -78,10 +88,11 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
         encoding="utf-8",
     )
     _write(
-        project / "manifests/nodes/add.jsonc",
+        sdk_resource(project, "node", "demo.add"),
         {
             "kind": "node",
             "type_key": "demo.add",
+            "rulesets": ["vibeflow.process"],
             "display_name": "Add",
 
             "description": "Adds a configured value.",
@@ -113,10 +124,11 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
         },
     )
     _write(
-        project / "manifests/nodes/start.jsonc",
+        sdk_resource(project, "node", "demo.start"),
         {
             "kind": "node",
             "type_key": "demo.start",
+            "rulesets": ["vibeflow.process"],
             "display_name": "Start",
 
             "description": "Starts the nested workflow.",
@@ -146,10 +158,11 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
         },
     )
     _write(
-        project / "manifests/base_lib/math.jsonc",
+        sdk_resource(project, "base_lib", "demo.math"),
         {
             "kind": "base_lib",
             "id": "demo.math",
+            "rulesets": ["vibeflow.base_lib"],
             "display_name": "Math",
             "description": "Math helpers.",
             "implementations": [
@@ -164,10 +177,11 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
         },
     )
     _write(
-        project / "manifests/base_lib/core.jsonc",
+        sdk_resource(project, "base_lib", "demo.core"),
         {
             "kind": "base_lib",
             "id": "demo.core",
+            "rulesets": ["vibeflow.base_lib"],
             "display_name": "Core",
             "description": "Core helpers.",
             "implementations": [
@@ -188,7 +202,7 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
         ("storage.read.result", {"type": "object"}),
     ):
         _write(
-            project / f"manifests/data/{type_key}.jsonc",
+            sdk_resource(project, "data_schema", type_key),
             {
                 "kind": "data_schema",
                 "type_key": type_key,
@@ -197,7 +211,7 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
             },
         )
     _write(
-        project / "manifests/capabilities/storage.jsonc",
+        sdk_resource(project, "capability", "demo.storage"),
         {
             "kind": "capability",
             "id": "demo.storage",
@@ -246,6 +260,7 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
         config,
         {
             "global_config": {"delta": 3},
+            "plugins": [{"source": {"kind": "file", "ref": "code_plugin.ts", "export": "plugin"}}],
             "rulesets": [],
             "nodeset_imports": ["nodesets/group.jsonc"],
             "pipeline": {
@@ -286,12 +301,6 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
         project / "vibeflow_project.jsonc",
         {
             "project_target": "javascript",
-            "descriptors": {
-                "nodes": ["manifests/nodes"],
-                "base_lib": ["manifests/base_lib"],
-                "data_schemas": ["manifests/data"],
-                "capabilities": ["manifests/capabilities"],
-            },
             "javascript": {
                 "package_root": ".",
                 "external_packages": ["host-package"],
@@ -336,7 +345,7 @@ export function createHostExtension(context) {
         encoding="utf-8",
     )
     _write(
-        project / f"manifests/host_extensions/{safe_name}.jsonc",
+        sdk_resource(project, "host_extension", extension_id),
         {
             "kind": "host_extension",
             "id": extension_id,
@@ -356,12 +365,6 @@ export function createHostExtension(context) {
             "dependencies": dependencies or [],
         },
     )
-    project_config = project / "vibeflow_project.jsonc"
-    raw = json.loads(project_config.read_text(encoding="utf-8"))
-    raw["descriptors"]["host_extensions"] = [
-        "manifests/host_extensions"
-    ]
-    _write(project_config, raw)
 
 
 def _add_unselected_plugin(project: Path) -> Path:
@@ -370,9 +373,9 @@ def _add_unselected_plugin(project: Path) -> Path:
         "export function createPlugin() { return {}; }\n",
         encoding="utf-8",
     )
-    manifest = project / "manifests/plugins/unused.jsonc"
+    manifest = sdk_resource(project, 'plugin', 'demo.unused')
     _write(
-        manifest,
+        sdk_resource(project, "plugin", "demo.unused"),
         {
             "kind": "plugin",
             "id": "demo.unused",
@@ -392,10 +395,6 @@ def _add_unselected_plugin(project: Path) -> Path:
             "config": {"schema": {}, "defaults": {}},
         },
     )
-    project_config = project / "vibeflow_project.jsonc"
-    raw = json.loads(project_config.read_text(encoding="utf-8"))
-    raw["descriptors"]["plugins"] = ["manifests/plugins"]
-    _write(project_config, raw)
     return manifest
 
 
@@ -410,9 +409,9 @@ def test_javascript_root_rejects_foreign_implementation_languages_even_when_unus
     request = _request(tmp_path)
     project = Path(request.config).parent
     if resource_kind == "node":
-        manifest = project / "manifests/nodes/add.jsonc"
+        manifest = sdk_resource(project, 'node', 'demo.add')
     elif resource_kind == "base_lib":
-        manifest = project / "manifests/base_lib/core.jsonc"
+        manifest = sdk_resource(project, 'base_lib', 'demo.core')
     elif resource_kind == "plugin":
         manifest = _add_unselected_plugin(project)
     else:
@@ -428,7 +427,7 @@ def test_javascript_root_rejects_foreign_implementation_languages_even_when_unus
     if resource_kind == "plugin":
         # Resource packages are enabled solely by workflow selection.
         document = json.loads(Path(request.config).read_text())
-        document["plugins"] = [{"id": "demo.unused"}]
+        document["plugins"] = [{"source": {"kind": "file", "ref": "code_plugin.ts", "export": "plugin"}}]
         _write(Path(request.config), document)
 
     with pytest.raises(ProjectBuildError) as captured:
@@ -453,18 +452,15 @@ def test_prepare_project_build_loads_static_js_only_nested_project(
         "_global": {"delta": 3},
         "delta": 7,
     }
-    assert prepared.payload["inputs"][0]["required"] is True
-    assert prepared.payload["outputs"][0]["as"] == "answer"
-    assert set(prepared.payload["schemas"]) == {
+    assert prepared.plan.inputs[0].required is True
+    assert prepared.plan.outputs[0].as_key == "answer"
+    assert set(prepared.javascript_bindings.schemas.to_value()) == {
         "storage.read.request",
         "storage.read.result",
         "value.in",
         "value.out",
     }
-    nested_payload = next(
-        block for block in prepared.payload["blocks"] if block["path"] == ["group"]
-    )
-    assert nested_payload["nodes"][0]["capabilities"] == [
+    assert [item.to_dict() for item in prepared.javascript_bindings.binding(("group", "add")).capabilities] == [
         {"id": "demo.storage", "operations": ["read"]}
     ]
     assert prepared.import_policy["node_base_libs"] == {
@@ -479,9 +475,7 @@ def test_prepare_project_build_loads_static_js_only_nested_project(
         "host-package",
         "pure-package",
     ]
-    assert Path(
-        prepared.implementation_by_type["demo.add"]["module"]
-    ).is_absolute()
+    assert Path(prepared.javascript_bindings.binding(("group", "add")).implementation.ref).is_absolute()
     bindings = prepared.javascript_bindings
     assert bindings is not None
     assert tuple(call.path for call in bindings.calls) == (
@@ -512,7 +506,7 @@ def test_prepare_project_build_loads_static_js_only_nested_project(
     assert set(bindings.capabilities.to_value()) == {"demo.storage"}
     assert bindings.import_policy.to_value() == prepared.import_policy
     assert "javascript_bindings" not in prepared.plan.to_dict()
-    emitted_plan = normalize_workflow_plan(prepared.payload)
+    emitted_plan = bound_workflow_view(prepared.plan, prepared.javascript_bindings)
     composite = next(node for node in emitted_plan.nodes if node.id == "group")
     assert composite.subplan is not None
     assert composite.subplan.nodes[0].params["delta"] == 7
@@ -561,6 +555,7 @@ def test_prepare_project_build_never_imports_python_target(
 
 def test_workflow_host_extensions_support_planned_and_instance_config(
     tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     request = _request(tmp_path)
     project = Path(request.config).parent
@@ -619,33 +614,35 @@ def test_workflow_host_extensions_support_planned_and_instance_config(
         for item in prepared.javascript_bindings.host_extensions
     ] == list(prepared.host_extensions)
 
+    from vibeflow.tooling.application.cli import main
+    arguments = ["--workspace", str(request.workspace), "--config", str(request.config), "--json"]
+    assert main(["review-rules", *arguments]) == 0
+    review = json.loads(capsys.readouterr().out)
+    assert {item["id"] for item in review["resources"] if item["kind"] == "host_extension"} == {
+        "demo.browser_host", "demo.future_host",
+    }
+    assert main(["validate", *arguments]) == 0
+    validation = json.loads(capsys.readouterr().out)
+    assert validation["status"] in {"PASS", "CONCERNS"}
 
-def test_workflow_host_extensions_override_legacy_project_selection(
-    tmp_path: Path,
-) -> None:
+
+@pytest.mark.parametrize("workflow_override", [False, True])
+@pytest.mark.parametrize("old_hosts", [[], ["demo.legacy_host"]])
+def test_project_host_selection_is_removed_even_with_workflow_override(tmp_path, workflow_override, old_hosts):
     request = _request(tmp_path)
     project = Path(request.config).parent
-    _add_host_extension(project, "demo.legacy_host")
     project_config = project / "vibeflow_project.jsonc"
-    project_raw = json.loads(project_config.read_text(encoding="utf-8"))
-    project_raw["javascript"]["host_extensions"] = ["demo.legacy_host"]
-    _write(project_config, project_raw)
-
-    legacy = prepare_project_build(request)
-    assert legacy.used_host_extensions == ("demo.legacy_host",)
-    assert legacy.warnings[0]["code"] == (
-        "VF_AOT_HOST_EXTENSION_LEGACY_SELECTION"
-    )
-
-    workflow_raw = json.loads(
-        Path(request.config).read_text(encoding="utf-8")
-    )
-    workflow_raw["host_extensions"] = []
-    _write(Path(request.config), workflow_raw)
-
-    workflow_override = prepare_project_build(request)
-    assert workflow_override.used_host_extensions == ()
-    assert workflow_override.warnings == ()
+    raw = json.loads(project_config.read_text(encoding="utf-8"))
+    raw["javascript"]["host_extensions"] = old_hosts
+    _write(project_config, raw)
+    if workflow_override:
+        workflow = json.loads(Path(request.config).read_text(encoding="utf-8"))
+        workflow["host_extensions"] = []
+        _write(Path(request.config), workflow)
+    with pytest.raises(WorkspaceConfigError, match="javascript.host_extensions was removed") as captured:
+        prepare_project_build(request)
+    assert captured.value.rule_id == "WORKSPACE.PROJECT_CONFIG.JAVASCRIPT"
+    assert captured.value.source_location["field"] == "javascript.host_extensions"
 
 
 def test_implemented_host_extension_cannot_depend_on_planned_extension(
@@ -751,10 +748,8 @@ def test_prepare_project_build_rejects_ambiguous_input_requiredness(
     raw["pipeline"]["inputs"][0].pop("required")
     _write(Path(request.config), raw)
 
-    with pytest.raises(ProjectBuildError) as captured:
+    with pytest.raises(GraphConfigError, match="required must be explicitly true or false"):
         prepare_project_build(request)
-
-    assert captured.value.code == "VF_AOT_INPUT_REQUIRED"
 
 
 def test_prepare_project_build_rejects_graph_call_contract_duplicates(
@@ -777,8 +772,7 @@ def test_prepare_project_build_requires_schema_and_target_implementation(
 ) -> None:
     request = _request(tmp_path)
     missing_schema = (
-        Path(request.config).parent
-        / "manifests/data/storage.read.result.jsonc"
+        sdk_resource(Path(request.config).parent, 'data_schema', 'storage.read.result')
     )
     missing_schema.unlink()
     with pytest.raises(ProjectBuildError) as captured:
@@ -787,7 +781,7 @@ def test_prepare_project_build_requires_schema_and_target_implementation(
 
     request = _request(tmp_path / "target")
     node_manifest = (
-        Path(request.config).parent / "manifests/nodes/add.jsonc"
+        sdk_resource(Path(request.config).parent, 'node', 'demo.add')
     )
     raw = json.loads(node_manifest.read_text(encoding="utf-8"))
     raw["implementations"][0]["targets"] = ["browser"]
@@ -809,8 +803,8 @@ def test_target_neutral_audit_does_not_require_a_shared_platform(
 ) -> None:
     request = _request(tmp_path)
     project = Path(request.config).parent
-    add_manifest = project / "manifests/nodes/add.jsonc"
-    start_manifest = project / "manifests/nodes/start.jsonc"
+    add_manifest = sdk_resource(project, 'node', 'demo.add')
+    start_manifest = sdk_resource(project, 'node', 'demo.start')
     add = json.loads(add_manifest.read_text(encoding="utf-8"))
     start = json.loads(start_manifest.read_text(encoding="utf-8"))
     add["implementations"][0]["targets"] = ["node"]
@@ -843,7 +837,7 @@ def test_target_neutral_audit_never_loads_planned_plugin_or_host_source(
     _add_host_extension(project, "demo.future_host")
     (project / "src/demo-future_host.ts").unlink()
     _write(
-        project / "manifests/plugins/future.jsonc",
+        sdk_resource(project, "plugin", "demo.future_plugin"),
         {
             "kind": "plugin",
             "id": "demo.future_plugin",
@@ -865,13 +859,11 @@ def test_target_neutral_audit_never_loads_planned_plugin_or_host_source(
             "config": {"schema": {}, "defaults": {}},
         },
     )
-    project_config = project / "vibeflow_project.jsonc"
-    project_data = json.loads(project_config.read_text(encoding="utf-8"))
-    project_data.setdefault("descriptors", {})["plugins"] = ["manifests/plugins"]
-    _write(project_config, project_data)
     workflow = json.loads(Path(request.config).read_text(encoding="utf-8"))
+    sdk_resource(project, "plugin", "demo.future_plugin").unlink()
     workflow["plugins"] = [
-        {"id": "demo.future_plugin", "status": "planned"}
+        {"source": {"kind": "file", "ref": "code_plugin.ts", "export": "plugin"}},
+        {"id": "demo.future_plugin", "status": "planned", "type": "runtime"}
     ]
     workflow["host_extensions"] = [
         {"id": "demo.future_host", "status": "planned"}
@@ -1104,7 +1096,7 @@ def test_javascript_audit_carries_descriptor_external_and_config_style_to_mermai
 ) -> None:
     request = _request(tmp_path)
     project = Path(request.config).parent
-    descriptor_path = project / "manifests/nodes/start.jsonc"
+    descriptor_path = sdk_resource(project, 'node', 'demo.start')
     descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
     descriptor["external"] = True
     _write(descriptor_path, descriptor)
@@ -1135,7 +1127,7 @@ def test_javascript_audit_carries_descriptor_external_and_config_style_to_mermai
 @pytest.mark.parametrize(
     ("manifest", "schema_path"),
     [
-        ("manifests/data/value.in.jsonc", ("schema",)),
+        ("value.in", ("schema",)),
     ],
 )
 def test_prepare_project_build_rejects_schema_keywords_runtime_cannot_enforce(
@@ -1144,7 +1136,7 @@ def test_prepare_project_build_rejects_schema_keywords_runtime_cannot_enforce(
     schema_path: tuple[str, ...],
 ) -> None:
     request = _request(tmp_path)
-    descriptor_path = Path(request.config).parent / manifest
+    descriptor_path = sdk_resource(Path(request.config).parent, "data_schema", manifest)
     raw = json.loads(descriptor_path.read_text(encoding="utf-8"))
     target = raw
     for key in schema_path:
@@ -1166,7 +1158,7 @@ def test_prepare_project_build_rejects_unaudited_source_kinds(
 ) -> None:
     request = _request(tmp_path)
     node_manifest = (
-        Path(request.config).parent / "manifests/nodes/add.jsonc"
+        sdk_resource(Path(request.config).parent, 'node', 'demo.add')
     )
     raw = json.loads(node_manifest.read_text(encoding="utf-8"))
     raw["implementations"][0]["source"] = {
@@ -1250,9 +1242,6 @@ def test_build_project_aot_forwards_prepared_request(
     assert forwarded.app_entry == "src/app.ts"
     assert forwarded.replace is True
     assert forwarded.sourcemap == "inline"
-    assert forwarded.implementation_by_type == {}
-    assert forwarded.import_policy == {}
-    assert forwarded.host_extensions == ()
     assert forwarded.javascript_bindings is result.prepared.javascript_bindings
     assert (
         forwarded.javascript_bindings.import_policy.to_value()[
@@ -1265,20 +1254,3 @@ def test_build_project_aot_forwards_prepared_request(
 
 
 # Publish controlled case inputs as fixed SDK plugins before formal entrypoints.
-_native_prepare_project_build = prepare_project_build
-def prepare_project_build(request, **options):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(request.workspace)
-    return _native_prepare_project_build(request, **options)
-
-_native_build_project_aot = build_project_aot
-def build_project_aot(request, **options):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(request.workspace)
-    return _native_build_project_aot(request, **options)
-
-_native_audit_javascript_project = audit_javascript_project
-def audit_javascript_project(request, **options):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(request.workspace)
-    return _native_audit_javascript_project(request, **options)

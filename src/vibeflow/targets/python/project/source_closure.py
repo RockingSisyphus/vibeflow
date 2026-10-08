@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from vibeflow.targets.python.quality.source_analysis.preflight import (
+from vibeflow.targets.python.project.source_facts import (
     PythonSourceFact,
 )
 
@@ -16,6 +16,8 @@ def collect_python_source_facts(
     project_root: Path | None = None,
     source_roots: tuple[Path, ...] = (),
     _facts: dict[str, PythonSourceFact] | None = None,
+    _parsed: dict | None = None,
+    _parse_cache: dict | None = None,
 ) -> tuple[PythonSourceFact, ...]:
     """Read and resolve the project-local sources reachable from ``entry_path``."""
 
@@ -28,7 +30,7 @@ def collect_python_source_facts(
         )
     )
     facts: dict[str, PythonSourceFact] = {} if _facts is None else _facts
-    _collect_source_fact(path, source_roots=roots, facts=facts)
+    _collect_source_fact(path, source_roots=roots, facts=facts, parsed=_parsed, parse_cache=_parse_cache)
     return tuple(facts[source_id] for source_id in sorted(facts))
 
 
@@ -49,6 +51,8 @@ def _collect_source_fact(
     *,
     source_roots: tuple[Path, ...],
     facts: dict[str, PythonSourceFact],
+    parsed: dict | None = None,
+    parse_cache: dict | None = None,
 ) -> None:
     resolved = path.resolve()
     source_id = str(resolved)
@@ -56,6 +60,16 @@ def _collect_source_fact(
         return
     project_root = _owning_source_root(resolved, source_roots)
     if project_root is None:
+        return
+    try:
+        stat = resolved.stat()
+        cache_key = source_id, tuple(map(str, source_roots)), stat.st_mtime_ns, stat.st_size
+    except OSError:
+        cache_key = None
+    if parsed is not None and cache_key in parsed:
+        fact = facts[source_id] = parsed[cache_key]
+        for child in (*fact.import_time_dependencies, *fact.runtime_dependencies):
+            _collect_source_fact(Path(child), source_roots=source_roots, facts=facts, parsed=parsed, parse_cache=parse_cache)
         return
     try:
         source = resolved.read_text(encoding="utf-8")
@@ -71,7 +85,8 @@ def _collect_source_fact(
         return
 
     try:
-        tree = ast.parse(source, filename=source_id)
+        from vibeflow.targets.python.quality.parse_cache import parse_python_source
+        tree = parse_python_source(source_id, source, parse_cache)
     except SyntaxError as exc:
         facts[source_id] = PythonSourceFact(
             source_id=source_id,
@@ -79,7 +94,6 @@ def _collect_source_fact(
             source=source,
             module_name=_module_name(resolved, project_root),
             root_path=str(project_root),
-            is_base_lib=_is_base_lib_source(resolved),
             parse_error=str(exc),
             parse_line=exc.lineno or 1,
             parse_column=exc.offset or 1,
@@ -115,11 +129,12 @@ def _collect_source_fact(
         root_path=str(project_root),
         import_time_dependencies=tuple(str(child) for child in import_time_paths),
         runtime_dependencies=tuple(str(child) for child in runtime_paths),
-        is_base_lib=_is_base_lib_source(resolved),
         _tree=tree,
     )
+    if parsed is not None and cache_key is not None:
+        parsed[cache_key] = facts[source_id]
     for child in (*import_time_paths, *runtime_paths):
-        _collect_source_fact(child, source_roots=source_roots, facts=facts)
+        _collect_source_fact(child, source_roots=source_roots, facts=facts, parsed=parsed, parse_cache=parse_cache)
 
 
 def _resolve_import_nodes(
@@ -239,8 +254,6 @@ class _ImportTimeImportCollector(ast.NodeVisitor):
         return
 
 
-def _is_base_lib_source(path: Path) -> bool:
-    return "base_lib" in path.parts
 
 
 def _owning_source_root(

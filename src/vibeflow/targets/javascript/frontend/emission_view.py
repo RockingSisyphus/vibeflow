@@ -19,12 +19,12 @@ from vibeflow.targets.javascript.frontend.emission_protocol import (
     EmissionNode,
     EmissionWorkflow,
     copy_json,
-    implementation_override,
     module_specifier,
     restore_properties_order,
     schema_order_path_key,
 )
-from vibeflow.targets.javascript.frontend.model_types import AotPlanError
+from vibeflow.targets.javascript.frontend.errors import AotPlanError
+from vibeflow.targets.javascript.frontend.plan_validation import validate_javascript_plan
 
 
 class _BoundContext:
@@ -51,6 +51,7 @@ class _BoundContext:
         self._validate()
 
     def _validate(self) -> None:
+        validate_javascript_plan(self.plan)
         if self.plan.workflow_id != self.bindings.workflow_id:
             raise AotPlanError(
                 "JavaScript binding workflow_id does not match WorkflowPlan"
@@ -109,16 +110,24 @@ class _BoundContext:
             raise AotPlanError(
                 f"JavaScript binding schedule mismatch at '{location}'"
             )
+        capabilities = {item.id: item for item in self.capabilities}
+        for requirement in binding.capabilities:
+            descriptor = capabilities.get(requirement.id)
+            if descriptor is None:
+                raise AotPlanError(f"node '{location}' requires undeclared capability '{requirement.id}'")
+            unknown = sorted(set(requirement.operations) - set(descriptor.operations))
+            if unknown:
+                raise AotPlanError(f"node '{location}' requires unknown operations on capability '{requirement.id}': {unknown}")
         if self.plan.entry_mode != "sync":
             return
         if binding.completion == "suspend":
             raise AotPlanError(
-                f"sync workflow contains asynchronous call '{location}'",
+                f"sync workflow contains suspending node '{location}'",
                 code="VF_ENTRY_MODE_SUSPEND_IN_SYNC",
             )
         if binding.schedule != "inline":
             raise AotPlanError(
-                f"sync workflow contains asynchronous call '{location}'",
+                f"sync workflow contains {binding.schedule} task '{location}'",
                 code="VF_ENTRY_MODE_TASK_IN_SYNC",
             )
 
@@ -254,7 +263,7 @@ class BoundNodeView:
 
 
 class BoundWorkflowView:
-    """WorkflowSpec-shaped projection whose authority remains canonical IR."""
+    """Read-only target view over the canonical workflow IR."""
 
     def __init__(
         self,
@@ -380,8 +389,8 @@ def bound_workflow_view(
     return BoundWorkflowView.from_plan(plan, bindings)
 
 
-def legacy_emission_payload(workflow: EmissionWorkflow) -> dict[str, Any]:
-    """Return the ABI-v2 hash projection without creating WorkflowSpec."""
+def emission_payload(workflow: EmissionWorkflow) -> dict[str, Any]:
+    """Serialize the canonical bound view for emission and its content hash."""
 
     return workflow.to_dict()
 
@@ -440,7 +449,6 @@ __all__ = [
     "EmissionNode",
     "EmissionWorkflow",
     "bound_workflow_view",
-    "implementation_override",
-    "legacy_emission_payload",
+    "emission_payload",
     "module_specifier",
 ]

@@ -1,6 +1,29 @@
-# 0.15 Rule 与 Node 声明迁移
+# 0.16 统一资源与旧 API 退役
 
-0.15.0 使用代码插件声明资源。升级时将旧登记转换为所属语言的 SDK 声明和 workflow 插件选择。公开契约为 Rule ABI v1、Plugin ABI v3、Workflow ABI v4；原生数据路由、Nodeset、Loop 和业务执行协议保持原有语义。
+自 0.15.0 起，VibeFlow 使用代码插件声明资源。升级时将旧登记转换为所属语言的 SDK 声明和 workflow 插件选择。公开契约为 Rule ABI v1、Plugin ABI v3、Workflow ABI v4；原生数据路由、Nodeset、Loop 和业务执行协议保持原有语义。
+
+0.16 完成内部迁移，直接移除旧公开 API。默认资源由自动接入的内置插件贡献，无需在 Config 中声明；内置和外部插件共用贡献校验、来源、冲突处理和实现绑定。资源进入 Catalog 不表示选中了它的规则，显式空 Ruleset 仍只提供资料。
+
+## 删除的接口及替代入口
+
+| 旧接口或输入 | 当前入口 |
+| --- | --- |
+| NodeInfo、NodeContract、类内 NODE_INFO/CONTRACT | Python `@node` 或完整 NodeDescriptor/NodeContractDescriptor |
+| Context、RegistryBase、旧 runtime.config facade、boundary_registry 参数 | 原生 runtime 返回值与 Core 的显式 scope/config 契约；副作用由所选 Rule 与原生 I/O/生命周期承担 |
+| BaseLibInfo、BaseLibRegistry、自动 scan/analyze、Registry → Catalog adapter | SDK `base_lib` 声明及 `inspect-resources`、所选 Ruleset |
+| PluginInfo、metadata normalizer、module/class 插件选择 | SDK `Plugin` 的 compiler/runtime 工厂与显式 source 选择 |
+| workflow base_lib.paths、module/name 注册与 policy.base_lib allowlist | 资源 ID 选择及 Descriptor 中的 base_libs/dependencies/implementation_files |
+| JS WorkflowSpec、独立 workflow/parser/validator 与 Plugin parser | WorkflowPlan + 必填 JavascriptBindingPlan；SDK 与统一 decoder |
+| 项目级 JavaScript Host 选择 | workflow.host_extensions；项目字段存在即报迁移错误，包括空列表，预览与验证共用该契约 |
+| Python pipeline.inputs 缺省或 null 的 required | 每项明确声明 required 为 true 或 false；Core 构造使用 `PipelineInputSpec(key, type, required=True)`，其他位置参数含义保持不变 |
+| Target `analyze_python_source` / `analyze_python_source_tree` 的 `check_side_effects` 参数 | Target 只返回源码事实；使用 Application `scan_code_quality(check_side_effects=True)` 或 CLI 的 `--check-side-effects` 执行所选效果 Rule |
+| Target `scan_javascript_quality` 默认检查入口 | Target 提取源码事实；Application `vibeflow.tooling.application.javascript.quality_scan.scan_javascript_quality` 复用所选 Catalog 执行项目规则 |
+
+Python 的 NodeRegistry 仅保存 canonical 声明和实际绑定，不自动装配默认规则。直接使用低级 Target API 时，调用者应显式提供规则 Catalog 与绑定；正式 Application 入口完成默认装配。Core 的 `evaluate_project_quality` 只接收事实和显式规则，`rulesets=[]` 支持 facts-only。
+
+库放在 `boundary`、`nodes`、`runtime` 或其他目录不会改变身份。身份来自声明、具名导出、支撑文件和真实导入位置；未声明的跨资源依赖仍会失败。纯 Node 调用有副作用的库 helper，仍受 Node 自身选中的效果规则约束，即使库的 `rulesets=[]`。
+
+未被资源声明归属的普通代码也不会因目录名成为 Node、BaseLib 或 Plugin；与库入口同目录不构成库归属。普通代码继续参与已选项目规则的数量、复杂度和依赖距离等通用检查。
 
 ## Node 自己声明规则和展示
 
@@ -50,7 +73,7 @@ JS 和 TS 属于同一个执行族，不能分别登记一个 node 实现和一�
 
 ## 源码资料与范围
 
-源码解析、符号、导入关系和指标由 Target 提供；同次检查共享资料，公开上下文只读。Python 使用解析后的相对导入及允许的辅助目录，JS 包括 literal dynamic import 和 require。公开 Node/BaseLib/dependency_chain leaf 与默认 maintainability 使用相同指标资料。
+源码解析、符号、导入关系和指标由 Target 提供；同次检查共享资料，公开上下文只读。Python 使用真实导入闭包与显式源码归属，JS 包括 literal dynamic import 和 require。公开 Node/BaseLib/dependency_chain topic 与默认 maintainability 使用相同指标资料。
 
 Node 导入 Rule 检查自身的实际导入闭包。helper 的引用关系与实现归属分别记录，共享文件按各资源所选规则分别检查。已加载未调用的 Nodeset 使用声明及真实可得资料，调用路径为空。planned helper 的初始化由所选 planned Rule 检查。
 
@@ -59,6 +82,16 @@ BaseLib、Plugin、HostExtension 通过 `rulesets` 选择审查，插件包声�
 `review-rules` 展示当前作用域内的有效规则、参数来源和资源选择，加载受信插件固定定义，框架不调用 Rule、Node 或生命周期工厂。Python 预览可使用 Target 的解析闭包定位已引用库。
 
 ## 默认检查行为
+
+综合 workflow、effects 等主题直接执行各自判定，保留原有检查范围。可独立选择的 topic Rule 不会自动成为综合主题的子调用；执行记录只列实际选择和执行的规则。主题内部可以复用普通算法，覆盖有效 `policy` 参数会直接影响判定。
+
+`vibeflow.no_side_effects` 在两个 Target 都消费有效 `effect_scope`、`policy` 参数。Python 的 Node、BaseLib、Plugin 和普通源码共用效果遍历；可解析 helper 按真实函数体判断，纯函数改名为 write/read/close 不改变结果。资源仍独立选择规则，BaseLib 保留自身顶层结构与显式支撑文件检查，不继承调用者权限。
+
+普通项目源码的效果审查默认使用 `none`；`terminal` 仅允许终端效果，`python_io` 允许相应一般 I/O，`global_state` 允许资源或模块状态但不允许修改 builtin、原型及宿主关键状态。`trusted` 不提供额外豁免。scope 不解除显式导入禁止、资源依赖或硬性效果限制。参数细则见[效果与导入参数](rules-and-nodes.md#效果与导入参数)。
+
+迁移旧 policy 时，区分导入禁止与效果分类：Python effects 自身默认禁止 importlib；imports-only 默认四个政策数组为空。旧模板中用于表示一般 I/O 分类的 banned_roots 不应继续作为显式禁令，真正需要禁止的模块则继续明确列出。显式空数组会生效，不回退旧禁用表；effects/imports 不接受指标政策，指标规则也不再记录未消费的导入参数。
+
+所有活动 workflow、Nodeset body、Loop body 和 SDK 输入都必须明确填写布尔 required；必需输入写 true，可缺省输入写 false。运行时先拒绝未声明键再检查必填键，空 inputs 只接受 `{}`。值为 null 仍算键存在，不能用它恢复旧的整组免检行为。低层 portable supplied 输入不得改变原声明的 key、type、required 或顺序。
 
 默认规则检查 Decision 路由输出、契约重叠、examples 形状、公开 callable、decorator 和模块结构。声明模型接受 `examples.outputs`；Python 默认接口 Rule 禁止该字段，JS 默认 Rule 接受合法输出示例。Python 默认导入 Rule 拒绝模块级 `try/match`，需要放宽时替换该 Rule。
 

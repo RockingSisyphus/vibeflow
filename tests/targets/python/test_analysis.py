@@ -33,7 +33,7 @@ def test_python_analysis_target_imports_do_not_load_removed_or_tooling() -> None
     _run_isolated(
         """
 import sys
-import vibeflow.targets.python.project.base_lib
+import vibeflow.targets.python.quality.rules.base_lib_effects
 import vibeflow.targets.python.project.planned
 import vibeflow.targets.python.quality.source_analysis
 
@@ -51,37 +51,6 @@ assert forbidden == [], forbidden
     )
 
 
-def test_base_lib_filesystem_adapter_matches_pure_source_analysis(
-    tmp_path: Path,
-) -> None:
-    from vibeflow.targets.python.project.base_lib import scan_base_lib
-    from vibeflow.targets.python.project.base_lib import analyze_base_lib_source
-
-    root = tmp_path / "base_lib"
-    root.mkdir()
-    module_path = root / "math.py"
-    source = "def add(left, right):\n    return left + right\n"
-    module_path.write_text(source, encoding="utf-8")
-
-    pure = analyze_base_lib_source(
-        source,
-        module="base_lib.math",
-        path=str(module_path),
-    )
-    scanned = scan_base_lib(tmp_path)
-
-    assert scanned.modules == (pure,)
-    assert scanned.roots == (str(root.resolve()),)
-    assert not scanned.findings
-
-    virtual = analyze_base_lib_source(
-        "import subprocess\n",
-        module="base_lib.virtual",
-        path="/path/that/does/not/exist.py",
-    )
-    assert {finding.rule_id for finding in virtual.findings} == {
-        "BASE_LIB.BANNED_IMPORT"
-    }
 
 
 def test_planned_file_validation_matches_source_validation(

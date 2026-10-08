@@ -1,22 +1,30 @@
 from tests.fixtures.support.strict_support import *
-from tests.fixtures.support.rule_inspection import _valid_node_source, _inspect_node_source, write_registry_project
+from tests.fixtures.support.rule_inspection import _valid_node_source, _inspect_node_source, write_registry_project, node_document
+
+
+def _chain_declarations(modules):
+    node = node_document()
+    node["base_libs"] = ["test.library"]
+    library = {"kind": "base_lib", "id": "test.library", "display_name": "Library",
+        "description": "A declared chain of pure helper functions", "rulesets": [],
+        "implementations": [{"language": "python", "targets": ["python"],
+            "source": {"kind": "file", "ref": "base_lib/a.py", "export": "helper"},
+            "implementation_files": [{"kind": "file", "ref": "base_lib/__init__.py"},
+                *[{"kind": "file", "ref": "base_lib/" + name + ".py"} for name in modules[1:]]]}]}
+    return node, library
 
 def test_node_base_lib_dependency_chain_warning_and_error(tmp_path, capsys, monkeypatch) -> None:
     _clear_base_lib_modules()
     monkeypatch.syspath_prepend(str(tmp_path))
     _write_base_lib_chain(tmp_path, ["a", "b", "c", "d"])
-    policy_path = tmp_path / "kernel_policy.jsonc"
-    policy_path.write_text(
-        '{"base_lib": {"allowed_paths": ["base_lib"], "allowed_modules": ["base_lib.a"]}}',
-        encoding="utf-8",
-    )
     source = _valid_node_source(
         run_body="""
         from base_lib.a import helper
         return {"demo.out": helper()}
 """.rstrip()
     )
-    code, payload = _inspect_node_source(tmp_path, capsys, source, extra_args=["--policy", str(policy_path)])
+    descriptor, library = _chain_declarations(["a", "b", "c", "d"])
+    code, payload = _inspect_node_source(tmp_path, capsys, source, descriptor=descriptor, additional_nodes=[library])
     assert code == 0
     assert payload["health"]["status"] == "CONCERNS"
     warning = next(item for item in payload["health"]["warnings"] if item["rule_id"] == "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP")
@@ -29,12 +37,8 @@ def test_node_base_lib_dependency_chain_warning_and_error(tmp_path, capsys, monk
     _clear_base_lib_modules()
     monkeypatch.syspath_prepend(str(deeper))
     _write_base_lib_chain(deeper, ["a", "b", "c", "d", "e", "f"])
-    deep_policy = deeper / "kernel_policy.jsonc"
-    deep_policy.write_text(
-        '{"base_lib": {"allowed_paths": ["base_lib"], "allowed_modules": ["base_lib.a"]}}',
-        encoding="utf-8",
-    )
-    code, payload = _inspect_node_source(deeper, capsys, source, extra_args=["--policy", str(deep_policy)])
+    descriptor, library = _chain_declarations(["a", "b", "c", "d", "e", "f"])
+    code, payload = _inspect_node_source(deeper, capsys, source, descriptor=descriptor, additional_nodes=[library])
     assert code == 1
     error = next(item for item in payload["health"]["errors"] if item["rule_id"] == "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP")
     assert error["details"]["longest_chain_length"] == 7
@@ -161,14 +165,13 @@ def test_schema_validation_rejects_policy_bool_as_int() -> None:
     assert any(finding.rule_id == "CONFIG.SCHEMA.POLICY_POSITIVE_INT" for finding in findings)
 
 def test_cli_validate_jsonc_outputs_effective_policy(tmp_path, capsys) -> None:
-    write_registry_project(tmp_path, _registry(), ("test.start", "test.seed", "test.add", "test.out_end"))
+    selection = write_registry_project(tmp_path, _registry(), ("test.start", "test.seed", "test.add", "test.out_end"))
     config_path = tmp_path / "workflow.jsonc"
     config_path.write_text(
         """
 {
   "policy": {
-    "node_source": {"max_lines": 222},
-    "base_lib": {"allowed_paths": ["src/shared"], "allowed_modules": ["shared.math"]}
+    "node_source": {"max_lines": 222}
   },
   "pipeline": {
     // explicit edges define the graph
@@ -187,6 +190,7 @@ def test_cli_validate_jsonc_outputs_effective_policy(tmp_path, capsys) -> None:
     )
     document = json.loads(config_path.read_text().replace("// explicit edges define the graph", ""))
     policy = document.pop("policy")
+    document["plugins"] = [selection]
     config_path.write_text(json.dumps(document), encoding="utf-8")
     workspace_path = tmp_path / "vibeflow_config.jsonc"
     workspace_path.write_text(json.dumps({"policy": policy, "roots": [{"id": "project", "path": "."}]}), encoding="utf-8")
@@ -196,7 +200,6 @@ def test_cli_validate_jsonc_outputs_effective_policy(tmp_path, capsys) -> None:
     assert payload["status"] == "CONCERNS"
     assert {item["code"] for item in payload["warnings"]} == {"GRAPH.SMELL.DUPLICATE_LOGIC"}
     assert payload["effective_policy"]["node_source"]["max_lines"] == 222
-    assert payload["effective_policy"]["base_lib"]["allowed_modules"] == ["shared.math"]
     assert payload["effective_policy"]["sources"][-1] == f"workspace.policy:{workspace_path}"
 
 def test_cli_validate_bad_jsonc_reports_syntax_layer(tmp_path, capsys) -> None:
@@ -240,12 +243,12 @@ def test_cli_validate_topology_error_reports_topology_layer(tmp_path, capsys) ->
     assert payload["errors"][0]["failure_layer"] == "topology"
 
 def test_cli_validate_explicit_policy_path_and_inspect_config(tmp_path, capsys) -> None:
-    write_registry_project(tmp_path, _registry(), ("test.start", "test.seed", "test.add", "test.out_end"))
+    selection = write_registry_project(tmp_path, _registry(), ("test.start", "test.seed", "test.add", "test.out_end"))
     config_path = tmp_path / "workflow.json"
     policy_path = tmp_path / "policy.jsonc"
     config_path.write_text(
         json.dumps(
-            {"pipeline": _seed_add_pipeline()}
+            {"plugins": [selection], "pipeline": _seed_add_pipeline()}
         ),
         encoding="utf-8",
     )
@@ -278,7 +281,7 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
     assert result.context.get("value.out")["value"] == 5
     assert result.health.status == "CONCERNS"
     assert result.health.info["rule_executions"]
-    assert result.health.effective_policy["base_lib"]["allowed_modules"] == ["base_lib.math_tools"]
+    assert result.health.info["effective_resources"]["base_lib"]["modules"][0]["id"] == "base_lib.math_tools"
     assert (result.run_dir / "compiled_graph.json").exists()
     assert (result.run_dir / "graph.txt").exists()
     assert (result.run_dir / "graph.mmd").exists()

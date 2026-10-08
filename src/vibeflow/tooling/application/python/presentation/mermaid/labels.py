@@ -86,8 +86,8 @@ def _node_shape(node_id: str, label: str, flow_kind: object, *, shape: str = "")
 def _resources_payload(resources: object | None) -> Mapping[str, object]:
     return resources_payload(resources)
 
-def _rendered_resources_payload(resources: object | None, graph: GraphConfig | None = None) -> dict[str, object]:
-    return rendered_resources_payload(resources, graph)
+def _rendered_resources_payload(resources: object | None, graph: GraphConfig | None = None, registry=None) -> dict[str, object]:
+    return rendered_resources_payload(resources, graph, registry)
 
 def _mapping_items(value: object) -> tuple[Mapping[str, object], ...]:
     return mapping_items(value)
@@ -136,7 +136,9 @@ def _resource_label(resource: Mapping[str, object], *, kind: str, show_semantics
     if source_path:
         source_lines.append(f"path: {_display_source_path(source_path, root_path)}")
 
-    sections: list[list[str]] = [[display_name], identity_lines]
+    presentation = resource.get("presentation", {})
+    icon = str(presentation.get("icon", "")) if isinstance(presentation, Mapping) else ""
+    sections: list[list[str]] = [[f"{icon} {display_name}" if icon else display_name], identity_lines]
     if source_lines:
         sections.append([_section_label("resource"), *source_lines])
     if show_semantics:

@@ -1,7 +1,15 @@
 """Shared fact access and diagnostic construction; these are not rules."""
 
 from vibeflow.core.findings import HealthFinding
-from vibeflow.targets.python.quality.source_analysis.types import PurityPolicy, _SourceInfo
+from vibeflow.targets.python.quality.source_analysis.types import _SourceInfo
+from vibeflow.targets.python.quality.policy_parameters import source_policy
+
+
+def rule_effect_scope(params):
+    scope = params.get("effect_scope", "none")
+    if not isinstance(scope, str) or scope not in {"none", "terminal", "python_io", "global_state", "trusted"}:
+        raise ValueError(f"unsupported rule effect_scope: {scope!r}")
+    return scope
 
 
 def source_subject(context):
@@ -15,33 +23,6 @@ def source_subject(context):
 def source_info(file, symbol=None):
     text = file.text if symbol is None else "\n".join(file.text.splitlines()[symbol.line - 1:symbol.end_line])
     return _SourceInfo(path=file.path, class_text=text, class_start_line=1, module_text=file.text)
-
-
-def source_policy(context, params=None):
-    from dataclasses import replace
-    policy = context.facts.get("purity_policy") or PurityPolicy()
-    override = dict((params or {}).get("policy",{}))
-    fields = {
-        "node_source": {"max_lines":"max_source_lines","max_bytes":"max_source_bytes",
-            "warn_lines":"warn_source_lines","warn_bytes":"warn_source_bytes"},
-        "complexity": {name:name for name in ("max_functions","max_branches","max_nesting_depth","max_params","max_contract_keys")},
-        "imports": {"allowed_roots":"allowed_import_roots","banned_roots":"banned_import_roots",
-            "allowed_modules":"allowed_import_modules","banned_modules":"banned_import_modules"},
-        "base_lib": {"allowed_paths":"allowed_base_lib_paths","allowed_modules":"allowed_base_lib_modules",
-            "banned_modules":"banned_base_lib_modules"},
-        "maintainability": {name:name for name in ("warn_call_chain_length","max_call_chain_length",
-            "warn_dependency_chain_length","max_dependency_chain_length")},
-    }
-    changes = {}
-    for group, values in override.items():
-        if group not in fields or not hasattr(values,"items"):
-            raise ValueError(f"unknown or invalid rule policy section: {group}")
-        for name, value in values.items():
-            target = fields[group].get(name)
-            if target is None:
-                raise ValueError(f"unknown rule policy parameter: {group}.{name}")
-            changes[target] = tuple(value) if target.startswith(("allowed_","banned_")) else value
-    return replace(policy,**changes)
 
 
 def finding(context, rule_id, message, *, path="", line=1, column=1, severity="error", details=None, suggested_fix_type=""):

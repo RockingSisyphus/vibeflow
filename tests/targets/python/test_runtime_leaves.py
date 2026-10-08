@@ -47,7 +47,7 @@ import vibeflow.targets.python.runtime.trace
 import vibeflow.targets.python.runtime.types
 import vibeflow.targets.python.runtime.values
 import vibeflow.targets.python.runtime.helpers
-import vibeflow.targets.python.runtime.config
+import vibeflow.core.config.scope
 import vibeflow.targets.python.runtime.block_compiler
 import vibeflow.targets.python.runtime.compiled
 

@@ -303,7 +303,7 @@ def load():
         (self.fixture.root / "archive").mkdir()
         self.assertNotIn("GENERATED_ARTIFACT", self.codes("base"))
 
-    def test_base_checks_document_links_and_stale_release_text(self) -> None:
+    def test_base_checks_document_links_without_rejecting_historical_release_text(self) -> None:
         self.fixture.write(
             "docs/guide.md",
             "VibeFlow 0.10.0 used [a missing guide](missing.md).\n",
@@ -315,8 +315,55 @@ def load():
                 for item in findings
                 if item.subject_id == "docs/guide.md"
             },
-            {"DOCUMENT_LINK_MISSING", "STALE_DOCUMENTATION"},
+            {"DOCUMENT_LINK_MISSING"},
         )
+
+    def test_base_current_development_version_uses_project_metadata(self) -> None:
+        for text in (
+            "当前开发版本为 `0.16.0`，Workflow ABI 为 v4。\n",
+            "Current development package version: `0.16.0`. Workflow ABI: v4.\n",
+        ):
+            with self.subTest(text=text):
+                self.fixture.write("pyproject.toml", '[project]\nversion = "0.17.0"\n')
+                self.fixture.write("README.md", text)
+
+                findings = [
+                    finding for finding in run_profile(self.fixture.root, "base").findings
+                    if finding.code == "STALE_DOCUMENTATION"
+                ]
+
+                self.assertEqual(len(findings), 1)
+                self.assertEqual(findings[0].details, {
+                    "version": "0.16.0",
+                    "expected_version": "0.17.0",
+                    "version_source": "pyproject.toml",
+                })
+                self.assertIn("0.17.0", findings[0].suggested_fix)
+                self.assertNotIn("0.15.0", findings[0].suggested_fix)
+
+                self.fixture.write("pyproject.toml", '[project]\nversion = "0.16.0"\n')
+                self.assertNotIn("STALE_DOCUMENTATION", self.codes("base"))
+
+    def test_base_accepts_current_development_version_with_history_and_older_release(self) -> None:
+        self.fixture.write("pyproject.toml", '[project]\nversion = "0.16.0"\n')
+        self.fixture.write(
+            "README.md",
+            "当前开发版本为 0.16.0；旧版 0.9.0、0.10.0 仅作历史对照。\n"
+            "Previously released package: vibeflow-distribution-0.15.2.zip.\n",
+        )
+        self.fixture.write(
+            "README.en.md",
+            "Current development package version: 0.16.0.\n"
+            "VibeFlow 0.10.0 used a different architecture.\n",
+        )
+
+        self.assertNotIn("STALE_DOCUMENTATION", self.codes("base"))
+
+    def test_base_reports_missing_version_metadata_for_current_development_claim(self) -> None:
+        self.fixture.write("README.md", "当前开发版本为 `0.16.0`。\n")
+
+        with self.assertRaisesRegex(profile_module.RepositoryCheckError, "pyproject.toml"):
+            run_profile(self.fixture.root, "base")
 
     def test_base_checks_document_image_links(self) -> None:
         self.fixture.write(

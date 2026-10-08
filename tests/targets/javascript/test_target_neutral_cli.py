@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.fixtures.support.plugins import Resource, resource as sdk_resource
+
 import json
 import os
 from pathlib import Path
@@ -40,10 +42,8 @@ def _copy_minimal(
             "*.pyc",
         ),
     )
-    from tests.fixtures.support.code_plugins import copy_archival_inputs
-    copy_archival_inputs(SANDBOX, sandbox)
-    from tests.fixtures.support.code_plugins import resource_inputs
-    resource_inputs(sandbox / "project")
+    from tests.fixtures.support.plugins import copy_sdk_inputs
+    copy_sdk_inputs(SANDBOX, sandbox)
     project_config_path = sandbox / "project/vibeflow_project.jsonc"
     project_config = json.loads(
         project_config_path.read_text(encoding="utf-8")
@@ -61,7 +61,8 @@ def _copy_minimal(
 
 
 def _write_json(path: Path, payload: object) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    if not isinstance(path, Resource):
+        path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
@@ -109,7 +110,7 @@ def test_validate_audits_only_selected_node_and_base_lib_sources(
     sandbox = _copy_minimal(tmp_path, toolchain=_toolchain_root())
     project = sandbox / "project"
     _write_json(
-        project / "manifests/base_lib/unused.jsonc",
+        sdk_resource(project, "base_lib", "example.unused"),
         {
             "kind": "base_lib",
             "id": "example.unused",
@@ -130,7 +131,7 @@ def test_validate_audits_only_selected_node_and_base_lib_sources(
         },
     )
     _write_json(
-        project / "manifests/nodes/unused.jsonc",
+        sdk_resource(project, "node", "example.unused"),
         {
             "kind": "node",
             "type_key": "example.unused",
@@ -176,9 +177,6 @@ def test_validate_audits_only_selected_node_and_base_lib_sources(
         "config": project / "configs/greeting.jsonc",
         "audit_sources": False,
     }
-
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(sandbox / "vibeflow_config.jsonc")
     selected = audit_javascript_project(JavascriptAuditRequest(**request))
     complete = audit_javascript_project(
         JavascriptAuditRequest(
@@ -207,7 +205,6 @@ def test_homogeneous_javascript_quality_respects_disabled_root(
         {
             "project_target": "javascript",
             "quality_enabled": False,
-            "descriptors": {},
             "javascript": {"package_root": "."},
         },
     )
@@ -354,7 +351,7 @@ def test_project_quality_detects_browser_only_discarded_fetch(
         pytest.skip("the JavaScript sandbox toolchain has not been installed")
     sandbox = _copy_minimal(tmp_path, toolchain=toolchain)
     project = sandbox / "project"
-    manifest_path = project / "manifests/nodes/greet.jsonc"
+    manifest_path = sdk_resource(project, 'node', 'example.greet')
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["implementations"][0]["targets"] = ["browser"]
     _write_json(manifest_path, manifest)
@@ -395,74 +392,30 @@ def test_project_quality_does_not_register_unselected_plugin_files(
         pytest.skip("the JavaScript sandbox toolchain has not been installed")
     sandbox = _copy_minimal(tmp_path, toolchain=toolchain)
     project = sandbox / "project"
-    project_config_path = project / "vibeflow_project.jsonc"
-    project_config = json.loads(
-        project_config_path.read_text(encoding="utf-8")
-    )
-    project_config.setdefault("descriptors", {})["plugins"] = ["manifests/plugins"]
-    project_config.setdefault("descriptors", {})["host_extensions"] = [
-        "manifests/host_extensions"
-    ]
-    _write_json(project_config_path, project_config)
-    _write_json(
-        project / "manifests/plugins/unselected.jsonc",
-        {
-            "kind": "plugin",
-            "id": "example.unselected_plugin",
-            "type": "runtime",
-            "targets": ["browser"],
-            "implementations": [
-                {
-                    "language": "typescript",
-                    "targets": ["browser"],
-                    "source": {
-                        "kind": "file",
-                        "ref": "plugins/unselected.ts",
-                        "export": "createPlugin",
-                    },
-                }
-            ],
-            "dependencies": [],
-            "external_packages": [],
-            "config": {"schema": {}, "defaults": {}},
-        },
-    )
+    # This package is deliberately absent from workflow.plugins. Historical
+    # manifest inputs are migrated into the selected fixture package by main's
+    # test wrapper, so they cannot represent unselected SDK contributions.
     (project / "plugins").mkdir()
     (project / "plugins/unselected.ts").write_text(
-        "export function createPlugin() {\n"
-        "  return { beforeRun() { addEventListener('message', () => {}); } };\n"
-        "}\n",
+        'import {definePlugin} from "@vibeflow/plugin";\n'
+        'import {host} from "../host/unselected.ts";\n'
+        'throw new Error("UNSELECTED_PLUGIN_WAS_LOADED");\n'
+        'export const plugin=definePlugin({id:"example.unselected_plugin",\n'
+        '  resources:[host],runtime(){\n'
+        "    return { beforeRun() { addEventListener('message', () => {}); } };\n"
+        '  }});\n',
         encoding="utf-8",
-    )
-    _write_json(
-        project / "manifests/host_extensions/unselected.jsonc",
-        {
-            "kind": "host_extension",
-            "id": "example.unselected_host",
-            "targets": ["browser"],
-            "implementations": [
-                {
-                    "language": "typescript",
-                    "targets": ["browser"],
-                    "source": {
-                        "kind": "file",
-                        "ref": "host/unselected.ts",
-                        "export": "createHostExtension",
-                    },
-                }
-            ],
-            "provides": [],
-            "dependencies": [],
-            "external_packages": [],
-        },
     )
     (project / "host").mkdir()
     (project / "host/unselected.ts").write_text(
+        'import {defineHostExtension} from "@vibeflow/plugin";\n'
         "import { run } from '../nodes/greet.ts';\n"
         "export function createHostExtension() {\n"
         "  void run;\n"
         "  return { start() {}, stop() {} };\n"
-        "}\n",
+        "}\n"
+        'export const host=defineHostExtension({id:"example.unselected_host",\n'
+        '  targets:["browser"],provides:[],dependencies:[],factory:createHostExtension});\n',
         encoding="utf-8",
     )
     config = project / "configs/greeting.jsonc"
@@ -498,6 +451,8 @@ def test_project_quality_does_not_register_unselected_plugin_files(
     assert quality_payload["status"] in {"PASS", "CONCERNS"}
     report = quality_payload["reports"][0]
     assert "example.greet" in report["rule_checks"]["subjects"]
+    assert "host_extension:example.unselected_host" not in report["rule_checks"]["subjects"]
+    assert "plugin:example.unselected_plugin" not in report["rule_checks"]["subjects"]
     assert not any("plugins/unselected.ts" in file for file in report["source_files"])
     assert any(file["path"] == "plugins/unselected.ts" for file in quality_payload["source_quality"]["files"])
 
@@ -534,23 +489,3 @@ def test_dispatched_quality_path_uses_project_config_without_workspace(
 
 # Publish controlled case inputs as fixed SDK plugins before formal entrypoints.
 from vibeflow.tooling.application.javascript.audit import audit_javascript_project
-_native_audit_javascript_project = audit_javascript_project
-def audit_javascript_project(request, **options):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(request.workspace)
-    return _native_audit_javascript_project(request, **options)
-
-
-
-_native_main, _native_dispatch_main = main, dispatch_main
-def _publish_for_arguments(args):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture, prepare_config_fixture
-    if "--workspace" in args: prepare_workspace_fixture(args[args.index("--workspace")+1])
-    elif "--config" in args: prepare_config_fixture(args[args.index("--config")+1])
-    elif "--path" in args: prepare_config_fixture(args[args.index("--path")+1])
-def main(args):
-    _publish_for_arguments(args)
-    return _native_main(args)
-def dispatch_main(args):
-    _publish_for_arguments(args)
-    return _native_dispatch_main(args)

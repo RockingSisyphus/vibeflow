@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import time
 
@@ -371,6 +372,13 @@ export function unusedComposite() {
 """.strip()
 
 
+JAVASCRIPT_COMPLETIONS = {
+    "fixture.async_route": "suspend",
+    "fixture.async_double": "suspend",
+    "fixture.detached_audit": "suspend",
+}
+
+
 JAVASCRIPT_EXPORTS = {
     "fixture.terminal": "terminal",
     "fixture.alias": "aliasValues",
@@ -538,6 +546,7 @@ def _case(
         registry=_registry(),
         javascript_source=JAVASCRIPT_SOURCE,
         javascript_exports=JAVASCRIPT_EXPORTS,
+        javascript_completions=JAVASCRIPT_COMPLETIONS,
         port_inputs=port_inputs or {},
     )
 
@@ -805,39 +814,13 @@ def test_python_explicit_input_contract_fails_before_any_node(
     assert runtime.trace.qualified_edge_executions == {}
 
 
-def test_python_any_legacy_input_keeps_entire_contract_permissive(
-    tmp_path: Path,
-) -> None:
+def test_mixed_input_contract_rejects_omitted_required() -> None:
     document = _input_preflight_document(explicit_required=False)
-    pipeline = document["pipeline"]
-    assert isinstance(pipeline, dict)
-    pipeline_inputs = pipeline["inputs"]
-    assert isinstance(pipeline_inputs, list)
-    pipeline_inputs.append(
-        {
-            "key": "explicit",
-            "type": "explicit",
-            "display_name": "explicit",
-            "required": True,
-        }
-    )
-    graph = parse_graph_config(document)
-    runtime = PipelineRuntime(
-        graph,
-        registry=_registry(),
-        run_dir=tmp_path,
-        runtime_options=RuntimeOptions(trace="full"),
-    )
-
-    result = runtime.run({"unexpected": 2})
-
-    assert not result.exists("number")
-    assert not result.exists("unexpected")
-    assert runtime.trace.step_count == 2
-    assert runtime.trace.qualified_node_runs == {
-        "start": 1,
-        "end": 1,
-    }
+    document["pipeline"]["inputs"].append({
+        "key": "explicit", "type": "explicit", "display_name": "explicit", "required": True,
+    })
+    with pytest.raises(ValueError, match="required must be explicitly true or false"):
+        parse_graph_config(document)
 
 
 @pytest.mark.parametrize(
@@ -882,6 +865,34 @@ def test_portable_conformance_input_preflight_before_nodes(
     assert result.python.error == expected_error
     assert result.python.node_runs == ()
     assert result.python.edge_runs == ()
+
+
+@pytest.mark.parametrize("inputs", [{}, {"number": None}])
+def test_portable_optional_inputs_use_key_presence(tmp_path, inputs):
+    document = _input_preflight_document()
+    document["pipeline"]["inputs"][0]["required"] = False
+    result = run_portable_conformance(
+        _case("conformance.optional_input", document, inputs), work_dir=tmp_path,
+    )
+    result.assert_equivalent()
+    assert result.python.error is None
+    assert dict(result.python.node_runs) == {"start": 1, "end": 1}
+
+
+@pytest.mark.parametrize("inputs", [{}, {"unexpected": 2}])
+def test_portable_empty_input_contract_is_closed(tmp_path, inputs):
+    document = _input_preflight_document()
+    document["pipeline"]["inputs"] = []
+    result = run_portable_conformance(
+        _case("conformance.empty_inputs", document, inputs), work_dir=tmp_path,
+    )
+    result.assert_equivalent()
+    if inputs:
+        assert result.python.error.category == "input_unknown"
+        assert result.python.node_runs == ()
+    else:
+        assert result.python.error is None
+        assert dict(result.python.node_runs) == {"start": 1, "end": 1}
 
 
 def test_portable_conformance_linear_alias_and_optional_output(
@@ -1125,6 +1136,47 @@ def test_python_result_key_activates_unconditional_route_once(
 
     assert result.get("answer")["value"] == 6
     assert runtime.trace.edge_executions["calculate->end"] == 1
+
+
+@pytest.mark.parametrize("async_mode,public_output", (("result_key", True), ("detached", True), ("detached", False)))
+def test_portable_conformance_immediate_implementation_scheduled_as_task(
+    tmp_path: Path, async_mode: str, public_output: bool,
+) -> None:
+    call = {"async": async_mode}
+    if async_mode == "result_key":
+        call["result_key"] = "answer"
+    document = {"pipeline": {
+        "entry_mode": "async",
+        "inputs": [_pipeline_input("number")],
+        "nodes": [
+            _node("start", "fixture.terminal"),
+            _node("calculate", "fixture.detached_audit" if async_mode == "detached" else "fixture.double", **call),
+            _node("end", "fixture.terminal"),
+        ],
+        "edges": [_edge("start", "calculate"),
+                  _edge("start" if async_mode == "detached" else "calculate", "end")],
+        "outputs": [_pipeline_output("answer")] if async_mode == "result_key" else [],
+    }}
+    case = _case("conformance.immediate_task." + async_mode, document, {"number": 6})
+    if async_mode == "detached":
+        if public_output:
+            document["pipeline"]["nodes"].insert(2, _node("value", "fixture.left_item"))
+            document["pipeline"]["edges"] = [
+                _edge("start", "calculate"), _edge("start", "value"), _edge("value", "end")]
+            document["pipeline"]["outputs"] = [_pipeline_output("item", alias="value")]
+        case = replace(case,
+            javascript_source=JAVASCRIPT_SOURCE + "\nexport function immediateAudit() { return {}; }\n",
+            javascript_exports={**JAVASCRIPT_EXPORTS, "fixture.detached_audit": "immediateAudit"},
+            javascript_completions={**JAVASCRIPT_COMPLETIONS, "fixture.detached_audit": "immediate"})
+    result = run_portable_conformance(case, work_dir=tmp_path)
+    _assert_success(result, {"answer": 12} if async_mode == "result_key" else {"value": 1} if public_output else {})
+    python_root = next(block for block in result.portable_plan["blocks"] if block["id"] == "block:/")
+    javascript_root = next(block for block in result.javascript_plan["blocks"] if block["id"] == "block:/")
+    assert python_root["tasks"][0]["executor"] == "thread"
+    assert javascript_root["tasks"][0]["executor"] == "event_loop"
+    calls = {node["id"]: node for node in javascript_root["nodes"]}
+    assert calls["calculate"]["completion"] == "immediate"
+    assert calls["start"]["executor"] == calls["end"]["executor"] == "current"
 
 
 def test_portable_conformance_result_key_async_conditional_route(
@@ -1413,6 +1465,7 @@ def test_portable_conformance_nested_nodeset_deferred_result_key(
         registry=_registry(),
         javascript_source=JAVASCRIPT_SOURCE,
         javascript_exports=exports,
+        javascript_completions=JAVASCRIPT_COMPLETIONS,
     )
 
     result = run_portable_conformance(case, work_dir=tmp_path)
@@ -1502,6 +1555,7 @@ def test_portable_conformance_nested_nodeset_detached_cleanup(
         registry=_registry(),
         javascript_source=JAVASCRIPT_SOURCE,
         javascript_exports=exports,
+        javascript_completions=JAVASCRIPT_COMPLETIONS,
     )
 
     result = run_portable_conformance(case, work_dir=tmp_path)
@@ -1592,6 +1646,7 @@ def test_portable_conformance_nested_nodeset_all_output(
         registry=_registry(),
         javascript_source=JAVASCRIPT_SOURCE,
         javascript_exports=exports,
+        javascript_completions=JAVASCRIPT_COMPLETIONS,
     )
 
     result = run_portable_conformance(case, work_dir=tmp_path)
@@ -1823,6 +1878,7 @@ def test_portable_conformance_loop_body_contains_nested_nodeset(
             registry=_registry(),
             javascript_source=JAVASCRIPT_SOURCE,
             javascript_exports=exports,
+            javascript_completions=JAVASCRIPT_COMPLETIONS,
         ),
         work_dir=tmp_path,
     )
@@ -1984,6 +2040,7 @@ def test_portable_conformance_nested_loops_carry_collect_and_stop(
             registry=_registry(),
             javascript_source=JAVASCRIPT_SOURCE,
             javascript_exports=exports,
+            javascript_completions=JAVASCRIPT_COMPLETIONS,
         ),
         work_dir=tmp_path,
     )

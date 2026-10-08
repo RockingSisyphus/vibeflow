@@ -12,6 +12,7 @@
       "docs/user/multifile-resources.md",
       "docs/user/rules-and-nodes.md",
       "docs/user/rule-system-migration.md",
+      "docs/user/runtime-observation.md",
       "docs/user/commands-and-results.md"
     ],
     "collaborative": [

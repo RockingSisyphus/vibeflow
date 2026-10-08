@@ -29,8 +29,12 @@ def ownership_findings(context):
         if key in visited:
             continue
         visited.add(key)
-        implementation = sources.implementation_tree(path,own.get("symbol","")) if own.get("role") == "entry" and own["kind"] in {"node","plugin"} else None
+        implementation = sources._analysis._implementation_tree(sources,path,own.get("symbol","")) if own.get("role") == "entry" and own["kind"] in {"node","plugin"} else None
         referenced = {item.id for item in ast.walk(implementation) if isinstance(item,ast.Name)} if implementation else None
+        if referenced is not None:
+            referenced.update(alias.asname or alias.name.split(".")[0]
+                for statement in ast.walk(implementation) if isinstance(statement,(ast.Import,ast.ImportFrom))
+                for alias in statement.names)
         for imported in sources.imports:
             if imported.path != path or not imported.resolved_path or imported.resolved_path not in paths:
                 continue

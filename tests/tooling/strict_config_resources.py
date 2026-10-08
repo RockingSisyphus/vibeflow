@@ -1,21 +1,11 @@
+from tests.fixtures.support.plugins import publish_native_fixture, append_resource, write_lifecycle_fixture
+from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
 from tests.fixtures.support.strict_support_runtime_implementations import GlobalParamNode
 
 
-GlobalParamNode_DECLARATION = node_declaration(NodeInfo(
-        type_key="test.global_param",
-        display_name="Global Param",
-
-        description="Reads global config from params.",
-        version="0.1.0",
-        flow_kind="process",
-    ), NodeContract(
-        provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
-        output_semantics={"value.out": ("global config value",)},
-
-        examples=({"inputs": {}, "params": {"_global": {"offset": 1}}},),
-    ), rulesets=("vibeflow.process",))
+GlobalParamNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.global_param', display_name='Global Param', description='Reads global config from params.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.out', 'value.out', display_name='value.out'),), output_semantics={'value.out': ('global config value',)}, examples=({'inputs': {}, 'params': {'_global': {'offset': 1}}},)), rulesets=("vibeflow.process",))
 
 def test_config_resource_schema_rejects_invalid_status_and_plugin_config() -> None:
     findings = collect_config_schema_findings(
@@ -28,7 +18,7 @@ def test_config_resource_schema_rejects_invalid_status_and_plugin_config() -> No
     )
     rule_ids = {finding.rule_id for finding in findings}
     assert "CONFIG.SCHEMA.GLOBAL_CONFIG" in rule_ids
-    assert "CONFIG.SCHEMA.BASE_LIB_PATHS" in rule_ids
+    assert "CONFIG.BASE_LIB.REGISTRATION_REMOVED" in rule_ids
     assert "CONFIG.SCHEMA.RESOURCE_STATUS" in rule_ids
     assert "CONFIG.SCHEMA.PLUGIN_CONFIG" in rule_ids
     assert "CONFIG.SCHEMA.RESOURCE_METADATA_STRING" in {
@@ -150,10 +140,8 @@ Path("planned.txt").write_text("not executable")
         f"""
 import json
 from pathlib import Path
-from vibeflow.targets.python.project import PluginInfo
 
 class RuntimePlugin:
-    PLUGIN_INFO = PluginInfo("configured_runtime", "runtime", "Configured Runtime", "test", "Records runtime config.", "0.1.0")
     name = "configured_runtime"
 
     def configure(self, config):
@@ -172,17 +160,16 @@ class RuntimePlugin:
             {
                 "global_config": {"offset": 7},
                 "base_lib": {
-                    "paths": ["base_lib"],
                     "modules": [
                         {
-                            "module": "base_lib.math_tools",
+                            "id": "base_lib.math_tools",
                             "display_name": "Math Tools Resource",
                             "category": "test",
                             "description": "Configured arithmetic helper resource.",
                             "version": "0.1.0",
                         },
                         {
-                            "module": "base_lib.future_tools",
+                            "id": "base_lib.future_tools",
                             "status": "planned",
                             "display_name": "Future Tools",
                             "category": "test",
@@ -191,32 +178,13 @@ class RuntimePlugin:
                         },
                     ],
                 },
-                "plugins": [
-                    {
-                        "module": str(plugin_path),
-                        "class": "RuntimePlugin",
-                        "type": "runtime",
-                        "display_name": "Configured Runtime Resource",
-                        "category": "test",
-                        "description": "Configured runtime hook resource.",
-                        "version": "0.1.0",
-                        "config": {"marker": str(marker_path), "label": "ready"},
-                    },
-                    {
-                        "name": "future_runtime_plugin",
-                        "type": "runtime",
-                        "status": "planned",
-                        "display_name": "Future Runtime Plugin",
-                        "category": "test",
-                        "description": "Planned runtime hook.",
-                        "version": "0.1.0",
-                    },
-                ],
+                "plugins": [{"id":"future_runtime_plugin","type":"runtime","status":"planned",
+                    "display_name":"Future Runtime Plugin","description":"Planned runtime hook."}],
                 "pipeline": {
                     "nodes": [
                         _node_call("start", "test.start", "Starts the resource fixture."),
-                        _node_call("global", "test.global_param", "Reads global config.", provides=[PROV_SPEC("value.out")]),
-                        _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                        _node_call("global", "test.global_param", "Reads global config."),
+                        _node_call("end", "test.out_end", "Consumes value.out."),
                     ],
                     "edges": _edge_chain("start", "global", "end"),
                     "outputs": [REQ_SPEC("value.out")],
@@ -228,6 +196,17 @@ class RuntimePlugin:
     registry = _registry()
     register_node(registry, GlobalParamNode_DECLARATION, GlobalParamNode)
 
+    publish_native_fixture(config_path,registry)
+    append_resource(tmp_path,{"kind":"base_lib","id":"base_lib.math_tools","display_name":"Math Tools Resource",
+        "description":"Configured arithmetic helper resource.","implementations":[{"language":"python","targets":["python"],
+        "source":{"kind":"file","ref":"base_lib/math_tools.py"}}]})
+    lifecycle = write_lifecycle_fixture(tmp_path,source={"kind":"file","ref":"runtime_plugin.py","export":"RuntimePlugin"},
+        plugin_id="configured_runtime",config={"marker":str(marker_path),"label":"ready"},filename="selected_lifecycle_0.py")
+    source_path = tmp_path / "selected_lifecycle_0.py"
+    source_path.write_text(source_path.read_text().replace("display_name='configured_runtime'", "display_name='Configured Runtime Resource'").replace('description="Native lifecycle fixture"','description="Configured runtime hook resource."'))
+    document = json.loads(config_path.read_text())
+    document["plugins"].insert(1,lifecycle)
+    config_path.write_text(json.dumps(document))
     result = run_checked(config_path, registry=registry, run_root=tmp_path / "runs", run_id="resources")
 
     assert result.context.get("value.out")["value"] == 7
@@ -236,7 +215,7 @@ class RuntimePlugin:
     assert resources["global_config"] == {"offset": 7}
     assert [item["status"] for item in resources["base_lib"]["modules"]] == ["implemented", "planned"]
     assert [item["status"] for item in resources["plugins"]] == ["implemented", "planned"]
-    assert all(item["rulesets"] == [] for item in resources["plugins"])
+    assert all(item.get("rulesets", []) == [] for item in resources["plugins"])
     assert result.health.info["production_ready"] is False
     assert result.health.info["plugins"]["plugins"] == [
         {
@@ -269,43 +248,24 @@ class RuntimePlugin:
     assert not any(finding.rule_id.startswith("CONFIG.SMELL.MISSING_") for finding in result.health.warnings)
 
 
-def test_config_resource_metadata_missing_fields_warn_without_blocking(tmp_path) -> None:
-    from vibeflow.tooling.application.python.project.resources import load_config_resources
-    from vibeflow.tooling.application.python.cli.config import validate_config_path
+def test_planned_resources_preserve_explicit_review_metadata(tmp_path) -> None:
+    from types import SimpleNamespace
+    from vibeflow.tooling.application.python.project.resource_selection import select_python_resources
+    from vibeflow.core.descriptors import compose_contributions
+    planned = {"id":"future_runtime","type":"runtime","status":"planned",
+        "display_name":"Future Runtime","description":"Review a future runtime."}
+    registry = SimpleNamespace(loaded_plugins=SimpleNamespace(catalogs=compose_contributions(()), lifecycle_selections=(planned,)))
+    resources, findings = select_python_resources({"base_lib":{"modules":[{"id":"future_tools","status":"planned",
+        "display_name":"Future Tools","description":"Review a future library."}]}},registry=registry)
+    assert findings == ()
+    assert resources.plugins[0].status == "planned"
+    assert resources.plugins[0].display_name == "Future Runtime"
+    assert resources.base_libs[0].status == "planned"
 
-    config = {
-        "base_lib": {"modules": [{"module": "base_lib.future_tools", "status": "planned"}]},
-        "plugins": [{"name": "future_runtime", "type": "runtime", "status": "planned"}],
-        "pipeline": _seed_only_pipeline(),
-    }
-
-    resources, findings = load_config_resources(config, base_path=tmp_path)
-
-    assert resources.to_dict()["plugins"][0]["name"] == "future_runtime"
-    rule_ids = {finding.rule_id for finding in findings}
-    assert "CONFIG.SMELL.MISSING_BASE_LIB_DISPLAY_NAME" in rule_ids
-    assert "CONFIG.SMELL.MISSING_BASE_LIB_DESCRIPTION" in rule_ids
-    assert "CONFIG.SMELL.MISSING_PLUGIN_DISPLAY_NAME" in rule_ids
-    assert "CONFIG.SMELL.MISSING_PLUGIN_DESCRIPTION" in rule_ids
-    assert {finding.severity for finding in findings} == {"warning"}
-
-    config_path = tmp_path / "workflow.json"
-    config_path.write_text(json.dumps(config), encoding="utf-8")
-    from tests.fixtures.support.declarations import write_node_manifests
-    write_node_manifests(tmp_path, [("test.start", "StartNode", {}, {}), ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}), ("test.in_end", "InEndNode", {}, {})])
-    (tmp_path / "vibeflow_project.jsonc").write_text(json.dumps({"project_target": "python", "descriptors": {"nodes": ["manifests/nodes"]}}))
-    from tests.fixtures.support.code_plugins import migrate_fixture
-    data = json.loads(config_path.read_text())
-    data["plugins"][0]["id"] = data["plugins"][0].pop("name")
-    config_path.write_text(json.dumps(data))
-    migrate_fixture(tmp_path)
-    report = validate_config_path(config_path)
-    assert report.status == "CONCERNS"
-    assert {finding.rule_id for finding in report.warnings} >= rule_ids
 
 
 def test_host_extension_resources_keep_workflow_status_and_config() -> None:
-    from vibeflow.tooling.application.python.project.resources import load_config_resources
+    from vibeflow.tooling.application.python.project.resource_selection import select_python_resources as load_config_resources
 
     resources, findings = load_config_resources(
         {
@@ -356,7 +316,7 @@ def test_host_extension_resources_keep_workflow_status_and_config() -> None:
 def test_host_extension_resources_resolve_registered_descriptor_metadata(
     tmp_path,
 ) -> None:
-    from vibeflow.tooling.application.python.project.resources import (
+    from vibeflow.tooling.project.host_extensions import (
         HostExtensionResource,
         resolve_host_extension_resources,
     )
@@ -434,57 +394,18 @@ def test_host_extension_resources_resolve_registered_descriptor_metadata(
     }
 
 
-def test_registered_plugin_reference_preserves_planned_status(tmp_path) -> None:
-    from vibeflow.targets.python.project import PluginResourceRegistry
-    from vibeflow.tooling.application.python.project.resources import load_config_resources
-
-    registry = PluginResourceRegistry()
-    registry.register(
-        "future_runtime",
-        module="project.plugins.future_policy",
-        class_name="FuturePolicy",
-        plugin_type="runtime",
-        display_name="Future Policy",
-        description="Planned policy plugin.",
-    )
-
-    resources, findings = load_config_resources(
-        {
-            "plugins": [
-                {
-                    "id": "future_runtime",
-                    "status": "planned",
-                    "config": {"mode": "review"},
-                    "display_name": "Future Policy",
-                    "description": "Planned policy plugin.",
-                    "type": "runtime",
-                }
-            ]
-        },
-        base_path=tmp_path,
-        plugin_resource_registry=registry,
-    )
-
+def test_planned_plugin_selection_skips_implementation_load(tmp_path) -> None:
+    from types import SimpleNamespace
+    from vibeflow.core.descriptors import compose_contributions
+    from vibeflow.tooling.application.python.project.resource_selection import select_python_resources
+    selection = {"id":"future_runtime","type":"runtime","status":"planned","config":{"mode":"review"},
+        "display_name":"Future Policy","description":"Planned policy plugin."}
+    registry = SimpleNamespace(loaded_plugins=SimpleNamespace(catalogs=compose_contributions(()),lifecycle_selections=(selection,)))
+    resources, findings = select_python_resources({},registry=registry)
     assert findings == ()
-    assert resources.to_dict()["plugins"] == [
-        {
-            "id": "future_runtime",
-            "name": "future_runtime",
-            "type": "runtime",
-            "status": "planned",
-            "module": "",
-            "class": "",
-            "display_name": "Future Policy",
-            "category": "",
-            "description": "Planned policy plugin.",
-            "version": "",
-            "config_keys": ["mode"],
-            "rulesets": [],
-            "targets": [],
-            "priority": 100,
-            "config": {"mode": "review"},
-        }
-    ]
+    assert resources.plugins[0].descriptor is None
+    assert resources.plugins[0].to_dict()["config"] == {"mode":"review"}
+
 
 
 def test_global_config_overrides_node_params_and_warns_when_not_allowed(tmp_path) -> None:
@@ -499,7 +420,9 @@ def test_global_config_overrides_node_params_and_warns_when_not_allowed(tmp_path
         encoding="utf-8",
     )
 
-    result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="global_override")
+    registry = _registry()
+    publish_native_fixture(config_path,registry)
+    result = run_checked(config_path, registry=registry, run_root=tmp_path / "runs", run_id="global_override")
 
     assert result.context.get("value.out")["value"] == 6
     warnings = {warning.rule_id for warning in result.health.warnings}
@@ -514,7 +437,8 @@ def test_global_config_overrides_node_params_and_warns_when_not_allowed(tmp_path
         ),
         encoding="utf-8",
     )
-    allowed = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="global_override_allowed")
+    publish_native_fixture(config_path,registry)
+    allowed = run_checked(config_path, registry=registry, run_root=tmp_path / "runs", run_id="global_override_allowed")
     assert allowed.context.get("value.out")["value"] == 6
     assert "CONFIG.GLOBAL_CONFIG.OVERRIDES_LOCAL" not in {warning.rule_id for warning in allowed.health.warnings}
 
@@ -533,11 +457,11 @@ def test_nodeset_call_config_overrides_nodeset_global_and_inner_node_config(tmp_
                 | {"global_config": {"config": {"delta": 2}, "allow_config_override": False}}
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the nodeset config fixture."),
-                    _node_call("flow", "math.add_one", "Calls add-one with config override.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")], config={"delta": 6}, allow_config_override=False),
-                    _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("flow", "math.add_one", "Calls add-one with config override.",  config={"delta": 6}, allow_config_override=False),
+                    _node_call("end", "test.out_end", "Consumes value.out."),
                 ],
                 "edges": _edge_chain("start", "flow", "end"),
                 "outputs": [REQ_SPEC("value.out")],
@@ -576,11 +500,11 @@ def test_imported_nodeset_file_global_config_is_used_for_inner_nodes(tmp_path) -
             {
                 "nodeset_imports": [{"path": "nodesets.jsonc"}],
                 "pipeline": {
-                    "inputs": [PROV_SPEC("value.in")],
+                    "inputs": [INPUT_SPEC("value.in")],
                     "nodes": [
                         _node_call("start", "test.start", "Starts the imported nodeset fixture."),
-                        _node_call("flow", "math.add_one", "Calls imported add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                        _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                        _node_call("flow", "math.add_one", "Calls imported add-one nodeset."),
+                        _node_call("end", "test.out_end", "Consumes value.out."),
                     ],
                     "edges": _edge_chain("start", "flow", "end"),
                     "outputs": [REQ_SPEC("value.out")],
@@ -590,7 +514,9 @@ def test_imported_nodeset_file_global_config_is_used_for_inner_nodes(tmp_path) -
         encoding="utf-8",
     )
 
-    result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="imported_nodeset_global", initial={"value.in": 2})
+    registry = _registry()
+    publish_native_fixture(config_path,registry)
+    result = run_checked(config_path, registry=registry, run_root=tmp_path / "runs", run_id="imported_nodeset_global", initial={"value.in": 2})
 
     assert result.context.get("value.out")["value"] == 6
 
@@ -598,132 +524,30 @@ def test_imported_nodeset_file_global_config_is_used_for_inner_nodes(tmp_path) -
 def test_sdk_metadata_is_authoritative_and_planned_resources_skip_load(tmp_path) -> None:
     base_dir = tmp_path / "base_lib"
     base_dir.mkdir()
-    (base_dir / "__init__.py").write_text("", encoding="utf-8")
-    (base_dir / "missing_info.py").write_text("def helper():\n    return 1\n", encoding="utf-8")
-    plugin_path = tmp_path / "missing_info_plugin.py"
-    plugin_path.write_text(
-        """
-class Plugin:
-    name = "missing_info"
-""".strip(),
-        encoding="utf-8",
-    )
+    (base_dir / "__init__.py").write_text("")
+    (base_dir / "plain.py").write_text("def helper():\n    return 1\n")
+    (tmp_path / "plain_plugin.py").write_text('from vibeflow.targets.python.sdk import Plugin\ndef runtime(context):\n    return type("NativeRuntime",(),{})()\nplugin=Plugin(id="with_info",runtime=runtime,display_name="With Info",description="SDK metadata is authoritative.")\n')
     config_path = tmp_path / "workflow.json"
-    config_path.write_text(
-        json.dumps(
-            {
-                "base_lib": {
-                    "paths": ["base_lib"],
-                    "modules": [
-                        {"module": "base_lib.missing_info", "status": "implemented"},
-                        {"name": "base_lib.future_missing", "status": "planned", "description": "Future helper."},
-                    ],
-                },
-                "plugins": [
-                    {"module": str(plugin_path), "type": "runtime"},
-                    {"name": "future_runtime", "status": "planned", "description": "Future policy."},
-                ],
-                "pipeline": _seed_only_pipeline(),
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="missing_metadata")
+    config_path.write_text(json.dumps({"base_lib":{"modules":["math",{"id":"future_missing","status":"planned","description":"Future helper."}]},
+        "plugins":[{"source":{"kind":"file","ref":"plain_plugin.py","export":"plugin"}},
+          {"id":"future_runtime","type":"runtime","status":"planned","description":"Future policy."}],
+        "pipeline":_seed_only_pipeline()}))
+    registry = _registry()
+    publish_native_fixture(config_path,registry)
+    append_resource(tmp_path,{"kind":"base_lib","id":"math","display_name":"Math","description":"Plain source uses SDK metadata.",
+        "implementations":[{"language":"python","targets":["python"],"source":{"kind":"file","ref":"base_lib/plain.py"}}]})
+    result = run_checked(config_path,registry=registry,run_root=tmp_path / "runs",run_id="declared_metadata")
     assert result.context is not None
     assert not result.health.errors
-
-    plugin_path.write_text(
-        """
-from vibeflow.targets.python.project import PluginInfo
-
-class Plugin:
-    PLUGIN_INFO = PluginInfo("with_info", "runtime", "With Info", "test", "Valid policy metadata.", "0.1.0")
-    name = "with_info"
-""".strip(),
-        encoding="utf-8",
-    )
-    result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="declared_metadata")
-    assert result.context is not None
-    assert not any(error.rule_id == "BASE_LIB.INFO.MISSING" for error in result.health.errors)
+    assert result.health.info["resources"]["plugins"][0]["display_name"] == "With Info"
+    assert result.health.info["resources"]["plugins"][1]["status"] == "planned"
 
 
-def test_planned_base_lib_does_not_satisfy_node_import_allowlist(tmp_path, monkeypatch) -> None:
-    _clear_base_lib_modules()
-    monkeypatch.syspath_prepend(str(tmp_path))
-    _write_base_lib_info_module(tmp_path, "math_tools")
-    future = tmp_path / "base_lib" / "future_tools.py"
-    future.write_text("def helper():\n    return 9\n", encoding="utf-8")
-    node_path = tmp_path / "future_node.py"
-    node_path.write_text(
-        """
-class FutureNode:
 
-    def run_pure(self, inputs, params):
-        from base_lib.future_tools import helper
-        return {"value.out": helper()}
-""".strip(),
-        encoding="utf-8",
-    )
-    module = _load_module_from_path(node_path, "_future_node")
-    registry = _registry()
-    register_node(registry, node_declaration(NodeInfo("test.future", "Future", "Imports a planned helper.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.out", "value.out", display_name="Value Out"),), output_semantics={"value.out": ("future value",)})), module.FutureNode)
-    config_path = tmp_path / "workflow.json"
-    config_path.write_text(
-        json.dumps(
-            {
-                "base_lib": {
-                    "paths": ["base_lib"],
-                    "modules": [
-                        {"module": "base_lib.math_tools", "status": "implemented"},
-                        {"module": "base_lib.future_tools", "status": "planned", "description": "Future helper."},
-                    ],
-                },
-                "pipeline": {
-                    "nodes": [
-                        _node_call("start", "test.start", "Starts the planned base_lib fixture."),
-                        _node_call("future", "test.future", "Imports a planned base_lib.", provides=[PROV_SPEC("value.out")]),
-                        _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
-                    ],
-                    "edges": _edge_chain("start", "future", "end"),
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    with pytest.raises(CheckedRunError) as exc_info:
-        run_checked(config_path, registry=registry, run_root=tmp_path / "runs", run_id="planned_base_lib_import")
-
-    assert any(error.code == "NODE.BASE_LIB.BASE_LIB_UNDECLARED" for error in exc_info.value.result.health.errors)
-    assert exc_info.value.result.health.effective_policy["base_lib"]["allowed_modules"] == ["base_lib.math_tools"]
 
 
 def _write_base_lib_info_module(tmp_path: Path, name: str) -> None:
     base_dir = tmp_path / "base_lib"
     base_dir.mkdir(exist_ok=True)
     (base_dir / "__init__.py").write_text("", encoding="utf-8")
-    (base_dir / f"{name}.py").write_text(
-        f"""
-from vibeflow.targets.python.project import BaseLibInfo
-
-BASE_LIB_INFO = BaseLibInfo(
-    module="base_lib.{name}",
-    display_name="{name.replace("_", " ").title()}",
-    category="test",
-    description="Pure helper module.",
-    version="0.1.0",
-)
-
-def helper():
-    return 1
-""".strip(),
-        encoding="utf-8",
-    )
-
-
-_native_run_checked = run_checked
-def run_checked(config_path, *, registry, **options):
-    from tests.fixtures.support.code_plugins import publish_runtime_fixture
-    publish_runtime_fixture(config_path, registry)
-    return _native_run_checked(config_path, registry=registry, **options)
+    (base_dir / f"{name}.py").write_text("def helper():\n    return 1\n",encoding="utf-8")

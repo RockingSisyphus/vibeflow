@@ -1,0 +1,6 @@
+[
+  "layout.review.nested_repeat_loop",
+  "layout.expanded_svg.nested_repeat_loop",
+  "layout.mermaid.explicit_resources",
+  "layout.ordinary_svg.explicit_resources"
+]

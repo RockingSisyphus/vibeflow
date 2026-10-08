@@ -17,16 +17,11 @@ from vibeflow.targets.javascript.frontend.emission_protocol import (
 )
 from vibeflow.targets.javascript.frontend.emission_view import (
     bound_workflow_view,
-    implementation_override,
-    legacy_emission_payload,
+    emission_payload,
     module_specifier,
 )
-from vibeflow.targets.javascript.frontend.model import (
-    AotPlanError,
-    ImplementationSpec,
-    WorkflowSpec,
-    normalize_workflow_plan,
-)
+from vibeflow.targets.javascript.frontend.errors import AotPlanError
+
 from vibeflow.targets.javascript.frontend.schema import (
     JavascriptJsonValueError,
     validate_javascript_json_value,
@@ -47,53 +42,24 @@ class EmittedWorkflow:
 
 
 def emit_workflow_module(
-    plan: WorkflowSpec | WorkflowPlan | object,
+    plan: WorkflowPlan,
     *,
-    implementation_by_type: Mapping[str, object] | None = None,
-    host_extensions: tuple[Mapping[str, Any], ...] = (),
-    javascript_bindings: JavascriptBindingPlan | None = None,
+    javascript_bindings: JavascriptBindingPlan,
 ) -> EmittedWorkflow:
-    """Emit a side-effect-free ESM module from portable JSON/dataclasses.
-
-    ``implementation_by_type`` is the integration seam for a descriptor
-    catalog. Portable catalog source references can be replaced with concrete
-    JS/TS locations without mutating the portable plan.
-    """
-
-    if javascript_bindings is None:
-        workflow: EmissionWorkflow = normalize_workflow_plan(plan)
-        raw_overrides = {
-            str(key): value
-            for key, value in (implementation_by_type or {}).items()
-        }
-        overrides = {
-            str(key): implementation_override(value)
-            for key, value in raw_overrides.items()
-        }
-        runtime_plugins: tuple[Mapping[str, Any], ...] = ()
-    else:
-        if not isinstance(plan, WorkflowPlan):
-            raise TypeError(
-                "canonical JavaScript emission requires a WorkflowPlan"
-            )
-        workflow = bound_workflow_view(plan, javascript_bindings)
-        raw_overrides = {}
-        overrides = {}
-        host_extensions = tuple(
-            item.to_value() for item in javascript_bindings.host_extensions
-        )
-        runtime_plugins = tuple(
-            _plugin_binding_value(item)
-            for item in getattr(javascript_bindings, "runtime_plugins", ())
-        )
-    serializable = legacy_emission_payload(workflow)
+    """Emit a side-effect-free ESM module from a canonical plan and bindings."""
+    workflow = bound_workflow_view(plan, javascript_bindings)
+    host_extensions = tuple(
+        item.to_value() for item in javascript_bindings.host_extensions
+    )
+    runtime_plugins = tuple(
+        _plugin_binding_value(item) for item in javascript_bindings.runtime_plugins
+    )
+    serializable = emission_payload(workflow)
     bindings: dict[tuple[str, str], str] = {}
     modules: list[str] = []
     _bind_implementations(
         workflow,
         serializable,
-        raw_overrides=raw_overrides,
-        overrides=overrides,
         bindings=bindings,
         modules=modules,
     )
@@ -151,13 +117,13 @@ def emit_workflow_module(
     if workflow.entry_mode == "sync":
         public_entry = (
             "export function runWorkflow(inputs, options) {\n"
-            "  return __vfInvokeWorkflow(inputs, options);\n"
+            "  return __vfObserveSync(__vfInvokeWorkflow, inputs, options);\n"
             "}"
         )
     else:
         public_entry = (
             "export async function runWorkflowAsync(inputs, options) {\n"
-            "  return __vfInvokeWorkflow(inputs, options);\n"
+            "  return __vfObserveAsync(__vfInvokeWorkflow, inputs, options);\n"
             "}"
         )
     source_parts = [
@@ -201,8 +167,6 @@ def _bind_implementations(
     workflow: EmissionWorkflow,
     serializable: dict[str, Any],
     *,
-    raw_overrides: Mapping[str, object],
-    overrides: Mapping[str, ImplementationSpec],
     bindings: dict[tuple[str, str], str],
     modules: list[str],
 ) -> None:
@@ -212,10 +176,7 @@ def _bind_implementations(
         path: tuple[str, ...],
     ) -> None:
         if node.implementation is not None:
-            implementation = overrides.get(
-                node.type_used,
-                node.implementation,
-            )
+            implementation = node.implementation
             module = module_specifier(implementation.module)
             binding_key = (module, implementation.export)
             binding = bindings.get(binding_key)
@@ -381,14 +342,14 @@ def _host_extension_source(
     invocation = (
         """
     try {
-      return __vfInvokeWorkflow(inputs, { ...rawOptions, capabilities, signal: linked.signal });
+      return runWorkflow(inputs, { ...rawOptions, capabilities, signal: linked.signal, __vfParentObservation: options.__vfParentObservation });
     } finally {
       linked.cleanup();
     }"""
         if workflow.entry_mode == "sync"
         else """
     const invocation = Promise.resolve().then(() =>
-      __vfInvokeWorkflow(inputs, { ...rawOptions, capabilities, signal: linked.signal })
+      runWorkflowAsync(inputs, { ...rawOptions, capabilities, signal: linked.signal, __vfParentObservation: options.__vfParentObservation })
     );
     active.add(invocation);
     try {
@@ -446,6 +407,10 @@ function __vfFrozenHostConfig(value) {{
 }}
 
 export function createWorkflowHost(options = {{}}) {{
+  return __vfObserveHost(__vfCreateWorkflowHost, options);
+}}
+
+function __vfCreateWorkflowHost(options = {{}}) {{
   if (!options || typeof options !== "object" || Array.isArray(options)) {{
     throw __vfHostFailure(
       "VF_HOST_OPTIONS",

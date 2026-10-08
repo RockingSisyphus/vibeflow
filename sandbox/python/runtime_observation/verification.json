@@ -1,0 +1,53 @@
+{
+  "schema": "vibeflow.runtime-observation-verification.v1",
+  "base_revision": "9c443f3",
+  "targeted_regressions": {
+    "passed": 513,
+    "failed": 0,
+    "log": "/tmp/vf-observation-verification.log"
+  },
+  "startup_and_document_followup": {
+    "passed": 38,
+    "failed": 0,
+    "log": "/tmp/vf-observation-final-followup.log"
+  },
+  "stream_and_delegate_followup": {
+    "passed": 99,
+    "failed": 0,
+    "log": "/tmp/vf-observation-stream-tests.log"
+  },
+  "independent_quality": {
+    "errors": 0,
+    "warnings": 0,
+    "tests_passed": 46
+  },
+  "annotation_controls": {
+    "cases": 14,
+    "matched": true,
+    "before": "../typing_annotations/before.json",
+    "after": "../typing_annotations/after.json"
+  },
+  "python_actual_cli": {
+    "cases": 3,
+    "matched": true,
+    "report": "report.json"
+  },
+  "javascript_actual_aot": {
+    "cases": 3,
+    "matched": true,
+    "report": "../../javascript/runtime_observation/report.json"
+  },
+  "real_browser": {
+    "matched": true,
+    "full_gate_step_tested": true
+  },
+  "full_repository_gate_executed": false,
+  "mnist_training_executed": false,
+  "release_archives_rebuilt": true,
+  "documentation_release_followup": {
+    "targeted_tests_passed": 43,
+    "matched": true,
+    "report": "documentation-release.json",
+    "extracted_package_executions": 4
+  }
+}

@@ -45,17 +45,20 @@
       {
         "key": "outer.inner",
         "type": "outer.inner",
-        "display_name": "Outer Inner"
+        "display_name": "Outer Inner",
+        "required": true
       },
       {
         "key": "inner.current",
         "type": "inner.current",
-        "display_name": "Inner Current"
+        "display_name": "Inner Current",
+        "required": true
       },
       {
         "key": "total.inner",
         "type": "total.inner",
-        "display_name": "Total Inner"
+        "display_name": "Total Inner",
+        "required": true
       }
     ],
     "nodes": [

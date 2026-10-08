@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tests.fixtures.support.declarations import native_registry
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 
 import math
@@ -10,13 +11,8 @@ from tests.fixtures.support import runtime_dispatch_helpers
 from vibeflow.core import DataProvider, DataRequirement
 from vibeflow.targets.python.project.compiler import _implementation_fact, _runtime_dispatch_fact
 from vibeflow.targets.python.project.registry import NodeRegistry
-from vibeflow.targets.python.project.node import (
-    EFFECT_SCOPE_GLOBAL_STATE,
-    EFFECT_SCOPE_NONE,
-    EFFECT_SCOPE_TERMINAL,
-    NodeContract,
-    NodeInfo,
-)
+from vibeflow.targets.python.project.node import EFFECT_SCOPE_GLOBAL_STATE, EFFECT_SCOPE_NONE, EFFECT_SCOPE_TERMINAL
+from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from vibeflow.targets.python.quality.source_analysis import (
     analyze_runtime_dispatch,
 )
@@ -124,35 +120,10 @@ class StaticAndProtocolCalls:
         return payload.get("result")
 
 
-_CONTRACT = NodeContract(
-    requires=(DataRequirement("callback.in", "exactly_one", display_name="callback.in"),),
-    provides=(DataProvider("callback.out", "callback.out", display_name="callback.out"),),
-    input_semantics={"callback.in": ("runtime callback",)},
-    output_semantics={"callback.out": ("callback result",)},
-
-    examples=(
-        {
-            "inputs": {
-                "callback.in": {
-                    "key": "callback.in",
-                    "type": "callback.in",
-                    "value": 1,
-                    "source_node": "example",
-                }
-            },
-            "params": {},
-        },
-    ),
-)
+_CONTRACT = NodeContractDescriptor(requires=(DataRequirement('callback.in', 'exactly_one', display_name='callback.in'),), provides=(DataProvider('callback.out', 'callback.out', display_name='callback.out'),), input_semantics={'callback.in': ('runtime callback',)}, output_semantics={'callback.out': ('callback result',)}, examples=({'inputs': {'callback.in': {'key': 'callback.in', 'type': 'callback.in', 'value': 1, 'source_node': 'example'}}, 'params': {}},))
 
 
-OrdinaryCallbackNode_DECLARATION = node_declaration(NodeInfo(
-        "test.callback.ordinary",
-        "Ordinary Callback",
-        "Invokes a runtime callback from an ordinary process node.",
-        "0.1.0",
-        "process",
-    ), _CONTRACT, rulesets=("vibeflow.process",))
+OrdinaryCallbackNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.callback.ordinary', display_name='Ordinary Callback', description='Invokes a runtime callback from an ordinary process node.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), _CONTRACT, rulesets=("vibeflow.process",))
 
 class OrdinaryCallbackNode:
 
@@ -162,13 +133,7 @@ class OrdinaryCallbackNode:
         return {"callback.out": value}
 
 
-GlobalStateCallbackNode_DECLARATION = node_declaration(NodeInfo(
-        "test.callback.global",
-        "Global Callback",
-        "Declares a visible runtime callback boundary.",
-        "0.1.0",
-        "global_state",
-    ), _CONTRACT, rulesets=("vibeflow.global_state",))
+GlobalStateCallbackNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.callback.global', display_name='Global Callback', description='Declares a visible runtime callback boundary.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor()), _CONTRACT, rulesets=("vibeflow.global_state",))
 
 class GlobalStateCallbackNode:
 
@@ -178,13 +143,7 @@ class GlobalStateCallbackNode:
         return {"callback.out": value}
 
 
-IoCallbackNode_DECLARATION = node_declaration(NodeInfo(
-        "test.callback.io",
-        "IO Callback",
-        "Invokes a runtime callback inside an existing IO boundary.",
-        "0.1.0",
-        "io",
-    ), _CONTRACT, rulesets=("vibeflow.io",))
+IoCallbackNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.callback.io', display_name='IO Callback', description='Invokes a runtime callback inside an existing IO boundary.', version='0.1.0', flow_kind='io', contract=NodeContractDescriptor()), _CONTRACT, rulesets=("vibeflow.io",))
 
 class IoCallbackNode:
 
@@ -194,14 +153,7 @@ class IoCallbackNode:
         return {"callback.out": value}
 
 
-ExternalCallbackNode_DECLARATION = node_declaration(NodeInfo(
-        "test.callback.external",
-        "External Callback",
-        "Represents an unavailable external callback adapter.",
-        "0.1.0",
-        "process",
-        external=True,
-    ), _CONTRACT, rulesets=("vibeflow.process",))
+ExternalCallbackNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.callback.external', display_name='External Callback', description='Represents an unavailable external callback adapter.', version='0.1.0', flow_kind='process', external=True, contract=NodeContractDescriptor()), _CONTRACT, rulesets=("vibeflow.process",))
 
 class ExternalCallbackNode:
 
@@ -215,7 +167,7 @@ class ExternalCallbackNode:
 def _check(declaration,implementation):
     from vibeflow.tooling.application.python.project.declarations import collect_node_source_context
     from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rules
-    registry=NodeRegistry()
+    registry=native_registry()
     registry.register(declaration,implementation)
     return execute_python_node_rules(registry,collect_node_source_context(registry,(declaration.type_key,))).findings
 
@@ -275,7 +227,7 @@ def test_ordinary_node_warns_without_blocking_but_visible_effect_boundaries_do_n
 
 def test_compiler_fact_records_tri_state_runtime_dispatch_and_effect_scope() -> None:
     from dataclasses import replace
-    registry=NodeRegistry()
+    registry=native_registry()
     for declaration,implementation in ((OrdinaryCallbackNode_DECLARATION,OrdinaryCallbackNode),(GlobalStateCallbackNode_DECLARATION,GlobalStateCallbackNode),(IoCallbackNode_DECLARATION,IoCallbackNode)):
         registry.register(declaration,implementation)
     registry.register(ExternalCallbackNode_DECLARATION)
@@ -310,6 +262,46 @@ def test_training_sandbox_declares_runtime_model_and_optimizer_calls_as_global_s
         assert registry.descriptor(key).flow_kind == "global_state"
     report=execute_python_node_rules(registry,context)
     assert not any(item.code == "NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED" for item in report.findings)
+
+
+def test_source_dispatch_reuses_target_trees_and_preserves_public_ast_isolation(monkeypatch):
+    import ast
+    from pathlib import Path
+    from vibeflow.tooling.project.workspace_loader import load_project_workspace
+    from vibeflow.tooling.application.python.project.declarations import declared_python_registry, collect_node_source_context
+    from vibeflow.targets.python.quality.source_context import PythonSourceFile, PythonSymbol
+    from vibeflow.targets.python.quality.source_analysis.runtime_dispatch import analyze_source_runtime_dispatch
+
+    project = Path(__file__).resolve().parents[3] / "sandbox/python/integration/project"
+    registry = declared_python_registry(load_project_workspace(project), project / "configs/pass_training_nodeset_object_flow.jsonc")
+    context = collect_node_source_context(registry, ("sandbox.forward_loss",))
+    node = next(item for item in context.nodes if item.type_key == "sandbox.forward_loss")
+    trees = {file.path: ast.dump(file._tree) for file in context.files if file._tree is not None}
+    counts = {"tree": 0, "node": 0}
+    tree_getter, node_getter = PythonSourceFile.tree.fget, PythonSymbol.node.fget
+
+    def tree_view(source):
+        counts["tree"] += 1
+        return tree_getter(source)
+
+    def node_view(symbol):
+        counts["node"] += 1
+        return node_getter(symbol)
+
+    monkeypatch.setattr(PythonSourceFile, "tree", property(tree_view))
+    monkeypatch.setattr(PythonSymbol, "node", property(node_view))
+    first = analyze_source_runtime_dispatch(context, node)
+    second = analyze_source_runtime_dispatch(context, node)
+    assert first is not None and first.detected and first == second
+    assert counts == {"tree": 0, "node": 0}
+    assert trees == {file.path: ast.dump(file._tree) for file in context.files if file._tree is not None}
+    source = context.file(node.path)
+    source.tree.body.clear()
+    symbol = context.symbol(node.path, node.symbol)
+    symbol.node.body.clear()
+    assert source.tree.body
+    assert symbol.node.body
+    assert trees[node.path] == ast.dump(source._tree)
 
 
 def _global_state_graph(*, lock_scope: str = ""):

@@ -219,6 +219,7 @@ function emitTrace(root, kind, details = {}, boundary = false) {
     workflowId: root.workflowId,
     ...details,
   });
+  root.kernelLog?.(event);
   if (!root.onTrace) return;
   try {
     root.onTrace(event);
@@ -250,6 +251,8 @@ function normalizeOptions(workflow, options) {
     signal: raw.signal,
     traceMode,
     onTrace: raw.onTrace,
+    statusUpdate: raw.__vfStatusUpdate,
+    kernelLog: raw.__vfKernelLog,
     capabilities: raw.capabilities ?? {},
     detachedTimeoutMs,
   };
@@ -656,6 +659,7 @@ function nodeContext(node, state) {
   return Object.freeze({
     signal: state.root.signal,
     capabilities: Object.freeze(allowed),
+    updateInfo(info) { state.root.statusUpdate?.(info); },
     trace(kind, details = {}) {
       emitTrace(state.root, "node_trace", {
         nodeId: node.id,
@@ -1206,6 +1210,8 @@ function createRoot(workflow, normalized) {
     signal: normalized.signal || new AbortController().signal,
     traceMode: normalized.traceMode,
     onTrace: normalized.onTrace,
+    statusUpdate: normalized.statusUpdate,
+    kernelLog: normalized.kernelLog,
     detachedTimeoutMs: normalized.detachedTimeoutMs,
     detached: new Set(),
     detachedFailure: null,

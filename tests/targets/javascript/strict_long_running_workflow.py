@@ -1,15 +1,15 @@
 from __future__ import annotations
-from tests.fixtures.support.declarations import node_declaration, configured_declaration
+from tests.fixtures.support.declarations import configured_declaration, native_registry
 
 import json
 from pathlib import Path
 import subprocess
 
-from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
+from tests.targets.javascript.aot_fixtures import emit_fixture
 from vibeflow.targets.python.project.compiler import GraphCompiler
 from vibeflow.core.contracts import DataProvider, DataRequirement
 from vibeflow.tooling.project.graph_config import parse_graph_config
-from vibeflow.targets.python.project.node import NodeContract, NodeInfo
+from vibeflow.core.descriptors import NodeContractDescriptor, NodeDescriptor
 from vibeflow.targets.python.project.registry import NodeRegistry
 from vibeflow.targets.python.runtime import PipelineRuntime
 
@@ -79,18 +79,16 @@ def _empty_sync_plan(node_module: Path) -> dict[str, object]:
     }
 
 
-_DoubleNode_DECLARATION = node_declaration(NodeInfo(
-        "test.double",
-        "Double",
-        "Doubles a number.",
-        "1",
-        "process",
-    ), NodeContract(
+_DoubleNode_DECLARATION = NodeDescriptor(
+    "test.double", "Double", "Doubles a number.", "1", "process",
+    contract=NodeContractDescriptor(
         requires=(DataRequirement("number", "exactly_one", display_name="number"),),
         provides=(DataProvider("answer", "answer", display_name="answer"),),
         input_semantics={"number": ("number to double",)},
         output_semantics={"answer": ("doubled number",)},
-    ), rulesets=("vibeflow.process",))
+    ),
+    rulesets=("vibeflow.process",),
+)
 
 class _DoubleNode:
 
@@ -152,7 +150,7 @@ def test_python_port_nodes_receive_transform_and_send(
             }
         }
     )
-    registry = NodeRegistry()
+    registry = native_registry()
     registry.register(configured_declaration(_DoubleNode_DECLARATION, {}, {}), _DoubleNode)
     sent: list[dict[str, object]] = []
     runtime = PipelineRuntime(
@@ -305,7 +303,7 @@ export function double(inputs) {
         "order": ["receive", "double", "send"],
         "max_steps": 10,
     }
-    emitted = emit_workflow_module(plan)
+    emitted = emit_fixture(plan)
     workflow = tmp_path / "workflow.mjs"
     workflow.write_text(emitted.source, encoding="utf-8")
 
@@ -445,7 +443,7 @@ export function createHostExtension() {
         "order": ["run"],
         "max_steps": 5,
     }
-    emitted = emit_workflow_module(
+    emitted = emit_fixture(
         plan,
         host_extensions=(
             {
@@ -524,7 +522,7 @@ export function createHostExtension() {
     )
     plan = _empty_sync_plan(node_module)
     plan["entry_mode"] = "async"
-    emitted = emit_workflow_module(
+    emitted = emit_fixture(
         plan,
         host_extensions=(
             {
@@ -606,7 +604,7 @@ export function createHostExtension(context) {
 """,
         encoding="utf-8",
     )
-    emitted = emit_workflow_module(
+    emitted = emit_fixture(
         _empty_sync_plan(node_module),
         host_extensions=(
             {
@@ -696,7 +694,7 @@ export function createHostExtension() {
 """,
         encoding="utf-8",
     )
-    emitted = emit_workflow_module(
+    emitted = emit_fixture(
         _empty_sync_plan(node_module),
         host_extensions=(
             {

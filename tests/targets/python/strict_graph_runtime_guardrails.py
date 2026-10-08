@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tests.fixtures.support.declarations import native_registry
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 
 import json
@@ -6,13 +7,14 @@ import re
 
 from vibeflow.core import DataProvider, DataRequirement
 from vibeflow.tooling.project.graph_config import parse_graph_config
-from vibeflow.targets.python.project import NodeContract, NodeInfo, NodeRegistry
+from vibeflow.targets.python.project import NodeRegistry
+from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from vibeflow.targets.python.quality import validate_graph_health
 from vibeflow.targets.python.runtime import PipelineRuntime, RuntimeOptions
 from vibeflow.targets.python.quality.source_analysis.types import PurityPolicy
 from vibeflow.core.rules.models import plain
 
-from tests.fixtures.support.strict_support import PROV_SPEC, REQ_SPEC, _edge_chain, _node_call, _registry
+from tests.fixtures.support.strict_support import INPUT_SPEC, PROV_SPEC, REQ_SPEC, _edge_chain, _node_call, _registry
 
 
 def _env(inputs, data_type: str):
@@ -27,7 +29,7 @@ def _prov(key: str) -> DataProvider:
     return DataProvider(key, key, display_name=key)
 
 
-GuideStart_DECLARATION = node_declaration(NodeInfo("guide.start", "Start", "Starts a neutral guide flow.", "1.0.0", "terminal"), NodeContract(examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+GuideStart_DECLARATION = node_declaration(NodeDescriptor(type_key='guide.start', display_name='Start', description='Starts a neutral guide flow.', version='1.0.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(examples=({'inputs': {}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class GuideStart:
 
@@ -35,12 +37,7 @@ class GuideStart:
         return {}
 
 
-GuardSecond_DECLARATION = node_declaration(NodeInfo("guard.second", "Guard Second", "Requires both the original and first result for a guardrail fixture.", "1.0.0", "process"), NodeContract(
-        requires=(_req("value.in"), _req("value.out")),
-        provides=(DataProvider("value.final", "value.in", display_name="Value Final"),),
-        input_semantics={"value.in": ("original value",), "value.out": ("first result",)},
-        output_semantics={"value.final": ("final value compatible with value.in",)},
-    ), rulesets=("vibeflow.process",))
+GuardSecond_DECLARATION = node_declaration(NodeDescriptor(type_key='guard.second', display_name='Guard Second', description='Requires both the original and first result for a guardrail fixture.', version='1.0.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(_req('value.in'), _req('value.out')), provides=(DataProvider('value.final', 'value.in', display_name='Value Final'),), input_semantics={'value.in': ('original value',), 'value.out': ('first result',)}, output_semantics={'value.final': ('final value compatible with value.in',)}), rulesets=("vibeflow.process",))
 
 class GuardSecond:
 
@@ -48,12 +45,7 @@ class GuardSecond:
         return {"value.final": _env(inputs, "value.out")}
 
 
-GuardNormalize_DECLARATION = node_declaration(NodeInfo("guard.normalize", "Guard Normalize", "Normalizes value.out into a value.in-compatible key.", "1.0.0", "process"), NodeContract(
-        requires=(_req("value.out"),),
-        provides=(DataProvider("value.normalized", "value.in", display_name="Value Normalized"),),
-        input_semantics={"value.out": ("value to normalize",)},
-        output_semantics={"value.normalized": ("normalized value",)},
-    ), rulesets=("vibeflow.process",))
+GuardNormalize_DECLARATION = node_declaration(NodeDescriptor(type_key='guard.normalize', display_name='Guard Normalize', description='Normalizes value.out into a value.in-compatible key.', version='1.0.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(_req('value.out'),), provides=(DataProvider('value.normalized', 'value.in', display_name='Value Normalized'),), input_semantics={'value.out': ('value to normalize',)}, output_semantics={'value.normalized': ('normalized value',)}), rulesets=("vibeflow.process",))
 
 class GuardNormalize:
 
@@ -61,12 +53,7 @@ class GuardNormalize:
         return {"value.normalized": _env(inputs, "value.out")}
 
 
-GuardConsume_DECLARATION = node_declaration(NodeInfo("guard.consume", "Guard Consume", "Consumes a mainline and bypassed value.", "1.0.0", "process"), NodeContract(
-        requires=(_req("value.in"), _req("value.out")),
-        provides=(DataProvider("value.final", "value.out", display_name="Value Final"),),
-        input_semantics={"value.in": ("mainline normalized value",), "value.out": ("bypassed result",)},
-        output_semantics={"value.final": ("combined final value",)},
-    ), rulesets=("vibeflow.process",))
+GuardConsume_DECLARATION = node_declaration(NodeDescriptor(type_key='guard.consume', display_name='Guard Consume', description='Consumes a mainline and bypassed value.', version='1.0.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(_req('value.in'), _req('value.out')), provides=(DataProvider('value.final', 'value.out', display_name='Value Final'),), input_semantics={'value.in': ('mainline normalized value',), 'value.out': ('bypassed result',)}, output_semantics={'value.final': ('combined final value',)}), rulesets=("vibeflow.process",))
 
 class GuardConsume:
 
@@ -74,7 +61,7 @@ class GuardConsume:
         return {"value.final": _env(inputs, "value.in")}
 
 
-GuideEnd_DECLARATION = node_declaration(NodeInfo("guide.end", "End", "Ends a neutral guide flow.", "1.0.0", "terminal"), NodeContract(examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+GuideEnd_DECLARATION = node_declaration(NodeDescriptor(type_key='guide.end', display_name='End', description='Ends a neutral guide flow.', version='1.0.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(examples=({'inputs': {}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class GuideEnd:
 
@@ -82,12 +69,7 @@ class GuideEnd:
         return {}
 
 
-GuideRoute_DECLARATION = node_declaration(NodeInfo("guide.route", "Route", "Selects a neutral branch.", "1.0.0", "decision"), NodeContract(
-        provides=(_prov("flow.route"),),
-        output_semantics={"flow.route": ("selected branch",)},
-
-        examples=({"inputs": {}, "params": {}},),
-    ), rulesets=("vibeflow.process",))
+GuideRoute_DECLARATION = node_declaration(NodeDescriptor(type_key='guide.route', display_name='Route', description='Selects a neutral branch.', version='1.0.0', flow_kind='decision', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(_prov('flow.route'),), output_semantics={'flow.route': ('selected branch',)}, examples=({'inputs': {}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class GuideRoute:
 
@@ -95,12 +77,7 @@ class GuideRoute:
         return {"flow.route": "left"}
 
 
-GuideSource_DECLARATION = node_declaration(NodeInfo("guide.source", "Source", "Produces two neutral values.", "1.0.0", "io"), NodeContract(
-        provides=(_prov("record.original"), _prov("record.current")),
-        output_semantics={"record.original": ("original record",), "record.current": ("current record",)},
-
-        examples=({"inputs": {}, "params": {}},),
-    ), rulesets=("vibeflow.io",))
+GuideSource_DECLARATION = node_declaration(NodeDescriptor(type_key='guide.source', display_name='Source', description='Produces two neutral values.', version='1.0.0', flow_kind='io', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(_prov('record.original'), _prov('record.current')), output_semantics={'record.original': ('original record',), 'record.current': ('current record',)}, examples=({'inputs': {}, 'params': {}},)), rulesets=("vibeflow.io",))
 
 class GuideSource:
 
@@ -108,14 +85,7 @@ class GuideSource:
         return {"record.original": " Alpha ", "record.current": " Alpha "}
 
 
-GuideNormalize_DECLARATION = node_declaration(NodeInfo("guide.normalize", "Normalize", "Normalizes one value.", "1.0.0", "process"), NodeContract(
-        requires=(_req("record.current"),),
-        provides=(_prov("record.normalized"),),
-        input_semantics={"record.current": ("current record",)},
-        output_semantics={"record.normalized": ("normalized record",)},
-
-        examples=({"inputs": {"record.current": {"key": "record.current", "type": "record.current", "value": " A ", "source_node": "example"}}, "params": {}},),
-    ), rulesets=("vibeflow.process",))
+GuideNormalize_DECLARATION = node_declaration(NodeDescriptor(type_key='guide.normalize', display_name='Normalize', description='Normalizes one value.', version='1.0.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(_req('record.current'),), provides=(_prov('record.normalized'),), input_semantics={'record.current': ('current record',)}, output_semantics={'record.normalized': ('normalized record',)}, examples=({'inputs': {'record.current': {'key': 'record.current', 'type': 'record.current', 'value': ' A ', 'source_node': 'example'}}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class GuideNormalize:
 
@@ -123,14 +93,7 @@ class GuideNormalize:
         return {"record.normalized": str(_env(inputs, "record.current")).strip().lower()}
 
 
-GuideCombine_DECLARATION = node_declaration(NodeInfo("guide.combine", "Combine", "Combines two values.", "1.0.0", "process"), NodeContract(
-        requires=(_req("record.original"), _req("record.normalized")),
-        provides=(_prov("semantic.combined"),),
-        input_semantics={"record.original": ("original record",), "record.normalized": ("normalized record",)},
-        output_semantics={"semantic.combined": ("combined record",)},
-
-        examples=({"inputs": {"record.original": {"key": "record.original", "type": "record.original", "value": " A ", "source_node": "example"}, "record.normalized": {"key": "record.normalized", "type": "record.normalized", "value": "a", "source_node": "example"}}, "params": {}},),
-    ), rulesets=("vibeflow.process",))
+GuideCombine_DECLARATION = node_declaration(NodeDescriptor(type_key='guide.combine', display_name='Combine', description='Combines two values.', version='1.0.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(_req('record.original'), _req('record.normalized')), provides=(_prov('semantic.combined'),), input_semantics={'record.original': ('original record',), 'record.normalized': ('normalized record',)}, output_semantics={'semantic.combined': ('combined record',)}, examples=({'inputs': {'record.original': {'key': 'record.original', 'type': 'record.original', 'value': ' A ', 'source_node': 'example'}, 'record.normalized': {'key': 'record.normalized', 'type': 'record.normalized', 'value': 'a', 'source_node': 'example'}}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class GuideCombine:
 
@@ -138,14 +101,7 @@ class GuideCombine:
         return {"semantic.combined": [_env(inputs, "record.original"), _env(inputs, "record.normalized")]}
 
 
-GuideOutputValue_DECLARATION = node_declaration(NodeInfo("guide.output_value", "Output Value", "Adapts a combined value.", "1.0.0", "io"), NodeContract(
-        requires=(_req("semantic.combined"),),
-        provides=(_prov("response.value"),),
-        input_semantics={"semantic.combined": ("combined record",)},
-        output_semantics={"response.value": ("external response",)},
-
-        examples=({"inputs": {"semantic.combined": {"key": "semantic.combined", "type": "semantic.combined", "value": ["A", "a"], "source_node": "example"}}, "params": {}},),
-    ), rulesets=("vibeflow.io",))
+GuideOutputValue_DECLARATION = node_declaration(NodeDescriptor(type_key='guide.output_value', display_name='Output Value', description='Adapts a combined value.', version='1.0.0', flow_kind='io', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(_req('semantic.combined'),), provides=(_prov('response.value'),), input_semantics={'semantic.combined': ('combined record',)}, output_semantics={'response.value': ('external response',)}, examples=({'inputs': {'semantic.combined': {'key': 'semantic.combined', 'type': 'semantic.combined', 'value': ['A', 'a'], 'source_node': 'example'}}, 'params': {}},)), rulesets=("vibeflow.io",))
 
 class GuideOutputValue:
 
@@ -153,7 +109,7 @@ class GuideOutputValue:
         return {"response.value": _env(inputs, "semantic.combined")}
 
 
-GuideLeft_DECLARATION = node_declaration(NodeInfo("guide.left", "Left", "Produces the left branch.", "1.0.0", "process"), NodeContract(provides=(_prov("branch.left"),), output_semantics={"branch.left": ("left value",)}, examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+GuideLeft_DECLARATION = node_declaration(NodeDescriptor(type_key='guide.left', display_name='Left', description='Produces the left branch.', version='1.0.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(_prov('branch.left'),), output_semantics={'branch.left': ('left value',)}, examples=({'inputs': {}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class GuideLeft:
 
@@ -161,7 +117,7 @@ class GuideLeft:
         return {"branch.left": 2}
 
 
-GuideRight_DECLARATION = node_declaration(NodeInfo("guide.right", "Right", "Produces the right branch.", "1.0.0", "process"), NodeContract(provides=(_prov("branch.right"),), output_semantics={"branch.right": ("right value",)}, examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+GuideRight_DECLARATION = node_declaration(NodeDescriptor(type_key='guide.right', display_name='Right', description='Produces the right branch.', version='1.0.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(_prov('branch.right'),), output_semantics={'branch.right': ('right value',)}, examples=({'inputs': {}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class GuideRight:
 
@@ -169,14 +125,7 @@ class GuideRight:
         return {"branch.right": 3}
 
 
-GuideMerge_DECLARATION = node_declaration(NodeInfo("guide.merge", "Merge", "Merges two branches.", "1.0.0", "process"), NodeContract(
-        requires=(_req("branch.left"), _req("branch.right")),
-        provides=(_prov("semantic.merged"),),
-        input_semantics={"branch.left": ("left value",), "branch.right": ("right value",)},
-        output_semantics={"semantic.merged": ("merged value",)},
-
-        examples=({"inputs": {"branch.left": {"key": "branch.left", "type": "branch.left", "value": 2, "source_node": "example"}, "branch.right": {"key": "branch.right", "type": "branch.right", "value": 3, "source_node": "example"}}, "params": {}},),
-    ), rulesets=("vibeflow.process",))
+GuideMerge_DECLARATION = node_declaration(NodeDescriptor(type_key='guide.merge', display_name='Merge', description='Merges two branches.', version='1.0.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(_req('branch.left'), _req('branch.right')), provides=(_prov('semantic.merged'),), input_semantics={'branch.left': ('left value',), 'branch.right': ('right value',)}, output_semantics={'semantic.merged': ('merged value',)}, examples=({'inputs': {'branch.left': {'key': 'branch.left', 'type': 'branch.left', 'value': 2, 'source_node': 'example'}, 'branch.right': {'key': 'branch.right', 'type': 'branch.right', 'value': 3, 'source_node': 'example'}}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class GuideMerge:
 
@@ -184,14 +133,7 @@ class GuideMerge:
         return {"semantic.merged": _env(inputs, "branch.left") + _env(inputs, "branch.right")}
 
 
-GuideOutputMerged_DECLARATION = node_declaration(NodeInfo("guide.output_merged", "Output Merged", "Adapts a merged value.", "1.0.0", "io"), NodeContract(
-        requires=(_req("semantic.merged"),),
-        provides=(_prov("response.value"),),
-        input_semantics={"semantic.merged": ("merged value",)},
-        output_semantics={"response.value": ("external response",)},
-
-        examples=({"inputs": {"semantic.merged": {"key": "semantic.merged", "type": "semantic.merged", "value": 5, "source_node": "example"}}, "params": {}},),
-    ), rulesets=("vibeflow.io",))
+GuideOutputMerged_DECLARATION = node_declaration(NodeDescriptor(type_key='guide.output_merged', display_name='Output Merged', description='Adapts a merged value.', version='1.0.0', flow_kind='io', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(_req('semantic.merged'),), provides=(_prov('response.value'),), input_semantics={'semantic.merged': ('merged value',)}, output_semantics={'response.value': ('external response',)}, examples=({'inputs': {'semantic.merged': {'key': 'semantic.merged', 'type': 'semantic.merged', 'value': 5, 'source_node': 'example'}}, 'params': {}},)), rulesets=("vibeflow.io",))
 
 class GuideOutputMerged:
 
@@ -199,14 +141,7 @@ class GuideOutputMerged:
         return {"response.value": _env(inputs, "semantic.merged")}
 
 
-GuideInput_DECLARATION = node_declaration(NodeInfo("guide.input", "Input", "Decodes an external value.", "1.0.0", "io"), NodeContract(
-        requires=(_req("request.raw"),),
-        provides=(_prov("input.text"),),
-        input_semantics={"request.raw": ("raw request",)},
-        output_semantics={"input.text": ("decoded text",)},
-
-        examples=({"inputs": {"request.raw": {"key": "request.raw", "type": "request.raw", "value": "7", "source_node": "example"}}, "params": {}},),
-    ), rulesets=("vibeflow.io",))
+GuideInput_DECLARATION = node_declaration(NodeDescriptor(type_key='guide.input', display_name='Input', description='Decodes an external value.', version='1.0.0', flow_kind='io', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(_req('request.raw'),), provides=(_prov('input.text'),), input_semantics={'request.raw': ('raw request',)}, output_semantics={'input.text': ('decoded text',)}, examples=({'inputs': {'request.raw': {'key': 'request.raw', 'type': 'request.raw', 'value': '7', 'source_node': 'example'}}, 'params': {}},)), rulesets=("vibeflow.io",))
 
 class GuideInput:
 
@@ -214,14 +149,7 @@ class GuideInput:
         return {"input.text": str(_env(inputs, "request.raw"))}
 
 
-GuideSemantic_DECLARATION = node_declaration(NodeInfo("guide.semantic", "Semantic", "Builds a typed value.", "1.0.0", "process"), NodeContract(
-        requires=(_req("input.text"),),
-        provides=(_prov("semantic.number"),),
-        input_semantics={"input.text": ("decoded text",)},
-        output_semantics={"semantic.number": ("typed number",)},
-
-        examples=({"inputs": {"input.text": {"key": "input.text", "type": "input.text", "value": "7", "source_node": "example"}}, "params": {}},),
-    ), rulesets=("vibeflow.process",))
+GuideSemantic_DECLARATION = node_declaration(NodeDescriptor(type_key='guide.semantic', display_name='Semantic', description='Builds a typed value.', version='1.0.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(_req('input.text'),), provides=(_prov('semantic.number'),), input_semantics={'input.text': ('decoded text',)}, output_semantics={'semantic.number': ('typed number',)}, examples=({'inputs': {'input.text': {'key': 'input.text', 'type': 'input.text', 'value': '7', 'source_node': 'example'}}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class GuideSemantic:
 
@@ -229,14 +157,7 @@ class GuideSemantic:
         return {"semantic.number": int(_env(inputs, "input.text"))}
 
 
-GuideOutputNumber_DECLARATION = node_declaration(NodeInfo("guide.output_number", "Output Number", "Adapts a typed number.", "1.0.0", "io"), NodeContract(
-        requires=(_req("semantic.number"),),
-        provides=(_prov("response.number"),),
-        input_semantics={"semantic.number": ("typed number",)},
-        output_semantics={"response.number": ("external number",)},
-
-        examples=({"inputs": {"semantic.number": {"key": "semantic.number", "type": "semantic.number", "value": 7, "source_node": "example"}}, "params": {}},),
-    ), rulesets=("vibeflow.io",))
+GuideOutputNumber_DECLARATION = node_declaration(NodeDescriptor(type_key='guide.output_number', display_name='Output Number', description='Adapts a typed number.', version='1.0.0', flow_kind='io', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(_req('semantic.number'),), provides=(_prov('response.number'),), input_semantics={'semantic.number': ('typed number',)}, output_semantics={'response.number': ('external number',)}, examples=({'inputs': {'semantic.number': {'key': 'semantic.number', 'type': 'semantic.number', 'value': 7, 'source_node': 'example'}}, 'params': {}},)), rulesets=("vibeflow.io",))
 
 class GuideOutputNumber:
 
@@ -245,7 +166,7 @@ class GuideOutputNumber:
 
 
 def _guide_registry() -> NodeRegistry:
-    registry = NodeRegistry()
+    registry = native_registry()
     for node_cls in (
         GuideStart,
         GuideEnd,
@@ -281,25 +202,23 @@ def _health(pipeline: dict):
 def test_runtime_guardrails_reject_empty_start_shortcut_and_transfer_only_all_join() -> None:
     report = _health(
         {
-            "inputs": [PROV_SPEC("value.in")],
+            "inputs": [INPUT_SPEC("value.in")],
             "nodes": [
                 _node_call("start", "test.start", "Starts the sequential workflow."),
                 _node_call(
                     "first",
                     "test.add",
                     "Consumes the injected input and produces the first semantic result.",
-                    requires=[REQ_SPEC("value.in")],
-                    provides=[PROV_SPEC("value.out")],
+
                 ),
                 _node_call(
                     "second",
                     "guard.second",
                     "Needs both the original input and the first result.",
-                    requires=[REQ_SPEC("value.in"), REQ_SPEC("value.out")],
-                    provides=[PROV_SPEC("value.final", "value.in")],
+
                     join_policy="all",
                 ),
-                _node_call("end", "test.in_end", "Ends after the final value.", requires=[REQ_SPEC("value.in")]),
+                _node_call("end", "test.in_end", "Ends after the final value."),
             ],
             "edges": [
                 {"from": "start", "to": "first"},
@@ -328,31 +247,28 @@ def test_runtime_guardrails_reject_empty_start_shortcut_and_transfer_only_all_jo
 def test_runtime_guardrails_allow_payload_bypass_on_a_sequential_control_spine() -> None:
     report = _health(
         {
-            "inputs": [PROV_SPEC("value.in")],
+            "inputs": [INPUT_SPEC("value.in")],
             "nodes": [
                 _node_call("start", "test.start", "Starts the sequential workflow."),
                 _node_call(
                     "produce",
                     "test.add",
                     "Produces a value that is needed again downstream.",
-                    requires=[REQ_SPEC("value.in")],
-                    provides=[PROV_SPEC("value.out")],
+
                 ),
                 _node_call(
                     "normalize",
                     "guard.normalize",
                     "Produces the mainline value.",
-                    requires=[REQ_SPEC("value.out")],
-                    provides=[PROV_SPEC("value.normalized", "value.in")],
+
                 ),
                 _node_call(
                     "consume",
                     "guard.consume",
                     "Consumes one mainline value and one legitimate bypassed value.",
-                    requires=[REQ_SPEC("value.in"), REQ_SPEC("value.out")],
-                    provides=[PROV_SPEC("value.final", "value.out")],
+
                 ),
-                _node_call("end", "test.out_end", "Ends after the final value.", requires=[REQ_SPEC("value.out")]),
+                _node_call("end", "test.out_end", "Ends after the final value."),
             ],
             "edges": [
                 *_edge_chain("start", "produce", "normalize", "consume", "end"),
@@ -374,16 +290,15 @@ def test_join_policy_all_with_one_real_predecessor_is_redundant() -> None:
         {
             "nodes": [
                 _node_call("start", "test.start", "Starts the single-predecessor workflow."),
-                _node_call("seed", "test.seed", "Produces the only input.", provides=[PROV_SPEC("value.in")]),
+                _node_call("seed", "test.seed", "Produces the only input."),
                 _node_call(
                     "join",
                     "test.add",
                     "Has no parallel branches to join.",
-                    requires=[REQ_SPEC("value.in")],
-                    provides=[PROV_SPEC("value.out")],
+
                     join_policy="all",
                 ),
-                _node_call("end", "test.out_end", "Ends after the output.", requires=[REQ_SPEC("value.out")]),
+                _node_call("end", "test.out_end", "Ends after the output."),
             ],
             "edges": _edge_chain("start", "seed", "join", "end"),
         }
@@ -400,17 +315,16 @@ def test_join_policy_all_with_two_parallel_schedule_branches_remains_legal() -> 
         {
             "nodes": [
                 _node_call("start", "test.start", "Starts two real branches."),
-                _node_call("left", "test.seed", "Produces the left value.", provides=[PROV_SPEC("value.left", "value.in")]),
-                _node_call("right", "test.seed", "Produces the right value.", provides=[PROV_SPEC("value.right", "value.out")]),
+                _node_call("left", "test.seed", "Produces the left value."),
+                _node_call("right", "test.seed", "Produces the right value."),
                 _node_call(
                     "join",
                     "test.add",
                     "Waits for both real branches.",
-                    requires=[REQ_SPEC("value.in"), REQ_SPEC("value.out")],
-                    provides=[PROV_SPEC("value.final", "value.out")],
+
                     join_policy="all",
                 ),
-                _node_call("end", "test.out_end", "Ends after the output.", requires=[REQ_SPEC("value.out")]),
+                _node_call("end", "test.out_end", "Ends after the output."),
             ],
             "edges": [
                 {"from": "start", "to": "left"},
@@ -440,34 +354,32 @@ def _guide_decision_join_health(*, left_when: str, right_when: str):
                         "route",
                         "guide.route",
                         "Selects one or more branches.",
-                        provides=[PROV_SPEC("flow.route")],
+
                     ),
                     _node_call(
                         "left",
                         "guide.left",
                         "Produces the left branch value.",
-                        provides=[PROV_SPEC("branch.left")],
+
                     ),
                     _node_call(
                         "right",
                         "guide.right",
                         "Produces the right branch value.",
-                        provides=[PROV_SPEC("branch.right")],
+
                     ),
                     _node_call(
                         "merge",
                         "guide.merge",
                         "Waits for both schedule branches.",
-                        requires=[REQ_SPEC("branch.left"), REQ_SPEC("branch.right")],
-                        provides=[PROV_SPEC("semantic.merged")],
+
                         join_policy="all",
                     ),
                     _node_call(
                         "output",
                         "guide.output_merged",
                         "Adapts the merged result.",
-                        requires=[REQ_SPEC("semantic.merged")],
-                        provides=[PROV_SPEC("response.value")],
+
                     ),
                     _node_call("end", "guide.end", "Ends after output adaptation."),
                 ],

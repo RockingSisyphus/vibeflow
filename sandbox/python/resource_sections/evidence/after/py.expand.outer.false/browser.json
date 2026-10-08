@@ -1,0 +1,943 @@
+{
+  "root": "flowchart-review-columns",
+  "titles": [
+    {
+      "text": "main pipeline",
+      "x": 9.54011344909668,
+      "y": 411.7132873535156,
+      "width": 55.956298828125,
+      "height": 10
+    },
+    {
+      "text": "Plugins",
+      "x": 263.6855773925781,
+      "y": 411.7132873535156,
+      "width": 31.685089111328125,
+      "height": 10
+    },
+    {
+      "text": "BaseLib",
+      "x": 929.3450927734375,
+      "y": 411.7132873535156,
+      "width": 33.984375,
+      "height": 10
+    },
+    {
+      "text": "Node types",
+      "x": 1469.3333740234375,
+      "y": 411.7132873535156,
+      "width": 47.221923828125,
+      "height": 10
+    }
+  ],
+  "fragments": [
+    {
+      "title": "main pipeline",
+      "nodes": [
+        "vf_column_0_0_my-svg-flowchart-start-0",
+        "vf_column_0_0_my-svg-flowchart-outer_a-3",
+        "vf_column_0_0_my-svg-flowchart-outer_b-6",
+        "vf_column_0_0_my-svg-flowchart-loop-9",
+        "vf_column_0_0_my-svg-flowchart-n_end-12"
+      ]
+    },
+    {
+      "title": "Plugins",
+      "nodes": [
+        "vf_column_1_0_my-svg-flowchart-vf_resource_91969cdf748e3d12-0",
+        "vf_column_1_0_my-svg-flowchart-vf_resource_8e07ce426a914cef-3",
+        "vf_column_1_0_my-svg-flowchart-vf_resource_2c1992e5b1861ce2-5",
+        "vf_column_1_0_my-svg-flowchart-vf_resource_f590f4b2283e3d79-7",
+        "vf_column_1_0_my-svg-flowchart-vf_resource_6958e9af4f4547e3-17",
+        "vf_column_1_0_my-svg-flowchart-vf_resource_bd1a7a610076b77e-19",
+        "vf_column_1_0_my-svg-flowchart-vf_resource_9c5ce4c56f5b1d5b-21",
+        "vf_column_1_0_my-svg-flowchart-vf_resource_1c84a8c49e991bd1-23",
+        "vf_column_1_0_my-svg-flowchart-vf_resource_a0f9d4ca6918a406-26",
+        "vf_column_1_0_my-svg-flowchart-vf_resource_f811475aac7fc582-29",
+        "vf_column_1_0_my-svg-flowchart-vf_resource_576b998f88b73426-32",
+        "vf_column_1_0_my-svg-flowchart-vf_resource_8924c954971c85dc-35",
+        "vf_column_1_0_my-svg-flowchart-vf_resource_f07a2e4205f2b586-38",
+        "vf_column_1_0_my-svg-flowchart-vf_resource_6a1e1bef142d6065-41"
+      ]
+    },
+    {
+      "title": "BaseLib",
+      "nodes": [
+        "vf_column_2_0_my-svg-flowchart-vf_resource_652b902b3d78d7ec-0",
+        "vf_column_2_0_my-svg-flowchart-vf_resource_881d43c74247bbc8-3",
+        "vf_column_2_0_my-svg-flowchart-vf_resource_257b6829e46b5417-7",
+        "vf_column_2_0_my-svg-flowchart-vf_resource_8d9e9be4e44a8cca-9",
+        "vf_column_2_0_my-svg-flowchart-vf_resource_47600e6a75b05c46-12",
+        "vf_column_2_0_my-svg-flowchart-vf_resource_98598161dbf506ec-15",
+        "vf_column_2_0_my-svg-flowchart-vf_resource_229fdbcff52877ed-18",
+        "vf_column_2_0_my-svg-flowchart-vf_resource_3aa1fb8de781ffab-21"
+      ]
+    },
+    {
+      "title": "Node types",
+      "nodes": [
+        "vf_column_3_0_my-svg-flowchart-vf_resource_8828ae20c0722c04-0",
+        "vf_column_3_0_my-svg-flowchart-vf_resource_201270386322ba37-3",
+        "vf_column_3_0_my-svg-flowchart-vf_resource_286b9861cfcdf05e-5",
+        "vf_column_3_0_my-svg-flowchart-vf_resource_34eba124b12ad35c-7",
+        "vf_column_3_0_my-svg-flowchart-vf_resource_136d12bd71b43a38-9",
+        "vf_column_3_0_my-svg-flowchart-vf_resource_93c9a4897872eb3f-22",
+        "vf_column_3_0_my-svg-flowchart-vf_resource_570d017a94ba83bb-24",
+        "vf_column_3_0_my-svg-flowchart-vf_resource_5f9cb2be0a22a716-27",
+        "vf_column_3_0_my-svg-flowchart-vf_resource_e1ed7abbe2c426bc-30",
+        "vf_column_3_0_my-svg-flowchart-vf_resource_c2362041487afc77-33"
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "vf_column_0_0_my-svg-flowchart-start-0",
+      "text": "startid: starttype_used: layout.startrulesets: vibeflow.process, layout.health_set---------- source ----------root: layoutpath: workflow.jsonc---------- meta ----------desc: Layout fixture startflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "main pipeline"
+      ],
+      "x": 48.392704010009766,
+      "y": 434.0234680175781,
+      "width": 150.9998016357422,
+      "height": 83.07846069335938,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 150.9998016357422,
+          "height": 83.07846069335938
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 150.9998016357422,
+          "height": 83.07846069335938
+        }
+      ]
+    },
+    {
+      "id": "vf_column_0_0_my-svg-flowchart-outer_a-3",
+      "text": "outer_aid: outer_atype_used: layout.outer---------- source ----------root: layoutpath: outer.jsonc---------- call ----------flow_kind: predefinedrulesets: vibeflow.workflowdesc: Layout fixture outer_aeffect_scope: unconstrainedruntime_dispatch: unknown---------- nodeset ----------type_key: layout.outerdesc: A concrete layout fixture body.",
+      "fragments": [
+        "main pipeline"
+      ],
+      "x": 67.05252838134766,
+      "y": 552.8773803710938,
+      "width": 113.6801528930664,
+      "height": 110.66534423828125,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(237, 233, 254)",
+          "stroke": "rgb(124, 58, 237)",
+          "rx": null,
+          "width": 113.6801528930664,
+          "height": 110.66534423828125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_0_0_my-svg-flowchart-outer_b-6",
+      "text": "outer_bid: outer_btype_used: layout.outer---------- source ----------root: layoutpath: outer.jsonc---------- call ----------flow_kind: predefinedrulesets: vibeflow.workflowdesc: Layout fixture outer_beffect_scope: unconstrainedruntime_dispatch: unknown---------- nodeset ----------type_key: layout.outerdesc: A concrete layout fixture body.",
+      "fragments": [
+        "main pipeline"
+      ],
+      "x": 67.05252838134766,
+      "y": 699.318115234375,
+      "width": 113.6801528930664,
+      "height": 110.66534423828125,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(239, 224, 248)",
+          "stroke": "rgb(124, 58, 237)",
+          "rx": null,
+          "width": 113.6801528930664,
+          "height": 110.66534423828125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_0_0_my-svg-flowchart-loop-9",
+      "text": "loopid: looptype_used: vibeflow.loop.while---------- source ----------root: layoutpath: outer.jsonc---------- loop ----------body: layout.outerstop: stop_after: 1max: 1---------- meta ----------flow_kind: predefinedrulesets: vibeflow.workflowdesc: Layout fixture loopeffect_scope: unconstrainedruntime_dispatch: unknown",
+      "fragments": [
+        "main pipeline"
+      ],
+      "x": 19.080228805541992,
+      "y": 845.7589111328125,
+      "width": 209.624755859375,
+      "height": 118.05889892578125,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(240, 253, 250)",
+          "stroke": "rgb(15, 118, 110)",
+          "rx": null,
+          "width": 209.624755859375,
+          "height": 118.05889892578125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_0_0_my-svg-flowchart-n_end-12",
+      "text": "endid: endtype_used: layout.endrulesets: vibeflow.process, layout.health_set---------- source ----------root: layoutpath: workflow.jsonc---------- meta ----------desc: Layout fixture endflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "main pipeline"
+      ],
+      "x": 48.392704010009766,
+      "y": 999.59326171875,
+      "width": 150.9998016357422,
+      "height": 83.0784912109375,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 150.9998016357422,
+          "height": 83.0784912109375
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 150.9998016357422,
+          "height": 83.0784912109375
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-vf_resource_91969cdf748e3d12-0",
+      "text": "Plugins",
+      "fragments": [
+        "Plugins"
+      ],
+      "x": 273.2256774902344,
+      "y": 477.27197265625,
+      "width": 33.185455322265625,
+      "height": 12.72015380859375,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 33.185455322265625,
+          "height": 12.72015380859375
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-vf_resource_8e07ce426a914cef-3",
+      "text": "Layout lifecycleplugin: layout.resources.compilerstatus: implementedrulesets: vibeflow.plugin",
+      "fragments": [
+        "Plugins"
+      ],
+      "x": 567.5875854492188,
+      "y": 434.0234680175781,
+      "width": 116.0595703125,
+      "height": 33.708404541015625,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(217, 230, 255)",
+          "stroke": "rgb(37, 99, 235)",
+          "rx": null,
+          "width": 116.0595703125,
+          "height": 33.708404541015625
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-vf_resource_2c1992e5b1861ce2-5",
+      "text": "Layout lifecycleplugin: layout.resources.runtimestatus: implementedrulesets: vibeflow.plugin",
+      "fragments": [
+        "Plugins"
+      ],
+      "x": 569.1139526367188,
+      "y": 499.5322570800781,
+      "width": 113.0068359375,
+      "height": 33.708404541015625,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(217, 230, 255)",
+          "stroke": "rgb(37, 99, 235)",
+          "rx": null,
+          "width": 113.0068359375,
+          "height": 33.708404541015625
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-vf_resource_f590f4b2283e3d79-7",
+      "text": "Layout lifecycleplugin_declaration: layout.resourcesstatus: implementedrulesets: vibeflow.plugin_declaration",
+      "fragments": [
+        "Plugins"
+      ],
+      "x": 364.28533935546875,
+      "y": 621.5860595703125,
+      "width": 124.84503173828125,
+      "height": 34.10595703125,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(217, 230, 255)",
+          "stroke": "rgb(37, 99, 235)",
+          "rx": null,
+          "width": 124.84503173828125,
+          "height": 34.10595703125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-vf_resource_6958e9af4f4547e3-17",
+      "text": "lifecycle.pyentryloadedowners: plugin:layout.resources.compiler,plugin:layout.resources.runtime",
+      "fragments": [
+        "Plugins"
+      ],
+      "x": 757.3311767578125,
+      "y": 464.8996276855469,
+      "width": 128.58660888671875,
+      "height": 58.329681396484375,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 128.58660888671875,
+          "height": 58.329681396484375
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 128.58660888671875,
+          "height": 58.329681396484375
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-vf_resource_bd1a7a610076b77e-19",
+      "text": "code_plugin.pyentryloadedowners: plugin_declaration:layout.resources",
+      "fragments": [
+        "Plugins"
+      ],
+      "x": 557.6068115234375,
+      "y": 948.9493408203125,
+      "width": 136.0211181640625,
+      "height": 50.08203125,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 136.0211181640625,
+          "height": 50.08203125
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 136.0211181640625,
+          "height": 50.08203125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-vf_resource_9c5ce4c56f5b1d5b-21",
+      "text": "check.pyentryloadedowners: rule:layout.health",
+      "fragments": [
+        "Plugins"
+      ],
+      "x": 779.420654296875,
+      "y": 571.0414428710938,
+      "width": 84.40765380859375,
+      "height": 49.585205078125,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 84.40765380859375,
+          "height": 49.585205078125
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 84.40765380859375,
+          "height": 49.585205078125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-vf_resource_1c84a8c49e991bd1-23",
+      "text": "引用 / referencehelper.pyentryloadedowners: base_lib:layout.helpersection: base_lib",
+      "fragments": [
+        "Plugins"
+      ],
+      "x": 766.6073608398438,
+      "y": 904.0909423828125,
+      "width": 110.03424072265625,
+      "height": 54.0606689453125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 110.03424072265625,
+          "height": 54.0606689453125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-vf_resource_a0f9d4ca6918a406-26",
+      "text": "引用 / referencesteps.pyentryloadedowners: node:layout.end, node:layout.start,node:layout.step, node:layout.step_rightsection: node_types",
+      "fragments": [
+        "Plugins"
+      ],
+      "x": 748.8842163085938,
+      "y": 989.9519653320312,
+      "width": 145.48052978515625,
+      "height": 61.05682373046875,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 145.48052978515625,
+          "height": 61.05682373046875
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-vf_resource_f811475aac7fc582-29",
+      "text": "引用 / referencelayout.endnode: layout.endsection: node_types",
+      "fragments": [
+        "Plugins"
+      ],
+      "x": 585.4041748046875,
+      "y": 589.6068115234375,
+      "width": 80.4263916015625,
+      "height": 40.0684814453125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 80.4263916015625,
+          "height": 40.0684814453125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-vf_resource_576b998f88b73426-32",
+      "text": "引用 / referencelayout.startnode: layout.startsection: node_types",
+      "fragments": [
+        "Plugins"
+      ],
+      "x": 585.4041748046875,
+      "y": 661.4757080078125,
+      "width": 80.4263916015625,
+      "height": 40.0684814453125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 80.4263916015625,
+          "height": 40.0684814453125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-vf_resource_8924c954971c85dc-35",
+      "text": "引用 / referencelayout.stepnode: layout.stepsection: node_types",
+      "fragments": [
+        "Plugins"
+      ],
+      "x": 585.4041748046875,
+      "y": 733.3445434570312,
+      "width": 80.4263916015625,
+      "height": 40.0684814453125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 80.4263916015625,
+          "height": 40.0684814453125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-vf_resource_f07a2e4205f2b586-38",
+      "text": "引用 / referencelayout.step_rightnode: layout.step_rightsection: node_types",
+      "fragments": [
+        "Plugins"
+      ],
+      "x": 581.404296875,
+      "y": 805.21337890625,
+      "width": 88.4261474609375,
+      "height": 40.0684814453125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 88.4261474609375,
+          "height": 40.0684814453125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-vf_resource_6a1e1bef142d6065-41",
+      "text": "引用 / referencelayout.helperbase_lib: layout.helpersection: base_lib",
+      "fragments": [
+        "Plugins"
+      ],
+      "x": 581.736572265625,
+      "y": 877.082275390625,
+      "width": 87.7615966796875,
+      "height": 40.0684814453125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 87.7615966796875,
+          "height": 40.0684814453125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_2_0_my-svg-flowchart-vf_resource_652b902b3d78d7ec-0",
+      "text": "BaseLib",
+      "fragments": [
+        "BaseLib"
+      ],
+      "x": 984.0516357421875,
+      "y": 434.0234680175781,
+      "width": 35.346923828125,
+      "height": 12.72015380859375,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 35.346923828125,
+          "height": 12.72015380859375
+        }
+      ]
+    },
+    {
+      "id": "vf_column_2_0_my-svg-flowchart-vf_resource_881d43c74247bbc8-3",
+      "text": "layout.helperbase_lib: layout.helperstatus: implementedrulesets: vibeflow.base_lib",
+      "fragments": [
+        "BaseLib"
+      ],
+      "x": 1158.5419921875,
+      "y": 504.95819091796875,
+      "width": 96.9451904296875,
+      "height": 34.10589599609375,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(255, 230, 179)",
+          "stroke": "rgb(5, 150, 105)",
+          "rx": null,
+          "width": 96.9451904296875,
+          "height": 34.10589599609375
+        }
+      ]
+    },
+    {
+      "id": "vf_column_2_0_my-svg-flowchart-vf_resource_257b6829e46b5417-7",
+      "text": "helper.pyentryloadedowners: base_lib:layout.helper",
+      "fragments": [
+        "BaseLib"
+      ],
+      "x": 1336.2440185546875,
+      "y": 588.8515625,
+      "width": 98.109130859375,
+      "height": 50.08203125,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 98.109130859375,
+          "height": 50.08203125
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 98.109130859375,
+          "height": 50.08203125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_2_0_my-svg-flowchart-vf_resource_8d9e9be4e44a8cca-9",
+      "text": "引用 / referencesteps.pyentryloadedowners: node:layout.end, node:layout.start,node:layout.step, node:layout.step_rightsection: node_types",
+      "fragments": [
+        "BaseLib"
+      ],
+      "x": 1134.2742919921875,
+      "y": 570.864501953125,
+      "width": 145.4805908203125,
+      "height": 61.05670166015625,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 145.4805908203125,
+          "height": 61.05670166015625
+        }
+      ]
+    },
+    {
+      "id": "vf_column_2_0_my-svg-flowchart-vf_resource_47600e6a75b05c46-12",
+      "text": "引用 / referencecode_plugin.pyentryloadedowners: plugin_declaration:layout.resourcessection: plugins",
+      "fragments": [
+        "BaseLib"
+      ],
+      "x": 1133.0413818359375,
+      "y": 663.7215576171875,
+      "width": 147.9462890625,
+      "height": 53.66314697265625,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 147.9462890625,
+          "height": 53.66314697265625
+        }
+      ]
+    },
+    {
+      "id": "vf_column_2_0_my-svg-flowchart-vf_resource_98598161dbf506ec-15",
+      "text": "引用 / referencelayout.stepnode: layout.stepsection: node_types",
+      "fragments": [
+        "BaseLib"
+      ],
+      "x": 961.5119018554688,
+      "y": 478.5439758300781,
+      "width": 80.42645263671875,
+      "height": 40.068511962890625,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 80.42645263671875,
+          "height": 40.068511962890625
+        }
+      ]
+    },
+    {
+      "id": "vf_column_2_0_my-svg-flowchart-vf_resource_229fdbcff52877ed-18",
+      "text": "引用 / referencelayout.step_rightnode: layout.step_rightsection: node_types",
+      "fragments": [
+        "BaseLib"
+      ],
+      "x": 957.5120239257812,
+      "y": 550.412841796875,
+      "width": 88.42620849609375,
+      "height": 40.0684814453125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 88.42620849609375,
+          "height": 40.0684814453125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_2_0_my-svg-flowchart-vf_resource_3aa1fb8de781ffab-21",
+      "text": "引用 / referenceLayout lifecycleplugin_declaration: layout.resourcessection: plugins",
+      "fragments": [
+        "BaseLib"
+      ],
+      "x": 938.8851928710938,
+      "y": 622.2816772460938,
+      "width": 125.67987060546875,
+      "height": 39.6710205078125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 125.67987060546875,
+          "height": 39.6710205078125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_my-svg-flowchart-vf_resource_8828ae20c0722c04-0",
+      "text": "Node types",
+      "fragments": [
+        "Node types"
+      ],
+      "x": 1519.4656982421875,
+      "y": 699.5936279296875,
+      "width": 44.49560546875,
+      "height": 12.72015380859375,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 44.49560546875,
+          "height": 12.72015380859375
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_my-svg-flowchart-vf_resource_201270386322ba37-3",
+      "text": "layout.endnode: layout.endstatus: implementedflow_kind: terminalrulesets: vibeflow.process, layout.health_set",
+      "fragments": [
+        "Node types"
+      ],
+      "x": 1676.7393798828125,
+      "y": 678.544677734375,
+      "width": 140.5272216796875,
+      "height": 41.10198974609375,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 140.5272216796875,
+          "height": 41.10198974609375
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 140.5272216796875,
+          "height": 41.10198974609375
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_my-svg-flowchart-vf_resource_286b9861cfcdf05e-5",
+      "text": "layout.startnode: layout.startstatus: implementedflow_kind: terminalrulesets: vibeflow.process, layout.health_set",
+      "fragments": [
+        "Node types"
+      ],
+      "x": 1676.7393798828125,
+      "y": 605.6422729492188,
+      "width": 140.5272216796875,
+      "height": 41.10205078125,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 140.5272216796875,
+          "height": 41.10205078125
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 140.5272216796875,
+          "height": 41.10205078125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_my-svg-flowchart-vf_resource_34eba124b12ad35c-7",
+      "text": "layout.stepnode: layout.stepstatus: implementedflow_kind: processrulesets: vibeflow.process, layout.health_set",
+      "fragments": [
+        "Node types"
+      ],
+      "x": 1678.88525390625,
+      "y": 526.77734375,
+      "width": 136.2354736328125,
+      "height": 47.0645751953125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(214, 234, 255)",
+          "stroke": "rgb(66, 90, 120)",
+          "rx": "5",
+          "width": 136.2354736328125,
+          "height": 47.0645751953125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_my-svg-flowchart-vf_resource_136d12bd71b43a38-9",
+      "text": "layout.step_rightnode: layout.step_rightstatus: implementedflow_kind: processrulesets: vibeflow.process, layout.health_set",
+      "fragments": [
+        "Node types"
+      ],
+      "x": 1678.88525390625,
+      "y": 438.47271728515625,
+      "width": 136.2354736328125,
+      "height": 47.0645751953125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(214, 234, 255)",
+          "stroke": "rgb(66, 90, 120)",
+          "rx": "5",
+          "width": 136.2354736328125,
+          "height": 47.0645751953125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_my-svg-flowchart-vf_resource_93c9a4897872eb3f-22",
+      "text": "steps.pyentryloadedowners: node:layout.end, node:layout.start,node:layout.step, node:layout.step_right",
+      "fragments": [
+        "Node types"
+      ],
+      "x": 1882.0738525390625,
+      "y": 676.538330078125,
+      "width": 133.555419921875,
+      "height": 58.8265380859375,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 133.555419921875,
+          "height": 58.8265380859375
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 133.555419921875,
+          "height": 58.8265380859375
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_my-svg-flowchart-vf_resource_570d017a94ba83bb-24",
+      "text": "引用 / referencehelper.pyentryloadedowners: base_lib:layout.helpersection: base_lib",
+      "fragments": [
+        "Node types"
+      ],
+      "x": 2070.885498046875,
+      "y": 678.92333984375,
+      "width": 110.0341796875,
+      "height": 54.0606689453125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 110.0341796875,
+          "height": 54.0606689453125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_my-svg-flowchart-vf_resource_5f9cb2be0a22a716-27",
+      "text": "引用 / referencecode_plugin.pyentryloadedowners: plugin_declaration:layout.resourcessection: plugins",
+      "fragments": [
+        "Node types"
+      ],
+      "x": 1673.02978515625,
+      "y": 751.4470825195312,
+      "width": 147.9462890625,
+      "height": 53.66314697265625,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 147.9462890625,
+          "height": 53.66314697265625
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_my-svg-flowchart-vf_resource_e1ed7abbe2c426bc-30",
+      "text": "引用 / referenceLayout lifecycleplugin_declaration: layout.resourcessection: plugins",
+      "fragments": [
+        "Node types"
+      ],
+      "x": 1478.87353515625,
+      "y": 442.1695251464844,
+      "width": 125.6798095703125,
+      "height": 39.67095947265625,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 125.6798095703125,
+          "height": 39.67095947265625
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_my-svg-flowchart-vf_resource_c2362041487afc77-33",
+      "text": "引用 / referencelayout.helperbase_lib: layout.helpersection: base_lib",
+      "fragments": [
+        "Node types"
+      ],
+      "x": 1904.970703125,
+      "y": 450.218994140625,
+      "width": 87.7615966796875,
+      "height": 40.0684814453125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(248, 250, 252)",
+          "stroke": "rgb(100, 116, 139)",
+          "rx": null,
+          "width": 87.7615966796875,
+          "height": 40.0684814453125
+        }
+      ]
+    }
+  ]
+}

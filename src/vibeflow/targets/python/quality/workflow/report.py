@@ -4,7 +4,6 @@ import json
 from typing import TYPE_CHECKING, Any, Mapping
 
 from vibeflow.core.findings import HealthFinding, HealthReport
-from vibeflow.targets.python.project.policy import EffectivePolicy
 
 if TYPE_CHECKING:
     from vibeflow.core.compiler import CompiledGraph
@@ -17,10 +16,8 @@ def _build_health_report(
     compiled: CompiledGraph | None,
     plugin_registry: PluginRegistry | None,
     state: _HealthValidationState,
-    effective_policy: EffectivePolicy | None = None,
     rule_phase: str | None = None,
 ) -> HealthReport:
-    from vibeflow.core.quality.workflow_rules.rule_catalog import rule_catalog
     from vibeflow.targets.python.runtime.helpers import has_planned, planned_items
 
     errors: tuple[HealthFinding, ...] = tuple(state.errors)
@@ -47,7 +44,6 @@ def _build_health_report(
             "plugins": plugin_registry.to_dict() if plugin_registry is not None else {"plugins": []},
             "planned": [dict(item) for item in planned_items(graph)],
             "production_ready": not has_planned(graph),
-            "rule_catalog": rule_catalog(),
             "rule_executions": [item.to_dict() for item in state.rule_executions],
             "workflow_rulesets": list(graph.rulesets),
         },

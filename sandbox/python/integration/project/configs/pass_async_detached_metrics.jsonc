@@ -4,7 +4,8 @@
       {
         "key": "train.batch",
         "type": "train.batch",
-        "display_name": "Train Batch"
+        "display_name": "Train Batch",
+        "required": true
       }
     ],
     "nodes": [

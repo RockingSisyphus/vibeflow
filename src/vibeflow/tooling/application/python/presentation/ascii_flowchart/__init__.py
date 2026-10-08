@@ -40,11 +40,17 @@ def export_ascii_flowchart(
     show_contract: bool = True,
     show_semantics: bool = True,
     show_findings: bool = True,
+    prepared=None,
 ) -> str:
+    from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
+
+    prepared = prepared or prepare_python_presentation(graph, compiled=compiled, registry=registry)
+    registry = prepared.registry
     graph, actual_compiled = effective_graph_for_render(
         graph,
         compiled,
         registry,
+        prepared=prepared,
     )
     return _Renderer(
         expand_nodesets=expand_nodesets,
@@ -53,6 +59,7 @@ def export_ascii_flowchart(
         show_contract=show_contract,
         show_semantics=show_semantics,
         show_findings=show_findings,
+        prepared=prepared,
     ).render(graph, actual_compiled)
 
 
@@ -66,6 +73,7 @@ class _Renderer:
         show_contract: bool,
         show_semantics: bool,
         show_findings: bool,
+        prepared=None,
     ) -> None:
         self.expand_nodesets = expand_nodesets
         self.registry = registry
@@ -73,6 +81,7 @@ class _Renderer:
         self.show_contract = show_contract
         self.show_semantics = show_semantics
         self.show_findings = show_findings
+        self.prepared = prepared
 
     def render(self, graph: GraphConfig, compiled: CompiledGraph) -> str:
         lines = ["TOPOLOGY FLOWCHART", ""]
@@ -119,9 +128,9 @@ class _Renderer:
     def _render_nodesets(self, lines: list[str], graph: GraphConfig, *, indent: str) -> None:
         for node in graph.nodes:
             nodeset = nodeset_for_node(graph, node)
-            if nodeset is None:
+            if nodeset is None or not nodeset.expand:
                 continue
-            nested_compiled = compile_for_render(nodeset.graph, None, self.registry)
+            nested_compiled = compile_for_render(nodeset.graph, None, self.registry, prepared=self.prepared)
             title = node.metadata.display_name or nodeset.display_name or node.id
             self._render_section(lines, nodeset.graph, nested_compiled, title=f"nodeset {title} (id={node.id}, type_key={nodeset.type_key})", indent=f"{indent}  ")
 

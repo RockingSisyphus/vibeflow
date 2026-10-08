@@ -1,7 +1,7 @@
 """Selected effect Rulesets, static execution boundaries and source-only evidence."""
 import ast
 import pytest
-from tests.fixtures.support.strict_support import PurityPolicy, scan_base_lib
+from tests.fixtures.support.strict_support import PurityPolicy
 from tests.fixtures.support.rule_inspection import node_document, _inspect_node_source as _inspect_declared_source
 from vibeflow.targets.python.project.node import EFFECT_SCOPE_NONE, EFFECT_SCOPE_TERMINAL, EFFECT_SCOPE_PYTHON_IO, EFFECT_SCOPE_GLOBAL_STATE
 from vibeflow.targets.python.quality.source_analysis.effects import call_violation, import_violation_code
@@ -600,29 +600,6 @@ def test_preflight_blocks_implicit_class_execution(tmp_path, capsys, class_prefi
     messages = "\n".join(item["message"] for item in payload["health"]["errors"])
     assert any(item["code"] == "NODE.IMPORT.SIDE_EFFECT" for item in payload["health"]["errors"])
 
-def test_base_lib_none_scope_rejects_builtins_open_process_argv_and_system_exit(tmp_path) -> None:
-    base_dir = tmp_path / "base_lib"
-    base_dir.mkdir()
-    (base_dir / "unsafe.py").write_text(
-        """
-import builtins
-import sys
-
-def unsafe():
-    builtins.open("artifact.txt", "w")
-    value = sys.argv
-    raise SystemExit(len(value))
-""".strip(),
-        encoding="utf-8",
-    )
-
-    report = scan_base_lib(tmp_path, policy=PurityPolicy(max_source_lines=1000))
-    messages = "\n".join(finding.message for finding in report.findings)
-
-    assert "builtins.open" in messages
-    assert "sys.argv" in messages
-    assert "SystemExit" in messages
-    assert {finding.rule_id for finding in report.findings} == {"BASE_LIB.SIDE_EFFECT_CALL"}
 
 def test_flow_kind_and_external_metadata_do_not_select_effect_authority(tmp_path,capsys):
     declaration=node_document(rulesets=["vibeflow.process"])

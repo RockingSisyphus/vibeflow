@@ -49,6 +49,8 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
         )
 
 def _validate_node_identity(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
+    if "expand" in value:
+        findings.append(_error("CONFIG.SCHEMA.NODESET_EXPAND_LOCATION", f"{prefix}.expand belongs on the Nodeset definition", f"{prefix}.expand"))
     if "name" in value:
         findings.append(_error("CONFIG.SCHEMA.NODE_LEGACY_NAME", f"{prefix}.name is removed; use {prefix}.id", f"{prefix}.name"))
     if "type" in value or "registry_key" in value:

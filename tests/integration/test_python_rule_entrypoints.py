@@ -1,4 +1,5 @@
 """Declaration conflicts and lazy imports use the formal Python entrypoints."""
+from tests.fixtures.support.plugins import resource as resource_ref, write_plugin
 
 import json
 import sys
@@ -17,8 +18,6 @@ def project(tmp_path):
 
 
 def call(capsys, arguments):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(arguments[arguments.index("--workspace")+1])
     code = main(arguments)
     return code, json.loads(capsys.readouterr().out)
 
@@ -26,20 +25,21 @@ def call(capsys, arguments):
 @pytest.mark.parametrize("kind", ["rule", "ruleset"])
 def test_cross_root_resource_conflicts_are_formal_diagnostics_with_both_origins(project, capsys, kind):
     other = project.root / "other"
-    resources = other / "resources"
-    resources.mkdir(parents=True)
-    original = project.project / ("bundle/rules/provider.jsonc" if kind == "rule" else "bundle/rulesets/graph.jsonc")
+    other.mkdir(parents=True)
+    original = resource_ref(project.project, kind, "example.number_provider" if kind == "rule" else "example.rule_graph")
     document = project.read(original)
     document["description"] = "A conflicting declaration in another project root."
-    conflict = resources / "conflict.jsonc"
-    project.write(conflict, document)
+    selection = write_plugin(other, [document], target="python", plugin_id="other.resources")
     if kind == "rule":
         (other / "rules").mkdir()
         (other / "rules/provider.py").write_text((project.project / "rules/provider.py").read_text())
-    project.write(other / "vibeflow_project.jsonc", {"project_target": "python", "descriptors": {kind + "s": ["resources"]}})
+    project.write(other / "vibeflow_project.jsonc", {"project_target": "python"})
     workspace = project.read(project.workspace)
     workspace["roots"].append({"id": "other-python", "path": "other"})
     project.write(project.workspace, workspace)
+    graph_config = project.read(project.config)
+    graph_config["plugins"].append({**selection, "root": "other-python"})
+    project.write(project.config, graph_config)
     code, payload = call(capsys, ["validate", *project.common_arguments(), "--json"])
     assert code == 1, payload
     finding = next(item for item in payload["errors"] if item["code"] == "RULE.RESOURCE.CONFLICT")
@@ -68,7 +68,7 @@ def check(context, inputs, params):
     graph = project.read(project.graph_resource)
     graph["entrypoints"] = {"import": ["checker"], "static": [], "run": []}
     project.write(project.graph_resource, graph)
-    descriptor = project.project / "bundle/nodes/calculate.jsonc"
+    descriptor = resource_ref(project.project, 'node', 'example.calculate')
     document = project.read(descriptor)
     document["contract"]["params_schema"] = {"factor": {"type": "integer"}}
     document["contract"]["params_defaults"] = {"factor": 2}

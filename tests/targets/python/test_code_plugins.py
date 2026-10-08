@@ -264,6 +264,8 @@ def test_refused_nodeset_preserves_health_before_rendering(tmp_path):
     fixture = Path(__file__).resolve().parents[3] / "sandbox/python/integration"
     shutil.copytree(fixture / "project", tmp_path / "project")
     shutil.copy2(fixture / "vibeflow_config.jsonc", tmp_path / "vibeflow_config.jsonc")
+    from tests.fixtures.support.plugins import copy_sdk_inputs
+    copy_sdk_inputs(fixture, tmp_path)
     workspace = load_workspace_config(tmp_path / "vibeflow_config.jsonc")
     config = tmp_path / "project/configs/fail_nodeset_key_leak.jsonc"
     environment = build_workspace_environment(workspace, config)

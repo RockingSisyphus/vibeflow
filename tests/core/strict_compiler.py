@@ -1,3 +1,4 @@
+from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
 
@@ -8,21 +9,7 @@ import vibeflow.core.compiler as core_compiler
 from vibeflow.core.flow import NodeSpec
 
 
-RouteNode_DECLARATION = node_declaration(NodeInfo(
-        type_key="test.route",
-        display_name="Route",
-
-        description="Routes the next step.",
-        version="0.1.0",
-        flow_kind="decision",
-    ), NodeContract(
-        requires=(DataRequirement("value.out", "exactly_one", display_name="Value Out"),),
-        provides=(DataProvider("flow.route", "flow.route", display_name="Flow Route"),),
-        input_semantics={"value.out": ("output value",)},
-        output_semantics={"flow.route": ("branch route",)},
-
-        examples=({"inputs": {"value.out": 1}, "params": {}},),
-    ), rulesets=("vibeflow.process",))
+RouteNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.route', display_name='Route', description='Routes the next step.', version='0.1.0', flow_kind='decision', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='Value Out'),), provides=(DataProvider('flow.route', 'flow.route', display_name='Flow Route'),), input_semantics={'value.out': ('output value',)}, output_semantics={'flow.route': ('branch route',)}, examples=({'inputs': {'value.out': 1}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class RouteNode:
 
@@ -30,15 +17,7 @@ class RouteNode:
         return {"flow.route": "done"}
 
 
-ExternalVisualNode_DECLARATION = node_declaration(NodeInfo(
-        type_key="test.external_visual",
-        display_name="External Visual",
-
-        description="Exercises external review styling.",
-        version="0.1.0",
-        flow_kind="process",
-        external=True,
-    ), NodeContract(), rulesets=("vibeflow.process",))
+ExternalVisualNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.external_visual', display_name='External Visual', description='Exercises external review styling.', version='0.1.0', flow_kind='process', external=True, contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.process",))
 
 class ExternalVisualNode:
 
@@ -46,18 +25,7 @@ class ExternalVisualNode:
         return {}
 
 
-ExternalResultVisualNode_DECLARATION = node_declaration(NodeInfo(
-        type_key="test.external_result_visual",
-        display_name="External Result Visual",
-
-        description="Exercises an external result-key boundary.",
-        version="0.1.0",
-        flow_kind="process",
-        external=True,
-    ), NodeContract(
-        provides=(DataProvider("external.result", "external.result", display_name="External Result"),),
-        output_semantics={"external.result": ("external visual result",)},
-    ), rulesets=("vibeflow.process",))
+ExternalResultVisualNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.external_result_visual', display_name='External Result Visual', description='Exercises an external result-key boundary.', version='0.1.0', flow_kind='process', external=True, contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('external.result', 'external.result', display_name='External Result'),), output_semantics={'external.result': ('external visual result',)}), rulesets=("vibeflow.process",))
 
 class ExternalResultVisualNode(ExternalVisualNode):
 
@@ -65,10 +33,7 @@ class ExternalResultVisualNode(ExternalVisualNode):
         return {"external.result": 1}
 
 
-BackgroundVisualNode_DECLARATION = node_declaration(NodeInfo("test.background_visual", "Background Visual", "Produces a detached background value.", "0.1.0", "process"), NodeContract(
-        provides=(DataProvider("background.value", "background.value", display_name="Background Value"),),
-        output_semantics={"background.value": ("detached background value",)},
-    ), rulesets=("vibeflow.process",))
+BackgroundVisualNode_DECLARATION = node_declaration(NodeDescriptor('test.background_visual', 'Background Visual', 'Produces a detached background value.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('background.value', 'background.value', display_name='Background Value'),), output_semantics={'background.value': ('detached background value',)}), rulesets=("vibeflow.process",))
 
 class BackgroundVisualNode:
 
@@ -76,14 +41,7 @@ class BackgroundVisualNode:
         return {"background.value": 1}
 
 
-GlobalVisualNode_DECLARATION = node_declaration(NodeInfo(
-        type_key="test.global_visual",
-        display_name="Global Visual",
-
-        description="Exercises global-state cloud styling.",
-        version="0.1.0",
-        flow_kind="global_state",
-    ), NodeContract(), rulesets=("vibeflow.global_state",))
+GlobalVisualNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.global_visual', display_name='Global Visual', description='Exercises global-state cloud styling.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.global_state",))
 
 class GlobalVisualNode:
 
@@ -106,9 +64,9 @@ def test_compiler_merges_duplicate_explicit_edges_with_when() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
-                    _node_call("add", "test.add", "Adds the incoming value.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("add", "test.add", "Adds the incoming value."),
                     _node_call("copy", "test.copy", "Copies the output value."),
                 ],
                 "edges": [
@@ -147,7 +105,7 @@ def test_config_node_visual_metadata_and_style_are_not_runtime_params() -> None:
                             "similar_to": "runtime similarity parameter",
                         },
                     },
-                    _node_call("base_seed", "test.seed", "Reference node for similar_to.", provides=[PROV_SPEC("base.value")]),
+                    _node_call("base_seed", "test.seed", "Reference node for similar_to."),
                 ]
             }
         }
@@ -181,7 +139,7 @@ def test_config_node_join_policy_and_loop_are_not_runtime_params() -> None:
                     provides=["total.next"],
                     exports=["total.next"],
                     pipeline={
-                        "inputs": [PROV_SPEC("total.current")],
+                        "inputs": [INPUT_SPEC("total.current")],
                         "nodes": [_node_call("start", "test.start", "Starts loop body.")],
                     },
                 )
@@ -221,14 +179,14 @@ def test_nodeset_effective_graph_uses_one_dp_state_per_definition(
     nodesets = []
     for index in range(20):
         if index == 19:
-            nodes = [_node_call("seed", "test.seed", "Produces the terminal chain value.", provides=[PROV_SPEC("value.out")])]
+            nodes = [_node_call("seed", "test.seed", "Produces the terminal chain value.")]
         else:
             nodes = [
                 _node_call(
                     "next",
                     f"perf.ns{index + 1}",
                     "Calls a nodeset declared later in the same config.",
-                    provides=[PROV_SPEC("value.out")],
+
                 )
             ]
         nodesets.append(
@@ -246,7 +204,7 @@ def test_nodeset_effective_graph_uses_one_dp_state_per_definition(
             "nodesets": nodesets,
             "pipeline": {
                 "nodes": [
-                    _node_call("top", "perf.ns0", "Calls the first chain nodeset.", provides=[PROV_SPEC("value.out")]),
+                    _node_call("top", "perf.ns0", "Calls the first chain nodeset."),
                 ]
             },
         }
@@ -327,7 +285,7 @@ def test_parse_rejects_unknown_nodeset_call_with_reference_detail() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("missing", "missing.body", "References a missing composite.", provides=[PROV_SPEC("value.out")]),
+                    _node_call("missing", "missing.body", "References a missing composite."),
                 ]
             }
         }
@@ -344,11 +302,11 @@ def test_config_parse_trace_reports_nodeset_timing(monkeypatch, capsys) -> None:
             "nodesets": [
                 _nodeset_config(
                     "trace.body",
-                    pipeline={"nodes": [_node_call("seed", "test.seed", "Produces trace output.", provides=[PROV_SPEC("value.out")])]},
+                    pipeline={"nodes": [_node_call("seed", "test.seed", "Produces trace output.")]},
                 )
             ],
             "pipeline": {
-                "nodes": [_node_call("flow", "trace.body", "Calls trace body.", provides=[PROV_SPEC("value.out")])]
+                "nodes": [_node_call("flow", "trace.body", "Calls trace body.")]
             },
         }
     )
@@ -363,7 +321,7 @@ def test_config_schema_rejects_invalid_join_policy_and_loop_shape() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("bad_join", "test.seed", "Bad join.", join_policy="sometimes", provides=[PROV_SPEC("value.in")]),
+                    _node_call("bad_join", "test.seed", "Bad join.", join_policy="sometimes"),
                     _node_call("bad_loop", "vibeflow.loop.while", "Bad loop.", loop={"body": "", "items": {"from": "", "as": ""}}),
                 ]
             }
@@ -523,7 +481,7 @@ def test_mermaid_renders_sectioned_labels_default_node_and_custom_style() -> Non
                         "Produces a seed value with a long readable description that should wrap deterministically in the SVG label.",
                         display_name="Readable Seed",
                         style={"fill": "#123abc", "stroke": "#456def", "text": "#654321"},
-                        provides=[PROV_SPEC("value.in")],
+
                     )
                 ]
             }
@@ -552,7 +510,7 @@ def test_mermaid_custom_style_overrides_health_class_color() -> None:
                         "test.seed",
                         "Produces a styled seed with a warning class.",
                         style={"fill": "#123abc", "stroke": "#456def", "text": "#654321"},
-                        provides=[PROV_SPEC("value.in")],
+
                     )
                 ]
             }
@@ -643,8 +601,8 @@ def test_mermaid_renders_contracts_on_edges_and_hides_them_when_requested() -> N
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
-                    _node_call("add", "test.add", "Adds value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("seed", "test.seed", "Produces value.in."),
+                    _node_call("add", "test.add", "Adds value.in."),
                 ],
                 "edges": [{"from": "seed", "to": "add", "when": "flow.route == 'again'"}],
             }
@@ -669,9 +627,9 @@ def test_mermaid_styles_mainline_and_explicit_data_bypass_edges() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the styled edge fixture."),
-                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
-                    _node_call("add", "test.add", "Runs before the end node.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.in_end", "Consumes bypassed value.in.", requires=[REQ_SPEC("value.in")]),
+                    _node_call("seed", "test.seed", "Produces value.in."),
+                    _node_call("add", "test.add", "Runs before the end node."),
+                    _node_call("end", "test.in_end", "Consumes bypassed value.in."),
                 ],
                 "edges": [
                     {"from": "start", "to": "seed"},
@@ -775,13 +733,13 @@ def test_compiler_applies_explicit_edge_roles_after_default_inference() -> None:
                         "seed",
                         "test.seed",
                         "Produces transfer-only data.",
-                        provides=[PROV_SPEC("value.in")],
+
                     ),
                     _node_call(
                         "end",
                         "test.in_end",
                         "Receives data without being scheduled by the edge.",
-                        requires=[REQ_SPEC("value.in")],
+
                     ),
                 ],
                 "edges": [
@@ -832,13 +790,13 @@ def test_schedule_edges_keep_sync_mainline_before_async_branches() -> None:
                         "seed",
                         "test.seed",
                         "Runs first on the synchronous mainline.",
-                        provides=[PROV_SPEC("value.in")],
+
                     ),
                     _node_call(
                         "end",
                         "test.in_end",
                         "Ends the synchronous mainline.",
-                        requires=[REQ_SPEC("value.in")],
+
                     ),
                 ],
                 "edges": [
@@ -869,20 +827,19 @@ def test_compiler_rejects_edge_with_no_effective_role_after_inference() -> None:
                         "seed",
                         "test.seed",
                         "Produces a shortcut value.",
-                        provides=[PROV_SPEC("value.in")],
+
                     ),
                     _node_call(
                         "add",
                         "test.add",
                         "Runs on the mainline.",
-                        requires=[REQ_SPEC("value.in")],
-                        provides=[PROV_SPEC("value.out")],
+
                     ),
                     _node_call(
                         "end",
                         "test.out_end",
                         "Ends the inferred role fixture.",
-                        requires=[REQ_SPEC("value.out")],
+
                     ),
                 ],
                 "edges": [
@@ -905,34 +862,14 @@ def test_compiler_rejects_edge_with_no_effective_role_after_inference() -> None:
 def test_python_runtime_separates_schedule_and_transfer_edges(
     execution: str,
 ) -> None:
-    GatePoisonNode_DECLARATION = node_declaration(NodeInfo(
-            "test.edge_gate",
-            "Edge Gate",
-            "Produces a same-typed value that must not cross a schedule-only edge.",
-            "0.1.0",
-            "process",
-        ), NodeContract(
-            requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
-            provides=(DataProvider("gate.value", "value.in", display_name="gate.value"),),
-
-        ), rulesets=("vibeflow.process",))
+    GatePoisonNode_DECLARATION = node_declaration(NodeDescriptor('test.edge_gate', 'Edge Gate', 'Produces a same-typed value that must not cross a schedule-only edge.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('gate.value', 'value.in', display_name='gate.value'),), input_semantics={item.type: ('Fixture requires ' + item.type,) for item in (DataRequirement('value.out', 'exactly_one', display_name='value.out'),)}, output_semantics={item.key: ('Fixture provides ' + item.key,) for item in (DataProvider('gate.value', 'value.in', display_name='gate.value'),)}), rulesets=("vibeflow.process",))
 
     class GatePoisonNode:
 
         def run_pure(self, inputs, params):
             return {"gate.value": inputs["value.out"]["value"] + 100}
 
-    MixedEdgeConsumerNode_DECLARATION = node_declaration(NodeInfo(
-            "test.edge_consumer",
-            "Edge Consumer",
-            "Consumes only the transfer-only payload.",
-            "0.1.0",
-            "process",
-        ), NodeContract(
-            requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"),),
-            provides=(DataProvider("result", "mixed.result", display_name="result"),),
-
-        ), rulesets=("vibeflow.process",))
+    MixedEdgeConsumerNode_DECLARATION = node_declaration(NodeDescriptor('test.edge_consumer', 'Edge Consumer', 'Consumes only the transfer-only payload.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='value.in'),), provides=(DataProvider('result', 'mixed.result', display_name='result'),), input_semantics={item.type: ('Fixture requires ' + item.type,) for item in (DataRequirement('value.in', 'exactly_one', display_name='value.in'),)}, output_semantics={item.key: ('Fixture provides ' + item.key,) for item in (DataProvider('result', 'mixed.result', display_name='result'),)}), rulesets=("vibeflow.process",))
 
     class MixedEdgeConsumerNode:
 
@@ -951,30 +888,27 @@ def test_python_runtime_separates_schedule_and_transfer_edges(
                         "seed",
                         "test.seed",
                         "Produces the value delivered by the transfer-only edge.",
-                        provides=[PROV_SPEC("value.in")],
+
                         value=4,
                     ),
                     _node_call(
                         "prepare",
                         "test.add",
                         "Produces an intermediate mainline value.",
-                        requires=[REQ_SPEC("value.in")],
-                        provides=[PROV_SPEC("value.out")],
+
                         delta=3,
                     ),
                     _node_call(
                         "gate",
                         "test.edge_gate",
                         "Produces a same-typed value that the schedule-only edge must not deliver.",
-                        requires=[REQ_SPEC("value.out")],
-                        provides=[PROV_SPEC("gate.value", "value.in")],
+
                     ),
                     _node_call(
                         "consume",
                         "test.edge_consumer",
                         "Runs when gate schedules it but consumes the bypassed seed.",
-                        requires=[REQ_SPEC("value.in")],
-                        provides=[PROV_SPEC("result", "mixed.result")],
+
                     ),
                     _node_call(
                         "end",
@@ -1027,31 +961,14 @@ def test_python_runtime_separates_schedule_and_transfer_edges(
 def test_terminal_records_outputs_and_transfer_before_completion(
     execution: str,
 ) -> None:
-    TerminalProducerNode_DECLARATION = node_declaration(NodeInfo(
-            "test.terminal_producer",
-            "Terminal Producer",
-            "Produces a final value before completing the workflow.",
-            "0.1.0",
-            "terminal",
-        ), NodeContract(
-            provides=(DataProvider("terminal.value", "terminal.value", display_name="terminal.value"),),
-
-        ), rulesets=("vibeflow.process",))
+    TerminalProducerNode_DECLARATION = node_declaration(NodeDescriptor('test.terminal_producer', 'Terminal Producer', 'Produces a final value before completing the workflow.', '0.1.0', 'terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('terminal.value', 'terminal.value', display_name='terminal.value'),), output_semantics={item.key: ('Fixture provides ' + item.key,) for item in (DataProvider('terminal.value', 'terminal.value', display_name='terminal.value'),)}), rulesets=("vibeflow.process",))
 
     class TerminalProducerNode:
 
         def run_pure(self, inputs, params):
             return {"terminal.value": 9}
 
-    TransferSinkNode_DECLARATION = node_declaration(NodeInfo(
-            "test.transfer_sink",
-            "Transfer Sink",
-            "Accepts a transfer-only terminal value without being scheduled.",
-            "0.1.0",
-            "process",
-        ), NodeContract(
-            requires=(DataRequirement("terminal.value", "exactly_one", display_name="terminal.value"),),
-        ), rulesets=("vibeflow.process",))
+    TransferSinkNode_DECLARATION = node_declaration(NodeDescriptor('test.transfer_sink', 'Transfer Sink', 'Accepts a transfer-only terminal value without being scheduled.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('terminal.value', 'exactly_one', display_name='terminal.value'),), input_semantics={item.type: ('Fixture requires ' + item.type,) for item in (DataRequirement('terminal.value', 'exactly_one', display_name='terminal.value'),)}), rulesets=("vibeflow.process",))
 
     class TransferSinkNode:
 
@@ -1069,13 +986,13 @@ def test_terminal_records_outputs_and_transfer_before_completion(
                         "finish",
                         "test.terminal_producer",
                         "Produces the final value.",
-                        provides=[PROV_SPEC("terminal.value")],
+
                     ),
                     _node_call(
                         "sink",
                         "test.transfer_sink",
                         "Receives the value without running.",
-                        requires=[REQ_SPEC("terminal.value")],
+
                     ),
                 ],
                 "edges": [
@@ -1153,7 +1070,7 @@ def test_async_result_key_rejects_transfer_only_outgoing_edge() -> None:
                         "async_seed",
                         "test.seed",
                         "Produces a result that requires a scheduled join.",
-                        provides=[PROV_SPEC("value.in")],
+
                         result_key="value.in",
                         **{"async": "result_key"},
                     ),
@@ -1161,7 +1078,7 @@ def test_async_result_key_rejects_transfer_only_outgoing_edge() -> None:
                         "end",
                         "test.in_end",
                         "Would receive only transferred async data.",
-                        requires=[REQ_SPEC("value.in")],
+
                     ),
                 ],
                 "edges": [
@@ -1220,43 +1137,21 @@ def test_mermaid_renders_while_loop_shape_class_and_stop_condition() -> None:
 
 
 def test_mermaid_edge_contract_labels_summarize_provider_key_type_mapping() -> None:
-    MappingProducerNode_DECLARATION = node_declaration(NodeInfo("test.mapping_producer", "Mapping Producer", "Produces three mapped values.", "0.1.0", "process"), NodeContract(
-            provides=(
-                DataProvider("value.copy", "value.in", display_name="Value Copy"),
-                DataProvider("other.copy", "other.in", display_name="Other Copy"),
-                DataProvider("extra.copy", "extra.in", display_name="Extra Copy"),
-            ),
-            output_semantics={
-                "value.copy": ("first mapped value",),
-                "other.copy": ("second mapped value",),
-                "extra.copy": ("third mapped value",),
-            },
-        ), rulesets=("vibeflow.process",))
+    MappingProducerNode_DECLARATION = node_declaration(NodeDescriptor('test.mapping_producer', 'Mapping Producer', 'Produces three mapped values.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.copy', 'value.in', display_name='Value Copy'), DataProvider('other.copy', 'other.in', display_name='Other Copy'), DataProvider('extra.copy', 'extra.in', display_name='Extra Copy')), output_semantics={'value.copy': ('first mapped value',), 'other.copy': ('second mapped value',), 'extra.copy': ('third mapped value',)}), rulesets=("vibeflow.process",))
 
     class MappingProducerNode:
 
         def run_pure(self, inputs, params):
             return {"value.copy": 1, "other.copy": 2, "extra.copy": 3}
 
-    MappingConsumerNode_DECLARATION = node_declaration(NodeInfo("test.mapping_consumer", "Mapping Consumer", "Consumes three mapped values.", "0.1.0", "process"), NodeContract(
-            requires=(
-                DataRequirement("value.in", "exactly_one", display_name="Value In"),
-                DataRequirement("other.in", "exactly_one", display_name="Other In"),
-                DataRequirement("extra.in", "exactly_one", display_name="Extra In"),
-            ),
-            input_semantics={
-                "value.in": ("first mapped value",),
-                "other.in": ("second mapped value",),
-                "extra.in": ("third mapped value",),
-            },
-        ), rulesets=("vibeflow.process",))
+    MappingConsumerNode_DECLARATION = node_declaration(NodeDescriptor('test.mapping_consumer', 'Mapping Consumer', 'Consumes three mapped values.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='Value In'), DataRequirement('other.in', 'exactly_one', display_name='Other In'), DataRequirement('extra.in', 'exactly_one', display_name='Extra In')), input_semantics={'value.in': ('first mapped value',), 'other.in': ('second mapped value',), 'extra.in': ('third mapped value',)}), rulesets=("vibeflow.process",))
 
     class MappingConsumerNode:
 
         def run_pure(self, inputs, params):
             return {}
 
-    registry = NodeRegistry()
+    registry = native_registry()
     register_node(registry, MappingProducerNode_DECLARATION, MappingProducerNode)
     register_node(registry, MappingConsumerNode_DECLARATION, MappingConsumerNode)
     graph = parse_graph_config(
@@ -1296,7 +1191,7 @@ def test_config_schema_rejects_reserved_and_invalid_node_style_colors() -> None:
                         "test.seed",
                         "Produces value.in.",
                         style={"fill": "#ECECFF"},
-                        provides=[PROV_SPEC("value.in")],
+
                     )
                 ]
             }
@@ -1311,7 +1206,7 @@ def test_config_schema_rejects_reserved_and_invalid_node_style_colors() -> None:
                         "test.seed",
                         "Produces value.in.",
                         style={"stroke": "red"},
-                        provides=[PROV_SPEC("value.in")],
+
                     )
                 ]
             }
@@ -1327,8 +1222,8 @@ def test_config_schema_rejects_invalid_node_similarity_metadata() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")], similar_to={"node": "seed", "relationship": "variant", "reason": ""}),
-                    _node_call("copy", "test.seed", "Produces copied value.", provides=[PROV_SPEC("value.copy")], similar_to={"node": "missing", "relationship": "clone", "reason": "bad target"}),
+                    _node_call("seed", "test.seed", "Produces value.in.",  similar_to={"node": "seed", "relationship": "variant", "reason": ""}),
+                    _node_call("copy", "test.seed", "Produces copied value.",  similar_to={"node": "missing", "relationship": "clone", "reason": "bad target"}),
                 ]
             }
         }
@@ -1350,12 +1245,27 @@ def test_config_rejects_missing_instance_visual_metadata() -> None:
         )
 
 
+@pytest.mark.parametrize("contract_field", ("requires", "provides"))
+def test_node_call_fixture_preserves_canonical_contract_rejection(contract_field) -> None:
+    config = {
+        "pipeline": {
+            "nodes": [_node_call(
+                "seed", "test.seed", "Attempts to redeclare a source-owned contract.",
+                **{contract_field: []},
+            )],
+        },
+    }
+
+    with pytest.raises(GraphConfigError, match="derived from type_used"):
+        parse_graph_config(config)
+
+
 def test_config_rejects_removed_loop_registration() -> None:
     with pytest.raises(GraphConfigError, match="pipeline.loops is removed"):
         parse_graph_config(
             {
                 "pipeline": {
-                    "nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])],
+                    "nodes": [_node_call("seed", "test.seed", "Produces value.in.")],
                     "loops": [{"id": "old", "edges": [["seed", "seed"]], "max_iterations": 2}],
                 }
             }
@@ -1367,8 +1277,8 @@ def test_compiler_rejects_cycle_without_router() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("add", "test.add", "Adds the incoming value.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("copy", "test.copy", "Copies the output value.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.copy")]),
+                    _node_call("add", "test.add", "Adds the incoming value."),
+                    _node_call("copy", "test.copy", "Copies the output value."),
                 ],
                 "edges": [{"from": "add", "to": "copy"}, {"from": "copy", "to": "add"}],
             }
@@ -1388,8 +1298,8 @@ def test_compiler_rejects_cycle_with_decision_router() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("add", "test.add", "Adds the incoming value.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("route", "test.route", "Routes the cycle branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
+                    _node_call("add", "test.add", "Adds the incoming value."),
+                    _node_call("route", "test.route", "Routes the cycle branch."),
                     _node_call("copy", "test.start", "Receives the unconditional decision edge."),
                     _node_call("end", "test.start", "Exits the old decision cycle."),
                 ],
@@ -1418,9 +1328,9 @@ def test_graph_health_reports_forbidden_cycle() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("add", "test.add", "Adds the incoming value.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("route", "test.route", "Routes the cycle branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
-                    _node_call("copy", "test.seed", "Recreates value.in for the loop.", provides=[PROV_SPEC("value.in")]),
+                    _node_call("add", "test.add", "Adds the incoming value."),
+                    _node_call("route", "test.route", "Routes the cycle branch."),
+                    _node_call("copy", "test.seed", "Recreates value.in for the loop."),
                     _node_call("end", "test.start", "Unreachable exit placeholder."),
                 ],
                 "edges": [
@@ -1445,10 +1355,10 @@ def test_compiler_rejects_unconditional_edge_from_decision() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
-                    _node_call("add", "test.add", "Adds the incoming value.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("route", "test.route", "Routes the branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
+                    _node_call("add", "test.add", "Adds the incoming value."),
+                    _node_call("route", "test.route", "Routes the branch."),
                     _node_call("copy", "test.start", "Receives the unconditional decision edge."),
                 ],
                 "edges": [{"from": "route", "to": "copy"}],
@@ -1468,10 +1378,10 @@ def test_compiled_payload_uses_registry_flow_kind() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
-                    _node_call("add", "test.add", "Adds the incoming value.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("route", "test.route", "Routes the branch.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
+                    _node_call("add", "test.add", "Adds the incoming value."),
+                    _node_call("route", "test.route", "Routes the branch."),
                 ],
             }
         }
@@ -1696,7 +1606,7 @@ def test_implemented_node_cannot_declare_config_flow_kind() -> None:
             {
                 "pipeline": {
                     "nodes": [
-                        _node_call("seed", "test.seed", "Produces value.in.", flow_kind="process", provides=[PROV_SPEC("value.in")]),
+                        _node_call("seed", "test.seed", "Produces value.in.", flow_kind="process"),
                     ]
                 }
             }

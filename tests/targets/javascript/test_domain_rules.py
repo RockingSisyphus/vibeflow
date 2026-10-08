@@ -1,5 +1,7 @@
-"""Executable domain bundle: class styling, ownership, Rule diagnostics and runtime."""
+"""Executable SDK domain resources: styling, ownership, Rule diagnostics and runtime."""
 from __future__ import annotations
+
+from tests.fixtures.support.plugins import resource as sdk_resource
 
 import json
 import os
@@ -27,16 +29,14 @@ def domain_project(tmp_path: Path) -> tuple[Path, Path]:
         pytest.skip("requires the project-local TypeScript/esbuild toolchain")
     example = tmp_path / "example"
     shutil.copytree(EXAMPLE, example)
-    from tests.fixtures.support.code_plugins import copy_archival_inputs
-    copy_archival_inputs(EXAMPLE, example)
+    from tests.fixtures.support.plugins import copy_sdk_inputs
+    copy_sdk_inputs(EXAMPLE, example)
     project = example / "project"
     (project / "node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
-    from tests.fixtures.support.code_plugins import resource_inputs
-    resource_inputs(project)
     return example / "vibeflow_config.jsonc", project
 
 
-def test_domain_bundle_category_defaults_and_actual_numerical_execution(domain_project, tmp_path: Path) -> None:
+def test_domain_sdk_presentation_and_actual_numerical_execution(domain_project, tmp_path: Path) -> None:
     workspace, project = domain_project
     config = project / "configs/model.jsonc"
     audited = audit_javascript_project(JavascriptAuditRequest(workspace, config))
@@ -58,14 +58,10 @@ def test_domain_rule_rejects_helper_model_definition_with_precise_ownership(doma
     helper.write_text("// wrong business location\nexport function modelForward(value: number): number { return value + 1; }\n", encoding="utf-8")
     transform = project / "nodes/transform.ts"
     transform.write_text('import {modelForward} from "./transform_helper.ts";\nexport function run(inputs: Readonly<{"example.feature": Readonly<{value: number}>}>) {\n  return {output: modelForward(inputs["example.feature"].value)};\n}\n', encoding="utf-8")
-    declaration = project / "bundle/nodes/transform.jsonc"
+    declaration = sdk_resource(project, 'node', 'example.transform')
     descriptor = json.loads(declaration.read_text()); descriptor["base_libs"] = ["example.transform_helper"]
     declaration.write_text(json.dumps(descriptor), encoding="utf-8")
-    config = project / "vibeflow_project.jsonc"
-    data = json.loads(config.read_text()); data.setdefault("descriptors", {})["base_lib"] = ["manifests/base_lib"]
-    config.write_text(json.dumps(data), encoding="utf-8")
-    manifests = project / "manifests/base_lib"; manifests.mkdir()
-    (manifests / "helper.jsonc").write_text(json.dumps({"kind": "base_lib", "id": "example.transform_helper", "display_name": "Transform helper", "description": "Helper attributed to the transform Node.", "implementations": [{"language": "typescript", "targets": ["browser", "node"], "source": {"kind": "file", "ref": "nodes/transform_helper.ts"}}]}), encoding="utf-8")
+    (sdk_resource(project, "base_lib", "example.transform_helper")).write_text(json.dumps({"kind": "base_lib", "id": "example.transform_helper", "display_name": "Transform helper", "description": "Helper attributed to the transform Node.", "implementations": [{"language": "typescript", "targets": ["browser", "node"], "source": {"kind": "file", "ref": "nodes/transform_helper.ts"}}]}), encoding="utf-8")
     with pytest.raises(ProjectBuildError) as error:
         audit_javascript_project(JavascriptAuditRequest(workspace, project / "configs/model.jsonc"))
     finding = next(item for item in error.value.diagnostics if item["rule_id"] == "EXAMPLE.MODEL.LOCATION")
@@ -81,7 +77,7 @@ def _wrong_domain_location(project: Path, location: str) -> tuple[Path, int]:
     if location == "shared_file":
         source = project / "nodes/model.ts"
         source.write_text(source.read_text() + '\nexport function transformRun(inputs: Readonly<{"example.feature": Readonly<{value: number}>}>) { return {output: inputs["example.feature"].value + 1}; }\n')
-        declaration = project / "bundle/nodes/transform.jsonc"
+        declaration = sdk_resource(project, 'node', 'example.transform')
         data = json.loads(declaration.read_text())
         data["implementations"][0]["source"].update({"ref": "nodes/model.ts", "export": "transformRun"})
         declaration.write_text(json.dumps(data))
@@ -93,17 +89,13 @@ def _wrong_domain_location(project: Path, location: str) -> tuple[Path, int]:
         source = project / "nodes/transform_helper.ts"
         source.write_text('// A model definition in a transform helper.\nexport function modelForward(value: number): number { return value + 1; }\n')
         transform.write_text('import {modelForward} from "./transform_helper.js";\nexport function run(inputs: Readonly<{"example.feature": Readonly<{value: number}>}>) { return {output: modelForward(inputs["example.feature"].value)}; }\n')
-        declaration = project / "bundle/nodes/transform.jsonc"
+        declaration = sdk_resource(project, 'node', 'example.transform')
         data = json.loads(declaration.read_text()); data["base_libs"] = ["example.transform_helper"]
         declaration.write_text(json.dumps(data))
-        directory = project / "manifests/base_lib"; directory.mkdir()
-        (directory / "helper.jsonc").write_text(json.dumps({"kind": "base_lib", "id": "example.transform_helper",
+        (sdk_resource(project, "base_lib", "example.transform_helper")).write_text(json.dumps({"kind": "base_lib", "id": "example.transform_helper",
             "display_name": "Transform helper", "description": "A helper attributed to the transform.",
             "implementations": [{"language": "typescript", "targets": ["node", "browser"],
                 "source": {"kind": "file", "ref": "nodes/transform_helper.ts"}}]}))
-        config = project / "vibeflow_project.jsonc"
-        data = json.loads(config.read_text()); data.setdefault("descriptors", {})["base_lib"] = ["manifests/base_lib"]
-        config.write_text(json.dumps(data))
     return source, 2
 
 
@@ -116,8 +108,6 @@ def _domain_commands(project: Path) -> None:
 
 
 def _domain_cli(workspace: Path, project: Path, command: str, *options: str):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(workspace)
     environment = {**os.environ, "PYTHONPATH": str(ROOT / "src"), "PYTHONNOUSERSITE": "1", "PYTHONDONTWRITEBYTECODE": "1"}
     return subprocess.run([sys.executable, "-m", "vibeflow", command, "--workspace", str(workspace),
         "--config", str(project / "configs/model.jsonc"), *options], cwd=project, env=environment,
@@ -199,7 +189,7 @@ def test_run_only_domain_rule_is_explicit_and_does_not_become_a_build_check(doma
 
     workspace, project = domain_project
     source, line = _wrong_domain_location(project, "transform")
-    rule = project / "bundle/rulesets/model-domain.jsonc"
+    rule = sdk_resource(project, 'ruleset', 'example.model_domain')
     data = json.loads(rule.read_text()); data["entrypoints"] = {"import": [], "static": [], "run": ["model_definition"]}
     rule.write_text(json.dumps(data))
     audited = audit_javascript_project(JavascriptAuditRequest(workspace, project / "configs/model.jsonc"))
@@ -209,8 +199,6 @@ def test_run_only_domain_rule_is_explicit_and_does_not_become_a_build_check(doma
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == {"result": 7}
     # The public Target checker can explicitly select run; no JS run command or implicit runtime scan is introduced.
-    from tests.fixtures.support.code_plugins import migrate_fixture
-    migrate_fixture(project)
     catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/model.jsonc")
     policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set())
     checked = run_javascript_rules(audited.graph, catalogs, project_root=project, package_root=project, target="node", phase="run", import_policy=policy)
@@ -225,23 +213,19 @@ def test_process_console_policy_is_checked_at_build_and_actual_runtime(domain_pr
     source.write_text(source.read_text().replace('  return {output: inputs["example.feature"].value + 1};',
         '  console.log("domain transform result", inputs["example.feature"].value + 1);\n'
         '  return {output: inputs["example.feature"].value + 1};'))
-    manifest = project / "bundle/nodes/transform.jsonc"
+    manifest = sdk_resource(project, 'node', 'example.transform')
     descriptor = json.loads(manifest.read_text())
     assert descriptor["flow_kind"] == "process"
     if selection == "empty":
         descriptor["rulesets"] = []
         manifest.write_text(json.dumps(descriptor))
     elif selection == "terminal":
-        resource = project / "bundle/rulesets/data-terminal.jsonc"
-        resource.write_text(json.dumps({"kind": "ruleset", "id": "example.data_terminal",
+        sdk_resource(project, "ruleset", "example.data_terminal").write_text(json.dumps({"kind": "ruleset", "id": "example.data_terminal",
             "calls": [{"id": "native", "ruleset_id": "vibeflow.process"},
                       {"id": "domain", "ruleset_id": "example.model_domain"}],
             "relations": [{"source": "$self", "target": "native/effects", "kind": "overrides",
                 "params": {"effect_scope": "terminal"}}],
             "entrypoints": {"import": ["native"], "static": ["native", "domain"], "run": ["native", "domain"]}}))
-        bundle = project / "bundles/domain.jsonc"
-        data = json.loads(bundle.read_text()); data["resources"]["rulesets"].append("../bundle/rulesets/data-terminal.jsonc")
-        bundle.write_text(json.dumps(data))
         descriptor["rulesets"] = ["example.data_terminal"]
         manifest.write_text(json.dumps(descriptor))
     request = ProjectBuildRequest(workspace, project / "configs/model.jsonc", tmp_path / "dist", "node", "single-esm")
@@ -288,7 +272,7 @@ def test_process_console_name_shadowing_keeps_local_object_pure(domain_project, 
 
 def test_explicit_empty_node_rulesets_is_reported_unconstrained(domain_project) -> None:
     workspace, project = domain_project
-    manifest = project / "bundle/nodes/model.jsonc"
+    manifest = sdk_resource(project, 'node', 'example.model')
     declaration = json.loads(manifest.read_text())
     declaration["rulesets"] = []
     manifest.write_text(json.dumps(declaration), encoding="utf-8")
@@ -308,10 +292,8 @@ def test_multiple_effect_rules_retain_all_constraints_and_report_mixed(domain_pr
     from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
 
     _, project = domain_project
-    file = project / "bundle/nodes/model.jsonc"
+    file = sdk_resource(project, 'node', 'example.model')
     data = json.loads(file.read_text()); data["rulesets"] = ["vibeflow.process", "vibeflow.io"]; file.write_text(json.dumps(data))
-    from tests.fixtures.support.code_plugins import migrate_fixture
-    migrate_fixture(project)
     catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/model.jsonc")
     graph = GraphConfig(nodes=(NodeSpec("first", "example.model"), NodeSpec("second", "example.model")), rulesets=())
     report = run_javascript_rules(graph, catalogs, project_root=project, package_root=project, evaluate_sources=False)
@@ -332,16 +314,10 @@ def test_call_effect_policy_keeps_actual_call_config_and_findings(domain_project
 
     _, project = domain_project
     (project / "rules/call_policy.ts").write_text('export function check(context) { const io=context.subject.call_spec.params.io; return {records:{policy:{type_id:"vibeflow.effect_policy.v1",value:{effect_scope:io?"terminal":"none",allowed_effects:io?["terminal"]:[]}}},findings:io?[]:[{code:"EXAMPLE.STRICT",severity:"error",message:"Strict constraint stays visible"}]}; }\n')
-    directory = project / "manifests/rules"; directory.mkdir()
-    (directory / "call.jsonc").write_text(json.dumps({"kind": "rule", "id": "test.call_policy", "outputs": {"policy": "vibeflow.effect_policy.v1"}, "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/call_policy.ts", "export": "check"}}]}))
-    directory = project / "manifests/rulesets"; directory.mkdir()
-    (directory / "call.jsonc").write_text(json.dumps({"kind": "ruleset", "id": "test.call_policy", "calls": [{"id": "effect", "rule_id": "test.call_policy"}], "entrypoints": {"static": ["effect"]}}))
-    file = project / "vibeflow_project.jsonc"
-    data = json.loads(file.read_text()); data.setdefault("descriptors", {}).update({"rules": ["manifests/rules"], "rulesets": ["manifests/rulesets"]}); file.write_text(json.dumps(data))
-    file = project / "bundle/nodes/model.jsonc"
+    (sdk_resource(project, "rule", "test.call_policy")).write_text(json.dumps({"kind": "rule", "id": "test.call_policy", "outputs": {"policy": "vibeflow.effect_policy.v1"}, "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/call_policy.ts", "export": "check"}}]}))
+    (sdk_resource(project, "ruleset", "test.call_policy")).write_text(json.dumps({"kind": "ruleset", "id": "test.call_policy", "calls": [{"id": "effect", "rule_id": "test.call_policy"}], "entrypoints": {"static": ["effect"]}}))
+    file = sdk_resource(project, 'node', 'example.model')
     data = json.loads(file.read_text()); data["rulesets"] = ["test.call_policy"]; file.write_text(json.dumps(data))
-    from tests.fixtures.support.code_plugins import migrate_fixture
-    migrate_fixture(project)
     catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/model.jsonc")
     graph = GraphConfig(nodes=(NodeSpec("strict", "example.model", params={"io": False}), NodeSpec("io", "example.model", params={"io": True})), rulesets=())
     report = run_javascript_rules(graph, catalogs, project_root=project, package_root=project, target="node")
@@ -366,7 +342,6 @@ def _select_scoped_file_rule(project: Path, scope: str, *, implementation: str =
     rule_id = "vibeflow.quality.files"
     if implementation != "builtin":
         rule_id = "test.files"
-        directory = project / "manifests/rules"; directory.mkdir()
         declaration = {"kind": "rule", "id": rule_id,
             "params_schema": {"max_file_lines": {"type": "integer"}, "warn_file_lines": {"type": "integer"}},
             "params_defaults": {"max_file_lines": 8, "warn_file_lines": 8}}
@@ -375,20 +350,16 @@ def _select_scoped_file_rule(project: Path, scope: str, *, implementation: str =
         else:
             (project / "rules/files.ts").write_text('export function check(context, inputs, params) { return {findings:context.facts.project_facts.files.filter(file=>file.lines>params.max_file_lines).map(file=>({code:"TEST.CLOSURE.LINES",severity:"error",message:"Reached helper exceeds the chosen limit",source_location:{path:context.facts.project_facts.root+"/"+file.path,line:1},details:{limit:params.max_file_lines}}))}; }\n')
             declaration["implementations"] = [{"language": "typescript", "source": {"kind": "file", "ref": "rules/files.ts", "export": "check"}}]
-        (directory / "files.jsonc").write_text(json.dumps(declaration))
+        sdk_resource(project, "rule", rule_id).write_text(json.dumps(declaration))
     ruleset = {"kind": "ruleset", "id": "test.scope", "calls": [{"id": "files", "rule_id": "vibeflow.quality.files", "params": {"max_file_lines": 8, "warn_file_lines": 8}}],
                "entrypoints": {"static": ["files"], "import": [], "run": []}}
-    if implementation != "builtin":
+    if implementation == "ordinary":
+        ruleset["calls"][0]["rule_id"] = rule_id
+    elif implementation != "builtin":
         ruleset["relations"] = [{"source": "$self", "target": "files", "kind": "overrides", "replace_rule": rule_id}]
-    directory = project / "manifests/rulesets"; directory.mkdir()
-    resource = directory / "scope.jsonc"; resource.write_text(json.dumps(ruleset))
-    file = project / "vibeflow_project.jsonc"
-    data = json.loads(file.read_text()); data.setdefault("descriptors", {})["rulesets"] = ["manifests/rulesets"]
-    if implementation != "builtin":
-        data.setdefault("descriptors", {})["rules"] = ["manifests/rules"]
-    file.write_text(json.dumps(data))
+    resource = sdk_resource(project, "ruleset", "test.scope"); resource.write_text(json.dumps(ruleset))
     for name in ("model", "transform", "boundary"):
-        file = project / "bundle/nodes" / (name + ".jsonc")
+        file = sdk_resource(project, "node", "example." + name)
         data = json.loads(file.read_text()); data["rulesets"] = ["test.scope"] if scope == "node" and name == "model" else []; file.write_text(json.dumps(data))
     config = project / "configs/model.jsonc"
     data = json.loads(config.read_text()); data["rulesets"] = ["test.scope"] if scope == "workflow" else []; config.write_text(json.dumps(data))
@@ -426,7 +397,7 @@ def test_selected_file_rule_uses_real_closure_and_explicit_overrides(domain_proj
     assert call["parameter_sources"]["max_file_lines"] == "override:$self"
     assert not any("unused.ts" in str(item.to_dict()) for item in audited.rule_report.findings)
     if scope == "node":
-        file = project / "bundle/nodes/model.jsonc"
+        file = sdk_resource(project, 'node', 'example.model')
     else:
         file = config
     data = json.loads(file.read_text()); data["rulesets"] = []; file.write_text(json.dumps(data))
@@ -434,7 +405,7 @@ def test_selected_file_rule_uses_real_closure_and_explicit_overrides(domain_proj
     assert unconstrained.rule_report.results[key] == ()
 
 
-@pytest.mark.parametrize("implementation", ["alias", "replacement"])
+@pytest.mark.parametrize("implementation", ["alias", "replacement", "ordinary"])
 def test_project_topic_alias_and_replacement_receive_the_actual_scope(domain_project, implementation) -> None:
     workspace, project = domain_project
     _, helper = _select_scoped_file_rule(project, "node", implementation=implementation)
@@ -445,6 +416,29 @@ def test_project_topic_alias_and_replacement_receive_the_actual_scope(domain_pro
     assert finding["definition_id"] == "test.files"
     assert finding["source_location"]["path"] == str(helper)
     assert finding["details"]["limit"] == 8
+    assert all("unused.ts" not in str(item) for item in error.value.diagnostics)
+
+
+def test_native_project_alias_keeps_declared_defaults_and_explicit_overrides(domain_project):
+    workspace, project = domain_project
+    ruleset, helper = _select_scoped_file_rule(project, "node", implementation="alias")
+    data = json.loads(ruleset.read_text())
+    data["calls"][0]["params"] = {}
+    ruleset.write_text(json.dumps(data))
+    with pytest.raises(ProjectBuildError) as error:
+        audit_javascript_project(JavascriptAuditRequest(workspace, project / "configs/model.jsonc"))
+    finding = next(item for item in error.value.diagnostics if item["code"] == "QUALITY.FILE.MAX_LINES")
+    assert finding["definition_id"] == "test.files"
+    assert finding["source_location"]["path"] == str(helper)
+    assert finding["details"]["limit"] == 8
+    data["relations"].append({"source":"$self", "target":"files", "kind":"overrides",
+                              "params":{"max_file_lines":20,"warn_file_lines":20}})
+    ruleset.write_text(json.dumps(data))
+    audited = audit_javascript_project(JavascriptAuditRequest(workspace, project / "configs/model.jsonc"))
+    invocation = audited.rule_report.results["example.model"][-1].plan.to_dict()["calls"][0]
+    assert invocation["params"] == {"max_file_lines":20, "warn_file_lines":20}
+    assert invocation["parameter_sources"]["max_file_lines"] == "override:$self"
+    assert not any("unused.ts" in str(item.to_dict()) for item in audited.rule_report.findings)
 
 
 @pytest.mark.parametrize("state", ["unavailable", "failed"])
@@ -458,13 +452,9 @@ def test_formal_rule_state_failure_is_rejected_before_later_entrances(domain_pro
     model = project / "nodes/model.ts"
     model.write_text('import {writeFileSync} from "node:fs"; writeFileSync(' + json.dumps(str(business_marker)) + ',"ran");\n' + model.read_text())
     (project / "rules/status.ts").write_text('import {writeFileSync} from "node:fs"; export function check(context) { if(context.phase===' + json.dumps(phase) + ') return {state:' + json.dumps(state) + ',findings:' + ('[{code:"EXAMPLE.STATUS.WARNING",severity:"warning",message:"Incomplete with warning"}]' if state == "failed" else '[]') + '}; writeFileSync(' + json.dumps(str(static_marker)) + ',"later phase ran"); return {findings:[]}; }\n')
-    directory = project / "manifests/rules"; directory.mkdir()
-    (directory / "status.jsonc").write_text(json.dumps({"kind": "rule", "id": "test.status", "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/status.ts", "export": "check"}}]}))
-    directory = project / "manifests/rulesets"; directory.mkdir()
-    (directory / "status.jsonc").write_text(json.dumps({"kind": "ruleset", "id": "test.status", "calls": [{"id": "check", "rule_id": "test.status"}], "entrypoints": {"import": ["check"] if phase == "import" else [], "static": ["check"]}}))
-    file = project / "vibeflow_project.jsonc"
-    data = json.loads(file.read_text()); data.setdefault("descriptors", {}).update({"rules": ["manifests/rules"], "rulesets": ["manifests/rulesets"]}); file.write_text(json.dumps(data))
-    file = project / "bundle/nodes/model.jsonc"
+    (sdk_resource(project, "rule", "test.status")).write_text(json.dumps({"kind": "rule", "id": "test.status", "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/status.ts", "export": "check"}}]}))
+    (sdk_resource(project, "ruleset", "test.status")).write_text(json.dumps({"kind": "ruleset", "id": "test.status", "calls": [{"id": "check", "rule_id": "test.status"}], "entrypoints": {"import": ["check"] if phase == "import" else [], "static": ["check"]}}))
+    file = sdk_resource(project, 'node', 'example.model')
     data = json.loads(file.read_text()); data["rulesets"] = ["test.status"]; file.write_text(json.dumps(data))
     config = project / "configs/model.jsonc"
     with pytest.raises(ProjectBuildError) as error:
@@ -512,16 +502,10 @@ def test_rule_scope_keeps_call_identity_and_caches_source_snapshots(domain_proje
     _, project = domain_project
     rule = project / "rules/scope.ts"
     rule.write_text('let count=0; export function check(context) { console.log("Rule log"); return {records:{count:{type_id:"example.count.v1",value:{count:++count, call:context.subject.call_spec?.id ?? null, rule:context.subject.rule_call_id ?? null}}},findings:[{code:"EXAMPLE.SCOPE",severity:"warning",message:"Scope proof",source_location:{path:context.facts.source_files[0],line:1}}]}; }\n', encoding="utf-8")
-    directory = project / "manifests/rules"; directory.mkdir()
-    (directory / "scope.jsonc").write_text(json.dumps({"kind": "rule", "id": "test.scope", "scope": scope, "outputs": {"count": "example.count.v1"}, "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/scope.ts", "export": "check"}}]}))
-    directory = project / "manifests/rulesets"; directory.mkdir()
-    (directory / "scope.jsonc").write_text(json.dumps({"kind": "ruleset", "id": "test.scope", "calls": [{"id": "check", "rule_id": "test.scope"}], "entrypoints": {"static": ["check"]}}))
-    file = project / "vibeflow_project.jsonc"
-    data = json.loads(file.read_text()); data.setdefault("descriptors", {}).update({"rules": ["manifests/rules"], "rulesets": ["manifests/rulesets"]}); file.write_text(json.dumps(data))
-    file = project / "bundle/nodes/model.jsonc"
+    (sdk_resource(project, "rule", "test.scope")).write_text(json.dumps({"kind": "rule", "id": "test.scope", "scope": scope, "outputs": {"count": "example.count.v1"}, "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/scope.ts", "export": "check"}}]}))
+    (sdk_resource(project, "ruleset", "test.scope")).write_text(json.dumps({"kind": "ruleset", "id": "test.scope", "calls": [{"id": "check", "rule_id": "test.scope"}], "entrypoints": {"static": ["check"]}}))
+    file = sdk_resource(project, 'node', 'example.model')
     data = json.loads(file.read_text()); data["rulesets"] = ["test.scope"]; file.write_text(json.dumps(data))
-    from tests.fixtures.support.code_plugins import migrate_fixture
-    migrate_fixture(project)
     catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/model.jsonc")
     policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set(), node_ids=frozenset({"example.model"}))
     graph = GraphConfig(nodes=(NodeSpec("first", "example.model"), NodeSpec("second", "example.model")), rulesets=())
@@ -538,13 +522,3 @@ def test_rule_scope_keeps_call_identity_and_caches_source_snapshots(domain_proje
     assert [finding.to_dict()["details"]["call_paths"] for finding in findings] == expected_paths
 
 # Historical mutations are test inputs; publish fixed SDK code explicitly.
-_native_audit = audit_javascript_project
-_native_build = build_project_aot
-def audit_javascript_project(request, **options):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(request.workspace)
-    return _native_audit(request, **options)
-def build_project_aot(request, **options):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(request.workspace)
-    return _native_build(request, **options)

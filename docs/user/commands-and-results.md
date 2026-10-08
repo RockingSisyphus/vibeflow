@@ -21,6 +21,12 @@ VibeFlow 的公开命令分别报告结构、质量、构建、审核产物或�
 
 对实际 Config 的完整工作流执行 `review`，得到一张展开 SVG，并更新已登记的 `ARCHITECTURE.jsonc`。SVG 展示工作流与资源区，JSONC 保存声明、入口与支撑文件、真实依赖、有效规则和展示来源。审核失败时保留已有正式产物。多文件图形内容见[图形与 Architecture](multifile-resources.md#图形与-architecture)。
 
+展开图的资源目录按 `plugins`、`base_lib`、`host_extensions` 排列：目录父节点连接当前配置使用的资源。Node 显示在流程的实际调用位置；Nodeset 按定义的 `expand` 设置展开。`export-svg --expand-nodesets` 和 `export-mermaid --mermaid-layout review-columns` 沿用这一展示方式。有效规则与参数来源通过 `review-rules --json` 查询。
+
+## 运行日志与监控
+
+Python 执行和 Node.js AOT 调用生成 `vibeflow.log`、`business.log` 和 `status.json`。通过状态文件读取启动、运行、成功或失败状态；Node 可更新缓存中的业务信息。固定路径、更新间隔和双语言 API 见[运行日志与状态接口](runtime-observation.md)。
+
 ## 检查范围
 
 一次命令的 `checked` 只列出实际完成的阶段。结构检查可以覆盖：
@@ -71,6 +77,6 @@ Python `run` 会在 run 目录写入 `workflow_execution_report.json`。JavaScri
 
 ## 运行产物
 
-Python run 目录包含健康报告、Architecture、图形、trace 和脱敏输入输出摘要。真实业务结果从成功运行返回的 Context 或业务入口读取；摘要文件用于审计形状，不是业务返回值。
+Python run 目录包含健康报告、Architecture、图形、trace 和脱敏输入输出摘要。真实业务结果从成功运行返回值或业务入口读取；摘要文件用于审计形状，不是业务返回值。
 
 `delegate-cli` 把 workflow 作为普通业务 CLI 使用。业务 stdout/stderr 不添加 VibeFlow 范围说明，框架诊断写入当次 run 的 `vibeflow.log`。

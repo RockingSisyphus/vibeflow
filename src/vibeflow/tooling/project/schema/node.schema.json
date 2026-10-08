@@ -131,6 +131,9 @@
               },
               "params": {
                 "type": "object"
+              },
+              "outputs": {
+                "type": "object"
               }
             },
             "additionalProperties": false

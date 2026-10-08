@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import tomllib
 from typing import Callable, Iterator
 from urllib.parse import unquote
 
@@ -91,8 +92,6 @@ _REMOVED_DOCUMENT_TOKENS = (
 )
 
 _STALE_DOCUMENT_TOKENS = {
-    "0.9.0": "Replace the obsolete public release version with 0.15.0.",
-    "0.10.0": "Replace the obsolete public release version with 0.15.0.",
     "vibeflow.runtime": "Use the owning layered API instead of the removed runtime facade.",
     "vibeflow.aot": "Use vibeflow.targets.javascript instead of the removed AOT facade.",
     "vibeflow.portable": "Use vibeflow.block_compiler instead of the removed portable facade.",
@@ -101,6 +100,12 @@ _STALE_DOCUMENT_TOKENS = {
 }
 
 _MARKDOWN_LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+
+_CURRENT_DEVELOPMENT_VERSION_RE = re.compile(
+    r"^[ \t]*(?:当前开发版本为[ \t]*|Current development package version:[ \t]*)"
+    r"`?(?P<version>\d+\.\d+\.\d+(?:[A-Za-z0-9.+-]*[A-Za-z0-9])?)",
+    re.IGNORECASE,
+)
 
 _DOCUMENT_COMMAND_PATTERNS = (
     (
@@ -402,10 +407,41 @@ def _markdown_link_target(raw: str) -> str:
 
 def _documentation_findings(root: Path) -> list[Finding]:
     findings: list[Finding] = []
+    development_version: str | None = None
     for path in _iter_documentation_files(root):
         source = path.read_text(encoding="utf-8")
         lines = source.splitlines()
         for line_number, line in enumerate(lines, start=1):
+            version_match = _CURRENT_DEVELOPMENT_VERSION_RE.match(line)
+            if version_match is not None:
+                if development_version is None:
+                    metadata = root / "pyproject.toml"
+                    try:
+                        project = tomllib.loads(metadata.read_text(encoding="utf-8"))["project"]
+                        development_version = project["version"]
+                        if not isinstance(development_version, str) or not development_version.strip():
+                            raise ValueError("project.version must be a non-empty string")
+                    except (OSError, KeyError, TypeError, ValueError) as exc:
+                        raise RepositoryCheckError(
+                            f"cannot read current development version from {metadata}: {exc}"
+                        ) from exc
+                documented_version = version_match.group("version")
+                if documented_version != development_version:
+                    findings.append(
+                        _finding(
+                            "STALE_DOCUMENTATION",
+                            root,
+                            path,
+                            f"Current development version {documented_version!r} does not match project.version {development_version!r}.",
+                            f"Update the current development version to {development_version} from pyproject.toml.",
+                            line=line_number,
+                            details={
+                                "version": documented_version,
+                                "expected_version": development_version,
+                                "version_source": "pyproject.toml",
+                            },
+                        )
+                    )
             for match in _MARKDOWN_LINK_RE.finditer(line):
                 target = _markdown_link_target(match.group(1))
                 if not target or target.startswith(
@@ -619,6 +655,8 @@ def check_base(root: Path, *, node_executable: str | None = None) -> list[Findin
     # dependencies reached through other neutral helpers.
     graph = build_import_graph(root)
     findings.extend(scan_layer(root, "tooling", graph=graph))
+    findings.extend(scan_layer(root, "builtin", graph=graph))
+    findings.extend(scan_layer(root, "target-services", graph=graph))
     findings.extend(neutral_tooling_findings(root, graph))
     findings.extend(_documentation_findings(root))
     return findings

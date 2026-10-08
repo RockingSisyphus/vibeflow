@@ -15,6 +15,8 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     from vibeflow.core.contracts import DataProvider, DataRequirement
     from vibeflow.core.flow import EdgeSpec, GraphConfig, IoSpec, LoopSpec, NodeMetadata, NodeSpec, NodesetSpec
     from vibeflow.targets.python.project.registry import NodeRegistry
+    if variant == "current":
+        from vibeflow.tooling.application.python.project.declarations import default_python_registry as NodeRegistry
     from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
 
     def io(name, operation, signal):
@@ -28,7 +30,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         if fanout:
             body_nodes += (io("right", "send", "child.signal"),)
             body_edges += (EdgeSpec("start", "right"),)
-        body = GraphConfig(body_nodes, body_edges)
+        body = GraphConfig(body_nodes, body_edges, **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
         if variant == "current":
             body = replace(body, rulesets=() if child_empty else (selected,) if selected else body.rulesets)
         child = NodesetSpec("variant.body", "Body", "A loaded and invoked native graph.", (), (), body)
@@ -38,7 +40,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         nodes = (io("start", "receive", "root.signal"), *calls, io("end", "send", "root.signal"))
         edges = tuple(EdgeSpec(first.id, second.id, schedule=True) for first, second in zip(nodes, nodes[1:]))
         edges += (EdgeSpec("start", "end", schedule=False, transfer=True),)
-        graph = GraphConfig(nodes, edges, nodesets={child.type_key: child})
+        graph = GraphConfig(nodes, edges, nodesets={child.type_key: child}, **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
         if variant == "current":
             graph = replace(graph, rulesets=() if root_empty else (selected,) if selected else graph.rulesets)
         return graph

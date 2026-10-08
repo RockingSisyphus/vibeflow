@@ -1,4 +1,4 @@
-"""JavaScript source adapter for the shared project-quality evaluator."""
+"""Extract JavaScript source facts for the selected project scope."""
 
 from __future__ import annotations
 
@@ -11,15 +11,12 @@ from vibeflow.core.quality import (
     FileQuality,
     FunctionQuality,
     ImportSite,
-    ProjectQualityFacts,
     QualityFinding,
     QualityPolicy,
-    QualityReport,
     QualityStructureConventions,
     QualityStructureLimits,
     QualityStructureRoles,
     QualityThresholds,
-    evaluate_project_quality,
 )
 from vibeflow.targets.javascript.build.toolchain import AotToolchainError, DriverQualityResult, run_quality_facts_driver
 from vibeflow.targets.javascript.build.quality_implementation import registered_implementation_requests
@@ -41,7 +38,7 @@ def javascript_quality_policy(*, thresholds: QualityThresholds | None = None,
         structure_limits = replace(structure_limits, allowed_root_code_files=("index.ts", "index.js", "index.tsx", "index.jsx", "index.mts", "index.mjs"))
     return QualityPolicy(
         thresholds=thresholds or QualityThresholds(), structure_limits=structure_limits,
-        structure_roles=structure_roles or QualityStructureRoles(base_lib_paths=(), infer_roles_from_path=False),
+        structure_roles=structure_roles or QualityStructureRoles(),
         structure_conventions=QualityStructureConventions(
             code_label="JavaScript/TypeScript", package_entry="index.ts",
             suggested_entry_files=("index.ts", "index.js"), public_entry_stems=("index", "api", "types"),
@@ -51,19 +48,16 @@ def javascript_quality_policy(*, thresholds: QualityThresholds | None = None,
     )
 
 
-def scan_javascript_quality(
+def collect_javascript_quality_facts(
     root: Path | str,
     *,
     package_root: Path | str,
-    thresholds: QualityThresholds | None = None,
-    structure_limits: QualityStructureLimits | None = None,
-    structure_roles: QualityStructureRoles | None = None,
     registered_catalogs: object | None = None,
     excluded_dirs: Iterable[str] = DEFAULT_EXCLUDED_DIRS,
     node_command: str = "node",
     facts_cache: MutableMapping[str, DriverQualityResult] | None = None,
-) -> QualityReport:
-    """Scan handwritten sources once and evaluate language-neutral rules in Core."""
+) -> DriverQualityResult:
+    """Read the selected source scope and return parser facts without Rule selection."""
 
     selected = Path(root).expanduser().resolve()
     files = tuple(_iter_source_files(selected, set(excluded_dirs)))
@@ -93,19 +87,7 @@ def scan_javascript_quality(
         for path in files
     }:
         raise AotToolchainError("QUALITY.FACTS.MISSING", "JavaScript parser omitted selected source files")
-    findings = list(_finding_fact(item) for item in facts.findings)
-    return evaluate_project_quality(
-        ProjectQualityFacts(
-            root=str(selected if selected.is_dir() else selected.parent),
-            files=parsed_files,
-            findings=tuple(findings),
-        ),
-        javascript_quality_policy(
-            thresholds=thresholds,
-            structure_limits=structure_limits,
-            structure_roles=structure_roles,
-        ),
-    )
+    return facts
 
 
 def _iter_source_files(root: Path, excluded: set[str]) -> Iterable[Path]:
@@ -204,4 +186,4 @@ def _finding_fact(row: Mapping[str, object]) -> QualityFinding:
     )
 
 
-__all__ = ["DEFAULT_EXCLUDED_DIRS", "javascript_quality_policy", "scan_javascript_quality"]
+__all__ = ["DEFAULT_EXCLUDED_DIRS", "javascript_quality_policy", "collect_javascript_quality_facts"]

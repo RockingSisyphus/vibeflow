@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
-import hashlib
+from dataclasses import dataclass, field, fields, replace
 import json
 from typing import Mapping
 
 from vibeflow.core.findings import Finding, HealthFinding
-from vibeflow.core.rules import RuleContext, RuleGraphError, compile_ruleset, execute_rule_plan, rule_graph_error_finding
-from vibeflow.core.rules.builtin import builtin_rule_resources
-from vibeflow.targets.python.quality.rules import python_rule_handlers
+from vibeflow.core.rules import EFFECT_POLICY_TYPE, RuleContext, RuleGraphError, compile_ruleset, execute_rule_plan, rule_graph_error_finding
+from vibeflow.targets.python.quality.policy_parameters import complete_source_policy_plan, native_rule_bindings, native_rule_origins
+from vibeflow.core.rules.fingerprint import record_inputs_fingerprint, value_fingerprint
 
 
 @dataclass(frozen=True)
@@ -25,10 +24,22 @@ class PythonRuleReport:
 
 
 def rule_resources(registry, *, purity_policy=None, quality_policy=None):
-    built_rules, built_sets = builtin_rule_resources()
-    rules = {item.id: item for item in built_rules}
-    rulesets = {item.id: item for item in built_sets}
-    origins = {(kind, item.id): f"builtin:{item.id}" for kind, items in (("rule", built_rules), ("ruleset", built_sets)) for item in items}
+    defaults = registry.rule_defaults() if hasattr(registry, "rule_defaults") else {}
+    purity_policy = purity_policy if purity_policy is not None else defaults.get("purity_policy")
+    quality_policy = quality_policy if quality_policy is not None else defaults.get("quality_policy")
+    from vibeflow.targets.python.project.check_session import current_python_check, catalog_key, fact_key
+    session = current_python_check(registry)
+    if session is None:
+        return _rule_resources(registry, purity_policy=purity_policy, quality_policy=quality_policy)
+    key = catalog_key(registry), fact_key((purity_policy, quality_policy))
+    if key not in session.rules:
+        session.rules[key] = _rule_resources(registry, purity_policy=purity_policy, quality_policy=quality_policy)
+    rules, rulesets = session.rules[key]
+    return dict(rules), dict(rulesets)
+
+
+def _rule_resources(registry, *, purity_policy=None, quality_policy=None):
+    rules, rulesets, origins = {}, {}, {}
     for catalogs in registry.rule_catalogs or ():
         for kind, catalog, target in (("rule", catalogs.rules, rules), ("ruleset", catalogs.rulesets, rulesets)):
             for descriptor in catalog:
@@ -40,11 +51,11 @@ def rule_resources(registry, *, purity_policy=None, quality_policy=None):
                          "previous_source":origins.get((kind,descriptor.id),"")})
                 target[descriptor.id] = descriptor
                 origins.setdefault((kind,descriptor.id),source)
-    from vibeflow.core.rules.builtin.project_quality import project_quality_rule_defaults
+    from vibeflow.builtin.project_quality import bound_project_quality_defaults
     from vibeflow.targets.python.quality.project_context import source_quality_policy
-    for rule_id,defaults in project_quality_rule_defaults(quality_policy or source_quality_policy(purity_policy)).items():
-        if rule_id in rules:
-            rules[rule_id] = replace(rules[rule_id],params_defaults={**rules[rule_id].params_defaults,**defaults})
+    for rule_id,defaults in bound_project_quality_defaults(native_rule_bindings(registry, rules),
+        quality_policy or source_quality_policy(purity_policy), rules=rules, origins=native_rule_origins(registry)).items():
+        rules[rule_id] = replace(rules[rule_id],params_defaults={**rules[rule_id].params_defaults,**defaults})
     return rules, rulesets
 
 
@@ -58,17 +69,18 @@ def selected_effect_scope(registry, type_key: str) -> str:
     for selected in registry.rulesets(type_key):
         try:
             plan = compile_ruleset(selected, rules=rules, rulesets=rulesets, entrypoint="static")
+            plan = complete_source_policy_plan(plan, registry.rule_defaults().get("purity_policy"), handlers=native_rule_bindings(registry, rules))
         except RuleGraphError:
             return "unavailable"
         for invocation in plan.invocations:
-            if invocation.rule.id == "vibeflow.no_side_effects":
+            if EFFECT_POLICY_TYPE in invocation.rule.outputs.values() and "effect_scope" in invocation.params:
                 scopes.add(str(invocation.params["effect_scope"]))
     return next(iter(scopes)) if len(scopes) == 1 else "mixed" if scopes else "unconstrained"
 
 
 def graph_error_finding(registry, error, *, object_type, object_id, fallback_path=""):
     source = str(error.details.get("source", ""))
-    if source and not source.startswith("builtin:"):
+    if source:
         resource = str(error.details.get("resource_id", ""))
         kind = str(error.details.get("resource_kind", "ruleset"))
         return HealthFinding(rule_id=error.code,severity="error",object_type=object_type,object_id=object_id,
@@ -86,15 +98,28 @@ def graph_error_finding(registry, error, *, object_type, object_id, fallback_pat
 
 
 def execute_python_node_rules(registry, source_context, *, phase="static", purity_policy=None, quality_policy=None, extra_handlers=None, extra_facts=None):
+    return _execute_python_node_rules(registry, source_context, phase=phase, purity_policy=purity_policy,
+        quality_policy=quality_policy, extra_handlers=extra_handlers, extra_facts=extra_facts)
+
+
+def review_python_node_binding(registry, source_context, type_key, *, purity_policy=None, quality_policy=None):
+    """Review a pending binding using the command's complete source fact view."""
+    return _execute_python_node_rules(registry, source_context, phase="import", purity_policy=purity_policy,
+        quality_policy=quality_policy, selected_types=(type_key,))
+
+
+def _execute_python_node_rules(registry, source_context, *, phase="static", purity_policy=None,
+    quality_policy=None, extra_handlers=None, extra_facts=None, selected_types=None):
     registry.configure_rule_defaults(purity_policy=purity_policy,quality_policy=quality_policy)
     try:
         rules, rulesets = rule_resources(registry,purity_policy=purity_policy,quality_policy=quality_policy)
     except RuleGraphError as exc:
         finding = graph_error_finding(registry,exc,object_type="rule",object_id=str(exc.details.get("resource_id","")))
         return PythonRuleReport(findings=(finding,),effect_scopes={node.type_key:"unavailable" for node in source_context.nodes})
-    handlers = {**python_rule_handlers(), **dict(extra_handlers or {})}
+    handlers = dict(extra_handlers or {})
     custom = getattr(registry, "rule_handler_loader", None)
     findings = []
+    seen_diagnostics = set()
     executions = []
     metrics = {}
     call_metrics = {}
@@ -104,22 +129,22 @@ def execute_python_node_rules(registry, source_context, *, phase="static", purit
     call_policies = {}
     call_scoped_types = set()
     unavailable_types = set()
-    source_cache = {}
-    project_fact_cache = {}
+    from vibeflow.targets.python.project.check_session import current_python_check, PythonCheckSession
+    session = current_python_check(registry) or PythonCheckSession()
+    view = session.view(registry, source_context, extra_facts=extra_facts)
+    source_cache = view.source_cache(phase)
+    project_fact_cache = view.project_facts
     from vibeflow.targets.python.quality.project_context import project_rule_facts
     if phase in {"static","run"}:
         registry.reset_effect_policies(node.type_key for node in source_context.nodes)
     from vibeflow.core.rules.models import plain
-    source_facts = {"files":[(item.path,item.module,item.root_id,item.text) for item in source_context.files],
-        "calls":[(item.owner,item.node_id,item.type_key,plain(item.params),item.source_path,item.local_id,item.call_path) for item in source_context.calls],
-        "imports":[(item.path,item.specifier,item.module,item.resolved_path,item.symbol,item.alias,item.line,item.column) for item in source_context.imports],
-        "nodes":[(item.descriptor.to_dict(),item.path,item.symbol,item.root_id,item.calls) for item in source_context.nodes]}
-    snapshot = hashlib.sha256(json.dumps(source_facts,sort_keys=True).encode()).hexdigest()
+    base_context = view.context(phase)
     for node in source_context.nodes:
-        identity = ("python",node.path,node.symbol,json.dumps(node.descriptor.to_dict(),sort_keys=True),snapshot)
+        if selected_types is not None and node.type_key not in selected_types:
+            continue
         for selected_id in registry.rulesets(node.type_key):
             try:
-                plan = compile_ruleset(selected_id, rules=rules, rulesets=rulesets, entrypoint=phase)
+                plan = session.plan(selected_id, rules, rulesets, phase)
             except RuleGraphError as exc:
                 findings.append(graph_error_finding(registry,exc,object_type="node",object_id=node.type_key,
                     fallback_path=registry.source_info(node.type_key).path))
@@ -139,24 +164,38 @@ def execute_python_node_rules(registry, source_context, *, phase="static", purit
                     findings.extend(failure)
                     unavailable_types.add(node.type_key)
                     continue
-            from vibeflow.core.descriptors.contributions import contribution_facts
-            contributions = contribution_facts(registry.loaded_plugins.catalogs) if hasattr(registry, "loaded_plugins") else {}
-            from vibeflow.targets.python.project.source_membership import source_ownership
-            facts = {**contributions, **source_ownership(registry), "source_load_states":getattr(registry, "source_load_states", {}),
-                     **project_rule_facts(plan,source_context,project_fact_cache),"source_context":source_context,
-                     "node_catalog":tuple(registry.descriptor(key) for key in registry.available()), **dict(extra_facts or {})}
-            if purity_policy is not None:
-                facts["purity_policy"] = purity_policy
+            plan = complete_source_policy_plan(plan, purity_policy, handlers=handlers)
+            implementation_identity = session.implementation_identity(plan,handlers)
+            identity = ("python",node.path,node.symbol,json.dumps(node.descriptor.to_dict(),sort_keys=True),
+                        view.snapshot,view.token,implementation_identity)
+            updates = {"source_load_states":getattr(registry, "source_load_states", {}),
+                **project_rule_facts(plan,source_context,project_fact_cache,handlers=handlers)}
+            node_context = replace(base_context, facts={**base_context.facts,
+                **{key:value for key,value in updates.items() if key not in (extra_facts or {})}})
             for owner, call_id in node.calls or (("source",node.type_key),):
-                context = RuleContext(facts={**facts,"call":source_context.call(owner,call_id)},subject={"type_key":node.type_key,"kind":"node","descriptor":node.descriptor,
+                context = replace(node_context, facts={**node_context.facts,"call":source_context.call(owner,call_id)},subject={"type_key":node.type_key,"kind":"node","descriptor":node.descriptor,
                     "source_identity":identity,"calls":node.calls,"owner":owner,"call_id":call_id},
-                    scope={"files":tuple(item.path for item in source_context.files),"workflow":owner,
-                        "workflows":tuple(sorted({call.owner for call in source_context.calls}))},phase=phase,target="python")
+                    scope={**node_context.scope,"workflow":owner})
                 result = execute_rule_plan(plan,context,handlers=handlers,source_cache=source_cache)
                 executions.append(result)
-                for item in result.findings:
-                    definition = rules.get(getattr(item,"definition_id", ""))
+                # Core suppresses duplicate top-level findings on cache hits.
+                # A new adapter/binding still needs the actual cached diagnostics.
+                diagnostics = tuple((invocation_id,item) for invocation_id,value in result.results.items() for item in value.findings)
+                for invocation_id,item in diagnostics:
+                    invocation = next(value for value in plan.invocations if value.id == invocation_id)
+                    definition = invocation.rule
                     association = node.calls if definition is not None and definition.scope == "source" else ((owner,call_id),)
+                    inputs = {name:result.results[provider].records[output]
+                              for name,(provider,output) in invocation.inputs.items()
+                              if output in result.results[provider].records}
+                    inputs_key = record_inputs_fingerprint(inputs)
+                    effective_call = value_fingerprint((definition.id,invocation.params,inputs_key))
+                    if definition.scope != "source" or inputs_key is None:
+                        effective_call += value_fingerprint((selected_id,owner,call_id,invocation_id))
+                    diagnostic_key = node.type_key, association, effective_call, value_fingerprint({field.name:getattr(item,field.name) for field in fields(item)})
+                    if diagnostic_key in seen_diagnostics:
+                        continue
+                    seen_diagnostics.add(diagnostic_key)
                     location = str(item.source_location.get("path",node.path))
                     source = next((file for file in source_context.files if file.path == location),None)
                     findings.append(replace(item,details={**item.details,"node_type":node.type_key,
@@ -191,8 +230,14 @@ def execute_python_node_rules(registry, source_context, *, phase="static", purit
             registry.record_effect_policy(node.type_key,scopes[node.type_key])
     call_scopes = {key:next(iter(value)) if len(value) == 1 else "mixed" for key,value in call_policy_scopes.items()}
     from vibeflow.targets.python.project.resource_rules import review_reached_base_libs
+    entries = ()
+    if selected_types is not None:
+        entries = tuple(item["path"] for item in base_context.facts.get("source_owners", ())
+                        if item["kind"] == "node" and item["id"] in selected_types)
+        if not entries:
+            entries = tuple(node.path for node in source_context.nodes if node.type_key in selected_types)
     library_findings, library_executions = review_reached_base_libs(registry,source_context,rules=rules,rulesets=rulesets,
-        handlers=handlers,phase=phase,purity_policy=purity_policy)
+        handlers=handlers,phase=phase,purity_policy=purity_policy,session=session,entry_paths=entries)
     findings.extend(library_findings)
     executions.extend(library_executions)
     return PythonRuleReport(tuple(findings),tuple(executions),metrics,scopes,call_scopes,{key:tuple(value) for key,value in call_policies.items()},call_metrics)

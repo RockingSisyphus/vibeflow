@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import inspect
-import json
 from copy import copy
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Mapping, MutableMapping
@@ -11,6 +10,7 @@ from typing import Any, Callable, Mapping, MutableMapping
 from vibeflow.core.findings import Finding, HealthFinding
 from vibeflow.core.rules.graph import RuleInvocation, RulePlan
 from vibeflow.core.rules.models import RuleContext, RuleRecord, RuleResult, plain, readonly
+from vibeflow.core.rules.fingerprint import cacheable_record_value as _cacheable_record_value, record_inputs_fingerprint, value_fingerprint
 
 
 RuleHandler = Callable[[RuleContext, Mapping[str, RuleRecord], Mapping[str, Any]], RuleResult]
@@ -121,10 +121,10 @@ def _key(invocation: RuleInvocation, inputs: Mapping[str, RuleRecord], context: 
     identity = context.subject.get("source_identity")
     if invocation.rule.scope != "source" or identity is None:
         return None
-    def opaque(value: Any) -> str:
-        return f"{type(value).__module__}.{type(value).__qualname__}@{id(value)}"
-    return json.dumps([plain(identity), context.target, context.phase, invocation.rule.id, plain(invocation.params),
-                       {key: record.to_dict() for key, record in inputs.items()}], sort_keys=True, allow_nan=False, default=opaque)
+    inputs_key = record_inputs_fingerprint(inputs)
+    if inputs_key is None:
+        return None
+    return value_fingerprint((identity, context.target, context.phase, invocation.rule.id, invocation.params, inputs_key))
 
 
 class _Execution:

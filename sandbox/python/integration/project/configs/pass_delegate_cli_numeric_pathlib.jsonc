@@ -4,7 +4,8 @@
       {
         "key": "cli.argv",
         "type": "cli.argv",
-        "display_name": "CLI Argv"
+        "display_name": "CLI Argv",
+        "required": true
       }
     ],
     "outputs": [

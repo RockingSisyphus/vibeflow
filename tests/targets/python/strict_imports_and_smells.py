@@ -1,3 +1,4 @@
+from tests.fixtures.support.declarations import native_registry
 from tests.fixtures.support.strict_support import *
 from tests.fixtures.support.rule_inspection import _valid_node_source, _inspect_node_source, node_document
 from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor_manifest
@@ -25,32 +26,6 @@ def test_urllib_parse_is_allowed_but_urllib_request_is_banned_for_nodes(tmp_path
     assert any(error["code"] == "NODE.EFFECT.IMPORT_FORBIDDEN" for error in payload["health"]["errors"])
 
 
-def test_urllib_parse_is_allowed_but_urllib_request_is_banned_for_base_lib(tmp_path) -> None:
-    base_dir = tmp_path / "base_lib"
-    base_dir.mkdir()
-    (base_dir / "parse_tools.py").write_text(
-        """
-from urllib.parse import urlparse
-
-def path_length(url):
-    return len(urlparse(url).path)
-""".strip(),
-        encoding="utf-8",
-    )
-    report = scan_base_lib(tmp_path, policy=PurityPolicy(max_source_lines=1000))
-    assert report.findings == ()
-
-    (base_dir / "request_tools.py").write_text(
-        """
-from urllib.request import urlopen
-
-def load(url):
-    return urlopen(url)
-""".strip(),
-        encoding="utf-8",
-    )
-    report = scan_base_lib(tmp_path, policy=PurityPolicy(max_source_lines=1000))
-    assert any(finding.rule_id == "BASE_LIB.BANNED_IMPORT" for finding in report.findings)
 
 
 def test_graph_health_suppresses_duplicate_logic_for_standard_wrappers(tmp_path) -> None:
@@ -75,7 +50,7 @@ class WrapperTwoNode:
         encoding="utf-8",
     )
     module = _load_module_from_path(module_path, "_wrapper_nodes")
-    registry = NodeRegistry()
+    registry = native_registry()
     for key, implementation, output in (
         ("test.wrapper_one", module.WrapperOneNode, "wrap.one"),
         ("test.wrapper_two", module.WrapperTwoNode, "wrap.two"),
@@ -91,10 +66,10 @@ class WrapperTwoNode:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
-                    _node_call("wrapper_one", "test.wrapper_one", "Wraps value.in once.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("wrap.one")]),
-                    _node_call("wrapper_two", "test.wrapper_two", "Wraps value.in twice.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("wrap.two")]),
+                    _node_call("wrapper_one", "test.wrapper_one", "Wraps value.in once."),
+                    _node_call("wrapper_two", "test.wrapper_two", "Wraps value.in twice."),
                 ],
             }
         }

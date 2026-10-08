@@ -1,6 +1,8 @@
 """Real workflow import Rules run before native compilation and AOT binding."""
 from __future__ import annotations
 
+from tests.fixtures.support.plugins import resource as sdk_resource, update_resources, resource_declarations
+
 import json
 import os
 from pathlib import Path
@@ -25,14 +27,15 @@ def import_project(tmp_path):
     shutil.copytree(ROOT / "sandbox/javascript/integration", sandbox,
                     ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc", ".artifacts"))
     project = sandbox / "project"
-    from tests.fixtures.support.code_plugins import copy_archival_inputs
-    copy_archival_inputs(ROOT / "sandbox/javascript/integration", sandbox)
+    from tests.fixtures.support.plugins import copy_sdk_inputs
+    copy_sdk_inputs(ROOT / "sandbox/javascript/integration", sandbox)
     (project / "node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
     # Workflow Rules receive actual source scopes even when Node Rules are unselected.
-    for file in (project / "manifests/nodes").glob("*.jsonc"):
-        declaration = json.loads(file.read_text())
-        declaration["rulesets"] = []
-        file.write_text(json.dumps(declaration))
+    definitions = resource_declarations(project)
+    for definition in definitions:
+        if definition["kind"] == "node":
+            definition["rulesets"] = []
+    update_resources(project, definitions)
     return sandbox / "vibeflow_config.jsonc", project
 
 
@@ -64,10 +67,10 @@ def _select_import_rule(project, scope, outcome):
         ' const file=context.facts.source_files[0]; if(!file || !context.sources.symbols(file).length) throw new Error("Missing actual source ABI");\n'
         ' if(context.facts.graph.nodes.some(node=>node.type_used==="sandbox.add") && !context.facts.sources.some(source=>source.path.endsWith("/base_lib/math.ts"))) throw new Error("Missing reached helper snapshot");\n'
         ' return ' + returned + ';\n}\n')
-    manifest = project / "manifests/rules/workflow-import.jsonc"
-    manifest.write_text(json.dumps({"kind": "rule", "id": "test.workflow_import", "outputs": {"evidence": "test.workflow_import.v1"} if outcome == "completed" else {},
+    manifest = sdk_resource(project, "rule", "test.workflow_import")
+    sdk_resource(project, "rule", "test.workflow_import").write_text(json.dumps({"kind": "rule", "id": "test.workflow_import", "outputs": {"evidence": "test.workflow_import.v1"} if outcome == "completed" else {},
         "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/workflow_import.ts", "export": "check"}}]}))
-    (project / "manifests/rulesets/workflow-import.jsonc").write_text(json.dumps({"kind": "ruleset", "id": "test.workflow_import",
+    (sdk_resource(project, "ruleset", "test.workflow_import")).write_text(json.dumps({"kind": "ruleset", "id": "test.workflow_import",
         "calls": [{"id": "check", "rule_id": "test.workflow_import"}], "entrypoints": {"import": ["check"], "static": ["check"] if outcome == "completed" else [], "run": []}}))
     return config, owner
 
@@ -152,7 +155,7 @@ def test_loaded_unused_nodeset_keeps_its_rule_selection_without_fake_calls(impor
 def test_workflow_import_builtin_reads_actual_scoped_source_ownership(import_project):
     workspace, project = import_project
     config, _ = _select_import_rule(project, "root", "completed")
-    manifest = project / "manifests/rulesets/workflow-import.jsonc"
+    manifest = sdk_resource(project, "ruleset", "test.workflow_import")
     selection = json.loads(manifest.read_text())
     selection["calls"] = [{"id": "guard", "rule_id": "vibeflow.import_side_effects"}]
     selection["entrypoints"] = {"import": ["guard"], "static": [], "run": []}
@@ -200,13 +203,3 @@ def test_business_types_remain_outside_health_review(import_project, tmp_path):
     assert built.out_dir.is_dir()
 
 # Historic input mutations are published explicitly before the formal operation.
-_native_audit = audit_javascript_project
-_native_build = build_project_aot
-def audit_javascript_project(request, **options):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(request.workspace)
-    return _native_audit(request, **options)
-def build_project_aot(request, **options):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(request.workspace)
-    return _native_build(request, **options)

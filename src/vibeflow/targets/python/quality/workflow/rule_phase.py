@@ -6,10 +6,10 @@ from dataclasses import dataclass, replace
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.flow import LOOP_NODE_TYPES, STATUS_PLANNED
 from vibeflow.core.rules import RuleContext, RuleGraphError, compile_ruleset, execute_rule_plan
+from vibeflow.targets.python.quality.policy_parameters import complete_source_policy_plan, native_rule_bindings, native_rule_origins, bound_python_workflow_defaults
 from vibeflow.core.descriptors.contributions import contribution_facts
 from vibeflow.targets.python.quality.project_context import project_rule_facts
 from vibeflow.targets.python.quality.rule_adapter import rule_resources, graph_error_finding
-from vibeflow.targets.python.quality.rules import python_rule_handlers
 
 
 @dataclass(frozen=True)
@@ -58,17 +58,18 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
     from vibeflow.targets.python.quality.workflow.validation import _append_findings
     from types import SimpleNamespace
 
-    resources = registry if registry is not None else SimpleNamespace(rule_catalogs=())
+    from vibeflow.targets.python.project.registry import NodeRegistry
+    resources = registry if registry is not None else NodeRegistry()
     try:
         rules, rulesets = rule_resources(resources, purity_policy=purity_policy, quality_policy=quality_policy)
     except RuleGraphError as exc:
         _append_findings(state, (graph_error_finding(registry,exc,object_type="workflow",object_id="pipeline",fallback_path=graph.source_path),))
         return
-    for rule_id in ("vibeflow.workflow", "vibeflow.graph.nodesets"):
-        descriptor = rules.get(rule_id)
-        if descriptor is not None:
-            rules[rule_id] = replace(descriptor, params_defaults={**descriptor.params_defaults, "nodeset_max_depth": nodeset_max_depth})
-    handlers, project_fact_cache = python_rule_handlers(), {}
+    for rule_id, defaults in bound_python_workflow_defaults(native_rule_bindings(resources, rules),
+        nodeset_max_depth, rules=rules, origins=native_rule_origins(resources)).items():
+        descriptor = rules[rule_id]
+        rules[rule_id] = replace(descriptor, params_defaults={**descriptor.params_defaults, **defaults})
+    handlers, project_fact_cache = {}, {}
     registry_queries = None
     invocations = workflow_invocations(graph)
     for invocation in invocations:
@@ -90,16 +91,17 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
                     continue
                 if registry is not None and registry_queries is None:
                     registry_queries = NodeRegistryQueries(registry)
-                custom = getattr(registry, "rule_handler_loader", None)
+                custom = getattr(resources, "rule_handler_loader", None)
                 if callable(custom):
                     handlers.update(custom(plan))
+                plan = complete_source_policy_plan(plan, purity_policy, handlers=handlers)
                 contributions = contribution_facts(registry.loaded_plugins.catalogs) if hasattr(registry, "loaded_plugins") else {}
-                facts = {**contributions, **project_rule_facts(plan, source_context, project_fact_cache), "graph": current,
+                facts = {**contributions, **project_rule_facts(plan, source_context, project_fact_cache,handlers=handlers), "graph": current,
                     "source_load_states": getattr(registry, "source_load_states", {}),
                     "registry": registry_queries, "source_context": source_context,
                     "node_catalog": tuple(registry.descriptor(key) for key in registry.available()) if registry is not None else (),
                     "rule_invocations": {item.id: item.rule for item in plan.invocations},
-                    "global_config": global_config, "purity_policy": purity_policy, "owner": owner,
+                    "global_config": global_config, "owner": owner,
                     "node_types": {spec.id: spec.type_used for spec in current.nodes},
                     "runtime_flow_kinds": {spec.id: registry.descriptor(spec.type_used).flow_kind for spec in current.nodes
                         if registry is not None and spec.type_used in registry.available()},

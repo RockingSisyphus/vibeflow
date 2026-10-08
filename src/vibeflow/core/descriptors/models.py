@@ -20,6 +20,16 @@ class DescriptorModelError(ValueError):
     """Raised when a descriptor cannot be normalized safely."""
 
 
+class ResourceImplementationConflict(DescriptorModelError):
+    """A resource cannot declare two different authorities for its implementation."""
+
+    code = "RESOURCE.IMPLEMENTATION.CONFLICT"
+
+    def __init__(self, message: str, *, field_name: str):
+        super().__init__(message)
+        self.location = {"field": field_name}
+
+
 def _required_text(value: object, *, field_name: str) -> str:
     if not isinstance(value, str):
         raise DescriptorModelError(f"{field_name} must be a non-empty string")

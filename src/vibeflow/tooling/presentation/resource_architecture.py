@@ -1,4 +1,4 @@
-"""One resource/source graph for the machine document and formal SVG."""
+"""Selected project resource and source facts for Architecture JSONC."""
 from pathlib import Path
 import hashlib
 
@@ -69,7 +69,7 @@ def resource_architecture(catalogs, *, project_root, source_facts=(), selections
                 key=include_file(path,owner)
                 source_rows.append({"id":key,"path":path,"role":role,"symbol":owner["symbol"],
                     "language":implementation.language,"load_state":files[key]["load_state"]})
-        if not source_rows and kind != "plugin_declaration":continue
+        if not source_rows and kind != "plugin_declaration" and not use and not (kind == "node" and selected is not None):continue
         group={"node":"nodes","base_lib":"base_libs","plugin":"plugins","host_extension":"host_extensions"}.get(kind)
         origin=catalogs.origins.get((group,descriptor.id))
         plugin_id=origin.plugin_id if origin else descriptor.id if kind == "plugin_declaration" else ""

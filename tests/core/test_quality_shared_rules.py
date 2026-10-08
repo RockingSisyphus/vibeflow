@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.fixtures.support.project_rules import evaluate_standard_project_quality
+
 from dataclasses import replace
 
 import pytest
@@ -10,16 +12,14 @@ from vibeflow.core.quality import (
     ProjectQualityFacts,
     QualityPolicy,
     QualityThresholds,
-    evaluate_project_quality,
 )
 from vibeflow.core.quality.implementation import (
     ImplementationLimits,
     ImplementationMetrics,
     analyze_call_graph,
-    evaluate_base_lib_dependency_chain,
-    evaluate_base_lib_implementation,
-    evaluate_node_implementation,
 )
+
+from vibeflow.builtin.implementation import check_node_implementation, check_base_lib_implementation, check_base_lib_dependency_chain
 
 
 def _file(**changes) -> FileQuality:
@@ -46,7 +46,7 @@ def _file(**changes) -> FileQuality:
     ],
 )
 def test_shared_file_thresholds(change, value, rule, severity) -> None:
-    report = evaluate_project_quality(ProjectQualityFacts(root="/tmp/quality", files=(_file(**{change: value}),)))
+    report = evaluate_standard_project_quality(ProjectQualityFacts(root="/tmp/quality", files=(_file(**{change: value}),)))
     matching = [item for item in report.findings if item.rule_id == rule] if rule else []
     if rule is None:
         assert report.status == "PASS"
@@ -80,7 +80,7 @@ def test_shared_file_thresholds(change, value, rule, severity) -> None:
 def test_shared_function_thresholds(change, value, rule) -> None:
     function = FunctionQuality("run", 7, 8, 2, 0, 0, 0, "fingerprint")
     file = _file(functions=(replace(function, **{change: value}),))
-    report = evaluate_project_quality(ProjectQualityFacts(root="/tmp/quality", files=(file,)))
+    report = evaluate_standard_project_quality(ProjectQualityFacts(root="/tmp/quality", files=(file,)))
     finding = next(item for item in report.findings if item.rule_id == rule)
     assert finding.severity == "warning"
     assert finding.source_location["line"] == 7
@@ -95,7 +95,7 @@ def test_shared_function_thresholds(change, value, rule) -> None:
 def test_shared_node_chain_boundaries(length, expected) -> None:
     calls = {f"f{index}": (f"f{index + 1}",) if index + 1 < length else () for index in range(length)}
     chain = analyze_call_graph(calls, entry="f0")
-    findings = evaluate_node_implementation(ImplementationMetrics(call_chain=chain), ImplementationLimits())
+    findings = check_node_implementation(ImplementationMetrics(call_chain=chain), ImplementationLimits())
     assert tuple((item.rule_id, item.severity) for item in findings) == expected
     if findings:
         assert findings[0].details["path"] == [f"f{index}" for index in range(length)]
@@ -103,7 +103,7 @@ def test_shared_node_chain_boundaries(length, expected) -> None:
 
 @pytest.mark.parametrize("calls", [{"run": ("run",)}, {"run": ("helper",), "helper": ("run",)}])
 def test_shared_node_recursion_is_an_error(calls) -> None:
-    findings = evaluate_node_implementation(
+    findings = check_node_implementation(
         ImplementationMetrics(call_chain=analyze_call_graph(calls, entry="run")),
         ImplementationLimits(),
     )
@@ -122,26 +122,26 @@ def test_shared_node_recursion_is_an_error(calls) -> None:
 )
 def test_optional_node_complexity_limits(field, metric) -> None:
     metrics = ImplementationMetrics(**{metric: 2})
-    assert not evaluate_node_implementation(metrics, ImplementationLimits())
-    assert not evaluate_node_implementation(metrics, replace(ImplementationLimits(), **{field: 2}))
-    findings = evaluate_node_implementation(metrics, replace(ImplementationLimits(), **{field: 1}))
+    assert not check_node_implementation(metrics, ImplementationLimits())
+    assert not check_node_implementation(metrics, replace(ImplementationLimits(), **{field: 2}))
+    findings = check_node_implementation(metrics, replace(ImplementationLimits(), **{field: 1}))
     assert [(item.rule_id, item.severity) for item in findings] == [(f"NODE.MAINTAINABILITY.COMPLEXITY_{field.upper()}", "error")]
     assert findings[0].details[metric] == 2
 
 
 def test_shared_base_lib_source_size_boundaries() -> None:
     limits = ImplementationLimits()
-    assert {item.severity for item in evaluate_base_lib_implementation(ImplementationMetrics(source_lines=500, source_bytes=60000), limits)} == {"warning"}
-    findings = evaluate_base_lib_implementation(ImplementationMetrics(source_lines=501, source_bytes=60001), limits)
+    assert {item.severity for item in check_base_lib_implementation(ImplementationMetrics(source_lines=500, source_bytes=60000), limits)} == {"warning"}
+    findings = check_base_lib_implementation(ImplementationMetrics(source_lines=501, source_bytes=60001), limits)
     assert {item.rule_id for item in findings} == {"BASE_LIB.SOURCE.MAX_LINES", "BASE_LIB.SOURCE.MAX_BYTES"}
 
 
 def test_shared_node_source_size_boundaries() -> None:
     limits = ImplementationLimits(warn_source_lines=None, warn_source_bytes=None)
-    assert not evaluate_node_implementation(
+    assert not check_node_implementation(
         ImplementationMetrics(source_lines=500, source_bytes=60000), limits,
     )
-    findings = evaluate_node_implementation(
+    findings = check_node_implementation(
         ImplementationMetrics(source_lines=501, source_bytes=60001), limits,
     )
     assert {(item.rule_id, item.severity) for item in findings} == {
@@ -151,7 +151,7 @@ def test_shared_node_source_size_boundaries() -> None:
     by_rule = {item.rule_id: item for item in findings}
     assert by_rule["NODE.PURITY.SOURCE_TOO_LARGE"].details == {"lines": 501, "limit": 500}
     assert by_rule["NODE.PURITY.SOURCE_BYTES_TOO_LARGE"].details == {"bytes": 60001, "limit": 60000}
-    warning = evaluate_node_implementation(ImplementationMetrics(source_lines=450), ImplementationLimits())
+    warning = check_node_implementation(ImplementationMetrics(source_lines=450), ImplementationLimits())
     assert [(item.rule_id, item.severity) for item in warning] == [("NODE.PURITY.SOURCE_NEAR_LIMIT", "warning")]
 
 
@@ -166,7 +166,7 @@ def test_shared_base_lib_dependency_chain_boundary(length, severity) -> None:
         for index in range(1, length)
     })
     chain = analyze_call_graph(graph, entry="node")
-    finding = evaluate_base_lib_dependency_chain(chain, ImplementationLimits())
+    finding = check_base_lib_dependency_chain(chain, ImplementationLimits())
     assert (finding.severity if finding else None) == severity
     if finding:
         assert finding.rule_id == "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP"

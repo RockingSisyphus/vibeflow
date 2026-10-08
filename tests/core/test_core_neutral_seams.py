@@ -16,18 +16,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = PROJECT_ROOT / "src"
 
 
-def test_runtime_config_adapter_preserves_error_contract() -> None:
-    from vibeflow.targets.python.runtime.config import normalize_node_config_overrides
-    from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
-
-    with pytest.raises(
-        PipelineRuntimeError,
-        match=(
-            r"^Pipeline runtime error: node config override for 'bad' "
-            r"must be an object$"
-        ),
-    ):
-        normalize_node_config_overrides({"bad": 1})  # type: ignore[dict-item]
 
 
 def test_core_config_binding_uses_neutral_error() -> None:

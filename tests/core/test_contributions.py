@@ -4,7 +4,7 @@ import pytest
 
 from vibeflow.core.descriptors import ContributionBuilder, ResourceOrigin, compose_contributions
 from vibeflow.core.descriptors.catalogs import DescriptorCatalogError
-from vibeflow.core.descriptors.contributions import builtin_contributions
+from vibeflow.targets.python.quality.builtin_plugin import builtin_plugin
 from vibeflow.core.descriptors.models import DataSchemaDescriptor, DescriptorModelError
 from vibeflow.core.descriptors.decode import decode_resource
 from vibeflow.core.descriptors.contributions import RESOURCE_GROUPS
@@ -21,7 +21,7 @@ def test_contributions_are_fixed_and_config_is_read_only():
         contribution.config["new"] = 1
     with pytest.raises(DescriptorModelError, match="frozen"):
         builder.add(DataSchemaDescriptor(type_key="other", schema={}))
-    catalogs = compose_contributions((builtin_contributions(), contribution))
+    catalogs = compose_contributions((builtin_plugin().contributions(), contribution))
     assert catalogs.schemas.require("payload").schema["type"] == "object"
     assert catalogs.rules.require("vibeflow.no_side_effects")
 
@@ -53,7 +53,7 @@ def test_every_resource_kind_uses_the_same_pure_collection_path(data):
     descriptor = decode_resource(data)
     builder = ContributionBuilder("demo", source="plugin.py")
     builder.add(descriptor, origin=ResourceOrigin("demo", "plugin.py", 9))
-    catalogs = compose_contributions((builtin_contributions(), builder.finish()))
+    catalogs = compose_contributions((builtin_plugin().contributions(), builder.finish()))
     catalog = getattr(catalogs, RESOURCE_GROUPS[data["kind"]])
     assert catalog.require(descriptor.id) == descriptor
     assert catalogs.origins[(RESOURCE_GROUPS[data["kind"]], descriptor.id)].line == 9

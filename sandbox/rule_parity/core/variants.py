@@ -15,9 +15,18 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     rows = []
     emit = lambda name, title, family, operation, expected, **kw: support.append(rows, name, title, family, operation, expected, **kw)
     codes = support.expectation
-    from vibeflow.core.quality import FileQuality, FunctionQuality, ImportSite, ProjectQualityFacts, QualityPolicy, QualityStructureLimits, QualityStructureRoles, QualityThresholds, evaluate_project_quality
+    from vibeflow.core.quality import FileQuality, FunctionQuality, ImportSite, ProjectQualityFacts, QualityPolicy, QualityStructureLimits, QualityStructureRoles, QualityThresholds
     from vibeflow.core.quality.models import QualityStructureConventions
-    from vibeflow.core.quality.implementation import CallChain, ImplementationLimits, ImplementationMetrics, analyze_call_graph, evaluate_node_implementation, evaluate_base_lib_dependency_chain
+    from vibeflow.core.quality.implementation import CallChain, ImplementationLimits, ImplementationMetrics, analyze_call_graph
+
+    if variant == "baseline":
+        from vibeflow.core.quality import evaluate_project_quality
+        from vibeflow.core.quality.implementation import (evaluate_node_implementation,
+            evaluate_base_lib_implementation, evaluate_base_lib_dependency_chain)
+    else:
+        from sandbox.rule_parity.core.support import evaluate_standard_project_quality as evaluate_project_quality
+        from vibeflow.builtin.implementation import (check_node_implementation as evaluate_node_implementation,
+            check_base_lib_implementation as evaluate_base_lib_implementation, check_base_lib_dependency_chain as evaluate_base_lib_dependency_chain)
 
     def file(path="sample.py", **changes):
         return replace(FileQuality(path, path[:-3].replace("/", "."), 1, 1, 0, 0, 0, 0, 0, (), ()), **changes)
@@ -78,21 +87,37 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             codes(*(("NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP", "error" if amount > 3 else "warning"),) if amount > 2 else ()), evidence="core/quality/implementation.py:153-168")
 
     role_cases = (
-        ("inferred_node", "nodes/a.py", "utils/b.py", QualityStructureRoles(), "NODE_UNDECLARED_PROJECT_IMPORT"),
-        ("inferred_task_node", "task_nodes/a.py", "utils/b.py", QualityStructureRoles(), "NODE_UNDECLARED_PROJECT_IMPORT"),
-        ("inferred_custom_nodes", "custom_nodes/a.py", "utils/b.py", QualityStructureRoles(), "NODE_UNDECLARED_PROJECT_IMPORT"),
-        ("inference_off", "nodes/a.py", "utils/b.py", QualityStructureRoles(infer_roles_from_path=False), None),
-        ("module_base", "nodes/a.py", "vendor/b.py", QualityStructureRoles(base_lib_modules=("vendor",)), None),
-        ("path_base", "nodes/a.py", "vendor/b.py", QualityStructureRoles(base_lib_paths=("vendor",)), None),
-        ("explicit_override", "nodes/a.py", "utils/b.py", QualityStructureRoles(module_roles={"nodes.a": "unknown"}), None),
-        ("prefix_exact", "base_library/a.py", "utils/b.py", QualityStructureRoles(base_lib_paths=("base_lib",)), None),
+        ("inferred_node", "nodes/a.py", "utils/b.py", False),
+        ("inferred_task_node", "task_nodes/a.py", "utils/b.py", False),
+        ("inferred_custom_nodes", "custom_nodes/a.py", "utils/b.py", False),
+        ("inference_off", "nodes/a.py", "utils/b.py", False),
+        ("module_base", "nodes/a.py", "vendor/b.py", True),
+        ("path_base", "nodes/a.py", "vendor/b.py", True),
+        ("explicit_override", "nodes/a.py", "utils/b.py", False),
+        ("prefix_exact", "base_library/a.py", "utils/b.py", False),
     )
-    for name, source_path, target_path, roles, diagnostic in role_cases:
+    for name, source_path, target_path, declared in role_cases:
         target_module = target_path[:-3].replace("/", ".")
-        files = [file(source_path, imports=(target_module,)), file(target_path)]
-        emit("roles." + name, "角色路径/声明精确选择 " + name, "project.structure.variants",
+        source_module = source_path[:-3].replace("/", ".")
+        files = [file(source_path, imports=(target_module,),
+            import_sites=(ImportSite(source_module,target_module,"import "+target_module,source_path,1,1),)), file(target_path)]
+        owners = [{"path":source_path,"id":"node","kind":"node","role":"entry","base_libs":["library"]},
+                  {"path":target_path,"id":"library","kind":"base_lib","role":"entry","base_libs":[]}]
+        if variant == "baseline":
+            historical_options={"inference_off":{"infer_roles_from_path":False},
+                "module_base":{"base_lib_modules":("vendor",)}, "path_base":{"base_lib_paths":("vendor",)},
+                "explicit_override":{"module_roles":{"nodes.a":"unknown"}},
+                "prefix_exact":{"base_lib_paths":("base_lib",)}}
+            roles = QualityStructureRoles(**historical_options.get(name, {}))
+        else:
+            roles = QualityStructureRoles(_resource_scopes=({"id":"selected","owners":owners},) if declared else ())
+        changed = name.startswith("inferred_")
+        emit("roles." + name, "源码身份只来自真实声明 " + name, "project.structure.variants",
             lambda files=files, roles=roles: project(files, QualityPolicy(structure_limits=replace(quiet, enforce_role_imports=True), structure_roles=roles)),
-            codes(*(("QUALITY.STRUCTURE." + diagnostic, "error"),) if diagnostic else ()), evidence="core/quality/root_structure.py:300-333")
+            codes(*(("QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT","error"),) if variant == "baseline" and changed else ()),
+            classification="approved_change" if changed else "preserved",
+            notes="目录名不再赋予未声明源码Node或BaseLib身份；真实资源依赖仍由明确归属检查。",
+            evidence="core/quality/root_structure.py; core/quality/resource_imports.py")
     for stem, exempt in (("runner", True), ("custom_runner", False), ("entry", True)):
         conventions = QualityStructureConventions(distance_exempt_stems=("runner", "entry"))
         source = file(f"a/b/{stem}.py", imports=("d.e._helper",))

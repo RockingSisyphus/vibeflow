@@ -13,19 +13,12 @@ from typing import Any, Callable, Mapping
 
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.quality.policy_data import COMMON_POLICY_DATA, merge_policy_data
-from vibeflow.targets.python.quality.source_analysis.types import BANNED_IMPORT_ROOTS, PurityPolicy
+from vibeflow.targets.python.quality.source_analysis.types import PurityPolicy
 
 
 DEFAULT_POLICY_DATA: dict[str, Any] = {
     **deepcopy(COMMON_POLICY_DATA),
-    "imports": {
-        "allowed_roots": [],
-        "banned_roots": sorted(BANNED_IMPORT_ROOTS),
-        "allowed_modules": ["urllib.parse", "vibeflow"],
-        "banned_modules": ["urllib.request"],
-    },
-    "base_lib": {"allowed_paths": [], "allowed_modules": [], "banned_modules": []},
-
+    "imports": {},
 }
 
 
@@ -43,28 +36,24 @@ class EffectivePolicy:
         node_source = self.data.get("node_source", {})
         complexity = self.data.get("complexity", {})
         imports = self.data.get("imports", {})
-        base_lib = self.data.get("base_lib", {})
         maintainability = self.data.get("maintainability", {})
         default_source = DEFAULT_POLICY_DATA["node_source"]
-        default_imports = DEFAULT_POLICY_DATA["imports"]
         default_maintainability = DEFAULT_POLICY_DATA["maintainability"]
         return PurityPolicy(
             max_source_lines=int(node_source.get("max_lines", default_source["max_lines"])),
             max_source_bytes=int(node_source.get("max_bytes", default_source["max_bytes"])),
             warn_source_lines=node_source.get("warn_lines", default_source["warn_lines"]),
             warn_source_bytes=node_source.get("warn_bytes", default_source["warn_bytes"]),
+            configured_import_fields=frozenset(imports),
             allowed_import_roots=tuple(imports.get("allowed_roots", ())),
-            banned_import_roots=tuple(imports.get("banned_roots", default_imports["banned_roots"])),
-            allowed_import_modules=tuple(imports.get("allowed_modules", default_imports["allowed_modules"])),
-            banned_import_modules=tuple(imports.get("banned_modules", default_imports["banned_modules"])),
+            banned_import_roots=tuple(imports.get("banned_roots", ())),
+            allowed_import_modules=tuple(imports.get("allowed_modules", ())),
+            banned_import_modules=tuple(imports.get("banned_modules", ())),
             max_functions=complexity.get("max_functions"),
             max_branches=complexity.get("max_branches"),
             max_nesting_depth=complexity.get("max_nesting_depth"),
             max_params=complexity.get("max_params"),
             max_contract_keys=complexity.get("max_contract_keys"),
-            allowed_base_lib_paths=tuple(base_lib.get("allowed_paths", ())),
-            allowed_base_lib_modules=tuple(base_lib.get("allowed_modules", ())),
-            banned_base_lib_modules=tuple(base_lib.get("banned_modules", ())),
             warn_call_chain_length=int(maintainability.get("warn_call_chain_length", default_maintainability["warn_call_chain_length"])),
             max_call_chain_length=int(maintainability.get("max_call_chain_length", default_maintainability["max_call_chain_length"])),
             warn_dependency_chain_length=int(maintainability.get("warn_dependency_chain_length", default_maintainability["warn_dependency_chain_length"])),

@@ -20,13 +20,13 @@ def _chain_cases():
                 expected["variants"] = {"current": {"should_accept": length != 4, "codes": ([{"code": "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP", "severity": "error"}] if length == 4 else []), "metrics": {"dependency_chain.longest_chain_length": length + 1, "exit_code": int(length == 4)}}}
             cases.append(_case("chain_" + name + "_" + str(length), "Library chain " + name + " " + str(length), code,
                 source=f'from {package}.m0 import step\nclass DemoNode:\n    def run_pure(self, inputs, params):\n        return {{"demo.out": step(1)}}\n',
-                library_chain={"package": package, "relative": relative, "length": length}, policy=policy, expect=expected,
+                library_chain={"package": package, "relative": relative, "length": length}, policy=policy, current_policy={"maintainability":policy["maintainability"]}, expect=expected,
                 classification="baseline_limitation" if limitation else "preserved", notes="Both versions historically report zero Node dependency length for a custom non-base_lib module name." if limitation else "Relative imports must use the real resolved local dependency relation."))
     for package in ("base_lib", "support"):
         cases.append(_case("reachable_functions_" + package, "Reachable library function count: " + package, "BASE_LIB.COMPLEXITY.MAX_FUNCTIONS",
             source=f'from {package}.m0 import step\nclass DemoNode:\n    def run_pure(self, inputs, params):\n        return {{"demo.out": step(1)}}\n',
             library_chain={"package": package, "length": 1, "extra_functions": True},
-            policy={"base_lib": {"allowed_paths": [package], "allowed_modules": [package]}, "complexity": {"max_functions": 2}}))
+            policy={"base_lib": {"allowed_paths": [package], "allowed_modules": [package]}, "complexity": {"max_functions": 2}}, current_policy={"complexity":{"max_functions":2}}))
     return cases
 
 
@@ -50,4 +50,12 @@ def _standalone_cases():
 
 
 def case_specs():
-    return [*_chain_cases(), *_standalone_cases()]
+    cases = [*_chain_cases(), *_standalone_cases()]
+    for spec in cases:
+        name = spec["id"].rsplit(".", 1)[-1]
+        if name in {"scan_syntax", "scan_project_import"}:
+            current = {"should_accept":name == "scan_project_import", "codes":[] if name == "scan_project_import" else [{"code":"QUALITY.SYNTAX.PYTHON","severity":"error"}]}
+            spec["expected"].setdefault("variants", {})["current"] = current
+            spec["classification"] = "approved_change"
+            spec["notes"] = "Selected canonical library Rules use shared syntax findings and actual ownership; directory names do not establish project roles."
+    return cases
