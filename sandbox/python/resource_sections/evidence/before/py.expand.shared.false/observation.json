@@ -1,0 +1,18 @@
+{
+  "exit_code": 0,
+  "error": null,
+  "frames": [],
+  "panels": [],
+  "columns": [],
+  "seconds": 0.35172170601435937,
+  "arguments": [
+    "export-mermaid",
+    "--workspace",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-before-final/py.expand.shared.false/vibeflow_config.jsonc",
+    "--config",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-before-final/py.expand.shared.false/workflow.jsonc",
+    "--output",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-before-final/py.expand.shared.false/graph.mmd",
+    "--expand-nodesets"
+  ]
+}

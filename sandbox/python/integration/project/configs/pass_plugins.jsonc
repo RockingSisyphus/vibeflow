@@ -13,7 +13,8 @@
       {
         "key": "io.result",
         "type": "io.result",
-        "display_name": "Io Result"
+        "display_name": "Io Result",
+        "required": true
       }
     ],
     "nodes": [

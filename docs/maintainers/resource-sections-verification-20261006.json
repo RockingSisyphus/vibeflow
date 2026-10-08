@@ -1,0 +1,84 @@
+{
+  "recorded_at": "2026-10-05T23:10:11.654464+00:00",
+  "version": "0.15.1",
+  "scope": "Resource diagram sections, opt-in Rule details, display-only Nodeset expansion",
+  "source": {
+    "files": 348,
+    "sha256": "a6a27a226e874ad521665c522b6624baa5461e61ffd6ff1f0b420f6059176569",
+    "hash_format": "sorted repo-relative source path, NUL, file bytes, NUL"
+  },
+  "verification": {
+    "pytest": {
+      "passed": 2038,
+      "exit_code": 0,
+      "log": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/full-pytest-final-direction.log"
+    },
+    "cli_sandboxes": {
+      "python": {
+        "report": "sandbox/python/resource_sections/after.json",
+        "summary": {
+          "cases": 14,
+          "matched": 14,
+          "unmatched": 0
+        }
+      },
+      "javascript": {
+        "report": "sandbox/javascript/resource_sections/after.json",
+        "summary": {
+          "cases": 14,
+          "matched": 14,
+          "unmatched": 0,
+          "expected_cases": 14,
+          "observation_errors": 0
+        }
+      },
+      "layout": {
+        "report": "sandbox/python/review_layout/sections-after.json",
+        "summary": {
+          "cases": 4,
+          "matched": 4,
+          "unmatched": 0,
+          "observation_errors": 0
+        }
+      }
+    },
+    "performance": {
+      "passed": 57,
+      "observation_errors": [],
+      "report": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/performance.json"
+    },
+    "quality_tests": {
+      "passed": 46,
+      "log": "/tmp/vf-resource-sections-quality-tests.log"
+    },
+    "repository_quality": {
+      "errors": 0,
+      "warnings": 0,
+      "log": "/tmp/vf-resource-sections-quality-final-direction.log"
+    },
+    "javascript_browser": {
+      "passed": 3,
+      "report": "sandbox/javascript/resource_sections/browser-audit.json"
+    }
+  },
+  "historical_failures": {
+    "architecture_field_expectation": {
+      "failed": 1,
+      "passed": 2037,
+      "log": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/full-pytest-final.log",
+      "resolution": "Migrate strict JSON expectation and validate compact rule plan references"
+    },
+    "javascript_parent_direction": {
+      "failed": 2,
+      "passed": 6,
+      "log": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/js-direction-before.log",
+      "resolution": "Determine parent direction from actual Nodeset calls, including folded definitions"
+    }
+  },
+  "baseline": {
+    "python": "sandbox/python/resource_sections/before.json",
+    "javascript": "sandbox/javascript/resource_sections/before.json",
+    "source": "sandbox/javascript/resource_sections/source-before.json"
+  },
+  "distribution": "existing release archives were not rebuilt for this feature"
+}

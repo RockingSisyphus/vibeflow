@@ -14,13 +14,9 @@
       "max_contract_keys": 8
     },
     "imports": {
-      "allowed_roots": ["math"],
-      "banned_roots": ["os", "sys", "subprocess", "socket", "requests", "urllib", "pathlib", "shutil", "sqlite3", "importlib"]
-    },
-    "base_lib": {
-      "allowed_paths": ["../base_lib"],
-      "allowed_modules": ["base_lib"],
-      "banned_modules": []
+      "allowed_roots": [
+        "math"
+      ]
     },
     "maintainability": {
       "warn_call_chain_length": 4,

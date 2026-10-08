@@ -359,8 +359,8 @@ def test_architecture_and_mermaid_share_edge_contract_roles_and_loop_resource_ro
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("seed", "test.seed", "Produces input.", provides=[PROV_SPEC("value.copy", "value.in")]),
-                    _node_call("add", "test.add", "Consumes input.", requires=[REQ_SPEC("value.in")]),
+                    _node_call("seed", "test.seed", "Produces input."),
+                    _node_call("add", "test.add", "Consumes input."),
                 ],
                 "edges": [{"from": "seed", "to": "add"}],
             }

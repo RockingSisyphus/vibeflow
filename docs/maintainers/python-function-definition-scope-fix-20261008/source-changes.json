@@ -1,0 +1,40 @@
+{
+  "files": [
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/bindings.py",
+      "before_sha256": "8048ed1905319305ff4fee5e688f9044d5d641f9fd7e58c0d137852b45cf08e4",
+      "after_sha256": "28c25078f4d32253a0229aee4da4c769efedbca90592b9a5d3a08760b64cb781",
+      "changed": true
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/visitors.py",
+      "before_sha256": "d31b4d7319322f1be023ae4f593473e5578b7aaee8a9967529dea64b01ee63b7",
+      "after_sha256": "86f9df117d3457e598a7ffcfbfe613545f270a8fa20240121e80db417f9e848c",
+      "changed": true
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/input_tracking.py",
+      "before_sha256": "f3bf09209ec953800b7617789ae2c59ecacc53c870256a4ad3d5d5639bf115df",
+      "after_sha256": "dd037fa4a176db0d1aaa2fd6c763886be690b9d403443c0386f63c41adae6e26",
+      "changed": true
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rules/base_lib_effects.py",
+      "before_sha256": "c87f9be761082b68b10c8a33587c1e6b532b28ba189e0c0dd4afdf1074cf8ca5",
+      "after_sha256": "f60e2d8a028ddd5243b4195ce8147b3bba04f1fab0473c2939e7e4d339871fec",
+      "changed": true
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rules/effects.py",
+      "before_sha256": "6cced6b73e6d7b754c29b38ee920c0e968562ed65c657ffc5c8e846ec8343e8f",
+      "after_sha256": "a17517f5afd05754fe74f3cb4810c3afa3229a0fc74efc0f879a9d3d7fe9b6b0",
+      "changed": true
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_context.py",
+      "before_sha256": "872493dac5471b02d19fcd68912523830bfadc53b0dcd2e9965f0e7ca4b9bd25",
+      "after_sha256": "1a9f0e8ff1cfb77dd592d03a4369be2427bfa40bc95a46eb72027c6540532914",
+      "changed": true
+    }
+  ]
+}

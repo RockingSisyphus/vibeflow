@@ -61,7 +61,7 @@ def parse_graph_config_data(
         root_path=actual_root_path,
         source_path=actual_source_path,
     )
-    return replace(graph, rulesets=_parse_rulesets(config.get("rulesets", ("vibeflow.workflow",))))
+    return replace(graph, rulesets=_parse_rulesets(config.get("rulesets", ())))
 
 
 def _parse_graph_body(
@@ -121,7 +121,7 @@ def _parse_graph_body(
         root_path=root_path,
         source_path=source_path,
         execution_lock=execution_lock,
-        rulesets=_parse_rulesets(raw.get("rulesets", ("vibeflow.workflow",))),
+        rulesets=_parse_rulesets(raw.get("rulesets", ())),
     )
 
 
@@ -132,6 +132,8 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         raise GraphConfigError(f"pipeline.nodes[{index}].name is removed; use id")
     if "type" in item or "registry_key" in item:
         raise GraphConfigError(f"pipeline.nodes[{index}].type is removed; use type_used")
+    if "expand" in item:
+        raise GraphConfigError(f"pipeline.nodes[{index}].expand belongs on the Nodeset definition")
     node_id = str(item.get("id", "")).strip()
     status = _parse_status(item.get("status", STATUS_IMPLEMENTED), field=f"pipeline.nodes[{index}].status")
     type_used = str(item.get("type_used", "")).strip()
@@ -275,7 +277,7 @@ def _parse_nodesets(value: Any, *, project_root: str = "", root_id: str = "", ro
         return {}
     if not isinstance(value, list):
         raise GraphConfigError("nodesets must be a list")
-    raw_nodesets: list[tuple[int, str, Mapping[str, Any], str, PlannedBehavior, str]] = []
+    raw_nodesets: list[tuple[int, str, Mapping[str, Any], str, PlannedBehavior, str, bool]] = []
     type_keys: set[str] = set()
     for index, item in enumerate(value):
         if not isinstance(item, Mapping):
@@ -310,10 +312,11 @@ def _parse_nodesets(value: Any, *, project_root: str = "", root_id: str = "", ro
         flow_kind = str(item.get("flow_kind", FLOW_KIND_PREDEFINED)).strip() or FLOW_KIND_PREDEFINED
         if flow_kind not in FLOW_KINDS:
             raise GraphConfigError(f"nodesets[{index}].flow_kind must be one of {sorted(FLOW_KINDS)}")
-        raw_nodesets.append((index, type_key, item, status, planned_behavior, flow_kind))
+        expand = _parse_bool(item.get("expand", True), field=f"nodesets[{index}].expand")
+        raw_nodesets.append((index, type_key, item, status, planned_behavior, flow_kind, expand))
 
     out: dict[str, NodesetSpec] = {}
-    for nodeset_index, type_key, item, status, planned_behavior, flow_kind in raw_nodesets:
+    for nodeset_index, type_key, item, status, planned_behavior, flow_kind, expand in raw_nodesets:
         pipeline = item.get("pipeline")
         nodeset_root_id = str(item.get("__vibeflow_root_id__", root_id)).strip()
         nodeset_root_path = str(item.get("__vibeflow_root_path__", root_path)).strip()
@@ -341,7 +344,7 @@ def _parse_nodesets(value: Any, *, project_root: str = "", root_id: str = "", ro
                 root_path=nodeset_root_path,
                 source_path=nodeset_source_path,
             )
-        graph = replace(graph, rulesets=_parse_rulesets(item.get("rulesets", ("vibeflow.workflow",))))
+        graph = replace(graph, rulesets=_parse_rulesets(item.get("rulesets", ())))
         out[type_key] = NodesetSpec(
             type_key=type_key,
             display_name=str(item["display_name"]).strip(),
@@ -356,6 +359,7 @@ def _parse_nodesets(value: Any, *, project_root: str = "", root_id: str = "", ro
             root_id=nodeset_root_id,
             root_path=nodeset_root_path,
             source_path=nodeset_source_path,
+            expand=expand,
         )
     return out
 

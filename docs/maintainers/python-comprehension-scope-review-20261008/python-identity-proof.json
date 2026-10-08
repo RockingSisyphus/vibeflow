@@ -1,0 +1,31 @@
+{
+  "note": "Only harmless synthetic Python evaluated; no project, product or probe business code executed.",
+  "rows": [
+    {
+      "case": "local_sys_identity",
+      "source": "def read(objects):\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+      "result": [
+        "local"
+      ],
+      "outer_sys_unchanged": true
+    },
+    {
+      "case": "nonlocal_input_identity",
+      "source": "def run(inputs):\n    alias = {}\n    def inner():\n        nonlocal alias\n        alias = inputs\n    inner()\n    alias.pop(\"seed\", None)\n",
+      "before": {
+        "seed": 1
+      },
+      "after": {},
+      "actually_mutated_input": true
+    },
+    {
+      "case": "global_input_identity",
+      "source": "def run(inputs):\n    def inner():\n        global alias\n        alias = inputs\n    inner()\n    alias.pop(\"seed\", None)\n",
+      "before": {
+        "seed": 1
+      },
+      "after": {},
+      "actually_mutated_input": true
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "schema": "vibeflow.exit-stack-verification.v1",
+  "formal_cli": {
+    "cases": 34,
+    "matched": true,
+    "real_runs": 4,
+    "command": "PYTHONPATH=src:. python -B -m sandbox.python.exit_stack.probe --work /tmp/vf-exit-stack-final-34 --report sandbox/python/exit_stack/after.json"
+  },
+  "historical_reproduction": {
+    "cases": 22,
+    "false_rejections": 9,
+    "report": "before.json",
+    "later_cases_have_no_fabricated_historical_results": true
+  },
+  "regression": {
+    "command": "npm_config_cache=/tmp/vibeflow-npm-cache python -B tools/run_tests.py -- tests/targets/python tests/core",
+    "passed": 807,
+    "skipped": 5,
+    "failed": 0,
+    "seconds": 27.03,
+    "skip_reason": "existing Mermaid renderer-dependent SVG tests; all new sandbox cases executed"
+  },
+  "repository_quality": {
+    "findings": [],
+    "ok": true,
+    "profile": "all",
+    "schema_version": "vibeflow.repository-quality.v1",
+    "summary": {
+      "error": 0,
+      "info": 0,
+      "total": 0,
+      "warning": 0
+    }
+  },
+  "quality_self_tests": {
+    "command": "python -B quality/test.py",
+    "passed": 46
+  },
+  "boundaries": {
+    "vibetrain_modified": false,
+    "training_executed": false,
+    "distribution_rebuilt": false,
+    "full_cross_target_release_validation": false
+  },
+  "project_validation": {
+    "schema": "vibeflow.readonly-project-validation.v1",
+    "command": [
+      "/home/rockingsisyphus/miniforge3/bin/python",
+      "-B",
+      "-m",
+      "vibeflow",
+      "validate",
+      "--workspace",
+      "/home/rockingsisyphus/projects/vibeTrain/vibeflow_config.jsonc",
+      "--config",
+      "/home/rockingsisyphus/projects/vibeTrain/project/configs/mnist_example.jsonc",
+      "--json"
+    ],
+    "kernel": "/home/rockingsisyphus/projects/VibeFlow/src",
+    "stdout": "/tmp/vf-exit-stack-mnist-final/observation.stdout.json",
+    "stderr": "/tmp/vf-exit-stack-mnist-final/observation.stderr.txt",
+    "exit_code": 1,
+    "completed": true,
+    "status": "FAIL",
+    "errors": 20,
+    "warnings": 91,
+    "error_codes": {
+      "NODE.PURITY.SOURCE_TOO_LARGE": 17,
+      "NODE.PURITY.MISSING_OUTPUT": 1,
+      "BASE_LIB.SIDE_EFFECT_CALL": 1,
+      "RULE.EXECUTION": 1
+    },
+    "warning_codes": {
+      "BASE_LIB.SOURCE.NEAR_LIMIT": 45,
+      "NODE.MAINTAINABILITY.WIDE_CONTRACT": 6,
+      "NODE.PURITY.SOURCE_NEAR_LIMIT": 14,
+      "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP": 15,
+      "GRAPH.DATA.UNCONSUMED_PROVIDER": 4,
+      "NODESET.SMELL.TOO_WIDE": 2,
+      "NODESET.CONFIG.OVERRIDES_GLOBAL_CONFIG": 1,
+      "VIBETRAIN.PLUGIN.BEST_METRIC_MULTIPLE_SOURCES": 1,
+      "GRAPH.DATA.TYPE_CARDINALITY_AMBIGUOUS": 2,
+      "GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT": 1
+    },
+    "seconds": 120.2895119820023,
+    "reports": [
+      "mnist-observation.json",
+      "mnist-report.json"
+    ],
+    "previous_errors": 31,
+    "removed_findings": 11
+  }
+}

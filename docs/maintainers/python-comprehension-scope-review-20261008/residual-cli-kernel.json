@@ -1,0 +1,365 @@
+{
+  "count": 10,
+  "mismatches": 5,
+  "rows": [
+    {
+      "case": "alias_escape_sys",
+      "kind": "node",
+      "expected": false,
+      "actual": true,
+      "matched": false,
+      "exit": 1,
+      "status": "FAIL",
+      "source": "from vibeflow.targets.python.sdk import node\nimport sys\ndef helper():\n    return (lambda: (list(alias := sys for sys in ()), alias.argv))()\n\n@node(type_key='probe.task', rulesets=['probe.effects'], contract={})\nclass Task:\n    def run_pure(self, inputs, params):\n        helper()\n        return {}\n\n@node(type_key='probe.start', flow_kind='terminal', rulesets=[], contract={})\nclass Start:\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.alias_escape_sys/node_resource.py",
+            "line": 4,
+            "column": 56
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {
+            "node_type": "probe.task",
+            "calls": [
+              {
+                "owner": "pipeline",
+                "node": "task"
+              }
+            ]
+          },
+          "root_id": "comprehension",
+          "source_path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.alias_escape_sys/node_resource.py",
+          "definition_id": "vibeflow.no_side_effects"
+        },
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.alias_escape_sys/node_resource.py",
+            "line": 4,
+            "column": 56
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "origin": {
+        "origin": "/home/rockingsisyphus/.cache/vibeflow-comprehension-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.alias_escape_sys"
+    },
+    {
+      "case": "alias_escape_item",
+      "kind": "node",
+      "expected": false,
+      "actual": false,
+      "matched": true,
+      "exit": 0,
+      "status": "PASS",
+      "source": "from vibeflow.targets.python.sdk import node\nimport sys\ndef helper():\n    return (lambda: (list(alias := item for item in ()), alias.argv))()\n\n@node(type_key='probe.task', rulesets=['probe.effects'], contract={})\nclass Task:\n    def run_pure(self, inputs, params):\n        helper()\n        return {}\n\n@node(type_key='probe.start', flow_kind='terminal', rulesets=[], contract={})\nclass Start:\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "findings": [],
+      "origin": {
+        "origin": "/home/rockingsisyphus/.cache/vibeflow-comprehension-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.alias_escape_item"
+    },
+    {
+      "case": "alias_escape_sys",
+      "kind": "base_lib",
+      "expected": false,
+      "actual": true,
+      "matched": false,
+      "exit": 1,
+      "status": "FAIL",
+      "source": "from vibeflow.targets.python.sdk import base_lib\nimport sys\n@base_lib(id='probe.library', rulesets=['probe.effects'])\ndef calculate():\n    return (lambda: (list(alias := sys for sys in ()), alias.argv))()\n",
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.library",
+          "source_location": {
+            "path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/base_lib.alias_escape_sys/library.py",
+            "line": 5,
+            "column": 56
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {},
+          "root_id": "comprehension",
+          "source_path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/base_lib.alias_escape_sys/library.py",
+          "definition_id": "vibeflow.no_side_effects"
+        },
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.library",
+          "source_location": {
+            "path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/base_lib.alias_escape_sys/library.py",
+            "line": 5,
+            "column": 56
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "origin": {
+        "origin": "/home/rockingsisyphus/.cache/vibeflow-comprehension-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/base_lib.alias_escape_sys"
+    },
+    {
+      "case": "alias_escape_item",
+      "kind": "base_lib",
+      "expected": false,
+      "actual": false,
+      "matched": true,
+      "exit": 0,
+      "status": "PASS",
+      "source": "from vibeflow.targets.python.sdk import base_lib\nimport sys\n@base_lib(id='probe.library', rulesets=['probe.effects'])\ndef calculate():\n    return (lambda: (list(alias := item for item in ()), alias.argv))()\n",
+      "findings": [],
+      "origin": {
+        "origin": "/home/rockingsisyphus/.cache/vibeflow-comprehension-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/base_lib.alias_escape_item"
+    },
+    {
+      "case": "alias_escape_sys",
+      "kind": "plugin",
+      "expected": false,
+      "actual": true,
+      "matched": false,
+      "exit": 1,
+      "status": "FAIL",
+      "source": "import sys\ndef helper():\n    return (lambda: (list(alias := sys for sys in ()), alias.argv))()\n\ndef create_runtime(context):\n    helper()\n    return Runtime()\n\nclass Runtime:\n    pass\n",
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.runtime",
+          "source_location": {
+            "path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/plugin.alias_escape_sys/runtime_resource.py",
+            "line": 3,
+            "column": 56
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "origin": {
+        "origin": "/home/rockingsisyphus/.cache/vibeflow-comprehension-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/plugin.alias_escape_sys"
+    },
+    {
+      "case": "alias_escape_item",
+      "kind": "plugin",
+      "expected": false,
+      "actual": false,
+      "matched": true,
+      "exit": 0,
+      "status": "PASS",
+      "source": "import sys\ndef helper():\n    return (lambda: (list(alias := item for item in ()), alias.argv))()\n\ndef create_runtime(context):\n    helper()\n    return Runtime()\n\nclass Runtime:\n    pass\n",
+      "findings": [],
+      "origin": {
+        "origin": "/home/rockingsisyphus/.cache/vibeflow-comprehension-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/plugin.alias_escape_item"
+    },
+    {
+      "case": "nonlocal_direct",
+      "kind": "node",
+      "expected": true,
+      "actual": false,
+      "matched": false,
+      "exit": 0,
+      "status": "PASS",
+      "source": "def sink(payload):\n    payload.pop(\"seed\", None)\nfrom vibeflow.targets.python.sdk import node\n\n@node(type_key='probe.task', rulesets=['probe.effects'], contract={})\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def inner():\n            nonlocal alias\n            alias = inputs\n        inner()\n        alias.pop(\"seed\", None)\n        return {}\n\n@node(type_key='probe.start', flow_kind='terminal', rulesets=[], contract={})\nclass Start:\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "findings": [],
+      "origin": {
+        "origin": "/home/rockingsisyphus/.cache/vibeflow-comprehension-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.nonlocal_direct"
+    },
+    {
+      "case": "nonlocal_helper",
+      "kind": "node",
+      "expected": true,
+      "actual": true,
+      "matched": true,
+      "exit": 1,
+      "status": "FAIL",
+      "source": "def sink(payload):\n    payload.pop(\"seed\", None)\nfrom vibeflow.targets.python.sdk import node\n\n@node(type_key='probe.task', rulesets=['probe.effects'], contract={})\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def inner():\n            nonlocal alias\n            alias = inputs\n        inner()\n        sink(alias)\n        return {}\n\n@node(type_key='probe.start', flow_kind='terminal', rulesets=[], contract={})\nclass Start:\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.nonlocal_helper/node_resource.py",
+            "line": 2,
+            "column": 5
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {
+            "node_type": "probe.task",
+            "calls": [
+              {
+                "owner": "pipeline",
+                "node": "task"
+              }
+            ]
+          },
+          "root_id": "comprehension",
+          "source_path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.nonlocal_helper/node_resource.py",
+          "definition_id": "vibeflow.no_side_effects"
+        },
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.nonlocal_helper/node_resource.py",
+            "line": 2,
+            "column": 5
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "origin": {
+        "origin": "/home/rockingsisyphus/.cache/vibeflow-comprehension-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.nonlocal_helper"
+    },
+    {
+      "case": "global_direct",
+      "kind": "node",
+      "expected": true,
+      "actual": false,
+      "matched": false,
+      "exit": 0,
+      "status": "PASS",
+      "source": "def sink(payload):\n    payload.pop(\"seed\", None)\nfrom vibeflow.targets.python.sdk import node\n\n@node(type_key='probe.task', rulesets=['probe.effects'], contract={})\nclass Task:\n    def run_pure(self, inputs, params):\n        def inner():\n            global alias\n            alias = inputs\n        inner()\n        alias.pop(\"seed\", None)\n        return {}\n\n@node(type_key='probe.start', flow_kind='terminal', rulesets=[], contract={})\nclass Start:\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "findings": [],
+      "origin": {
+        "origin": "/home/rockingsisyphus/.cache/vibeflow-comprehension-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.global_direct"
+    },
+    {
+      "case": "global_helper",
+      "kind": "node",
+      "expected": true,
+      "actual": true,
+      "matched": true,
+      "exit": 1,
+      "status": "FAIL",
+      "source": "def sink(payload):\n    payload.pop(\"seed\", None)\nfrom vibeflow.targets.python.sdk import node\n\n@node(type_key='probe.task', rulesets=['probe.effects'], contract={})\nclass Task:\n    def run_pure(self, inputs, params):\n        def inner():\n            global alias\n            alias = inputs\n        inner()\n        sink(alias)\n        return {}\n\n@node(type_key='probe.start', flow_kind='terminal', rulesets=[], contract={})\nclass Start:\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.global_helper/node_resource.py",
+            "line": 2,
+            "column": 5
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {
+            "node_type": "probe.task",
+            "calls": [
+              {
+                "owner": "pipeline",
+                "node": "task"
+              }
+            ]
+          },
+          "root_id": "comprehension",
+          "source_path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.global_helper/node_resource.py",
+          "definition_id": "vibeflow.no_side_effects"
+        },
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.global_helper/node_resource.py",
+            "line": 2,
+            "column": 5
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "origin": {
+        "origin": "/home/rockingsisyphus/.cache/vibeflow-comprehension-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-independent-review-20261008/residual-cli-new/node.global_helper"
+    }
+  ]
+}

@@ -4,7 +4,8 @@
       {
         "key": "callback.in",
         "type": "callback.in",
-        "display_name": "Runtime Callback"
+        "display_name": "Runtime Callback",
+        "required": true
       }
     ],
     "nodes": [

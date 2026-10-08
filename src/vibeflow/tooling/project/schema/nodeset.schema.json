@@ -23,6 +23,11 @@
       "type": "string",
       "minLength": 1
     },
+    "expand": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether expanded architecture views show this Nodeset's implementation details."
+    },
     "status": {
       "enum": [
         "planned",

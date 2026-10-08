@@ -1,0 +1,35 @@
+{
+  "rules_import": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/rules/__init__.py",
+  "legacy_side_effect_findings_exported": false,
+  "legacy_rules_direct_load": "ImportError: cannot import name 'SIDE_EFFECT_ATTR_CALLS' from 'vibeflow.targets.python.quality.source' (/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source.py)",
+  "legacy_adapter_rulesets": {
+    "native": [
+      "custom.review"
+    ],
+    "descriptor": []
+  },
+  "node_import_names": {
+    "plain.calc": [],
+    "base_lib.calc": [
+      "NODE.BASE_LIB.BASE_LIB_UNDECLARED"
+    ],
+    "nodes.calc": [
+      "NODE.METADATA.NODE_IMPORT"
+    ],
+    "boundary.calc": [
+      "NODE.PURITY.BOUNDARY_IMPORT"
+    ]
+  },
+  "base_lib_import_names": {
+    "plain.calc": [],
+    "nodes.calc": [
+      "BASE_LIB.FORBIDDEN_PROJECT_IMPORT"
+    ],
+    "runtime.calc": [
+      "BASE_LIB.FORBIDDEN_PROJECT_IMPORT"
+    ],
+    "plugins.calc": [
+      "BASE_LIB.FORBIDDEN_PROJECT_IMPORT"
+    ]
+  }
+}

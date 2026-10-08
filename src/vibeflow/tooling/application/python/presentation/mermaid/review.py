@@ -85,7 +85,7 @@ def _render_main_column(renderer: Any, lines: list[str], graph: GraphConfig, com
 
 
 def _render_resource_columns(renderer: Any, lines: list[str], graph: GraphConfig) -> list[str]:
-    payload = _rendered_resources_payload(renderer.resources, graph)
+    payload = _rendered_resources_payload(renderer.resources, graph, renderer.registry)
     if not payload:
         return []
     anchors: list[str] = []
@@ -135,7 +135,7 @@ def _render_nodesets_column(renderer: Any, lines: list[str], graph: GraphConfig)
     if not renderer.expand_nodesets:
         return ""
     nodeset_nodes = [(node, nodeset_for_node(graph, node)) for node in graph.nodes]
-    nodeset_nodes = [(node, nodeset) for node, nodeset in nodeset_nodes if nodeset is not None]
+    nodeset_nodes = [(node, nodeset) for node, nodeset in nodeset_nodes if nodeset is not None and nodeset.expand]
     if not nodeset_nodes:
         return ""
     column_anchor = "__vibeflow_layout_nodesets_anchor"
@@ -172,7 +172,7 @@ def _render_one_nodeset(
     lines.append(f'    subgraph {group_id}["{_escape_label(f"{title} (id: {node.id}, type_key: {nodeset.type_key})")}"]')
     lines.append("      direction LR")
     _render_anchor(lines, group_anchor, indent="      ")
-    nested_compiled = compile_for_render(nodeset.graph, None, renderer.registry)
+    nested_compiled = compile_for_render(nodeset.graph, None, renderer.registry, prepared=renderer.prepared)
     nested_prefix = f"__vibeflow_layout_nodesets__{node.id}__"
     renderer._render_graph_body(
         lines,
@@ -205,10 +205,10 @@ def _render_anchor(lines: list[str], node_id: str, *, indent: str) -> None:
     lines.append(f"{indent}class {node_id} layoutAnchor;")
 
 
-def _rendered_resources_payload(resources: object | None, graph: GraphConfig) -> Mapping[str, object]:
+def _rendered_resources_payload(resources: object | None, graph: GraphConfig, registry=None) -> Mapping[str, object]:
     from vibeflow.tooling.application.python.presentation.mermaid import _rendered_resources_payload as impl
 
-    return impl(resources, graph)
+    return impl(resources, graph, registry)
 
 
 def _mapping_items(value: object) -> tuple[Mapping[str, object], ...]:

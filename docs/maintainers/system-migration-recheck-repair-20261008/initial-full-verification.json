@@ -1,0 +1,93 @@
+{
+  "steps": [
+    {
+      "step": "repository-quality",
+      "status": "passed",
+      "seconds": 5.0596854939940386
+    },
+    {
+      "step": "compileall",
+      "status": "passed",
+      "seconds": 0.8040755869587883
+    },
+    {
+      "step": "pytest",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'tools/run_tests.py', '--workers', '8', '--scratch', '/tmp/vibeflow-recheck-repair-full-20261008/pytest', '--', '/home/rockingsisyphus/projects/VibeFlow/tests/core', '/home/rockingsisyphus/projects/VibeFlow/tests/block_compiler', '/home/rockingsisyphus/projects/VibeFlow/tests/targets', '/home/rockingsisyphus/projects/VibeFlow/tests/tooling', '/home/rockingsisyphus/projects/VibeFlow/tests/conformance', '/home/rockingsisyphus/projects/VibeFlow/tests/integration')' returned non-zero exit status 1.",
+      "seconds": 112.86636861698935
+    },
+    {
+      "step": "python-sandbox",
+      "status": "passed",
+      "seconds": 323.6154970349744
+    },
+    {
+      "step": "javascript-minimal",
+      "status": "passed",
+      "seconds": 12.169357826991472
+    },
+    {
+      "step": "javascript-integration",
+      "status": "passed",
+      "seconds": 112.74138435203349
+    },
+    {
+      "step": "rule-regression-sandboxes",
+      "status": "passed",
+      "seconds": 716.6674722100142
+    },
+    {
+      "step": "runtime-observation-browser",
+      "status": "passed",
+      "seconds": 2.901631746964995
+    },
+    {
+      "step": "review-layout-sandbox",
+      "status": "passed",
+      "seconds": 17.188413149036933
+    },
+    {
+      "step": "resource-sections-sandbox",
+      "status": "passed",
+      "seconds": 58.66760893096216
+    },
+    {
+      "step": "review-performance-sandbox",
+      "status": "passed",
+      "seconds": 66.76960684201913
+    },
+    {
+      "step": "adaptation-regression-sandbox",
+      "status": "passed",
+      "seconds": 89.43027898302535
+    },
+    {
+      "step": "wheel-isolation",
+      "status": "passed",
+      "seconds": 17.75747540203156
+    },
+    {
+      "step": "generated-artifact-cleanup",
+      "status": "passed",
+      "seconds": 0.14750572404591367
+    },
+    {
+      "step": "distribution",
+      "status": "passed",
+      "seconds": 18.896575493970886
+    },
+    {
+      "step": "repository-quality-final",
+      "status": "passed",
+      "seconds": 5.715531103021931
+    },
+    {
+      "step": "clean-tree",
+      "status": "passed",
+      "seconds": 0.08455041504930705
+    }
+  ],
+  "failures": [
+    "pytest failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'tools/run_tests.py', '--workers', '8', '--scratch', '/tmp/vibeflow-recheck-repair-full-20261008/pytest', '--', '/home/rockingsisyphus/projects/VibeFlow/tests/core', '/home/rockingsisyphus/projects/VibeFlow/tests/block_compiler', '/home/rockingsisyphus/projects/VibeFlow/tests/targets', '/home/rockingsisyphus/projects/VibeFlow/tests/tooling', '/home/rockingsisyphus/projects/VibeFlow/tests/conformance', '/home/rockingsisyphus/projects/VibeFlow/tests/integration')' returned non-zero exit status 1."
+  ]
+}

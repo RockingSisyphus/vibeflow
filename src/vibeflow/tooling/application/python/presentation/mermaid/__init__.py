@@ -62,11 +62,19 @@ def export_mermaid(
     show_semantics: bool = True,
     show_findings: bool = True,
     mermaid_layout: str = MERMAID_LAYOUT_DEFAULT,
+    prepared=None,
 ) -> str:
+    from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
+
+    prepared = prepared or prepare_python_presentation(graph, compiled=compiled, registry=registry, resources=resources)
+    registry = prepared.registry
+    # Shared facts do not opt workflow fragments into drawing resources.
+    # The caller's resources selection controls this rendering only.
     graph, actual_compiled = effective_graph_for_render(
         graph,
         compiled,
         registry,
+        prepared=prepared,
     )
     renderer = _MermaidRenderer(
         expand_nodesets=expand_nodesets,
@@ -78,6 +86,7 @@ def export_mermaid(
         show_findings=show_findings,
         mermaid_layout=mermaid_layout,
     )
+    renderer.prepared = prepared
     return renderer.render(graph, actual_compiled)
 
 
@@ -166,7 +175,7 @@ def _resource_payload_has_planned(
         isinstance(item, Mapping)
         and str(item.get("status", "implemented")) == STATUS_PLANNED
         for group in groups
-        if isinstance(group, list)
+        if isinstance(group, (list, tuple))
         for item in group
     )
 
@@ -302,7 +311,7 @@ class _MermaidRenderer:
             if presentation.shape == "cloud":
                 lines.append(f"{indent}class {node_id} {_MERMAID_CLOUD_NODE_CLASS};")
             lines.append(f"{indent}style {node_id} {presentation.mermaid_style()};")
-            if not should_expand:
+            if not should_expand or not nodeset.expand:
                 continue
             group_id = _safe_id(f"{prefix}{node.id}__expanded")
             group_title = _expanded_nodeset_title(node, nodeset)
@@ -310,7 +319,7 @@ class _MermaidRenderer:
             if nodeset.type_key in visited_nodesets:
                 lines.append(f"{indent}  %% recursive nodeset expansion skipped: {nodeset.type_key}")
             else:
-                nested_compiled = compile_for_render(nodeset.graph, None, self.registry)
+                nested_compiled = compile_for_render(nodeset.graph, None, self.registry, prepared=self.prepared)
                 nested_prefix = f"{prefix}{node.id}__"
                 self._render_graph_body(
                     lines,
@@ -347,7 +356,7 @@ class _MermaidRenderer:
             lines.append(f"{indent}linkStyle {edge_index} {style};")
 
     def _render_resources(self, lines: list[str], *, graph: GraphConfig, indent: str) -> None:
-        payload = _rendered_resources_payload(self.resources, graph)
+        payload = _rendered_resources_payload(self.resources, graph, self.registry)
         if not payload:
             return
         base_lib = payload.get("base_lib", {})
@@ -411,10 +420,13 @@ class _MermaidRenderer:
         for index, resource in enumerate(resources):
             resource_id = f"{root_id}_{index}"
             label = _resource_label(resource, kind=label_kind, show_semantics=self.show_semantics)
-            lines.append(f'{indent}{resource_id}@{{ shape: {child_shape}, label: "{_escape_label(label)}" }}')
-            self._append_edge_line(lines, f"{indent}{root_id} -.-> {resource_id}")
             status = str(resource.get("status", "implemented"))
+            presentation = resolve_presentation(resource, native_class=child_class, resource_kind=label_kind,
+                status_class="plannedResource" if status == STATUS_PLANNED else "", call_style=resource.get("style"))
+            lines.append(f'{indent}{resource_id}@{{ shape: {presentation.shape}, label: "{_escape_label(label)}" }}')
+            self._append_edge_line(lines, f"{indent}{root_id} -.-> {resource_id}")
             lines.append(f"{indent}class {resource_id} {'plannedResource' if status == STATUS_PLANNED else child_class};")
+            lines.append(f"{indent}style {resource_id} {presentation.mermaid_style()}")
 
     def _render_findings(self, lines: list[str], graph: GraphConfig, compiled: CompiledGraph, *, indent: str) -> None:
         for finding in _health_findings(self.health_report):
@@ -455,19 +467,6 @@ class _MermaidRenderer:
             return "documentNode"
         return "defaultNode"
 
-    def _render_custom_node_style(self, lines: list[str], node: NodeSpec, node_id: str, *, indent: str) -> None:
-        style = node.style.to_dict()
-        if not style:
-            return
-        fields: list[str] = []
-        if "fill" in style:
-            fields.append(f"fill:{style['fill']}")
-        if "stroke" in style:
-            fields.append(f"stroke:{style['stroke']}")
-        if "text" in style:
-            fields.append(f"color:{style['text']}")
-        if fields:
-            lines.append(f"{indent}style {node_id} {','.join(fields)};")
 
     def _presentation(self, node: NodeSpec, node_id: str, *, native_class: str, status_class: str, flow_kind: str):
         descriptor = registry_descriptor(self.registry, node.type_used)

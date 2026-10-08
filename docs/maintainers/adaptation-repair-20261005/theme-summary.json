@@ -1,0 +1,86 @@
+{
+  "themes": {
+    "A01": {
+      "cases": 38,
+      "before_unmatched": 13,
+      "after_unmatched": 0
+    },
+    "A02": {
+      "cases": 4,
+      "before_unmatched": 2,
+      "after_unmatched": 0
+    },
+    "A03": {
+      "cases": 7,
+      "before_unmatched": 4,
+      "after_unmatched": 0
+    },
+    "A04": {
+      "cases": 6,
+      "before_unmatched": 2,
+      "after_unmatched": 0
+    },
+    "A05": {
+      "cases": 38,
+      "before_unmatched": 13,
+      "after_unmatched": 0
+    },
+    "A06": {
+      "cases": 4,
+      "before_unmatched": 2,
+      "after_unmatched": 0
+    },
+    "A07": {
+      "cases": 16,
+      "before_unmatched": 3,
+      "after_unmatched": 0
+    },
+    "A08": {
+      "cases": 31,
+      "before_unmatched": 15,
+      "after_unmatched": 0
+    },
+    "A09": {
+      "cases": 4,
+      "before_unmatched": 3,
+      "after_unmatched": 0
+    },
+    "A10": {
+      "cases": 16,
+      "before_unmatched": 1,
+      "after_unmatched": 0
+    },
+    "S01": {
+      "cases": 6,
+      "before_unmatched": 1,
+      "after_unmatched": 0
+    },
+    "S02": {
+      "cases": 2,
+      "before_unmatched": 2,
+      "after_unmatched": 0
+    },
+    "S03": {
+      "cases": 6,
+      "before_unmatched": 0,
+      "after_unmatched": 0
+    }
+  },
+  "case_manifest": "sandbox/adaptation_regressions/cases.json",
+  "original_baseline_cases": 178,
+  "additional_first_fixed_cases": {
+    "A05": {
+      "cases": 20,
+      "before_unmatched": 6
+    },
+    "A01": {
+      "cases": 9,
+      "before_unmatched": 9
+    }
+  },
+  "final": {
+    "cases": 207,
+    "unmatched": 0,
+    "process_errors": 0
+  }
+}

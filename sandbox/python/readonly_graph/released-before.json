@@ -1,0 +1,113 @@
+{
+  "schema": "vibeflow.readonly-sharing.v1",
+  "python": "3.13.13 | packaged by conda-forge | (main, Apr  8 2026, 02:00:33) [GCC 14.3.0]",
+  "implementation": "/home/rockingsisyphus/projects/vibeTrain/kernel/vibeflow-kernel.zip/vibeflow/core/rules/models.py",
+  "cases": [
+    {
+      "id": "tuple.4",
+      "kind": "tuple",
+      "depth": 4,
+      "input_objects": {
+        "tuple": 4
+      },
+      "output_objects": {
+        "tuple": 15
+      },
+      "seconds": 7.145399285946041e-05,
+      "sharing_preserved": false,
+      "matched": false
+    },
+    {
+      "id": "tuple.8",
+      "kind": "tuple",
+      "depth": 8,
+      "input_objects": {
+        "tuple": 8
+      },
+      "output_objects": {
+        "tuple": 255
+      },
+      "seconds": 0.00023731398687232286,
+      "sharing_preserved": false,
+      "matched": false
+    },
+    {
+      "id": "tuple.12",
+      "kind": "tuple",
+      "depth": 12,
+      "input_objects": {
+        "tuple": 12
+      },
+      "output_objects": {
+        "tuple": 4095
+      },
+      "seconds": 0.004319471001508646,
+      "sharing_preserved": false,
+      "matched": false
+    },
+    {
+      "id": "list.12",
+      "kind": "list",
+      "depth": 12,
+      "input_objects": {
+        "list": 12
+      },
+      "output_objects": {
+        "tuple": 4095
+      },
+      "seconds": 0.0041565959982108325,
+      "sharing_preserved": false,
+      "matched": false
+    },
+    {
+      "id": "mapping.12",
+      "kind": "mapping",
+      "depth": 12,
+      "input_objects": {
+        "mapping": 12
+      },
+      "output_objects": {
+        "mapping": 12
+      },
+      "seconds": 2.7040994609706104e-05,
+      "sharing_preserved": true,
+      "matched": true
+    },
+    {
+      "id": "dataclass.12",
+      "kind": "dataclass",
+      "depth": 12,
+      "input_objects": {
+        "Pair": 12
+      },
+      "output_objects": {
+        "Pair": 12
+      },
+      "seconds": 8.344699745066464e-05,
+      "sharing_preserved": true,
+      "matched": true
+    },
+    {
+      "id": "namespace.12",
+      "kind": "namespace",
+      "depth": 12,
+      "input_objects": {
+        "SimpleNamespace": 12
+      },
+      "output_objects": {
+        "SimpleNamespace": 12
+      },
+      "seconds": 1.3816010323353112e-05,
+      "sharing_preserved": true,
+      "matched": true
+    },
+    {
+      "id": "mixed.containers",
+      "sharing_preserved": false,
+      "mutation_blocked": true,
+      "snapshot_isolated": true,
+      "matched": false
+    }
+  ],
+  "matched": false
+}

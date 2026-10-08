@@ -42,21 +42,23 @@ class DataRequirement:
 class PipelineInputSpec:
     """A public workflow input.
 
-    ``required=None`` is intentionally retained for legacy Python workflows.
-    AOT targets must reject that ambiguous state before emitting code.
+    Every target uses the same explicit required/optional contract.
     """
 
     key: str
     type: str
     display_name: str = field(default="", compare=False)
-    required: bool | None = None
+    required: bool = field(kw_only=True)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.required, bool):
+            raise ValueError("pipeline input required must be explicitly true or false")
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {"key": self.key, "type": self.type}
         if self.display_name:
             payload["display_name"] = self.display_name
-        if self.required is not None:
-            payload["required"] = self.required
+        payload["required"] = self.required
         return payload
 
     def to_provider(self) -> DataProvider:
@@ -260,8 +262,8 @@ def _parse_pipeline_input(item: Any, *, field: str) -> PipelineInputSpec:
     data_type = _required_text(item.get("type"), field=f"{field}.type")
     display_name = _required_text(item.get("display_name"), field=f"{field}.display_name")
     required = item.get("required")
-    if required is not None and not isinstance(required, bool):
-        raise ValueError(f"{field}.required must be a boolean")
+    if not isinstance(required, bool):
+        raise ValueError(f"{field}.required must be explicitly true or false")
     return PipelineInputSpec(key=key, type=data_type, display_name=display_name, required=required)
 
 

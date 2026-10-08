@@ -1,4 +1,5 @@
 """Declaration failures and effective rule plans through actual public CLIs."""
+from tests.fixtures.support.plugins import resource as resource_ref, resources, resource_declarations, update_resources, append_resource, write_plugin
 
 from copy import deepcopy
 import json
@@ -16,7 +17,7 @@ def _declaration_project(work, target, toolchain):
     graph = _read(project / "configs/model.jsonc")
     graph["rulesets"] = []
     write(project / "configs/model.jsonc", graph)
-    for path in (project / "bundle/nodes").glob("*.jsonc"):
+    for path in resources(project, "node"):
         data = _read(path)
         data["rulesets"] = []
         write(path, data)
@@ -28,21 +29,16 @@ def _declaration_project(work, target, toolchain):
                 "implementations": implementation("declaration_provider")}
     consumer = {"kind": "rule", "id": "gap.consumer", "inputs": {"input": "gap.value.v1"},
                 "implementations": implementation("declaration_consumer")}
-    resource = project / "bundle/rules/declaration-provider.jsonc"
+    resource = resource_ref(project, "rule", "gap.provider")
     write(resource, provider)
-    write(project / "bundle/rules/declaration-consumer.jsonc", consumer)
-    write(project / "bundle/rulesets/declaration.jsonc", {
+    write(resource_ref(project, "rule", "gap.consumer"), consumer)
+    write(resource_ref(project, "ruleset", "gap.declaration"), {
         "kind": "ruleset", "id": "gap.declaration", "calls": [
             {"id": "provider", "rule_id": "gap.provider"}, {"id": "consumer", "rule_id": "gap.consumer"}],
         "relations": [{"kind": "requires", "source": "consumer", "target": "provider",
                        "bindings": {"input": "value"}}],
         "entrypoints": {"import": ["consumer"], "static": ["consumer"], "run": []}})
-    bundle_path = project / "bundles/domain.jsonc"
-    bundle = _read(bundle_path)
-    bundle["resources"]["rules"].extend(["../bundle/rules/declaration-provider.jsonc", "../bundle/rules/declaration-consumer.jsonc"])
-    bundle["resources"]["rulesets"].append("../bundle/rulesets/declaration.jsonc")
-    write(bundle_path, bundle)
-    model = project / "bundle/nodes/model.jsonc"
+    model = resource_ref(project, 'node', 'example.model')
     data = _read(model)
     data["rulesets"] = ["gap.declaration"]
     write(model, data)
@@ -69,27 +65,22 @@ def _handlers(project, target, marker, record_type):
 def _resource_case(rows, work, target, label, group, value, toolchain):
     project, marker, provider_path = _declaration_project(work / label, target, toolchain)
     if group == "category":
-        resource = project / "bundle/removed-category.jsonc"
-        write(resource, {"kind":"node_category", "id":"model", "presentation":{"shape":value}})
-        bundle_path = project / "bundles/domain.jsonc"
-        bundle = _read(bundle_path)
-        bundle["resources"]["nodes"].append("../bundle/removed-category.jsonc")
-        write(bundle_path, bundle)
+        append_resource(project, {"kind":"node_category", "id":"model", "presentation":{"shape":value}})
         record_type = "gap.value.v1"
     elif group == "node":
-        resource = project / "bundle/nodes/model.jsonc"
+        resource = resource_ref(project, 'node', 'example.model')
         data = _read(resource)
         data["presentation"] = {"shape": value}
         write(resource, data)
         record_type = "gap.value.v1"
     else:
-        resource = provider_path if group == "output" else project / "bundle/rules/declaration-consumer.jsonc"
+        resource = provider_path if group == "output" else resource_ref(project, "rule", "gap.consumer")
         data = _read(resource)
         data["outputs" if group == "output" else "inputs"] = {"value" if group == "output" else "input": value}
         write(resource, data)
         # A valid counterpart and real output isolate the wrong declared type.
         record_type = str(value)
-        counterpart = project / ("bundle/rules/declaration-consumer.jsonc" if group == "output" else "bundle/rules/declaration-provider.jsonc")
+        counterpart = resource_ref(project, "rule", "gap.consumer" if group == "output" else "gap.provider")
         other = _read(counterpart)
         other["inputs" if group == "output" else "outputs"] = {"input" if group == "output" else "value": record_type}
         write(counterpart, other)
@@ -115,39 +106,28 @@ def _resource_case(rows, work, target, label, group, value, toolchain):
 def _sibling_project(work, toolchain, *, conflict=False):
     main_root, project = copy_project(work / "main", "python", toolchain=toolchain)
     sibling_root, sibling = copy_project(work / "sibling", "python", toolchain=toolchain)
-    for path in (sibling / "bundle/nodes").glob("*.jsonc"):
-        data = _read(path)
-        data["type_key"] = "sibling." + data["type_key"]
-        write(path, data)
-    for folder in ("manifests/data", "manifests/data_schemas"):
-        for path in (sibling / folder).glob("*.jsonc"):
-            path.unlink()
-    for path in (sibling / "bundle").rglob("*.jsonc"):
-        data = _read(path)
-        if data.get("kind") == "base_lib":
+    declarations = resource_declarations(sibling)
+    for data in declarations:
+        if data["kind"] == "node":
+            data["type_key"] = "sibling." + data["type_key"]
+            if data.get("base_libs"):
+                data["base_libs"] = ["sibling." + value for value in data["base_libs"]]
+        elif data["kind"] == "base_lib":
             data["id"] = "sibling." + data["id"]
-            write(path,data)
-        elif data.get("kind") == "node" and data.get("base_libs"):
-            data["base_libs"] = ["sibling."+value for value in data["base_libs"]]
-            write(path,data)
+    write_plugin(sibling, [data for data in declarations if data["kind"] != "data_schema"],
+                 target="python", plugin_id="sibling.resources")
     config = project / "configs/model.jsonc"
     graph = _read(config)
     graph["pipeline"]["nodes"][1]["type_used"] = "sibling.example.model"
+    graph["plugins"].append({"root":"sibling", "source": {"kind":"file", "ref":"code_plugin.py", "export":"plugin"}})
     write(config, graph)
     # The sibling Node must select one shared, explicitly enabled definition.
     # The non-conflict case contributes only sibling Nodes/helpers, referencing
     # main's rules. The conflict case intentionally contributes both definitions.
     if not conflict:
-        for folder in ("rules", "rulesets"):
-            for file in (sibling / "bundle" / folder).glob("*.jsonc"):
-                file.unlink()
-        bundle_path = sibling / "bundles/domain.jsonc"
-        bundle = _read(bundle_path)
-        bundle["resources"]["rules"] = []
-        bundle["resources"]["rulesets"] = []
-        write(bundle_path, bundle)
+        update_resources(sibling, [data for data in resource_declarations(sibling) if data["kind"] not in {"rule", "ruleset"}])
     if conflict:
-        path = sibling / "bundle/rules/model-definition.jsonc"
+        path = resource_ref(sibling, 'rule', 'example.model_definition')
         data = _read(path)
         data["description"] += " A conflicting sibling definition."
         write(path, data)

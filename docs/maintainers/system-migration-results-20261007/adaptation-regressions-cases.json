@@ -1,0 +1,2795 @@
+{
+  "summary": {
+    "cases": 207,
+    "matched": 207,
+    "unmatched": 0,
+    "process_errors": 0
+  },
+  "detail_report": "/tmp/vibeflow-migration-full-passing-20261007/adaptation-regressions.json",
+  "cases": [
+    {
+      "id": "A01.node.auto_actual",
+      "title": "Node implementation identity: auto_actual",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "NODE.EFFECT.CALL_FORBIDDEN"
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1,
+        "codes": [
+          "NODE.EFFECT.CALL_FORBIDDEN"
+        ]
+      }
+    },
+    {
+      "id": "A01.node.auto_actual.checked_run",
+      "title": "Checked run uses the reviewed Node: auto_actual",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "NODE.EFFECT.CALL_FORBIDDEN"
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1,
+        "codes": [
+          "NODE.EFFECT.CALL_FORBIDDEN"
+        ]
+      }
+    },
+    {
+      "id": "A01.node.delayed",
+      "title": "Node implementation identity: delayed",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A01.node.delayed.checked_run",
+      "title": "Checked run uses the reviewed Node: delayed",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A01.node.metadata_preserved",
+      "title": "Same-source explicit metadata remains public",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A01.node.module_alias",
+      "title": "Node implementation identity: module_alias",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A01.node.other_file",
+      "title": "Node implementation identity: other_file",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "RESOURCE.IMPLEMENTATION.CONFLICT"
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "RESOURCE.IMPLEMENTATION.CONFLICT"
+        ]
+      }
+    },
+    {
+      "id": "A01.node.other_file.checked_run",
+      "title": "Checked run uses the reviewed Node: other_file",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "RESOURCE.IMPLEMENTATION.CONFLICT"
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "RESOURCE.IMPLEMENTATION.CONFLICT"
+        ]
+      }
+    },
+    {
+      "id": "A01.node.relative_alias",
+      "title": "Node implementation identity: relative_alias",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A01.node.same_file_other_symbol",
+      "title": "Node implementation identity: same_file_other_symbol",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "RESOURCE.IMPLEMENTATION.CONFLICT"
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "RESOURCE.IMPLEMENTATION.CONFLICT"
+        ]
+      }
+    },
+    {
+      "id": "A01.node.same_source_metadata",
+      "title": "Node implementation identity: same_source_metadata",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A01.node.same_source_metadata.checked_run",
+      "title": "Checked run uses the reviewed Node: same_source_metadata",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A01.node.symbol_alias",
+      "title": "Node implementation identity: symbol_alias",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A01.rule.auto",
+      "title": "Rule implementation identity: auto",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "CONCERNS",
+        "exit_code": 0,
+        "codes": [
+          "CASE.ACTUAL"
+        ]
+      }
+    },
+    {
+      "id": "A01.rule.builtin_alias",
+      "title": "Rule implementation identity: builtin_alias",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "QUALITY.FILE.MAX_LINES"
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1,
+        "codes": [
+          "QUALITY.FILE.MAX_LINES"
+        ]
+      }
+    },
+    {
+      "id": "A01.rule.delayed",
+      "title": "Rule implementation identity: delayed",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "CONCERNS",
+        "exit_code": 0,
+        "codes": [
+          "CASE.DECLARED"
+        ]
+      }
+    },
+    {
+      "id": "A01.rule.handler_with_direct",
+      "title": "Rule implementation identity: handler_with_direct",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "RESOURCE.IMPLEMENTATION.CONFLICT"
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "RESOURCE.IMPLEMENTATION.CONFLICT"
+        ]
+      }
+    },
+    {
+      "id": "A01.rule.handler_with_source",
+      "title": "Rule implementation identity: handler_with_source",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "RESOURCE.IMPLEMENTATION.CONFLICT"
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "RESOURCE.IMPLEMENTATION.CONFLICT"
+        ]
+      }
+    },
+    {
+      "id": "A01.rule.other_file",
+      "title": "Rule implementation identity: other_file",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "RESOURCE.IMPLEMENTATION.CONFLICT"
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "RESOURCE.IMPLEMENTATION.CONFLICT"
+        ]
+      }
+    },
+    {
+      "id": "A01.rule.same_source",
+      "title": "Rule implementation identity: same_source",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "CONCERNS",
+        "exit_code": 0,
+        "codes": [
+          "CASE.ACTUAL"
+        ]
+      }
+    },
+    {
+      "id": "A02.python.compiler.after-failure",
+      "title": "One compiler stage retains its artifact and releases its instance",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "FAIL",
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A02.python.compiler.before-failure",
+      "title": "One compiler stage retains its artifact and releases its instance",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "FAIL",
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A02.python.compiler.checked-run",
+      "title": "Actual Runtime retains the checked compiler artifact and computes its number",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A02.python.compiler.success",
+      "title": "One compiler stage retains its artifact and releases its instance",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A04.python.scope.control-run",
+      "title": "Supplementary unused implementation cannot replace actual workflow scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A04.python.scope.pure-query",
+      "title": "Query and fact compilation preserve the published check scope",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A04.python.scope.unused-refused-run",
+      "title": "Supplementary unused implementation cannot replace actual workflow scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "FAIL",
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A04.python.scope.unused-refused-validate",
+      "title": "Supplementary unused implementation cannot replace actual workflow scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "FAIL",
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A04.python.scope.unused-run",
+      "title": "Supplementary unused implementation cannot replace actual workflow scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A04.python.scope.unused-validate",
+      "title": "Supplementary unused implementation cannot replace actual workflow scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A05.python.cross-root-allowed.quality-check",
+      "title": "Explicit source ownership: cross-root-allowed",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A05.python.cross-root-allowed.validate",
+      "title": "Explicit source ownership: cross-root-allowed",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A05.python.cross-root-denied.quality-check",
+      "title": "Explicit source ownership: cross-root-denied",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A05.python.cross-root-denied.validate",
+      "title": "Explicit source ownership: cross-root-denied",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A05.python.declaration-contribution.quality-check",
+      "title": "Declared Python source relationship: declaration-contribution",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A05.python.declaration-contribution.validate",
+      "title": "Declared Python source relationship: declaration-contribution",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A05.python.library-support.quality-check",
+      "title": "Declared Python source relationship: library-support",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A05.python.library-support.validate",
+      "title": "Declared Python source relationship: library-support",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A05.python.library-unregistered.quality-check",
+      "title": "Declared Python source relationship: library-unregistered",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "exit_code": 1,
+        "codes": [
+          "QUALITY.STRUCTURE.BASE_LIB_UPWARD_IMPORT",
+          "VF_IMPORT_OWNER"
+        ]
+      }
+    },
+    {
+      "id": "A05.python.library-unregistered.validate",
+      "title": "Declared Python source relationship: library-unregistered",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "exit_code": 1,
+        "codes": [
+          "VF_IMPORT_OWNER"
+        ]
+      }
+    },
+    {
+      "id": "A05.python.lifecycle-contribution-denied.quality-check",
+      "title": "Explicit source ownership: lifecycle-contribution-denied",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A05.python.lifecycle-library-allowed.quality-check",
+      "title": "Explicit source ownership: lifecycle-library-allowed",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A05.python.node-support-conventional.quality-check",
+      "title": "Declared Python source relationship: node-support-conventional",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A05.python.node-support-conventional.validate",
+      "title": "Declared Python source relationship: node-support-conventional",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A05.python.node-support.quality-check",
+      "title": "Declared Python source relationship: node-support",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A05.python.node-support.validate",
+      "title": "Declared Python source relationship: node-support",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "A05.python.node-unregistered.quality-check",
+      "title": "Declared Python source relationship: node-unregistered",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "exit_code": 1,
+        "codes": [
+          "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT",
+          "VF_IMPORT_OWNER"
+        ]
+      }
+    },
+    {
+      "id": "A05.python.node-unregistered.validate",
+      "title": "Declared Python source relationship: node-unregistered",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "exit_code": 1,
+        "codes": [
+          "VF_IMPORT_OWNER"
+        ]
+      }
+    },
+    {
+      "id": "A05.python.shared-denied.quality-check",
+      "title": "Explicit source ownership: shared-denied",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A05.python.shared-denied.validate",
+      "title": "Explicit source ownership: shared-denied",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A05.python.shared-symbol-isolated.quality-check",
+      "title": "Explicit source ownership: shared-symbol-isolated",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A05.python.shared-symbol-isolated.validate",
+      "title": "Explicit source ownership: shared-symbol-isolated",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A05.python.workflow-isolation-allowed.validate",
+      "title": "Explicit source ownership: workflow-isolation-allowed",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A05.python.workflow-isolation-denied.validate",
+      "title": "Explicit source ownership: workflow-isolation-denied",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A05.python.workflow-isolation-mixed.quality-check",
+      "title": "Explicit source ownership: workflow-isolation-mixed",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A06.python.inspect-config.project-invalid",
+      "title": "Inspect config consumes one checked result",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "FAIL",
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A06.python.inspect-config.project-valid",
+      "title": "Inspect config consumes one checked result",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "CONCERNS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "CONCERNS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A06.python.inspect-config.workspace-invalid",
+      "title": "Inspect config consumes one checked result",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "FAIL",
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A06.python.inspect-config.workspace-valid",
+      "title": "Inspect config consumes one checked result",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "CONCERNS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "CONCERNS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A07.python.policy.discovered-denied.inspect-node",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "FAIL",
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A07.python.policy.discovered-denied.validate",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "FAIL",
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A07.python.policy.explicit-wins.inspect-node",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A07.python.policy.explicit-wins.validate",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A07.python.policy.inline-allowed.inspect-node",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A07.python.policy.inline-allowed.validate",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A07.python.policy.inline-denied.inspect-node",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "FAIL",
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A07.python.policy.inline-denied.validate",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "FAIL",
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A07.python.policy.inline-wins.inspect-node",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "FAIL",
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A07.python.policy.inline-wins.validate",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "FAIL",
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A07.python.policy.nested-discovery.inspect-node",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "FAIL",
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A07.python.policy.nested-discovery.validate",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "FAIL",
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "A07.python.policy.rule-params-win.inspect-node",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A07.python.policy.rule-params-win.validate",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A07.python.policy.unrelated-node.inspect-node",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A07.python.policy.unrelated-node.validate",
+      "title": "Inspect Node preserves workflow policy precedence and its own scope",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS",
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "A08.cache.different_leaf",
+      "title": "Cache retains content and type semantics: different_leaf",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS"
+      },
+      "observed": {
+        "status": "PASS"
+      }
+    },
+    {
+      "id": "A08.cache.equal_tree",
+      "title": "Cache retains content and type semantics: equal_tree",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS"
+      },
+      "observed": {
+        "status": "PASS"
+      }
+    },
+    {
+      "id": "A08.cache.integer_boolean",
+      "title": "Cache retains content and type semantics: integer_boolean",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS"
+      },
+      "observed": {
+        "status": "PASS"
+      }
+    },
+    {
+      "id": "A08.cache.integer_float",
+      "title": "Cache retains content and type semantics: integer_float",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS"
+      },
+      "observed": {
+        "status": "PASS"
+      }
+    },
+    {
+      "id": "A08.cache.mapping_order",
+      "title": "Cache retains content and type semantics: mapping_order",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS"
+      },
+      "observed": {
+        "status": "PASS"
+      }
+    },
+    {
+      "id": "A08.cache.native_types",
+      "title": "Cache retains content and type semantics: native_types",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS"
+      },
+      "observed": {
+        "status": "PASS"
+      }
+    },
+    {
+      "id": "A08.cache.native_vs_json",
+      "title": "Cache retains content and type semantics: native_vs_json",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS"
+      },
+      "observed": {
+        "status": "PASS"
+      }
+    },
+    {
+      "id": "A08.cache.same_dag",
+      "title": "Cache retains content and type semantics: same_dag",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS"
+      },
+      "observed": {
+        "status": "PASS"
+      }
+    },
+    {
+      "id": "A08.cache.set_vs_sequence",
+      "title": "Cache retains content and type semantics: set_vs_sequence",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS"
+      },
+      "observed": {
+        "status": "PASS"
+      }
+    },
+    {
+      "id": "A08.cache.signed_zero",
+      "title": "Cache retains content and type semantics: signed_zero",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "status": "PASS"
+      },
+      "observed": {
+        "status": "PASS"
+      }
+    },
+    {
+      "id": "A08.cache_identity.call_scope",
+      "title": "Cache eligibility and identity boundary: call_scope",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.cache_identity.no_source_identity",
+      "title": "Cache eligibility and identity boundary: no_source_identity",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.cache_identity.params",
+      "title": "Cache eligibility and identity boundary: params",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.cache_identity.phase",
+      "title": "Cache eligibility and identity boundary: phase",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.cache_identity.port",
+      "title": "Cache eligibility and identity boundary: port",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.cache_identity.rule_id",
+      "title": "Cache eligibility and identity boundary: rule_id",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.cache_identity.source",
+      "title": "Cache eligibility and identity boundary: source",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.cache_identity.target",
+      "title": "Cache eligibility and identity boundary: target",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.cache_identity.type_id",
+      "title": "Cache eligibility and identity boundary: type_id",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.formal.cycle",
+      "title": "Formal provider/consumer and finding dedup: cycle",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {
+        "codes": [
+          "RULE.EXECUTION",
+          "RULE.INPUT.UNAVAILABLE",
+          "RULE.EXECUTION"
+        ]
+      }
+    },
+    {
+      "id": "A08.formal.provider_error",
+      "title": "Formal provider/consumer and finding dedup: provider_error",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {
+        "codes": [
+          "CASE.PROVIDER",
+          "CASE.PROVIDER",
+          "CASE.RECORD"
+        ]
+      }
+    },
+    {
+      "id": "A08.formal.shared",
+      "title": "Formal provider/consumer and finding dedup: shared",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {
+        "codes": [
+          "CASE.RECORD"
+        ]
+      }
+    },
+    {
+      "id": "A08.snapshot.cycle_dataclass",
+      "title": "Record snapshot: cycle_dataclass",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.snapshot.cycle_list",
+      "title": "Record snapshot: cycle_list",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.snapshot.cycle_mapping",
+      "title": "Record snapshot: cycle_mapping",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.snapshot.cycle_tuple_list",
+      "title": "Record snapshot: cycle_tuple_list",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.snapshot.json_boundary",
+      "title": "Record snapshot: json_boundary",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.snapshot.mapping",
+      "title": "Record snapshot: mapping",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.snapshot.mixed",
+      "title": "Record snapshot: mixed",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.snapshot.native",
+      "title": "Record snapshot: native",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "A08.snapshot.tuple",
+      "title": "Record snapshot: tuple",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "S01.fixed_contribution",
+      "title": "One immutable definition; only report boundary serializes",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "S01.public_validation.duplicate",
+      "title": "Direct public contributions stay validated: duplicate",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "S01.public_validation.raw_entry",
+      "title": "Direct public contributions stay validated: raw_entry",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "S01.public_validation.wrong_descriptor",
+      "title": "Direct public contributions stay validated: wrong_descriptor",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "S01.public_validation.wrong_origin",
+      "title": "Direct public contributions stay validated: wrong_origin",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "S01.workflow_isolation",
+      "title": "Workflow config does not rewrite the fixed plugin definition",
+      "matched": true,
+      "failures": [],
+      "expected": {},
+      "observed": {}
+    },
+    {
+      "id": "js.A01.base_lib.alias",
+      "title": "JS actual callable source authority: base_lib/alias",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.base_lib.auto",
+      "title": "JS actual callable source authority: base_lib/auto",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.base_lib.delayed",
+      "title": "JS actual callable source authority: base_lib/delayed",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.base_lib.other_file",
+      "title": "JS actual callable source authority: base_lib/other_file",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "RESOURCE.IMPLEMENTATION.CONFLICT"
+        ]
+      }
+    },
+    {
+      "id": "js.A01.base_lib.other_symbol",
+      "title": "JS actual callable source authority: base_lib/other_symbol",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "RESOURCE.IMPLEMENTATION.CONFLICT"
+        ]
+      }
+    },
+    {
+      "id": "js.A01.base_lib.path_alias",
+      "title": "JS actual callable source authority: base_lib/path_alias",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.base_lib.path_auto",
+      "title": "JS actual callable source authority: base_lib/path_auto",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.base_lib.path_same_source",
+      "title": "JS actual callable source authority: base_lib/path_same_source",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.base_lib.same_source",
+      "title": "JS actual callable source authority: base_lib/same_source",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.node.alias",
+      "title": "JS actual callable source authority: node/alias",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.node.auto",
+      "title": "JS actual callable source authority: node/auto",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.node.delayed",
+      "title": "JS actual callable source authority: node/delayed",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.node.other_file",
+      "title": "JS actual callable source authority: node/other_file",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "RESOURCE.IMPLEMENTATION.CONFLICT"
+        ]
+      }
+    },
+    {
+      "id": "js.A01.node.other_symbol",
+      "title": "JS actual callable source authority: node/other_symbol",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "RESOURCE.IMPLEMENTATION.CONFLICT"
+        ]
+      }
+    },
+    {
+      "id": "js.A01.node.path_alias",
+      "title": "JS actual callable source authority: node/path_alias",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.node.path_auto",
+      "title": "JS actual callable source authority: node/path_auto",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.node.path_same_source",
+      "title": "JS actual callable source authority: node/path_same_source",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.node.same_source",
+      "title": "JS actual callable source authority: node/same_source",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.rule.alias",
+      "title": "JS actual callable source authority: rule/alias",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.rule.auto",
+      "title": "JS actual callable source authority: rule/auto",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.rule.delayed",
+      "title": "JS actual callable source authority: rule/delayed",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.rule.other_file",
+      "title": "JS actual callable source authority: rule/other_file",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "RESOURCE.IMPLEMENTATION.CONFLICT"
+        ]
+      }
+    },
+    {
+      "id": "js.A01.rule.other_symbol",
+      "title": "JS actual callable source authority: rule/other_symbol",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "RESOURCE.IMPLEMENTATION.CONFLICT"
+        ]
+      }
+    },
+    {
+      "id": "js.A01.rule.path_alias",
+      "title": "JS actual callable source authority: rule/path_alias",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.rule.path_auto",
+      "title": "JS actual callable source authority: rule/path_auto",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.rule.path_same_source",
+      "title": "JS actual callable source authority: rule/path_same_source",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A01.rule.same_source",
+      "title": "JS actual callable source authority: rule/same_source",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A03.compiler.loop",
+      "title": "Compiler receives a finite native graph and preserves numeric execution",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A03.compiler.mutation",
+      "title": "Existing void results remain legal; compiler graph mutation remains rejected",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A03.compiler.nested",
+      "title": "Compiler receives a finite native graph and preserves numeric execution",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A03.compiler.nodeset",
+      "title": "Compiler receives a finite native graph and preserves numeric execution",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A03.compiler.serial",
+      "title": "Compiler receives a finite native graph and preserves numeric execution",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A03.compiler.shared",
+      "title": "Compiler receives a finite native graph and preserves numeric execution",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "CONCERNS",
+        "exit_code": 0,
+        "codes": [
+          "GRAPH.DATA.UNCONSUMED_PROVIDER"
+        ]
+      }
+    },
+    {
+      "id": "js.A03.compiler.void",
+      "title": "Existing void results remain legal; compiler graph mutation remains rejected",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.scope.alias_type.registered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.scope.alias_type.unregistered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1,
+        "codes": [
+          "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.scope.constructor_called.registered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.scope.constructor_called.unregistered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1,
+        "codes": [
+          "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.scope.constructor_unused.registered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.scope.constructor_unused.unregistered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.scope.direct_type.registered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.scope.direct_type.unregistered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1,
+        "codes": [
+          "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.scope.method_called.registered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.scope.method_called.unregistered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1,
+        "codes": [
+          "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.scope.method_unused.registered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.scope.method_unused.unregistered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.scope.side_effect.registered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.scope.side_effect.unregistered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1,
+        "codes": [
+          "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.scope.symbol_isolation.registered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.scope.symbol_isolation.unregistered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1,
+        "codes": [
+          "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.scope.top_const.registered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.scope.top_const.unregistered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1,
+        "codes": [
+          "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.scope.top_void.registered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.scope.top_void.unregistered",
+      "title": "Source ownership covers initialization and type edges without merging symbol permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1,
+        "codes": [
+          "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.structure.base_support.registered",
+      "title": "Registered resource support and plugin contributions remain legal in project quality",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.structure.base_support.unregistered",
+      "title": "Removing support registration is rejected by the selected resource import Rule",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "VF_IMPORT_OWNER"
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "VF_IMPORT_OWNER"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.structure.base_upward",
+      "title": "Business Node edges and BaseLib upward imports are not resource support permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "VF_IMPORT_LAYER"
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "VF_IMPORT_LAYER"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.structure.declaration.registered",
+      "title": "Registered resource support and plugin contributions remain legal in project quality",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.structure.declaration_lifecycle_use",
+      "title": "A contribution import does not grant the lifecycle factory permission to call its Node",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "QUALITY.STRUCTURE.PLUGIN_NODE_IMPORT"
+      },
+      "observed": {
+        "status": "FAIL",
+        "exit_code": 1,
+        "codes": [
+          "QUALITY.STRUCTURE.PLUGIN_NODE_IMPORT"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.structure.foreign_node",
+      "title": "Business Node edges and BaseLib upward imports are not resource support permissions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "VF_IMPORT_NODE_TO_NODE"
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "VF_IMPORT_NODE_TO_NODE"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.structure.host_support.registered",
+      "title": "Registered resource support and plugin contributions remain legal in project quality",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.structure.host_support.unregistered",
+      "title": "Removing support registration is rejected by the selected resource import Rule",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "VF_IMPORT_OWNER"
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "VF_IMPORT_OWNER"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.structure.node_support.registered",
+      "title": "Registered resource support and plugin contributions remain legal in project quality",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.structure.node_support.unregistered",
+      "title": "Removing support registration is rejected by the selected resource import Rule",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "VF_IMPORT_OWNER"
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "VF_IMPORT_OWNER"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.structure.plugin_support.registered",
+      "title": "Registered resource support and plugin contributions remain legal in project quality",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A05.structure.plugin_support.unregistered",
+      "title": "Removing support registration is rejected by the selected resource import Rule",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1,
+        "target_code": "VF_IMPORT_OWNER"
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "VF_IMPORT_OWNER"
+        ]
+      }
+    },
+    {
+      "id": "js.A05.structure.type_support.registered",
+      "title": "Registered resource support and plugin contributions remain legal in project quality",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A09.cleanup.dispose",
+      "title": "Failing user disposal releases every owned process and preserves primary errors",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "js.A09.cleanup.multiple",
+      "title": "Failing user disposal releases every owned process and preserves primary errors",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "js.A09.cleanup.normal",
+      "title": "Failing user disposal releases every owned process and preserves primary errors",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "js.A09.cleanup.root_and_dispose",
+      "title": "Failing user disposal releases every owned process and preserves primary errors",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "exit_code": 1
+      }
+    },
+    {
+      "id": "js.A10.health.child500.build",
+      "title": "Every active Host dependency applies its own per-file Ruleset before AOT",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "CONCERNS",
+        "exit_code": 0,
+        "codes": [
+          "BASE_LIB.SOURCE.NEAR_LIMIT"
+        ]
+      }
+    },
+    {
+      "id": "js.A10.health.child500.validate",
+      "title": "Every active Host dependency applies its own per-file Ruleset before AOT",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "CONCERNS",
+        "exit_code": 0,
+        "codes": [
+          "BASE_LIB.SOURCE.NEAR_LIMIT"
+        ]
+      }
+    },
+    {
+      "id": "js.A10.health.child501.build",
+      "title": "Every active Host dependency applies its own per-file Ruleset before AOT",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "BASE_LIB.SOURCE.MAX_LINES"
+        ]
+      }
+    },
+    {
+      "id": "js.A10.health.child501.validate",
+      "title": "Every active Host dependency applies its own per-file Ruleset before AOT",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "BASE_LIB.SOURCE.MAX_LINES"
+        ]
+      }
+    },
+    {
+      "id": "js.A10.health.explicit501.build",
+      "title": "Every active Host dependency applies its own per-file Ruleset before AOT",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "BASE_LIB.SOURCE.MAX_LINES"
+        ]
+      }
+    },
+    {
+      "id": "js.A10.health.two300.build",
+      "title": "Every active Host dependency applies its own per-file Ruleset before AOT",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A10.health.unconstrained501.build",
+      "title": "Every active Host dependency applies its own per-file Ruleset before AOT",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A10.health.unselected501.validate",
+      "title": "Every active Host dependency applies its own per-file Ruleset before AOT",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A10.preview.dependency_rules",
+      "title": "Rule preview shares active Host closure without executing factories",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": null,
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A10.state.cycle",
+      "title": "Native planned/disabled/dependency behavior stays explicit and instance-deduplicated",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A10.state.disabled_dependency",
+      "title": "Native planned/disabled/dependency behavior stays explicit and instance-deduplicated",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A10.state.disabled_planned_dependency",
+      "title": "Native planned/disabled/dependency behavior stays explicit and instance-deduplicated",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A10.state.planned_dependency",
+      "title": "Native planned/disabled/dependency behavior stays explicit and instance-deduplicated",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A10.state.planned_only",
+      "title": "Native planned/disabled/dependency behavior stays explicit and instance-deduplicated",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A10.state.shared_dependency",
+      "title": "Native planned/disabled/dependency behavior stays explicit and instance-deduplicated",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.A10.state.unknown_dependency",
+      "title": "Native planned/disabled/dependency behavior stays explicit and instance-deduplicated",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.S02.analysis.one_check_session",
+      "title": "Share syntax and metrics across topics without skipping Rule decisions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "js.S02.analysis.quality_check_session",
+      "title": "Share syntax and metrics across topics without skipping Rule decisions",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "js.S03.formal.accepted.build",
+      "title": "One formal selected-plugin Rule path; previews do not invoke handlers",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.S03.formal.accepted.validate",
+      "title": "One formal selected-plugin Rule path; previews do not invoke handlers",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.S03.formal.preview.inspect-resources",
+      "title": "One formal selected-plugin Rule path; previews do not invoke handlers",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": "PASS",
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.S03.formal.preview.review-rules",
+      "title": "One formal selected-plugin Rule path; previews do not invoke handlers",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 0
+      },
+      "observed": {
+        "status": null,
+        "exit_code": 0,
+        "codes": []
+      }
+    },
+    {
+      "id": "js.S03.formal.rejected.build",
+      "title": "One formal selected-plugin Rule path; previews do not invoke handlers",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "CASE.PLUGIN.REJECT"
+        ]
+      }
+    },
+    {
+      "id": "js.S03.formal.rejected.validate",
+      "title": "One formal selected-plugin Rule path; previews do not invoke handlers",
+      "matched": true,
+      "failures": [],
+      "expected": {
+        "exit_code": 1
+      },
+      "observed": {
+        "status": "ERROR",
+        "exit_code": 1,
+        "codes": [
+          "CASE.PLUGIN.REJECT"
+        ]
+      }
+    }
+  ]
+}

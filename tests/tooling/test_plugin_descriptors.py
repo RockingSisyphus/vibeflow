@@ -1,4 +1,4 @@
-"""File-backed plugin descriptor loading remains a Tooling concern."""
+"""Canonical plugin declarations compose through the common catalogs."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 
 from vibeflow.core.descriptors import PluginDescriptor
-from tests.fixtures.support.contributions import collected_fixture_catalogs as load_descriptor_catalogs
-from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor_manifest
+from vibeflow.core.descriptors import ContributionBuilder, ResourceOrigin, compose_contributions
+from vibeflow.core.descriptors.decode import decode_resource
 
 
 def _manifest() -> dict[str, object]:
@@ -31,24 +31,15 @@ def _manifest() -> dict[str, object]:
 
 
 def test_generic_descriptor_parser_supports_plugin_kind() -> None:
-    descriptor = parse_descriptor_manifest(_manifest(), expected_kind="plugin")
+    descriptor = decode_resource(_manifest(), expected_kind="plugin")
 
     assert isinstance(descriptor, PluginDescriptor)
     assert descriptor.implementations[0].source.export == "createPlugin"
 
 
 def test_descriptor_loader_registers_plugin_catalog(tmp_path: Path) -> None:
-    directory = tmp_path / "manifests/plugins"
-    directory.mkdir(parents=True)
-    (directory / "runtime.jsonc").write_text(
-        json.dumps(_manifest()),
-        encoding="utf-8",
-    )
-
-    catalogs = load_descriptor_catalogs(
-        tmp_path,
-        {"plugins": ["manifests/plugins"]},
-    )
-
+    builder = ContributionBuilder("demo", source="runtime_plugin.py")
+    builder.add(decode_resource(_manifest()), origin=ResourceOrigin("demo", "runtime_plugin.py"))
+    catalogs = compose_contributions((builder.finish(),))
     assert catalogs.plugins.require("demo.runtime").plugin_type == "runtime"
-    assert len(catalogs.source_files) == 1
+    assert catalogs.source_files == ("runtime_plugin.py",)

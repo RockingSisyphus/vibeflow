@@ -225,7 +225,8 @@ def test_python_application_run_succeeds_when_javascript_target_is_blocked(
         sys.modules[spec.name] = module
         spec.loader.exec_module(module)
 
-        registry = NodeRegistry()
+        from tests.fixtures.support.declarations import native_registry
+        registry = native_registry()
         from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor_manifest
         for data in DECLARATIONS:
             descriptor = parse_descriptor_manifest(data)
@@ -265,14 +266,3 @@ def test_python_application_run_succeeds_when_javascript_target_is_blocked(
 
 # Publish controlled case inputs as fixed SDK plugins before formal entrypoints.
 from vibeflow.tooling.application.javascript.build import prepare_project_build, build_project_aot
-_native_prepare_project_build = prepare_project_build
-def prepare_project_build(request, **options):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(request.workspace)
-    return _native_prepare_project_build(request, **options)
-
-_native_build_project_aot = build_project_aot
-def build_project_aot(request, **options):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(request.workspace)
-    return _native_build_project_aot(request, **options)

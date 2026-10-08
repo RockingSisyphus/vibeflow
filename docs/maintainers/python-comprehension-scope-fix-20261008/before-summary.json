@@ -1,0 +1,97 @@
+{
+  "phase": "F02 pre-fix baseline; immutable source snapshot and full02 kernel",
+  "products": [
+    {
+      "product": "source-before",
+      "original_f02": {
+        "cases": 180,
+        "mismatches": 112,
+        "report": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-scope-validation-20261008/f02-original180-source-before.json"
+      },
+      "formal_f02": {
+        "cases": 89,
+        "matched": 52,
+        "mismatches": 37,
+        "by_family": {
+          "host": {
+            "cases": 36,
+            "mismatches": 15
+          },
+          "pure": {
+            "cases": 27,
+            "mismatches": 12
+          },
+          "input": {
+            "cases": 26,
+            "mismatches": 10
+          }
+        }
+      },
+      "formal_f02_report": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-scope-validation-20261008/formal-cli-source-before-r2.json",
+      "formal_product_hashes_stable": true,
+      "foreign_cli_children": 0,
+      "original_f01": {
+        "cases": 40,
+        "mismatches": 0
+      },
+      "formal_f01": {
+        "cases": 72,
+        "semantic_matches": 72,
+        "semantic_mismatches": 0,
+        "unequal_alias_pairs": 0,
+        "unequal_parameter_pairs": 0,
+        "original_matrix_cases": 48,
+        "renamed_parameter_cases": 24
+      }
+    },
+    {
+      "product": "full02-kernel-before",
+      "original_f02": {
+        "cases": 180,
+        "mismatches": 112,
+        "report": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-scope-validation-20261008/f02-original180-full02-kernel-before.json"
+      },
+      "formal_f02": {
+        "cases": 89,
+        "matched": 52,
+        "mismatches": 37,
+        "by_family": {
+          "host": {
+            "cases": 36,
+            "mismatches": 15
+          },
+          "pure": {
+            "cases": 27,
+            "mismatches": 12
+          },
+          "input": {
+            "cases": 26,
+            "mismatches": 10
+          }
+        }
+      },
+      "formal_f02_report": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-scope-validation-20261008/formal-cli-full02-kernel-before-r2.json",
+      "formal_product_hashes_stable": true,
+      "foreign_cli_children": 0,
+      "original_f01": {
+        "cases": 40,
+        "mismatches": 0
+      },
+      "formal_f01": {
+        "cases": 72,
+        "semantic_matches": 72,
+        "semantic_mismatches": 0,
+        "unequal_alias_pairs": 0,
+        "unequal_parameter_pairs": 0,
+        "original_matrix_cases": 48,
+        "renamed_parameter_cases": 24
+      }
+    }
+  ],
+  "original180_case_results_identical": true,
+  "all_334_source_and_kernel_bytes_match": true,
+  "original_audit_and_script_unchanged": true,
+  "manifest": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-scope-validation-20261008/before-fix-product-manifest.json",
+  "product_or_tests_edits_by_probe": false,
+  "final_fixed_source_and_products": "pending root readiness and approved complete full gate"
+}

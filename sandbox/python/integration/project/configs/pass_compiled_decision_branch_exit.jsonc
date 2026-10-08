@@ -4,7 +4,8 @@
       {
         "key": "value.in",
         "type": "value.in",
-        "display_name": "Value In"
+        "display_name": "Value In",
+        "required": true
       }
     ],
     "max_steps": 20,

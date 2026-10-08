@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import ast
+import collections.abc
+import typing
 
 from vibeflow.targets.python.project.node import EFFECT_SCOPE_GLOBAL_STATE, EFFECT_SCOPE_PYTHON_IO, EFFECT_SCOPE_TERMINAL
 from vibeflow.targets.python.quality.source_analysis.ast_rules import (
@@ -9,7 +11,8 @@ from vibeflow.targets.python.quality.source_analysis.ast_rules import (
     qualified_call_name,
     qualified_reference_name,
 )
-from vibeflow.targets.python.quality.source_analysis.helpers import _call_name, _matches_prefix
+from vibeflow.targets.python.quality.source_analysis.ast_rules import call_name as _call_name
+from vibeflow.targets.python.quality.source_analysis.helpers import _matches_prefix
 from vibeflow.targets.python.quality.source_analysis.types import BANNED_ATTR_CALLS, BANNED_CALL_NAMES, BANNED_IMPORT_ROOTS, PurityPolicy
 
 
@@ -105,7 +108,7 @@ SYSTEM_EXIT_SCOPES = frozenset({EFFECT_SCOPE_TERMINAL, EFFECT_SCOPE_PYTHON_IO})
 TERMINAL_CALLS = frozenset({"input", "builtins.input", "print", "builtins.print"})
 TERMINAL_STREAMS = ("sys.stdin", "sys.stdout", "sys.stderr")
 PYTHON_IO_IMPORT_ROOTS = frozenset(
-    (BANNED_IMPORT_ROOTS - {"boundary", "boundaries", "importlib"})
+    (BANNED_IMPORT_ROOTS - {"importlib"})
     | {
         "argparse",
         "dbm",
@@ -265,14 +268,36 @@ IO_METHOD_NAMES = frozenset(
 PROCESS_CONTROL_CALLS = frozenset({"time.sleep"})
 
 
-def import_violation_code(module: str, *, effect_scope: str, policy: PurityPolicy) -> str:
-    """Return an absolute effect code or a legacy policy import code."""
+PURE_PATH_CLASSES = frozenset({"PurePath", "PurePosixPath", "PureWindowsPath"})
 
+
+def import_violation_code(module: str, *, effect_scope: str, policy: PurityPolicy,
+                          imported_names: set[str] | None = None) -> str:
+    """Effect categories cannot be lifted by configurable import policy."""
+    effect = effect_import_violation_code(module, effect_scope=effect_scope, imported_names=imported_names)
+    if effect:
+        return effect
+    if module == "urllib" and imported_names == {"parse"}:
+        module = "urllib.parse"
+    return policy_import_violation_code(module, policy=policy)
+
+
+def policy_import_violation_code(module: str, *, policy: PurityPolicy) -> str:
+    """Configurable import decisions, independent of effect classification."""
+    return "banned_import" if _policy_bans_import(module, policy) else ""
+
+
+def effect_import_violation_code(module: str, *, effect_scope: str,
+                                 imported_names: set[str] | None = None) -> str:
     root = module.split(".", 1)[0]
+    if module == "urllib" and imported_names == {"parse"}:
+        return ""
+    if module == "pathlib" and imported_names and imported_names <= PURE_PATH_CLASSES:
+        return ""
     if root in HARD_FORBIDDEN_IMPORT_ROOTS:
         return "effect_import"
     if module == "urllib.parse" or module.startswith("urllib.parse."):
-        return "banned_import" if _policy_bans_import(module, policy) else ""
+        return ""
     if root in PYTHON_IO_IMPORT_ROOTS or any(
         module == effect_module or module.startswith(f"{effect_module}.")
         for effect_module in PYTHON_IO_IMPORT_MODULES
@@ -282,7 +307,7 @@ def import_violation_code(module: str, *, effect_scope: str, policy: PurityPolic
         if effect_scope == EFFECT_SCOPE_TERMINAL and root == "argparse":
             return ""
         return "effect_import"
-    return "banned_import" if _policy_bans_import(module, policy) else ""
+    return ""
 
 
 def call_violation(
@@ -293,33 +318,48 @@ def call_violation(
     imported_roots: set[str] | frozenset[str] = frozenset(),
     module_state_names: set[str] | frozenset[str] = frozenset(),
     local_names: set[str] | frozenset[str] = frozenset(),
+    source_resolved: bool = False,
+    stack_cleanup: bool = False,
+    local_reference: bool = False,
 ) -> tuple[str, str]:
     """Return ``(code, name)`` for a denied call, keeping non-effect rules stable."""
 
     name = qualified_call_name(node.func, aliases)
     raw_name = _call_name(node.func)
     candidate = name or raw_name
-    if candidate in DYNAMIC_CODE_CALLS or raw_name in DYNAMIC_CODE_CALLS or candidate in DYNAMIC_NAMESPACE_CALLS:
+    raw_root = raw_name.split(".", 1)[0]
+    local_receiver = local_reference or "." in raw_name and raw_root in local_names and raw_root not in aliases
+    # A local receiver does not denote the host namespace its spelling resembles.
+    # It still needs the ordinary body/cleanup proofs and conservative IO checks.
+    if not local_receiver and (candidate in DYNAMIC_CODE_CALLS or raw_name in DYNAMIC_CODE_CALLS or candidate in DYNAMIC_NAMESPACE_CALLS):
         return "banned_call", candidate
-    dynamic_reflection = _dynamic_reflection_call_name(node, aliases, imported_roots)
+    dynamic_reflection = _dynamic_reflection_call_name(node, aliases, imported_roots, local_names)
     if dynamic_reflection:
         return "banned_call", dynamic_reflection
     leaf = candidate.rsplit(".", 1)[-1]
-    if candidate in HARD_FFI_CALLS or raw_name in HARD_FFI_CALLS or leaf in HARD_FFI_LEAVES:
+    if leaf in HARD_FFI_LEAVES or not local_receiver and (candidate in HARD_FFI_CALLS or raw_name in HARD_FFI_CALLS):
         return "effect_call", candidate
-    if candidate in CALLBACK_INJECTION_CALLS or raw_name in CALLBACK_INJECTION_CALLS:
+    if not local_receiver and (candidate in CALLBACK_INJECTION_CALLS or raw_name in CALLBACK_INJECTION_CALLS):
         return "effect_call", candidate
-    if any(candidate == prefix or candidate.startswith(f"{prefix}.") for prefix in HARD_PROCESS_STATE_PREFIXES):
+    if not local_receiver and any(candidate == prefix or candidate.startswith(f"{prefix}.") for prefix in HARD_PROCESS_STATE_PREFIXES):
         return "effect_call", candidate
-    if candidate in HARD_PROCESS_TERMINATION_CALLS or raw_name in HARD_PROCESS_TERMINATION_CALLS:
+    if not local_receiver and (candidate in HARD_PROCESS_TERMINATION_CALLS or raw_name in HARD_PROCESS_TERMINATION_CALLS):
         return "effect_call", candidate
-    if is_system_exit_call(candidate, raw_name):
+    if not local_receiver and is_system_exit_call(candidate, raw_name):
         if effect_scope in SYSTEM_EXIT_SCOPES:
             return "", ""
         return "effect_call", candidate
     argparse_violation = _argparse_violation(node, candidate, raw_name)
     if argparse_violation:
         return "effect_call", argparse_violation
+    if source_resolved:
+        # Review the available body instead of guessing IO/state effects from
+        # a user function's name (reset, close, write, ...).
+        return "", ""
+    if stack_cleanup:
+        # ExitStack.close invokes separately reviewed context exits/callbacks;
+        # it is not itself a file/socket close operation.
+        return "", ""
     ambient_state = ambient_state_call_name(
         node,
         aliases=aliases,
@@ -333,9 +373,9 @@ def call_violation(
         return "effect_call", ambient_state
     if effect_scope == EFFECT_SCOPE_PYTHON_IO:
         return "", ""
-    if candidate == "urllib.parse" or candidate.startswith("urllib.parse."):
+    if not local_receiver and (candidate == "urllib.parse" or candidate.startswith("urllib.parse.")):
         return "", ""
-    if is_terminal_call(candidate):
+    if not local_receiver and is_terminal_call(candidate):
         if effect_scope == EFFECT_SCOPE_TERMINAL and terminal_print_target_is_allowed(node, candidate, aliases):
             return "", ""
         return "effect_call", candidate
@@ -343,7 +383,11 @@ def call_violation(
     if path_effect:
         return "effect_call", path_effect
     root = candidate.split(".", 1)[0]
-    if _is_python_io_call(candidate, raw_name, root, leaf):
+    if not local_receiver and candidate in {"pathlib." + name for name in PURE_PATH_CLASSES}:
+        return "", ""
+    if _is_python_io_call("" if local_receiver else candidate,
+                          "" if local_receiver else raw_name,
+                          "" if local_receiver else root, leaf):
         return "effect_call", candidate
     return "", ""
 
@@ -403,6 +447,13 @@ def dynamic_namespace_reference(
     if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
         return ""
     base = qualified_reference_name(node.value, aliases)
+    # Public standard-library type constructors use [] for specialization,
+    # rather than indexing a module namespace. Continue visiting the arguments
+    # so calls embedded in an annotation retain their ordinary effect checks.
+    namespace, _, member = base.rpartition(".")
+    if (namespace == "typing" and member in typing.__all__
+            or namespace == "collections.abc" and member in collections.abc.__all__):
+        return ""
     normalized = base[: -len(".__dict__")] if base.endswith(".__dict__") else base
     root = normalized.split(".", 1)[0]
     if root in SENSITIVE_REFLECTION_ROOTS or root in imported_roots:
@@ -483,7 +534,7 @@ def _policy_bans_import(module: str, policy: PurityPolicy) -> bool:
     return is_banned_import(
         module,
         allowed_roots=policy.allowed_import_roots,
-        banned_roots=policy.banned_import_roots or tuple(sorted(BANNED_IMPORT_ROOTS)),
+        banned_roots=policy.banned_import_roots,
         allowed_modules=policy.allowed_import_modules,
         banned_modules=policy.banned_import_modules,
     )
@@ -527,11 +578,15 @@ def _dynamic_reflection_call_name(
     node: ast.Call,
     aliases: dict[str, str],
     imported_roots: set[str] | frozenset[str],
+    local_names: set[str] | frozenset[str] = frozenset(),
 ) -> str:
     function = qualified_call_name(node.func, aliases)
     if function not in {"getattr", "builtins.getattr"} or len(node.args) < 2:
         return ""
     if isinstance(node.args[1], ast.Constant) and isinstance(node.args[1].value, str):
+        return ""
+    raw_root = _call_name(node.args[0]).split(".", 1)[0]
+    if raw_root in local_names and raw_root not in aliases:
         return ""
     base = qualified_reference_name(node.args[0], aliases)
     root = base.split(".", 1)[0]

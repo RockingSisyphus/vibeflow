@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.targets.javascript.aot_fixtures import emit_fixture, fixture_build_request
+
 from pathlib import Path
 
 import pytest
@@ -7,7 +9,7 @@ import pytest
 from vibeflow.targets.javascript.build.builder import BuildRequest, build_aot
 from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
 from vibeflow.targets.javascript.frontend.errors import AotBuildError
-from vibeflow.targets.javascript.frontend.model import AotPlanError
+from vibeflow.targets.javascript.frontend.errors import AotPlanError
 
 
 def _plan(schema: object) -> dict[str, object]:
@@ -38,7 +40,7 @@ def test_low_level_builder_rejects_unsupported_schema_before_toolchain(
 
     with pytest.raises(AotBuildError) as captured:
         build_aot(
-            BuildRequest(
+            fixture_build_request(
                 plan=_plan(
                     {
                         "type": "number",
@@ -68,11 +70,11 @@ def test_low_level_builder_rejects_lossy_integer_params_before_toolchain(
             "id": "value",
             "type_used": "example.value",
             "params": {"value": 9_007_199_254_740_992},
-            "requirements": [],
-            "providers": [],
+            "requires": [],
+            "provides": [],
             "is_terminal": True,
             "implementation": {
-                "module": "./value.js",
+                "ref": "./value.js",
                 "export": "run",
                 "language": "javascript",
             },
@@ -83,7 +85,7 @@ def test_low_level_builder_rejects_lossy_integer_params_before_toolchain(
 
     with pytest.raises(AotBuildError) as captured:
         build_aot(
-            BuildRequest(
+            fixture_build_request(
                 plan=plan,
                 project_root=project,
                 package_root=project,
@@ -105,7 +107,7 @@ def test_low_level_builder_rejects_lossy_integer_schema_literal(
 
     with pytest.raises(AotBuildError) as captured:
         build_aot(
-            BuildRequest(
+            fixture_build_request(
                 plan=_plan(
                     {
                         "type": "integer",
@@ -132,6 +134,6 @@ def test_direct_emitter_rejects_lossy_integer_without_builder() -> None:
     )
 
     with pytest.raises(AotPlanError) as captured:
-        emit_workflow_module(plan)
+        emit_fixture(plan)
 
     assert captured.value.code == "VF_AOT_NUMBER_RANGE"

@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "checks": [
+    "test_document_index_covers_every_active_markdown",
+    "test_active_documentation_has_no_duplicate_long_prose"
+  ],
+  "passed": 2,
+  "failed": 0,
+  "attempts": [
+    {
+      "exit_code": 5,
+      "tests_collected": 0,
+      "cause": "Relative node selectors were not resolved by the isolated runner.",
+      "log": "final-docs-no-collection.log"
+    },
+    {
+      "exit_code": 0,
+      "passed": 2,
+      "node_selectors": "absolute paths",
+      "log": "final-docs-tests.log"
+    }
+  ]
+}

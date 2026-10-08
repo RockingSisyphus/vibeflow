@@ -27,6 +27,13 @@ export type WorkflowTraceMode = "off" | "boundary" | "full";
 """
     + _ABORT_SIGNAL_DECLARATION
     + """
+export interface WorkflowRunStatus {
+  readonly state: "starting" | "running" | "succeeded" | "failed";
+  readonly error: string | null;
+  readonly updated_at: string;
+  readonly info?: readonly Readonly<Record<string, unknown>>[];
+}
+
 export interface WorkflowTraceEvent {
   readonly kind: string;
   readonly workflowId: string;
@@ -87,6 +94,10 @@ def declarations(
             "  readonly onTrace?: (event: WorkflowTraceEvent) => void;",
             "  readonly capabilities?: WorkflowCapabilities;",
             "  readonly detachedTimeoutMs?: number;",
+            "  readonly statusIntervalMs?: number;",
+            "  readonly statusFile?: string;",
+            "  readonly runDir?: string;",
+            "  readonly onStatus?: (status: WorkflowRunStatus) => void;",
             "}",
             "",
             "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v4\";",
@@ -124,6 +135,10 @@ def _host_declarations(workflow: EmissionWorkflow) -> list[str]:
     return [
         "export interface WorkflowHostOptions {",
         "  readonly capabilities?: WorkflowCapabilities;",
+        "  readonly runDir?: string;",
+        "  readonly statusFile?: string;",
+        "  readonly statusIntervalMs?: number;",
+        "  readonly onStatus?: (status: WorkflowRunStatus) => void;",
         "}",
         "",
         "export interface WorkflowHost {",

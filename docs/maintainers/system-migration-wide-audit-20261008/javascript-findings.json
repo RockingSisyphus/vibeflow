@@ -1,0 +1,592 @@
+{
+  "scope": "JavaScript target/frontend/build/runtime/resources/SDK、Application JavaScript、共享Target binding协议",
+  "baseline": "current dirty worktree on HEAD 9c443f3, 2026-10-08",
+  "read_only": true,
+  "findings": [
+    {
+      "id": "JS-M01",
+      "status": "confirmed",
+      "category": "新Rule包装仍固定调用历史判定算法，接受的有效参数未送达判定层",
+      "title": "JavaScript effects/import Rule 的 policy 参数无效；import Rule 的 effect_scope 也无效",
+      "severity": "medium",
+      "current_locations": [
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/builtin/effects.py",
+          "line": 7,
+          "end_line": 18
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/quality/builtin_plugin.py",
+          "line": 21,
+          "end_line": 32
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/build/rule_session.py",
+          "line": 248,
+          "end_line": 258
+        }
+      ],
+      "history": {
+        "commit": "28ebb58",
+        "paths": [
+          "src/vibeflow/core/rules/builtin/effects.py",
+          "src/vibeflow/targets/javascript/build/rule_session.py"
+        ],
+        "old_release": "0.15.2",
+        "old_locations": [
+          {
+            "path": "/tmp/vibeflow-wide-audit/snapshots/0.15.2/vibeflow/targets/javascript/build/rule_session.py",
+            "line": 267,
+            "end_line": 278
+          }
+        ],
+        "description": "Rule迁移提交就通过topics包装既有source driver；目前只是移到标准plugin原生bindings，参数投影缺口仍与当时相同。"
+      },
+      "call_chain": [
+        "RulesetDescriptor relations $self overrides effects/imports",
+        "Core compile_ruleset参数schema验证与有效params计算",
+        "_RuleSession.execute编译计划并解析catalog native_binding",
+        "javascript_rule_bindings.effects/imports",
+        "_source_check",
+        "_AnalysisCache.source_check -> run_rule_check_driver",
+        "toolchain_driver.mjs按ruleTopics执行固定算法"
+      ],
+      "behavior_evidence": {
+        "artifact": "/tmp/vibeflow-wide-js-formal-policy.json",
+        "script": "/tmp/vibeflow-wide-js-formal-policy.py",
+        "summary": [
+          {
+            "name": "empty",
+            "requested_params": {
+              "effect_scope": "none",
+              "policy": {}
+            },
+            "phases": [
+              {
+                "entrypoint": "import",
+                "calls": [
+                  {
+                    "id": "imports",
+                    "params": {
+                      "effect_scope": "none",
+                      "policy": {}
+                    },
+                    "parameter_sources": {
+                      "effect_scope": "override:$self",
+                      "policy": "override:$self"
+                    }
+                  }
+                ]
+              },
+              {
+                "entrypoint": "static",
+                "calls": [
+                  {
+                    "id": "effects",
+                    "params": {
+                      "effect_scope": "none",
+                      "policy": {}
+                    },
+                    "parameter_sources": {
+                      "effect_scope": "override:$self",
+                      "policy": "override:$self"
+                    }
+                  }
+                ]
+              }
+            ],
+            "requests": [
+              {
+                "topics": [],
+                "request_keys": [
+                  "typecheckFiles",
+                  "ruleTopics"
+                ]
+              },
+              {
+                "topics": [
+                  "purity",
+                  "imports",
+                  "ownership"
+                ],
+                "request_keys": [
+                  "typecheckFiles",
+                  "ruleTopics",
+                  "importPolicy",
+                  "sourceSnapshots",
+                  "ruleSubjectKind",
+                  "ruleSubjectId"
+                ]
+              },
+              {
+                "topics": [
+                  "module_state",
+                  "host_io"
+                ],
+                "request_keys": [
+                  "typecheckFiles",
+                  "ruleTopics",
+                  "importPolicy",
+                  "sourceSnapshots",
+                  "ruleSubjectKind",
+                  "ruleSubjectId"
+                ]
+              }
+            ],
+            "findings": [
+              "VF_BASE_LIB_HOST_IO"
+            ]
+          },
+          {
+            "name": "marker",
+            "requested_params": {
+              "effect_scope": "none",
+              "policy": {
+                "audit_marker": "selected"
+              }
+            },
+            "phases": [
+              {
+                "entrypoint": "import",
+                "calls": [
+                  {
+                    "id": "imports",
+                    "params": {
+                      "effect_scope": "none",
+                      "policy": {
+                        "audit_marker": "selected"
+                      }
+                    },
+                    "parameter_sources": {
+                      "effect_scope": "override:$self",
+                      "policy": "override:$self"
+                    }
+                  }
+                ]
+              },
+              {
+                "entrypoint": "static",
+                "calls": [
+                  {
+                    "id": "effects",
+                    "params": {
+                      "effect_scope": "none",
+                      "policy": {
+                        "audit_marker": "selected"
+                      }
+                    },
+                    "parameter_sources": {
+                      "effect_scope": "override:$self",
+                      "policy": "override:$self"
+                    }
+                  }
+                ]
+              }
+            ],
+            "requests": [
+              {
+                "topics": [],
+                "request_keys": [
+                  "typecheckFiles",
+                  "ruleTopics"
+                ]
+              },
+              {
+                "topics": [
+                  "purity",
+                  "imports",
+                  "ownership"
+                ],
+                "request_keys": [
+                  "typecheckFiles",
+                  "ruleTopics",
+                  "importPolicy",
+                  "sourceSnapshots",
+                  "ruleSubjectKind",
+                  "ruleSubjectId"
+                ]
+              },
+              {
+                "topics": [
+                  "module_state",
+                  "host_io"
+                ],
+                "request_keys": [
+                  "typecheckFiles",
+                  "ruleTopics",
+                  "importPolicy",
+                  "sourceSnapshots",
+                  "ruleSubjectKind",
+                  "ruleSubjectId"
+                ]
+              }
+            ],
+            "findings": [
+              "VF_BASE_LIB_HOST_IO"
+            ]
+          },
+          {
+            "name": "terminal",
+            "requested_params": {
+              "effect_scope": "terminal",
+              "policy": {}
+            },
+            "phases": [
+              {
+                "entrypoint": "import",
+                "calls": [
+                  {
+                    "id": "imports",
+                    "params": {
+                      "effect_scope": "terminal",
+                      "policy": {}
+                    },
+                    "parameter_sources": {
+                      "effect_scope": "override:$self",
+                      "policy": "override:$self"
+                    }
+                  }
+                ]
+              },
+              {
+                "entrypoint": "static",
+                "calls": [
+                  {
+                    "id": "effects",
+                    "params": {
+                      "effect_scope": "terminal",
+                      "policy": {}
+                    },
+                    "parameter_sources": {
+                      "effect_scope": "override:$self",
+                      "policy": "override:$self"
+                    }
+                  }
+                ]
+              }
+            ],
+            "requests": [
+              {
+                "topics": [],
+                "request_keys": [
+                  "typecheckFiles",
+                  "ruleTopics"
+                ]
+              },
+              {
+                "topics": [
+                  "purity",
+                  "imports",
+                  "ownership"
+                ],
+                "request_keys": [
+                  "typecheckFiles",
+                  "ruleTopics",
+                  "importPolicy",
+                  "sourceSnapshots",
+                  "ruleSubjectKind",
+                  "ruleSubjectId"
+                ]
+              },
+              {
+                "topics": [
+                  "module_state"
+                ],
+                "request_keys": [
+                  "typecheckFiles",
+                  "ruleTopics",
+                  "importPolicy",
+                  "sourceSnapshots",
+                  "ruleSubjectKind",
+                  "ruleSubjectId"
+                ]
+              }
+            ],
+            "findings": []
+          }
+        ],
+        "method": "正式当前catalog/Ruleset与run_javascript_rules，真实Node/TS driver执行；仅在进程内记录入参。隔离tmp fixture、当前SDK输入和既有TS7.0.2工具链。"
+      },
+      "impact": "Core执行计划会显示override已选入params；JS source判定层不可能看到policy。no_side_effects的effect_scope有真实效果，但policy不读、不记录、不传送；import_side_effects不读任何params。",
+      "boundaries": [
+        "probe policy.audit_marker仅证明被接受及被丢弃，不声称某个未定义JS policy子键应有特定语义。",
+        "这不是第二套Rule编译器，而是新Rule接口到旧算法之间的迁移投影缺口。",
+        "未运行全量回归。"
+      ]
+    },
+    {
+      "id": "JS-M02",
+      "status": "confirmed",
+      "category": "已删除的历史source-owner判定仍留有请求和无消费者字段",
+      "title": "ownership topic 仍从正式import Rule发出，但driver已不消费；effectScope仍被正规化后无人读取",
+      "severity": "low",
+      "current_locations": [
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/quality/builtin_plugin.py",
+          "line": 31,
+          "end_line": 32
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/resources/toolchain_driver.mjs",
+          "line": 283,
+          "end_line": 297
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/resources/toolchain_driver.mjs",
+          "line": 2222,
+          "end_line": 2241
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/build/project_resources.py",
+          "line": 363,
+          "end_line": 365
+        }
+      ],
+      "history": {
+        "commit": "28ebb58",
+        "old_release": "0.15.2",
+        "old_locations": [
+          {
+            "path": "/tmp/vibeflow-wide-audit/snapshots/0.15.2/vibeflow/targets/javascript/resources/toolchain_driver.mjs",
+            "line": 1844,
+            "end_line": 1846
+          },
+          {
+            "path": "/tmp/vibeflow-wide-audit/snapshots/0.15.2/vibeflow/targets/javascript/resources/toolchain_driver.mjs",
+            "line": 2315
+          },
+          {
+            "path": "/tmp/vibeflow-wide-audit/snapshots/0.15.2/vibeflow/targets/javascript/build/rule_session.py",
+            "line": 278
+          }
+        ],
+        "description": "0.15.2 ownership topic执行auditUnclassifiedHiddenWork，且只服务owner.kind=source。当前worktree删掉该函数/dispatch与历史source-owner分支，调用方topic与effectScope正规化残留。effectScope从Rule迁移时即无实际reader。"
+      },
+      "call_chain": [
+        "正式import_side_effects -> _source_check topics purity/imports/ownership",
+        "run_rule_check_driver -> toolchain_driver rule_check",
+        "driver只dispatch imports/purity/completion/module_state/host_io；ownership忽略",
+        "target_neutral_import_policy owner不产effect_scope -> normalizeImportPolicy仍补effectScope -> 没有reader"
+      ],
+      "behavior_evidence": {
+        "artifact": "/tmp/vibeflow-wide-js-probe.json",
+        "probes": [
+          "source_topics_ownership",
+          "source_topics_completion",
+          "source_topics_imports,purity,ownership"
+        ],
+        "result": "同一setTimeout/Promise源码 ownership=[]；completion报告VF_NODE_LONG_LIVED_LISTENER/VF_COMPLETION_IMMEDIATE_PROMISE；formal policy probe各import调用仍发ownership。"
+      },
+      "impact": "请求名与实际执行能力脱节，遗留字段没有可观察作用；容易让维护者误以为ownership审查或owner级effectScope仍生效。",
+      "boundaries": [
+        "不能据此推导正式Node监听器/Promise漏检：当前completion Rule仍执行相应算法。",
+        "不是旧判定仍活跃，更不是旧source-owner解析器仍活跃；是移除后未收尾的协议垃圾。",
+        "不可把这些dead请求扩展成删除整个toolchain driver。"
+      ]
+    }
+  ],
+  "excluded_or_retired": [
+    {
+      "id": "JS-X01",
+      "title": "历史WorkflowSpec解析器/模型/validator和双路builder",
+      "status": "retired_in_current_worktree",
+      "history": "0.9–0.15.2仍存在frontend/model.py/model_types.py/frontend_parser.py/frontend_validation.py；0.9开始同时有canonical bindings/emission_view与旧WorkflowSpec路线。0.10–0.14 model.py SHA相同，0.15.2仍发布。",
+      "current_evidence": [
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/build/builder.py",
+          "line": 43,
+          "end_line": 46
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/build/builder.py",
+          "line": 72,
+          "end_line": 76
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/frontend/emitter.py",
+          "line": 44,
+          "end_line": 50
+        }
+      ],
+      "reason": "当前上述旧文件删除，target公开API不再export旧模型/parse API；build/emitter均强制canonical WorkflowPlan+JavascriptBindingPlan。Bound*View只读投影没有独立parser。"
+    },
+    {
+      "id": "JS-X02",
+      "title": "历史JavaScript独立PluginDescriptor解析与policy Plugin hooks",
+      "status": "retired_in_current_worktree",
+      "history": "0.10–0.14 parse_javascript_plugin_descriptor ABI v1，0.15.2升级ABI v3但旧parser仍残留。",
+      "current_evidence": [
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/resources/plugin_worker.mjs",
+          "line": 214,
+          "end_line": 220
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/build/plugin_hooks.py",
+          "line": 164,
+          "end_line": 165
+        }
+      ],
+      "reason": "现有plugin_descriptors.py只做JavaScript selection/binding并使用Core descriptor解析；旧policy类型/extendPolicy等hooks明确拒绝，compiler lifecycle不得返回findings/relaxations。SDK、worker、runtime、d.ts均ABI v3。"
+    },
+    {
+      "id": "JS-X03",
+      "title": "历史quality/models.py+validation.py与nodeset_limits.py",
+      "status": "retired_in_current_worktree",
+      "history": "0.9–0.15.2有独立quality validator；0.10–0.14 quality/validation.py SHA相同，0.15.2仍发布；nodeset_limits.py曾测试入口独用。",
+      "reason": "当前这些文件删除；正式Application执行Rules，Target quality/source只提取facts。"
+    },
+    {
+      "id": "JS-X04",
+      "title": "project javascript.host_extensions与workflow host_extensions两来源fallback",
+      "status": "retired_in_current_worktree",
+      "current_evidence": [
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/project/project_config_options.py",
+          "line": 24,
+          "end_line": 28
+        }
+      ],
+      "reason": "当前共用项目配置解析器拒绝旧字段。Application host选择走workflow同一入口，S02修复当前worktree已落地。"
+    },
+    {
+      "id": "JS-X05",
+      "title": "quality/source.py无产品静态入边",
+      "status": "public_facts_facade",
+      "current_evidence": [
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/quality/source.py",
+          "line": 1,
+          "end_line": 8
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_quality_sandbox.py",
+          "line": 207,
+          "end_line": 219
+        }
+      ],
+      "reason": "公开facts collector façade，独立测试明确验证其不assemble默认Rules；不是旧quality validator残留。冻结parity cases的旧分支只在旧包baseline中执行。"
+    },
+    {
+      "id": "JS-X06",
+      "title": "toolchain纯度/IO/module state/completion算法沿用与原生Rule binding",
+      "status": "legitimate_algorithm_reuse",
+      "current_evidence": [
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/resources/toolchain_driver.mjs",
+          "line": 2222,
+          "end_line": 2241
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/build/rule_session.py",
+          "line": 284,
+          "end_line": 290
+        }
+      ],
+      "reason": "算法仍在同一正式Rule选择的topic下执行；catalog native_binding按贡献来源解析，并非builtin ID专属绕过旧注册表。不能仅因函数历史早就存在判为旧系统耦合。"
+    },
+    {
+      "id": "JS-X07",
+      "title": "TS程序构建的classic/native API分支",
+      "status": "backend_api_adapter",
+      "reason": "首个JS AOT提交19a26c8已同时适配API并要求TS>=7<8；现有TS7.0.2缺classic createProgram/createSourceFile。分支不是TypeScript5→7迁移遗留证据。"
+    },
+    {
+      "id": "JS-X08",
+      "title": "legacy node.async与PipelineInputSpec.required=None",
+      "status": "single_contract_and_explicit_target_limit",
+      "current_evidence": [
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/build/project_graph.py",
+          "line": 305,
+          "end_line": 318
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/frontend/plan_validation.py",
+          "line": 31,
+          "end_line": 34
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/frontend/facts.py",
+          "line": 97,
+          "end_line": 102
+        }
+      ],
+      "behavior_artifact": "/tmp/vibeflow-wide-js-probe.json",
+      "reason": "JS无独立node.async parser，Core单一parse_node_async投影schedule后以Target facts覆盖event_loop executor；正式build required=None明确VF_AOT_INPUT_REQUIRED。result_key实跑prepare转成deferred/event_loop；不能把共享源配置保留当两套异步engine。"
+    }
+  ],
+  "retained_boundaries": [
+    {
+      "id": "JS-B01",
+      "title": "completion/executor由JS binding补足并可shadow低层canonical plan",
+      "status": "confirmed_lower_level_behavior_not_counted_as_migration_residue",
+      "current_evidence": [
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/frontend/bindings.py",
+          "line": 383,
+          "end_line": 385
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/frontend/bindings.py",
+          "line": 532,
+          "end_line": 545
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/frontend/emission_view.py",
+          "line": 90,
+          "end_line": 112
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/frontend/emission_view.py",
+          "line": 221,
+          "end_line": 230
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_models.py",
+          "line": 248,
+          "end_line": 258
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_models.py",
+          "line": 315,
+          "end_line": 318
+        }
+      ],
+      "history": "git blame精确定位8926a87：canonical/Target侧车架构建立时已此设计。",
+      "artifact": "/tmp/vibeflow-wide-js-binding-authority.json",
+      "observed": "手工将canonical node改suspend/event_loop，搭配旧immediate/current binding，emitter接受并生成sync；同一async plan metadata可选immediate或suspend。",
+      "reason_not_counted": "官方Application的plan和binding来自相同descriptor，未发现真实正式链路分歧；测试明确承诺metadata shadow。此为单一侧车设计的边界风险，需要明确API权威或校验，可与Core审计设计结论合并。"
+    },
+    {
+      "id": "JS-B02",
+      "title": "root WorkflowPlan.inputs可与entry BlockPlan.inputs不同",
+      "status": "intentional_root_signature_projection",
+      "current_evidence": [
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/frontend/emission_view.py",
+          "line": 286,
+          "end_line": 289
+        },
+        {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/application/javascript/build.py",
+          "line": 350,
+          "end_line": 360
+        }
+      ],
+      "artifact": "/tmp/vibeflow-wide-js-probe.json",
+      "reason_not_counted": "root emission始终使用WorkflowPlan.inputs；低层compile_graph_plan支持签名override，正式Application不传。Core维护者代理确认不是历史第二权威。"
+    }
+  ],
+  "artifacts": [
+    "/tmp/vibeflow-wide-js-formal-policy.json",
+    "/tmp/vibeflow-wide-js-probe.json",
+    "/tmp/vibeflow-wide-js-binding-authority.json",
+    "/tmp/vibeflow-wide-js-history.json"
+  ],
+  "validation_limits": [
+    "只读代码/Git/多个历史包核对，隔离tmp定向探针。",
+    "未执行全量测试或真实业务AOT run；不得称全局迁移全面验收。",
+    "父代理与Core代理处理跨域项；本报告仅JS范围。"
+  ]
+}

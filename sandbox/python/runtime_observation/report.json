@@ -1,0 +1,106 @@
+{
+  "schema": "vibeflow.runtime-observation.v1",
+  "cases": [
+    {
+      "id": "success",
+      "matched": true,
+      "checks": {
+        "exit": true,
+        "final_state": true,
+        "error": true,
+        "kernel_separation": true,
+        "console": true,
+        "terminal": true,
+        "final_info": true,
+        "heartbeat": true,
+        "report_separation": true
+      },
+      "exit_code": 0,
+      "final": {
+        "state": "succeeded",
+        "error": null,
+        "updated_at": "2026-10-04T16:13:37.717252Z",
+        "info": [
+          {
+            "metrics": {
+              "loss": 0.125
+            }
+          },
+          {
+            "message": "正在训练第10轮"
+          }
+        ]
+      },
+      "states": [
+        "running",
+        "starting",
+        "succeeded"
+      ],
+      "run_dir": "/tmp/vf-observation-final-python/runs/success",
+      "stderr": "business-stderr\n"
+    },
+    {
+      "id": "runtime_failure",
+      "matched": true,
+      "checks": {
+        "exit": true,
+        "final_state": true,
+        "error": true,
+        "kernel_separation": true,
+        "console": true,
+        "terminal": true,
+        "final_info": true,
+        "heartbeat": true,
+        "report_separation": true
+      },
+      "exit_code": 1,
+      "final": {
+        "state": "failed",
+        "error": "sandbox training failed",
+        "updated_at": "2026-10-04T16:13:38.696427Z",
+        "info": [
+          {
+            "metrics": {
+              "loss": 0.125
+            }
+          },
+          {
+            "message": "正在训练第10轮"
+          }
+        ]
+      },
+      "states": [
+        "failed",
+        "running",
+        "starting",
+        "succeeded"
+      ],
+      "run_dir": "/tmp/vf-observation-final-python/runs/runtime_failure",
+      "stderr": "business-stderr\nTraceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/__main__.py\", line 7, in <module>\n    raise SystemExit(main())\n                     ~~~~^^\n  File \"/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/application/cli/__init__.py\", line 95, in main\n    return target_main(raw_args)\n  File \"/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/application/python/cli/__init__.py\", line 165, in main\n    return handler(args)\n  File \"/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/application/python/run_observation.py\", line 95, in observed\n    code = function(args)\n  File \"/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/application/python/cli/__init__.py\", line 293, in _handle_run\n    result = run_workspace_checked(\n        Path(args.config),\n    ...<5 lines>...\n        _prepared_run_dir=getattr(args, \"_prepared_run_dir\", None),\n    )\n  File \"/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/application/python/run_observation.py\", line 39, in observed\n    return function(*args, **kwargs)\n  File \"/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/application/python/workspace_service.py\", line 179, in run_workspace_checked\n    context = _execute_runtime(\n    graph,\n    ...<7 lines>...\n    **execute_kwargs,\n    )\n  File \"/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/application/python/runner.py\", line 426, in _execute_runtime\n    context = runtime.run(initial)\n  File \"/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/runtime/engine.py\", line 138, in run\n    return self._run_observed(initial)\n           ~~~~~~~~~~~~~~~~~~^^^^^^^^^\n  File \"/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/runtime/engine.py\", line 161, in _run_observed\n    self._run_steps(state)\n    ~~~~~~~~~~~~~~~^^^^^^^\n  File \"/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/runtime/engine.py\", line 328, in _run_steps\n    outputs = self._run_node(node_name, state)\n  File \"/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/runtime/engine.py\", line 508, in _run_node\n    outputs = self._run_pure_node(frame, inputs)\n  File \"/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/runtime/node_mixin.py\", line 193, in _run_pure_node\n    outputs = self._execute_pure_outputs(frame, inputs)\n  File \"/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/runtime/node_mixin.py\", line 249, in _execute_pure_outputs\n    outputs = node.run_pure(inputs, params)\n  File \"/tmp/vf-observation-final-python/runtime_failure/plugin.py\", line 33, in run_pure\n    raise RuntimeError(\"sandbox training failed\")\nRuntimeError: sandbox training failed\n"
+    },
+    {
+      "id": "startup_failure",
+      "matched": true,
+      "checks": {
+        "exit": true,
+        "final_state": true,
+        "error": true,
+        "kernel_separation": true,
+        "reset_info": true
+      },
+      "exit_code": 1,
+      "final": {
+        "state": "failed",
+        "error": "[Errno 2] No such file or directory: '/tmp/vf-observation-final-python/startup_failure/missing.jsonc'",
+        "updated_at": "2026-10-04T16:13:38.827443Z",
+        "info": []
+      },
+      "states": [
+        "failed"
+      ],
+      "run_dir": "/tmp/vf-observation-final-python/runs/startup_failure",
+      "stderr": ""
+    }
+  ],
+  "matched": true
+}

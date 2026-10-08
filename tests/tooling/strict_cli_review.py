@@ -1,5 +1,5 @@
 from __future__ import annotations
-from tests.fixtures.support.declarations import write_node_manifests
+from tests.fixtures.support.declarations import write_node_plugin
 
 import ast
 import json
@@ -39,7 +39,6 @@ def _write_review_workspace(
     )
     project_config: dict[str, object] = {
         "project_target": "python",
-        "descriptors": {"nodes": ["manifests/nodes"]},
         "quality_enabled": False,
     }
     if registered:
@@ -50,7 +49,7 @@ def _write_review_workspace(
         json.dumps(project_config, indent=2),
         encoding="utf-8",
     )
-    write_node_manifests(project, [("test.start", "StartNode", {}, {}),
+    selection = write_node_plugin(project, [("test.start", "StartNode", {}, {}),
         ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}),
         ("test.add", "AddNode", {"delta": {"type": "number"}}, {"delta": 1}),
         ("test.out_end", "OutEndNode", {}, {})])
@@ -65,7 +64,7 @@ def _write_review_workspace(
         pipeline["nodes"][2]["provides"] = [
             {"key": "value.out", "type": "value.out", "display_name": "Value Out"}
         ]
-    workflow_path.write_text(json.dumps({"pipeline": pipeline}, indent=2), encoding="utf-8")
+    workflow_path.write_text(json.dumps({"plugins": [selection], "pipeline": pipeline}, indent=2), encoding="utf-8")
     return workspace_path, workflow_path, architecture_path, output_path
 
 
@@ -145,6 +144,31 @@ def test_review_refreshes_architecture_validates_and_atomically_publishes_svg(
     assert not list(output_path.parent.glob("*provenance*"))
 
 
+def test_review_uses_one_health_check_and_shares_presentation(tmp_path, monkeypatch, capsys):
+    import vibeflow.tooling.application.python.workspace_service as service
+
+    workspace, workflow, architecture, output = _write_review_workspace(tmp_path)
+    renders = _install_fake_renderer(monkeypatch)
+    checks = []
+    original = service.validate_graph_health
+
+    def validate(*args, **kwargs):
+        checks.append(kwargs["source_context"])
+        return original(*args, **kwargs)
+
+    def reload(*_args, **_kwargs):
+        raise AssertionError("review must not reload resources for a second health check")
+
+    monkeypatch.setattr(service, "validate_graph_health", validate)
+    monkeypatch.setattr(service, "validate_workspace_config_path", reload)
+    assert cli_main(_review_args(workspace, workflow, output)) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["published"] is True and len(checks) == 1
+    assert renders[0]["prepared"].source_context is checks[0]
+    assert renders[0]["prepared"].architecture()["workflow"]["source"]["path"] == "configs/main.jsonc"
+    assert architecture.read_text().startswith(ARCHITECTURE_DOCUMENT_HEADER)
+
+
 def test_review_rejects_unregistered_workflow_without_rendering(tmp_path, monkeypatch, capsys) -> None:
     workspace_path, workflow_path, architecture_path, output_path = _write_review_workspace(
         tmp_path,
@@ -181,8 +205,6 @@ def test_review_rejects_output_that_would_overwrite_a_source(
         "workflow": workflow_path,
         "architecture": architecture_path,
     }
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(workspace_path)
     before = {name: path.read_bytes() for name, path in protected.items()}
 
     def fail_renderer(*args, **kwargs):
@@ -261,7 +283,7 @@ def test_review_preflight_failure_does_not_touch_architecture_or_render(tmp_path
             False,
         ),
         (
-            "validate_workspace_config_path",
+            "_validate_registered_architecture_document",
             "validation",
             "REVIEW.VALIDATION",
             True,
@@ -278,6 +300,7 @@ def test_review_stage_exception_is_json_failure_without_publishing(
     architecture_is_refreshed,
 ) -> None:
     import vibeflow.tooling.application.python.workspace_service as workspace_module
+    import vibeflow.tooling.application.python.presentation.architecture_validation as architecture_module
 
     workspace_path, workflow_path, architecture_path, output_path = _write_review_workspace(tmp_path)
     architecture_before = b"architecture-before-stage-exception"
@@ -292,7 +315,8 @@ def test_review_stage_exception_is_json_failure_without_publishing(
     def fail_renderer(*args, **kwargs):
         raise AssertionError("failed review stage must not render")
 
-    monkeypatch.setattr(workspace_module, helper, raise_stage_error)
+    module = workspace_module if helper == "load_workspace_graph_for_export" else architecture_module
+    monkeypatch.setattr(module, helper, raise_stage_error)
     monkeypatch.setattr("vibeflow.tooling.application.python.cli.review._render_canonical_review_svg", fail_renderer)
     code = cli_main(_review_args(workspace_path, workflow_path, output_path))
     payload = json.loads(capsys.readouterr().out)

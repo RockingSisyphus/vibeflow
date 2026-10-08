@@ -19,8 +19,13 @@ export const normalize = defineNode({
     input_semantics: {"text.raw": ["Text before normalization."]},
     output_semantics: {normalized_text: ["Normalized whitespace."]},
   },
-  run(inputs, params) {
-    return {normalized_text: inputs["text.raw"].value.trim().replace(/\s+/g, " ")};
+  run(inputs, params, context) {
+    const normalizedText = inputs["text.raw"].value.trim().replace(/\s+/g, " ");
+    context.updateInfo([{
+      id: "normalize", characters: normalizedText.length,
+      message: "文本规范化完成",
+    }]);
+    return {normalized_text: normalizedText};
   },
 });
 export const normalized = defineDataSchema({type_key: "text.normalized", schema: {type: "string"}});
@@ -30,6 +35,8 @@ export const plugin = definePlugin({id: "example.text", resources: [normalize, r
 ```
 
 可绑定执行代码的资源使用具名导出。SDK 自动记录原始声明、实现符号和位置；函数保留在 Target worker 中，不经过 JSON 序列化。Rule 使用 `defineRule({id, check(...) {...}})`，Ruleset 使用 `defineRuleset`。BaseLib 可用 `defineBaseLib({id, implementation(...) {...}})` 定位同文件函数，也可声明整个独立辅助模块。HostExtension 使用 `defineHostExtension({id, targets, provides, createHost(context) {...}})`，Capability 使用 `defineCapability`。
+
+直接提供 `run`、`check`、`implementation` 或 `createHost` 时，实际导出的资源对象确定实现身份。若同时显式填写同语言 `source/implementations`，它必须指向同一实现；同文件导出别名可以使用。指向另一文件或另一资源的声明会返回 `RESOURCE.IMPLEMENTATION.CONFLICT`，诊断包含声明和实际实现位置。没有直接函数的延迟定义仍由 `source` 绑定，核对来源不会额外加载延迟模块。
 
 `vibeflow_project.jsonc` 只保存项目及工具链信息：
 
@@ -73,3 +80,9 @@ const result = runWorkflow({request: {message: "hello"}});
 Browser/Node 平台由 `build --target` 选择。Rule 始终在 Node worker 环境检查，业务平台只是规则上下文资料。浏览器产物保留执行所需的 Node、helper、Host 和 runtime hook，不打包 Rule 或 compiler hook 的专用 Node 依赖。需要不同执行环境时可以分模块，每个资源仍可与自己的实现放在一起。
 
 项目的 TypeScript、ESLint 和业务测试分别验证类型、编码约定和业务结果。插件入口的初始化与延迟实现的检查时机见[加载与检查](plugins-and-integrations.md#加载与检查)。
+
+## 在业务 Node 中更新进度
+
+上例使用运行器提供的第三个参数 `context`，通过 `context.updateInfo` 提交信息，并照常返回 Node 输出。异步 Node 在 `await` 业务操作后使用同一接口；训练循环可逐轮更新。Node 的规则选择与原生执行协议沿用已有声明。
+
+传入普通 JSON 对象数组，每次调用替换全部 `info`；`[]` 清空信息。缓存会在下次刷新、状态变化或结束时发布，默认间隔为 60000 毫秒，运行选项 `statusIntervalMs` 可调整。Node.js 写入状态文件，浏览器通过 `onStatus` 向宿主提供快照。文件路径、Host 会话及完整格式见[运行日志与状态接口](runtime-observation.md)。

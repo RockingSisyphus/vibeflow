@@ -1,0 +1,167 @@
+{
+  "exit_code": 0,
+  "error": null,
+  "frames": [
+    {
+      "title": "main pipeline",
+      "direction": "flowchart TD",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.expanded_svg.nested_repeat_loop/fragment-00.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 575.3515625,
+      "height": 1679.800048828125
+    },
+    {
+      "title": "plugins",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.expanded_svg.nested_repeat_loop/fragment-01.mmd",
+      "resource_groups": [
+        "resource_plugins"
+      ],
+      "has_resource_nodes": false,
+      "width": 610.5281372070312,
+      "height": 150.4000015258789
+    },
+    {
+      "title": "base_lib",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.expanded_svg.nested_repeat_loop/fragment-02.mmd",
+      "resource_groups": [
+        "resource_base_lib"
+      ],
+      "has_resource_nodes": false,
+      "width": 517.1218872070312,
+      "height": 238.40000915527344
+    },
+    {
+      "title": "parent flow",
+      "direction": "flowchart TD",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.expanded_svg.nested_repeat_loop/fragment-03.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 335.3769836425781,
+      "height": 1937.199951171875
+    },
+    {
+      "title": "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.expanded_svg.nested_repeat_loop/fragment-04.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 1908.1993408203125,
+      "height": 272.0
+    },
+    {
+      "title": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.expanded_svg.nested_repeat_loop/fragment-05.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 1595.6290283203125,
+      "height": 272.0
+    },
+    {
+      "title": "parent flow",
+      "direction": "flowchart TD",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.expanded_svg.nested_repeat_loop/fragment-06.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 335.3769836425781,
+      "height": 1937.199951171875
+    },
+    {
+      "title": "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.expanded_svg.nested_repeat_loop/fragment-07.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 1908.1993408203125,
+      "height": 272.0
+    },
+    {
+      "title": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.expanded_svg.nested_repeat_loop/fragment-08.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 1595.6290283203125,
+      "height": 272.0
+    }
+  ],
+  "panels": [
+    {
+      "parent": "parent flow",
+      "children": [
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "positions": [
+        {
+          "title": "parent flow",
+          "x": 24.0,
+          "y": 52.0
+        },
+        {
+          "title": "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+          "x": 415.377,
+          "y": 52.0
+        },
+        {
+          "title": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+          "x": 415.377,
+          "y": 400.0
+        }
+      ]
+    },
+    {
+      "parent": "parent flow",
+      "children": [
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "positions": [
+        {
+          "title": "parent flow",
+          "x": 24.0,
+          "y": 52.0
+        },
+        {
+          "title": "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+          "x": 415.377,
+          "y": 52.0
+        },
+        {
+          "title": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+          "x": 415.377,
+          "y": 400.0
+        }
+      ]
+    }
+  ],
+  "columns": [
+    [
+      "main pipeline"
+    ],
+    [
+      "plugins"
+    ],
+    [
+      "base_lib"
+    ],
+    [
+      "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+      "loop (id: loop, type_key: layout.outer)"
+    ]
+  ],
+  "seconds": 5.328947128000436,
+  "arguments": [
+    "export-svg",
+    "--workspace",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.expanded_svg.nested_repeat_loop/vibeflow_config.jsonc",
+    "--config",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.expanded_svg.nested_repeat_loop/workflow.jsonc",
+    "--output",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.expanded_svg.nested_repeat_loop/graph.svg",
+    "--expand-nodesets"
+  ]
+}

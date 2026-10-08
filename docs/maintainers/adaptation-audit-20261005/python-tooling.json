@@ -1,0 +1,3074 @@
+{
+  "registered_node_support": {
+    "validate": {
+      "exit_code": 0,
+      "status": "PASS",
+      "findings": [],
+      "payload": {
+        "status": "PASS",
+        "errors": [],
+        "warnings": [],
+        "skipped": [],
+        "info": {
+          "explicit_edges": [],
+          "data_edges": [],
+          "effective_edges": [],
+          "mainline": {},
+          "node_metrics": {
+            "leaf": {
+              "source_lines": 4,
+              "source_bytes": 113,
+              "function_count": 1,
+              "branch_count": 0,
+              "max_nesting_depth": 0,
+              "param_count": 0,
+              "contract_key_count": 1,
+              "function_names": [
+                "run_pure"
+              ],
+              "call_chain_length": 1,
+              "call_chain_path": [
+                "run_pure"
+              ],
+              "recursive_call_chains": [],
+              "max_dependency_chain_length": 2,
+              "max_dependency_chain": [
+                "node",
+                "parts.util"
+              ],
+              "imported_base_lib_modules": [
+                "parts.util"
+              ],
+              "run_pure_fingerprint": "FunctionDef('_', arguments([], [arg('_'), arg('_'), arg('_')]), [Return(Dict([Constant('<str>')], [Call(Name('value', Load()))]))])",
+              "run_pure_shape": "wrapper",
+              "requires_count": 0,
+              "provides_count": 1
+            }
+          },
+          "node_effect_scopes": {
+            "leaf": "none"
+          },
+          "call_effect_policies": [
+            {
+              "owner": "pipeline",
+              "node": "leaf",
+              "policies": [
+                {
+                  "definition_id": "vibeflow.no_side_effects",
+                  "ruleset_id": "vibeflow.process",
+                  "rule_call_id": "effects",
+                  "scope": "source",
+                  "value": {
+                    "effect_scope": "none",
+                    "source": "vibeflow.no_side_effects"
+                  },
+                  "call_path": [
+                    "leaf"
+                  ]
+                }
+              ],
+              "effect_scope": "none"
+            }
+          ],
+          "nodeset_findings": {},
+          "plugins": {
+            "plugins": []
+          },
+          "planned": [],
+          "production_ready": true,
+          "rule_catalog": {
+            "GRAPH.CYCLE.FORBIDDEN": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.DATA.NO_PAYLOAD_BYPASS": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.DATA.RUNTIME_REQUIREMENT_UNREACHABLE": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.DATA.UNCONSUMED_PROVIDER": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.EDGE.CONFLICTING_DUPLICATE": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.EDGE.DUPLICATE": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.EXECUTION_LOCK.GLOBAL_STATE_UNCOORDINATED": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.JOIN.ALL_BRANCHES_MUTUALLY_EXCLUSIVE": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.JOIN.ALL_DEPENDS_ON_TRANSFER_ONLY": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.JOIN.REDUNDANT_ALL": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.SMELL.CONFUSING_NODE_NAME": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.SMELL.MISSING_NODE_DESCRIPTION": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "NODE.EFFECT.CALL_FORBIDDEN": {
+              "severity": "error",
+              "layer": "implementation",
+              "suggested_fix_type": "fix_contract"
+            },
+            "NODE.EFFECT.IMPORT_FORBIDDEN": {
+              "severity": "error",
+              "layer": "implementation",
+              "suggested_fix_type": "fix_contract"
+            },
+            "NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED": {
+              "severity": "warning",
+              "layer": "implementation",
+              "suggested_fix_type": "fix_contract"
+            },
+            "NODESET.NESTING.DEPTH_EXCEEDED": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_nodeset"
+            },
+            "NODESET.SMELL.TOO_WIDE": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_nodeset"
+            }
+          },
+          "rule_executions": [
+            {
+              "status": "PASS",
+              "plan": {
+                "ruleset_id": "vibeflow.process",
+                "entrypoint": "import",
+                "order": [
+                  "imports"
+                ],
+                "calls": [
+                  {
+                    "id": "imports",
+                    "rule_id": "vibeflow.import_side_effects",
+                    "original_rule_id": "vibeflow.import_side_effects",
+                    "params": {
+                      "effect_scope": "none",
+                      "policy": {}
+                    },
+                    "dependencies": [],
+                    "inputs": {},
+                    "origins": [
+                      "vibeflow.process"
+                    ],
+                    "parameter_sources": {
+                      "effect_scope": "call:imports",
+                      "policy": "default:vibeflow.import_side_effects"
+                    }
+                  }
+                ],
+                "relations": []
+              },
+              "results": {
+                "imports": {
+                  "state": "completed",
+                  "records": {},
+                  "findings": []
+                }
+              },
+              "findings": [],
+              "executed": [
+                "imports"
+              ],
+              "aliases": {}
+            },
+            {
+              "status": "PASS",
+              "plan": {
+                "ruleset_id": "vibeflow.process",
+                "entrypoint": "static",
+                "order": [
+                  "effects",
+                  "interface",
+                  "maintainability"
+                ],
+                "calls": [
+                  {
+                    "id": "effects",
+                    "rule_id": "vibeflow.no_side_effects",
+                    "original_rule_id": "vibeflow.no_side_effects",
+                    "params": {
+                      "effect_scope": "none",
+                      "policy": {}
+                    },
+                    "dependencies": [],
+                    "inputs": {},
+                    "origins": [
+                      "vibeflow.process"
+                    ],
+                    "parameter_sources": {
+                      "effect_scope": "call:effects",
+                      "policy": "default:vibeflow.no_side_effects"
+                    }
+                  },
+                  {
+                    "id": "interface",
+                    "rule_id": "vibeflow.node_interface",
+                    "original_rule_id": "vibeflow.node_interface",
+                    "params": {
+                      "allowed_methods": []
+                    },
+                    "dependencies": [],
+                    "inputs": {},
+                    "origins": [
+                      "vibeflow.process"
+                    ],
+                    "parameter_sources": {
+                      "allowed_methods": "default:vibeflow.node_interface"
+                    }
+                  },
+                  {
+                    "id": "maintainability",
+                    "rule_id": "vibeflow.maintainability",
+                    "original_rule_id": "vibeflow.maintainability",
+                    "params": {
+                      "policy": {}
+                    },
+                    "dependencies": [],
+                    "inputs": {},
+                    "origins": [
+                      "vibeflow.process"
+                    ],
+                    "parameter_sources": {
+                      "policy": "default:vibeflow.maintainability"
+                    }
+                  }
+                ],
+                "relations": []
+              },
+              "results": {
+                "effects": {
+                  "state": "completed",
+                  "records": {
+                    "effect_policy": {
+                      "type_id": "vibeflow.effect_policy.v1",
+                      "value": {
+                        "effect_scope": "none",
+                        "source": "vibeflow.no_side_effects"
+                      }
+                    }
+                  },
+                  "findings": []
+                },
+                "interface": {
+                  "state": "completed",
+                  "records": {},
+                  "findings": []
+                },
+                "maintainability": {
+                  "state": "completed",
+                  "records": {
+                    "metrics": {
+                      "type_id": "vibeflow.node_metrics.v1",
+                      "value": {
+                        "source_lines": 4,
+                        "source_bytes": 113,
+                        "function_count": 1,
+                        "branch_count": 0,
+                        "max_nesting_depth": 0,
+                        "param_count": 0,
+                        "contract_key_count": 1,
+                        "function_names": [
+                          "run_pure"
+                        ],
+                        "call_chain_length": 1,
+                        "call_chain_path": [
+                          "run_pure"
+                        ],
+                        "recursive_call_chains": [],
+                        "max_dependency_chain_length": 2,
+                        "max_dependency_chain": [
+                          "node",
+                          "parts.util"
+                        ],
+                        "imported_base_lib_modules": [
+                          "parts.util"
+                        ],
+                        "run_pure_fingerprint": "FunctionDef('_', arguments([], [arg('_'), arg('_'), arg('_')]), [Return(Dict([Constant('<str>')], [Call(Name('value', Load()))]))])",
+                        "run_pure_shape": "wrapper",
+                        "requires_count": 0,
+                        "provides_count": 1
+                      }
+                    }
+                  },
+                  "findings": []
+                }
+              },
+              "findings": [],
+              "executed": [
+                "effects",
+                "interface",
+                "maintainability"
+              ],
+              "aliases": {}
+            }
+          ],
+          "workflow_rulesets": [],
+          "nodeset_imports": [],
+          "resources": {
+            "global_config": {},
+            "base_lib": {
+              "paths": [],
+              "modules": []
+            },
+            "plugins": [],
+            "host_extensions": []
+          },
+          "effective_resources": {
+            "global_config": {},
+            "base_lib": {
+              "paths": [],
+              "modules": []
+            },
+            "plugins": [],
+            "host_extensions": []
+          },
+          "available_resources": {
+            "global_config": {},
+            "base_lib": {
+              "paths": [
+                "/tmp/vf-adaptation-tooling-audit/support"
+              ],
+              "modules": []
+            },
+            "plugins": [],
+            "host_extensions": []
+          },
+          "workspace": {
+            "path": "/tmp/vf-adaptation-tooling-audit/support/vibeflow_project.jsonc",
+            "roots": [
+              {
+                "id": "project",
+                "path": "/tmp/vf-adaptation-tooling-audit/support",
+                "config": "/tmp/vf-adaptation-tooling-audit/support/vibeflow_project.jsonc",
+                "project_target": "python",
+                "quality_enabled": true
+              }
+            ]
+          }
+        },
+        "effective_policy": {
+          "node_source": {
+            "max_lines": 500,
+            "max_bytes": 60000,
+            "warn_lines": 450,
+            "warn_bytes": 54000
+          },
+          "complexity": {
+            "max_functions": null,
+            "max_branches": null,
+            "max_nesting_depth": null,
+            "max_params": null,
+            "max_contract_keys": null
+          },
+          "maintainability": {
+            "warn_call_chain_length": 4,
+            "max_call_chain_length": 4,
+            "warn_dependency_chain_length": 4,
+            "max_dependency_chain_length": 6
+          },
+          "imports": {
+            "allowed_roots": [],
+            "banned_roots": [
+              "_ctypes",
+              "_thread",
+              "asyncio",
+              "boto3",
+              "boundaries",
+              "boundary",
+              "cffi",
+              "concurrent",
+              "ctypes",
+              "dotenv",
+              "httpx",
+              "importlib",
+              "multiprocessing",
+              "nodriver",
+              "os",
+              "pathlib",
+              "playwright",
+              "psycopg2",
+              "pymongo",
+              "pymysql",
+              "redis",
+              "requests",
+              "selenium",
+              "shutil",
+              "socket",
+              "sqlalchemy",
+              "sqlite3",
+              "subprocess",
+              "threading",
+              "urllib"
+            ],
+            "allowed_modules": [
+              "urllib.parse",
+              "vibeflow"
+            ],
+            "banned_modules": [
+              "urllib.request"
+            ]
+          },
+          "base_lib": {
+            "allowed_paths": [],
+            "allowed_modules": [],
+            "banned_modules": []
+          },
+          "sources": [
+            "kernel.default_policy",
+            "workspace.policy:/tmp/vf-adaptation-tooling-audit/support/vibeflow_project.jsonc"
+          ]
+        },
+        "result_code": "VIBEFLOW_STRUCTURE_PASS",
+        "validation_scope": "vibeflow_structure",
+        "summary": "VibeFlow \u7ed3\u6784\u68c0\u67e5\u901a\u8fc7",
+        "checked": [
+          {
+            "id": "config_registration",
+            "label": "\u914d\u7f6e\u548c\u767b\u8bb0\u5173\u7cfb"
+          },
+          {
+            "id": "node_contract_shape",
+            "label": "\u8282\u70b9\u5951\u7ea6\u5f62\u72b6"
+          },
+          {
+            "id": "data_reachability",
+            "label": "\u6570\u636e\u53ef\u8fbe\u6027"
+          },
+          {
+            "id": "control_flow",
+            "label": "\u63a7\u5236\u6d41"
+          },
+          {
+            "id": "effect_boundaries",
+            "label": "\u526f\u4f5c\u7528\u8fb9\u754c"
+          },
+          {
+            "id": "project_structure",
+            "label": "\u9879\u76ee\u7ed3\u6784"
+          }
+        ],
+        "not_checked": [
+          {
+            "id": "business_correctness",
+            "label": "\u4e1a\u52a1\u7ed3\u679c\u6b63\u786e\u6027"
+          },
+          {
+            "id": "requirements_conformance",
+            "label": "\u9879\u76ee\u9700\u6c42\u7b26\u5408\u6027"
+          },
+          {
+            "id": "external_semantics",
+            "label": "\u5916\u90e8\u63a5\u53e3\u4e1a\u52a1\u8bed\u4e49"
+          },
+          {
+            "id": "domain_data_correctness",
+            "label": "\u9886\u57df\u6570\u636e\u6b63\u786e\u6027"
+          }
+        ]
+      }
+    },
+    "quality": {
+      "exit_code": 1,
+      "status": "FAIL",
+      "findings": [
+        {
+          "code": "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT",
+          "rule_id": "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT",
+          "severity": "error",
+          "object_type": "module_dependency",
+          "object_id": "nodes.leaf -> parts.util",
+          "source_location": {
+            "path": "p/nodes/leaf.py",
+            "line": 1,
+            "column": 1
+          },
+          "message": "node module imports project code outside declared base_lib: nodes.leaf -> parts.util",
+          "suggested_fix_type": "clarify_structure",
+          "details": {
+            "source": "nodes.leaf",
+            "target": "parts.util",
+            "import_sites": [
+              {
+                "source_module": "nodes.leaf",
+                "imported": "parts.util",
+                "raw_import": "from parts.util import value",
+                "path": "nodes/leaf.py",
+                "line": 1,
+                "column": 1,
+                "target_module": "parts.util"
+              },
+              {
+                "source_module": "nodes.leaf",
+                "imported": "parts.util.value",
+                "raw_import": "from parts.util import value",
+                "path": "nodes/leaf.py",
+                "line": 1,
+                "column": 1,
+                "target_module": "parts.util"
+              }
+            ]
+          },
+          "root_id": "p",
+          "root_path": "/tmp/vf-adaptation-tooling-audit/support",
+          "source_path": "/tmp/vf-adaptation-tooling-audit/support/nodes/leaf.py",
+          "definition_id": "vibeflow.quality.structure"
+        }
+      ],
+      "payload": {
+        "status": "FAIL",
+        "root": "/tmp/vf-adaptation-tooling-audit/support",
+        "summary": "VibeFlow \u9879\u76ee\u8d28\u91cf\u68c0\u67e5\u5931\u8d25",
+        "scope_summary": {
+          "src": {
+            "files": 0,
+            "errors": 0,
+            "warnings": 0
+          },
+          "tests": {
+            "files": 0,
+            "errors": 0,
+            "warnings": 0
+          },
+          "devtools": {
+            "files": 0,
+            "errors": 0,
+            "warnings": 0
+          },
+          "other": {
+            "files": 3,
+            "errors": 1,
+            "warnings": 0
+          }
+        },
+        "top_offenders": {
+          "files": [
+            {
+              "path": "p/nodes/leaf.py",
+              "score": 10,
+              "lines": 4,
+              "branches": 0,
+              "findings": 1
+            }
+          ],
+          "functions": [
+            {
+              "object_id": "p/nodes/leaf.py:Leaf.run_pure",
+              "score": 2,
+              "lines": 2,
+              "branches": 0,
+              "params": 2,
+              "findings": 0
+            }
+          ]
+        },
+        "thresholds": {
+          "max_file_lines": 500,
+          "warn_file_lines": 450,
+          "max_file_bytes": 60000,
+          "max_functions_per_file": 40,
+          "max_classes_per_file": 20,
+          "max_public_api_per_file": 30,
+          "max_file_branches": 150,
+          "max_directory_fanout": 25,
+          "max_directory_fanin": 25,
+          "max_prefix_cluster_files": 12,
+          "max_public_entry_bypass_imports": 3,
+          "max_dependency_distance": 3,
+          "max_scattered_dependency_directories": 6,
+          "max_function_lines": 80,
+          "max_function_branches": 12,
+          "max_function_nesting": 4,
+          "max_function_params": 6,
+          "warn_dependency_chain": 6,
+          "max_dependency_chain": 10
+        },
+        "files": [
+          {
+            "path": "p/nodes/leaf.py",
+            "module": "p.nodes.leaf",
+            "lines": 4,
+            "bytes": 113,
+            "function_count": 1,
+            "class_count": 1,
+            "public_api_count": 1,
+            "branch_count": 0,
+            "max_nesting_depth": 0,
+            "imports": [
+              "parts.util",
+              "parts.util.value"
+            ],
+            "import_sites": [
+              {
+                "source_module": "nodes.leaf",
+                "imported": "parts.util",
+                "raw_import": "from parts.util import value",
+                "path": "nodes/leaf.py",
+                "line": 1,
+                "column": 1
+              },
+              {
+                "source_module": "nodes.leaf",
+                "imported": "parts.util.value",
+                "raw_import": "from parts.util import value",
+                "path": "nodes/leaf.py",
+                "line": 1,
+                "column": 1
+              }
+            ],
+            "functions": [
+              {
+                "qualname": "Leaf.run_pure",
+                "line_start": 3,
+                "line_end": 4,
+                "lines": 2,
+                "branches": 0,
+                "max_nesting_depth": 0,
+                "param_count": 2,
+                "ast_fingerprint": "FunctionDef(name='_function', args=arguments(args=[arg(arg='_arg'), arg(arg='_arg'), arg(arg='_arg')]), body=[Return(value=Dict(keys=[Constant(value='_constant')], values=[Call(func=Name(id='_name', ctx=Load()))]))])"
+              }
+            ]
+          },
+          {
+            "path": "p/parts/util.py",
+            "module": "p.parts.util",
+            "lines": 2,
+            "bytes": 26,
+            "function_count": 1,
+            "class_count": 0,
+            "public_api_count": 1,
+            "branch_count": 0,
+            "max_nesting_depth": 0,
+            "imports": [],
+            "import_sites": [],
+            "functions": [
+              {
+                "qualname": "value",
+                "line_start": 1,
+                "line_end": 2,
+                "lines": 2,
+                "branches": 0,
+                "max_nesting_depth": 0,
+                "param_count": 0,
+                "ast_fingerprint": "FunctionDef(name='_function', args=arguments(), body=[Return(value=Constant(value='_constant'))])"
+              }
+            ]
+          },
+          {
+            "path": "p/plugins/entry.py",
+            "module": "p.plugins.entry",
+            "lines": 3,
+            "bytes": 411,
+            "function_count": 0,
+            "class_count": 0,
+            "public_api_count": 0,
+            "branch_count": 0,
+            "max_nesting_depth": 0,
+            "imports": [
+              "vibeflow.targets.python.sdk",
+              "vibeflow.targets.python.sdk.Plugin",
+              "vibeflow.targets.python.sdk.SourceLocator",
+              "vibeflow.targets.python.sdk.node"
+            ],
+            "import_sites": [
+              {
+                "source_module": "plugins.entry",
+                "imported": "vibeflow.targets.python.sdk",
+                "raw_import": "from vibeflow.targets.python.sdk import Plugin, node, SourceLocator",
+                "path": "plugins/entry.py",
+                "line": 1,
+                "column": 1
+              },
+              {
+                "source_module": "plugins.entry",
+                "imported": "vibeflow.targets.python.sdk.Plugin",
+                "raw_import": "from vibeflow.targets.python.sdk import Plugin",
+                "path": "plugins/entry.py",
+                "line": 1,
+                "column": 1
+              },
+              {
+                "source_module": "plugins.entry",
+                "imported": "vibeflow.targets.python.sdk.SourceLocator",
+                "raw_import": "from vibeflow.targets.python.sdk import SourceLocator",
+                "path": "plugins/entry.py",
+                "line": 1,
+                "column": 1
+              },
+              {
+                "source_module": "plugins.entry",
+                "imported": "vibeflow.targets.python.sdk.node",
+                "raw_import": "from vibeflow.targets.python.sdk import node",
+                "path": "plugins/entry.py",
+                "line": 1,
+                "column": 1
+              }
+            ],
+            "functions": []
+          }
+        ],
+        "dependency_graph": {
+          "p.nodes.leaf": [
+            "p.parts.util"
+          ],
+          "p.parts.util": [],
+          "p.plugins.entry": []
+        },
+        "directory_graph": [
+          {
+            "directory": "p/nodes",
+            "module_count": 1,
+            "internal_import_count": 0,
+            "external_import_count": 1,
+            "outgoing_directories": [
+              "parts"
+            ],
+            "incoming_directories": []
+          },
+          {
+            "directory": "p/parts",
+            "module_count": 1,
+            "internal_import_count": 0,
+            "external_import_count": 0,
+            "outgoing_directories": [],
+            "incoming_directories": [
+              "nodes"
+            ]
+          },
+          {
+            "directory": "p/plugins",
+            "module_count": 1,
+            "internal_import_count": 0,
+            "external_import_count": 0,
+            "outgoing_directories": [],
+            "incoming_directories": []
+          }
+        ],
+        "prefix_clusters": [],
+        "structure_summary": {
+          "workspace_roots": [
+            {
+              "id": "p",
+              "path": "/tmp/vf-adaptation-tooling-audit/support",
+              "project_target": "python",
+              "files": 3,
+              "status": "FAIL"
+            }
+          ]
+        },
+        "longest_dependency_chain": [
+          "p.nodes.leaf",
+          "p.parts.util"
+        ],
+        "errors": [
+          {
+            "code": "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT",
+            "rule_id": "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT",
+            "severity": "error",
+            "object_type": "module_dependency",
+            "object_id": "nodes.leaf -> parts.util",
+            "source_location": {
+              "path": "p/nodes/leaf.py",
+              "line": 1,
+              "column": 1
+            },
+            "message": "node module imports project code outside declared base_lib: nodes.leaf -> parts.util",
+            "suggested_fix_type": "clarify_structure",
+            "details": {
+              "source": "nodes.leaf",
+              "target": "parts.util",
+              "import_sites": [
+                {
+                  "source_module": "nodes.leaf",
+                  "imported": "parts.util",
+                  "raw_import": "from parts.util import value",
+                  "path": "nodes/leaf.py",
+                  "line": 1,
+                  "column": 1,
+                  "target_module": "parts.util"
+                },
+                {
+                  "source_module": "nodes.leaf",
+                  "imported": "parts.util.value",
+                  "raw_import": "from parts.util import value",
+                  "path": "nodes/leaf.py",
+                  "line": 1,
+                  "column": 1,
+                  "target_module": "parts.util"
+                }
+              ]
+            },
+            "root_id": "p",
+            "root_path": "/tmp/vf-adaptation-tooling-audit/support",
+            "source_path": "/tmp/vf-adaptation-tooling-audit/support/nodes/leaf.py",
+            "definition_id": "vibeflow.quality.structure"
+          }
+        ],
+        "warnings": [],
+        "workspace_roots": [
+          {
+            "id": "p",
+            "path": "/tmp/vf-adaptation-tooling-audit/support",
+            "project_target": "python",
+            "files": 3,
+            "status": "FAIL"
+          }
+        ],
+        "source_quality": {
+          "status": "FAIL",
+          "root": "/tmp/vf-adaptation-tooling-audit/support",
+          "summary": {
+            "files": 3,
+            "errors": 1,
+            "warnings": 0,
+            "score": 90,
+            "longest_dependency_chain_length": 2
+          },
+          "scope_summary": {
+            "src": {
+              "files": 0,
+              "errors": 0,
+              "warnings": 0
+            },
+            "tests": {
+              "files": 0,
+              "errors": 0,
+              "warnings": 0
+            },
+            "devtools": {
+              "files": 0,
+              "errors": 0,
+              "warnings": 0
+            },
+            "other": {
+              "files": 3,
+              "errors": 1,
+              "warnings": 0
+            }
+          },
+          "top_offenders": {
+            "files": [
+              {
+                "path": "p/nodes/leaf.py",
+                "score": 10,
+                "lines": 4,
+                "branches": 0,
+                "findings": 1
+              }
+            ],
+            "functions": [
+              {
+                "object_id": "p/nodes/leaf.py:Leaf.run_pure",
+                "score": 2,
+                "lines": 2,
+                "branches": 0,
+                "params": 2,
+                "findings": 0
+              }
+            ]
+          },
+          "thresholds": {
+            "max_file_lines": 500,
+            "warn_file_lines": 450,
+            "max_file_bytes": 60000,
+            "max_functions_per_file": 40,
+            "max_classes_per_file": 20,
+            "max_public_api_per_file": 30,
+            "max_file_branches": 150,
+            "max_directory_fanout": 25,
+            "max_directory_fanin": 25,
+            "max_prefix_cluster_files": 12,
+            "max_public_entry_bypass_imports": 3,
+            "max_dependency_distance": 3,
+            "max_scattered_dependency_directories": 6,
+            "max_function_lines": 80,
+            "max_function_branches": 12,
+            "max_function_nesting": 4,
+            "max_function_params": 6,
+            "warn_dependency_chain": 6,
+            "max_dependency_chain": 10
+          },
+          "files": [
+            {
+              "path": "p/nodes/leaf.py",
+              "module": "p.nodes.leaf",
+              "lines": 4,
+              "bytes": 113,
+              "function_count": 1,
+              "class_count": 1,
+              "public_api_count": 1,
+              "branch_count": 0,
+              "max_nesting_depth": 0,
+              "imports": [
+                "parts.util",
+                "parts.util.value"
+              ],
+              "import_sites": [
+                {
+                  "source_module": "nodes.leaf",
+                  "imported": "parts.util",
+                  "raw_import": "from parts.util import value",
+                  "path": "nodes/leaf.py",
+                  "line": 1,
+                  "column": 1
+                },
+                {
+                  "source_module": "nodes.leaf",
+                  "imported": "parts.util.value",
+                  "raw_import": "from parts.util import value",
+                  "path": "nodes/leaf.py",
+                  "line": 1,
+                  "column": 1
+                }
+              ],
+              "functions": [
+                {
+                  "qualname": "Leaf.run_pure",
+                  "line_start": 3,
+                  "line_end": 4,
+                  "lines": 2,
+                  "branches": 0,
+                  "max_nesting_depth": 0,
+                  "param_count": 2,
+                  "ast_fingerprint": "FunctionDef(name='_function', args=arguments(args=[arg(arg='_arg'), arg(arg='_arg'), arg(arg='_arg')]), body=[Return(value=Dict(keys=[Constant(value='_constant')], values=[Call(func=Name(id='_name', ctx=Load()))]))])"
+                }
+              ]
+            },
+            {
+              "path": "p/parts/util.py",
+              "module": "p.parts.util",
+              "lines": 2,
+              "bytes": 26,
+              "function_count": 1,
+              "class_count": 0,
+              "public_api_count": 1,
+              "branch_count": 0,
+              "max_nesting_depth": 0,
+              "imports": [],
+              "import_sites": [],
+              "functions": [
+                {
+                  "qualname": "value",
+                  "line_start": 1,
+                  "line_end": 2,
+                  "lines": 2,
+                  "branches": 0,
+                  "max_nesting_depth": 0,
+                  "param_count": 0,
+                  "ast_fingerprint": "FunctionDef(name='_function', args=arguments(), body=[Return(value=Constant(value='_constant'))])"
+                }
+              ]
+            },
+            {
+              "path": "p/plugins/entry.py",
+              "module": "p.plugins.entry",
+              "lines": 3,
+              "bytes": 411,
+              "function_count": 0,
+              "class_count": 0,
+              "public_api_count": 0,
+              "branch_count": 0,
+              "max_nesting_depth": 0,
+              "imports": [
+                "vibeflow.targets.python.sdk",
+                "vibeflow.targets.python.sdk.Plugin",
+                "vibeflow.targets.python.sdk.SourceLocator",
+                "vibeflow.targets.python.sdk.node"
+              ],
+              "import_sites": [
+                {
+                  "source_module": "plugins.entry",
+                  "imported": "vibeflow.targets.python.sdk",
+                  "raw_import": "from vibeflow.targets.python.sdk import Plugin, node, SourceLocator",
+                  "path": "plugins/entry.py",
+                  "line": 1,
+                  "column": 1
+                },
+                {
+                  "source_module": "plugins.entry",
+                  "imported": "vibeflow.targets.python.sdk.Plugin",
+                  "raw_import": "from vibeflow.targets.python.sdk import Plugin",
+                  "path": "plugins/entry.py",
+                  "line": 1,
+                  "column": 1
+                },
+                {
+                  "source_module": "plugins.entry",
+                  "imported": "vibeflow.targets.python.sdk.SourceLocator",
+                  "raw_import": "from vibeflow.targets.python.sdk import SourceLocator",
+                  "path": "plugins/entry.py",
+                  "line": 1,
+                  "column": 1
+                },
+                {
+                  "source_module": "plugins.entry",
+                  "imported": "vibeflow.targets.python.sdk.node",
+                  "raw_import": "from vibeflow.targets.python.sdk import node",
+                  "path": "plugins/entry.py",
+                  "line": 1,
+                  "column": 1
+                }
+              ],
+              "functions": []
+            }
+          ],
+          "dependency_graph": {
+            "p.nodes.leaf": [
+              "p.parts.util"
+            ],
+            "p.parts.util": [],
+            "p.plugins.entry": []
+          },
+          "directory_graph": [
+            {
+              "directory": "p/nodes",
+              "module_count": 1,
+              "internal_import_count": 0,
+              "external_import_count": 1,
+              "outgoing_directories": [
+                "parts"
+              ],
+              "incoming_directories": []
+            },
+            {
+              "directory": "p/parts",
+              "module_count": 1,
+              "internal_import_count": 0,
+              "external_import_count": 0,
+              "outgoing_directories": [],
+              "incoming_directories": [
+                "nodes"
+              ]
+            },
+            {
+              "directory": "p/plugins",
+              "module_count": 1,
+              "internal_import_count": 0,
+              "external_import_count": 0,
+              "outgoing_directories": [],
+              "incoming_directories": []
+            }
+          ],
+          "prefix_clusters": [],
+          "structure_summary": {
+            "workspace_roots": [
+              {
+                "id": "p",
+                "path": "/tmp/vf-adaptation-tooling-audit/support",
+                "project_target": "python",
+                "files": 3,
+                "status": "FAIL"
+              }
+            ]
+          },
+          "longest_dependency_chain": [
+            "p.nodes.leaf",
+            "p.parts.util"
+          ],
+          "errors": [
+            {
+              "code": "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT",
+              "rule_id": "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT",
+              "severity": "error",
+              "object_type": "module_dependency",
+              "object_id": "nodes.leaf -> parts.util",
+              "source_location": {
+                "path": "p/nodes/leaf.py",
+                "line": 1,
+                "column": 1
+              },
+              "message": "node module imports project code outside declared base_lib: nodes.leaf -> parts.util",
+              "suggested_fix_type": "clarify_structure",
+              "details": {
+                "source": "nodes.leaf",
+                "target": "parts.util",
+                "import_sites": [
+                  {
+                    "source_module": "nodes.leaf",
+                    "imported": "parts.util",
+                    "raw_import": "from parts.util import value",
+                    "path": "nodes/leaf.py",
+                    "line": 1,
+                    "column": 1,
+                    "target_module": "parts.util"
+                  },
+                  {
+                    "source_module": "nodes.leaf",
+                    "imported": "parts.util.value",
+                    "raw_import": "from parts.util import value",
+                    "path": "nodes/leaf.py",
+                    "line": 1,
+                    "column": 1,
+                    "target_module": "parts.util"
+                  }
+                ]
+              },
+              "root_id": "p",
+              "root_path": "/tmp/vf-adaptation-tooling-audit/support",
+              "source_path": "/tmp/vf-adaptation-tooling-audit/support/nodes/leaf.py",
+              "definition_id": "vibeflow.quality.structure"
+            }
+          ],
+          "warnings": [],
+          "workspace_roots": [
+            {
+              "id": "p",
+              "path": "/tmp/vf-adaptation-tooling-audit/support",
+              "project_target": "python",
+              "files": 3,
+              "status": "FAIL"
+            }
+          ]
+        },
+        "reports": [],
+        "details_summary": {
+          "files": 3,
+          "errors": 1,
+          "warnings": 0,
+          "score": 90,
+          "longest_dependency_chain_length": 2
+        },
+        "result_code": "VIBEFLOW_QUALITY_FAIL",
+        "validation_scope": "vibeflow_quality",
+        "checked": [
+          {
+            "id": "project_structure",
+            "label": "\u9879\u76ee\u7ed3\u6784"
+          },
+          {
+            "id": "source_quality",
+            "label": "\u6e90\u7801\u8d28\u91cf\u4e0e\u4f9d\u8d56\u7ed3\u6784"
+          },
+          {
+            "id": "effect_boundaries",
+            "label": "\u526f\u4f5c\u7528\u8fb9\u754c"
+          }
+        ],
+        "not_checked": [
+          {
+            "id": "business_correctness",
+            "label": "\u4e1a\u52a1\u7ed3\u679c\u6b63\u786e\u6027"
+          },
+          {
+            "id": "requirements_conformance",
+            "label": "\u9879\u76ee\u9700\u6c42\u7b26\u5408\u6027"
+          },
+          {
+            "id": "external_semantics",
+            "label": "\u5916\u90e8\u63a5\u53e3\u4e1a\u52a1\u8bed\u4e49"
+          },
+          {
+            "id": "domain_data_correctness",
+            "label": "\u9886\u57df\u6570\u636e\u6b63\u786e\u6027"
+          }
+        ]
+      }
+    }
+  },
+  "inspection_policy": {
+    "validate": {
+      "exit_code": 1,
+      "status": "FAIL",
+      "findings": [
+        {
+          "code": "NODE.PURITY.SOURCE_TOO_LARGE",
+          "rule_id": "NODE.PURITY.SOURCE_TOO_LARGE",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "audit.leaf",
+          "source_location": {
+            "path": "/tmp/vf-adaptation-tooling-audit/inspect-policy/leaf.py",
+            "line": 1,
+            "column": 1
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node source has 28 lines > 10",
+          "suggested_fix_type": "split_node",
+          "details": {
+            "lines": 28,
+            "limit": 10,
+            "node_type": "audit.leaf",
+            "calls": [
+              {
+                "owner": "pipeline",
+                "node": "leaf"
+              }
+            ]
+          },
+          "root_id": "project",
+          "source_path": "/tmp/vf-adaptation-tooling-audit/inspect-policy/leaf.py",
+          "definition_id": "vibeflow.maintainability"
+        }
+      ],
+      "payload": {
+        "status": "FAIL",
+        "errors": [
+          {
+            "code": "NODE.PURITY.SOURCE_TOO_LARGE",
+            "rule_id": "NODE.PURITY.SOURCE_TOO_LARGE",
+            "severity": "error",
+            "object_type": "node",
+            "object_id": "audit.leaf",
+            "source_location": {
+              "path": "/tmp/vf-adaptation-tooling-audit/inspect-policy/leaf.py",
+              "line": 1,
+              "column": 1
+            },
+            "rule_source": "ruleset.selection",
+            "failure_layer": "implementation",
+            "message": "node source has 28 lines > 10",
+            "suggested_fix_type": "split_node",
+            "details": {
+              "lines": 28,
+              "limit": 10,
+              "node_type": "audit.leaf",
+              "calls": [
+                {
+                  "owner": "pipeline",
+                  "node": "leaf"
+                }
+              ]
+            },
+            "root_id": "project",
+            "source_path": "/tmp/vf-adaptation-tooling-audit/inspect-policy/leaf.py",
+            "definition_id": "vibeflow.maintainability"
+          }
+        ],
+        "warnings": [],
+        "skipped": [],
+        "info": {
+          "explicit_edges": [],
+          "data_edges": [],
+          "effective_edges": [],
+          "mainline": {},
+          "node_metrics": {
+            "leaf": {
+              "source_lines": 28,
+              "source_bytes": 103,
+              "function_count": 1,
+              "branch_count": 0,
+              "max_nesting_depth": 0,
+              "param_count": 0,
+              "contract_key_count": 1,
+              "function_names": [
+                "run_pure"
+              ],
+              "call_chain_length": 1,
+              "call_chain_path": [
+                "run_pure"
+              ],
+              "recursive_call_chains": [],
+              "max_dependency_chain_length": 0,
+              "max_dependency_chain": [],
+              "imported_base_lib_modules": [],
+              "run_pure_fingerprint": "FunctionDef('_', arguments([], [arg('_'), arg('_'), arg('_')]), [Return(Dict([Constant('<str>')], [Constant(0)]))])",
+              "run_pure_shape": "literal",
+              "requires_count": 0,
+              "provides_count": 1
+            }
+          },
+          "node_effect_scopes": {
+            "leaf": "none"
+          },
+          "call_effect_policies": [
+            {
+              "owner": "pipeline",
+              "node": "leaf",
+              "policies": [
+                {
+                  "definition_id": "vibeflow.no_side_effects",
+                  "ruleset_id": "vibeflow.process",
+                  "rule_call_id": "effects",
+                  "scope": "source",
+                  "value": {
+                    "effect_scope": "none",
+                    "source": "vibeflow.no_side_effects"
+                  },
+                  "call_path": [
+                    "leaf"
+                  ]
+                }
+              ],
+              "effect_scope": "none"
+            }
+          ],
+          "nodeset_findings": {},
+          "plugins": {
+            "plugins": []
+          },
+          "planned": [],
+          "production_ready": true,
+          "rule_catalog": {
+            "GRAPH.CYCLE.FORBIDDEN": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.DATA.NO_PAYLOAD_BYPASS": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.DATA.RUNTIME_REQUIREMENT_UNREACHABLE": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.DATA.UNCONSUMED_PROVIDER": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.EDGE.CONFLICTING_DUPLICATE": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.EDGE.DUPLICATE": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.EXECUTION_LOCK.GLOBAL_STATE_UNCOORDINATED": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.JOIN.ALL_BRANCHES_MUTUALLY_EXCLUSIVE": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.JOIN.ALL_DEPENDS_ON_TRANSFER_ONLY": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.JOIN.REDUNDANT_ALL": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.SMELL.CONFUSING_NODE_NAME": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.SMELL.MISSING_NODE_DESCRIPTION": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "NODE.EFFECT.CALL_FORBIDDEN": {
+              "severity": "error",
+              "layer": "implementation",
+              "suggested_fix_type": "fix_contract"
+            },
+            "NODE.EFFECT.IMPORT_FORBIDDEN": {
+              "severity": "error",
+              "layer": "implementation",
+              "suggested_fix_type": "fix_contract"
+            },
+            "NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED": {
+              "severity": "warning",
+              "layer": "implementation",
+              "suggested_fix_type": "fix_contract"
+            },
+            "NODESET.NESTING.DEPTH_EXCEEDED": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_nodeset"
+            },
+            "NODESET.SMELL.TOO_WIDE": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_nodeset"
+            }
+          },
+          "rule_executions": [
+            {
+              "status": "PASS",
+              "plan": {
+                "ruleset_id": "vibeflow.process",
+                "entrypoint": "import",
+                "order": [
+                  "imports"
+                ],
+                "calls": [
+                  {
+                    "id": "imports",
+                    "rule_id": "vibeflow.import_side_effects",
+                    "original_rule_id": "vibeflow.import_side_effects",
+                    "params": {
+                      "effect_scope": "none",
+                      "policy": {}
+                    },
+                    "dependencies": [],
+                    "inputs": {},
+                    "origins": [
+                      "vibeflow.process"
+                    ],
+                    "parameter_sources": {
+                      "effect_scope": "call:imports",
+                      "policy": "default:vibeflow.import_side_effects"
+                    }
+                  }
+                ],
+                "relations": []
+              },
+              "results": {
+                "imports": {
+                  "state": "completed",
+                  "records": {},
+                  "findings": []
+                }
+              },
+              "findings": [],
+              "executed": [
+                "imports"
+              ],
+              "aliases": {}
+            },
+            {
+              "status": "FAIL",
+              "plan": {
+                "ruleset_id": "vibeflow.process",
+                "entrypoint": "static",
+                "order": [
+                  "effects",
+                  "interface",
+                  "maintainability"
+                ],
+                "calls": [
+                  {
+                    "id": "effects",
+                    "rule_id": "vibeflow.no_side_effects",
+                    "original_rule_id": "vibeflow.no_side_effects",
+                    "params": {
+                      "effect_scope": "none",
+                      "policy": {}
+                    },
+                    "dependencies": [],
+                    "inputs": {},
+                    "origins": [
+                      "vibeflow.process"
+                    ],
+                    "parameter_sources": {
+                      "effect_scope": "call:effects",
+                      "policy": "default:vibeflow.no_side_effects"
+                    }
+                  },
+                  {
+                    "id": "interface",
+                    "rule_id": "vibeflow.node_interface",
+                    "original_rule_id": "vibeflow.node_interface",
+                    "params": {
+                      "allowed_methods": []
+                    },
+                    "dependencies": [],
+                    "inputs": {},
+                    "origins": [
+                      "vibeflow.process"
+                    ],
+                    "parameter_sources": {
+                      "allowed_methods": "default:vibeflow.node_interface"
+                    }
+                  },
+                  {
+                    "id": "maintainability",
+                    "rule_id": "vibeflow.maintainability",
+                    "original_rule_id": "vibeflow.maintainability",
+                    "params": {
+                      "policy": {}
+                    },
+                    "dependencies": [],
+                    "inputs": {},
+                    "origins": [
+                      "vibeflow.process"
+                    ],
+                    "parameter_sources": {
+                      "policy": "default:vibeflow.maintainability"
+                    }
+                  }
+                ],
+                "relations": []
+              },
+              "results": {
+                "effects": {
+                  "state": "completed",
+                  "records": {
+                    "effect_policy": {
+                      "type_id": "vibeflow.effect_policy.v1",
+                      "value": {
+                        "effect_scope": "none",
+                        "source": "vibeflow.no_side_effects"
+                      }
+                    }
+                  },
+                  "findings": []
+                },
+                "interface": {
+                  "state": "completed",
+                  "records": {},
+                  "findings": []
+                },
+                "maintainability": {
+                  "state": "completed",
+                  "records": {
+                    "metrics": {
+                      "type_id": "vibeflow.node_metrics.v1",
+                      "value": {
+                        "source_lines": 28,
+                        "source_bytes": 103,
+                        "function_count": 1,
+                        "branch_count": 0,
+                        "max_nesting_depth": 0,
+                        "param_count": 0,
+                        "contract_key_count": 1,
+                        "function_names": [
+                          "run_pure"
+                        ],
+                        "call_chain_length": 1,
+                        "call_chain_path": [
+                          "run_pure"
+                        ],
+                        "recursive_call_chains": [],
+                        "max_dependency_chain_length": 0,
+                        "max_dependency_chain": [],
+                        "imported_base_lib_modules": [],
+                        "run_pure_fingerprint": "FunctionDef('_', arguments([], [arg('_'), arg('_'), arg('_')]), [Return(Dict([Constant('<str>')], [Constant(0)]))])",
+                        "run_pure_shape": "literal",
+                        "requires_count": 0,
+                        "provides_count": 1
+                      }
+                    }
+                  },
+                  "findings": [
+                    {
+                      "code": "NODE.PURITY.SOURCE_TOO_LARGE",
+                      "rule_id": "NODE.PURITY.SOURCE_TOO_LARGE",
+                      "severity": "error",
+                      "object_type": "node",
+                      "object_id": "audit.leaf",
+                      "source_location": {
+                        "path": "/tmp/vf-adaptation-tooling-audit/inspect-policy/leaf.py",
+                        "line": 1,
+                        "column": 1
+                      },
+                      "rule_source": "ruleset.selection",
+                      "failure_layer": "implementation",
+                      "message": "node source has 28 lines > 10",
+                      "suggested_fix_type": "split_node",
+                      "details": {
+                        "lines": 28,
+                        "limit": 10
+                      },
+                      "definition_id": "vibeflow.maintainability"
+                    }
+                  ]
+                }
+              },
+              "findings": [
+                {
+                  "code": "NODE.PURITY.SOURCE_TOO_LARGE",
+                  "rule_id": "NODE.PURITY.SOURCE_TOO_LARGE",
+                  "severity": "error",
+                  "object_type": "node",
+                  "object_id": "audit.leaf",
+                  "source_location": {
+                    "path": "/tmp/vf-adaptation-tooling-audit/inspect-policy/leaf.py",
+                    "line": 1,
+                    "column": 1
+                  },
+                  "rule_source": "ruleset.selection",
+                  "failure_layer": "implementation",
+                  "message": "node source has 28 lines > 10",
+                  "suggested_fix_type": "split_node",
+                  "details": {
+                    "lines": 28,
+                    "limit": 10
+                  },
+                  "definition_id": "vibeflow.maintainability"
+                }
+              ],
+              "executed": [
+                "effects",
+                "interface",
+                "maintainability"
+              ],
+              "aliases": {}
+            }
+          ],
+          "workflow_rulesets": [],
+          "nodeset_imports": [],
+          "resources": {
+            "global_config": {},
+            "base_lib": {
+              "paths": [],
+              "modules": []
+            },
+            "plugins": [],
+            "host_extensions": []
+          },
+          "effective_resources": {
+            "global_config": {},
+            "base_lib": {
+              "paths": [],
+              "modules": []
+            },
+            "plugins": [],
+            "host_extensions": []
+          },
+          "available_resources": {
+            "global_config": {},
+            "base_lib": {
+              "paths": [
+                "/tmp/vf-adaptation-tooling-audit/inspect-policy"
+              ],
+              "modules": []
+            },
+            "plugins": [],
+            "host_extensions": []
+          },
+          "workspace": {
+            "path": "/tmp/vf-adaptation-tooling-audit/inspect-policy/vibeflow_project.jsonc",
+            "roots": [
+              {
+                "id": "project",
+                "path": "/tmp/vf-adaptation-tooling-audit/inspect-policy",
+                "config": "/tmp/vf-adaptation-tooling-audit/inspect-policy/vibeflow_project.jsonc",
+                "project_target": "python",
+                "quality_enabled": true
+              }
+            ]
+          }
+        },
+        "effective_policy": {
+          "node_source": {
+            "max_lines": 10,
+            "max_bytes": 60000,
+            "warn_lines": 450,
+            "warn_bytes": 54000
+          },
+          "complexity": {
+            "max_functions": null,
+            "max_branches": null,
+            "max_nesting_depth": null,
+            "max_params": null,
+            "max_contract_keys": null
+          },
+          "maintainability": {
+            "warn_call_chain_length": 4,
+            "max_call_chain_length": 4,
+            "warn_dependency_chain_length": 4,
+            "max_dependency_chain_length": 6
+          },
+          "imports": {
+            "allowed_roots": [],
+            "banned_roots": [
+              "_ctypes",
+              "_thread",
+              "asyncio",
+              "boto3",
+              "boundaries",
+              "boundary",
+              "cffi",
+              "concurrent",
+              "ctypes",
+              "dotenv",
+              "httpx",
+              "importlib",
+              "multiprocessing",
+              "nodriver",
+              "os",
+              "pathlib",
+              "playwright",
+              "psycopg2",
+              "pymongo",
+              "pymysql",
+              "redis",
+              "requests",
+              "selenium",
+              "shutil",
+              "socket",
+              "sqlalchemy",
+              "sqlite3",
+              "subprocess",
+              "threading",
+              "urllib"
+            ],
+            "allowed_modules": [
+              "urllib.parse",
+              "vibeflow"
+            ],
+            "banned_modules": [
+              "urllib.request"
+            ]
+          },
+          "base_lib": {
+            "allowed_paths": [],
+            "allowed_modules": [],
+            "banned_modules": []
+          },
+          "sources": [
+            "kernel.default_policy",
+            "workspace.policy:/tmp/vf-adaptation-tooling-audit/inspect-policy/vibeflow_project.jsonc"
+          ]
+        },
+        "result_code": "VIBEFLOW_STRUCTURE_FAIL",
+        "validation_scope": "vibeflow_structure",
+        "summary": "VibeFlow \u7ed3\u6784\u68c0\u67e5\u5931\u8d25",
+        "checked": [],
+        "not_checked": [
+          {
+            "id": "business_correctness",
+            "label": "\u4e1a\u52a1\u7ed3\u679c\u6b63\u786e\u6027"
+          },
+          {
+            "id": "requirements_conformance",
+            "label": "\u9879\u76ee\u9700\u6c42\u7b26\u5408\u6027"
+          },
+          {
+            "id": "external_semantics",
+            "label": "\u5916\u90e8\u63a5\u53e3\u4e1a\u52a1\u8bed\u4e49"
+          },
+          {
+            "id": "domain_data_correctness",
+            "label": "\u9886\u57df\u6570\u636e\u6b63\u786e\u6027"
+          }
+        ]
+      }
+    },
+    "inspect_node": {
+      "exit_code": 0,
+      "status": "PASS",
+      "findings": [],
+      "payload": {
+        "health": {
+          "status": "PASS",
+          "errors": [],
+          "warnings": [],
+          "skipped": [],
+          "info": {
+            "rule_executions": [
+              {
+                "status": "PASS",
+                "plan": {
+                  "ruleset_id": "vibeflow.process",
+                  "entrypoint": "static",
+                  "order": [
+                    "effects",
+                    "interface",
+                    "maintainability"
+                  ],
+                  "calls": [
+                    {
+                      "id": "effects",
+                      "rule_id": "vibeflow.no_side_effects",
+                      "original_rule_id": "vibeflow.no_side_effects",
+                      "params": {
+                        "effect_scope": "none",
+                        "policy": {}
+                      },
+                      "dependencies": [],
+                      "inputs": {},
+                      "origins": [
+                        "vibeflow.process"
+                      ],
+                      "parameter_sources": {
+                        "effect_scope": "call:effects",
+                        "policy": "default:vibeflow.no_side_effects"
+                      }
+                    },
+                    {
+                      "id": "interface",
+                      "rule_id": "vibeflow.node_interface",
+                      "original_rule_id": "vibeflow.node_interface",
+                      "params": {
+                        "allowed_methods": []
+                      },
+                      "dependencies": [],
+                      "inputs": {},
+                      "origins": [
+                        "vibeflow.process"
+                      ],
+                      "parameter_sources": {
+                        "allowed_methods": "default:vibeflow.node_interface"
+                      }
+                    },
+                    {
+                      "id": "maintainability",
+                      "rule_id": "vibeflow.maintainability",
+                      "original_rule_id": "vibeflow.maintainability",
+                      "params": {
+                        "policy": {}
+                      },
+                      "dependencies": [],
+                      "inputs": {},
+                      "origins": [
+                        "vibeflow.process"
+                      ],
+                      "parameter_sources": {
+                        "policy": "default:vibeflow.maintainability"
+                      }
+                    }
+                  ],
+                  "relations": []
+                },
+                "results": {
+                  "effects": {
+                    "state": "completed",
+                    "records": {
+                      "effect_policy": {
+                        "type_id": "vibeflow.effect_policy.v1",
+                        "value": {
+                          "effect_scope": "none",
+                          "source": "vibeflow.no_side_effects"
+                        }
+                      }
+                    },
+                    "findings": []
+                  },
+                  "interface": {
+                    "state": "completed",
+                    "records": {},
+                    "findings": []
+                  },
+                  "maintainability": {
+                    "state": "completed",
+                    "records": {
+                      "metrics": {
+                        "type_id": "vibeflow.node_metrics.v1",
+                        "value": {
+                          "source_lines": 28,
+                          "source_bytes": 103,
+                          "function_count": 1,
+                          "branch_count": 0,
+                          "max_nesting_depth": 0,
+                          "param_count": 0,
+                          "contract_key_count": 1,
+                          "function_names": [
+                            "run_pure"
+                          ],
+                          "call_chain_length": 1,
+                          "call_chain_path": [
+                            "run_pure"
+                          ],
+                          "recursive_call_chains": [],
+                          "max_dependency_chain_length": 0,
+                          "max_dependency_chain": [],
+                          "imported_base_lib_modules": [],
+                          "run_pure_fingerprint": "FunctionDef('_', arguments([], [arg('_'), arg('_'), arg('_')]), [Return(Dict([Constant('<str>')], [Constant(0)]))])",
+                          "run_pure_shape": "literal",
+                          "requires_count": 0,
+                          "provides_count": 1
+                        }
+                      }
+                    },
+                    "findings": []
+                  }
+                },
+                "findings": [],
+                "executed": [
+                  "effects",
+                  "interface",
+                  "maintainability"
+                ],
+                "aliases": {}
+              }
+            ]
+          },
+          "effective_policy": {}
+        },
+        "base_lib_dependency_chain": {
+          "imported_modules": [],
+          "longest_chain_length": 0,
+          "longest_chain": [],
+          "recursive_chains": []
+        },
+        "node": {
+          "kind": "node",
+          "type_key": "audit.leaf",
+          "display_name": "audit.leaf",
+          "description": "audit.leaf",
+          "version": "1.0.0",
+          "flow_kind": "process",
+          "tags": [],
+          "external": false,
+          "contract": {
+            "requires": [],
+            "provides": [
+              {
+                "key": "result",
+                "type": "number",
+                "display_name": "Result"
+              }
+            ],
+            "input_semantics": {},
+            "output_semantics": {
+              "result": [
+                "Value"
+              ]
+            },
+            "params_schema": {},
+            "params_defaults": {},
+            "examples": []
+          },
+          "implementations": [
+            {
+              "language": "python",
+              "targets": [
+                "python"
+              ],
+              "source": {
+                "kind": "file",
+                "ref": "/tmp/vf-adaptation-tooling-audit/inspect-policy/leaf.py",
+                "export": "Leaf"
+              },
+              "completion": "immediate"
+            }
+          ],
+          "base_libs": [],
+          "capabilities": [],
+          "rulesets": [
+            "vibeflow.process"
+          ],
+          "presentation": {},
+          "metadata": {},
+          "class_name": "Leaf",
+          "effect_scope": "none",
+          "metrics": {
+            "source_lines": 28,
+            "source_bytes": 103,
+            "function_count": 1,
+            "branch_count": 0,
+            "max_nesting_depth": 0,
+            "param_count": 0,
+            "contract_key_count": 1,
+            "function_names": [
+              "run_pure"
+            ],
+            "call_chain_length": 1,
+            "call_chain_path": [
+              "run_pure"
+            ],
+            "recursive_call_chains": [],
+            "max_dependency_chain_length": 0,
+            "max_dependency_chain": [],
+            "imported_base_lib_modules": [],
+            "run_pure_fingerprint": "FunctionDef('_', arguments([], [arg('_'), arg('_'), arg('_')]), [Return(Dict([Constant('<str>')], [Constant(0)]))])",
+            "run_pure_shape": "literal",
+            "requires_count": 0,
+            "provides_count": 1
+          },
+          "source": {
+            "path": "/tmp/vf-adaptation-tooling-audit/inspect-policy/leaf.py"
+          }
+        }
+      }
+    }
+  },
+  "conventional_directory_control": {
+    "validate": {
+      "exit_code": 0,
+      "payload": {
+        "status": "PASS",
+        "errors": [],
+        "warnings": [],
+        "skipped": [],
+        "info": {
+          "explicit_edges": [],
+          "data_edges": [],
+          "effective_edges": [],
+          "mainline": {},
+          "node_metrics": {
+            "leaf": {
+              "source_lines": 4,
+              "source_bytes": 116,
+              "function_count": 1,
+              "branch_count": 0,
+              "max_nesting_depth": 0,
+              "param_count": 0,
+              "contract_key_count": 1,
+              "function_names": [
+                "run_pure"
+              ],
+              "call_chain_length": 1,
+              "call_chain_path": [
+                "run_pure"
+              ],
+              "recursive_call_chains": [],
+              "max_dependency_chain_length": 2,
+              "max_dependency_chain": [
+                "node",
+                "base_lib.util"
+              ],
+              "imported_base_lib_modules": [
+                "base_lib.util"
+              ],
+              "run_pure_fingerprint": "FunctionDef('_', arguments([], [arg('_'), arg('_'), arg('_')]), [Return(Dict([Constant('<str>')], [Call(Name('value', Load()))]))])",
+              "run_pure_shape": "wrapper",
+              "requires_count": 0,
+              "provides_count": 1
+            }
+          },
+          "node_effect_scopes": {
+            "leaf": "none"
+          },
+          "call_effect_policies": [
+            {
+              "owner": "pipeline",
+              "node": "leaf",
+              "policies": [
+                {
+                  "definition_id": "vibeflow.no_side_effects",
+                  "ruleset_id": "vibeflow.process",
+                  "rule_call_id": "effects",
+                  "scope": "source",
+                  "value": {
+                    "effect_scope": "none",
+                    "source": "vibeflow.no_side_effects"
+                  },
+                  "call_path": [
+                    "leaf"
+                  ]
+                }
+              ],
+              "effect_scope": "none"
+            }
+          ],
+          "nodeset_findings": {},
+          "plugins": {
+            "plugins": []
+          },
+          "planned": [],
+          "production_ready": true,
+          "rule_catalog": {
+            "GRAPH.CYCLE.FORBIDDEN": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.DATA.NO_PAYLOAD_BYPASS": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.DATA.RUNTIME_REQUIREMENT_UNREACHABLE": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.DATA.UNCONSUMED_PROVIDER": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.EDGE.CONFLICTING_DUPLICATE": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.EDGE.DUPLICATE": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.EXECUTION_LOCK.GLOBAL_STATE_UNCOORDINATED": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.JOIN.ALL_BRANCHES_MUTUALLY_EXCLUSIVE": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.JOIN.ALL_DEPENDS_ON_TRANSFER_ONLY": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.JOIN.REDUNDANT_ALL": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.SMELL.CONFUSING_NODE_NAME": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.SMELL.MISSING_NODE_DESCRIPTION": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_config"
+            },
+            "NODE.EFFECT.CALL_FORBIDDEN": {
+              "severity": "error",
+              "layer": "implementation",
+              "suggested_fix_type": "fix_contract"
+            },
+            "NODE.EFFECT.IMPORT_FORBIDDEN": {
+              "severity": "error",
+              "layer": "implementation",
+              "suggested_fix_type": "fix_contract"
+            },
+            "NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED": {
+              "severity": "warning",
+              "layer": "implementation",
+              "suggested_fix_type": "fix_contract"
+            },
+            "NODESET.NESTING.DEPTH_EXCEEDED": {
+              "severity": "error",
+              "layer": "topology",
+              "suggested_fix_type": "fix_nodeset"
+            },
+            "NODESET.SMELL.TOO_WIDE": {
+              "severity": "warning",
+              "layer": "topology",
+              "suggested_fix_type": "fix_nodeset"
+            }
+          },
+          "rule_executions": [
+            {
+              "status": "PASS",
+              "plan": {
+                "ruleset_id": "vibeflow.process",
+                "entrypoint": "import",
+                "order": [
+                  "imports"
+                ],
+                "calls": [
+                  {
+                    "id": "imports",
+                    "rule_id": "vibeflow.import_side_effects",
+                    "original_rule_id": "vibeflow.import_side_effects",
+                    "params": {
+                      "effect_scope": "none",
+                      "policy": {}
+                    },
+                    "dependencies": [],
+                    "inputs": {},
+                    "origins": [
+                      "vibeflow.process"
+                    ],
+                    "parameter_sources": {
+                      "effect_scope": "call:imports",
+                      "policy": "default:vibeflow.import_side_effects"
+                    }
+                  }
+                ],
+                "relations": []
+              },
+              "results": {
+                "imports": {
+                  "state": "completed",
+                  "records": {},
+                  "findings": []
+                }
+              },
+              "findings": [],
+              "executed": [
+                "imports"
+              ],
+              "aliases": {}
+            },
+            {
+              "status": "PASS",
+              "plan": {
+                "ruleset_id": "vibeflow.process",
+                "entrypoint": "static",
+                "order": [
+                  "effects",
+                  "interface",
+                  "maintainability"
+                ],
+                "calls": [
+                  {
+                    "id": "effects",
+                    "rule_id": "vibeflow.no_side_effects",
+                    "original_rule_id": "vibeflow.no_side_effects",
+                    "params": {
+                      "effect_scope": "none",
+                      "policy": {}
+                    },
+                    "dependencies": [],
+                    "inputs": {},
+                    "origins": [
+                      "vibeflow.process"
+                    ],
+                    "parameter_sources": {
+                      "effect_scope": "call:effects",
+                      "policy": "default:vibeflow.no_side_effects"
+                    }
+                  },
+                  {
+                    "id": "interface",
+                    "rule_id": "vibeflow.node_interface",
+                    "original_rule_id": "vibeflow.node_interface",
+                    "params": {
+                      "allowed_methods": []
+                    },
+                    "dependencies": [],
+                    "inputs": {},
+                    "origins": [
+                      "vibeflow.process"
+                    ],
+                    "parameter_sources": {
+                      "allowed_methods": "default:vibeflow.node_interface"
+                    }
+                  },
+                  {
+                    "id": "maintainability",
+                    "rule_id": "vibeflow.maintainability",
+                    "original_rule_id": "vibeflow.maintainability",
+                    "params": {
+                      "policy": {}
+                    },
+                    "dependencies": [],
+                    "inputs": {},
+                    "origins": [
+                      "vibeflow.process"
+                    ],
+                    "parameter_sources": {
+                      "policy": "default:vibeflow.maintainability"
+                    }
+                  }
+                ],
+                "relations": []
+              },
+              "results": {
+                "effects": {
+                  "state": "completed",
+                  "records": {
+                    "effect_policy": {
+                      "type_id": "vibeflow.effect_policy.v1",
+                      "value": {
+                        "effect_scope": "none",
+                        "source": "vibeflow.no_side_effects"
+                      }
+                    }
+                  },
+                  "findings": []
+                },
+                "interface": {
+                  "state": "completed",
+                  "records": {},
+                  "findings": []
+                },
+                "maintainability": {
+                  "state": "completed",
+                  "records": {
+                    "metrics": {
+                      "type_id": "vibeflow.node_metrics.v1",
+                      "value": {
+                        "source_lines": 4,
+                        "source_bytes": 116,
+                        "function_count": 1,
+                        "branch_count": 0,
+                        "max_nesting_depth": 0,
+                        "param_count": 0,
+                        "contract_key_count": 1,
+                        "function_names": [
+                          "run_pure"
+                        ],
+                        "call_chain_length": 1,
+                        "call_chain_path": [
+                          "run_pure"
+                        ],
+                        "recursive_call_chains": [],
+                        "max_dependency_chain_length": 2,
+                        "max_dependency_chain": [
+                          "node",
+                          "base_lib.util"
+                        ],
+                        "imported_base_lib_modules": [
+                          "base_lib.util"
+                        ],
+                        "run_pure_fingerprint": "FunctionDef('_', arguments([], [arg('_'), arg('_'), arg('_')]), [Return(Dict([Constant('<str>')], [Call(Name('value', Load()))]))])",
+                        "run_pure_shape": "wrapper",
+                        "requires_count": 0,
+                        "provides_count": 1
+                      }
+                    }
+                  },
+                  "findings": []
+                }
+              },
+              "findings": [],
+              "executed": [
+                "effects",
+                "interface",
+                "maintainability"
+              ],
+              "aliases": {}
+            }
+          ],
+          "workflow_rulesets": [],
+          "nodeset_imports": [],
+          "resources": {
+            "global_config": {},
+            "base_lib": {
+              "paths": [],
+              "modules": []
+            },
+            "plugins": [],
+            "host_extensions": []
+          },
+          "effective_resources": {
+            "global_config": {},
+            "base_lib": {
+              "paths": [],
+              "modules": []
+            },
+            "plugins": [],
+            "host_extensions": []
+          },
+          "available_resources": {
+            "global_config": {},
+            "base_lib": {
+              "paths": [
+                "/tmp/vf-adaptation-tooling-audit/support-conventional"
+              ],
+              "modules": []
+            },
+            "plugins": [],
+            "host_extensions": []
+          },
+          "workspace": {
+            "path": "/tmp/vf-adaptation-tooling-audit/support-conventional/vibeflow_project.jsonc",
+            "roots": [
+              {
+                "id": "project",
+                "path": "/tmp/vf-adaptation-tooling-audit/support-conventional",
+                "config": "/tmp/vf-adaptation-tooling-audit/support-conventional/vibeflow_project.jsonc",
+                "project_target": "python",
+                "quality_enabled": true
+              }
+            ]
+          }
+        },
+        "effective_policy": {
+          "node_source": {
+            "max_lines": 500,
+            "max_bytes": 60000,
+            "warn_lines": 450,
+            "warn_bytes": 54000
+          },
+          "complexity": {
+            "max_functions": null,
+            "max_branches": null,
+            "max_nesting_depth": null,
+            "max_params": null,
+            "max_contract_keys": null
+          },
+          "maintainability": {
+            "warn_call_chain_length": 4,
+            "max_call_chain_length": 4,
+            "warn_dependency_chain_length": 4,
+            "max_dependency_chain_length": 6
+          },
+          "imports": {
+            "allowed_roots": [],
+            "banned_roots": [
+              "_ctypes",
+              "_thread",
+              "asyncio",
+              "boto3",
+              "boundaries",
+              "boundary",
+              "cffi",
+              "concurrent",
+              "ctypes",
+              "dotenv",
+              "httpx",
+              "importlib",
+              "multiprocessing",
+              "nodriver",
+              "os",
+              "pathlib",
+              "playwright",
+              "psycopg2",
+              "pymongo",
+              "pymysql",
+              "redis",
+              "requests",
+              "selenium",
+              "shutil",
+              "socket",
+              "sqlalchemy",
+              "sqlite3",
+              "subprocess",
+              "threading",
+              "urllib"
+            ],
+            "allowed_modules": [
+              "urllib.parse",
+              "vibeflow"
+            ],
+            "banned_modules": [
+              "urllib.request"
+            ]
+          },
+          "base_lib": {
+            "allowed_paths": [],
+            "allowed_modules": [],
+            "banned_modules": []
+          },
+          "sources": [
+            "kernel.default_policy",
+            "workspace.policy:/tmp/vf-adaptation-tooling-audit/support-conventional/vibeflow_project.jsonc"
+          ]
+        },
+        "result_code": "VIBEFLOW_STRUCTURE_PASS",
+        "validation_scope": "vibeflow_structure",
+        "summary": "VibeFlow \u7ed3\u6784\u68c0\u67e5\u901a\u8fc7",
+        "checked": [
+          {
+            "id": "config_registration",
+            "label": "\u914d\u7f6e\u548c\u767b\u8bb0\u5173\u7cfb"
+          },
+          {
+            "id": "node_contract_shape",
+            "label": "\u8282\u70b9\u5951\u7ea6\u5f62\u72b6"
+          },
+          {
+            "id": "data_reachability",
+            "label": "\u6570\u636e\u53ef\u8fbe\u6027"
+          },
+          {
+            "id": "control_flow",
+            "label": "\u63a7\u5236\u6d41"
+          },
+          {
+            "id": "effect_boundaries",
+            "label": "\u526f\u4f5c\u7528\u8fb9\u754c"
+          },
+          {
+            "id": "project_structure",
+            "label": "\u9879\u76ee\u7ed3\u6784"
+          }
+        ],
+        "not_checked": [
+          {
+            "id": "business_correctness",
+            "label": "\u4e1a\u52a1\u7ed3\u679c\u6b63\u786e\u6027"
+          },
+          {
+            "id": "requirements_conformance",
+            "label": "\u9879\u76ee\u9700\u6c42\u7b26\u5408\u6027"
+          },
+          {
+            "id": "external_semantics",
+            "label": "\u5916\u90e8\u63a5\u53e3\u4e1a\u52a1\u8bed\u4e49"
+          },
+          {
+            "id": "domain_data_correctness",
+            "label": "\u9886\u57df\u6570\u636e\u6b63\u786e\u6027"
+          }
+        ]
+      }
+    },
+    "quality": {
+      "exit_code": 0,
+      "payload": {
+        "status": "PASS",
+        "root": "/tmp/vf-adaptation-tooling-audit/support-conventional",
+        "summary": "VibeFlow \u9879\u76ee\u8d28\u91cf\u68c0\u67e5\u901a\u8fc7",
+        "scope_summary": {
+          "src": {
+            "files": 0,
+            "errors": 0,
+            "warnings": 0
+          },
+          "tests": {
+            "files": 0,
+            "errors": 0,
+            "warnings": 0
+          },
+          "devtools": {
+            "files": 0,
+            "errors": 0,
+            "warnings": 0
+          },
+          "other": {
+            "files": 3,
+            "errors": 0,
+            "warnings": 0
+          }
+        },
+        "top_offenders": {
+          "files": [],
+          "functions": [
+            {
+              "object_id": "p/nodes/leaf.py:Leaf.run_pure",
+              "score": 2,
+              "lines": 2,
+              "branches": 0,
+              "params": 2,
+              "findings": 0
+            }
+          ]
+        },
+        "thresholds": {
+          "max_file_lines": 500,
+          "warn_file_lines": 450,
+          "max_file_bytes": 60000,
+          "max_functions_per_file": 40,
+          "max_classes_per_file": 20,
+          "max_public_api_per_file": 30,
+          "max_file_branches": 150,
+          "max_directory_fanout": 25,
+          "max_directory_fanin": 25,
+          "max_prefix_cluster_files": 12,
+          "max_public_entry_bypass_imports": 3,
+          "max_dependency_distance": 3,
+          "max_scattered_dependency_directories": 6,
+          "max_function_lines": 80,
+          "max_function_branches": 12,
+          "max_function_nesting": 4,
+          "max_function_params": 6,
+          "warn_dependency_chain": 6,
+          "max_dependency_chain": 10
+        },
+        "files": [
+          {
+            "path": "p/base_lib/util.py",
+            "module": "p.base_lib.util",
+            "lines": 2,
+            "bytes": 26,
+            "function_count": 1,
+            "class_count": 0,
+            "public_api_count": 1,
+            "branch_count": 0,
+            "max_nesting_depth": 0,
+            "imports": [],
+            "import_sites": [],
+            "functions": [
+              {
+                "qualname": "value",
+                "line_start": 1,
+                "line_end": 2,
+                "lines": 2,
+                "branches": 0,
+                "max_nesting_depth": 0,
+                "param_count": 0,
+                "ast_fingerprint": "FunctionDef(name='_function', args=arguments(), body=[Return(value=Constant(value='_constant'))])"
+              }
+            ]
+          },
+          {
+            "path": "p/nodes/leaf.py",
+            "module": "p.nodes.leaf",
+            "lines": 4,
+            "bytes": 116,
+            "function_count": 1,
+            "class_count": 1,
+            "public_api_count": 1,
+            "branch_count": 0,
+            "max_nesting_depth": 0,
+            "imports": [
+              "base_lib.util",
+              "base_lib.util.value"
+            ],
+            "import_sites": [
+              {
+                "source_module": "nodes.leaf",
+                "imported": "base_lib.util",
+                "raw_import": "from base_lib.util import value",
+                "path": "nodes/leaf.py",
+                "line": 1,
+                "column": 1
+              },
+              {
+                "source_module": "nodes.leaf",
+                "imported": "base_lib.util.value",
+                "raw_import": "from base_lib.util import value",
+                "path": "nodes/leaf.py",
+                "line": 1,
+                "column": 1
+              }
+            ],
+            "functions": [
+              {
+                "qualname": "Leaf.run_pure",
+                "line_start": 3,
+                "line_end": 4,
+                "lines": 2,
+                "branches": 0,
+                "max_nesting_depth": 0,
+                "param_count": 2,
+                "ast_fingerprint": "FunctionDef(name='_function', args=arguments(args=[arg(arg='_arg'), arg(arg='_arg'), arg(arg='_arg')]), body=[Return(value=Dict(keys=[Constant(value='_constant')], values=[Call(func=Name(id='_name', ctx=Load()))]))])"
+              }
+            ]
+          },
+          {
+            "path": "p/plugins/entry.py",
+            "module": "p.plugins.entry",
+            "lines": 3,
+            "bytes": 414,
+            "function_count": 0,
+            "class_count": 0,
+            "public_api_count": 0,
+            "branch_count": 0,
+            "max_nesting_depth": 0,
+            "imports": [
+              "vibeflow.targets.python.sdk",
+              "vibeflow.targets.python.sdk.Plugin",
+              "vibeflow.targets.python.sdk.SourceLocator",
+              "vibeflow.targets.python.sdk.node"
+            ],
+            "import_sites": [
+              {
+                "source_module": "plugins.entry",
+                "imported": "vibeflow.targets.python.sdk",
+                "raw_import": "from vibeflow.targets.python.sdk import Plugin, node, SourceLocator",
+                "path": "plugins/entry.py",
+                "line": 1,
+                "column": 1
+              },
+              {
+                "source_module": "plugins.entry",
+                "imported": "vibeflow.targets.python.sdk.Plugin",
+                "raw_import": "from vibeflow.targets.python.sdk import Plugin",
+                "path": "plugins/entry.py",
+                "line": 1,
+                "column": 1
+              },
+              {
+                "source_module": "plugins.entry",
+                "imported": "vibeflow.targets.python.sdk.SourceLocator",
+                "raw_import": "from vibeflow.targets.python.sdk import SourceLocator",
+                "path": "plugins/entry.py",
+                "line": 1,
+                "column": 1
+              },
+              {
+                "source_module": "plugins.entry",
+                "imported": "vibeflow.targets.python.sdk.node",
+                "raw_import": "from vibeflow.targets.python.sdk import node",
+                "path": "plugins/entry.py",
+                "line": 1,
+                "column": 1
+              }
+            ],
+            "functions": []
+          }
+        ],
+        "dependency_graph": {
+          "p.base_lib.util": [],
+          "p.nodes.leaf": [
+            "p.base_lib.util"
+          ],
+          "p.plugins.entry": []
+        },
+        "directory_graph": [
+          {
+            "directory": "p/base_lib",
+            "module_count": 1,
+            "internal_import_count": 0,
+            "external_import_count": 0,
+            "outgoing_directories": [],
+            "incoming_directories": [
+              "nodes"
+            ]
+          },
+          {
+            "directory": "p/nodes",
+            "module_count": 1,
+            "internal_import_count": 0,
+            "external_import_count": 1,
+            "outgoing_directories": [
+              "base_lib"
+            ],
+            "incoming_directories": []
+          },
+          {
+            "directory": "p/plugins",
+            "module_count": 1,
+            "internal_import_count": 0,
+            "external_import_count": 0,
+            "outgoing_directories": [],
+            "incoming_directories": []
+          }
+        ],
+        "prefix_clusters": [],
+        "structure_summary": {
+          "workspace_roots": [
+            {
+              "id": "p",
+              "path": "/tmp/vf-adaptation-tooling-audit/support-conventional",
+              "project_target": "python",
+              "files": 3,
+              "status": "PASS"
+            }
+          ]
+        },
+        "longest_dependency_chain": [
+          "p.nodes.leaf",
+          "p.base_lib.util"
+        ],
+        "errors": [],
+        "warnings": [],
+        "workspace_roots": [
+          {
+            "id": "p",
+            "path": "/tmp/vf-adaptation-tooling-audit/support-conventional",
+            "project_target": "python",
+            "files": 3,
+            "status": "PASS"
+          }
+        ],
+        "source_quality": {
+          "status": "PASS",
+          "root": "/tmp/vf-adaptation-tooling-audit/support-conventional",
+          "summary": {
+            "files": 3,
+            "errors": 0,
+            "warnings": 0,
+            "score": 100,
+            "longest_dependency_chain_length": 2
+          },
+          "scope_summary": {
+            "src": {
+              "files": 0,
+              "errors": 0,
+              "warnings": 0
+            },
+            "tests": {
+              "files": 0,
+              "errors": 0,
+              "warnings": 0
+            },
+            "devtools": {
+              "files": 0,
+              "errors": 0,
+              "warnings": 0
+            },
+            "other": {
+              "files": 3,
+              "errors": 0,
+              "warnings": 0
+            }
+          },
+          "top_offenders": {
+            "files": [],
+            "functions": [
+              {
+                "object_id": "p/nodes/leaf.py:Leaf.run_pure",
+                "score": 2,
+                "lines": 2,
+                "branches": 0,
+                "params": 2,
+                "findings": 0
+              }
+            ]
+          },
+          "thresholds": {
+            "max_file_lines": 500,
+            "warn_file_lines": 450,
+            "max_file_bytes": 60000,
+            "max_functions_per_file": 40,
+            "max_classes_per_file": 20,
+            "max_public_api_per_file": 30,
+            "max_file_branches": 150,
+            "max_directory_fanout": 25,
+            "max_directory_fanin": 25,
+            "max_prefix_cluster_files": 12,
+            "max_public_entry_bypass_imports": 3,
+            "max_dependency_distance": 3,
+            "max_scattered_dependency_directories": 6,
+            "max_function_lines": 80,
+            "max_function_branches": 12,
+            "max_function_nesting": 4,
+            "max_function_params": 6,
+            "warn_dependency_chain": 6,
+            "max_dependency_chain": 10
+          },
+          "files": [
+            {
+              "path": "p/base_lib/util.py",
+              "module": "p.base_lib.util",
+              "lines": 2,
+              "bytes": 26,
+              "function_count": 1,
+              "class_count": 0,
+              "public_api_count": 1,
+              "branch_count": 0,
+              "max_nesting_depth": 0,
+              "imports": [],
+              "import_sites": [],
+              "functions": [
+                {
+                  "qualname": "value",
+                  "line_start": 1,
+                  "line_end": 2,
+                  "lines": 2,
+                  "branches": 0,
+                  "max_nesting_depth": 0,
+                  "param_count": 0,
+                  "ast_fingerprint": "FunctionDef(name='_function', args=arguments(), body=[Return(value=Constant(value='_constant'))])"
+                }
+              ]
+            },
+            {
+              "path": "p/nodes/leaf.py",
+              "module": "p.nodes.leaf",
+              "lines": 4,
+              "bytes": 116,
+              "function_count": 1,
+              "class_count": 1,
+              "public_api_count": 1,
+              "branch_count": 0,
+              "max_nesting_depth": 0,
+              "imports": [
+                "base_lib.util",
+                "base_lib.util.value"
+              ],
+              "import_sites": [
+                {
+                  "source_module": "nodes.leaf",
+                  "imported": "base_lib.util",
+                  "raw_import": "from base_lib.util import value",
+                  "path": "nodes/leaf.py",
+                  "line": 1,
+                  "column": 1
+                },
+                {
+                  "source_module": "nodes.leaf",
+                  "imported": "base_lib.util.value",
+                  "raw_import": "from base_lib.util import value",
+                  "path": "nodes/leaf.py",
+                  "line": 1,
+                  "column": 1
+                }
+              ],
+              "functions": [
+                {
+                  "qualname": "Leaf.run_pure",
+                  "line_start": 3,
+                  "line_end": 4,
+                  "lines": 2,
+                  "branches": 0,
+                  "max_nesting_depth": 0,
+                  "param_count": 2,
+                  "ast_fingerprint": "FunctionDef(name='_function', args=arguments(args=[arg(arg='_arg'), arg(arg='_arg'), arg(arg='_arg')]), body=[Return(value=Dict(keys=[Constant(value='_constant')], values=[Call(func=Name(id='_name', ctx=Load()))]))])"
+                }
+              ]
+            },
+            {
+              "path": "p/plugins/entry.py",
+              "module": "p.plugins.entry",
+              "lines": 3,
+              "bytes": 414,
+              "function_count": 0,
+              "class_count": 0,
+              "public_api_count": 0,
+              "branch_count": 0,
+              "max_nesting_depth": 0,
+              "imports": [
+                "vibeflow.targets.python.sdk",
+                "vibeflow.targets.python.sdk.Plugin",
+                "vibeflow.targets.python.sdk.SourceLocator",
+                "vibeflow.targets.python.sdk.node"
+              ],
+              "import_sites": [
+                {
+                  "source_module": "plugins.entry",
+                  "imported": "vibeflow.targets.python.sdk",
+                  "raw_import": "from vibeflow.targets.python.sdk import Plugin, node, SourceLocator",
+                  "path": "plugins/entry.py",
+                  "line": 1,
+                  "column": 1
+                },
+                {
+                  "source_module": "plugins.entry",
+                  "imported": "vibeflow.targets.python.sdk.Plugin",
+                  "raw_import": "from vibeflow.targets.python.sdk import Plugin",
+                  "path": "plugins/entry.py",
+                  "line": 1,
+                  "column": 1
+                },
+                {
+                  "source_module": "plugins.entry",
+                  "imported": "vibeflow.targets.python.sdk.SourceLocator",
+                  "raw_import": "from vibeflow.targets.python.sdk import SourceLocator",
+                  "path": "plugins/entry.py",
+                  "line": 1,
+                  "column": 1
+                },
+                {
+                  "source_module": "plugins.entry",
+                  "imported": "vibeflow.targets.python.sdk.node",
+                  "raw_import": "from vibeflow.targets.python.sdk import node",
+                  "path": "plugins/entry.py",
+                  "line": 1,
+                  "column": 1
+                }
+              ],
+              "functions": []
+            }
+          ],
+          "dependency_graph": {
+            "p.base_lib.util": [],
+            "p.nodes.leaf": [
+              "p.base_lib.util"
+            ],
+            "p.plugins.entry": []
+          },
+          "directory_graph": [
+            {
+              "directory": "p/base_lib",
+              "module_count": 1,
+              "internal_import_count": 0,
+              "external_import_count": 0,
+              "outgoing_directories": [],
+              "incoming_directories": [
+                "nodes"
+              ]
+            },
+            {
+              "directory": "p/nodes",
+              "module_count": 1,
+              "internal_import_count": 0,
+              "external_import_count": 1,
+              "outgoing_directories": [
+                "base_lib"
+              ],
+              "incoming_directories": []
+            },
+            {
+              "directory": "p/plugins",
+              "module_count": 1,
+              "internal_import_count": 0,
+              "external_import_count": 0,
+              "outgoing_directories": [],
+              "incoming_directories": []
+            }
+          ],
+          "prefix_clusters": [],
+          "structure_summary": {
+            "workspace_roots": [
+              {
+                "id": "p",
+                "path": "/tmp/vf-adaptation-tooling-audit/support-conventional",
+                "project_target": "python",
+                "files": 3,
+                "status": "PASS"
+              }
+            ]
+          },
+          "longest_dependency_chain": [
+            "p.nodes.leaf",
+            "p.base_lib.util"
+          ],
+          "errors": [],
+          "warnings": [],
+          "workspace_roots": [
+            {
+              "id": "p",
+              "path": "/tmp/vf-adaptation-tooling-audit/support-conventional",
+              "project_target": "python",
+              "files": 3,
+              "status": "PASS"
+            }
+          ]
+        },
+        "reports": [],
+        "details_summary": {
+          "files": 3,
+          "errors": 0,
+          "warnings": 0,
+          "score": 100,
+          "longest_dependency_chain_length": 2
+        },
+        "result_code": "VIBEFLOW_QUALITY_PASS",
+        "validation_scope": "vibeflow_quality",
+        "checked": [
+          {
+            "id": "project_structure",
+            "label": "\u9879\u76ee\u7ed3\u6784"
+          },
+          {
+            "id": "source_quality",
+            "label": "\u6e90\u7801\u8d28\u91cf\u4e0e\u4f9d\u8d56\u7ed3\u6784"
+          },
+          {
+            "id": "effect_boundaries",
+            "label": "\u526f\u4f5c\u7528\u8fb9\u754c"
+          }
+        ],
+        "not_checked": [
+          {
+            "id": "business_correctness",
+            "label": "\u4e1a\u52a1\u7ed3\u679c\u6b63\u786e\u6027"
+          },
+          {
+            "id": "requirements_conformance",
+            "label": "\u9879\u76ee\u9700\u6c42\u7b26\u5408\u6027"
+          },
+          {
+            "id": "external_semantics",
+            "label": "\u5916\u90e8\u63a5\u53e3\u4e1a\u52a1\u8bed\u4e49"
+          },
+          {
+            "id": "domain_data_correctness",
+            "label": "\u9886\u57df\u6570\u636e\u6b63\u786e\u6027"
+          }
+        ]
+      }
+    }
+  }
+}

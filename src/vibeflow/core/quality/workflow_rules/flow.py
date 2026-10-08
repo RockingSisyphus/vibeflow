@@ -68,19 +68,11 @@ def _flowchart_health_facts(
     _append_orphan_findings(active_names, incoming_edges, outgoing_edges, incoming, outgoing, state, owner=owner)
 
 
-def _append_rule_topic(topic, graph, compiled, state, *, owner="pipeline"):
-    from vibeflow.core.rules.builtin.workflow import evaluate_workflow_topic
-    result = evaluate_workflow_topic(topic, graph=graph, compiled=compiled, owner=owner)
-    for finding in result.findings:
-        (state.warnings if finding.severity == "warning" else state.errors).append(finding)
-
-
 def append_flowchart_health(graph, compiled, state, *, owner="pipeline"):
-    _append_rule_topic("flow", graph, compiled, state, owner=owner)
-
+    _flowchart_health_facts(graph, compiled, state, owner=owner)
 
 def append_join_policy_health(graph, compiled, state, *, owner="pipeline"):
-    _append_rule_topic("join", graph, compiled, state, owner=owner)
+    _join_policy_facts(graph, compiled, state, owner=owner)
 
 
 def _flow_maps(compiled, active_names: set[str]) -> tuple[dict[str, list[str]], dict[str, list[str]], dict[str, list[object]], dict[str, list[object]]]:

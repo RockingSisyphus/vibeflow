@@ -17,13 +17,7 @@ from vibeflow.targets.python.runtime.types import _RuntimeState
 
 class RuntimeContractMixin:
     def _validate_public_inputs(self, initial: Mapping[str, Any]) -> None:
-        """Apply the closed ABI only when every input declares required."""
-
-        if not self.graph.inputs or any(
-            input_spec.required is None
-            for input_spec in self.graph.inputs
-        ):
-            return
+        """Apply the canonical closed input contract before running nodes."""
         known_keys = {input_spec.key for input_spec in self.graph.inputs}
         for key in initial:
             if key not in known_keys:

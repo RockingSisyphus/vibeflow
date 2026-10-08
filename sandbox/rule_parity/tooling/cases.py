@@ -98,9 +98,11 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     ]:
         if variant == "current" and name == "plugin_object":
             code = "PLUGIN.SELECTION.MIGRATION"
-        emit(name, {**pipeline(), **extra}, (code,), family="config.resources", classification="approved_change" if name == "plugin_object" and variant == "current" else "preserved")
+        elif variant == "current" and name == "base_paths":
+            code = "CONFIG.BASE_LIB.REGISTRATION_REMOVED"
+        emit(name, {**pipeline(), **extra}, (code,), family="config.resources", classification="approved_change" if name in {"plugin_object", "base_paths"} and variant == "current" else "preserved")
     emit("resources.normal", {**pipeline(), "plugins": ([{"source":{"kind":"file","ref":"plugin.py"}}] if variant == "current" else ["parity.plugin"]), "host_extensions": ["parity.host"],
-                             "base_lib": {"paths": ["support"], "modules": ["support.math"]}, "global_config": {"values": {"size": 1}}}, family="config.resources")
+                             "base_lib": ({"modules": ["support.math"]} if variant == "current" else {"paths": ["support"], "modules": ["support.math"]}), "global_config": {"values": {"size": 1}}}, family="config.resources")
     io = {**NODE, "type_used": "vibeflow.io", "requires": [],
           "provides": [{"key": "value", "type": "parity.value", "display_name": "Value"}], "io": {"operation": "receive"}}
     emit("system_io.normal", pipeline(nodes=[io]), family="config.contract")

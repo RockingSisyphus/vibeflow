@@ -25,12 +25,14 @@
       {
         "key": "calc.a",
         "type": "calc.a",
-        "display_name": "Calc A"
+        "display_name": "Calc A",
+        "required": true
       },
       {
         "key": "calc.b",
         "type": "calc.b",
-        "display_name": "Calc B"
+        "display_name": "Calc B",
+        "required": true
       }
     ],
     "nodes": [

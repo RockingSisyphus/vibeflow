@@ -17,22 +17,6 @@ def _export(module: str, *names: str) -> None:
 
 
 _export(
-    "vibeflow.targets.python.project.base_lib",
-    "analyze_base_lib_source",
-    "base_lib_imports_from_source",
-    "build_base_lib_scan_report",
-    "node_base_lib_imports",
-    "scan_base_lib",
-    "summarize_base_lib_dependency_chain",
-)
-_export(
-    "vibeflow.targets.python.project.base_lib_types",
-    "BaseLibDependencySummary",
-    "BaseLibFinding",
-    "BaseLibModuleReport",
-    "BaseLibScanReport",
-)
-_export(
     "vibeflow.targets.python.project.bindings",
     "PythonBindingError",
     "PythonBindingPlan",
@@ -45,19 +29,6 @@ _export(
     "GraphCompiler",
     "explicit_flow_cycles",
 )
-_export("vibeflow.targets.python.project.context", "Context", "ContextKeyError")
-_export(
-    "vibeflow.targets.python.project.descriptors",
-    "LegacyDescriptorError",
-    "PythonBaseLibAdapterResult",
-    "PythonNodeAdapterResult",
-    "adapt_base_lib_registry",
-    "adapt_node_registry",
-    "base_lib_catalog_from_registry",
-    "base_lib_descriptor_from_registry",
-    "catalog_from_node_registry",
-    "node_descriptor_from_registry",
-)
 _export(
     "vibeflow.targets.python.project.node",
     "EFFECT_SCOPE_GLOBAL_STATE",
@@ -65,8 +36,6 @@ _export(
     "EFFECT_SCOPE_PYTHON_IO",
     "EFFECT_SCOPE_TERMINAL",
     "EFFECT_SCOPE_TRUSTED",
-    "NodeContract",
-    "NodeInfo",
     "PureNode",
 )
 _export(
@@ -100,20 +69,6 @@ _export(
     "NodeRegistrationInfo",
     "NodeRegistry",
     "NodeRegistryError",
-)
-_export("vibeflow.targets.python.project.registry_base", "RegistryBase")
-_export(
-    "vibeflow.targets.python.project.resources",
-    "BaseLibInfo",
-    "BaseLibRegistry",
-    "BaseLibResource",
-    "PluginInfo",
-    "PluginResource",
-    "PluginResourceRegistry",
-    "normalize_base_lib_info",
-    "normalize_plugin_config",
-    "normalize_plugin_info",
-    "plugin_status",
 )
 
 del _export

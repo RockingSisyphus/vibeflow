@@ -1,0 +1,1277 @@
+{
+  "root": "flowchart-review-columns",
+  "titles": [
+    {
+      "text": "main pipeline",
+      "x": 347.12908935546875,
+      "y": 13.165246963500977,
+      "width": 45.29376220703125,
+      "height": 8
+    },
+    {
+      "text": "plugins",
+      "x": 574.0427856445312,
+      "y": 13.165246963500977,
+      "width": 25.22747802734375,
+      "height": 8
+    },
+    {
+      "text": "base_lib",
+      "x": 813.4408569335938,
+      "y": 13.165246963500977,
+      "width": 29.0028076171875,
+      "height": 8
+    },
+    {
+      "text": "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+      "x": 1019.68798828125,
+      "y": 13.165246963500977,
+      "width": 190.765625,
+      "height": 8
+    },
+    {
+      "text": "parent flow",
+      "x": 1028.2059326171875,
+      "y": 35.879615783691406,
+      "width": 38.2454833984375,
+      "height": 8
+    },
+    {
+      "text": "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+      "x": 1167.1102294921875,
+      "y": 35.879615783691406,
+      "width": 194.5938720703125,
+      "height": 8
+    },
+    {
+      "text": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+      "x": 1167.1102294921875,
+      "y": 159.3889923095703,
+      "width": 149.484375,
+      "height": 8
+    },
+    {
+      "text": "loop (id: loop, type_key: layout.outer)",
+      "x": 1019.68798828125,
+      "y": 762.4553833007812,
+      "width": 126.234375,
+      "height": 8
+    },
+    {
+      "text": "parent flow",
+      "x": 1028.2059326171875,
+      "y": 785.1697998046875,
+      "width": 38.2454833984375,
+      "height": 8
+    },
+    {
+      "text": "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+      "x": 1167.1102294921875,
+      "y": 785.1697998046875,
+      "width": 194.5938720703125,
+      "height": 8
+    },
+    {
+      "text": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+      "x": 1167.1102294921875,
+      "y": 908.67919921875,
+      "width": 149.484375,
+      "height": 8
+    }
+  ],
+  "fragments": [
+    {
+      "title": "main pipeline",
+      "nodes": [
+        "vf_column_0_0_my-svg-flowchart-start-0",
+        "vf_column_0_0_my-svg-flowchart-outer_a-3",
+        "vf_column_0_0_my-svg-flowchart-outer_b-6",
+        "vf_column_0_0_my-svg-flowchart-loop-9",
+        "vf_column_0_0_my-svg-flowchart-n_end-12"
+      ]
+    },
+    {
+      "title": "plugins",
+      "nodes": [
+        "vf_column_1_0_my-svg-flowchart-resource_plugins-0",
+        "vf_column_1_0_my-svg-flowchart-resource_plugins_0-2"
+      ]
+    },
+    {
+      "title": "base_lib",
+      "nodes": [
+        "vf_column_2_0_my-svg-flowchart-resource_base_lib-0",
+        "vf_column_2_0_my-svg-flowchart-resource_base_lib_0-2"
+      ]
+    },
+    {
+      "title": "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+      "nodes": []
+    },
+    {
+      "title": "parent flow",
+      "nodes": [
+        "vf_column_3_0_vf_parent_0_my-svg-flowchart-outer_start-0",
+        "vf_column_3_0_vf_parent_0_my-svg-flowchart-inner_a-3",
+        "vf_column_3_0_vf_parent_0_my-svg-flowchart-inner_b-6",
+        "vf_column_3_0_vf_parent_0_my-svg-flowchart-inner_c-9",
+        "vf_column_3_0_vf_parent_0_my-svg-flowchart-outer_end-12",
+        "vf_column_3_0_vf_parent_0_my-svg-flowchart-__vibeflow_layout_start-23",
+        "vf_column_3_0_vf_parent_0_my-svg-flowchart-__vibeflow_layout_end-25"
+      ]
+    },
+    {
+      "title": "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+      "nodes": [
+        "vf_column_3_0_vf_children_0_my-svg-flowchart-a_start-0",
+        "vf_column_3_0_vf_children_0_my-svg-flowchart-left-3",
+        "vf_column_3_0_vf_children_0_my-svg-flowchart-right-6",
+        "vf_column_3_0_vf_children_0_my-svg-flowchart-a_end-9",
+        "vf_column_3_0_vf_children_0_my-svg-flowchart-__vibeflow_layout_start-18",
+        "vf_column_3_0_vf_children_0_my-svg-flowchart-__vibeflow_layout_end-20"
+      ]
+    },
+    {
+      "title": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+      "nodes": [
+        "vf_column_3_0_vf_children_1_my-svg-flowchart-b_start-0",
+        "vf_column_3_0_vf_children_1_my-svg-flowchart-middle-3",
+        "vf_column_3_0_vf_children_1_my-svg-flowchart-b_end-6",
+        "vf_column_3_0_vf_children_1_my-svg-flowchart-__vibeflow_layout_start-13",
+        "vf_column_3_0_vf_children_1_my-svg-flowchart-__vibeflow_layout_end-15"
+      ]
+    },
+    {
+      "title": "loop (id: loop, type_key: layout.outer)",
+      "nodes": []
+    },
+    {
+      "title": "parent flow",
+      "nodes": [
+        "vf_column_3_1_vf_parent_0_my-svg-flowchart-outer_start-0",
+        "vf_column_3_1_vf_parent_0_my-svg-flowchart-inner_a-3",
+        "vf_column_3_1_vf_parent_0_my-svg-flowchart-inner_b-6",
+        "vf_column_3_1_vf_parent_0_my-svg-flowchart-inner_c-9",
+        "vf_column_3_1_vf_parent_0_my-svg-flowchart-outer_end-12",
+        "vf_column_3_1_vf_parent_0_my-svg-flowchart-__vibeflow_layout_start-23",
+        "vf_column_3_1_vf_parent_0_my-svg-flowchart-__vibeflow_layout_end-25"
+      ]
+    },
+    {
+      "title": "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+      "nodes": [
+        "vf_column_3_1_vf_children_0_my-svg-flowchart-a_start-0",
+        "vf_column_3_1_vf_children_0_my-svg-flowchart-left-3",
+        "vf_column_3_1_vf_children_0_my-svg-flowchart-right-6",
+        "vf_column_3_1_vf_children_0_my-svg-flowchart-a_end-9",
+        "vf_column_3_1_vf_children_0_my-svg-flowchart-__vibeflow_layout_start-18",
+        "vf_column_3_1_vf_children_0_my-svg-flowchart-__vibeflow_layout_end-20"
+      ]
+    },
+    {
+      "title": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+      "nodes": [
+        "vf_column_3_1_vf_children_1_my-svg-flowchart-b_start-0",
+        "vf_column_3_1_vf_children_1_my-svg-flowchart-middle-3",
+        "vf_column_3_1_vf_children_1_my-svg-flowchart-b_end-6",
+        "vf_column_3_1_vf_children_1_my-svg-flowchart-__vibeflow_layout_start-13",
+        "vf_column_3_1_vf_children_1_my-svg-flowchart-__vibeflow_layout_end-15"
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "vf_column_0_0_my-svg-flowchart-start-0",
+      "text": "startid: starttype_used: layout.startrulesets: vibeflow.process---------- source ----------root: layoutpath: workflow.jsonc---------- meta ----------desc: Layout fixture startflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "main pipeline"
+      ],
+      "x": 404.96136474609375,
+      "y": 31.942079544067383,
+      "width": 88.53460693359375,
+      "height": 74.17660522460938,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 88.53460693359375,
+          "height": 74.17660522460938
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 88.53460693359375,
+          "height": 74.17660522460938
+        }
+      ]
+    },
+    {
+      "id": "vf_column_0_0_my-svg-flowchart-outer_a-3",
+      "text": "outer_aid: outer_atype_used: layout.outer---------- source ----------root: layoutpath: outer.jsonc---------- call ----------flow_kind: predefinedrulesets: vibeflow.workflowdesc: Layout fixture outer_aeffect_scope: unconstrainedruntime_dispatch: unknown---------- nodeset ----------type_key: layout.outerdesc: A concrete layout fixture body.",
+      "fragments": [
+        "main pipeline"
+      ],
+      "x": 398.4790344238281,
+      "y": 138.06076049804688,
+      "width": 101.499267578125,
+      "height": 98.80751037597656,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(237, 233, 254)",
+          "stroke": "rgb(124, 58, 237)",
+          "rx": null,
+          "width": 101.499267578125,
+          "height": 98.80751037597656
+        }
+      ]
+    },
+    {
+      "id": "vf_column_0_0_my-svg-flowchart-outer_b-6",
+      "text": "outer_bid: outer_btype_used: layout.outer---------- source ----------root: layoutpath: outer.jsonc---------- call ----------flow_kind: predefinedrulesets: vibeflow.workflowdesc: Layout fixture outer_beffect_scope: unconstrainedruntime_dispatch: unknown---------- nodeset ----------type_key: layout.outerdesc: A concrete layout fixture body.",
+      "fragments": [
+        "main pipeline"
+      ],
+      "x": 398.4790344238281,
+      "y": 268.8103332519531,
+      "width": 101.499267578125,
+      "height": 98.80752563476562,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(239, 224, 248)",
+          "stroke": "rgb(124, 58, 237)",
+          "rx": null,
+          "width": 101.499267578125,
+          "height": 98.80752563476562
+        }
+      ]
+    },
+    {
+      "id": "vf_column_0_0_my-svg-flowchart-loop-9",
+      "text": "loopid: looptype_used: vibeflow.loop.while---------- source ----------root: layoutpath: outer.jsonc---------- loop ----------body: layout.outerstop: stop_after: 1max: 1---------- meta ----------flow_kind: predefinedrulesets: vibeflow.workflowdesc: Layout fixture loopeffect_scope: unconstrainedruntime_dispatch: unknown",
+      "fragments": [
+        "main pipeline"
+      ],
+      "x": 355.64697265625,
+      "y": 399.5599365234375,
+      "width": 187.16339111328125,
+      "height": 105.40887451171875,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(240, 253, 250)",
+          "stroke": "rgb(15, 118, 110)",
+          "rx": null,
+          "width": 187.16339111328125,
+          "height": 105.40887451171875
+        }
+      ]
+    },
+    {
+      "id": "vf_column_0_0_my-svg-flowchart-n_end-12",
+      "text": "endid: endtype_used: layout.endrulesets: vibeflow.process---------- source ----------root: layoutpath: workflow.jsonc---------- meta ----------desc: Layout fixture endflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "main pipeline"
+      ],
+      "x": 404.96136474609375,
+      "y": 536.910888671875,
+      "width": 88.53460693359375,
+      "height": 74.17657470703125,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 88.53460693359375,
+          "height": 74.17657470703125
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 88.53460693359375,
+          "height": 74.17657470703125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-resource_plugins-0",
+      "text": "plugins",
+      "fragments": [
+        "plugins"
+      ],
+      "x": 582.5606689453125,
+      "y": 44.43497848510742,
+      "width": 28.99737548828125,
+      "height": 11.357185363769531,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(239, 246, 255)",
+          "stroke": "rgb(37, 99, 235)",
+          "rx": null,
+          "width": 28.99737548828125,
+          "height": 11.357185363769531
+        }
+      ]
+    },
+    {
+      "id": "vf_column_1_0_my-svg-flowchart-resource_plugins_0-2",
+      "text": "Layout lifecycleid: layout.resourcesstatus: implemented---------- meta ----------desc: Real compiler and runtime declarations.",
+      "fragments": [
+        "plugins"
+      ],
+      "x": 643.5001220703125,
+      "y": 31.942079544067383,
+      "width": 138.70849609375,
+      "height": 36.342987060546875,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(217, 230, 255)",
+          "stroke": "rgb(37, 99, 235)",
+          "rx": null,
+          "width": 138.70849609375,
+          "height": 36.342987060546875
+        }
+      ]
+    },
+    {
+      "id": "vf_column_2_0_my-svg-flowchart-resource_base_lib-0",
+      "text": "base_lib",
+      "fragments": [
+        "base_lib"
+      ],
+      "x": 821.958740234375,
+      "y": 59.8736572265625,
+      "width": 32.36907958984375,
+      "height": 11.71209716796875,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(236, 253, 245)",
+          "stroke": "rgb(5, 150, 105)",
+          "rx": null,
+          "width": 32.36907958984375,
+          "height": 11.71209716796875
+        }
+      ]
+    },
+    {
+      "id": "vf_column_2_0_my-svg-flowchart-resource_base_lib_0-2",
+      "text": "layout.helperid: layout.helpertype: base_libstatus: implemented---------- resource ----------module: base_lib.helperroot: layoutpath: base_lib/helper.py---------- meta ----------desc: layout.helper",
+      "fragments": [
+        "base_lib"
+      ],
+      "x": 886.2698974609375,
+      "y": 31.942079544067383,
+      "width": 102.18585205078125,
+      "height": 67.57525634765625,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(255, 230, 179)",
+          "stroke": "rgb(5, 150, 105)",
+          "rx": null,
+          "width": 102.18585205078125,
+          "height": 67.57525634765625
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_parent_0_my-svg-flowchart-outer_start-0",
+      "text": "outer_startid: outer_starttype_used: layout.startrulesets: vibeflow.process---------- source ----------root: layoutpath: outer.jsonc---------- meta ----------desc: Layout fixture outer_startflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "parent flow"
+      ],
+      "x": 1036.7237548828125,
+      "y": 103.6343002319336,
+      "width": 101.9935302734375,
+      "height": 74.1766128540039,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 101.9935302734375,
+          "height": 74.1766128540039
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 101.9935302734375,
+          "height": 74.1766128540039
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_parent_0_my-svg-flowchart-inner_a-3",
+      "text": "inner_aid: inner_atype_used: layout.leaf_a---------- source ----------root: layoutpath: leaf_a.jsonc---------- call ----------flow_kind: predefinedrulesets: vibeflow.workflowdesc: Layout fixture inner_aeffect_scope: unconstrainedruntime_dispatch: unknown---------- nodeset ----------type_key: layout.leaf_adesc: A concrete layout fixture body.",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "parent flow"
+      ],
+      "x": 1036.970947265625,
+      "y": 209.75299072265625,
+      "width": 101.499267578125,
+      "height": 98.8074951171875,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(237, 233, 254)",
+          "stroke": "rgb(124, 58, 237)",
+          "rx": null,
+          "width": 101.499267578125,
+          "height": 98.8074951171875
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_parent_0_my-svg-flowchart-inner_b-6",
+      "text": "inner_bid: inner_btype_used: layout.leaf_a---------- source ----------root: layoutpath: leaf_a.jsonc---------- call ----------flow_kind: predefinedrulesets: vibeflow.workflowdesc: Layout fixture inner_beffect_scope: unconstrainedruntime_dispatch: unknown---------- nodeset ----------type_key: layout.leaf_adesc: A concrete layout fixture body.",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "parent flow"
+      ],
+      "x": 1036.970947265625,
+      "y": 340.5025634765625,
+      "width": 101.499267578125,
+      "height": 98.80746459960938,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(237, 233, 254)",
+          "stroke": "rgb(124, 58, 237)",
+          "rx": null,
+          "width": 101.499267578125,
+          "height": 98.80746459960938
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_parent_0_my-svg-flowchart-inner_c-9",
+      "text": "inner_cid: inner_ctype_used: layout.leaf_b---------- source ----------root: layoutpath: leaf_b.jsonc---------- call ----------flow_kind: predefinedrulesets: vibeflow.workflowdesc: Layout fixture inner_ceffect_scope: unconstrainedruntime_dispatch: unknown---------- nodeset ----------type_key: layout.leaf_bdesc: A concrete layout fixture body.",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "parent flow"
+      ],
+      "x": 1036.970947265625,
+      "y": 471.2521667480469,
+      "width": 101.499267578125,
+      "height": 98.80746459960938,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(237, 233, 254)",
+          "stroke": "rgb(124, 58, 237)",
+          "rx": null,
+          "width": 101.499267578125,
+          "height": 98.80746459960938
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_parent_0_my-svg-flowchart-outer_end-12",
+      "text": "outer_endid: outer_endtype_used: layout.endrulesets: vibeflow.process---------- source ----------root: layoutpath: outer.jsonc---------- meta ----------desc: Layout fixture outer_endflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "parent flow"
+      ],
+      "x": 1037.60546875,
+      "y": 602.001708984375,
+      "width": 100.2301025390625,
+      "height": 74.17657470703125,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 100.2301025390625,
+          "height": 74.17657470703125
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 100.2301025390625,
+          "height": 74.17657470703125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_parent_0_my-svg-flowchart-__vibeflow_layout_start-23",
+      "text": "__vibeflow_layout_start",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "parent flow"
+      ],
+      "x": 1047.124755859375,
+      "y": 54.65644836425781,
+      "width": 81.191650390625,
+      "height": 17.03577423095703,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgba(0, 0, 0, 0)",
+          "stroke": "rgba(0, 0, 0, 0)",
+          "rx": null,
+          "width": 81.191650390625,
+          "height": 17.03577423095703
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_parent_0_my-svg-flowchart-__vibeflow_layout_end-25",
+      "text": "__vibeflow_layout_end",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "parent flow"
+      ],
+      "x": 1048.0064697265625,
+      "y": 708.120361328125,
+      "width": 79.4281005859375,
+      "height": 17.03582763671875,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgba(0, 0, 0, 0)",
+          "stroke": "rgba(0, 0, 0, 0)",
+          "rx": null,
+          "width": 79.4281005859375,
+          "height": 17.03582763671875
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_children_0_my-svg-flowchart-a_start-0",
+      "text": "a_startid: a_starttype_used: layout.startrulesets: vibeflow.process---------- source ----------root: layoutpath: leaf_a.jsonc---------- meta ----------desc: Layout fixture a_startflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)"
+      ],
+      "x": 1288.7618408203125,
+      "y": 57.31828689575195,
+      "width": 92.20849609375,
+      "height": 74.17660522460938,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 92.20849609375,
+          "height": 74.17660522460938
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 92.20849609375,
+          "height": 74.17660522460938
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_children_0_my-svg-flowchart-left-3",
+      "text": "leftid: lefttype_used: layout.steprulesets: vibeflow.process---------- source ----------root: layoutpath: leaf_a.jsonc---------- meta ----------desc: Layout fixture leftflow_kind: processruntime_dispatch: none",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)"
+      ],
+      "x": 1412.9124755859375,
+      "y": 54.65644836425781,
+      "width": 75.3521728515625,
+      "height": 79.50028991699219,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(214, 234, 255)",
+          "stroke": "rgb(66, 90, 120)",
+          "rx": "5",
+          "width": 75.3521728515625,
+          "height": 79.50028991699219
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_children_0_my-svg-flowchart-right-6",
+      "text": "rightid: righttype_used: layout.step_rightrulesets: vibeflow.process---------- source ----------root: layoutpath: leaf_a.jsonc---------- meta ----------desc: Layout fixture rightflow_kind: processruntime_dispatch: none",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)"
+      ],
+      "x": 1520.206787109375,
+      "y": 54.65644836425781,
+      "width": 81.873779296875,
+      "height": 79.50028991699219,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(189, 232, 208)",
+          "stroke": "rgb(66, 90, 120)",
+          "rx": "5",
+          "width": 81.873779296875,
+          "height": 79.50028991699219
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_children_0_my-svg-flowchart-a_end-9",
+      "text": "a_endid: a_endtype_used: layout.endrulesets: vibeflow.process---------- source ----------root: layoutpath: leaf_a.jsonc---------- meta ----------desc: Layout fixture a_endflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)"
+      ],
+      "x": 1634.0225830078125,
+      "y": 57.31828689575195,
+      "width": 90.4422607421875,
+      "height": 74.17660522460938,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 90.4422607421875,
+          "height": 74.17660522460938
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 90.4422607421875,
+          "height": 74.17660522460938
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_children_0_my-svg-flowchart-__vibeflow_layout_start-18",
+      "text": "__vibeflow_layout_start",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)"
+      ],
+      "x": 1175.628173828125,
+      "y": 85.88870239257812,
+      "width": 81.191650390625,
+      "height": 17.03577423095703,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgba(0, 0, 0, 0)",
+          "stroke": "rgba(0, 0, 0, 0)",
+          "rx": null,
+          "width": 81.191650390625,
+          "height": 17.03577423095703
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_children_0_my-svg-flowchart-__vibeflow_layout_end-20",
+      "text": "__vibeflow_layout_end",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)"
+      ],
+      "x": 1756.406982421875,
+      "y": 85.88870239257812,
+      "width": 79.42822265625,
+      "height": 17.03577423095703,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgba(0, 0, 0, 0)",
+          "stroke": "rgba(0, 0, 0, 0)",
+          "rx": null,
+          "width": 79.42822265625,
+          "height": 17.03577423095703
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_children_1_my-svg-flowchart-b_start-0",
+      "text": "b_startid: b_starttype_used: layout.startrulesets: vibeflow.process---------- source ----------root: layoutpath: leaf_b.jsonc---------- meta ----------desc: Layout fixture b_startflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "x": 1344.2293701171875,
+      "y": 180.82765197753906,
+      "width": 92.20849609375,
+      "height": 74.17662048339844,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 92.20849609375,
+          "height": 74.17662048339844
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 92.20849609375,
+          "height": 74.17662048339844
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_children_1_my-svg-flowchart-middle-3",
+      "text": "middleid: middletype_used: layout.steprulesets: vibeflow.process---------- source ----------root: layoutpath: leaf_b.jsonc---------- meta ----------desc: Layout fixture middleflow_kind: processruntime_dispatch: none",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "x": 1468.3798828125,
+      "y": 178.1658172607422,
+      "width": 78.233154296875,
+      "height": 79.50028991699219,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(214, 234, 255)",
+          "stroke": "rgb(66, 90, 120)",
+          "rx": "5",
+          "width": 78.233154296875,
+          "height": 79.50028991699219
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_children_1_my-svg-flowchart-b_end-6",
+      "text": "b_endid: b_endtype_used: layout.endrulesets: vibeflow.process---------- source ----------root: layoutpath: leaf_b.jsonc---------- meta ----------desc: Layout fixture b_endflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "x": 1578.55517578125,
+      "y": 180.82765197753906,
+      "width": 90.4422607421875,
+      "height": 74.17662048339844,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 90.4422607421875,
+          "height": 74.17662048339844
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 90.4422607421875,
+          "height": 74.17662048339844
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_children_1_my-svg-flowchart-__vibeflow_layout_start-13",
+      "text": "__vibeflow_layout_start",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "x": 1231.0955810546875,
+      "y": 209.3980712890625,
+      "width": 81.191650390625,
+      "height": 17.035781860351562,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgba(0, 0, 0, 0)",
+          "stroke": "rgba(0, 0, 0, 0)",
+          "rx": null,
+          "width": 81.191650390625,
+          "height": 17.035781860351562
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_0_vf_children_1_my-svg-flowchart-__vibeflow_layout_end-15",
+      "text": "__vibeflow_layout_end",
+      "fragments": [
+        "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "x": 1700.939453125,
+      "y": 209.3980712890625,
+      "width": 79.42822265625,
+      "height": 17.035781860351562,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgba(0, 0, 0, 0)",
+          "stroke": "rgba(0, 0, 0, 0)",
+          "rx": null,
+          "width": 79.42822265625,
+          "height": 17.035781860351562
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_parent_0_my-svg-flowchart-outer_start-0",
+      "text": "outer_startid: outer_starttype_used: layout.startrulesets: vibeflow.process---------- source ----------root: layoutpath: outer.jsonc---------- meta ----------desc: Layout fixture outer_startflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "parent flow"
+      ],
+      "x": 1036.7237548828125,
+      "y": 852.9244995117188,
+      "width": 101.9935302734375,
+      "height": 74.17657470703125,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 101.9935302734375,
+          "height": 74.17657470703125
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 101.9935302734375,
+          "height": 74.17657470703125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_parent_0_my-svg-flowchart-inner_a-3",
+      "text": "inner_aid: inner_atype_used: layout.leaf_a---------- source ----------root: layoutpath: leaf_a.jsonc---------- call ----------flow_kind: predefinedrulesets: vibeflow.workflowdesc: Layout fixture inner_aeffect_scope: unconstrainedruntime_dispatch: unknown---------- nodeset ----------type_key: layout.leaf_adesc: A concrete layout fixture body.",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "parent flow"
+      ],
+      "x": 1036.970947265625,
+      "y": 959.0431518554688,
+      "width": 101.499267578125,
+      "height": 98.80755615234375,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(237, 233, 254)",
+          "stroke": "rgb(124, 58, 237)",
+          "rx": null,
+          "width": 101.499267578125,
+          "height": 98.80755615234375
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_parent_0_my-svg-flowchart-inner_b-6",
+      "text": "inner_bid: inner_btype_used: layout.leaf_a---------- source ----------root: layoutpath: leaf_a.jsonc---------- call ----------flow_kind: predefinedrulesets: vibeflow.workflowdesc: Layout fixture inner_beffect_scope: unconstrainedruntime_dispatch: unknown---------- nodeset ----------type_key: layout.leaf_adesc: A concrete layout fixture body.",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "parent flow"
+      ],
+      "x": 1036.970947265625,
+      "y": 1089.792724609375,
+      "width": 101.499267578125,
+      "height": 98.8074951171875,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(237, 233, 254)",
+          "stroke": "rgb(124, 58, 237)",
+          "rx": null,
+          "width": 101.499267578125,
+          "height": 98.8074951171875
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_parent_0_my-svg-flowchart-inner_c-9",
+      "text": "inner_cid: inner_ctype_used: layout.leaf_b---------- source ----------root: layoutpath: leaf_b.jsonc---------- call ----------flow_kind: predefinedrulesets: vibeflow.workflowdesc: Layout fixture inner_ceffect_scope: unconstrainedruntime_dispatch: unknown---------- nodeset ----------type_key: layout.leaf_bdesc: A concrete layout fixture body.",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "parent flow"
+      ],
+      "x": 1036.970947265625,
+      "y": 1220.5423583984375,
+      "width": 101.499267578125,
+      "height": 98.8074951171875,
+      "shapes": [
+        {
+          "tag": "polygon",
+          "fill": "rgb(237, 233, 254)",
+          "stroke": "rgb(124, 58, 237)",
+          "rx": null,
+          "width": 101.499267578125,
+          "height": 98.8074951171875
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_parent_0_my-svg-flowchart-outer_end-12",
+      "text": "outer_endid: outer_endtype_used: layout.endrulesets: vibeflow.process---------- source ----------root: layoutpath: outer.jsonc---------- meta ----------desc: Layout fixture outer_endflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "parent flow"
+      ],
+      "x": 1037.60546875,
+      "y": 1351.2918701171875,
+      "width": 100.2301025390625,
+      "height": 74.1766357421875,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 100.2301025390625,
+          "height": 74.1766357421875
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 100.2301025390625,
+          "height": 74.1766357421875
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_parent_0_my-svg-flowchart-__vibeflow_layout_start-23",
+      "text": "__vibeflow_layout_start",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "parent flow"
+      ],
+      "x": 1047.124755859375,
+      "y": 803.9465942382812,
+      "width": 81.191650390625,
+      "height": 17.03582763671875,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgba(0, 0, 0, 0)",
+          "stroke": "rgba(0, 0, 0, 0)",
+          "rx": null,
+          "width": 81.191650390625,
+          "height": 17.03582763671875
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_parent_0_my-svg-flowchart-__vibeflow_layout_end-25",
+      "text": "__vibeflow_layout_end",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "parent flow"
+      ],
+      "x": 1048.0064697265625,
+      "y": 1457.4105224609375,
+      "width": 79.4281005859375,
+      "height": 17.0357666015625,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgba(0, 0, 0, 0)",
+          "stroke": "rgba(0, 0, 0, 0)",
+          "rx": null,
+          "width": 79.4281005859375,
+          "height": 17.0357666015625
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_children_0_my-svg-flowchart-a_start-0",
+      "text": "a_startid: a_starttype_used: layout.startrulesets: vibeflow.process---------- source ----------root: layoutpath: leaf_a.jsonc---------- meta ----------desc: Layout fixture a_startflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)"
+      ],
+      "x": 1288.7618408203125,
+      "y": 806.6084594726562,
+      "width": 92.20849609375,
+      "height": 74.1766357421875,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 92.20849609375,
+          "height": 74.1766357421875
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 92.20849609375,
+          "height": 74.1766357421875
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_children_0_my-svg-flowchart-left-3",
+      "text": "leftid: lefttype_used: layout.steprulesets: vibeflow.process---------- source ----------root: layoutpath: leaf_a.jsonc---------- meta ----------desc: Layout fixture leftflow_kind: processruntime_dispatch: none",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)"
+      ],
+      "x": 1412.9124755859375,
+      "y": 803.9465942382812,
+      "width": 75.3521728515625,
+      "height": 79.50030517578125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(214, 234, 255)",
+          "stroke": "rgb(66, 90, 120)",
+          "rx": "5",
+          "width": 75.3521728515625,
+          "height": 79.50030517578125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_children_0_my-svg-flowchart-right-6",
+      "text": "rightid: righttype_used: layout.step_rightrulesets: vibeflow.process---------- source ----------root: layoutpath: leaf_a.jsonc---------- meta ----------desc: Layout fixture rightflow_kind: processruntime_dispatch: none",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)"
+      ],
+      "x": 1520.206787109375,
+      "y": 803.9465942382812,
+      "width": 81.873779296875,
+      "height": 79.50030517578125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(189, 232, 208)",
+          "stroke": "rgb(66, 90, 120)",
+          "rx": "5",
+          "width": 81.873779296875,
+          "height": 79.50030517578125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_children_0_my-svg-flowchart-a_end-9",
+      "text": "a_endid: a_endtype_used: layout.endrulesets: vibeflow.process---------- source ----------root: layoutpath: leaf_a.jsonc---------- meta ----------desc: Layout fixture a_endflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)"
+      ],
+      "x": 1634.0225830078125,
+      "y": 806.6084594726562,
+      "width": 90.4422607421875,
+      "height": 74.1766357421875,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 90.4422607421875,
+          "height": 74.1766357421875
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 90.4422607421875,
+          "height": 74.1766357421875
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_children_0_my-svg-flowchart-__vibeflow_layout_start-18",
+      "text": "__vibeflow_layout_start",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)"
+      ],
+      "x": 1175.628173828125,
+      "y": 835.1788940429688,
+      "width": 81.191650390625,
+      "height": 17.0357666015625,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgba(0, 0, 0, 0)",
+          "stroke": "rgba(0, 0, 0, 0)",
+          "rx": null,
+          "width": 81.191650390625,
+          "height": 17.0357666015625
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_children_0_my-svg-flowchart-__vibeflow_layout_end-20",
+      "text": "__vibeflow_layout_end",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)"
+      ],
+      "x": 1756.406982421875,
+      "y": 835.1788940429688,
+      "width": 79.42822265625,
+      "height": 17.0357666015625,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgba(0, 0, 0, 0)",
+          "stroke": "rgba(0, 0, 0, 0)",
+          "rx": null,
+          "width": 79.42822265625,
+          "height": 17.0357666015625
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_children_1_my-svg-flowchart-b_start-0",
+      "text": "b_startid: b_starttype_used: layout.startrulesets: vibeflow.process---------- source ----------root: layoutpath: leaf_b.jsonc---------- meta ----------desc: Layout fixture b_startflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "x": 1344.2293701171875,
+      "y": 930.1178588867188,
+      "width": 92.20849609375,
+      "height": 74.17657470703125,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 92.20849609375,
+          "height": 74.17657470703125
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 92.20849609375,
+          "height": 74.17657470703125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_children_1_my-svg-flowchart-middle-3",
+      "text": "middleid: middletype_used: layout.steprulesets: vibeflow.process---------- source ----------root: layoutpath: leaf_b.jsonc---------- meta ----------desc: Layout fixture middleflow_kind: processruntime_dispatch: none",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "x": 1468.3798828125,
+      "y": 927.4559936523438,
+      "width": 78.233154296875,
+      "height": 79.50030517578125,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgb(214, 234, 255)",
+          "stroke": "rgb(66, 90, 120)",
+          "rx": "5",
+          "width": 78.233154296875,
+          "height": 79.50030517578125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_children_1_my-svg-flowchart-b_end-6",
+      "text": "b_endid: b_endtype_used: layout.endrulesets: vibeflow.process---------- source ----------root: layoutpath: leaf_b.jsonc---------- meta ----------desc: Layout fixture b_endflow_kind: terminalruntime_dispatch: none",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "x": 1578.55517578125,
+      "y": 930.1178588867188,
+      "width": 90.4422607421875,
+      "height": 74.17657470703125,
+      "shapes": [
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 90.4422607421875,
+          "height": 74.17657470703125
+        },
+        {
+          "tag": "path",
+          "fill": "rgb(236, 236, 255)",
+          "stroke": "rgb(147, 112, 219)",
+          "rx": null,
+          "width": 90.4422607421875,
+          "height": 74.17657470703125
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_children_1_my-svg-flowchart-__vibeflow_layout_start-13",
+      "text": "__vibeflow_layout_start",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "x": 1231.0955810546875,
+      "y": 958.688232421875,
+      "width": 81.191650390625,
+      "height": 17.0357666015625,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgba(0, 0, 0, 0)",
+          "stroke": "rgba(0, 0, 0, 0)",
+          "rx": null,
+          "width": 81.191650390625,
+          "height": 17.0357666015625
+        }
+      ]
+    },
+    {
+      "id": "vf_column_3_1_vf_children_1_my-svg-flowchart-__vibeflow_layout_end-15",
+      "text": "__vibeflow_layout_end",
+      "fragments": [
+        "loop (id: loop, type_key: layout.outer)",
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "x": 1700.939453125,
+      "y": 958.688232421875,
+      "width": 79.42822265625,
+      "height": 17.0357666015625,
+      "shapes": [
+        {
+          "tag": "rect",
+          "fill": "rgba(0, 0, 0, 0)",
+          "stroke": "rgba(0, 0, 0, 0)",
+          "rx": null,
+          "width": 79.42822265625,
+          "height": 17.0357666015625
+        }
+      ]
+    }
+  ]
+}

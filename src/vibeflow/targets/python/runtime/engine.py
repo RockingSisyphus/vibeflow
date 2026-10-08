@@ -32,6 +32,7 @@ from vibeflow.targets.python.runtime.execution_lock_mixin import RuntimeExecutio
 from vibeflow.targets.python.runtime.support.contract_mixin import RuntimeContractMixin
 from vibeflow.targets.python.runtime.types import _RuntimeState
 from vibeflow.targets.python.runtime.summaries import summarize_mapping
+from vibeflow.targets.python.runtime.observation import observe_run
 
 
 class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, RuntimeAsyncMixin, RuntimeOutputMixin, RuntimeTraceMixin, RuntimeExecutionLockMixin):
@@ -40,7 +41,6 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         graph: GraphConfig,
         *,
         registry: NodeRegistry,
-        boundary_registry: object | None = None,
         plugin_registry: PluginRegistry | None = None,
         run_dir: str | Path | None = None,
         node_config_overrides: Mapping[str, Mapping[str, object]] | None = None,
@@ -51,18 +51,20 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
     ) -> None:
         self.runtime_options = normalize_runtime_options(runtime_options)
         self.delegate_cli = bool(delegate_cli)
-        if boundary_registry is not None:
-            raise PipelineRuntimeError("boundary_registry is removed; use flowchart nodes")
         self._assert_planned_runtime_allowed(graph)
         self.registry = registry
         self._plugin_registry = plugin_registry
         self._runtime_plugins = plugin_registry.runtime_plugins() if plugin_registry is not None else ()
         self._hook_plan = runtime_hook_plan(self._runtime_plugins, self.runtime_options)
-        compilation = GraphCompiler().compile_with_findings(
-            graph,
-            registry=registry,
-            plugin_registry=plugin_registry,
-        )
+        from vibeflow.targets.python.project.check_session import current_python_check
+        session = current_python_check(registry)
+        compilation = session.checked_compilation(graph) if session is not None else None
+        if compilation is None:
+            compilation = GraphCompiler().compile_with_findings(
+                graph,
+                registry=registry,
+                plugin_registry=plugin_registry,
+            )
         graph = compilation.workflow.graph
         self.graph = graph
         self.compiled = compilation.compiled_graph
@@ -131,6 +133,12 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         return runtime
 
     def run(self, initial: Mapping[str, Any] | None = None) -> RunResult:
+        with observe_run(self._run_dir, self.runtime_options) as observer:
+            observer.configure(self.runtime_options)
+            observer.transition("running")
+            return self._run_observed(initial)
+
+    def _run_observed(self, initial: Mapping[str, Any] | None = None) -> RunResult:
         owns_trace_sink = self._trace_sink is None
         if owns_trace_sink:
             self._trace_path_prefix = ()
@@ -345,54 +353,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         details = _block_compile_error_details(self._plan)
         raise PipelineRuntimeError(f"block execution requires a compiled graph block: {details}")
 
-    def _execute_graph_block(self, block_name: str, block_nodes: tuple[str, ...], state: _RuntimeState) -> tuple[str, Mapping[str, object]]:
-        started = time.perf_counter()
-        self._record_runtime_event("block_enter", block_name, "block")
-        self._call_runtime_plugins("before_block", block_name, block_nodes)
-        ready = self._initial_ready_nodes(state)
-        if len(ready) != 1:
-            raise PipelineRuntimeError("block execution requires exactly one ready start node")
-        node_name = ready[0]
-        outputs: Mapping[str, object] = {}
-        last_node = node_name
-        try:
-            for _ in range(self._plan.max_steps):
-                if not self._requirements_available(node_name, state):
-                    self.trace.stop_reason = "no_ready_nodes"
-                    return last_node, outputs
-                outputs = self._run_node(node_name, state)
-                last_node = node_name
-                self.trace.step_count += 1
-                self._clear_conditional_outgoing(node_name, state)
-                active = self._activated_edges(node_name, outputs, state)
-                active_pairs = {edge.pair for edge in active}
-                for edge in active:
-                    self._activate_edge(edge, state)
-                    self._deliver_outputs(edge, outputs, state)
-                self._deliver_transfer_only_edges(node_name, outputs, state, active_pairs)
-                if self._is_end_terminal(node_name):
-                    self.trace.stop_reason = "completed"
-                    self._record_runtime_event("block_exit", block_name, "block", output_summary=summarize_mapping(outputs), elapsed_ms=elapsed_ms(started))
-                    self._call_runtime_plugins("after_block", block_name, block_nodes)
-                    return last_node, outputs
-                if len(active) != 1:
-                    raise PipelineRuntimeError(f"block execution requires exactly one active edge from '{node_name}'")
-                edge = active[0]
-                node_name = edge.target
-            self.trace.stop_reason = "max_steps"
-            raise PipelineRuntimeError(f"pipeline exceeded max_steps={self._plan.max_steps}")
-        except Exception as exc:
-            self._record_runtime_event("block_failed", block_name, "block", failure=str(exc), elapsed_ms=elapsed_ms(started))
-            self._call_runtime_plugins("block_failed", block_name, block_nodes, str(exc))
-            raise
 
-    def _assert_block_eligible(self) -> None:
-        for name in self._plan.order:
-            outgoing = self._frames[name].outgoing
-            if len(outgoing) <= 1:
-                continue
-            if not all(edge.when for edge in outgoing):
-                raise PipelineRuntimeError(f"block execution only supports conditional multi-edge routes: {name}")
 
     def _initial_ready_nodes(self, state: _RuntimeState) -> tuple[str, ...]:
         ready = []

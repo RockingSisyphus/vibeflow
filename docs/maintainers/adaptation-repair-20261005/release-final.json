@@ -1,0 +1,39 @@
+{
+  "build": {
+    "command": "python -B distribution/build.py",
+    "exit_code": 0
+  },
+  "packages": [
+    {
+      "profile": "collaborative",
+      "path": "/home/rockingsisyphus/projects/VibeFlow/archive/vibeflow-distribution-0.15.0.zip",
+      "sha256": "fb35d66b6c5f05d43b8660046ec172a59395ac8f07c46727da056a259e9f1ae6",
+      "bytes": 804591,
+      "kernel_sha256": "253bafd9dca02ef2ca98bf209c0225ba972c29181822e0962fa7c1404b23dd8d",
+      "summary": {
+        "cases": 79,
+        "expected_cases": 79,
+        "matched": 79,
+        "unmatched": 0,
+        "observation_errors": 0
+      },
+      "isolation_acceptance": true
+    },
+    {
+      "profile": "autonomous",
+      "path": "/home/rockingsisyphus/projects/VibeFlow/archive/vibeflow-distribution-autonomous-0.15.0.zip",
+      "sha256": "a9326ff744e1071d1863c10acaa7a882347f17956a0ed779f41e230526db8e29",
+      "bytes": 803834,
+      "kernel_sha256": "253bafd9dca02ef2ca98bf209c0225ba972c29181822e0962fa7c1404b23dd8d",
+      "summary": {
+        "cases": 79,
+        "expected_cases": 79,
+        "matched": 79,
+        "unmatched": 0,
+        "observation_errors": 0
+      },
+      "isolation_acceptance": true
+    }
+  ],
+  "source_manifest": "fixed-source.json"
+}

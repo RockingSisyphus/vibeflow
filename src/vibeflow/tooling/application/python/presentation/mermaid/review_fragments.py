@@ -46,6 +46,7 @@ def _nodeset_fragments(
     max_text_size: int | None,
     max_edges: int | None,
     review_fragment_max_width: float,
+    prepared=None,
 ) -> list[_SvgFragment]:
     fragments: list[_SvgFragment] = []
     for group in _direct_nodeset_call_groups(graph):
@@ -63,6 +64,7 @@ def _nodeset_fragments(
                 max_edges=max_edges,
                 review_fragment_max_width=review_fragment_max_width,
                 visited_nodesets=(),
+                prepared=prepared,
             )
         )
     return fragments
@@ -81,6 +83,7 @@ def _render_nodeset_detail_fragment(
     max_edges: int | None,
     review_fragment_max_width: float = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
     visited_nodesets: tuple[str, ...] = (),
+    prepared=None,
 ) -> _SvgFragment:
     if nodeset.type_key in visited_nodesets:
         return _placeholder_fragment(
@@ -91,7 +94,7 @@ def _render_nodeset_detail_fragment(
     if not nodeset.graph.nodes:
         return _placeholder_fragment(title, "nodeset has no concrete pipeline", background=background)
 
-    compiled = compile_for_render(nodeset.graph, None, registry)
+    compiled = compile_for_render(nodeset.graph, None, registry, prepared=prepared)
     child_groups = _direct_nodeset_call_groups(nodeset.graph)
     if not child_groups:
         return _render_fragment(
@@ -102,7 +105,8 @@ def _render_nodeset_detail_fragment(
                 registry=registry,
                 show_contract=show_contract,
                 show_semantics=show_semantics,
-                direction="LR",
+                direction="TD" if any(invocation_for_node(nodeset.graph, node) is not None for node in nodeset.graph.nodes) else "LR",
+                prepared=prepared,
             ),
             temp_dir,
             theme=theme,
@@ -120,6 +124,7 @@ def _render_nodeset_detail_fragment(
             show_contract=show_contract,
             show_semantics=show_semantics,
             direction="TD",
+            prepared=prepared,
         ),
         temp_dir,
         theme=theme,
@@ -141,6 +146,7 @@ def _render_nodeset_detail_fragment(
             max_edges=max_edges,
             review_fragment_max_width=review_fragment_max_width,
             visited_nodesets=(*visited_nodesets, nodeset.type_key),
+            prepared=prepared,
         )
         for group in child_groups
     ]
@@ -160,7 +166,7 @@ def _direct_nodeset_call_groups(graph: GraphConfig) -> tuple[_NodesetInvocationG
     nodes: dict[tuple[str, str], list[NodeSpec]] = {}
     for node in graph.nodes:
         invocation = invocation_for_node(graph, node)
-        if invocation is None:
+        if invocation is None or not invocation.nodeset.expand:
             continue
         key = (invocation.kind, invocation.target)
         if key not in nodes:
@@ -213,6 +219,7 @@ def _nodeset_mermaid(
     show_contract: bool,
     show_semantics: bool,
     direction: str,
+    prepared=None,
 ) -> str:
     text = export_mermaid(
         graph,
@@ -222,6 +229,7 @@ def _nodeset_mermaid(
         show_contract=show_contract,
         show_semantics=show_semantics,
         mermaid_layout=MERMAID_LAYOUT_DEFAULT,
+        prepared=prepared,
     )
     text = _force_flowchart_direction(text, direction)
     return _inject_layout_spine(text, graph)
@@ -383,6 +391,7 @@ def _render_fragment(
     return _SvgFragment(title=title, svg_text=svg_text, width=width, height=height)
 
 def _resource_mermaid(root_label: str, resources: tuple[Mapping[str, object], ...], *, kind: str) -> str:
+    from vibeflow.tooling.presentation.node_presentation import resolve_presentation
     root_id = f"resource_{root_label}"
     child_shape = "fr-rect" if kind == "base_lib" else "hex"
     child_class = {
@@ -399,8 +408,11 @@ def _resource_mermaid(root_label: str, resources: tuple[Mapping[str, object], ..
     for index, resource in enumerate(resources):
         resource_id = f"{root_id}_{index}"
         label = _resource_label(resource, kind=kind, show_semantics=True)
-        lines.append(f'  {resource_id}@{{ shape: {child_shape}, label: "{_escape_label(label)}" }}')
-        lines.append(f"  {root_id} -.-> {resource_id}")
         status = str(resource.get("status", "implemented"))
+        presentation = resolve_presentation(resource, native_class=child_class, resource_kind=kind,
+            status_class="plannedResource" if status == STATUS_PLANNED else "", call_style=resource.get("style"))
+        lines.append(f'  {resource_id}@{{ shape: {presentation.shape}, label: "{_escape_label(label)}" }}')
+        lines.append(f"  {root_id} -.-> {resource_id}")
         lines.append(f"  class {resource_id} {'plannedResource' if status == STATUS_PLANNED else child_class};")
+        lines.append(f"  style {resource_id} {presentation.mermaid_style()}")
     return "\n".join(lines) + "\n"

@@ -8,7 +8,8 @@ from vibeflow.targets.python.sdk.resources import (
 from vibeflow.core.contracts import DataProvider, DataRequirement
 from vibeflow.core.descriptors.models import NodeContractDescriptor
 from vibeflow.core.rules.models import RuleResult, RuleContext
+from vibeflow.targets.python.runtime.observation import update_run_info
 
 __all__ = ["Plugin", "node", "rule", "ruleset", "data_schema", "base_lib", "lifecycle", "capability",
     "host_extension", "SourceLocator", "RuleCall", "RuleRelation", "ResourceDefinition",
-    "DataProvider", "DataRequirement", "NodeContractDescriptor", "RuleResult", "RuleContext"]
+    "DataProvider", "DataRequirement", "NodeContractDescriptor", "RuleResult", "RuleContext", "update_run_info"]

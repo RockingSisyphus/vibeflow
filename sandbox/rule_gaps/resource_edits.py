@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from common import write
-from resource_support import project,cli,replace,observe,KINDS,FILES,PARTS,IDS,mutate_presentation,documents,declarations
+from resource_support import project,cli,replace,observe,KINDS,FILES,PARTS,IDS,mutate_presentation,documents,declarations,display_resource,display_nodes
 from resource_runtime import execute
 
 
@@ -39,10 +39,10 @@ def execution(root,kind,name):
 
 def diagram(root,kind,name):
     actual,architecture,mermaid,browser=documents(root,name=name,screenshot=True)
-    resource=architecture.get("implementation_graph",{}).get("resources",{}).get(kind+":"+IDS[kind],{})
+    resource=display_resource(architecture,kind)
     fields=resource.get("effective_presentation",{}).get("values",{})
-    nodes=[item for item in browser.get("nodes",()) if kind+": "+IDS[kind] in item["text"]]
-    # The rendered node is the same resource whose effective style is serialized.
+    nodes=display_nodes(browser,kind)
+    # The rendered call or directory card uses its actual effective style.
     from resource_support import rgb
     correct=any(shape["fill"]==rgb(fields["fill"]) for node in nodes for shape in node["shapes"])
     project_file=root/"vibeflow_project.jsonc"
@@ -51,9 +51,9 @@ def diagram(root,kind,name):
             "fill":fields.get("fill"),"shape":fields.get("shape"),"matches_svg":correct}
 
 
-def run_cases(work,toolchain):
+def run_cases(work,toolchain,*,kinds=KINDS,include_extra=True):
     rows=[]
-    for kind in KINDS:
+    for kind in kinds:
         for variant in ("add_file","delete_file","rename_file","move_file","implementation","ruleset","colour","shape"):
             case=f"edits.javascript.{kind}.{variant}";root=project(work/case,toolchain=toolchain)
             if kind=="host_extension":
@@ -90,6 +90,7 @@ def run_cases(work,toolchain):
                 metrics["modified_rulesets"]=[];actual["metrics"]["modified_rulesets"]=descriptor.get("rulesets")
             rows.append(observe(case,"resource-edits",actual,accept=variant!="delete_file",
                 code="PLUGIN.DECLARATION.LOAD" if variant=="delete_file" else None,metrics=metrics))
-    from resource_edit_extra import run_cases as declaration_cases
-    rows.extend(declaration_cases(work,toolchain))
+    if include_extra:
+        from resource_edit_extra import run_cases as declaration_cases
+        rows.extend(declaration_cases(work,toolchain))
     return rows

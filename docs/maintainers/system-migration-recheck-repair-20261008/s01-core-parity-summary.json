@@ -1,0 +1,62 @@
+{
+  "baseline": "f169429a8d41de73d97b25b8fb4832cdfd49c47a",
+  "current": "9c443f3111e65e6f99842d86d983416a745d391b",
+  "current_includes_working_files": true,
+  "targets": [
+    "core"
+  ],
+  "workers": 2,
+  "summary": {
+    "cases": 324,
+    "matched": 324,
+    "classifications": {
+      "preserved": 299,
+      "approved_change": 9,
+      "new_feature": 13,
+      "baseline_limitation": 3
+    },
+    "families": {
+      "workflow.formal_consumption": 13,
+      "implementation.node": 28,
+      "implementation.base_lib": 11,
+      "native.async": 2,
+      "native.config": 9,
+      "native.routing": 3,
+      "native.graph": 3,
+      "native.contract": 2,
+      "native.facts": 3,
+      "native.features": 2,
+      "native.advisory": 5,
+      "native.execution_lock": 4,
+      "native.loop": 9,
+      "native.blocks": 1,
+      "project.dependencies": 6,
+      "project.structure": 40,
+      "project.duplicates": 2,
+      "project.files": 16,
+      "project.functions": 8,
+      "rule.selection": 10,
+      "implementation.variants": 11,
+      "project.dependencies.variants": 5,
+      "project.structure.variants": 42,
+      "project.duplicates.variants": 2,
+      "workflow.formal_variants": 12,
+      "native.async.variants": 4,
+      "native.execution_lock.variants": 8,
+      "workflow.planned.variants": 9,
+      "workflow.nodesets.variants": 2,
+      "project.files.variants": 2,
+      "project.functions.variants": 2,
+      "workflow.data.variants": 10,
+      "workflow.join.variants": 7,
+      "workflow.data": 5,
+      "workflow.flow": 6,
+      "workflow.duplicates": 3,
+      "workflow.join": 4,
+      "workflow.nodesets": 8,
+      "workflow.planned": 4,
+      "workflow.orchestration": 1
+    }
+  },
+  "detail_report": "/tmp/vibeflow-s01-core-two-kernels-20261008.json"
+}

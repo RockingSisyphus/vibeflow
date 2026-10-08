@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/home/rockingsisyphus/miniforge3/bin/python",
+    "-B",
+    "sandbox/python/integration/run_all.py"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 495.5078576070082,
+  "finished_at": "2026-10-05T22:05:51.405308+00:00",
+  "wrapper_pid": 2650653
+}

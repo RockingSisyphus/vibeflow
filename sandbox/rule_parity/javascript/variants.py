@@ -233,14 +233,14 @@ def _task_route(fixture, root, variant, document, mode):
         declaration['contract']['provides'] = [{'key': 'final', 'type': 'parity.final', 'display_name': 'Final'}]
         declaration['contract']['output_semantics'] = {'final': ['Actual task consumer output.']}
         source = 'export function run(inputs: Readonly<{"parity.result": Readonly<{value: number}>}>) {return {final: inputs["parity.result"].value};}\n'
-        fixture._write_json(root / 'manifests/data_schemas/final.jsonc', {'kind': 'data_schema', 'type_key': 'parity.final', 'schema': {'type': 'number'}})
+        fixture._write_json(fixture.definition(root, variant, 'data_schema', 'parity.final', 'data_schemas/final.jsonc'), {'kind': 'data_schema', 'type_key': 'parity.final', 'schema': {'type': 'number'}})
         document['pipeline']['outputs'][0]['type'] = 'parity.final'
     else:
         document['pipeline']['nodes'][0].pop('async', None)
         declaration = fixture._node_descriptor(variant, 'parity.consume', 'nodes/consume.ts', fixture.Case('consumer', '', 'control'))
         declaration['contract'].update(requires=[], provides=[], input_semantics={}, output_semantics={})
         source = 'export function run() {return {};}\n'
-    fixture._write_json(root / 'manifests/nodes/consume.jsonc', declaration)
+    fixture._write_json(fixture.definition(root, variant, 'node', 'parity.consume', 'nodes/consume.jsonc'), declaration)
     (root / 'nodes/consume.ts').write_text(source, encoding='utf-8')
     call = {'id': 'consume', 'type_used': 'parity.consume', 'display_name': 'Consume actual task', 'description': 'Real task route.'}
     if mode == 'detached':
@@ -261,15 +261,17 @@ def run_variants(work_root: Path, variant: str, toolchain: Path, *, fixture: Any
         _merge(document['pipeline']['nodes'][0], item.call_patch)
         if case.id.startswith('js.variant.task.') and case.id.endswith(('.normal', '.sync')):
             _task_route(fixture, root, variant, document, item.call_patch['async'])
+        if variant == "current":
+            document["plugins"] = [{"source": {"kind":"file", "ref":"code_plugin.ts", "export":"plugin"}}]
         fixture._write_json(config, document)
-        node_path = root / 'manifests/nodes/calc.jsonc'
+        node_path = fixture.definition(root, variant, 'node', 'parity.calc', 'nodes/calc.jsonc')
         descriptor = json.loads(node_path.read_text())
         _merge(descriptor, item.node_patch)
         if case.role != 'node':
             descriptor['implementations'][0]['completion'] = 'immediate'
         fixture._write_json(node_path, descriptor)
         if case.role == 'plugin':
-            path = root / 'manifests/plugins/runtime.jsonc'
+            path = fixture.definition(root, variant, 'plugin', 'parity.plugin', 'plugins/runtime.jsonc')
             declaration = json.loads(path.read_text())
             declaration['implementations'][0]['completion'] = case.completion
             fixture._write_json(path, declaration)
@@ -277,19 +279,12 @@ def run_variants(work_root: Path, variant: str, toolchain: Path, *, fixture: Any
             if variant == 'baseline':
                 fixture._write_json(root / 'kernel_policy.jsonc', item.policy)
             else:
-                project_path = root / 'vibeflow_project.jsonc'
-                project = json.loads(project_path.read_text())
-                project.setdefault('descriptors', {})['rulesets'] = ['manifests/rulesets']
-                fixture._write_json(project_path, project)
-                fixture._write_json(root / 'manifests/rulesets/numeric.jsonc', {
+                fixture._write_json(fixture.definition(root, variant, 'ruleset', 'parity.numeric', 'rulesets/numeric.jsonc'), {
                     'kind': 'ruleset', 'id': 'parity.numeric', 'calls': [{'id': 'native', 'ruleset_id': 'vibeflow.process'}],
                     'relations': [{'source': '$self', 'target': 'native/maintainability', 'kind': 'overrides', 'params': {'policy': item.policy}}],
                 })
                 descriptor['rulesets'] = ['parity.numeric']
                 fixture._write_json(node_path, descriptor)
-        if variant == 'current':
-            import runpy
-            runpy.run_path(str(Path(__file__).resolve().parents[3] / 'tests/fixtures/support/code_plugins.py'))['migrate_fixture'](root)
         if (case.entrypoint == 'build' and (item.target != 'node' or item.profile != 'single-esm')) or (case.entrypoint == 'build-run' and case.id.startswith('js.variant.task.')):
             from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, build_project_aot
             try:
@@ -313,7 +308,7 @@ def run_variants(work_root: Path, variant: str, toolchain: Path, *, fixture: Any
                            'details': dict(getattr(error, 'details', {}) or {}), 'diagnostics': list(getattr(error, 'diagnostics', ()) or ())}
                 actual = fixture._actual('FAIL', fixture._finding_rows(payload), message=str(error))
         else:
-            actual = fixture._observe(case, root, workspace, config, source)
+            actual = fixture._observe(case, root, workspace, config, source, variant=variant)
         code = case.current_code if variant == 'current' and case.current_code is not None else case.code
         expected = {'should_accept': not code or item.severity == 'warning', 'codes': [{'code': code, 'severity': item.severity}] if code else [], 'metrics': dict(case.metrics)}
         if variant == 'current' and 'source_files' in expected['metrics']:

@@ -1,0 +1,42 @@
+{
+  "command": [
+    "/home/rockingsisyphus/miniforge3/bin/python",
+    "-m",
+    "vibeflow",
+    "validate",
+    "--workspace",
+    "/tmp/vibeflow-recheck-host-preview-vgp7ny_j/vibeflow_config.jsonc",
+    "--config",
+    "/tmp/vibeflow-recheck-host-preview-vgp7ny_j/workflow.jsonc",
+    "--json"
+  ],
+  "exit_code": 1,
+  "output": {
+    "status": "ERROR",
+    "code": "VF_AOT_JAVASCRIPT_CONFIG",
+    "error": "javascript.host_extensions was removed; select host_extensions in the workflow",
+    "result_code": "VIBEFLOW_STRUCTURE_ERROR",
+    "validation_scope": "vibeflow_structure",
+    "summary": "VibeFlow \u7ed3\u6784\u68c0\u67e5\u65e0\u6cd5\u5b8c\u6210",
+    "checked": [],
+    "not_checked": [
+      {
+        "id": "business_correctness",
+        "label": "\u4e1a\u52a1\u7ed3\u679c\u6b63\u786e\u6027"
+      },
+      {
+        "id": "requirements_conformance",
+        "label": "\u9879\u76ee\u9700\u6c42\u7b26\u5408\u6027"
+      },
+      {
+        "id": "external_semantics",
+        "label": "\u5916\u90e8\u63a5\u53e3\u4e1a\u52a1\u8bed\u4e49"
+      },
+      {
+        "id": "domain_data_correctness",
+        "label": "\u9886\u57df\u6570\u636e\u6b63\u786e\u6027"
+      }
+    ]
+  },
+  "stderr": ""
+}

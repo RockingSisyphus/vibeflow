@@ -1,0 +1,61 @@
+{
+  "work": "/tmp/vibeflow-recheck-layout-6ixox9dx",
+  "results": [
+    {
+      "directory": "ordinary",
+      "exit_code": 0,
+      "status": "PASS",
+      "findings": []
+    },
+    {
+      "directory": "nodes",
+      "exit_code": 1,
+      "status": "FAIL",
+      "findings": [
+        {
+          "code": "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT",
+          "message": "node module imports project code outside declared base_lib: nodes.worker -> utility.math"
+        }
+      ]
+    },
+    {
+      "directory": "task_nodes",
+      "exit_code": 1,
+      "status": "FAIL",
+      "findings": [
+        {
+          "code": "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT",
+          "message": "node module imports project code outside declared base_lib: task_nodes.worker -> utility.math"
+        }
+      ]
+    },
+    {
+      "directory": "custom_nodes",
+      "exit_code": 1,
+      "status": "FAIL",
+      "findings": [
+        {
+          "code": "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT",
+          "message": "node module imports project code outside declared base_lib: custom_nodes.worker -> utility.math"
+        }
+      ]
+    },
+    {
+      "directory": "base_lib",
+      "exit_code": 1,
+      "status": "FAIL",
+      "findings": [
+        {
+          "code": "QUALITY.STRUCTURE.BASE_LIB_UPWARD_IMPORT",
+          "message": "base_lib module imports a project layer module: base_lib.worker -> utility.math"
+        }
+      ]
+    },
+    {
+      "directory": "plugins",
+      "exit_code": 0,
+      "status": "PASS",
+      "findings": []
+    }
+  ]
+}

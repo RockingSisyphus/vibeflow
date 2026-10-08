@@ -117,10 +117,7 @@ def node_review_effect_scope(graph: GraphConfig, node: NodeSpec, registry: NodeR
 def registry_node_class(registry: NodeRegistry | None, type_key: str) -> type | None:
     if registry is None:
         return None
-    try:
-        return registry.get(type_key)
-    except Exception:
-        return None
+    return getattr(registry, "_registry", {}).get(type_key)
 
 
 def node_review_metadata(graph: GraphConfig, node: NodeSpec, registry: NodeRegistry | None) -> dict[str, object]:
@@ -172,10 +169,19 @@ def resources_payload(resources: object | None) -> Mapping[str, object]:
     return payload if isinstance(payload, Mapping) else {}
 
 
-def rendered_resources_payload(resources: object | None, graph: GraphConfig | None = None) -> dict[str, object]:
+def rendered_resources_payload(resources: object | None, graph: GraphConfig | None = None, registry=None) -> dict[str, object]:
     payload = resources_payload(resources)
     if not payload:
         return {}
+    catalogs = getattr(getattr(registry, "loaded_plugins", None), "catalogs", None)
+    # PythonResources describes lifecycle bindings. The user's directory shows
+    # the selected package once, including packages without lifecycle hooks.
+    if catalogs is not None and hasattr(resources, "plugins"):
+        payload = {**payload, "plugins": [
+            {**dict(record.get("declaration", {})), **dict(record),
+             "config_keys": sorted(record.get("config", {}))}
+            for record in catalogs.plugin_records
+        ]}
     root_ids = graph_root_ids(graph)
     plugins = _rendered_resource_items(mapping_items(payload.get("plugins", ())), root_ids=root_ids)
     host_extensions = _rendered_resource_items(
@@ -194,6 +200,18 @@ def rendered_resources_payload(resources: object | None, graph: GraphConfig | No
         result["plugins"] = list(plugins)
     if host_extensions:
         result["host_extensions"] = list(host_extensions)
+    if catalogs is not None:
+        for kind, items in (("base_lib", modules), ("host_extension", host_extensions)):
+            catalog = catalogs.base_libs if kind == "base_lib" else catalogs.host_extensions
+            enriched = []
+            for item in items:
+                descriptor = catalog.get(str(item.get("id", "")))
+                enriched.append({**(descriptor.to_dict() if descriptor else {}), **item})
+            if enriched:
+                if kind == "base_lib":
+                    result["base_lib"] = {"modules": enriched}
+                else:
+                    result["host_extensions"] = enriched
     return result
 
 
@@ -272,7 +290,7 @@ def _edge_pairs(edges: object) -> frozenset[tuple[str, str]]:
 
 
 def mapping_items(value: object) -> tuple[Mapping[str, object], ...]:
-    if not isinstance(value, list):
+    if not isinstance(value, (list, tuple)):
         return ()
     return tuple(item for item in value if isinstance(item, Mapping))
 

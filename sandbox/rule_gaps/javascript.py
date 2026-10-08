@@ -4,6 +4,7 @@ The current-only gap runner selects a kernel before calling run_cases. Normal
 and negative cases use actual commands, workers, records and business execution.
 """
 from __future__ import annotations
+from tests.fixtures.support.plugins import resource as resource_ref
 
 import importlib.util
 import json
@@ -145,7 +146,7 @@ def _platform_cases(s, work: Path, tools: Path | None) -> list[dict[str, Any]]:
         project = s.new_project(work, "platform-"+label, tools)
         s.select_provider_and_consumer(project, 'export function check(){return {records:{value:{type_id:"gaps.value.v1",value:[3]}}};}\n')
         if split:
-            descriptor = project.project / "bundle/rules/provider.jsonc"
+            descriptor = resource_ref(project.project, 'rule', 'example.number_provider')
             data = s.read_json(descriptor)
             data["implementations"] = []
             for target in ("node", "browser"):
@@ -181,28 +182,27 @@ def _platform_cases(s, work: Path, tools: Path | None) -> list[dict[str, Any]]:
     return rows
 
 
-def _bundle_cases(s, work: Path, tools: Path | None) -> list[dict[str, Any]]:
+def _sdk_cases(s, work: Path, tools: Path | None) -> list[dict[str, Any]]:
     rows = []
     project = s.new_project(work,"bundle-native-normal",tools)
-    s.bundle_native_resources(project)
+    s.sdk_native_resources(project)
     actual, payload = s.command(project,"build","--target","node","--profile","single-esm","--out-dir",str(project.root/"dist"))
     if actual["metrics"]["exit_code"]==0:
         actual["metrics"].update(s.loaded_native_groups(project))
     actual["metrics"].update(s.execute_business(project,payload,host=True))
-    rows.append(_row("bundle.native.normal", "Bundle 所有原生资源真实 build/run 与生命周期", "javascript.bundle.native_resources",
-        {"should_accept":True,"metrics":{"exit_code":0,"native_groups_loaded":True,"bundle_only":True,"business_executed":True,
+    rows.append(_row("bundle.native.normal", "SDK 所有原生资源真实 build/run 与生命周期", "javascript.bundle.native_resources",
+        {"should_accept":True,"metrics":{"exit_code":0,"native_groups_loaded":True,"sdk_only":True,"business_executed":True,
          "runtime_exit_code":0,"business_result":7,"import_events":[],
          "lifecycle":["host:create","host:start","plugin:create","plugin:beforeRun","capability:offset","plugin:afterRun","plugin:dispose","host:stop"]}}, actual,
-         "BaseLib、DataSchema、Capability、Host、Runtime Plugin 全部由 bundle 装载；没有直接 descriptors 回退接入。"))
+         "BaseLib、DataSchema、Capability、Host、Runtime Plugin 全部由同一 SDK 插件贡献，使用统一装配。"))
     for group in s.NATIVE_GROUPS:
         for failure in ("dangling", "conflict"):
             project = s.new_project(work,"bundle-"+group+"-"+failure,tools)
-            paths = s.bundle_native_resources(project)
+            paths = s.sdk_native_resources(project)
             original = paths[group]
-            changed = project.project / "contribution" / (group+".jsonc")
-            # Keep the enclosing directory real so this probes the selected
-            # missing descriptor, rather than an earlier missing-directory error.
-            changed.parent.mkdir(parents=True, exist_ok=True)
+            from tests.fixtures.support.plugins import write_plugin
+            changed = project.project / "additional_plugin.ts"
+            config = s.read_json(project.config)
             if failure=="conflict":
                 data = s.read_json(original)
                 if group=="data_schemas":
@@ -211,12 +211,15 @@ def _bundle_cases(s, work: Path, tools: Path | None) -> list[dict[str, Any]]:
                     data["operations"]["offset"]["completion"] = "suspend"
                 else:
                     data["description"] = "A conflicting contribution."
-                s.write_json(changed,data)
-            s.write_json(project.project/"bundles/extra.jsonc",{"kind":"bundle","id":"gaps.extra","resources":{group:["../"+changed.relative_to(project.project).as_posix()]}})
+                selection = write_plugin(project.project, [data], target="javascript", filename=changed.name, plugin_id="gaps.additional")
+            else:
+                selection = {"source": {"kind":"file", "ref":changed.name, "export":"plugin"}}
+            config["plugins"].append(selection)
+            s.write_json(project.config, config)
             actual, _ = s.command(project,"build","--target","node","--profile","single-esm","--out-dir",str(project.root/"dist"))
             actual["metrics"].update(business_executed=False,build_published=(project.root/"dist").exists())
-            origin_path = str(project.project / ("code_lifecycle_" if group == "plugins" else "code_plugin.ts"))
-            reason = [origin_path, '"origins"', '"previous"', '"current"'] if failure == "conflict" else [changed.with_suffix(".ts").name]
+            origin_path = str(project.project / "code_plugin.ts")
+            reason = [origin_path, '"origins"', '"previous"', '"current"'] if failure == "conflict" else [changed.name]
             rows.append(_row("bundle."+group+"."+failure, "Bundle "+group+" 的 "+failure+" 必须正式拒绝",
                 "javascript.bundle.native_resources", {"should_accept":False,"codes":["DESCRIPTOR.CONFLICT" if failure=="conflict" else "PLUGIN.DECLARATION.LOAD"],
                  "message_contains":reason,"metrics":{"exit_code":1,"build_published":False,"business_executed":False}},actual,
@@ -230,4 +233,4 @@ def run_cases(work_root: Path, variant: str = "current", toolchain_root: Path | 
     work_root.mkdir(parents=True,exist_ok=True)
     support = _support()
     return [*_record_cases(support,work_root,toolchain_root), *_source_cases(support,work_root,toolchain_root),
-            *_platform_cases(support,work_root,toolchain_root), *_bundle_cases(support,work_root,toolchain_root)]
+            *_platform_cases(support,work_root,toolchain_root), *_sdk_cases(support,work_root,toolchain_root)]

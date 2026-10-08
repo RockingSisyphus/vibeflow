@@ -43,9 +43,14 @@ def source_quality_policy(purity_policy=None):
     return QualityPolicy(thresholds=replace(QualityThresholds(),**values))
 
 
-def project_rule_facts(plan,source_context,cache):
-    if source_context is None or not any(any(identity.startswith("vibeflow.quality.") for identity in
-        (item.rule.id,item.rule.handler,item.original_rule_id)) for item in plan.invocations):
+def project_rule_facts(plan,source_context,cache, *, handlers):
+    from inspect import unwrap
+    from vibeflow.builtin.project_quality import project_quality_handlers
+    native = tuple(project_quality_handlers().values())
+    def needs_facts(invocation):
+        handler = handlers.get(invocation.rule.handler or invocation.rule.id, handlers.get(invocation.rule.id))
+        return callable(handler) and any(unwrap(handler) is check for check in native)
+    if source_context is None or not any(needs_facts(item) for item in plan.invocations):
         return {}
     if "project_facts" not in cache:
         cache["project_facts"] = source_context_quality_facts(source_context)

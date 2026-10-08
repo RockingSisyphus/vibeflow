@@ -66,9 +66,9 @@ def _nodeset_quality_facts(
     return tuple(findings)
 
 
+
 def nodeset_quality_findings(graph: GraphConfig, *, max_depth: int = 4, warn_width: int = NODESET_WIDTH_WARNING) -> tuple[HealthFinding, ...]:
-    from vibeflow.core.rules.builtin.workflow import evaluate_workflow_topic
-    return evaluate_workflow_topic("nodesets", graph=graph, params={"nodeset_max_depth": max_depth, "nodeset_warn_width": warn_width}).findings
+    return _nodeset_quality_facts(graph, max_depth=max_depth, warn_width=warn_width)
 
 
 __all__ = ["nodeset_quality_findings"]

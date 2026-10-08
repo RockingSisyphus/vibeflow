@@ -10,6 +10,7 @@ import sys
 import pytest
 
 from tests.fixtures.support.strict_support import cli_main as main
+from tests.fixtures.support.plugins import resource, resources
 from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
 
@@ -22,8 +23,8 @@ EXAMPLE = ROOT / "sandbox/python/domain_rules"
 def domain_project(tmp_path):
     example = tmp_path / "example"
     shutil.copytree(EXAMPLE, example)
-    from tests.fixtures.support.code_plugins import copy_archival_inputs
-    copy_archival_inputs(EXAMPLE, example)
+    from tests.fixtures.support.plugins import copy_sdk_inputs
+    copy_sdk_inputs(EXAMPLE, example)
     for name in tuple(sys.modules):
         if name == "domain_nodes" or name.startswith("domain_helpers"):
             sys.modules.pop(name)
@@ -68,6 +69,10 @@ def _illegal_helper(project):
     source = source.replace('return {"result": value + params["offset"]}',
                             'return {"result": model_forward(value) + params["offset"]}')
     path.write_text(source)
+    declaration = resource(project, "node", "example.transform")
+    data = json.loads(declaration.read_text())
+    data["implementations"][0].setdefault("implementation_files", []).append({"kind":"file", "ref":"domain_helpers/illegal_model.py"})
+    declaration.write_text(json.dumps(data))
     return helper
 
 
@@ -166,7 +171,7 @@ def test_one_block_is_a_domain_convention_and_empty_selection_is_unconstrained(d
     finding = next(item for item in payload["errors"] if item["code"] == "EXAMPLE.MODEL.ONE_BLOCK")
     assert finding["definition_id"] == "example.model_definition"
     assert finding["details"]["count"] == 2
-    declaration = project / "bundle/nodes/model.jsonc"
+    declaration = resource(project, 'node', 'example.model')
     data = json.loads(declaration.read_text())
     data["rulesets"] = []
     declaration.write_text(json.dumps(data))
@@ -180,8 +185,8 @@ def test_one_block_is_a_domain_convention_and_empty_selection_is_unconstrained(d
 
 def test_unselected_declarations_and_unreachable_files_are_not_domain_scanned(domain_project, capsys):
     workspace, project = domain_project
-    path = project / "bundle/nodes/unused.jsonc"
-    data = json.loads((project / "bundle/nodes/model.jsonc").read_text())
+    path = resource(project, 'node', 'example.unused')
+    data = json.loads((resource(project, 'node', 'example.model')).read_text())
     data["type_key"] = "example.unused"
     data["implementations"][0]["source"] = {"kind": "file", "ref": "unused/model.py", "export": "UnusedModel"}
     path.write_text(json.dumps(data))
@@ -189,9 +194,6 @@ def test_unselected_declarations_and_unreachable_files_are_not_domain_scanned(do
     unused.mkdir()
     (unused / "model.py").write_text("class UnusedModel:\n    def run_pure(self, inputs, params):\n        return {'feature': 1}\n")
     (unused / "unreachable.py").write_text("def model_forward(value):\n    return value\n")
-    bundle = project / "bundles/domain.jsonc"
-    data = json.loads(bundle.read_text()); data["resources"]["nodes"].append("../bundle/nodes/unused.jsonc")
-    bundle.write_text(json.dumps(data))
     code, payload = _call(capsys, ["quality-check", "--workspace", str(workspace), "--json"])
     assert code == 0, payload["source_quality"]["errors"]
     definitions = [item for report in payload["reports"] for item in report["errors"] if item["definition_id"] == "example.model_definition"]
@@ -257,14 +259,14 @@ def test_process_print_policy_is_checked_and_executed_through_cli(domain_project
     source.write_text(source.read_text().replace('return {"result": value + params["offset"]}',
         'print("domain transform result", value + params["offset"])\n'
         '        return {"result": value + params["offset"]}'))
-    declaration = project / "bundle/nodes/transform.jsonc"
+    declaration = resource(project, 'node', 'example.transform')
     node = json.loads(declaration.read_text())
     assert node["flow_kind"] == "process"
     if selection == "empty":
         node["rulesets"] = []
         declaration.write_text(json.dumps(node))
     elif selection == "terminal":
-        ruleset = project / "bundle/rulesets/data-domain.jsonc"
+        ruleset = resource(project, 'ruleset', 'example.data_domain')
         data = json.loads(ruleset.read_text())
         data["relations"] = [{"source": "$self", "target": "native/effects", "kind": "overrides",
                               "params": {"effect_scope": "terminal"}}]
@@ -306,21 +308,17 @@ def test_selected_import_interface_rejects_missing_export_before_module_executio
     marker = project / "business-module-imported"
     path = project / "domain_nodes.py"
     path.write_text(f"from pathlib import Path\nPath({str(marker)!r}).write_text('imported')\n" + path.read_text())
-    for manifest in (project / "bundle/nodes").glob("*.jsonc"):
+    for manifest in resources(project, "node"):
         node = json.loads(manifest.read_text())
         node["rulesets"] = []
         if node["type_key"] == "example.model":
             node["rulesets"] = ["example.prebind_interface"]
             node["implementations"][0]["source"]["export"] = "MissingModel"
         manifest.write_text(json.dumps(node))
-    declaration = project / "bundle/rulesets/prebind-interface.jsonc"
+    declaration = resource(project, 'ruleset', 'example.prebind_interface')
     declaration.write_text(json.dumps({"kind":"ruleset","id":"example.prebind_interface",
         "calls":[{"id":"interface","rule_id":"vibeflow.node_interface"}],
         "entrypoints":{"import":["interface"],"static":[],"run":[]}}))
-    bundle = project / "bundles/domain.jsonc"
-    resources = json.loads(bundle.read_text())
-    resources["resources"]["rulesets"].append("../bundle/rulesets/prebind-interface.jsonc")
-    bundle.write_text(json.dumps(resources))
     code, payload = _call(capsys, ["validate", *_common(workspace, project), "--json"])
     assert code == 1, payload
     finding = next(item for item in payload["errors"] if item["code"] == "NODE.IMPLEMENTATION.SYMBOL")
@@ -340,7 +338,7 @@ def test_selected_import_interface_rejects_missing_export_before_module_executio
 @pytest.mark.parametrize("export", ["check", "missing_module_rule"])
 def test_module_rule_binding_uses_resolved_source_provenance(domain_project, capsys, export):
     workspace, project = domain_project
-    manifest = project / "bundle/rules/model-definition.jsonc"
+    manifest = resource(project, 'rule', 'example.model_definition')
     data = json.loads(manifest.read_text())
     data["implementations"][0]["source"] = {"kind":"module","ref":"rules.model_definition","export":export}
     manifest.write_text(json.dumps(data))
@@ -356,10 +354,3 @@ def test_module_rule_binding_uses_resolved_source_provenance(domain_project, cap
         assert finding["source_location"]["line"] > 0
         assert finding["details"]["implementation"] == {"kind":"module","ref":"rules.model_definition",
             "export":export,"path":str(project / "rules/model_definition.py")}
-
-
-from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-_fixture_native_load_workspace_config = load_workspace_config
-def load_workspace_config(path, **options):
-    prepare_workspace_fixture(path)
-    return _fixture_native_load_workspace_config(path, **options)

@@ -1,0 +1,16 @@
+# JS 基线夹具纠正（保留原案例 ID）
+
+- review-rules 成功返回规则图，没有 status；保留退出码0和声明内容/不执行处理函数断言，不虚构 PASS 字段。
+- 外部 Node→Node 的真实目标诊断为 VF_IMPORT_NODE_TO_NODE。
+- Host 原生依赖的计划、未知、循环各有专用诊断码：VF_AOT_HOST_EXTENSION_PLANNED_DEPENDENCY/UNKNOWN/CYCLE。保留这些具体错误。
+- planned-only 不产生可执行 Host；实际产物只提供 runWorkflow，不要求不存在的 createWorkflowHost。仍验证数值与零 Host 工厂事件。
+- A05 项目 quality 显式传 workflow config，与原只读审计相同；原夹具去掉架构注册而遗漏 config，使插件未装配，原正例未覆盖目标规则。现在实际装配 SDK 声明。
+- cleanup probe 在 main 返回后显式调用正式子进程实际 atexit owner release _close_definitions，再观察 tracked Session。仅保存 Session 引用不能据此断言 Catalog 已释放。失败仍记录，不清除；finally 只释放自己的 PID。正常 owner release 应通过。
+- 新增同文件 declaration/lifecycle 共享导入负例：包贡献关系允许声明导入 Node，但工厂使用 model.run 不获得该权限。正式 quality-check；未执行工厂。
+
+以上为公开接口和观察方法纠正，不修改产品行为，不把已证实缺陷写入通过期待。冻结内核仍为 /tmp/vf-adaptation-baseline-20261005/src。
+
+- shared Nodeset 夹具移除两个父级同名输出并由末尾普通 Node 输出 result；两个调用共享同一 Nodeset 定义，继续覆盖有限图递归问题。旧夹具在递归修复后遭原生重复 producer 规则拒绝，与目标无关。新增正式产物 manifest 中两阶段 annotation 断言。
+- S02 新增完整 quality-check 计数案例：Target instrumentation 放在工作流源码范围外，避免检查测量代码本身；保留真实 Program/指标构造计数，不以请求数代替。
+
+- 既有 test_project_quality_does_not_register_unselected_plugin_files 修正：旧 main 包装先调用 prepare_workspace_fixture，把未选 Host archival manifest 自动写入已启用 code_plugin 的资源列表；新增 A05 的 Host 归属错误是该已贡献资源的真实错误。现在未选资源只存在于独立 SDK plugin.ts，workflow 不引用它，入口带 throw marker；保留 validate/quality 通过、未选源码不进入资源审查、项目源码指标仍包括文件的原要求。没有修改目标 Rule 或忽略错误。

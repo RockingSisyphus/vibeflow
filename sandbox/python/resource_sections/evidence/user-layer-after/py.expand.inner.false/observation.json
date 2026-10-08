@@ -1,0 +1,136 @@
+{
+  "exit_code": 0,
+  "error": null,
+  "frames": [
+    {
+      "title": "main pipeline",
+      "direction": "flowchart TD",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-sections/current/py.expand.inner.false/fragment-00.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 575.3515625,
+      "height": 1679.800048828125
+    },
+    {
+      "title": "plugins",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-sections/current/py.expand.inner.false/fragment-01.mmd",
+      "resource_groups": [
+        "resource_plugins"
+      ],
+      "has_resource_nodes": false,
+      "width": 610.5281372070312,
+      "height": 150.4000015258789
+    },
+    {
+      "title": "base_lib",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-sections/current/py.expand.inner.false/fragment-02.mmd",
+      "resource_groups": [
+        "resource_base_lib"
+      ],
+      "has_resource_nodes": false,
+      "width": 517.1218872070312,
+      "height": 238.40000915527344
+    },
+    {
+      "title": "parent flow",
+      "direction": "flowchart TD",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-sections/current/py.expand.inner.false/fragment-03.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 427.8691711425781,
+      "height": 1937.199951171875
+    },
+    {
+      "title": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-sections/current/py.expand.inner.false/fragment-04.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 1963.02734375,
+      "height": 272.0
+    },
+    {
+      "title": "parent flow",
+      "direction": "flowchart TD",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-sections/current/py.expand.inner.false/fragment-05.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 427.8691711425781,
+      "height": 1937.199951171875
+    },
+    {
+      "title": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-sections/current/py.expand.inner.false/fragment-06.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 1963.02734375,
+      "height": 272.0
+    }
+  ],
+  "panels": [
+    {
+      "parent": "parent flow",
+      "children": [
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "positions": [
+        {
+          "title": "parent flow",
+          "x": 24.0,
+          "y": 52.0
+        },
+        {
+          "title": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+          "x": 507.869,
+          "y": 52.0
+        }
+      ]
+    },
+    {
+      "parent": "parent flow",
+      "children": [
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "positions": [
+        {
+          "title": "parent flow",
+          "x": 24.0,
+          "y": 52.0
+        },
+        {
+          "title": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+          "x": 507.869,
+          "y": 52.0
+        }
+      ]
+    }
+  ],
+  "columns": [
+    [
+      "main pipeline"
+    ],
+    [
+      "plugins"
+    ],
+    [
+      "base_lib"
+    ],
+    [
+      "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+      "loop (id: loop, type_key: layout.outer)"
+    ]
+  ],
+  "seconds": 4.253405402007047,
+  "arguments": [
+    "review",
+    "--workspace",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-sections/current/py.expand.inner.false/vibeflow_config.jsonc",
+    "--config",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-sections/current/py.expand.inner.false/workflow.jsonc",
+    "--output",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-sections/current/py.expand.inner.false/graph.svg"
+  ]
+}

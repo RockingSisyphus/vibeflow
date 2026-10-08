@@ -11,12 +11,12 @@ import tempfile
 
 RESOURCE_NAMES = frozenset(
     {
-        "runtime_helpers.mjs",
+        "runtime_helpers.mjs", "status_helpers.mjs", "node_observation.mjs",
         "sdk.mjs", "sdk.d.ts", "sdk_loader.mjs",
         "plugin_worker.mjs",
         "plugin_abi.d.ts",
         "rule_abi.d.ts",
-        "toolchain_driver.mjs",
+        "toolchain_driver.mjs", "analysis_program.mjs", "source_ownership.mjs",
     }
 )
 

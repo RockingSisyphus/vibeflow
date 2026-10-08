@@ -617,7 +617,7 @@ def _quality_group_case() -> dict[str, Any]:
         [
             sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
             str(_REPOSITORY_ROOT / "tests/targets/javascript/test_quality_sandbox.py"),
-            str(_REPOSITORY_ROOT / "tests/targets/javascript/test_nodeset_limits.py"),
+            str(_REPOSITORY_ROOT / "tests/targets/javascript/test_nodeset_rules.py"),
         ],
         cwd=_REPOSITORY_ROOT,
         env=environment,

@@ -4,22 +4,26 @@
       {
         "key": "calc.a",
         "type": "calc.a",
-        "display_name": "Calc A"
+        "display_name": "Calc A",
+        "required": true
       },
       {
         "key": "calc.b",
         "type": "calc.b",
-        "display_name": "Calc B"
+        "display_name": "Calc B",
+        "required": true
       },
       {
         "key": "calc.c",
         "type": "calc.c",
-        "display_name": "Calc C"
+        "display_name": "Calc C",
+        "required": true
       },
       {
         "key": "calc.d",
         "type": "calc.d",
-        "display_name": "Calc D"
+        "display_name": "Calc D",
+        "required": true
       }
     ],
     "nodes": [

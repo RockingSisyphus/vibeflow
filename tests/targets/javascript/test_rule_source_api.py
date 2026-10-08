@@ -1,6 +1,8 @@
 """Public Rule source services exercised by real TypeScript implementations."""
 from __future__ import annotations
 
+from tests.fixtures.support.plugins import resource as sdk_resource
+
 import json
 import os
 from pathlib import Path
@@ -31,25 +33,18 @@ def source_project(tmp_path: Path) -> Path:
         pytest.skip("requires the pinned TypeScript/esbuild toolchain")
     project = tmp_path / "project"
     shutil.copytree(ROOT / "sandbox/javascript/domain_rules/project", project)
-    from tests.fixtures.support.code_plugins import copy_archival_inputs
-    copy_archival_inputs(ROOT / "sandbox/javascript/domain_rules/project", project)
+    from tests.fixtures.support.plugins import copy_sdk_inputs
+    copy_sdk_inputs(ROOT / "sandbox/javascript/domain_rules/project", project)
     (project / "node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
     (project / "nodes/model.ts").write_text(MODEL, encoding="utf-8")
     (project / "nodes/model_helper.ts").write_text(HELPER, encoding="utf-8")
-    directory = project / "manifests/base_lib"
-    directory.mkdir()
-    (directory / "helper.jsonc").write_text(json.dumps({
+    (sdk_resource(project, "base_lib", "example.model_helper")).write_text(json.dumps({
         "kind": "base_lib", "id": "example.model_helper", "display_name": "Model helper",
         "description": "Owned implementation helper.", "implementations": [{
             "language": "typescript", "targets": ["node"],
             "source": {"kind": "file", "ref": "nodes/model_helper.ts"}}]}), encoding="utf-8")
     config = project / "vibeflow_project.jsonc"
-    data = json.loads(config.read_text())
-    data.setdefault("descriptors", {"bundles": ["bundles"], "data_schemas": ["manifests/data"]}).update({"base_lib": ["manifests/base_lib"], "rules": ["manifests/rules"], "rulesets": ["manifests/rulesets"]})
-    config.write_text(json.dumps(data), encoding="utf-8")
-    for directory in ("rules", "rulesets"):
-        (project / "manifests" / directory).mkdir()
-    descriptor = project / "bundle/nodes/model.jsonc"
+    descriptor = sdk_resource(project, 'node', 'example.model')
     data = json.loads(descriptor.read_text())
     data.update({"base_libs": ["example.model_helper"], "rulesets": ["test.source"], "metadata": {"nested": {"count": 7}}})
     descriptor.write_text(json.dumps(data), encoding="utf-8")
@@ -58,18 +53,16 @@ def source_project(tmp_path: Path) -> Path:
 
 def _rule(project: Path, name: str, source: str, *, inputs=None, outputs=None) -> None:
     (project / "rules" / (name + ".ts")).write_text(source, encoding="utf-8")
-    (project / "manifests/rules" / (name + ".jsonc")).write_text(json.dumps({
+    (sdk_resource(project, "rule", "test." + name)).write_text(json.dumps({
         "kind": "rule", "id": "test." + name, "inputs": inputs or {}, "outputs": outputs or {},
         "implementations": [{"language": "typescript",
             "source": {"kind": "file", "ref": "rules/" + name + ".ts", "export": "check"}}]}), encoding="utf-8")
 
 
 def _execute(project: Path, calls, relations=(), *, completed: bool = True):
-    (project / "manifests/rulesets/source.jsonc").write_text(json.dumps({
+    (sdk_resource(project, "ruleset", "test.source")).write_text(json.dumps({
         "kind": "ruleset", "id": "test.source", "calls": calls, "relations": relations,
         "entrypoints": {"static": [calls[-1]["id"]], "import": [], "run": []}}), encoding="utf-8")
-    from tests.fixtures.support.code_plugins import migrate_fixture
-    migrate_fixture(project)
     catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/model.jsonc")
     import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set(), node_ids=frozenset({"example.model"}))
     report = run_javascript_rules(GraphConfig(nodes=(NodeSpec("model", "example.model"),), rulesets=()),
@@ -167,7 +160,7 @@ def test_two_real_rules_cannot_mutate_shared_facts_records_or_source_results(sou
 def test_real_rule_binding_errors_keep_declaration_implementation_and_owner(source_project: Path, failure: str) -> None:
     _rule(source_project, "missing", 'export function check() { return {findings:[]}; }\n')
     module = source_project / "rules/missing.ts"
-    manifest = source_project / "manifests/rules/missing.jsonc"
+    manifest = sdk_resource(source_project, "rule", "test.missing")
     if failure == "source":
         module.unlink()
     else:

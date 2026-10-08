@@ -57,18 +57,6 @@ _EXPORTS = {
         "vibeflow.targets.python.quality.workflow",
         "validate_graph_health",
     ),
-    "validate_node_config_health": (
-        "vibeflow.targets.python.quality.workflow",
-        "validate_node_config_health",
-    ),
-    "validate_nodeset_depth": (
-        "vibeflow.targets.python.quality.workflow",
-        "validate_nodeset_depth",
-    ),
-    "validate_nodesets": (
-        "vibeflow.targets.python.quality.workflow",
-        "validate_nodesets",
-    ),
 }
 
 __all__ = sorted(_EXPORTS)

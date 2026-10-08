@@ -1,0 +1,159 @@
+{
+  "baseline": {
+    "head": "9c443f3111e65e6f99842d86d983416a745d391b",
+    "source": "/tmp/vf-review-performance-baseline/src"
+  },
+  "findings": [
+    {
+      "id": "python.compiler.disposed_hooks",
+      "classification": "bug",
+      "status": "confirmed_current_and_baseline",
+      "sources": [
+        {
+          "path": "src/vibeflow/tooling/application/python/workspace_service.py",
+          "line": 404
+        },
+        {
+          "path": "src/vibeflow/tooling/application/python/workspace_service.py",
+          "line": 415
+        },
+        {
+          "path": "src/vibeflow/tooling/application/python/workspace_service.py",
+          "line": 418
+        },
+        {
+          "path": "src/vibeflow/targets/python/quality/workflow/validation.py",
+          "line": 57
+        }
+      ],
+      "observed": {
+        "current_exit": 1,
+        "baseline_exit": 1,
+        "hooks": [
+          "created",
+          "before:False",
+          "after:False",
+          "dispose",
+          "before:True"
+        ],
+        "code": "GRAPH.COMPILE",
+        "severity": "error"
+      },
+      "evidence": [
+        "current-compiler-disposed.json",
+        "baseline-compiler-disposed.json"
+      ],
+      "minimal_fix": "Keep compiler lifecycle in its compile/transform phase; post-Rule fact compilation must not call already disposed compiler hooks."
+    },
+    {
+      "id": "python.compiler.source_scope_mutation",
+      "classification": "bug",
+      "status": "confirmed_current_and_baseline",
+      "sources": [
+        {
+          "path": "src/vibeflow/targets/python/project/compiler.py",
+          "line": 206
+        },
+        {
+          "path": "src/vibeflow/targets/python/project/compiler.py",
+          "line": 209
+        },
+        {
+          "path": "src/vibeflow/tooling/application/python/project/declarations.py",
+          "line": 151
+        },
+        {
+          "path": "src/vibeflow/tooling/application/python/project/declarations.py",
+          "line": 156
+        }
+      ],
+      "observed": {
+        "current_validate_exit": 0,
+        "baseline_validate_exit": 0,
+        "current_run_exit": 1,
+        "baseline_run_exit": 1,
+        "code": "AUDIT.LOAD_STATE.MISSING",
+        "severity": "error",
+        "location": {
+          "path": "/tmp/vf-python-adaptation-audit/unused-node-load-rule/a.py",
+          "line": 1
+        }
+      },
+      "evidence": [
+        "unused-node-source-scope/probe.json",
+        "unused-node-load-rule/validate-actual.json",
+        "unused-node-load-rule/run-actual.json",
+        "unused-node-load-rule/validate-baseline.json",
+        "unused-node-load-rule/run-baseline.json"
+      ],
+      "minimal_fix": "Make auxiliary implementation analysis a pure scoped query, or restore all registry/session state changed by the source loader."
+    },
+    {
+      "id": "python.inspect_config.duplicate_assembly",
+      "classification": "performance",
+      "status": "confirmed_current",
+      "sources": [
+        {
+          "path": "src/vibeflow/tooling/application/python/cli/__init__.py",
+          "line": 375
+        },
+        {
+          "path": "src/vibeflow/tooling/application/python/cli/__init__.py",
+          "line": 388
+        },
+        {
+          "path": "src/vibeflow/tooling/application/python/cli/config.py",
+          "line": 78
+        },
+        {
+          "path": "src/vibeflow/tooling/application/python/cli/config.py",
+          "line": 85
+        }
+      ],
+      "observed": {
+        "fixture": {
+          "nodes": 8,
+          "base_libs": 1
+        },
+        "validate": {
+          "environment": 1,
+          "health": 1,
+          "compile": 2,
+          "call_rule": 8,
+          "source_parse_each": 1
+        },
+        "inspect_workspace": {
+          "environment": 2,
+          "health": 2,
+          "compile": 4,
+          "call_rule": 16,
+          "source_parse_each": 2
+        },
+        "inspect_project": {
+          "environment": 1,
+          "health": 1,
+          "compile": 4,
+          "call_rule": 8,
+          "base_lib_and_group_source_parse_each": 12,
+          "terminal_source_parse": 6,
+          "plugin_source_parse": 3
+        }
+      },
+      "evidence": [
+        "inspect-config/comparison.json",
+        "inspect-config/inspect-config-project-actual.json"
+      ],
+      "minimal_fix": "Both inspect-config branches should consume one checked assembly and final compilation inside one private session."
+    }
+  ],
+  "not_a_confirmed_bug": {
+    "descriptor_authority": "Registry configuration and runtime contracts use descriptors / resolved Graph; class binding is used for execution. No contrary metadata authority confirmed in this audit."
+  },
+  "reproduction_script": "/tmp/vf-python-adaptation-audit/reproduce_existing.py",
+  "boundaries": [
+    "No repository source or test edits",
+    "No full gate or heavy tasks",
+    "No VibeTrain access",
+    "Uncalled imported Nodeset fixture is legal in formal CLI; the earlier inline fixture is only the pure Graph API probe"
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "head": "9c443f3111e65e6f99842d86d983416a745d391b",
+  "product_unchanged_during_review": true,
+  "product_files": 334,
+  "pytest": {
+    "passed": 1471,
+    "failed": 0,
+    "log": "dist/python-comprehension-independent-review-20261008/tests.log"
+  },
+  "quality_selftest": {
+    "passed": 49,
+    "failed": 0
+  },
+  "original_replay_total": 821,
+  "original_replay_mismatches": 0,
+  "new_static_cases_per_product": 36,
+  "current_static_mismatches": 18,
+  "new_static_introduced_mismatches": [],
+  "new_static_improvements": [
+    "real_inputs_escape.node"
+  ],
+  "new_cli_cases_per_product": 10,
+  "current_cli_mismatches": 5,
+  "findings": [
+    {
+      "id": "F03",
+      "priority": 2,
+      "classification": "retained",
+      "type": "false_positive",
+      "static_cases": 16,
+      "formal_cases": 3
+    },
+    {
+      "id": "F04",
+      "priority": 2,
+      "classification": "retained",
+      "type": "false_negative",
+      "static_cases": 2,
+      "formal_cases": 2
+    }
+  ],
+  "product_code_modified_by_review": false,
+  "full_regression_reexecuted": false
+}

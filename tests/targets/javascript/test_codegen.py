@@ -19,14 +19,18 @@ TARGET_ROOT = SOURCE_ROOT / "vibeflow" / "targets" / "javascript"
 FRONTEND_ROOT = TARGET_ROOT / "frontend"
 
 # Plugin ABI v3 ships the code SDK and its binding loader.
-RESOURCE_SHA256 = {'plugin_abi.d.ts': '1e3536feb02310d31f5f58cd95ce57f40d6f1c5814651107655df600739f08cb',
- 'plugin_worker.mjs': 'efc2595246c395142fd01bbb4822e74a061e161ed4205d57dc7e2e9906138dd1',
+RESOURCE_SHA256 = {'analysis_program.mjs': '3c640186cbb5b74238fa8a9822980bbdecc8295390c238722a2b1e8c518b83e5',
+ 'node_observation.mjs': '59da6bb0d8be799ae53dec1607c283df842cf57ec73ef153e35216400215510e',
+ 'plugin_abi.d.ts': '1e3536feb02310d31f5f58cd95ce57f40d6f1c5814651107655df600739f08cb',
+ 'plugin_worker.mjs': 'da41ed0c49961f682ab1e8f78a7e9bb25512b7ce9c5a3a468d82461f2fcf4949',
  'rule_abi.d.ts': '985f229f744ba14ceccc057d0293e460ce9e4661c7b959e4dde2c2e520b1c308',
- 'runtime_helpers.mjs': '77747ef8c71c76054639bedcb4852836ec72920ec9f3f88c09dcbdd1bc3b1bcd',
- 'sdk.d.ts': 'a2615a1b4121b09d75bc665376377c387bbaea305a2920335c0c811c23d543f8',
- 'sdk.mjs': '7df73ff6c74aec534dfb6eaa9813acf6728dc32a8ff670d61f16888faeb22715',
- 'sdk_loader.mjs': 'd9a5f18235a5d881fc0abff6683887c0400c18e621f041bbfbdae16df596d2d9',
- 'toolchain_driver.mjs': '977bf438ef07c3f4a3163b0f9cc52c365c3cb39b15fa88c35be0b1c360c649d7'}
+ 'runtime_helpers.mjs': '7c1f38667fb6bd5b85822be3e7607de88ea71d1ec9a6515145faa7f2b3af247e',
+ 'sdk.d.ts': '74979716121edc59860148b1fb0c39616b5ce695c00afae251db4c62a45f3826',
+ 'sdk.mjs': 'e90d8d02537a3af9d5592f23c1a9c296ab66da098443ea1980801a749ed062d2',
+ 'sdk_loader.mjs': 'c6774773501c5f4f6190baeb6d0f2bc6707da632f2035e5fd646da94edbda5c8',
+ 'source_ownership.mjs': '957310161d44b100c0ef78b47aa21a7a2623a225d8512a20b9330237f8a94ce7',
+ 'status_helpers.mjs': 'ab9bc7282b17d669ed17fe78c8c254b510abaf139762e15f5558aa0accf53c60',
+ 'toolchain_driver.mjs': '8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58'}
 
 
 def _run_isolated(source: str) -> None:
@@ -83,7 +87,8 @@ def test_target_resource_api_is_closed_and_templates_use_canonical_runtime() -> 
     from vibeflow.targets.javascript.frontend.templates import RUNTIME_SOURCE
 
     assert resources.RESOURCE_NAMES == frozenset(RESOURCE_SHA256)
-    assert RUNTIME_SOURCE == resources.read_text("runtime_helpers.mjs").strip()
+    assert RUNTIME_SOURCE == (resources.read_text("runtime_helpers.mjs").strip() + "\n"
+                              + resources.read_text("status_helpers.mjs"))
     with pytest.raises(ValueError, match="unknown JavaScript Target resource"):
         resources.resource("../runtime_helpers.mjs")
 

@@ -44,9 +44,10 @@ def handle_quality_check(args: argparse.Namespace) -> int:
     structure_overrides = _quality_structure_overrides(args)
     structure_enabled = _quality_structure_enabled(args, bool(structure_overrides))
     catalogs_by_root = {}
-    workflow_reports = _python_quality_workflow_reports(args, catalogs_by_root=catalogs_by_root)
+    parse_cache = {}
+    workflow_reports = _python_quality_workflow_reports(args, catalogs_by_root=catalogs_by_root, _parse_cache=parse_cache)
     if getattr(args, "workspace", None) and args.path is None:
-        report = _workspace_quality_report(args, thresholds, structure_overrides, structure_enabled, excluded_dirs, catalogs_by_root)
+        report = _workspace_quality_report(args, thresholds, structure_overrides, structure_enabled, excluded_dirs, catalogs_by_root, _parse_cache=parse_cache)
     else:
         scope = _quality_workspace_scope(args)
         roles = None
@@ -61,6 +62,7 @@ def handle_quality_check(args: argparse.Namespace) -> int:
             excluded_dirs=excluded_dirs,
             check_side_effects=bool(args.check_side_effects),
             structure_roles=roles,
+            _parse_cache=parse_cache,
         )
     if isinstance(report, HealthReport):
         source_payload = report.to_dict()
@@ -116,11 +118,12 @@ def _quality_workspace_scope(args):
     return workspace, roots
 
 
-def _python_quality_workflow_reports(args: argparse.Namespace, *, catalogs_by_root=None) -> list[dict[str, object]]:
+def _python_quality_workflow_reports(args: argparse.Namespace, *, catalogs_by_root=None, _parse_cache=None) -> list[dict[str, object]]:
     from vibeflow.core.findings import HealthReport
     from vibeflow.tooling.application.python.workspace_service import _environment_or_report, validate_workspace_config_path
     from vibeflow.tooling.project.workflow_discovery import workflow_configs_for_root
     from vibeflow.tooling.project.workspace_loader import WorkspaceConfigError
+    from vibeflow.tooling.application.python.presentation.prepared import python_check_scope
     try:
         scope = _quality_workspace_scope(args)
     except WorkspaceConfigError:
@@ -134,14 +137,18 @@ def _python_quality_workflow_reports(args: argparse.Namespace, *, catalogs_by_ro
             continue
         for config in workflow_configs_for_root(root):
             environment = _environment_or_report(workspace, config)
-            result = validate_workspace_config_path(config, workspace=workspace, environment=environment)
+            if isinstance(environment, HealthReport):
+                result = environment
+            else:
+                with python_check_scope(environment.registry, _parse_cache=_parse_cache):
+                    result = validate_workspace_config_path(config, workspace=workspace, environment=environment)
             if catalogs_by_root is not None and not isinstance(environment, HealthReport):
                 catalogs_by_root.setdefault(root.id, []).append(environment.registry.loaded_plugins.catalogs)
             reports.append({"config": str(config), **result.to_dict()})
     return reports
 
 
-def _workspace_quality_report(args, thresholds, structure_overrides, structure_enabled, excluded_dirs, catalogs_by_root=None):
+def _workspace_quality_report(args, thresholds, structure_overrides, structure_enabled, excluded_dirs, catalogs_by_root=None, *, _parse_cache=None):
     from vibeflow.core.findings import HealthReport
     from vibeflow.tooling.application.python.workspace_service import scan_workspace_code_quality
 
@@ -156,6 +163,7 @@ def _workspace_quality_report(args, thresholds, structure_overrides, structure_e
         excluded_dirs=excluded_dirs,
         check_side_effects=bool(args.check_side_effects),
         catalogs_by_root=catalogs_by_root,
+        _parse_cache=_parse_cache,
     )
 
 

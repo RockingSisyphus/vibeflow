@@ -1,0 +1,42 @@
+{
+  "input": {
+    "pipeline": {
+      "nodes": [
+        {
+          "id": "process",
+          "type_used": "demo.process",
+          "display_name": "Process",
+          "description": "Produce declared output.",
+          "requires": [],
+          "provides": [
+            {
+              "key": "value.out",
+              "type": "value.out",
+              "display_name": "Value"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "results": [
+    {
+      "parser": "canonical",
+      "accepted": false,
+      "exception": "GraphConfigError",
+      "message": "Graph config error: pipeline.nodes[0].requires is derived from type_used and must not be declared"
+    },
+    {
+      "parser": "tests.targets.python.strict_node_purity",
+      "accepted": true,
+      "requires": [],
+      "provides": []
+    },
+    {
+      "parser": "tests.targets.python.strict_plugins",
+      "accepted": true,
+      "requires": [],
+      "provides": []
+    }
+  ]
+}

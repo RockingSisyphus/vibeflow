@@ -1,0 +1,46 @@
+{
+  "current": "9c443f3111e65e6f99842d86d983416a745d391b",
+  "current_includes_working_files": true,
+  "groups": [
+    "python",
+    "javascript",
+    "graph",
+    "tooling",
+    "composition",
+    "resources"
+  ],
+  "workers": 8,
+  "summary": {
+    "cases": 680,
+    "matched": 680,
+    "unmatched": 0,
+    "process_errors": 0,
+    "families": {
+      "domain-native-composition": 20,
+      "rule_graph.finding_boundary": 21,
+      "rule_graph.includes": 4,
+      "rule_graph.invalid_graph": 8,
+      "rule_graph.implementation_leaf": 12,
+      "rule_graph.implementation_leaf_control": 12,
+      "rule_graph.replacement": 12,
+      "rule_graph.source_cache": 12,
+      "javascript.bundle.native_resources": 11,
+      "javascript.rule.platform_selection": 10,
+      "javascript.records.portability": 12,
+      "javascript.sources.graph": 3,
+      "javascript.sources.availability": 1,
+      "node-import-isolation": 3,
+      "planned-helper-closure": 4,
+      "helper-ownership": 4,
+      "resource-display": 103,
+      "resource-edits": 47,
+      "resource-ownership": 160,
+      "resource-registration": 77,
+      "resource-rules": 42,
+      "resource-runtime": 46,
+      "declaration_contract": 48,
+      "workspace_rule_scope": 8
+    }
+  },
+  "errors": []
+}

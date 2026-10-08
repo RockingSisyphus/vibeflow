@@ -1,0 +1,9 @@
+{
+  "source_report": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/rule-parity.json",
+  "summary": {
+    "cases": 1219,
+    "matched": 1219,
+    "unmatched": 0,
+    "process_errors": 0
+  }
+}

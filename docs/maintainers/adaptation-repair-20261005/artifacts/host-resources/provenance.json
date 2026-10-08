@@ -1,0 +1,32 @@
+{
+  "case_id": "resources.display.host_extension.colours",
+  "kind": "formal review with Node BaseLib Plugin and Host",
+  "files": {
+    "diagram-browser.json": {
+      "source": "/tmp/vf-adaptation-full-accepted/rule-gaps/resources/projects/display/display.host_extension.colours/evidence/diagram-browser.json",
+      "sha256": "5fe785aa0b01d1f7706eddd2903418387b7df92dceac0a0ae0d63cee2900c6da"
+    },
+    "diagram.png": {
+      "source": "/tmp/vf-adaptation-full-accepted/rule-gaps/resources/projects/display/display.host_extension.colours/evidence/diagram.png",
+      "sha256": "81b79d3ae0142c9da5d984f80b391ee77fb2841d3b061c63eee342bb6738d490"
+    },
+    "diagram.mmd": {
+      "source": "/tmp/vf-adaptation-full-accepted/rule-gaps/resources/projects/display/display.host_extension.colours/evidence/diagram.mmd",
+      "sha256": "3f0f4a16074dff7d5006d4e055d15a369ae403f5127692f27caf0d80c31be585"
+    },
+    "diagram.json": {
+      "source": "/tmp/vf-adaptation-full-accepted/rule-gaps/resources/projects/display/display.host_extension.colours/evidence/diagram.json",
+      "sha256": "691a2cc8059c4068e2a83ebf54ab8aee03816eabfe32e155261e47f6bd646800"
+    },
+    "diagram.svg": {
+      "source": "/tmp/vf-adaptation-full-accepted/rule-gaps/resources/projects/display/display.host_extension.colours/evidence/diagram.svg",
+      "sha256": "8c78b86a715497b70229ea0d873be9ff5151f3645a5dc74c21d8ef2068e50b2e"
+    },
+    "ARCHITECTURE.jsonc": {
+      "source": "/tmp/vf-adaptation-full-accepted/rule-gaps/resources/projects/display/display.host_extension.colours/ARCHITECTURE.jsonc",
+      "sha256": "486c8097fd45c72d1e47b1523b10eb001938a5e811a7c096456fb822be778cb9"
+    }
+  },
+  "source_manifest": "../../fixed-source.json",
+  "browser_evidence": "observation.json"
+}

@@ -54,8 +54,8 @@ def test_pipeline_interface_preserves_legacy_and_exposes_aot_fields() -> None:
     )
 
     assert graph.inputs == (
-        PipelineInputSpec("request", "request.v1", "Request", True),
-        PipelineInputSpec("hint", "hint.v1", "Hint", False),
+        PipelineInputSpec("request", "request.v1", "Request", required=True),
+        PipelineInputSpec("hint", "hint.v1", "Hint", required=False),
     )
     assert graph.outputs == (
         PipelineOutputSpec("response.v1", "exactly_one", "Response", "response"),
@@ -63,33 +63,13 @@ def test_pipeline_interface_preserves_legacy_and_exposes_aot_fields() -> None:
     assert graph.outputs[0].public_name == "response"
 
 
-def test_pipeline_input_requiredness_is_legacy_optional_but_must_be_boolean() -> None:
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "inputs": [{"key": "value", "type": "value.v1", "display_name": "Value"}],
-                "nodes": [_terminal_node()],
-            }
-        }
-    )
-    assert graph.inputs[0].required is None
-
-    with pytest.raises(GraphConfigError, match="required must be a boolean"):
-        parse_graph_config(
-            {
-                "pipeline": {
-                    "inputs": [
-                        {
-                            "key": "value",
-                            "type": "value.v1",
-                            "display_name": "Value",
-                            "required": "yes",
-                        }
-                    ],
-                    "nodes": [_terminal_node()],
-                }
-            }
-        )
+@pytest.mark.parametrize("required", [None, 0, 1, "yes", "missing"])
+def test_pipeline_inputs_require_explicit_boolean(required) -> None:
+    item = {"key": "value", "type": "value.v1", "display_name": "Value"}
+    if required != "missing":
+        item["required"] = required
+    with pytest.raises(GraphConfigError, match="required must be explicitly true or false"):
+        parse_graph_config({"pipeline": {"inputs": [item], "nodes": [_terminal_node()]}})
 
 
 def test_pipeline_output_aliases_are_unique() -> None:

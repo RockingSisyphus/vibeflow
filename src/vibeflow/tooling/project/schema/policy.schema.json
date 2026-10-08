@@ -94,29 +94,6 @@
         }
       }
     },
-    "base_lib": {
-      "type": "object",
-      "properties": {
-        "allowed_paths": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "allowed_modules": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "banned_modules": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
     "maintainability": {
       "type": "object",
       "properties": {
@@ -137,6 +114,10 @@
           "minimum": 1
         }
       }
+    },
+    "base_lib": {
+      "not": {},
+      "description": "Removed: declare BaseLib dependencies on resources through the SDK."
     }
   },
   "$defs": {}

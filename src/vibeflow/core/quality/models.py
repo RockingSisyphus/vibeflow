@@ -96,10 +96,9 @@ class QualityStructureLimits:
 
 @dataclass(frozen=True)
 class QualityStructureRoles:
-    base_lib_paths: tuple[str, ...] = ("base_lib",)
-    base_lib_modules: tuple[str, ...] = ()
-    module_roles: Mapping[str, str] = field(default_factory=dict)
-    infer_roles_from_path: bool = True
+    """Target-supplied ownership for each selected workflow's declarations."""
+
+    _resource_scopes: tuple[Mapping[str, object], ...] = field(default=(), repr=False)
 
 
 @dataclass(frozen=True)

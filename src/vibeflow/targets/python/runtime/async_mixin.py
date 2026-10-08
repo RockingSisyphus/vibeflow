@@ -18,7 +18,7 @@ class RuntimeAsyncMixin:
         node_name: str,
         active_edges: tuple["EdgeSpec", ...],
     ) -> tuple[str, ...]:
-        """Return runnable and deferred-result targets in stable edge order.
+        """Return targets in stable edge order, starting tasks before an exit.
 
         A ``result_key`` node starts before its outputs exist, so conditions on
         those outputs cannot be evaluated on the first scheduler pass. Queueing
@@ -33,6 +33,15 @@ class RuntimeAsyncMixin:
                 target = str(edge.target)
                 if target not in targets:
                     targets.append(target)
+        # Core groups synchronous schedule edges before asynchronous edges.
+        # An end terminal stops this scheduler, so tasks activated by this same
+        # transition must be started before that terminal can discard the queue.
+        for index, target in enumerate(targets):
+            if self._is_end_terminal(target):
+                remaining = targets[index:]
+                return tuple((*targets[:index],
+                    *(name for name in remaining if self._frames[name].async_mode),
+                    *(name for name in remaining if not self._frames[name].async_mode)))
         return tuple(targets)
 
     def _run_async_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:

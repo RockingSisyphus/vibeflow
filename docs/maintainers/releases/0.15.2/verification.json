@@ -1,0 +1,137 @@
+{
+  "schema": "vibeflow.release-verification.v1",
+  "version": "0.15.2",
+  "state": "verified",
+  "finished_at": "2026-10-06T15:28:51.270586+08:00",
+  "build": {
+    "command": "python -B distribution/build.py",
+    "exit_code": 0,
+    "log": "build.log"
+  },
+  "packages": [
+    {
+      "profile": "collaborative",
+      "archive": "archive/vibeflow-distribution-0.15.2.zip",
+      "bytes": 808553,
+      "sha256": "b057dcae5502a19b7faafde4fcfa15e04eb20a68d46c8fc52a9acf22742767b6",
+      "kernel_sha256": "b4f75808f77ec2132489104c34d9dcfde4092ec07ca687fe4aa3fbc5dcdd01cf",
+      "version": "0.15.2",
+      "extracted": "/home/rockingsisyphus/.cache/vibeflow-verification/release-0.15.2-20261006/collaborative/vibeflow-distribution",
+      "installed_kernel": "/home/rockingsisyphus/.cache/vibeflow-verification/release-0.15.2-20261006/collaborative/installed-kernel",
+      "canonical_documents_and_prompt": true,
+      "kernel_source_matches": true,
+      "deleted_renderer_absent": true
+    },
+    {
+      "profile": "autonomous",
+      "archive": "archive/vibeflow-distribution-autonomous-0.15.2.zip",
+      "bytes": 807818,
+      "sha256": "65e1d861c7e87aa5c906c0cc0c59b5dee528ab877210b964bec11e23323883f1",
+      "kernel_sha256": "b4f75808f77ec2132489104c34d9dcfde4092ec07ca687fe4aa3fbc5dcdd01cf",
+      "version": "0.15.2",
+      "extracted": "/home/rockingsisyphus/.cache/vibeflow-verification/release-0.15.2-20261006/autonomous/vibeflow-distribution",
+      "installed_kernel": "/home/rockingsisyphus/.cache/vibeflow-verification/release-0.15.2-20261006/autonomous/installed-kernel",
+      "canonical_documents_and_prompt": true,
+      "kernel_source_matches": true,
+      "deleted_renderer_absent": true
+    }
+  ],
+  "distribution_tests": {
+    "passed": 39,
+    "failed": 0,
+    "seconds": 30.07,
+    "workers": 8,
+    "exit_code": 0,
+    "log": "distribution-tests.log"
+  },
+  "isolated_package_checks": {
+    "collaborative": {
+      "layout": {
+        "summary": {
+          "cases": 4,
+          "matched": 4,
+          "unmatched": 0,
+          "observation_errors": 0
+        },
+        "report": "collaborative-layout.json"
+      },
+      "javascript": {
+        "summary": {
+          "cases": 14,
+          "matched": 14,
+          "unmatched": 0,
+          "expected_cases": 14,
+          "observation_errors": 0
+        },
+        "report": "collaborative-javascript.json"
+      }
+    },
+    "autonomous": {
+      "layout": {
+        "summary": {
+          "cases": 4,
+          "matched": 4,
+          "unmatched": 0,
+          "observation_errors": 0
+        },
+        "report": "autonomous-layout.json"
+      },
+      "javascript": {
+        "summary": {
+          "cases": 14,
+          "matched": 14,
+          "unmatched": 0,
+          "expected_cases": 14,
+          "observation_errors": 0
+        },
+        "report": "autonomous-javascript.json"
+      }
+    }
+  },
+  "source_snapshot": {
+    "files": 348,
+    "sha256": "b6a1c4ca336ef5e060e0ace4964627fb270d03ed67bb804a97e973776bdd1923",
+    "algorithm": "sha256 of compact JSON ordered src path / file-sha256 pairs, .py/.mjs/.ts/.json only"
+  },
+  "same_source_full_regression": {
+    "passed": 2041,
+    "report": "../../user-svg-boundary-verification-20261006.json",
+    "reexecuted_this_build": false
+  },
+  "prior_attempts": [
+    {
+      "log": "distribution-tests-quota-attempt.log",
+      "passed": 32,
+      "failed": 7,
+      "observation": "Temporary filesystem quota errors and renderer timeout; not accepted."
+    },
+    {
+      "log": "distribution-tests-npm-quota-attempt.log",
+      "passed": 38,
+      "failed": 1,
+      "observation": "npm cache write error errno -122; not accepted."
+    },
+    {
+      "log": "renderer-targeted.log",
+      "exit_code": 5,
+      "observation": "Node-ID selection collected no tests; not accepted."
+    },
+    {
+      "log": "renderer-targeted-selection.log",
+      "passed": 1,
+      "failed": 0,
+      "observation": "Explicit file and -k selection with dedicated npm cache."
+    },
+    {
+      "reports": "*-quota-attempt.json",
+      "observation": "Initial isolated observers failed on filesystem quota."
+    },
+    {
+      "reports": "*-socket-attempt.json",
+      "observation": "Real CLI succeeded; browser failed because TMPDIR exceeded Unix socket pathname limit."
+    }
+  ],
+  "verify_project_full_executed": false,
+  "git_committed": false,
+  "github_published": false
+}

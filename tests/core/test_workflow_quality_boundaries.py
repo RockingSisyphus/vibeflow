@@ -82,11 +82,12 @@ def test_planned_structural_and_python_source_events_keep_finding_order(
     tmp_path: Path,
 ) -> None:
     from vibeflow.tooling.project.graph_config import parse_graph_config
-    from vibeflow.targets.python.quality.workflow.planned import append_planned_findings
-    from vibeflow.targets.python.quality.workflow.validation import _HealthValidationState
+    from vibeflow.targets.python.quality.workflow import validate_graph_health
+    from tests.fixtures.support.declarations import native_registry
 
     graph = parse_graph_config(
         {
+            "rulesets": ["vibeflow.workflow"],
             "pipeline": {
                 "nodes": [
                         {
@@ -107,15 +108,13 @@ def test_planned_structural_and_python_source_events_keep_finding_order(
         },
         project_root=tmp_path,
     )
-    state = _HealthValidationState()
+    report = validate_graph_health(graph, registry=native_registry())
 
-    append_planned_findings(graph, state)
-
-    assert [finding.rule_id for finding in state.warnings] == [
+    assert [finding.rule_id for finding in report.warnings if finding.rule_id.startswith("GRAPH.PLANNED.")] == [
         "GRAPH.PLANNED.NODE",
         "GRAPH.PLANNED.PYTHON_STUB_DEV_ONLY",
     ]
-    assert [finding.rule_id for finding in state.errors] == [
+    assert [finding.rule_id for finding in report.errors if finding.rule_id.startswith("GRAPH.PLANNED.")] == [
         "GRAPH.PLANNED.STUB_MISSING"
     ]
 

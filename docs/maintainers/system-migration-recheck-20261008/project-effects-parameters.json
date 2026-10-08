@@ -1,0 +1,46 @@
+[
+  {
+    "scope": "none",
+    "state": "completed",
+    "finding_codes": [
+      "QUALITY.SIDE_EFFECT.CALL"
+    ],
+    "policy_record": {
+      "effect_scope": "none",
+      "source": "vibeflow.no_side_effects"
+    }
+  },
+  {
+    "scope": "python_io",
+    "state": "completed",
+    "finding_codes": [
+      "QUALITY.SIDE_EFFECT.CALL"
+    ],
+    "policy_record": {
+      "effect_scope": "python_io",
+      "source": "vibeflow.no_side_effects"
+    }
+  },
+  {
+    "scope": "terminal",
+    "state": "completed",
+    "finding_codes": [
+      "QUALITY.SIDE_EFFECT.CALL"
+    ],
+    "policy_record": {
+      "effect_scope": "terminal",
+      "source": "vibeflow.no_side_effects"
+    }
+  },
+  {
+    "scope": "trusted",
+    "state": "completed",
+    "finding_codes": [
+      "QUALITY.SIDE_EFFECT.CALL"
+    ],
+    "policy_record": {
+      "effect_scope": "trusted",
+      "source": "vibeflow.no_side_effects"
+    }
+  }
+]

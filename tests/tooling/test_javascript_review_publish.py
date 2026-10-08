@@ -68,14 +68,28 @@ def _review_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     return args, result, architecture, svg, rendered_architecture
 
 
-def test_review_pair_failure_restores_both_previous_documents(
+def _write_review_svg(_result, output: Path, **_kwargs) -> None:
+    output.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" '
+        'aria-roledescription="flowchart-review-columns">'
+        '<g class="review-inline-fragment" data-review-kind="workflow" '
+        'data-review-owner="" data-review-target="demo"><g/></g></svg>',
+        encoding="utf-8",
+    )
+
+
+def test_review_publish_failure_keeps_new_architecture_and_old_svg(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    architecture = tmp_path / "ARCHITECTURE.jsonc"
-    svg = tmp_path / "review.svg"
+    from vibeflow.tooling.application.javascript import review
+
+    args, result, architecture, svg, rendered = _review_fixture(tmp_path, monkeypatch)
     architecture.write_text("old architecture\n", encoding="utf-8")
     svg.write_text("old svg\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "_audit", lambda _args: (result, None))
+    monkeypatch.setattr(review, "write_review_svg", _write_review_svg)
     real_replace = os.replace
 
     def fail_svg_publish(source, destination):
@@ -87,18 +101,17 @@ def test_review_pair_failure_restores_both_previous_documents(
 
     monkeypatch.setattr(cli.os, "replace", fail_svg_publish)
 
-    with pytest.raises(OSError, match="injected SVG"):
-        cli._publish_review_pair(
-            (
-                (architecture, "new architecture\n"),
-                (svg, "new svg\n"),
-            )
-        )
+    assert cli.handle_review(args) == 1
 
-    assert architecture.read_text(encoding="utf-8") == "old architecture\n"
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["failed_stage"] == "publish"
+    assert payload["code"] == "REVIEW.SVG.PUBLISH"
+    assert payload["published"] is False
+    assert "injected SVG publish failure" in payload["error"]["message"]
+    assert architecture.read_text(encoding="utf-8") == rendered
     assert svg.read_text(encoding="utf-8") == "old svg\n"
     assert not tuple(tmp_path.glob(".*.tmp"))
-    assert not tuple(tmp_path.glob(".*.backup"))
+    assert not tuple(architecture.parent.glob(".*.tmp"))
 
 
 def test_review_svg_coverage_rejects_missing_nodeset_fragment(tmp_path: Path) -> None:
@@ -174,6 +187,35 @@ def test_review_renderer_failure_keeps_new_architecture_and_old_svg(
     assert svg.read_text(encoding="utf-8") == "old svg\n"
 
 
+def test_review_coverage_failure_keeps_new_architecture_and_old_svg(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from vibeflow.tooling.application.javascript import review
+
+    args, result, architecture, svg, rendered = _review_fixture(tmp_path, monkeypatch)
+    svg.write_text("old svg\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "_audit", lambda _args: (result, None))
+    monkeypatch.setattr(review, "write_review_svg", _write_review_svg)
+    monkeypatch.setattr(
+        review,
+        "expected_review_coverage",
+        lambda _result: frozenset({("workflow", "", "demo"), ("nodeset", "workflow", "demo.group")}),
+    )
+
+    assert cli.handle_review(args) == 1
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "FAIL"
+    assert payload["failed_stage"] == "svg_check"
+    assert payload["code"] == "REVIEW.SVG.COVERAGE"
+    assert payload["published"] is False
+    assert architecture.read_text(encoding="utf-8") == rendered
+    assert svg.read_text(encoding="utf-8") == "old svg\n"
+    assert not tuple(tmp_path.glob(".*.tmp"))
+
+
 def test_review_publishes_single_json_and_coverage_checked_svg(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -184,16 +226,7 @@ def test_review_publishes_single_json_and_coverage_checked_svg(
     args, result, architecture, svg, rendered = _review_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(cli, "_audit", lambda _args: (result, None))
 
-    def write_svg(_result, output: Path, **_kwargs) -> None:
-        output.write_text(
-            '<svg xmlns="http://www.w3.org/2000/svg" '
-            'aria-roledescription="flowchart-review-columns">'
-            '<g class="review-inline-fragment" data-review-kind="workflow" '
-            'data-review-owner="" data-review-target="demo"><g/></g></svg>',
-            encoding="utf-8",
-        )
-
-    monkeypatch.setattr(review, "write_review_svg", write_svg)
+    monkeypatch.setattr(review, "write_review_svg", _write_review_svg)
 
     assert cli.handle_review(args) == 0
 

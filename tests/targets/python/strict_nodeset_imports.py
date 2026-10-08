@@ -2,15 +2,15 @@ from tests.fixtures.support.strict_support import *
 
 
 def test_nodeset_imports_expand_for_validate_inspect_mermaid_and_run(tmp_path, capsys) -> None:
-    from tests.fixtures.support.declarations import write_node_manifests
-    write_node_manifests(tmp_path, [
+    from tests.fixtures.support.declarations import write_node_plugin
+    plugin = write_node_plugin(tmp_path, [
         ("test.start", "StartNode", {}, {}),
         ("test.out_end", "OutEndNode", {}, {}),
         ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}),
         ("test.add", "AddNode", {"delta": {"type": "number"}}, {"delta": 1}),
     ])
     (tmp_path / "vibeflow_project.jsonc").write_text(json.dumps({
-        "project_target": "python", "descriptors": {"nodes": ["manifests/nodes"]}}))
+        "project_target": "python"}))
     imports_path = tmp_path / "math_add_one.jsonc"
     imports_path.write_text(
         json.dumps(
@@ -28,13 +28,14 @@ def test_nodeset_imports_expand_for_validate_inspect_mermaid_and_run(tmp_path, c
     config_path.write_text(
         json.dumps(
             {
+                "plugins":[plugin],
                 "nodeset_imports": [{"path": "math_add_one.jsonc"}],
                 "pipeline": {
                     "nodes": [
                         _node_call("start", "test.start", "Starts the imported nodeset fixture."),
-                        _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")], value=4),
-                        _node_call("flow", "math.add_one", "Calls imported add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                        _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                        _node_call("seed", "test.seed", "Produces value.in.",  value=4),
+                        _node_call("flow", "math.add_one", "Calls imported add-one nodeset."),
+                        _node_call("end", "test.out_end", "Consumes value.out."),
                     ],
                     "edges": _edge_chain("start", "seed", "flow", "end"),
                     "outputs": [REQ_SPEC("value.out")],
@@ -107,7 +108,7 @@ def test_nodeset_imports_cache_reused_documents_within_one_load(tmp_path, monkey
                     {"path": "nodesets.jsonc"},
                     {"path": "nodesets.jsonc"},
                 ],
-                "pipeline": {"nodes": [_node_call("flow", "math.add_one", "Calls imported flow.", provides=[PROV_SPEC("value.out")])]},
+                "pipeline": {"nodes": [_node_call("flow", "math.add_one", "Calls imported flow.")]},
             }
         ),
         encoding="utf-8",

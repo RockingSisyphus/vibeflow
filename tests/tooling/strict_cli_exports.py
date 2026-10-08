@@ -1,16 +1,10 @@
+from tests.fixtures.support.plugins import publish_native_fixture, append_resource
+from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
 
 
-CliExternalNode_DECLARATION = node_declaration(NodeInfo(
-        type_key="test.cli_external",
-        display_name="CLI External",
-
-        description="Exercises workspace registry metadata during CLI export.",
-        version="0.1.0",
-        flow_kind="process",
-        external=True,
-    ), NodeContract(), rulesets=("vibeflow.process",))
+CliExternalNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.cli_external', display_name='CLI External', description='Exercises workspace registry metadata during CLI export.', version='0.1.0', flow_kind='process', external=True, contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.process",))
 
 class CliExternalNode:
 
@@ -51,17 +45,19 @@ def _write_nodeset_export_config(path: Path) -> None:
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the nodeset export fixture."),
-                    _node_call("input", "test.value_input", "Reads value.in.", requires=[REQ_SPEC("value.in")]),
-                    _node_call("composite", "math.add_one", "Calls the add-one composite.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("input", "test.value_input", "Reads value.in."),
+                    _node_call("composite", "math.add_one", "Calls the add-one composite."),
+                    _node_call("end", "test.out_end", "Consumes value.out at the end."),
                 ],
                 "edges": _edge_chain("start", "input", "composite", "end"),
             },
         },
     )
+
+    publish_native_fixture(path, _registry())
 
 
 @pytest.mark.parametrize(
@@ -86,70 +82,18 @@ def test_cli_export_text_formats_read_jsonc(tmp_path, capsys, command, expected)
 def test_cli_export_mermaid_includes_declared_resources(tmp_path, capsys) -> None:
     base_dir = tmp_path / "base_lib"
     base_dir.mkdir()
-    (base_dir / "__init__.py").write_text("", encoding="utf-8")
-    (base_dir / "math_tools.py").write_text(
-        """
-from vibeflow.targets.python.project import BaseLibInfo
-
-BASE_LIB_INFO = BaseLibInfo("base_lib.math_tools", "Math Tools", "math", "Pure arithmetic helpers.", "0.1.0")
-""".strip(),
-        encoding="utf-8",
-    )
-    plugin_path = tmp_path / "policy_plugin.py"
-    plugin_path.write_text(
-        """
-from vibeflow.targets.python.project import PluginInfo
-
-PLUGIN_INFO = PluginInfo("policy", "policy", "Policy", "policy", "Policy extension.", "0.1.0")
-
-class Plugin:
-    name = "policy"
-""".strip(),
-        encoding="utf-8",
-    )
+    (base_dir / "__init__.py").write_text("")
+    (base_dir / "math_tools.py").write_text("def add(a,b):\n    return a+b\n")
+    (tmp_path / "policy_plugin.py").write_text('from vibeflow.targets.python.sdk import Plugin\ndef runtime(context):\n    return object()\nplugin=Plugin(id="policy",runtime=runtime,display_name="Config Policy",description="Config-level policy declaration.")\n')
     config_path = tmp_path / "workflow.jsonc"
-    config_path.write_text(
-        json.dumps(
-            {
-                "base_lib": {
-                    "paths": ["base_lib"],
-                    "modules": [
-                        {
-                            "module": "base_lib.math_tools",
-                            "display_name": "Config Math Tools",
-                            "category": "math",
-                            "description": "Config-level math helper declaration.",
-                            "version": "0.1.0",
-                        }
-                    ],
-                },
-                "plugins": [
-                    {
-                        "module": str(plugin_path),
-                        "type": "runtime",
-                        "display_name": "Config Policy",
-                        "category": "policy",
-                        "description": "Config-level policy declaration.",
-                        "version": "0.1.0",
-                    },
-                    {
-                        "name": "future_policy",
-                        "type": "runtime",
-                        "status": "planned",
-                        "display_name": "Future Policy",
-                        "category": "policy",
-                        "description": "planned policy",
-                        "version": "0.1.0",
-                    },
-                ],
-                "pipeline": _seed_only_pipeline(),
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    from tests.fixtures.support.code_plugins import publish_runtime_fixture
-    publish_runtime_fixture(config_path, _registry())
+    config_path.write_text(json.dumps({"base_lib":{"modules":["base_lib.math_tools"]},
+        "plugins":[{"source":{"kind":"file","ref":"policy_plugin.py","export":"plugin"}},
+            {"id":"future_policy","type":"runtime","status":"planned","display_name":"Future Policy", "description":"planned policy"}],
+        "pipeline":_seed_only_pipeline()}))
+    publish_native_fixture(config_path, _registry())
+    append_resource(tmp_path, {"kind":"base_lib","id":"base_lib.math_tools","display_name":"Config Math Tools",
+        "description":"Config-level math helper declaration.","implementations":[{"language":"python","targets":["python"],
+        "source":{"kind":"file","ref":"base_lib/math_tools.py"}}]})
     code = cli_main(["export-mermaid", "--config", str(config_path)])
     output = capsys.readouterr().out
 
@@ -160,7 +104,8 @@ class Plugin:
     assert "Config Policy" in output
     assert "desc: Config-level policy declaration." in output
     assert "future_policy" in output
-    assert "class resource_plugins_1 plannedResource;" in output
+    planned = re.search(r'(resource_plugins_\d+)@\{[^\n]*Future Policy', output)
+    assert planned and f"class {planned[1]} plannedResource;" in output
 
 
 def test_cli_export_svg_reads_jsonc(tmp_path, capsys) -> None:
@@ -257,10 +202,12 @@ def test_cli_workspace_mermaid_and_collapsed_svg_keep_external_registry_metadata
         }
     )
     compiled = GraphCompiler().compile(graph, registry=registry)
+    from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
+    prepared = prepare_python_presentation(graph, compiled=compiled, registry=registry)
     monkeypatch.setattr(
         export_module,
         "_workspace_graph_or_report",
-        lambda args, validate_health=False: (graph, compiled, registry, None),
+        lambda args, validate_health=False: (graph, compiled, registry, None, prepared),
     )
 
     workspace_path = tmp_path / "vibeflow_config.jsonc"

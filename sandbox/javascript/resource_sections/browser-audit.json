@@ -1,0 +1,63 @@
+{
+  "scope": "Saved Puppeteer DOM, computed shapes/colours and screenshots of the real formal CLI SVGs",
+  "passed": true,
+  "cases": [
+    {
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/js-final-resolved/js.sections.review.default",
+      "titles": [
+        "main pipeline",
+        "Plugins",
+        "BaseLib",
+        "Host",
+        "Node types",
+        "capabilities",
+        "Outer (calls: 1 [stage], type_key: audit.outer)",
+        "parent flow",
+        "Body (calls: 1 [model], type_key: audit.body)"
+      ],
+      "nodes": 51,
+      "rule_nodes": 0,
+      "concrete_model_calls": 2,
+      "screenshot": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/js-final-resolved/js.sections.review.default/graph.png",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/js-final-resolved/js.sections.review.rules",
+      "titles": [
+        "main pipeline",
+        "Plugins",
+        "BaseLib",
+        "Host",
+        "Node types and rules",
+        "capabilities",
+        "Outer (calls: 1 [stage], type_key: audit.outer)",
+        "parent flow",
+        "Body (calls: 1 [model], type_key: audit.body)"
+      ],
+      "nodes": 97,
+      "rule_nodes": 44,
+      "concrete_model_calls": 2,
+      "screenshot": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/js-final-resolved/js.sections.review.rules/graph.png",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/js-final-resolved/js.expand.outer.false",
+      "titles": [
+        "main pipeline",
+        "Plugins",
+        "BaseLib",
+        "Host",
+        "Node types",
+        "capabilities"
+      ],
+      "nodes": 45,
+      "rule_nodes": 0,
+      "concrete_model_calls": 0,
+      "screenshot": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/js-final-resolved/js.expand.outer.false/graph.png",
+      "passed": true,
+      "failures": []
+    }
+  ]
+}

@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from dataclasses import replace
 from pathlib import PurePosixPath
 from typing import Mapping, Sequence
 
 from .structure_distance import directory_for_path
-from .models import FileQuality, ImportSite, QualityFinding, QualityStructureConventions, QualityStructureLimits, QualityStructureRoles
+from .models import FileQuality, QualityFinding, QualityStructureConventions, QualityStructureLimits, QualityStructureRoles
+from .resource_imports import resource_import_violations
 
 
 _ROOT_DIR = "(root)"
-_NODE_ROLES = frozenset({"nodes", "task_nodes"})
-_BASE_LIB_ROLE = "base_lib"
-_PLUGIN_ROLE = "plugins"
 
 
 def analyze_root_structure(
@@ -35,7 +34,7 @@ def analyze_root_structure(
         *_root_level_file_findings(stats, limits, conventions),
     ]
     if limits.enforce_role_imports:
-        findings.extend(_role_import_findings(files, dependency_graph, import_sites_by_edge, roles or QualityStructureRoles()))
+        findings.extend(_resource_import_findings(files, dependency_graph, import_sites_by_edge, roles or QualityStructureRoles()))
     return _summary(stats, limits), tuple(findings)
 
 
@@ -188,7 +187,7 @@ def _root_level_file_findings(stats: Mapping[str, object], limits: QualityStruct
     return [finding] if finding else []
 
 
-def _role_import_findings(
+def _resource_import_findings(
     files: Sequence[FileQuality],
     dependency_graph: Mapping[str, Sequence[str]],
     import_sites_by_edge: Mapping[tuple[str, str], Sequence[Mapping[str, object]]],
@@ -200,25 +199,20 @@ def _role_import_findings(
         source_file = files_by_module.get(source)
         if source_file is None:
             continue
-        source_role = _role_for_file(source_file, roles)
         for target in sorted(targets):
             target_file = files_by_module.get(target)
             if target_file is None:
                 continue
-            finding = _role_import_finding(source, target, source_role, _role_for_file(target_file, roles), import_sites_by_edge)
-            if finding:
-                findings.append(finding)
+            for code, owner, sites, scope in resource_import_violations(
+                source_file.path, target_file.path,
+                import_sites_by_edge.get((source, target), ()), roles._resource_scopes,
+            ):
+                finding = _import_finding(code, source, target,
+                    f"{owner['kind']} '{owner['id']}' imports code outside its declared implementation and libraries",
+                    {(source, target): sites})
+                findings.append(replace(finding, details={**finding.details,
+                    "resource_id": owner["id"], "resource_kind": owner["kind"], "workflow_scope": scope}))
     return findings
-
-
-def _role_import_finding(source: str, target: str, source_role: str, target_role: str, import_sites_by_edge) -> QualityFinding | None:
-    if source_role == _BASE_LIB_ROLE and target_role != _BASE_LIB_ROLE:
-        return _import_finding("QUALITY.STRUCTURE.BASE_LIB_UPWARD_IMPORT", source, target, "base_lib module imports a project layer module", import_sites_by_edge)
-    if _is_node_role(source_role) and target_role != _BASE_LIB_ROLE:
-        return _import_finding("QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT", source, target, "node module imports project code outside declared base_lib", import_sites_by_edge)
-    if source_role == _PLUGIN_ROLE and _is_node_role(target_role):
-        return _import_finding("QUALITY.STRUCTURE.PLUGIN_NODE_IMPORT", source, target, "plugin module imports node code", import_sites_by_edge)
-    return None
 
 
 def _import_finding(rule_id: str, source: str, target: str, message: str, import_sites_by_edge) -> QualityFinding:
@@ -292,41 +286,6 @@ def _summary(stats: Mapping[str, object], limits: QualityStructureLimits) -> dic
 def _directory(path: PurePosixPath) -> str:
     directory = directory_for_path(str(path))
     return directory if directory and directory != "." else _ROOT_DIR
-
-
-def _role_for_file(file: FileQuality, roles: QualityStructureRoles) -> str:
-    if file.module in roles.module_roles:
-        return roles.module_roles[file.module]
-    if _is_declared_base_lib(file, roles):
-        return _BASE_LIB_ROLE
-    return _role_for_path(file.path) if roles.infer_roles_from_path else "unknown"
-
-
-def _is_declared_base_lib(file: FileQuality, roles: QualityStructureRoles) -> bool:
-    return any(_path_matches(file.path, path) for path in roles.base_lib_paths) or any(_module_matches(file.module, module) for module in roles.base_lib_modules)
-
-
-def _path_matches(path: str, prefix: str) -> bool:
-    normalized = prefix.strip().replace("\\", "/").strip("/")
-    if not normalized or normalized == ".":
-        return False
-    return path == normalized or path.startswith(f"{normalized}/")
-
-
-def _module_matches(module: str, prefix: str) -> bool:
-    normalized = prefix.strip().strip(".")
-    if not normalized:
-        return False
-    return module == normalized or module.startswith(f"{normalized}.")
-
-
-def _role_for_path(path: str) -> str:
-    parts = PurePosixPath(path).parts
-    return parts[0] if len(parts) > 1 else _ROOT_DIR
-
-
-def _is_node_role(role: str) -> bool:
-    return role in _NODE_ROLES or role.endswith("_nodes")
 
 
 def _first_path(paths: Sequence[str]) -> str:

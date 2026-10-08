@@ -343,6 +343,8 @@ def _project_runtime_options(
         "async_max_workers",
         "async_flush_timeout",
         "nodeset_max_depth",
+        "status_interval",
+        "status_file",
     }
     unknown = set(raw_runtime) - allowed
     if unknown:
@@ -358,6 +360,17 @@ def _project_runtime_options(
 
 
 def _project_runtime_value(name: str, value: object, *, path: Path) -> object:
+    if name == "status_file":
+        if value is None or isinstance(value, str) and value:
+            return value
+        raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.RUNTIME",
+                                   "runtime.status_file must be null or a nonempty path string", {"path": str(path)})
+    if name == "status_interval":
+        import math
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value > 0:
+            return value
+        raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.RUNTIME",
+                                   "runtime.status_interval must be positive finite seconds", {"path": str(path)})
     if name in {"async_max_workers", "nodeset_max_depth"}:
         if isinstance(value, int) and not isinstance(value, bool) and value > 0:
             return value

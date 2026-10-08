@@ -10,6 +10,7 @@ from typing import Mapping, Sequence
 from xml.etree import ElementTree
 
 from vibeflow.core.result_scope import add_result_scope, format_result_scope
+from vibeflow.targets.javascript.build.driver_session import check_scope
 from vibeflow.tooling.application.quality_options import (
     add_quality_limit_arguments,
     _quality_structure_enabled,
@@ -28,6 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+@check_scope
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(list(sys.argv[1:] if argv is None else argv))
@@ -191,17 +193,7 @@ def handle_build(args: argparse.Namespace) -> int:
             )
         )
     except Exception as exc:
-        diagnostics = getattr(exc, "diagnostics", ())
-        payload: dict[str, object] = {
-            "status": "ERROR",
-            "code": str(getattr(exc, "code", "VF_BUILD_FAILED")),
-            "error": str(getattr(exc, "message", str(exc))),
-        }
-        if diagnostics:
-            payload["diagnostics"] = [
-                dict(item) if isinstance(item, Mapping) else str(item)
-                for item in diagnostics
-            ]
+        payload = _error_payload(exc, default_code="VF_BUILD_FAILED")
         print(json.dumps(add_result_scope(payload, "vibeflow_build", checked_ids=()), ensure_ascii=False, indent=2))
         return 1
 
@@ -489,7 +481,7 @@ def handle_review(args: argparse.Namespace) -> int:
             theme="default",
             background="transparent",
             mermaid_layout="review-columns",
-        )
+            )
     except Exception as exc:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
@@ -642,7 +634,7 @@ def _handle_standalone_quality(
     args: argparse.Namespace,
 ) -> int:
     from vibeflow.core.quality import QualityStructureLimits, QualityThresholds
-    from vibeflow.targets.javascript.quality.source import DEFAULT_EXCLUDED_DIRS, scan_javascript_quality
+    from vibeflow.tooling.application.javascript.quality_scan import DEFAULT_EXCLUDED_DIRS, scan_javascript_quality
 
     selected = source_path.expanduser().resolve()
     try:
@@ -686,7 +678,7 @@ def _project_source_quality(workspace, args: argparse.Namespace, configs: Sequen
     from dataclasses import replace
 
     from vibeflow.core.quality import QualityStructureLimits, QualityThresholds
-    from vibeflow.targets.javascript.quality.source import DEFAULT_EXCLUDED_DIRS, scan_javascript_quality
+    from vibeflow.tooling.application.javascript.quality_scan import DEFAULT_EXCLUDED_DIRS, scan_javascript_quality
     from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
     from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
 
@@ -721,7 +713,7 @@ def _project_source_quality(workspace, args: argparse.Namespace, configs: Sequen
         elif overrides:
             limits = replace(limits if limits is not None else QualityStructureLimits(), **overrides)
         try:
-            from vibeflow.core.descriptors.contributions import builtin_contributions, compose_contributions
+            from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
             scoped_catalogs = []
             for config in configs:
                 if root.path not in config.parents:
@@ -730,13 +722,14 @@ def _project_source_quality(workspace, args: argparse.Namespace, configs: Sequen
                 scoped_catalogs.append(catalog)
                 if catalog_cache is not None:
                     catalog_cache[config] = catalog
-            catalogs = scoped_catalogs[0] if scoped_catalogs else compose_contributions((builtin_contributions(),))
+            catalogs = scoped_catalogs[0] if scoped_catalogs else load_builtin_plugins("javascript").catalogs
             roles = _javascript_structure_roles(root, catalogs)
             for catalog in scoped_catalogs[1:]:
                 extra = _javascript_structure_roles(root, catalog)
-                roles = replace(roles, module_roles={**roles.module_roles, **extra.module_roles})
+                roles = replace(roles, _resource_scopes=(*roles._resource_scopes, *extra._resource_scopes))
             report = scan_javascript_quality(
                 scan_path,
+                catalog=catalogs,
                 package_root=package_root,
                 thresholds=_quality_thresholds(args, QualityThresholds),
                 structure_limits=_javascript_structure_limits(limits),
@@ -776,26 +769,9 @@ def _audit_registered_without_workflow(report, catalogs, root, package_root: Pat
 
 def _javascript_structure_roles(root, catalogs):
     from vibeflow.core.quality import QualityStructureRoles
-    roles: dict[str, str] = {}
-    for group, role in (
-        (catalogs.nodes, "nodes"),
-        (catalogs.base_libs, "base_lib"),
-        (catalogs.plugins, "plugins"),
-    ):
-        for descriptor in group:
-            for implementation in descriptor.implementations:
-                if implementation.language not in {"javascript", "typescript"} or implementation.source.kind != "file":
-                    continue
-                source = (root.path / implementation.source.ref).resolve()
-                try:
-                    relative = source.relative_to(root.path).as_posix()
-                except ValueError:
-                    continue
-                roles[relative] = role
+    from vibeflow.tooling.project.source_roles import resource_structure_scopes
     return QualityStructureRoles(
-        base_lib_paths=(),
-        module_roles=roles,
-        infer_roles_from_path=False,
+        _resource_scopes=resource_structure_scopes((catalogs,), root.path, language="javascript"),
     )
 
 
@@ -975,78 +951,6 @@ def _atomic_write(path: Path, text: str) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def _publish_review_pair(
-    documents: tuple[tuple[Path, str], tuple[Path, str]],
-) -> None:
-    """Publish Architecture and SVG as one recoverable filesystem change."""
-
-    staged: dict[Path, Path] = {}
-    backups: dict[Path, Path | None] = {}
-    published: list[Path] = []
-    committed = False
-    try:
-        for raw_path, text in documents:
-            path = raw_path.resolve()
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                encoding="utf-8",
-                prefix=f".{path.name}.",
-                suffix=".tmp",
-                dir=path.parent,
-                delete=False,
-            ) as handle:
-                handle.write(text)
-                handle.flush()
-                os.fsync(handle.fileno())
-                staged[path] = Path(handle.name)
-
-        for path, _text in ((item[0].resolve(), item[1]) for item in documents):
-            backup: Path | None = None
-            if path.exists():
-                with tempfile.NamedTemporaryFile(
-                    prefix=f".{path.name}.",
-                    suffix=".backup",
-                    dir=path.parent,
-                    delete=False,
-                ) as handle:
-                    backup = Path(handle.name)
-                backup.unlink()
-                os.replace(path, backup)
-            backups[path] = backup
-            try:
-                os.replace(staged[path], path)
-            except BaseException:
-                if backup is not None:
-                    os.replace(backup, path)
-                    backups[path] = None
-                raise
-            published.append(path)
-        committed = True
-    except BaseException:
-        restore_error: BaseException | None = None
-        for path in reversed(published):
-            try:
-                path.unlink(missing_ok=True)
-                backup = backups.get(path)
-                if backup is not None and backup.exists():
-                    os.replace(backup, path)
-                    backups[path] = None
-            except BaseException as exc:
-                restore_error = restore_error or exc
-        if restore_error is not None:
-            raise OSError(
-                "review publish failed and rollback could not restore all files"
-            ) from restore_error
-        raise
-    finally:
-        for temporary in staged.values():
-            temporary.unlink(missing_ok=True)
-        for backup in backups.values():
-            if committed and backup is not None:
-                backup.unlink(missing_ok=True)
-
-
 class _ReviewSvgValidationError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
@@ -1136,18 +1040,6 @@ def _validate_review_svg_file(
         )
 
 
-def _validate_review_documents(architecture: str, svg: str) -> None:
-    """Compatibility validation used by older programmatic callers."""
-
-    _validate_architecture_document(architecture)
-    try:
-        root = ElementTree.fromstring(svg)
-    except ElementTree.ParseError as exc:
-        raise ValueError("generated review SVG is not valid XML") from exc
-    if not root.tag.endswith("svg"):
-        raise ValueError("generated review SVG has an invalid root element")
-    if root.get("aria-roledescription") != "flowchart-review-columns":
-        raise ValueError("generated review SVG has no review layout marker")
 
 
 def _finish_review_failure(
@@ -1260,12 +1152,13 @@ def _find_workspace(value: Path) -> Path:
     )
 
 
-def _error_payload(error: Exception, *, config: Path | None = None) -> dict[str, object]:
+def _error_payload(error: Exception, *, config: Path | None = None,
+                   default_code: str = "VF_AUDIT_FAILED") -> dict[str, object]:
     diagnostics = getattr(error, "diagnostics", ())
     payload: dict[str, object] = {
         "status": "ERROR",
         "code": str(
-            getattr(error, "code", getattr(error, "rule_id", "VF_AUDIT_FAILED"))
+            getattr(error, "code", getattr(error, "rule_id", default_code))
         ),
         "error": str(getattr(error, "message", str(error))),
     }
@@ -1275,6 +1168,8 @@ def _error_payload(error: Exception, *, config: Path | None = None) -> dict[str,
         payload["source_location"] = {"path": str(error.path)}
     if getattr(error, "field", ""):
         payload["field"] = str(error.field)
+    if getattr(error, "details", None):
+        payload["details"] = dict(error.details)
     if diagnostics:
         payload["diagnostics"] = [
             dict(item) if isinstance(item, Mapping) else str(item)

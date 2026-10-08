@@ -21,7 +21,6 @@ from vibeflow.targets.javascript.build.build_support import (
     entry_name as _entry_name,
     publish as _publish,
     resolve_under_project as _resolve_under_project,
-    resolved_implementations as _resolved_implementations,
     validate_existing_target as _validate_existing_target,
     validate_modes as _validate_modes,
     validate_profile_output as _validate_profile_output,
@@ -32,11 +31,8 @@ from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
 from vibeflow.targets.javascript.frontend.bindings import JavascriptBindingPlan
 from vibeflow.targets.javascript.frontend.emission_view import bound_workflow_view
 from vibeflow.targets.javascript.frontend.errors import AotBuildError
-from vibeflow.targets.javascript.frontend.model import (
-    AotPlanError,
-    WorkflowSpec,
-    normalize_workflow_plan,
-)
+from vibeflow.targets.javascript.frontend.errors import AotPlanError
+
 from vibeflow.targets.javascript.build.toolchain import (
     AotToolchainError,
     ToolchainInfo,
@@ -46,23 +42,20 @@ from vibeflow.targets.javascript.build.toolchain import (
 
 @dataclass(frozen=True)
 class BuildRequest:
-    plan: WorkflowSpec | object
+    plan: WorkflowPlan
+    javascript_bindings: JavascriptBindingPlan
     project_root: str | Path
     package_root: str | Path
     out_dir: str | Path
     target: str
     profile: str
-    implementation_by_type: Mapping[str, object] = field(default_factory=dict)
     external_packages: tuple[str, ...] = ()
-    import_policy: Mapping[str, Any] = field(default_factory=dict)
-    host_extensions: tuple[Mapping[str, Any], ...] = ()
     entry_name: str = ""
     sourcemap: str = "external"
     replace: bool = False
     html_template: str | Path | None = None
     app_entry: str | Path | None = None
     node_command: str = "node"
-    javascript_bindings: JavascriptBindingPlan | None = None
     plugin_manifest: Mapping[str, Any] = field(default_factory=dict)
     audit_sources: tuple[str, ...] = ()
 
@@ -77,33 +70,12 @@ class BuildResult:
 
 
 def build_aot(request: BuildRequest) -> BuildResult:
-    canonical = request.javascript_bindings is not None
-    if canonical:
-        if not isinstance(request.plan, WorkflowPlan):
-            raise AotBuildError(
-                "VF_PLAN",
-                "canonical JavaScript build requires a WorkflowPlan",
-            )
-        try:
-            workflow = bound_workflow_view(
-                request.plan,
-                request.javascript_bindings,
-            )
-        except AotPlanError as exc:
-            raise AotBuildError(exc.code, str(exc)) from exc
-        implementation_facts: Mapping[str, object] = {}
-        import_policy = request.javascript_bindings.import_policy.to_value()
-    else:
-        try:
-            workflow = normalize_workflow_plan(request.plan)
-        except AotPlanError as exc:
-            raise AotBuildError(exc.code, str(exc)) from exc
-        implementation_facts = request.implementation_by_type
-        import_policy = request.import_policy
-    _validate_schema_subset(
-        workflow,
-        implementation_by_type=implementation_facts,
-    )
+    try:
+        workflow = bound_workflow_view(request.plan, request.javascript_bindings)
+    except (AotPlanError, TypeError) as exc:
+        raise AotBuildError(getattr(exc, "code", "VF_PLAN"), str(exc)) from exc
+    import_policy = request.javascript_bindings.import_policy.to_value()
+    _validate_schema_subset(workflow)
     target, profile, sourcemap = _validate_modes(request)
     project_root = Path(request.project_root).expanduser().resolve()
     if not project_root.is_dir():
@@ -128,26 +100,8 @@ def build_aot(request: BuildRequest) -> BuildResult:
             "out_dir must name a dedicated build directory",
         )
     _validate_existing_target(out_dir, replace=request.replace)
-    implementations = (
-        {}
-        if canonical
-        else _resolved_implementations(
-            workflow,
-            project_root=project_root,
-            overrides=request.implementation_by_type,
-        )
-    )
-    emitted = (
-        emit_workflow_module(
-            request.plan,
-            javascript_bindings=request.javascript_bindings,
-        )
-        if canonical
-        else emit_workflow_module(
-            workflow,
-            implementation_by_type=implementations,
-            host_extensions=request.host_extensions,
-        )
+    emitted = emit_workflow_module(
+        request.plan, javascript_bindings=request.javascript_bindings,
     )
     entry_name = _entry_name(profile, request.entry_name)
     html_template, app_entry = _web_inputs(
@@ -168,16 +122,16 @@ def build_aot(request: BuildRequest) -> BuildResult:
     source_dir.mkdir()
     staging.mkdir()
     workflow_entry = source_dir / "workflow-entry.mjs"
-    workflow_entry.write_text(emitted.source, encoding="utf-8")
+    from vibeflow.targets.javascript.resources import read_text
+    runtime_source = (read_text("node_observation.mjs") + "\n" if target == "node" else "") + emitted.source
+    workflow_entry.write_text(runtime_source, encoding="utf-8")
     contract_check = source_dir / "node-contract-check.ts"
     contract_check.write_text(
-        _node_contract_check(workflow, implementations),
+        _node_contract_check(workflow),
         encoding="utf-8",
     )
     plugin_contract_check: Path | None = None
-    if request.javascript_bindings is not None and (
-        request.javascript_bindings.runtime_plugins
-    ):
+    if request.javascript_bindings.runtime_plugins:
         plugin_contract_check = source_dir / "runtime-plugin-contract-check.ts"
         plugin_contract_check.write_text(
             _runtime_plugin_contract_check(request.javascript_bindings),
@@ -204,7 +158,7 @@ def build_aot(request: BuildRequest) -> BuildResult:
             "runtimeBindings": [{"module": module, "export": exported} for module, exported in emitted.implementation_bindings]
                 + ([{"module": item.to_value()["module"], "export": item.to_value()["export"]} for item in request.javascript_bindings.host_extensions]
                    + [{"module": item.implementation.ref, "export": item.implementation.export} for item in request.javascript_bindings.runtime_plugins]
-                   if request.javascript_bindings is not None else []),
+                   ),
             "typecheckFiles": [
                 str(contract_check),
                 *(

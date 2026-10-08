@@ -77,19 +77,22 @@ def _write_project(root, variant, spec):
         descriptor.pop("category", None)
         if "category" in spec.get("node_fields", {}):
             descriptor["category"] = spec["node_fields"]["category"]
-    manifests = root / "manifests/nodes"
-    manifests.mkdir(parents=True, exist_ok=True)
-    (manifests / "node.jsonc").write_text(json.dumps(descriptor), encoding="utf-8")
+    manifests = root / "manifests/nodes" if variant == "baseline" else None
+    resources = [descriptor]
+    if variant == "baseline":
+        manifests.mkdir(parents=True, exist_ok=True)
+        (manifests / "node.jsonc").write_text(json.dumps(descriptor), encoding="utf-8")
     (root / "node.py").write_text(source, encoding="utf-8")
     if spec.get("registered_other_node"):
-        _write_other_node(root, variant, manifests, spec)
+        resources.append(_write_other_node(root, variant, manifests, spec))
     if spec.get("entrypoint") in {"target.validate_graph_health", "cli.run"}:
-        _write_boundaries(root, variant, manifests)
-    (root / "vibeflow_project.jsonc").write_text(json.dumps({
-        "project_target": "python", "descriptors": {"nodes": ["manifests/nodes"]},
-    }), encoding="utf-8")
+        resources.extend(_write_boundaries(root, variant, manifests))
+    if variant == "baseline":
+        (root / "vibeflow_project.jsonc").write_text(json.dumps({
+            "project_target": "python", "descriptors": {"nodes": ["manifests/nodes"]},
+        }), encoding="utf-8")
     if spec.get("entrypoint") == "cli.run":
-        _write_run_project(root, variant)
+        resources.extend(_write_run_project(root, variant))
     files = dict(spec.get("files", {}))
     if spec.get("library_chain"):
         files.update(_chain_files(spec["library_chain"]))
@@ -97,9 +100,11 @@ def _write_project(root, variant, spec):
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text.replace("__MARKER__", repr(str(root / "marker.txt"))), encoding="utf-8")
-    policy = deepcopy(spec.get("policy", {}))
-    if "base_lib" in policy:
+    policy = deepcopy(spec.get("current_policy", spec.get("policy", {})) if variant == "current" else spec.get("policy", {}))
+    if "base_lib" in policy and variant == "baseline":
         policy["base_lib"]["allowed_paths"] = [str(root / value) for value in policy["base_lib"].get("allowed_paths", [])]
+    if variant == "current":
+        _write_current_plugin(root, spec, resources, files)
     (root / "policy.jsonc").write_text(json.dumps({"policy": policy}), encoding="utf-8")
     if "general_source" in spec:
         (root / "source.py").write_text(spec["general_source"], encoding="utf-8")
@@ -107,6 +112,7 @@ def _write_project(root, variant, spec):
 
 def _write_run_project(root, variant):
     """Use formal runtime assembly, with import-only selection in the new kernel."""
+    declarations = []
     project = {"project_target": "python"}
     if variant == "baseline":
         project["registry"] = "registry.py:register_nodes"
@@ -115,28 +121,22 @@ def _write_run_project(root, variant):
             registry += f"    registry.register('parity.{type_key}',{name},config_schema={{}},config_defaults={{}})\n"
         (root / "registry.py").write_text(registry + "    return registry\n", encoding="utf-8")
     else:
-        project["descriptors"] = {"nodes": ["manifests/nodes"], "rulesets": ["manifests/rulesets"]}
-        for name in ("start", "end"):
-            path = root / "manifests/nodes" / (name + ".jsonc")
-            declaration = json.loads(path.read_text(encoding="utf-8"))
-            declaration["rulesets"] = []
-            path.write_text(json.dumps(declaration), encoding="utf-8")
-        rule_directory = root / "manifests/rulesets"
-        rule_directory.mkdir(parents=True, exist_ok=True)
-        (rule_directory / "import_only.jsonc").write_text(json.dumps({
-            "kind": "ruleset", "id": "parity.import_only",
-            "calls": [{"id": "import", "rule_id": "vibeflow.import_side_effects", "params": {"effect_scope": "none"}}],
-            "entrypoints": {"import": ["import"], "static": [], "run": []},
-        }), encoding="utf-8")
-    (root / "vibeflow_project.jsonc").write_text(json.dumps(project), encoding="utf-8")
+        declarations.append({"kind": "ruleset", "id": "parity.import_only",
+            "calls": [{"id":"import", "rule_id":"vibeflow.import_side_effects", "params":{"effect_scope":"none"}}],
+            "entrypoints":{"import":["import"], "static":[], "run":[]}})
+    if variant == "baseline":
+        (root / "vibeflow_project.jsonc").write_text(json.dumps(project), encoding="utf-8")
     (root / "workspace.jsonc").write_text(json.dumps({"roots": [{"id": "project", "path": "."}]}), encoding="utf-8")
     calls = [{"id": name, "type_used": "parity." + ("node" if name == "demo" else name),
         "display_name": name.title(), "description": "Runtime import parity call."} for name in ("start", "demo", "end")]
     (root / "workflow.jsonc").write_text(json.dumps({"pipeline": {"nodes": calls,
         "edges": [["start", "demo"], ["demo", "end"]]}}), encoding="utf-8")
 
+    return declarations
+
 
 def _write_boundaries(root, variant, manifests):
+    declarations = []
     contract = {"requires": [], "provides": [], "input_semantics": {}, "output_semantics": {}, "examples": [{"inputs": {}, "params": {}}]}
     for name in ("start", "end"):
         descriptor = _declaration({"flow_kind": "terminal"}, contract, type_key="parity." + name, ref=name + ".py")
@@ -146,7 +146,11 @@ def _write_boundaries(root, variant, manifests):
         else:
             descriptor.pop("category", None)
         (root / (name + ".py")).write_text(source, encoding="utf-8")
-        (manifests / (name + ".jsonc")).write_text(json.dumps(descriptor), encoding="utf-8")
+        declarations.append(descriptor)
+        if variant == "baseline":
+            (manifests / (name + ".jsonc")).write_text(json.dumps(descriptor), encoding="utf-8")
+
+    return declarations
 
 
 def _write_other_node(root, variant, manifests, spec):
@@ -163,7 +167,9 @@ def _write_other_node(root, variant, manifests, spec):
     else:
         descriptor.pop("category", None)
     path.write_text(source, encoding="utf-8")
-    (manifests / "other.jsonc").write_text(json.dumps(descriptor), encoding="utf-8")
+    if variant == "baseline":
+        (manifests / "other.jsonc").write_text(json.dumps(descriptor), encoding="utf-8")
+    return descriptor
 
 
 def _chain_files(options):
@@ -178,36 +184,81 @@ def _chain_files(options):
     return files
 
 
+def _write_current_plugin(root, spec, resources, files):
+    """Author current inputs as fixed SDK declarations; never convert old files."""
+    import runpy
+    write_plugin = runpy.run_path(str(Path(__file__).resolve().parents[3] / "tests/fixtures/support/plugins.py"))["write_plugin"]
+    library_paths = []
+    standalone = spec.get("entrypoint") == "target.scan_base_lib"
+    package = spec.get("library_chain", {}).get("package")
+    if standalone:
+        library_paths = [name for name in files if name.endswith(".py")]
+    elif package:
+        library_paths = [name for name in files if name.startswith(package + "/") and name.endswith(".py")]
+    else:
+        library_paths = list(spec.get("library_files", ()))
+    node = resources[0]
+    if library_paths:
+        entry = next((name for name in library_paths if not name.endswith("__init__.py")), library_paths[0])
+        resources.append({"kind":"base_lib", "id":"parity.library", "display_name":"Library",
+            "description":"An explicitly declared library", "rulesets":["vibeflow.base_lib"],
+            "implementations":[{"language":"python", "targets":["python"], "source":{"kind":"file","ref":entry},
+                "implementation_files":[{"kind":"file","ref":name} for name in library_paths if name != entry]}]})
+        node["base_libs"] = ["parity.library"]
+    other_entries = {item["implementations"][0]["source"]["ref"] for item in resources if item["kind"] == "node"}
+    support = [name for name in files if name.endswith(".py") and name not in library_paths and name not in other_entries]
+    node["implementations"][0]["implementation_files"] = [{"kind":"file","ref":name} for name in support]
+    if spec.get("entrypoint") == "cli.run":
+        for item in resources:
+            if item["kind"] == "node":
+                item["rulesets"] = ["parity.import_only"] if item["type_key"] == "parity.node" else []
+    selection = write_plugin(root, resources, target="python", plugin_id="parity.resources")
+    (root / "vibeflow_project.jsonc").write_text(json.dumps({"project_target":"python"}))
+    workflow = root / "workflow.jsonc"
+    data = json.loads(workflow.read_text()) if workflow.is_file() else {"rulesets":[], "pipeline":{"nodes":[{
+        "id":"demo", "type_used":"parity.node", "display_name":"Demo", "description":"Source rule observation"}]}}
+    data["plugins"] = [selection]
+    workflow.write_text(json.dumps(data))
+
+
+def _library_rule_script():
+    return '''import json,sys
+from pathlib import Path
+from vibeflow.tooling.application.python.project.declarations import declared_python_registry
+from vibeflow.tooling.project.workspace_loader import load_project_workspace
+from vibeflow.targets.python.project.resource_rules import review_python_resource
+from vibeflow.targets.python.quality.source_analysis import PurityPolicy
+root=Path(sys.argv[1]); options=json.loads(sys.argv[2])
+registry=declared_python_registry(load_project_workspace(root/"workflow.jsonc"),config_path=root/"workflow.jsonc")
+registry.configure_rule_defaults(purity_policy=PurityPolicy(**options))
+findings=[item.to_dict() for declaration in registry.loaded_plugins.catalogs.base_libs
+    for phase in ("import","static") for item in review_python_resource(declaration,base_path=root,registry=registry,phase=phase)]
+print(json.dumps({"base_lib":{"findings":findings,"modules":[item.id for item in registry.loaded_plugins.catalogs.base_libs]}}))
+'''
+
+
 def _command(root, variant, spec):
     entrypoint = spec.get("entrypoints", {}).get(variant, spec.get("entrypoint", "cli.inspect-node"))
-    if entrypoint == "cli.quality-check" and variant == "current":
-        import runpy
-        runpy.run_path(str(Path(__file__).resolve().parents[3] / "tests/fixtures/support/code_plugins.py"))["migrate_fixture"](root)
     if entrypoint == "cli.quality-check":
         return [sys.executable, "-m", "vibeflow", "quality-check", "--path", str(root / "source.py"), "--json", *spec.get("cli_args", [])]
-    if entrypoint == "cli.run" and variant == "current":
-        import runpy
-        runpy.run_path(str(Path(__file__).resolve().parents[3] / "tests/fixtures/support/code_plugins.py"))["migrate_fixture"](root)
     if entrypoint == "cli.run":
         return [sys.executable, "-m", "vibeflow", "run", "--config", str(root / "workflow.jsonc"),
             "--workspace", str(root / "workspace.jsonc"), "--run-root", str(root / "runs"), "--run-id", "import-marker"]
-    if variant == "current":
-        import runpy
-        migrate = runpy.run_path(str(Path(__file__).resolve().parents[3] / "tests/fixtures/support/code_plugins.py"))["migrate_fixture"]
-        if not (root / "workflow.jsonc").is_file():
-            (root / "workflow.jsonc").write_text(json.dumps({"rulesets": [], "pipeline": {"nodes": [{"id":"demo", "type_used":"parity.node", "display_name":"Demo", "description":"Source rule observation"}]}}))
-        migrate(root)
     if entrypoint == "cli.inspect-node":
         return [sys.executable, "-m", "vibeflow", "inspect-node", "--type", "parity.node", "--module", str(root / "node.py"),
             "--class", "DemoNode", "--policy", str(root / "policy.jsonc"), *(["--config", str(root / "workflow.jsonc")] if variant == "current" else [])]
-    scripts = {"target.scan_base_lib": _base_lib_script, "target.analyze_python_source": _source_script,
+    scripts = {"target.scan_base_lib": lambda: _base_lib_script(variant), "target.analyze_python_source": lambda: _source_script(variant),
         "target.validate_node_class": _class_validation_script}
     script = scripts[entrypoint]() if entrypoint in scripts else _graph_script(variant)
-    options = spec.get("source_options", {}) if entrypoint == "target.analyze_python_source" else spec.get("purity_kwargs", {})
+    options = deepcopy(spec.get("source_options", {}) if entrypoint == "target.analyze_python_source" else spec.get("purity_kwargs", {}))
+    if variant == "current":
+        options = deepcopy(spec.get("current_purity_kwargs", options))
     return [sys.executable, "-c", script, str(root), json.dumps(options)]
 
 
-def _base_lib_script():
+def _base_lib_script(variant):
+    if variant == "current":
+        return _library_rule_script()
     return '''import json,sys
 from pathlib import Path
 from vibeflow.targets.python.project import scan_base_lib
@@ -270,7 +321,25 @@ graph=GraphConfig(nodes=tuple(call(name) for name in ('start','demo','end')),edg
 ''' + setup + "print(json.dumps({'health':report.to_dict()}))\n"
 
 
-def _source_script():
+def _source_script(variant):
+    if variant == "current":
+        return '''import json,sys
+from pathlib import Path
+from vibeflow.targets.python.quality import PythonSource,analyze_python_source
+from vibeflow.tooling.application.python.project.quality_scan import scan_code_quality
+root=Path(sys.argv[1]); options=json.loads(sys.argv[2]); path=root/'source.py'
+result=analyze_python_source(PythonSource(module=options.get('module','pkg.source'),relative_path='source.py',source_path=str(path),text=path.read_text()))
+findings=list(result.findings)
+if options.get('check_side_effects',False):
+    review=scan_code_quality(path,check_side_effects=True)
+    findings.extend(item for item in review.findings if item.code.startswith('QUALITY.SIDE_EFFECT.'))
+file=result.file; functions=file.functions
+metrics={'file':file.to_dict(),'fingerprints_equal':len(functions)==2 and functions[0].ast_fingerprint==functions[1].ast_fingerprint,
+    'required_params_first':functions[0].param_count if functions else 0,
+    'relative_import_resolved':'pkg.helper' in file.imports,
+    'first_import_line':file.import_sites[0].line if file.import_sites else 0}
+print(json.dumps({'source_facts':metrics,'findings':[finding.to_dict() for finding in findings]}))
+'''
     return '''import json,sys
 from pathlib import Path
 from vibeflow.targets.python.quality import PythonSource,analyze_python_source

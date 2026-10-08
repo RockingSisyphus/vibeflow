@@ -5,6 +5,7 @@ from dataclasses import replace
 import pytest
 
 from tests.fixtures.support.rule_inspection import node_document
+from tests.fixtures.support.plugins import write_plugin, resource
 from vibeflow.tooling.application.python.project.core import build_workspace_node_registry
 from vibeflow.tooling.application.python.runner import CheckedRunError, run_checked
 from vibeflow.tooling.application.python.workspace_service import run_workspace_checked, validate_workspace_config_path
@@ -12,13 +13,10 @@ from vibeflow.tooling.project.workspace_loader import load_project_workspace, lo
 
 
 def _project(root, *, owner="workflow", state="completed", error=False, needs_compiled=False):
-    for name in ("nodes", "rules", "rulesets"):
-        (root / "manifests" / name).mkdir(parents=True, exist_ok=True)
     marker, observations = root / "node-imported", root / "rule-observations.jsonl"
     (root / "leaf.py").write_text(f'from pathlib import Path\nPath({str(marker)!r}).write_text("executed")\nclass Leaf:\n    def run_pure(self, inputs, params):\n        return {{}}\n')
     node = node_document(type_key="test.leaf", class_name="Leaf", contract={}, rulesets=[])
     node["implementations"][0]["source"]["ref"] = "leaf.py"
-    (root / "manifests/nodes/leaf.jsonc").write_text(json.dumps(node))
     (root / "domain.py").write_text(f'''import json
 from pathlib import Path
 from vibeflow.core.findings import HealthFinding
@@ -43,16 +41,15 @@ def check(context, inputs, params):
         "error":{"type":"boolean"}, "needs_compiled":{"type":"boolean"}},
         "params_defaults":{"state":state,"error":error,"needs_compiled":needs_compiled},
         "implementations":[{"language":"python","source":{"kind":"file","ref":"domain.py","export":"check"}}]}
-    (root / "manifests/rules/domain.jsonc").write_text(json.dumps(rule))
     selection = {"kind":"ruleset", "id":"test.before_bind", "calls":[
         {"id":"files","rule_id":"vibeflow.quality.files","params":{"warn_file_lines":1000}},
         {"id":"domain","rule_id":"test.domain.import"}],
         "entrypoints":{"import":["files","domain"],"static":[],"run":[]}}
-    (root / "manifests/rulesets/import.jsonc").write_text(json.dumps(selection))
     (root / "vibeflow_project.jsonc").write_text(json.dumps({"project_target":"python", "quality_enabled":False,
-        "descriptors":{name:["manifests/"+name] for name in ("nodes","rules","rulesets")}}))
+}))
     leaf = {"id":"leaf", "type_used":"test.leaf", "display_name":"Leaf", "description":"One delayed implementation."}
-    data = {"rulesets":[selection["id"]] if owner == "workflow" else [], "pipeline":{"nodes":[leaf]}}
+    plugin = write_plugin(root, [node, rule, selection], target="python")
+    data = {"plugins":[plugin], "rulesets":[selection["id"]] if owner == "workflow" else [], "pipeline":{"nodes":[leaf]}}
     if owner != "workflow":
         child = {"type_key":"test.stage", "display_name":"Stage", "description":"The actual child scope.",
             "rulesets":[selection["id"]], "requires":[], "provides":[], "pipeline":{"nodes":[leaf]}}
@@ -108,7 +105,7 @@ def test_workflow_import_completed_error_and_missing_compiled_are_not_fake_succe
     report = validate_workspace_config_path(config, workspace=workspace)
     assert report.status == "FAIL" and report.errors[0].definition_id == "test.domain.import"
     assert not marker.exists()
-    rule_path = tmp_path / "manifests/rules/domain.jsonc"
+    rule_path = resource(tmp_path, "rule", "test.domain.import")
     rule = json.loads(rule_path.read_text())
     rule["params_defaults"].update(error=False,needs_compiled=True)
     rule_path.write_text(json.dumps(rule))
@@ -169,22 +166,3 @@ def test_repeated_nodeset_workflow_import_keeps_actual_call_paths_and_preview_de
     assert report.status == "PASS" and not marker.exists()
     assert [json.loads(line)["path"] for line in observations.read_text().splitlines()] == [["first"],["second"]]
     assert all(next(call for call in item["plan"]["calls"] if call["rule_id"] == "vibeflow.quality.files")["params"]["max_file_lines"] == 25 for item in report.info["rule_executions"])
-
-
-from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-_fixture_native_load_workspace_config = load_workspace_config
-def load_workspace_config(path, **options):
-    prepare_workspace_fixture(path)
-    return _fixture_native_load_workspace_config(path, **options)
-
-
-from tests.fixtures.support.code_plugins import prepare_config_fixture
-_fixture_native_load_project_workspace = load_project_workspace
-def load_project_workspace(path, **options):
-    prepare_config_fixture(path)
-    return _fixture_native_load_project_workspace(path, **options)
-
-_native_validation = validate_workspace_config_path
-def validate_workspace_config_path(config, **options):
-    prepare_config_fixture(config)
-    return _native_validation(config, **options)

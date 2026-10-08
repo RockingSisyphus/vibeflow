@@ -1,0 +1,89 @@
+{
+  "steps": [
+    {
+      "step": "repository-quality",
+      "status": "passed",
+      "seconds": 8.034390405024169
+    },
+    {
+      "step": "compileall",
+      "status": "passed",
+      "seconds": 1.109345924021909
+    },
+    {
+      "step": "pytest",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'tools/run_tests.py', '--workers', '8', '--scratch', '/tmp/vf-adaptation-full-final/pytest', '--', '/home/rockingsisyphus/projects/VibeFlow/tests/core', '/home/rockingsisyphus/projects/VibeFlow/tests/block_compiler', '/home/rockingsisyphus/projects/VibeFlow/tests/targets', '/home/rockingsisyphus/projects/VibeFlow/tests/tooling', '/home/rockingsisyphus/projects/VibeFlow/tests/conformance', '/home/rockingsisyphus/projects/VibeFlow/tests/integration')' returned non-zero exit status 1.",
+      "seconds": 144.38509591898764
+    },
+    {
+      "step": "python-sandbox",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/python/integration/run_all.py')' returned non-zero exit status 1.",
+      "seconds": 87.37685955999768
+    },
+    {
+      "step": "javascript-minimal",
+      "status": "passed",
+      "seconds": 13.622816487011733
+    },
+    {
+      "step": "javascript-integration",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/javascript/integration/run_all.py', '--puppeteer-root', '/tmp/vf-adaptation-full-final/puppeteer')' returned non-zero exit status 1.",
+      "seconds": 166.11771484499332
+    },
+    {
+      "step": "rule-regression-sandboxes",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/rule_parity/run_all.py', '--workers', '8', '--current-only', '--toolchain', '/tmp/vf-adaptation-full-final/pytest/javascript-toolchain', '--work', '/tmp/vf-adaptation-full-final/rule-parity', '--report', '/tmp/vf-adaptation-full-final/rule-parity.json')' returned non-zero exit status 1.",
+      "seconds": 140.7891463789856
+    },
+    {
+      "step": "runtime-observation-browser",
+      "status": "passed",
+      "seconds": 3.1178369879780803
+    },
+    {
+      "step": "review-performance-sandbox",
+      "status": "passed",
+      "seconds": 61.720507559977705
+    },
+    {
+      "step": "adaptation-regression-sandbox",
+      "status": "passed",
+      "seconds": 81.22019930498209
+    },
+    {
+      "step": "wheel-isolation",
+      "status": "passed",
+      "seconds": 12.604204761999426
+    },
+    {
+      "step": "generated-artifact-cleanup",
+      "status": "passed",
+      "seconds": 0.09854054902098142
+    },
+    {
+      "step": "distribution",
+      "status": "passed",
+      "seconds": 23.454544100008206
+    },
+    {
+      "step": "repository-quality-final",
+      "status": "passed",
+      "seconds": 8.127928593021352
+    },
+    {
+      "step": "clean-tree",
+      "status": "passed",
+      "seconds": 0.08272812500945292
+    }
+  ],
+  "failures": [
+    "pytest failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'tools/run_tests.py', '--workers', '8', '--scratch', '/tmp/vf-adaptation-full-final/pytest', '--', '/home/rockingsisyphus/projects/VibeFlow/tests/core', '/home/rockingsisyphus/projects/VibeFlow/tests/block_compiler', '/home/rockingsisyphus/projects/VibeFlow/tests/targets', '/home/rockingsisyphus/projects/VibeFlow/tests/tooling', '/home/rockingsisyphus/projects/VibeFlow/tests/conformance', '/home/rockingsisyphus/projects/VibeFlow/tests/integration')' returned non-zero exit status 1.",
+    "python-sandbox failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/python/integration/run_all.py')' returned non-zero exit status 1.",
+    "javascript-integration failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/javascript/integration/run_all.py', '--puppeteer-root', '/tmp/vf-adaptation-full-final/puppeteer')' returned non-zero exit status 1.",
+    "rule-regression-sandboxes failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/rule_parity/run_all.py', '--workers', '8', '--current-only', '--toolchain', '/tmp/vf-adaptation-full-final/pytest/javascript-toolchain', '--work', '/tmp/vf-adaptation-full-final/rule-parity', '--report', '/tmp/vf-adaptation-full-final/rule-parity.json')' returned non-zero exit status 1."
+  ]
+}

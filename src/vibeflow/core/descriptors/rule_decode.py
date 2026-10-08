@@ -73,5 +73,7 @@ def parse_ruleset(data: Mapping[str, Any]) -> RulesetDescriptor:
 def _construct(model, **values):
     try:
         return model(**values)
+    except DescriptorModelError:
+        raise
     except ValueError as exc:
         raise DescriptorModelError(str(exc)) from exc

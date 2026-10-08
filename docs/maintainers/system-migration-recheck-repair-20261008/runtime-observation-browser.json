@@ -1,0 +1,23 @@
+{
+  "id": "real_browser",
+  "matched": true,
+  "record": {
+    "result": 4,
+    "states": [
+      "starting",
+      "running",
+      "succeeded"
+    ],
+    "info": [
+      {
+        "metrics": {
+          "loss": 0.125
+        }
+      },
+      {
+        "message": "训练第10轮"
+      }
+    ]
+  },
+  "entry": "/tmp/vibeflow-recheck-repair-final-20261008/runtime-observation-browser/web/index.js"
+}

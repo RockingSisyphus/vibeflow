@@ -117,10 +117,6 @@ def _provider_keys(value: Any) -> set[str]:
         return set()
     return {str(item.get("key", "")).strip() for item in value if isinstance(item, Mapping) and _non_empty_string(item.get("key"))}
 
-def _string_items(value: Any) -> set[str]:
-    if not isinstance(value, list):
-        return set()
-    return {str(item).strip() for item in value if _non_empty_string(item)}
 
 def _validate_positive_int(
     value: Any,

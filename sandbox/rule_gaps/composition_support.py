@@ -1,6 +1,7 @@
 """Real domain project generation, formal CLI execution, and diagram evidence."""
 
 from __future__ import annotations
+from tests.fixtures.support.plugins import resource as resource_ref
 
 from copy import deepcopy
 import json
@@ -28,13 +29,6 @@ def _edge(source, target, **fields):
     return {"source": source, "target": target, **fields}
 
 
-def _bundle_resource(project, group, ref):
-    path = project / "bundles/domain.jsonc"
-    bundle = json.loads(path.read_text())
-    bundle["resources"].setdefault(group, []).append(ref)
-    write(path, bundle)
-
-
 def _gain(project, target):
     if target == "python":
         return
@@ -43,7 +37,7 @@ def _gain(project, target):
                     'export function modelForward(value: number, gain: number): number { return value * gain; }\n'
                     'export function run(inputs: Readonly<{"example.input": Envelope}>, params: Readonly<{gain: number}>) {\n'
                     '  return {feature: modelForward(inputs["example.input"].value, params.gain)};\n}\n')
-    declaration = project / "bundle/nodes/model.jsonc"
+    declaration = resource_ref(project, 'node', 'example.model')
     data = json.loads(declaration.read_text())
     data["contract"].update(params_schema={"gain": {"type": "number"}}, params_defaults={"gain": 2})
     write(declaration, data)
@@ -58,7 +52,7 @@ def _choose(project, target):
               'export function run(inputs: Readonly<{"example.choice_input": Readonly<{value: number}>}>, params: Readonly<{branch: string}>) {\n'
               '  return {forwarded: inputs["example.choice_input"].value, "route.branch": params.branch};\n}\n')
     (project / ref).write_text(source)
-    write(project / "bundle/nodes/choose.jsonc", {"kind": "node", "type_key": "example.choose",
+    write(resource_ref(project, 'node', 'example.choose'), {"kind": "node", "type_key": "example.choose",
           "display_name": "Choose",  "description": "Choose one native conditional branch.",
           "version": "0.15.0", "flow_kind": "decision", "rulesets": ["vibeflow.process"],
           "contract": {"requires": [_require("example.choice_input")],
@@ -68,8 +62,7 @@ def _choose(project, target):
               "params_schema": {"branch": {"type": "string"}}, "params_defaults": {"branch": "left"}},
           "implementations": [{"language": language, "targets": ["python"] if target == "python" else ["node", "browser"],
               "source": {"kind": "file", "ref": ref, "export": "Choose" if target == "python" else "run"}}]})
-    _bundle_resource(project, "nodes", "../bundle/nodes/choose.jsonc")
-    write(project / "manifests/data/branch.jsonc", {"kind": "data_schema", "type_key": "route.branch",
+    write(resource_ref(project, 'data_schema', 'route.branch'), {"kind": "data_schema", "type_key": "route.branch",
           "representation": "json", "schema": {"type": "string"}})
 
 
@@ -83,7 +76,7 @@ def _branch_ports(project, target):
                   'export function run(inputs: Readonly<{"example.feature": Readonly<{value: number}>}>) {\n'
                   f'  return {{{name}_feature: inputs["example.feature"].value}};\n}}\n')
         (project / ref).write_text(source)
-        write(project / ("bundle/nodes/" + name + "-feature.jsonc"), {"kind": "node", "type_key": type_key,
+        write(resource_ref(project, 'node', type_key), {"kind": "node", "type_key": type_key,
             "display_name": name.title() + " Feature",  "description": "Expose an isolated branch value.",
             "version": "0.15.0", "flow_kind": "process", "contract": {"requires": [_require("example.feature")],
                 "provides": [_provider(name + "_feature", type_key)], "input_semantics": {"example.feature": ["The model result."]},
@@ -91,12 +84,11 @@ def _branch_ports(project, target):
             "implementations": [{"language": "python" if target == "python" else "typescript",
                 "targets": ["python"] if target == "python" else ["node", "browser"],
                 "source": {"kind": "file", "ref": ref, "export": "Rekey" if target == "python" else "run"}}]})
-        _bundle_resource(project, "nodes", "../bundle/nodes/" + name + "-feature.jsonc")
-        write(project / ("manifests/data/" + name + "-feature.jsonc"), {"kind": "data_schema", "type_key": type_key,
+        write(resource_ref(project, 'data_schema', type_key), {"kind": "data_schema", "type_key": type_key,
               "representation": "json", "schema": {"type": "number"}})
-    write(project / "manifests/data/choice-input.jsonc", {"kind": "data_schema", "type_key": "example.choice_input",
+    write(resource_ref(project, 'data_schema', 'example.choice_input'), {"kind": "data_schema", "type_key": "example.choice_input",
           "representation": "json", "schema": {"type": "number"}})
-    path = project / "bundle/nodes/transform.jsonc"
+    path = resource_ref(project, 'node', 'example.transform')
     declaration = json.loads(path.read_text())
     declaration["contract"]["requires"] = [{**_require("example." + name + "_feature"), "cardinality": "optional_one"} for name in ("left", "right")]
     declaration["contract"]["input_semantics"] = {"example." + name + "_feature": ["The one active branch result."] for name in ("left", "right")}
@@ -183,19 +175,22 @@ def _invalid(project, spec):
             source = path.read_text().replace("from domain_helpers.arithmetic import scale",
                 "from domain_helpers.arithmetic import scale\nfrom domain_helpers.illegal_model import model_forward")
             path.write_text(source.replace('value + params["offset"]', 'model_forward(value) + params["offset"]'))
+            declaration = resource_ref(project, "node", "example.transform")
+            data = json.loads(declaration.read_text())
+            data["implementations"][0].setdefault("implementation_files", []).append("domain_helpers/illegal_model.py")
+            write(declaration, data)
         else:
             (project / "nodes/transform_helper.ts").write_text('export function modelForward(value: number) { return value + 1; }\n')
             source = (project / "nodes/transform.ts").read_text()
             source = source.replace('packet!.value + 1', 'modelForward(packet!.value)').replace('inputs["example.feature"].value + 1', 'modelForward(inputs["example.feature"].value)')
             (project / "nodes/transform.ts").write_text('import {modelForward} from "./transform_helper.ts";\n' + source)
-            path = project / "bundle/nodes/transform.jsonc"
+            path = resource_ref(project, 'node', 'example.transform')
             data = json.loads(path.read_text()); data["base_libs"] = ["example.transform_helper"]
             write(path, data)
-            write(project / "bundle/base_lib/helper.jsonc", {"kind": "base_lib", "id": "example.transform_helper",
+            write(resource_ref(project, 'base_lib', 'example.transform_helper'), {"kind": "base_lib", "id": "example.transform_helper",
                 "display_name": "Transform helper", "description": "A helper owned by the transform.",
                 "implementations": [{"language": "typescript", "targets": ["node", "browser"],
                     "source": {"kind": "file", "ref": "nodes/transform_helper.ts"}}]})
-            _bundle_resource(project, "base_lib", "../bundle/base_lib/helper.jsonc")
 
 
 PYTHON_RUN = '''import json,sys

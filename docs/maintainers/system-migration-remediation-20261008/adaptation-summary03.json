@@ -1,0 +1,9 @@
+{
+  "source_report": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/adaptation-regressions.json",
+  "summary": {
+    "cases": 207,
+    "matched": 207,
+    "unmatched": 0,
+    "process_errors": 0
+  }
+}

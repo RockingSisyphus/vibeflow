@@ -25,12 +25,7 @@ def _project(
     root = tmp_path / "project"
     root.mkdir()
     project_config: dict[str, object] = {"project_target": target}
-    if target == "python":
-        (root / "registry.py").write_text(
-            "def build_node_registry():\n    raise AssertionError('must not load')\n",
-            encoding="utf-8",
-        )
-    else:
+    if target == "javascript":
         project_config.update(
             {
                 "javascript": {"package_root": "."},
@@ -355,7 +350,6 @@ def test_workspace_rejects_cross_target_nodeset_outside_declared_roots(
         json.dumps(
             {
                 "project_target": "python",
-                "registry": "registry.py:build_node_registry",
             }
         ),
         encoding="utf-8",
@@ -555,7 +549,6 @@ def test_mixed_workspace_quality_runs_each_root_in_an_isolated_process(
         json.dumps(
             {
                 "project_target": "python",
-                "registry": "registry.py:build_node_registry",
             }
         ),
         encoding="utf-8",
@@ -659,7 +652,6 @@ def test_mixed_workspace_quality_keeps_workspace_for_external_roots(
         json.dumps(
             {
                 "project_target": "python",
-                "registry": "registry.py:build_node_registry",
             }
         ),
         encoding="utf-8",
@@ -707,13 +699,3 @@ def test_mixed_workspace_quality_keeps_workspace_for_external_roots(
     assert len(captured) == 2
     for arguments in captured:
         assert arguments[arguments.index("--workspace") + 1] == str(workspace)
-
-
-_native_cli_main = cli_main
-def cli_main(args):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture, prepare_config_fixture
-    if "--workspace" in args:
-        prepare_workspace_fixture(args[args.index("--workspace")+1])
-    elif "--config" in args:
-        prepare_config_fixture(args[args.index("--config")+1])
-    return _native_cli_main(args)

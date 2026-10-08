@@ -190,10 +190,17 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     schema("policy.source.zero", {**pipeline(), "policy": {"node_source": {"max_lines": 0}}}, "POLICY_POSITIVE_INT")
     for section, fields in (("imports", ("allowed_roots", "banned_roots", "allowed_modules", "banned_modules")),
                             ("base_lib", ("allowed_paths", "allowed_modules", "banned_modules"))):
-        schema("policy." + section + ".object", {**pipeline(), "policy": {section: []}}, "POLICY_SECTION")
-        for field in fields:
-            schema("policy." + section + "." + field, {**pipeline(), "policy": {section: {field: [""]}}}, "POLICY_STRING_LIST")
-        emit("policy." + section + ".normal", {**pipeline(), "policy": {section: {field: ["support"] for field in fields}}})
+        if section == "base_lib" and variant == "current":
+            removed = ("CONFIG.POLICY.BASE_LIB.REMOVED",)
+            emit("policy.base_lib.object", {**pipeline(),"policy":{"base_lib":[]}}, removed, classification="approved_change")
+            for field in fields:
+                emit("policy.base_lib."+field,{**pipeline(),"policy":{"base_lib":{field:[""]}}},removed,classification="approved_change")
+            emit("policy.base_lib.normal",{**pipeline(),"policy":{"base_lib":{field:["support"] for field in fields}}},removed,classification="approved_change")
+        else:
+            schema("policy." + section + ".object", {**pipeline(), "policy": {section: []}}, "POLICY_SECTION")
+            for field in fields:
+                schema("policy." + section + "." + field, {**pipeline(), "policy": {section: {field: [""]}}}, "POLICY_STRING_LIST")
+            emit("policy." + section + ".normal", {**pipeline(), "policy": {section: {field: ["support"] for field in fields}}})
     legacy_entry = {"rule_id": "NODE.SOURCE.TOO_LONG", "to": "warning", "reason": "A documented migration case.", "expires": "2099-01-01"}
     removed = ("CONFIG.POLICY.RULES.REMOVED",)
     def legacy(name, value, baseline_codes=()):

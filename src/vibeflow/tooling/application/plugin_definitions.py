@@ -14,8 +14,24 @@ def load_plugin_definition(source, *, owner, workspace, node_command):
 
 
 def attach_plugin_definitions(catalog, definitions):
+    from vibeflow.targets.shared.bindings import attach_native_bindings
+    attach_native_bindings(catalog, (value for values in definitions.values() for value in values))
     for target, values in definitions.items():
         application = import_module(_APPLICATIONS[target])
         attach = getattr(application, "attach_definitions", None)
         if attach is not None:
             attach(catalog, values)
+
+
+def normalize_contributions(contribution, bindings, *, owner, workspace):
+    application = import_module(_APPLICATIONS[owner.project_target])
+    normalize = getattr(application, "normalize_contributions", None)
+    return normalize(contribution, bindings, owner=owner, workspace=workspace) if normalize else contribution
+
+
+def load_builtin_definition(target):
+    if target == "project":
+        from vibeflow.builtin.plugin import project_plugin
+        return project_plugin()
+    module = import_module(f"vibeflow.targets.{target}.quality.builtin_plugin")
+    return module.builtin_plugin()

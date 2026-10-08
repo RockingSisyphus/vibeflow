@@ -105,6 +105,26 @@ workflow 和 Nodeset 文件顶层也可选择 `rulesets`，默认 `vibeflow.work
 
 正式报告的 `rule_executions` 保存实际计划和结果，`record_availability` 区分资料可用、不可用及未选择；未检查的依赖或结构结果为 `null`。failed/unavailable 表示检查未完成，会使正式检查失败。
 
+## 效果与导入参数
+
+效果权限来自实际选中 Rule 的有效参数，与 Node、BaseLib、Plugin 或 Host 的身份独立。共享源码仍按各资源自己的参数分别检查。
+
+同一插件声明文件可以贡献独立的 Node、Host 或生命周期资源。效果检查从当前资源的真实实现与可达 helper 出发，不把它的参数应用到闭包内未被其使用的其他资源。Node 调用的库 helper 仍受 Node 自身的效果选择约束。compiler Plugin 若实际写文件，应显式选择 python_io；编译身份不授予额外权限。Rule/compiler 专用依赖留在检查编译环境，运行产物按真实引用打包。
+
+| effect_scope | 允许的效果 |
+| --- | --- |
+| none | 不授予效果权限 |
+| terminal | 终端输入输出，例如 print/console；不允许 fetch 或文件 I/O |
+| python_io | 各 Target 对应的一般 I/O；显式导入禁止继续生效 |
+| global_state | 资源或模块状态；不允许修改 builtin、原型及宿主关键状态 |
+| trusted | 不增加权限 |
+
+JavaScript 继续执行其已有时间、随机数检查；python_io 保留该 Target 既有的放行行为。Python 本轮没有新增时间、随机数禁令，两个语言分析器的覆盖不保证完全相同。
+
+effects 与 imports Rule 的 `policy.imports` 支持 `allowed_roots`、`banned_roots`、`allowed_modules`、`banned_modules` 四个字符串数组。显式模块禁止优先，其次检查模块允许，再处理根政策；根允许是同根禁止的例外。允许只影响导入政策，不解除效果检查或未声明资源依赖。JS 支持 scoped npm 包、子路径，以及 fs/node:fs 等价形式。
+
+Python effects 默认根禁止只有 importlib，并保留 urllib.parse/vibeflow 模块允许；imports-only 的四数组默认都为空，仍检查导入期执行和真实 ownership。显式空数组不会回退默认禁止。参数只能包含实际 handler 消费的内容，未知或不相关字段明确失败；对象参数的显式覆盖整体替换原对象，有效参数与来源在正式记录中可查。
+
 ## 入口、范围与源码归属
 
 import 检查在后续实现绑定前执行，static 用于正式静态检查，run 执行运行入口选择的规则。新领域 Ruleset 未填写 run/import 时，这两个入口为空；未填写 static 时执行其静态组合。插件固定定义及直接导入先初始化，延迟源码可保留检查后绑定的顺序，详见[加载与检查](plugins-and-integrations.md#加载与检查)。
@@ -114,6 +134,8 @@ Workflow 及实际调用的 Nodeset/Loop 也执行所选 import 入口。此时�
 上下文覆盖当前命令实际范围中的声明、调用、实现与相关辅助源码。Python 提供 SourceContext 的符号、导入、helper 引用和归属；JS 提供只读文本、符号、导入与 AST 查询。源码在本次检查内复用，引用与所有权分别记录，共享文件按各所属资源的规则分别检查。
 
 规则通过 `context.subject` 取得当前对象声明，通过 `context.scope` 了解实际范围。Node 检查中，Python 的 `context.subject["descriptor"]` 是只读 NodeDescriptor，JS 是同模型的 JSON 对象；库、插件与 Host 检查提供各自的声明。调用级规则读取实际调用，源码级规则取得全部调用关联。
+
+Python 中需要从当前上下文派生另一个检查对象时，可使用 `dataclasses.replace(context, subject={...})`，或以同样方式更新阶段、范围及补充 facts。同次检查中已有的只读资料会复用，新增容器仍会递归冻结。直接从原始资料构造 `RuleContext` 则创建独立快照，不跨检查缓存项目资料。
 
 Python 的公开分析对象是 `context.require("source_context")`，类型从 `vibeflow.targets.python.quality` 导入。常用查询如下：
 

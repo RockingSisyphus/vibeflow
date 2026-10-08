@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any, Mapping
 
 from vibeflow.targets.javascript.frontend.declarations import schema_to_typescript
@@ -18,8 +17,6 @@ from vibeflow.targets.javascript.frontend.templates import ABORT_SIGNAL_DECLARAT
 
 def validate_schema_subset(
     workflow: EmissionWorkflow,
-    *,
-    implementation_by_type: Mapping[str, object],
 ) -> None:
     try:
         validate_javascript_json_value(
@@ -63,7 +60,6 @@ def validate_schema_subset(
 
 def node_contract_check(
     workflow: EmissionWorkflow,
-    implementations: Mapping[str, object],
 ) -> str:
     module_bindings: dict[str, str] = {}
     lines = [
@@ -81,12 +77,7 @@ def node_contract_check(
         nonlocal check_index
         for node in plan.nodes:
             if node.implementation is not None:
-                module, exported = _node_implementation(
-                    node.type_used,
-                    node.implementation.module,
-                    node.implementation.export,
-                    implementations,
-                )
+                module, exported = node.implementation.module, node.implementation.export
                 namespace = module_bindings.setdefault(
                     module,
                     f"__vf_contract_module_{len(module_bindings)}",
@@ -108,10 +99,7 @@ def node_contract_check(
                     input_members.append(
                         f"readonly {json.dumps(requirement.type)}: {envelope_type}"
                     )
-                implementation_metadata = _node_contract_metadata(
-                    node,
-                    implementations.get(node.type_used),
-                )
+                implementation_metadata = _node_contract_metadata(node)
                 output_members = []
                 for provider in node.provides:
                     provider_schema = _provider_schema(
@@ -193,20 +181,9 @@ def runtime_plugin_contract_check(bindings: object) -> str:
     return "\n".join([*imports, *checks, ""])
 
 
-def _implementation_metadata(value: object) -> Mapping[str, Any]:
-    return value if isinstance(value, Mapping) else {}
-
-
-def _node_contract_metadata(
-    node: object,
-    implementation: object,
-) -> Mapping[str, Any]:
-    metadata = dict(_implementation_metadata(implementation))
-    for key in ("params_schema",):
-        value = getattr(node, key, None)
-        if isinstance(value, Mapping):
-            metadata[key] = value
-    return metadata
+def _node_contract_metadata(node: object) -> Mapping[str, Any]:
+    value = getattr(node, "params_schema", None)
+    return {"params_schema": value} if isinstance(value, Mapping) else {}
 
 
 def _provider_schema(
@@ -345,38 +322,10 @@ def _node_context_type(
         "Readonly<{ "
         "signal?: VibeFlowAbortSignal; "
         f"capabilities: {capabilities_type}; "
-        "trace(kind: string, details?: Readonly<Record<string, unknown>>): void"
+        "trace(kind: string, details?: Readonly<Record<string, unknown>>): void; "
+        "updateInfo(info: readonly Readonly<Record<string, unknown>>[]): void"
         " }>"
     )
-
-
-def _node_implementation(
-    type_used: str,
-    default_module: str,
-    default_export: str,
-    implementations: Mapping[str, object],
-) -> tuple[str, str]:
-    value = implementations.get(type_used)
-    if value is None:
-        return default_module, default_export
-    if isinstance(value, (str, Path)):
-        return str(value), default_export
-    if isinstance(value, Mapping):
-        source = value.get("source")
-        source_mapping = source if isinstance(source, Mapping) else {}
-        module = value.get(
-            "module",
-            value.get(
-                "entry",
-                value.get("ref", source_mapping.get("ref", default_module)),
-            ),
-        )
-        exported = value.get(
-            "export",
-            source_mapping.get("export", default_export),
-        )
-        return str(module), str(exported or "run")
-    return default_module, default_export
 
 
 __all__ = [

@@ -7,7 +7,8 @@ from typing import Any, Mapping
 
 from vibeflow.targets.javascript.frontend.emitter import EmittedWorkflow
 from vibeflow.targets.javascript.frontend.errors import AotBuildError
-from vibeflow.targets.javascript.frontend.model import PROFILES, TARGETS, WorkflowSpec
+from vibeflow.targets.javascript.frontend.contracts import PROFILES, TARGETS
+from vibeflow.targets.javascript.frontend.emission_protocol import EmissionWorkflow
 from vibeflow.targets.javascript.build.publish import (
     AotPublishError,
     atomic_publish_directory,
@@ -133,55 +134,6 @@ def resolve_under_project(
             f"{subject} does not exist: {path}",
         )
     return path
-
-
-def resolved_implementations(
-    workflow: WorkflowSpec,
-    *,
-    project_root: Path,
-    overrides: Mapping[str, object],
-) -> dict[str, object]:
-    resolved: dict[str, object] = dict(overrides)
-
-    def visit(plan: WorkflowSpec) -> None:
-        for node in plan.nodes:
-            if node.implementation is not None and node.type_used not in resolved:
-                implementation = node.implementation
-                module_path = Path(implementation.module).expanduser()
-                candidate = (
-                    module_path
-                    if module_path.is_absolute()
-                    else project_root / module_path
-                )
-                if candidate.is_file():
-                    resolved[node.type_used] = {
-                        **implementation.to_dict(),
-                        "module": str(candidate.resolve()),
-                    }
-            if node.subplan is not None:
-                visit(node.subplan)
-
-    visit(workflow)
-    for type_key, value in tuple(resolved.items()):
-        if isinstance(value, (str, Path)):
-            module = Path(value).expanduser()
-            candidate = module if module.is_absolute() else project_root / module
-            if candidate.is_file():
-                resolved[type_key] = str(candidate.resolve())
-        elif isinstance(value, Mapping):
-            module_value = value.get(
-                "module",
-                value.get("entry", value.get("ref", "")),
-            )
-            if module_value:
-                module = Path(str(module_value)).expanduser()
-                candidate = module if module.is_absolute() else project_root / module
-                if candidate.is_file():
-                    resolved[type_key] = {
-                        **dict(value),
-                        "module": str(candidate.resolve()),
-                    }
-    return resolved
 
 
 def write_profile_companions(
@@ -319,7 +271,7 @@ def validate_profile_output(
 
 
 def build_manifest(
-    workflow: WorkflowSpec,
+    workflow: EmissionWorkflow,
     *,
     emitted: EmittedWorkflow,
     driver_result: DriverBuildResult,

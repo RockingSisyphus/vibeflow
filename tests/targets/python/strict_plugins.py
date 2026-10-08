@@ -2,9 +2,9 @@ from tests.fixtures.support.strict_support_runtime_implementations import SinkNo
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 import re
 import xml.etree.ElementTree as ET
-from copy import deepcopy
 
 from tests.fixtures.support.strict_support import *
+from tests.fixtures.support.plugins import publish_native_fixture, write_lifecycle_fixture
 
 
 from vibeflow.targets.python.quality.workflow.validation import validate_graph_health as _validate_graph_health
@@ -17,46 +17,6 @@ def validate_graph_health(graph, *, registry=None, **kwargs):
     return _validate_graph_health(graph,registry=registry,**kwargs)
 
 
-def parse_graph_config(config):
-    """Migrate this module's legacy inline graphs to the effective-contract ABI."""
-    from vibeflow.tooling.project.graph_config import parse_graph_config as raw_parse_graph_config
-
-    migrated = deepcopy(config)
-    raw_nodesets = migrated.get("nodesets", []) if isinstance(migrated, dict) else []
-    nodeset_items = list(raw_nodesets.values()) if isinstance(raw_nodesets, dict) else list(raw_nodesets)
-    nodeset_types = {
-        str(item.get("type_key", ""))
-        for item in nodeset_items
-        if isinstance(item, dict) and item.get("type_key")
-    }
-
-    def visit(body):
-        pipeline = body.get("pipeline", body)
-        for node in pipeline.get("nodes", []):
-            node.setdefault("display_name", str(node.get("id", "Node")).replace("_", " ").title())
-            node.setdefault("description", f"Exercises {node.get('id', 'this node')} in the plugin test workflow.")
-            explicit = (
-                node.get("status") == "planned"
-                or node.get("type_used") == "vibeflow.io"
-                or str(node.get("type_used", "")).startswith("vibeflow.loop.")
-            )
-            if explicit:
-                node.setdefault("requires", [])
-                node.setdefault("provides", [])
-            else:
-                node.pop("requires", None)
-                node.pop("provides", None)
-        nested = body.get("nodesets", pipeline.get("nodesets", {}))
-        iterable = nested.values() if isinstance(nested, dict) else nested
-        for nodeset in iterable:
-            if not isinstance(nodeset, dict):
-                continue
-            nodeset.setdefault("display_name", str(nodeset.get("type_key", "Nodeset")))
-            nodeset.setdefault("description", "Defines a composite workflow used by plugin tests.")
-            visit(nodeset)
-
-    visit(migrated)
-    return raw_parse_graph_config(migrated)
 
 
 def _review_title_positions(svg_text: str) -> dict[str, tuple[float, float]]:
@@ -69,18 +29,7 @@ def _review_title_positions(svg_text: str) -> dict[str, tuple[float, float]]:
     return positions
 
 
-SinkNode_DECLARATION = node_declaration(NodeInfo(
-        type_key="test.sink",
-        display_name="Sink",
-
-        description="Consumes a value.",
-        version="0.1.0",
-        flow_kind="process",
-    ), NodeContract(
-        requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"),),
-        input_semantics={"value.in": ("input value",)},
-        examples=({"inputs": {"value.in": 1}, "params": {}},),
-    ), rulesets=("vibeflow.process",))
+SinkNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.sink', display_name='Sink', description='Consumes a value.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='value.in'),), input_semantics={'value.in': ('input value',)}, examples=({'inputs': {'value.in': 1}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 
 
@@ -91,7 +40,6 @@ def test_compiler_and_runtime_plugins_are_hooked(tmp_path) -> None:
         f"""
 import json
 from pathlib import Path
-from vibeflow.targets.python.project import PluginInfo
 
 MARKER = Path({str(marker_path)!r})
 
@@ -100,13 +48,11 @@ def record(value):
         handle.write(json.dumps(value, sort_keys=True) + "\\n")
 
 class CompilerPlugin:
-    PLUGIN_INFO = PluginInfo("compiler_hook", "compiler", "Compiler Hook", "test", "Records compiler hook calls.", "0.1.0")
     name = "compiler_hook"
     def after_compile(self, graph, compiled):
         record({{"hook": "after_compile", "nodes": len(graph.nodes)}})
 
 class RuntimePlugin:
-    PLUGIN_INFO = PluginInfo("runtime_hook", "runtime", "Runtime Hook", "test", "Records runtime hook calls.", "0.1.0")
     name = "runtime_hook"
     def before_node(self, name, node_type, input_summary):
         record({{"hook": "before_node", "id": name}})
@@ -120,14 +66,15 @@ class RuntimePlugin:
         json.dumps(
             {
                 "plugins": [
-                    {"module": str(plugin_path), "class": "CompilerPlugin", "type": "compiler"},
-                    {"module": str(plugin_path), "class": "RuntimePlugin", "type": "runtime"},
+                    write_lifecycle_fixture(tmp_path, source={"kind":"file", "ref":plugin_path.name, "export":"CompilerPlugin"}, plugin_id="compiler_hook", plugin_type="compiler", filename="compiler_definition.py"),
+                    write_lifecycle_fixture(tmp_path, source={"kind":"file", "ref":plugin_path.name, "export":"RuntimePlugin"}, plugin_id="runtime_hook", filename="runtime_definition.py"),
                 ],
                 "pipeline": _seed_only_pipeline(),
             }
         ),
         encoding="utf-8",
     )
+    publish_native_fixture(config_path, _registry())
     run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="plugin_hooks")
     records = [json.loads(line) for line in marker_path.read_text(encoding="utf-8").splitlines()]
     hooks = [record["hook"] for record in records]
@@ -176,17 +123,11 @@ def test_nodeset_can_be_used_as_a_node() -> None:
                     "requires": [REQ_SPEC("value.in")],
                     "provides": [PROV_SPEC("value.out")],
                     "pipeline": {
-                        "inputs": [PROV_SPEC("value.in")],
+                        "inputs": [INPUT_SPEC("value.in")],
                         "nodes": [
-                            {"id": "start", "type_used": "test.start"},
-                            {
-                                "id": "add",
-                                "type_used": "test.add",
-                                "requires": [REQ_SPEC("value.in")],
-                                "provides": [PROV_SPEC("value.out")],
-                                "delta": 1,
-                            },
-                            {"id": "end", "type_used": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                            {'id': 'start', 'type_used': 'test.start', 'display_name': 'Start', 'description': 'Exercises start in the plugin test workflow.'},
+                            {'id': 'add', 'type_used': 'test.add', 'delta': 1, 'display_name': 'Add', 'description': 'Exercises add in the plugin test workflow.'},
+                            {'id': 'end', 'type_used': 'test.out_end', 'display_name': 'End', 'description': 'Exercises end in the plugin test workflow.'},
                         ],
                         "edges": _edge_chain("start", "add", "end"),
                         "outputs": [REQ_SPEC("value.out")],
@@ -194,16 +135,11 @@ def test_nodeset_can_be_used_as_a_node() -> None:
                 }
             ],
                 "pipeline": {
-                    "inputs": [PROV_SPEC("value.in")],
+                    "inputs": [INPUT_SPEC("value.in")],
                     "nodes": [
-                        {"id": "start", "type_used": "test.start"},
-                        {
-                            "id": "composite",
-                            "type_used": "math.add_one",
-                            "requires": [REQ_SPEC("value.in")],
-                            "provides": [PROV_SPEC("value.out")],
-                        },
-                        {"id": "end", "type_used": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                        {'id': 'start', 'type_used': 'test.start', 'display_name': 'Start', 'description': 'Exercises start in the plugin test workflow.'},
+                        {'id': 'composite', 'type_used': 'math.add_one', 'display_name': 'Composite', 'description': 'Exercises composite in the plugin test workflow.'},
+                        {'id': 'end', 'type_used': 'test.out_end', 'display_name': 'End', 'description': 'Exercises end in the plugin test workflow.'},
                     ],
                     "edges": _edge_chain("start", "composite", "end"),
                     "outputs": [REQ_SPEC("value.out")],
@@ -242,12 +178,12 @@ def test_mermaid_collapses_and_expands_nodesets_with_contract_metadata() -> None
                 )
             ],
                 "pipeline": {
-                    "inputs": [PROV_SPEC("value.in")],
+                    "inputs": [INPUT_SPEC("value.in")],
                     "nodes": [
                         _node_call("start", "test.start", "Starts the nodeset Mermaid fixture."),
-                        _node_call("input", "test.value_input", "Reads value.in.", requires=[REQ_SPEC("value.in")]),
-                        _node_call("composite", "math.add_one", "Calls the add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                        _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
+                        _node_call("input", "test.value_input", "Reads value.in."),
+                        _node_call("composite", "math.add_one", "Calls the add-one nodeset."),
+                        _node_call("end", "test.out_end", "Consumes value.out at the end."),
                     ],
                     "edges": _edge_chain("start", "input", "composite", "end"),
                 },
@@ -281,12 +217,12 @@ def test_mermaid_review_columns_layout_separates_main_resources_and_expanded_nod
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the review-column fixture."),
-                    _node_call("input", "test.value_input", "Reads value.in.", requires=[REQ_SPEC("value.in")]),
-                    _node_call("composite", "math.add_one", "Calls the add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Consumes value.out at the end.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("input", "test.value_input", "Reads value.in."),
+                    _node_call("composite", "math.add_one", "Calls the add-one nodeset."),
+                    _node_call("end", "test.out_end", "Consumes value.out at the end."),
                 ],
                 "edges": _edge_chain("start", "input", "composite", "end"),
             },
@@ -435,12 +371,12 @@ def test_review_columns_svg_composer_places_columns_left_to_right(tmp_path) -> N
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
-                    {"id": "start", "type_used": "test.start"},
-                    {"id": "input", "type_used": "test.value_input", "requires": [REQ_SPEC("value.in")]},
-                    {"id": "composite", "type_used": "math.add_one", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")]},
-                    {"id": "end", "type_used": "test.out_end", "requires": [REQ_SPEC("value.out")]},
+                    {'id': 'start', 'type_used': 'test.start', 'display_name': 'Start', 'description': 'Exercises start in the plugin test workflow.'},
+                    {'id': 'input', 'type_used': 'test.value_input', 'display_name': 'Input', 'description': 'Exercises input in the plugin test workflow.'},
+                    {'id': 'composite', 'type_used': 'math.add_one', 'display_name': 'Composite', 'description': 'Exercises composite in the plugin test workflow.'},
+                    {'id': 'end', 'type_used': 'test.out_end', 'display_name': 'End', 'description': 'Exercises end in the plugin test workflow.'},
                 ],
                 "edges": _edge_chain("start", "input", "composite", "end"),
             },
@@ -584,6 +520,7 @@ def test_run_checked_writes_quick_and_expanded_svg_artifacts(tmp_path, monkeypat
 
     config_path = tmp_path / "workflow.json"
     config_path.write_text(json.dumps({"pipeline": _seed_add_pipeline()}), encoding="utf-8")
+    publish_native_fixture(config_path, _registry())
     result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="svg_artifacts")
 
     assert quick_calls == [result.run_dir / "graph.svg"]
@@ -610,6 +547,7 @@ def test_run_checked_records_expanded_svg_error_without_failing_run(tmp_path, mo
 
     config_path = tmp_path / "workflow.json"
     config_path.write_text(json.dumps({"pipeline": _seed_add_pipeline()}), encoding="utf-8")
+    publish_native_fixture(config_path, _registry())
     result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="svg_error")
 
     assert (result.run_dir / "graph.svg").exists()
@@ -656,10 +594,10 @@ def test_nodeset_detail_parent_mermaid_preserves_collapsed_callsite_edges() -> N
                     "detail.parent",
                     pipeline={
                         "nodes": [
-                            {"id": "start", "type_used": "test.start"},
-                            {"id": "before", "type_used": "test.value_input", "requires": [REQ_SPEC("value.in")]},
-                            {"id": "child", "type_used": "detail.leaf"},
-                            {"id": "after", "type_used": "test.out_end"},
+                            {'id': 'start', 'type_used': 'test.start', 'display_name': 'Start', 'description': 'Exercises start in the plugin test workflow.'},
+                            {'id': 'before', 'type_used': 'test.value_input', 'display_name': 'Before', 'description': 'Exercises before in the plugin test workflow.'},
+                            {'id': 'child', 'type_used': 'detail.leaf', 'display_name': 'Child', 'description': 'Exercises child in the plugin test workflow.'},
+                            {'id': 'after', 'type_used': 'test.out_end', 'display_name': 'After', 'description': 'Exercises after in the plugin test workflow.'},
                         ],
                         "edges": [
                             {"from": "start", "to": "before"},
@@ -674,7 +612,7 @@ def test_nodeset_detail_parent_mermaid_preserves_collapsed_callsite_edges() -> N
             ],
             "pipeline": {
                 "nodes": [
-                    {"id": "main", "type_used": "detail.parent"},
+                    {'id': 'main', 'type_used': 'detail.parent', 'display_name': 'Main', 'description': 'Exercises main in the plugin test workflow.'},
                 ],
             },
         }
@@ -735,10 +673,10 @@ def test_nodeset_detail_fragment_recurses_nested_child_panels(tmp_path, monkeypa
                         provides=[],
                     pipeline={
                         "nodes": [
-                            {"id": "mid_start", "type_used": "test.start"},
-                            {"id": "inner_a", "type_used": "detail.leaf_two"},
-                            {"id": "inner_b", "type_used": "detail.leaf_three"},
-                            {"id": "mid_end", "type_used": "test.out_end"},
+                            {'id': 'mid_start', 'type_used': 'test.start', 'display_name': 'Mid Start', 'description': 'Exercises mid_start in the plugin test workflow.'},
+                            {'id': 'inner_a', 'type_used': 'detail.leaf_two', 'display_name': 'Inner A', 'description': 'Exercises inner_a in the plugin test workflow.'},
+                            {'id': 'inner_b', 'type_used': 'detail.leaf_three', 'display_name': 'Inner B', 'description': 'Exercises inner_b in the plugin test workflow.'},
+                            {'id': 'mid_end', 'type_used': 'test.out_end', 'display_name': 'Mid End', 'description': 'Exercises mid_end in the plugin test workflow.'},
                         ],
                         "edges": _edge_chain("mid_start", "inner_a", "inner_b", "mid_end"),
                     },
@@ -748,17 +686,17 @@ def test_nodeset_detail_fragment_recurses_nested_child_panels(tmp_path, monkeypa
                         provides=[],
                     pipeline={
                         "nodes": [
-                            {"id": "root_start", "type_used": "test.start"},
-                            {"id": "first", "type_used": "detail.leaf_one"},
-                            {"id": "second", "type_used": "detail.mid"},
-                            {"id": "third", "type_used": "detail.leaf_three"},
-                            {"id": "root_end", "type_used": "test.out_end"},
+                            {'id': 'root_start', 'type_used': 'test.start', 'display_name': 'Root Start', 'description': 'Exercises root_start in the plugin test workflow.'},
+                            {'id': 'first', 'type_used': 'detail.leaf_one', 'display_name': 'First', 'description': 'Exercises first in the plugin test workflow.'},
+                            {'id': 'second', 'type_used': 'detail.mid', 'display_name': 'Second', 'description': 'Exercises second in the plugin test workflow.'},
+                            {'id': 'third', 'type_used': 'detail.leaf_three', 'display_name': 'Third', 'description': 'Exercises third in the plugin test workflow.'},
+                            {'id': 'root_end', 'type_used': 'test.out_end', 'display_name': 'Root End', 'description': 'Exercises root_end in the plugin test workflow.'},
                         ],
                         "edges": _edge_chain("root_start", "first", "second", "third", "root_end"),
                     },
                 ),
             ],
-            "pipeline": {"nodes": [{"id": "root", "type_used": "detail.root"}]},
+            "pipeline": {"nodes": [{'id': 'root', 'type_used': 'detail.root', 'display_name': 'Root', 'description': 'Exercises root in the plugin test workflow.'}]},
         }
     )
     rendered: list[tuple[str, str]] = []
@@ -823,26 +761,12 @@ def test_nodeset_detail_groups_direct_calls_by_kind_in_first_occurrence_order(tm
             ],
             "pipeline": {
                 "nodes": [
-                    {"id": "a", "type_used": "detail.shared"},
-                    {"id": "other", "type_used": "detail.other"},
-                    {
-                        "id": "b",
-                            "type_used": "detail.shared",
-                            "async": "result_key",
-                            "result_key": "value.out",
-                    },
-                    {
-                        "id": "c",
-                        "type_used": "detail.shared",
-                        "config": {"delta": 2},
-                        "node_configs": {"inner": {"delta": 3}},
-                    },
-                    {"id": "d", "type_used": "detail.shared"},
-                    {
-                        "id": "loop",
-                        "type_used": "vibeflow.loop.while",
-                        "loop": {"body": "detail.shared", "stop_after": 1},
-                    },
+                    {'id': 'a', 'type_used': 'detail.shared', 'display_name': 'A', 'description': 'Exercises a in the plugin test workflow.'},
+                    {'id': 'other', 'type_used': 'detail.other', 'display_name': 'Other', 'description': 'Exercises other in the plugin test workflow.'},
+                    {'id': 'b', 'type_used': 'detail.shared', 'async': 'result_key', 'result_key': 'value.out', 'display_name': 'B', 'description': 'Exercises b in the plugin test workflow.'},
+                    {'id': 'c', 'type_used': 'detail.shared', 'config': {'delta': 2}, 'node_configs': {'inner': {'delta': 3}}, 'display_name': 'C', 'description': 'Exercises c in the plugin test workflow.'},
+                    {'id': 'd', 'type_used': 'detail.shared', 'display_name': 'D', 'description': 'Exercises d in the plugin test workflow.'},
+                    {'id': 'loop', 'type_used': 'vibeflow.loop.while', 'loop': {'body': 'detail.shared', 'stop_after': 1}, 'requires': [], 'provides': [], 'display_name': 'Loop', 'description': 'Exercises loop in the plugin test workflow.'},
                 ]
             },
         }
@@ -908,11 +832,11 @@ def test_nodeset_detail_deduplication_is_local_to_each_parent(tmp_path, monkeypa
                         provides=[],
                     pipeline={
                         "nodes": [
-                            {"id": "one_start", "type_used": "test.start"},
-                            {"id": "first", "type_used": "detail.shared"},
-                            {"id": "second", "type_used": "detail.shared"},
-                            {"id": "same_shape", "type_used": "detail.same_shape"},
-                            {"id": "one_end", "type_used": "test.out_end"},
+                            {'id': 'one_start', 'type_used': 'test.start', 'display_name': 'One Start', 'description': 'Exercises one_start in the plugin test workflow.'},
+                            {'id': 'first', 'type_used': 'detail.shared', 'display_name': 'First', 'description': 'Exercises first in the plugin test workflow.'},
+                            {'id': 'second', 'type_used': 'detail.shared', 'display_name': 'Second', 'description': 'Exercises second in the plugin test workflow.'},
+                            {'id': 'same_shape', 'type_used': 'detail.same_shape', 'display_name': 'Same Shape', 'description': 'Exercises same_shape in the plugin test workflow.'},
+                            {'id': 'one_end', 'type_used': 'test.out_end', 'display_name': 'One End', 'description': 'Exercises one_end in the plugin test workflow.'},
                         ],
                         "edges": _edge_chain("one_start", "first", "second", "same_shape", "one_end"),
                     },
@@ -922,9 +846,9 @@ def test_nodeset_detail_deduplication_is_local_to_each_parent(tmp_path, monkeypa
                         provides=[],
                     pipeline={
                         "nodes": [
-                            {"id": "two_start", "type_used": "test.start"},
-                            {"id": "third", "type_used": "detail.shared"},
-                            {"id": "two_end", "type_used": "test.out_end"},
+                            {'id': 'two_start', 'type_used': 'test.start', 'display_name': 'Two Start', 'description': 'Exercises two_start in the plugin test workflow.'},
+                            {'id': 'third', 'type_used': 'detail.shared', 'display_name': 'Third', 'description': 'Exercises third in the plugin test workflow.'},
+                            {'id': 'two_end', 'type_used': 'test.out_end', 'display_name': 'Two End', 'description': 'Exercises two_end in the plugin test workflow.'},
                         ],
                         "edges": _edge_chain("two_start", "third", "two_end"),
                     },
@@ -932,8 +856,8 @@ def test_nodeset_detail_deduplication_is_local_to_each_parent(tmp_path, monkeypa
             ],
             "pipeline": {
                 "nodes": [
-                    {"id": "parent_one", "type_used": "detail.parent_one"},
-                    {"id": "parent_two", "type_used": "detail.parent_two"},
+                    {'id': 'parent_one', 'type_used': 'detail.parent_one', 'display_name': 'Parent One', 'description': 'Exercises parent_one in the plugin test workflow.'},
+                    {'id': 'parent_two', 'type_used': 'detail.parent_two', 'display_name': 'Parent Two', 'description': 'Exercises parent_two in the plugin test workflow.'},
                 ]
             },
         }
@@ -977,8 +901,8 @@ def test_mermaid_shows_when_edges_and_health_findings() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    {"id": "seed", "type_used": "test.seed", "provides": [PROV_SPEC("value.in")]},
-                    {"id": "consumer", "type_used": "test.add", "requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")]},
+                    {'id': 'seed', 'type_used': 'test.seed', 'display_name': 'Seed', 'description': 'Exercises seed in the plugin test workflow.'},
+                    {'id': 'consumer', 'type_used': 'test.add', 'display_name': 'Consumer', 'description': 'Exercises consumer in the plugin test workflow.'},
                 ],
                 "edges": [{"from": "seed", "to": "consumer", "when": "flow.route == 'go'"}],
             },
@@ -1013,8 +937,8 @@ def test_health_report_status_pass_when_no_findings() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the sink fixture."),
-                    _node_call("input", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
-                    _node_call("sink", "test.sink", "Consumes value.in.", requires=[REQ_SPEC("value.in")]),
+                    _node_call("input", "test.seed", "Produces value.in."),
+                    _node_call("sink", "test.sink", "Consumes value.in."),
                     _node_call("end", "test.start", "Ends the sink fixture."),
                 ],
                 "edges": _edge_chain("start", "input", "sink", "end"),
@@ -1026,7 +950,7 @@ def test_health_report_status_pass_when_no_findings() -> None:
     assert all(warning.rule_id == "GRAPH.SMELL.DUPLICATE_LOGIC" for warning in report.warnings)
 
 def test_health_report_status_fail_for_unknown_node() -> None:
-    graph = parse_graph_config({"pipeline": {"nodes": [{"id": "missing", "type_used": "test.missing", "provides": [PROV_SPEC("x")]}]}})
+    graph = parse_graph_config({"pipeline": {"nodes": [{'id': 'missing', 'type_used': 'test.missing', 'display_name': 'Missing', 'description': 'Exercises missing in the plugin test workflow.'}]}})
     report = validate_graph_health(graph, registry=_registry(), purity_policy=PurityPolicy(max_source_lines=1000))
     assert report.status == "FAIL"
     assert report.errors[0].rule_id == "NODE.TYPE.UNKNOWN"
@@ -1034,18 +958,15 @@ def test_health_report_status_fail_for_unknown_node() -> None:
 
 def _declared_cli_document():
     pipeline = _seed_add_pipeline()
-    for node in pipeline["nodes"]:
-        node.pop("requires",None)
-        node.pop("provides",None)
     return {"pipeline":pipeline}
 
 
 def test_cli_validate_json_reports_pass(tmp_path, capsys) -> None:
     from tests.fixtures.support.rule_inspection import write_registry_project
-    write_registry_project(tmp_path,_registry(),("test.start","test.seed","test.add","test.out_end"))
+    selection = write_registry_project(tmp_path,_registry(),("test.start","test.seed","test.add","test.out_end"))
     config_path = tmp_path / "workflow.json"
     config_path.write_text(
-        json.dumps(_declared_cli_document()),
+        json.dumps({**_declared_cli_document(), "plugins":[selection]}),
         encoding="utf-8",
     )
     code = cli_main(["validate", "--config", str(config_path), "--json"])
@@ -1080,10 +1001,10 @@ def test_cli_validate_text_error_includes_rule_file_line_and_column(tmp_path, ca
 
 def test_cli_inspect_config_outputs_effective_edges(tmp_path, capsys) -> None:
     from tests.fixtures.support.rule_inspection import write_registry_project
-    write_registry_project(tmp_path,_registry(),("test.start","test.seed","test.add","test.out_end"))
+    selection = write_registry_project(tmp_path,_registry(),("test.start","test.seed","test.add","test.out_end"))
     config_path = tmp_path / "workflow.json"
     config_path.write_text(
-        json.dumps(_declared_cli_document()),
+        json.dumps({**_declared_cli_document(), "plugins":[selection]}),
         encoding="utf-8",
     )
     code = cli_main(["inspect-config", "--config", str(config_path)])
@@ -1118,10 +1039,3 @@ def test_cli_inspect_node_requires_explicit_workflow(capsys) -> None:
         cli_main(["inspect-node", "--type", "demo.node"])
     assert error.value.code == 2
     assert "--config" in capsys.readouterr().err
-
-
-_native_run_checked = run_checked
-def run_checked(config_path, *, registry, **options):
-    from tests.fixtures.support.code_plugins import publish_runtime_fixture
-    publish_runtime_fixture(config_path, registry)
-    return _native_run_checked(config_path, registry=registry, **options)

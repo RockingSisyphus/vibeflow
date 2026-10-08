@@ -1,0 +1,61 @@
+[
+  {
+    "case": "base_libs",
+    "core": {
+      "accepted": true
+    },
+    "old_js_public_parser": {
+      "accepted": false,
+      "code": "VF_AOT_PLUGIN_CONFIG",
+      "message": "VF_AOT_PLUGIN_CONFIG: plugin contains unknown fields: ['base_libs']"
+    }
+  },
+  {
+    "case": "implementation_files",
+    "core": {
+      "accepted": true
+    },
+    "old_js_public_parser": {
+      "accepted": false,
+      "code": "VF_AOT_PLUGIN_CONFIG",
+      "message": "VF_AOT_PLUGIN_CONFIG: plugin.implementations[0] contains unknown fields: ['implementation_files']"
+    }
+  },
+  {
+    "case": "legacy_frontend",
+    "accepted": true,
+    "is_terminal": true,
+    "schedule": "deferred",
+    "async_mode": "result_key",
+    "flow_kind": "terminal"
+  },
+  {
+    "case": "presentation",
+    "core": {
+      "accepted": true
+    },
+    "old_js_public_parser": {
+      "accepted": false,
+      "code": "VF_AOT_PLUGIN_CONFIG",
+      "message": "VF_AOT_PLUGIN_CONFIG: plugin contains unknown fields: ['presentation']"
+    }
+  },
+  {
+    "case": "old_quality_host_extension",
+    "codes": [
+      "QUALITY.JAVASCRIPT.IMPORT.BOUNDARY"
+    ],
+    "messages": [
+      "host_extension cannot import base_lib source"
+    ]
+  },
+  {
+    "case": "old_quality_plugin",
+    "codes": [
+      "QUALITY.JAVASCRIPT.COMPLETION.SUSPEND_NON_PROMISE"
+    ],
+    "messages": [
+      "suspend implementation does not return a Promise"
+    ]
+  }
+]

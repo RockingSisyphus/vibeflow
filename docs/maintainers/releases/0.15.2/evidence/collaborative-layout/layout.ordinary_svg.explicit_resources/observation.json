@@ -1,0 +1,17 @@
+{
+  "exit_code": 0,
+  "error": null,
+  "frames": [],
+  "panels": [],
+  "columns": [],
+  "seconds": 1.1577613090048544,
+  "arguments": [
+    "export-svg",
+    "--workspace",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/release-0.15.2-20261006/collaborative/layout-final/layout.ordinary_svg.explicit_resources/vibeflow_config.jsonc",
+    "--config",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/release-0.15.2-20261006/collaborative/layout-final/layout.ordinary_svg.explicit_resources/workflow.jsonc",
+    "--output",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/release-0.15.2-20261006/collaborative/layout-final/layout.ordinary_svg.explicit_resources/graph.svg"
+  ]
+}

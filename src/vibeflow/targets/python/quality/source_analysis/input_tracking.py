@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import ast
 
-from vibeflow.targets.python.project.node import EFFECT_SCOPE_GLOBAL_STATE
-from vibeflow.targets.python.quality.source_analysis.ast_rules import name_targets, qualified_reference_name
-from vibeflow.targets.python.quality.source_analysis.effects import ambient_assignment_is_forbidden
+from vibeflow.targets.python.quality.source_analysis.ast_rules import name_targets
+from vibeflow.targets.python.quality.source_analysis.bindings import _comprehension_evaluation_steps, _function_definition_expressions, _function_scope_bindings
 from vibeflow.targets.python.quality.source_analysis.helpers import _dict_literal_keys, _literal_subscript_key
 from vibeflow.targets.python.quality.source_analysis.types import MUTATING_METHODS
 
@@ -56,7 +55,7 @@ def _trace_helper_input_parameters(
     tainted: dict[str, set[str]] = {name: set() for name in helpers}
     if target is None:
         return tainted
-    sources: list[tuple[ast.AST, set[str]]] = [
+    sources: list[tuple[ast.FunctionDef | ast.AsyncFunctionDef, set[str]]] = [
         (stmt, {"inputs"})
         for stmt in target.body
         if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef))
@@ -67,11 +66,10 @@ def _trace_helper_input_parameters(
     ]
     while sources:
         source, seeds = sources.pop()
-        aliases = _input_reference_aliases(source, seeds)
-        for call in (child for child in ast.walk(source) if isinstance(child, ast.Call)):
+        for call, input_arguments in _input_call_facts(source, seeds).items():
             if not isinstance(call.func, ast.Name) or call.func.id not in helpers:
                 continue
-            next_names = _tainted_helper_parameters(call, helpers[call.func.id], aliases)
+            next_names = _tainted_helper_parameters(call, helpers[call.func.id], input_arguments)
             unseen = next_names - tainted[call.func.id]
             if unseen:
                 tainted[call.func.id].update(unseen)
@@ -81,25 +79,23 @@ def _trace_helper_input_parameters(
 
 def source_input_parameters(sources, node) -> dict[str, set[str]]:
     """Propagate input ownership along resolved, project-local symbol calls."""
-    symbols = {item.id:item for item in sources.helpers(node.type_key) if isinstance(item.node,(ast.FunctionDef,ast.AsyncFunctionDef))}
+    symbols = {item.id:item for item in sources.helpers(node.type_key) if isinstance(item._node,(ast.FunctionDef,ast.AsyncFunctionDef))}
     seeds = {key:{"inputs"} for key,item in symbols.items() if item.path == node.path and item.name.startswith(node.symbol+".") and item.name.endswith(".run_pure")}
     tainted = {key:set(value) for key,value in seeds.items()}
     pending = list(seeds)
     while pending:
         key = pending.pop()
         symbol = symbols[key]
-        aliases = _input_reference_aliases(symbol.node,tainted[key])
-        references = {(ref.line,ref.column):ref.target for ref in sources.references if ref.source == key and ref.kind == "call"}
-        for call in (item for item in ast.walk(symbol.node) if isinstance(item,ast.Call)):
+        references = {(ref.line,ref.column):ref.target for ref in sources.references
+                      if ref.source.rpartition(":")[0] == symbol.path and ref.kind == "call"}
+        for call, input_arguments in _input_call_facts(symbol._node, tainted[key]).items():
             target = symbols.get(references.get((call.lineno,call.col_offset+1)))
             if target is None:
                 continue
-            helper = target.node
-            if isinstance(call.func,ast.Attribute) and isinstance(call.func.value,ast.Name) and call.func.value.id in {"self","cls"}:
-                from copy import deepcopy
-                call = deepcopy(call)
-                call.args.insert(0,ast.Constant(None))
-            names = _tainted_helper_parameters(call,helper,aliases)
+            helper = target._node
+            bound_method = (isinstance(call.func, ast.Attribute) and isinstance(call.func.value, ast.Name)
+                            and call.func.value.id in {"self", "cls"})
+            names = _tainted_helper_parameters(call, helper, input_arguments, bound_method=bound_method)
             unseen = names-tainted.setdefault(target.id,set())
             if unseen:
                 tainted[target.id].update(unseen)
@@ -117,38 +113,161 @@ def _called_module_helpers(node: ast.AST, helpers: dict[str, ast.AST]) -> set[st
     }
 
 
-def _input_reference_aliases(node: ast.AST, seeds: set[str]) -> set[str]:
-    aliases = set(seeds)
-    changed = True
-    while changed:
-        changed = False
-        for child in ast.walk(node):
-            if not isinstance(child, (ast.Assign, ast.AnnAssign)):
-                continue
-            value = child.value
-            if value is None or not _is_input_reference(value, aliases):
-                continue
-            targets = child.targets if isinstance(child, ast.Assign) else [child.target]
-            for target in targets:
-                if isinstance(target, ast.Name) and target.id not in aliases:
-                    aliases.add(target.id)
-                    changed = True
-    return aliases
+def _input_call_facts(node: ast.FunctionDef | ast.AsyncFunctionDef, seeds: set[str]):
+    """Possible input ownership of actual arguments within each lexical scope."""
+    return _InputCallFacts(node, seeds).collect()
 
 
-def _tainted_helper_parameters(
-    call: ast.Call,
-    helper: ast.FunctionDef | ast.AsyncFunctionDef,
-    aliases: set[str],
-) -> set[str]:
+class _InputCallFacts(ast.NodeVisitor):
+    def __init__(self, root, seeds):
+        self.root, self.seeds = root, set(seeds)
+        self.assigned = {}
+        self.bindings = {}
+        self.comprehension_names = {}
+        self.calls = {}
+
+    def collect(self):
+        # Keep assignment possibilities across branches, loops and closures.
+        # Only aliases derived in the same lexical scope participate in this
+        # finite fixed point; a comprehension target never becomes an alias.
+        while True:
+            self.changed = False
+            self.aliases, self.frames = set(), []
+            self.visit(self.root)
+            if not self.changed:
+                return self.calls
+
+    def visit_FunctionDef(self, node):
+        for expression in _function_definition_expressions(node):
+            self.visit(expression)
+        bindings = self.bindings.get(node)
+        if bindings is None:
+            bindings = self.bindings[node] = _function_scope_bindings(node)
+        local = bindings.names - bindings.global_names - bindings.nonlocal_names
+        aliases = self.aliases - local - bindings.global_names
+        aliases |= self.assigned.get(node, set())
+        if node is self.root:
+            aliases |= self.seeds
+        previous = self.aliases
+        self.aliases = aliases
+        self.frames.append((node, aliases, False))
+        aliases.update(name for name in self.assigned.get(None, ())
+                       if self._declared_binding_frame(name) is None)
+        try:
+            if isinstance(node, ast.Lambda):
+                self.visit(node.body)
+            else:
+                for statement in node.body:
+                    self.visit(statement)
+        finally:
+            self.frames.pop()
+            self.aliases = previous
+
+    visit_AsyncFunctionDef = visit_FunctionDef
+    visit_Lambda = visit_FunctionDef
+
+    def visit_ListComp(self, node):
+        previous, entered = self.aliases, False
+        try:
+            for expression, bound in _comprehension_evaluation_steps(node):
+                if bound is not None and not entered:
+                    self.aliases = self.aliases - bound
+                    self.comprehension_names[node] = bound
+                    self.frames.append((node, self.aliases, True))
+                    entered = True
+                self.visit(expression)
+        finally:
+            if entered:
+                self.frames.pop()
+            self.aliases = previous
+
+    visit_SetComp = visit_ListComp
+    visit_DictComp = visit_ListComp
+    visit_GeneratorExp = visit_ListComp
+
+    def _declared_binding_frame(self, name, frames=None, *, containing=False):
+        # None is the module owner. An external nonlocal cell can be represented
+        # only inside the selected function root; never treat it as a global.
+        external_nonlocal = None
+        for frame in reversed(self.frames if frames is None else frames):
+            node, _, comprehension = frame
+            if comprehension:
+                if not containing and name in self.comprehension_names[node]:
+                    return frame
+                continue
+            bindings = self.bindings[node]
+            if name in bindings.global_names:
+                return None
+            if name in bindings.nonlocal_names:
+                if external_nonlocal is None:
+                    external_nonlocal = frame
+                continue
+            if name in bindings.names:
+                return frame
+        return external_nonlocal
+
+    def _record_alias(self, target, *, containing=False):
+        if not isinstance(target, ast.Name) or not self.frames:
+            return
+        frame = self._declared_binding_frame(target.id, containing=containing)
+        owner = frame[0] if frame is not None else None
+        known = self.assigned.setdefault(owner, set())
+        if target.id not in known:
+            known.add(target.id)
+            self.changed = True
+        # A declared nonlocal/global write may escape its immediate function.
+        # Preserve the possible alias only in scopes reading that same binding;
+        # a sibling local, lambda parameter or comprehension target stays local.
+        for index, active in enumerate(self.frames):
+            if self._declared_binding_frame(target.id, self.frames[:index + 1]) is frame:
+                active[1].add(target.id)
+
+    def visit_Assign(self, node):
+        self.visit(node.value)
+        owned = _is_input_reference(node.value, self.aliases)
+        for target in node.targets:
+            self.visit(target)
+            if owned:
+                self._record_alias(target)
+
+    def visit_AnnAssign(self, node):
+        if node.value is not None:
+            self.visit(node.value)
+            if _is_input_reference(node.value, self.aliases):
+                self._record_alias(node.target)
+        self.visit(node.target)
+
+    def visit_NamedExpr(self, node):
+        self.visit(node.value)
+        if _is_input_reference(node.value, self.aliases):
+            self._record_alias(node.target, containing=True)
+
+    def visit_Call(self, node):
+        self.visit(node.func)
+        arguments, keywords = [], []
+        for argument in node.args:
+            self.visit(argument)
+            arguments.append(_is_input_reference(argument, self.aliases))
+        for keyword in node.keywords:
+            self.visit(keyword.value)
+            keywords.append(_is_input_reference(keyword.value, self.aliases))
+        previous = self.calls.get(node)
+        if previous is not None:
+            arguments = [current or earlier for current, earlier in zip(arguments, previous[0])]
+            keywords = [current or earlier for current, earlier in zip(keywords, previous[1])]
+        self.calls[node] = tuple(arguments), tuple(keywords)
+
+
+def _tainted_helper_parameters(call, helper, input_arguments, *, bound_method=False) -> set[str]:
     positional = (*helper.args.posonlyargs, *helper.args.args)
-    tainted: set[str] = set()
-    for index, value in enumerate(call.args):
-        if index < len(positional) and _is_input_reference(value, aliases):
-            tainted.add(positional[index].arg)
+    arguments, keywords = input_arguments
+    if bound_method:
+        arguments = (False, *arguments)
+    tainted = {positional[index].arg for index, owned in enumerate(arguments)
+               if owned and index < len(positional)}
     parameters = {arg.arg for arg in (*positional, *helper.args.kwonlyargs)}
-    for keyword in call.keywords:
-        if keyword.arg in parameters and _is_input_reference(keyword.value, aliases):
+    for keyword, owned in zip(call.keywords, keywords):
+        if keyword.arg in parameters and owned:
             tainted.add(str(keyword.arg))
     return tainted
 
@@ -156,6 +275,8 @@ def _tainted_helper_parameters(
 def _is_input_reference(node: ast.AST, aliases: set[str]) -> bool:
     if isinstance(node, ast.Name):
         return node.id in aliases
+    if isinstance(node, ast.NamedExpr):
+        return _is_input_reference(node.value, aliases)
     if isinstance(node, (ast.Attribute, ast.Subscript)):
         return _is_input_reference(node.value, aliases)
     if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
@@ -212,36 +333,7 @@ class _NodeDataTrackingMixin:
     def _check_assignment_target(self, target: ast.AST, node: ast.AST) -> None:
         if self._target_mutates_node_input(target):
             self._add("input_mutation", "node must not mutate inputs", node, suggested_fix_type="fix_node")
-        if not isinstance(target, (ast.Attribute, ast.Subscript)):
-            return
-        value = target.value
-        aliases = getattr(self, "_import_aliases", {})
-        imported_roots = getattr(self, "_imported_module_roots", set())
-        module_state_names = getattr(self, "_module_state_names", set())
-        local_names = getattr(self, "_current_local_names", set())
-        import_names = getattr(self, "_current_import_names", set())
-        name = qualified_reference_name(value, aliases)
-        root = name.split(".", 1)[0]
-        raw_root = _reference_root_name(value)
-        locally_owned = raw_root in local_names and raw_root not in import_names
-        if name and not locally_owned and (
-            root in imported_roots or root in module_state_names
-        ):
-            if ambient_assignment_is_forbidden(name):
-                self._add(
-                    "effect_call",
-                    f"node must not mutate forbidden process state: {name}",
-                    node,
-                    suggested_fix_type="move_to_boundary",
-                )
-                return
-            if getattr(self, "effect_scope", "") != EFFECT_SCOPE_GLOBAL_STATE:
-                self._add(
-                    "global_state",
-                    f"node must not mutate ambient module state: {name}",
-                    node,
-                    suggested_fix_type="move_to_boundary",
-                )
+        if self._ambient_target(target):
             return
         if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id != "self":
             self._add("monkey_patch", "assigning to external object attributes is forbidden", node, suggested_fix_type="fix_node")
@@ -250,7 +342,7 @@ class _NodeDataTrackingMixin:
         return isinstance(target, (ast.Subscript, ast.Attribute)) and self._is_node_input_reference(target.value)
 
     def _is_node_input_reference(self, node: ast.AST) -> bool:
-        return _is_input_reference(node, {"inputs", *self._input_aliases})
+        return _is_input_reference(node, self._input_aliases)
 
     def _return_keys(self, value: ast.AST | None) -> tuple[set[str] | None, bool]:
         if isinstance(value, ast.Dict):

@@ -1,0 +1,17 @@
+{
+  "exit_code": 0,
+  "error": null,
+  "frames": [],
+  "panels": [],
+  "columns": [],
+  "seconds": 0.8492098910210188,
+  "arguments": [
+    "export-svg",
+    "--workspace",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.ordinary_svg.explicit_resources/vibeflow_config.jsonc",
+    "--config",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.ordinary_svg.explicit_resources/workflow.jsonc",
+    "--output",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/user-svg-boundary-20261006/python-layout/current/layout.ordinary_svg.explicit_resources/graph.svg"
+  ]
+}

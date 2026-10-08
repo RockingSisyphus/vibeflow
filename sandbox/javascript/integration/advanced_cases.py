@@ -12,40 +12,26 @@ def execution_model_case(
     async_result: Any,
     detached_result: Any,
 ) -> Any:
-    sync_payload = sync_result.prepared.payload
-    async_payload = async_result.prepared.payload
-    detached_payload = detached_result.prepared.payload
+    def nodes(prepared: Any) -> dict[str, dict[str, Any]]:
+        block = prepared.plan.block(prepared.plan.entry_block)
+        return {node.id: prepared.javascript_bindings.binding((*block.path, node.id)).to_dict()
+                for node in block.nodes}
 
-    def nodes(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
-        entry = payload["entry_block"]
-        block = next(item for item in payload["blocks"] if item["id"] == entry)
-        return {item["id"]: item for item in block["nodes"]}
+    def tasks(prepared: Any) -> list[dict[str, Any]]:
+        return [task.to_dict() for task in prepared.plan.block(prepared.plan.entry_block).tasks]
 
-    def tasks(payload: dict[str, Any]) -> list[dict[str, Any]]:
-        entry = payload["entry_block"]
-        block = next(item for item in payload["blocks"] if item["id"] == entry)
-        return list(block["tasks"])
-
-    sync_nodes = nodes(sync_payload)
-    async_nodes = nodes(async_payload)
-    detached_nodes = nodes(detached_payload)
-    if sync_payload["entry_mode"] != "sync":
-        raise AssertionError(sync_payload["entry_mode"])
-    if any(
-        (
-            item["completion"],
-            item["schedule"],
-            item["executor"],
-        )
-        != ("immediate", "inline", "current")
-        for item in sync_nodes.values()
-    ):
+    sync_nodes = nodes(sync_result.prepared)
+    async_nodes = nodes(async_result.prepared)
+    detached_nodes = nodes(detached_result.prepared)
+    if sync_result.prepared.plan.entry_mode != "sync":
+        raise AssertionError(sync_result.prepared.plan.entry_mode)
+    if any((item["completion"], item["schedule"], item["executor"])
+           != ("immediate", "inline", "current") for item in sync_nodes.values()):
         raise AssertionError(sync_nodes)
-    if tasks(sync_payload):
-        raise AssertionError(tasks(sync_payload))
-
-    if async_payload["entry_mode"] != "async":
-        raise AssertionError(async_payload["entry_mode"])
+    if tasks(sync_result.prepared):
+        raise AssertionError(tasks(sync_result.prepared))
+    if async_result.prepared.plan.entry_mode != "async":
+        raise AssertionError(async_result.prepared.plan.entry_mode)
     expected_async = {
         "double": ("suspend", "deferred", "event_loop"),
         "read": ("suspend", "inline", "event_loop"),
@@ -59,7 +45,7 @@ def execution_model_case(
         )
         if actual != expected:
             raise AssertionError((node_id, actual, expected))
-    async_tasks = tasks(async_payload)
+    async_tasks = tasks(async_result.prepared)
     if async_tasks != [
         {
             "id": "block:/:task:double",
@@ -78,7 +64,7 @@ def execution_model_case(
         audit["executor"],
     ) != ("suspend", "detached", "event_loop"):
         raise AssertionError(audit)
-    detached_tasks = tasks(detached_payload)
+    detached_tasks = tasks(detached_result.prepared)
     if detached_tasks != [
         {
             "id": "block:/:task:audit",
@@ -175,12 +161,8 @@ process.stdout.write(JSON.stringify({
 
 
 def nested_async_case(result: Any) -> Any:
-    payload = result.prepared.payload
-    inner = next(
-        block
-        for block in payload["blocks"]
-        if block.get("path") == ["outer", "inner"]
-    )
+    inner = next(block for block in result.prepared.plan.blocks
+                 if block.path == ("outer", "inner")).to_dict()
     if inner["tasks"] != [
         {
             "id": "block:/outer/inner:task:double",

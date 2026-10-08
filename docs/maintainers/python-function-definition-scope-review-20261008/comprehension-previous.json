@@ -1,0 +1,5167 @@
+{
+  "product_origin": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+  "cases": [
+    {
+      "case": "control_no_comprehension",
+      "scope": "none",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "none",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: sys.argv)()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 25
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "none",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "none",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "none",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "none",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, [item for item in ()]))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "none",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "none",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "none",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "none",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, [sys for sys in ()]))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "none",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "none",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "none",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "none",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, {sys for sys in ()}))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "none",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "none",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "none",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "none",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "none",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "none",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "none",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "none",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, (sys for sys in ())))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "none",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "none",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "none",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "none",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: [sys for sys in sys.argv])()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 41
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "none",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "none",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "terminal",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "terminal",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: sys.argv)()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 25
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "terminal",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "terminal",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "terminal",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "terminal",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, [item for item in ()]))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "terminal",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "terminal",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, [sys for sys in ()]))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, {sys for sys in ()}))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, (sys for sys in ())))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "terminal",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "terminal",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "terminal",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: [sys for sys in sys.argv])()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 41
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "terminal",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "terminal",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "python_io",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "python_io",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: sys.argv)()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 25
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "python_io",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "python_io",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "python_io",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "python_io",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, [item for item in ()]))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "python_io",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "python_io",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, [sys for sys in ()]))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, {sys for sys in ()}))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, (sys for sys in ())))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "python_io",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "python_io",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "python_io",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: [sys for sys in sys.argv])()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 41
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "python_io",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "python_io",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "global_state",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: sys.argv)()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 25
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "global_state",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "global_state",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "global_state",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, [item for item in ()]))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "global_state",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "global_state",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, [sys for sys in ()]))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, {sys for sys in ()}))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, (sys for sys in ())))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "global_state",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "global_state",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: [sys for sys in sys.argv])()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 41
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "global_state",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "global_state",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "trusted",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "trusted",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: sys.argv)()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 25
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "trusted",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_no_comprehension",
+      "scope": "trusted",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: sys.argv)()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 21
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "trusted",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "trusted",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, [item for item in ()]))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "trusted",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "control_different_target",
+      "scope": "trusted",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [item for item in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, [sys for sys in ()]))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "list_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, {sys for sys in ()}))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "set_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "dict_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: (sys.argv, (sys for sys in ())))()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "generator_target_shadows_lambda",
+      "scope": "trusted",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "trusted",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "trusted",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: [sys for sys in sys.argv])()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 41
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "trusted",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "outer_iterable",
+      "scope": "trusted",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys for sys in sys.argv])()\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 37
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "none",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "none",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: [sys.argv for sys in ()])()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "none",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "none",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "terminal",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "terminal",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: [sys.argv for sys in ()])()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "terminal",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "terminal",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "python_io",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "python_io",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: [sys.argv for sys in ()])()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "python_io",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "python_io",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "global_state",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: [sys.argv for sys in ()])()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "global_state",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "global_state",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "trusted",
+      "kind": "python_source",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "trusted",
+      "kind": "node",
+      "source": "import sys\nclass Task:\n    def _helper(self, ):\n        return (lambda: [sys.argv for sys in ()])()\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 4,
+            "column": 26
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "trusted",
+      "kind": "base_lib",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "comprehension_body_local_control",
+      "scope": "trusted",
+      "kind": "plugin",
+      "source": "import sys\ndef helper():\n    return (lambda: [sys.argv for sys in ()])()\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "input_control",
+      "placement": "method",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "class Task:\n    def run_pure(self, inputs, params):\n        fn = lambda: inputs.pop('seed', None)\n        fn()\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/owned.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "input_different_target",
+      "placement": "method",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "class Task:\n    def run_pure(self, inputs, params):\n        fn = lambda: (inputs.pop('seed', None), [item for item in ()])\n        fn()\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/owned.py",
+            "line": 3,
+            "column": 23
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "input_list_same_target",
+      "placement": "method",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "class Task:\n    def run_pure(self, inputs, params):\n        fn = lambda: (inputs.pop('seed', None), [inputs for inputs in ()])\n        fn()\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/owned.py",
+            "line": 3,
+            "column": 23
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "input_set_same_target",
+      "placement": "method",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "class Task:\n    def run_pure(self, inputs, params):\n        fn = lambda: (inputs.pop('seed', None), {inputs for inputs in ()})\n        fn()\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/owned.py",
+            "line": 3,
+            "column": 23
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "input_dict_same_target",
+      "placement": "method",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "class Task:\n    def run_pure(self, inputs, params):\n        fn = lambda: (inputs.pop('seed', None), {inputs: inputs for inputs in ()})\n        fn()\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/owned.py",
+            "line": 3,
+            "column": 23
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "input_generator_same_target",
+      "placement": "method",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "class Task:\n    def run_pure(self, inputs, params):\n        fn = lambda: (inputs.pop('seed', None), (inputs for inputs in ()))\n        fn()\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/owned.py",
+            "line": 3,
+            "column": 23
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "input_control",
+      "placement": "helper",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "def helper(inputs):\n    fn = lambda: inputs.pop('seed', None)\n    fn()\n\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/owned.py",
+            "line": 2,
+            "column": 18
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "input_different_target",
+      "placement": "helper",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "def helper(inputs):\n    fn = lambda: (inputs.pop('seed', None), [item for item in ()])\n    fn()\n\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/owned.py",
+            "line": 2,
+            "column": 19
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "input_list_same_target",
+      "placement": "helper",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "def helper(inputs):\n    fn = lambda: (inputs.pop('seed', None), [inputs for inputs in ()])\n    fn()\n\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/owned.py",
+            "line": 2,
+            "column": 19
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "input_set_same_target",
+      "placement": "helper",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "def helper(inputs):\n    fn = lambda: (inputs.pop('seed', None), {inputs for inputs in ()})\n    fn()\n\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/owned.py",
+            "line": 2,
+            "column": 19
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "input_dict_same_target",
+      "placement": "helper",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "def helper(inputs):\n    fn = lambda: (inputs.pop('seed', None), {inputs: inputs for inputs in ()})\n    fn()\n\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/owned.py",
+            "line": 2,
+            "column": 19
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "input_generator_same_target",
+      "placement": "helper",
+      "scope": "global_state",
+      "kind": "node",
+      "source": "def helper(inputs):\n    fn = lambda: (inputs.pop('seed', None), (inputs for inputs in ()))\n    fn()\n\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+      "expected_findings": true,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/owned.py",
+            "line": 2,
+            "column": 19
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "pure_close_control",
+      "scope": "none",
+      "kind": "python_source",
+      "source": "from helper import close\ndef task():\n    return (lambda: (close(), [item for item in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+      "expected_findings": false,
+      "actual_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "pure_close_control",
+      "scope": "none",
+      "kind": "node",
+      "source": "from helper import close\ndef task():\n    return (lambda: (close(), [item for item in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+      "expected_findings": false,
+      "actual_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "pure_close_control",
+      "scope": "none",
+      "kind": "base_lib",
+      "source": "from helper import close\ndef task():\n    return (lambda: (close(), [item for item in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+      "expected_findings": false,
+      "actual_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "pure_close_control",
+      "scope": "none",
+      "kind": "plugin",
+      "source": "from helper import close\ndef task():\n    return (lambda: (close(), [item for item in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+      "expected_findings": false,
+      "actual_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "pure_close_same_target",
+      "scope": "none",
+      "kind": "python_source",
+      "source": "from helper import close\ndef task():\n    return (lambda: (close(), [close for close in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "entry.py",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned call: helper.close",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "pure_close_same_target",
+      "scope": "none",
+      "kind": "node",
+      "source": "from helper import close\ndef task():\n    return (lambda: (close(), [close for close in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned call: helper.close",
+          "suggested_fix_type": "configure_effect_rules",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "pure_close_same_target",
+      "scope": "none",
+      "kind": "base_lib",
+      "source": "from helper import close\ndef task():\n    return (lambda: (close(), [close for close in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned call: helper.close",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "pure_close_same_target",
+      "scope": "none",
+      "kind": "plugin",
+      "source": "from helper import close\ndef task():\n    return (lambda: (close(), [close for close in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+      "expected_findings": false,
+      "actual_findings": true,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/entry.py",
+            "line": 3,
+            "column": 22
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned call: helper.close",
+          "suggested_fix_type": "configure_effect_rules",
+          "details": {}
+        }
+      ]
+    }
+  ],
+  "count": 180,
+  "mismatches": 24
+}

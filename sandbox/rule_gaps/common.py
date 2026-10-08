@@ -9,6 +9,8 @@ import shutil
 import subprocess
 import sys
 
+from tests.fixtures.support.plugins import copy_sdk_inputs
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -22,9 +24,7 @@ def copy_project(work, target, *, example="domain_rules", toolchain=None):
     destination = work / target
     shutil.copytree(ROOT / "sandbox" / target / example, destination,
                     ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc", ".artifacts"))
-    import runpy
-    copy_archival_inputs = runpy.run_path(str(ROOT / "tests/fixtures/support/code_plugins.py"))["copy_archival_inputs"]
-    copy_archival_inputs(ROOT / "sandbox" / target / example, destination)
+    copy_sdk_inputs(ROOT / "sandbox" / target / example, destination)
     project = destination / "project"
     if target == "javascript":
         if toolchain is None:
@@ -81,12 +81,6 @@ def normalize(process, *, metrics=None):
 
 
 def command(project, arguments, *, name, executable=None, timeout=120):
-    import runpy
-    helpers = runpy.run_path(str(ROOT / "tests/fixtures/support/code_plugins.py"))
-    if "--workspace" in arguments:
-        helpers["prepare_workspace_fixture"](arguments[list(arguments).index("--workspace") + 1])
-    else:
-        helpers["migrate_fixture"](project)
     cmd = [*(executable or [sys.executable, "-m", "vibeflow"]), *map(str, arguments)]
     process = subprocess.run(cmd, cwd=project, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
                              text=True, capture_output=True, check=False, timeout=timeout)

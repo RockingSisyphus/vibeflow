@@ -1,0 +1,31 @@
+{
+  "passed": true,
+  "profiles": [
+    {
+      "profile": "collaborative",
+      "archive": "archive/vibeflow-distribution-0.15.2.zip",
+      "bytes": 808553,
+      "sha256": "b057dcae5502a19b7faafde4fcfa15e04eb20a68d46c8fc52a9acf22742767b6",
+      "kernel_sha256": "b4f75808f77ec2132489104c34d9dcfde4092ec07ca687fe4aa3fbc5dcdd01cf",
+      "version": "0.15.2",
+      "extracted": "/home/rockingsisyphus/.cache/vibeflow-verification/release-0.15.2-20261006/collaborative/vibeflow-distribution",
+      "installed_kernel": "/home/rockingsisyphus/.cache/vibeflow-verification/release-0.15.2-20261006/collaborative/installed-kernel",
+      "canonical_documents_and_prompt": true,
+      "kernel_source_matches": true,
+      "deleted_renderer_absent": true
+    },
+    {
+      "profile": "autonomous",
+      "archive": "archive/vibeflow-distribution-autonomous-0.15.2.zip",
+      "bytes": 807818,
+      "sha256": "65e1d861c7e87aa5c906c0cc0c59b5dee528ab877210b964bec11e23323883f1",
+      "kernel_sha256": "b4f75808f77ec2132489104c34d9dcfde4092ec07ca687fe4aa3fbc5dcdd01cf",
+      "version": "0.15.2",
+      "extracted": "/home/rockingsisyphus/.cache/vibeflow-verification/release-0.15.2-20261006/autonomous/vibeflow-distribution",
+      "installed_kernel": "/home/rockingsisyphus/.cache/vibeflow-verification/release-0.15.2-20261006/autonomous/installed-kernel",
+      "canonical_documents_and_prompt": true,
+      "kernel_source_matches": true,
+      "deleted_renderer_absent": true
+    }
+  ]
+}

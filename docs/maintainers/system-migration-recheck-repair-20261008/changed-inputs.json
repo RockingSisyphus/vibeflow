@@ -1,0 +1,30 @@
+{
+  "previous_input_files": 2360,
+  "current_input_files": 2362,
+  "changed": [
+    "docs/user/rule-system-migration.md",
+    "sandbox/rule_parity/core/cases.py",
+    "sandbox/rule_parity/core/variants.py",
+    "src/vibeflow/builtin/project_quality.py",
+    "src/vibeflow/core/quality/models.py",
+    "src/vibeflow/core/quality/resource_imports.py",
+    "src/vibeflow/core/quality/root_structure.py",
+    "src/vibeflow/targets/python/quality/rules/effects.py",
+    "src/vibeflow/targets/python/quality/rules/project_effects.py",
+    "src/vibeflow/targets/python/quality/source_analysis/effects.py",
+    "src/vibeflow/targets/python/quality/source_analysis/types.py",
+    "src/vibeflow/tooling/application/javascript/cli.py",
+    "src/vibeflow/tooling/application/python/project/quality.py",
+    "src/vibeflow/tooling/project/project_config_options.py",
+    "tests/core/test_resource_structure_imports.py",
+    "tests/targets/javascript/strict_aot_project_build.py",
+    "tests/tooling/strict_base_config_examples.py",
+    "tests/tooling/strict_workspace.py",
+    "tools/audit_retired_architecture.py"
+  ],
+  "added": [
+    "tests/targets/python/test_source_effect_parameters.py",
+    "tests/tooling/test_project_config_options.py"
+  ],
+  "removed": []
+}

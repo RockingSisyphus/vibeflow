@@ -389,6 +389,11 @@ def _run_driver(
         separators=(",", ":"),
         allow_nan=False,
     )
+    from vibeflow.targets.javascript.build.driver_session import current_scope
+    active = current_scope()
+    if active is not None:
+        payload = active.request(request, node_command)
+        return _driver_result(payload, 0)
     with tempfile.NamedTemporaryFile(
         mode="w",
         encoding="utf-8",
@@ -431,6 +436,10 @@ def _run_driver(
             "VF_PROTOCOL",
             f"JavaScript build driver returned invalid JSON: {detail}",
         ) from exc
+    return _driver_result(payload, completed.returncode)
+
+
+def _driver_result(payload, returncode):
     if not isinstance(payload, Mapping):
         raise AotToolchainError(
             "VF_PROTOCOL",
@@ -452,7 +461,7 @@ def _run_driver(
             str(error_mapping.get("message", "JavaScript build driver failed")),
             diagnostics=diagnostics,
         )
-    if completed.returncode != 0:
+    if returncode != 0:
         raise AotToolchainError(
             "VF_PROTOCOL",
             "JavaScript build driver exited unsuccessfully with an ok result",

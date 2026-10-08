@@ -1,0 +1,30 @@
+{
+  "graph": {
+    "native_shared_table": true,
+    "error_type": "RecursionError",
+    "error": "maximum recursion depth exceeded"
+  },
+  "dispose": {
+    "pid": 5,
+    "error_type": "JavascriptPluginError",
+    "error": "RULE.EXECUTION: probe dispose failed",
+    "worker_alive_after_failed_exit": true,
+    "stdin_closed": false,
+    "retains_process": true,
+    "retains_materialized_resources": true,
+    "stderr_closed": false,
+    "owned_worker_cleanup_exit": 0
+  },
+  "quality": {
+    "validate": {
+      "exit": 0,
+      "status": "PASS",
+      "report": "/tmp/vf-js-adaptation-audit/nested-validate.json"
+    },
+    "quality": {
+      "exit": 1,
+      "status": "FAIL",
+      "report": "/tmp/vf-js-adaptation-audit/nested-quality.json"
+    }
+  }
+}

@@ -1,0 +1,515 @@
+{
+  "captured_utc": "2026-10-08T07:44:49.027324+00:00",
+  "gate": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02",
+  "status": "passed",
+  "formal_full_gate": {
+    "stages": 17,
+    "passed": 17,
+    "failed": 0
+  },
+  "products": [
+    {
+      "product": "wheel",
+      "status": "passed",
+      "cases": {
+        "formal_defaults": 72,
+        "original_review": 40,
+        "python_effects": 873,
+        "inputs": 20,
+        "javascript": 33
+      },
+      "checks": {
+        "default_cases_72": true,
+        "alias_and_parameter_pairs_equal": true,
+        "formal_cli_children_54": true,
+        "original_review_40": true,
+        "python_effects_873": true,
+        "python_package_isolation": true,
+        "input_parse8_runtime12": true,
+        "input_parser_rejections": true,
+        "input_failures_zero_execution": true,
+        "input_acceptances": true,
+        "javascript33": true,
+        "javascript_parameter_switch": true,
+        "all_origins_unique": true,
+        "six_frozen_hashes": true,
+        "installed_wheel_hashes": true
+      },
+      "product_origin": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/wheel-venv/lib/python3.13/site-packages/vibeflow/__init__.py",
+      "product_origins_by_probe": {
+        "original_review": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/wheel-venv/lib/python3.13/site-packages/vibeflow/__init__.py",
+        "effects": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/wheel-venv/lib/python3.13/site-packages/vibeflow/__init__.py",
+        "inputs": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/wheel-venv/lib/python3.13/site-packages/vibeflow/__init__.py",
+        "javascript": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/wheel-venv/lib/python3.13/site-packages/vibeflow/__init__.py"
+      },
+      "foreign_product_modules_by_probe": {
+        "defaults": {},
+        "formal_cli_children": [],
+        "original_review": {},
+        "effects": [],
+        "inputs": {},
+        "javascript": {}
+      },
+      "formal_cli_children": 54,
+      "loaded_product_modules": {
+        "defaults": 109,
+        "original_review": 83,
+        "effects": 114,
+        "inputs": 136,
+        "javascript": 118
+      },
+      "source_sha256": {
+        "source_analysis/bindings.py": "28c25078f4d32253a0229aee4da4c769efedbca90592b9a5d3a08760b64cb781",
+        "source_analysis/visitors.py": "86f9df117d3457e598a7ffcfbfe613545f270a8fa20240121e80db417f9e848c",
+        "source_analysis/input_tracking.py": "dd037fa4a176db0d1aaa2fd6c763886be690b9d403443c0386f63c41adae6e26",
+        "rules/base_lib_effects.py": "f60e2d8a028ddd5243b4195ce8147b3bba04f1fab0473c2939e7e4d339871fec",
+        "rules/effects.py": "a17517f5afd05754fe74f3cb4810c3afa3229a0fc74efc0f879a9d3d7fe9b6b0",
+        "source_context.py": "1a9f0e8ff1cfb77dd592d03a4369be2427bfa40bc95a46eb72027c6540532914"
+      },
+      "installed_wheel_sha256": {
+        "source_analysis/bindings.py": "28c25078f4d32253a0229aee4da4c769efedbca90592b9a5d3a08760b64cb781",
+        "source_analysis/visitors.py": "86f9df117d3457e598a7ffcfbfe613545f270a8fa20240121e80db417f9e848c",
+        "source_analysis/input_tracking.py": "dd037fa4a176db0d1aaa2fd6c763886be690b9d403443c0386f63c41adae6e26",
+        "rules/base_lib_effects.py": "f60e2d8a028ddd5243b4195ce8147b3bba04f1fab0473c2939e7e4d339871fec",
+        "rules/effects.py": "a17517f5afd05754fe74f3cb4810c3afa3229a0fc74efc0f879a9d3d7fe9b6b0",
+        "source_context.py": "1a9f0e8ff1cfb77dd592d03a4369be2427bfa40bc95a46eb72027c6540532914"
+      },
+      "javascript_driver_sha256": "8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58",
+      "javascript_parameter_switch": [
+        {
+          "ruleset": "probe.cache_a",
+          "params": {
+            "effect_scope": "terminal",
+            "policy": {}
+          },
+          "denied": true,
+          "cache_entries": 2,
+          "new_native_requests": 2,
+          "effect_policy_records": [
+            {
+              "effect_scope": "terminal",
+              "allowed_effects": [
+                "terminal"
+              ]
+            }
+          ]
+        },
+        {
+          "ruleset": "probe.cache_b",
+          "params": {
+            "effect_scope": "python_io",
+            "policy": {}
+          },
+          "denied": false,
+          "cache_entries": 4,
+          "new_native_requests": 2,
+          "effect_policy_records": [
+            {
+              "effect_scope": "python_io",
+              "allowed_effects": [
+                "python_io"
+              ]
+            }
+          ]
+        },
+        {
+          "ruleset": "probe.cache_a",
+          "params": {
+            "effect_scope": "terminal",
+            "policy": {}
+          },
+          "denied": true,
+          "cache_entries": 4,
+          "new_native_requests": 0,
+          "effect_policy_records": [
+            {
+              "effect_scope": "terminal",
+              "allowed_effects": [
+                "terminal"
+              ]
+            }
+          ]
+        },
+        {
+          "ruleset": "probe.cache_c",
+          "params": {
+            "effect_scope": "python_io",
+            "policy": {
+              "imports": {
+                "banned_roots": [
+                  "fs"
+                ]
+              }
+            }
+          },
+          "denied": true,
+          "cache_entries": 5,
+          "new_native_requests": 1,
+          "effect_policy_records": []
+        },
+        {
+          "ruleset": "probe.cache_b",
+          "params": {
+            "effect_scope": "python_io",
+            "policy": {}
+          },
+          "denied": false,
+          "cache_entries": 5,
+          "new_native_requests": 0,
+          "effect_policy_records": [
+            {
+              "effect_scope": "python_io",
+              "allowed_effects": [
+                "python_io"
+              ]
+            }
+          ]
+        }
+      ],
+      "input_runtime_summary": {
+        "accepted": 6,
+        "rejected": 6,
+        "failures_node_calls_zero": true
+      },
+      "detailed_reports": {
+        "defaults": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/packaged-defaults-wheel.json",
+        "original_review": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/review-original-wheel.json",
+        "effects": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/packaged-effects-wheel.json",
+        "inputs": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/packaged-inputs-wheel.json",
+        "javascript": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/packaged-js-wheel.json"
+      }
+    },
+    {
+      "product": "collaborative",
+      "status": "passed",
+      "cases": {
+        "formal_defaults": 72,
+        "original_review": 40,
+        "python_effects": 873,
+        "inputs": 20,
+        "javascript": 33
+      },
+      "checks": {
+        "default_cases_72": true,
+        "alias_and_parameter_pairs_equal": true,
+        "formal_cli_children_54": true,
+        "original_review_40": true,
+        "python_effects_873": true,
+        "python_package_isolation": true,
+        "input_parse8_runtime12": true,
+        "input_parser_rejections": true,
+        "input_failures_zero_execution": true,
+        "input_acceptances": true,
+        "javascript33": true,
+        "javascript_parameter_switch": true,
+        "all_origins_unique": true,
+        "six_frozen_hashes": true,
+        "installed_wheel_hashes": true
+      },
+      "product_origin": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+      "product_origins_by_probe": {
+        "original_review": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "effects": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "inputs": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "javascript": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py"
+      },
+      "foreign_product_modules_by_probe": {
+        "defaults": {},
+        "formal_cli_children": [],
+        "original_review": {},
+        "effects": [],
+        "inputs": {},
+        "javascript": {}
+      },
+      "formal_cli_children": 54,
+      "loaded_product_modules": {
+        "defaults": 109,
+        "original_review": 83,
+        "effects": 114,
+        "inputs": 136,
+        "javascript": 118
+      },
+      "source_sha256": {
+        "source_analysis/bindings.py": "28c25078f4d32253a0229aee4da4c769efedbca90592b9a5d3a08760b64cb781",
+        "source_analysis/visitors.py": "86f9df117d3457e598a7ffcfbfe613545f270a8fa20240121e80db417f9e848c",
+        "source_analysis/input_tracking.py": "dd037fa4a176db0d1aaa2fd6c763886be690b9d403443c0386f63c41adae6e26",
+        "rules/base_lib_effects.py": "f60e2d8a028ddd5243b4195ce8147b3bba04f1fab0473c2939e7e4d339871fec",
+        "rules/effects.py": "a17517f5afd05754fe74f3cb4810c3afa3229a0fc74efc0f879a9d3d7fe9b6b0",
+        "source_context.py": "1a9f0e8ff1cfb77dd592d03a4369be2427bfa40bc95a46eb72027c6540532914"
+      },
+      "installed_wheel_sha256": null,
+      "javascript_driver_sha256": "8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58",
+      "javascript_parameter_switch": [
+        {
+          "ruleset": "probe.cache_a",
+          "params": {
+            "effect_scope": "terminal",
+            "policy": {}
+          },
+          "denied": true,
+          "cache_entries": 2,
+          "new_native_requests": 2,
+          "effect_policy_records": [
+            {
+              "effect_scope": "terminal",
+              "allowed_effects": [
+                "terminal"
+              ]
+            }
+          ]
+        },
+        {
+          "ruleset": "probe.cache_b",
+          "params": {
+            "effect_scope": "python_io",
+            "policy": {}
+          },
+          "denied": false,
+          "cache_entries": 4,
+          "new_native_requests": 2,
+          "effect_policy_records": [
+            {
+              "effect_scope": "python_io",
+              "allowed_effects": [
+                "python_io"
+              ]
+            }
+          ]
+        },
+        {
+          "ruleset": "probe.cache_a",
+          "params": {
+            "effect_scope": "terminal",
+            "policy": {}
+          },
+          "denied": true,
+          "cache_entries": 4,
+          "new_native_requests": 0,
+          "effect_policy_records": [
+            {
+              "effect_scope": "terminal",
+              "allowed_effects": [
+                "terminal"
+              ]
+            }
+          ]
+        },
+        {
+          "ruleset": "probe.cache_c",
+          "params": {
+            "effect_scope": "python_io",
+            "policy": {
+              "imports": {
+                "banned_roots": [
+                  "fs"
+                ]
+              }
+            }
+          },
+          "denied": true,
+          "cache_entries": 5,
+          "new_native_requests": 1,
+          "effect_policy_records": []
+        },
+        {
+          "ruleset": "probe.cache_b",
+          "params": {
+            "effect_scope": "python_io",
+            "policy": {}
+          },
+          "denied": false,
+          "cache_entries": 5,
+          "new_native_requests": 0,
+          "effect_policy_records": [
+            {
+              "effect_scope": "python_io",
+              "allowed_effects": [
+                "python_io"
+              ]
+            }
+          ]
+        }
+      ],
+      "input_runtime_summary": {
+        "accepted": 6,
+        "rejected": 6,
+        "failures_node_calls_zero": true
+      },
+      "detailed_reports": {
+        "defaults": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/packaged-defaults-collaborative.json",
+        "original_review": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/review-original-collaborative.json",
+        "effects": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/packaged-effects-collaborative.json",
+        "inputs": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/packaged-inputs-collaborative.json",
+        "javascript": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/packaged-js-collaborative.json"
+      }
+    },
+    {
+      "product": "autonomous",
+      "status": "passed",
+      "cases": {
+        "formal_defaults": 72,
+        "original_review": 40,
+        "python_effects": 873,
+        "inputs": 20,
+        "javascript": 33
+      },
+      "checks": {
+        "default_cases_72": true,
+        "alias_and_parameter_pairs_equal": true,
+        "formal_cli_children_54": true,
+        "original_review_40": true,
+        "python_effects_873": true,
+        "python_package_isolation": true,
+        "input_parse8_runtime12": true,
+        "input_parser_rejections": true,
+        "input_failures_zero_execution": true,
+        "input_acceptances": true,
+        "javascript33": true,
+        "javascript_parameter_switch": true,
+        "all_origins_unique": true,
+        "six_frozen_hashes": true,
+        "installed_wheel_hashes": true
+      },
+      "product_origin": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/distribution-autonomous/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+      "product_origins_by_probe": {
+        "original_review": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/distribution-autonomous/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "effects": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/distribution-autonomous/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "inputs": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/distribution-autonomous/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "javascript": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/distribution-autonomous/kernel/vibeflow-kernel.zip/vibeflow/__init__.py"
+      },
+      "foreign_product_modules_by_probe": {
+        "defaults": {},
+        "formal_cli_children": [],
+        "original_review": {},
+        "effects": [],
+        "inputs": {},
+        "javascript": {}
+      },
+      "formal_cli_children": 54,
+      "loaded_product_modules": {
+        "defaults": 109,
+        "original_review": 83,
+        "effects": 114,
+        "inputs": 136,
+        "javascript": 118
+      },
+      "source_sha256": {
+        "source_analysis/bindings.py": "28c25078f4d32253a0229aee4da4c769efedbca90592b9a5d3a08760b64cb781",
+        "source_analysis/visitors.py": "86f9df117d3457e598a7ffcfbfe613545f270a8fa20240121e80db417f9e848c",
+        "source_analysis/input_tracking.py": "dd037fa4a176db0d1aaa2fd6c763886be690b9d403443c0386f63c41adae6e26",
+        "rules/base_lib_effects.py": "f60e2d8a028ddd5243b4195ce8147b3bba04f1fab0473c2939e7e4d339871fec",
+        "rules/effects.py": "a17517f5afd05754fe74f3cb4810c3afa3229a0fc74efc0f879a9d3d7fe9b6b0",
+        "source_context.py": "1a9f0e8ff1cfb77dd592d03a4369be2427bfa40bc95a46eb72027c6540532914"
+      },
+      "installed_wheel_sha256": null,
+      "javascript_driver_sha256": "8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58",
+      "javascript_parameter_switch": [
+        {
+          "ruleset": "probe.cache_a",
+          "params": {
+            "effect_scope": "terminal",
+            "policy": {}
+          },
+          "denied": true,
+          "cache_entries": 2,
+          "new_native_requests": 2,
+          "effect_policy_records": [
+            {
+              "effect_scope": "terminal",
+              "allowed_effects": [
+                "terminal"
+              ]
+            }
+          ]
+        },
+        {
+          "ruleset": "probe.cache_b",
+          "params": {
+            "effect_scope": "python_io",
+            "policy": {}
+          },
+          "denied": false,
+          "cache_entries": 4,
+          "new_native_requests": 2,
+          "effect_policy_records": [
+            {
+              "effect_scope": "python_io",
+              "allowed_effects": [
+                "python_io"
+              ]
+            }
+          ]
+        },
+        {
+          "ruleset": "probe.cache_a",
+          "params": {
+            "effect_scope": "terminal",
+            "policy": {}
+          },
+          "denied": true,
+          "cache_entries": 4,
+          "new_native_requests": 0,
+          "effect_policy_records": [
+            {
+              "effect_scope": "terminal",
+              "allowed_effects": [
+                "terminal"
+              ]
+            }
+          ]
+        },
+        {
+          "ruleset": "probe.cache_c",
+          "params": {
+            "effect_scope": "python_io",
+            "policy": {
+              "imports": {
+                "banned_roots": [
+                  "fs"
+                ]
+              }
+            }
+          },
+          "denied": true,
+          "cache_entries": 5,
+          "new_native_requests": 1,
+          "effect_policy_records": []
+        },
+        {
+          "ruleset": "probe.cache_b",
+          "params": {
+            "effect_scope": "python_io",
+            "policy": {}
+          },
+          "denied": false,
+          "cache_entries": 5,
+          "new_native_requests": 0,
+          "effect_policy_records": [
+            {
+              "effect_scope": "python_io",
+              "allowed_effects": [
+                "python_io"
+              ]
+            }
+          ]
+        }
+      ],
+      "input_runtime_summary": {
+        "accepted": 6,
+        "rejected": 6,
+        "failures_node_calls_zero": true
+      },
+      "detailed_reports": {
+        "defaults": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/packaged-defaults-autonomous.json",
+        "original_review": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/review-original-autonomous.json",
+        "effects": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/packaged-effects-autonomous.json",
+        "inputs": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/packaged-inputs-autonomous.json",
+        "javascript": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/packaged-js-autonomous.json"
+      }
+    }
+  ],
+  "total_probe_cases": 3114,
+  "artifact_report": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/final-artifacts.json",
+  "frozen_final_source": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/frozen-final-source.json",
+  "product_source_or_tests_modified": false
+}

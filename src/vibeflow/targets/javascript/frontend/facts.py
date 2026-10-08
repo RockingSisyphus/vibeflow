@@ -10,6 +10,7 @@ from vibeflow.core.constants import (
 )
 from vibeflow.core.descriptors import DescriptorCatalogs, NodeCatalog
 from vibeflow.core.models import ImplementationFact, ImplementationFacts
+from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES
 
 
 class JavascriptImplementationFactsError(ValueError):
@@ -98,6 +99,7 @@ def implementation_facts_from_catalog(
                 executor=(
                     "event_loop" if completion == "suspend" else "current"
                 ),
+                async_executor="event_loop",
                 source_kind=source.kind if source is not None else "",
                 source_ref=source.ref if source is not None else "",
                 source_export=(source.export or "") if source is not None else "",
@@ -150,6 +152,7 @@ def target_neutral_implementation_facts_from_catalog(
                 executor=(
                     "event_loop" if completion == "suspend" else "current"
                 ),
+                async_executor="event_loop",
             )
         )
     return ImplementationFacts(tuple(facts), strict=True)
@@ -170,9 +173,28 @@ def _effect_scope(policy: Mapping[str, Any] | None) -> str:
     return EFFECT_SCOPE_NONE
 
 
+def native_workflow_facts(graph: GraphConfig) -> ImplementationFacts:
+    """Supply this Target's execution facts for embedded workflows and loops."""
+    nodes = []
+    graph_states = (graph, *(nodeset.graph for nodeset in graph.nodesets.values()))
+    native_types = {node.type_used for state in graph_states for node in state.nodes
+                    if node.type_used in graph.nodesets or node.type_used in LOOP_NODE_TYPES}
+    for type_key in sorted(native_types):
+        nodeset = graph.nodesets.get(type_key)
+        nodes.append(ImplementationFact(
+            type_key=type_key,
+            flow_kind="predefined",
+            requires=tuple(nodeset.requires) if nodeset is not None else (),
+            provides=tuple(nodeset.provides) if nodeset is not None else (),
+            async_executor="event_loop",
+        ))
+    return ImplementationFacts(tuple(nodes))
+
+
 __all__ = [
     "JavascriptImplementationFactsError",
     "implementation_facts_from_catalog",
+    "native_workflow_facts",
     "target_neutral_implementation_facts_from_catalog",
     "validate_javascript_descriptor_catalogs",
 ]

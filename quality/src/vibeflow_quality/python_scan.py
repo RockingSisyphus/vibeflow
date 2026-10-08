@@ -16,7 +16,9 @@ from .models import Finding, SourceLocation
 
 LAYER_MODULES = {
     "core": "vibeflow.core",
+    "builtin": "vibeflow.builtin",
     "block-compiler": "vibeflow.block_compiler",
+    "target-services": "vibeflow.targets.shared",
     "python-target": "vibeflow.targets.python",
     "javascript-target": "vibeflow.targets.javascript",
     "tooling": "vibeflow.tooling",
@@ -24,7 +26,9 @@ LAYER_MODULES = {
 
 LAYER_PATHS = {
     "core": Path("core"),
+    "builtin": Path("builtin"),
     "block-compiler": Path("block_compiler"),
+    "target-services": Path("targets/shared"),
     "python-target": Path("targets/python"),
     "javascript-target": Path("targets/javascript"),
     "tooling": Path("tooling"),
@@ -32,10 +36,12 @@ LAYER_PATHS = {
 
 ALLOWED_LAYERS = {
     "core": frozenset({"core"}),
+    "builtin": frozenset({"builtin", "core"}),
     "block-compiler": frozenset({"block-compiler", "core"}),
-    "python-target": frozenset({"python-target", "block-compiler", "core"}),
+    "target-services": frozenset({"target-services", "core"}),
+    "python-target": frozenset({"python-target", "block-compiler", "core", "builtin", "target-services"}),
     "javascript-target": frozenset(
-        {"javascript-target", "block-compiler", "core"}
+        {"javascript-target", "block-compiler", "core", "builtin", "target-services"}
     ),
     "tooling": frozenset(LAYER_MODULES),
 }

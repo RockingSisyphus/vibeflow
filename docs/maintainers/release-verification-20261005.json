@@ -1,0 +1,83 @@
+{
+  "schema": "vibeflow.release-verification.v1",
+  "built_at": "2026-10-05T02:35:18.623102+00:00",
+  "version": "0.15.0",
+  "build_command": "npm_config_cache=/tmp/vibeflow-npm-cache python -B distribution/build.py",
+  "source_head": "9c443f3111e65e6f99842d86d983416a745d391b",
+  "includes_uncommitted_source": true,
+  "archives": [
+    {
+      "profile": "collaborative",
+      "archive": "/home/rockingsisyphus/projects/VibeFlow/archive/vibeflow-distribution-0.15.0.zip",
+      "archive_sha256": "9946aabf2389b3e5f3e42b3c4697ca7a1a727fdb07698862e7de02b3a6adbe70",
+      "bytes": 777517,
+      "kernel_sha256": "f3221e4b0cedc1c7e28ca0d83ff3d67145c9aa59b1cdc3bfa8fb59e7d67ef178",
+      "source_files_byte_identical": 333,
+      "docs_prompt_verified": true,
+      "verify_kernel": "kernel integrity: OK"
+    },
+    {
+      "profile": "autonomous",
+      "archive": "/home/rockingsisyphus/projects/VibeFlow/archive/vibeflow-distribution-autonomous-0.15.0.zip",
+      "archive_sha256": "20b7ba2ddeb3246111f845b1d94585298709d3aeb604c6ed5628c06fdf1cfe72",
+      "bytes": 776750,
+      "kernel_sha256": "f3221e4b0cedc1c7e28ca0d83ff3d67145c9aa59b1cdc3bfa8fb59e7d67ef178",
+      "source_files_byte_identical": 333,
+      "docs_prompt_verified": true,
+      "verify_kernel": "kernel integrity: OK"
+    }
+  ],
+  "released_kernel_regressions": {
+    "exit_stack": {
+      "cases": 34,
+      "matched": true,
+      "runs": 4
+    },
+    "typing_annotations": {
+      "cases": 14,
+      "matched": true,
+      "runs": 0
+    },
+    "source_bindings": {
+      "cases": 33,
+      "matched": true,
+      "runs": 4
+    },
+    "json_defaults": {
+      "cases": 9,
+      "matched": true,
+      "actual_runs": 9
+    },
+    "defaults_native_container_isolation": {
+      "cases": 9,
+      "matched": true
+    },
+    "readonly_sharing": {
+      "cases": 10,
+      "matched": true,
+      "implementation": "/tmp/vf-release-20261005/collaborative/vibeflow-distribution/kernel/vibeflow-kernel.zip/vibeflow/core/rules/models.py"
+    },
+    "python_monitoring": {
+      "cases": 3,
+      "matched": true
+    },
+    "javascript_aot_monitoring": {
+      "matched": true
+    }
+  },
+  "build_checks": {
+    "repository_quality": "0 errors / 0 warnings",
+    "both_profile_minimal_validation": true,
+    "both_profile_minimal_actual_run": true,
+    "both_extracted_launchers_verify_kernel": true,
+    "canonical_docs_and_prompts": true
+  },
+  "boundaries": {
+    "vibetrain_modified": false,
+    "downstream_training_run": false,
+    "full_gate_rerun": false,
+    "browser_rerun": false,
+    "git_committed": false
+  },
+  "details_directory": "/tmp/vf-release-20261005"
+}

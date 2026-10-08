@@ -17,7 +17,7 @@ def case_specs():
         for permission in ("undeclared","banned","allowed"):
             policy={"base_lib":{"allowed_paths":["base_lib"],"allowed_modules":[] if permission=="undeclared" else ["base_lib"],"banned_modules":["base_lib.helper"] if permission=="banned" else []}}
             code={"undeclared":"NODE.BASE_LIB.BASE_LIB_UNDECLARED","banned":"NODE.BASE_LIB.BASE_LIB_BANNED","allowed":None}[permission]
-            cases.append(case("library.node_"+location+"_"+permission,location+" library permission "+permission,"base-lib",source=source,files=files,policy=policy,code=code))
+            cases.append(case("library.node_"+location+"_"+permission,location+" library permission "+permission,"base-lib",source=source,files=files,policy=policy,current_policy={},library_files=tuple(files),code=code))
     for name,text,code in (
         ("top_with",'with open("ignored","w"):\n    pass\n',"BASE_LIB.TOP_LEVEL_SIDE_EFFECT"),
         ("top_for",'for item in ():\n    pass\n',"BASE_LIB.TOP_LEVEL_SIDE_EFFECT"),
@@ -41,7 +41,7 @@ def case_specs():
     for limit in (1,2):
         cases.append(_scan("branches_"+str(limit),nested,"BASE_LIB.COMPLEXITY.MAX_BRANCHES" if limit==1 else None,purity_kwargs={"max_branches":limit}))
         cases.append(_scan("nesting_"+str(limit),nested,"BASE_LIB.COMPLEXITY.MAX_NESTING_DEPTH" if limit==1 else None,purity_kwargs={"max_nesting_depth":limit}))
-    cases.append(_scan("explicit_banned_module","import math\n", "BASE_LIB.BANNED_MODULE",purity_kwargs={"banned_base_lib_modules":["math"]}))
+    cases.append(_scan("explicit_banned_module","import math\n", "BASE_LIB.BANNED_MODULE",purity_kwargs={"banned_base_lib_modules":["math"]}, current_purity_kwargs={"banned_import_modules":["math"]}))
     cases.append(_scan("math_allowed","import math\n",None))
     closure={"base_lib/a.py":"from .b import value\ndef entry():\n    return value()\n","base_lib/b.py":"def value():\n    print('bad')\n    return 1\n"}
     cases.append(case("library.dependency_closure","Library dependency closure retains indirect violation","base-lib",entrypoint="target.scan_base_lib",files=closure,code="BASE_LIB.DEPENDENCY_CLOSURE_VIOLATION"))
@@ -51,4 +51,15 @@ def case_specs():
             spec["expected"]={"should_accept":True,"codes":[],"forbidden_codes":["NODE.BASE_LIB.BASE_LIB_UNDECLARED","NODE.BASE_LIB.BASE_LIB_BANNED"]}
             spec["classification"]="baseline_limitation"
             spec["notes"]="Baseline and current both skip the Node allow/banned library declaration judgment on a module-level import; the same import inside run_pure has separate refusing neighbours."
+    for spec in cases:
+        name = spec["id"].rsplit(".", 1)[-1]
+        if name.startswith("node_") and name.endswith(("undeclared", "banned")):
+            spec["expected"].setdefault("variants", {})["current"] = {"should_accept":True, "codes":[]}
+            spec["classification"] = "approved_change"
+            spec["notes"] = "The current fixture declares library membership/dependencies directly; the retired module-name permission policy only exercises the historical baseline."
+        if name in {"explicit_banned_module", "dependency_closure"}:
+            code = "BASE_LIB.BANNED_IMPORT" if name == "explicit_banned_module" else "BASE_LIB.SIDE_EFFECT_CALL"
+            spec["expected"].setdefault("variants", {})["current"] = {"should_accept":False, "codes":[{"code":code,"severity":"error"}]}
+            spec["classification"] = "approved_change"
+            spec["notes"] = "The same selected library safety Rule reviews the actual source closure and reports direct Finding records."
     return cases

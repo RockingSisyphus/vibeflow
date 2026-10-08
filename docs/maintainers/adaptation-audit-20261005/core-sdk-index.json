@@ -1,0 +1,68 @@
+{
+  "mode": "readonly-audit",
+  "repository": "/home/rockingsisyphus/projects/VibeFlow",
+  "repository_modified": false,
+  "forbidden_project_read_or_run": false,
+  "report": "/tmp/vf-core-sdk-adaptation-audit.md",
+  "confirmed_correctness": [
+    {
+      "theme": "Python SDK declared implementation and direct binding have two authorities",
+      "manifestations": [
+        "node",
+        "rule"
+      ],
+      "public_sdk_only": true,
+      "formal_cli": true,
+      "node_results": "/tmp/vf-sdk-declared-source-binding-probe/source-mismatch-results.json",
+      "rule_results": "/tmp/vf-rule-declared-source-binding-probe/report.json",
+      "controls": [
+        "Node automatic actual source blocks print",
+        "Rule automatic actual source executes actual handler",
+        "Rule delayed source executes declared handler"
+      ],
+      "source": [
+        "src/vibeflow/targets/python/sdk/resources.py:60",
+        "src/vibeflow/targets/python/sdk/plugin.py:76",
+        "src/vibeflow/tooling/application/python/project/declarations.py:185",
+        "src/vibeflow/tooling/application/python/project/declarations.py:276"
+      ]
+    }
+  ],
+  "confirmed_memory_performance": [
+    {
+      "theme": "RuleRecord output snapshot loses DAG sharing",
+      "source": [
+        "src/vibeflow/core/rules/models.py:61",
+        "src/vibeflow/core/rules/models.py:243"
+      ],
+      "results": "/tmp/vf-rule-record-dag-boundaries.json",
+      "input_distinct_at_depth12": 12,
+      "record_output_distinct_at_depth12": 4095,
+      "RuleContext_control_distinct_at_depth12": 12,
+      "fix_boundaries": [
+        "memoized in-memory record snapshot",
+        "memoized typed structural internal fingerprint",
+        "final JSON expansion separately measured"
+      ],
+      "full_pipeline_performance_measured": false
+    }
+  ],
+  "confirmed_duplicate_work": [
+    {
+      "theme": "Fixed plugin descriptor serialization and validation repeated",
+      "results": "/tmp/vf-core-sdk-duplicate-work-probe.json",
+      "to_dict_calls_for_one_ruleset": 8,
+      "dominant_runtime_cost_proven": false
+    }
+  ],
+  "unconfirmed_extensions": [
+    "same direct-binding mismatch for BaseLib/lifecycle/JS",
+    "end-to-end RuleRecord freeze/fingerprint/serialization cost"
+  ],
+  "excluded_fixed_topics": [
+    "RuleContext readonly tuple memo",
+    "readonly provenance sharing",
+    "native-record JSON cache collision",
+    "Target AST copy optimization"
+  ]
+}

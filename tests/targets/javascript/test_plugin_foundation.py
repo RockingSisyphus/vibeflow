@@ -8,13 +8,13 @@ import pickle
 
 import pytest
 
-from vibeflow.core.descriptors import PluginCatalog
+from vibeflow.core.descriptors import PluginCatalog, DescriptorModelError
+from vibeflow.core.descriptors.decode import decode_resource
 from vibeflow.targets.javascript.frontend.bindings import (
     JavascriptBindingPlan,
 )
 from vibeflow.targets.javascript.frontend.plugin_descriptors import (
     JavascriptPluginError,
-    parse_javascript_plugin_descriptor,
     parse_javascript_plugin_selection,
     resolve_javascript_plugins,
 )
@@ -55,8 +55,8 @@ def _descriptor(
     }
 
 
-def test_plugin_descriptor_parser_uses_single_factory_abi() -> None:
-    descriptor = parse_javascript_plugin_descriptor(_descriptor())
+def test_shared_plugin_decoder_uses_single_factory_abi() -> None:
+    descriptor = decode_resource(_descriptor())
 
     assert descriptor.id == "demo.runtime"
     assert descriptor.plugin_type == "runtime"
@@ -64,32 +64,35 @@ def test_plugin_descriptor_parser_uses_single_factory_abi() -> None:
     assert descriptor.config_defaults["mode"] == "default"
 
 
-def test_plugin_descriptor_parser_reports_stable_codes() -> None:
-    wrong_kind = _descriptor()
-    wrong_kind["kind"] = "node"
-    with pytest.raises(JavascriptPluginError) as kind:
-        parse_javascript_plugin_descriptor(wrong_kind)
-    assert kind.value.code == "VF_AOT_PLUGIN_KIND"
-
-    suspending_policy = _descriptor(
-        plugin_type="policy",
-        completion="suspend",
-    )
-    with pytest.raises(JavascriptPluginError) as factory:
-        parse_javascript_plugin_descriptor(suspending_policy)
-    assert factory.value.code == "VF_AOT_PLUGIN_TYPE"
-
+def test_shared_decoder_rejects_removed_plugin_type_and_invalid_config() -> None:
+    with pytest.raises(DescriptorModelError):
+        decode_resource(_descriptor(plugin_type="policy", completion="suspend"))
     invalid_config = _descriptor()
     invalid_config["config"] = []
-    with pytest.raises(JavascriptPluginError) as config:
-        parse_javascript_plugin_descriptor(invalid_config)
-    assert config.value.code == "VF_AOT_PLUGIN_CONFIG"
+    with pytest.raises(DescriptorModelError):
+        decode_resource(invalid_config)
+
+
+@pytest.mark.parametrize("field", ["base_libs", "presentation", "implementation_files"])
+def test_shared_plugin_decoder_accepts_current_resource_fields(field) -> None:
+    data = _descriptor()
+    if field == "implementation_files":
+        data["implementations"][0][field] = [{"kind": "file", "ref": "plugins/helper.ts"}]
+    else:
+        data[field] = ["demo.math"] if field == "base_libs" else {"shape": "rect"}
+    descriptor = decode_resource(data)
+    if field == "implementation_files":
+        assert descriptor.implementations[0].implementation_files[0].ref == "plugins/helper.ts"
+    elif field == "base_libs":
+        assert descriptor.base_libs == ("demo.math",)
+    else:
+        assert descriptor.presentation["shape"] == "rect"
 
 
 def test_runtime_plugin_binding_is_absolute_frozen_and_deterministic(
     tmp_path: Path,
 ) -> None:
-    descriptor = parse_javascript_plugin_descriptor(_descriptor())
+    descriptor = decode_resource(_descriptor())
     binding_plan = resolve_javascript_plugins(
         (
             parse_javascript_plugin_selection(
@@ -124,7 +127,7 @@ def test_runtime_plugin_binding_is_absolute_frozen_and_deterministic(
 def test_planned_plugin_never_resolves_source(tmp_path: Path) -> None:
     outside = tmp_path.parent / "must-not-resolve.ts"
     descriptor = _descriptor(source=str(outside))
-    parsed = parse_javascript_plugin_descriptor(descriptor)
+    parsed = decode_resource(descriptor)
     binding_plan = resolve_javascript_plugins(
         (
             parse_javascript_plugin_selection(
@@ -149,7 +152,7 @@ def test_planned_plugin_never_resolves_source(tmp_path: Path) -> None:
 
 
 def test_sync_entry_rejects_suspending_runtime_plugin() -> None:
-    descriptor = parse_javascript_plugin_descriptor(
+    descriptor = decode_resource(
         _descriptor(completion="suspend")
     )
     selection = parse_javascript_plugin_selection(descriptor.id)
@@ -175,7 +178,7 @@ def test_sync_entry_rejects_suspending_runtime_plugin() -> None:
 
 
 def test_active_plugin_source_cannot_escape_project_root(tmp_path: Path) -> None:
-    descriptor = parse_javascript_plugin_descriptor(
+    descriptor = decode_resource(
         _descriptor(source="../outside.ts")
     )
     with pytest.raises(JavascriptPluginError) as failure:

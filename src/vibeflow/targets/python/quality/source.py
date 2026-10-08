@@ -13,12 +13,6 @@ from vibeflow.core.quality import (
     ImportSite,
     QualityFinding,
 )
-from vibeflow.targets.python.quality.source_analysis.ast_rules import (
-    import_aliases,
-    import_roots,
-    path_effect_call_name,
-    qualified_call_name,
-)
 
 
 BRANCH_NODES = (
@@ -51,21 +45,22 @@ class PythonSourceQuality:
 def analyze_python_source(
     source: PythonSource,
     *,
-    check_side_effects: bool = False,
+    _parse_cache=None,
 ) -> PythonSourceQuality:
     """Extract ordinary facts from Python source without filesystem access."""
 
     byte_count = len(source.text.encode("utf-8"))
     line_count = len(source.text.splitlines())
     try:
-        tree = ast.parse(source.text, filename=source.source_path)
+        from vibeflow.targets.python.quality.parse_cache import parse_python_source
+        tree = parse_python_source(source.source_path, source.text, _parse_cache)
     except SyntaxError as exc:
         return _syntax_error(source, line_count, byte_count, exc)
 
-    return analyze_python_source_tree(source, tree, check_side_effects=check_side_effects)
+    return analyze_python_source_tree(source, tree)
 
 
-def analyze_python_source_tree(source: PythonSource, tree: ast.Module, *, check_side_effects: bool = False) -> PythonSourceQuality:
+def analyze_python_source_tree(source: PythonSource, tree: ast.Module) -> PythonSourceQuality:
     """Extract the same facts from an already parsed, Target-owned tree."""
     byte_count = len(source.text.encode("utf-8"))
     line_count = len(source.text.splitlines())
@@ -86,7 +81,6 @@ def analyze_python_source_tree(source: PythonSource, tree: ast.Module, *, check_
         source.relative_path,
         tree,
     )
-    findings = _selected_source_effect_findings(source,tree) if check_side_effects else ()
     return PythonSourceQuality(
         file=FileQuality(
             path=source.relative_path,
@@ -102,25 +96,7 @@ def analyze_python_source_tree(source: PythonSource, tree: ast.Module, *, check_
             functions=functions,
             import_sites=import_sites,
         ),
-        findings=findings,
     )
-
-
-def _selected_source_effect_findings(source,tree):
-    from vibeflow.core.rules import RuleCall, RuleContext, RulesetDescriptor, compile_ruleset, execute_rule_plan
-    from vibeflow.core.rules.builtin import builtin_rule_resources
-    from vibeflow.targets.python.quality.rules import python_rule_handlers
-    from vibeflow.targets.python.quality.source_context import PythonSourceFile
-    rules, _ = builtin_rule_resources()
-    selection = RulesetDescriptor("vibeflow.python.source_effects",calls=(RuleCall("effects",rule_id="vibeflow.no_side_effects"),))
-    plan = compile_ruleset(selection,rules={item.id:item for item in rules})
-    context = RuleContext(facts={"python_source":source,
-        "source_file":PythonSourceFile(source.source_path,source.module,source.text,_tree=tree)},
-        subject={"kind":"python_source","id":source.relative_path},target="python")
-    result = execute_rule_plan(plan,context,handlers=python_rule_handlers())
-    return tuple(QualityFinding(rule_id=item.code,severity=item.severity,object_type=item.object_type,object_id=item.object_id,
-        message=item.message,source_location=item.source_location,suggested_fix_type=item.suggested_fix_type,
-        details=item.details,definition_id=item.definition_id) for item in result.findings)
 
 
 def _syntax_error(

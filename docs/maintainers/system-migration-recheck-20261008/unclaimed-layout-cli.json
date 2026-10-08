@@ -1,0 +1,41 @@
+{
+  "work": "/tmp/vibeflow-recheck-layout-6ixox9dx",
+  "results": [
+    {
+      "directory": "ordinary",
+      "exit_code": 0,
+      "status": "PASS",
+      "findings": []
+    },
+    {
+      "directory": "nodes",
+      "exit_code": 0,
+      "status": "PASS",
+      "findings": []
+    },
+    {
+      "directory": "task_nodes",
+      "exit_code": 0,
+      "status": "PASS",
+      "findings": []
+    },
+    {
+      "directory": "custom_nodes",
+      "exit_code": 0,
+      "status": "PASS",
+      "findings": []
+    },
+    {
+      "directory": "base_lib",
+      "exit_code": 0,
+      "status": "PASS",
+      "findings": []
+    },
+    {
+      "directory": "plugins",
+      "exit_code": 0,
+      "status": "PASS",
+      "findings": []
+    }
+  ]
+}

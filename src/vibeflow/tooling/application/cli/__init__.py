@@ -69,9 +69,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         with core_diagnostic_sink(lambda _message: None):
             target = _command_target(command, raw_args)
     except WorkspaceConfigError as exc:
+        if command in {"run", "delegate-cli"}:
+            _observe_startup_failure(raw_args, exc.message)
         return _print_error(exc.rule_id, exc.message, details=exc.source_location)
 
     if command in _PYTHON_ONLY_COMMANDS and target != "python":
+        if command in {"run", "delegate-cli"}:
+            _observe_startup_failure(raw_args, f"{command} requires Python Target; configured Target is {target}")
         return _target_mismatch(command, expected="python", actual=target)
     if command in _JAVASCRIPT_ONLY_COMMANDS and target != "javascript":
         return _target_mismatch(
@@ -90,6 +94,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     from vibeflow.tooling.application.python.cli import main as target_main
 
     return target_main(raw_args)
+
+
+def _observe_startup_failure(args, message):
+    from vibeflow.tooling.application.startup_status import record_startup_failure
+    from vibeflow.tooling.project.diagnostic_sink import emit_core_diagnostic
+    try:
+        record_startup_failure(args, message, _option_value)
+    except OSError as exc:
+        emit_core_diagnostic(f"cannot save run observation: {exc}")
 
 
 def build_parser() -> argparse.ArgumentParser:

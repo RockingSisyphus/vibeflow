@@ -27,7 +27,8 @@
       {
         "key": "calc.resource",
         "type": "calc.resource",
-        "display_name": "Calc Resource"
+        "display_name": "Calc Resource",
+        "required": true
       }
     ],
     "nodes": [

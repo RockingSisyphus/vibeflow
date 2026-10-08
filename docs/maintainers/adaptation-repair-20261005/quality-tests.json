@@ -1,0 +1,5 @@
+{
+  "command": "python -B quality/test.py",
+  "tests": 46,
+  "result": "passed"
+}

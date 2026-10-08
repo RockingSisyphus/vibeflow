@@ -1,0 +1,64 @@
+{
+  "pytest": [
+    "tests/tooling/strict_mermaid_cli.py::test_example_outputs_field_is_removed",
+    "tests/targets/javascript/test_domain_rules.py::test_project_topic_alias_and_replacement_receive_the_actual_scope[alias]",
+    "tests/targets/javascript/test_domain_rules.py::test_project_topic_alias_and_replacement_receive_the_actual_scope[replacement]"
+  ],
+  "python_sandbox": {
+    "total": 138,
+    "passed": 80,
+    "failed": 58,
+    "root_cause": "one remaining effective_policy keyword to validate_graph_health; derived diagram health audit also failed"
+  },
+  "repository_quality": {
+    "errors": 3,
+    "root_cause": "neutral rule_review imports Target Python policy_parameters directly",
+    "also_blocks": "distribution quality validation"
+  },
+  "passed_summaries": {
+    "rule-parity": {
+      "cases": 1219,
+      "matched": 1219,
+      "unmatched": 0,
+      "process_errors": 0
+    },
+    "rule-gaps": {
+      "cases": 680,
+      "matched": 680,
+      "unmatched": 0,
+      "process_errors": 0,
+      "families": {
+        "domain-native-composition": 20,
+        "rule_graph.finding_boundary": 21,
+        "rule_graph.includes": 4,
+        "rule_graph.invalid_graph": 8,
+        "rule_graph.implementation_leaf": 12,
+        "rule_graph.implementation_leaf_control": 12,
+        "rule_graph.replacement": 12,
+        "rule_graph.source_cache": 12,
+        "javascript.bundle.native_resources": 11,
+        "javascript.rule.platform_selection": 10,
+        "javascript.records.portability": 12,
+        "javascript.sources.graph": 3,
+        "javascript.sources.availability": 1,
+        "node-import-isolation": 3,
+        "planned-helper-closure": 4,
+        "helper-ownership": 4,
+        "resource-display": 103,
+        "resource-edits": 47,
+        "resource-ownership": 160,
+        "resource-registration": 77,
+        "resource-rules": 42,
+        "resource-runtime": 46,
+        "declaration_contract": 48,
+        "workspace_rule_scope": 8
+      }
+    },
+    "adaptation-regressions": {
+      "cases": 207,
+      "matched": 207,
+      "unmatched": 0,
+      "process_errors": 0
+    }
+  }
+}

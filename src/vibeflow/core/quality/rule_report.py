@@ -28,11 +28,6 @@ def project_quality_report(facts, policy, executions, checked_rulesets):
         findings.extend(execution.findings)
         for invocation in execution.plan.invocations:
             promised.update(_RECORD_FIELDS[kind] for kind in invocation.rule.outputs.values() if kind in _RECORD_FIELDS)
-            if invocation.rule.id.startswith("vibeflow.quality."):
-                for name in {item.name for item in fields(QualityThresholds)}.intersection(invocation.params):
-                    value = invocation.params[name]
-                    if isinstance(value, int) and not isinstance(value, bool):
-                        threshold_values.setdefault(name, set()).add(value)
             result = execution.results[invocation.id]
             if result.state != "completed":
                 if not any(item.severity == "error" for item in result.findings):
@@ -41,6 +36,10 @@ def project_quality_report(facts, policy, executions, checked_rulesets):
                         failure_layer="rule", message=f"selected rule did not complete ({result.state})",
                         details={"state": result.state, "ruleset": execution.plan.ruleset_id}))
                 continue
+            for name in {item.name for item in fields(QualityThresholds)}.intersection(invocation.params):
+                value = invocation.params[name]
+                if isinstance(value, int) and not isinstance(value, bool):
+                    threshold_values.setdefault(name, set()).add(value)
             for record in result.records.values():
                 name = _RECORD_FIELDS.get(record.type_id)
                 if name is not None:

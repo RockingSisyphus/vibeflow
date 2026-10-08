@@ -126,13 +126,26 @@ try {
 
 ## 图形与 Architecture
 
-登记 Architecture 文档后，`review --output ARCHITECTURE.svg` 生成一张展开图，并更新 `ARCHITECTURE.jsonc`。JSONC 与 SVG 使用同一个 `implementation_graph`：前者便于 AI 查询声明、文件、关系和来源，后者展示工作流及资源区。Host 与实现文件位于资源区，资源依赖使用虚线，Workflow 执行连边使用原生表示。
+登记 Architecture 文档后，`review --output ARCHITECTURE.svg` 生成当前 Workflow 的展开图，并更新 `ARCHITECTURE.jsonc`。
 
-Architecture 记录入口/支撑文件、实际导入、库依赖、插件贡献、源码归属、加载状态、有效规则和展示来源，可沿文件位置继续定位真实实现。
+SVG 从左到右展示主流程、当前配置使用的资源目录和 Nodeset 展开详情。资源目录按 `plugins`、`base_lib`、`host_extensions` 分组，目录父节点连接每项实际选择的资源；没有选择的组省略。Node 显示在它所属的主流程或 Nodeset 调用位置。
+
+主流程纵向显示；包含子 Nodeset 的父流程也纵向显示，子详情放在右侧并上下排列；叶子 Nodeset 横向显示。Nodeset 定义的 `expand` 属性控制是否展示内部，见[Nodeset 与 Loop](nodesets-and-loops.md)。
+
+```bash
+vibeflow review --workspace vibeflow_config.jsonc --config workflow.jsonc \
+  --output ARCHITECTURE.svg
+vibeflow export-mermaid --workspace vibeflow_config.jsonc --config workflow.jsonc \
+  --mermaid-layout review-columns --output ARCHITECTURE.mmd
+```
+
+`export-svg` 默认生成普通图；使用 `--expand-nodesets` 可生成展开图。正式审核使用 `review`，同时更新登记的 Architecture 文档。
+
+Architecture 另记录项目声明、入口/支撑文件、实际导入、库依赖、插件贡献、源码归属、加载状态、有效规则和展示来源，便于查询源码及审核证据。通过 `review-rules --json` 查询有效规则与参数来源，通过 `inspect-resources --json` 查询本次插件贡献的资源。
 
 四类资源使用相同 `presentation` 字段：`fill/stroke/text/shape/icon`。颜色必须是六位十六进制值并遵守系统保留色；14 种形状与 Node 相同。使用处只覆盖 `fill/stroke/text`，形状和图标由资源声明选择。顺序为原生默认、资源声明、状态、使用处颜色；真实 `flow_kind`、external、planned 和诊断标记单独保留。
 
-公开形状为 `rect/rounded/stadium/diamond/lean-r/lean-l/fr-rect/cyl/doc/hex/cloud/circle/dbl-circ/trap-b`；序列化后 `diamond` 归一化为 `diam`。实现区显示资源的默认展示，Workflow 中每次 Node 调用仍分别保存调用样式与真实执行身份。
+公开形状为 `rect/rounded/stadium/diamond/lean-r/lean-l/fr-rect/cyl/doc/hex/cloud/circle/dbl-circ/trap-b`；序列化后 `diamond` 归一化为 `diam`。资源目录使用资源的有效展示，Workflow 中每次 Node 调用分别保存调用样式与真实执行身份。
 
 Node 使用调用点 `style`；Host 使用 `host_extensions[].style`；插件使用 `plugins[].style`；BaseLib 使用 `base_lib.modules[].style`。插件颜色覆盖只影响插件包和它的生命周期，不改写包内 Node、Host 或库的声明。
 

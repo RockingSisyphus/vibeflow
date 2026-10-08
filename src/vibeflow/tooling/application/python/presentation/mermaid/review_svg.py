@@ -93,7 +93,13 @@ def render_review_columns_svg(
     max_text_size: int | None = None,
     max_edges: int | None = None,
     review_fragment_max_width: float = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
+    prepared=None,
 ) -> None:
+    from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
+
+    prepared = prepared or prepare_python_presentation(graph, compiled=compiled, registry=registry, resources=resources)
+    graph, compiled, registry = prepared.graph, prepared.compiled, prepared.registry
+    resources = prepared.resources if resources is None else resources
     actual_review_fragment_max_width = _validate_review_fragment_max_width(review_fragment_max_width)
     actual_max_text_size = max_text_size if max_text_size is not None else DEFAULT_MERMAID_MAX_TEXT_SIZE
     actual_max_edges = max_edges if max_edges is not None else DEFAULT_MERMAID_MAX_EDGES
@@ -113,6 +119,7 @@ def render_review_columns_svg(
             max_text_size=actual_max_text_size,
             max_edges=actual_max_edges,
             review_fragment_max_width=actual_review_fragment_max_width,
+            prepared=prepared,
         )
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(_compose_svg(columns, background=background, review_fragment_max_width=actual_review_fragment_max_width), encoding="utf-8")
@@ -133,6 +140,7 @@ def _build_columns(
     max_text_size: int | None,
     max_edges: int | None,
     review_fragment_max_width: float,
+    prepared=None,
 ) -> list[list[_SvgFragment]]:
     columns: list[list[_SvgFragment]] = [
         [
@@ -146,6 +154,7 @@ def _build_columns(
                     show_contract=show_contract,
                     show_semantics=show_semantics,
                     mermaid_layout=MERMAID_LAYOUT_DEFAULT,
+                    prepared=prepared,
                 ),
                 temp_dir,
                 theme=theme,
@@ -155,14 +164,7 @@ def _build_columns(
             )
         ]
     ]
-    if hasattr(registry,"loaded_plugins") and graph.source_path and Path(graph.source_path).is_file():
-        from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document
-        from vibeflow.tooling.presentation.resource_mermaid import render_resource_graph
-        architecture = build_architecture_document(graph,compiled=compiled,registry=registry,resources=resources)
-        columns.append([_render_fragment("resources and implementation files", render_resource_graph(architecture["implementation_graph"]),
-            temp_dir,theme=theme,background=background,max_text_size=max_text_size,max_edges=max_edges)])
-    else:
-        columns.extend(_resource_columns(graph, resources, temp_dir, theme=theme, background=background, max_text_size=max_text_size, max_edges=max_edges))
+    columns.extend(_resource_columns(graph, resources, temp_dir, registry=registry, theme=theme, background=background, max_text_size=max_text_size, max_edges=max_edges))
     if expand_nodesets:
         nodeset_fragments = _nodeset_fragments(
             graph,
@@ -175,6 +177,7 @@ def _build_columns(
             max_text_size=max_text_size,
             max_edges=max_edges,
             review_fragment_max_width=review_fragment_max_width,
+            prepared=prepared,
         )
         if nodeset_fragments:
             columns.append(nodeset_fragments)
@@ -190,8 +193,9 @@ def _resource_columns(
     background: str,
     max_text_size: int | None,
     max_edges: int | None,
+    registry=None,
 ) -> list[list[_SvgFragment]]:
-    payload = _rendered_resources_payload(resources, graph)
+    payload = _rendered_resources_payload(resources, graph, registry)
     columns: list[list[_SvgFragment]] = []
     plugins = _mapping_items(payload.get("plugins", ()))
     if plugins:

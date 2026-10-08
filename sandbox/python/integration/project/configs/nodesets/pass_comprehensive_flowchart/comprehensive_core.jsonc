@@ -20,7 +20,8 @@
       {
         "key": "value.prepared",
         "type": "value.prepared",
-        "display_name": "Value Prepared"
+        "display_name": "Value Prepared",
+        "required": true
       }
     ],
     "nodes": [

@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from time import perf_counter
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +26,7 @@ if str(ROOT) not in sys.path:
     # are deliberately not packaged in the wheel.
     sys.path.insert(0, str(ROOT))
 from tools.test_parallel import DEFAULT_WORKERS, add_worker_argument
+from tools.audit_retired_architecture import RETIRED_FILES, MOVED_FILES
 PYTHON = sys.executable
 TEST_GROUPS = (
     "tests/core",
@@ -155,10 +157,64 @@ def _javascript_integration(scratch: Path) -> None:
 
 def _rule_sandboxes(scratch: Path, *, workers: int = DEFAULT_WORKERS) -> None:
     toolchain = scratch / "pytest/javascript-toolchain"
-    _run((PYTHON, "sandbox/rule_parity/run_all.py", "--workers", str(workers), "--current-only", "--toolchain", toolchain,
-          "--work", scratch / "rule-parity", "--report", scratch / "rule-parity.json"))
-    _run((PYTHON, "sandbox/rule_gaps/run_all.py", "--workers", str(workers), "--toolchain", toolchain,
-          "--renderer", _puppeteer_root(scratch), "--work", scratch / "rule-gaps", "--report", scratch / "rule-gaps.json"))
+    commands = (
+        (PYTHON, "sandbox/rule_parity/run_all.py", "--workers", str(workers), "--current-only", "--toolchain", toolchain,
+         "--work", scratch / "rule-parity", "--report", scratch / "rule-parity.json"),
+        (PYTHON, "sandbox/rule_gaps/run_all.py", "--workers", str(workers), "--toolchain", toolchain,
+         "--renderer", _puppeteer_root(scratch), "--work", scratch / "rule-gaps", "--report", scratch / "rule-gaps.json"),
+    )
+    failures = []
+    for command in commands:
+        try:
+            _run(command)
+        except (subprocess.CalledProcessError, VerificationError) as error:
+            failures.append(str(error))
+    if failures:
+        raise VerificationError("rule sandbox failures: " + "; ".join(failures))
+
+
+def _runtime_observation_browser(scratch: Path) -> None:
+    """Exercise onStatus in an actual browser; Python/Node cases run in pytest."""
+    _run((PYTHON, "-c", """
+import json
+from pathlib import Path
+import sys
+from sandbox.javascript.runtime_observation.probe import observe_browser
+work, toolchain, renderer, report = map(Path, sys.argv[1:])
+work.mkdir(parents=True, exist_ok=True)
+result = observe_browser(work, toolchain, renderer)
+report.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\\n')
+if not result['matched']:
+    raise SystemExit('browser runtime observation mismatch')
+""", scratch / "runtime-observation-browser", scratch / "pytest/javascript-toolchain",
+          _puppeteer_root(scratch), scratch / "runtime-observation-browser.json"))
+
+
+def _review_performance_sandbox(scratch: Path) -> None:
+    _run((PYTHON, "sandbox/python/review_performance/run_all.py",
+          "--work", scratch / "review-performance", "--report", scratch / "review-performance.json",
+          "--renderer", _puppeteer_root(scratch)))
+
+
+def _review_layout_sandbox(scratch: Path) -> None:
+    _run((PYTHON, "sandbox/python/review_layout/run_all.py",
+          "--work", scratch / "review-layout", "--report", scratch / "review-layout.json",
+          "--renderer", _puppeteer_root(scratch)))
+
+
+def _resource_sections_sandbox(scratch: Path) -> None:
+    _run((PYTHON, "sandbox/python/resource_sections/run_all.py",
+          "--work", scratch / "python-resource-sections", "--report", scratch / "python-resource-sections.json",
+          "--renderer", _puppeteer_root(scratch)))
+    _run((PYTHON, "sandbox/javascript/resource_sections/run_all.py",
+          "--work", scratch / "javascript-resource-sections", "--report", scratch / "javascript-resource-sections.json",
+          "--renderer", _puppeteer_root(scratch), "--toolchain", scratch / "pytest/javascript-toolchain"))
+
+
+def _adaptation_sandbox(scratch: Path, *, workers: int = DEFAULT_WORKERS) -> None:
+    _run((PYTHON, "sandbox/adaptation_regressions/run_all.py", "--workers", str(workers),
+          "--toolchain", scratch / "pytest/javascript-toolchain", "--renderer", _puppeteer_root(scratch),
+          "--work", scratch / "adaptation-regressions", "--report", scratch / "adaptation-regressions.json"))
 
 
 def _venv_python(root: Path) -> Path:
@@ -375,9 +431,13 @@ def _wheel_smoke(scratch: Path) -> None:
             "from vibeflow.targets.python.project import NodeRegistry",
             "from vibeflow.targets.python.runtime import PipelineRuntime",
             "from vibeflow.targets.python.sdk import Plugin, node, rule, ruleset",
-            "from vibeflow.targets.javascript import WorkflowSpec",
+            "from vibeflow.targets.javascript import JavascriptBindingPlan",
+            "from vibeflow.targets.python.quality.builtin_plugin import builtin_plugin",
+            "assert builtin_plugin().contributions().resources",
             "from vibeflow.tooling.project.config_loader import load_config_document",
             "root = files('vibeflow')",
+            f"for retired in {(*RETIRED_FILES, *MOVED_FILES)!r}:",
+            "    assert not root.joinpath(retired).is_file(), retired",
             "for name in ('config.schema.json', 'health_report.schema.json', 'node.schema.json', 'nodeset.schema.json', 'policy.schema.json', 'rule.schema.json', 'ruleset.schema.json'):",
             "    assert root.joinpath('tooling/project/schema', name).is_file()",
             "for name in ('runtime_helpers.mjs', 'toolchain_driver.mjs', 'plugin_worker.mjs', 'plugin_abi.d.ts', 'rule_abi.d.ts', 'sdk.mjs', 'sdk.d.ts', 'sdk_loader.mjs'):",
@@ -463,6 +523,9 @@ def _distribution_smoke(scratch: Path) -> None:
         metadata = json.loads((output / "DISTRIBUTION.json").read_text(encoding="utf-8"))
         if metadata.get("development_profile") != expected_profile:
             raise VerificationError(f"wrong distribution profile metadata: {metadata}")
+        title = (output / "README.md").read_text(encoding="utf-8").splitlines()[0]
+        if not title.startswith(f"# VibeFlow {metadata['version']} "):
+            raise VerificationError(f"distribution README version does not match metadata: {title}")
         _run(
             (
                 PYTHON,
@@ -593,6 +656,11 @@ def _steps(*, full: bool, workers: int = DEFAULT_WORKERS) -> tuple[Step, ...]:
         Step("javascript-minimal", _javascript_minimal),
         Step("javascript-integration", _javascript_integration),
         Step("rule-regression-sandboxes", lambda scratch: _rule_sandboxes(scratch, workers=workers)),
+        Step("runtime-observation-browser", _runtime_observation_browser),
+        Step("review-layout-sandbox", _review_layout_sandbox),
+        Step("resource-sections-sandbox", _resource_sections_sandbox),
+        Step("review-performance-sandbox", _review_performance_sandbox),
+        Step("adaptation-regression-sandbox", lambda scratch: _adaptation_sandbox(scratch, workers=workers)),
         Step("wheel-isolation", _wheel_smoke),
         Step("generated-artifact-cleanup", _cleanup_generated_artifacts),
         Step("distribution", _distribution_smoke),
@@ -602,13 +670,25 @@ def _steps(*, full: bool, workers: int = DEFAULT_WORKERS) -> tuple[Step, ...]:
 
 
 def _run_steps(steps: Sequence[Step], *, scratch: Path) -> None:
+    observations = []
+    failures = []
     for index, step in enumerate(steps, start=1):
         print(f"\n[{index}/{len(steps)}] {step.name}", flush=True)
+        started = perf_counter()
         try:
             step.action(scratch)
         except (OSError, subprocess.CalledProcessError, VerificationError) as exc:
-            raise VerificationError(f"{step.name} failed: {exc}") from exc
-        print(f"PASS: {step.name}", flush=True)
+            failure = f"{step.name} failed: {exc}"
+            failures.append(failure)
+            observations.append({'step':step.name,'status':'failed','error':str(exc),
+                                 'seconds':perf_counter()-started})
+            print(failure, file=sys.stderr, flush=True)
+        else:
+            observations.append({'step':step.name,'status':'passed','seconds':perf_counter()-started})
+            print(f"PASS: {step.name}", flush=True)
+        (scratch/'verification.json').write_text(json.dumps({'steps':observations,'failures':failures},indent=2)+'\n')
+    if failures:
+        raise VerificationError('\n'.join(failures))
 
 
 def _parser() -> argparse.ArgumentParser:

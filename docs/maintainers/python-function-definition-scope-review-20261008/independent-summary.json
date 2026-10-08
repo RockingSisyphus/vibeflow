@@ -1,0 +1,692 @@
+{
+  "reviewed_product_files": 334,
+  "product_files_changed_during_review": [],
+  "original_F01": {
+    "source_cases": 40,
+    "source_mismatches": 0,
+    "kernel_cases": 40,
+    "kernel_mismatches": 0
+  },
+  "formal_default_probe_summary": {
+    "cases": 72,
+    "semantic_matches": 72,
+    "semantic_mismatches": 0,
+    "unequal_alias_pairs": 0,
+    "unequal_parameter_pairs": 0,
+    "original_matrix_cases": 48,
+    "renamed_parameter_cases": 24
+  },
+  "tests": {
+    "passed": 902,
+    "skipped": 2,
+    "failed": 0
+  },
+  "quality_tests": {
+    "passed": 49,
+    "failed": 0
+  },
+  "new_scope_matrix": {
+    "cases_per_product": 180,
+    "previous_mismatches": 24,
+    "current_mismatches": 112,
+    "new_kernel_mismatches": 112,
+    "introduced_mismatches": 108,
+    "retained_mismatches": 4,
+    "improved_cases": 20,
+    "introduced_cases": [
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "node",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "node",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "node",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "node",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "python_source",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "node",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "base_lib",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "plugin",
+        "scope": "none",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "node",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "node",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "node",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "node",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "python_source",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "node",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "base_lib",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "plugin",
+        "scope": "terminal",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "node",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "node",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "node",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "node",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "python_source",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "node",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "base_lib",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "plugin",
+        "scope": "python_io",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "node",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "node",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "node",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "node",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "python_source",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "node",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "base_lib",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "plugin",
+        "scope": "global_state",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "node",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "list_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "node",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "set_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "node",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "dict_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "python_source",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "node",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "base_lib",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "generator_target_shadows_lambda",
+        "kind": "plugin",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "python_source",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "node",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "base_lib",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "outer_iterable",
+        "kind": "plugin",
+        "scope": "trusted",
+        "placement": null
+      },
+      {
+        "case": "input_list_same_target",
+        "kind": "node",
+        "scope": "global_state",
+        "placement": "method"
+      },
+      {
+        "case": "input_set_same_target",
+        "kind": "node",
+        "scope": "global_state",
+        "placement": "method"
+      },
+      {
+        "case": "input_dict_same_target",
+        "kind": "node",
+        "scope": "global_state",
+        "placement": "method"
+      },
+      {
+        "case": "input_generator_same_target",
+        "kind": "node",
+        "scope": "global_state",
+        "placement": "method"
+      },
+      {
+        "case": "input_list_same_target",
+        "kind": "node",
+        "scope": "global_state",
+        "placement": "helper"
+      },
+      {
+        "case": "input_set_same_target",
+        "kind": "node",
+        "scope": "global_state",
+        "placement": "helper"
+      },
+      {
+        "case": "input_dict_same_target",
+        "kind": "node",
+        "scope": "global_state",
+        "placement": "helper"
+      },
+      {
+        "case": "input_generator_same_target",
+        "kind": "node",
+        "scope": "global_state",
+        "placement": "helper"
+      }
+    ]
+  },
+  "new_findings": [
+    "F02"
+  ],
+  "retained_related_false_positive": "pure_close_same_target",
+  "repository_quality_final": "[all] PASS (0 error, 0 warning, 0 info)"
+}

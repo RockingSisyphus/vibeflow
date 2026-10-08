@@ -6,6 +6,7 @@ This module adapts canonical declarations and available implementation facts.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, Protocol
 
 from vibeflow.core.compiler import (
@@ -58,6 +59,7 @@ class GraphCompiler:
         known_nodesets: set[str] | None = None,
         plugin_registry: CompilerPluginRegistry | None = None,
         owner: str = "pipeline",
+        implementation_facts: ImplementationFacts | None = None,
     ) -> CompiledGraph:
         return self.compile_with_findings(
             graph,
@@ -66,6 +68,7 @@ class GraphCompiler:
             known_nodesets=known_nodesets,
             plugin_registry=plugin_registry,
             owner=owner,
+            implementation_facts=implementation_facts,
         ).compiled_graph
 
     def compile_with_findings(
@@ -77,6 +80,7 @@ class GraphCompiler:
         known_nodesets: set[str] | None = None,
         plugin_registry: CompilerPluginRegistry | None = None,
         owner: str = "pipeline",
+        implementation_facts: ImplementationFacts | None = None,
     ) -> CoreCompilation:
         """Compile and retain advisory Core findings for health/report callers."""
 
@@ -87,11 +91,10 @@ class GraphCompiler:
         type_source = catalog if catalog is not None else registry
         _call_compiler_plugins(plugin_registry, "before_compile", graph)
         nodesets = known_nodesets or set(graph.nodesets)
-        implementation_facts = _adapt_implementation_facts(
-            graph,
-            source=type_source,
-            nodesets=nodesets,
-        )
+        if implementation_facts is None:
+            implementation_facts = _adapt_implementation_facts(graph, source=type_source, nodesets=nodesets)
+        elif not isinstance(implementation_facts, ImplementationFacts):
+            raise GraphCompileError("implementation_facts must be an ImplementationFacts snapshot")
         compilation = compile_core(
             CoreCompileRequest(
                 graph=graph,
@@ -115,7 +118,42 @@ class GraphCompiler:
             graph,
             compilation.compiled_graph,
         )
+        if registry is not None and plugin_registry is not None:
+            from vibeflow.targets.python.project.check_session import current_python_check
+            session = current_python_check(registry)
+            if session is not None:
+                session.remember_compiler_stage(graph, compilation)
         return compilation
+
+    def prepare_implementation_facts(self, graph: GraphConfig, *, registry=None, catalog=None) -> ImplementationFacts:
+        """Freeze Target facts once for a root and its presentation subgraphs."""
+        if registry is not None and catalog is not None:
+            raise GraphCompileError("fact preparation accepts either registry or catalog, not both")
+        return _adapt_implementation_facts(graph, source=catalog if catalog is not None else registry,
+                                           nodesets=set(graph.nodesets))
+
+    def _refresh_rule_facts(self, compilation: CoreCompilation, *, registry) -> CoreCompilation:
+        """Update review metadata while retaining the compiler stage artifact.
+
+        Rules describe effects and Target analysis supplies runtime dispatch.
+        Neither changes the already resolved native topology or contracts.
+        Compiler hooks own their stage's other compiled fields.
+        """
+        facts = ImplementationFacts(tuple(replace(fact,
+            effect_scope=registry.effect_scope(fact.type_key),
+            runtime_dispatch=_runtime_dispatch_fact(registry, fact.type_key))
+            for fact in compilation.workflow.implementation_facts.nodes),
+            strict=compilation.workflow.implementation_facts.strict)
+        graph = compilation.workflow.graph
+        compiled = compilation.compiled_graph
+        scopes, dispatches = dict(compiled.effect_scopes), dict(compiled.runtime_dispatches)
+        for node in graph.nodes:
+            fact = facts.get(node.type_used)
+            if node.status != STATUS_PLANNED and fact is not None:
+                scopes[node.id] = fact.effect_scope or "unconstrained"
+                dispatches[node.id] = fact.runtime_dispatch
+        return replace(compilation, workflow=replace(compilation.workflow, implementation_facts=facts),
+                       compiled_graph=replace(compiled, effect_scopes=scopes, runtime_dispatches=dispatches))
 
 
 def _adapt_implementation_facts(
@@ -192,12 +230,8 @@ def _runtime_dispatch_fact(registry, type_key):
     node = next((item for item in context.nodes if item.type_key == type_key), None) if context is not None else None
     loader = getattr(registry,"source_context_loader",None)
     if node is None and callable(loader):
-        previous = context
-        try:
-            context = loader(type_key)
-            node = next((item for item in context.nodes if item.type_key == type_key),None)
-        finally:
-            registry.source_context_snapshot = previous
+        context = loader(type_key)
+        node = next((item for item in context.nodes if item.type_key == type_key),None)
     if node is not None:
         from vibeflow.targets.python.quality.source_analysis.runtime_dispatch import analyze_source_runtime_dispatch
         analysis = analyze_source_runtime_dispatch(context, node)

@@ -1,0 +1,92 @@
+{
+  "schema": "vibeflow.observation-documentation-release.v1",
+  "matched": true,
+  "same_kernel": true,
+  "source_path_excluded_from_runtime": true,
+  "cases": [
+    {
+      "profile": "collaborative",
+      "archive": "/home/rockingsisyphus/projects/VibeFlow/archive/vibeflow-distribution-0.15.0.zip",
+      "sha256": "da7e755fe6716445e3731be1fcdfbe3db5780198660a672448e1fa5db306e367",
+      "canonical_documents": 13,
+      "prompt_matches": true,
+      "zip_integrity": true,
+      "package_integrity": true,
+      "python_documented_node": {
+        "matched": true,
+        "status": {
+          "state": "succeeded",
+          "error": null,
+          "updated_at": "2026-10-04T16:57:15.216352Z",
+          "info": [
+            {
+              "id": "normalize",
+              "characters": 3,
+              "message": "文本规范化完成"
+            }
+          ]
+        }
+      },
+      "javascript_documented_node": {
+        "matched": true,
+        "outputs": {
+          "normalized": "x y"
+        },
+        "status": {
+          "state": "succeeded",
+          "error": null,
+          "updated_at": "2026-10-04T16:57:18.311Z",
+          "info": [
+            {
+              "id": "normalize",
+              "characters": 3,
+              "message": "文本规范化完成"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "profile": "autonomous",
+      "archive": "/home/rockingsisyphus/projects/VibeFlow/archive/vibeflow-distribution-autonomous-0.15.0.zip",
+      "sha256": "b997c85f333477ccfd15978065e8f3498ebc87d2d7577c7b8e1bba55000d46b4",
+      "canonical_documents": 13,
+      "prompt_matches": true,
+      "zip_integrity": true,
+      "package_integrity": true,
+      "python_documented_node": {
+        "matched": true,
+        "status": {
+          "state": "succeeded",
+          "error": null,
+          "updated_at": "2026-10-04T16:57:19.352670Z",
+          "info": [
+            {
+              "id": "normalize",
+              "characters": 3,
+              "message": "文本规范化完成"
+            }
+          ]
+        }
+      },
+      "javascript_documented_node": {
+        "matched": true,
+        "outputs": {
+          "normalized": "x y"
+        },
+        "status": {
+          "state": "succeeded",
+          "error": null,
+          "updated_at": "2026-10-04T16:57:22.487Z",
+          "info": [
+            {
+              "id": "normalize",
+              "characters": 3,
+              "message": "文本规范化完成"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

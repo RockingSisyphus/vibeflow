@@ -15,8 +15,6 @@ BANNED_IMPORT_ROOTS = {
     "httpx",
     "importlib",
     "asyncio",
-    "boundaries",
-    "boundary",
     "multiprocessing",
     "nodriver",
     "os",
@@ -60,7 +58,6 @@ BANNED_ATTR_CALLS = {
     "time.sleep",
 }
 RESOURCE_FIELD_NAMES = {
-    "boundary",
     "browser",
     "client",
     "connection",
@@ -92,17 +89,15 @@ class PurityPolicy:
     warn_source_lines: int | None = None
     warn_source_bytes: int | None = None
     allowed_import_roots: tuple[str, ...] = ()
-    banned_import_roots: tuple[str, ...] = tuple(sorted(BANNED_IMPORT_ROOTS))
+    banned_import_roots: tuple[str, ...] = ("importlib",)
     allowed_import_modules: tuple[str, ...] = ("urllib.parse", "vibeflow")
-    banned_import_modules: tuple[str, ...] = ("urllib.request",)
+    banned_import_modules: tuple[str, ...] = ()
+    configured_import_fields: frozenset[str] | None = field(default=None, compare=False, repr=False)
     max_functions: int | None = None
     max_branches: int | None = None
     max_nesting_depth: int | None = None
     max_params: int | None = None
     max_contract_keys: int | None = None
-    allowed_base_lib_paths: tuple[str, ...] = ()
-    allowed_base_lib_modules: tuple[str, ...] = ()
-    banned_base_lib_modules: tuple[str, ...] = ()
     warn_call_chain_length: int = 4
     max_call_chain_length: int = 4
     warn_dependency_chain_length: int = 4
@@ -197,41 +192,25 @@ def _default_rule_id(code: str) -> str:
     }
     if code in effect_rules:
         return effect_rules[code]
-    flow_rules = {
-        "node_info_flow_kind": "NODE.FLOW_KIND.MISSING",
-        "node_flow_kind_invalid": "NODE.FLOW_KIND.INVALID",
-        "node_decision_missing_route_output": "NODE.DECISION.MISSING_ROUTE_OUTPUT",
-        "node_external_invalid": "NODE.EXTERNAL.INVALID",
-    }
-    if code in flow_rules:
-        return flow_rules[code]
-    if code.startswith("node_") or code in {"type_mismatch"}:
+    if code.startswith("node_"):
         return f"NODE.METADATA.{code.upper()}"
     if code.startswith("contract") or code in {
         "async_run_pure",
         "context_run_forbidden",
         "init_signature",
-        "missing_contract",
-        "missing_node_info",
         "missing_run_pure",
         "public_callable",
         "run_pure_signature",
-        "signature_unavailable",
     }:
         return f"NODE.CONTRACT.{code.upper()}"
-    if code in {"node_direct_call", "node_import", "node_internal_read"}:
-        return f"NODE.COUPLING.{code.upper()}"
     if code.startswith("base_lib_"):
         return f"NODE.BASE_LIB.{code.upper()}"
     if code.startswith("complexity_") or code in {
         "call_chain_too_deep",
         "confusing_key_name",
-        "example_shape",
         "recursive_call_chain",
         "temporary_key",
         "wide_contract",
     }:
         return f"NODE.MAINTAINABILITY.{code.upper()}"
     return f"NODE.PURITY.{code.upper()}"
-
-

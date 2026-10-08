@@ -1,35 +1,32 @@
 """Formal runtime reviews use selected Rules, while lifecycle plugins stay separate."""
 
 from tests.fixtures.support.strict_support import *
-from tests.fixtures.support.declarations import write_node_manifests
+from tests.fixtures.support.declarations import write_node_plugin
+from tests.fixtures.support.plugins import resource, append_resource
 from vibeflow.tooling.application.python.cli.config import validate_config_path
 from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
 from vibeflow.tooling.project.workspace_loader import load_project_workspace
 
 
 def _rule_project(root, *, handler_source=None, outputs=None):
-    write_node_manifests(root, [
+    plugin = write_node_plugin(root, [
         ("test.start", "StartNode", {}, {}),
         ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}),
         ("test.in_end", "InEndNode", {}, {}),
     ])
-    manifests = root / "manifests"
-    for role in ("rules", "rulesets", "bundles"):
-        (manifests / role).mkdir()
     if handler_source is not None:
         (root / "review_rule.py").write_text(handler_source)
-        (manifests / "rules/check.jsonc").write_text(json.dumps({
+        append_resource(root, {
             "kind": "rule", "id": "project.review", "outputs": outputs or {},
             "params_schema": {"severity": {"type": "string", "enum": ["error", "warning"]}},
             "params_defaults": {"severity": "warning"},
             "implementations": [{"language": "python",
                 "source": {"kind": "file", "ref": "review_rule.py", "export": "check"}}],
-        }))
-    _refresh_bundle(root)
+        })
     (root / "vibeflow_project.jsonc").write_text(json.dumps({
-        "project_target": "python", "descriptors": {"bundles": ["manifests/bundles"]}}))
+        "project_target": "python"}))
     config = root / "workflow.jsonc"
-    config.write_text(json.dumps({"pipeline": _seed_only_pipeline()}))
+    config.write_text(json.dumps({"plugins":[plugin], "pipeline": _seed_only_pipeline()}))
     return config
 
 
@@ -40,20 +37,12 @@ def _select_node_rules(root, *, params=None, relations=(), extra_calls=()):
             phase: ["base", *[call["id"] for call in extra_calls]]
             for phase in ("static", "run")}}
     data["entrypoints"]["import"] = ["base"]
-    (root / "manifests/rulesets/node.jsonc").write_text(json.dumps(data))
-    manifest = root / "manifests/nodes/test-seed.jsonc"
+    resource(root, "ruleset", "project.node_review").write_text(json.dumps(data))
+    manifest = resource(root, "node", "test.seed")
     node = json.loads(manifest.read_text())
     node["rulesets"] = ["project.node_review"]
     manifest.write_text(json.dumps(node))
-    _refresh_bundle(root)
 
-
-def _refresh_bundle(root):
-    manifests = root / "manifests"
-    bundle = {"kind": "bundle", "id": "project.review_bundle", "resources": {
-        kind: ["../" + kind + "/" + path.name for path in sorted((manifests / kind).glob("*.jsonc"))]
-        for kind in ("nodes", "rules", "rulesets")}}
-    (manifests / "bundles/review.jsonc").write_text(json.dumps(bundle))
 
 
 _DIAGNOSTIC_RULE = '''from vibeflow.core import HealthFinding
@@ -105,7 +94,7 @@ def test_local_rule_override_changes_severity_without_a_second_policy_switch(tmp
     _select_node_rules(tmp_path, extra_calls=[{"id": "domain", "rule_id": "project.review", "params": {"severity": "error"}}])
     report = validate_config_path(config)
     assert any(item.code == "DOMAIN.NODE" for item in report.errors), [(item.code, item.message) for item in report.errors]
-    manifest = tmp_path / "manifests/rulesets/node.jsonc"
+    manifest = resource(tmp_path, "ruleset", "project.node_review")
     data = json.loads(manifest.read_text())
     data["relations"] = [{"source": "$self", "target": "domain", "kind": "overrides", "params": {"severity": "warning"}}]
     manifest.write_text(json.dumps(data))
@@ -119,11 +108,10 @@ def test_local_rule_override_changes_severity_without_a_second_policy_switch(tmp
 def test_rule_bundle_contributes_node_and_workflow_findings_to_normal_run(tmp_path):
     config = _rule_project(tmp_path, handler_source=_DIAGNOSTIC_RULE)
     _select_node_rules(tmp_path, extra_calls=[{"id": "domain", "rule_id": "project.review"}])
-    (tmp_path / "manifests/rulesets/workflow.jsonc").write_text(json.dumps({
+    resource(tmp_path, "ruleset", "project.workflow_review").write_text(json.dumps({
         "kind": "ruleset", "id": "project.workflow_review", "calls": [
             {"id": "base", "ruleset_id": "vibeflow.workflow"}, {"id": "domain", "rule_id": "project.review"}],
         "entrypoints": {"static": ["base", "domain"], "run": ["base", "domain"]}}))
-    _refresh_bundle(tmp_path)
     data = json.loads(config.read_text())
     data["rulesets"] = ["project.workflow_review"]
     config.write_text(json.dumps(data))
@@ -137,22 +125,9 @@ def test_rule_bundle_contributes_node_and_workflow_findings_to_normal_run(tmp_pa
 def test_missing_lifecycle_plugin_refuses_formal_validation(tmp_path, capsys):
     config = _rule_project(tmp_path)
     data = json.loads(config.read_text())
-    data["plugins"] = [{"source":{"kind":"file","ref":"missing.py"}}]
+    data["plugins"].append({"source":{"kind":"file","ref":"missing.py"}})
     config.write_text(json.dumps(data))
     assert cli_main(["validate", "--config", str(config), "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "ERROR"
     assert any(item["code"] == "PLUGIN.DECLARATION.LOAD" for item in payload["errors"])
-
-
-_load_project = load_project_workspace
-def load_project_workspace(config):
-    from tests.fixtures.support.code_plugins import prepare_config_fixture
-    prepare_config_fixture(config)
-    return _load_project(config)
-
-_validate_config = validate_config_path
-def validate_config_path(config, **options):
-    from tests.fixtures.support.code_plugins import prepare_config_fixture
-    prepare_config_fixture(config)
-    return _validate_config(config, **options)

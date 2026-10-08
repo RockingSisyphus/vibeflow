@@ -1,9 +1,10 @@
 """Small real projects for the JavaScript public Rule/API gap sandbox.
 
 Only standard-library modules are imported before the isolated runner chooses
-the kernel. Frozen mutation inputs are converted into fixed SDK plugins.
+the kernel. Resources are authored directly through fixed SDK plugins.
 """
 from __future__ import annotations
+from tests.fixtures.support.plugins import resource as resource_ref, copy_sdk_inputs, append_resource
 
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
@@ -63,8 +64,7 @@ def new_project(work_root: Path, name: str, toolchain_root: Path | None) -> Proj
     root = work_root / name
     shutil.copytree(ROOT / "sandbox/javascript/rule_graph", root,
                     ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc", ".artifacts", "dist", "runs"))
-    import runpy
-    runpy.run_path(str(ROOT / "tests/fixtures/support/code_plugins.py"))["copy_archival_inputs"](ROOT / "sandbox/javascript/rule_graph", root)
+    copy_sdk_inputs(ROOT / "sandbox/javascript/rule_graph", root)
     result = Project(root)
     toolchain = Path(toolchain_root or os.environ.get("VIBEFLOW_TEST_TOOLCHAIN_ROOT", ROOT / "sandbox/javascript/minimal/project"))
     if not (toolchain / "node_modules/typescript").is_dir():
@@ -73,14 +73,15 @@ def new_project(work_root: Path, name: str, toolchain_root: Path | None) -> Proj
     # A source file is not assigned two different Node contracts. This keeps
     # helper/capability declarations from masking the API being tested.
     (result.project / "nodes/boundary.ts").write_text("export function boundary() { return {}; }\n")
-    boundary = result.project / "bundle/nodes/boundary.jsonc"
+    boundary = resource_ref(result.project, 'node', 'example.boundary')
     data = read_json(boundary)
     data["implementations"][0]["source"]["ref"] = "nodes/boundary.ts"
     write_json(boundary, data)
     (result.project / "nodes/calculation.ts").write_text(
         'export function calculate(inputs) { return {result: inputs["example.input"].value * 2 + 1}; }\n')
     for name in ("provider", "checker", "replacement", "wrong-replacement"):
-        path = result.project / "bundle/rules" / (name + ".jsonc")
+        rule_id = {"provider": "number_provider", "checker": "number_checker", "replacement": "replacement_provider", "wrong-replacement": "wrong_provider"}[name]
+        path = resource_ref(result.project, "rule", "example." + rule_id)
         data = read_json(path)
         data["params_defaults"]["marker"] = str(result.marker)
         write_json(path, data)
@@ -93,11 +94,11 @@ def new_project(work_root: Path, name: str, toolchain_root: Path | None) -> Proj
 
 def select_provider_and_consumer(project: Project, provider_source: str) -> None:
     (project.project / "rules/provider.ts").write_text(provider_source, encoding="utf-8")
-    provider = project.project / "bundle/rules/provider.jsonc"
+    provider = resource_ref(project.project, 'rule', 'example.number_provider')
     data = read_json(provider)
     data["outputs"] = {"value": VALUE_TYPE}
     write_json(provider, data)
-    checker = project.project / "bundle/rules/checker.jsonc"
+    checker = resource_ref(project.project, 'rule', 'example.number_checker')
     data = read_json(checker)
     data["inputs"] = {"value": VALUE_TYPE}
     write_json(checker, data)
@@ -108,7 +109,7 @@ export function check(context, inputs, params) {
   return {records:{proof:{type_id:"example.proof.v1",value:proof}}};
 }
 ''', encoding="utf-8")
-    path = project.project / "bundle/rulesets/graph.jsonc"
+    path = resource_ref(project.project, 'ruleset', 'example.rule_graph')
     data = read_json(path)
     data["relations"][0]["bindings"] = {"value": "value"}
     data["entrypoints"] = {"static": ["checker"], "import": [], "run": []}
@@ -146,8 +147,6 @@ def actual(payload: dict[str, Any], *, exit_code: int) -> dict[str, Any]:
 
 
 def command(project: Project, name: str, *options: str, label: str | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
-    import runpy
-    runpy.run_path(str(ROOT / "tests/fixtures/support/code_plugins.py"))["migrate_fixture"](project.project)
     from vibeflow.tooling.application.cli import main
     output, errors = StringIO(), StringIO()
     try:
@@ -207,7 +206,7 @@ def add_helper(project: Project, kind: str) -> Path:
         code = ('\n\n\nimport {double} from "./helper.js";\n'
                 'export function calculate(inputs) { return {result:double(inputs["example.input"].value)+1}; }\n')
     source.write_text(code)
-    descriptor = project.project / "bundle/nodes/calculate.jsonc"
+    descriptor = resource_ref(project.project, 'node', 'example.calculate')
     data = read_json(descriptor)
     data["base_libs"] = ["gaps.helper"]
     implementation = data["implementations"][0]
@@ -221,23 +220,16 @@ def add_helper(project: Project, kind: str) -> Path:
     declaration = {"kind":"base_lib", "id":"gaps.helper", "display_name":"Numeric helper", "description":"Actually reached helper.",
                    "implementations":[{"language":"javascript" if javascript else "typescript", "targets":["node","browser"],
                                        "source":{"kind":"file","ref":helper.relative_to(project.project).as_posix()}}]}
-    write_json(project.project / "bundle/helper.jsonc", declaration)
-    bundle = project.project / "bundles/rule-graph.jsonc"
-    data = read_json(bundle)
-    data["resources"]["base_lib"] = ["../bundle/helper.jsonc"]
-    write_json(bundle, data)
+    append_resource(project.project, declaration)
     return helper
 
 
 NATIVE_GROUPS = ("base_lib", "data_schemas", "capabilities", "host_extensions", "plugins")
 
 
-def bundle_native_resources(project: Project) -> dict[str, Path]:
-    """Contribute all native groups through one ordinary bundle, then use them."""
-    data = read_json(project.project / "vibeflow_project.jsonc")
-    data["descriptors"] = {"bundles": ["bundles"]}
-    write_json(project.project / "vibeflow_project.jsonc", data)
-    node = project.project / "bundle/nodes/calculate.jsonc"
+def sdk_native_resources(project: Project) -> dict[str, Path]:
+    """Contribute all native groups through one SDK plugin, then use them."""
+    node = resource_ref(project.project, 'node', 'example.calculate')
     data = read_json(node)
     data.update(rulesets=[], base_libs=["gaps.helper"], capabilities=[{"id":"gaps.math", "operations":["offset"]}])
     write_json(node, data)
@@ -278,21 +270,13 @@ export function calculate(inputs, params, context) {
                     "implementations":[implementation("plugins/runtime.ts","createPlugin")],
                     "config":{"schema":{"type":"object","additionalProperties":False},"defaults":{}}},
     }
-    paths = {group: project.project / "bundle/native" / (group + ".jsonc") for group in resources}
+    paths = {}
     for group, declaration in resources.items():
-        write_json(paths[group], declaration)
-    schema = project.project / "bundle/native/input.jsonc"
-    write_json(schema, read_json(project.project / "manifests/data/input.jsonc"))
-    output = project.project / "bundle/native/output.jsonc"
-    write_json(output, read_json(project.project / "manifests/data/output.jsonc"))
-    paths["data_schemas"] = schema
-    bundle = project.project / "bundles/rule-graph.jsonc"
-    data = read_json(bundle)
-    data["resources"].update({group:["../"+path.relative_to(project.project).as_posix()] for group,path in paths.items()})
-    data["resources"]["data_schemas"].append("../bundle/native/output.jsonc")
-    write_json(bundle, data)
+        append_resource(project.project, declaration)
+        paths[group] = resource_ref(project.project, declaration["kind"], declaration.get("id", declaration.get("type_key")))
+    paths["data_schemas"] = resource_ref(project.project, "data_schema", "example.input")
     config = read_json(project.config)
-    config.update(plugins=["gaps.runtime"], host_extensions=["gaps.host"])
+    config.update(plugins=[{"source": {"kind": "file", "ref": "code_plugin.ts", "export": "plugin"}}], host_extensions=["gaps.host"])
     write_json(project.config, config)
     return paths
 
@@ -304,4 +288,4 @@ def loaded_native_groups(project: Project) -> dict[str, Any]:
               "capabilities":catalogs.capabilities.get("gaps.math"), "host_extensions":catalogs.host_extensions.get("gaps.host"),
               "plugins":catalogs.plugins.get("gaps.runtime")}
     return {"native_groups_loaded":all(checks.values()),
-            "bundle_only":"descriptors" not in read_json(project.project / "vibeflow_project.jsonc") and any(item.get("source",{}).get("ref")=="code_plugin.ts" for item in read_json(project.config).get("plugins",[]))}
+            "sdk_only":"descriptors" not in read_json(project.project / "vibeflow_project.jsonc") and any(item.get("source",{}).get("ref")=="code_plugin.ts" for item in read_json(project.config).get("plugins",[]))}

@@ -1,8 +1,10 @@
+from tests.fixtures.support.declarations import native_registry
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 import threading
 from dataclasses import replace
 
 from tests.fixtures.support.strict_support import *
+from tests.fixtures.support.plugins import publish_native_fixture, write_lifecycle_fixture
 
 
 def _runtime_trace_lines_from_context(context) -> list[dict[str, object]]:
@@ -20,9 +22,10 @@ def _runtime_trace_lines(trace_path: Path) -> list[dict[str, object]]:
 def test_checked_run_refuses_failed_health_before_runtime(tmp_path) -> None:
     config_path = tmp_path / "bad.json"
     config_path.write_text(
-        json.dumps({"pipeline": {"nodes": [_node_call("missing", "test.missing", "References an unknown node type.", provides=[PROV_SPEC("value.out")])]}}),
+        json.dumps({"pipeline": {"nodes": [_node_call("missing", "test.missing", "References an unknown node type.")]}}),
         encoding="utf-8",
     )
+    publish_native_fixture(config_path, _registry())
     with pytest.raises(CheckedRunError) as exc_info:
         run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="bad_run")
     result = exc_info.value.result
@@ -58,7 +61,7 @@ def test_execution_plan_binds_node_instance_and_params_once() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the counting fixture."),
-                    _node_call("count", "test.counting_init", "Produces configured value.out.", provides=[PROV_SPEC("value.out")], config={"value": 9}),
+                    _node_call("count", "test.counting_init", "Produces configured value.out.",  config={"value": 9}),
                     _node_call("end", "test.start", "Ends the compiled branch fixture."),
                 ],
                 "edges": _edge_chain("start", "count", "end"),
@@ -89,15 +92,14 @@ def test_execution_plan_prebuilds_nodeset_subplan_with_overrides() -> None:
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the nodeset override fixture."),
                     _node_call(
                         "composite",
                         "math.add_one",
                         "Calls add-one with inner override.",
-                        requires=[REQ_SPEC("value.in")],
-                        provides=[PROV_SPEC("value.out")],
+
                         node_configs={"add": {"delta": 6}},
                     ),
                     _node_call("end", "test.start", "Ends the compiled branch fixture."),
@@ -129,8 +131,8 @@ def test_nodeset_runner_reuses_cached_subruntime() -> None:
                     pipeline={
                         "nodes": [
                             _node_call("start", "test.start", "Starts the count nodeset."),
-                            _node_call("count", "test.counting_init", "Produces configured value.out.", provides=[PROV_SPEC("value.out")], config={"value": 5}),
-                            _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                            _node_call("count", "test.counting_init", "Produces configured value.out.",  config={"value": 5}),
+                            _node_call("end", "test.out_end", "Consumes value.out."),
                         ],
                         "edges": _edge_chain("start", "count", "end"),
                         "outputs": [REQ_SPEC("value.out")],
@@ -140,7 +142,7 @@ def test_nodeset_runner_reuses_cached_subruntime() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the cached nodeset fixture."),
-                    _node_call("composite", "count.once", "Calls count-once nodeset.", provides=[PROV_SPEC("value.out")]),
+                    _node_call("composite", "count.once", "Calls count-once nodeset."),
                     _node_call("end", "test.start", "Ends the compiled branch fixture."),
                 ],
                 "edges": _edge_chain("start", "composite", "end"),
@@ -169,11 +171,11 @@ def test_nodeset_inputs_and_exports_preserve_object_reference() -> None:
                     provides=["value.out"],
                     exports=["value.out"],
                     pipeline={
-                        "inputs": [PROV_SPEC("value.in")],
+                        "inputs": [INPUT_SPEC("value.in")],
                         "nodes": [
                             _node_call("start", "test.start", "Starts the identity nodeset."),
-                            _node_call("identity", "test.identity_object", "Passes value.in through.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                            _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                            _node_call("identity", "test.identity_object", "Passes value.in through."),
+                            _node_call("end", "test.out_end", "Consumes value.out."),
                         ],
                         "edges": _edge_chain("start", "identity", "end"),
                         "outputs": [REQ_SPEC("value.out")],
@@ -181,11 +183,11 @@ def test_nodeset_inputs_and_exports_preserve_object_reference() -> None:
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the object reference fixture."),
-                    _node_call("composite", "identity.object", "Calls identity nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("composite", "identity.object", "Calls identity nodeset."),
+                    _node_call("end", "test.out_end", "Consumes value.out."),
                 ],
                 "edges": _edge_chain("start", "composite", "end"),
                 "outputs": [REQ_SPEC("value.out")],
@@ -204,7 +206,7 @@ def test_node_config_invalid_override_fails_health_before_runtime() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("seed", "test.seed", "Produces invalid value.in.", provides=[PROV_SPEC("value.in")], value="bad"),
+                    _node_call("seed", "test.seed", "Produces invalid value.in.",  value="bad"),
                 ]
             }
         }
@@ -237,6 +239,7 @@ def test_checked_run_refuses_planned_architecture(tmp_path) -> None:
         },
     )
 
+    publish_native_fixture(config_path, _registry())
     with pytest.raises(CheckedRunError) as exc_info:
         run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="planned_run")
 
@@ -260,18 +263,17 @@ def test_nodeset_call_can_override_inner_node_config_independently() -> None:
                 )
             ],
             "pipeline": {
-                    "inputs": [PROV_SPEC("value.in")],
+                    "inputs": [INPUT_SPEC("value.in")],
                     "nodes": [
                         _node_call("start", "test.start", "Starts the nodeset override fixture."),
                         _node_call(
                             "composite",
                             "math.add_one",
                             "Calls add-one with an inner override.",
-                            requires=[REQ_SPEC("value.in")],
-                            provides=[PROV_SPEC("value.out")],
+
                             node_configs={"add": {"delta": 5}},
                         ),
-                        _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                        _node_call("end", "test.out_end", "Consumes value.out."),
                     ],
                     "edges": _edge_chain("start", "composite", "end"),
                     "outputs": [REQ_SPEC("value.out")],
@@ -287,13 +289,7 @@ class NoDeepcopyObject:
         raise AssertionError("should not deepcopy runtime objects")
 
 
-LoopCopyNode_DECLARATION = node_declaration(NodeInfo("test.loop_copy", "Loop Copy", "Copies value.out into the next value.in slot.", "0.1.0", "process"), NodeContract(
-        requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
-        provides=(DataProvider("value.loop", "value.in", display_name="value.loop"),),
-        input_semantics={"value.out": ("output value",)},
-        output_semantics={"value.loop": ("next loop input",)},
-
-    ), rulesets=("vibeflow.process",))
+LoopCopyNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.loop_copy', display_name='Loop Copy', description='Copies value.out into the next value.in slot.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('value.loop', 'value.in', display_name='value.loop'),), input_semantics={'value.out': ('output value',)}, output_semantics={'value.loop': ('next loop input',)}), rulesets=("vibeflow.process",))
 
 class LoopCopyNode:
 
@@ -301,12 +297,7 @@ class LoopCopyNode:
         return {"value.loop": inputs["value.out"]["value"]}
 
 
-BranchCopyNode_DECLARATION = node_declaration(NodeInfo("test.branch_copy", "Branch Copy", "Copies value.out into a distinct value.in-compatible key.", "0.1.0", "process"), NodeContract(
-        requires=(DataRequirement("value.out", "exactly_one", display_name="Value Out"),),
-        provides=(DataProvider("value.copy", "value.in", display_name="Value Copy"),),
-        input_semantics={"value.out": ("output value selected by the route",)},
-        output_semantics={"value.copy": ("copied value compatible with value.in",)},
-    ), rulesets=("vibeflow.process",))
+BranchCopyNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.branch_copy', display_name='Branch Copy', description='Copies value.out into a distinct value.in-compatible key.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='Value Out'),), provides=(DataProvider('value.copy', 'value.in', display_name='Value Copy'),), input_semantics={'value.out': ('output value selected by the route',)}, output_semantics={'value.copy': ('copied value compatible with value.in',)}), rulesets=("vibeflow.process",))
 
 class BranchCopyNode:
 
@@ -314,11 +305,7 @@ class BranchCopyNode:
         return {"value.copy": inputs["value.out"]["value"]}
 
 
-LoopAddItemNode_DECLARATION = node_declaration(NodeInfo("test.loop_add_item", "Loop Add Item", "Adds one loop item into a running total.", "0.1.0", "process"), NodeContract(
-        requires=(DataRequirement("total.current", "exactly_one", display_name="total.current"), DataRequirement("item.value", "exactly_one", display_name="item.value")),
-        provides=(DataProvider("total.next", "total.next", display_name="total.next"), DataProvider("item.metric", "item.metric", display_name="item.metric")),
-
-    ), rulesets=("vibeflow.process",))
+LoopAddItemNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.loop_add_item', display_name='Loop Add Item', description='Adds one loop item into a running total.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('total.current', 'exactly_one', display_name='total.current'), DataRequirement('item.value', 'exactly_one', display_name='item.value')), provides=(DataProvider('total.next', 'total.next', display_name='total.next'), DataProvider('item.metric', 'item.metric', display_name='item.metric')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('total.current', 'exactly_one', display_name='total.current'), DataRequirement('item.value', 'exactly_one', display_name='item.value'))}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('total.next', 'total.next', display_name='total.next'), DataProvider('item.metric', 'item.metric', display_name='item.metric'))}), rulesets=("vibeflow.process",))
 
 class LoopAddItemNode:
 
@@ -327,12 +314,7 @@ class LoopAddItemNode:
         return {"total.next": inputs["total.current"]["value"] + item, "item.metric": item}
 
 
-LoopStepUntilNode_DECLARATION = node_declaration(NodeInfo("test.loop_step_until", "Loop Step Until", "Increments loop.current until it reaches target.", "0.1.0", "process"), NodeContract(
-        requires=(DataRequirement("loop.current", "exactly_one", display_name="loop.current"),),
-        provides=(DataProvider("loop.next", "loop.next", display_name="loop.next"), DataProvider("loop.done", "loop.done", display_name="loop.done")),
-
-
-    ), rulesets=("vibeflow.process",))
+LoopStepUntilNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.loop_step_until', display_name='Loop Step Until', description='Increments loop.current until it reaches target.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('loop.current', 'exactly_one', display_name='loop.current'),), provides=(DataProvider('loop.next', 'loop.next', display_name='loop.next'), DataProvider('loop.done', 'loop.done', display_name='loop.done')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('loop.current', 'exactly_one', display_name='loop.current'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('loop.next', 'loop.next', display_name='loop.next'), DataProvider('loop.done', 'loop.done', display_name='loop.done'))}), rulesets=("vibeflow.process",))
 
 class LoopStepUntilNode:
 
@@ -341,10 +323,7 @@ class LoopStepUntilNode:
         return {"loop.next": value, "loop.done": value >= params.get("target", 3)}
 
 
-LoopNextEndNode_DECLARATION = node_declaration(NodeInfo("test.loop_next_end", "Loop Next End", "Ends one loop body after loop.next is ready.", "0.1.0", "terminal"), NodeContract(
-        requires=(DataRequirement("loop.next", "exactly_one", display_name="Loop Next"),),
-        input_semantics={"loop.next": ("next loop value",)},
-    ), rulesets=("vibeflow.process",))
+LoopNextEndNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.loop_next_end', display_name='Loop Next End', description='Ends one loop body after loop.next is ready.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('loop.next', 'exactly_one', display_name='Loop Next'),), input_semantics={'loop.next': ('next loop value',)}), rulesets=("vibeflow.process",))
 
 class LoopNextEndNode:
 
@@ -352,10 +331,7 @@ class LoopNextEndNode:
         return {}
 
 
-LoopFinalEndNode_DECLARATION = node_declaration(NodeInfo("test.loop_final_end", "Loop Final End", "Ends a loop workflow after loop.final is ready.", "0.1.0", "terminal"), NodeContract(
-        requires=(DataRequirement("loop.final", "exactly_one", display_name="Loop Final"),),
-        input_semantics={"loop.final": ("final loop value",)},
-    ), rulesets=("vibeflow.process",))
+LoopFinalEndNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.loop_final_end', display_name='Loop Final End', description='Ends a loop workflow after loop.final is ready.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('loop.final', 'exactly_one', display_name='Loop Final'),), input_semantics={'loop.final': ('final loop value',)}), rulesets=("vibeflow.process",))
 
 class LoopFinalEndNode:
 
@@ -363,11 +339,7 @@ class LoopFinalEndNode:
         return {}
 
 
-JoinPassthroughNode_DECLARATION = node_declaration(NodeInfo("test.join_passthrough", "Join Passthrough", "Copies value.in to value.out.", "0.1.0", "process"), NodeContract(
-        requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"),),
-        provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
-
-    ), rulesets=("vibeflow.process",))
+JoinPassthroughNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.join_passthrough', display_name='Join Passthrough', description='Copies value.in to value.out.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='value.in'),), provides=(DataProvider('value.out', 'value.out', display_name='value.out'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.in', 'exactly_one', display_name='value.in'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.out', 'value.out', display_name='value.out'),)}), rulesets=("vibeflow.process",))
 
 class JoinPassthroughNode:
 
@@ -375,10 +347,7 @@ class JoinPassthroughNode:
         return {"value.out": inputs["value.in"]["value"]}
 
 
-ConditionalValueNode_DECLARATION = node_declaration(NodeInfo("test.conditional_value", "Conditional Value", "Provides value.in and a branch flag.", "0.1.0", "process"), NodeContract(
-        provides=(DataProvider("value.alt", "value.in", display_name="value.alt"), DataProvider("flow.use_alt", "flow.use_alt", display_name="flow.use_alt")),
-
-    ), rulesets=("vibeflow.process",))
+ConditionalValueNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.conditional_value', display_name='Conditional Value', description='Provides value.in and a branch flag.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.alt', 'value.in', display_name='value.alt'), DataProvider('flow.use_alt', 'flow.use_alt', display_name='flow.use_alt')), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.alt', 'value.in', display_name='value.alt'), DataProvider('flow.use_alt', 'flow.use_alt', display_name='flow.use_alt'))}), rulesets=("vibeflow.process",))
 
 class ConditionalValueNode:
 
@@ -386,7 +355,7 @@ class ConditionalValueNode:
         return {"value.alt": 99, "flow.use_alt": True}
 
 
-LeftValueNode_DECLARATION = node_declaration(NodeInfo("test.left_value", "Left Value", "Produces left value.in.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.left", "value.in", display_name="value.left"),)), rulesets=("vibeflow.process",))
+LeftValueNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.left_value', display_name='Left Value', description='Produces left value.in.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.left', 'value.in', display_name='value.left'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.left', 'value.in', display_name='value.left'),)}), rulesets=("vibeflow.process",))
 
 class LeftValueNode:
 
@@ -394,7 +363,7 @@ class LeftValueNode:
         return {"value.left": 1}
 
 
-RightValueNode_DECLARATION = node_declaration(NodeInfo("test.right_value", "Right Value", "Produces right value.in.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.right", "value.in", display_name="value.right"),)), rulesets=("vibeflow.process",))
+RightValueNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.right_value', display_name='Right Value', description='Produces right value.in.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.right', 'value.in', display_name='value.right'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.right', 'value.in', display_name='value.right'),)}), rulesets=("vibeflow.process",))
 
 class RightValueNode:
 
@@ -402,7 +371,7 @@ class RightValueNode:
         return {"value.right": 2}
 
 
-OtherValueNode_DECLARATION = node_declaration(NodeInfo("test.other_value", "Other Value", "Produces other.in.", "0.1.0", "process"), NodeContract(provides=(DataProvider("other.in", "other.in", display_name="other.in"),)), rulesets=("vibeflow.process",))
+OtherValueNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.other_value', display_name='Other Value', description='Produces other.in.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('other.in', 'other.in', display_name='other.in'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('other.in', 'other.in', display_name='other.in'),)}), rulesets=("vibeflow.process",))
 
 class OtherValueNode:
 
@@ -410,11 +379,7 @@ class OtherValueNode:
         return {"other.in": 10}
 
 
-TwoInputJoinNode_DECLARATION = node_declaration(NodeInfo("test.two_input_join", "Two Input Join", "Adds value.in and other.in.", "0.1.0", "process"), NodeContract(
-        requires=(DataRequirement("value.in", "exactly_one", display_name="value.in"), DataRequirement("other.in", "exactly_one", display_name="other.in")),
-        provides=(DataProvider("value.out", "value.out", display_name="value.out"),),
-
-    ), rulesets=("vibeflow.process",))
+TwoInputJoinNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.two_input_join', display_name='Two Input Join', description='Adds value.in and other.in.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='value.in'), DataRequirement('other.in', 'exactly_one', display_name='other.in')), provides=(DataProvider('value.out', 'value.out', display_name='value.out'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.in', 'exactly_one', display_name='value.in'), DataRequirement('other.in', 'exactly_one', display_name='other.in'))}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.out', 'value.out', display_name='value.out'),)}), rulesets=("vibeflow.process",))
 
 class TwoInputJoinNode:
 
@@ -422,10 +387,7 @@ class TwoInputJoinNode:
         return {"value.out": inputs["value.in"]["value"] + inputs["other.in"]["value"]}
 
 
-InactiveRouteNode_DECLARATION = node_declaration(NodeInfo("test.inactive_route", "Inactive Route", "Produces a false route flag.", "0.1.0", "decision"), NodeContract(
-        provides=(DataProvider("flow.route", "flow.route", display_name="flow.route"),),
-
-    ), rulesets=("vibeflow.process",))
+InactiveRouteNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.inactive_route', display_name='Inactive Route', description='Produces a false route flag.', version='0.1.0', flow_kind='decision', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('flow.route', 'flow.route', display_name='flow.route'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('flow.route', 'flow.route', display_name='flow.route'),)}), rulesets=("vibeflow.process",))
 
 class InactiveRouteNode:
 
@@ -459,15 +421,14 @@ def _fixed_count_loop_graph(*, max_iterations: int = 10, stop_after: int = 3):
                     provides=["loop.next", "loop.done"],
                     exports=["loop.next", "loop.done"],
                     pipeline={
-                        "inputs": [PROV_SPEC("loop.current")],
+                        "inputs": [INPUT_SPEC("loop.current")],
                         "nodes": [
                             _node_call("start", "test.start", "Starts the fixed loop body."),
                             _node_call(
                                 "step",
                                 "test.loop_step_until",
                                 "Increments loop.current for one fixed-count iteration.",
-                                requires=[REQ_SPEC("loop.current")],
-                                provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
+
                             ),
                             _node_call("end", "test.loop_next_end", "Ends the fixed loop body."),
                         ],
@@ -477,7 +438,7 @@ def _fixed_count_loop_graph(*, max_iterations: int = 10, stop_after: int = 3):
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("loop.current")],
+                "inputs": [INPUT_SPEC("loop.current")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the fixed-count loop fixture."),
                     _node_call(
@@ -546,15 +507,14 @@ def _while_loop_graph(
                     provides=["loop.next", "loop.done"],
                     exports=["loop.next", "loop.done"],
                     pipeline={
-                        "inputs": [PROV_SPEC("loop.current")],
+                        "inputs": [INPUT_SPEC("loop.current")],
                         "nodes": [
                             _node_call("start", "test.start", "Starts the while loop body."),
                             _node_call(
                                 "step",
                                 "test.loop_step_until",
                                 "Increments loop.current and reports loop.done.",
-                                requires=[REQ_SPEC("loop.current")],
-                                provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
+
                                 config={"target": target},
                             ),
                             _node_call("end", "test.loop_next_end", "Ends the while body."),
@@ -565,7 +525,7 @@ def _while_loop_graph(
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("loop.current")],
+                "inputs": [INPUT_SPEC("loop.current")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the while loop fixture."),
                     _node_call(
@@ -660,7 +620,7 @@ def test_node_config_overrides_pass_through_nested_loop_body_in_all_execution_mo
                     provides=["value.out"],
                     exports=["value.out"],
                     pipeline={
-                        "inputs": [PROV_SPEC("value.in")],
+                        "inputs": [INPUT_SPEC("value.in")],
                         "nodes": [
                             _node_call("start", "test.start", "Starts the outer loop body."),
                             _node_call(
@@ -677,7 +637,7 @@ def test_node_config_overrides_pass_through_nested_loop_body_in_all_execution_mo
                                     "outputs": [{"from": "value.out", "as": "value.out"}],
                                 },
                             ),
-                            _node_call("end", "test.out_end", "Ends after inner value.out.", requires=[REQ_SPEC("value.out")]),
+                            _node_call("end", "test.out_end", "Ends after inner value.out."),
                         ],
                         "edges": _edge_chain("start", "inner_loop", "end"),
                         "outputs": [REQ_SPEC("value.out")],
@@ -685,7 +645,7 @@ def test_node_config_overrides_pass_through_nested_loop_body_in_all_execution_mo
                 ),
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the nested loop override fixture."),
                     _node_call(
@@ -703,7 +663,7 @@ def test_node_config_overrides_pass_through_nested_loop_body_in_all_execution_mo
                             "outputs": [{"from": "value.out", "as": "value.out"}],
                         },
                     ),
-                    _node_call("end", "test.out_end", "Ends after outer value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Ends after outer value.out."),
                 ],
                 "edges": _edge_chain("start", "outer_loop", "end"),
                 "outputs": [REQ_SPEC("value.out")],
@@ -748,15 +708,14 @@ def test_block_execution_compiles_loop_body_with_nested_nodeset() -> None:
                     provides=["loop.next", "loop.done"],
                     exports=["loop.next", "loop.done"],
                     pipeline={
-                        "inputs": [PROV_SPEC("loop.current")],
+                        "inputs": [INPUT_SPEC("loop.current")],
                         "nodes": [
                             _node_call("start", "test.start", "Starts inner loop step."),
                             _node_call(
                                 "step",
                                 "test.loop_step_until",
                                 "Produces loop.next and loop.done.",
-                                requires=[REQ_SPEC("loop.current")],
-                                provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
+
                             ),
                             _node_call("end", "test.loop_next_end", "Ends inner step."),
                         ],
@@ -770,15 +729,14 @@ def test_block_execution_compiles_loop_body_with_nested_nodeset() -> None:
                     provides=["loop.next", "loop.done"],
                     exports=["loop.next", "loop.done"],
                     pipeline={
-                        "inputs": [PROV_SPEC("loop.current")],
+                        "inputs": [INPUT_SPEC("loop.current")],
                         "nodes": [
                             _node_call("start", "test.start", "Starts uncompiled body."),
                             _node_call(
                                 "nested",
                                 "loop.step_until",
                                 "Calls a nested nodeset inside a block-compiled loop body.",
-                                requires=[REQ_SPEC("loop.current")],
-                                provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
+
                             ),
                             _node_call("end", "test.loop_next_end", "Ends uncompiled body."),
                         ],
@@ -788,7 +746,7 @@ def test_block_execution_compiles_loop_body_with_nested_nodeset() -> None:
                 ),
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("loop.current")],
+                "inputs": [INPUT_SPEC("loop.current")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts block rejection fixture."),
                     _node_call(
@@ -839,7 +797,7 @@ def test_block_execution_fail_fast_reports_compile_reason_for_unsupported_loop()
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts unsupported block fixture."),
                     _node_call(
@@ -857,7 +815,7 @@ def test_block_execution_fail_fast_reports_compile_reason_for_unsupported_loop()
                         },
                         **{"async": "detached"},
                     ),
-                    _node_call("end", "test.out_end", "Ends unsupported block fixture.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Ends unsupported block fixture."),
                 ],
                 "edges": _edge_chain("start", "async_loop", "end"),
                 "outputs": [REQ_SPEC("value.out")],
@@ -877,17 +835,16 @@ def test_join_policy_any_active_allows_unconditional_input_when_condition_is_ina
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the join fixture."),
-                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")], config={"value": 7}),
-                    _node_call("route", "test.inactive_route", "Produces an inactive control value.", provides=[PROV_SPEC("flow.route")]),
+                    _node_call("seed", "test.seed", "Produces value.in.",  config={"value": 7}),
+                    _node_call("route", "test.inactive_route", "Produces an inactive control value."),
                     _node_call(
                         "join",
                         "test.join_passthrough",
                         "Consumes value.in even when a separate conditional control edge is inactive.",
-                        requires=[REQ_SPEC("value.in")],
-                        provides=[PROV_SPEC("value.out")],
+
                         join_policy="any_active",
                     ),
-                    _node_call("end", "test.out_end", "Ends after value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Ends after value.out."),
                 ],
                 "edges": [
                     {"from": "start", "to": "seed"},
@@ -912,10 +869,10 @@ def test_health_reports_ambiguous_unconditional_conditional_join() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the ambiguous join fixture."),
-                    _node_call("seed", "test.seed", "Produces unconditional value.in.", provides=[PROV_SPEC("value.in")]),
-                    _node_call("alt", "test.conditional_value", "Produces conditional value.in.", provides=[PROV_SPEC("value.alt", "value.in"), PROV_SPEC("flow.use_alt")]),
-                    _node_call("join", "test.join_passthrough", "Ambiguously consumes value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Ends after value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("seed", "test.seed", "Produces unconditional value.in."),
+                    _node_call("alt", "test.conditional_value", "Produces conditional value.in."),
+                    _node_call("join", "test.join_passthrough", "Ambiguously consumes value.in."),
+                    _node_call("end", "test.out_end", "Ends after value.out."),
                 ],
                 "edges": [
                     {"from": "start", "to": "seed"},
@@ -939,9 +896,9 @@ def test_multiple_active_exactly_one_join_errors_at_runtime() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the conflicting join fixture."),
-                    _node_call("left", "test.left_value", "Produces left value.in.", provides=[PROV_SPEC("value.left", "value.in")]),
-                    _node_call("right", "test.right_value", "Produces right value.in.", provides=[PROV_SPEC("value.right", "value.in")]),
-                    _node_call("join", "test.join_passthrough", "Conflicts on value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
+                    _node_call("left", "test.left_value", "Produces left value.in."),
+                    _node_call("right", "test.right_value", "Produces right value.in."),
+                    _node_call("join", "test.join_passthrough", "Conflicts on value.in."),
                 ],
                 "edges": [{"from": "start", "to": "left"}, {"from": "start", "to": "right"}, {"from": "left", "to": "join"}, {"from": "right", "to": "join"}],
             }
@@ -958,17 +915,16 @@ def test_join_policy_all_waits_for_all_incoming_inputs() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the all join fixture."),
-                    _node_call("left", "test.left_value", "Produces value.in.", provides=[PROV_SPEC("value.left", "value.in")]),
-                    _node_call("other", "test.other_value", "Produces other.in.", provides=[PROV_SPEC("other.in")]),
+                    _node_call("left", "test.left_value", "Produces value.in."),
+                    _node_call("other", "test.other_value", "Produces other.in."),
                     _node_call(
                         "join",
                         "test.two_input_join",
                         "Runs only after both incoming inputs arrive.",
-                        requires=[REQ_SPEC("value.in"), REQ_SPEC("other.in")],
-                        provides=[PROV_SPEC("value.out")],
+
                         join_policy="all",
                     ),
-                    _node_call("end", "test.out_end", "Ends after value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Ends after value.out."),
                 ],
                 "edges": [
                     {"from": "start", "to": "left"},
@@ -992,11 +948,11 @@ def test_runtime_passes_non_deepcopy_object_by_reference() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the object reference fixture."),
-                    _node_call("identity", "test.identity_object", "Passes value.in through.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("identity", "test.identity_object", "Passes value.in through."),
+                    _node_call("end", "test.out_end", "Consumes value.out."),
                 ],
                 "edges": _edge_chain("start", "identity", "end"),
                 "outputs": [REQ_SPEC("value.out")],
@@ -1016,8 +972,8 @@ def test_checked_run_writes_runtime_failure_trace(tmp_path) -> None:
                 "pipeline": {
                     "nodes": [
                         _node_call("start", "test.start", "Starts the runtime failure fixture."),
-                        _node_call("bad", "test.runtime_fail", "Fails at runtime.", provides=[PROV_SPEC("value.out")], config={"fail": True}),
-                        _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                        _node_call("bad", "test.runtime_fail", "Fails at runtime.",  config={"fail": True}),
+                        _node_call("end", "test.out_end", "Consumes value.out."),
                     ],
                     "edges": _edge_chain("start", "bad", "end"),
                 }
@@ -1025,6 +981,7 @@ def test_checked_run_writes_runtime_failure_trace(tmp_path) -> None:
         ),
         encoding="utf-8",
     )
+    publish_native_fixture(config_path, _registry())
     with pytest.raises(RuntimeError, match="boom"):
         run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="runtime_fail")
     trace_lines = [
@@ -1148,8 +1105,8 @@ def test_runtime_options_compiled_failure_records_node_and_block_failed() -> Non
             "pipeline": {
                 "nodes": [
                         _node_call("start", "test.start", "Starts the compiled failure fixture."),
-                        _node_call("bad", "test.runtime_fail", "Fails in a compiled block.", provides=[PROV_SPEC("value.out")], config={"fail": True}),
-                        _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                        _node_call("bad", "test.runtime_fail", "Fails in a compiled block.",  config={"fail": True}),
+                        _node_call("end", "test.out_end", "Consumes value.out."),
                 ],
                 "edges": _edge_chain("start", "bad", "end"),
             }
@@ -1177,9 +1134,9 @@ def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the compiled branch fixture."),
-                    _node_call("seed", "test.seed", "Produces initial value.in.", provides=[PROV_SPEC("value.in")], config={"value": 1}),
-                    _node_call("add", "test.add", "Adds value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("route", "test.route", "Chooses the route.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
+                    _node_call("seed", "test.seed", "Produces initial value.in.",  config={"value": 1}),
+                    _node_call("add", "test.add", "Adds value.in."),
+                    _node_call("route", "test.route", "Chooses the route."),
                     _node_call("copy", "test.branch_copy", "Copies value.out on the alternate branch."),
                     _node_call("end", "test.start", "Ends the compiled branch fixture."),
                 ],
@@ -1210,12 +1167,7 @@ def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
 
 
 def test_runtime_options_compiled_rejects_decision_loop() -> None:
-    DoneCheckNode_DECLARATION = node_declaration(NodeInfo("test.done_check", "Done Check", "Checks loop completion.", "0.1.0", "decision"), NodeContract(
-            requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
-            provides=(DataProvider("loop.done", "loop.done", display_name="loop.done"), DataProvider("value.loop", "value.in", display_name="value.loop")),
-
-
-        ), rulesets=("vibeflow.process",))
+    DoneCheckNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.done_check', display_name='Done Check', description='Checks loop completion.', version='0.1.0', flow_kind='decision', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('loop.done', 'loop.done', display_name='loop.done'), DataProvider('value.loop', 'value.in', display_name='value.loop')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.out', 'exactly_one', display_name='value.out'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('loop.done', 'loop.done', display_name='loop.done'), DataProvider('value.loop', 'value.in', display_name='value.loop'))}), rulesets=("vibeflow.process",))
 
     class DoneCheckNode:
 
@@ -1233,11 +1185,7 @@ def test_runtime_options_compiled_rejects_decision_loop() -> None:
 
 
 def test_runtime_options_block_rejects_decision_loop_before_max_steps() -> None:
-    NeverDoneNode_DECLARATION = node_declaration(NodeInfo("test.never_done", "Never Done", "Never exits loop.", "0.1.0", "decision"), NodeContract(
-            requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
-            provides=(DataProvider("loop.done", "loop.done", display_name="loop.done"), DataProvider("value.loop", "value.in", display_name="value.loop")),
-
-        ), rulesets=("vibeflow.process",))
+    NeverDoneNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.never_done', display_name='Never Done', description='Never exits loop.', version='0.1.0', flow_kind='decision', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('loop.done', 'loop.done', display_name='loop.done'), DataProvider('value.loop', 'value.in', display_name='value.loop')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.out', 'exactly_one', display_name='value.out'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('loop.done', 'loop.done', display_name='loop.done'), DataProvider('value.loop', 'value.in', display_name='value.loop'))}), rulesets=("vibeflow.process",))
 
     class NeverDoneNode:
 
@@ -1254,17 +1202,14 @@ def test_runtime_options_block_rejects_decision_loop_before_max_steps() -> None:
 
 
 def test_runtime_options_compiled_generates_block_with_async_barrier() -> None:
-    OutToNextNode_DECLARATION = node_declaration(NodeInfo("test.out_to_next", "Out To Next", "Copies value.out to value.next.", "0.1.0", "process"), NodeContract(
-            requires=(DataRequirement("value.out", "exactly_one", display_name="value.out"),),
-            provides=(DataProvider("value.next", "value.next", display_name="value.next"),),
-        ), rulesets=("vibeflow.process",))
+    OutToNextNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.out_to_next', display_name='Out To Next', description='Copies value.out to value.next.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('value.next', 'value.next', display_name='value.next'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.out', 'exactly_one', display_name='value.out'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.next', 'value.next', display_name='value.next'),)}), rulesets=("vibeflow.process",))
 
     class OutToNextNode:
 
         def run_pure(self, inputs, params):
             return {"value.next": inputs["value.out"]["value"]}
 
-    NextEndNode_DECLARATION = node_declaration(NodeInfo("test.next_end", "Next End", "Ends after value.next.", "0.1.0", "terminal"), NodeContract(requires=(DataRequirement("value.next", "exactly_one", display_name="value.next"),)), rulesets=("vibeflow.process",))
+    NextEndNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.next_end', display_name='Next End', description='Ends after value.next.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.next', 'exactly_one', display_name='value.next'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.next', 'exactly_one', display_name='value.next'),)}), rulesets=("vibeflow.process",))
 
     class NextEndNode:
 
@@ -1279,10 +1224,10 @@ def test_runtime_options_compiled_generates_block_with_async_barrier() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the async barrier fixture."),
-                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")], config={"value": 4}),
-                    _node_call("async_add", "test.add", "Adds asynchronously.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")], result_key="value.out", config={"delta": 3}, **{"async": "result_key"}),
-                    _node_call("out_to_next", "test.out_to_next", "Copies value.out to value.next.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("value.next")]),
-                    _node_call("end", "test.next_end", "Consumes value.next.", requires=[REQ_SPEC("value.next")]),
+                    _node_call("seed", "test.seed", "Produces value.in.",  config={"value": 4}),
+                    _node_call("async_add", "test.add", "Adds asynchronously.",  result_key="value.out", config={"delta": 3}, **{"async": "result_key"}),
+                    _node_call("out_to_next", "test.out_to_next", "Copies value.out to value.next."),
+                    _node_call("end", "test.next_end", "Consumes value.next."),
                 ],
                 "edges": _edge_chain("start", "seed", "async_add", "out_to_next", "end"),
                 "outputs": [REQ_SPEC("value.next")],
@@ -1316,9 +1261,9 @@ def _decision_loop_graph(*, target: int, max_steps: int = 20):
                 "max_steps": max_steps,
                 "nodes": [
                     _node_call("start", "test.start", "Starts the decision loop fixture."),
-                    _node_call("seed", "test.seed", "Produces initial value.in.", provides=[PROV_SPEC("value.in")], config={"value": 1}),
-                    _node_call("add", "test.add", "Adds value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("done", "test.done_check", "Checks whether the loop is done.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("loop.done"), PROV_SPEC("value.loop", "value.in")], config={"target": target}),
+                    _node_call("seed", "test.seed", "Produces initial value.in.",  config={"value": 1}),
+                    _node_call("add", "test.add", "Adds value.in."),
+                    _node_call("done", "test.done_check", "Checks whether the loop is done.",  config={"target": target}),
                     _node_call("end", "test.start", "Ends the decision loop fixture."),
                 ],
                 "edges": [
@@ -1342,9 +1287,9 @@ def test_runtime_options_block_executes_simple_conditional_route() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the conditional route fixture."),
-                    _node_call("seed", "test.seed", "Produces initial value.in.", provides=[PROV_SPEC("value.in")], config={"value": 1}),
-                    _node_call("add", "test.add", "Adds value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("route", "test.route", "Chooses the route.", requires=[REQ_SPEC("value.out")], provides=[PROV_SPEC("flow.route")]),
+                    _node_call("seed", "test.seed", "Produces initial value.in.",  config={"value": 1}),
+                    _node_call("add", "test.add", "Adds value.in."),
+                    _node_call("route", "test.route", "Chooses the route."),
                     _node_call("copy", "test.branch_copy", "Copies value.out on the alternate branch."),
                     _node_call("end", "test.start", "Ends the conditional route fixture."),
                 ],
@@ -1384,11 +1329,11 @@ def _runtime_nodeset_depth_config(depth: int) -> dict:
                 requires=["value.in"],
                 provides=["value.out"],
                 pipeline={
-                    "inputs": [PROV_SPEC("value.in")],
+                    "inputs": [INPUT_SPEC("value.in")],
                     "nodes": [
                         _node_call("start", "test.start", f"Starts runtime depth wrapper {index}."),
-                        _node_call("call", child, f"Calls {child}.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                        _node_call("end", "test.out_end", f"Ends runtime depth wrapper {index}.", requires=[REQ_SPEC("value.out")]),
+                        _node_call("call", child, f"Calls {child}."),
+                        _node_call("end", "test.out_end", f"Ends runtime depth wrapper {index}."),
                     ],
                     "edges": _edge_chain("start", "call", "end"),
                     "outputs": [REQ_SPEC("value.out")],
@@ -1398,17 +1343,16 @@ def _runtime_nodeset_depth_config(depth: int) -> dict:
     return {
         "nodesets": nodesets,
         "pipeline": {
-            "inputs": [PROV_SPEC("value.in")],
+            "inputs": [INPUT_SPEC("value.in")],
             "nodes": [
                 _node_call("start", "test.start", "Starts the runtime depth fixture."),
                 _node_call(
                     "top",
                     f"runtime.depth.{depth - 1}",
                     "Calls the runtime depth fixture.",
-                    requires=[REQ_SPEC("value.in")],
-                    provides=[PROV_SPEC("value.out")],
+
                 ),
-                _node_call("end", "test.out_end", "Ends the runtime depth fixture.", requires=[REQ_SPEC("value.out")]),
+                _node_call("end", "test.out_end", "Ends the runtime depth fixture."),
             ],
             "edges": _edge_chain("start", "top", "end"),
             "outputs": [REQ_SPEC("value.out")],
@@ -1457,9 +1401,11 @@ def test_checked_run_and_validate_use_effective_nodeset_max_depth(tmp_path) -> N
     config_path = tmp_path / "depth.jsonc"
     _write_config_file(config_path, _runtime_nodeset_depth_config(5))
 
+    publish_native_fixture(config_path, _registry())
     validation = validate_config_path(config_path)
     with pytest.raises(CheckedRunError) as refused:
         run_checked(config_path, registry=_registry(), initial={"value.in": 2}, run_root=tmp_path / "runs", run_id="default-depth")
+    publish_native_fixture(config_path, _registry())
     result = run_checked(
         config_path,
         registry=_registry(),
@@ -1546,9 +1492,9 @@ def test_async_result_key_joins_when_required() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the async join fixture."),
-                    _node_call("seed", "test.seed", "Produces value.in asynchronously.", provides=[PROV_SPEC("value.in")], result_key="value.in", config={"value": 4}, **{"async": "result_key"}),
-                    _node_call("add", "test.add", "Adds delta to value.in.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")], config={"delta": 3}),
-                    _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("seed", "test.seed", "Produces value.in asynchronously.",  result_key="value.in", config={"value": 4}, **{"async": "result_key"}),
+                    _node_call("add", "test.add", "Adds delta to value.in.",  config={"delta": 3}),
+                    _node_call("end", "test.out_end", "Consumes value.out."),
                 ],
                 "edges": _edge_chain("start", "seed", "add", "end"),
                 "outputs": [REQ_SPEC("value.out")],
@@ -1563,7 +1509,7 @@ def test_async_result_key_joins_when_required() -> None:
 
 
 def test_async_result_key_not_joined_when_unconsumed() -> None:
-    SlowResultNode_DECLARATION = node_declaration(NodeInfo("test.slow_result", "Slow Result", "Slow result-key async task.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.async", "value.async", display_name="value.async"),), examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+    SlowResultNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.slow_result', display_name='Slow Result', description='Slow result-key async task.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.async', 'value.async', display_name='value.async'),), examples=({'inputs': {}, 'params': {}},), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.async', 'value.async', display_name='value.async'),)}), rulesets=("vibeflow.process",))
 
     class SlowResultNode:
 
@@ -1578,9 +1524,9 @@ def test_async_result_key_not_joined_when_unconsumed() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the unconsumed async fixture."),
-                    _node_call("slow", "test.slow_result", "Produces an unconsumed async result.", provides=[PROV_SPEC("value.async")], result_key="value.async", **{"async": "result_key"}),
-                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")], config={"value": 2}),
-                    _node_call("end", "test.in_end", "Consumes value.in.", requires=[REQ_SPEC("value.in")]),
+                    _node_call("slow", "test.slow_result", "Produces an unconsumed async result.",  result_key="value.async", **{"async": "result_key"}),
+                    _node_call("seed", "test.seed", "Produces value.in.",  config={"value": 2}),
+                    _node_call("end", "test.in_end", "Consumes value.in."),
                 ],
                 "edges": _edge_chain("start", "slow", "seed", "end"),
                 "outputs": [REQ_SPEC("value.in")],
@@ -1601,9 +1547,9 @@ def test_async_detached_failure_records_warning_and_completes() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the detached failure fixture."),
-                    _node_call("metrics", "test.runtime_fail", "Fails in a detached task.", provides=[PROV_SPEC("value.out")], config={"fail": True}, **{"async": "detached"}),
-                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")], config={"value": 2}),
-                    _node_call("end", "test.in_end", "Consumes value.in.", requires=[REQ_SPEC("value.in")]),
+                    _node_call("metrics", "test.runtime_fail", "Fails in a detached task.",  config={"fail": True}, **{"async": "detached"}),
+                    _node_call("seed", "test.seed", "Produces value.in.",  config={"value": 2}),
+                    _node_call("end", "test.in_end", "Consumes value.in."),
                 ],
                 "edges": _edge_chain("start", "metrics", "seed", "end"),
                 "outputs": [REQ_SPEC("value.in")],
@@ -1625,8 +1571,8 @@ def test_async_result_key_requires_declared_output() -> None:
                 "pipeline": {
                     "nodes": [
                         _node_call("start", "test.start", "Starts the bad async fixture."),
-                        _node_call("seed", "test.seed", "Produces value.in with an invalid result key.", provides=[PROV_SPEC("value.in")], result_key="value.missing", **{"async": "result_key"}),
-                        _node_call("end", "test.in_end", "Consumes value.in.", requires=[REQ_SPEC("value.in")]),
+                        _node_call("seed", "test.seed", "Produces value.in with an invalid result key.",  result_key="value.missing", **{"async": "result_key"}),
+                        _node_call("end", "test.in_end", "Consumes value.in."),
                     ],
                     "edges": _edge_chain("start", "seed", "end"),
                 }
@@ -1641,7 +1587,7 @@ def test_config_schema_reports_async_result_key_not_in_provides() -> None:
         {
             "pipeline": {
                 "nodes": [
-                    _node_call("seed", "test.seed", "Produces value.in with an invalid result key.", provides=[PROV_SPEC("value.in")], result_key="value.missing", **{"async": "result_key"})
+                    _node_call("seed", "test.seed", "Produces value.in with an invalid result key.",  result_key="value.missing", **{"async": "result_key"})
                 ]
             }
         }
@@ -1658,8 +1604,8 @@ def test_runtime_no_longer_has_json_snapshot_output_mode() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the NaN output fixture."),
-                    _node_call("set", "test.nan_output", "Produces NaN value.out.", provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("set", "test.nan_output", "Produces NaN value.out."),
+                    _node_call("end", "test.out_end", "Consumes value.out."),
                 ],
                 "edges": _edge_chain("start", "set", "end"),
                 "outputs": [REQ_SPEC("value.out")],
@@ -1684,11 +1630,11 @@ def test_async_nodeset_result_key_joins_when_required() -> None:
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the async nodeset fixture."),
-                    _node_call("composite", "math.add_one", "Calls add-one asynchronously.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")], result_key="value.out", **{"async": "result_key"}),
-                    _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("composite", "math.add_one", "Calls add-one asynchronously.",  result_key="value.out", **{"async": "result_key"}),
+                    _node_call("end", "test.out_end", "Consumes value.out."),
                 ],
                 "edges": _edge_chain("start", "composite", "end"),
                 "outputs": [REQ_SPEC("value.out")],
@@ -1704,7 +1650,7 @@ def test_async_nodeset_result_key_joins_when_required() -> None:
 
 
 def test_async_detached_timeout_records_warning_and_does_not_block() -> None:
-    SlowNode_DECLARATION = node_declaration(NodeInfo("test.slow", "Slow", "Slow detached task.", "0.1.0", "process"), NodeContract(provides=(DataProvider("value.out", "value.out", display_name="value.out"),), examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+    SlowNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.slow', display_name='Slow', description='Slow detached task.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.out', 'value.out', display_name='value.out'),), examples=({'inputs': {}, 'params': {}},), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.out', 'value.out', display_name='value.out'),)}), rulesets=("vibeflow.process",))
 
     class SlowNode:
 
@@ -1719,9 +1665,9 @@ def test_async_detached_timeout_records_warning_and_does_not_block() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the detached timeout fixture."),
-                    _node_call("slow", "test.slow", "Runs a slow detached task.", provides=[PROV_SPEC("value.out")], **{"async": "detached"}),
-                    _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")], config={"value": 3}),
-                    _node_call("end", "test.in_end", "Consumes value.in.", requires=[REQ_SPEC("value.in")]),
+                    _node_call("slow", "test.slow", "Runs a slow detached task.",  **{"async": "detached"}),
+                    _node_call("seed", "test.seed", "Produces value.in.",  config={"value": 3}),
+                    _node_call("end", "test.in_end", "Consumes value.in."),
                 ],
                 "edges": _edge_chain("start", "slow", "seed", "end"),
                 "outputs": [REQ_SPEC("value.in")],
@@ -1742,13 +1688,11 @@ def test_runtime_options_node_hooks_false_skips_per_node_hooks(tmp_path) -> None
         f"""
 import json
 from pathlib import Path
-from vibeflow.targets.python.project import PluginInfo
 MARKER = Path({str(marker_path)!r})
 def record(value):
     with MARKER.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(value, sort_keys=True) + "\\n")
 class RuntimePlugin:
-    PLUGIN_INFO = PluginInfo("runtime_hook", "runtime", "Runtime Hook", "test", "Records runtime hook calls.", "0.1.0")
     name = "runtime_hook"
     def before_run(self, state):
         record({{"hook": "before_run"}})
@@ -1765,13 +1709,14 @@ class RuntimePlugin:
     config_path.write_text(
         json.dumps(
             {
-                "plugins": [{"module": str(plugin_path), "class": "RuntimePlugin", "type": "runtime"}],
+                "plugins": [write_lifecycle_fixture(tmp_path, source={"kind":"file", "ref":plugin_path.name, "export":"RuntimePlugin"}, plugin_id="runtime_hook", filename="runtime_definition.py")],
                 "pipeline": _seed_only_pipeline(),
             }
         ),
         encoding="utf-8",
     )
 
+    publish_native_fixture(config_path, _registry())
     run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="node_hooks_off", runtime_options=RuntimeOptions(node_hooks=False))
 
     hooks = [json.loads(line)["hook"] for line in marker_path.read_text(encoding="utf-8").splitlines()]
@@ -1785,13 +1730,11 @@ def test_runtime_options_hook_granularity_controls_nodeset_and_block_hooks(tmp_p
         f"""
 import json
 from pathlib import Path
-from vibeflow.targets.python.project import PluginInfo
 MARKER = Path({str(marker_path)!r})
 def record(value):
     with MARKER.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(value, sort_keys=True) + "\\n")
 class RuntimePlugin:
-    PLUGIN_INFO = PluginInfo("runtime_hook", "runtime", "Runtime Hook", "test", "Records runtime hook calls.", "0.1.0")
     name = "runtime_hook"
     def before_nodeset(self, name, node_type):
         record({{"hook": "before_nodeset"}})
@@ -1808,13 +1751,14 @@ class RuntimePlugin:
     config_path.write_text(
         json.dumps(
             {
-                "plugins": [{"module": str(plugin_path), "class": "RuntimePlugin", "type": "runtime"}],
+                "plugins": [write_lifecycle_fixture(tmp_path, source={"kind":"file", "ref":plugin_path.name, "export":"RuntimePlugin"}, plugin_id="runtime_hook", filename="runtime_definition.py")],
                 "pipeline": _seed_add_pipeline(add={"config": {"delta": 4}}),
             }
         ),
         encoding="utf-8",
     )
 
+    publish_native_fixture(config_path, _registry())
     run_checked(
         config_path,
         registry=_registry(),
@@ -1841,17 +1785,18 @@ def test_checked_run_trace_records_nodeset_enter_exit(tmp_path) -> None:
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the nodeset trace fixture."),
-                    _node_call("composite", "math.add_one", "Calls add-one nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("composite", "math.add_one", "Calls add-one nodeset."),
+                    _node_call("end", "test.out_end", "Consumes value.out."),
                 ],
                 "edges": _edge_chain("start", "composite", "end"),
                 "outputs": [REQ_SPEC("value.out")],
             },
         },
     )
+    publish_native_fixture(config_path, _registry())
     result = run_checked(
         config_path,
         registry=_registry(),
@@ -1879,8 +1824,8 @@ def test_checked_run_output_summary_does_not_expand_large_prediction_mapping(tmp
                 "pipeline": {
                     "nodes": [
                         _node_call("start", "test.start", "Starts large prediction fixture."),
-                        _node_call("predict", "test.large_prediction", "Produces large prediction mapping.", provides=[PROV_SPEC("value.out")]),
-                        _node_call("end", "test.out_end", "Consumes predictions.", requires=[REQ_SPEC("value.out")]),
+                        _node_call("predict", "test.large_prediction", "Produces large prediction mapping."),
+                        _node_call("end", "test.out_end", "Consumes predictions."),
                     ],
                     "edges": _edge_chain("start", "predict", "end"),
                     "outputs": [REQ_SPEC("value.out")],
@@ -1890,6 +1835,7 @@ def test_checked_run_output_summary_does_not_expand_large_prediction_mapping(tmp
         encoding="utf-8",
     )
 
+    publish_native_fixture(config_path, registry)
     result = run_checked(config_path, registry=registry, run_root=tmp_path / "runs", run_id="large_prediction")
 
     assert result.context.get("value.out")["value"]["sample_0999"] == 999
@@ -1916,8 +1862,8 @@ def test_runtime_trace_records_nested_nodeset_qualified_paths() -> None:
                     pipeline={
                         "nodes": [
                             _node_call("start", "test.start", "Starts outer flow."),
-                            _node_call("inner_call", "inner.flow", "Calls inner flow.", provides=[PROV_SPEC("value.out")]),
-                            _node_call("end", "test.out_end", "Consumes outer value.out.", requires=[REQ_SPEC("value.out")]),
+                            _node_call("inner_call", "inner.flow", "Calls inner flow."),
+                            _node_call("end", "test.out_end", "Consumes outer value.out."),
                         ],
                         "edges": _edge_chain("start", "inner_call", "end"),
                         "outputs": [REQ_SPEC("value.out")],
@@ -1927,8 +1873,8 @@ def test_runtime_trace_records_nested_nodeset_qualified_paths() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts nested trace fixture."),
-                    _node_call("outer_call", "outer.flow", "Calls outer flow.", provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Consumes final value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("outer_call", "outer.flow", "Calls outer flow."),
+                    _node_call("end", "test.out_end", "Consumes final value.out."),
                 ],
                 "edges": _edge_chain("start", "outer_call", "end"),
                 "outputs": [REQ_SPEC("value.out")],
@@ -1956,15 +1902,14 @@ def test_runtime_trace_counts_while_loop_nodeset_steps() -> None:
                     provides=["loop.next", "loop.done"],
                     exports=["loop.next", "loop.done"],
                     pipeline={
-                        "inputs": [PROV_SPEC("loop.current")],
+                        "inputs": [INPUT_SPEC("loop.current")],
                         "nodes": [
                             _node_call("start", "test.start", "Starts while body."),
                             _node_call(
                                 "step",
                                 "test.loop_step_until",
                                 "Increments loop.current and reports completion.",
-                                requires=[REQ_SPEC("loop.current")],
-                                provides=[PROV_SPEC("loop.next"), PROV_SPEC("loop.done")],
+
                                 config={"target": 3},
                             ),
                             _node_call("end", "test.loop_next_end", "Ends while body."),
@@ -1975,7 +1920,7 @@ def test_runtime_trace_counts_while_loop_nodeset_steps() -> None:
                 )
             ],
             "pipeline": {
-                "inputs": [PROV_SPEC("loop.current")],
+                "inputs": [INPUT_SPEC("loop.current")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts loop trace fixture."),
                     _node_call(
@@ -1995,7 +1940,7 @@ def test_runtime_trace_counts_while_loop_nodeset_steps() -> None:
                             ],
                         },
                     ),
-                    _node_call("end", "test.out_end", "Consumes final value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("end", "test.out_end", "Consumes final value.out."),
                 ],
                 "edges": _edge_chain("start", "loop_call", "end"),
                 "outputs": [REQ_SPEC("value.out"), REQ_SPEC("loop.iterations")],
@@ -2024,8 +1969,8 @@ def test_runtime_trace_preserves_nested_failure_path() -> None:
                     pipeline={
                         "nodes": [
                             _node_call("start", "test.start", "Starts failing nodeset."),
-                            _node_call("bad", "test.runtime_fail", "Fails inside nodeset.", provides=[PROV_SPEC("value.out")], config={"fail": True}),
-                            _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                            _node_call("bad", "test.runtime_fail", "Fails inside nodeset.",  config={"fail": True}),
+                            _node_call("end", "test.out_end", "Consumes value.out."),
                         ],
                         "edges": _edge_chain("start", "bad", "end"),
                         "outputs": [REQ_SPEC("value.out")],
@@ -2035,8 +1980,8 @@ def test_runtime_trace_preserves_nested_failure_path() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts nested failure fixture."),
-                    _node_call("composite", "fail.flow", "Calls failing nodeset.", provides=[PROV_SPEC("value.out")]),
-                    _node_call("end", "test.out_end", "Consumes final value.out.", requires=[REQ_SPEC("value.out")]),
+                    _node_call("composite", "fail.flow", "Calls failing nodeset."),
+                    _node_call("end", "test.out_end", "Consumes final value.out."),
                 ],
                 "edges": _edge_chain("start", "composite", "end"),
             },
@@ -2121,7 +2066,7 @@ def test_checked_run_rejects_unsafe_programmatic_run_id_without_writing(tmp_path
 def test_cli_run_uses_checked_run_and_refuses_without_registered_nodes(tmp_path, capsys) -> None:
     config_path = tmp_path / "workflow.json"
     config_path.write_text(
-        json.dumps({"pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")])]}}),
+        json.dumps({"pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.")]}}),
         encoding="utf-8",
     )
     code = cli_main(
@@ -2143,18 +2088,18 @@ def test_cli_run_uses_checked_run_and_refuses_without_registered_nodes(tmp_path,
     assert payload["health"]["errors"][0]["rule_id"] == "NODE.TYPE.UNKNOWN"
 
 def test_cli_run_succeeds_with_declarations_and_writes_artifacts(tmp_path, capsys) -> None:
-    from tests.fixtures.support.declarations import write_node_manifests
-    write_node_manifests(tmp_path, [
+    from tests.fixtures.support.declarations import write_node_plugin
+    plugin = write_node_plugin(tmp_path, [
         ("test.start", "StartNode", {}, {}),
         ("test.in_end", "InEndNode", {}, {}),
         ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}),
     ])
     (tmp_path / "vibeflow_project.jsonc").write_text(json.dumps({
-        "project_target": "python", "descriptors": {"nodes": ["manifests/nodes"]}}))
+        "project_target": "python"}))
     config_path = tmp_path / "workflow.json"
     input_path = tmp_path / "input.json"
     config_path.write_text(
-        json.dumps({"pipeline": _seed_only_pipeline(seed={"value": 9})}),
+        json.dumps({"plugins":[plugin], "pipeline": _seed_only_pipeline(seed={"value": 9})}),
         encoding="utf-8",
     )
     input_path.write_text("{}", encoding="utf-8")
@@ -2242,7 +2187,7 @@ def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_pa
 
 
 def test_distribution_build_is_deterministic_without_wall_clock_metadata(tmp_path) -> None:
-    from distribution.build import build_distribution
+    from distribution.build import VERSION, build_distribution
 
     first = tmp_path / "first"
     second = tmp_path / "second"
@@ -2261,7 +2206,7 @@ def test_distribution_build_is_deterministic_without_wall_clock_metadata(tmp_pat
     }
     assert first_files == second_files
     metadata = json.loads((first / "DISTRIBUTION.json").read_text(encoding="utf-8"))
-    assert metadata["version"] == "0.15.0"
+    assert metadata["version"] == VERSION
     assert metadata["development_profile"] == "collaborative"
 
 
@@ -2345,10 +2290,3 @@ def test_distribution_self_check_uses_standalone_quality_project(monkeypatch) ->
     assert captured["cwd"] == distribution_builder.ROOT
     assert captured["env"]["PYTHONDONTWRITEBYTECODE"] == "1"
     assert captured["check"] is False
-
-
-_native_run_checked = run_checked
-def run_checked(config_path, *, registry, **options):
-    from tests.fixtures.support.code_plugins import publish_runtime_fixture
-    publish_runtime_fixture(config_path, registry)
-    return _native_run_checked(config_path, registry=registry, **options)

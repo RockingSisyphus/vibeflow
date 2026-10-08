@@ -5,7 +5,7 @@ from vibeflow.core.descriptors.contributions import contribution_facts
 from vibeflow.core.descriptors.source_bundle import source_resources, implementation_sources
 
 from contextlib import ExitStack
-from dataclasses import dataclass, field, fields, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 import json
 import hashlib
@@ -17,9 +17,7 @@ from vibeflow.core.rules import (
     EFFECT_POLICY_TYPE, RuleGraphError, rule_graph_error_finding,
 )
 from vibeflow.core.rules.models import plain
-from vibeflow.core.rules.builtin.workflow import workflow_rule_checks, workflow_topic_handlers
-from vibeflow.core.rules.builtin import project_quality_rule_defaults
-from vibeflow.core.rules.builtin.project_quality import project_quality_handlers
+from vibeflow.builtin.project_quality import bound_project_quality_defaults
 from vibeflow.core.quality import ProjectQualityFacts, QualityPolicy
 from vibeflow.core.flow import LOOP_NODE_TYPES, STATUS_PLANNED
 from vibeflow.targets.javascript.build.plugin_session import JavascriptPluginSession
@@ -27,7 +25,9 @@ from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
 from vibeflow.targets.javascript.frontend.plugin_descriptors import JavascriptPluginError
 from vibeflow.targets.javascript.build.toolchain import run_rule_check_driver, run_quality_facts_driver
 from vibeflow.targets.javascript.build.project_resources import driver_import_policy
+from vibeflow.targets.javascript.build.graph_wire import graph_wire
 from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy, _file_fact, _finding_fact
+from vibeflow.targets.shared.bindings import native_binding
 
 
 def _compile_rule_plan(ruleset_id: str, *, catalogs: Any, entrypoint: str, rules: Any = None,
@@ -149,16 +149,11 @@ def _rule_wire_facts(facts: Mapping[str, Any]) -> Mapping[str, Any]:
     """Encode the native shared Nodeset registry as finite declarations and refs."""
     portable = {key: plain(value) for key, value in facts.items()
                 if key not in {"graph", "catalogs", "prefetched_quality", "analysis_cache"}}
+    if "project_facts" not in portable and "analysis_cache" in facts:
+        portable["project_facts"] = plain(facts["analysis_cache"].project_facts(facts))
     graph = facts.get("graph")
     if graph is not None:
-        def body(block):
-            return {item.name: plain(getattr(block, item.name)) for item in fields(block) if item.name != "nodesets"}
-        portable["graph"] = body(graph)
-        portable["graph"]["nodesets"] = {
-            key: {**{item.name: plain(getattr(nodeset, item.name)) for item in fields(nodeset) if item.name != "graph"},
-                  "graph": {**body(nodeset.graph), "nodeset_refs": list(nodeset.graph.nodesets)}}
-            for key, nodeset in graph.nodesets.items()
-        }
+        portable["graph"] = graph_wire(graph, plain)
     return portable
 
 
@@ -250,93 +245,19 @@ class _AnalysisCache:
                                    findings=tuple(_finding_fact(item) for item in parsed.findings))
 
 
-def _source_check(context: RuleContext, topics: tuple[str, ...], rule_id: str) -> tuple[Finding, ...]:
+def _source_check(context: RuleContext, topics: tuple[str, ...], rule_id: str, *, params: Mapping[str, Any] | None = None) -> tuple[Finding, ...]:
     facts = context.facts
     if not topics or not facts.get("evaluate_sources", True):
         return ()
     result = facts["analysis_cache"].source_check(
         {"typecheckFiles": list(facts.get("source_files", ())), "ruleTopics": list(topics),
+         "ruleParams": plain(params or {}),
          "importPolicy": plain(facts.get("import_policy", {})), "sourceSnapshots": plain(facts.get("sources", ())),
          "ruleSubjectKind": context.subject.get("kind", "node"), "ruleSubjectId": context.subject.get("type_key", context.subject.get("id", ""))},
         package_root=facts["package_root"], node_command=str(facts.get("node_command", "node")),
     )
     return tuple(_finding(item, rule_id, context) for item in result.findings)
 
-
-def builtin_javascript_handlers() -> Mapping[str, Any]:
-    def project_handler(checker):
-        def check(context: RuleContext, inputs: Mapping[str, RuleRecord], params: Mapping[str, Any]) -> RuleResult:
-            if not context.facts.get("evaluate_sources", True):
-                return RuleResult(state="unavailable")
-            return checker(context, inputs, params)
-        return check
-    def effects(context: RuleContext, inputs: Mapping[str, RuleRecord], params: Mapping[str, Any]) -> RuleResult:
-        scope = str(params.get("effect_scope", "none"))
-        topics = (() if scope == "global_state" else ("module_state",))
-        if scope not in {"python_io", "terminal", "trusted"}:
-            topics = (*topics, "host_io")
-        findings = _source_check(context, topics, "vibeflow.no_side_effects")
-        allowed = {"none": [], "terminal": ["terminal"], "python_io": ["python_io"], "global_state": ["global_state"], "trusted": ["trusted"]}.get(scope, [])
-        return RuleResult(records={"effect_policy": RuleRecord("vibeflow.effect_policy.v1", {"effect_scope": scope, "allowed_effects": allowed})}, findings=findings)
-    def interface(context: RuleContext, inputs: Mapping[str, RuleRecord], params: Mapping[str, Any]) -> RuleResult:
-        return RuleResult(findings=_source_check(context, ("completion",), "vibeflow.node_interface"))
-    def imports(context: RuleContext, inputs: Mapping[str, RuleRecord], params: Mapping[str, Any]) -> RuleResult:
-        return RuleResult(findings=_source_check(context, ("purity", "imports", "ownership"), "vibeflow.import_side_effects"))
-    def measured(context: RuleContext, params: Mapping[str, Any], *, topic="all"):
-        from vibeflow.targets.javascript.quality.implementation import registered_implementation_requests, evaluate_registered_facts
-        facts = context.facts
-        if not facts.get("evaluate_sources", True):
-            return RuleResult(state="unavailable")
-        kind = context.subject.get("kind", "node")
-        resource_id = context.subject.get("type_key", context.subject.get("id", ""))
-        descriptor = next(item for owner,item in source_resources(facts["catalogs"]) if owner == kind and item.id == resource_id)
-        base_ids: set[str] = set()
-        def visit(resource_id: str) -> None:
-            if resource_id in base_ids:
-                return
-            base_ids.add(resource_id)
-            resource = facts["catalogs"].base_libs.get(resource_id)
-            if resource is not None:
-                for dependency in resource.dependencies:
-                    visit(dependency)
-        for resource_id in getattr(descriptor, "base_libs", getattr(descriptor, "dependencies", ())) :
-            visit(resource_id)
-        selected_files = {item["path"] for item in facts.get("sources", ())}
-        for source in facts.get("source_owners", ()):
-            if source.get("kind") == "base_lib" and source.get("id") in base_ids:
-                selected_files.add(source["path"])
-        ownership, descriptors = registered_implementation_requests(facts["catalogs"], project_root=Path(facts["project_root"]), selected_files=tuple(selected_files))
-        selected_ids = {context.subject.get("type_key", context.subject.get("id", "")), *base_ids}
-        ownership = [item for item in ownership if item["type_key"] in selected_ids]
-        descriptors = {key: value for key, value in descriptors.items() if key[0] in selected_ids}
-        extracted = facts.get("prefetched_quality") or facts["analysis_cache"].quality_facts({"qualityRoot": facts["project_root"], "qualityFiles": sorted({item["path"] for item in ownership}), "qualityImplementations": ownership}, package_root=facts["package_root"], node_command=str(facts.get("node_command", "node")))
-        found = evaluate_registered_facts(extracted, ownership, descriptors, project_root=Path(facts["project_root"]), policy_data=plain(params.get("policy", {})), topic=topic)
-        from vibeflow.targets.javascript.quality.implementation import relative_source_path
-        relative_files = {relative_source_path(item["path"], facts["project_root"]) for item in ownership}
-        metrics = {"files": [plain(item) for item in extracted.files if item["path"] in relative_files],
-                   "implementations": [plain(item) for item in extracted.implementations if item["type_key"] in selected_ids]}
-        return found, metrics
-    def maintainability(context, inputs, params):
-        result = measured(context, params)
-        if isinstance(result, RuleResult):
-            return result
-        found, metrics = result
-        return RuleResult(records={"metrics": RuleRecord("vibeflow.node_metrics.v1", metrics)}, findings=tuple(_finding(item.to_dict(), "vibeflow.maintainability", context) for item in found))
-    def implementation(topic):
-        def check(context, inputs, params):
-            result = measured(context, params, topic=topic)
-            if isinstance(result, RuleResult):
-                return result
-            found, _ = result
-            records = [{"rule_id":item.rule_id,"severity":item.severity,"message":item.message,
-                "suggested_fix_type":item.suggested_fix_type,"details":dict(item.details)} for item in found]
-            return RuleResult({"diagnostics": RuleRecord("vibeflow.implementation_diagnostics.v1", records)}, tuple(found))
-        return check
-    return {"vibeflow.no_side_effects": effects, "vibeflow.node_interface": interface,
-            "vibeflow.import_side_effects": imports, "vibeflow.maintainability": maintainability,
-            **{"vibeflow.implementation." + topic: implementation(topic) for topic in ("node", "base_lib", "dependency_chain")},
-            "vibeflow.workflow": workflow_rule_checks, **workflow_topic_handlers(),
-            **{key: project_handler(checker) for key, checker in project_quality_handlers().items()}}
 
 
 class _RuleSession:
@@ -355,24 +276,19 @@ class _RuleSession:
         results = []
         phases = ("import", context.phase) if before_import and context.phase != "import" else (context.phase,)
         for phase in phases:
-            active_context = RuleContext(facts=context.facts, subject=context.subject, scope=context.scope, phase=phase, target=context.target)
+            active_context = replace(context, phase=phase)
             for ruleset_id in selected:
                 rules = {rule.id: rule for rule in self.catalogs.rules}
                 for rule_id, defaults in context.facts.get("rule_defaults", {}).items():
                     if rule_id in rules:
                         rules[rule_id] = replace(rules[rule_id], params_defaults={**rules[rule_id].params_defaults, **defaults})
                 plan = _compile_rule_plan(ruleset_id, rules=rules, catalogs=self.catalogs, entrypoint=phase, context=active_context)
-                project_handlers = project_quality_handlers()
-                if active_context.facts.get("evaluate_sources", True) and any(
-                    {item.rule.id, item.rule.handler, item.original_rule_id} & project_handlers.keys()
-                    for item in plan.invocations
-                ):
-                    active_context = replace(active_context, facts={**active_context.facts,
-                        "project_facts": self.analysis_cache.project_facts(active_context.facts)})
-                handlers = dict(builtin_javascript_handlers())
+                handlers = {}
                 for invocation in plan.invocations:
                     rule = invocation.rule
-                    if rule.id in handlers or rule.handler in handlers:
+                    bound = native_binding(self.catalogs, "rule", rule.id)
+                    if bound is not None:
+                        handlers[rule.id] = bound
                         continue
                     def handler(ctx: RuleContext, inputs: Mapping[str, RuleRecord], params: Mapping[str, Any], *, rule=rule) -> RuleResult:
                         if not ctx.facts.get("evaluate_sources", True):
@@ -428,6 +344,18 @@ class _RuleSession:
         return tuple(results)
 
 
+def _check_session(stack, **options):
+    from vibeflow.targets.javascript.build.driver_session import current_scope
+    scope = current_scope()
+    if scope is None:
+        return _RuleSession(stack, **options)
+    key = (id(options["catalogs"]), str(options["project_root"]), str(options["package_root"]),
+           options["node_command"], options["target"])
+    if key not in scope.rule_sessions:
+        scope.rule_sessions[key] = _RuleSession(scope.stack, **options)
+    return scope.rule_sessions[key]
+
+
 def run_javascript_rules(
     graph: Any, catalogs: Any, *, project_root: Path, package_root: Path,
     phase: str = "static", target: str = "javascript", import_policy: Mapping[str, Any] | None = None,
@@ -448,13 +376,16 @@ def run_javascript_rules(
     policy_records: dict[str, list[Mapping[str, Any]]] = {}
     call_records: dict[tuple[str, ...], list[Mapping[str, Any]]] = {}
     source_scopes: dict[str, Mapping[str, Any]] = {}
-    rule_defaults = project_quality_rule_defaults(quality_policy or javascript_quality_policy())
+    rule_defaults = bound_project_quality_defaults(
+        {item.id: native_binding(catalogs, "rule", item.id) for item in catalogs.rules},
+        quality_policy or javascript_quality_policy(),
+        rules={item.id:item for item in catalogs.rules}, origins=catalogs.origins)
     workflow_import_sources = evaluate_sources and any(
         _compile_rule_plan(ruleset_id, catalogs=catalogs, entrypoint="import", selection_source=str(block.source_path or "")).invocations
         for block, _ in _workflow_blocks(graph) for ruleset_id in block.rulesets
     )
     with ExitStack() as stack:
-        session = _RuleSession(stack, catalogs=catalogs, project_root=project_root, package_root=package_root, node_command=node_command, target=target)
+        session = _check_session(stack, catalogs=catalogs, project_root=project_root, package_root=package_root, node_command=node_command, target=target)
         subjects = [("node", key, catalogs.nodes.get(key), calls) for key, calls in sorted(used.items())]
         selected_resources = {(owner.get("kind"), owner.get("id")) for owner in (import_policy or {}).get("owners", ())}
         subjects.extend((kind, kind + ":" + item.id, item, []) for kind,item in source_resources(catalogs)
@@ -540,7 +471,7 @@ def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path
         if path is not None:
             source_call_paths[id(block)].append(path)
     with ExitStack() as stack:
-        session = _RuleSession(stack, catalogs=catalogs, project_root=project_root, package_root=package_root, node_command=node_command, target=target)
+        session = _check_session(stack, catalogs=catalogs, project_root=project_root, package_root=package_root, node_command=node_command, target=target)
         for block, path in workflow_blocks:
             definition_id = next((item.type_key for item in graph.nodesets.values() if item.graph is block), "")
             compiled = (compiled_nodesets or {}).get(definition_id) if path is None else compiled_by_path.get(path)
@@ -551,7 +482,10 @@ def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path
                 source_paths = {str(Path(source["path"]).resolve()) for source in sources.values()}
                 owners = {json.dumps(owner, sort_keys=True): owner for scope in selected_scopes for owner in scope["source_owners"] if str(Path(owner["path"]).resolve()) in source_paths}
                 import_policy = {**node_report.facts.get("import_policy", {}), "owners": list(owners.values())}
-                defaults = {**project_quality_rule_defaults(quality_policy or javascript_quality_policy()), **(rule_defaults or {})}
+                defaults = {**bound_project_quality_defaults(
+                    {item.id: native_binding(catalogs, "rule", item.id) for item in catalogs.rules},
+                    quality_policy or javascript_quality_policy(),
+                    rules={item.id:item for item in catalogs.rules}, origins=catalogs.origins), **(rule_defaults or {})}
                 facts = {**contribution_facts(catalogs), "graph": block, "node_types": node_report.facts.get("node_types", {}), "node_metrics": metrics, "sources": list(sources.values()), "source_files": source_files, "source_owners": list(owners.values()), "import_policy": driver_import_policy(import_policy), "catalogs": catalogs,
                     "project_root": str(project_root), "package_root": str(package_root), "node_command": node_command, "evaluate_sources": evaluate_sources, "rule_defaults": defaults, "analysis_cache": session.analysis_cache}
                 if compiled is not None:
@@ -572,4 +506,42 @@ def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path
                                 node_report.call_effect_scopes, node_report.call_effect_policies, node_report.source_scopes)
 
 
-__all__ = ["JavascriptRuleReport", "run_javascript_rules", "run_javascript_workflow_rules", "node_type_calls", "builtin_javascript_handlers"]
+__all__ = ["JavascriptRuleReport", "run_javascript_rules", "run_javascript_workflow_rules", "node_type_calls"]
+
+
+def measure_builtin_resource(context: RuleContext, params: Mapping[str, Any], *, topic="all"):
+    from vibeflow.targets.javascript.quality.implementation import registered_implementation_requests, evaluate_registered_facts
+    from vibeflow.core.descriptors.source_bundle import source_resources
+    from vibeflow.core.rules.models import plain
+    facts = context.facts
+    if not facts.get("evaluate_sources", True):
+        return RuleResult(state="unavailable")
+    kind = context.subject.get("kind", "node")
+    resource_id = context.subject.get("type_key", context.subject.get("id", ""))
+    descriptor = next(item for owner,item in source_resources(facts["catalogs"]) if owner == kind and item.id == resource_id)
+    base_ids: set[str] = set()
+    def visit(resource_id: str) -> None:
+        if resource_id in base_ids:
+            return
+        base_ids.add(resource_id)
+        resource = facts["catalogs"].base_libs.get(resource_id)
+        if resource is not None:
+            for dependency in resource.dependencies:
+                visit(dependency)
+    for resource_id in getattr(descriptor, "base_libs", getattr(descriptor, "dependencies", ())) :
+        visit(resource_id)
+    selected_files = {item["path"] for item in facts.get("sources", ())}
+    for source in facts.get("source_owners", ()):
+        if source.get("kind") == "base_lib" and source.get("id") in base_ids:
+            selected_files.add(source["path"])
+    ownership, descriptors = registered_implementation_requests(facts["catalogs"], project_root=Path(facts["project_root"]), selected_files=tuple(selected_files))
+    selected_ids = {context.subject.get("type_key", context.subject.get("id", "")), *base_ids}
+    ownership = [item for item in ownership if item["type_key"] in selected_ids]
+    descriptors = {key: value for key, value in descriptors.items() if key[0] in selected_ids}
+    extracted = facts.get("prefetched_quality") or facts["analysis_cache"].quality_facts({"qualityRoot": facts["project_root"], "qualityFiles": sorted({item["path"] for item in ownership}), "qualityImplementations": ownership}, package_root=facts["package_root"], node_command=str(facts.get("node_command", "node")))
+    found = evaluate_registered_facts(extracted, ownership, descriptors, project_root=Path(facts["project_root"]), policy_data=plain(params.get("policy", {})), topic=topic)
+    from vibeflow.targets.javascript.quality.implementation import relative_source_path
+    relative_files = {relative_source_path(item["path"], facts["project_root"]) for item in ownership}
+    metrics = {"files": [plain(item) for item in extracted.files if item["path"] in relative_files],
+               "implementations": [plain(item) for item in extracted.implementations if item["type_key"] in selected_ids]}
+    return found, metrics

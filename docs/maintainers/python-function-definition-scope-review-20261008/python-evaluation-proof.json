@@ -1,0 +1,5 @@
+{
+  "outside_comprehension_reference_uses_outer_object": true,
+  "outer_reference_unchanged_after_comprehension": true,
+  "outside_comprehension_input_pop_mutates_outer_dict": true
+}

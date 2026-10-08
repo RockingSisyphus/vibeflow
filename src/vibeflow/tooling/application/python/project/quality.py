@@ -27,8 +27,10 @@ def scan_workspace_code_quality(
     excluded_dirs=DEFAULT_EXCLUDED_DIRS,
     check_side_effects: bool = False,
     catalogs_by_root: Mapping[str, tuple] | None = None,
+    _parse_cache=None,
 ) -> QualityReport:
     active_thresholds = thresholds or QualityThresholds()
+    parse_cache = {} if _parse_cache is None else _parse_cache
     files: list[FileQuality] = []
     findings: list[QualityFinding] = []
     dependency_graph: dict[str, tuple[str, ...]] = {}
@@ -45,9 +47,10 @@ def scan_workspace_code_quality(
             root.path,
             thresholds=active_thresholds,
             structure_limits=_structure_limits_for_root(root.quality_structure, overrides=structure_overrides, enabled=structure_enabled),
-            structure_roles=structure_roles_for_root(root, (catalogs_by_root or {}).get(root.id, ())),
+            structure_roles=structure_roles_for_root(root, (catalogs_by_root or {}).get(root.id, ()), _parse_cache=parse_cache),
             excluded_dirs=excluded_dirs,
             check_side_effects=check_side_effects,
+            _parse_cache=parse_cache,
         )
         roots_payload.append(
             {
@@ -131,31 +134,15 @@ def _structure_limits_for_root(
     return replace(limits, **values) if values else limits
 
 
-def structure_roles_for_root(root: WorkspaceRoot, catalogs=()) -> QualityStructureRoles:
+def structure_roles_for_root(root: WorkspaceRoot, catalogs=(), *, _parse_cache=None) -> QualityStructureRoles:
     """Use selected declarations; project directories never enable resources."""
-    paths, modules = [], []
-    for catalog in catalogs:
-        for descriptor in catalog.base_libs:
-            for implementation in descriptor.implementations:
-                if implementation.language != "python":
-                    continue
-                source = implementation.source
-                origin = catalog.origins.get(("base_libs", descriptor.id))
-                # A sibling root's declaration must not classify this root's files.
-                if origin is None or not Path(origin.path).is_relative_to(root.path):
-                    continue
-                if source.kind == "module":
-                    modules.append(source.ref)
-                    paths.append(source.ref.replace(".", "/").rsplit("/", 1)[0])
-                elif source.kind == "file":
-                    path = (root.path / source.ref).resolve()
-                    if path.is_relative_to(root.path):
-                        relative = path.relative_to(root.path).with_suffix("")
-                        modules.append(".".join(relative.parts).removesuffix(".__init__"))
-                        paths.append(relative.parent.as_posix())
-    defaults = QualityStructureRoles()
-    return QualityStructureRoles(base_lib_paths=tuple(dict.fromkeys((*defaults.base_lib_paths, *(path for path in paths if path not in {"", "."})))),
-                                 base_lib_modules=tuple(dict.fromkeys(modules)))
+    from vibeflow.tooling.project.source_roles import resource_structure_scopes
+    from vibeflow.targets.python.project.source_closure import resolve_local_module_path
+    from vibeflow.targets.python.project.structure_sources import python_import_scopes
+    scopes = resource_structure_scopes(catalogs, root.path, language="python",
+        resolve_module=lambda name, base: resolve_local_module_path(name, project_root=base))
+    scopes = python_import_scopes(scopes, root.path, {} if _parse_cache is None else _parse_cache)
+    return QualityStructureRoles(_resource_scopes=scopes)
 
 
 def _prefix_dependency_graph(graph: Mapping[str, Any], *, root: WorkspaceRoot) -> dict[str, tuple[str, ...]]:

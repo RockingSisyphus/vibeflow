@@ -1,0 +1,76 @@
+{
+  "status": "PASS",
+  "checked_at_utc": "2026-10-08T02:15:24.331122+00:00",
+  "wheel": "/tmp/vibeflow-recheck-repair-final-20261008/wheel-dist/vibeflow-0.16.0-py3-none-any.whl",
+  "wheel_sha256": "d6bdd43effaa739c6d7f06f7808fa201e69ff49505ecf944fae4020da602ec21",
+  "source_root": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow",
+  "method": "Direct zip member bytes vs current filesystem bytes; independently parsed AST and token-boundary text search. Marker names copied from the audit inventory, without importing or executing that audit.",
+  "scope": "vibeflow/ product payload; dist-info metadata excluded; source __pycache__, .pyc and .pyo excluded",
+  "counts": {
+    "source_product_files": 333,
+    "source_python_files": 314,
+    "wheel_product_files": 333,
+    "wheel_python_files": 314,
+    "wheel_metadata_files": 6,
+    "byte_identical_files": 333
+  },
+  "payload_manifest_sha256": {
+    "source": "393396cf7d50224fddef8b7b29a6acd8b33fbcdfaf864dcd6bf1ece82818ae83",
+    "wheel": "393396cf7d50224fddef8b7b29a6acd8b33fbcdfaf864dcd6bf1ece82818ae83"
+  },
+  "byte_comparison": {
+    "missing_from_wheel": [],
+    "extra_in_wheel": [],
+    "mismatches": [],
+    "duplicate_wheel_members": []
+  },
+  "retired_marker_inventory": {
+    "S01_fields": [
+      "base_lib_paths",
+      "base_lib_modules",
+      "module_roles",
+      "infer_roles_from_path"
+    ],
+    "S01_roles": [
+      "_role_for_file",
+      "_is_declared_base_lib",
+      "_role_for_path",
+      "_is_node_role",
+      "_role_import_finding",
+      "_role_import_findings",
+      "_NODE_ROLES",
+      "_BASE_LIB_ROLE",
+      "_PLUGIN_ROLE"
+    ],
+    "S03_tables": [
+      "SIDE_EFFECT_IMPORT_ROOTS",
+      "SIDE_EFFECT_CALLS",
+      "SIDE_EFFECT_ATTR_CALLS"
+    ],
+    "S04_codes": [
+      "node_info_flow_kind",
+      "node_flow_kind_invalid",
+      "missing_node_info",
+      "missing_contract",
+      "node_external_invalid",
+      "node_decision_missing_route_output",
+      "type_mismatch",
+      "signature_unavailable",
+      "example_shape"
+    ]
+  },
+  "independent_source_scan": {
+    "python_files_parsed": 314,
+    "ast_hits": [],
+    "token_hits": [],
+    "parse_errors": [],
+    "undecodable_files": []
+  },
+  "independent_wheel_scan": {
+    "python_files_parsed": 314,
+    "ast_hits": [],
+    "token_hits": [],
+    "parse_errors": [],
+    "undecodable_files": []
+  }
+}

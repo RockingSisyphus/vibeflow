@@ -1,0 +1,137 @@
+{
+  "schema": "vibeflow.readonly-sharing.v1",
+  "python": "3.13.13 | packaged by conda-forge | (main, Apr  8 2026, 02:00:33) [GCC 14.3.0]",
+  "implementation": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/core/rules/models.py",
+  "cases": [
+    {
+      "id": "tuple.4",
+      "kind": "tuple",
+      "depth": 4,
+      "input_objects": {
+        "tuple": 4
+      },
+      "output_objects": {
+        "tuple": 15
+      },
+      "seconds": 6.655399920418859e-05,
+      "sharing_preserved": false,
+      "matched": false
+    },
+    {
+      "id": "tuple.8",
+      "kind": "tuple",
+      "depth": 8,
+      "input_objects": {
+        "tuple": 8
+      },
+      "output_objects": {
+        "tuple": 255
+      },
+      "seconds": 0.00024111200764309615,
+      "sharing_preserved": false,
+      "matched": false
+    },
+    {
+      "id": "tuple.12",
+      "kind": "tuple",
+      "depth": 12,
+      "input_objects": {
+        "tuple": 12
+      },
+      "output_objects": {
+        "tuple": 4095
+      },
+      "seconds": 0.003960938993259333,
+      "sharing_preserved": false,
+      "matched": false
+    },
+    {
+      "id": "tuple.16",
+      "kind": "tuple",
+      "depth": 16,
+      "input_objects": {
+        "tuple": 16
+      },
+      "output_objects": null,
+      "seconds": 0.06435593499918468,
+      "sharing_preserved": false,
+      "matched": false
+    },
+    {
+      "id": "tuple.20",
+      "kind": "tuple",
+      "depth": 20,
+      "input_objects": {
+        "tuple": 20
+      },
+      "output_objects": null,
+      "seconds": 1.145181606989354,
+      "sharing_preserved": false,
+      "matched": false
+    },
+    {
+      "id": "list.12",
+      "kind": "list",
+      "depth": 12,
+      "input_objects": {
+        "list": 12
+      },
+      "output_objects": {
+        "tuple": 4095
+      },
+      "seconds": 0.00398110700189136,
+      "sharing_preserved": false,
+      "matched": false
+    },
+    {
+      "id": "mapping.12",
+      "kind": "mapping",
+      "depth": 12,
+      "input_objects": {
+        "mapping": 12
+      },
+      "output_objects": {
+        "mapping": 12
+      },
+      "seconds": 2.6729991077445447e-05,
+      "sharing_preserved": true,
+      "matched": true
+    },
+    {
+      "id": "dataclass.12",
+      "kind": "dataclass",
+      "depth": 12,
+      "input_objects": {
+        "Pair": 12
+      },
+      "output_objects": {
+        "Pair": 12
+      },
+      "seconds": 8.796500333119184e-05,
+      "sharing_preserved": true,
+      "matched": true
+    },
+    {
+      "id": "namespace.12",
+      "kind": "namespace",
+      "depth": 12,
+      "input_objects": {
+        "SimpleNamespace": 12
+      },
+      "output_objects": {
+        "SimpleNamespace": 12
+      },
+      "seconds": 1.2994991266168654e-05,
+      "sharing_preserved": true,
+      "matched": true
+    },
+    {
+      "id": "mixed.containers",
+      "sharing_preserved": false,
+      "mutation_blocked": true,
+      "snapshot_isolated": true,
+      "matched": false
+    }
+  ],
+  "matched": false
+}

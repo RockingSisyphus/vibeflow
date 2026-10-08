@@ -48,9 +48,9 @@ def mutate(root,kind,variant):
         config(root,lambda data:data["plugins"][0].update(config={"revision":3}))
 
 
-def run_cases(work,toolchain):
+def run_cases(work,toolchain,*,kinds=KINDS):
     rows=[]
-    for kind in KINDS:
+    for kind in kinds:
         for variant in ("symbol","description","dependency","contract"):
             if kind=="base_lib" and variant=="contract":continue
             case=f"edits.javascript.{kind}.{variant}";root=project(work/case,toolchain=toolchain)

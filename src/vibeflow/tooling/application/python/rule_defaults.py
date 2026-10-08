@@ -1,19 +1,35 @@
 """Read Python Rule defaults without importing business implementations."""
 
-from vibeflow.core.rules.builtin import project_quality_rule_defaults
+from vibeflow.builtin.project_quality import bound_project_quality_defaults
 from vibeflow.targets.python.quality.project_context import source_quality_policy
+from vibeflow.targets.python.quality.policy_parameters import source_rule_defaults as configured_source_rules, bound_python_workflow_defaults
+from vibeflow.core.rules.models import plain
 from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
 from vibeflow.tooling.application.python.project.policy import resolve_workspace_effective_policy
 
 
-def source_rule_defaults(document, *, workspace=None):
+def source_policy_for_document(document, *, workspace=None):
     resolved = (resolve_workspace_effective_policy(workspace.policy, workspace_path=workspace.path)
                 if workspace else resolve_effective_policy(document.data, config_path=document.path))
     errors = [finding.message for finding in resolved.findings if finding.severity == "error"]
     if errors:
         raise ValueError("; ".join(errors))
-    policy = source_quality_policy(resolved.effective_policy.to_purity_policy())
-    return project_quality_rule_defaults(policy)
+    return resolved.effective_policy.to_purity_policy()
+
+
+def complete_rule_plan(plan, purity_policy, *, handlers):
+    """Apply Python parameters through the owning Application boundary."""
+    from vibeflow.targets.python.quality.policy_parameters import complete_source_policy_plan
+    return complete_source_policy_plan(plan, purity_policy, handlers=handlers)
+
+
+def source_rule_defaults(document, *, workspace=None, handlers, rules, origins, depth=4):
+    policy = source_policy_for_document(document, workspace=workspace)
+    configured = configured_source_rules(rules, policy, handlers=handlers)
+    defaults = {key:{"policy":plain(rule.params_defaults["policy"])} for key, rule in configured.items()
+                if rule is not rules[key]}
+    return {**defaults, **bound_project_quality_defaults(handlers, source_quality_policy(policy), rules=rules, origins=origins),
+            **bound_python_workflow_defaults(handlers, depth, rules=rules, origins=origins)}
 
 
 def declared_rule_resources(workspace, config_path, *, loaded_plugins=None):

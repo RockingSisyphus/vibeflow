@@ -1,0 +1,16 @@
+{
+  "exit_code": 0,
+  "error": null,
+  "frames": [],
+  "panels": [],
+  "columns": [],
+  "seconds": 0.38491240597795695,
+  "arguments": [
+    "validate",
+    "--workspace",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.expand.validate.false/vibeflow_config.jsonc",
+    "--config",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.expand.validate.false/workflow.jsonc",
+    "--json"
+  ]
+}

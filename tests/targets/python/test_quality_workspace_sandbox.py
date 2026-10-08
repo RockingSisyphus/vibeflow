@@ -108,7 +108,8 @@ def test_root_quality_retains_sibling_base_lib_context(workspace_case: Path, ent
     assert len(quality["reports"]) == 1
     report = quality["reports"][0]
     assert report["config"] == str(case / "project/configs/main.jsonc")
-    assert report["effective_policy"]["base_lib"]["allowed_modules"] == ["base_lib.shared_math"]
+    assert "base_lib" not in report["effective_policy"]
+    assert any(item["id"] == "shared_math" for item in report["info"]["resources"]["base_lib"]["modules"])
     assert {root["id"] for root in report["info"]["workspace"]["roots"]} == {"framework", "project"}
     assert {item["path"] for item in quality["source_quality"]["files"]} == {
         "__init__.py", "plugins/code_plugin.py", "nodes/__init__.py", "nodes/workflow_nodes.py",

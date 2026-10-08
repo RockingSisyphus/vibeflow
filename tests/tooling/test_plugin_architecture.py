@@ -1,7 +1,8 @@
 from __future__ import annotations
-from tests.fixtures.support.declarations import write_node_manifests
+from tests.fixtures.support.declarations import write_node_plugin
 
 import json
+import re
 from pathlib import Path
 
 from tests.fixtures.support.strict_support import _seed_add_pipeline
@@ -83,7 +84,7 @@ def test_implemented_static_plugin_architecture_uses_only_review_facts(
     assert resource["targets"] == ["python"]
     assert resource["config"] == {"label": "selected", "mode": "audit"}
     assert "implementation" not in resource
-    assert resource["module"] == str(source_path)
+    assert resource["module"] == "plugins.runtime_audit"
     assert resource["class"] == "runtime"
 
     document = build_architecture_document(
@@ -96,7 +97,7 @@ def test_implemented_static_plugin_architecture_uses_only_review_facts(
     assert plugin["targets"] == ["python"]
     assert plugin["config"] == {"label": "selected", "mode": "audit"}
     assert plugin["priority"] == 20
-    assert plugin["module"] == "plugins/runtime_audit.py" and plugin["class"] == "runtime"
+    assert plugin["module"] == "plugins.runtime_audit" and plugin["class"] == "runtime"
     assert "plugins/runtime_audit.py" in json.dumps(document)
 
 
@@ -154,9 +155,12 @@ def test_static_plugins_render_in_mermaid_with_planned_status(
     assert "resource_plugins" in mermaid
     assert "Runtime Audit" in mermaid
     assert "Future Compiler" in mermaid
-    assert "targets: python" in mermaid
+    # The directory lists selected packages, not lifecycle factory contracts.
+    assert "id: demo.runtime_audit\\n" in mermaid
+    assert "class: runtime" not in mermaid
     assert "config: label, mode" in mermaid
-    assert "class resource_plugins_1 plannedResource;" in mermaid
+    planned = re.search(r'(resource_plugins_\d+)@\{[^\n]*Future Compiler', mermaid)
+    assert planned and f"class {planned[1]} plannedResource;" in mermaid
 
 
 def _write_plugin_workspace(
@@ -167,102 +171,22 @@ def _write_plugin_workspace(
     repository = tmp_path / "repository"
     project = repository / "project"
     configs = project / "configs"
-    manifests = project / "manifests" / "plugins"
     configs.mkdir(parents=True)
-    manifests.mkdir(parents=True)
     workspace_path = repository / "vibeflow_config.jsonc"
     workflow_path = configs / "main.jsonc"
-    source_path = project / "plugins" / "runtime_audit.ts"
-    workspace_path.write_text(
-        json.dumps(
-            {"policy": {}, "roots": [{"id": "project", "path": "project"}]}
-        ),
-        encoding="utf-8",
-    )
-    (project / "vibeflow_project.jsonc").write_text(
-        json.dumps(
-            {
-                "project_target": "python",
-                "quality_enabled": False,
-                "descriptors": {"nodes": ["manifests/nodes"], "plugins": ["manifests/plugins"]},
-            }
-        ),
-        encoding="utf-8",
-    )
-    write_node_manifests(project, [("test.start", "StartNode", {}, {}),
+    workspace_path.write_text(json.dumps({"policy": {}, "roots": [{"id": "project", "path": "project"}]}))
+    (project / "vibeflow_project.jsonc").write_text(json.dumps({"project_target": "python", "quality_enabled": False}))
+    node_selection = write_node_plugin(project, [("test.start", "StartNode", {}, {}),
         ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}),
         ("test.add", "AddNode", {"delta": {"type": "number"}}, {"delta": 1}),
         ("test.out_end", "OutEndNode", {}, {})])
-    (manifests / "runtime-audit.jsonc").write_text(
-        json.dumps(
-            {
-                "kind": "plugin",
-                "id": "demo.runtime_audit",
-                "type": "runtime",
-                "targets": ["python"],
-                "display_name": "Runtime Audit",
-                "category": "review",
-                "description": "Audits one workflow invocation.",
-                "version": "1.0.0",
-                "priority": 20,
-                "implementations": [
-                    {
-                        "language": "typescript",
-                        "targets": ["python"],
-                        "completion": "immediate",
-                        "source": {
-                            "kind": "file",
-                            "ref": "plugins/runtime_audit.ts",
-                            "export": "createPlugin",
-                        },
-                    }
-                ],
-                "dependencies": [],
-                "external_packages": [],
-                "config": {
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "mode": {"type": "string"},
-                            "label": {"type": "string"},
-                        },
-                    },
-                    "defaults": {"mode": "audit"},
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    plugins: list[object] = [
-        {"id": "demo.runtime_audit", "config": {"label": "selected"}}
-    ]
-    if include_planned:
-        plugins.append(
-            {
-                "id": "demo.future_compiler",
-                "status": "planned",
-                "type": "compiler",
-                "targets": ["browser"],
-                "config": {"phase": "future"},
-                "display_name": "Future Compiler",
-                "description": "Reviews a future compiler hook.",
-            }
-        )
-    workflow_path.write_text(
-        json.dumps({"plugins": plugins, "pipeline": _seed_add_pipeline()}),
-        encoding="utf-8",
-    )
-    from tests.fixtures.support.code_plugins import migrate_fixture
-    # The actual SDK package is Python; native callbacks are delayed until run.
-    project_document = json.loads((project / "vibeflow_project.jsonc").read_text())
-    project_document["descriptors"].pop("plugins")
-    (project / "vibeflow_project.jsonc").write_text(json.dumps(project_document))
-    migrate_fixture(project)
     source_path = project / "plugins/runtime_audit.py"
-    source_path.parent.mkdir(exist_ok=True)
+    source_path.parent.mkdir()
     source_path.write_text('from vibeflow.targets.python.sdk import Plugin\ndef runtime(context):\n    raise AssertionError("runtime factory invoked during review")\nplugin = Plugin(id="demo.runtime_audit", runtime=runtime, priority=20, display_name="Runtime Audit", description="Audits one invocation", config_schema={"type":"object","properties":{"mode":{"type":"string"},"label":{"type":"string"}}},config_defaults={"mode":"audit"})\n')
-    workflow = json.loads(workflow_path.read_text())
-    workflow["plugins"] = [item for item in workflow["plugins"] if item.get("status") == "planned" or item.get("source")]
-    workflow["plugins"].append({"source":{"kind":"file","ref":"plugins/runtime_audit.py"},"config":{"label":"selected"}})
-    workflow_path.write_text(json.dumps(workflow))
+    plugins = [node_selection, {"source": {"kind": "file", "ref": "plugins/runtime_audit.py", "export": "plugin"}, "config": {"label": "selected"}}]
+    if include_planned:
+        plugins.append({"id": "demo.future_compiler", "status": "planned", "type": "compiler",
+            "targets": ["browser"], "config": {"phase": "future"}, "display_name": "Future Compiler",
+            "description": "Reviews a future compiler hook."})
+    workflow_path.write_text(json.dumps({"plugins": plugins, "pipeline": _seed_add_pipeline()}))
     return workspace_path, workflow_path, source_path

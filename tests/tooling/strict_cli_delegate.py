@@ -1,8 +1,8 @@
 from __future__ import annotations
-from tests.fixtures.support.declarations import node_declaration, configured_declaration
+from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
+from tests.fixtures.support.declarations import node_declaration, configured_declaration, native_registry
 
 import sys
-from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -13,61 +13,12 @@ from vibeflow.core.contracts import DataEnvelope, DataProvider, DataRequirement,
 from vibeflow.core import HealthReport
 from vibeflow.tooling.application.python.diagnostics import emit_core_diagnostic
 from vibeflow.tooling.application.python.runner import CheckedRunResult
-from vibeflow.tooling.project.graph_config import parse_graph_config as _parse_graph_config
-from vibeflow.targets.python.project.node import NodeContract, NodeInfo
+from vibeflow.tooling.project.graph_config import parse_graph_config
+
 from vibeflow.targets.python.project.plugins import PluginRegistry
 from vibeflow.targets.python.project.registry import NodeRegistry
 from vibeflow.targets.python.runtime import PipelineRuntime
 from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
-
-
-def parse_graph_config(config):
-    """Give legacy test fixtures the now-required per-instance documentation."""
-    migrated = deepcopy(config)
-    raw_nodesets = migrated.get("nodesets", []) if isinstance(migrated, dict) else []
-    if isinstance(raw_nodesets, dict):
-        nodeset_items = list(raw_nodesets.values())
-    else:
-        nodeset_items = list(raw_nodesets)
-    nodeset_types = {
-        str(item.get("type_key", ""))
-        for item in nodeset_items
-        if isinstance(item, dict) and item.get("type_key")
-    }
-
-    implemented_types = {
-        "delegate.start", "delegate.authorized_exit", "delegate.unauthorized_exit",
-        "delegate.none_exit", "delegate.bool_exit", "delegate.negative_exit",
-        "delegate.large_exit", "delegate.string_exit", "delegate.argparse_exit",
-        "delegate.detached_exit", "delegate.second_detached_exit",
-        "delegate.detached_failure", "delegate.successful_side",
-        "delegate.normal_exit", "delegate.async_diagnostic_exit", "delegate.exit_end",
-        "delegate.argv_gate", "delegate.parallel_join_exit", "delegate.parallel_join_failure",
-    }
-
-    def visit(body):
-        pipeline = body.get("pipeline", body)
-        for node in pipeline.get("nodes", []):
-            node.setdefault("display_name", str(node.get("id", "Node")).replace("_", " ").title())
-            node.setdefault("description", f"Exercises {node.get('id', 'this node')} in the delegated CLI test workflow.")
-            if node.get("type_used") in {"delegate.output", "delegate.shadow"}:
-                node.setdefault("status", "planned")
-                node.setdefault("flow_kind", "process")
-                node.setdefault("requires", [])
-                node.setdefault("provides", [])
-            elif node.get("type_used") in implemented_types or node.get("type_used") in nodeset_types:
-                node.pop("requires", None)
-                node.pop("provides", None)
-        nested_nodesets = body.get("nodesets", pipeline.get("nodesets", {}))
-        iterable = nested_nodesets.values() if isinstance(nested_nodesets, dict) else nested_nodesets
-        for nodeset in iterable:
-            if isinstance(nodeset, dict):
-                nodeset.setdefault("display_name", "Nested delegated CLI workflow")
-                nodeset.setdefault("description", "Defines a nested workflow used by delegated CLI tests.")
-                visit(nodeset)
-
-    visit(migrated)
-    return _parse_graph_config(migrated)
 
 
 @pytest.fixture(autouse=True)
@@ -78,7 +29,7 @@ def _stub_delegate_workspace_loader(monkeypatch):
     )
 
 
-_StartNode_DECLARATION = node_declaration(NodeInfo("delegate.start", "Start", "Starts delegate test.", "0.1.0", "terminal"), NodeContract(examples=({"inputs": {}, "params": {}},)), rulesets=("vibeflow.process",))
+_StartNode_DECLARATION = node_declaration(NodeDescriptor('delegate.start', 'Start', 'Starts delegate test.', '0.1.0', 'terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(examples=({'inputs': {}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class _StartNode:
 
@@ -86,14 +37,7 @@ class _StartNode:
         return {}
 
 
-_AuthorizedExitNode_DECLARATION = node_declaration(NodeInfo("delegate.authorized_exit", "Authorized exit", "Exits delegated CLI.", "0.1.0", "io"), NodeContract(
-        requires=(DataRequirement("cli.argv", "exactly_one", display_name="cli.argv"),),
-        provides=(DataProvider("cli.exit_code", "cli.exit_code", display_name="cli.exit_code"),),
-        input_semantics={"cli.argv": ("business argv",)},
-        output_semantics={"cli.exit_code": ("business exit code",)},
-
-        examples=({"inputs": {"cli.argv": {"key": "cli.argv", "type": "cli.argv", "value": [], "source_node": "example"}}, "params": {}},),
-    ), rulesets=("vibeflow.io",))
+_AuthorizedExitNode_DECLARATION = node_declaration(NodeDescriptor('delegate.authorized_exit', 'Authorized exit', 'Exits delegated CLI.', '0.1.0', 'io', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('cli.argv', 'exactly_one', display_name='cli.argv'),), provides=(DataProvider('cli.exit_code', 'cli.exit_code', display_name='cli.exit_code'),), input_semantics={'cli.argv': ('business argv',)}, output_semantics={'cli.exit_code': ('business exit code',)}, examples=({'inputs': {'cli.argv': {'key': 'cli.argv', 'type': 'cli.argv', 'value': [], 'source_node': 'example'}}, 'params': {}},)), rulesets=("vibeflow.io",))
 
 class _AuthorizedExitNode:
 
@@ -101,13 +45,13 @@ class _AuthorizedExitNode:
         raise SystemExit(2)
 
 
-_UnauthorizedExitNode_DECLARATION = node_declaration(NodeInfo("delegate.unauthorized_exit", "Unauthorized exit", "Cannot exit delegated CLI.", "0.1.0", "process"), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.process",))
+_UnauthorizedExitNode_DECLARATION = node_declaration(NodeDescriptor('delegate.unauthorized_exit', 'Unauthorized exit', 'Cannot exit delegated CLI.', '0.1.0', 'process', contract=NodeContractDescriptor()), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.process",))
 
 class _UnauthorizedExitNode(_AuthorizedExitNode):
     pass
 
 
-_NoneExitNode_DECLARATION = node_declaration(NodeInfo("delegate.none_exit", "None exit", "Exits delegated CLI with the default success code.", "0.1.0", "io"), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
+_NoneExitNode_DECLARATION = node_declaration(NodeDescriptor('delegate.none_exit', 'None exit', 'Exits delegated CLI with the default success code.', '0.1.0', 'io', contract=NodeContractDescriptor()), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
 
 class _NoneExitNode(_AuthorizedExitNode):
 
@@ -115,7 +59,7 @@ class _NoneExitNode(_AuthorizedExitNode):
         raise SystemExit(None)
 
 
-_BoolExitNode_DECLARATION = node_declaration(NodeInfo("delegate.bool_exit", "Bool exit", "Attempts an invalid boolean CLI exit.", "0.1.0", "io"), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
+_BoolExitNode_DECLARATION = node_declaration(NodeDescriptor('delegate.bool_exit', 'Bool exit', 'Attempts an invalid boolean CLI exit.', '0.1.0', 'io', contract=NodeContractDescriptor()), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
 
 class _BoolExitNode(_AuthorizedExitNode):
 
@@ -123,7 +67,7 @@ class _BoolExitNode(_AuthorizedExitNode):
         raise SystemExit(True)
 
 
-_NegativeExitNode_DECLARATION = node_declaration(NodeInfo("delegate.negative_exit", "Negative exit", "Attempts an invalid negative CLI exit.", "0.1.0", "io"), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
+_NegativeExitNode_DECLARATION = node_declaration(NodeDescriptor('delegate.negative_exit', 'Negative exit', 'Attempts an invalid negative CLI exit.', '0.1.0', 'io', contract=NodeContractDescriptor()), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
 
 class _NegativeExitNode(_AuthorizedExitNode):
 
@@ -131,7 +75,7 @@ class _NegativeExitNode(_AuthorizedExitNode):
         raise SystemExit(-1)
 
 
-_LargeExitNode_DECLARATION = node_declaration(NodeInfo("delegate.large_exit", "Large exit", "Attempts an invalid oversized CLI exit.", "0.1.0", "io"), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
+_LargeExitNode_DECLARATION = node_declaration(NodeDescriptor('delegate.large_exit', 'Large exit', 'Attempts an invalid oversized CLI exit.', '0.1.0', 'io', contract=NodeContractDescriptor()), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
 
 class _LargeExitNode(_AuthorizedExitNode):
 
@@ -139,7 +83,7 @@ class _LargeExitNode(_AuthorizedExitNode):
         raise SystemExit(256)
 
 
-_StringExitNode_DECLARATION = node_declaration(NodeInfo("delegate.string_exit", "String exit", "Attempts an invalid string CLI exit.", "0.1.0", "io"), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
+_StringExitNode_DECLARATION = node_declaration(NodeDescriptor('delegate.string_exit', 'String exit', 'Attempts an invalid string CLI exit.', '0.1.0', 'io', contract=NodeContractDescriptor()), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
 
 class _StringExitNode(_AuthorizedExitNode):
 
@@ -147,7 +91,7 @@ class _StringExitNode(_AuthorizedExitNode):
         raise SystemExit("invalid")
 
 
-_ArgparseExitNode_DECLARATION = node_declaration(NodeInfo("delegate.argparse_exit", "Argparse exit", "Exercises real argparse exits.", "0.1.0", "io"), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
+_ArgparseExitNode_DECLARATION = node_declaration(NodeDescriptor('delegate.argparse_exit', 'Argparse exit', 'Exercises real argparse exits.', '0.1.0', 'io', contract=NodeContractDescriptor()), _AuthorizedExitNode_DECLARATION.contract, rulesets=("vibeflow.io",))
 
 class _ArgparseExitNode(_AuthorizedExitNode):
 
@@ -160,11 +104,7 @@ class _ArgparseExitNode(_AuthorizedExitNode):
         return {"cli.exit_code": 0}
 
 
-_DetachedExitNode_DECLARATION = node_declaration(NodeInfo("delegate.detached_exit", "Detached exit", "Exits from a detached task.", "0.1.0", "io"), NodeContract(
-        provides=(DataProvider("async.first", "async.first", display_name="First async result"),),
-        output_semantics={"async.first": ("first delegated async result",)},
-        examples=({"inputs": {}, "params": {}},),
-    ), rulesets=("vibeflow.io",))
+_DetachedExitNode_DECLARATION = node_declaration(NodeDescriptor('delegate.detached_exit', 'Detached exit', 'Exits from a detached task.', '0.1.0', 'io', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('async.first', 'async.first', display_name='First async result'),), output_semantics={'async.first': ('first delegated async result',)}, examples=({'inputs': {}, 'params': {}},)), rulesets=("vibeflow.io",))
 
 class _DetachedExitNode:
 
@@ -172,10 +112,7 @@ class _DetachedExitNode:
         raise SystemExit(11)
 
 
-_SecondDetachedExitNode_DECLARATION = node_declaration(NodeInfo("delegate.second_detached_exit", "Second detached exit", "Exits from another detached task.", "0.1.0", "io"), NodeContract(
-        provides=(DataProvider("async.second", "async.second", display_name="Second async result"),),
-        output_semantics={"async.second": ("second delegated async result",)},
-    ), rulesets=("vibeflow.io",))
+_SecondDetachedExitNode_DECLARATION = node_declaration(NodeDescriptor('delegate.second_detached_exit', 'Second detached exit', 'Exits from another detached task.', '0.1.0', 'io', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('async.second', 'async.second', display_name='Second async result'),), output_semantics={'async.second': ('second delegated async result',)}), rulesets=("vibeflow.io",))
 
 class _SecondDetachedExitNode(_DetachedExitNode):
 
@@ -183,10 +120,7 @@ class _SecondDetachedExitNode(_DetachedExitNode):
         raise SystemExit(12)
 
 
-_DetachedFailureNode_DECLARATION = node_declaration(NodeInfo("delegate.detached_failure", "Detached failure", "Fails from a detached task.", "0.1.0", "process"), NodeContract(
-        provides=(DataProvider("async.pending", "async.pending", display_name="Pending async result"),),
-        output_semantics={"async.pending": ("pending task result used by the async failure fixture",)},
-    ), rulesets=("vibeflow.process",))
+_DetachedFailureNode_DECLARATION = node_declaration(NodeDescriptor('delegate.detached_failure', 'Detached failure', 'Fails from a detached task.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('async.pending', 'async.pending', display_name='Pending async result'),), output_semantics={'async.pending': ('pending task result used by the async failure fixture',)}), rulesets=("vibeflow.process",))
 
 class _DetachedFailureNode(_DetachedExitNode):
 
@@ -194,12 +128,7 @@ class _DetachedFailureNode(_DetachedExitNode):
         raise RuntimeError("late detached failure")
 
 
-_SuccessfulSideNode_DECLARATION = node_declaration(NodeInfo("delegate.successful_side", "Successful side", "Completes an async side task.", "0.1.0", "process"), NodeContract(
-        provides=(DataProvider("async.pending", "async.pending", display_name="async.pending"),),
-        output_semantics={"async.pending": ("completed side result",)},
-
-        examples=({"inputs": {}, "params": {}},),
-    ), rulesets=("vibeflow.process",))
+_SuccessfulSideNode_DECLARATION = node_declaration(NodeDescriptor('delegate.successful_side', 'Successful side', 'Completes an async side task.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('async.pending', 'async.pending', display_name='async.pending'),), output_semantics={'async.pending': ('completed side result',)}, examples=({'inputs': {}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class _SuccessfulSideNode:
 
@@ -207,12 +136,7 @@ class _SuccessfulSideNode:
         return {"async.pending": "done"}
 
 
-_ArgvGateNode_DECLARATION = node_declaration(NodeInfo("delegate.argv_gate", "Argv gate", "Forwards CLI arguments after pending work starts.", "0.1.0", "process"), NodeContract(
-        requires=(DataRequirement("cli.argv", "exactly_one", display_name="CLI argv"),),
-        provides=(DataProvider("cli.argv.gated", "cli.argv", display_name="Forwarded CLI argv"),),
-        input_semantics={"cli.argv": ("business argv",)},
-        output_semantics={"cli.argv.gated": ("forwarded business argv",)},
-    ), rulesets=("vibeflow.process",))
+_ArgvGateNode_DECLARATION = node_declaration(NodeDescriptor('delegate.argv_gate', 'Argv gate', 'Forwards CLI arguments after pending work starts.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('cli.argv', 'exactly_one', display_name='CLI argv'),), provides=(DataProvider('cli.argv.gated', 'cli.argv', display_name='Forwarded CLI argv'),), input_semantics={'cli.argv': ('business argv',)}, output_semantics={'cli.argv.gated': ('forwarded business argv',)}), rulesets=("vibeflow.process",))
 
 class _ArgvGateNode:
 
@@ -220,16 +144,7 @@ class _ArgvGateNode:
         return {"cli.argv.gated": inputs["cli.argv"]["value"]}
 
 
-_ParallelJoinExitNode_DECLARATION = node_declaration(NodeInfo("delegate.parallel_join_exit", "Parallel exit join", "Joins two delegated exit results.", "0.1.0", "terminal"), NodeContract(
-        requires=(
-            DataRequirement("async.first", "exactly_one", display_name="First async result"),
-            DataRequirement("async.second", "exactly_one", display_name="Second async result"),
-        ),
-        input_semantics={
-            "async.first": ("first delegated async result",),
-            "async.second": ("second delegated async result",),
-        },
-    ), rulesets=("vibeflow.process",))
+_ParallelJoinExitNode_DECLARATION = node_declaration(NodeDescriptor('delegate.parallel_join_exit', 'Parallel exit join', 'Joins two delegated exit results.', '0.1.0', 'terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('async.first', 'exactly_one', display_name='First async result'), DataRequirement('async.second', 'exactly_one', display_name='Second async result')), input_semantics={'async.first': ('first delegated async result',), 'async.second': ('second delegated async result',)}), rulesets=("vibeflow.process",))
 
 class _ParallelJoinExitNode:
 
@@ -237,16 +152,7 @@ class _ParallelJoinExitNode:
         return {}
 
 
-_ParallelJoinFailureNode_DECLARATION = node_declaration(NodeInfo("delegate.parallel_join_failure", "Parallel failure join", "Joins an exit result with a failing result.", "0.1.0", "terminal"), NodeContract(
-        requires=(
-            DataRequirement("async.first", "exactly_one", display_name="First async result"),
-            DataRequirement("async.pending", "exactly_one", display_name="Pending async result"),
-        ),
-        input_semantics={
-            "async.first": ("first delegated async result",),
-            "async.pending": ("pending async result",),
-        },
-    ), rulesets=("vibeflow.process",))
+_ParallelJoinFailureNode_DECLARATION = node_declaration(NodeDescriptor('delegate.parallel_join_failure', 'Parallel failure join', 'Joins an exit result with a failing result.', '0.1.0', 'terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('async.first', 'exactly_one', display_name='First async result'), DataRequirement('async.pending', 'exactly_one', display_name='Pending async result')), input_semantics={'async.first': ('first delegated async result',), 'async.pending': ('pending async result',)}), rulesets=("vibeflow.process",))
 
 class _ParallelJoinFailureNode:
 
@@ -254,12 +160,7 @@ class _ParallelJoinFailureNode:
         return {}
 
 
-_NormalExitNode_DECLARATION = node_declaration(NodeInfo("delegate.normal_exit", "Normal exit", "Returns a normal delegated exit.", "0.1.0", "process"), NodeContract(
-        provides=(DataProvider("cli.exit_code", "cli.exit_code", display_name="cli.exit_code"),),
-        output_semantics={"cli.exit_code": ("business exit code",)},
-
-        examples=({"inputs": {}, "params": {}},),
-    ), rulesets=("vibeflow.process",))
+_NormalExitNode_DECLARATION = node_declaration(NodeDescriptor('delegate.normal_exit', 'Normal exit', 'Returns a normal delegated exit.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('cli.exit_code', 'cli.exit_code', display_name='cli.exit_code'),), output_semantics={'cli.exit_code': ('business exit code',)}, examples=({'inputs': {}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class _NormalExitNode:
 
@@ -267,13 +168,7 @@ class _NormalExitNode:
         return {"cli.exit_code": 0}
 
 
-_AsyncDiagnosticExitNode_DECLARATION = node_declaration(NodeInfo(
-        "delegate.async_diagnostic_exit",
-        "Async diagnostic exit",
-        "Emits a core diagnostic from an async worker.",
-        "0.1.0",
-        "process",
-    ), _NormalExitNode_DECLARATION.contract, rulesets=("vibeflow.process",))
+_AsyncDiagnosticExitNode_DECLARATION = node_declaration(NodeDescriptor('delegate.async_diagnostic_exit', 'Async diagnostic exit', 'Emits a core diagnostic from an async worker.', '0.1.0', 'process', contract=NodeContractDescriptor()), _NormalExitNode_DECLARATION.contract, rulesets=("vibeflow.process",))
 
 class _AsyncDiagnosticExitNode(_NormalExitNode):
 
@@ -282,23 +177,7 @@ class _AsyncDiagnosticExitNode(_NormalExitNode):
         return {"cli.exit_code": 0}
 
 
-_ExitEndNode_DECLARATION = node_declaration(NodeInfo("delegate.exit_end", "Exit end", "Consumes a delegated exit.", "0.1.0", "terminal"), NodeContract(
-        requires=(DataRequirement("cli.exit_code", "exactly_one", display_name="cli.exit_code"),),
-        input_semantics={"cli.exit_code": ("business exit code",)},
-        examples=(
-            {
-                "inputs": {
-                    "cli.exit_code": {
-                        "key": "cli.exit_code",
-                        "type": "cli.exit_code",
-                        "value": 0,
-                        "source_node": "example",
-                    }
-                },
-                "params": {},
-            },
-        ),
-    ), rulesets=("vibeflow.process",))
+_ExitEndNode_DECLARATION = node_declaration(NodeDescriptor('delegate.exit_end', 'Exit end', 'Consumes a delegated exit.', '0.1.0', 'terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('cli.exit_code', 'exactly_one', display_name='cli.exit_code'),), input_semantics={'cli.exit_code': ('business exit code',)}, examples=({'inputs': {'cli.exit_code': {'key': 'cli.exit_code', 'type': 'cli.exit_code', 'value': 0, 'source_node': 'example'}}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class _ExitEndNode:
 
@@ -307,7 +186,7 @@ class _ExitEndNode:
 
 
 def _runtime_registry() -> NodeRegistry:
-    registry = NodeRegistry()
+    registry = native_registry()
     registry.register(configured_declaration(_StartNode_DECLARATION, {}, {}), _StartNode)
     registry.register(configured_declaration(_AuthorizedExitNode_DECLARATION, {}, {}), _AuthorizedExitNode)
     registry.register(_UnauthorizedExitNode_DECLARATION, _UnauthorizedExitNode)
@@ -334,11 +213,11 @@ def _exit_graph(node_type: str):
     return parse_graph_config(
         {
             "pipeline": {
-                "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
                 "nodes": [
-                    {"id": "start", "type_used": "delegate.start"},
-                    {"id": "exit", "type_used": node_type},
+                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
+                    {"id": "exit", "type_used": node_type, "display_name": "Exit", "description": "Exercises exit in the delegated CLI test workflow."},
                 ],
                 "edges": [["start", "exit"]],
             }
@@ -349,7 +228,7 @@ def _exit_graph(node_type: str):
 def _graph(*, include_argv: bool = True, exit_cardinality: str = "exactly_one"):
     inputs = []
     if include_argv:
-        inputs.append({"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"})
+        inputs.append({"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv", "required": False})
     return parse_graph_config(
         {
             "pipeline": {
@@ -372,6 +251,11 @@ def _graph(*, include_argv: bool = True, exit_cardinality: str = "exactly_one"):
                                 "display_name": "CLI exit code",
                             }
                         ],
+                        "display_name": "Output",
+                        "description": "Exercises output in the delegated CLI test workflow.",
+                        "status": "planned",
+                        "flow_kind": "process",
+                        "requires": [],
                     }
                 ],
             }
@@ -383,18 +267,19 @@ def _multiple_detached_graph(second_node_type: str):
     return parse_graph_config(
         {
             "pipeline": {
-                "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
                 "nodes": [
-                    {"id": "start", "type_used": "delegate.start"},
-                    {"id": "first", "type_used": "delegate.detached_exit", "async": "detached"},
-                    {"id": "second", "type_used": second_node_type, "async": "detached"},
+                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
+                    {"id": "first", "type_used": "delegate.detached_exit", "async": "detached", "display_name": "First", "description": "Exercises first in the delegated CLI test workflow."},
+                    {"id": "second", "type_used": second_node_type, "async": "detached", "display_name": "Second", "description": "Exercises second in the delegated CLI test workflow."},
                     {
                         "id": "normal_exit",
                         "type_used": "delegate.normal_exit",
-                        "provides": [{"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit code"}],
+                        "display_name": "Normal Exit",
+                        "description": "Exercises normal_exit in the delegated CLI test workflow.",
                     },
-                    {"id": "end", "type_used": "delegate.exit_end"},
+                    {"id": "end", "type_used": "delegate.exit_end", "display_name": "End", "description": "Exercises end in the delegated CLI test workflow."},
                 ],
                 "edges": [["start", "first"], ["first", "second"], ["second", "normal_exit"], ["normal_exit", "end"]],
             }
@@ -408,26 +293,31 @@ def _parallel_result_graph(second_node_type: str):
     return parse_graph_config(
         {
             "pipeline": {
-                "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
                 "nodes": [
-                    {"id": "start", "type_used": "delegate.start"},
+                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
                     {
                         "id": "first",
                         "type_used": "delegate.detached_exit",
-                        "provides": [{"key": "async.first", "type": "async.first", "display_name": "First result"}],
                         "async": "result_key",
                         "result_key": "async.first",
+                        "display_name": "First",
+                        "description": "Exercises first in the delegated CLI test workflow.",
                     },
                     {
                         "id": "second",
                         "type_used": second_node_type,
                         "async": "result_key",
                         "result_key": second_result_key,
+                        "display_name": "Second",
+                        "description": "Exercises second in the delegated CLI test workflow.",
                     },
                     {
                         "id": "join",
                         "type_used": join_type,
+                        "display_name": "Join",
+                        "description": "Exercises join in the delegated CLI test workflow.",
                     },
                 ],
                 "edges": [["start", "first"], ["start", "second"], ["first", "join"], ["second", "join"]],
@@ -440,17 +330,19 @@ def _async_diagnostic_graph():
     return parse_graph_config(
         {
             "pipeline": {
-                "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
                 "nodes": [
-                    {"id": "start", "type_used": "delegate.start"},
+                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
                     {
                         "id": "output",
                         "type_used": "delegate.async_diagnostic_exit",
                         "async": "result_key",
                         "result_key": "cli.exit_code",
+                        "display_name": "Output",
+                        "description": "Exercises output in the delegated CLI test workflow.",
                     },
-                    {"id": "end", "type_used": "delegate.exit_end"},
+                    {"id": "end", "type_used": "delegate.exit_end", "display_name": "End", "description": "Exercises end in the delegated CLI test workflow."},
                 ],
                 "edges": [["start", "output"], ["output", "end"]],
             }
@@ -470,23 +362,26 @@ def _unconsumed_result_graph(*node_types: str):
             "type_used": node_type,
             "async": "result_key",
             "result_key": result_keys[node_type],
+            "display_name": f"Side {index}",
+            "description": f"Exercises side_{index} in the delegated CLI test workflow.",
         }
         for index, node_type in enumerate(node_types)
     ]
     return parse_graph_config(
         {
             "pipeline": {
-                "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
                 "nodes": [
-                    {"id": "start", "type_used": "delegate.start"},
+                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
                     *async_nodes,
                     {
                         "id": "normal_exit",
                         "type_used": "delegate.normal_exit",
-                        "provides": [{"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit code"}],
+                        "display_name": "Normal Exit",
+                        "description": "Exercises normal_exit in the delegated CLI test workflow.",
                     },
-                    {"id": "end", "type_used": "delegate.exit_end"},
+                    {"id": "end", "type_used": "delegate.exit_end", "display_name": "End", "description": "Exercises end in the delegated CLI test workflow."},
                 ],
                 "edges": [
                     *[["start", node["id"]] for node in async_nodes],
@@ -508,28 +403,23 @@ def _exit_with_pending_pipeline(
         "id": "a_pending",
         "type_used": pending_node_type,
         "async": async_mode,
+        "display_name": "A Pending",
+        "description": "Exercises a_pending in the delegated CLI test workflow.",
     }
     if async_mode == "result_key":
         pending_node.update(
             {
-                "provides": [
-                    {
-                        "key": "async.pending",
-                        "type": "async.pending",
-                        "display_name": "Pending async result",
-                    }
-                ],
                 "result_key": "async.pending",
             }
         )
     return {
-        "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+        "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
         "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
         "nodes": [
-            {"id": "inner_start", "type_used": "delegate.start"},
+            {"id": "inner_start", "type_used": "delegate.start", "display_name": "Inner Start", "description": "Exercises inner_start in the delegated CLI test workflow."},
             pending_node,
-            {"id": "gate", "type_used": "delegate.argv_gate"},
-            {"id": "inner_exit", "type_used": exit_node_type},
+            {"id": "gate", "type_used": "delegate.argv_gate", "display_name": "Gate", "description": "Exercises gate in the delegated CLI test workflow."},
+            {"id": "inner_exit", "type_used": exit_node_type, "display_name": "Inner Exit", "description": "Exercises inner_exit in the delegated CLI test workflow."},
         ],
         "edges": [
             ["inner_start", "a_pending"],
@@ -572,15 +462,15 @@ def _nested_exit_with_pending_graph(*, pending_node_type: str, async_mode: str):
         {
             "nodesets": [inner],
             "pipeline": {
-                "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
                 "nodes": [
-                    {"id": "start", "type_used": "delegate.start"},
+                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
                     {
                         "id": "inner",
                         "type_used": "delegate.inner_pending",
-                        "requires": [{"type": "cli.argv", "cardinality": "exactly_one", "display_name": "CLI argv"}],
-                        "provides": [{"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit code"}],
+                        "display_name": "Inner",
+                        "description": "Exercises inner in the delegated CLI test workflow.",
                     },
                 ],
                 "edges": [["start", "inner"]],
@@ -1056,7 +946,7 @@ def test_delegate_cli_log_escapes_run_and_config_path_line_breaks(monkeypatch, t
     assert status == 0
     assert capsys.readouterr().err == ""
     log = (run_root / run_id / "vibeflow.log").read_text(encoding="utf-8")
-    lines = log.splitlines()
+    lines = [line for line in log.splitlines() if not line.startswith("STATE ")]
     assert len(lines) == 3
     assert "run_id=run\\r\\nid config=project/config\\r\\nmain.jsonc" in lines[0]
     assert "runs\\r\\nroot/run\\r\\nid" in lines[1]
@@ -1152,9 +1042,9 @@ def test_delegate_cli_contract_rejects_missing_wrong_or_duplicate_exit_providers
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
-                "nodes": [{"id": "output", "type_used": "delegate.output", "provides": providers}],
+                "nodes": [{"id": "output", "type_used": "delegate.output", "provides": providers, "display_name": "Output", "description": "Exercises output in the delegated CLI test workflow.", "status": "planned", "flow_kind": "process", "requires": []}],
             }
         }
     )
@@ -1169,7 +1059,7 @@ def test_delegate_cli_contract_rejects_reserved_exit_key_conflict_across_nodes()
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit"}],
                 "nodes": [
                     {
@@ -1178,6 +1068,11 @@ def test_delegate_cli_contract_rejects_reserved_exit_key_conflict_across_nodes()
                         "provides": [
                             {"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit"}
                         ],
+                        "display_name": "Output",
+                        "description": "Exercises output in the delegated CLI test workflow.",
+                        "status": "planned",
+                        "flow_kind": "process",
+                        "requires": [],
                     },
                     {
                         "id": "shadow",
@@ -1185,6 +1080,11 @@ def test_delegate_cli_contract_rejects_reserved_exit_key_conflict_across_nodes()
                         "provides": [
                             {"key": "cli.exit_code", "type": "wrong", "display_name": "Shadow exit"}
                         ],
+                        "display_name": "Shadow",
+                        "description": "Exercises shadow in the delegated CLI test workflow.",
+                        "status": "planned",
+                        "flow_kind": "process",
+                        "requires": [],
                     },
                 ],
             }
@@ -1200,11 +1100,11 @@ def test_delegate_cli_contract_rejects_reserved_exit_key_conflict_across_nodes()
 @pytest.mark.parametrize(
     "inputs",
     [
-        [{"key": "cli.argv", "type": "wrong", "display_name": "Wrong argv"}],
-        [{"key": "wrong", "type": "cli.argv", "display_name": "Wrong argv"}],
+        [{"key": "cli.argv", "type": "wrong", "display_name": "Wrong argv", "required": False}],
+        [{"key": "wrong", "type": "cli.argv", "display_name": "Wrong argv", "required": False}],
         [
-            {"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"},
-            {"key": "wrong", "type": "cli.argv", "display_name": "Shadow argv"},
+            {"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv", "required": False},
+            {"key": "wrong", "type": "cli.argv", "display_name": "Shadow argv", "required": False},
         ],
     ],
 )
@@ -1221,6 +1121,11 @@ def test_delegate_cli_contract_rejects_reserved_argv_key_or_type_conflicts(input
                         "provides": [
                             {"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit"}
                         ],
+                        "display_name": "Output",
+                        "description": "Exercises output in the delegated CLI test workflow.",
+                        "status": "planned",
+                        "flow_kind": "process",
+                        "requires": [],
                     }
                 ],
             }
@@ -1237,7 +1142,7 @@ def test_delegate_cli_contract_rejects_detached_exit_provider() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
                 "nodes": [
                     {
@@ -1247,6 +1152,11 @@ def test_delegate_cli_contract_rejects_detached_exit_provider() -> None:
                             {"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit code"}
                         ],
                         "async": "detached",
+                        "display_name": "Output",
+                        "description": "Exercises output in the delegated CLI test workflow.",
+                        "status": "planned",
+                        "flow_kind": "process",
+                        "requires": [],
                     }
                 ],
             }
@@ -1291,23 +1201,21 @@ def test_delegate_cli_executes_normal_business_graph_once_in_every_execution_mod
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit"}],
                 "nodes": [
-                    {"id": "start", "type_used": "delegate.start"},
+                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
                     {
                         "id": "output",
                         "type_used": "delegate.normal_exit",
-                        "provides": [
-                            {"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit"}
-                        ],
+                        "display_name": "Output",
+                        "description": "Exercises output in the delegated CLI test workflow.",
                     },
                     {
                         "id": "end",
                         "type_used": "delegate.exit_end",
-                        "requires": [
-                            {"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit"}
-                        ],
+                        "display_name": "End",
+                        "description": "Exercises end in the delegated CLI test workflow.",
                     },
                 ],
                 "edges": [["start", "output"], ["output", "end"]],
@@ -1360,17 +1268,15 @@ def test_real_argparse_help_and_error_keep_business_streams_and_exit_codes(tmp_p
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit"}],
                 "nodes": [
-                    {"id": "start", "type_used": "delegate.start"},
+                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
                     {
                         "id": "exit",
                         "type_used": "delegate.argparse_exit",
-                        "requires": [{"type": "cli.argv", "cardinality": "exactly_one", "display_name": "CLI argv"}],
-                        "provides": [
-                            {"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit"}
-                        ],
+                        "display_name": "Exit",
+                        "description": "Exercises exit in the delegated CLI test workflow.",
                     },
                 ],
                 "edges": [["start", "exit"]],
@@ -1477,19 +1383,19 @@ def test_async_authorized_system_exit_stops_outer_runtime(tmp_path) -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
                 "nodes": [
-                    {"id": "start", "type_used": "delegate.start"},
+                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
                     {
                         "id": "exit",
                         "type_used": "delegate.authorized_exit",
-                        "requires": [{"type": "cli.argv", "cardinality": "exactly_one", "display_name": "CLI argv"}],
-                        "provides": [{"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit code"}],
                         "async": "result_key",
                         "result_key": "cli.exit_code",
+                        "display_name": "Exit",
+                        "description": "Exercises exit in the delegated CLI test workflow.",
                     },
-                    {"id": "end", "type_used": "delegate.exit_end"},
+                    {"id": "end", "type_used": "delegate.exit_end", "display_name": "End", "description": "Exercises end in the delegated CLI test workflow."},
                 ],
                 "edges": [["start", "exit"], ["exit", "end"]],
             }
@@ -1508,19 +1414,19 @@ def test_normal_runtime_async_node_system_exit_is_pipeline_failure(tmp_path) -> 
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
                 "nodes": [
-                    {"id": "start", "type_used": "delegate.start"},
+                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
                     {
                         "id": "exit",
                         "type_used": "delegate.authorized_exit",
-                        "requires": [{"type": "cli.argv", "cardinality": "exactly_one", "display_name": "CLI argv"}],
-                        "provides": [{"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit code"}],
                         "async": "result_key",
                         "result_key": "cli.exit_code",
+                        "display_name": "Exit",
+                        "description": "Exercises exit in the delegated CLI test workflow.",
                     },
-                    {"id": "end", "type_used": "delegate.exit_end"},
+                    {"id": "end", "type_used": "delegate.exit_end", "display_name": "End", "description": "Exercises end in the delegated CLI test workflow."},
                 ],
                 "edges": [["start", "exit"], ["exit", "end"]],
             }
@@ -1607,11 +1513,11 @@ def test_nested_authorized_system_exit_stops_outer_runtime(tmp_path) -> None:
         "requires": [{"type": "cli.argv", "cardinality": "exactly_one", "display_name": "CLI argv"}],
         "provides": [{"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit code"}],
         "pipeline": {
-            "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+            "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
             "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
             "nodes": [
-                {"id": "inner_start", "type_used": "delegate.start"},
-                {"id": "inner_exit", "type_used": "delegate.authorized_exit"},
+                {"id": "inner_start", "type_used": "delegate.start", "display_name": "Inner Start", "description": "Exercises inner_start in the delegated CLI test workflow."},
+                {"id": "inner_exit", "type_used": "delegate.authorized_exit", "display_name": "Inner Exit", "description": "Exercises inner_exit in the delegated CLI test workflow."},
             ],
             "edges": [["inner_start", "inner_exit"]],
         },
@@ -1620,15 +1526,15 @@ def test_nested_authorized_system_exit_stops_outer_runtime(tmp_path) -> None:
         {
             "nodesets": [inner],
             "pipeline": {
-                "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
                 "nodes": [
-                    {"id": "start", "type_used": "delegate.start"},
+                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
                     {
                         "id": "inner",
                         "type_used": "delegate.inner",
-                        "requires": [{"type": "cli.argv", "cardinality": "exactly_one", "display_name": "CLI argv"}],
-                        "provides": [{"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit code"}],
+                        "display_name": "Inner",
+                        "description": "Exercises inner in the delegated CLI test workflow.",
                     },
                 ],
                 "edges": [["start", "inner"]],

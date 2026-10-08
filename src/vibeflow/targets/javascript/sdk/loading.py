@@ -1,12 +1,12 @@
 """Load fixed JS/TS definitions through the existing Target worker."""
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 import weakref
 import atexit
 
-from vibeflow.core.descriptors.contributions import ContributionBuilder, ResourceOrigin
+from vibeflow.core.descriptors.contributions import PluginContributions, ResourceDeclaration, ResourceOrigin
 from vibeflow.core.descriptors.decode import decode_resource
 from vibeflow.targets.javascript.build.plugin_session import JavascriptPluginSession
 
@@ -21,13 +21,18 @@ class JavascriptPluginDefinition:
     load_states: Any
     session: Any
     declaration: Any = None
+    _fixed_contributions: PluginContributions = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self):
+        resources = tuple(ResourceDeclaration(descriptor,
+            ResourceOrigin(self.id, location.get("path", self.source), location.get("line"),
+                           location.get("column"), location.get("symbol", "")))
+            for descriptor, location in self.resources)
+        object.__setattr__(self, "_fixed_contributions", PluginContributions(
+            self.id, resources, source=self.source, declaration=self.declaration or {}))
 
     def contributions(self, config=None):
-        builder = ContributionBuilder(self.id, source=self.source)
-        for descriptor, location in self.resources:
-            builder.add(descriptor, origin=ResourceOrigin(self.id, location.get("path", self.source),
-                location.get("line"), location.get("column"), location.get("symbol", "")))
-        return replace(builder.finish(config=config), declaration=self.declaration or {})
+        return self._fixed_contributions._with_config(config)
 
     def close(self):
         self.session.__exit__(None, None, None)
@@ -44,8 +49,14 @@ def attach_catalog(catalog, definitions):
 
 
 def _release_catalog(key):
+    errors = []
     for definition in _definitions.pop(key, ()):
-        definition.close()
+        try:
+            definition.close()
+        except Exception as error:
+            errors.append(error)
+    from vibeflow.targets.javascript.build.cleanup import finish_cleanup
+    finish_cleanup(None, errors)
 
 
 def contribution_session(catalog, group, resource_id):
@@ -58,8 +69,14 @@ def contribution_session(catalog, group, resource_id):
 
 @atexit.register
 def _close_definitions():
+    errors = []
     for key in tuple(_definitions):
-        _release_catalog(key)
+        try:
+            _release_catalog(key)
+        except Exception as error:
+            errors.append(error)
+    from vibeflow.targets.javascript.build.cleanup import finish_cleanup
+    finish_cleanup(None, errors)
 
 
 def load_plugin(source, *, root, project_config, node_command="node"):
@@ -90,9 +107,9 @@ process.stdout.write(entry);
     try:
         result = session.declarations(module=module, package_root=package_root, export=source.export or "plugin")
     except Exception as exc:
-        session.__exit__(None, None, None)
+        session.__exit__(type(exc), exc, exc.__traceback__)
         from vibeflow.targets.javascript.frontend.plugin_descriptors import JavascriptPluginError
-        if getattr(exc,"code","") == "DESCRIPTOR.INVALID":
+        if getattr(exc,"code","") in {"DESCRIPTOR.INVALID", "RESOURCE.IMPLEMENTATION.CONFLICT"}:
             exc.location = dict(exc.details.get("location", {}))
             raise
         raise JavascriptPluginError("PLUGIN.DECLARATION.LOAD", f"could not load fixed plugin {module}: {exc}", details=getattr(exc,"details",{})) from exc
@@ -102,7 +119,7 @@ process.stdout.write(entry);
         try:
             descriptor = decode_resource(item["descriptor"])
         except ValueError as error:
-            session.__exit__(None, None, None)
+            session.__exit__(type(error), error, error.__traceback__)
             error.location = location
             raise
         resources.append((descriptor, location))
@@ -114,5 +131,9 @@ process.stdout.write(entry);
             for member in getattr(implementation,"implementation_files",()):
                 if member.ref.endswith((".d.ts",".d.mts",".d.cts")):
                     states[member.ref]="not_loaded"
-    return JavascriptPluginDefinition(result["id"], resources, result.get("config_schema", {}),
-                                      result.get("config_defaults", {}), str(module), states, session, result.get("declaration", {}))
+    try:
+        return JavascriptPluginDefinition(result["id"], resources, result.get("config_schema", {}),
+                                          result.get("config_defaults", {}), str(module), states, session, result.get("declaration", {}))
+    except Exception as exc:
+        session.__exit__(type(exc), exc, exc.__traceback__)
+        raise

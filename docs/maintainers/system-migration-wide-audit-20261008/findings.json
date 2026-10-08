@@ -1,0 +1,116 @@
+{
+  "date": "2026-10-08",
+  "head": "9c443f3111e65e6f99842d86d983416a745d391b",
+  "development_version": "0.16.0",
+  "audited_state": "actual uncommitted working tree",
+  "preexisting_git_status_entries": 457,
+  "product_files": 333,
+  "python_files": 314,
+  "mutations": "new audit report/evidence and docs index only",
+  "confirmed_class_count": 11,
+  "counting_unit": "mechanism classes, not individual files or symbols",
+  "findings": [
+    {
+      "id": "M01",
+      "classification": "behavior",
+      "title": "BaseLib旧AST遍历与其他资源效果检查不一致",
+      "path": "src/vibeflow/targets/python/quality/rules/effects.py",
+      "line": 27,
+      "evidence": "python-cli-observations.json",
+      "layer_id": "PY-A01"
+    },
+    {
+      "id": "M02",
+      "classification": "behavior",
+      "title": "Plugin未消费真实调用事实导致名称误判",
+      "path": "src/vibeflow/targets/python/quality/rules/effects.py",
+      "line": 51,
+      "evidence": "python-cli-observations.json",
+      "layer_id": "PY-A02"
+    },
+    {
+      "id": "M03",
+      "classification": "parameter_contract",
+      "title": "JS已选择Rule参数未完整传入判定",
+      "path": "src/vibeflow/targets/javascript/quality/builtin_plugin.py",
+      "line": 21,
+      "evidence": "javascript-formal-policy.json",
+      "layer_id": "JS-M01"
+    },
+    {
+      "id": "M04",
+      "classification": "cleanup",
+      "title": "旧耦合诊断映射分支被前缀返回遮蔽",
+      "path": "src/vibeflow/targets/python/quality/source_analysis/types.py",
+      "line": 194,
+      "evidence": "python-native-and-mapping.json",
+      "layer_id": null
+    },
+    {
+      "id": "M05",
+      "classification": "cleanup",
+      "title": "旧runtime输入转换私有死链",
+      "path": "src/vibeflow/targets/python/runtime/values.py",
+      "line": 11,
+      "evidence": "python-findings.json",
+      "layer_id": "PY-A03"
+    },
+    {
+      "id": "M06",
+      "classification": "cleanup",
+      "title": "旧资源路径与模块搜索helper",
+      "path": "src/vibeflow/tooling/project/resource_helpers.py",
+      "line": 10,
+      "evidence": "core-tooling-findings.json",
+      "layer_id": "C01"
+    },
+    {
+      "id": "M07",
+      "classification": "cleanup_stale_test",
+      "title": "JS旧成对发布事务只有直接单测调用",
+      "path": "src/vibeflow/tooling/application/javascript/cli.py",
+      "line": 954,
+      "evidence": "core-tooling-findings.json",
+      "layer_id": "C02"
+    },
+    {
+      "id": "M08",
+      "classification": "cleanup_stale_test",
+      "title": "旧浏览器首选helper只有直接单测调用",
+      "path": "src/vibeflow/tooling/presentation/mermaid.py",
+      "line": 398,
+      "evidence": "core-tooling-findings.json",
+      "layer_id": "C03"
+    },
+    {
+      "id": "M09",
+      "classification": "cleanup_protocol",
+      "title": "JS失效ownership topic和无reader的effectScope",
+      "path": "src/vibeflow/targets/javascript/quality/builtin_plugin.py",
+      "line": 32,
+      "evidence": "javascript-probes.json",
+      "layer_id": "JS-M02"
+    },
+    {
+      "id": "M10",
+      "classification": "test_migration_debt",
+      "title": "活动测试仍转换并删除旧调用点契约",
+      "path": "tests/targets/python/strict_node_purity.py",
+      "line": 20,
+      "evidence": "test-local-migration-bridges.json",
+      "layer_id": null
+    },
+    {
+      "id": "M11",
+      "classification": "maintenance_policy",
+      "title": "文档检查器版本建议过期且误判历史对照",
+      "path": "quality/src/vibeflow_quality/profiles.py",
+      "line": 93,
+      "evidence": "documentation-history-policy.json",
+      "layer_id": null
+    }
+  ],
+  "retained_boundaries": "See the main report and layer reports; they are not included in confirmed_class_count.",
+  "release_boundary": "default dist profiles are 0.15.2; src is 0.16.0; no old dist kernel dependency in current source entrypoint",
+  "validation_limit": "No full regression rerun; directional actual CLI/Rule/driver probes, source and wheel comparisons, history and consumer tracing."
+}

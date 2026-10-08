@@ -96,7 +96,7 @@
     {
       "name": "base_lib_escape",
       "module_source": "from nodes.some_node import SomeNode\n\n\ndef helper():\n    return 1\n",
-      "expected_rule_id": "BASE_LIB.FORBIDDEN_PROJECT_IMPORT"
+      "expected_rule_id": "VF_IMPORT_LAYER"
     }
   ],
   "health_cases": [
@@ -109,7 +109,8 @@
             {
               "key": "value.in",
               "type": "value.in",
-              "display_name": "Value In"
+              "display_name": "Value In",
+              "required": true
             }
           ],
           "nodes": [

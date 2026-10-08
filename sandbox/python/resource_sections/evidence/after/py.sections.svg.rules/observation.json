@@ -1,0 +1,176 @@
+{
+  "exit_code": 0,
+  "error": null,
+  "frames": [
+    {
+      "title": "main pipeline",
+      "direction": "flowchart TD",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.sections.svg.rules/fragment-00.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 575.3515625,
+      "height": 1679.800048828125
+    },
+    {
+      "title": "Plugins",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.sections.svg.rules/fragment-01.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": true,
+      "width": 1610.5953369140625,
+      "height": 1600.1455078125
+    },
+    {
+      "title": "BaseLib",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.sections.svg.rules/fragment-02.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": true,
+      "width": 1294.4453125,
+      "height": 760.8499755859375
+    },
+    {
+      "title": "Node types and rules",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.sections.svg.rules/fragment-03.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": true,
+      "width": 2491.375,
+      "height": 10913.4453125
+    },
+    {
+      "title": "parent flow",
+      "direction": "flowchart TD",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.sections.svg.rules/fragment-04.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 427.8691711425781,
+      "height": 1937.199951171875
+    },
+    {
+      "title": "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.sections.svg.rules/fragment-05.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 2395.75390625,
+      "height": 272.0
+    },
+    {
+      "title": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.sections.svg.rules/fragment-06.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 1963.02734375,
+      "height": 272.0
+    },
+    {
+      "title": "parent flow",
+      "direction": "flowchart TD",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.sections.svg.rules/fragment-07.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 427.8691711425781,
+      "height": 1937.199951171875
+    },
+    {
+      "title": "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.sections.svg.rules/fragment-08.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 2395.75390625,
+      "height": 272.0
+    },
+    {
+      "title": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+      "direction": "flowchart LR",
+      "mermaid_path": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.sections.svg.rules/fragment-09.mmd",
+      "resource_groups": [],
+      "has_resource_nodes": false,
+      "width": 1963.02734375,
+      "height": 272.0
+    }
+  ],
+  "panels": [
+    {
+      "parent": "parent flow",
+      "children": [
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "positions": [
+        {
+          "title": "parent flow",
+          "x": 24.0,
+          "y": 52.0
+        },
+        {
+          "title": "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+          "x": 507.869,
+          "y": 52.0
+        },
+        {
+          "title": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+          "x": 507.869,
+          "y": 400.0
+        }
+      ]
+    },
+    {
+      "parent": "parent flow",
+      "children": [
+        "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+        "inner_c (id: inner_c, type_key: layout.leaf_b)"
+      ],
+      "positions": [
+        {
+          "title": "parent flow",
+          "x": 24.0,
+          "y": 52.0
+        },
+        {
+          "title": "Leaf A (calls: 2 [inner_a, inner_b], type_key: layout.leaf_a)",
+          "x": 507.869,
+          "y": 52.0
+        },
+        {
+          "title": "inner_c (id: inner_c, type_key: layout.leaf_b)",
+          "x": 507.869,
+          "y": 400.0
+        }
+      ]
+    }
+  ],
+  "columns": [
+    [
+      "main pipeline"
+    ],
+    [
+      "Plugins"
+    ],
+    [
+      "BaseLib"
+    ],
+    [
+      "Node types and rules"
+    ],
+    [
+      "Outer (calls: 2 [outer_a, outer_b], type_key: layout.outer)",
+      "loop (id: loop, type_key: layout.outer)"
+    ]
+  ],
+  "seconds": 5.6388640310033225,
+  "arguments": [
+    "export-svg",
+    "--workspace",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.sections.svg.rules/vibeflow_config.jsonc",
+    "--config",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.sections.svg.rules/workflow.jsonc",
+    "--output",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-final/py.sections.svg.rules/graph.svg",
+    "--expand-nodesets",
+    "--show-rules"
+  ]
+}

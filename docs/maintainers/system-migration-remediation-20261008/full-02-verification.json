@@ -1,0 +1,95 @@
+{
+  "steps": [
+    {
+      "step": "repository-quality",
+      "status": "passed",
+      "seconds": 7.287914604006801
+    },
+    {
+      "step": "compileall",
+      "status": "passed",
+      "seconds": 1.5575464210123755
+    },
+    {
+      "step": "pytest",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'tools/run_tests.py', '--workers', '8', '--scratch', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/pytest', '--', '/home/rockingsisyphus/projects/VibeFlow/tests/core', '/home/rockingsisyphus/projects/VibeFlow/tests/block_compiler', '/home/rockingsisyphus/projects/VibeFlow/tests/targets', '/home/rockingsisyphus/projects/VibeFlow/tests/tooling', '/home/rockingsisyphus/projects/VibeFlow/tests/conformance', '/home/rockingsisyphus/projects/VibeFlow/tests/integration')' returned non-zero exit status 1.",
+      "seconds": 170.73293189698597
+    },
+    {
+      "step": "python-sandbox",
+      "status": "passed",
+      "seconds": 513.6441073980532
+    },
+    {
+      "step": "javascript-minimal",
+      "status": "passed",
+      "seconds": 14.93526950897649
+    },
+    {
+      "step": "javascript-integration",
+      "status": "passed",
+      "seconds": 185.14661357802106
+    },
+    {
+      "step": "rule-regression-sandboxes",
+      "status": "failed",
+      "error": "rule sandbox failures: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/rule_parity/run_all.py', '--workers', '8', '--current-only', '--toolchain', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/pytest/javascript-toolchain', '--work', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/rule-parity', '--report', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/rule-parity.json')' returned non-zero exit status 1.; Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/rule_gaps/run_all.py', '--workers', '8', '--toolchain', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/pytest/javascript-toolchain', '--renderer', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/puppeteer', '--work', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/rule-gaps', '--report', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/rule-gaps.json')' returned non-zero exit status 1.",
+      "seconds": 920.6294931350276
+    },
+    {
+      "step": "runtime-observation-browser",
+      "status": "passed",
+      "seconds": 3.0078489339794032
+    },
+    {
+      "step": "review-layout-sandbox",
+      "status": "passed",
+      "seconds": 19.211131641000975
+    },
+    {
+      "step": "resource-sections-sandbox",
+      "status": "passed",
+      "seconds": 63.551865780958906
+    },
+    {
+      "step": "review-performance-sandbox",
+      "status": "passed",
+      "seconds": 68.8518400429748
+    },
+    {
+      "step": "adaptation-regression-sandbox",
+      "status": "passed",
+      "seconds": 95.35469410696533
+    },
+    {
+      "step": "wheel-isolation",
+      "status": "passed",
+      "seconds": 7.285634846019093
+    },
+    {
+      "step": "generated-artifact-cleanup",
+      "status": "passed",
+      "seconds": 0.12364098796388134
+    },
+    {
+      "step": "distribution",
+      "status": "passed",
+      "seconds": 16.79249158804305
+    },
+    {
+      "step": "repository-quality-final",
+      "status": "passed",
+      "seconds": 5.348799042985775
+    },
+    {
+      "step": "clean-tree",
+      "status": "passed",
+      "seconds": 0.07693333900533617
+    }
+  ],
+  "failures": [
+    "pytest failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'tools/run_tests.py', '--workers', '8', '--scratch', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/pytest', '--', '/home/rockingsisyphus/projects/VibeFlow/tests/core', '/home/rockingsisyphus/projects/VibeFlow/tests/block_compiler', '/home/rockingsisyphus/projects/VibeFlow/tests/targets', '/home/rockingsisyphus/projects/VibeFlow/tests/tooling', '/home/rockingsisyphus/projects/VibeFlow/tests/conformance', '/home/rockingsisyphus/projects/VibeFlow/tests/integration')' returned non-zero exit status 1.",
+    "rule-regression-sandboxes failed: rule sandbox failures: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/rule_parity/run_all.py', '--workers', '8', '--current-only', '--toolchain', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/pytest/javascript-toolchain', '--work', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/rule-parity', '--report', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/rule-parity.json')' returned non-zero exit status 1.; Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/rule_gaps/run_all.py', '--workers', '8', '--toolchain', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/pytest/javascript-toolchain', '--renderer', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/puppeteer', '--work', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/rule-gaps', '--report', '/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-02/rule-gaps.json')' returned non-zero exit status 1."
+  ]
+}

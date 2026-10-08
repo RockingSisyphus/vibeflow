@@ -64,11 +64,7 @@ def _planned_health_facts(
 
 
 def planned_health_events(graph):
-    from vibeflow.core.rules.builtin.workflow import evaluate_workflow_topic
-    result = evaluate_workflow_topic("planned", graph=graph)
-    if result.state != "completed":
-        return result.findings
-    return tuple(result.records["events"].value)
+    return _planned_health_facts(graph)
 
 
 def graph_has_planned(graph, *, visited_nodesets: set[str] | None = None) -> bool:

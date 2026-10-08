@@ -1,0 +1,346 @@
+{
+  "cases": [
+    {
+      "id": "py.sections.review.default",
+      "theme": "resource-sections",
+      "title": "Split resources and display-only Nodeset folding",
+      "expected": {
+        "exit_code": 0
+      },
+      "actual": {
+        "exit_code": 1,
+        "error": null,
+        "frames": [],
+        "panels": [],
+        "columns": [],
+        "seconds": 0.3318202779919375,
+        "arguments": [
+          "review",
+          "--workspace",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.sections.review.default/vibeflow_config.jsonc",
+          "--config",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.sections.review.default/workflow.jsonc",
+          "--output",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.sections.review.default/graph.svg"
+        ],
+        "stdout": "{\"report\": \"/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.sections.review.default/observation.json\", \"exit_code\": 1, \"error\": null}\n",
+        "stderr": ""
+      },
+      "matched": false,
+      "failures": [
+        "expected CLI exit 0, got 1: None"
+      ],
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.sections.review.default"
+    },
+    {
+      "id": "py.sections.review.rules",
+      "theme": "resource-sections",
+      "title": "Split resources and display-only Nodeset folding",
+      "expected": {
+        "exit_code": 0
+      },
+      "actual": {
+        "exit_code": 1,
+        "error": null,
+        "frames": [],
+        "panels": [],
+        "columns": [],
+        "seconds": 0.32587755599524826,
+        "arguments": [
+          "review",
+          "--workspace",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.sections.review.rules/vibeflow_config.jsonc",
+          "--config",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.sections.review.rules/workflow.jsonc",
+          "--output",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.sections.review.rules/graph.svg",
+          "--show-rules"
+        ],
+        "stdout": "{\"report\": \"/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.sections.review.rules/observation.json\", \"exit_code\": 1, \"error\": null}\n",
+        "stderr": ""
+      },
+      "matched": false,
+      "failures": [
+        "expected CLI exit 0, got 1: None"
+      ],
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.sections.review.rules"
+    },
+    {
+      "id": "py.sections.svg.rules",
+      "theme": "resource-sections",
+      "title": "Observation failed",
+      "expected": {},
+      "actual": {
+        "error": "RuntimeError('formal CLI observer failed: ')"
+      },
+      "matched": false,
+      "failures": [
+        "RuntimeError('formal CLI observer failed: ')"
+      ],
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.sections.svg.rules"
+    },
+    {
+      "id": "py.sections.mermaid.columns",
+      "theme": "resource-sections",
+      "title": "Observation failed",
+      "expected": {},
+      "actual": {
+        "error": "RuntimeError('formal CLI observer failed: ')"
+      },
+      "matched": false,
+      "failures": [
+        "RuntimeError('formal CLI observer failed: ')"
+      ],
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.sections.mermaid.columns"
+    },
+    {
+      "id": "py.sections.mermaid.rules",
+      "theme": "resource-sections",
+      "title": "Observation failed",
+      "expected": {},
+      "actual": {
+        "error": "RuntimeError('formal CLI observer failed: ')"
+      },
+      "matched": false,
+      "failures": [
+        "RuntimeError('formal CLI observer failed: ')"
+      ],
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.sections.mermaid.rules"
+    },
+    {
+      "id": "py.expand.outer.false",
+      "theme": "resource-sections",
+      "title": "Split resources and display-only Nodeset folding",
+      "expected": {
+        "exit_code": 0
+      },
+      "actual": {
+        "exit_code": 1,
+        "error": null,
+        "frames": [],
+        "panels": [],
+        "columns": [],
+        "seconds": 0.31746421998832375,
+        "arguments": [
+          "review",
+          "--workspace",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.outer.false/vibeflow_config.jsonc",
+          "--config",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.outer.false/workflow.jsonc",
+          "--output",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.outer.false/graph.svg"
+        ],
+        "stdout": "{\"report\": \"/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.outer.false/observation.json\", \"exit_code\": 1, \"error\": null}\n",
+        "stderr": ""
+      },
+      "matched": false,
+      "failures": [
+        "expected CLI exit 0, got 1: None"
+      ],
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.outer.false"
+    },
+    {
+      "id": "py.expand.inner.false",
+      "theme": "resource-sections",
+      "title": "Split resources and display-only Nodeset folding",
+      "expected": {
+        "exit_code": 0
+      },
+      "actual": {
+        "exit_code": 1,
+        "error": null,
+        "frames": [],
+        "panels": [],
+        "columns": [],
+        "seconds": 0.3277783730009105,
+        "arguments": [
+          "review",
+          "--workspace",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.inner.false/vibeflow_config.jsonc",
+          "--config",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.inner.false/workflow.jsonc",
+          "--output",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.inner.false/graph.svg"
+        ],
+        "stdout": "{\"report\": \"/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.inner.false/observation.json\", \"exit_code\": 1, \"error\": null}\n",
+        "stderr": ""
+      },
+      "matched": false,
+      "failures": [
+        "expected CLI exit 0, got 1: None"
+      ],
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.inner.false"
+    },
+    {
+      "id": "py.expand.shared.false",
+      "theme": "resource-sections",
+      "title": "Split resources and display-only Nodeset folding",
+      "expected": {
+        "exit_code": 0
+      },
+      "actual": {
+        "exit_code": 0,
+        "error": null,
+        "frames": [],
+        "panels": [],
+        "columns": [],
+        "seconds": 0.3552254739915952,
+        "arguments": [
+          "export-mermaid",
+          "--workspace",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.shared.false/vibeflow_config.jsonc",
+          "--config",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.shared.false/workflow.jsonc",
+          "--output",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.shared.false/graph.mmd",
+          "--expand-nodesets"
+        ],
+        "stdout": "{\"report\": \"/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.shared.false/observation.json\", \"exit_code\": 0, \"error\": null}\n",
+        "stderr": ""
+      },
+      "matched": true,
+      "failures": [],
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.shared.false"
+    },
+    {
+      "id": "py.expand.loop.false",
+      "theme": "resource-sections",
+      "title": "Observation failed",
+      "expected": {},
+      "actual": {
+        "error": "RuntimeError('formal CLI observer failed: ')"
+      },
+      "matched": false,
+      "failures": [
+        "RuntimeError('formal CLI observer failed: ')"
+      ],
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.loop.false"
+    },
+    {
+      "id": "py.expand.ascii.false",
+      "theme": "resource-sections",
+      "title": "Split resources and display-only Nodeset folding",
+      "expected": {
+        "exit_code": 0
+      },
+      "actual": {
+        "exit_code": 0,
+        "error": null,
+        "frames": [],
+        "panels": [],
+        "columns": [],
+        "seconds": 0.356907322013285,
+        "arguments": [
+          "export-ascii",
+          "--workspace",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.ascii.false/vibeflow_config.jsonc",
+          "--config",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.ascii.false/workflow.jsonc",
+          "--output",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.ascii.false/graph.txt",
+          "--expand-nodesets"
+        ],
+        "stdout": "{\"report\": \"/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.ascii.false/observation.json\", \"exit_code\": 0, \"error\": null}\n",
+        "stderr": ""
+      },
+      "matched": true,
+      "failures": [],
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.ascii.false"
+    },
+    {
+      "id": "py.expand.validate.false",
+      "theme": "resource-sections",
+      "title": "Split resources and display-only Nodeset folding",
+      "expected": {
+        "exit_code": 0
+      },
+      "actual": {
+        "exit_code": 1,
+        "error": null,
+        "frames": [],
+        "panels": [],
+        "columns": [],
+        "seconds": 0.3060792610049248,
+        "arguments": [
+          "validate",
+          "--workspace",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.validate.false/vibeflow_config.jsonc",
+          "--config",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.validate.false/workflow.jsonc",
+          "--json"
+        ],
+        "stdout": "{\"report\": \"/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.validate.false/observation.json\", \"exit_code\": 1, \"error\": null}\n",
+        "stderr": ""
+      },
+      "matched": false,
+      "failures": [
+        "expected CLI exit 0, got 1: None"
+      ],
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.validate.false"
+    },
+    {
+      "id": "py.expand.quality.false",
+      "theme": "resource-sections",
+      "title": "Observation failed",
+      "expected": {},
+      "actual": {
+        "error": "RuntimeError('formal CLI observer failed: ')"
+      },
+      "matched": false,
+      "failures": [
+        "RuntimeError('formal CLI observer failed: ')"
+      ],
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.quality.false"
+    },
+    {
+      "id": "py.expand.health.false",
+      "theme": "resource-sections",
+      "title": "Split resources and display-only Nodeset folding",
+      "expected": {
+        "exit_code": 1
+      },
+      "actual": {
+        "exit_code": 1,
+        "error": null,
+        "frames": [],
+        "panels": [],
+        "columns": [],
+        "seconds": 0.325087027013069,
+        "arguments": [
+          "validate",
+          "--workspace",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.health.false/vibeflow_config.jsonc",
+          "--config",
+          "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.health.false/workflow.jsonc",
+          "--json"
+        ],
+        "stdout": "{\"report\": \"/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.health.false/observation.json\", \"exit_code\": 1, \"error\": null}\n",
+        "stderr": ""
+      },
+      "matched": false,
+      "failures": [
+        "the folded body must retain its selected health rule diagnostic"
+      ],
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.health.false"
+    },
+    {
+      "id": "py.expand.run.false",
+      "theme": "resource-sections",
+      "title": "Observation failed",
+      "expected": {},
+      "actual": {
+        "error": "RuntimeError('formal CLI observer failed: ')"
+      },
+      "matched": false,
+      "failures": [
+        "RuntimeError('formal CLI observer failed: ')"
+      ],
+      "artifact_root": "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/python-after/py.expand.run.false"
+    }
+  ],
+  "summary": {
+    "cases": 14,
+    "matched": 2,
+    "unmatched": 12
+  }
+}

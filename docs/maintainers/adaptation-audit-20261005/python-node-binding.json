@@ -1,0 +1,146 @@
+[
+  {
+    "variant": "declared_other_direct_actual",
+    "command": "validate",
+    "exit_code": 0,
+    "status": "PASS",
+    "node_step0_metrics": {
+      "source_lines": 3,
+      "source_bytes": 80,
+      "function_count": 1,
+      "branch_count": 0,
+      "max_nesting_depth": 0,
+      "param_count": 0,
+      "contract_key_count": 1,
+      "function_names": [
+        "run_pure"
+      ],
+      "call_chain_length": 1,
+      "call_chain_path": [
+        "run_pure"
+      ],
+      "recursive_call_chains": [],
+      "max_dependency_chain_length": 0,
+      "max_dependency_chain": [],
+      "imported_base_lib_modules": [],
+      "run_pure_fingerprint": "FunctionDef('_', arguments([], [arg('_'), arg('_'), arg('_')]), [Return(Dict([Constant('<str>')], [Constant(0)]))])",
+      "run_pure_shape": "literal",
+      "requires_count": 0,
+      "provides_count": 1
+    },
+    "errors": [],
+    "stdout_marker": false,
+    "stdout_path": "/tmp/vf-sdk-declared-source-binding-probe/declared_other_direct_actual-validate.stdout.txt"
+  },
+  {
+    "variant": "declared_other_direct_actual",
+    "command": "run",
+    "exit_code": 0,
+    "status": "PASS",
+    "node_step0_metrics": null,
+    "errors": [],
+    "stdout_marker": true,
+    "stdout_path": "/tmp/vf-sdk-declared-source-binding-probe/declared_other_direct_actual-run.stdout.txt"
+  },
+  {
+    "variant": "auto_declares_actual",
+    "command": "validate",
+    "exit_code": 1,
+    "status": "FAIL",
+    "node_step0_metrics": {
+      "source_lines": 12,
+      "source_bytes": 596,
+      "function_count": 1,
+      "branch_count": 1,
+      "max_nesting_depth": 1,
+      "param_count": 0,
+      "contract_key_count": 1,
+      "function_names": [
+        "run_pure"
+      ],
+      "call_chain_length": 1,
+      "call_chain_path": [
+        "run_pure"
+      ],
+      "recursive_call_chains": [],
+      "max_dependency_chain_length": 0,
+      "max_dependency_chain": [],
+      "imported_base_lib_modules": [],
+      "run_pure_fingerprint": "FunctionDef('_', arguments([], [arg('_'), arg('_'), arg('_')]), [Expr(Call(Name('print', Load()), [Constant('<str>')])), Assign([Name('value', Store())], Constant(0)), If(Compare(Name('value', Load()), [NotEq()], [Constant(0)]), [Raise(Call(Name('ValueError', Load()), [Constant('<str>')]))]), Return(Dict([Constant('<str>')], [Name('value', Load())]))])",
+      "run_pure_shape": "logic",
+      "requires_count": 0,
+      "provides_count": 1
+    },
+    "errors": [
+      {
+        "code": "NODE.EFFECT.CALL_FORBIDDEN",
+        "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+        "severity": "error",
+        "object_type": "node",
+        "object_id": "perf.step.0",
+        "source_location": {
+          "path": "/tmp/vf-sdk-declared-source-binding-probe/nodes/group0.py",
+          "line": 7,
+          "column": 9
+        },
+        "rule_source": "ruleset.selection",
+        "failure_layer": "implementation",
+        "message": "banned call: print",
+        "suggested_fix_type": "move_to_boundary",
+        "details": {
+          "node_type": "perf.step.0",
+          "calls": [
+            {
+              "owner": "pipeline",
+              "node": "step0"
+            }
+          ]
+        },
+        "root_id": "perf",
+        "source_path": "/tmp/vf-sdk-declared-source-binding-probe/nodes/group0.py",
+        "definition_id": "vibeflow.no_side_effects"
+      }
+    ],
+    "stdout_marker": false,
+    "stdout_path": "/tmp/vf-sdk-declared-source-binding-probe/auto_declares_actual-validate.stdout.txt"
+  },
+  {
+    "variant": "auto_declares_actual",
+    "command": "run",
+    "exit_code": 1,
+    "status": "FAIL",
+    "node_step0_metrics": null,
+    "errors": [
+      {
+        "code": "NODE.EFFECT.CALL_FORBIDDEN",
+        "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+        "severity": "error",
+        "object_type": "node",
+        "object_id": "perf.step.0",
+        "source_location": {
+          "path": "/tmp/vf-sdk-declared-source-binding-probe/nodes/group0.py",
+          "line": 7,
+          "column": 9
+        },
+        "rule_source": "ruleset.selection",
+        "failure_layer": "implementation",
+        "message": "banned call: print",
+        "suggested_fix_type": "move_to_boundary",
+        "details": {
+          "node_type": "perf.step.0",
+          "calls": [
+            {
+              "owner": "pipeline",
+              "node": "step0"
+            }
+          ]
+        },
+        "root_id": "perf",
+        "source_path": "/tmp/vf-sdk-declared-source-binding-probe/nodes/group0.py",
+        "definition_id": "vibeflow.no_side_effects"
+      }
+    ],
+    "stdout_marker": false,
+    "stdout_path": "/tmp/vf-sdk-declared-source-binding-probe/auto_declares_actual-run.stdout.txt"
+  }
+]

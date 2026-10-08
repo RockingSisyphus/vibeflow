@@ -1,0 +1,53 @@
+flowchart LR
+  vf_resource_3644c5cb6a448958@{ shape: stadium, label: "layout.end\nnode: layout.end\nstatus: implemented\nflow_kind: terminal\nrulesets: vibeflow.process, layout.health_set" }
+  style vf_resource_3644c5cb6a448958 fill:#ECECFF,stroke:#9370DB,color:#333333;
+  vf_resource_725ab9fde113f58d@{ shape: stadium, label: "layout.start\nnode: layout.start\nstatus: implemented\nflow_kind: terminal\nrulesets: vibeflow.process, layout.health_set" }
+  style vf_resource_725ab9fde113f58d fill:#ECECFF,stroke:#9370DB,color:#333333;
+  vf_resource_ab03b0f2dea275d5@{ shape: rounded, label: "layout.step\nnode: layout.step\nstatus: implemented\nflow_kind: process\nrulesets: vibeflow.process, layout.health_set" }
+  style vf_resource_ab03b0f2dea275d5 fill:#d6eaff,stroke:#425a78,color:#172b45;
+  vf_resource_dc0eb677c1dfc95c@{ shape: rounded, label: "layout.step_right\nnode: layout.step_right\nstatus: implemented\nflow_kind: process\nrulesets: vibeflow.process, layout.health_set" }
+  style vf_resource_dc0eb677c1dfc95c fill:#d6eaff,stroke:#425a78,color:#172b45;
+  vf_resource_4f544402d9513132@{ shape: hex, label: "layout.helper\nbase_lib: layout.helper\nstatus: implemented\nrulesets: vibeflow.base_lib" }
+  style vf_resource_4f544402d9513132 fill:#ffe6b3,stroke:#059669,color:#064e3b;
+  vf_resource_7b92c0fcd1260818@{ shape: hex, label: "Layout lifecycle\nplugin: layout.resources.compiler\nstatus: implemented\nrulesets: vibeflow.plugin" }
+  style vf_resource_7b92c0fcd1260818 fill:#d9e6ff,stroke:#2563eb,color:#1e3a8a;
+  vf_resource_c034ee488c5f87c8@{ shape: hex, label: "Layout lifecycle\nplugin: layout.resources.runtime\nstatus: implemented\nrulesets: vibeflow.plugin" }
+  style vf_resource_c034ee488c5f87c8 fill:#d9e6ff,stroke:#2563eb,color:#1e3a8a;
+  vf_resource_7d5d010e2e471ee1@{ shape: hex, label: "Layout lifecycle\nplugin_declaration: layout.resources\nstatus: implemented\nrulesets: vibeflow.plugin_declaration" }
+  style vf_resource_7d5d010e2e471ee1 fill:#d9e6ff,stroke:#2563eb,color:#1e3a8a;
+  vf_resource_737093298400a490@{ shape: doc, label: "steps.py\nentry\nloaded" }
+  vf_resource_619a51ddc5a287b2@{ shape: doc, label: "helper.py\nentry\nloaded" }
+  vf_resource_d56db0c4a752b5a1@{ shape: doc, label: "lifecycle.py\nentry\nloaded" }
+  vf_resource_366518403a057622@{ shape: doc, label: "code_plugin.py\nentry\nloaded" }
+  vf_resource_e8b5ee12a558ba69@{ shape: doc, label: "check.py\nentry\nloaded" }
+  vf_resource_906189a97e3062da@{ shape: doc, label: "__init__.py\nunregistered\nloaded" }
+  vf_resource_d669d8eb89f59370@{ shape: doc, label: "__init__.py\nunregistered\nloaded" }
+  vf_resource_c5e61922dc83d333@{ shape: doc, label: "__init__.py\nunregistered\nloaded" }
+  vf_resource_3644c5cb6a448958 -. "entry" .-> vf_resource_737093298400a490
+  vf_resource_725ab9fde113f58d -. "entry" .-> vf_resource_737093298400a490
+  vf_resource_ab03b0f2dea275d5 -. "entry" .-> vf_resource_737093298400a490
+  vf_resource_dc0eb677c1dfc95c -. "entry" .-> vf_resource_737093298400a490
+  vf_resource_4f544402d9513132 -. "entry" .-> vf_resource_619a51ddc5a287b2
+  vf_resource_7b92c0fcd1260818 -. "entry" .-> vf_resource_d56db0c4a752b5a1
+  vf_resource_c034ee488c5f87c8 -. "entry" .-> vf_resource_d56db0c4a752b5a1
+  vf_resource_7d5d010e2e471ee1 -. "entry" .-> vf_resource_366518403a057622
+  vf_resource_7d5d010e2e471ee1 -. "rule_implementation" .-> vf_resource_e8b5ee12a558ba69
+  vf_resource_737093298400a490 -. "import" .-> vf_resource_619a51ddc5a287b2
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_e8b5ee12a558ba69
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_e8b5ee12a558ba69
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_619a51ddc5a287b2
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_737093298400a490
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_737093298400a490
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_737093298400a490
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_737093298400a490
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_d56db0c4a752b5a1
+  vf_resource_366518403a057622 -. "import" .-> vf_resource_d56db0c4a752b5a1
+  vf_resource_7d5d010e2e471ee1 -. "contributes" .-> vf_resource_3644c5cb6a448958
+  vf_resource_7d5d010e2e471ee1 -. "contributes" .-> vf_resource_725ab9fde113f58d
+  vf_resource_ab03b0f2dea275d5 -. "base_lib" .-> vf_resource_4f544402d9513132
+  vf_resource_7d5d010e2e471ee1 -. "contributes" .-> vf_resource_ab03b0f2dea275d5
+  vf_resource_dc0eb677c1dfc95c -. "base_lib" .-> vf_resource_4f544402d9513132
+  vf_resource_7d5d010e2e471ee1 -. "contributes" .-> vf_resource_dc0eb677c1dfc95c
+  vf_resource_7d5d010e2e471ee1 -. "contributes" .-> vf_resource_4f544402d9513132
+  vf_resource_7d5d010e2e471ee1 -. "contributes" .-> vf_resource_7b92c0fcd1260818
+  vf_resource_7d5d010e2e471ee1 -. "contributes" .-> vf_resource_c034ee488c5f87c8

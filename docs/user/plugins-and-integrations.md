@@ -2,6 +2,8 @@
 
 固定插件贡献自定义 Node、Rule、Ruleset、DataSchema、BaseLib、Capability 和 HostExtension。Python 用 `Plugin`，JS/TS 用 `definePlugin`；workflow 的 `plugins` 显式选择本次使用的插件及资源。
 
+默认规则和资源由内置插件自动接入，Config 无需声明。它们与外部插件共用 Catalog、冲突诊断和实现绑定；报告记录实际声明及实现来源。资源存在与规则选择是独立的，`rulesets=[]` 不触发默认检查。
+
 ## 选择与配置
 
 ```jsonc
@@ -83,6 +85,8 @@ export const clock = defineCapability({
 把此资源放入插件，并贡献其输入输出 DataSchema。Node 显式声明使用的 Capability，宿主通过 options 注入实现，或由启用的 JS HostExtension 提供。`defineHostExtension` 使用 `createHost` 回调或显式延迟源码；固定声明不改变原生 Host 协议。
 
 Host 在 `host_extensions` 中选择，通常明确使用 `vibeflow.host_extension` Ruleset。入口及支撑文件共同实现一个 Host；每次创建时持有独立会话状态。`implementation_files` 登记内部文件，`base_libs` 引用共享库，`dependencies` 表达其他 Host 实例依赖。多文件示例、逐文件检查和架构资源区见[一个 Host，多个实现文件](multifile-resources.md#一个-host多个实现文件)。
+
+选择统一写在 workflow.host_extensions；旧项目级 Host 字段会返回迁移错误。
 
 ```bash
 python run.py inspect-resources --config <root>/configs/main.jsonc --json

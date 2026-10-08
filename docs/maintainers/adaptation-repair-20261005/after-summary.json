@@ -1,0 +1,18 @@
+{
+  "schema": "vibeflow.adaptation-regressions.v1",
+  "kernel": "/home/rockingsisyphus/projects/VibeFlow/src",
+  "groups": [
+    "core_sdk",
+    "python_runtime",
+    "javascript",
+    "structure"
+  ],
+  "workers": 8,
+  "errors": [],
+  "summary": {
+    "cases": 178,
+    "matched": 178,
+    "unmatched": 0,
+    "process_errors": 0
+  }
+}

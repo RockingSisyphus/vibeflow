@@ -1,0 +1,109 @@
+{
+  "reviewed_head": "9c443f3111e65e6f99842d86d983416a745d391b",
+  "tests": [
+    {
+      "group": "effects-retirement-authoring",
+      "passed": 682,
+      "skipped": 3,
+      "failed": 0
+    },
+    {
+      "group": "input-portable-runtime-AOT",
+      "passed": 92,
+      "skipped": 1,
+      "failed": 0
+    },
+    {
+      "group": "independent-quality-tool",
+      "passed": 49,
+      "failed": 0
+    }
+  ],
+  "environment_failure": {
+    "initial_tests": {
+      "passed": 603,
+      "failed": 79,
+      "skipped": 3
+    },
+    "error": "EDQUOT / Unknown system error -122 while Node writes temporary files",
+    "recovery": "TMPDIR and scratch redirected into dist/remediation-independent-review-20261008; same selection then passed"
+  },
+  "original_python_replay_cases": 13,
+  "original_javascript_replay_cases": 3,
+  "new_findings": [
+    "F01"
+  ],
+  "default_scope_probe": {
+    "source_cases": 40,
+    "source_mismatches": 28,
+    "kernel_cases": 40,
+    "kernel_mismatches": 28
+  },
+  "packaged_probes": {
+    "packaged-inputs-wheel": {
+      "passed": true,
+      "failures": [],
+      "product": {
+        "kind": "installed_wheel",
+        "version": "0.16.0",
+        "origin": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/wheel-venv/lib/python3.13/site-packages/vibeflow/__init__.py"
+      },
+      "loaded_product_module_count": 136,
+      "foreign_product_modules": {},
+      "parse_cases": 8,
+      "runtime_cases": 12
+    },
+    "packaged-python-kernel": {
+      "count": 873,
+      "passed": 873,
+      "failed": 0,
+      "package": {
+        "kind": "kernel_zip",
+        "origin": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+        "package_root": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution/kernel/vibeflow-kernel.zip/vibeflow",
+        "kernel": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution/kernel/vibeflow-kernel.zip",
+        "kernel_sha256": "ccc805917e2fd8d475c777fdfda477c7faefb987114c30344c33963da749e196",
+        "script_origin": "/home/rockingsisyphus/projects/VibeFlow/dist/unification-validation-20261008/packaged_python_effects_probe.py",
+        "script_sha256": "afb6d125ae228ec29e282b663fc6267e19be22393e9d878718e2f309c09f7970",
+        "rejected_source_prefixes": [
+          "/home/rockingsisyphus/projects/VibeFlow/src"
+        ]
+      },
+      "package_isolation_pass": true,
+      "loaded_module_count": 114,
+      "foreign_modules": []
+    },
+    "packaged-js-kernel": {
+      "status": "passed",
+      "package_file": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+      "driver_sha256": "8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58",
+      "loaded_product_module_count": 118,
+      "foreign_product_modules": {},
+      "cases": 33,
+      "native_requests": 87,
+      "cache_denied": [
+        true,
+        false,
+        true,
+        true,
+        false
+      ],
+      "cache_entries": [
+        2,
+        4,
+        4,
+        5,
+        5
+      ],
+      "cache_new_native_requests": [
+        2,
+        2,
+        0,
+        1,
+        0
+      ]
+    }
+  },
+  "product_files_changed_during_review": [],
+  "repository_quality_final": "[all] PASS (0 error, 0 warning, 0 info)"
+}

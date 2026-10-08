@@ -1,0 +1,17 @@
+{
+  "exit_code": 0,
+  "error": null,
+  "frames": [],
+  "panels": [],
+  "columns": [],
+  "seconds": 0.35702183601097204,
+  "arguments": [
+    "export-mermaid",
+    "--workspace",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/layout/layout.mermaid.explicit_resources/vibeflow_config.jsonc",
+    "--config",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/layout/layout.mermaid.explicit_resources/workflow.jsonc",
+    "--output",
+    "/home/rockingsisyphus/.cache/vibeflow-verification/resource-sections-20261006/layout/layout.mermaid.explicit_resources/graph.mmd"
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "review-rules": {
+    "command": [
+      "/home/rockingsisyphus/miniforge3/bin/python",
+      "-B",
+      "-m",
+      "vibeflow",
+      "review-rules",
+      "--workspace",
+      "/tmp/vibeflow-migration-recheck-m9l1z0xg/host/vibeflow_config.jsonc",
+      "--config",
+      "/tmp/vibeflow-migration-recheck-m9l1z0xg/host/workflow.jsonc",
+      "--json"
+    ],
+    "exit_code": 1,
+    "output": {
+      "status": "ERROR",
+      "code": "WORKSPACE.PROJECT_CONFIG.JAVASCRIPT",
+      "error": "javascript.host_extensions was removed; select host_extensions in the workflow",
+      "details": {},
+      "diagnostics": []
+    },
+    "stderr": ""
+  },
+  "validate": {
+    "command": [
+      "/home/rockingsisyphus/miniforge3/bin/python",
+      "-B",
+      "-m",
+      "vibeflow",
+      "validate",
+      "--workspace",
+      "/tmp/vibeflow-migration-recheck-m9l1z0xg/host/vibeflow_config.jsonc",
+      "--config",
+      "/tmp/vibeflow-migration-recheck-m9l1z0xg/host/workflow.jsonc",
+      "--json"
+    ],
+    "exit_code": 1,
+    "output": {
+      "status": "ERROR",
+      "code": "WORKSPACE.PROJECT_CONFIG.JAVASCRIPT",
+      "error": "javascript.host_extensions was removed; select host_extensions in the workflow",
+      "details": {
+        "path": "/tmp/vibeflow-migration-recheck-m9l1z0xg/host/vibeflow_project.jsonc",
+        "field": "javascript.host_extensions"
+      }
+    },
+    "stderr": ""
+  }
+}

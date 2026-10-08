@@ -1,0 +1,48 @@
+{
+  "schema": "vibeflow.context-reuse.v1",
+  "cases": [
+    {
+      "id": "subject",
+      "readonly_visits": 4,
+      "seconds": 4.806998185813427e-05,
+      "analysis_reused": true,
+      "facts_reused": true,
+      "protected": true,
+      "matched": true
+    },
+    {
+      "id": "phase",
+      "readonly_visits": 3,
+      "seconds": 1.9445986254140735e-05,
+      "analysis_reused": true,
+      "facts_reused": true,
+      "protected": true,
+      "matched": true
+    },
+    {
+      "id": "fact_overlay",
+      "readonly_visits": 7,
+      "seconds": 1.7291982658207417e-05,
+      "analysis_reused": true,
+      "facts_reused": false,
+      "protected": true,
+      "matched": true
+    },
+    {
+      "id": "source_projection",
+      "readonly_visits": 5,
+      "seconds": 1.2203003279864788e-05,
+      "analysis_reused": true,
+      "facts_reused": false,
+      "protected": true,
+      "matched": true
+    },
+    {
+      "id": "external_shallow_proxy",
+      "matched": true,
+      "isolated": true
+    }
+  ],
+  "matched": true,
+  "implementation": "/home/rockingsisyphus/projects/VibeFlow/dist/vibeflow-distribution/kernel/vibeflow-kernel.zip/vibeflow/core/rules/models.py"
+}

@@ -5,8 +5,8 @@ from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path
 from typing import Any, Mapping
 
-from vibeflow.core.descriptors.models import SourceLocator, DescriptorModelError, _thaw_json
-from vibeflow.core.descriptors.contributions import builtin_contributions, compose_contributions
+from vibeflow.core.descriptors.models import SourceLocator, _thaw_json
+from vibeflow.core.descriptors.contributions import compose_contributions, resource_kind
 from vibeflow.core.descriptors.catalogs import DescriptorCatalogError
 from vibeflow.core.descriptors.plugin_selection import _validate_plugin_config
 from vibeflow.tooling.project.config_loader import load_raw_config_document
@@ -53,12 +53,23 @@ def load_workflow_plugins(workspace, config_path, *, node_command="node") -> Loa
     definitions = {}
     try:
         return _load_workflow_plugins(workspace, config_path, node_command=node_command, definitions=definitions)
-    except Exception:
-        for values in definitions.values():
+    except Exception as error:
+        cleanup_errors = []
+        for target, values in definitions.items():
             for definition in values:
                 close = getattr(definition, "close", None)
                 if close is not None:
-                    close()
+                    try:
+                        close()
+                    except Exception as cleanup_error:
+                        cleanup_errors.append({"target": target, "error": str(cleanup_error)})
+        if cleanup_errors:
+            previous = getattr(error, "details", {})
+            try:
+                error.details = {**(previous if isinstance(previous, Mapping) else {}),
+                                 "cleanup_errors": cleanup_errors}
+            except Exception:
+                error.add_note(f"plugin cleanup errors: {cleanup_errors}")
         raise
 
 
@@ -76,8 +87,12 @@ def _load_workflow_plugins(workspace, config_path, *, node_command, definitions)
     if selection_errors:
         issue = selection_errors[0]
         raise DescriptorLoadError(issue.rule_id, issue.message, str(config_path), str(issue.source_location.get("field", issue.object_id)), {"selection_errors": [item.to_dict() for item in selection_errors]})
-    contributions = [builtin_contributions()]
-    bindings, records, lifecycle, load_states = {}, [], [], {}
+    from vibeflow.tooling.application.plugin_definitions import load_builtin_definition
+    builtin = load_builtin_definition(root.project_target)
+    definitions.setdefault(root.project_target, []).append(builtin)
+    contributions = [builtin.contributions()]
+    bindings = {(builtin.id, *key): value for key, value in builtin.bindings().items()}
+    records, lifecycle, load_states = [], [], {}
     for index, spec in enumerate(selections):
         field = f"plugins[{index}]"
         if not isinstance(spec, Mapping):
@@ -121,13 +136,17 @@ def _load_workflow_plugins(workspace, config_path, *, node_command, definitions)
             config = {**_thaw_json(defaults), **dict(overrides)}
             _validate_plugin_config(config, schema, plugin_id=plugin_id)
             contribution = _resolved_contributions(make_contributions(config), owner.path)
+            from vibeflow.tooling.application.plugin_definitions import normalize_contributions
+            contribution = normalize_contributions(contribution, plugin_bindings, owner=owner, workspace=workspace)
             if contribution.declaration:
                 from dataclasses import replace
-                declaration = _thaw_json(contribution.declaration)
-                for implementation in declaration["implementations"]:
-                    # The selected export is the actual declaration entry.
-                    implementation["source"]["export"] = source.export or "plugin"
-                contribution = replace(contribution, declaration=declaration)
+                export = source.export or "plugin"
+                if any(item["source"].get("export") != export for item in contribution.declaration["implementations"]):
+                    declaration = _thaw_json(contribution.declaration)
+                    for implementation in declaration["implementations"]:
+                        # The selected export is the actual declaration entry.
+                        implementation["source"]["export"] = export
+                    contribution = replace(contribution, declaration=declaration)
             _validate_support_sources(contribution, workspace)
             contributions.append(contribution)
             bindings.update({(plugin_id, *key): value for key, value in plugin_bindings.items()})
@@ -135,7 +154,7 @@ def _load_workflow_plugins(workspace, config_path, *, node_command, definitions)
                             "config": config, "loaded": True, "status": status,
                             "declaration": dict(contribution.declaration), "style": dict(spec.get("style", {}))})
             for resource in contribution.resources:
-                if resource.descriptor.to_dict()["kind"] == "plugin":
+                if resource_kind(resource.descriptor) == "plugin":
                     lifecycle.append({"id": resource.descriptor.id, "config": config})
         except DescriptorLoadError:
             raise
@@ -143,9 +162,12 @@ def _load_workflow_plugins(workspace, config_path, *, node_command, definitions)
             details = {"plugin_source": dict(source_data), "root": owner.id}
             if getattr(exc, "location", None):
                 details["location"] = dict(exc.location)
+            source_details = getattr(exc, "details", {})
+            if isinstance(source_details, Mapping):
+                details.update(source_details)
             if isinstance(exc, DescriptorCatalogError):
                 details.update({"source": exc.source, "previous_source": exc.previous_source, **exc.details})
-            code = "DESCRIPTOR.INVALID" if isinstance(exc, DescriptorModelError) else getattr(exc, "code", "DESCRIPTOR.INVALID" if isinstance(exc, ValueError) else "PLUGIN.DECLARATION.LOAD")
+            code = getattr(exc, "code", "DESCRIPTOR.INVALID" if isinstance(exc, ValueError) else "PLUGIN.DECLARATION.LOAD")
             raise DescriptorLoadError(code, str(exc),
                                       str((owner.path / source_data.get("ref", "")).resolve()) if source_data.get("kind") == "file" else str(config_path), field, details) from exc
     try:
@@ -173,6 +195,7 @@ def _resolved_contributions(contribution, root):
     """Resolve relative locators in the selected plugin's root, once."""
     from dataclasses import replace
     resources = []
+    changed = False
     for resource in contribution.resources:
         descriptor = resource.descriptor
         implementations = getattr(descriptor, "implementations", None)
@@ -181,12 +204,22 @@ def _resolved_contributions(contribution, root):
             for implementation in implementations:
                 source = implementation.source
                 if source.kind == "file":
-                    source = replace(source, ref=str((root / source.ref).resolve()))
-                files = tuple(replace(part, ref=str((root / part.ref).resolve())) for part in getattr(implementation, "implementation_files", ()))
-                values.append(replace(implementation, source=source, **({"implementation_files":files} if hasattr(implementation,"implementation_files") else {})))
-            descriptor = replace(descriptor, implementations=tuple(values))
-        resources.append(replace(resource, descriptor=descriptor))
-    return replace(contribution, resources=tuple(resources))
+                    reference = str((root / source.ref).resolve())
+                    if source.ref != reference:
+                        source = replace(source, ref=reference)
+                files = []
+                for part in getattr(implementation, "implementation_files", ()):
+                    reference = str((root / part.ref).resolve())
+                    files.append(replace(part, ref=reference) if part.ref != reference else part)
+                if source != implementation.source or tuple(files) != getattr(implementation,"implementation_files", ()):
+                    implementation = replace(implementation, source=source, **({"implementation_files":tuple(files)} if hasattr(implementation,"implementation_files") else {}))
+                values.append(implementation)
+            if tuple(values) != implementations:
+                descriptor = replace(descriptor, implementations=tuple(values))
+                resource = replace(resource, descriptor=descriptor)
+                changed = True
+        resources.append(resource)
+    return replace(contribution, resources=tuple(resources)) if changed else contribution
 
 
 
@@ -199,7 +232,7 @@ def _validate_support_sources(contribution, workspace):
         for implementation in getattr(descriptor,"implementations", ()):
             for index,source in enumerate(getattr(implementation,"implementation_files", ())):
                 path = Path(source.ref)
-                field = f"{descriptor.to_dict()['kind']}.{descriptor.id}.implementation_files[{index}]"
+                field = f"{resource_kind(descriptor)}.{descriptor.id}.implementation_files[{index}]"
                 if not any(path.is_relative_to(root.path) for root in workspace.roots):
                     raise DescriptorLoadError("RESOURCE.SOURCE.ROOT","support source must belong to a registered workspace root",str(path),field)
                 if not path.is_file():
@@ -221,3 +254,15 @@ def load_workflow_catalogs(project_root, *, workflow_config, workspace=None, pro
         else:
             workspace = load_workspace_config(workspace_file)
     return load_workflow_plugins(workspace, workflow_config, node_command=node_command).catalogs
+
+
+def load_builtin_plugins(target="python") -> LoadedPlugins:
+    """Use the same composition boundary for programmatic and standalone commands."""
+    from types import MappingProxyType
+    from vibeflow.tooling.application.plugin_definitions import load_builtin_definition
+    from vibeflow.tooling.application.plugin_definitions import attach_plugin_definitions
+    definition = load_builtin_definition(target)
+    catalogs = compose_contributions((definition.contributions(),))
+    attach_plugin_definitions(catalogs, {"python" if target == "project" else target: (definition,)})
+    bindings = MappingProxyType({(definition.id, *key): value for key, value in definition.bindings().items()})
+    return LoadedPlugins(catalogs, bindings, (), ())

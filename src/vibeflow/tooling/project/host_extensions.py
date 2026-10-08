@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Mapping
 
 from vibeflow.tooling.project.resource_helpers import _finding
-from vibeflow.core.descriptors.models import _string_tuple
+from vibeflow.core.descriptors.models import _freeze_json, _string_tuple
 from vibeflow.core.flow import STATUS_IMPLEMENTED, STATUS_PLANNED
 from vibeflow.core.findings import HealthFinding
 
@@ -33,9 +33,11 @@ class HostExtensionResource:
     root_path: str = ""
     source_path: str = ""
     rulesets: tuple[str, ...] = ()
+    style: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self):
         object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="host_extension.rulesets"))
+        object.__setattr__(self, "style", _freeze_json(self.style, field_name="host_extension.style"))
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -57,6 +59,8 @@ class HostExtensionResource:
             payload["root_path"] = self.root_path
         if self.source_path:
             payload["source_path"] = self.source_path
+        if self.style:
+            payload["style"] = dict(self.style)
         return payload
 
 
@@ -168,6 +172,7 @@ def _parse_resource(
         provides=sequences["provides"],
         dependencies=sequences["dependencies"],
         config=extension_config,
+        style=spec.get("style", {}),
         declared_contract_fields=frozenset(
             name for name in CONTRACT_FIELDS if name in spec
         ),

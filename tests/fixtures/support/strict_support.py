@@ -1,4 +1,6 @@
 from __future__ import annotations
+from tests.fixtures.support.declarations import native_registry
+from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 
 import importlib.util
@@ -15,17 +17,7 @@ from vibeflow.core.flow import GraphConfigError
 from vibeflow.core.findings import HealthFinding, HealthReport
 from vibeflow.tooling.project.graph_config import parse_graph_config
 from vibeflow.core.quality import QualityStructureLimits, QualityThresholds
-from vibeflow.targets.python.project import (
-    BaseLibInfo,
-    GraphCompileError,
-    GraphCompiler,
-    NodeContract,
-    NodeInfo,
-    NodeRegistry,
-    PluginInfo,
-    PluginRegistry,
-    scan_base_lib,
-)
+from vibeflow.targets.python.project import GraphCompileError, GraphCompiler, NodeRegistry, PluginRegistry
 from vibeflow.targets.python.quality import PurityPolicy, validate_graph_health
 from vibeflow.targets.python.runtime.block_compiler import explain_block_compilation
 from vibeflow.targets.python.runtime.engine import PipelineRuntime
@@ -61,6 +53,10 @@ def PROV_SPEC(key: str, data_type: str | None = None) -> dict[str, str]:
     return {"key": key, "type": data_type or key, "display_name": key.replace(".", " ").title()}
 
 
+def INPUT_SPEC(key: str, data_type: str | None = None, *, required: bool = True) -> dict:
+    return {**PROV_SPEC(key, data_type), "required": required}
+
+
 def _requirement_specs(values: list[str] | None) -> list[dict[str, str]]:
     return [REQ_SPEC(value) for value in values or []]
 
@@ -70,11 +66,6 @@ def _provider_specs(values: list[str] | None) -> list[dict[str, str]]:
 
 
 def cli_main(args):
-    from tests.fixtures.support.code_plugins import prepare_config_fixture, prepare_workspace_fixture
-    if "--config" in args:
-        prepare_config_fixture(args[args.index("--config") + 1])
-    elif "--workspace" in args:
-        prepare_workspace_fixture(args[args.index("--workspace") + 1])
     if args and args[0] == "review-rules":
         from vibeflow.tooling.application.cli import main
     else:
@@ -87,18 +78,7 @@ def register_node(registry: NodeRegistry, descriptor, node_cls: type, schema: di
     registry.register(configured_declaration(descriptor, schema, defaults), node_cls, **kwargs)
 
 
-BadIoNode_DECLARATION = node_declaration(NodeInfo(
-        type_key="test.bad_io",
-        display_name="Bad IO",
-
-        description="Illegally performs IO.",
-        version="0.1.0",
-        flow_kind="process",
-    ), NodeContract(
-        provides=(DataProvider(key="value.out", type="value.out", display_name="value.out"),),
-        output_semantics={"value.out": ("output value",)},
-
-    ), rulesets=("vibeflow.process",))
+BadIoNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.bad_io', display_name='Bad IO', description='Illegally performs IO.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider(key='value.out', type='value.out', display_name='value.out'),), output_semantics={'value.out': ('output value',)}), rulesets=("vibeflow.process",))
 
 class BadIoNode:
 
@@ -110,7 +90,7 @@ class BadIoNode:
 def _registry() -> NodeRegistry:
     from . import strict_support_runtime_nodes as runtime_nodes
 
-    registry = NodeRegistry()
+    registry = native_registry()
     register_node(registry, runtime_nodes.StartNode_DECLARATION, runtime_nodes.StartNode)
     register_node(registry, runtime_nodes.ValueInputNode_DECLARATION, runtime_nodes.ValueInputNode)
     register_node(registry, runtime_nodes.OutEndNode_DECLARATION, runtime_nodes.OutEndNode)
@@ -178,10 +158,7 @@ def _node_call(name: str, node_type: str, default_description: str, **fields) ->
         or type_used == "vibeflow.io"
         or type_used in {"vibeflow.loop", "vibeflow.loop.while"}
     )
-    if not explicit_contract:
-        fields.pop("requires", None)
-        fields.pop("provides", None)
-    else:
+    if explicit_contract:
         fields.setdefault("requires", [])
         fields.setdefault("provides", [])
     return {
@@ -195,17 +172,17 @@ def _node_call(name: str, node_type: str, default_description: str, **fields) ->
 
 def _seed_add_pipeline(*, seed: dict | None = None, add: dict | None = None) -> dict:
     seed_fields = dict(seed or {})
-    seed_defaults = {"provides": [PROV_SPEC("value.in")], **seed_fields}
+    seed_defaults = seed_fields
     seed_node = _node_call(str(seed_defaults.pop("id", seed_defaults.pop("name", "seed"))), str(seed_defaults.pop("type_used", seed_defaults.pop("type", "test.seed"))), "Produces the initial value.", **seed_defaults)
     add_fields = dict(add or {})
-    add_defaults = {"requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")], **add_fields}
+    add_defaults = add_fields
     add_node = _node_call(str(add_defaults.pop("id", add_defaults.pop("name", "add"))), str(add_defaults.pop("type_used", add_defaults.pop("type", "test.add"))), "Adds delta to value.in.", **add_defaults)
     return {
         "nodes": [
             _node_call("start", "test.start", "Starts the flow."),
             seed_node,
             add_node,
-            _node_call("end", "test.out_end", "Ends after value.out is ready.", requires=[REQ_SPEC("value.out")]),
+            _node_call("end", "test.out_end", "Ends after value.out is ready."),
         ],
         "edges": _edge_chain("start", "seed", "add", "end"),
         "outputs": [REQ_SPEC("value.out")],
@@ -214,13 +191,13 @@ def _seed_add_pipeline(*, seed: dict | None = None, add: dict | None = None) -> 
 
 def _seed_only_pipeline(*, seed: dict | None = None) -> dict:
     seed_fields = dict(seed or {})
-    seed_defaults = {"provides": [PROV_SPEC("value.in")], **seed_fields}
+    seed_defaults = seed_fields
     seed_node = _node_call(str(seed_defaults.pop("id", seed_defaults.pop("name", "seed"))), str(seed_defaults.pop("type_used", seed_defaults.pop("type", "test.seed"))), "Produces the initial value.", **seed_defaults)
     return {
         "nodes": [
             _node_call("start", "test.start", "Starts the flow."),
             seed_node,
-            _node_call("end", "test.in_end", "Ends after value.in is ready.", requires=[REQ_SPEC("value.in")]),
+            _node_call("end", "test.in_end", "Ends after value.in is ready."),
         ],
         "edges": _edge_chain("start", "seed", "end"),
         "outputs": [REQ_SPEC("value.in")],
@@ -229,15 +206,15 @@ def _seed_only_pipeline(*, seed: dict | None = None) -> dict:
 
 def _input_add_pipeline(*, add: dict | None = None) -> dict:
     add_fields = dict(add or {})
-    add_defaults = {"requires": [REQ_SPEC("value.in")], "provides": [PROV_SPEC("value.out")], **add_fields}
+    add_defaults = add_fields
     add_node = _node_call(str(add_defaults.pop("id", add_defaults.pop("name", "add"))), str(add_defaults.pop("type_used", add_defaults.pop("type", "test.add"))), "Adds delta to value.in.", **add_defaults)
     add_name = str(add_node["id"])
     return {
-        "inputs": [PROV_SPEC("value.in")],
+        "inputs": [INPUT_SPEC("value.in")],
         "nodes": [
             _node_call("start", "test.start", "Starts the flow."),
             add_node,
-            _node_call("end", "test.out_end", "Ends after value.out is ready.", requires=[REQ_SPEC("value.out")]),
+            _node_call("end", "test.out_end", "Ends after value.out is ready."),
         ],
         "edges": _edge_chain("start", add_name, "end"),
         "outputs": [REQ_SPEC("value.out")],

@@ -122,13 +122,25 @@ export function sdkPlugin(ts, {runtimeBindings = []} = {}) {
           const contents = runtimeDeclarations(ts, tree, program, project, selected);
           return {contents, loader: /\.[cm]?ts$/.test(args.path) ? "ts" : "js"};
         }
-        const names = new Set(), namespaces = new Set(), edits = [];
+        const names = new Set(), namespaces = new Set(), edits = [], exports = new Map();
         for (const statement of tree.statements) {
+          if (statement.modifiers?.some(item => ts.SyntaxKind[item.kind] === "ExportKeyword")) {
+            for (const declaration of statement.declarationList?.declarations || []) {
+              if (declaration.name?.text) exports.set(declaration.name.text, declaration.name.text);
+            }
+            if (statement.name?.text) exports.set(statement.name.text, statement.name.text);
+          }
+          if (!statement.moduleSpecifier) for (const item of statement.exportClause?.elements || []) {
+            exports.set(item.name.text, (item.propertyName || item.name).text);
+          }
           if (statement.moduleSpecifier?.text !== "@vibeflow/plugin") continue;
           const bindings = statement.importClause?.namedBindings;
           if (bindings?.elements) for (const element of bindings.elements) names.add(element.name.text);
           else if (bindings?.name) namespaces.add(bindings.name.text);
         }
+        let exportBindings = "__vibeflowSdkExports";
+        while (text.includes(exportBindings)) exportBindings += "_";
+        const resolver = [...exports].map(([name, local]) => `${JSON.stringify(name)}:()=>${local}`).join(",");
         function visit(node) {
           if (ts.SyntaxKind[node.kind] === "VariableDeclaration" && node.initializer && node.name?.text) {
             const call = node.initializer, expression = call.expression;
@@ -137,7 +149,7 @@ export function sdkPlugin(ts, {runtimeBindings = []} = {}) {
               const object = call.arguments[0], position = tree.getLineAndCharacterOfPosition(node.getStart(tree));
               const origin = {path: args.path, line: position.line + 1, column: position.character + 1,
                 symbol: node.name.text, language: /\.[cm]?tsx?$/.test(args.path) ? "typescript" : "javascript"};
-              edits.push({offset: object.end, text: `,__origin:${JSON.stringify(origin)}})`});
+              edits.push({offset: object.end, text: `,__origin:${JSON.stringify(origin)},__sourceRoot:${JSON.stringify(build.initialOptions.absWorkingDir)},__resolveExport:name=>${exportBindings}[name]?.()})`});
               edits.push({offset: object.getStart(tree), text: "({..."});
             }
           }
@@ -147,6 +159,7 @@ export function sdkPlugin(ts, {runtimeBindings = []} = {}) {
         visit(tree);
         let contents = text;
         for (const edit of edits.sort((a,b) => b.offset - a.offset)) contents = contents.slice(0, edit.offset) + edit.text + contents.slice(edit.offset);
+        if (edits.length) contents = `const ${exportBindings}={${resolver}};\n` + contents;
         return {contents, loader: /\.tsx$/.test(args.path) ? "tsx" : /\.jsx$/.test(args.path) ? "jsx" : /\.[cm]?ts$/.test(args.path) ? "ts" : "js"};
       } finally {snapshot?.dispose(); api?.close();}
     });

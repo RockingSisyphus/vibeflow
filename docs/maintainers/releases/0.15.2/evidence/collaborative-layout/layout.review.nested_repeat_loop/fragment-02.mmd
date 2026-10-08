@@ -1,0 +1,11 @@
+flowchart LR
+  classDef baseLibResource fill:#ecfdf5,stroke:#059669,color:#064e3b;
+  classDef pluginResource fill:#eff6ff,stroke:#2563eb,color:#1e3a8a;
+  classDef hostExtensionResource fill:#f5f3ff,stroke:#7c3aed,color:#3b0764;
+  classDef plannedResource fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;
+  resource_base_lib@{ shape: hex, label: "base_lib" }
+  class resource_base_lib baseLibResource;
+  resource_base_lib_0@{ shape: hex, label: "layout.helper\n\nid: layout.helper\ntype: base_lib\nstatus: implemented\n\n---------- resource ----------\nmodule: base_lib.helper\nroot: layout\npath: base_lib/helper.py\n\n---------- meta ----------\ndesc: layout.helper" }
+  resource_base_lib -.-> resource_base_lib_0
+  class resource_base_lib_0 baseLibResource;
+  style resource_base_lib_0 fill:#ffe6b3,stroke:#059669,color:#064e3b

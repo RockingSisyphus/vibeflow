@@ -21,10 +21,15 @@ def project_javascript_options(
             "project config javascript must be an object",
             {"path": str(path)},
         )
+    if "host_extensions" in raw:
+        raise WorkspaceConfigError(
+            "WORKSPACE.PROJECT_CONFIG.JAVASCRIPT",
+            "javascript.host_extensions was removed; select host_extensions in the workflow",
+            {"path": str(path), "field": "javascript.host_extensions"},
+        )
     allowed = {
         "package_root",
         "external_packages",
-        "host_extensions",
         "nodeset_max_depth",
     }
     unknown = set(raw) - allowed
@@ -52,19 +57,6 @@ def project_javascript_options(
             "javascript.external_packages must be a list of non-empty package names",
             {"path": str(path)},
         )
-    host_extensions = raw.get("host_extensions", [])
-    if (
-        not isinstance(host_extensions, list)
-        or not all(
-            isinstance(item, str) and item.strip()
-            for item in host_extensions
-        )
-    ):
-        raise WorkspaceConfigError(
-            "WORKSPACE.PROJECT_CONFIG.JAVASCRIPT",
-            "javascript.host_extensions must be a list of non-empty host_extension ids",
-            {"path": str(path)},
-        )
     nodeset_max_depth = raw.get("nodeset_max_depth", 4)
     if (
         not isinstance(nodeset_max_depth, int)
@@ -80,9 +72,6 @@ def project_javascript_options(
         "package_root": package_root.strip(),
         "external_packages": tuple(
             dict.fromkeys(item.strip() for item in external)
-        ),
-        "host_extensions": tuple(
-            dict.fromkeys(item.strip() for item in host_extensions)
         ),
         "nodeset_max_depth": nodeset_max_depth,
     }

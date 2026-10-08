@@ -4,12 +4,12 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from vibeflow.core.findings import HealthFinding
-from vibeflow.core.rules import RuleContext, RuleGraphError, compile_ruleset, execute_rule_plan
-from vibeflow.core.descriptors.contributions import contribution_facts
+from vibeflow.core.rules import RuleGraphError, execute_rule_plan
 from vibeflow.targets.python.project.source_closure import collect_python_source_facts, resolve_local_module_path
 from vibeflow.targets.python.quality.rule_adapter import graph_error_finding, rule_resources
-from vibeflow.targets.python.quality.rules import python_rule_handlers
 from vibeflow.targets.python.quality.source_context import PythonSourceFile, build_python_source_context
+from vibeflow.targets.python.project.check_session import current_python_check, PythonCheckSession
+from vibeflow.targets.python.quality.policy_parameters import complete_source_policy_plan
 
 
 def review_python_resource(resource, *, base_path, registry=None, phase="import"):
@@ -17,6 +17,7 @@ def review_python_resource(resource, *, base_path, registry=None, phase="import"
     if not resource.rulesets:
         return ()
     registry = registry or SimpleNamespace(rule_catalogs=())
+    session = current_python_check(registry) or PythonCheckSession()
     root = Path(base_path).resolve()
     descriptor = resource.to_dict()
     kind = descriptor.get("kind", "plugin")
@@ -33,9 +34,9 @@ def review_python_resource(resource, *, base_path, registry=None, phase="import"
             object_id=resource.id, message=f"declared Python source is unavailable: {reference}",
             source_location={"path":source_path or str(root)}),)
     files = []
-    from vibeflow.targets.python.project.source_membership import resource_paths, source_ownership
+    from vibeflow.targets.python.project.source_membership import resource_paths
     entries = tuple(file for _,file,_ in resource_paths(resource, root, getattr(registry,"source_roots",(root,)))) if implementation else (path,)
-    for fact in (fact for entry in entries for fact in collect_python_source_facts(entry, project_root=root, source_roots=getattr(registry, "source_roots", (root,)))):
+    for fact in (fact for entry in entries for fact in collect_python_source_facts(entry, project_root=root, source_roots=getattr(registry, "source_roots", (root,)),_parsed=session.parsed_sources,_parse_cache=session.parse_cache)):
         if fact.load_error:
             return (HealthFinding(rule_id="RESOURCE.SOURCE.UNAVAILABLE",severity="error",object_type="plugin",
                 object_id=resource.id,message=fact.load_error,source_location={"path":fact.path,"line":1}),)
@@ -44,28 +45,37 @@ def review_python_resource(resource, *, base_path, registry=None, phase="import"
         files.append(PythonSourceFile(fact.path, module, fact.source, root_id, fact._tree,
                                      fact.parse_error, fact.parse_line, fact.parse_column))
     files = list({file.path:file for file in files}.values())
-    sources = build_python_source_context((), files)
-    contributions = contribution_facts(registry.loaded_plugins.catalogs) if hasattr(registry, "loaded_plugins") else {}
+    source_key = tuple((file.path,file.root_id,id(file._tree),file.text) for file in files)
+    if source_key not in session.resource_sources:
+        session.resource_sources[source_key] = build_python_source_context((), files)
+    sources = session.resource_sources[source_key]
+    _, contributions = session.declarations(registry)
     defaults = registry.rule_defaults() if hasattr(registry,"rule_defaults") else {}
-    facts = {**contributions, **source_ownership(registry), "purity_policy":defaults.get("purity_policy"), "source_load_states":getattr(registry,"source_load_states",{}), "source_context":sources, "resource_source_file":sources.file(str(path)),
+    facts = {"resource_source_file":sources.file(str(path)),
              "resource_symbol":symbol_name, "resource":descriptor,
              "base_lib_file":sources.file(str(path)) if kind == "base_lib" else None}
-    findings, cache = [], {}
+    findings = []
     try:
         rules, rulesets = rule_resources(registry, **defaults)
-        handlers = python_rule_handlers()
+        handlers = {}
         for selected in resource.rulesets:
-            plan = compile_ruleset(selected, rules=rules, rulesets=rulesets, entrypoint=phase)
+            plan = session.plan(selected, rules, rulesets, phase)
+            if not plan.invocations:
+                continue
             custom = getattr(registry, "rule_handler_loader", None)
             if callable(custom):
                 handlers.update(custom(plan))
+            plan = complete_source_policy_plan(plan, defaults.get("purity_policy"), handlers=handlers)
             from vibeflow.targets.python.quality.project_context import project_rule_facts
-            context = RuleContext(facts={**facts, **project_rule_facts(plan, sources, cache)},
-                subject={"kind":kind, "id":resource.id, "descriptor":descriptor,
-                         "source_identity":("python",str(path),symbol_name,tuple((item.path,item.text) for item in files))},
-                scope={"files":tuple(item.path for item in files)}, phase=phase, target="python")
-            result = execute_rule_plan(plan, context, handlers=handlers)
-            findings.extend(result.findings)
+            view = session.view(registry,sources,extra_facts=facts)
+            from dataclasses import replace
+            context = replace(view.context(phase),facts={**view.facts,**project_rule_facts(plan,sources,view.project_facts,handlers=handlers)},subject={"kind":kind,"id":resource.id,"descriptor":descriptor,
+                "source_identity":("python",str(path),symbol_name,view.snapshot,view.token,
+                    session.implementation_identity(plan,handlers))})
+            result = execute_rule_plan(plan,context,handlers=handlers,source_cache=view.source_cache(phase))
+            findings.extend(item for invocation,value in result.results.items()
+                if invocation not in result.aliases or result.aliases[invocation].startswith("session:")
+                for item in value.findings)
             for invocation_id, value in result.results.items():
                 if value.state != "completed" and not any(item.severity == "error" for item in value.findings):
                     findings.append(HealthFinding(rule_id="RULE.EXECUTION.UNAVAILABLE",severity="error",object_type="plugin",
@@ -100,35 +110,46 @@ def reached_base_lib_sources(registry, sources):
             yield descriptor, source, origin
 
 
-def review_reached_base_libs(registry, sources, *, rules, rulesets, handlers, phase, purity_policy=None):
+def review_reached_base_libs(registry, sources, *, rules, rulesets, handlers, phase, purity_policy=None, session=None, entry_paths=()):
     """Select only declared libraries in the actual Node import closure."""
     from dataclasses import replace
     from vibeflow.targets.python.quality.project_context import project_rule_facts
     findings, executions = [], []
+    session = session or current_python_check(registry) or PythonCheckSession()
+    _, contributions = session.declarations(registry)
+    ownership = contributions.get("source_owners", ())
+    reachable = {file.path for entry in entry_paths for file in sources.import_closure(entry)} if entry_paths else None
     for descriptor, source, origin in reached_base_lib_sources(registry, sources):
-        from vibeflow.targets.python.project.source_membership import source_ownership
-        members = [item["path"] for item in source_ownership(registry).get("source_owners",()) if item["kind"] == "base_lib" and item["id"] == descriptor.id]
-        library_files = {file.path:file for entry in (members or [source.path]) for file in sources.import_closure(entry)}
-        library_sources = build_python_source_context((),library_files.values())
+        if reachable is not None and source.path not in reachable:
+            continue
+        members = [item["path"] for item in ownership if item["kind"] == "base_lib" and item["id"] == descriptor.id]
+        source_key = session.snapshot(sources), id(descriptor), tuple(members)
+        if source_key not in session.library_sources:
+            library_files = {file.path:file for entry in (members or [source.path]) for file in sources.import_closure(entry)}
+            session.library_sources[source_key] = build_python_source_context((),library_files.values())
+        library_sources = session.library_sources[source_key]
         symbol = next((item.source.export or "" for item in descriptor.implementations if item.language == "python"), "")
-        cache = {}
         for selected in descriptor.rulesets:
             try:
-                plan = compile_ruleset(selected, rules=rules, rulesets=rulesets, entrypoint=phase)
+                plan = session.plan(selected, rules, rulesets, phase)
+                if not plan.invocations:
+                    continue
                 custom = getattr(registry,"rule_handler_loader",None)
                 if callable(custom):
                     handlers.update(custom(plan))
-                contributions = contribution_facts(registry.loaded_plugins.catalogs) if hasattr(registry, "loaded_plugins") else {}
-                from vibeflow.targets.python.project.source_membership import source_ownership
-                context = RuleContext(facts={**contributions, **source_ownership(registry),"source_load_states":getattr(registry,"source_load_states",{}),"source_context":library_sources,"resource_source_file":source,"base_lib_file":source,"resource_symbol":symbol,
-                    "purity_policy":purity_policy, **project_rule_facts(plan,library_sources,cache)},
-                    subject={"kind":"base_lib","id":descriptor.id,"descriptor":descriptor.to_dict(),
-                        "source_identity":("python",source.path,symbol,tuple((file.path,file.text) for file in library_sources.files))},
-                    scope={"files":tuple(file.path for file in library_sources.files)}, phase=phase,target="python")
-                result = execute_rule_plan(plan,context,handlers=handlers)
+                plan = complete_source_policy_plan(plan, purity_policy, handlers=handlers)
+                view = session.view(registry,library_sources,extra_facts={
+                    "resource_source_file":source,"base_lib_file":source,"resource_symbol":symbol,
+                    })
+                context = replace(view.context(phase),facts={**view.facts,**project_rule_facts(plan,library_sources,view.project_facts,handlers=handlers)},subject={"kind":"base_lib","id":descriptor.id,"descriptor":descriptor.to_dict(),
+                    "source_identity":("python",source.path,symbol,view.snapshot,view.token,
+                        session.implementation_identity(plan,handlers))})
+                result = execute_rule_plan(plan,context,handlers=handlers,source_cache=view.source_cache(phase))
                 executions.append(result)
                 findings.extend(replace(item,root_id=item.root_id or source.root_id,source_path=item.source_path or source.path)
-                                for item in result.findings)
+                                for invocation,value in result.results.items()
+                                if invocation not in result.aliases or result.aliases[invocation].startswith("session:")
+                                for item in value.findings)
                 for invocation_id, value in result.results.items():
                     if value.state != "completed" and not any(item.severity == "error" for item in value.findings):
                         findings.append(HealthFinding(rule_id="RULE.EXECUTION.UNAVAILABLE",severity="error",object_type="base_lib",

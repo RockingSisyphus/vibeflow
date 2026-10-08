@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Mapping
+import json
 
 from vibeflow.core.contracts import DataEnvelope, DataRequirement, RunResult
 from vibeflow.targets.python.runtime.errors import PipelineRuntimeError, normalize_delegate_cli_system_exit
@@ -87,6 +88,12 @@ class RuntimeTraceMixin:
         if details is not None:
             event["details"] = dict(details)
         self.trace.add_event(event, self._trace_event_path((node_name,)), self._trace_sink)
+        from vibeflow.targets.python.runtime.observation import current_observation
+        observer = current_observation()
+        if observer is not None:
+            log_event = {key: value for key, value in event.items()
+                         if key in {"kind", "node", "type", "elapsed_ms"}}
+            observer.write_kernel(json.dumps(log_event, ensure_ascii=False, default=str))
 
     def _record_run_boundary(self, kind: str) -> None:
         if self.runtime_options.trace == "boundary":

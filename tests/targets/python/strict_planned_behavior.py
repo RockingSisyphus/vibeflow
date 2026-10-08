@@ -15,7 +15,7 @@ def _planned_stub_config(*, behavior=None, node_status: str = "planned") -> dict
     return {
         "global_config": {"config": {"bonus": 3}, "allow_config_override": True},
         "pipeline": {
-            "inputs": [PROV_SPEC("value.in")],
+            "inputs": [INPUT_SPEC("value.in")],
             "nodes": [
                 _node_call("start", "test.start", "Starts the planned stub fixture."),
                 _node_call(
@@ -30,7 +30,7 @@ def _planned_stub_config(*, behavior=None, node_status: str = "planned") -> dict
                     planned_behavior=behavior
                     or {"kind": "python_stub", "stub_module": "project/stubs/runtime_control_stub.py"},
                 ),
-                _node_call("end", "test.out_end", "Consumes planned stub output.", requires=[REQ_SPEC("value.out")]),
+                _node_call("end", "test.out_end", "Consumes planned stub output."),
             ],
             "edges": _edge_chain("start", "stub", "end"),
             "outputs": [REQ_SPEC("value.out")],
@@ -67,7 +67,7 @@ def test_transparent_planned_participates_in_flow_health() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
-                "inputs": [PROV_SPEC("value.in")],
+                "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the transparent planned fixture."),
                     _node_call(
@@ -80,7 +80,7 @@ def test_transparent_planned_participates_in_flow_health() -> None:
                         provides=[PROV_SPEC("value.in")],
                         planned_behavior="transparent",
                     ),
-                    _node_call("end", "test.in_end", "Consumes value.in.", requires=[REQ_SPEC("value.in")]),
+                    _node_call("end", "test.in_end", "Consumes value.in."),
                 ],
                 "edges": _edge_chain("start", "future", "end"),
             }
@@ -101,7 +101,7 @@ def test_blocking_planned_keeps_old_flow_health_behavior() -> None:
                 "nodes": [
                     _node_call("start", "test.start", "Starts the blocking planned fixture."),
                     _node_call("future", "planned.future", "Represents blocking future work.", status="planned", flow_kind="process"),
-                    _node_call("end", "test.in_end", "Consumes value.in.", requires=[REQ_SPEC("value.in")]),
+                    _node_call("end", "test.in_end", "Consumes value.in."),
                 ],
                 "edges": _edge_chain("start", "future", "end"),
             }
@@ -351,7 +351,7 @@ def run_stub(inputs, params):
             }
         ],
         "pipeline": {
-            "inputs": [PROV_SPEC("value.in")],
+            "inputs": [INPUT_SPEC("value.in")],
             "nodes": [
                 _node_call("start", "test.start", "Starts the planned nodeset fixture."),
                 _node_call(
@@ -364,7 +364,7 @@ def run_stub(inputs, params):
                     provides=[PROV_SPEC("value.out")],
                     config={"delta": 8},
                 ),
-                _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                _node_call("end", "test.out_end", "Consumes value.out."),
             ],
             "edges": _edge_chain("start", "future", "end"),
             "outputs": [REQ_SPEC("value.out")],

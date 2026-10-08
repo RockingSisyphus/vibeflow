@@ -25,7 +25,7 @@ from vibeflow.targets.javascript.frontend.bindings import (
     JavascriptCallBinding,
     build_javascript_binding_plan,
 )
-from vibeflow.targets.javascript.frontend.model_types import CapabilityRequirement
+from vibeflow.targets.javascript.frontend.contracts import CapabilityRequirement
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]

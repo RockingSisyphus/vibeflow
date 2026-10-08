@@ -7,6 +7,10 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 import {sdkPlugin, sdkTypes} from "./sdk_loader.mjs";
+import {AnalysisSession,analysisProgram} from "./analysis_program.mjs";
+import {ownershipImportStatements} from "./source_ownership.mjs";
+import readline from "node:readline";
+let analysisSession=null;
 
 function fail(code, message, details = {}) {
   const error = new Error(message);
@@ -289,7 +293,6 @@ function normalizeImportPolicy(raw, packageRoot) {
         export: String(item.export ?? "run"),
         role: String(item.role || "entry"),
         completion: String(item.completion || "immediate"),
-        effectScope: String(item.effect_scope || "unconstrained"),
       }))
       .sort((left, right) => right.path.length - left.path.length)
     : [];
@@ -582,7 +585,7 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
             `node '${sourceOwner.id}' imports base_lib '${destination.id}' without enabling it`,
           ));
         }
-      } else if (["plugin", "plugin_declaration", "host_extension", "runtime", "registry", "capability"].includes(destination.kind)) {
+      } else if (["plugin", "plugin_declaration", "host_extension"].includes(destination.kind)) {
         findings.push(importFinding(
           sourceFile,
           imported.node,
@@ -591,7 +594,7 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
         ));
       }
     } else if (sourceOwner.kind === "base_lib") {
-      if (["node", "plugin", "plugin_declaration", "host_extension", "runtime", "registry", "capability"].includes(destination.kind)) {
+      if (["node", "plugin", "plugin_declaration", "host_extension"].includes(destination.kind)) {
         findings.push(importFinding(
           sourceFile,
           imported.node,
@@ -829,6 +832,20 @@ function isImmutableModuleInitializer(ts, node) {
   return isPureInitializer(ts, value);
 }
 
+function isStateInitializer(ts, node) {
+  const value = unwrapExpression(ts, node);
+  if (!value) return true;
+  if (ts.isArrayLiteralExpression(value)) {
+    return value.elements.every(item => !ts.isSpreadElement(item) && isStateInitializer(ts, item));
+  }
+  if (ts.isObjectLiteralExpression(value)) {
+    return value.properties.every(item => !hasComputedPropertyName(ts, item)
+      && (ts.isPropertyAssignment(item) && isStateInitializer(ts, item.initializer)
+          || ts.isMethodDeclaration(item) || ts.isGetAccessorDeclaration(item) || ts.isSetAccessorDeclaration(item)));
+  }
+  return isPureInitializer(ts, value);
+}
+
 function importDeclarationHasRuntimeBindings(ts, statement) {
   const clause = statement.importClause;
   if (!clause || clause.isTypeOnly) return Boolean(clause?.isTypeOnly);
@@ -853,7 +870,7 @@ function isSdkDeclaration(ts, sourceFile, value) {
     if (bindings?.elements) for (const item of bindings.elements) imports.set(item.name.text, (item.propertyName || item.name).text);
     else if (bindings?.name) imports.set(bindings.name.text, "*");
   }
-  const names = new Set(["defineNode", "defineRule", "defineRuleset", "definePlugin", "defineDataSchema", "defineBaseLib", "defineCapability", "defineHostExtension"]);
+  const names = new Set(["defineNode", "defineRule", "defineRuleset", "definePlugin", "defineDataSchema", "defineBaseLib", "defineCapability", "defineHostExtension", "defineResource"]);
   const identified = names.has(imports.get(expression.text)) ||
     (imports.get(expression.expression?.text) === "*" && names.has(expression.name?.text));
   // Constructor arguments remain ordinary expressions. Inline implementations
@@ -870,10 +887,10 @@ function isSdkDeclaration(ts, sourceFile, value) {
   return identified && value.arguments.every(data);
 }
 
-function auditTopLevelPurity(ts, sourceFile, policy) {
+function auditTopLevelPurity(ts, sourceFile, policy, ruleParams = {}) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (!owner
-      || !["node", "base_lib", "host_extension", "plugin", "plugin_declaration", "source"].includes(owner.kind)) return [];
+      || !["node", "base_lib", "host_extension", "plugin", "plugin_declaration"].includes(owner.kind)) return [];
   const findings = [];
   if (hasDecorator(ts, sourceFile)) {
     findings.push(importFinding(
@@ -896,11 +913,14 @@ function auditTopLevelPurity(ts, sourceFile, policy) {
       allowed = isImportSafeClass(ts, statement);
     } else if (ts.isVariableStatement(statement)) {
       const immutable = Boolean(statement.declarationList.flags & ts.NodeFlags.Const);
-      allowed = immutable && statement.declarationList.declarations.every(
-        (declaration) => isSdkDeclaration(ts, sourceFile, declaration.initializer) || isImmutableModuleInitializer(ts, declaration.initializer),
+      allowed = (immutable || ruleParams.effect_scope === "global_state") && statement.declarationList.declarations.every(
+        (declaration) => isSdkDeclaration(ts, sourceFile, declaration.initializer)
+          || isImmutableModuleInitializer(ts, declaration.initializer)
+          || ruleParams.effect_scope === "global_state" && isStateInitializer(ts, declaration.initializer),
       );
     } else if (ts.isExportAssignment(statement)) {
-      allowed = isImmutableModuleInitializer(ts, statement.expression);
+      allowed = isImmutableModuleInitializer(ts, statement.expression)
+        || ruleParams.effect_scope === "global_state" && isStateInitializer(ts, statement.expression);
     } else if (ts.isExpressionStatement(statement)
         && isStringLiteralLike(ts, statement.expression)) {
       allowed = true;
@@ -1267,12 +1287,19 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
   return findings;
 }
 
-function implementationScope(ts, sourceFile, checker, project, policy) {
+function implementationScope(ts, sourceFile, checker, project, policy, symbolOnly = false, selectedExport = "") {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
-  if (!owner?.export?.includes(".")) return sourceFile;
-  const implementation = implementationDeclaration(ts, sourceFile, owner.export);
+  const exportName = selectedExport || owner?.export;
+  if (!exportName || (!symbolOnly && !exportName.includes("."))) return sourceFile;
+  const implementation = implementationDeclaration(ts, sourceFile, exportName);
   if (!implementation) return sourceFile;
-  const reachable = new Set([implementation]), pending = [implementation], referencedImports = new Set();
+  const moduleVariables = sourceFile.statements.filter(statement => ts.isVariableStatement(statement)
+    && statement.declarationList.declarations.every(declaration => {
+      const value = unwrapExpression(ts, declaration.initializer);
+      return !value || (!isSdkDeclaration(ts, sourceFile, value)
+        && !ts.isFunctionExpression(value) && !ts.isArrowFunction(value));
+    }));
+  const reachable = new Set([implementation]), pending = [implementation, ...moduleVariables], referencedImports = new Set(), importedNames = new Map();
   while (pending.length) {
     const current = pending.pop();
     function visit(node) {
@@ -1281,7 +1308,20 @@ function implementationScope(ts, sourceFile, checker, project, policy) {
           if (declaration.getSourceFile() !== sourceFile) continue;
           let statement = declaration;
           while (statement.parent && statement.parent !== sourceFile) statement = statement.parent;
-          if (ts.isImportDeclaration(statement) || ts.isImportEqualsDeclaration(statement)) referencedImports.add(statement);
+          if (ts.isImportDeclaration(statement) || ts.isImportEqualsDeclaration(statement)) {
+            referencedImports.add(statement);
+            const names = importedNames.get(statement) || new Set();
+            if (ts.isImportSpecifier(declaration)) names.add((declaration.propertyName || declaration.name).text);
+            else if (ts.isNamespaceImport(declaration)) {
+              const access = node.parent;
+              const name = ts.isPropertyAccessExpression(access) && access.expression === node ? access.name.text
+                : ts.isElementAccessExpression(access) && access.expression === node && isStringLiteralLike(ts, access.argumentExpression)
+                  ? access.argumentExpression.text : "*";
+              names.add(name);
+            } else if (ts.isImportClause(declaration)) names.add("default");
+            else names.add("*");
+            importedNames.set(statement, names);
+          }
           let callable = declaration;
           if (ts.isVariableDeclaration(callable)) callable = unwrapExpression(ts, callable.initializer);
           if (!callable || ![ts.isFunctionDeclaration, ts.isFunctionExpression, ts.isArrowFunction, ts.isClassDeclaration].some(test => test(callable))) continue;
@@ -1299,12 +1339,7 @@ function implementationScope(ts, sourceFile, checker, project, policy) {
       return referencedImports.has(statement);
     }
     if (ts.isImportEqualsDeclaration(statement)) return referencedImports.has(statement);
-    if (!ts.isVariableStatement(statement)) return false;
-    return statement.declarationList.declarations.every(declaration => {
-      const value = unwrapExpression(ts, declaration.initializer);
-      return !value || (!isSdkDeclaration(ts, sourceFile, value)
-        && !ts.isFunctionExpression(value) && !ts.isArrowFunction(value));
-    });
+    return moduleVariables.includes(statement);
   });
   // Preserve the original nodes and positions; only traversal is scoped to the
   // selected implementation and its local callable references.
@@ -1312,13 +1347,61 @@ function implementationScope(ts, sourceFile, checker, project, policy) {
   return Object.create(sourceFile, {
     statements: {value: statements, enumerable: true},
     implementationStatements: {value: statements},
+    implementationImportNames: {value: importedNames},
   });
 }
 
-function auditModuleRegExpState(ts, sourceFile, policy) {
+function implementationEffectScopes(ts, sourceFiles, checker, project, policy, rootFiles) {
+  const available = new Map(sourceFiles.map(file => [normalizedRealPath(ts, file.fileName), file]));
+  const scopes = new Map(), seen = new Set(), pending = [];
+  function enqueue(file, owner, exportName = "") {
+    if (!file || file.isDeclarationFile || !owner) return;
+    const key = JSON.stringify([normalizedRealPath(ts, file.fileName), owner.kind, owner.id, exportName || owner.export]);
+    if (seen.has(key)) return;
+    seen.add(key);
+    pending.push({file, owner, exportName});
+  }
+  // Roots are this Rule subject's declared entry and explicit support files.
+  // Its real helper calls retain these params; unrelated SDK factory imports do
+  // not inherit them merely because they share the frozen declaration closure.
+  for (const file of sourceFiles) {
+    if (rootFiles.has(path.resolve(file.fileName))) enqueue(file, ownerFor(ts, file.fileName, policy));
+  }
+  while (pending.length) {
+    const {file, owner, exportName} = pending.pop();
+    const ownedPolicy = {...policy, owners: [owner, ...policy.owners.filter(item => item !== owner)]};
+    const scope = implementationScope(ts, file, checker, project, ownedPolicy, true, exportName);
+    const key = normalizedRealPath(ts, file.fileName);
+    const entries = scopes.get(key) || [];
+    entries.push({scope, policy: ownedPolicy});
+    scopes.set(key, entries);
+    for (const imported of importSpecifiers(ts, scope)) {
+      if (imported.declaration?.importClause?.isTypeOnly) continue;
+      const resolved = resolvedImportFile(ts, checker, project, imported, file.fileName);
+      const destinationFile = available.get(normalizedRealPath(ts, resolved || ""));
+      if (!destinationFile) continue;
+      const bindings = imported.declaration?.importClause?.namedBindings;
+      const selectedNames = scope.implementationImportNames?.get(imported.declaration);
+      const imports = bindings && ts.isNamedImports(bindings)
+        ? bindings.elements.filter(item => !item.isTypeOnly && (!selectedNames || selectedNames.has("*")
+            || selectedNames.has((item.propertyName || item.name).text)))
+          .map(item => ({...imported, importedName: (item.propertyName || item.name).text}))
+        : [...(selectedNames || new Set(["*"]))].map(name => ({...imported, importedName: name}));
+      for (const dependency of imports) {
+        const destination = importDestinationOwner(ts, resolved, ownedPolicy, owner, dependency);
+        const name = dependency.importedName;
+        const selectedExport = name && destination?.export?.split(".")[0] !== name ? name : "";
+        enqueue(destinationFile, destination, selectedExport);
+      }
+    }
+  }
+  return scopes;
+}
+
+function auditModuleRegExpState(ts, sourceFile, policy, ruleParams = {}) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
-  if (!owner
-      || !["node", "base_lib", "host_extension", "plugin", "source"].includes(owner.kind)) return [];
+  if (ruleParams.effect_scope === "global_state" || !owner
+      || !["node", "base_lib", "host_extension", "plugin"].includes(owner.kind)) return [];
   const findings = [];
 
   function isFunctionBoundary(node) {
@@ -1368,14 +1451,16 @@ function auditModuleRegExpState(ts, sourceFile, policy) {
   return findings;
 }
 
-function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
+function auditModuleStateWrites(ts, sourceFile, checker, project, policy, ruleParams = {}) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (!owner
-      || !["node", "base_lib", "host_extension", "plugin", "source"].includes(owner.kind)) return [];
+      || !["node", "base_lib", "host_extension", "plugin"].includes(owner.kind)) return [];
   const moduleBindings = new Set();
   const aliases = new Set();
   const builtinPrototypeAliases = new Set();
   const builtinObjectAliases = new Set();
+  const namespaceAliases = new Map();
+  const namespaceGlobals = new Set(["globalThis", "global", "window", "self"]);
   const builtinConstructors = new Set([
     "Object", "Function", "Array", "Number", "String", "Boolean", "BigInt",
     "Symbol", "Date", "RegExp", "Error", "EvalError", "RangeError",
@@ -1389,7 +1474,11 @@ function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
   const builtinObjects = new Set([
     ...builtinConstructors,
     "Math", "JSON", "Reflect", "Atomics", "Intl", "WebAssembly",
+    "globalThis", "global", "window", "self", "process",
   ]);
+  const hostMembers = new Set(["process", "console", "fetch", "XMLHttpRequest", "WebSocket", "EventSource",
+    "document", "localStorage", "sessionStorage", "indexedDB", "caches", "navigator", "location",
+    "Worker", "SharedWorker", "performance", "crypto", "webcrypto"]);
   const findings = [];
 
   function addBindingName(name) {
@@ -1471,6 +1560,26 @@ function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
     );
   }
 
+  function namespaceReference(node) {
+    const value = unwrapExpression(ts, node);
+    if (!value) return null;
+    if (ts.isPropertyAccessExpression(value) || ts.isElementAccessExpression(value)) {
+      const parent = namespaceReference(value.expression);
+      return parent ? [...parent, staticMemberName(value)] : null;
+    }
+    if (!ts.isIdentifier(value)) return null;
+    return namespaceAliases.get(checker.getSymbolAtLocation(value))
+      || (isUnshadowedNamedGlobal(value, namespaceGlobals) ? [] : null);
+  }
+
+  function permittedNamespaceState(node) {
+    const members = namespaceReference(node);
+    return ["global_state", "python_io"].includes(ruleParams.effect_scope)
+      && members?.length && members[0] !== null
+      && !builtinObjects.has(members[0]) && !hostMembers.has(members[0])
+      && !members.some(name => name === "prototype" || name === "__proto__");
+  }
+
   function isBuiltinPrototypeSource(node) {
     const value = unwrapExpression(ts, node);
     if (!value) return false;
@@ -1486,7 +1595,9 @@ function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
 
   function isBuiltinObjectSource(node) {
     const value = unwrapExpression(ts, node);
-    if (!value || !ts.isIdentifier(value)) return false;
+    if (!value) return false;
+    if (namespaceReference(value)) return !permittedNamespaceState(value);
+    if (!ts.isIdentifier(value)) return false;
     const symbol = checker.getSymbolAtLocation(value);
     return builtinObjectAliases.has(symbol)
       || isUnshadowedNamedGlobal(value, builtinObjects);
@@ -1506,6 +1617,7 @@ function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
   function writesBuiltinObject(node) {
     let value = unwrapExpression(ts, node);
     if (!value) return false;
+    if (permittedNamespaceState(value)) return false;
     if (ts.isIdentifier(value)) {
       return isUnshadowedNamedGlobal(value, builtinObjects);
     }
@@ -1527,6 +1639,11 @@ function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
           && node.initializer) {
         const source = rootSymbol(node.initializer);
         const destination = checker.getSymbolAtLocation(node.name);
+        const namespace = namespaceReference(node.initializer);
+        if (namespace && destination && !namespaceAliases.has(destination)) {
+          namespaceAliases.set(destination, namespace);
+          changed = true;
+        }
         if (source && aliases.has(source)) {
           if (destination && !aliases.has(destination)) {
             aliases.add(destination);
@@ -1574,6 +1691,7 @@ function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
   }
 
   function report(node) {
+    if (ruleParams.effect_scope === "global_state") return;
     findings.push(importFinding(
       sourceFile,
       node,
@@ -1608,12 +1726,11 @@ function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
   function visit(node) {
     if (ts.isBinaryExpression(node)
         && isAssignmentOperator(ts, node.operatorToken.kind)) {
-      if (writesAlias(node.left)) report(node.left);
-      else if (writesBuiltinPrototype(node.left)) {
+      if (writesBuiltinPrototype(node.left)) {
         reportBuiltinPrototype(node.left);
       } else if (writesBuiltinObject(node.left)) {
         reportBuiltinObject(node.left);
-      }
+      } else if (writesAlias(node.left)) report(node.left);
     } else if (isKind(
       ts,
       node,
@@ -1621,12 +1738,11 @@ function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
       "isDeleteExpression",
       "DeleteExpression",
     )) {
-      if (writesAlias(node.expression)) report(node.expression);
-      else if (writesBuiltinPrototype(node.expression)) {
+      if (writesBuiltinPrototype(node.expression)) {
         reportBuiltinPrototype(node.expression);
       } else if (writesBuiltinObject(node.expression)) {
         reportBuiltinObject(node.expression);
-      }
+      } else if (writesAlias(node.expression)) report(node.expression);
     } else if ((ts.isPrefixUnaryExpression(node)
         || ts.isPostfixUnaryExpression(node))
         && new Set([
@@ -1634,12 +1750,11 @@ function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
           ts.SyntaxKind.MinusMinusToken,
           ts.SyntaxKind.DeleteKeyword,
         ]).has(node.operator)) {
-      if (writesAlias(node.operand)) report(node.operand);
-      else if (writesBuiltinPrototype(node.operand)) {
+      if (writesBuiltinPrototype(node.operand)) {
         reportBuiltinPrototype(node.operand);
       } else if (writesBuiltinObject(node.operand)) {
         reportBuiltinObject(node.operand);
-      }
+      } else if (writesAlias(node.operand)) report(node.operand);
     } else if (ts.isCallExpression(node)
         && (ts.isPropertyAccessExpression(node.expression)
           || ts.isElementAccessExpression(node.expression))) {
@@ -1666,13 +1781,12 @@ function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
           ]).has(operation))
       );
       if (mutatesFirstArgument && firstArgument) {
-        if (writesAlias(firstArgument)) report(firstArgument);
-        else if (writesBuiltinPrototype(firstArgument)) {
+        if (writesBuiltinPrototype(firstArgument)) {
           reportBuiltinPrototype(firstArgument);
         } else if (writesBuiltinObject(firstArgument)
             || isBuiltinObjectSource(firstArgument)) {
           reportBuiltinObject(firstArgument);
-        }
+        } else if (writesAlias(firstArgument)) report(firstArgument);
       }
     }
     visitChildren(ts, node, visit);
@@ -1681,14 +1795,44 @@ function auditModuleStateWrites(ts, sourceFile, checker, project, policy) {
   return findings;
 }
 
-function auditBaseLibHostIo(ts, sourceFile, checker, project, policy) {
+function canonicalImportSpecifier(value) {
+  return value.startsWith("node:") ? value.slice(5) : value;
+}
+
+function auditRuleImportPolicy(ts, sourceFile, ruleParams) {
+  const selected = ruleParams.policy?.imports || {};
+  const moduleMatches = (name, choices) => (choices || []).some(
+    value => name === canonicalImportSpecifier(value) || name.startsWith(`${canonicalImportSpecifier(value)}/`),
+  );
+  const findings = [];
+  for (const imported of importSpecifiers(ts, sourceFile)) {
+    const name = canonicalImportSpecifier(imported.value);
+    const root = packageName(name);
+    const denied = moduleMatches(name, selected.banned_modules)
+      || !moduleMatches(name, selected.allowed_modules)
+        && (selected.banned_roots || []).map(canonicalImportSpecifier).includes(root)
+        && !(selected.allowed_roots || []).map(canonicalImportSpecifier).includes(root);
+    if (denied) findings.push(importFinding(sourceFile, imported.node, "VF_IMPORT_POLICY",
+      `selected Rule policy forbids import '${imported.value}'`));
+  }
+  return findings;
+}
+
+function auditHostIo(ts, sourceFile, checker, project, policy, ruleParams = {}) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
-  if (!owner || owner.kind !== "base_lib") return [];
+  if (!owner || !["node", "base_lib", "plugin", "host_extension"].includes(owner.kind)) return [];
+  const scope = ruleParams.effect_scope || "none";
+  const code = owner.kind === "plugin" ? "VF_PLUGIN_HOST_IO" : "VF_BASE_LIB_HOST_IO";
+  const namespaceGlobals = new Set(["window", "self", "global", "globalThis"]);
+  const terminalMembers = new Set(["stdin", "stdout", "stderr", "argv"]);
+  const terminalConsole = new Set(["log", "info", "warn", "error", "debug", "dir", "dirxml", "table", "trace", "assert", "clear", "group", "groupCollapsed", "groupEnd"]);
+  const hardProcessMembers = new Set(["abort", "exit", "kill", "chdir", "setuid", "setgid", "seteuid", "setegid", "setgroups", "umask"]);
   const targetGlobals = new Set([
     "fetch", "XMLHttpRequest", "WebSocket", "EventSource", "document",
     "window", "self", "global", "globalThis", "localStorage",
     "sessionStorage", "indexedDB", "caches", "navigator", "location",
     "process", "console",
+    "Worker", "SharedWorker",
   ]);
   const nondeterministicGlobals = new Set([
     "Date",
@@ -1703,6 +1847,7 @@ function auditBaseLibHostIo(ts, sourceFile, checker, project, policy) {
     "net", "tls", "worker_threads",
   ]);
   const findings = [];
+  const importedPrimitives = new Map();
 
   function hasLocalImplementation(node) {
     const symbol = checker.getSymbolAtLocation(node);
@@ -1746,8 +1891,8 @@ function auditBaseLibHostIo(ts, sourceFile, checker, project, policy) {
     findings.push(importFinding(
       sourceFile,
       node,
-      "VF_BASE_LIB_HOST_IO",
-      `base_lib '${owner.id}' cannot access host global '${name}'; use a Capability`,
+      code,
+      `${owner.kind} '${owner.id}' cannot access host global '${name}' under effect_scope '${scope}'; use an explicitly permitted effect or Capability`,
     ));
   }
 
@@ -1755,152 +1900,119 @@ function auditBaseLibHostIo(ts, sourceFile, checker, project, policy) {
     findings.push(importFinding(
       sourceFile,
       node,
-      "VF_BASE_LIB_HOST_IO",
-      `base_lib '${owner.id}' cannot access nondeterministic host primitive '${effect}'; obtain it in a node through a Capability`,
+      code,
+      `${owner.kind} '${owner.id}' cannot access nondeterministic host primitive '${effect}' under effect_scope '${scope}'`,
     ));
   }
 
   for (const imported of importSpecifiers(ts, sourceFile)) {
-    const moduleName = imported.value.startsWith("node:")
-      ? imported.value.slice("node:".length)
-      : imported.value;
+    const moduleName = canonicalImportSpecifier(imported.value);
     const rootName = moduleName.split("/", 1)[0];
-    if (hostIoModules.has(rootName)) {
+    const bindings = imported.declaration?.importClause?.namedBindings;
+    if (rootName === "process" || rootName === "console") {
+      const remember = (node, members = []) => {
+        const symbol = node && checker.getSymbolAtLocation(node);
+        if (symbol) importedPrimitives.set(symbol, {primitive: rootName, members});
+      };
+      remember(imported.declaration?.importClause?.name);
+      if (bindings && ts.isNamespaceImport(bindings)) remember(bindings.name);
+      if (bindings && ts.isNamedImports(bindings)) {
+        for (const item of bindings.elements) remember(item.name, [(item.propertyName || item.name).text]);
+      }
+    }
+    const terminalProcessImport = rootName === "process" && scope === "terminal"
+      && bindings && ts.isNamedImports(bindings)
+      && bindings.elements.every(item => terminalMembers.has((item.propertyName || item.name).text));
+    if ((hostIoModules.has(rootName) || rootName === "process" || rootName === "console")
+        && scope !== "python_io" && !terminalProcessImport && !(rootName === "console" && scope === "terminal")) {
       findings.push(importFinding(
         sourceFile,
         imported.node,
-        "VF_BASE_LIB_HOST_IO",
-        `base_lib '${owner.id}' cannot import host IO module '${imported.value}'; use a Capability from a node`,
+        code,
+        `${owner.kind} '${owner.id}' cannot import host IO module '${imported.value}' under effect_scope '${scope}'`,
       ));
     }
+  }
+
+  function primitiveReference(expression) {
+    const value = unwrapExpression(ts, expression);
+    if (!value) return null;
+    if (ts.isPropertyAccessExpression(value) || ts.isElementAccessExpression(value)) {
+      const parent = primitiveReference(value.expression);
+      return parent ? {...parent, members: [...parent.members, memberName(value)]} : null;
+    }
+    if (!ts.isIdentifier(value)) return null;
+    const alias = importedPrimitives.get(checker.getSymbolAtLocation(value));
+    if (alias) return alias;
+    return (isUnshadowedGlobal(value, targetGlobals) || isUnshadowedGlobal(value, nondeterministicGlobals)
+            || isUnshadowedGlobal(value, mathGlobals)) ? {primitive:value.text, members:[]} : null;
+  }
+
+  // Follow static primitive aliases by symbol, so permissions and hard process
+  // restrictions survive ordinary local bindings without relying on their names.
+  let aliasesChanged = true;
+  while (aliasesChanged) {
+    aliasesChanged = false;
+    function collect(node) {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+        const symbol = checker.getSymbolAtLocation(node.name);
+        const primitive = primitiveReference(node.initializer);
+        if (symbol && primitive && !importedPrimitives.has(symbol)) {
+          importedPrimitives.set(symbol, primitive);
+          aliasesChanged = true;
+        }
+      }
+      visitChildren(ts, node, collect);
+    }
+    collect(sourceFile);
   }
 
   function visit(node) {
     if (ts.isIdentifier(node) && identifierIsReference(ts, node)) {
-      if (isUnshadowedGlobal(node, targetGlobals)) {
-        reportHostGlobal(node, node.text);
+      const imported = importedPrimitives.get(checker.getSymbolAtLocation(node));
+      let primitive = imported?.primitive || node.text;
+      const members = [...(imported?.members || [])];
+      let current = node;
+      for (let member = directMemberAccess(current); member; member = directMemberAccess(current)) {
+        members.push(memberName(member));
+        current = member;
+      }
+      const recognized = imported || isUnshadowedGlobal(node, targetGlobals);
+      if (recognized) {
+        const namespace = namespaceGlobals.has(primitive);
+        if (namespace) primitive = members.shift();
+        const name = members[0];
+        if (!primitive || !(targetGlobals.has(primitive) || nondeterministicGlobals.has(primitive) || primitive === "Math")) {
+          // A static custom slot is native host/resource state. The namespace
+          // value itself is a harmless read for general I/O; dynamic selection
+          // stays bounded, and builtin/prototype writes are checked separately.
+          const customState = namespace && primitive && !members.includes("prototype") && !members.includes("__proto__");
+          if (!(namespace && scope === "python_io" && primitive === undefined)
+              && !(customState && ["python_io", "global_state"].includes(scope))) reportHostGlobal(node, node.text);
+        } else if (primitive === "process" && hardProcessMembers.has(name)) {
+          reportHostGlobal(node, `process.${name}`);
+        } else if (primitive === "Math") {
+          if (scope !== "python_io" && (!members.length || name === null || name === "random")) {
+            reportNondeterminism(node, name === "random" ? "Math.random" : "Math object escape");
+          }
+        } else if (scope !== "python_io"
+            && !(scope === "terminal" && primitive === "console" && terminalConsole.has(name))
+            && !(scope === "terminal" && primitive === "process" && terminalMembers.has(name))) {
+          reportHostGlobal(node, [primitive, ...members].filter(Boolean).join("."));
+        }
       } else if (isUnshadowedGlobal(node, nondeterministicGlobals)) {
-        reportNondeterminism(node, node.text);
+        if (scope !== "python_io") reportNondeterminism(node, node.text);
       } else if (isUnshadowedGlobal(node, mathGlobals)) {
         const member = directMemberAccess(node);
-        if (!member) {
+        if (!member && scope !== "python_io") {
           reportNondeterminism(node, "Math object escape");
-        } else {
+        } else if (member) {
           const name = memberName(member);
-          if (name === "random") reportNondeterminism(member, "Math.random");
-          else if (name === null) {
+          if (name === "random" && scope !== "python_io") reportNondeterminism(member, "Math.random");
+          else if (name === null && scope !== "python_io") {
             reportNondeterminism(member, "Math[computed]");
           }
         }
-      }
-    }
-    visitChildren(ts, node, visit);
-  }
-  visit(sourceFile);
-  return findings;
-}
-
-function auditPluginHostIo(ts, sourceFile, checker, project, policy) {
-  const owner = ownerFor(ts, sourceFile.fileName, policy);
-  if (!owner || owner.kind !== "plugin") return [];
-  const blocked = new Set([
-    "globalThis", "window", "self", "global", "document", "process",
-    "localStorage", "sessionStorage", "navigator", "location", "fetch",
-    "XMLHttpRequest", "WebSocket", "EventSource", "indexedDB", "caches",
-    "Worker", "SharedWorker",
-  ]);
-  const findings = [];
-  function locallyDeclared(node) {
-    const symbol = checker.getSymbolAtLocation(node);
-    return symbolDeclarationNodes(symbol, project).some((declaration) => {
-      const file = declaration.getSourceFile();
-      return !file.isDeclarationFile
-        && normalizedRealPath(ts, file.fileName)
-          === normalizedRealPath(ts, sourceFile.fileName);
-    });
-  }
-  function visit(node) {
-    if (ts.isIdentifier(node)
-        && blocked.has(node.text)
-        && identifierIsReference(ts, node)
-        && !locallyDeclared(node)) {
-      findings.push(importFinding(
-        sourceFile,
-        node,
-        "VF_PLUGIN_HOST_IO",
-        `plugin '${owner.id}' cannot access host primitive '${node.text}'; use a host_extension`,
-      ));
-    }
-    visitChildren(ts, node, visit);
-  }
-  visit(sourceFile);
-  return findings;
-}
-
-function auditUnclassifiedHiddenWork(ts, sourceFile, checker, policy) {
-  const owner = ownerFor(ts, sourceFile.fileName, policy);
-  if (!owner || owner.kind !== "source") return [];
-  const findings = [];
-  function callName(node) {
-    if (!ts.isCallExpression(node)) return "";
-    if (ts.isIdentifier(node.expression)) return node.expression.text;
-    if (ts.isPropertyAccessExpression(node.expression)) {
-      return node.expression.name.text;
-    }
-    return "";
-  }
-  function visit(node) {
-    if (ts.isCallExpression(node)) {
-      const name = callName(node);
-      if (new Set([
-        "addEventListener", "eventOn", "on", "once", "setInterval",
-        "setTimeout",
-      ]).has(name)) {
-        findings.push(importFinding(
-          sourceFile,
-          node,
-          "VF_SOURCE_LISTENER_UNOWNED",
-          `source '${owner.id}' registers a long-lived listener or timer without a host_extension owner`,
-        ));
-      }
-      let returnsPromise = false;
-      try {
-        const type = checker.getTypeAtLocation(node);
-        returnsPromise = promiseLikeType(
-          ts,
-          checker,
-          type,
-          checker.typeToString(type),
-        );
-      } catch {
-        // Syntax-based Promise chain checks remain available below.
-      }
-      const discardedChain = ts.isPropertyAccessExpression(node.expression)
-        && new Set(["then", "catch", "finally"]).has(node.expression.name.text)
-        && ts.isExpressionStatement(node.parent);
-      if ((returnsPromise && ts.isExpressionStatement(node.parent))
-          || discardedChain) {
-        findings.push(importFinding(
-          sourceFile,
-          node,
-          "VF_PROMISE_UNOWNED",
-          `source '${owner.id}' discards Promise work without a workflow or TaskPlan owner`,
-        ));
-      }
-    }
-    if (ts.isVoidExpression(node)) {
-      try {
-        const type = checker.getTypeAtLocation(node.expression);
-        if (promiseLikeType(ts, checker, type, checker.typeToString(type))) {
-          findings.push(importFinding(
-            sourceFile,
-            node,
-            "VF_PROMISE_UNOWNED",
-            `source '${owner.id}' discards Promise work with void`,
-          ));
-        }
-      } catch {
-        // A plain void remains legal when Promise ownership is not provable.
       }
     }
     visitChildren(ts, node, visit);
@@ -2171,7 +2283,7 @@ function collectQualityFacts(ts, program, checker, project, sourceFiles, request
     const text = sourceFile.getFullText();
     const syntax = qualitySyntaxDiagnostics(ts, program, sourceFile);
     findings.push(...syntax.map((item) => ({ ...item, object_id: module })));
-    const parsed = syntax.length ? { functions: [], classCount: 0 } : qualityFunctions(ts, sourceFile);
+    const parsed = syntax.length ? { functions: [], classCount: 0 } : (analysisSession?analysisSession.metric(analysisSession.functions,sourceFile,"",()=>qualityFunctions(ts,sourceFile)):qualityFunctions(ts,sourceFile));
     const complexity = syntax.length ? { branches: 0, maxDepth: 0 } : qualityBranchMetrics(ts, sourceFile);
     const importSites = [];
     if (!syntax.length) {
@@ -2209,12 +2321,20 @@ function collectQualityFacts(ts, program, checker, project, sourceFiles, request
     });
     for (const item of request.qualityImplementations || []) {
       if (path.resolve(item.path) !== filePath || syntax.length) continue;
+      const ownershipImports = ownershipImportStatements(ts,sourceFile,checker,project,{
+        implementation:implementationDeclaration(ts,sourceFile,String(item.export ?? "run")),
+        declarations:symbolDeclarationNodes,unwrap:unwrapExpression,sdkDeclaration:isSdkDeclaration,
+      });
+      const lines = statements => [...new Set([...statements].map(node=>qualityPosition(sourceFile,node).line))].sort((a,b)=>a-b);
       implementations.push({
         path: module,
         type_key: String(item.type_key || ""),
         kind: String(item.kind || "node"),
         export: String(item.export ?? "run"),
-        ...qualityCallGraph(ts, sourceFile, String(item.export ?? "run")),
+        entry_import_lines:lines(ownershipImports.entry),
+        module_initialization_import_lines:lines(ownershipImports.initialization),
+        import_lines:lines(new Set([...ownershipImports.entry,...ownershipImports.initialization])),
+        ...(analysisSession?analysisSession.metric(analysisSession.callGraphs,sourceFile,String(item.export ?? "run"),()=>qualityCallGraph(ts,sourceFile,String(item.export ?? "run"))):qualityCallGraph(ts,sourceFile,String(item.export ?? "run"))),
       });
     }
   }
@@ -2252,97 +2372,11 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
       ? ["ES2022"]
       : ["ES2022", "DOM", "DOM.Iterable"],
   };
-  let program;
-  let checker;
-  let project = null;
-  let sourceFiles;
-  let diagnostics = [];
-  let dispose = () => {};
-  let temporaryConfigRoot = null;
-  if (ts.__native) {
-    const configDirectory = request.workflowEntry
-      ? path.dirname(request.workflowEntry)
-      : (temporaryConfigRoot = await mkdtemp(
-          path.join(os.tmpdir(), "vibeflow-audit-ts-"),
-        ));
-    const configPath = path.join(
-      configDirectory,
-      checkDiagnostics
-        ? "tsconfig.vibeflow.json"
-        : "tsconfig.vibeflow-closure.json",
-    );
-    await writeFile(configPath, JSON.stringify({
-      compilerOptions: jsonCompilerOptions,
-      files,
-    }), "utf8");
-    const snapshots = new Map((request.sourceSnapshots || []).map(source => [path.resolve(source.path), source.text]));
-    const api = new ts.API({ cwd: path.resolve(request.packageRoot), fs: {
-      readFile: name => snapshots.get(path.resolve(name)),
-      fileExists: name => snapshots.has(path.resolve(name)) ? true : undefined,
-    } });
-    let snapshot;
-    try {
-      snapshot = api.updateSnapshot({ openProjects: [configPath] });
-      project = snapshot.getProject(configPath) || snapshot.getProjects()[0];
-      if (!project) fail("VF_TYPESCRIPT", "TypeScript did not create a project for AOT validation");
-      program = project.program;
-      checker = project.checker;
-      sourceFiles = program.getSourceFileNames()
-        .map((fileName) => program.getSourceFile(fileName))
-        .filter(Boolean);
-      if (checkDiagnostics) {
-        diagnostics = sourceFiles
-          .filter((item) => contractFiles.has(path.resolve(item.fileName)))
-          .flatMap((item) => [
-            ...program.getSyntacticDiagnostics(item.fileName),
-            ...program.getBindDiagnostics(item.fileName),
-            ...program.getSemanticDiagnostics(item.fileName),
-          ])
-          .map((item) => diagnosticText(ts, item));
-      }
-    } catch (cause) {
-      try {
-        snapshot?.dispose();
-      } finally {
-        api.close();
-        if (temporaryConfigRoot) {
-          await rm(temporaryConfigRoot, { recursive: true, force: true });
-          temporaryConfigRoot = null;
-        }
-      }
-      throw cause;
-    }
-    dispose = () => {
-      try {
-        snapshot.dispose();
-      } finally {
-        api.close();
-      }
-    };
-  } else {
-    const compilerOptions = {
-      ...jsonCompilerOptions,
-      target: ts.ScriptTarget.ES2022,
-      module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.Bundler,
-      lib: request.target === "node"
-        ? ["lib.es2022.d.ts"]
-        : ["lib.es2022.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"],
-    };
-    const snapshots = new Map((request.sourceSnapshots || []).map(source => [path.resolve(source.path), source.text]));
-    const host = ts.createCompilerHost(compilerOptions);
-    const readFile = host.readFile.bind(host);
-    host.readFile = name => snapshots.get(path.resolve(name)) ?? readFile(name);
-    program = ts.createProgram({ rootNames: files, options: compilerOptions, host });
-    checker = program.getTypeChecker();
-    sourceFiles = program.getSourceFiles();
-    diagnostics = checkDiagnostics
-      ? sourceFiles
-        .filter((item) => contractFiles.has(path.resolve(item.fileName)))
-        .flatMap((item) => ts.getPreEmitDiagnostics(program, item))
-        .map((item) => diagnosticText(ts, item))
-      : [];
-  }
+  const state=await analysisProgram(ts,request,files,jsonCompilerOptions,analysisSession);
+  const {program,checker,project,sourceFiles}=state;
+  const diagnostics=checkDiagnostics?sourceFiles.filter(item=>contractFiles.has(path.resolve(item.fileName)))
+    .flatMap(item=>ts.__native?[...program.getSyntacticDiagnostics(item.fileName),...program.getBindDiagnostics(item.fileName),...program.getSemanticDiagnostics(item.fileName)]
+      :ts.getPreEmitDiagnostics(program,item)).map(item=>diagnosticText(ts,item)):[];
   try {
     if (qualityOnly) {
       return collectQualityFacts(ts, program, checker, project, sourceFiles, request);
@@ -2361,32 +2395,37 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
       policy,
     );
     const rootFiles = new Set(files.map((item) => path.resolve(item)));
+    const topics = new Set(request.ruleTopics || []);
+    const ruleParams = request.ruleParams || {};
+    const effectScopes = [...topics].some(topic => ["module_state", "host_io", "effect_imports"].includes(topic))
+      ? implementationEffectScopes(ts, sourceFiles, checker, project, policy, rootFiles) : new Map();
     for (const sourceFile of sourceFiles) {
       if (sourceFile.isDeclarationFile && sourceFile.fileName.includes(`${path.sep}node_modules${path.sep}`)) continue;
       const owned = ownerFor(ts, sourceFile.fileName, policy);
       if (!owned && !rootFiles.has(path.resolve(sourceFile.fileName))) continue;
-      const topics = new Set(request.ruleTopics || []);
       const implementationFile = implementationScope(ts, sourceFile, checker, project, policy);
       if (request.profile === "single-esm") findings.push(...auditSingleEsmConstraints(ts, sourceFile));
       if (topics.has("imports")) {
         findings.push(...auditParsedSource(ts, sourceFile, ""));
         findings.push(...auditImportOwnership(ts, implementationFile, checker, project, policy));
+        findings.push(...auditRuleImportPolicy(ts, sourceFile, ruleParams));
       }
       if (sourceFile.isDeclarationFile) continue;
-      if (topics.has("purity")) findings.push(...auditTopLevelPurity(ts, sourceFile, policy));
+      if (topics.has("purity")) findings.push(...auditTopLevelPurity(ts, sourceFile, policy, ruleParams));
       if (topics.has("completion")) findings.push(...auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy));
-      if (topics.has("module_state")) {
-        findings.push(...auditModuleRegExpState(ts, sourceFile, policy));
-        findings.push(...auditModuleStateWrites(ts, implementationFile, checker, project, policy));
+      for (const effect of effectScopes.get(normalizedRealPath(ts, sourceFile.fileName)) || []) {
+        const scoped = [];
+        if (topics.has("module_state")) {
+          scoped.push(...auditModuleRegExpState(ts, sourceFile, effect.policy, ruleParams));
+          scoped.push(...auditModuleStateWrites(ts, effect.scope, checker, project, effect.policy, ruleParams));
+        }
+        if (topics.has("host_io")) scoped.push(...auditHostIo(ts, effect.scope, checker, project, effect.policy, ruleParams));
+        if (topics.has("effect_imports")) {
+          scoped.push(...auditParsedSource(ts, effect.scope, ""));
+          scoped.push(...auditRuleImportPolicy(ts, effect.scope, ruleParams));
+        }
+        findings.push(...scoped.map(finding => ({...finding, owner: ownerFor(ts, sourceFile.fileName, effect.policy)})));
       }
-      if (topics.has("host_io")) {
-        const ioPolicy = request.ruleSubjectKind === "node" ? {
-          ...policy, owners: policy.owners.map(owner => owner.kind === "node" && owner.id === request.ruleSubjectId ? {...owner, kind: "base_lib"} : owner),
-        } : policy;
-        findings.push(...auditBaseLibHostIo(ts, implementationFile, checker, project, ioPolicy));
-        findings.push(...auditPluginHostIo(ts, implementationFile, checker, project, policy));
-      }
-      if (topics.has("ownership")) findings.push(...auditUnclassifiedHiddenWork(ts, implementationFile, checker, policy));
       const sharedOwners = policy.owners.filter(
         (item) => path.resolve(item.path) === path.resolve(sourceFile.fileName),
       );
@@ -2442,15 +2481,7 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
         diagnostics: contractDiagnostics,
       });
     }
-  } finally {
-    try {
-      dispose();
-    } finally {
-      if (temporaryConfigRoot) {
-        await rm(temporaryConfigRoot, { recursive: true, force: true });
-      }
-    }
-  }
+  } finally { await state.dispose(); }
 }
 
 const VIRTUAL_WORKFLOW_SPECIFIER = "vibeflow:workflow-entry";
@@ -2563,16 +2594,12 @@ async function build(request, tools) {
   };
 }
 
-async function main() {
-  if (process.argv.length !== 3) {
-    fail("VF_PROTOCOL", "usage: node toolchain_driver.mjs REQUEST.json");
-  }
-  const requestPath = path.resolve(process.argv[2]);
-  const request = JSON.parse(await readFile(requestPath, "utf8"));
+const packageCache=new Map();
+async function dispatch(request){
   const packageRoot = path.resolve(request.packageRoot);
-  const tools = await packageTools(packageRoot, {
-    requireEsbuild: request.command === "build",
-  });
+  const toolsKey=JSON.stringify([packageRoot,request.command === "build"]);
+  if(!packageCache.has(toolsKey))packageCache.set(toolsKey,await packageTools(packageRoot,{requireEsbuild:request.command === "build"}));
+  const tools=packageCache.get(toolsKey);
   const probe = {
     node: process.versions.node,
     typescript: String(tools.typescript.version || ""),
@@ -2599,17 +2626,16 @@ async function main() {
   fail("VF_PROTOCOL", `unknown driver command '${String(request.command)}'`);
 }
 
-try {
-  const result = await main();
-  process.stdout.write(JSON.stringify(result));
-} catch (error) {
-  process.stdout.write(JSON.stringify({
-    ok: false,
-    error: {
-      code: error?.code || "VF_TOOLCHAIN_INTERNAL",
-      message: error instanceof Error ? error.message : String(error),
-      details: error?.details || {},
-    },
-  }));
-  process.exitCode = 1;
+function errorPayload(error){return {ok:false,error:{code:error?.code||"VF_TOOLCHAIN_INTERNAL",message:error instanceof Error?error.message:String(error),details:error?.details||{}}};}
+if(process.argv.length===3&&process.argv[2]==="--session"){
+  analysisSession=new AnalysisSession();
+  const input=readline.createInterface({input:process.stdin,crlfDelay:Infinity});
+  try{for await(const line of input){if(!line.trim())continue;let result;try{result=await dispatch(JSON.parse(line));}catch(error){result=errorPayload(error);}process.stdout.write(JSON.stringify(result)+"\n");}}
+  finally{await analysisSession.dispose();}
+}else{
+  try{
+    if(process.argv.length!==3)fail("VF_PROTOCOL","usage: node toolchain_driver.mjs REQUEST.json");
+    const request=JSON.parse(await readFile(path.resolve(process.argv[2]),"utf8"));
+    process.stdout.write(JSON.stringify(await dispatch(request)));
+  }catch(error){process.stdout.write(JSON.stringify(errorPayload(error)));process.exitCode=1;}
 }

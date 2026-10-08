@@ -26,15 +26,6 @@ def javascript_options(root: WorkspaceRoot) -> dict[str, object]:
             "VF_AOT_JAVASCRIPT_CONFIG",
             "javascript.external_packages must be a list",
         )
-    host_extensions = raw.get("host_extensions", ())
-    if (
-        isinstance(host_extensions, str)
-        or not isinstance(host_extensions, (list, tuple))
-    ):
-        raise ProjectBuildError(
-            "VF_AOT_JAVASCRIPT_CONFIG",
-            "javascript.host_extensions must be a list",
-        )
     nodeset_max_depth = raw.get("nodeset_max_depth", 4)
     if (
         not isinstance(nodeset_max_depth, int)
@@ -49,11 +40,6 @@ def javascript_options(root: WorkspaceRoot) -> dict[str, object]:
         "package_root": package_root,
         "external_packages": tuple(
             dict.fromkeys(str(item).strip() for item in external)
-        ),
-        "host_extensions": tuple(
-            dict.fromkeys(
-                str(item).strip() for item in host_extensions
-            )
         ),
         "nodeset_max_depth": nodeset_max_depth,
     }

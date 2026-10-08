@@ -19,11 +19,8 @@ from tests.targets.javascript.test_aot_core import (
 )
 from vibeflow.targets.javascript.build import BuildRequest, build_aot
 from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
-from vibeflow.targets.javascript.frontend.model import (
-    AotPlanError,
-    WorkflowSpec,
-    normalize_workflow_plan,
-)
+from vibeflow.targets.javascript.frontend.errors import AotPlanError
+from tests.targets.javascript.aot_fixtures import emit_fixture, fixture_build_request, view_fixture
 
 
 def _sha256_text(value: str) -> str:
@@ -231,42 +228,41 @@ def _emission_cases() -> dict[str, tuple[dict[str, object], tuple[dict, ...]]]:
 # These hashes intentionally freeze generated source formatting as well as its
 # semantic plan.  Update them only after reviewing an intentional ABI change.
 # Plugin ABI v3 changes helpers and its declaration literal; Native plan hashes are unchanged.
-EMISSION_GOLDENS = {'async': ('3975030fdb79fe51263b7e9edfe36edb67cc38721959dabce5d659431ed466ae',
-           '57fa269dddfd6016300cf042d3cfb18222f73f9f0023d6fb41eea101e151ce87',
-           '19d01b13302c398cf9c22bd074274bfeb78fa22081ad37afba46a9cbab0fb755'),
- 'bounded_loop': ('eed7666b5558fe333427ba79114365e84404216e5c2b3e8ba914be11113d59f0',
-                  '9e78fc34748441aa52d2e7b5653c695e2467880b518a76a26c3a99b4b77fe046',
-                  '00ca22caf38d62947c800d9934c05931baa9a9fad1da8cb3ecca8817cb37af3e'),
- 'deferred': ('b85950265671831e926e3d9aaa3983d4469d566e579dd747c7221a3cee89037f',
-              '57fa269dddfd6016300cf042d3cfb18222f73f9f0023d6fb41eea101e151ce87',
-              'b3cc12a80cb958eca09111c026c00e149f095023ee7f2d2bd95678c1d68b7d9f'),
- 'detached': ('2b59099e0aefdc66a1b663f11d3499079e41650c5ac13bd1514a66a1282e95d6',
-              'f791a722322c1f0549c356f8841cf137650d5b8a630a24010ccf50c28c2bf9aa',
-              'a655bd121ffb1466eba440e2a8c76a283615b58d95a3a7cc956451b7288c5888'),
- 'host_extension': ('bfff6529fc4a5b7dbdf25cd7eb75bf31c61f2089939057231284c865528e9319',
-                    '86336979b50342feeda45466f0afe72e3ff5a9916f0716ec4392b7b6bb972e8d',
-                    '53e8507930ecd9f043c897669c0ff7a2dd4697e44de7540c5079f9442710faef'),
- 'nested_nodeset': ('81b6f68dd155a3ef5c48ef0355317df8964031253cea97d281ee83427f407cc6',
-                    '9e78fc34748441aa52d2e7b5653c695e2467880b518a76a26c3a99b4b77fe046',
-                    '60d3fe09ab50bd1b34714fbab3c59772e0ddfc5fed1e0d8b513d80e194b9c579'),
- 'port': ('8e8018b4dba563201c4917e9d1380584fca6c888868c5d7898b426cae4a04da2',
-          'f4b92f1f6d4a434bb2b2e0b2ee4f23a65b12cb51dd9c605965223292090dea48',
-          '3d8d823f0d64d73f593ed0efb5442a887e85c67b4c486f3a1727bd5a9743fc10'),
- 'sync': ('126f99ec7c25f1f2bc3d7c23c17fef3b7c7e98e242139c03589b2b98a156a3e3',
-          '9e78fc34748441aa52d2e7b5653c695e2467880b518a76a26c3a99b4b77fe046',
+EMISSION_GOLDENS = {'sync': ('b22d5cb58b92c2449e1c414738bc427b7b55160e0ab4c96915b9e90627e8825a',
+          '267d0586df4ba471549db93358ab104a0640833f67c6aa584a7a2c8813613d50',
           '53e8507930ecd9f043c897669c0ff7a2dd4697e44de7540c5079f9442710faef'),
- 'unbounded_loop': ('157478b9be08295fc6806c2b47fef60c15c706a8be880a204710bd7fa1bd0e49',
-                    '9e78fc34748441aa52d2e7b5653c695e2467880b518a76a26c3a99b4b77fe046',
-                    'b9885ee397416a76e43970aa768b3dd4574b87b0d12dc5605794fcade0bbe71d')}
+ 'async': ('763196c2409b4e210e0be24b4b30e37774fa7f0d2c7d4c76b9101b5e99b0ea6f',
+           '50b0853a0b8e8e2ba51600d062354ed59fd51cd9027723c20a6168d9932fd6ef',
+           '8e28da66ba854889a606495f2a0a0e3bd139d7f2219e7d3305f3db249b958379'),
+ 'nested_nodeset': ('64f67fa360b3e0c2acfd8130a691cfb45e1874f29ea2be6ca694b21154818405',
+                    '267d0586df4ba471549db93358ab104a0640833f67c6aa584a7a2c8813613d50',
+                    '750bcd394cec0893e7ad7c4c30e81a02e1d6a2f44838ed3a0ea195fbc523dab9'),
+ 'bounded_loop': ('df8934d9a99c241dcfc5639a47a6a7e11ba7bdfef8e8f148d94666415212121b',
+                  '267d0586df4ba471549db93358ab104a0640833f67c6aa584a7a2c8813613d50',
+                  '77ec1071a3a1e9ff5a596f09a86e7d866caa54a35381091899dce21d6dc43386'),
+ 'unbounded_loop': ('02d0f332b44ef2ed3ad5493ac686343076cd84f77ae28eca304060a2c3b2950c',
+                    '267d0586df4ba471549db93358ab104a0640833f67c6aa584a7a2c8813613d50',
+                    '6706fbd35b3a4c2928aa2c0e5ee3a483f35467e3ec85287851389ed8e6ed3260'),
+ 'deferred': ('706b7acde07c4c7421a547d08bf6fc18d0f2dde997131ceb2f1965cced97f9a1',
+              '50b0853a0b8e8e2ba51600d062354ed59fd51cd9027723c20a6168d9932fd6ef',
+              '0e778a67bc301f40f8a9aa58d23a0166f43e707bec3e36c6c2b79be543c5573d'),
+ 'detached': ('e4493e7fd3db204e0fa02842eb99142ff3858cc62542d8d1efc6b37a4bb2577e',
+              'decb4991f97aea58adec3e7941467cd09f506c7f6790c3c2986d6d513f6e87fe',
+              '1ca5974e988a6bf82959775b27d90e7e9640aab7249236b0e78f50c042ab9b5d'),
+ 'port': ('b7dceea3016d917c00e18e400f7f69709b74ec93f6603f0c17c75a57ded1871d',
+          '78a9022d14463548f32f5959a267cc7c729bea773fca34e3845d96cdb377dce1',
+          '3d8d823f0d64d73f593ed0efb5442a887e85c67b4c486f3a1727bd5a9743fc10'),
+ 'host_extension': ('84b111f17df4430b565116203f7f93b1f8ee5388c9baefb24b5f94f89a4b47c9',
+                    'f4ae4522e48fb9fd23eaff421fbaf4f65d7a96fda797f31cf7149d43214818fd',
+                    '53e8507930ecd9f043c897669c0ff7a2dd4697e44de7540c5079f9442710faef')}
 
 NORMALIZED_WORKFLOW_SHA256 = (
     "84040e3d50fdd63d581f8f8e778bc0144d77d98746a35c27a33fde64b85c4a04"
 )
 
 
-def test_workflow_spec_normalized_to_dict_is_frozen() -> None:
-    workflow = WorkflowSpec.from_portable(_sync_plan())
-    assert normalize_workflow_plan(workflow) is workflow
+def test_canonical_bound_view_payload_is_frozen() -> None:
+    workflow = view_fixture(_sync_plan())
     payload = workflow.to_dict()
 
     assert _sha256_text(_canonical_json(payload)) == NORMALIZED_WORKFLOW_SHA256
@@ -307,7 +303,7 @@ def test_representative_emission_source_declarations_and_plan_hash_are_frozen(
     case_name: str,
 ) -> None:
     plan, host_extensions = _emission_cases()[case_name]
-    emitted = emit_workflow_module(
+    emitted = emit_fixture(
         plan,
         host_extensions=host_extensions,
     )
@@ -392,7 +388,7 @@ def test_sync_task_and_port_diagnostics_are_frozen(
     mutate(plan)
 
     with pytest.raises(AotPlanError) as caught:
-        WorkflowSpec.from_portable(plan)
+        view_fixture(plan)
     assert caught.value.code == code
     assert message in str(caught.value)
 
@@ -514,7 +510,7 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
     monkeypatch.setattr(builder_module, "run_build_driver", capture_driver)
     expected = PROFILE_GOLDENS[profile]
     result = build_aot(
-        BuildRequest(
+        fixture_build_request(
             plan=_sync_plan(),
             project_root=project,
             package_root=project,
@@ -612,7 +608,7 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
 def test_importing_emitted_module_does_not_run_workflow_or_host_extension(
     tmp_path: Path,
 ) -> None:
-    emitted = emit_workflow_module(
+    emitted = emit_fixture(
         _sync_plan(),
         host_extensions=HOST_EXTENSIONS,
     )

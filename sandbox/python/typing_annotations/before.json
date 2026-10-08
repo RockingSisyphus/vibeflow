@@ -1,0 +1,97 @@
+[
+  {
+    "id": "annotated",
+    "exit_code": 1,
+    "errors": [
+      {
+        "code": "NODE.PURITY.BANNED_CALL",
+        "rule_id": "NODE.PURITY.BANNED_CALL",
+        "severity": "error",
+        "object_type": "node",
+        "object_id": "probe.defaults",
+        "source_location": {
+          "path": "/tmp/vf-iterable-annotation-repro/annotated/plugin.py",
+          "line": 16,
+          "column": 32
+        },
+        "rule_source": "ruleset.selection",
+        "failure_layer": "implementation",
+        "message": "dynamic module namespace lookup is forbidden: typing.Iterable",
+        "suggested_fix_type": "move_to_boundary",
+        "details": {
+          "node_type": "probe.defaults",
+          "calls": [
+            {
+              "owner": "pipeline",
+              "node": "inspect"
+            }
+          ]
+        },
+        "root_id": "probe",
+        "source_path": "/tmp/vf-iterable-annotation-repro/annotated/plugin.py",
+        "definition_id": "vibeflow.no_side_effects"
+      },
+      {
+        "code": "NODE.PURITY.BANNED_CALL",
+        "rule_id": "NODE.PURITY.BANNED_CALL",
+        "severity": "error",
+        "object_type": "node",
+        "object_id": "probe.end",
+        "source_location": {
+          "path": "/tmp/vf-iterable-annotation-repro/annotated/plugin.py",
+          "line": 22,
+          "column": 32
+        },
+        "rule_source": "ruleset.selection",
+        "failure_layer": "implementation",
+        "message": "dynamic module namespace lookup is forbidden: typing.Iterable",
+        "suggested_fix_type": "move_to_boundary",
+        "details": {
+          "node_type": "probe.end",
+          "calls": [
+            {
+              "owner": "pipeline",
+              "node": "end"
+            }
+          ]
+        },
+        "root_id": "probe",
+        "source_path": "/tmp/vf-iterable-annotation-repro/annotated/plugin.py",
+        "definition_id": "vibeflow.no_side_effects"
+      },
+      {
+        "code": "NODE.PURITY.BANNED_CALL",
+        "rule_id": "NODE.PURITY.BANNED_CALL",
+        "severity": "error",
+        "object_type": "node",
+        "object_id": "probe.start",
+        "source_location": {
+          "path": "/tmp/vf-iterable-annotation-repro/annotated/plugin.py",
+          "line": 6,
+          "column": 32
+        },
+        "rule_source": "ruleset.selection",
+        "failure_layer": "implementation",
+        "message": "dynamic module namespace lookup is forbidden: typing.Iterable",
+        "suggested_fix_type": "move_to_boundary",
+        "details": {
+          "node_type": "probe.start",
+          "calls": [
+            {
+              "owner": "pipeline",
+              "node": "start"
+            }
+          ]
+        },
+        "root_id": "probe",
+        "source_path": "/tmp/vf-iterable-annotation-repro/annotated/plugin.py",
+        "definition_id": "vibeflow.no_side_effects"
+      }
+    ]
+  },
+  {
+    "id": "plain",
+    "exit_code": 0,
+    "errors": []
+  }
+]

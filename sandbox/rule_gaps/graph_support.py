@@ -4,6 +4,7 @@ Only the child CLI imports VibeFlow.  The handlers are ordinary trusted plugin
 sources; their event files measure invocation rather than assuming it occurred.
 """
 from __future__ import annotations
+from tests.fixtures.support.plugins import resource as resource_ref, copy_sdk_inputs
 
 from dataclasses import dataclass
 import json
@@ -28,11 +29,11 @@ class Sandbox:
 
     @property
     def graph(self):
-        return self.project / "bundle/rulesets/graph.jsonc"
+        return resource_ref(self.project, 'ruleset', 'example.rule_graph')
 
     @property
     def node(self):
-        return self.project / "bundle/nodes/calculate.jsonc"
+        return resource_ref(self.project, 'node', 'example.calculate')
 
     @property
     def config(self):
@@ -53,14 +54,13 @@ class Sandbox:
         return [json.loads(line) for line in self.marker.read_text().splitlines()] if self.marker.exists() else []
 
     def rule(self, name):
-        return self.project / "bundle/rules" / (name + ".jsonc")
+        rule_id = {"provider": "number_provider", "checker": "number_checker", "replacement": "replacement_provider", "wrong-replacement": "wrong_provider"}[name]
+        return resource_ref(self.project, "rule", "example." + rule_id)
 
     def source(self, name):
         return self.project / "rules" / (name + (".py" if self.target == "python" else ".ts"))
 
     def command(self, command="validate", *options):
-        import runpy
-        runpy.run_path(str(ROOT / "tests/fixtures/support/code_plugins.py"))["migrate_fixture"](self.project)
         arguments = [sys.executable, "-m", "vibeflow", command,
                      "--workspace", str(self.root / "vibeflow_config.jsonc"),
                      "--config", str(self.config), *options, "--json"]
@@ -79,8 +79,7 @@ class Sandbox:
 def create(work_root, target, case_id, toolchain_root=None):
     root = work_root / case_id.replace(".", "-") / target
     shutil.copytree(ROOT / "sandbox" / target / "rule_graph", root)
-    import runpy
-    runpy.run_path(str(ROOT / "tests/fixtures/support/code_plugins.py"))["copy_archival_inputs"](ROOT / "sandbox" / target / "rule_graph", root)
+    copy_sdk_inputs(ROOT / "sandbox" / target / "rule_graph", root)
     case = Sandbox(target, root)
     if target == "javascript":
         toolchain = Path(toolchain_root or os.environ.get("VIBEFLOW_TEST_TOOLCHAIN_ROOT", ""))

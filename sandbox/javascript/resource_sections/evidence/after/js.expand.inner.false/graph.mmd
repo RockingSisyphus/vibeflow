@@ -1,0 +1,56 @@
+flowchart TD
+  classDef defaultNode fill:#ECECFF,stroke:#9370DB,color:#333333;
+  classDef healthError fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+  classDef healthWarning fill:#fef3c7,stroke:#d97706,color:#78350f;
+  classDef externalDependency fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
+  classDef externalBoundary stroke-width:7px,vector-effect:non-scaling-stroke;
+  classDef documentNode fill:#f0fdf4,stroke:#16a34a,color:#14532d;
+  classDef nodesetNode fill:#ede9fe,stroke:#7c3aed,color:#3b0764;
+  classDef loopNode fill:#f0fdfa,stroke:#0f766e,color:#134e4a;
+  classDef plannedNode fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;
+  classDef baseLibResource fill:#ecfdf5,stroke:#059669,color:#064e3b;
+  classDef pluginResource fill:#eff6ff,stroke:#2563eb,color:#1e3a8a;
+  classDef hostExtensionResource fill:#f5f3ff,stroke:#7c3aed,color:#3b0764;
+  classDef plannedResource fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;
+  vf_start@{ shape: stadium, label: "Start\n\nid: start\ntype_used: demo.start\nrulesets: unconstrained\n\n---------- meta ----------\ndesc: Starts the computation\nflow_kind: terminal\neffect_scope: unconstrained\nruntime_dispatch: unknown\nexecution_lock: none" }
+  class vf_start defaultNode;
+  style vf_start fill:#ECECFF,stroke:#9370DB,color:#333333;
+  vf_stage@{ shape: fr-rect, label: "Stage\n\nid: stage\ntype_used: audit.outer\ntype_key: audit.outer\n\n---------- meta ----------\ndesc: Native Nodeset\nflow_kind: predefined\neffect_scope: unconstrained\nruntime_dispatch: unknown\nexecution_lock: none" }
+  class vf_stage nodesetNode;
+  style vf_stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764;
+  vf_end@{ shape: stadium, label: "End\n\nid: end\ntype_used: demo.start\nrulesets: unconstrained\n\n---------- meta ----------\ndesc: Finishes the computation\nflow_kind: terminal\neffect_scope: unconstrained\nruntime_dispatch: unknown\nexecution_lock: none" }
+  class vf_end defaultNode;
+  style vf_end fill:#ECECFF,stroke:#9370DB,color:#333333;
+  vf_start --> vf_stage
+  linkStyle 0 stroke-width:4px;
+  vf_stage --> vf_end
+  linkStyle 1 stroke-width:4px;
+
+%% expanded nodeset: audit.outer
+flowchart TD
+  classDef defaultNode fill:#ECECFF,stroke:#9370DB,color:#333333;
+  classDef healthError fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+  classDef healthWarning fill:#fef3c7,stroke:#d97706,color:#78350f;
+  classDef externalDependency fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
+  classDef externalBoundary stroke-width:7px,vector-effect:non-scaling-stroke;
+  classDef documentNode fill:#f0fdf4,stroke:#16a34a,color:#14532d;
+  classDef nodesetNode fill:#ede9fe,stroke:#7c3aed,color:#3b0764;
+  classDef loopNode fill:#f0fdfa,stroke:#0f766e,color:#134e4a;
+  classDef plannedNode fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;
+  classDef baseLibResource fill:#ecfdf5,stroke:#059669,color:#064e3b;
+  classDef pluginResource fill:#eff6ff,stroke:#2563eb,color:#1e3a8a;
+  classDef hostExtensionResource fill:#f5f3ff,stroke:#7c3aed,color:#3b0764;
+  classDef plannedResource fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;
+  vf_start@{ shape: stadium, label: "Start\n\nid: start\ntype_used: demo.start\nrulesets: unconstrained\n\n---------- meta ----------\ndesc: Starts the computation\nflow_kind: terminal\neffect_scope: unconstrained\nruntime_dispatch: unknown\nexecution_lock: none" }
+  class vf_start defaultNode;
+  style vf_start fill:#ECECFF,stroke:#9370DB,color:#333333;
+  vf_model@{ shape: fr-rect, label: "Model\n\nid: model\ntype_used: audit.body\ntype_key: audit.body\n\n---------- meta ----------\ndesc: Computes one functional model block\nflow_kind: predefined\neffect_scope: unconstrained\nruntime_dispatch: unknown\nexecution_lock: none" }
+  class vf_model nodesetNode;
+  style vf_model fill:#ede9fe,stroke:#7c3aed,color:#3b0764;
+  vf_end@{ shape: stadium, label: "End\n\nid: end\ntype_used: demo.start\nrulesets: unconstrained\n\n---------- meta ----------\ndesc: Finishes the computation\nflow_kind: terminal\neffect_scope: unconstrained\nruntime_dispatch: unknown\nexecution_lock: none" }
+  class vf_end defaultNode;
+  style vf_end fill:#ECECFF,stroke:#9370DB,color:#333333;
+  vf_start --> vf_model
+  linkStyle 0 stroke-width:4px;
+  vf_model --> vf_end
+  linkStyle 1 stroke-width:4px;

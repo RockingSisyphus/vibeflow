@@ -1,0 +1,18 @@
+{
+  "helpers.calc": {
+    "ownership_findings": [],
+    "effect_findings": []
+  },
+  "runtime.calc": {
+    "ownership_findings": [],
+    "effect_findings": [
+      "BASE_LIB.FORBIDDEN_PROJECT_IMPORT"
+    ]
+  },
+  "plugins.calc": {
+    "ownership_findings": [],
+    "effect_findings": [
+      "BASE_LIB.FORBIDDEN_PROJECT_IMPORT"
+    ]
+  }
+}

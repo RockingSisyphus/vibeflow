@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Mapping, Protocol
 
 from vibeflow.core.findings import HealthFinding
-from vibeflow.targets.python.project.resources import PluginInfo, PluginResource
+from vibeflow.core.descriptors import PluginDescriptor as ResourceDescriptor
 
 
 class CompilerPlugin(Protocol):
@@ -32,7 +32,7 @@ class PluginDescriptor:
     scope: str
     source: str
     class_name: str = "Plugin"
-    info: PluginInfo | None = None
+    declaration: ResourceDescriptor | None = None
     config_keys: tuple[str, ...] = ()
     root_id: str = ""
     root_path: str = ""
@@ -77,7 +77,7 @@ class PluginRegistry:
         scope: str = "project",
         source: str = "manual",
         class_name: str = "Plugin",
-        info: PluginInfo | None = None,
+        declaration: ResourceDescriptor | None = None,
         config_keys: tuple[str, ...] = (),
         root_id: str = "",
         root_path: str = "",
@@ -126,7 +126,7 @@ class PluginRegistry:
             scope,
             source,
             class_name,
-            info,
+            declaration,
             tuple(config_keys),
             root_id,
             root_path,
@@ -152,34 +152,6 @@ class PluginRegistry:
             "plugins": [descriptor.to_dict() for descriptor in self.descriptors()]
         }
 
-    def resource_map(self) -> dict[tuple[str, str, str], PluginResource]:
-        resources: dict[tuple[str, str, str], PluginResource] = {}
-        for descriptor in self.descriptors():
-            key = (
-                descriptor.source,
-                descriptor.class_name,
-                descriptor.plugin_type,
-            )
-            resources[key] = PluginResource(
-                name=descriptor.name,
-                id=descriptor.name,
-                plugin_type=descriptor.plugin_type,
-                status="implemented",
-                module=descriptor.source,
-                class_name=descriptor.class_name,
-                description=(
-                    descriptor.info.description
-                    if descriptor.info is not None
-                    else ""
-                ),
-                config_keys=descriptor.config_keys,
-                info=descriptor.info,
-                root_id=descriptor.root_id,
-                root_path=descriptor.root_path,
-                source_path=descriptor.source_path,
-                rulesets=descriptor.rulesets,
-            )
-        return resources
 
 
 def plugin_error(

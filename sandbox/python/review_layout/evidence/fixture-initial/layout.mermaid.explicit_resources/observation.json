@@ -1,0 +1,17 @@
+{
+  "exit_code": 0,
+  "error": null,
+  "frames": [],
+  "panels": [],
+  "columns": [],
+  "seconds": 0.7395567820058204,
+  "arguments": [
+    "export-mermaid",
+    "--workspace",
+    "/tmp/vf-review-layout-before/layout.mermaid.explicit_resources/vibeflow_config.jsonc",
+    "--config",
+    "/tmp/vf-review-layout-before/layout.mermaid.explicit_resources/workflow.jsonc",
+    "--output",
+    "/tmp/vf-review-layout-before/layout.mermaid.explicit_resources/graph.mmd"
+  ]
+}

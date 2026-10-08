@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 import subprocess
 import tempfile
+from queue import Queue, Empty
+from threading import Thread
 from typing import Any, Mapping
 
 from vibeflow.targets.javascript.resources import materialized_resources
@@ -30,6 +32,8 @@ class JavascriptPluginSession:
         self._process: subprocess.Popen[str] | None = None
         self._opened: list[str] = []
         self._stderr = None
+        self._responses = None
+        self._reader = None
 
     def __enter__(self) -> JavascriptPluginSession:
         context = materialized_resources()
@@ -46,6 +50,19 @@ class JavascriptPluginSession:
                 encoding="utf-8",
                 bufsize=1,
             )
+            responses = Queue()
+            self._responses = responses
+            output = self._process.stdout
+            def read_responses():
+                try:
+                    for line in output:
+                        responses.put(line)
+                except (OSError, ValueError):
+                    pass
+                finally:
+                    responses.put("")
+            self._reader = Thread(target=read_responses, daemon=True)
+            self._reader.start()
         except Exception:
             context.__exit__(None, None, None)
             self._resource_context = None
@@ -66,12 +83,7 @@ class JavascriptPluginSession:
         package_root: str | Path,
         target: str,
         workflow_id: str,
-        rule_catalogs: Any = None,
     ) -> None:
-        if plugin.get("rulesets"):
-            from vibeflow.targets.javascript.build.rule_extensions import check_plugin_rules
-            check_plugin_rules(plugin, package_root=Path(package_root), target=target,
-                               catalogs=rule_catalogs, node_command=self.node_command)
         self._request(
             {
                 "command": "open",
@@ -127,35 +139,54 @@ class JavascriptPluginSession:
         normalized = str(session_id)
         if normalized not in self._opened:
             return
-        self._request({"command": "close", "sessionId": normalized})
-        self._opened.remove(normalized)
+        try:
+            self._request({"command": "close", "sessionId": normalized}, timeout=10)
+        finally:
+            self._opened.remove(normalized)
 
     def __exit__(self, exc_type, exc, traceback) -> None:
-        for session_id in reversed(tuple(self._opened)):
+        errors = []
+        def release(action):
             try:
-                self.close(session_id)
-            except Exception:
-                if exc is None:
-                    raise
+                action()
+            except Exception as error:
+                errors.append(error)
+        for session_id in reversed(tuple(self._opened)):
+            release(lambda session_id=session_id: self.close(session_id))
         process = self._process
         self._process = None
         if process is not None:
             if process.stdin is not None:
-                process.stdin.close()
+                release(process.stdin.close)
             try:
                 process.wait(timeout=10)
             except subprocess.TimeoutExpired:
-                process.terminate()
-                process.wait(timeout=5)
+                release(process.terminate)
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    release(process.kill)
+                    release(lambda: process.wait(timeout=5))
+            except Exception as error:
+                errors.append(error)
+            for stream in (process.stdout, process.stdin):
+                if stream is not None:
+                    release(stream.close)
         context = self._resource_context
         self._resource_context = None
         if context is not None:
-            context.__exit__(exc_type, exc, traceback)
+            release(lambda: context.__exit__(exc_type, exc, traceback))
         if self._stderr is not None:
-            self._stderr.close()
+            release(self._stderr.close)
             self._stderr = None
+        if self._reader is not None:
+            release(lambda: self._reader.join(timeout=1))
+        self._reader = self._responses = None
+        self._opened.clear()
+        from vibeflow.targets.javascript.build.cleanup import finish_cleanup
+        finish_cleanup(exc, errors)
 
-    def _request(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
+    def _request(self, payload: Mapping[str, Any], *, timeout=180) -> Mapping[str, Any]:
         process = self._process
         if process is None or process.stdin is None or process.stdout is None:
             raise JavascriptPluginError(
@@ -173,7 +204,11 @@ class JavascriptPluginSession:
             + "\n"
         )
         process.stdin.flush()
-        line = process.stdout.readline()
+        try:
+            line = self._responses.get(timeout=timeout)
+        except Empty as error:
+            raise JavascriptPluginError("VF_PLUGIN_TIMEOUT",
+                f"JavaScript plugin worker timed out during {payload.get('command')}") from error
         if not line:
             stderr = ""
             if self._stderr is not None:

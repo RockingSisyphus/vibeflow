@@ -1,0 +1,32 @@
+{
+  "schema": "vibeflow.review-performance.release.v1",
+  "profiles": {
+    "collaborative": {
+      "kernel": "/home/rockingsisyphus/projects/VibeFlow/dist/vibeflow-distribution/kernel/vibeflow-kernel.zip",
+      "kernel_sha256": "ba64ecd4c95c188fd64e450988e89ff8691dbb84a475d360bb876a77383ad8a6",
+      "archive": "/home/rockingsisyphus/projects/VibeFlow/archive/vibeflow-distribution-0.15.0.zip",
+      "archive_sha256": "7b3b15b0bf67e650bb61c38fea9204107d6a8b183442c8f825c052c66569ca9b",
+      "representative_cli_observations": 18,
+      "matched": true
+    },
+    "autonomous": {
+      "kernel": "/home/rockingsisyphus/projects/VibeFlow/dist/vibeflow-distribution-autonomous/kernel/vibeflow-kernel.zip",
+      "kernel_sha256": "ba64ecd4c95c188fd64e450988e89ff8691dbb84a475d360bb876a77383ad8a6",
+      "archive": "/home/rockingsisyphus/projects/VibeFlow/archive/vibeflow-distribution-autonomous-0.15.0.zip",
+      "archive_sha256": "4d60f977a6c911ad6d322dd95c7ffd71552c9d4f97de8e41d07c4502570aabef",
+      "representative_cli_observations": 18,
+      "matched": true
+    }
+  },
+  "kernel_imports": {
+    "vibeflow-distribution": "/home/rockingsisyphus/projects/VibeFlow/dist/vibeflow-distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+    "vibeflow-distribution-autonomous": "/home/rockingsisyphus/projects/VibeFlow/dist/vibeflow-distribution-autonomous/kernel/vibeflow-kernel.zip/vibeflow/__init__.py"
+  },
+  "wheel": {
+    "path": "/tmp/vf-performance-installed-wheel/dist/vibeflow-0.15.0-py3-none-any.whl",
+    "sha256": "bf82dfe006b2efbf518bf8c789ce82b8814f8aade3edbb92b61da3914ae7e9cb",
+    "installed_module": "/tmp/vf-performance-installed-wheel/venv/lib/python3.13/site-packages/vibeflow/__init__.py",
+    "observations": 18,
+    "matched": true
+  }
+}

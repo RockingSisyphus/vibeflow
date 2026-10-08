@@ -14,6 +14,8 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     from vibeflow.core.contracts import DataProvider, DataRequirement
     from vibeflow.core.flow import EdgeSpec, GraphConfig, IoSpec, NodeMetadata, NodeSpec, NodesetSpec
     from vibeflow.targets.python.project.registry import NodeRegistry
+    if variant == "current":
+        from vibeflow.tooling.application.python.project.declarations import default_python_registry as NodeRegistry
     from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
 
     def plain(value):
@@ -30,7 +32,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             requires=(DataRequirement(signal, "exactly_one", display_name="Sent value"),) if operation == "send" else ())
 
     def healthy():
-        return GraphConfig((io("start", "receive"), io("end", "send")), (EdgeSpec("start", "end"),))
+        return GraphConfig((io("start", "receive"), io("end", "send")), (EdgeSpec("start", "end"),), **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
 
     observations = []
     cases = (
@@ -48,12 +50,12 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             root = work_root / case_id
             root.mkdir(parents=True, exist_ok=True)
             if topic == "metadata":
-                body = GraphConfig((io("start", "receive", missing_metadata=True), io("end", "send", missing_metadata=True)), (EdgeSpec("start", "end"),))
+                body = GraphConfig((io("start", "receive", missing_metadata=True), io("end", "send", missing_metadata=True)), (EdgeSpec("start", "end"),), **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
             elif topic == "mainline":
                 body = GraphConfig((io("start", "receive"), io("left", "send"), io("right", "send")),
-                    (EdgeSpec("start", "left"), EdgeSpec("start", "right")))
+                    (EdgeSpec("start", "left"), EdgeSpec("start", "right")), **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
             elif topic == "flow":
-                body = GraphConfig((io("start", "receive"), io("end", "send"), io("orphan", "receive", signal="orphan.signal")), (EdgeSpec("start", "end"),))
+                body = GraphConfig((io("start", "receive"), io("end", "send"), io("orphan", "receive", signal="orphan.signal")), (EdgeSpec("start", "end"),), **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
             else:
                 body = healthy()
             required = (DataRequirement("root.signal", "exactly_one", display_name="Root value"),)
@@ -62,7 +64,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             graph = healthy()
             if used:
                 stage = NodeSpec("stage", child.type_key, metadata=NodeMetadata("Stage", "Calls the declared child."), requires=required, provides=provided)
-                graph = GraphConfig((io("start", "receive", signal="root.signal"), stage, io("end", "send")), (EdgeSpec("start", "stage"), EdgeSpec("stage", "end")))
+                graph = GraphConfig((io("start", "receive", signal="root.signal"), stage, io("end", "send")), (EdgeSpec("start", "stage"), EdgeSpec("stage", "end")), **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
             graph = replace(graph, nodesets={child.type_key: child})
             try:
                 report = validate_graph_health(graph, registry=NodeRegistry())
@@ -98,6 +100,8 @@ def _source_consumption_cases(work_root: Path, variant: str) -> list[dict]:
     from vibeflow.core.contracts import DataProvider, DataRequirement
     from vibeflow.core.flow import EdgeSpec, ExecutionLockSpec, GraphConfig, IoSpec, NodeMetadata, NodeSimilarity, NodeSpec
     from vibeflow.targets.python.project.registry import NodeRegistry
+    if variant == "current":
+        from vibeflow.tooling.application.python.project.declarations import default_python_registry as NodeRegistry
     from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
 
     cases = (
@@ -164,7 +168,7 @@ def _source_consumption_cases(work_root: Path, variant: str) -> list[dict]:
             similar_to=NodeSimilarity("work0", "copy", "Intentional equivalent implementation.") if mode == "similar" and index else NodeSimilarity())
             for index in range(len(kinds))), io("end", "send"))
         graph = GraphConfig(nodes, tuple(EdgeSpec(first.id, second.id) for first, second in zip(nodes, nodes[1:])),
-            execution_lock=ExecutionLockSpec("shared") if mode == "advisory_locked" else None)
+            execution_lock=ExecutionLockSpec("shared") if mode == "advisory_locked" else None, **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
         try:
             kwargs = {"source_context": build_python_source_context(selected, files, calls=calls)} if variant == "current" else {}
             report = validate_graph_health(graph, registry=registry, **kwargs)

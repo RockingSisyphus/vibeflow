@@ -1,0 +1,183 @@
+{
+  "batch": "F02 full-02 final candidate",
+  "observed_utc": "2026-10-08T10:09:14.460998+00:00",
+  "gate": "/home/rockingsisyphus/.cache/vibeflow-comprehension-scope-20261008/full-02",
+  "log": "/home/rockingsisyphus/.cache/vibeflow-comprehension-scope-20261008/full-02.log",
+  "official_verification_path": "/home/rockingsisyphus/.cache/vibeflow-comprehension-scope-20261008/full-02/verification.json",
+  "total_stages": 17,
+  "started_stages": [
+    {
+      "index": 1,
+      "step": "repository-quality"
+    },
+    {
+      "index": 2,
+      "step": "compileall"
+    },
+    {
+      "index": 3,
+      "step": "pytest"
+    },
+    {
+      "index": 4,
+      "step": "python-sandbox"
+    },
+    {
+      "index": 5,
+      "step": "javascript-minimal"
+    },
+    {
+      "index": 6,
+      "step": "javascript-integration"
+    },
+    {
+      "index": 7,
+      "step": "rule-regression-sandboxes"
+    },
+    {
+      "index": 8,
+      "step": "runtime-observation-browser"
+    },
+    {
+      "index": 9,
+      "step": "review-layout-sandbox"
+    },
+    {
+      "index": 10,
+      "step": "resource-sections-sandbox"
+    },
+    {
+      "index": 11,
+      "step": "review-performance-sandbox"
+    },
+    {
+      "index": 12,
+      "step": "adaptation-regression-sandbox"
+    },
+    {
+      "index": 13,
+      "step": "wheel-isolation"
+    },
+    {
+      "index": 14,
+      "step": "generated-artifact-cleanup"
+    },
+    {
+      "index": 15,
+      "step": "distribution"
+    },
+    {
+      "index": 16,
+      "step": "repository-quality-final"
+    },
+    {
+      "index": 17,
+      "step": "clean-tree"
+    }
+  ],
+  "completed_stages": [
+    {
+      "step": "repository-quality",
+      "status": "passed",
+      "seconds": 5.860777887981385
+    },
+    {
+      "step": "compileall",
+      "status": "passed",
+      "seconds": 1.1708259310107678
+    },
+    {
+      "step": "pytest",
+      "status": "passed",
+      "seconds": 136.4810101959738
+    },
+    {
+      "step": "python-sandbox",
+      "status": "passed",
+      "seconds": 384.3671116150217
+    },
+    {
+      "step": "javascript-minimal",
+      "status": "passed",
+      "seconds": 22.86530731699895
+    },
+    {
+      "step": "javascript-integration",
+      "status": "passed",
+      "seconds": 126.11023174598813
+    },
+    {
+      "step": "rule-regression-sandboxes",
+      "status": "passed",
+      "seconds": 829.7480903269607
+    },
+    {
+      "step": "runtime-observation-browser",
+      "status": "passed",
+      "seconds": 4.282490227022208
+    },
+    {
+      "step": "review-layout-sandbox",
+      "status": "passed",
+      "seconds": 17.71210833202349
+    },
+    {
+      "step": "resource-sections-sandbox",
+      "status": "passed",
+      "seconds": 62.836342017981224
+    },
+    {
+      "step": "review-performance-sandbox",
+      "status": "passed",
+      "seconds": 68.16063004703028
+    },
+    {
+      "step": "adaptation-regression-sandbox",
+      "status": "passed",
+      "seconds": 86.9963640680071
+    },
+    {
+      "step": "wheel-isolation",
+      "status": "passed",
+      "seconds": 6.498239618027583
+    },
+    {
+      "step": "generated-artifact-cleanup",
+      "status": "passed",
+      "seconds": 0.08617513603530824
+    },
+    {
+      "step": "distribution",
+      "status": "passed",
+      "seconds": 16.56835931900423
+    },
+    {
+      "step": "repository-quality-final",
+      "status": "passed",
+      "seconds": 5.738715665997006
+    },
+    {
+      "step": "clean-tree",
+      "status": "passed",
+      "seconds": 0.10130285000195727
+    }
+  ],
+  "active_stage": null,
+  "confirmed_failures": [],
+  "prior_batch_failures": [],
+  "all_stages_completed": true,
+  "official_all_stages_passed": true,
+  "latest_test_result_lines": [
+    "3589 passed in 129.61s (0:02:09)",
+    "integration sandbox: total=138 passed=138 failed=0",
+    "TypeScript sandbox: total=67 passed=67 failed=0 skipped=0"
+  ],
+  "frozen_product_all_334_hashes_match": true,
+  "tests_and_verification_config_declared_frozen": true,
+  "observer_input_count": 1558,
+  "changes_since_first_observation": [],
+  "observer_frozen_input_manifest": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-scope-validation-20261008/full-02-observer-frozen-inputs.json",
+  "packages_replayed": false,
+  "package_replay_pending_explicit_root_approval": true,
+  "product_source_tests_docs_or_config_modified_by_observer": false
+}

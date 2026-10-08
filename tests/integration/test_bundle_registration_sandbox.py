@@ -1,6 +1,7 @@
 """Both Targets register contributed declarations through the public CLI."""
 
 from __future__ import annotations
+from tests.fixtures.support.plugins import resource as resource_ref, copy_sdk_inputs, write_plugin, resources
 
 import json
 import os
@@ -28,15 +29,14 @@ def registered_project(tmp_path, request):
     example = tmp_path / target
     shutil.copytree(ROOT / f"sandbox/{target}/domain_rules", example,
         ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc", ".artifacts"))
-    from tests.fixtures.support.code_plugins import copy_archival_inputs
-    copy_archival_inputs(ROOT / f"sandbox/{target}/domain_rules", example)
+    copy_sdk_inputs(ROOT / f"sandbox/{target}/domain_rules", example)
     project = example / "project"
     if target == "javascript":
         toolchain = Path(os.environ.get("VIBEFLOW_TEST_TOOLCHAIN_ROOT", ROOT / "sandbox/javascript/minimal/project"))
         if not (toolchain / "node_modules/typescript").is_dir():
             pytest.skip("requires the pinned TypeScript/esbuild toolchain")
         (project / "node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
-    for manifest in (project / "bundle/nodes").glob("*.jsonc"):
+    for manifest in resources(project, "node"):
         data = json.loads(manifest.read_text())
         data["rulesets"] = []
         _write(manifest, data)
@@ -51,7 +51,7 @@ def registered_project(tmp_path, request):
             (project / "domain_nodes.py").read_text().replace('return {"feature": self.model_forward(value, params["gain"])}',
                 f"Path({str(executed)!r}).write_text('executed')\n"
                 '        return {"feature": self.model_forward(value, params["gain"])}'))
-        manifest = project / "bundle/nodes/model.jsonc"
+        manifest = resource_ref(project, 'node', 'example.model')
         data = json.loads(manifest.read_text())
         data["implementations"][0]["source"]["ref"] = "registration_node.py"
         _write(manifest, data)
@@ -71,49 +71,28 @@ def registered_project(tmp_path, request):
 
 
 def _validate(capsys, workspace, project):
-    from tests.fixtures.support.code_plugins import migrate_fixture
-    migrate_fixture(project)
     code = main(["validate", "--workspace", str(workspace),
                  "--config", str(project / "configs/model.jsonc"), "--json"])
     return code, json.loads(capsys.readouterr().out)
 
 
-def _extra_bundle(project, resources):
-    path = project / "bundles/extra.jsonc"
-    _write(path, {"kind": "bundle", "id": "example.extra", "resources": resources})
-    return path
-
-
-@pytest.mark.parametrize("route", ["shared", "transitive"])
-def test_multiple_bundles_share_one_canonical_declaration_and_keep_its_origin(registered_project, capsys, route):
-    target, workspace, project, imported, executed = registered_project
-    if route == "shared":
-        _extra_bundle(project, {"nodes": ["../bundle/nodes/model.jsonc"],
-                                "rules": ["../bundle/rules/model-definition.jsonc"]})
-    else:
-        _extra_bundle(project, {"bundles": ["domain.jsonc"]})
-    code, payload = _validate(capsys, workspace, project)
-    assert code == 0, payload
-    catalogs = load_workflow_catalogs(project, workflow_config=project / "configs/model.jsonc")
-    assert catalogs.nodes.source_for("example.model") == str(project / ("code_plugin.py" if target == "python" else "code_plugin.ts"))
-    assert catalogs.rules.source_for("example.model_definition") == str(project / ("code_plugin.py" if target == "python" else "code_plugin.ts"))
-    assert sum(item.type_key == "example.model" for item in catalogs.nodes) == 1
-    assert sum(item.id == "example.model_definition" for item in catalogs.rules) == 1
-    assert not imported.exists()
-    assert not executed.exists()
+def _select(project, selection):
+    config = project / "configs/model.jsonc"
+    data = json.loads(config.read_text())
+    data["plugins"].append(selection)
+    _write(config, data)
 
 
 @pytest.mark.parametrize("resource", ["nodes", "rules"])
 @pytest.mark.parametrize("different", [False, True], ids=["duplicate", "conflict"])
 def test_different_declaration_files_with_same_id_are_rejected_before_node_import(registered_project, capsys, resource, different):
     target, workspace, project, imported, executed = registered_project
-    original = project / ("bundle/nodes/model.jsonc" if resource == "nodes" else "bundle/rules/model-definition.jsonc")
+    original = resource_ref(project, "node" if resource == "nodes" else "rule", "example.model" if resource == "nodes" else "example.model_definition")
     data = json.loads(original.read_text())
     if different:
         data["description"] += " A conflicting contribution."
-    duplicate = project / "contribution" / original.name
-    _write(duplicate, data)
-    _extra_bundle(project, {resource: ["../contribution/" + original.name]})
+    selection = write_plugin(project, [data], target=target, plugin_id="fixture.additional", filename="additional_plugin.py" if target == "python" else "additional_plugin.ts")
+    _select(project, selection)
     code, payload = _validate(capsys, workspace, project)
     assert code == 1, payload
     diagnostic = json.dumps(payload)
@@ -121,28 +100,26 @@ def test_different_declaration_files_with_same_id_are_rejected_before_node_impor
     assert (prefix + (".CONFLICT" if different else ".DUPLICATE")) in diagnostic
     assert str(project / ("code_plugin.py" if target == "python" else "code_plugin.ts")) in diagnostic
     origins = payload.get("diagnostics",payload.get("errors",[]))[0]["details"]["origins"]
-    assert origins["current"]["line"] != origins["previous"]["line"]
+    assert origins["current"]["path"] != origins["previous"]["path"]
     assert ("example.model" if resource == "nodes" else "example.model_definition") in diagnostic
     assert not imported.exists()
     assert not executed.exists()
 
 
-def test_dangling_bundle_resource_is_rejected_with_its_resource_path(registered_project, capsys):
-    _, workspace, project, imported, executed = registered_project
-    missing = project / "contribution/missing.jsonc"
-    missing.parent.mkdir()
-    _extra_bundle(project, {"nodes": ["../contribution/missing.jsonc"]})
+def test_missing_selected_sdk_plugin_is_rejected_with_its_source(registered_project, capsys):
+    target, workspace, project, imported, executed = registered_project
+    missing = "missing_plugin.py" if target == "python" else "missing_plugin.ts"
+    _select(project, {"source": {"kind":"file", "ref":missing, "export":"plugin"}})
     code, payload = _validate(capsys, workspace, project)
     assert code == 1, payload
     diagnostic = json.dumps(payload)
-    assert "PLUGIN.DECLARATION.LOAD" in diagnostic or "VF_PLUGIN_PROCESS" in diagnostic
-    assert "missing" in diagnostic
+    assert missing in diagnostic
     assert not imported.exists() and not executed.exists()
 
 
 def test_unknown_selected_ruleset_rejects_before_node_import(registered_project, capsys):
     _, workspace, project, imported, executed = registered_project
-    manifest = project / "bundle/nodes/model.jsonc"
+    manifest = resource_ref(project, 'node', 'example.model')
     data = json.loads(manifest.read_text())
     data["rulesets"] = ["example.missing_ruleset"]
     _write(manifest, data)
@@ -158,7 +135,7 @@ def test_unknown_selected_ruleset_rejects_before_node_import(registered_project,
 @pytest.mark.parametrize("failure", ["source", "export"])
 def test_native_node_binding_failure_preserves_real_import_boundary(registered_project, capsys, failure):
     target, workspace, project, imported, executed = registered_project
-    manifest = project / "bundle/nodes/model.jsonc"
+    manifest = resource_ref(project, 'node', 'example.model')
     data = json.loads(manifest.read_text())
     source = data["implementations"][0]["source"]
     if failure == "source":
@@ -167,8 +144,6 @@ def test_native_node_binding_failure_preserves_real_import_boundary(registered_p
     else:
         source["export"] = "MissingNodeExport"
     _write(manifest, data)
-    from tests.fixtures.support.code_plugins import migrate_fixture
-    migrate_fixture(project)
     if failure == "source":
         code, payload = _validate(capsys, workspace, project)
     elif target == "python":
@@ -194,7 +169,7 @@ def test_native_node_binding_failure_preserves_real_import_boundary(registered_p
 @pytest.mark.parametrize("failure", ["source", "export"])
 def test_selected_rule_binding_failure_never_imports_the_business_node(registered_project, capsys, failure):
     target, workspace, project, imported, executed = registered_project
-    rule_manifest = project / "bundle/rules/model-definition.jsonc"
+    rule_manifest = resource_ref(project, 'rule', 'example.model_definition')
     data = json.loads(rule_manifest.read_text())
     source = data["implementations"][0]["source"]
     if failure == "source":
@@ -203,11 +178,10 @@ def test_selected_rule_binding_failure_never_imports_the_business_node(registere
     else:
         source["export"] = "missing_rule_export"
     _write(rule_manifest, data)
-    _write(project / "bundle/rulesets/registration.jsonc", {"kind": "ruleset", "id": "example.registration",
+    _write(resource_ref(project, "ruleset", "example.registration"), {"kind": "ruleset", "id": "example.registration",
         "calls": [{"id": "check", "rule_id": "example.model_definition"}],
         "entrypoints": {"import": ["check"], "static": ["check"], "run": ["check"]}})
-    _extra_bundle(project, {"rulesets": ["../bundle/rulesets/registration.jsonc"]})
-    manifest = project / "bundle/nodes/model.jsonc"
+    manifest = resource_ref(project, 'node', 'example.model')
     node = json.loads(manifest.read_text())
     node["rulesets"] = ["example.registration"]
     _write(manifest, node)

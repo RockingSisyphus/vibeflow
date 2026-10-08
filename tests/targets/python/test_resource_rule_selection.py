@@ -3,7 +3,6 @@ import json
 
 import pytest
 
-from vibeflow.targets.python.project.resources import PluginResourceRegistry
 from vibeflow.tooling.application.python.workspace_service import validate_workspace_config_path
 from vibeflow.tooling.project.workspace_loader import load_project_workspace
 
@@ -37,6 +36,7 @@ def test_plugin_import_rule_is_selected_and_blocks_the_actual_write(tmp_path, se
 
 
 def test_declared_library_rule_checks_only_its_reached_sources_before_binding(tmp_path):
+    from tests.fixtures.support.plugins import write_plugin
     def write(name, value):
         path = tmp_path / name
         path.parent.mkdir(parents=True,exist_ok=True)
@@ -52,22 +52,21 @@ def check(context, inputs, params):
     return {"findings":[{"code":"TEST.LIBRARY.REJECT","message":"Review reached library",
         "object_type":"base_lib","object_id":context.subject["id"]}]}
 ''')
-    write("manifests/nodes/leaf.jsonc",{"kind":"node","type_key":"leaf","display_name":"Leaf",
+    declarations = ({"kind":"node","type_key":"leaf","display_name":"Leaf",
         "description":"Selected implementation","version":"1","flow_kind":"process","rulesets":[],"contract":{},
-        "implementations":[{"language":"python","targets":["python"],"source":{"kind":"file","ref":"leaf.py","export":"Leaf"}}]})
-    write("manifests/base_lib/library.jsonc",{"kind":"base_lib","id":"library","rulesets":["test.library"],
+        "implementations":[{"language":"python","targets":["python"],"source":{"kind":"file","ref":"leaf.py","export":"Leaf"}}]},
+    {"kind":"base_lib","id":"library","rulesets":["test.library"],
         "display_name":"Library","description":"One reached library",
-        "implementations":[{"language":"python","targets":["python"],"source":{"kind":"file","ref":"library.py"}}]})
-    write("manifests/rules/library.jsonc",{"kind":"rule","id":"test.library","scope":"source",
-        "implementations":[{"language":"python","source":{"kind":"file","ref":"rule.py","export":"check"}}]})
-    write("manifests/rulesets/library.jsonc",{"kind":"ruleset","id":"test.library",
+        "implementations":[{"language":"python","targets":["python"],"source":{"kind":"file","ref":"library.py"}}]},
+    {"kind":"rule","id":"test.library","scope":"source",
+        "implementations":[{"language":"python","source":{"kind":"file","ref":"rule.py","export":"check"}}]},
+    {"kind":"ruleset","id":"test.library",
         "calls":[{"id":"library","rule_id":"test.library"}],"entrypoints":{"import":["library"]}})
     write("vibeflow_project.jsonc",{"project_target":"python","quality_enabled":False,
-        "descriptors":{group:["manifests/"+group] for group in ("nodes","base_lib","rules","rulesets")}})
-    write("main.jsonc",{"rulesets":[],"pipeline":{"nodes":[{"id":"leaf","type_used":"leaf",
+})
+    plugin = write_plugin(tmp_path, declarations, target="python")
+    write("main.jsonc",{"plugins":[plugin], "rulesets":[],"pipeline":{"nodes":[{"id":"leaf","type_used":"leaf",
         "display_name":"Leaf","description":"One real call"}]}})
-    from tests.fixtures.support.code_plugins import migrate_fixture
-    migrate_fixture(tmp_path)
     report = validate_workspace_config_path(tmp_path / "main.jsonc",workspace=load_project_workspace(tmp_path / "main.jsonc"))
     finding = next(item for item in report.errors if item.code == "TEST.LIBRARY.REJECT")
     assert finding.object_type == "base_lib" and finding.object_id == "library"
@@ -81,8 +80,7 @@ def check(context, inputs, params):
 
 
 def test_resource_registration_preserves_explicit_rule_choices(tmp_path):
-    # Declarations need no executable symbols to expose their review selection.
-    from vibeflow.targets.python.project.resources import BaseLibRegistry
-    libraries = BaseLibRegistry()
-    libraries.register("lib",module="library",display_name="Library",description="One declared library",rulesets=("custom",))
-    assert libraries.get("lib").to_dict()["rulesets"] == ["custom"]
+    from vibeflow.targets.python.sdk import base_lib, SourceLocator
+    library = base_lib(id="lib", display_name="Library", description="One declared library",
+        source=SourceLocator(kind="file", ref=str(tmp_path / "library.py")), rulesets=("custom",))
+    assert library.descriptor.to_dict()["rulesets"] == ["custom"]

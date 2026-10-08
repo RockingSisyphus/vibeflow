@@ -1,0 +1,114 @@
+{
+  "command": [
+    "/home/rockingsisyphus/miniforge3/bin/python",
+    "-m",
+    "vibeflow",
+    "review-rules",
+    "--config",
+    "/tmp/vibeflow-recheck-host-preview-vgp7ny_j/workflow.jsonc",
+    "--json"
+  ],
+  "exit_code": 0,
+  "output": {
+    "config": "/tmp/vibeflow-recheck-host-preview-vgp7ny_j/workflow.jsonc",
+    "phase": "static",
+    "workflow": [],
+    "scopes": [],
+    "nodes": [],
+    "resources": [],
+    "project_rule_defaults": {
+      "vibeflow.quality.dependencies": {
+        "warn_dependency_chain": 6,
+        "max_dependency_chain": 10
+      },
+      "vibeflow.quality.files": {
+        "max_file_lines": 500,
+        "warn_file_lines": 450,
+        "max_file_bytes": 60000,
+        "max_functions_per_file": 40,
+        "max_classes_per_file": 20,
+        "max_public_api_per_file": 30,
+        "max_file_branches": 150,
+        "max_function_lines": 80,
+        "max_function_branches": 12,
+        "max_function_nesting": 4,
+        "max_function_params": 6
+      },
+      "vibeflow.quality.structure": {
+        "max_directory_fanout": 25,
+        "max_directory_fanin": 25,
+        "max_prefix_cluster_files": 12,
+        "max_public_entry_bypass_imports": 3,
+        "max_dependency_distance": 3,
+        "max_scattered_dependency_directories": 6,
+        "enabled": false,
+        "warn_root_code_files": 96,
+        "max_root_code_files": 120,
+        "warn_code_dirs": 18,
+        "max_code_dirs": 24,
+        "warn_code_files_per_dir": 12,
+        "max_code_files_per_dir": 16,
+        "warn_code_dir_depth": 3,
+        "max_code_dir_depth": 4,
+        "warn_child_code_dirs_per_dir": 6,
+        "max_child_code_dirs_per_dir": 8,
+        "warn_root_level_code_files": 1,
+        "max_root_level_code_files": 2,
+        "allowed_root_code_files": [
+          "__init__.py",
+          "registry.py"
+        ],
+        "enforce_role_imports": true,
+        "structure_roles": {
+          "base_lib_paths": [],
+          "base_lib_modules": [],
+          "module_roles": {},
+          "infer_roles_from_path": false,
+          "_resource_scopes": []
+        },
+        "structure_conventions": {
+          "code_label": "JavaScript/TypeScript",
+          "package_entry": "index.ts",
+          "suggested_entry_files": [
+            "index.ts",
+            "index.js"
+          ],
+          "public_entry_stems": [
+            "index",
+            "api",
+            "types"
+          ],
+          "ignored_prefix_stems": [
+            "index"
+          ],
+          "internal_suffixes": [
+            "_helpers",
+            "_rules",
+            "_visitors",
+            "_validators",
+            "-internal"
+          ],
+          "source_extension": ".ts",
+          "require_exports_for_public_entry": true,
+          "distance_exempt_stems": [
+            "runtime",
+            "runner",
+            "health",
+            "cli",
+            "cli_reports",
+            "cli_config",
+            "cli_node"
+          ]
+        }
+      },
+      "vibeflow.graph.nodesets": {
+        "nodeset_max_depth": 4
+      },
+      "vibeflow.workflow": {
+        "nodeset_max_depth": 4
+      }
+    },
+    "plugins": []
+  },
+  "stderr": ""
+}

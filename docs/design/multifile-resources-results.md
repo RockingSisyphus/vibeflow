@@ -1,5 +1,7 @@
 # 多文件资源实现与验收
 
+**历史展示结果说明：** 本文记录多文件资源实现时的原始验收。把资源实现、源码文件与导入关系直接展开为正式 SVG 的方案已撤销；当前用户图展示 Workflow 调用与配置所选资源目录。多文件登记、源码审查、运行绑定和 Architecture JSONC 证据继续有效，历史图及计数按当时实际结果保存。
+
 起点为 `3ee7396`，保持 `0.15.0` 开发版本、Plugin ABI v3、Rule ABI v1 和 Workflow ABI v4。实现遵循 [计划](multifile-resources-plan.md)；接口和使用方式见 [公开文档](../user/multifile-resources.md)，案例见 [对应表](multifile-resource-cases.md)。
 
 ## 实现对应关系

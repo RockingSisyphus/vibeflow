@@ -57,14 +57,6 @@
     "base_lib": {
       "type": "object",
       "properties": {
-        "paths": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "uniqueItems": true
-        },
         "modules": {
           "type": "array",
           "items": {
@@ -77,14 +69,6 @@
                 "type": "object",
                 "properties": {
                   "id": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "module": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "name": {
                     "type": "string",
                     "minLength": 1
                   },
@@ -110,28 +94,16 @@
                     "$ref": "#/$defs/nodeStyle"
                   }
                 },
-                "anyOf": [
-                  {
-                    "required": [
-                      "id"
-                    ]
-                  },
-                  {
-                    "required": [
-                      "module"
-                    ]
-                  },
-                  {
-                    "required": [
-                      "name"
-                    ]
-                  }
-                ]
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
               }
             ]
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     "policy": {
       "$ref": "policy.schema.json"
@@ -372,7 +344,8 @@
       "required": [
         "key",
         "type",
-        "display_name"
+        "display_name",
+        "required"
       ],
       "properties": {
         "key": {

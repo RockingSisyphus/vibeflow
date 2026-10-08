@@ -1,0 +1,27 @@
+{
+  "kind": "formal checked review performance sandbox",
+  "files": {
+    "ARCHITECTURE.jsonc": {
+      "source": "/tmp/vf-adaptation-full-accepted/review-performance/entry-review-0/ARCHITECTURE.jsonc",
+      "sha256": "c59e9bf1b009b9203769f489d824d6f73321c898288e31432907910667426934"
+    },
+    "graph.svg": {
+      "source": "/tmp/vf-adaptation-full-accepted/review-performance/entry-review-0/graph.svg",
+      "sha256": "ee9ee2da65b63c13344eac5ef278d5c3866388d485f62a3677d8dc64eb5fb7c4"
+    },
+    "graph.mmd": {
+      "source": "/tmp/vf-adaptation-full-accepted/review-performance/entry-review-0/graph.mmd",
+      "sha256": "e0a1b4a8bd0de323aaa581f87ff4a677457532bc58cc8a1151a29338d364bd25"
+    },
+    "graph.png": {
+      "source": "/tmp/vf-adaptation-full-accepted/review-performance/entry-review-0/graph.png",
+      "sha256": "fbf36d15361aeac0008cc402d2358ba573e19c022de37cd84614dcd1b1dbf60f"
+    },
+    "browser.json": {
+      "source": "/tmp/vf-adaptation-full-accepted/review-performance/entry-review-0/browser.json",
+      "sha256": "21a0aacca3b57ffb2ade2d1c75a5fda02f820efff3ae78e91b6f4197f5897465"
+    }
+  },
+  "source_manifest": "../fixed-source.json",
+  "browser_assertions": "browser.json"
+}

@@ -1,0 +1,43 @@
+{
+  "schema": "vibeflow.readonly-project-validation.v1",
+  "command": [
+    "/home/rockingsisyphus/miniforge3/bin/python",
+    "-B",
+    "-m",
+    "vibeflow",
+    "validate",
+    "--workspace",
+    "/home/rockingsisyphus/projects/vibeTrain/vibeflow_config.jsonc",
+    "--config",
+    "/home/rockingsisyphus/projects/vibeTrain/project/configs/mnist_example.jsonc",
+    "--json"
+  ],
+  "kernel": "/home/rockingsisyphus/projects/VibeFlow/src",
+  "stdout": "/tmp/vf-source-fp-mnist-final/observation.stdout.json",
+  "stderr": "/tmp/vf-source-fp-mnist-final/observation.stderr.txt",
+  "exit_code": 1,
+  "completed": true,
+  "status": "FAIL",
+  "errors": 31,
+  "warnings": 91,
+  "error_codes": {
+    "NODE.PURITY.SOURCE_TOO_LARGE": 17,
+    "NODE.PURITY.MISSING_OUTPUT": 1,
+    "BASE_LIB.SIDE_EFFECT_CALL": 7,
+    "NODE.BASE_LIB.INDIRECT_VIOLATION": 5,
+    "RULE.EXECUTION": 1
+  },
+  "warning_codes": {
+    "BASE_LIB.SOURCE.NEAR_LIMIT": 45,
+    "NODE.MAINTAINABILITY.WIDE_CONTRACT": 6,
+    "NODE.PURITY.SOURCE_NEAR_LIMIT": 14,
+    "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP": 15,
+    "GRAPH.DATA.UNCONSUMED_PROVIDER": 4,
+    "NODESET.SMELL.TOO_WIDE": 2,
+    "NODESET.CONFIG.OVERRIDES_GLOBAL_CONFIG": 1,
+    "VIBETRAIN.PLUGIN.BEST_METRIC_MULTIPLE_SOURCES": 1,
+    "GRAPH.DATA.TYPE_CARDINALITY_AMBIGUOUS": 2,
+    "GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT": 1
+  },
+  "seconds": 127.06045697099762
+}

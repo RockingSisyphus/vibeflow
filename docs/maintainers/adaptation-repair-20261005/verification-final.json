@@ -1,0 +1,80 @@
+{
+  "steps": [
+    {
+      "step": "repository-quality",
+      "status": "passed",
+      "seconds": 5.534616360993823
+    },
+    {
+      "step": "compileall",
+      "status": "passed",
+      "seconds": 0.7662081539747305
+    },
+    {
+      "step": "pytest",
+      "status": "passed",
+      "seconds": 109.86147221099236
+    },
+    {
+      "step": "python-sandbox",
+      "status": "passed",
+      "seconds": 278.4478412120079
+    },
+    {
+      "step": "javascript-minimal",
+      "status": "passed",
+      "seconds": 12.08064699501847
+    },
+    {
+      "step": "javascript-integration",
+      "status": "passed",
+      "seconds": 121.30306963800103
+    },
+    {
+      "step": "rule-regression-sandboxes",
+      "status": "passed",
+      "seconds": 739.1397536009899
+    },
+    {
+      "step": "runtime-observation-browser",
+      "status": "passed",
+      "seconds": 3.204558749013813
+    },
+    {
+      "step": "review-performance-sandbox",
+      "status": "passed",
+      "seconds": 62.17945592297474
+    },
+    {
+      "step": "adaptation-regression-sandbox",
+      "status": "passed",
+      "seconds": 104.35858466700302
+    },
+    {
+      "step": "wheel-isolation",
+      "status": "passed",
+      "seconds": 13.174100053991424
+    },
+    {
+      "step": "generated-artifact-cleanup",
+      "status": "passed",
+      "seconds": 0.15296482099802233
+    },
+    {
+      "step": "distribution",
+      "status": "passed",
+      "seconds": 29.97411955401185
+    },
+    {
+      "step": "repository-quality-final",
+      "status": "passed",
+      "seconds": 12.895156109996606
+    },
+    {
+      "step": "clean-tree",
+      "status": "passed",
+      "seconds": 0.12558862299192697
+    }
+  ],
+  "failures": []
+}

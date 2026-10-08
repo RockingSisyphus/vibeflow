@@ -19,7 +19,9 @@ from vibeflow.targets.javascript.build.toolchain import (
 )
 from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
 from vibeflow.targets.javascript.frontend.errors import AotBuildError
-from vibeflow.targets.javascript.frontend.model import AotPlanError, WorkflowSpec
+from vibeflow.targets.javascript.frontend.errors import AotPlanError
+from vibeflow.block_compiler.model import PortablePlanError
+from tests.targets.javascript.aot_fixtures import emit_fixture, fixture_build_request, view_fixture
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 REAL_TOOLCHAIN_ROOT = (
@@ -44,10 +46,9 @@ def _build_with_selected_source_rules(request: BuildRequest):
     These tests cover the fact service called by Rule handlers. Build itself
     retains its portable ABI, typechecking and publication responsibilities.
     """
-    policy = dict(request.import_policy)
+    policy = request.javascript_bindings.import_policy.to_value()
     owners = [dict(item) for item in policy.get("owners", ())]
     for owner in owners:
-        owner.setdefault("effect_scope", "none" if owner.get("kind") in {"node", "base_lib"} else "unconstrained")
         if owner.get("kind") in {"node", "host_extension"}:
             owner.setdefault("export", "run" if owner["kind"] == "node" else "createHostExtension")
             owner.setdefault("completion", "immediate")
@@ -59,7 +60,7 @@ def _build_with_selected_source_rules(request: BuildRequest):
     policy["allowed_external_packages"] = list({*policy.get("allowed_external_packages", ()), *request.external_packages})
     checked = run_rule_check_driver({
         "typecheckFiles": sorted({str(item["path"]) for item in owners}),
-        "ruleTopics": ["imports", "purity", "ownership", "completion", "module_state", "host_io"],
+        "ruleTopics": ["imports", "purity", "completion", "module_state", "host_io"],
         "importPolicy": policy,
     }, package_root=request.package_root, node_command=request.node_command)
     errors = tuple(item for item in checked.findings if item.get("severity", "error") == "error")
@@ -94,6 +95,7 @@ def _node(
         "provides": provides or [],
         "flow_kind": "terminal" if terminal else "process",
         "is_terminal": terminal,
+        "schedule": {"": "inline", "result_key": "deferred", "detached": "detached"}[extra.get("async_mode", "")],
         **extra,
     }
 
@@ -137,7 +139,7 @@ def _linear_plan(
 
 def _write_emitted(tmp_path: Path, plan: dict[str, object], node_source: str) -> Path:
     (tmp_path / "nodes.mjs").write_text(node_source, encoding="utf-8")
-    emitted = emit_workflow_module(plan)
+    emitted = emit_fixture(plan)
     workflow = tmp_path / "workflow.mjs"
     workflow.write_text(emitted.source, encoding="utf-8")
     (tmp_path / "workflow.d.ts").write_text(emitted.declarations, encoding="utf-8")
@@ -155,6 +157,10 @@ def _write_emitted(tmp_path: Path, plan: dict[str, object], node_source: str) ->
             lambda plan: plan.update(execution_lock={"key": "trainer"}),
             "execution_locks",
         ),
+        (
+            lambda plan: plan["nodes"][1].update(executor="thread"),
+            "thread_executor",
+        ),
     ),
 )
 def test_javascript_frontend_rejects_unsupported_v3_features(
@@ -165,7 +171,7 @@ def test_javascript_frontend_rejects_unsupported_v3_features(
     mutate(plan)
 
     with pytest.raises(AotPlanError) as exc_info:
-        WorkflowSpec.from_portable(plan)
+        view_fixture(plan)
 
     assert exc_info.value.code == "TARGET.FEATURE.UNSUPPORTED"
     assert feature in str(exc_info.value)
@@ -181,8 +187,8 @@ def test_javascript_frontend_explicitly_rejects_legacy_workflow_abi(
     plan = _linear_plan(middle=_node("middle", "middle"))
     plan["abi_version"] = abi_version
 
-    with pytest.raises(AotPlanError, match="unsupported workflow ABI"):
-        WorkflowSpec.from_portable(plan)
+    with pytest.raises(PortablePlanError, match="workflow ABI must be"):
+        view_fixture(plan)
 
 
 def _run_esm(workflow: Path, body: str) -> object:
@@ -305,7 +311,7 @@ def test_emitted_esm_is_static_code_without_embedded_graph_interpreter() -> None
         )
     )
 
-    source = emit_workflow_module(plan).source
+    source = emit_fixture(plan).source
 
     for interpreter_marker in (
         "__vfPlan",
@@ -664,7 +670,7 @@ console.log(JSON.stringify({
     )
     abort_workflow = tmp_path / "abort-workflow.mjs"
     abort_workflow.write_text(
-        emit_workflow_module(abort_plan).source,
+        emit_fixture(abort_plan).source,
         encoding="utf-8",
     )
     started = time.monotonic()
@@ -904,7 +910,7 @@ console.log(JSON.stringify(values));
         entry_mode="async",
     )
     (tmp_path / "async-workflow.mjs").write_text(
-        emit_workflow_module(async_plan).source,
+        emit_fixture(async_plan).source,
         encoding="utf-8",
     )
     async_result = _run_esm(
@@ -977,7 +983,7 @@ console.log(JSON.stringify(value));
         "max_steps": 10,
     }
     (tmp_path / "conditional-async-workflow.mjs").write_text(
-        emit_workflow_module(conditional_async_plan).source,
+        emit_fixture(conditional_async_plan).source,
         encoding="utf-8",
     )
     conditional_async = _run_esm(
@@ -1026,7 +1032,7 @@ console.log(JSON.stringify({
         "max_steps": 10,
     }
     (tmp_path / "detached-workflow.mjs").write_text(
-        emit_workflow_module(detached_plan).source,
+        emit_fixture(detached_plan).source,
         encoding="utf-8",
     )
     detached_result = _run_esm(
@@ -1065,7 +1071,7 @@ console.log(JSON.stringify({ value, calls: globalThis.__vfCalls }));
         "max_steps": 10,
     }
     (tmp_path / "detached-failure-workflow.mjs").write_text(
-        emit_workflow_module(failure_plan).source,
+        emit_fixture(failure_plan).source,
         encoding="utf-8",
     )
     failure_result = _run_esm(
@@ -1086,7 +1092,7 @@ console.log(JSON.stringify({ code, calls: globalThis.__vfCalls }));
     }
 
 
-def test_portable_blocks_expand_child_nodeset_and_legacy_required_fails_closed() -> None:
+def test_canonical_blocks_expand_child_nodeset_and_require_explicit_input_required() -> None:
     child_nodes = [
         _node("child_start", "start", terminal=True),
         _node(
@@ -1161,7 +1167,7 @@ def test_portable_blocks_expand_child_nodeset_and_legacy_required_fails_closed()
         ],
         "max_steps": 10,
     }
-    normalized = WorkflowSpec.from_portable(portable)
+    normalized = view_fixture(portable)
     composite = normalized.nodes[1]
     assert composite.subplan is not None
     assert [node.id for node in composite.subplan.nodes] == [
@@ -1169,12 +1175,11 @@ def test_portable_blocks_expand_child_nodeset_and_legacy_required_fails_closed()
         "double",
         "child_end",
     ]
-    assert composite.implementation is not None
-    assert composite.implementation.module == "composite"
+    assert composite.implementation is None
 
     portable["inputs"][0]["required"] = None
-    with pytest.raises(AotPlanError, match="explicitly true or false"):
-        WorkflowSpec.from_portable(portable)
+    with pytest.raises(PortablePlanError, match="explicitly true or false"):
+        view_fixture(portable)
 
 
 def test_process_only_root_is_not_promoted_to_a_workflow_entry(
@@ -1193,12 +1198,12 @@ def test_process_only_root_is_not_promoted_to_a_workflow_entry(
         "max_steps": 5,
     }
     with pytest.raises(AotPlanError) as normalized:
-        WorkflowSpec.from_portable(plan)
+        view_fixture(plan)
     assert normalized.value.code == "VF_WORKFLOW_ENTRY"
 
     with pytest.raises(AotBuildError) as built:
         build_aot(
-            BuildRequest(
+            fixture_build_request(
                 plan=plan,
                 project_root=tmp_path,
                 package_root=tmp_path,
@@ -1281,7 +1286,7 @@ def test_canonical_portable_loop_accepts_stop_when_carry_and_collect() -> None:
         ],
         "max_steps": 20,
     }
-    workflow = WorkflowSpec.from_portable(portable)
+    workflow = view_fixture(portable)
     repeat = next(node for node in workflow.nodes if node.id == "repeat")
     assert repeat.loop.stop_after == 0
     assert repeat.loop.stop_when_source == "loop.done"
@@ -1406,7 +1411,7 @@ console.log(JSON.stringify(value));
         }
     )
     (tmp_path / "loop-workflow.mjs").write_text(
-        emit_workflow_module(loop_plan).source,
+        emit_fixture(loop_plan).source,
         encoding="utf-8",
     )
     looped = _run_esm(
@@ -1420,7 +1425,7 @@ console.log(JSON.stringify(value));
 
     loop_plan["nodes"][1]["loop"]["max_iterations"] = None
     (tmp_path / "unbounded-loop-workflow.mjs").write_text(
-        emit_workflow_module(loop_plan).source,
+        emit_fixture(loop_plan).source,
         encoding="utf-8",
     )
     unbounded = _run_esm(
@@ -1501,7 +1506,7 @@ def test_build_profiles_are_atomic_and_manifest_is_deterministic(
     }
     monkeypatch.setattr(builder_module, "run_build_driver", _fake_driver)
     out_dir = tmp_path / f"dist-{profile}"
-    request = BuildRequest(
+    request = fixture_build_request(
         plan=plan,
         project_root=project,
         package_root=project,
@@ -1622,7 +1627,7 @@ def test_real_typescript_rejects_mutable_state_and_side_effect_imports(
     module.write_text(source, encoding="utf-8")
     with pytest.raises(AotBuildError) as caught:
         _build_with_selected_source_rules(
-            BuildRequest(
+            fixture_build_request(
                 plan=_empty_real_plan(module),
                 project_root=project,
                 package_root=project,
@@ -1658,7 +1663,7 @@ def test_real_typescript_allows_recursively_frozen_module_constants(
         encoding="utf-8",
     )
     result = _build_with_selected_source_rules(
-        BuildRequest(
+        fixture_build_request(
             plan=_empty_real_plan(module),
             project_root=project,
             package_root=project,
@@ -1704,7 +1709,7 @@ def test_real_typescript_rejects_unowned_barrel_and_cross_node_imports(
         )
     with pytest.raises(AotBuildError) as caught:
         _build_with_selected_source_rules(
-            BuildRequest(
+            fixture_build_request(
                 plan=_empty_real_plan(first),
                 project_root=project,
                 package_root=project,
@@ -1741,7 +1746,7 @@ def test_real_typescript_rejects_base_lib_host_io(
     )
     with pytest.raises(AotBuildError) as caught:
         _build_with_selected_source_rules(
-            BuildRequest(
+            fixture_build_request(
                 plan=_empty_real_plan(module),
                 project_root=project,
                 package_root=project,
@@ -1840,7 +1845,7 @@ def test_real_typescript_rejects_base_lib_nondeterminism_and_host_observation(
     )
     with pytest.raises(AotBuildError) as caught:
         _build_with_selected_source_rules(
-            BuildRequest(
+            fixture_build_request(
                 plan=_empty_real_plan(module),
                 project_root=project,
                 package_root=project,
@@ -1919,7 +1924,7 @@ def test_real_typescript_allows_pure_math_base_lib_and_fake_capability(
         }
     ]
     result = _build_with_selected_source_rules(
-        BuildRequest(
+        fixture_build_request(
             plan=plan,
             project_root=project,
             package_root=project,
@@ -1971,7 +1976,7 @@ def test_real_typescript_rejects_base_lib_host_io_module(
     )
     with pytest.raises(AotBuildError) as caught:
         _build_with_selected_source_rules(
-            BuildRequest(
+            fixture_build_request(
                 plan=_empty_real_plan(module),
                 project_root=project,
                 package_root=project,
@@ -2017,7 +2022,7 @@ def test_real_typescript_allows_pure_node_builtin_for_node_target(
     )
 
     built = _build_with_selected_source_rules(
-        BuildRequest(
+        fixture_build_request(
             plan=_empty_real_plan(module),
             project_root=project,
             package_root=project,
@@ -2055,7 +2060,7 @@ def test_browser_platform_module_failure_is_reported_by_esbuild(
 
     with pytest.raises(AotBuildError) as caught:
         build_aot(
-            BuildRequest(
+            fixture_build_request(
                 plan=_empty_real_plan(module),
                 project_root=project,
                 package_root=project,
@@ -2099,7 +2104,7 @@ def test_real_single_esm_rejects_unbundled_worker_resources(
     worker.write_text("self.postMessage('ready');\n", encoding="utf-8")
     with pytest.raises(AotBuildError) as caught:
         build_aot(
-            BuildRequest(
+            fixture_build_request(
                 plan=_empty_real_plan(module),
                 project_root=project,
                 package_root=project,
@@ -2164,7 +2169,7 @@ def test_real_typescript_node_context_has_portable_abort_signal(
         encoding="utf-8",
     )
     result = build_aot(
-        BuildRequest(
+        fixture_build_request(
             plan=_empty_real_plan(module),
             project_root=project,
             package_root=project,
@@ -2245,7 +2250,7 @@ def test_real_typescript_leaves_platform_globals_to_project_tools(
         encoding="utf-8",
     )
     built = build_aot(
-        BuildRequest(
+        fixture_build_request(
             plan=_empty_real_plan(module),
             project_root=project,
             package_root=project,
@@ -2274,7 +2279,7 @@ def test_real_typescript_ordinary_type_error_is_not_a_vibeflow_error(
     )
 
     built = build_aot(
-        BuildRequest(
+        fixture_build_request(
             plan=_empty_real_plan(module),
             project_root=project,
             package_root=project,
@@ -2312,7 +2317,7 @@ def test_real_typescript_still_rejects_vibeflow_node_abi_mismatch(
 
     with pytest.raises(AotBuildError) as caught:
         build_aot(
-            BuildRequest(
+            fixture_build_request(
                 plan=plan,
                 project_root=project,
                 package_root=project,
@@ -2361,7 +2366,7 @@ def test_real_typescript_rejects_runtime_string_evaluation(
     )
     with pytest.raises(AotBuildError) as caught:
         _build_with_selected_source_rules(
-            BuildRequest(
+            fixture_build_request(
                 plan=_empty_real_plan(module),
                 project_root=project,
                 package_root=project,
@@ -2409,7 +2414,7 @@ def test_real_typescript_rejects_module_binding_state_mutation(
     )
     with pytest.raises(AotBuildError) as caught:
         _build_with_selected_source_rules(
-            BuildRequest(
+            fixture_build_request(
                 plan=_empty_real_plan(module),
                 project_root=project,
                 package_root=project,
@@ -2450,7 +2455,7 @@ def test_real_typescript_rejects_module_scoped_stateful_regexp(
     )
     with pytest.raises(AotBuildError) as caught:
         _build_with_selected_source_rules(
-            BuildRequest(
+            fixture_build_request(
                 plan=_empty_real_plan(module),
                 project_root=project,
                 package_root=project,
@@ -2501,7 +2506,7 @@ def test_real_typescript_function_local_regexp_is_isolated_between_runs(
     for node in plan["nodes"]:
         node["implementation"]["ref"] = str(module)
     result = _build_with_selected_source_rules(
-        BuildRequest(
+        fixture_build_request(
             plan=plan,
             project_root=project,
             package_root=project,
@@ -2570,7 +2575,7 @@ def test_real_typescript_rejects_builtin_prototype_mutation(
     )
     with pytest.raises(AotBuildError) as caught:
         _build_with_selected_source_rules(
-            BuildRequest(
+            fixture_build_request(
                 plan=_empty_real_plan(module),
                 project_root=project,
                 package_root=project,
@@ -2629,7 +2634,7 @@ def test_real_typescript_rejects_builtin_object_mutation(
     )
     with pytest.raises(AotBuildError) as caught:
         _build_with_selected_source_rules(
-            BuildRequest(
+            fixture_build_request(
                 plan=_empty_real_plan(module),
                 project_root=project,
                 package_root=project,
@@ -2683,7 +2688,7 @@ def test_real_typescript_local_builtin_name_is_isolated_between_runs(
     for node in plan["nodes"]:
         node["implementation"]["ref"] = str(module)
     result = _build_with_selected_source_rules(
-        BuildRequest(
+        fixture_build_request(
             plan=plan,
             project_root=project,
             package_root=project,
@@ -2754,7 +2759,7 @@ def test_real_typescript_rejects_class_definition_side_effects(
     module.write_text(source, encoding="utf-8")
     with pytest.raises(AotBuildError) as caught:
         _build_with_selected_source_rules(
-            BuildRequest(
+            fixture_build_request(
                 plan=_empty_real_plan(module),
                 project_root=project,
                 package_root=project,
@@ -2801,7 +2806,7 @@ def _host_extension_build_request(
             "void createWorkflowHost;\n",
             encoding="utf-8",
         )
-    return BuildRequest(
+    return fixture_build_request(
         plan=plan,
         project_root=project,
         package_root=project,

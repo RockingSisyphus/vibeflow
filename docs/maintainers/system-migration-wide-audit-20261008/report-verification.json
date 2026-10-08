@@ -1,0 +1,9 @@
+{
+  "linked_targets": 45,
+  "json_files": 37,
+  "probe_scripts": 4,
+  "problems": [],
+  "starting_source_test_distribution_inputs": 1846,
+  "changed_existing_source_test_distribution_inputs": [],
+  "repository_documentation_checker": "new report/index have no findings; all existing maintained docs findings=0"
+}

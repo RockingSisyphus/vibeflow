@@ -97,10 +97,11 @@ def documents(project, *, name="diagram", screenshot=False):
     payload = {}
     if document.exists():
         text = document.read_text();payload=json.loads(text[text.index("{"):])
-    from vibeflow.tooling.presentation.resource_mermaid import render_resource_graph
-    graph = payload.get("implementation_graph", {})
-    mermaid = render_resource_graph(graph) if graph else ""
-    (project / "evidence" / (name + ".mmd")).write_text(mermaid)
+    mermaid_path = project / "evidence" / (name + ".mmd")
+    exported = cli(project, "export-mermaid", name=name + "-mermaid",
+                   extra=["--mermaid-layout", "review-columns", "--output", mermaid_path])
+    actual["metrics"]["mermaid_exit_code"] = exported["metrics"]["exit_code"]
+    mermaid = mermaid_path.read_text() if mermaid_path.exists() else ""
     browser = {"nodes":[]}
     if svg.exists():
         renderer=os.environ.get("VIBEFLOW_MERMAID_RENDERER_ROOT","")
@@ -111,6 +112,24 @@ def documents(project, *, name="diagram", screenshot=False):
         write(project / "evidence" / (name + "-browser.json"),{"exit_code":process.returncode,"stdout":process.stdout,"stderr":process.stderr})
         actual["metrics"]["browser_exit_code"]=process.returncode
     return actual,payload,mermaid,browser
+
+
+def display_resource(architecture, kind):
+    """Compare an actual invocation or selected directory entry with its facts."""
+    if kind == "node":
+        record = next((node for node in architecture.get("workflow", {}).get("nodes", ())
+                       if node.get("type_used") == IDS[kind]), {})
+        return {**record, "effective_presentation":record.get("presentation", {})}
+    key = "plugin_declaration:demo" if kind == "plugin" else kind + ":" + IDS[kind]
+    return architecture.get("implementation_graph", {}).get("resources", {}).get(key, {})
+
+
+def display_nodes(browser, kind):
+    """Select the user's Node call or resource card, never a type/source card."""
+    import re
+    marker = "type_used: " + IDS[kind] if kind == "node" else "id: " + ("demo" if kind == "plugin" else IDS[kind])
+    return [node for node in browser.get("nodes", ())
+            if re.search(re.escape(marker) + r"(?=\s|$|rulesets:|status:|----------)", node["text"])]
 
 
 def rgb(value):

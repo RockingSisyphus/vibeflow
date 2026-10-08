@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from vibeflow.targets.javascript.build.driver_session import check_scope
+
 from dataclasses import dataclass
 from html import escape as escape_xml
 import json
@@ -28,9 +30,7 @@ from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE
 from vibeflow.core.inspection import build_architecture_report
 from vibeflow.core.quality import QualityPolicy
 from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
-from vibeflow.targets.javascript.build.project_graph import (
-    require_explicit_inputs,
-)
+from vibeflow.tooling.application.javascript.rule_defaults import workflow_rule_defaults
 from vibeflow.targets.javascript.build.project_paths import (
     javascript_options,
     safe_project_path,
@@ -62,7 +62,6 @@ from vibeflow.tooling.project.descriptor_loader import (
 )
 from vibeflow.tooling.project.document_kinds import ARCHITECTURE_DOCUMENT_HEADER
 from vibeflow.tooling.project.graph_config import parse_graph_config
-from vibeflow.tooling.project.host_extensions import host_extension_resources
 from vibeflow.tooling.project.plugin_review import load_plugin_review_resources
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
 from vibeflow.tooling.project.workspace_model import WorkspaceConfig, WorkspaceRoot
@@ -111,6 +110,7 @@ class JavascriptAuditResult:
         return self.document.path
 
 
+@check_scope
 def audit_javascript_project(
     request: JavascriptAuditRequest,
 ) -> JavascriptAuditResult:
@@ -166,7 +166,8 @@ def audit_javascript_project(
     javascript = javascript_options(root)
     package_root = safe_project_path(root.path, javascript["package_root"], subject="javascript.package_root", require_directory=True)
     rule_plugin_records, rule_plugin_ids = _plugin_records(document.data, catalogs=catalogs)
-    rule_host_records, rule_host_ids = _host_extension_records(document.data, root=root, catalogs=catalogs)
+    host_records, host_extension_ids = _host_extension_records(document.data, root=root, catalogs=catalogs)
+    rule_host_records, rule_host_ids = host_records, host_extension_ids
     if request.audit_registered_resources:
         planned_plugins = {item["id"] for item in rule_plugin_records if item.get("status") == "planned"}
         planned_hosts = {item["id"] for item in rule_host_records if item.get("status") == "planned"}
@@ -184,7 +185,7 @@ def audit_javascript_project(
         first = rule_errors[0]
         raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in rule_report.findings))
     rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={}, node_report=rule_report, project_root=root.path, package_root=package_root, phase="import", node_command=request.node_command, evaluate_sources=request.audit_sources,
-        rule_defaults={"vibeflow.workflow": {"nodeset_max_depth": javascript["nodeset_max_depth"]}, "vibeflow.graph.nodesets": {"nodeset_max_depth": javascript["nodeset_max_depth"]}},
+        rule_defaults=workflow_rule_defaults(catalogs, javascript["nodeset_max_depth"]),
         quality_policy=request.quality_policy or javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
     rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if rule_errors:
@@ -193,7 +194,6 @@ def audit_javascript_project(
     facts = target_neutral_implementation_facts_from_catalog(catalogs.nodes, effect_policies=rule_report.policies)
     width_warnings = ()
     javascript = javascript_options(root)
-    require_explicit_inputs(graph, path=())
     compiled_by_path: dict[tuple[str, ...], CompiledGraph] = {}
     used_node_types: set[str] = set()
     compilation = _validate_graph_tree(
@@ -229,11 +229,6 @@ def audit_javascript_project(
     )
     plugin_records, plugin_ids = _plugin_records(
         document.data,
-        catalogs=catalogs,
-    )
-    host_records, host_extension_ids = _host_extension_records(
-        document.data,
-        root=root,
         catalogs=catalogs,
     )
     package_root = safe_project_path(
@@ -298,7 +293,7 @@ def audit_javascript_project(
                 str(exc),
                 diagnostics=(*exc.diagnostics, *width_warnings),
             ) from exc
-    rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **compiled_by_path}, compiled_nodesets=compiled_nodesets, node_report=rule_report, project_root=root.path, package_root=package_root, rule_defaults={"vibeflow.workflow": {"nodeset_max_depth": javascript["nodeset_max_depth"]}, "vibeflow.graph.nodesets": {"nodeset_max_depth": javascript["nodeset_max_depth"]}}, node_command=request.node_command, evaluate_sources=request.audit_sources,
+    rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **compiled_by_path}, compiled_nodesets=compiled_nodesets, node_report=rule_report, project_root=root.path, package_root=package_root, rule_defaults=workflow_rule_defaults(catalogs, javascript["nodeset_max_depth"]), node_command=request.node_command, evaluate_sources=request.audit_sources,
                                                  quality_policy=request.quality_policy or javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
     workflow_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if workflow_errors:
@@ -319,6 +314,7 @@ def audit_javascript_project(
         host_records=host_records,
         root_id=root.id,
         source_path=config_path.relative_to(root.path).as_posix(),
+        findings=rule_report.findings,
     )
     architecture["rule_checks"] = rule_report.to_dict()
     from vibeflow.tooling.presentation.resource_architecture import resource_architecture
@@ -494,24 +490,6 @@ def _effective_lock_text(graph: GraphConfig, node: object) -> str:
     return ""
 
 
-def _cloud_path(x: float, y: float, width: float, height: float) -> str:
-    """Return a scalable cloud outline contained by the requested box."""
-
-    def point(px: float, py: float) -> str:
-        return f"{x + width * px:.2f},{y + height * py:.2f}"
-
-    return " ".join(
-        (
-            f"M {point(0.12, 0.96)}",
-            f"C {point(0.04, 0.96)} {point(0.01, 0.78)} {point(0.06, 0.61)}",
-            f"C {point(0.01, 0.42)} {point(0.08, 0.22)} {point(0.18, 0.31)}",
-            f"C {point(0.22, 0.02)} {point(0.39, 0.00)} {point(0.44, 0.27)}",
-            f"C {point(0.52, 0.08)} {point(0.66, 0.15)} {point(0.67, 0.39)}",
-            f"C {point(0.76, 0.18)} {point(0.90, 0.30)} {point(0.87, 0.55)}",
-            f"C {point(0.98, 0.54)} {point(1.00, 0.82)} {point(0.91, 0.94)}",
-            f"C {point(0.78, 1.01)} {point(0.31, 1.00)} {point(0.12, 0.96)} Z",
-        )
-    )
 
 
 def _validate_graph_tree(
@@ -698,103 +676,23 @@ def _plugin_records(
     )
 
 
-def _host_extension_records(
-    config: Mapping[str, Any],
-    *,
-    root: WorkspaceRoot,
-    catalogs: DescriptorCatalogs,
-) -> tuple[tuple[Mapping[str, object], ...], tuple[str, ...]]:
-    legacy = javascript_options(root)["host_extensions"]
-    actual = config
-    if "host_extensions" not in actual and legacy:
-        actual = {**actual, "host_extensions": list(legacy)}
-    findings: list[object] = []
-    resources = host_extension_resources(actual, findings=findings)
-    errors = [
-        item
-        for item in findings
-        if str(getattr(item, "severity", "error")) == "error"
-    ]
-    if errors:
-        first = errors[0]
-        raise ProjectBuildError(
-            "VF_AOT_CONTRACT_INVALID",
-            str(getattr(first, "message", first)),
-        )
-    records: list[Mapping[str, object]] = []
-    planned_ids = {
-        resource.id for resource in resources if resource.status == "planned"
-    }
-    active: list[str] = []
-    visiting: list[str] = []
+def _host_extension_records(config, *, root, catalogs):
+    from vibeflow.tooling.application.javascript.host_selection import declared_hosts, active_host_ids
+    resources = declared_hosts(config, catalog=catalogs.host_extensions)
+    active = active_host_ids(tuple(item.id for item in resources if item.status == "implemented"),
+        catalog=catalogs.host_extensions, planned=frozenset(item.id for item in resources if item.status == "planned"))
+    for identifier in active:
+        descriptor = catalogs.host_extensions.require(identifier)
+        implementations = tuple(item for item in descriptor.implementations
+                                if item.language in {"javascript", "typescript"})
+        if not implementations:
+            raise ProjectBuildError("VF_AOT_CONTRACT_INVALID",
+                f"host_extension '{identifier}' has no JavaScript/TypeScript implementation")
+        if any(item.completion != "immediate" for item in implementations):
+            raise ProjectBuildError("VF_AOT_CONTRACT_INVALID",
+                f"host_extension '{identifier}' factory must be immediate")
+    return tuple(item.to_dict() for item in resources), active
 
-    def visit(extension_id: str) -> None:
-        if extension_id in active:
-            return
-        if extension_id in planned_ids:
-            raise ProjectBuildError(
-                "VF_AOT_CONTRACT_INVALID",
-                (
-                    "implemented host_extension depends on planned "
-                    f"host_extension '{extension_id}'"
-                ),
-            )
-        if extension_id in visiting:
-            start = visiting.index(extension_id)
-            cycle = " -> ".join((*visiting[start:], extension_id))
-            raise ProjectBuildError(
-                "VF_AOT_CONTRACT_INVALID",
-                f"host_extension dependency cycle: {cycle}",
-            )
-        descriptor = catalogs.host_extensions.get(extension_id)
-        if descriptor is None:
-            raise ProjectBuildError(
-                "VF_AOT_CONTRACT_INVALID",
-                f"unknown implemented host_extension '{extension_id}'",
-            )
-        visiting.append(extension_id)
-        for dependency in descriptor.dependencies:
-            visit(dependency)
-        visiting.pop()
-        active.append(extension_id)
-
-    for resource in resources:
-        descriptor = catalogs.host_extensions.get(resource.id)
-        if descriptor is None and resource.status == "implemented":
-            raise ProjectBuildError(
-                "VF_AOT_CONTRACT_INVALID",
-                f"unknown implemented host_extension '{resource.id}'",
-            )
-        if descriptor is not None:
-            implementations = tuple(
-                item
-                for item in descriptor.implementations
-                if item.language in {"javascript", "typescript"}
-            )
-            if resource.status == "implemented":
-                if not implementations:
-                    raise ProjectBuildError(
-                        "VF_AOT_CONTRACT_INVALID",
-                        (
-                            f"host_extension '{resource.id}' has no "
-                            "JavaScript/TypeScript implementation"
-                        ),
-                    )
-                if any(
-                    item.completion != "immediate"
-                    for item in implementations
-                ):
-                    raise ProjectBuildError(
-                        "VF_AOT_CONTRACT_INVALID",
-                        (
-                            f"host_extension '{resource.id}' factory must "
-                            "be immediate"
-                        ),
-                    )
-        records.append(resource.to_dict())
-        if resource.status == "implemented":
-            visit(resource.id)
-    return tuple(records), tuple(active)
 
 def _architecture_payload(
     graph: GraphConfig,
@@ -808,7 +706,10 @@ def _architecture_payload(
     host_records: tuple[Mapping[str, object], ...],
     root_id: str,
     source_path: str,
+    findings: tuple = (),
 ) -> dict[str, object]:
+    from vibeflow.tooling.application.javascript.presentation_status import node_health_classes
+    health_classes = node_health_classes(graph, findings)
     return {
         "project_target": "javascript",
         "workflow": _javascript_graph_document(
@@ -817,6 +718,7 @@ def _architecture_payload(
             source={"root_id": root_id, "path": source_path},
             graph_lock_scope="root",
             catalogs=catalogs,
+            health_classes=health_classes,
         ),
         "nodesets": {
             key: {
@@ -825,6 +727,7 @@ def _architecture_payload(
                 "display_name": value.display_name,
                 "description": value.description,
                 "status": value.status,
+                "expand": value.expand,
                 "flow_kind": value.flow_kind,
                 "effect_scope": "unavailable" if value.status == STATUS_PLANNED else "unconstrained",
                 "rulesets": list(value.graph.rulesets),
@@ -839,6 +742,7 @@ def _architecture_payload(
                         source=_javascript_source_reference(value),
                         graph_lock_scope="block",
                         catalogs=catalogs,
+                        health_classes=health_classes,
                     )
                     if value.graph.nodes
                     else None
@@ -905,6 +809,7 @@ def _javascript_graph_document(
     source: Mapping[str, str],
     graph_lock_scope: str,
     catalogs: DescriptorCatalogs,
+    health_classes: Mapping[tuple[int, str], str] | None = None,
 ) -> dict[str, object]:
     report = build_architecture_report(graph, compiled=compiled)
     return {
@@ -934,6 +839,7 @@ def _javascript_graph_document(
                 source=source,
                 graph_lock_scope=graph_lock_scope,
                 catalogs=catalogs,
+                health_classes=health_classes,
             )
             for node in graph.nodes
         ],
@@ -952,6 +858,7 @@ def _javascript_node_document(
     source: Mapping[str, str],
     graph_lock_scope: str,
     catalogs: DescriptorCatalogs,
+    health_classes: Mapping[tuple[int, str], str] | None = None,
 ) -> dict[str, object]:
     node_id = str(getattr(node, "id", ""))
     type_used = str(getattr(node, "type_used", ""))
@@ -994,7 +901,7 @@ def _javascript_node_document(
     descriptor = catalogs.nodes.get(type_used)
     native_class = "externalDependency" if descriptor is not None and descriptor.external and nodeset is None else "loopNode" if is_loop else "nodesetNode" if nodeset is not None else "documentNode" if flow_kind == "document" else "defaultNode"
     planned = status == STATUS_PLANNED or nodeset is not None and nodeset.status == STATUS_PLANNED
-    presentation = resolve_presentation(descriptor, native_class=native_class, status_class="plannedNode" if planned else "", call_style=getattr(node, "style", None), flow_kind=flow_kind)
+    presentation = resolve_presentation(descriptor, native_class=native_class, status_class="plannedNode" if planned else (health_classes or {}).get((id(graph), node_id), ""), call_style=getattr(node, "style", None), flow_kind=flow_kind)
     return {
         "id": node_id,
         "type_used": type_used,

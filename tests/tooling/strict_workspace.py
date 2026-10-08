@@ -1,5 +1,6 @@
 from tests.fixtures.support.strict_support import *
-from tests.fixtures.support.declarations import write_node_manifests
+from tests.fixtures.support.declarations import write_node_plugin
+from tests.fixtures.support.plugins import resource, append_resource, write_lifecycle_fixture
 
 from importlib import resources
 
@@ -83,9 +84,9 @@ def test_workspace_cross_root_nodeset_validate_run_and_export(tmp_path) -> None:
                 "pipeline": {
                     "nodes": [
                         _node_call("start", "test.start", "Starts workspace flow."),
-                        _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")], value=4),
-                        _node_call("flow", "framework.add_one", "Calls framework nodeset.", requires=[REQ_SPEC("value.in")], provides=[PROV_SPEC("value.out")]),
-                        _node_call("end", "test.out_end", "Consumes value.out.", requires=[REQ_SPEC("value.out")]),
+                        _node_call("seed", "test.seed", "Produces value.in.",  value=4),
+                        _node_call("flow", "framework.add_one", "Calls framework nodeset."),
+                        _node_call("end", "test.out_end", "Consumes value.out."),
                     ],
                     "edges": _edge_chain("start", "seed", "flow", "end"),
                     "outputs": [REQ_SPEC("value.out")],
@@ -96,6 +97,7 @@ def test_workspace_cross_root_nodeset_validate_run_and_export(tmp_path) -> None:
     )
 
     workspace = load_workspace_config(workspace_path)
+    _select_fixture_plugins(config_path,project_root,framework_root)
     report = validate_workspace_config_path(config_path, workspace=workspace)
 
     assert report.status in {"PASS", "CONCERNS"}
@@ -103,9 +105,11 @@ def test_workspace_cross_root_nodeset_validate_run_and_export(tmp_path) -> None:
     assert report.info["nodeset_imports"][0]["root_id"] == "framework"
     assert report.info["nodeset_imports"][0]["source_path"] == str(nodeset_path.resolve())
 
+    _select_fixture_plugins(config_path,project_root,framework_root)
     result = run_workspace_checked(config_path, workspace=workspace, run_root=tmp_path / "runs", run_id="workspace-run")
     assert result.context.get("value.out")["value"] == 5
 
+    _select_fixture_plugins(config_path,project_root,framework_root)
     graph, compiled, registry, resources, error = load_workspace_graph_for_export(config_path, workspace=workspace)
     assert error is None
     assert graph.nodesets["framework.add_one"].root_id == "framework"
@@ -132,7 +136,7 @@ def test_workspace_rejects_duplicate_root_ids_and_unknown_top_level_fields(tmp_p
         encoding="utf-8",
     )
     with pytest.raises(WorkspaceConfigError) as duplicate:
-        _framework_load_workspace(workspace_path)
+        load_workspace_config(workspace_path)
     assert duplicate.value.rule_id == "WORKSPACE.ROOT.DUPLICATE"
 
     workspace_path.write_text(json.dumps({"version": 1, "roots": [{"id": "project", "path": "project"}]}), encoding="utf-8")
@@ -218,7 +222,7 @@ def test_workspace_rejects_project_target_field_conflicts(
     )
 
     with pytest.raises(WorkspaceConfigError) as conflict:
-        _framework_load_workspace(workspace_path)
+        load_workspace_config(workspace_path)
 
     removed = sorted(set(payload) & {"descriptors", "registry", "base_lib", "plugins"})
     assert conflict.value.rule_id == ("PLUGIN.REGISTRATION.MIGRATION" if removed else "WORKSPACE.PROJECT_TARGET.FIELD_CONFLICT")
@@ -392,8 +396,8 @@ def test_run_workspace_checked_uses_one_effective_root_runtime_options_object(tm
                 "pipeline": {
                     "nodes": [
                         _node_call("start", "test.start", "Starts root runtime options fixture."),
-                        _node_call("seed", "test.seed", "Produces value.in.", provides=[PROV_SPEC("value.in")]),
-                        _node_call("end", "test.in_end", "Consumes value.in.", requires=[REQ_SPEC("value.in")]),
+                        _node_call("seed", "test.seed", "Produces value.in."),
+                        _node_call("end", "test.in_end", "Consumes value.in."),
                     ],
                     "edges": _edge_chain("start", "seed", "end"),
                     "outputs": [REQ_SPEC("value.in")],
@@ -417,6 +421,7 @@ def test_run_workspace_checked_uses_one_effective_root_runtime_options_object(tm
     monkeypatch.setattr(runner_module, "_refuse_on_planned_run", record_refuse)
     monkeypatch.setattr(runner_module, "_execute_runtime", record_execute)
 
+    _select_fixture_plugins(config_path,project_root,framework_root)
     result = run_workspace_checked(
         config_path,
         workspace=load_workspace_config(workspace_path),
@@ -628,7 +633,9 @@ def test_workspace_nodeset_depth_limit_uses_workflow_root_config(tmp_path) -> No
     _write_config_file(project_config, _workspace_nodeset_depth_config(5))
     workspace = load_workspace_config(workspace_path)
 
+    _select_fixture_plugins(framework_config,project_root,framework_root)
     framework_report = validate_workspace_config_path(framework_config, workspace=workspace)
+    _select_fixture_plugins(project_config,project_root,framework_root)
     project_report = validate_workspace_config_path(project_config, workspace=workspace)
 
     framework_depth = next(error for error in framework_report.errors if error.rule_id == "NODESET.NESTING.DEPTH_EXCEEDED")
@@ -683,7 +690,7 @@ def test_workspace_registry_conflicts_report_roots(tmp_path) -> None:
     workspace = load_workspace_config(workspace_path)
     from vibeflow.tooling.project.descriptor_loader import DescriptorLoadError
     with pytest.raises(DescriptorLoadError) as conflict:
-        build_workspace_node_registry(workspace)
+        build_workspace_node_registry(workspace, config_path=_fixture_scope(workspace))
 
     assert conflict.value.code == "DESCRIPTOR.CONFLICT"
     assert "framework" in str(conflict.value)
@@ -695,17 +702,17 @@ def test_workspace_declaration_and_implementation_errors_are_explicit(tmp_path) 
     _write_project_config(framework_root)
     _write_project_config(project_root)
     _write_registry(project_root, [("test.seed", "SeedNode", {}, {})])
-    path = project_root / "manifests/nodes/test-seed.jsonc"
+    path = resource(project_root,"node","test.seed")
     payload = json.loads(path.read_text())
     payload["implementations"][0]["source"]["ref"] = "missing.py"
     path.write_text(json.dumps(payload))
     from vibeflow.targets.python.project import NodeRegistryError
     with pytest.raises((WorkspaceConfigError, NodeRegistryError), match="source does not exist"):
-        build_workspace_node_registry(load_workspace_config(workspace_path))
+        build_workspace_node_registry(load_workspace_config(workspace_path), config_path=_fixture_scope(load_workspace_config(workspace_path)))
     payload["implementations"][0]["source"]["ref"] = "fixture_nodes.py"
     payload["implementations"][0]["source"]["export"] = "MissingClass"
     path.write_text(json.dumps(payload))
-    registry = build_workspace_node_registry(load_workspace_config(workspace_path))
+    registry = build_workspace_node_registry(load_workspace_config(workspace_path), config_path=_fixture_scope(load_workspace_config(workspace_path)))
     with pytest.raises((AttributeError, NodeRegistryError), match="MissingClass"):
         registry.get("test.seed")
 
@@ -720,12 +727,12 @@ def test_workspace_declarations_resolve_implementation_imports_from_sibling_root
     (base_lib / "node_helpers.py").write_text("def transform(value):\n    return value + 1\n")
     (project_root / "task_node.py").write_text("from base_lib.node_helpers import transform\nclass TaskNode:\n    def run_pure(self, inputs, params):\n        return {'value.in': transform(params.get('value', 1))}\n")
     _write_registry(project_root, [("task.cross_root", "SeedNode", {"value": {"type": "number"}}, {"value": 1})])
-    path = project_root / "manifests/nodes/task-cross_root.jsonc"
+    path = resource(project_root,"node","task.cross_root")
     payload = json.loads(path.read_text())
     payload["rulesets"] = []
     payload["implementations"][0]["source"] = {"kind": "file", "ref": "task_node.py", "export": "TaskNode"}
     path.write_text(json.dumps(payload))
-    registry = build_workspace_node_registry(load_workspace_config(workspace_path))
+    registry = build_workspace_node_registry(load_workspace_config(workspace_path), config_path=_fixture_scope(load_workspace_config(workspace_path)))
     assert registry.available() == ["task.cross_root"]
     assert registry.get("task.cross_root")().run_pure({}, {"value": 4}) == {"value.in": 5}
 
@@ -746,6 +753,7 @@ def test_workspace_mode_rejects_config_level_policy(tmp_path) -> None:
         encoding="utf-8",
     )
 
+    _select_fixture_plugins(config_path,project_root,framework_root)
     report = validate_workspace_config_path(config_path, workspace=load_workspace_config(workspace_path))
 
     assert report.status in {"FAIL", "ERROR"}
@@ -790,7 +798,27 @@ def test_workspace_quality_applies_root_structure_limits_by_default(tmp_path) ->
     assert finding.source_path.endswith("project/nodes/part_0.py")
 
 
-def test_workspace_quality_role_imports_use_declared_base_lib_paths_and_modules(tmp_path) -> None:
+@pytest.mark.parametrize("directory", ["ordinary", "nodes", "task_nodes", "custom_nodes", "base_lib", "plugins"])
+def test_workspace_quality_unclaimed_source_identity_is_independent_of_directory(tmp_path, capsys, directory) -> None:
+    workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
+    for root, enabled in ((framework_root, False), (project_root, True)):
+        (root / "vibeflow_project.jsonc").write_text(json.dumps(
+            {"project_target": "python", "quality_enabled": enabled}), encoding="utf-8")
+    (project_root / directory).mkdir()
+    (project_root / "utility").mkdir()
+    (project_root / directory / "worker.py").write_text(
+        "from utility.math import double\ndef work(value):\n    return double(value)\n", encoding="utf-8")
+    (project_root / "utility" / "math.py").write_text("def double(value):\n    return value * 2\n", encoding="utf-8")
+    assert cli_main(["quality-check", "--workspace", str(workspace_path), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "PASS"
+    source = payload
+    assert source["errors"] == []
+    assert any(item["path"] == f"project/{directory}/worker.py" for item in source["files"])
+    assert source["dependency_graph"][f"project.{directory}.worker"] == ["project.utility.math"]
+
+
+def test_workspace_quality_declared_library_does_not_claim_undeclared_neighbor(tmp_path) -> None:
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
     _write_project_config(framework_root, quality_enabled=False)
     _write_registry(project_root, [])
@@ -808,7 +836,7 @@ def test_workspace_quality_role_imports_use_declared_base_lib_paths_and_modules(
         package.mkdir()
         (package / "__init__.py").write_text("", encoding="utf-8")
     (project_root / "nodes" / "main.py").write_text("import task_base_lib.helpers\n", encoding="utf-8")
-    (project_root / "task_base_lib" / "helpers.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (project_root / "task_base_lib" / "helpers.py").write_text("import plugins.policy\nVALUE = 1\n", encoding="utf-8")
     (project_root / "task_base_lib" / "bad.py").write_text("import plugins.policy\n", encoding="utf-8")
     (project_root / "plugins" / "policy.py").write_text("VALUE = 1\n", encoding="utf-8")
 
@@ -820,8 +848,9 @@ def test_workspace_quality_role_imports_use_declared_base_lib_paths_and_modules(
 
     assert "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT" not in rule_ids
     assert "QUALITY.STRUCTURE.BASE_LIB_UPWARD_IMPORT" in rule_ids
-    upward = next(finding for finding in report.findings if finding.rule_id == "QUALITY.STRUCTURE.BASE_LIB_UPWARD_IMPORT")
-    assert upward.object_id == "task_base_lib.bad -> plugins.policy"
+    upward, = (finding for finding in report.findings if finding.rule_id == "QUALITY.STRUCTURE.BASE_LIB_UPWARD_IMPORT")
+    assert upward.object_id == "task_base_lib.helpers -> plugins.policy"
+    assert upward.details["resource_id"] == "task.helpers"
     assert upward.root_id == "project"
 
 
@@ -834,19 +863,14 @@ def test_workspace_resources_have_root_source_and_feed_policy(tmp_path) -> None:
     (base_dir / "__init__.py").write_text("", encoding="utf-8")
     (base_dir / "math_tools.py").write_text(
         """
-from vibeflow.targets.python.project import BaseLibInfo
-
-BASE_LIB_INFO = BaseLibInfo("base_lib.math_tools", "Math Tools", "math", "Workspace helper.", "0.1.0")
+def helper():
+    return 1
 """.strip(),
         encoding="utf-8",
     )
     plugin_path = project_root / "runtime_plugin.py"
     plugin_path.write_text(
         """
-from vibeflow.targets.python.project import PluginInfo
-
-PLUGIN_INFO = PluginInfo("workspace_runtime", "runtime", "Workspace Runtime", "runtime", "Workspace runtime plugin.", "0.1.0")
-
 class Plugin:
     plugin_type = "runtime"
     name = "workspace_runtime"
@@ -854,7 +878,7 @@ class Plugin:
 """.strip(),
         encoding="utf-8",
     )
-    _append_resource_registry(
+    lifecycle = _append_resource_registry(
         project_root,
         base_libs=[("math_tools", "base_lib.math_tools", "Math Tools", "Workspace helper.")],
         plugins=[("workspace_runtime", "runtime_plugin.py", "Plugin", "runtime", "Workspace Runtime", "Workspace runtime plugin.")],
@@ -867,7 +891,7 @@ class Plugin:
         json.dumps(
             {
                 "base_lib": {"modules": ["math_tools"]},
-                "plugins": [{"id": "workspace_runtime"}],
+                "plugins": lifecycle,
                 "pipeline": {"nodes": [_node_call("start", "test.start", "Starts resource flow.")]},
             }
         ),
@@ -875,8 +899,10 @@ class Plugin:
     )
 
     workspace = load_workspace_config(workspace_path)
+    _select_fixture_plugins(config_path,project_root,framework_root)
     env = build_workspace_environment(workspace, config_path=config_path)
     available = env.available_resources.to_dict()
+    _select_fixture_plugins(config_path,project_root,framework_root)
     report = validate_workspace_config_path(config_path, workspace=workspace)
     resources = report.info["resources"]
 
@@ -886,8 +912,7 @@ class Plugin:
     assert resources["base_lib"]["modules"][0]["id"] == "math_tools"
     assert resources["base_lib"]["modules"][0]["source_path"].endswith("project/code_plugin.py")
     assert resources["plugins"][0]["id"] == "workspace_runtime.runtime"
-    assert str(project_root.resolve()) in report.effective_policy["base_lib"]["allowed_paths"]
-    assert "base_lib.math_tools" in report.effective_policy["base_lib"]["allowed_modules"]
+    assert resources["base_lib"]["modules"][0]["module"] == "base_lib.math_tools"
 
 
 def test_python_workspace_rejects_javascript_host_extension_fields(
@@ -918,46 +943,8 @@ def test_python_workspace_rejects_javascript_host_extension_fields(
         ),
         encoding="utf-8",
     )
-    manifest_path = (
-        project_root
-        / "manifests"
-        / "host_extensions"
-        / "legacy_host.jsonc"
-    )
-    manifest_path.parent.mkdir(parents=True)
-    manifest_path.write_text(
-        json.dumps(
-            {
-                "kind": "host_extension",
-                "id": "demo.legacy_host",
-                "display_name": "Legacy Browser Host",
-                "description": "Connects a legacy project selection.",
-                "version": "1.0.0",
-                "targets": ["browser"],
-                "implementations": [
-                    {
-                        "language": "typescript",
-                        "targets": ["browser"],
-                        "source": {
-                            "kind": "file",
-                            "ref": "src/legacy_host.ts",
-                            "export": "createHostExtension",
-                        },
-                    }
-                ],
-                "provides": ["demo.port"],
-                "dependencies": [],
-            }
-        ),
-        encoding="utf-8",
-    )
     project_config_path = project_root / "vibeflow_project.jsonc"
-    project_config = json.loads(
-        project_config_path.read_text(encoding="utf-8")
-    )
-    project_config["descriptors"] = {
-        "host_extensions": ["manifests/host_extensions"]
-    }
+    project_config = json.loads(project_config_path.read_text())
     project_config["javascript"] = {
         "package_root": ".",
         "external_packages": [],
@@ -1003,26 +990,21 @@ def test_workspace_mermaid_hides_resources_from_unused_roots(tmp_path) -> None:
     (framework_base / "__init__.py").write_text("", encoding="utf-8")
     (framework_base / "math_tools.py").write_text(
         """
-from vibeflow.targets.python.project import BaseLibInfo
-
-BASE_LIB_INFO = BaseLibInfo("base_lib.math_tools", "Framework Math", "math", "Unused workspace helper.", "0.1.0")
+def helper():
+    return 1
 """.strip(),
         encoding="utf-8",
     )
     project_plugin = project_root / "runtime_plugin.py"
     project_plugin.write_text(
         """
-from vibeflow.targets.python.project import PluginInfo
-
-PLUGIN_INFO = PluginInfo("project_runtime", "runtime", "Project Runtime", "runtime", "Project runtime plugin.", "0.1.0")
-
 class Plugin:
     plugin_type = "runtime"
     name = "project_runtime"
 """.strip(),
         encoding="utf-8",
     )
-    _append_resource_registry(
+    lifecycle = _append_resource_registry(
         project_root,
         base_libs=[("framework_math", "base_lib.math_tools", "Framework Math", "Unused workspace helper.")],
         plugins=[("project_runtime", "runtime_plugin.py", "Plugin", "runtime", "Project Runtime", "Project runtime plugin.")],
@@ -1031,8 +1013,9 @@ class Plugin:
     _write_project_config(framework_root)
     config_path = project_root / "configs" / "main.jsonc"
     config_path.parent.mkdir()
-    config_path.write_text(json.dumps({"plugins": [{"id": "project_runtime"}], "pipeline": _seed_only_pipeline()}), encoding="utf-8")
+    config_path.write_text(json.dumps({"base_lib":{"modules":[]},"plugins": lifecycle, "pipeline": _seed_only_pipeline()}), encoding="utf-8")
 
+    _select_fixture_plugins(config_path,project_root,framework_root)
     graph, compiled, _, resources, error = load_workspace_graph_for_export(config_path, workspace=load_workspace_config(workspace_path))
 
     assert error is None
@@ -1062,6 +1045,7 @@ def test_workspace_unknown_resource_ids_are_preflight_errors(tmp_path) -> None:
         encoding="utf-8",
     )
 
+    _select_fixture_plugins(config_path,project_root,framework_root)
     report = validate_workspace_config_path(config_path, workspace=load_workspace_config(workspace_path))
     rule_ids = {finding.rule_id for finding in report.errors}
 
@@ -1069,69 +1053,34 @@ def test_workspace_unknown_resource_ids_are_preflight_errors(tmp_path) -> None:
     assert "PLUGIN.SELECTION.SOURCE" in rule_ids
 
 
-def test_workspace_available_base_lib_does_not_allow_node_import_until_config_references_it(tmp_path) -> None:
+def test_workspace_node_library_dependency_is_explicit(tmp_path) -> None:
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
     _write_project_config(framework_root)
-    for directory in ("nodes", "base_lib"):
-        package = project_root / directory
-        package.mkdir()
-        (package / "__init__.py").write_text("", encoding="utf-8")
-    (project_root / "base_lib" / "math_tools.py").write_text(
-        """
-VALUE = 1
-""".strip(),
-        encoding="utf-8",
-    )
-    (project_root / "nodes" / "uses_math.py").write_text(
-        """
-import base_lib.math_tools
-from vibeflow.core import DataProvider
-from vibeflow.targets.python.project import NodeContract, NodeInfo
-
-class UsesMathNode:
-
-    def run_pure(self, inputs, params):
-        return {"value.out": 1}
-""".strip(),
-        encoding="utf-8",
-    )
-    _write_registry(project_root, [("test.start", "StartNode", {}, {}), ("test.uses_math", "LargePredictionNode", {}, {}), ("test.out_end", "OutEndNode", {}, {})])
-    declaration_path = project_root / "manifests/nodes/test-uses_math.jsonc"
-    declaration = json.loads(declaration_path.read_text())
-    declaration["implementations"][0]["source"] = {"kind": "file", "ref": "nodes/uses_math.py", "export": "UsesMathNode"}
-    declaration_path.write_text(json.dumps(declaration))
+    package = project_root / "base_lib"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    (package / "math_tools.py").write_text("def helper():\n    return 1\n")
+    (project_root / "uses_math.py").write_text('from base_lib.math_tools import helper\nclass UsesMathNode:\n    def run_pure(self,inputs,params):\n        return {"value.out":helper()}\n')
+    _write_registry(project_root,[("test.start","StartNode",{},{}),("test.math","LargePredictionNode",{},{}),("test.out_end","OutEndNode",{}, {})])
+    descriptor = resource(project_root,"node","test.math")
+    payload = json.loads(descriptor.read_text())
+    payload["implementations"][0]["source"] = {"kind":"file","ref":"uses_math.py","export":"UsesMathNode"}
+    descriptor.write_text(json.dumps(payload))
+    _append_resource_registry(project_root,base_libs=[("math","base_lib.math_tools","Math","Arithmetic helper.")])
     _write_project_config(project_root)
-    manifests = project_root / "manifests/base_lib"
-    manifests.mkdir()
-    (manifests / "math_tools.jsonc").write_text(json.dumps({"kind": "base_lib", "id": "math_tools", "display_name": "Math Tools", "category": "math", "description": "Declared helper metadata.", "version": "1.0.0", "implementations": [{"language": "python", "targets": ["python"], "source": {"kind": "module", "ref": "base_lib.math_tools"}}]}))
-    project_config = project_root / "vibeflow_project.jsonc"
-    data = json.loads(project_config.read_text())
-    data.setdefault("descriptors", {})["base_lib"] = ["manifests/base_lib"]
-    project_config.write_text(json.dumps(data))
-    config_path = project_root / "configs" / "main.jsonc"
-    config_path.parent.mkdir()
-    nodes = [
-        _node_call("start", "test.start", "Starts flow."),
-        _node_call("math", "test.uses_math", "Uses registered helper.", provides=[PROV_SPEC("value.out")]),
-        _node_call("end", "test.out_end", "Ends flow.", requires=[REQ_SPEC("value.out")]),
-    ]
-    config_path.write_text(json.dumps({"pipeline": {"nodes": nodes, "edges": _edge_chain("start", "math", "end")}}), encoding="utf-8")
-
-    missing = validate_workspace_config_path(config_path, workspace=load_workspace_config(workspace_path))
-    config_path.write_text(
-        json.dumps(
-                {
-                    "base_lib": {"modules": ["math_tools"]},
-                    "pipeline": {"nodes": nodes, "edges": _edge_chain("start", "math", "end")},
-                }
-        ),
-        encoding="utf-8",
-    )
-    referenced = validate_workspace_config_path(config_path, workspace=load_workspace_config(workspace_path))
-
-    assert "base_lib.math_tools" not in missing.effective_policy["base_lib"]["allowed_modules"]
-    assert "base_lib.math_tools" in referenced.effective_policy["base_lib"]["allowed_modules"]
-    assert "NODE.BASE_LIB.BASE_LIB_UNDECLARED" not in {finding.rule_id for finding in (*referenced.errors, *referenced.warnings)}
+    config_path = project_root / "main.jsonc"
+    config_path.write_text(json.dumps({"pipeline":{"nodes":[_node_call("start","test.start","Starts flow."),
+        _node_call("math","test.math","Uses the library."),
+        _node_call("end","test.out_end","Ends flow.")],"edges":_edge_chain("start","math","end")}}))
+    _select_fixture_plugins(config_path,project_root,framework_root)
+    _select_fixture_plugins(config_path,project_root,framework_root)
+    missing = validate_workspace_config_path(config_path,workspace=load_workspace_config(workspace_path))
+    payload["base_libs"] = ["math"]
+    descriptor.write_text(json.dumps(payload))
+    _select_fixture_plugins(config_path,project_root,framework_root)
+    referenced = validate_workspace_config_path(config_path,workspace=load_workspace_config(workspace_path))
+    assert "VF_IMPORT_LAYER" in {finding.rule_id for finding in (*missing.errors,*missing.warnings)}
+    assert "VF_IMPORT_LAYER" not in {finding.rule_id for finding in (*referenced.errors,*referenced.warnings)}
 
 
 def test_cli_workspace_validate_and_quality_default_roots(tmp_path, capsys) -> None:
@@ -1150,6 +1099,7 @@ def test_cli_workspace_validate_and_quality_default_roots(tmp_path, capsys) -> N
     config_path.write_text(json.dumps({"pipeline": _seed_only_pipeline()}), encoding="utf-8")
     (project_root / "too_long.py").write_text("x = 1\ny = 2\n", encoding="utf-8")
 
+    _select_fixture_plugins(config_path,project_root,framework_root)
     assert cli_main(["validate", "--workspace", str(workspace_path), "--config", str(config_path), "--json"]) == 0
     validate_payload = json.loads(capsys.readouterr().out)
     assert validate_payload["info"]["workspace"]["roots"][1]["id"] == "project"
@@ -1225,7 +1175,7 @@ def _workspace_nodeset_depth_config(depth: int) -> dict:
                     provides=["value.out"],
                     pipeline={
                         "nodes": [
-                            _node_call("call", child, f"Calls {child}.", provides=[PROV_SPEC("value.out")])
+                            _node_call("call", child, f"Calls {child}.")
                         ]
                     },
                 ),
@@ -1240,7 +1190,7 @@ def _workspace_nodeset_depth_config(depth: int) -> dict:
                     "top",
                     f"workspace.depth.{depth - 1}",
                     "Calls the workspace depth fixture.",
-                    provides=[PROV_SPEC("value.out")],
+
                 )
             ]
         },
@@ -1274,14 +1224,12 @@ def _write_project_config(root: Path, *, quality_enabled: bool = True, runtime: 
         json.dumps(payload),
         encoding="utf-8",
     )
-    if not (root / "registry.py").exists():
+    if not (root / "code_plugin.py").exists():
         _write_registry(root, [])
 
 
 def _write_registry(root: Path, registrations: list[tuple[str, str, dict, dict]]) -> None:
-    write_node_manifests(root, registrations)
-    root.mkdir(parents=True, exist_ok=True)
-    (root / "registry.py").touch()
+    return write_node_plugin(root, registrations)
 
 
 def _append_resource_registry(
@@ -1290,51 +1238,37 @@ def _append_resource_registry(
     base_libs: list[tuple[str, str, str, str]] = (),
     plugins: list[tuple[str, str, str, str, str, str]] = (),
 ) -> None:
-    lines = [
-        "",
-        "from vibeflow.targets.python.project import BaseLibRegistry, PluginResourceRegistry",
-        "",
-        "def build_base_lib_registry():",
-        "    registry = BaseLibRegistry()",
-    ]
+    selections = []
     for resource_id, module, display_name, description in base_libs:
-        lines.append(f"    registry.register({resource_id!r}, module={module!r}, display_name={display_name!r}, description={description!r})")
-    lines.extend(
-        [
-            "    return registry",
-            "",
-            "def build_plugin_registry():",
-            "    registry = PluginResourceRegistry()",
-        ]
-    )
+        append_resource(root,{"kind":"base_lib","id":resource_id,"display_name":display_name,"description":description,
+            "implementations":[{"language":"python","targets":["python"],"source":{"kind":"module","ref":module}}]})
     for resource_id, module, class_name, plugin_type, display_name, description in plugins:
-        lines.append(
-            f"    registry.register({resource_id!r}, module={module!r}, class_name={class_name!r}, plugin_type={plugin_type!r}, display_name={display_name!r}, description={description!r})"
-        )
-    lines.append("    return registry")
-    with (root / "registry.py").open("a", encoding="utf-8") as handle:
-        handle.write("\n".join(lines))
-
-
-# Fixture publication is test data preparation; production has no directory scan.
-_framework_load_workspace = load_workspace_config
-def load_workspace_config(path):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(path)
-    return _framework_load_workspace(path)
+        filename = "lifecycle_" + resource_id + ".py"
+        selection = write_lifecycle_fixture(root,source={"kind":"file","ref":module,"export":class_name},
+            plugin_id=resource_id,plugin_type=plugin_type,filename=filename)
+        path = root / filename
+        path.write_text(path.read_text().replace(f"display_name={resource_id!r}",f"display_name={display_name!r}").replace('description="Native lifecycle fixture"',f"description={description!r}"))
+        selections.append(selection)
+    return selections
 
 
 def _fixture_scope(workspace):
+    """Author the two fixed SDK fixture selections for registry-only tests."""
     config = workspace.roots[-1].path / "fixture-scope.jsonc"
     config.write_text(json.dumps({"rulesets": [], "plugins": [
         {"root":root.id, "source":{"kind":"file", "ref":"code_plugin.py", "export":"plugin"}}
-        for root in workspace.roots if (root.path / "code_plugin.py").exists()], "pipeline":{"nodes":[]}}))
+        for root in workspace.roots], "pipeline":{"nodes":[]}}))
     return config
 
-_build_registry = build_workspace_node_registry
-def build_workspace_node_registry(workspace, config_path=None):
-    return _build_registry(workspace, config_path=config_path or _fixture_scope(workspace))
 
-_build_environment = build_workspace_environment
-def build_workspace_environment(workspace, config_path=None):
-    return _build_environment(workspace, config_path=config_path or _fixture_scope(workspace))
+def _select_fixture_plugins(config, project, framework):
+    """Explicit fixture author step, before invoking a production loader."""
+    from vibeflow.tooling.project.config_loader import load_raw_config_document
+    data = dict(load_raw_config_document(config).data)
+    selected = list(data.get("plugins", []))
+    for root, directory in (("project",project),("framework",framework)):
+        declaration = {"root":root,"source":{"kind":"file","ref":"code_plugin.py","export":"plugin"}}
+        if declaration not in selected:
+            selected.insert(0,declaration)
+    data["plugins"] = selected
+    config.write_text(json.dumps(data))

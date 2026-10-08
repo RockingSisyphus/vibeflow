@@ -1,0 +1,103 @@
+{
+  "status": "passed",
+  "products": [
+    {
+      "product": "wheel",
+      "status": "passed",
+      "cases": 33,
+      "package_file": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/wheel-venv/lib/python3.13/site-packages/vibeflow/__init__.py",
+      "driver_sha256": "8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58",
+      "loaded_product_module_count": 118,
+      "foreign_product_modules": {},
+      "cache_denied": [
+        true,
+        false,
+        true,
+        true,
+        false
+      ],
+      "cache_entries": [
+        2,
+        4,
+        4,
+        5,
+        5
+      ],
+      "cache_new_native_requests": [
+        2,
+        2,
+        0,
+        1,
+        0
+      ],
+      "native_requests": 87,
+      "report": "/home/rockingsisyphus/projects/VibeFlow/dist/unification-validation-20261008/packaged-js-wheel03.json"
+    },
+    {
+      "product": "collaborative",
+      "status": "passed",
+      "cases": 33,
+      "package_file": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+      "driver_sha256": "8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58",
+      "loaded_product_module_count": 118,
+      "foreign_product_modules": {},
+      "cache_denied": [
+        true,
+        false,
+        true,
+        true,
+        false
+      ],
+      "cache_entries": [
+        2,
+        4,
+        4,
+        5,
+        5
+      ],
+      "cache_new_native_requests": [
+        2,
+        2,
+        0,
+        1,
+        0
+      ],
+      "native_requests": 87,
+      "report": "/home/rockingsisyphus/projects/VibeFlow/dist/unification-validation-20261008/packaged-js-collaborative03.json"
+    },
+    {
+      "product": "autonomous",
+      "status": "passed",
+      "cases": 33,
+      "package_file": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution-autonomous/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+      "driver_sha256": "8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58",
+      "loaded_product_module_count": 118,
+      "foreign_product_modules": {},
+      "cache_denied": [
+        true,
+        false,
+        true,
+        true,
+        false
+      ],
+      "cache_entries": [
+        2,
+        4,
+        4,
+        5,
+        5
+      ],
+      "cache_new_native_requests": [
+        2,
+        2,
+        0,
+        1,
+        0
+      ],
+      "native_requests": 87,
+      "report": "/home/rockingsisyphus/projects/VibeFlow/dist/unification-validation-20261008/packaged-js-autonomous03.json"
+    }
+  ],
+  "initial_attempt_preserved": "packaged-js-{wheel,collaborative,autonomous}03-first-attempt.{json,log}",
+  "probe_correction": "The initial probe read aggregate RuleExecutionResult.findings on cache aliases; Core intentionally de-duplicates those findings. The corrected probe validates actual cached RuleResult findings, state, definition_id and effect_policy, with aliases and zero additional native requests on A/B return. Product source and tests remained frozen."
+}

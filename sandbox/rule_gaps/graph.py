@@ -5,6 +5,7 @@ No production monkeypatch, fabricated source metric, xfail, or skipped Target is
 used. ``review-rules`` intentionally previews static and executes no handler.
 """
 from __future__ import annotations
+from tests.fixtures.support.plugins import resource as resource_ref
 
 import importlib.util
 import json
@@ -291,16 +292,13 @@ def _source_fixture(case, topic, oversized):
         # Once only calculate owns BaseLib dependencies, split the genuine
         # implementations so that ownership compatibility cannot mask metrics.
         (case.project / "nodes/boundary.ts").write_text("export function boundary(inputs,params) {return {};}\n")
-        boundary = case.project / "bundle/nodes/boundary.jsonc"
+        boundary = resource_ref(case.project, 'node', 'example.boundary')
         descriptor = case.read(boundary)
         descriptor["implementations"][0]["source"]["ref"] = "nodes/boundary.ts"
         case.write(boundary, descriptor)
     library = case.project / "base_lib"
     library.mkdir()
     (library / "__init__.py").write_text("") if case.target == "python" else None
-    bundle_path = case.project / "bundles/rule-graph.jsonc"
-    bundle = case.read(bundle_path)
-    bundle["resources"]["base_lib"] = []
     for index in range(count):
         following = index + 1 < count
         if case.target == "python":
@@ -312,13 +310,11 @@ def _source_fixture(case, topic, oversized):
         if topic == "base_lib" and oversized:
             text += ('# measured file line\n' if case.target == "python" else '// measured file line\n') * (501 - len(text.splitlines()))
         file.write_text(text)
-        manifest = case.project / "bundle/base_libs" / f"step{index}.jsonc"
+        manifest = resource_ref(case.project, "base_lib", f"gaps.step{index}")
         case.write(manifest, {"kind": "base_lib", "id": f"gaps.step{index}", "display_name": "Step", "description": "Actual pure helper source.",
                              "dependencies": [f"gaps.step{index+1}"] if following else [], "external_packages": [],
                              "implementations": [{"language": "python" if case.target == "python" else "typescript", "targets": ["python"] if case.target == "python" else ["node", "browser"],
                                  "source": {"kind": "file", "ref": str(file.relative_to(case.project))}}]})
-        bundle["resources"]["base_lib"].append("../bundle/base_libs/" + manifest.name)
-    case.write(bundle_path, bundle)
     text = node_file.read_text()
     if case.target == "python":
         text = 'from base_lib.step0 import step\n' + text.replace('inputs["example.input"]["value"] * 2 + 1', 'step(inputs["example.input"]["value"]) * 2 + 1')

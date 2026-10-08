@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from vibeflow.targets.javascript.frontend.emission_protocol import EmissionWorkflow
-from vibeflow.targets.javascript.frontend.model import AotPlanError
+from vibeflow.targets.javascript.frontend.errors import AotPlanError
 from vibeflow.targets.javascript.frontend.codegen_common import (
     WorkflowCode,
     constant,

@@ -1,0 +1,73 @@
+{
+  "completed_at_utc": "2026-10-07T16:37:31.111558+00:00",
+  "completed_local_date": "2026-10-08",
+  "command": "python tools/verify_project.py --full",
+  "exit_code": 0,
+  "steps_passed": 17,
+  "pytest": {
+    "passed": 2127,
+    "failed": 0
+  },
+  "python_integration": {
+    "passed": 138,
+    "total": 138
+  },
+  "javascript_integration": {
+    "passed": 67,
+    "total": 67,
+    "skipped": 0
+  },
+  "summaries": {
+    "rule-parity": {
+      "cases": 1219,
+      "matched": 1219,
+      "unmatched": 0,
+      "process_errors": 0
+    },
+    "rule-gaps": {
+      "cases": 680,
+      "matched": 680,
+      "unmatched": 0,
+      "process_errors": 0,
+      "families": {
+        "domain-native-composition": 20,
+        "rule_graph.finding_boundary": 21,
+        "rule_graph.includes": 4,
+        "rule_graph.invalid_graph": 8,
+        "rule_graph.implementation_leaf": 12,
+        "rule_graph.implementation_leaf_control": 12,
+        "rule_graph.replacement": 12,
+        "rule_graph.source_cache": 12,
+        "javascript.bundle.native_resources": 11,
+        "javascript.rule.platform_selection": 10,
+        "javascript.records.portability": 12,
+        "javascript.sources.graph": 3,
+        "javascript.sources.availability": 1,
+        "node-import-isolation": 3,
+        "planned-helper-closure": 4,
+        "helper-ownership": 4,
+        "resource-display": 103,
+        "resource-edits": 47,
+        "resource-ownership": 160,
+        "resource-registration": 77,
+        "resource-rules": 42,
+        "resource-runtime": 46,
+        "declaration_contract": 48,
+        "workspace_rule_scope": 8
+      }
+    },
+    "adaptation-regressions": {
+      "cases": 207,
+      "matched": 207,
+      "unmatched": 0,
+      "process_errors": 0
+    }
+  },
+  "wheel": {
+    "path": "/tmp/vibeflow-migration-full-passing-20261007/wheel-dist/vibeflow-0.16.0-py3-none-any.whl",
+    "bytes": 727475,
+    "sha256": "4f671a545e6aa0eb8dce829b9ac92e8220ca6a3f4d5c61ee6da5959e9defb958"
+  },
+  "source_inputs_sha256": "9b05b31933bbf93f2b531772068aca018fd4b6c4b8981b98758d068b516a6b4d",
+  "release_preparation": "0.16.0 breaking API removal; collaborative and autonomous smoke passed"
+}

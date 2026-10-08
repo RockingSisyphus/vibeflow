@@ -1,0 +1,27 @@
+[
+  {
+    "path": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/wheel-dist/vibeflow-0.16.0-py3-none-any.whl",
+    "size": 728545,
+    "sha256": "b9b798be549fb3218a7d072461502021268cf2e0bebb2fd4365a7d3e7badaf75"
+  },
+  {
+    "path": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/archives/vibeflow-distribution-0.16.0.zip",
+    "size": 778795,
+    "sha256": "db3f4c981609f22921a2d0e69689910191f5a1c13d6d0fe520d539b4249bcb93"
+  },
+  {
+    "path": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/archives/vibeflow-distribution-autonomous-0.16.0.zip",
+    "size": 778062,
+    "sha256": "9672e8a5001a120f0c04f1a4bad8c684737f73a8456240af4aceddceb92b230c"
+  },
+  {
+    "path": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution/kernel/vibeflow-kernel.zip",
+    "size": 699781,
+    "sha256": "ccc805917e2fd8d475c777fdfda477c7faefb987114c30344c33963da749e196"
+  },
+  {
+    "path": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution-autonomous/kernel/vibeflow-kernel.zip",
+    "size": 699781,
+    "sha256": "ccc805917e2fd8d475c777fdfda477c7faefb987114c30344c33963da749e196"
+  }
+]

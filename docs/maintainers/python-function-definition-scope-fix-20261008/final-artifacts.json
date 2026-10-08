@@ -1,0 +1,244 @@
+{
+  "captured_utc": "2026-10-08T07:44:49.027324+00:00",
+  "gate": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02",
+  "frozen_final_source": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/frozen-final-source.json",
+  "frozen_source_sha256": {
+    "source_analysis/bindings.py": "28c25078f4d32253a0229aee4da4c769efedbca90592b9a5d3a08760b64cb781",
+    "source_analysis/visitors.py": "86f9df117d3457e598a7ffcfbfe613545f270a8fa20240121e80db417f9e848c",
+    "source_analysis/input_tracking.py": "dd037fa4a176db0d1aaa2fd6c763886be690b9d403443c0386f63c41adae6e26",
+    "rules/base_lib_effects.py": "f60e2d8a028ddd5243b4195ce8147b3bba04f1fab0473c2939e7e4d339871fec",
+    "rules/effects.py": "a17517f5afd05754fe74f3cb4810c3afa3229a0fc74efc0f879a9d3d7fe9b6b0",
+    "source_context.py": "1a9f0e8ff1cfb77dd592d03a4369be2427bfa40bc95a46eb72027c6540532914"
+  },
+  "checks": {
+    "all_six_source_hashes_match": true,
+    "kernel_metadata_matches": true,
+    "embedded_kernel_matches": true,
+    "profile_kernels_identical": true
+  },
+  "artifacts": [
+    {
+      "kind": "wheel",
+      "profile": "wheel",
+      "path": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/wheel-dist/vibeflow-0.16.0-py3-none-any.whl",
+      "size": 730396,
+      "sha256": "befe3b7b6e0eddd0f72f18e83a01a42238339b269e169dfe6615196787d62d64",
+      "source_sha256": {
+        "source_analysis/bindings.py": "28c25078f4d32253a0229aee4da4c769efedbca90592b9a5d3a08760b64cb781",
+        "source_analysis/visitors.py": "86f9df117d3457e598a7ffcfbfe613545f270a8fa20240121e80db417f9e848c",
+        "source_analysis/input_tracking.py": "dd037fa4a176db0d1aaa2fd6c763886be690b9d403443c0386f63c41adae6e26",
+        "rules/base_lib_effects.py": "f60e2d8a028ddd5243b4195ce8147b3bba04f1fab0473c2939e7e4d339871fec",
+        "rules/effects.py": "a17517f5afd05754fe74f3cb4810c3afa3229a0fc74efc0f879a9d3d7fe9b6b0",
+        "source_context.py": "1a9f0e8ff1cfb77dd592d03a4369be2427bfa40bc95a46eb72027c6540532914"
+      },
+      "matches_frozen_final_source": true
+    },
+    {
+      "kind": "kernel",
+      "profile": "collaborative",
+      "path": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/distribution/kernel/vibeflow-kernel.zip",
+      "size": 701626,
+      "sha256": "54d848c1dfc5e6143d1414882e996f141c9b721a15d49a0694fa26b72ed58117",
+      "source_sha256": {
+        "source_analysis/bindings.py": "28c25078f4d32253a0229aee4da4c769efedbca90592b9a5d3a08760b64cb781",
+        "source_analysis/visitors.py": "86f9df117d3457e598a7ffcfbfe613545f270a8fa20240121e80db417f9e848c",
+        "source_analysis/input_tracking.py": "dd037fa4a176db0d1aaa2fd6c763886be690b9d403443c0386f63c41adae6e26",
+        "rules/base_lib_effects.py": "f60e2d8a028ddd5243b4195ce8147b3bba04f1fab0473c2939e7e4d339871fec",
+        "rules/effects.py": "a17517f5afd05754fe74f3cb4810c3afa3229a0fc74efc0f879a9d3d7fe9b6b0",
+        "source_context.py": "1a9f0e8ff1cfb77dd592d03a4369be2427bfa40bc95a46eb72027c6540532914"
+      },
+      "matches_frozen_final_source": true,
+      "distribution_metadata": {
+        "agent_automation": {
+          "build": true,
+          "quality": true,
+          "refresh_architecture": true,
+          "validate": true,
+          "workflow_execution_probe": true
+        },
+        "agent_protocol": {
+          "change_inventory": "required",
+          "human_approval_gate": true,
+          "planned_review": true,
+          "required_review_artifact": "expanded_svg"
+        },
+        "development_profile": "collaborative",
+        "kernel": {
+          "archive": "kernel/vibeflow-kernel.zip",
+          "sha256": "54d848c1dfc5e6143d1414882e996f141c9b721a15d49a0694fa26b72ed58117"
+        },
+        "roots": [
+          {
+            "id": "python-project",
+            "path": "python_project",
+            "project_target": "python"
+          },
+          {
+            "id": "javascript-project",
+            "path": "javascript_project",
+            "project_target": "javascript"
+          }
+        ],
+        "schema": "vibeflow.distribution.v2",
+        "version": "0.16.0"
+      },
+      "kernel_sha256_matches_metadata": true
+    },
+    {
+      "kind": "profile_zip",
+      "profile": "collaborative",
+      "path": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/archives/vibeflow-distribution-0.16.0.zip",
+      "size": 780681,
+      "sha256": "bfc46a7c7a402054713d5c7c633bfc5db1e8022eec0bdcdcec4d4efe55451afd",
+      "source_sha256": {
+        "source_analysis/bindings.py": "28c25078f4d32253a0229aee4da4c769efedbca90592b9a5d3a08760b64cb781",
+        "source_analysis/visitors.py": "86f9df117d3457e598a7ffcfbfe613545f270a8fa20240121e80db417f9e848c",
+        "source_analysis/input_tracking.py": "dd037fa4a176db0d1aaa2fd6c763886be690b9d403443c0386f63c41adae6e26",
+        "rules/base_lib_effects.py": "f60e2d8a028ddd5243b4195ce8147b3bba04f1fab0473c2939e7e4d339871fec",
+        "rules/effects.py": "a17517f5afd05754fe74f3cb4810c3afa3229a0fc74efc0f879a9d3d7fe9b6b0",
+        "source_context.py": "1a9f0e8ff1cfb77dd592d03a4369be2427bfa40bc95a46eb72027c6540532914"
+      },
+      "matches_frozen_final_source": true,
+      "distribution_metadata": {
+        "agent_automation": {
+          "build": true,
+          "quality": true,
+          "refresh_architecture": true,
+          "validate": true,
+          "workflow_execution_probe": true
+        },
+        "agent_protocol": {
+          "change_inventory": "required",
+          "human_approval_gate": true,
+          "planned_review": true,
+          "required_review_artifact": "expanded_svg"
+        },
+        "development_profile": "collaborative",
+        "kernel": {
+          "archive": "kernel/vibeflow-kernel.zip",
+          "sha256": "54d848c1dfc5e6143d1414882e996f141c9b721a15d49a0694fa26b72ed58117"
+        },
+        "roots": [
+          {
+            "id": "python-project",
+            "path": "python_project",
+            "project_target": "python"
+          },
+          {
+            "id": "javascript-project",
+            "path": "javascript_project",
+            "project_target": "javascript"
+          }
+        ],
+        "schema": "vibeflow.distribution.v2",
+        "version": "0.16.0"
+      },
+      "embedded_kernel_sha256": "54d848c1dfc5e6143d1414882e996f141c9b721a15d49a0694fa26b72ed58117",
+      "embedded_kernel_matches_standalone": true
+    },
+    {
+      "kind": "kernel",
+      "profile": "autonomous",
+      "path": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/distribution-autonomous/kernel/vibeflow-kernel.zip",
+      "size": 701626,
+      "sha256": "54d848c1dfc5e6143d1414882e996f141c9b721a15d49a0694fa26b72ed58117",
+      "source_sha256": {
+        "source_analysis/bindings.py": "28c25078f4d32253a0229aee4da4c769efedbca90592b9a5d3a08760b64cb781",
+        "source_analysis/visitors.py": "86f9df117d3457e598a7ffcfbfe613545f270a8fa20240121e80db417f9e848c",
+        "source_analysis/input_tracking.py": "dd037fa4a176db0d1aaa2fd6c763886be690b9d403443c0386f63c41adae6e26",
+        "rules/base_lib_effects.py": "f60e2d8a028ddd5243b4195ce8147b3bba04f1fab0473c2939e7e4d339871fec",
+        "rules/effects.py": "a17517f5afd05754fe74f3cb4810c3afa3229a0fc74efc0f879a9d3d7fe9b6b0",
+        "source_context.py": "1a9f0e8ff1cfb77dd592d03a4369be2427bfa40bc95a46eb72027c6540532914"
+      },
+      "matches_frozen_final_source": true,
+      "distribution_metadata": {
+        "agent_automation": {
+          "build": true,
+          "quality": true,
+          "refresh_architecture": true,
+          "validate": true,
+          "workflow_execution_probe": true
+        },
+        "agent_protocol": {
+          "change_inventory": "optional",
+          "human_approval_gate": false,
+          "planned_review": false,
+          "required_review_artifact": "on_demand"
+        },
+        "development_profile": "autonomous",
+        "kernel": {
+          "archive": "kernel/vibeflow-kernel.zip",
+          "sha256": "54d848c1dfc5e6143d1414882e996f141c9b721a15d49a0694fa26b72ed58117"
+        },
+        "roots": [
+          {
+            "id": "python-project",
+            "path": "python_project",
+            "project_target": "python"
+          },
+          {
+            "id": "javascript-project",
+            "path": "javascript_project",
+            "project_target": "javascript"
+          }
+        ],
+        "schema": "vibeflow.distribution.v2",
+        "version": "0.16.0"
+      },
+      "kernel_sha256_matches_metadata": true
+    },
+    {
+      "kind": "profile_zip",
+      "profile": "autonomous",
+      "path": "/home/rockingsisyphus/.cache/vibeflow-default-scope-20261008/full-02/archives/vibeflow-distribution-autonomous-0.16.0.zip",
+      "size": 779950,
+      "sha256": "a69196b32cabb5d8d09d4c6729e498a5e156be0638da7674d1f70878c3608858",
+      "source_sha256": {
+        "source_analysis/bindings.py": "28c25078f4d32253a0229aee4da4c769efedbca90592b9a5d3a08760b64cb781",
+        "source_analysis/visitors.py": "86f9df117d3457e598a7ffcfbfe613545f270a8fa20240121e80db417f9e848c",
+        "source_analysis/input_tracking.py": "dd037fa4a176db0d1aaa2fd6c763886be690b9d403443c0386f63c41adae6e26",
+        "rules/base_lib_effects.py": "f60e2d8a028ddd5243b4195ce8147b3bba04f1fab0473c2939e7e4d339871fec",
+        "rules/effects.py": "a17517f5afd05754fe74f3cb4810c3afa3229a0fc74efc0f879a9d3d7fe9b6b0",
+        "source_context.py": "1a9f0e8ff1cfb77dd592d03a4369be2427bfa40bc95a46eb72027c6540532914"
+      },
+      "matches_frozen_final_source": true,
+      "distribution_metadata": {
+        "agent_automation": {
+          "build": true,
+          "quality": true,
+          "refresh_architecture": true,
+          "validate": true,
+          "workflow_execution_probe": true
+        },
+        "agent_protocol": {
+          "change_inventory": "optional",
+          "human_approval_gate": false,
+          "planned_review": false,
+          "required_review_artifact": "on_demand"
+        },
+        "development_profile": "autonomous",
+        "kernel": {
+          "archive": "kernel/vibeflow-kernel.zip",
+          "sha256": "54d848c1dfc5e6143d1414882e996f141c9b721a15d49a0694fa26b72ed58117"
+        },
+        "roots": [
+          {
+            "id": "python-project",
+            "path": "python_project",
+            "project_target": "python"
+          },
+          {
+            "id": "javascript-project",
+            "path": "javascript_project",
+            "project_target": "javascript"
+          }
+        ],
+        "schema": "vibeflow.distribution.v2",
+        "version": "0.16.0"
+      },
+      "embedded_kernel_sha256": "54d848c1dfc5e6143d1414882e996f141c9b721a15d49a0694fa26b72ed58117",
+      "embedded_kernel_matches_standalone": true
+    }
+  ],
+  "passed": true
+}

@@ -1,0 +1,55 @@
+{
+  "products": [
+    {
+      "product": "wheel",
+      "report": "/home/rockingsisyphus/projects/VibeFlow/dist/unification-validation-20261008/packaged-python-effects-wheel03.json",
+      "archive": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/wheel-dist/vibeflow-0.16.0-py3-none-any.whl",
+      "archive_sha256": "b9b798be549fb3218a7d072461502021268cf2e0bebb2fd4365a7d3e7badaf75",
+      "origin": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/wheel-venv/lib/python3.13/site-packages/vibeflow/__init__.py",
+      "package_root": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/wheel-venv/lib/python3.13/site-packages/vibeflow",
+      "count": 873,
+      "passed": 873,
+      "failed": 0,
+      "loaded_module_count": 114,
+      "foreign_modules": [],
+      "package_isolation_pass": true,
+      "script_sha256": "afb6d125ae228ec29e282b663fc6267e19be22393e9d878718e2f309c09f7970",
+      "independent_origin_check": true,
+      "independent_archive_hash_check": true
+    },
+    {
+      "product": "collaborative",
+      "report": "/home/rockingsisyphus/projects/VibeFlow/dist/unification-validation-20261008/packaged-python-effects-collaborative03.json",
+      "archive": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution/kernel/vibeflow-kernel.zip",
+      "archive_sha256": "ccc805917e2fd8d475c777fdfda477c7faefb987114c30344c33963da749e196",
+      "origin": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+      "package_root": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution/kernel/vibeflow-kernel.zip/vibeflow",
+      "count": 873,
+      "passed": 873,
+      "failed": 0,
+      "loaded_module_count": 114,
+      "foreign_modules": [],
+      "package_isolation_pass": true,
+      "script_sha256": "afb6d125ae228ec29e282b663fc6267e19be22393e9d878718e2f309c09f7970",
+      "independent_origin_check": true,
+      "independent_archive_hash_check": true
+    },
+    {
+      "product": "autonomous",
+      "report": "/home/rockingsisyphus/projects/VibeFlow/dist/unification-validation-20261008/packaged-python-effects-autonomous03.json",
+      "archive": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution-autonomous/kernel/vibeflow-kernel.zip",
+      "archive_sha256": "ccc805917e2fd8d475c777fdfda477c7faefb987114c30344c33963da749e196",
+      "origin": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution-autonomous/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+      "package_root": "/home/rockingsisyphus/.cache/vibeflow-unification-20261008/full-03/distribution-autonomous/kernel/vibeflow-kernel.zip/vibeflow",
+      "count": 873,
+      "passed": 873,
+      "failed": 0,
+      "loaded_module_count": 114,
+      "foreign_modules": [],
+      "package_isolation_pass": true,
+      "script_sha256": "afb6d125ae228ec29e282b663fc6267e19be22393e9d878718e2f309c09f7970",
+      "independent_origin_check": true,
+      "independent_archive_hash_check": true
+    }
+  ]
+}

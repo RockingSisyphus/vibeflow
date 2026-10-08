@@ -1,0 +1,32 @@
+{
+  "phase": "Final frozen checkout source accepted; generated product acceptance recorded separately",
+  "formal_probe_report": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/checkout-fixed-final-r2.json",
+  "formal_probe_summary": {
+    "cases": 72,
+    "semantic_matches": 72,
+    "semantic_mismatches": 0,
+    "unequal_alias_pairs": 0,
+    "unequal_parameter_pairs": 0,
+    "original_matrix_cases": 48,
+    "renamed_parameter_cases": 24
+  },
+  "formal_cli_children": 54,
+  "foreign_product_modules": {},
+  "review_original_report": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/review-original-source-final-r2.json",
+  "review_original_summary": {
+    "cases": 40,
+    "mismatches": 0,
+    "former_mismatches_corrected": 28
+  },
+  "review_script_sha256": "985f96267f72d9311aa7026c9c5b3517a69b543b189d0733da4d9ae5e31678c0",
+  "source_sha256": {
+    "source_analysis/bindings.py": "28c25078f4d32253a0229aee4da4c769efedbca90592b9a5d3a08760b64cb781",
+    "source_analysis/visitors.py": "86f9df117d3457e598a7ffcfbfe613545f270a8fa20240121e80db417f9e848c",
+    "source_analysis/input_tracking.py": "dd037fa4a176db0d1aaa2fd6c763886be690b9d403443c0386f63c41adae6e26",
+    "rules/base_lib_effects.py": "f60e2d8a028ddd5243b4195ce8147b3bba04f1fab0473c2939e7e4d339871fec",
+    "rules/effects.py": "a17517f5afd05754fe74f3cb4810c3afa3229a0fc74efc0f879a9d3d7fe9b6b0",
+    "source_context.py": "1a9f0e8ff1cfb77dd592d03a4369be2427bfa40bc95a46eb72027c6540532914"
+  },
+  "source_stable_during_probe": true,
+  "old_after05_summary_preserved": true
+}

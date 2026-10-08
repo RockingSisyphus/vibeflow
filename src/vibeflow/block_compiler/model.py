@@ -155,12 +155,12 @@ class DataRequirementPlan:
 class PipelineInputSpec:
     key: str
     type: str
-    required: bool | None = None
+    required: bool
     display_name: str = ""
 
     def __post_init__(self) -> None:
-        if self.required is not None and not isinstance(self.required, bool):
-            raise PortablePlanError("pipeline input required must be true, false, or null for legacy input")
+        if not isinstance(self.required, bool):
+            raise PortablePlanError("pipeline input required must be explicitly true or false")
 
     def to_dict(self) -> dict[str, object]:
         return {

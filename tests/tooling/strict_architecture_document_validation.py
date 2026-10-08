@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
+
+import pytest
 
 from vibeflow.tooling.application.python.presentation.architecture_validation import architecture_regenerate_command, check_architecture_document
 from vibeflow.tooling.project.config_loader import ConfigLoadError, load_config_document, load_raw_config_document
@@ -105,3 +108,94 @@ def test_architecture_regenerate_command_prefers_distribution_wrapper(tmp_path) 
     command = architecture_regenerate_command(workflow, document, workspace_path=workspace)
 
     assert command == "python run.py architecture --config project/configs/main.jsonc --output project/ARCHITECTURE.jsonc"
+
+
+def _source_payload():
+    return {
+        "workflow": {"source": "main.jsonc"},
+        "implementation_graph": {
+            "files": {"file:demo": {"path": "node.py", "load_state": "not_loaded", "owners": [
+                {"kind": "node", "id": "demo", "role": "entry", "symbol": "Demo"}]}},
+            "resources": {"node:demo": {
+                "rulesets": ["vibeflow.process"],
+                "effective_rules": {"static": [{"ruleset_id": "vibeflow.process"}]},
+                "effective_presentation": {"values": {"fill": "#abcdef", "shape": "rect"}},
+                "origin": {"plugin_id": "demo", "path": "plugin.py", "line": 2},
+                "metadata": {"load_state": "business-value"},
+                "sources": [{"path": "node.py", "symbol": "Demo", "language": "python",
+                             "role": "entry", "load_state": "not_loaded"}],
+            }},
+            "relations": [{"from": "node:demo", "to": "file:demo", "relation": "entry"}],
+        },
+    }
+
+
+@pytest.mark.parametrize("file_state,resource_state", [
+    ("loaded", "loaded"), ("unknown", "loaded"), ("loaded", "unknown"),
+])
+def test_architecture_freshness_allows_valid_load_state_observations(tmp_path, file_state, resource_state):
+    payload = _source_payload()
+    observed = deepcopy(payload)
+    observed["implementation_graph"]["files"]["file:demo"]["load_state"] = file_state
+    observed["implementation_graph"]["resources"]["node:demo"]["sources"][0]["load_state"] = resource_state
+    path = tmp_path / "ARCHITECTURE.jsonc"
+    path.write_text(_expected(observed))
+    assert _check(path, payload, _expected(payload), workflow=tmp_path / "main.jsonc") is None
+    assert json.loads(path.read_text().removeprefix(ARCHITECTURE_DOCUMENT_HEADER)) == observed
+
+
+@pytest.mark.parametrize("section", ["file", "resource"])
+@pytest.mark.parametrize("state", ["missing", "invalid", None, [], {}])
+def test_architecture_freshness_keeps_missing_and_invalid_load_states(tmp_path, section, state):
+    payload = _source_payload()
+    observed = deepcopy(payload)
+    graph = observed["implementation_graph"]
+    record = graph["files"]["file:demo"] if section == "file" else graph["resources"]["node:demo"]["sources"][0]
+    if state == "missing":
+        record.pop("load_state")
+    else:
+        record["load_state"] = state
+    path = tmp_path / "ARCHITECTURE.jsonc"
+    path.write_text(_expected(observed))
+    finding = _check(path, payload, _expected(payload), workflow=tmp_path / "main.jsonc")
+    assert finding.rule_id == "ARCHITECTURE.DOCUMENT.STALE"
+    assert all(item.endswith(".load_state") for item in finding.details["difference_paths"])
+
+
+@pytest.mark.parametrize("mutation", ["file_path", "source_path", "symbol", "rules", "effective_rules",
+    "color", "shape", "origin", "owner", "relation", "metadata"])
+def test_architecture_freshness_preserves_structure_checks_with_new_load_state(tmp_path, mutation):
+    payload = _source_payload()
+    changed = deepcopy(payload)
+    graph = changed["implementation_graph"]
+    file = graph["files"]["file:demo"]
+    resource = graph["resources"]["node:demo"]
+    file["load_state"] = resource["sources"][0]["load_state"] = "loaded"
+    if mutation == "file_path": file["path"] = "moved.py"
+    elif mutation == "source_path": resource["sources"][0]["path"] = "moved.py"
+    elif mutation == "symbol": resource["sources"][0]["symbol"] = "Other"
+    elif mutation == "rules": resource["rulesets"] = []
+    elif mutation == "effective_rules": resource["effective_rules"]["static"][0]["ruleset_id"] = "custom"
+    elif mutation == "color": resource["effective_presentation"]["values"]["fill"] = "#fedcba"
+    elif mutation == "shape": resource["effective_presentation"]["values"]["shape"] = "hex"
+    elif mutation == "origin": resource["origin"]["path"] = "other_plugin.py"
+    elif mutation == "owner": file["owners"][0]["id"] = "other"
+    elif mutation == "relation": graph["relations"][0]["relation"] = "support"
+    else: resource["metadata"]["load_state"] = "changed-business-value"
+    path = tmp_path / "ARCHITECTURE.jsonc"
+    path.write_text(_expected(changed))
+    finding = _check(path, payload, _expected(payload), workflow=tmp_path / "main.jsonc")
+    assert finding.rule_id == "ARCHITECTURE.DOCUMENT.STALE"
+    assert finding.details["difference_paths"]
+    assert all(not item.endswith(".load_state") or ".metadata." in item
+               for item in finding.details["difference_paths"])
+
+
+def test_architecture_load_observations_do_not_bypass_canonical_format(tmp_path):
+    payload = _source_payload()
+    changed = deepcopy(payload)
+    changed["implementation_graph"]["files"]["file:demo"]["load_state"] = "loaded"
+    path = tmp_path / "ARCHITECTURE.jsonc"
+    path.write_text(_expected(changed) + "\n")
+    finding = _check(path, payload, _expected(payload), workflow=tmp_path / "main.jsonc")
+    assert finding.rule_id == "ARCHITECTURE.DOCUMENT.NON_CANONICAL"

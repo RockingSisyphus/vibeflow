@@ -1,0 +1,20 @@
+{
+  "full_verification_input_files": 2379,
+  "mismatches": [],
+  "missing": [],
+  "wheel_exists": true,
+  "wheel": {
+    "path": "/tmp/vibeflow-recheck-repair-final-20261008/wheel-dist/vibeflow-0.16.0-py3-none-any.whl",
+    "source_files": 333,
+    "wheel_files": 333,
+    "sha256": "d6bdd43effaa739c6d7f06f7808fa201e69ff49505ecf944fae4020da602ec21",
+    "different": [],
+    "missing": [],
+    "extra": []
+  },
+  "initial_comparison_timing": "before adding the new audit report and index",
+  "post_report_changed_recorded_inputs": [
+    "docs/README.md"
+  ],
+  "post_report_expected_change": "one new audit link in documentation index; product, tests and distribution inputs unchanged"
+}

@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-from vibeflow.targets.python.project.resources import BaseLibRegistry
 from vibeflow.core.contracts import DataProvider
 from vibeflow.core.descriptors import (
     JSON_SCHEMA_2020_12,
@@ -19,13 +18,11 @@ from vibeflow.core.descriptors import (
     NodeDescriptor,
     SourceLocator,
 )
-from vibeflow.targets.python.project.descriptors import (
-    adapt_base_lib_registry,
-)
 from vibeflow.tooling.project.descriptor_loader import (
     DescriptorLoadError,
 )
-from tests.fixtures.support.contributions import collected_fixture_catalogs as load_descriptor_catalogs
+from vibeflow.core.descriptors import ContributionBuilder, ResourceOrigin, compose_contributions, DescriptorCatalogError
+from vibeflow.core.descriptors.decode import decode_resource
 from vibeflow.targets.python.project.registry import NodeRegistry
 
 
@@ -75,16 +72,6 @@ def _node_payload(
     }
 
 
-def _descriptor_paths() -> dict[str, list[str]]:
-    return {
-        "nodes": ["manifests/nodes"],
-        "base_lib": ["manifests/base_lib"],
-        "data_schemas": ["manifests/data"],
-        "capabilities": ["manifests/capabilities"],
-        "host_extensions": ["manifests/host_extensions"],
-    }
-
-
 def test_descriptors_are_frozen_and_json_serializable() -> None:
     schema = DataSchemaDescriptor(
         type_key="value.out",
@@ -99,98 +86,29 @@ def test_descriptors_are_frozen_and_json_serializable() -> None:
     assert json.loads(json.dumps(snapshot)) == snapshot
 
 
-def test_loader_scans_recursively_and_builds_all_catalogs(tmp_path: Path) -> None:
-    root = tmp_path / "project-root"
-    root.mkdir()
-    _write_jsonc(
-        root / "manifests/nodes/nested/add.jsonc",
-        _node_payload(),
-        comment=True,
-    )
-    _write_jsonc(
-        root / "manifests/base_lib/math.jsonc",
-        {
-            "kind": "base_lib",
-            "id": "demo.math",
-            "display_name": "Math",
-            "description": "Pure math helpers.",
-            "implementations": [
-                {
-                    "language": "typescript",
-                    "targets": ["browser", "node"],
-                    "source": {
-                        "kind": "file",
-                        "ref": "project/base_lib/math.ts",
-                    },
-                }
-            ],
-            "dependencies": [],
-            "external_packages": [],
-        },
-    )
-    _write_jsonc(
-        root / "manifests/data/value.jsonc",
-        {
-            "kind": "data_schema",
-            "type_key": "value.out",
-            "representation": "json",
-            "schema": {"type": "number"},
-        },
-    )
-    _write_jsonc(
-        root / "manifests/capabilities/storage.jsonc",
-        {
-            "kind": "capability",
-            "id": "demo.storage",
-            "targets": ["browser", "node"],
-            "operations": {
-                "read": {
-                    "input_type": "storage.read.request",
-                    "output_type": "storage.read.result",
-                }
-            },
-        },
-    )
-    _write_jsonc(
-        root / "manifests/host_extensions/storage-host.jsonc",
-        {
-            "kind": "host_extension",
-            "id": "demo.storage_host",
-            "targets": ["browser", "node"],
-            "implementations": [
-                {
-                    "language": "typescript",
-                    "targets": ["browser", "node"],
-                    "source": {
-                        "kind": "file",
-                        "ref": "project/host_extensions/storage.ts",
-                        "export": "createHostExtension",
-                    },
-                }
-            ],
-            "provides": ["demo.storage"],
-            "dependencies": [],
-            "external_packages": [],
-        },
-    )
-
-    catalogs = load_descriptor_catalogs(root, _descriptor_paths())
-
+def test_explicit_contributions_build_all_catalogs() -> None:
+    values = [_node_payload(),
+        {"kind": "base_lib", "id": "demo.math", "display_name": "Math", "description": "Pure math helpers.",
+         "implementations": [{"language": "typescript", "targets": ["browser", "node"],
+             "source": {"kind": "file", "ref": "project/base_lib/math.ts"}}]},
+        {"kind": "data_schema", "type_key": "value.out", "representation": "json", "schema": {"type": "number"}},
+        {"kind": "capability", "id": "demo.storage", "targets": ["browser", "node"],
+         "operations": {"read": {"input_type": "storage.read.request", "output_type": "storage.read.result"}}},
+        {"kind": "host_extension", "id": "demo.storage_host", "targets": ["browser", "node"],
+         "implementations": [{"language": "typescript", "targets": ["browser", "node"],
+             "source": {"kind": "file", "ref": "project/host_extensions/storage.ts", "export": "createHostExtension"}}],
+         "provides": ["demo.storage"]}]
+    builder = ContributionBuilder("demo", source="demo_plugin.ts")
+    for value in values:
+        builder.add(decode_resource(value), origin=ResourceOrigin("demo", "demo_plugin.ts"))
+    catalogs = compose_contributions((builder.finish(),))
     assert catalogs.nodes.available() == ("demo.add",)
     assert catalogs.base_libs.available() == ("demo.math",)
     assert catalogs.schemas.available() == ("value.out",)
     assert catalogs.capabilities.available() == ("demo.storage",)
-    assert catalogs.host_extensions.available() == (
-        "demo.storage_host",
-    )
+    assert catalogs.host_extensions.available() == ("demo.storage_host",)
     assert catalogs.nodes.require("demo.add").contract.params_defaults["delta"] == 1
-    assert [Path(path).relative_to(root).as_posix() for path in catalogs.source_files] == [
-        "manifests/nodes/nested/add.jsonc",
-        "manifests/base_lib/math.jsonc",
-        "manifests/data/value.jsonc",
-        "manifests/capabilities/storage.jsonc",
-        "manifests/host_extensions/storage-host.jsonc",
-    ]
+    assert catalogs.source_files == ("demo_plugin.ts",)
     json.dumps(catalogs.to_dict())
 
 
@@ -203,20 +121,16 @@ def test_loader_reports_duplicate_and_conflicting_ids(
     second_name: str,
     expected_code: str,
 ) -> None:
-    root = tmp_path / "root"
-    root.mkdir()
-    _write_jsonc(root / "nodes/a.jsonc", _node_payload())
-    _write_jsonc(
-        root / "nodes/b.jsonc",
-        _node_payload(display_name=second_name),
-    )
-
-    with pytest.raises(DescriptorLoadError) as captured:
-        load_descriptor_catalogs(root, {"nodes": ["nodes"]})
-
+    contributions = []
+    for name, payload in (("a.py", _node_payload()), ("b.py", _node_payload(display_name=second_name))):
+        builder = ContributionBuilder(name, source=name)
+        builder.add(decode_resource(payload), origin=ResourceOrigin(name, name))
+        contributions.append(builder.finish())
+    with pytest.raises(DescriptorCatalogError) as captured:
+        compose_contributions(tuple(contributions))
     assert captured.value.code == expected_code
-    assert "a.jsonc" in str(captured.value)
-    assert "b.jsonc" in str(captured.value)
+    assert captured.value.source == "b.py"
+    assert captured.value.previous_source == "a.py"
 
 
 def test_selected_plugin_rejects_file_escape_and_symlink(tmp_path: Path) -> None:
@@ -281,31 +195,18 @@ def test_declared_metadata_is_authoritative_for_python_bindings() -> None:
     assert not hasattr(_DeclaredNode, "CONTRACT")
     json.dumps(descriptor.to_dict())
 
-    base_registry = BaseLibRegistry()
-    base_registry.register(
-        "demo.math",
-        module="demo.math",
-        display_name="Math",
-        description="Math helpers.",
-    )
-    static_base = BaseLibDescriptor(
-        id="demo.math",
-        display_name="Math",
-        description="Math helpers.",
+    # Canonical library declarations retain every language implementation and Ruleset.
+    descriptor = BaseLibDescriptor(
+        id="demo.math", display_name="Math", description="Math helpers.",
+        rulesets=("custom.review",),
         implementations=(
-            ImplementationDescriptor(
-                language="typescript",
-                targets=("browser", "node"),
-                source=SourceLocator(
-                    kind="file",
-                    ref="project/base_lib/math.ts",
-                ),
-            ),
+            ImplementationDescriptor(language="python", targets=("python",),
+                source=SourceLocator(kind="module", ref="demo.math")),
+            ImplementationDescriptor(language="typescript", targets=("browser", "node"),
+                source=SourceLocator(kind="file", ref="project/base_lib/math.ts")),
         ),
     )
-    base_adapted = adapt_base_lib_registry(
-        base_registry,
-        static_catalog=BaseLibCatalog((static_base,)),
-    )
-    assert base_adapted.module("demo.math") == "demo.math"
-    assert len(base_adapted.catalog.require("demo.math").implementations) == 2
+    catalog = BaseLibCatalog((descriptor,))
+    assert catalog.require("demo.math") is descriptor
+    assert catalog.require("demo.math").rulesets == ("custom.review",)
+    assert len(catalog.require("demo.math").implementations) == 2

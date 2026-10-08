@@ -82,7 +82,7 @@ def test_typescript_sandbox_positive_projects_prepare_real_aot_plans(
     assert prepared.used_base_libs == base_libs
     assert prepared.used_capabilities == capabilities
     assert prepared.used_node_types
-    assert prepared.payload["blocks"]
+    assert prepared.plan.blocks
     bindings = prepared.javascript_bindings
     assert bindings is not None
     assert tuple(call.path for call in bindings.calls) == tuple(
@@ -94,11 +94,8 @@ def test_typescript_sandbox_positive_projects_prepare_real_aot_plans(
     assert set(bindings.capabilities.to_value()) == set(capabilities)
     assert bindings.import_policy.to_value() == prepared.import_policy
     assert "javascript_bindings" not in prepared.plan.to_dict()
-    for block in prepared.payload["blocks"]:
-        assert all(
-            isinstance(input_spec.get("required"), bool)
-            for input_spec in block["inputs"]
-        )
+    for block in prepared.plan.blocks:
+        assert all(isinstance(input_spec.required, bool) for input_spec in block.inputs)
 
 
 @pytest.mark.parametrize(
@@ -247,15 +244,3 @@ def test_typescript_sandbox_toolchain_is_project_owned_and_locked() -> None:
     assert '"typescript": "7.0.2"' in package
     assert '"esbuild": "0.28.1"' in package
     assert '"lockfileVersion": 3' in lock
-
-
-_native_prepare_project_build = prepare_project_build
-_native_build_project_aot = build_project_aot
-def prepare_project_build(request, **options):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(request.workspace)
-    return _native_prepare_project_build(request, **options)
-def build_project_aot(request, **options):
-    from tests.fixtures.support.code_plugins import prepare_workspace_fixture
-    prepare_workspace_fixture(request.workspace)
-    return _native_build_project_aot(request, **options)

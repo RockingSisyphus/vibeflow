@@ -1,0 +1,53 @@
+{
+  "status": "ERROR",
+  "code": "BASE_LIB.SOURCE.MAX_LINES",
+  "error": "base_lib file has 501 lines > 500",
+  "diagnostics": [
+    {
+      "code": "BASE_LIB.SOURCE.MAX_LINES",
+      "rule_id": "BASE_LIB.SOURCE.MAX_LINES",
+      "severity": "error",
+      "object_type": "host_extension",
+      "object_id": "audit.child",
+      "source_location": {
+        "path": "/tmp/vf-js-adaptation-audit/host-dependency/src/child_support.ts",
+        "line": 1
+      },
+      "rule_source": "rule:vibeflow.maintainability",
+      "failure_layer": "implementation",
+      "message": "base_lib file has 501 lines > 500",
+      "suggested_fix_type": "",
+      "details": {
+        "lines": 501,
+        "limit": 500,
+        "source": "src/child_support.ts",
+        "export": "",
+        "rule_id": "vibeflow.maintainability",
+        "call_paths": []
+      },
+      "definition_id": "vibeflow.maintainability"
+    }
+  ],
+  "result_code": "VIBEFLOW_STRUCTURE_ERROR",
+  "validation_scope": "vibeflow_structure",
+  "summary": "VibeFlow 结构检查无法完成",
+  "checked": [],
+  "not_checked": [
+    {
+      "id": "business_correctness",
+      "label": "业务结果正确性"
+    },
+    {
+      "id": "requirements_conformance",
+      "label": "项目需求符合性"
+    },
+    {
+      "id": "external_semantics",
+      "label": "外部接口业务语义"
+    },
+    {
+      "id": "domain_data_correctness",
+      "label": "领域数据正确性"
+    }
+  ]
+}

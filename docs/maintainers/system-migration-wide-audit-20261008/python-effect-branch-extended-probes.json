@@ -1,0 +1,230 @@
+[
+  {
+    "case": "sys_stdout_attribute",
+    "kind": "base_lib",
+    "findings": []
+  },
+  {
+    "case": "sys_stdout_attribute",
+    "kind": "python_source",
+    "findings": [
+      {
+        "id": "QUALITY.SIDE_EFFECT.CALL",
+        "message": "banned terminal stream access in module helper: sys.stdout",
+        "location": {
+          "path": "/tmp/vibeflow-python-effect-sys_stdout_attribute.py",
+          "line": 3,
+          "column": 12
+        }
+      }
+    ]
+  },
+  {
+    "case": "sys_stdout_attribute",
+    "kind": "plugin",
+    "findings": [
+      {
+        "id": "NODE.EFFECT.CALL_FORBIDDEN",
+        "message": "banned terminal stream access in module helper: sys.stdout",
+        "location": {
+          "path": "/tmp/vibeflow-python-effect-sys_stdout_attribute.py",
+          "line": 3,
+          "column": 12
+        }
+      }
+    ]
+  },
+  {
+    "case": "sys_path_assignment",
+    "kind": "base_lib",
+    "findings": []
+  },
+  {
+    "case": "sys_path_assignment",
+    "kind": "python_source",
+    "findings": [
+      {
+        "id": "QUALITY.SIDE_EFFECT.CALL",
+        "message": "module helper must not mutate ambient module state: sys",
+        "location": {
+          "path": "/tmp/vibeflow-python-effect-sys_path_assignment.py",
+          "line": 3,
+          "column": 5
+        }
+      }
+    ]
+  },
+  {
+    "case": "sys_path_assignment",
+    "kind": "plugin",
+    "findings": [
+      {
+        "id": "NODE.PURITY.GLOBAL_STATE",
+        "message": "module helper must not mutate ambient module state: sys",
+        "location": {
+          "path": "/tmp/vibeflow-python-effect-sys_path_assignment.py",
+          "line": 3,
+          "column": 5
+        }
+      }
+    ]
+  },
+  {
+    "case": "global_mutating_alias",
+    "kind": "base_lib",
+    "findings": [
+      {
+        "id": "BASE_LIB.SIDE_EFFECT_CALL",
+        "message": "base_lib banned side-effect call: sys.path.append",
+        "location": {
+          "path": "/tmp/vibeflow-python-effect-global_mutating_alias.py",
+          "line": 3,
+          "column": 5
+        }
+      }
+    ]
+  },
+  {
+    "case": "global_mutating_alias",
+    "kind": "python_source",
+    "findings": [
+      {
+        "id": "QUALITY.SIDE_EFFECT.CALL",
+        "message": "banned call in module helper: sys.path.append",
+        "location": {
+          "path": "/tmp/vibeflow-python-effect-global_mutating_alias.py",
+          "line": 3,
+          "column": 5
+        }
+      }
+    ]
+  },
+  {
+    "case": "global_mutating_alias",
+    "kind": "plugin",
+    "findings": [
+      {
+        "id": "NODE.EFFECT.CALL_FORBIDDEN",
+        "message": "banned call in module helper: sys.path.append",
+        "location": {
+          "path": "/tmp/vibeflow-python-effect-global_mutating_alias.py",
+          "line": 3,
+          "column": 5
+        }
+      }
+    ]
+  },
+  {
+    "case": "sys_env_assignment",
+    "kind": "base_lib",
+    "findings": [
+      {
+        "id": "BASE_LIB.BANNED_IMPORT",
+        "message": "base_lib banned import: os",
+        "location": {
+          "path": "/tmp/vibeflow-python-effect-sys_env_assignment.py",
+          "line": 1,
+          "column": 1
+        }
+      }
+    ]
+  },
+  {
+    "case": "sys_env_assignment",
+    "kind": "python_source",
+    "findings": [
+      {
+        "id": "QUALITY.SIDE_EFFECT.IMPORT",
+        "message": "banned import: os",
+        "location": {
+          "path": "/tmp/vibeflow-python-effect-sys_env_assignment.py",
+          "line": 1,
+          "column": 1
+        }
+      },
+      {
+        "id": "QUALITY.SIDE_EFFECT.CALL",
+        "message": "module helper must not mutate forbidden process state: os.environ",
+        "location": {
+          "path": "/tmp/vibeflow-python-effect-sys_env_assignment.py",
+          "line": 3,
+          "column": 5
+        }
+      }
+    ]
+  },
+  {
+    "case": "sys_env_assignment",
+    "kind": "plugin",
+    "findings": [
+      {
+        "id": "NODE.EFFECT.IMPORT_FORBIDDEN",
+        "message": "banned import: os",
+        "location": {
+          "path": "/tmp/vibeflow-python-effect-sys_env_assignment.py",
+          "line": 1,
+          "column": 1
+        }
+      },
+      {
+        "id": "NODE.EFFECT.CALL_FORBIDDEN",
+        "message": "module helper must not mutate forbidden process state: os.environ",
+        "location": {
+          "path": "/tmp/vibeflow-python-effect-sys_env_assignment.py",
+          "line": 3,
+          "column": 5
+        }
+      }
+    ]
+  },
+  {
+    "case": "pure_method_close",
+    "kind": "base_lib",
+    "findings": []
+  },
+  {
+    "case": "pure_method_close",
+    "kind": "python_source",
+    "findings": []
+  },
+  {
+    "case": "pure_method_close",
+    "kind": "plugin",
+    "findings": [
+      {
+        "id": "NODE.EFFECT.CALL_FORBIDDEN",
+        "message": "banned call in module helper: Value.close",
+        "location": {
+          "path": "/tmp/vibeflow-python-effect-pure_method_close.py",
+          "line": 5,
+          "column": 12
+        }
+      }
+    ]
+  },
+  {
+    "case": "plain_read",
+    "kind": "base_lib",
+    "findings": []
+  },
+  {
+    "case": "plain_read",
+    "kind": "python_source",
+    "findings": []
+  },
+  {
+    "case": "plain_read",
+    "kind": "plugin",
+    "findings": [
+      {
+        "id": "NODE.EFFECT.CALL_FORBIDDEN",
+        "message": "banned call in module helper: read",
+        "location": {
+          "path": "/tmp/vibeflow-python-effect-plain_read.py",
+          "line": 4,
+          "column": 12
+        }
+      }
+    ]
+  }
+]

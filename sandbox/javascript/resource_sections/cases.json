@@ -1,0 +1,16 @@
+[
+  "js.sections.review.default",
+  "js.sections.review.rules",
+  "js.sections.mermaid.default",
+  "js.sections.mermaid.columns",
+  "js.sections.mermaid.rules",
+  "js.sections.svg.columns",
+  "js.expand.outer.false",
+  "js.expand.inner.false",
+  "js.expand.ascii.false",
+  "js.expand.shared.false",
+  "js.expand.loop.false",
+  "js.expand.validate.false",
+  "js.expand.health.false",
+  "js.expand.run.false"
+]

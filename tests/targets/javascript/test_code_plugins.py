@@ -92,7 +92,7 @@ def test_fixed_resource_definitions_and_parameter_isolation(tmp_path):
     assert second.catalogs.plugin_settings["demo"]["value"] == 9
 
 
-def test_definition_import_does_not_select_resource(tmp_path):
+def test_definition_import_does_not_select_declaration(tmp_path):
     workspace, config = project(tmp_path, SOURCE.replace('resources:[start,calculation,health,checks,number]', 'resources:[start,health,checks,number]'))
     assert "demo.calculate" not in load_workflow_plugins(workspace,config).catalogs.nodes.available()
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from copy import copy
 from types import MappingProxyType
 from typing import Any, Mapping
 
@@ -16,6 +17,21 @@ RESOURCE_GROUPS = {
     "data_schema": "schemas", "base_lib": "base_libs",
     "capability": "capabilities", "host_extension": "host_extensions", "plugin": "plugins",
 }
+
+
+def resource_kind(descriptor: Any) -> str:
+    """Read typed declaration identity without serializing its contents."""
+    from vibeflow.core.descriptors.models import NodeDescriptor, DataSchemaDescriptor, BaseLibDescriptor, CapabilityDescriptor, HostExtensionDescriptor, PluginDescriptor
+    from vibeflow.core.rules.models import RuleDescriptor, RulesetDescriptor
+    from vibeflow.core.descriptors.source_bundle import PluginDeclarationDescriptor
+    types = ((NodeDescriptor, "node"), (RuleDescriptor, "rule"), (RulesetDescriptor, "ruleset"),
+             (DataSchemaDescriptor, "data_schema"), (BaseLibDescriptor, "base_lib"),
+             (CapabilityDescriptor, "capability"), (HostExtensionDescriptor, "host_extension"),
+             (PluginDescriptor, "plugin"), (PluginDeclarationDescriptor, "plugin_declaration"))
+    for descriptor_type, kind in types:
+        if isinstance(descriptor, descriptor_type):
+            return kind
+    raise DescriptorCatalogError("DESCRIPTOR.TYPE", f"plugin resources require a resource descriptor, got {type(descriptor).__name__}")
 
 
 @dataclass(frozen=True)
@@ -70,6 +86,12 @@ class PluginContributions:
                 raise DescriptorModelError("plugin.resources must contain resource declarations")
             checker.add(entry.descriptor, origin=entry.origin)
 
+    def _with_config(self, config: Mapping[str, Any] | None = None) -> PluginContributions:
+        """Bind one workflow's settings; fixed fields were checked at construction."""
+        snapshot = copy(self)
+        object.__setattr__(snapshot, "config", _freeze_mapping({} if config is None else config, field_name="plugin.config"))
+        return snapshot
+
 
 class ContributionBuilder:
     """Collect validated descriptors without Target objects or filesystem I/O."""
@@ -84,9 +106,7 @@ class ContributionBuilder:
     def add(self, descriptor: Any, *, origin: ResourceOrigin | None = None) -> Any:
         if self._closed:
             raise DescriptorModelError("plugin contributions are already frozen")
-        if not hasattr(descriptor, "to_dict"):
-            raise DescriptorModelError("plugin resources must be resource descriptors")
-        kind = descriptor.to_dict().get("kind")
+        kind = resource_kind(descriptor)
         if kind not in RESOURCE_GROUPS:
             raise DescriptorModelError(f"unsupported plugin resource kind: {kind}")
         location = origin or ResourceOrigin(self.id, self.source)
@@ -97,7 +117,7 @@ class ContributionBuilder:
         except DescriptorCatalogError as exc:
             if not exc.code.endswith((".DUPLICATE", ".CONFLICT")):
                 raise
-            previous = next(item.origin for item in self._entries if item.descriptor.to_dict()["kind"] == kind and item.descriptor.id == descriptor.id)
+            previous = next(item.origin for item in self._entries if resource_kind(item.descriptor) == kind and item.descriptor.id == descriptor.id)
             raise DescriptorCatalogError(exc.code, exc.message, exc.descriptor_id, exc.source, exc.previous_source,
                 {"location": {key:value for key,value in location.to_dict().items() if key in {"line","column"}}, "origins": {"current": location.to_dict(), "previous": previous.to_dict()}}) from exc
         self._entries.append(ResourceDeclaration(descriptor, location))
@@ -108,15 +128,6 @@ class ContributionBuilder:
             raise DescriptorModelError("plugin contributions are already frozen")
         self._closed = True
         return PluginContributions(self.id, tuple(self._entries), config or {}, self.source)
-
-
-def builtin_contributions() -> PluginContributions:
-    from vibeflow.core.rules.builtin import builtin_rule_resources
-    builder = ContributionBuilder("vibeflow.core", source="builtin")
-    rules, rulesets = builtin_rule_resources()
-    for resource in (*rules, *rulesets):
-        builder.add(resource, origin=ResourceOrigin(builder.id, "builtin:" + resource.id))
-    return builder.finish()
 
 
 def compose_contributions(contributions: tuple[PluginContributions, ...]) -> DescriptorCatalogs:
@@ -134,7 +145,7 @@ def compose_contributions(contributions: tuple[PluginContributions, ...]) -> Des
         settings[plugin.id] = plugin.config
         for entry in plugin.resources:
             descriptor, origin = entry.descriptor, entry.origin
-            group = RESOURCE_GROUPS[descriptor.to_dict()["kind"]]
+            group = RESOURCE_GROUPS[resource_kind(descriptor)]
             key = (group, descriptor.id)
             try:
                 getattr(catalogs, group).register(descriptor, source=origin.path, source_location={"path":origin.path, **({"line":origin.line} if origin.line else {}), **({"column":origin.column} if origin.column else {})})
@@ -145,7 +156,7 @@ def compose_contributions(contributions: tuple[PluginContributions, ...]) -> Des
                      "origins": {"current": origin.to_dict(), "previous": previous.to_dict() if previous else {}}})
                 raise error from exc
             origins[key] = origin
-            if not origin.path.startswith("builtin:") and origin.path not in files:
+            if origin.path not in files:
                 files.append(origin.path)
     from dataclasses import replace
     for group in RESOURCE_GROUPS.values():

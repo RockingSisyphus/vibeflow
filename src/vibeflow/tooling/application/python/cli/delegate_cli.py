@@ -74,13 +74,22 @@ def handle_delegate_cli(args) -> int:
     messages = [
         f"INFO CLI.DELEGATE.START run_id={_single_line(actual_run_id)} config={_single_line(Path(args.config))}",
     ]
+    from vibeflow.targets.python.runtime.observation import current_observation
+    observer = current_observation()
+    if observer is not None:
+        observer.write_kernel(messages.pop())
 
     def collect(message: str) -> None:
-        messages.append("CORE " + _single_line(message))
+        line = "CORE " + _single_line(message)
+        observer = current_observation()
+        if observer is not None:
+            observer.write_kernel(line)
+        else:
+            messages.append(line)
 
     owned_run_dir: Path | None = None
     try:
-        owned_run_dir = _prepare_run_dir(run_root, actual_run_id)
+        owned_run_dir = getattr(args, "_prepared_run_dir", None) or _prepare_run_dir(run_root, actual_run_id)
         with core_diagnostic_sink(collect):
             workspace = _load_workspace_for_cli(Path(args.workspace))
             if isinstance(workspace, HealthReport):
@@ -109,7 +118,7 @@ def handle_delegate_cli(args) -> int:
     except CheckedRunError as exc:
         messages.extend(
             (
-                f"ERROR CLI.DELEGATE.FAIL stage=health status={exc.result.health.status}",
+                f"ERROR CLI.DELEGATE.FAIL stage=health status={exc.result.health.status} reason={_single_line(exc)}",
                 _artifact_line(exc.result.run_dir),
                 "INFO CLI.DELEGATE.END status=ERROR exit_code=1",
             )
@@ -189,7 +198,16 @@ def _workspace_import_paths(workspace: object) -> Iterator[None]:
 def _finish_with_log(run_dir: Path, messages: list[str], exit_code: int) -> int:
     try:
         run_dir.mkdir(parents=True, exist_ok=True)
-        (run_dir / "vibeflow.log").write_text("\n".join(messages) + "\n", encoding="utf-8")
+        from vibeflow.targets.python.runtime.observation import current_observation
+        observer = current_observation()
+        if observer is not None:
+            observer.write_kernel("\n".join(messages))
+            if exit_code != 0:
+                failures = [message for message in messages if message.startswith("ERROR ")]
+                observer.transition("failed", "; ".join(failures) or f"program exited with code {exit_code}")
+        else:
+            with (run_dir / "vibeflow.log").open("a", encoding="utf-8") as stream:
+                stream.write("\n".join(messages) + "\n")
     except OSError:
         _minimal_stderr("cannot write delegate CLI run log")
         return 1

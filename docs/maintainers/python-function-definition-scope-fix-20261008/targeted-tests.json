@@ -1,0 +1,43 @@
+{
+  "new_regressions": {
+    "test_functions": 14,
+    "parameterized_cases": 389,
+    "first_group": 325,
+    "final_group": 64,
+    "file": "tests/targets/python/test_source_effect_parameters.py",
+    "file_total_cases": 674
+  },
+  "targeted": {
+    "runner": "tools/run_tests.py",
+    "passed": 962,
+    "failed": 0,
+    "seconds": 41.74,
+    "includes_document_index": true
+  },
+  "quality_tests": {
+    "command": "python -B quality/test.py",
+    "passed": 49,
+    "failed": 0
+  },
+  "quality_profile_all": {
+    "command": "python -B quality/run.py --profile all",
+    "passed": true,
+    "error": 0,
+    "warning": 0,
+    "info": 0
+  },
+  "logs": {
+    "targeted": {
+      "path": "/home/rockingsisyphus/projects/VibeFlow/dist/unification-validation-20261008/python-default-scope-after-06.log",
+      "sha256": "8a88cc2b04e0687d71827277e814fd1b1a03fb39f6c48b8a5bf9d468f7d887e6"
+    },
+    "quality_tests": {
+      "path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/quality-tests.log",
+      "sha256": "804baca242ea0d5436edaee6ad5f0da12fd7fb994c4ccc6244d07de91abba43b"
+    },
+    "quality_profile_all": {
+      "path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-default-scope-validation-20261008/quality-fixed-r2.log",
+      "sha256": "6e43b0b50425e96a222464de0acd0c8e7f069740beba6d06252a51e218e36e10"
+    }
+  }
+}

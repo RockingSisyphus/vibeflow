@@ -39,7 +39,8 @@ class NodeRegistry:
         self._loaders: dict[str, Callable[[], type]] = {}
         self._registration_info: dict[str, NodeRegistrationInfo] = {}
         self._config_specs: dict[str, NodeConfigSpec] = {}
-        self.rule_catalogs: object | None = None
+        self.rule_catalogs: tuple[object, ...] = ()
+        self.rule_handler_loader = None
         self._effect_policies: dict[str, str] = {}
         self.rule_policy_resolver: Callable[[str], str] | None = None
         self._rule_defaults: dict[str, object] = {"purity_policy":None,"quality_policy":None}

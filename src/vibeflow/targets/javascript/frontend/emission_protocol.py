@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
 
 from vibeflow.block_compiler.model import (
@@ -17,7 +16,7 @@ from vibeflow.targets.javascript.frontend.bindings import (
     JavascriptCallBinding,
     JavascriptSchemaMemberOrder,
 )
-from vibeflow.targets.javascript.frontend.model_types import AotPlanError, ImplementationSpec
+from vibeflow.targets.javascript.frontend.errors import AotPlanError
 
 
 class EmissionNode(Protocol):
@@ -76,13 +75,7 @@ class BoundInputView:
 
     @property
     def required(self) -> bool:
-        value = self.source.required
-        if not isinstance(value, bool):
-            raise AotPlanError(
-                "pipeline input required must be explicitly true or false "
-                "for JS AOT"
-            )
-        return value
+        return self.source.required
 
     def to_dict(self) -> dict[str, Any]:
         return _schema_payload(
@@ -282,34 +275,6 @@ class BoundLoopView:
         return _loop_payload(self)
 
 
-def implementation_override(value: object) -> ImplementationSpec:
-    """Normalize one legacy emitter implementation override."""
-
-    if isinstance(value, ImplementationSpec):
-        return value
-    if isinstance(value, (str, Path)):
-        return ImplementationSpec(module=str(value))
-    if not isinstance(value, Mapping):
-        raise TypeError(
-            "implementation override must be a path, mapping, "
-            "or ImplementationSpec"
-        )
-    source = value.get("source")
-    source_map = source if isinstance(source, Mapping) else {}
-    module = value.get("module", value.get("entry", value.get(
-        "ref", source_map.get("ref", source_map.get("module", ""))
-    )))
-    if not str(module or "").strip():
-        raise ValueError("implementation override requires module/ref")
-    exported = value.get("export", source_map.get("export", "run"))
-    return ImplementationSpec(
-        module=str(module),
-        export=str(exported or "run"),
-        language=str(value.get("language", "javascript") or "javascript"),
-        completion=str(value.get("completion", "immediate") or "immediate"),
-    )
-
-
 def module_specifier(value: str) -> str:
     module = str(value).strip()
     if not module:
@@ -406,7 +371,6 @@ __all__ = [
     "EmissionNode",
     "EmissionWorkflow",
     "copy_json",
-    "implementation_override",
     "module_specifier",
     "restore_properties_order",
     "schema_order_path_key",

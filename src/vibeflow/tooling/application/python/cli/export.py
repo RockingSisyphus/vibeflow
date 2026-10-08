@@ -14,7 +14,7 @@ def handle_export_graph(args, *, export_kind: str) -> int:
     )
     from vibeflow.targets.python.project.compiler import GraphCompiler, GraphCompileError
     from vibeflow.tooling.project.config_loader import ConfigLoadError, load_config_document
-    from vibeflow.tooling.application.python.project.resources import load_config_resources
+    from vibeflow.tooling.application.python.project.resource_selection import select_python_resources
     from vibeflow.tooling.project.config_schema import collect_config_schema_findings
     from vibeflow.core.flow import GraphConfigError
     from vibeflow.tooling.project.graph_config import parse_graph_config, project_root_for_config
@@ -36,9 +36,10 @@ def handle_export_graph(args, *, export_kind: str) -> int:
         if isinstance(loaded, HealthReport):
             print(loaded.to_json())
             return 1
-        graph, compiled, registry, resources = loaded
+        graph, compiled, registry, resources, prepared = loaded
     else:
         registry = None
+        prepared = None
         try:
             graph, compiled, resources = _load_unowned_graph(args, validate_health=export_kind == "architecture")
         except ConfigLoadError as exc:
@@ -61,9 +62,9 @@ def handle_export_graph(args, *, export_kind: str) -> int:
             return 1
 
     if export_kind == "architecture":
-        return _export_architecture(args, graph=graph, compiled=compiled, registry=registry, resources=resources)
+        return _export_architecture(args, graph=graph, compiled=compiled, registry=registry, resources=resources, prepared=prepared)
     if export_kind == "svg":
-        return _export_svg(args, graph=graph, compiled=compiled, registry=registry, resources=resources)
+        return _export_svg(args, graph=graph, compiled=compiled, registry=registry, resources=resources, prepared=prepared)
     if export_kind == "ascii":
         text = export_ascii_flowchart(
             graph,
@@ -71,6 +72,8 @@ def handle_export_graph(args, *, export_kind: str) -> int:
             expand_nodesets=bool(args.expand_nodesets),
             show_contract=not bool(args.hide_contract),
             show_semantics=not bool(args.hide_semantics),
+            registry=registry,
+            prepared=prepared,
         )
     else:
         text = export_mermaid(
@@ -82,6 +85,7 @@ def handle_export_graph(args, *, export_kind: str) -> int:
             show_semantics=not bool(args.hide_semantics),
             resources=resources,
             mermaid_layout=str(args.mermaid_layout),
+            prepared=prepared,
         )
     if args.output:
         Path(args.output).write_text(text, encoding="utf-8")
@@ -90,7 +94,7 @@ def handle_export_graph(args, *, export_kind: str) -> int:
     return 0
 
 
-def _export_architecture(args, *, graph, compiled, registry, resources) -> int:
+def _export_architecture(args, *, graph, compiled, registry, resources, prepared=None) -> int:
     from vibeflow.tooling.application.python.presentation.architecture_validation import architecture_finding_status, check_architecture_document
     from vibeflow.tooling.application.python.reports import fail_report
     from vibeflow.targets.python.project.compiler import GraphCompileError
@@ -99,7 +103,7 @@ def _export_architecture(args, *, graph, compiled, registry, resources) -> int:
     from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document, render_architecture_payload
 
     try:
-        payload = build_architecture_document(graph, compiled=compiled, registry=registry, resources=resources)
+        payload = build_architecture_document(graph, compiled=compiled, registry=registry, resources=resources, prepared=prepared)
     except GraphCompileError as exc:
         report = fail_report(
             exc.rule_id,
@@ -170,14 +174,15 @@ def _workspace_graph_or_report(args, *, validate_health: bool = False):
         workspace = load_project_workspace(Path(args.config))
     if isinstance(workspace, HealthReport):
         return workspace
-    graph, compiled, registry, resources, error = load_workspace_graph_for_export(
+    graph, compiled, registry, resources, error, _, prepared = load_workspace_graph_for_export(
         Path(args.config),
         workspace=workspace,
         validate_health=validate_health,
+        _include_presentation=True,
     )
     if error is not None:
         return error
-    return graph, compiled, registry, resources
+    return graph, compiled, registry, resources, prepared
 
 
 def _load_workspace_for_export(path: Path):
@@ -208,7 +213,7 @@ def _load_unowned_graph(args, *, validate_health: bool = False):
     from vibeflow.tooling.application.python.reports import dedupe_findings
     from vibeflow.targets.python.project.compiler import GraphCompiler
     from vibeflow.tooling.project.config_loader import load_config_document
-    from vibeflow.tooling.application.python.project.resources import load_config_resources
+    from vibeflow.tooling.application.python.project.resource_selection import select_python_resources
     from vibeflow.tooling.project.config_schema import collect_config_schema_findings
     from vibeflow.tooling.project.graph_config import parse_graph_config, project_root_for_config
     from vibeflow.core.findings import HealthReport
@@ -218,16 +223,18 @@ def _load_unowned_graph(args, *, validate_health: bool = False):
 
     config_path = Path(args.config)
     document = load_config_document(config_path)
+    from vibeflow.tooling.application.python.project.declarations import default_python_registry
+    registry = default_python_registry()
     plugin_registry = PluginRegistry()
     if document.data.get("plugins"):
         raise _SchemaExportError(HealthReport(status="ERROR", errors=(HealthFinding(
             rule_id="PLUGIN.CONFIG.ROOT", severity="error", object_type="config", object_id=str(config_path),
             source_location={"path": str(config_path)}, failure_layer="plugin",
             message="custom plugins require an owning vibeflow_project.jsonc"),)))
-    resources, resource_findings = load_config_resources(
+    resources, resource_findings = select_python_resources(
         document.data,
         base_path=config_path.parent,
-        plugin_registry=plugin_registry,
+        registry=registry,
     )
     schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *resource_findings))
     schema_errors = tuple(finding for finding in schema_findings if finding.severity == "error")
@@ -253,17 +260,17 @@ def _load_unowned_graph(args, *, validate_health: bool = False):
 
         health = validate_graph_health(
             graph,
-            registry=None,
+            registry=registry,
             plugin_registry=plugin_registry,
             global_config=resources.global_config,
-            effective_policy=default_effective_policy(),
+            purity_policy=default_effective_policy().to_purity_policy(),
         )
         if health.status in {"FAIL", "ERROR"}:
             raise _HealthExportError(health)
     return graph, GraphCompiler().compile(graph), resources
 
 
-def _export_svg(args, *, graph, compiled, registry, resources) -> int:
+def _export_svg(args, *, graph, compiled, registry, resources, prepared=None) -> int:
     from vibeflow.tooling.application.python.reports import fail_report
     from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
     from vibeflow.tooling.application.python.presentation.mermaid.render import (
@@ -280,7 +287,7 @@ def _export_svg(args, *, graph, compiled, registry, resources) -> int:
     max_edges = int(args.mermaid_max_edges) if args.mermaid_max_edges is not None else (EXPANDED_MERMAID_MAX_EDGES if bool(args.expand_nodesets) else DEFAULT_MERMAID_MAX_EDGES)
     try:
         if bool(args.expand_nodesets) or str(args.mermaid_layout) == "review-columns":
-            _render_review_svg(args, graph=graph, compiled=compiled, registry=registry, resources=resources, max_text_size=max_text_size, max_edges=max_edges)
+            _render_review_svg(args, graph=graph, compiled=compiled, registry=registry, resources=resources, max_text_size=max_text_size, max_edges=max_edges, prepared=prepared)
             return 0
         mermaid_text = export_mermaid(
             graph,
@@ -291,6 +298,7 @@ def _export_svg(args, *, graph, compiled, registry, resources) -> int:
             show_semantics=not bool(args.hide_semantics),
             resources=resources,
             mermaid_layout=str(args.mermaid_layout),
+            prepared=prepared,
         )
         if args.output:
             render_mermaid_svg(mermaid_text, Path(args.output), theme=str(args.theme), background=str(args.background), max_text_size=max_text_size, max_edges=max_edges)
@@ -306,10 +314,10 @@ def _export_svg(args, *, graph, compiled, registry, resources) -> int:
     return 0
 
 
-def _render_review_svg(args, *, graph, compiled, registry, resources, max_text_size: int, max_edges: int) -> None:
+def _render_review_svg(args, *, graph, compiled, registry, resources, max_text_size: int, max_edges: int, prepared=None) -> None:
     from vibeflow.tooling.application.python.presentation.mermaid.review_svg import render_review_columns_svg
 
-    review_kwargs = {}
+    review_kwargs = {"prepared":prepared}
     if args.review_fragment_max_width is not None:
         review_kwargs["review_fragment_max_width"] = float(args.review_fragment_max_width)
     if args.output:

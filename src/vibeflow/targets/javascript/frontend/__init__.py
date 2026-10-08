@@ -14,7 +14,6 @@ from vibeflow.targets.javascript.frontend.plugin_descriptors import (
     JavascriptPluginBindingPlan,
     JavascriptPluginError,
     build_javascript_plugin_binding_plan,
-    parse_javascript_plugin_descriptor,
     parse_javascript_plugin_selection,
     resolve_javascript_plugins,
 )
@@ -28,7 +27,6 @@ __all__ = [
     "build_javascript_plugin_binding_plan",
     "build_javascript_binding_plan",
     "node_contract_check",
-    "parse_javascript_plugin_descriptor",
     "parse_javascript_plugin_selection",
     "resolve_javascript_plugins",
     "validate_schema_subset",

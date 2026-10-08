@@ -395,11 +395,6 @@ def _system_browser_candidates() -> list[str]:
     return candidates
 
 
-def _find_chromium() -> str | None:
-    candidates = _system_browser_candidates()
-    return candidates[0] if candidates else None
-
-
 def _snap_chromium_candidates() -> list[str]:
     candidates: list[str] = []
     for name in ("chromium", "chromium-browser"):

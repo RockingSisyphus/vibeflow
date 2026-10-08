@@ -1,0 +1,1450 @@
+{
+  "date": "2026-10-08",
+  "checkout": "current uncommitted working tree; HEAD 9c443f3",
+  "scope_files": 144,
+  "source_manifest": [
+    {
+      "path": "src/vibeflow/targets/python/__init__.py",
+      "sha256": "cd39899113348c749bf7553de8a16619e847ce0516e07508fc55f5e8f4cbe671"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/__init__.py",
+      "sha256": "4546d997c67ba7c5023de2bc54277063a1320403bcac3bff7473ecc658f2f8cf"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/bindings.py",
+      "sha256": "a5ef6ed0b42ac11b0202e43f0b5bb42bb4d1dc3a7a4264882f8aba482b6971aa"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/check_session.py",
+      "sha256": "2c1f7c07a0234f9e4adab2630d52108a5c01c7377595337c0f206dc7fac3da81"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/compiler.py",
+      "sha256": "e58f08e0a7363685c597b5ea982a942db91f9bcd9a801a88065684fd64096c90"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/node.py",
+      "sha256": "58c55e30847ab7e2936c973231f1a2c29ee72c5b1b1cc60eba9b5977403a3625"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/planned.py",
+      "sha256": "48f5206c600be0c8c54ba9be73b34089c0cfe4dd34019a79366db0a89de72500"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/planned_files.py",
+      "sha256": "22d9dc16d13c1aaacc4de0977ced5963e57f6d8fdd10be9b4e4b43a4b92c9638"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/plugins.py",
+      "sha256": "7a31a82c00cf3592e9c1c7edfafb72a258344d3a3684a0894932a73e8233b371"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/policy.py",
+      "sha256": "6e440427ecf3a469d34776b9afc6c0fb677c33ea83e777c0a343b6ad097cb5c9"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/registry.py",
+      "sha256": "100e94abc8e86184b7b2392416e36028f89801a5593fd808fc099ee97fd9771b"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/resource_bindings.py",
+      "sha256": "eb65d5daeed16169c5b1d64b4c0a7081d78e78b93683914255b20dd5cc6bb7e9"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/resource_rules.py",
+      "sha256": "6727506b783fe66c60f4d99c473897055be867213f17b79e6a9cf286f1ea9974"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/source_closure.py",
+      "sha256": "6d2caec2d332183e27aa5893b21ddc2f0eb2eec2ae1ff4fad9e61492157c392c"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/source_facts.py",
+      "sha256": "5feec841876e397ba79d9710df7f55b0db377bf7118384e72ff82a175ab4f5cf"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/source_membership.py",
+      "sha256": "fcacf724c915504445361d9e838edbae7c93ff11f69d194420f12f94cb55515b"
+    },
+    {
+      "path": "src/vibeflow/targets/python/project/structure_sources.py",
+      "sha256": "acee5c14949a52fb8478fae0124b55fd3df2e216993b23f4e94c4603be869127"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/__init__.py",
+      "sha256": "58940dd170703867008bcbbcb01480c8efcfb7b4d023c08e511c6710da517caf"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/analysis_metrics.py",
+      "sha256": "66713d05ec0ae1735bfc9a9bfa02f11d836dd23004d817ef63359e1ba9bf025f"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/builtin_plugin.py",
+      "sha256": "813c2ce1fed084c248fc2e3c9439a4ad36fb8d313364a0e16385fec4940a706a"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/parse_cache.py",
+      "sha256": "d5d7574693770cbd2362d4de5a012e9d81a1a859b491479497aa7e062d40fe34"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/policy_parameters.py",
+      "sha256": "9aaa5e412b6b1c4e5c60b73f384769b345f9abe5c20394e37af1add2c8bddb24"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/project_context.py",
+      "sha256": "0015091179abe4fc0860d5d87f7034e7dd84dd690ba4d2378fefaf7aa506926d"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rule_adapter.py",
+      "sha256": "80b4d9c747d22ec52acfd82193ed03ee16d83c2495a9428c92f72d16a4f0d4b7"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rules/__init__.py",
+      "sha256": "6cca947b3c1c06fd2b6f3fe9ac74ff9ad04cd1f52a04d7bc8c5630680f675f78"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rules/base_lib_effects.py",
+      "sha256": "e46f31ea8ee4de3a6c46b9750593bd2516e33cd2bccec7b160ec5645fcc928e8"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rules/definition_review.py",
+      "sha256": "d96d501e672475f83951dfb5a51b397bf00f7aff55e99d8af54b3c2e4deae812"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rules/effects.py",
+      "sha256": "083cd887dd2ac85dd2bf00702aa0ada96312871063a73405a8ecc44d36c4ab78"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rules/helpers.py",
+      "sha256": "9a1a04e5f2732db02fac3a8e32c5ff998e0b0abdb95d6afada1287ff3b55f606"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rules/import_side_effects.py",
+      "sha256": "b691797ab6a84e50ba2fd8d8e897fb148adec85c7805fbefca462ff869a49275"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rules/maintainability.py",
+      "sha256": "64ae2388054885cbeebd2c1b0f9eac2305d374d3c49c5eac6375ce3ce937291e"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rules/node_interface.py",
+      "sha256": "ac1de391410d8f93171b7b3d6465d278ebad1d6b53b89851ad8c913989f53501"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rules/planned_implementation.py",
+      "sha256": "f582a3148052029703bb2c9e87421d7dc15b0554771d369b2d9584bcb1a826a6"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rules/project_effects.py",
+      "sha256": "86761f69a6102da3c0b5e958ed5b6a7499e80dd19182590ead0040e390b8b1ff"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rules/source_ownership.py",
+      "sha256": "3af1de3dd70553bc9c71a3e0af61d1d82dcf581c0631fc627b8623f608215291"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/rules/workflow.py",
+      "sha256": "7e4cc27a9fbc9615689037d209dad06f2831a76f100f534cf2d725acb351efa2"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source.py",
+      "sha256": "66f794cb92a978e5e14fc72d0142893b3a2d1121a88f72eaa887dc8647e4abfc"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/__init__.py",
+      "sha256": "1e444083a9a0842edcebe0cc24ceb75d10150583dc405854a8e09a798a02da53"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/ast_rules.py",
+      "sha256": "db1b123e6660a48186c0ca4463cdc69e3c9159fc3675dfff4df7a7a475d4f095"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/bindings.py",
+      "sha256": "8048ed1905319305ff4fee5e688f9044d5d641f9fd7e58c0d137852b45cf08e4"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/class_members.py",
+      "sha256": "c555fe1e194ac0936cec111117f5c559fbe933c000ff6873c76f941c52e18a16"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/effects.py",
+      "sha256": "4bf0eeec541f4ce05cde24a3855e247ceb53f0c656c5d2d26f53e022f037420a"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/exit_stacks.py",
+      "sha256": "68e96b9cfc86359217ff5009bf9ae372793de55ea0fbbf0a73f6df9b30d95360"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/helpers.py",
+      "sha256": "6001b52980df0c83402ec8619ade24110d25eff58c27725fb879711119c44f45"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/input_tracking.py",
+      "sha256": "1fdeed108ab8ebefbfda97a59296f8d3b70ada4ef3bc1cafa64d5ab7ee2e63d9"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/metrics.py",
+      "sha256": "dc421e6a2e110d56a480084c790fcb94e057c43eb4ba6896e8fe2de303250173"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/runtime_dispatch.py",
+      "sha256": "fcbcdb63f44db50463952ee9ca4057afd731687c55376eb4ae4cd6572e4424ea"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/sdk_declarations.py",
+      "sha256": "2ab154b977685f3dec8c41530a55b178db18fa500829fe0ffcbeef9adb3c0955"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/source.py",
+      "sha256": "14df7357c6ebdfb08e03dd515655999e1228cc0b2dbb2df4e592d721ef1b8e70"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/types.py",
+      "sha256": "e1b60743a261d67e5636883568abbf98918f84b09bc133f5fb3698528602f944"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/validators.py",
+      "sha256": "726a91557214666b3f1fcf014b2f42c1fda6112dc17e7ad0f1bb66e6f6cc9f8a"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_analysis/visitors.py",
+      "sha256": "12f71f0efeeca80e8e187bc5500124dfcd2fd27b3b1821434637ce873c5f48b4"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/source_context.py",
+      "sha256": "872493dac5471b02d19fcd68912523830bfadc53b0dcd2e9965f0e7ca4b9bd25"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/workflow/__init__.py",
+      "sha256": "ddfce78c2df6fd54efdf70774cf8a919abef3f46c1dbeeddffee217cfefe7798"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/workflow/flow.py",
+      "sha256": "5922b1b72b427d07ddad7b8a3914df9d05a6222bbcf1891a30b2213f7643b951"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/workflow/flow_data.py",
+      "sha256": "238b142f69291a93b0943fc118285c6ee487974ba7ea967819445ee16149623a"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/workflow/mainline.py",
+      "sha256": "526f68096d46858004620b8344a4e266f4373e7ef4d6c26665efc826c2a04ce5"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/workflow/node_config.py",
+      "sha256": "744586a25087aaa9ef9ebfef20a1201f2faab8e039805730227981e287a11d4d"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/workflow/nodesets.py",
+      "sha256": "b1726b4b787b1ac065043127df4fef4c73adfe71e4dd2d29537d2da565ce962e"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/workflow/report.py",
+      "sha256": "f3e740c9d18e86b9705c350b9ea18dfec92d4d67fbca693bbb20c35b7dc38405"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/workflow/rule_phase.py",
+      "sha256": "21d4b98e7f273e7de363714f9f92ca039c748a23b2bc17e784249019aeda1881"
+    },
+    {
+      "path": "src/vibeflow/targets/python/quality/workflow/validation.py",
+      "sha256": "f0a036a1141524963eec57604928bc21df493105393291cbea6d103336d2968f"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/__init__.py",
+      "sha256": "8ee79ce8b2cd8a9d08f1359cba1ed014641f8845faac2bba6f9daf7cf6a8a2e0"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/async_mixin.py",
+      "sha256": "39ee040224d180744359a05c16743051474deb6372bfe7324d74c1746f1f1eb6"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/block_compiler.py",
+      "sha256": "42b582b2b2149cdd1798b01ee9813e1c06029298b4a4a6d0425a43a76e5c8abf"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/compiled.py",
+      "sha256": "893ac7b48e345c4da151c0895b3653545262bc91bc5082a05ec70c5e2e301f78"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/console_capture.py",
+      "sha256": "930b0f278a14082c8bb4c1427d6770af435aed4fccdf1e60e85a7740ebdedb97"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/engine.py",
+      "sha256": "f2d40db591be6e9cd6c435cc45673905e4761837d0ddd79f6dd75d60b7cc4b92"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/errors.py",
+      "sha256": "07756a7ebf2d072d03008d3b3fbf124cf2c4f87d306dab90f27744c12682f821"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/execution_lock_mixin.py",
+      "sha256": "60bb29ffb3caa79d993832945dd1c12d3c1b83e854490946af704770f0b69e9c"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/execution_locks.py",
+      "sha256": "203ea42e7f6943d16280d21ce140b5fd974540c3d611b5e2ef5d2b8276a0ae4a"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/helpers.py",
+      "sha256": "8cdb85bad53c6dd576a9a86bc8c6e2eb8eb462e075d7f797df7f28dbf9214eca"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/loop_mixin.py",
+      "sha256": "02cdb902fee0c44577975921f275691f538b5235c146ae004fc34906eab286bc"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/node_mixin.py",
+      "sha256": "9d593ef4a82bd2b062c31dc981c93f086bc7f8629e3cc1e5ab3a40a9e1f56d7a"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/nodeset_mixin.py",
+      "sha256": "e042a6283fd2e52be9897b33608bbc1d98d3bc84c5dd2c3ff97aefa236f2d64a"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/observation.py",
+      "sha256": "a60b154be391fc7b3c462026ad178b3319e615ed1606873ee6dbfba2d3a2a4fd"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/options.py",
+      "sha256": "8b1d3b33a35b50962931b8ba431f8b8ccf09dfdf20bd9e11af588e02f3289238"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/output_mixin.py",
+      "sha256": "2f8e8606fa78b4cfd7ab0303dfb37c3e67fa8a23aa57f94ee1adfc3643285707"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/planning.py",
+      "sha256": "70c2874ba392a68d6eb5cbd7897a6213632618e764c71c1824bb95242d2702e1"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/summaries.py",
+      "sha256": "d7070f65fee143a3afe3c0c4d2d132f1847ae96447cbd87e8b02c2de77c30464"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/support/__init__.py",
+      "sha256": "5c104f7f4c272809e8646530601a99088f3f0f7b57c045f6c726e6fecae91a56"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/support/binding_builder.py",
+      "sha256": "147bbbacaa24f3aa2c3f8b4f00ba31c0b884deac44564e86dd41a634821a0b8b"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/support/contract_mixin.py",
+      "sha256": "075573220abeaa26ad10de7ebd653745e236d266eb7b511a057627c7ec069a19"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/support/planned.py",
+      "sha256": "781e4dcb6f3981aaf619bf5017bddb9c8bf5895569837237005184f100524128"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/support/portable_adapter.py",
+      "sha256": "bd78f6d156f0c91f0edbc25ef55aadfc14c2f0006f100bed4dd46152b5e0d55b"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/trace.py",
+      "sha256": "89b63bf6572bca8d09952fefb030871522d400712c5c96cc09331c51ae237a7f"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/trace_mixin.py",
+      "sha256": "72c0383b69c82a24b33af638f5440e55eeecc9cec0a46779dfc5c847bce86af2"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/types.py",
+      "sha256": "3135c6eb2f59f214731fda322e538db55bfbc9916b4121d507129a63c533e4a6"
+    },
+    {
+      "path": "src/vibeflow/targets/python/runtime/values.py",
+      "sha256": "348afb82f54946fb4e334df42de11d000879dddf2e1262af95f8af51d2a8889e"
+    },
+    {
+      "path": "src/vibeflow/targets/python/sdk/__init__.py",
+      "sha256": "1234ad715f5cf3f5031ec0acde8876915cea2be82b70a8ca3d1be6b2a50f4df7"
+    },
+    {
+      "path": "src/vibeflow/targets/python/sdk/identity.py",
+      "sha256": "04114013119c228a3026a45bedcdb45912f93a08ade35fea7ce75e7856f12841"
+    },
+    {
+      "path": "src/vibeflow/targets/python/sdk/loading.py",
+      "sha256": "c7605de61522ebf084998029e4dded3e694293ebb9bbab71300c87c1ec3631e9"
+    },
+    {
+      "path": "src/vibeflow/targets/python/sdk/plugin.py",
+      "sha256": "886fcae2e9581be40587c56217f5401cdcd131630a5270ac588b62403fa54504"
+    },
+    {
+      "path": "src/vibeflow/targets/python/sdk/resources.py",
+      "sha256": "a7eb1a0a58286d685b1956f9550d87d710b5e42725ee0638337fd97d2638cf9f"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/__init__.py",
+      "sha256": "579381a31d2d0881699636c8ad26b2e8c67609823e2ae88ced7c5df256a06aa6"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/cli/__init__.py",
+      "sha256": "979a199eb25a676386c32cf701fcfe4760be6776f24076179a8586b39655befb"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/cli/config.py",
+      "sha256": "daf0552e809615376285c03e50f0e62d963cd0fb40d88882582bc15be9468c4a"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/cli/delegate_cli.py",
+      "sha256": "522e3b3dc47723efface4f60b477f38fb63033ae59d73d8a340cf4b2decf8c2e"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/cli/export.py",
+      "sha256": "1ed998a0e27f79a5945e91bef3fc2835a30889d1b096b35bf135c31dac913a1a"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/cli/node.py",
+      "sha256": "a84664f608f96beca4de22d18a4c86dff3f3a2f099fd4253bdaa10a0ce0d01ad"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/cli/quality.py",
+      "sha256": "075def426e71692d7a7960e69da14b513e09f984eea472f57dec530d59192cef"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/cli/review.py",
+      "sha256": "992c633a5a33cf52d6008eb8b3765b420c7d4b00c53f07895c9133842659d11f"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/delegate_contract.py",
+      "sha256": "eb77fee39c88a47d5a7703075d7b905e96a39fa3bedec673027a708992edb2ff"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/diagnostics.py",
+      "sha256": "75381b0e6cdd2e4d60b5ceabf7347c912c799c37b57eaf0c53fbc9adc71fa81f"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/plugin_definitions.py",
+      "sha256": "9ee2300f367ebbc7a9660b31f37a1c1d95052e36a1cad62286d20badcadf8acb"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/__init__.py",
+      "sha256": "4664b43a4fb5f82c163992ffb2870b5a4b0493d31fb2c84bf5e431f3bf48e265"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/architecture_document.py",
+      "sha256": "6667d67966ab59aedbfc2ff3cdc16a4869ec6c9e7f02f9523c072cf1fc51f28e"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/architecture_validation.py",
+      "sha256": "56c39136388b048174f9e6af8885c099b9a075fe1f2cdb737b97ad21640d123c"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/ascii_flowchart/__init__.py",
+      "sha256": "0572a1773768d1930cb974818b3431ebfbe13f4eb890dfd3058358c3b0a90eb1"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/ascii_flowchart/canvas.py",
+      "sha256": "a5c02900a7e00035e5192495b1c851a28645332cde383bca4499e69f7df868e8"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/ascii_flowchart/layout.py",
+      "sha256": "f571b5664417e26cfb99865f6ebccc0edfac474ef5cb67a7067b5a53e0792b60"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/ascii_flowchart/model.py",
+      "sha256": "4e0a28844edaa7eb64768bef072907df62d482f3ebd6f5e5ffb2a074b113539b"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/ascii_flowchart/shapes.py",
+      "sha256": "ea0c0da8ef76eccede1637e9ae2ffff7e5890bed4a27f9e1cdfee77894f7668b"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/helpers.py",
+      "sha256": "5ab5e2ab5424b1bed0776b46d84ce4b7fb7cfa29a322d57113328afe468c86a2"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/mermaid/__init__.py",
+      "sha256": "a0a52464539aa214f62a7635c11cfe229f25fa2e43c1d58e1998ea4562aed4a3"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/mermaid/labels.py",
+      "sha256": "8c13b87a709523702b36c72cf0ed21ecda1c28ac0caae0e5d27279915aaecfd7"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/mermaid/render.py",
+      "sha256": "20e6cbc3c1bb1efec1d10f018ca073f73d587d6708703f7d18a0c71b3a773dfe"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/mermaid/review.py",
+      "sha256": "4c929ee23d7f2139102895014e5af31a10d35351c5d9c2a96d97ade2f70c76e1"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/mermaid/review_fragments.py",
+      "sha256": "51324b8945809f83ccb5f75f4286c77c435412a31a7f68816bed7fafdd1f27c6"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/mermaid/review_layout.py",
+      "sha256": "8b72a3b0edd95de0e7195efebb3385227032ad7eaf754104e019ea4f4fefc26e"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/mermaid/review_svg.py",
+      "sha256": "d4adbb3181a3706d0fb9594c4f578e41bcae76bda65f8b3eaf9999ee1db7b3f2"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/mermaid/review_types.py",
+      "sha256": "924d2ecf217f3950650e84dcb8ed697799b89c7acebafd1dd9792e91f9a5d933"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/prepared.py",
+      "sha256": "f06f324086fe92756ff16c60994a9481457de6a3cfeb2029fe04f9debd6864d9"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/review_model.py",
+      "sha256": "442f80d4bdc033739ee252eaac578d2c3016af15161c6aae09c11c42d0fddb19"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/presentation/style.py",
+      "sha256": "e0440a3be6586040a8fbd9adf8c11b731cac14cc5313fe7ab6a8450481b9cef9"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/project/__init__.py",
+      "sha256": "626557d84207a057aaf69fe7fba67570d8c92fe5be7012f5b6a8902de2ce3924"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/project/contributions.py",
+      "sha256": "211ab16f2075f392e26222fedbf1d436f885982e6dfd3c9854f6048713364924"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/project/core.py",
+      "sha256": "ec436d5cd3dcfebf3c75658c7de46bccf7e5734c70ad1cb443d7aba29a92f2f8"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/project/declarations.py",
+      "sha256": "14cbdc60e20a443f677e7ef734b9281b1f57d24d83422c46a0c18f87b7dde0fe"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/project/effective_policy.py",
+      "sha256": "e8b948aedf701251b2a72545fbe3160427c122f0ca8de4cc6ab45796e2dc210c"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/project/policy.py",
+      "sha256": "7804e6188e132eebf978979d52124db68dde19cdc2f5ac6bf71172d33e26c54b"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/project/prepared_graph.py",
+      "sha256": "4d8458832d2d7ffe3e64bf1fa8756f2055880168c765eeebc0ee365f8606c214"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/project/project_options.py",
+      "sha256": "800d48c8363706c650628ef0adf87b5b6e6196ebd2e4990ae156324b348ec899"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/project/quality.py",
+      "sha256": "b1acf3a31587cf2607df24398f5cc9a72b831819e6134eca338de3f78ed1c64a"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/project/quality_scan.py",
+      "sha256": "9c337167247b7d32667399f67e6811da66248d694cda8c443ef83e878cc7f1ff"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/project/resource_selection.py",
+      "sha256": "c3e7e6b52987fe786d3de3a080e70c7fc1a7b43e38d121884c343ee94fc4c518"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/project/types.py",
+      "sha256": "cd5aa8509c5f736545e4ebecee686ea34b6d8a3125205b13836273959e1e75bc"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/quality_output.py",
+      "sha256": "f19e2a4e380999ed27bf081b2a404676e6f5f91b791c6f4daa5ac4401e6d4abf"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/reports.py",
+      "sha256": "407a2c1bb48abf790390d908d9aef12a9fdb232be667fdba24ec2acc14e6d2b5"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/rule_defaults.py",
+      "sha256": "7c17d50af16a0f6553b0214906018cbb710117953ed6a3910bf173d96438ffae"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/run_directory.py",
+      "sha256": "04912c447db621009d86eb30040a353812b4c8bb00724a051e87e066ef4c927a"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/run_observation.py",
+      "sha256": "3894d7d5be9da91faf334e6ab5865f9ab1073f85e12fb7df877b9fd3441d5739"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/runner.py",
+      "sha256": "f6bc1799690ffac0a14185e649ed45af55b4f05b2c2d43ea4b899decd408e104"
+    },
+    {
+      "path": "src/vibeflow/tooling/application/python/workspace_service.py",
+      "sha256": "da502e4d241c3a6e746394ad970d5f32b5c85c06edcb4d27073b630ab693dfa7"
+    }
+  ],
+  "confirmed_findings": [
+    {
+      "id": "PY-A01",
+      "kind": "active old AST scanner retained",
+      "severity": "behavior divergence",
+      "current": [
+        "src/vibeflow/targets/python/quality/rules/effects.py:27-50",
+        "src/vibeflow/targets/python/quality/rules/base_lib_effects.py:70-84",
+        "src/vibeflow/targets/python/quality/rules/base_lib_effects.py:103-123"
+      ],
+      "historical": "f169429 src/vibeflow/targets/python/project/base_lib.py:_BaseLibAstScanner, visit_ImportFrom/visit_Assign/visit_Attribute same structural logic",
+      "call_chain": "validate CLI -> workspace preparation -> selected BaseLib Rule -> no_side_effects(kind=base_lib) -> _BaseLibAstScanner",
+      "observed": "Five none-scope effect cases PASS as BaseLib, FAIL as Plugin: from sys stdout, from io open, from http client, sys.stdout attribute, sys.path assignment. Ordinary-source direct Rule also rejects. The same built-in Rule scope/policy promises shared classification.",
+      "deletion_boundary": "Keep BaseLib selected rule, canonical ownership, immutable-top-level constraints and effect classification; consolidate effect traversal before retiring scanner; not entire file blindly."
+    },
+    {
+      "id": "PY-A02",
+      "kind": "new source facts unused by one retained visitor branch",
+      "severity": "false rejection by name",
+      "current": [
+        "src/vibeflow/targets/python/quality/rules/effects.py:51-67",
+        "src/vibeflow/targets/python/quality/source_analysis/visitors.py:563-580",
+        "src/vibeflow/targets/python/quality/source_analysis/effects.py:339-342"
+      ],
+      "historical": "f169429 ModulePurityVisitor guessed write/read/close from name; current Node/BaseLib/ordinary branches gained resolved_calls, Plugin branch did not",
+      "call_chain": "validate CLI -> selected lifecycle Plugin Rule -> no_side_effects(kind=plugin) -> ModulePurityVisitor without resolved_calls -> call_violation name guessing",
+      "observed": "Pure local write helper FAIL, identical renamed identity helper PASS. Same write helper BaseLib PASS. Direct additional read/Value.close probes same drift.",
+      "deletion_boundary": "Wire current canonical symbol-resolved calls to Plugin visitor; preserve review of helper bodies and actual effects, no name allowlist or rule disable."
+    },
+    {
+      "id": "PY-A03",
+      "kind": "private dead historical helper chain",
+      "severity": "cleanup remainder",
+      "current": [
+        "src/vibeflow/targets/python/runtime/values.py:11-19",
+        "src/vibeflow/targets/python/runtime/values.py:136-138",
+        "src/vibeflow/targets/python/runtime/values.py:153-155"
+      ],
+      "historical": "2feb215 introduces these functions without callers; e8fd909 and 8926a87 move them. f169429 and working tree identical",
+      "references": "Only definitions, two calls from dead _inputs_to_initial to _copy_input_item, __all__; no external AST reference, no star importer of module, no lazy/dynamic export mapping",
+      "deletion_boundary": "Only two functions and __all__ entries; keep active _nodeset_inputs_to_initial and remaining runtime values algorithms."
+    }
+  ],
+  "additional_confirmed_low_priority": [
+    {
+      "id": "PY-L01",
+      "current": "src/vibeflow/targets/python/quality/source_analysis/types.py:194-206",
+      "observation": "node_* branch always returns before later explicit coupling branch. PurityViolation node_direct_call/import/internal_read yields NODE.METADATA.*, never NODE.COUPLING.*. Same ordering at f169429. Current sandbox asserts METADATA labels; do not treat as old metadata authority.",
+      "boundary": "Later coupling branch is dead. Changing emitted label requires API/test migration decision; removing dead branch preserves behavior."
+    }
+  ],
+  "compatibility_and_exclusions": [
+    {
+      "id": "PY-K01",
+      "current": "runtime/planning.py:115-168; engine.py:71-84; support/portable_adapter.py:77-108",
+      "observation": "ExecutionPlan.frames native execution is intentionally retained; PythonBindingPlan shadows; WorkflowPlan is projection. This is explicit native/portable dual representation, not hidden duplicate declaration authority."
+    },
+    {
+      "id": "PY-K02",
+      "current": "core/contracts.py:45-52; runtime/support/contract_mixin.py:19-36",
+      "observation": "required=None explicitly retains legacy Python workflows; any such input disables whole closed public-input check. Four method probes show mixed required=True+None allows missing and unknown keys. AOT rejects None. Intentional compatibility boundary; whole-system strict/unified ABI would require a goal decision."
+    },
+    {
+      "id": "PY-K03",
+      "current": "core/config/graph.py:254-257,444-465; runtime/planning.py:327,366,423; async_mixin.py:47-77; node_mixin.py:43-132",
+      "observation": "node.async uses ThreadPoolExecutor scheduling for ordinary Node/Nodeset/Loop; native vibeflow.io uses port capability receive/send completion. They have different functions; no evidence of duplicate old I/O implementation."
+    },
+    {
+      "id": "PY-K04",
+      "current": "tooling/project/graph_config.py:65-70; application/python/runner.py:75-99; cli/config.py:32-50; cli/export.py:229-233",
+      "observation": "Directory project root inference remains for unowned low-level configurations; canonical SDK owner uses workspace path and unowned custom plugins are rejected. Not proven mainline directory role residual."
+    },
+    {
+      "id": "PY-K05",
+      "current": "runtime/planning.py:110-137,230-244; runtime/block_compiler.py:68-88",
+      "observation": "Public export_keys, block_for and duplicate plan indexes/compiled_blocks have no current repository consumers; active runtime consumes plan.blocks/frames. They existed at 8926a87/f169429. Public low-level fields are compatibility candidates, not proven deletable private code."
+    },
+    {
+      "id": "PY-K06",
+      "current": "project/registry.py:54-70; project/resource_bindings.py:10-62; application/python/project/contributions.py:17-58",
+      "observation": "Node descriptor canonical metadata and resource binding preserve selected rulesets; PluginRegistry dispatches bound instances lifecycle. No second old metadata authority."
+    },
+    {
+      "id": "PY-K07",
+      "current": "quality/rules/effects.py:12-26; rules/project_effects.py:12-53; application/python/project/quality.py:137-145",
+      "observation": "S01 directory identity and S03 ordinary-source fixed table are no longer present; current ordinary source consumes scope/policy/shared visitor. Historical R01-R04/PY-6-PY-12 deleted paths are absent; historical findings are not current defects."
+    }
+  ],
+  "formal_cli": {
+    "work": "/tmp/vibeflow-wide-python-cli-77pf_e96",
+    "observations": [
+      {
+        "case": "sys_stdout-base_lib",
+        "exit": 0,
+        "status": "PASS",
+        "errors": []
+      },
+      {
+        "case": "sys_stdout-plugin",
+        "exit": 1,
+        "status": "FAIL",
+        "errors": [
+          {
+            "code": "NODE.EFFECT.IMPORT_FORBIDDEN",
+            "definition_id": "vibeflow.no_side_effects",
+            "message": "terminal streams are forbidden by the selected effect policy",
+            "source_location": {
+              "path": "/tmp/vibeflow-wide-python-cli-77pf_e96/sys_stdout-plugin/plugin_support.py",
+              "line": 1,
+              "column": 1
+            }
+          }
+        ]
+      },
+      {
+        "case": "io_open-base_lib",
+        "exit": 0,
+        "status": "PASS",
+        "errors": []
+      },
+      {
+        "case": "io_open-plugin",
+        "exit": 1,
+        "status": "FAIL",
+        "errors": [
+          {
+            "code": "NODE.EFFECT.IMPORT_FORBIDDEN",
+            "definition_id": "vibeflow.no_side_effects",
+            "message": "Python IO import is forbidden by the selected effect policy: io",
+            "source_location": {
+              "path": "/tmp/vibeflow-wide-python-cli-77pf_e96/io_open-plugin/plugin_support.py",
+              "line": 1,
+              "column": 1
+            }
+          }
+        ]
+      },
+      {
+        "case": "http_client-base_lib",
+        "exit": 0,
+        "status": "PASS",
+        "errors": []
+      },
+      {
+        "case": "http_client-plugin",
+        "exit": 1,
+        "status": "FAIL",
+        "errors": [
+          {
+            "code": "NODE.EFFECT.IMPORT_FORBIDDEN",
+            "definition_id": "vibeflow.no_side_effects",
+            "message": "Python IO import is forbidden by the selected effect policy: http",
+            "source_location": {
+              "path": "/tmp/vibeflow-wide-python-cli-77pf_e96/http_client-plugin/plugin_support.py",
+              "line": 1,
+              "column": 1
+            }
+          }
+        ]
+      },
+      {
+        "case": "sys_stdout_attribute-base_lib",
+        "exit": 0,
+        "status": "PASS",
+        "errors": []
+      },
+      {
+        "case": "sys_stdout_attribute-plugin",
+        "exit": 1,
+        "status": "FAIL",
+        "errors": [
+          {
+            "code": "NODE.EFFECT.CALL_FORBIDDEN",
+            "definition_id": "vibeflow.no_side_effects",
+            "message": "banned terminal stream access in module helper: sys.stdout",
+            "source_location": {
+              "path": "/tmp/vibeflow-wide-python-cli-77pf_e96/sys_stdout_attribute-plugin/plugin_support.py",
+              "line": 3,
+              "column": 12
+            }
+          }
+        ]
+      },
+      {
+        "case": "sys_path_assignment-base_lib",
+        "exit": 0,
+        "status": "PASS",
+        "errors": []
+      },
+      {
+        "case": "sys_path_assignment-plugin",
+        "exit": 1,
+        "status": "FAIL",
+        "errors": [
+          {
+            "code": "NODE.PURITY.GLOBAL_STATE",
+            "definition_id": "vibeflow.no_side_effects",
+            "message": "module helper must not mutate ambient module state: sys",
+            "source_location": {
+              "path": "/tmp/vibeflow-wide-python-cli-77pf_e96/sys_path_assignment-plugin/plugin_support.py",
+              "line": 3,
+              "column": 5
+            }
+          }
+        ]
+      },
+      {
+        "case": "local_identity-plugin",
+        "exit": 0,
+        "status": "PASS",
+        "errors": []
+      },
+      {
+        "case": "local_write-plugin",
+        "exit": 1,
+        "status": "FAIL",
+        "errors": [
+          {
+            "code": "NODE.EFFECT.CALL_FORBIDDEN",
+            "definition_id": "vibeflow.no_side_effects",
+            "message": "banned call in module helper: write",
+            "source_location": {
+              "path": "/tmp/vibeflow-wide-python-cli-77pf_e96/local_write-plugin/plugin_support.py",
+              "line": 6,
+              "column": 9
+            }
+          }
+        ]
+      },
+      {
+        "case": "local_write-base_lib",
+        "exit": 0,
+        "status": "PASS",
+        "errors": []
+      }
+    ]
+  },
+  "direct_effect_probes": [
+    {
+      "case": "pure_path",
+      "kind": "base_lib",
+      "findings": []
+    },
+    {
+      "case": "pure_path",
+      "kind": "python_source",
+      "findings": []
+    },
+    {
+      "case": "pure_path",
+      "kind": "plugin",
+      "findings": []
+    },
+    {
+      "case": "terminal_stream",
+      "kind": "base_lib",
+      "findings": []
+    },
+    {
+      "case": "terminal_stream",
+      "kind": "python_source",
+      "findings": [
+        {
+          "id": "QUALITY.SIDE_EFFECT.IMPORT",
+          "message": "terminal streams are forbidden by the selected effect policy",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-terminal_stream.py",
+            "line": 1,
+            "column": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "terminal_stream",
+      "kind": "plugin",
+      "findings": [
+        {
+          "id": "NODE.EFFECT.IMPORT_FORBIDDEN",
+          "message": "terminal streams are forbidden by the selected effect policy",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-terminal_stream.py",
+            "line": 1,
+            "column": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "io_open_import",
+      "kind": "base_lib",
+      "findings": []
+    },
+    {
+      "case": "io_open_import",
+      "kind": "python_source",
+      "findings": [
+        {
+          "id": "QUALITY.SIDE_EFFECT.IMPORT",
+          "message": "Python IO import is forbidden by the selected effect policy: io",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-io_open_import.py",
+            "line": 1,
+            "column": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "io_open_import",
+      "kind": "plugin",
+      "findings": [
+        {
+          "id": "NODE.EFFECT.IMPORT_FORBIDDEN",
+          "message": "Python IO import is forbidden by the selected effect policy: io",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-io_open_import.py",
+            "line": 1,
+            "column": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "http_import",
+      "kind": "base_lib",
+      "findings": []
+    },
+    {
+      "case": "http_import",
+      "kind": "python_source",
+      "findings": [
+        {
+          "id": "QUALITY.SIDE_EFFECT.IMPORT",
+          "message": "Python IO import is forbidden by the selected effect policy: http",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-http_import.py",
+            "line": 1,
+            "column": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "http_import",
+      "kind": "plugin",
+      "findings": [
+        {
+          "id": "NODE.EFFECT.IMPORT_FORBIDDEN",
+          "message": "Python IO import is forbidden by the selected effect policy: http",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-http_import.py",
+            "line": 1,
+            "column": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "local_write",
+      "kind": "base_lib",
+      "findings": []
+    },
+    {
+      "case": "local_write",
+      "kind": "python_source",
+      "findings": []
+    },
+    {
+      "case": "local_write",
+      "kind": "plugin",
+      "findings": [
+        {
+          "id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "message": "banned call in module helper: write",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-local_write.py",
+            "line": 4,
+            "column": 12
+          }
+        }
+      ]
+    }
+  ],
+  "extended_direct_probes": [
+    {
+      "case": "sys_stdout_attribute",
+      "kind": "base_lib",
+      "findings": []
+    },
+    {
+      "case": "sys_stdout_attribute",
+      "kind": "python_source",
+      "findings": [
+        {
+          "id": "QUALITY.SIDE_EFFECT.CALL",
+          "message": "banned terminal stream access in module helper: sys.stdout",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-sys_stdout_attribute.py",
+            "line": 3,
+            "column": 12
+          }
+        }
+      ]
+    },
+    {
+      "case": "sys_stdout_attribute",
+      "kind": "plugin",
+      "findings": [
+        {
+          "id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "message": "banned terminal stream access in module helper: sys.stdout",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-sys_stdout_attribute.py",
+            "line": 3,
+            "column": 12
+          }
+        }
+      ]
+    },
+    {
+      "case": "sys_path_assignment",
+      "kind": "base_lib",
+      "findings": []
+    },
+    {
+      "case": "sys_path_assignment",
+      "kind": "python_source",
+      "findings": [
+        {
+          "id": "QUALITY.SIDE_EFFECT.CALL",
+          "message": "module helper must not mutate ambient module state: sys",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-sys_path_assignment.py",
+            "line": 3,
+            "column": 5
+          }
+        }
+      ]
+    },
+    {
+      "case": "sys_path_assignment",
+      "kind": "plugin",
+      "findings": [
+        {
+          "id": "NODE.PURITY.GLOBAL_STATE",
+          "message": "module helper must not mutate ambient module state: sys",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-sys_path_assignment.py",
+            "line": 3,
+            "column": 5
+          }
+        }
+      ]
+    },
+    {
+      "case": "global_mutating_alias",
+      "kind": "base_lib",
+      "findings": [
+        {
+          "id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "message": "base_lib banned side-effect call: sys.path.append",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-global_mutating_alias.py",
+            "line": 3,
+            "column": 5
+          }
+        }
+      ]
+    },
+    {
+      "case": "global_mutating_alias",
+      "kind": "python_source",
+      "findings": [
+        {
+          "id": "QUALITY.SIDE_EFFECT.CALL",
+          "message": "banned call in module helper: sys.path.append",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-global_mutating_alias.py",
+            "line": 3,
+            "column": 5
+          }
+        }
+      ]
+    },
+    {
+      "case": "global_mutating_alias",
+      "kind": "plugin",
+      "findings": [
+        {
+          "id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "message": "banned call in module helper: sys.path.append",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-global_mutating_alias.py",
+            "line": 3,
+            "column": 5
+          }
+        }
+      ]
+    },
+    {
+      "case": "sys_env_assignment",
+      "kind": "base_lib",
+      "findings": [
+        {
+          "id": "BASE_LIB.BANNED_IMPORT",
+          "message": "base_lib banned import: os",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-sys_env_assignment.py",
+            "line": 1,
+            "column": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "sys_env_assignment",
+      "kind": "python_source",
+      "findings": [
+        {
+          "id": "QUALITY.SIDE_EFFECT.IMPORT",
+          "message": "banned import: os",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-sys_env_assignment.py",
+            "line": 1,
+            "column": 1
+          }
+        },
+        {
+          "id": "QUALITY.SIDE_EFFECT.CALL",
+          "message": "module helper must not mutate forbidden process state: os.environ",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-sys_env_assignment.py",
+            "line": 3,
+            "column": 5
+          }
+        }
+      ]
+    },
+    {
+      "case": "sys_env_assignment",
+      "kind": "plugin",
+      "findings": [
+        {
+          "id": "NODE.EFFECT.IMPORT_FORBIDDEN",
+          "message": "banned import: os",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-sys_env_assignment.py",
+            "line": 1,
+            "column": 1
+          }
+        },
+        {
+          "id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "message": "module helper must not mutate forbidden process state: os.environ",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-sys_env_assignment.py",
+            "line": 3,
+            "column": 5
+          }
+        }
+      ]
+    },
+    {
+      "case": "pure_method_close",
+      "kind": "base_lib",
+      "findings": []
+    },
+    {
+      "case": "pure_method_close",
+      "kind": "python_source",
+      "findings": []
+    },
+    {
+      "case": "pure_method_close",
+      "kind": "plugin",
+      "findings": [
+        {
+          "id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "message": "banned call in module helper: Value.close",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-pure_method_close.py",
+            "line": 5,
+            "column": 12
+          }
+        }
+      ]
+    },
+    {
+      "case": "plain_read",
+      "kind": "base_lib",
+      "findings": []
+    },
+    {
+      "case": "plain_read",
+      "kind": "python_source",
+      "findings": []
+    },
+    {
+      "case": "plain_read",
+      "kind": "plugin",
+      "findings": [
+        {
+          "id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "message": "banned call in module helper: read",
+          "location": {
+            "path": "/tmp/vibeflow-python-effect-plain_read.py",
+            "line": 4,
+            "column": 12
+          }
+        }
+      ]
+    }
+  ],
+  "native_and_mapping_probes": {
+    "input_legacy_contract": [
+      {
+        "case": "all_explicit",
+        "initial": {},
+        "result": "PipelineRuntimeError: Pipeline runtime error: required workflow input 'needed' is missing"
+      },
+      {
+        "case": "all_explicit",
+        "initial": {
+          "unexpected": 1
+        },
+        "result": "PipelineRuntimeError: Pipeline runtime error: unknown workflow input 'unexpected'"
+      },
+      {
+        "case": "mixed_legacy",
+        "initial": {},
+        "result": "accepted"
+      },
+      {
+        "case": "mixed_legacy",
+        "initial": {
+          "unexpected": 1
+        },
+        "result": "accepted"
+      }
+    ],
+    "diagnostic_mapping": [
+      {
+        "code": "node_direct_call",
+        "actual_rule_id": "NODE.METADATA.NODE_DIRECT_CALL",
+        "later_unreachable_return": "NODE.COUPLING.NODE_DIRECT_CALL"
+      },
+      {
+        "code": "node_import",
+        "actual_rule_id": "NODE.METADATA.NODE_IMPORT",
+        "later_unreachable_return": "NODE.COUPLING.NODE_IMPORT"
+      },
+      {
+        "code": "node_internal_read",
+        "actual_rule_id": "NODE.METADATA.NODE_INTERNAL_READ",
+        "later_unreachable_return": "NODE.COUPLING.NODE_INTERNAL_READ"
+      }
+    ]
+  },
+  "reproducers": [
+    "/tmp/vibeflow-wide-python-cli-probe.py",
+    "/tmp/vibeflow-wide-python-cli-extended-probe.py"
+  ],
+  "limits": [
+    "No product edits or full test suite",
+    "Formal validate evidence, not executed business or comprehensive dynamic source-effect soundness proof",
+    "All Python family modules inventoried and static scanned; entrypoints/declarations/Rule/ownership/runtime paths manually reviewed, not every line or every third-party dynamic API execution",
+    "Public exported low-level fields cannot be proven unused by external callers from repository references"
+  ],
+  "scanner_history": [
+    {
+      "version": "initial",
+      "path": "/tmp/vibeflow-wide-audit/snapshots/initial/src/topology_kernel/base_lib.py",
+      "same_methods_as_current": {
+        "visit_ImportFrom": {
+          "old_line": 260,
+          "current_line": 69,
+          "same_ast": false
+        }
+      }
+    },
+    {
+      "version": "0.3-era",
+      "path": "/tmp/vibeflow-wide-audit/snapshots/0.3-era/src/vibeflow/base_lib.py",
+      "same_methods_as_current": {
+        "visit_ImportFrom": {
+          "old_line": 197,
+          "current_line": 69,
+          "same_ast": false
+        }
+      }
+    },
+    {
+      "version": "0.6-era",
+      "path": "/tmp/vibeflow-wide-audit/snapshots/0.6-era/src/vibeflow/base_lib.py",
+      "same_methods_as_current": {
+        "visit_ImportFrom": {
+          "old_line": 203,
+          "current_line": 69,
+          "same_ast": true
+        },
+        "visit_Attribute": {
+          "old_line": 219,
+          "current_line": 115,
+          "same_ast": true
+        }
+      }
+    },
+    {
+      "version": "0.9-era",
+      "path": "/tmp/vibeflow-wide-audit/snapshots/0.9-era/src/vibeflow/targets/python/project/base_lib.py",
+      "same_methods_as_current": {
+        "visit_ImportFrom": {
+          "old_line": 269,
+          "current_line": 69,
+          "same_ast": true
+        },
+        "visit_Attribute": {
+          "old_line": 296,
+          "current_line": 115,
+          "same_ast": true
+        }
+      }
+    },
+    {
+      "version": "0.10.0",
+      "path": "/tmp/vibeflow-wide-audit/snapshots/0.10.0/vibeflow/targets/python/project/base_lib.py",
+      "same_methods_as_current": {
+        "visit_ImportFrom": {
+          "old_line": 269,
+          "current_line": 69,
+          "same_ast": true
+        },
+        "visit_Attribute": {
+          "old_line": 296,
+          "current_line": 115,
+          "same_ast": true
+        }
+      }
+    },
+    {
+      "version": "0.10.2",
+      "path": "/tmp/vibeflow-wide-audit/snapshots/0.10.2/vibeflow/targets/python/project/base_lib.py",
+      "same_methods_as_current": {
+        "visit_ImportFrom": {
+          "old_line": 273,
+          "current_line": 69,
+          "same_ast": true
+        },
+        "visit_Assign": {
+          "old_line": 301,
+          "current_line": 103,
+          "same_ast": true
+        },
+        "visit_Attribute": {
+          "old_line": 313,
+          "current_line": 115,
+          "same_ast": true
+        }
+      }
+    },
+    {
+      "version": "0.11.0",
+      "path": "/tmp/vibeflow-wide-audit/snapshots/0.11.0/vibeflow/targets/python/project/base_lib.py",
+      "same_methods_as_current": {
+        "visit_ImportFrom": {
+          "old_line": 273,
+          "current_line": 69,
+          "same_ast": true
+        },
+        "visit_Assign": {
+          "old_line": 301,
+          "current_line": 103,
+          "same_ast": true
+        },
+        "visit_Attribute": {
+          "old_line": 313,
+          "current_line": 115,
+          "same_ast": true
+        }
+      }
+    },
+    {
+      "version": "0.12.0",
+      "path": "/tmp/vibeflow-wide-audit/snapshots/0.12.0/vibeflow/targets/python/project/base_lib.py",
+      "same_methods_as_current": {
+        "visit_ImportFrom": {
+          "old_line": 273,
+          "current_line": 69,
+          "same_ast": true
+        },
+        "visit_Assign": {
+          "old_line": 301,
+          "current_line": 103,
+          "same_ast": true
+        },
+        "visit_Attribute": {
+          "old_line": 313,
+          "current_line": 115,
+          "same_ast": true
+        }
+      }
+    },
+    {
+      "version": "0.13.0",
+      "path": "/tmp/vibeflow-wide-audit/snapshots/0.13.0/vibeflow/targets/python/project/base_lib.py",
+      "same_methods_as_current": {
+        "visit_ImportFrom": {
+          "old_line": 273,
+          "current_line": 69,
+          "same_ast": true
+        },
+        "visit_Assign": {
+          "old_line": 301,
+          "current_line": 103,
+          "same_ast": true
+        },
+        "visit_Attribute": {
+          "old_line": 313,
+          "current_line": 115,
+          "same_ast": true
+        }
+      }
+    },
+    {
+      "version": "0.14.2",
+      "path": "/tmp/vibeflow-wide-audit/snapshots/0.14.2/vibeflow/targets/python/project/base_lib.py",
+      "same_methods_as_current": {
+        "visit_ImportFrom": {
+          "old_line": 268,
+          "current_line": 69,
+          "same_ast": true
+        },
+        "visit_Assign": {
+          "old_line": 296,
+          "current_line": 103,
+          "same_ast": true
+        },
+        "visit_Attribute": {
+          "old_line": 308,
+          "current_line": 115,
+          "same_ast": true
+        }
+      }
+    },
+    {
+      "version": "0.15.2",
+      "path": "/tmp/vibeflow-wide-audit/snapshots/0.15.2/vibeflow/targets/python/quality/rules/base_lib_effects.py",
+      "same_methods_as_current": {
+        "visit_ImportFrom": {
+          "old_line": 95,
+          "current_line": 69,
+          "same_ast": true
+        },
+        "visit_Assign": {
+          "old_line": 129,
+          "current_line": 103,
+          "same_ast": true
+        },
+        "visit_Attribute": {
+          "old_line": 141,
+          "current_line": 115,
+          "same_ast": true
+        }
+      }
+    }
+  ]
+}

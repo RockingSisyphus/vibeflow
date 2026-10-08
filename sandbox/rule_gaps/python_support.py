@@ -10,6 +10,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+from tests.fixtures.support.plugins import resource
+
 
 def _fixture():
     location = Path(__file__).parents[1] / "rule_parity/python/fixture.py"
@@ -22,14 +24,22 @@ def _fixture():
 def _write_project(root, spec, fixture):
     fixture._write_project(root, "current", {"entrypoint": "cli.run", "rulesets": spec.get("rulesets", []),
                                              "source": spec.get("source", fixture.DEFAULT_SOURCE)})
+    node_path = resource(root, "node", "parity.node")
+    node = json.loads(node_path.read_text(encoding="utf-8"))
+    node["rulesets"] = spec.get("rulesets", [])
     if "start_source" in spec:
         (root / "start.py").write_text(spec["start_source"], encoding="utf-8")
-    start_path = root / "manifests/nodes/start.jsonc"
+    start_path = resource(root, "node", "parity.start")
     start = json.loads(start_path.read_text(encoding="utf-8"))
     start["rulesets"] = spec.get("start_rulesets", [])
     start_path.write_text(json.dumps(start), encoding="utf-8")
     if "helper_source" in spec:
         _write_source(root / "helper.py", root, spec["helper_source"])
+        node["implementations"][0]["implementation_files"] = [{"kind": "file", "ref": "helper.py"}]
+        if "start_source" in spec:
+            start["implementations"][0]["implementation_files"] = [{"kind": "file", "ref": "helper.py"}]
+            start_path.write_text(json.dumps(start), encoding="utf-8")
+    node_path.write_text(json.dumps(node), encoding="utf-8")
     if "stub_source" in spec:
         workflow_path = root / "workflow.jsonc"
         workflow = json.loads(workflow_path.read_text(encoding="utf-8"))

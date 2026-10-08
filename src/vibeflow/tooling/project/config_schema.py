@@ -67,6 +67,13 @@ def collect_policy_schema_findings(
 
 
 def _validate_pipeline(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
+    from vibeflow.core.contracts import parse_pipeline_inputs
+
+    if "inputs" in value:
+        try:
+            parse_pipeline_inputs(value["inputs"], field=f"{prefix}.inputs")
+        except ValueError as exc:
+            findings.append(_error("CONFIG.SCHEMA.PIPELINE_INPUTS", str(exc), f"{prefix}.inputs"))
     if "execution_lock" in value:
         _validate_execution_lock(
             value["execution_lock"],
@@ -198,6 +205,8 @@ def _validate_nodeset_metadata(item: Mapping[str, Any], prefix: str, findings: l
     for field in ("display_name", "description"):
         if not _non_empty_string(item.get(field)):
             findings.append(_error("CONFIG.SCHEMA.NODESET_METADATA", f"{prefix}.{field} must be a non-empty string", f"{prefix}.{field}"))
+    if "expand" in item and not isinstance(item["expand"], bool):
+        findings.append(_error("CONFIG.SCHEMA.NODESET_EXPAND", f"{prefix}.expand must be a boolean", f"{prefix}.expand"))
 
 
 def _validate_nodeset_contract(item: Mapping[str, Any], prefix: str, findings: list[HealthFinding], *, status: str) -> None:
@@ -251,7 +260,7 @@ def _validate_policy(value: Any, prefix: str, findings: list[HealthFinding], *, 
     if "imports" in value:
         _validate_string_list_policy(value["imports"], f"{prefix}.imports", ("allowed_roots", "banned_roots", "allowed_modules", "banned_modules"), findings, rule_source=rule_source)
     if "base_lib" in value:
-        _validate_string_list_policy(value["base_lib"], f"{prefix}.base_lib", ("allowed_paths", "allowed_modules", "banned_modules"), findings, rule_source=rule_source)
+        findings.append(_error("CONFIG.POLICY.BASE_LIB.REMOVED", "policy.base_lib is removed; declare BaseLib dependencies on resources and configure external imports through policy.imports", f"{prefix}.base_lib", rule_source=rule_source))
     if "maintainability" in value:
         _validate_int_policy(value["maintainability"], f"{prefix}.maintainability", ("warn_call_chain_length", "max_call_chain_length", "warn_dependency_chain_length", "max_dependency_chain_length"), findings, rule_source=rule_source, allow_null=False)
     if "rules" in value:
@@ -466,7 +475,7 @@ def _validate_base_lib_resources(value: Any, findings: list[HealthFinding]) -> N
         findings.append(_error("CONFIG.SCHEMA.BASE_LIB", "base_lib must be an object", "base_lib"))
         return
     if "paths" in value:
-        _validate_string_list(value["paths"], "base_lib.paths", findings, "CONFIG.SCHEMA.BASE_LIB_PATHS")
+        findings.append(_error("CONFIG.BASE_LIB.REGISTRATION_REMOVED", "base_lib.paths is removed; contribute BaseLib resources through an SDK plugin", "base_lib.paths"))
     if "modules" not in value:
         return
     modules = value["modules"]
@@ -477,13 +486,15 @@ def _validate_base_lib_resources(value: Any, findings: list[HealthFinding]) -> N
         prefix = f"base_lib.modules[{index}]"
         if isinstance(item, str):
             if not item.strip():
-                findings.append(_error("CONFIG.SCHEMA.BASE_LIB_MODULE", f"{prefix} must be a non-empty module string", prefix))
+                findings.append(_error("CONFIG.SCHEMA.BASE_LIB_MODULE", f"{prefix} must be a non-empty resource ID", prefix))
             continue
         if not isinstance(item, Mapping):
             findings.append(_error("CONFIG.SCHEMA.BASE_LIB_MODULE", f"{prefix} must be a string or object", prefix))
             continue
-        if not (_non_empty_string(item.get("id")) or _non_empty_string(item.get("module")) or _non_empty_string(item.get("name"))):
-            findings.append(_error("CONFIG.SCHEMA.BASE_LIB_MODULE", f"{prefix}.id, module, or name must be a non-empty string", f"{prefix}.module"))
+        if "module" in item or "name" in item:
+            findings.append(_error("CONFIG.BASE_LIB.REGISTRATION_REMOVED", f"{prefix} must select a contributed BaseLib by id; module/name registration is removed", prefix))
+        if not _non_empty_string(item.get("id")):
+            findings.append(_error("CONFIG.SCHEMA.BASE_LIB_MODULE", f"{prefix}.id must be a non-empty resource ID", f"{prefix}.id"))
         status = str(item.get("status", "implemented")).strip() or "implemented"
         if status not in STATUSES:
             findings.append(_error("CONFIG.SCHEMA.RESOURCE_STATUS", f"{prefix}.status must be implemented or planned", f"{prefix}.status"))

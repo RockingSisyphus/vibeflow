@@ -43,4 +43,9 @@ def case_specs():
         body='import argparse\nparser=argparse.ArgumentParser()\nparser.parse_args('+('["--help"]' if explicit else '')+')\nreturn {"demo.out":1}'
         cases.append(case("effect.argparse_"+str(explicit),"argparse explicit argv neighbour "+str(explicit),"effect-branches",body=body,
             flow_kind="document",rulesets=["vibeflow.python_io"],code=None if explicit else "NODE.EFFECT.CALL_FORBIDDEN"))
+    for spec in cases:
+        if spec["id"].endswith("boundary_import"):
+            spec["expected"]["variants"] = {"current":{"should_accept":True,"codes":[]}}
+            spec["classification"] = "approved_change"
+            spec["notes"] = "A directory/module spelling does not declare a boundary; current role checks use actual canonical owners."
     return cases

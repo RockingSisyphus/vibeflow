@@ -21,6 +21,8 @@
 
 多文件资源的 [案例对应表](../../docs/design/multifile-resource-cases.md) 和 [正式示例](../resources/README.md) 记录专项检查及 SVG/Architecture 证据。此前 205 项接口场景保留原 ID，与新资源组分别统计。
 
+资源展示组保留全部 103 个案例及 47 个连续修改案例的 ID。当前观察通过公开 `review` 与 `export-mermaid --mermaid-layout review-columns` 取得真实用户图，定位实际 Node 调用或所选 Plugin/BaseLib/Host 目录条目；所有 14 种形状与颜色、文字、图标仍由最终 SVG 的浏览器几何及计算样式验收。插件条目按配置选中的包 ID 定位，包内生命周期的源码健康诊断另在 Architecture 中核对。原来的独立 Node 类型卡、源码文件卡和 reference 图断言已撤销，历史机器报告不覆盖。
+
 ## 运行
 
 从仓库根目录执行；`--work` 必须是尚不存在的目录：

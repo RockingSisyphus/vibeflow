@@ -1,0 +1,2611 @@
+{
+  "schema": "vibeflow.context-reuse-cli.v1",
+  "matched": true,
+  "identity": {
+    "checks": 24,
+    "sources": 1,
+    "catalogs": 1,
+    "call_checks": 12,
+    "source_checks": 12
+  },
+  "validate": {
+    "command": [
+      "/home/rockingsisyphus/miniforge3/bin/python",
+      "-B",
+      "-m",
+      "vibeflow",
+      "validate",
+      "--workspace",
+      "/tmp/vf-context-reuse-release/cli/project/vibeflow_config.jsonc",
+      "--config",
+      "/tmp/vf-context-reuse-release/cli/project/workflow.jsonc",
+      "--json"
+    ],
+    "exit_code": 0,
+    "status": "PASS",
+    "payload": {
+      "status": "CONCERNS",
+      "errors": [],
+      "warnings": [
+        {
+          "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "severity": "warning",
+          "object_type": "contract_key",
+          "object_id": "result0",
+          "source_location": {},
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "topology",
+          "message": "node 'inspect0' provides key 'result0' type 'probe.inspection' but no direct downstream flow successor requires that type",
+          "suggested_fix_type": "fix_config",
+          "details": {
+            "owner": "pipeline",
+            "phase": "static",
+            "call_path": [],
+            "node": "inspect0",
+            "provider_key": "result0",
+            "provider_type": "probe.inspection",
+            "downstream_nodes": [
+              "inspect1"
+            ],
+            "downstream_required_types": {
+              "inspect1": []
+            },
+            "pipeline_output_types": [],
+            "rule_contexts": [
+              {
+                "owner": "pipeline",
+                "phase": "static",
+                "call_path": []
+              }
+            ]
+          },
+          "root_id": "probe",
+          "root_path": "/tmp/vf-context-reuse-release/cli/project",
+          "source_path": "/tmp/vf-context-reuse-release/cli/project/workflow.jsonc",
+          "definition_id": "vibeflow.workflow"
+        },
+        {
+          "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "severity": "warning",
+          "object_type": "contract_key",
+          "object_id": "result1",
+          "source_location": {},
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "topology",
+          "message": "node 'inspect1' provides key 'result1' type 'probe.inspection' but no direct downstream flow successor requires that type",
+          "suggested_fix_type": "fix_config",
+          "details": {
+            "owner": "pipeline",
+            "phase": "static",
+            "call_path": [],
+            "node": "inspect1",
+            "provider_key": "result1",
+            "provider_type": "probe.inspection",
+            "downstream_nodes": [
+              "inspect2"
+            ],
+            "downstream_required_types": {
+              "inspect2": []
+            },
+            "pipeline_output_types": [],
+            "rule_contexts": [
+              {
+                "owner": "pipeline",
+                "phase": "static",
+                "call_path": []
+              }
+            ]
+          },
+          "root_id": "probe",
+          "root_path": "/tmp/vf-context-reuse-release/cli/project",
+          "source_path": "/tmp/vf-context-reuse-release/cli/project/workflow.jsonc",
+          "definition_id": "vibeflow.workflow"
+        },
+        {
+          "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "severity": "warning",
+          "object_type": "contract_key",
+          "object_id": "result2",
+          "source_location": {},
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "topology",
+          "message": "node 'inspect2' provides key 'result2' type 'probe.inspection' but no direct downstream flow successor requires that type",
+          "suggested_fix_type": "fix_config",
+          "details": {
+            "owner": "pipeline",
+            "phase": "static",
+            "call_path": [],
+            "node": "inspect2",
+            "provider_key": "result2",
+            "provider_type": "probe.inspection",
+            "downstream_nodes": [
+              "inspect3"
+            ],
+            "downstream_required_types": {
+              "inspect3": []
+            },
+            "pipeline_output_types": [],
+            "rule_contexts": [
+              {
+                "owner": "pipeline",
+                "phase": "static",
+                "call_path": []
+              }
+            ]
+          },
+          "root_id": "probe",
+          "root_path": "/tmp/vf-context-reuse-release/cli/project",
+          "source_path": "/tmp/vf-context-reuse-release/cli/project/workflow.jsonc",
+          "definition_id": "vibeflow.workflow"
+        },
+        {
+          "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "severity": "warning",
+          "object_type": "contract_key",
+          "object_id": "result3",
+          "source_location": {},
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "topology",
+          "message": "node 'inspect3' provides key 'result3' type 'probe.inspection' but no direct downstream flow successor requires that type",
+          "suggested_fix_type": "fix_config",
+          "details": {
+            "owner": "pipeline",
+            "phase": "static",
+            "call_path": [],
+            "node": "inspect3",
+            "provider_key": "result3",
+            "provider_type": "probe.inspection",
+            "downstream_nodes": [
+              "inspect4"
+            ],
+            "downstream_required_types": {
+              "inspect4": []
+            },
+            "pipeline_output_types": [],
+            "rule_contexts": [
+              {
+                "owner": "pipeline",
+                "phase": "static",
+                "call_path": []
+              }
+            ]
+          },
+          "root_id": "probe",
+          "root_path": "/tmp/vf-context-reuse-release/cli/project",
+          "source_path": "/tmp/vf-context-reuse-release/cli/project/workflow.jsonc",
+          "definition_id": "vibeflow.workflow"
+        },
+        {
+          "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "severity": "warning",
+          "object_type": "contract_key",
+          "object_id": "result4",
+          "source_location": {},
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "topology",
+          "message": "node 'inspect4' provides key 'result4' type 'probe.inspection' but no direct downstream flow successor requires that type",
+          "suggested_fix_type": "fix_config",
+          "details": {
+            "owner": "pipeline",
+            "phase": "static",
+            "call_path": [],
+            "node": "inspect4",
+            "provider_key": "result4",
+            "provider_type": "probe.inspection",
+            "downstream_nodes": [
+              "inspect5"
+            ],
+            "downstream_required_types": {
+              "inspect5": []
+            },
+            "pipeline_output_types": [],
+            "rule_contexts": [
+              {
+                "owner": "pipeline",
+                "phase": "static",
+                "call_path": []
+              }
+            ]
+          },
+          "root_id": "probe",
+          "root_path": "/tmp/vf-context-reuse-release/cli/project",
+          "source_path": "/tmp/vf-context-reuse-release/cli/project/workflow.jsonc",
+          "definition_id": "vibeflow.workflow"
+        },
+        {
+          "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "severity": "warning",
+          "object_type": "contract_key",
+          "object_id": "result5",
+          "source_location": {},
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "topology",
+          "message": "node 'inspect5' provides key 'result5' type 'probe.inspection' but no direct downstream flow successor requires that type",
+          "suggested_fix_type": "fix_config",
+          "details": {
+            "owner": "pipeline",
+            "phase": "static",
+            "call_path": [],
+            "node": "inspect5",
+            "provider_key": "result5",
+            "provider_type": "probe.inspection",
+            "downstream_nodes": [
+              "inspect6"
+            ],
+            "downstream_required_types": {
+              "inspect6": []
+            },
+            "pipeline_output_types": [],
+            "rule_contexts": [
+              {
+                "owner": "pipeline",
+                "phase": "static",
+                "call_path": []
+              }
+            ]
+          },
+          "root_id": "probe",
+          "root_path": "/tmp/vf-context-reuse-release/cli/project",
+          "source_path": "/tmp/vf-context-reuse-release/cli/project/workflow.jsonc",
+          "definition_id": "vibeflow.workflow"
+        },
+        {
+          "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "severity": "warning",
+          "object_type": "contract_key",
+          "object_id": "result6",
+          "source_location": {},
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "topology",
+          "message": "node 'inspect6' provides key 'result6' type 'probe.inspection' but no direct downstream flow successor requires that type",
+          "suggested_fix_type": "fix_config",
+          "details": {
+            "owner": "pipeline",
+            "phase": "static",
+            "call_path": [],
+            "node": "inspect6",
+            "provider_key": "result6",
+            "provider_type": "probe.inspection",
+            "downstream_nodes": [
+              "inspect7"
+            ],
+            "downstream_required_types": {
+              "inspect7": []
+            },
+            "pipeline_output_types": [],
+            "rule_contexts": [
+              {
+                "owner": "pipeline",
+                "phase": "static",
+                "call_path": []
+              }
+            ]
+          },
+          "root_id": "probe",
+          "root_path": "/tmp/vf-context-reuse-release/cli/project",
+          "source_path": "/tmp/vf-context-reuse-release/cli/project/workflow.jsonc",
+          "definition_id": "vibeflow.workflow"
+        },
+        {
+          "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "severity": "warning",
+          "object_type": "contract_key",
+          "object_id": "result7",
+          "source_location": {},
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "topology",
+          "message": "node 'inspect7' provides key 'result7' type 'probe.inspection' but no direct downstream flow successor requires that type",
+          "suggested_fix_type": "fix_config",
+          "details": {
+            "owner": "pipeline",
+            "phase": "static",
+            "call_path": [],
+            "node": "inspect7",
+            "provider_key": "result7",
+            "provider_type": "probe.inspection",
+            "downstream_nodes": [
+              "inspect8"
+            ],
+            "downstream_required_types": {
+              "inspect8": []
+            },
+            "pipeline_output_types": [],
+            "rule_contexts": [
+              {
+                "owner": "pipeline",
+                "phase": "static",
+                "call_path": []
+              }
+            ]
+          },
+          "root_id": "probe",
+          "root_path": "/tmp/vf-context-reuse-release/cli/project",
+          "source_path": "/tmp/vf-context-reuse-release/cli/project/workflow.jsonc",
+          "definition_id": "vibeflow.workflow"
+        },
+        {
+          "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "severity": "warning",
+          "object_type": "contract_key",
+          "object_id": "result8",
+          "source_location": {},
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "topology",
+          "message": "node 'inspect8' provides key 'result8' type 'probe.inspection' but no direct downstream flow successor requires that type",
+          "suggested_fix_type": "fix_config",
+          "details": {
+            "owner": "pipeline",
+            "phase": "static",
+            "call_path": [],
+            "node": "inspect8",
+            "provider_key": "result8",
+            "provider_type": "probe.inspection",
+            "downstream_nodes": [
+              "inspect9"
+            ],
+            "downstream_required_types": {
+              "inspect9": []
+            },
+            "pipeline_output_types": [],
+            "rule_contexts": [
+              {
+                "owner": "pipeline",
+                "phase": "static",
+                "call_path": []
+              }
+            ]
+          },
+          "root_id": "probe",
+          "root_path": "/tmp/vf-context-reuse-release/cli/project",
+          "source_path": "/tmp/vf-context-reuse-release/cli/project/workflow.jsonc",
+          "definition_id": "vibeflow.workflow"
+        },
+        {
+          "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "severity": "warning",
+          "object_type": "contract_key",
+          "object_id": "result9",
+          "source_location": {},
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "topology",
+          "message": "node 'inspect9' provides key 'result9' type 'probe.inspection' but no direct downstream flow successor requires that type",
+          "suggested_fix_type": "fix_config",
+          "details": {
+            "owner": "pipeline",
+            "phase": "static",
+            "call_path": [],
+            "node": "inspect9",
+            "provider_key": "result9",
+            "provider_type": "probe.inspection",
+            "downstream_nodes": [
+              "inspect10"
+            ],
+            "downstream_required_types": {
+              "inspect10": []
+            },
+            "pipeline_output_types": [],
+            "rule_contexts": [
+              {
+                "owner": "pipeline",
+                "phase": "static",
+                "call_path": []
+              }
+            ]
+          },
+          "root_id": "probe",
+          "root_path": "/tmp/vf-context-reuse-release/cli/project",
+          "source_path": "/tmp/vf-context-reuse-release/cli/project/workflow.jsonc",
+          "definition_id": "vibeflow.workflow"
+        },
+        {
+          "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "severity": "warning",
+          "object_type": "contract_key",
+          "object_id": "result10",
+          "source_location": {},
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "topology",
+          "message": "node 'inspect10' provides key 'result10' type 'probe.inspection' but no direct downstream flow successor requires that type",
+          "suggested_fix_type": "fix_config",
+          "details": {
+            "owner": "pipeline",
+            "phase": "static",
+            "call_path": [],
+            "node": "inspect10",
+            "provider_key": "result10",
+            "provider_type": "probe.inspection",
+            "downstream_nodes": [
+              "inspect11"
+            ],
+            "downstream_required_types": {
+              "inspect11": []
+            },
+            "pipeline_output_types": [],
+            "rule_contexts": [
+              {
+                "owner": "pipeline",
+                "phase": "static",
+                "call_path": []
+              }
+            ]
+          },
+          "root_id": "probe",
+          "root_path": "/tmp/vf-context-reuse-release/cli/project",
+          "source_path": "/tmp/vf-context-reuse-release/cli/project/workflow.jsonc",
+          "definition_id": "vibeflow.workflow"
+        },
+        {
+          "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+          "severity": "warning",
+          "object_type": "contract_key",
+          "object_id": "result11",
+          "source_location": {},
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "topology",
+          "message": "node 'inspect11' provides key 'result11' type 'probe.inspection' but no direct downstream flow successor requires that type",
+          "suggested_fix_type": "fix_config",
+          "details": {
+            "owner": "pipeline",
+            "phase": "static",
+            "call_path": [],
+            "node": "inspect11",
+            "provider_key": "result11",
+            "provider_type": "probe.inspection",
+            "downstream_nodes": [
+              "end"
+            ],
+            "downstream_required_types": {
+              "end": []
+            },
+            "pipeline_output_types": [],
+            "rule_contexts": [
+              {
+                "owner": "pipeline",
+                "phase": "static",
+                "call_path": []
+              }
+            ]
+          },
+          "root_id": "probe",
+          "root_path": "/tmp/vf-context-reuse-release/cli/project",
+          "source_path": "/tmp/vf-context-reuse-release/cli/project/workflow.jsonc",
+          "definition_id": "vibeflow.workflow"
+        }
+      ],
+      "skipped": [],
+      "info": {
+        "explicit_edges": [
+          [
+            "start",
+            "inspect0"
+          ],
+          [
+            "inspect0",
+            "inspect1"
+          ],
+          [
+            "inspect1",
+            "inspect2"
+          ],
+          [
+            "inspect2",
+            "inspect3"
+          ],
+          [
+            "inspect3",
+            "inspect4"
+          ],
+          [
+            "inspect4",
+            "inspect5"
+          ],
+          [
+            "inspect5",
+            "inspect6"
+          ],
+          [
+            "inspect6",
+            "inspect7"
+          ],
+          [
+            "inspect7",
+            "inspect8"
+          ],
+          [
+            "inspect8",
+            "inspect9"
+          ],
+          [
+            "inspect9",
+            "inspect10"
+          ],
+          [
+            "inspect10",
+            "inspect11"
+          ],
+          [
+            "inspect11",
+            "end"
+          ]
+        ],
+        "data_edges": [],
+        "effective_edges": [
+          [
+            "start",
+            "inspect0"
+          ],
+          [
+            "inspect0",
+            "inspect1"
+          ],
+          [
+            "inspect1",
+            "inspect2"
+          ],
+          [
+            "inspect2",
+            "inspect3"
+          ],
+          [
+            "inspect3",
+            "inspect4"
+          ],
+          [
+            "inspect4",
+            "inspect5"
+          ],
+          [
+            "inspect5",
+            "inspect6"
+          ],
+          [
+            "inspect6",
+            "inspect7"
+          ],
+          [
+            "inspect7",
+            "inspect8"
+          ],
+          [
+            "inspect8",
+            "inspect9"
+          ],
+          [
+            "inspect9",
+            "inspect10"
+          ],
+          [
+            "inspect10",
+            "inspect11"
+          ],
+          [
+            "inspect11",
+            "end"
+          ]
+        ],
+        "mainline": {
+          "pipeline": {
+            "owner": "pipeline",
+            "mainline_edges": [
+              {
+                "from": "start",
+                "to": "inspect0"
+              },
+              {
+                "from": "inspect0",
+                "to": "inspect1"
+              },
+              {
+                "from": "inspect1",
+                "to": "inspect2"
+              },
+              {
+                "from": "inspect2",
+                "to": "inspect3"
+              },
+              {
+                "from": "inspect3",
+                "to": "inspect4"
+              },
+              {
+                "from": "inspect4",
+                "to": "inspect5"
+              },
+              {
+                "from": "inspect5",
+                "to": "inspect6"
+              },
+              {
+                "from": "inspect6",
+                "to": "inspect7"
+              },
+              {
+                "from": "inspect7",
+                "to": "inspect8"
+              },
+              {
+                "from": "inspect8",
+                "to": "inspect9"
+              },
+              {
+                "from": "inspect9",
+                "to": "inspect10"
+              },
+              {
+                "from": "inspect10",
+                "to": "inspect11"
+              },
+              {
+                "from": "inspect11",
+                "to": "end"
+              }
+            ],
+            "data_bypass_edges": [],
+            "async_edges": [],
+            "schedule_edges": [
+              {
+                "from": "start",
+                "to": "inspect0"
+              },
+              {
+                "from": "inspect0",
+                "to": "inspect1"
+              },
+              {
+                "from": "inspect1",
+                "to": "inspect2"
+              },
+              {
+                "from": "inspect2",
+                "to": "inspect3"
+              },
+              {
+                "from": "inspect3",
+                "to": "inspect4"
+              },
+              {
+                "from": "inspect4",
+                "to": "inspect5"
+              },
+              {
+                "from": "inspect5",
+                "to": "inspect6"
+              },
+              {
+                "from": "inspect6",
+                "to": "inspect7"
+              },
+              {
+                "from": "inspect7",
+                "to": "inspect8"
+              },
+              {
+                "from": "inspect8",
+                "to": "inspect9"
+              },
+              {
+                "from": "inspect9",
+                "to": "inspect10"
+              },
+              {
+                "from": "inspect10",
+                "to": "inspect11"
+              },
+              {
+                "from": "inspect11",
+                "to": "end"
+              }
+            ],
+            "transfer_edges": [
+              {
+                "from": "start",
+                "to": "inspect0"
+              },
+              {
+                "from": "inspect0",
+                "to": "inspect1"
+              },
+              {
+                "from": "inspect1",
+                "to": "inspect2"
+              },
+              {
+                "from": "inspect2",
+                "to": "inspect3"
+              },
+              {
+                "from": "inspect3",
+                "to": "inspect4"
+              },
+              {
+                "from": "inspect4",
+                "to": "inspect5"
+              },
+              {
+                "from": "inspect5",
+                "to": "inspect6"
+              },
+              {
+                "from": "inspect6",
+                "to": "inspect7"
+              },
+              {
+                "from": "inspect7",
+                "to": "inspect8"
+              },
+              {
+                "from": "inspect8",
+                "to": "inspect9"
+              },
+              {
+                "from": "inspect9",
+                "to": "inspect10"
+              },
+              {
+                "from": "inspect10",
+                "to": "inspect11"
+              },
+              {
+                "from": "inspect11",
+                "to": "end"
+              }
+            ],
+            "mainline_nodes": [
+              "start",
+              "inspect0",
+              "inspect1",
+              "inspect2",
+              "inspect3",
+              "inspect4",
+              "inspect5",
+              "inspect6",
+              "inspect7",
+              "inspect8",
+              "inspect9",
+              "inspect10",
+              "inspect11",
+              "end"
+            ],
+            "async_nodes": [],
+            "findings": []
+          }
+        },
+        "node_metrics": {},
+        "node_effect_scopes": {
+          "start": "unconstrained",
+          "inspect0": "unconstrained",
+          "inspect1": "unconstrained",
+          "inspect2": "unconstrained",
+          "inspect3": "unconstrained",
+          "inspect4": "unconstrained",
+          "inspect5": "unconstrained",
+          "inspect6": "unconstrained",
+          "inspect7": "unconstrained",
+          "inspect8": "unconstrained",
+          "inspect9": "unconstrained",
+          "inspect10": "unconstrained",
+          "inspect11": "unconstrained",
+          "end": "unconstrained"
+        },
+        "call_effect_policies": [],
+        "nodeset_findings": {},
+        "plugins": {
+          "plugins": []
+        },
+        "planned": [],
+        "production_ready": true,
+        "rule_catalog": {
+          "GRAPH.CYCLE.FORBIDDEN": {
+            "severity": "error",
+            "layer": "topology",
+            "suggested_fix_type": "fix_config"
+          },
+          "GRAPH.DATA.NO_PAYLOAD_BYPASS": {
+            "severity": "error",
+            "layer": "topology",
+            "suggested_fix_type": "fix_config"
+          },
+          "GRAPH.DATA.RUNTIME_REQUIREMENT_UNREACHABLE": {
+            "severity": "error",
+            "layer": "topology",
+            "suggested_fix_type": "fix_config"
+          },
+          "GRAPH.DATA.UNCONSUMED_PROVIDER": {
+            "severity": "warning",
+            "layer": "topology",
+            "suggested_fix_type": "fix_config"
+          },
+          "GRAPH.EDGE.CONFLICTING_DUPLICATE": {
+            "severity": "warning",
+            "layer": "topology",
+            "suggested_fix_type": "fix_config"
+          },
+          "GRAPH.EDGE.DUPLICATE": {
+            "severity": "warning",
+            "layer": "topology",
+            "suggested_fix_type": "fix_config"
+          },
+          "GRAPH.EXECUTION_LOCK.GLOBAL_STATE_UNCOORDINATED": {
+            "severity": "warning",
+            "layer": "topology",
+            "suggested_fix_type": "fix_config"
+          },
+          "GRAPH.JOIN.ALL_BRANCHES_MUTUALLY_EXCLUSIVE": {
+            "severity": "error",
+            "layer": "topology",
+            "suggested_fix_type": "fix_config"
+          },
+          "GRAPH.JOIN.ALL_DEPENDS_ON_TRANSFER_ONLY": {
+            "severity": "error",
+            "layer": "topology",
+            "suggested_fix_type": "fix_config"
+          },
+          "GRAPH.JOIN.REDUNDANT_ALL": {
+            "severity": "warning",
+            "layer": "topology",
+            "suggested_fix_type": "fix_config"
+          },
+          "GRAPH.SMELL.CONFUSING_NODE_NAME": {
+            "severity": "warning",
+            "layer": "topology",
+            "suggested_fix_type": "fix_config"
+          },
+          "GRAPH.SMELL.MISSING_NODE_DESCRIPTION": {
+            "severity": "warning",
+            "layer": "topology",
+            "suggested_fix_type": "fix_config"
+          },
+          "GRAPH.SMELL.MISSING_NODE_DISPLAY_NAME": {
+            "severity": "warning",
+            "layer": "topology",
+            "suggested_fix_type": "fix_config"
+          },
+          "NODE.EFFECT.CALL_FORBIDDEN": {
+            "severity": "error",
+            "layer": "implementation",
+            "suggested_fix_type": "fix_contract"
+          },
+          "NODE.EFFECT.IMPORT_FORBIDDEN": {
+            "severity": "error",
+            "layer": "implementation",
+            "suggested_fix_type": "fix_contract"
+          },
+          "NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED": {
+            "severity": "warning",
+            "layer": "implementation",
+            "suggested_fix_type": "fix_contract"
+          },
+          "NODESET.NESTING.DEPTH_EXCEEDED": {
+            "severity": "error",
+            "layer": "topology",
+            "suggested_fix_type": "fix_nodeset"
+          },
+          "NODESET.SMELL.TOO_WIDE": {
+            "severity": "warning",
+            "layer": "topology",
+            "suggested_fix_type": "fix_nodeset"
+          }
+        },
+        "rule_executions": [
+          {
+            "status": "PASS",
+            "plan": {
+              "ruleset_id": "probe.identity",
+              "entrypoint": "static",
+              "order": [
+                "call",
+                "source"
+              ],
+              "calls": [
+                {
+                  "id": "call",
+                  "rule_id": "probe.identity.call",
+                  "original_rule_id": "probe.identity.call",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                },
+                {
+                  "id": "source",
+                  "rule_id": "probe.identity.source",
+                  "original_rule_id": "probe.identity.source",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                }
+              ],
+              "relations": []
+            },
+            "results": {
+              "call": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              },
+              "source": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              }
+            },
+            "findings": [],
+            "executed": [
+              "call",
+              "source"
+            ],
+            "aliases": {}
+          },
+          {
+            "status": "PASS",
+            "plan": {
+              "ruleset_id": "probe.identity",
+              "entrypoint": "static",
+              "order": [
+                "call",
+                "source"
+              ],
+              "calls": [
+                {
+                  "id": "call",
+                  "rule_id": "probe.identity.call",
+                  "original_rule_id": "probe.identity.call",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                },
+                {
+                  "id": "source",
+                  "rule_id": "probe.identity.source",
+                  "original_rule_id": "probe.identity.source",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                }
+              ],
+              "relations": []
+            },
+            "results": {
+              "call": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              },
+              "source": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              }
+            },
+            "findings": [],
+            "executed": [
+              "call",
+              "source"
+            ],
+            "aliases": {}
+          },
+          {
+            "status": "PASS",
+            "plan": {
+              "ruleset_id": "probe.identity",
+              "entrypoint": "static",
+              "order": [
+                "call",
+                "source"
+              ],
+              "calls": [
+                {
+                  "id": "call",
+                  "rule_id": "probe.identity.call",
+                  "original_rule_id": "probe.identity.call",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                },
+                {
+                  "id": "source",
+                  "rule_id": "probe.identity.source",
+                  "original_rule_id": "probe.identity.source",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                }
+              ],
+              "relations": []
+            },
+            "results": {
+              "call": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              },
+              "source": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              }
+            },
+            "findings": [],
+            "executed": [
+              "call",
+              "source"
+            ],
+            "aliases": {}
+          },
+          {
+            "status": "PASS",
+            "plan": {
+              "ruleset_id": "probe.identity",
+              "entrypoint": "static",
+              "order": [
+                "call",
+                "source"
+              ],
+              "calls": [
+                {
+                  "id": "call",
+                  "rule_id": "probe.identity.call",
+                  "original_rule_id": "probe.identity.call",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                },
+                {
+                  "id": "source",
+                  "rule_id": "probe.identity.source",
+                  "original_rule_id": "probe.identity.source",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                }
+              ],
+              "relations": []
+            },
+            "results": {
+              "call": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              },
+              "source": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              }
+            },
+            "findings": [],
+            "executed": [
+              "call",
+              "source"
+            ],
+            "aliases": {}
+          },
+          {
+            "status": "PASS",
+            "plan": {
+              "ruleset_id": "probe.identity",
+              "entrypoint": "static",
+              "order": [
+                "call",
+                "source"
+              ],
+              "calls": [
+                {
+                  "id": "call",
+                  "rule_id": "probe.identity.call",
+                  "original_rule_id": "probe.identity.call",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                },
+                {
+                  "id": "source",
+                  "rule_id": "probe.identity.source",
+                  "original_rule_id": "probe.identity.source",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                }
+              ],
+              "relations": []
+            },
+            "results": {
+              "call": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              },
+              "source": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              }
+            },
+            "findings": [],
+            "executed": [
+              "call",
+              "source"
+            ],
+            "aliases": {}
+          },
+          {
+            "status": "PASS",
+            "plan": {
+              "ruleset_id": "probe.identity",
+              "entrypoint": "static",
+              "order": [
+                "call",
+                "source"
+              ],
+              "calls": [
+                {
+                  "id": "call",
+                  "rule_id": "probe.identity.call",
+                  "original_rule_id": "probe.identity.call",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                },
+                {
+                  "id": "source",
+                  "rule_id": "probe.identity.source",
+                  "original_rule_id": "probe.identity.source",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                }
+              ],
+              "relations": []
+            },
+            "results": {
+              "call": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              },
+              "source": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              }
+            },
+            "findings": [],
+            "executed": [
+              "call",
+              "source"
+            ],
+            "aliases": {}
+          },
+          {
+            "status": "PASS",
+            "plan": {
+              "ruleset_id": "probe.identity",
+              "entrypoint": "static",
+              "order": [
+                "call",
+                "source"
+              ],
+              "calls": [
+                {
+                  "id": "call",
+                  "rule_id": "probe.identity.call",
+                  "original_rule_id": "probe.identity.call",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                },
+                {
+                  "id": "source",
+                  "rule_id": "probe.identity.source",
+                  "original_rule_id": "probe.identity.source",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                }
+              ],
+              "relations": []
+            },
+            "results": {
+              "call": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              },
+              "source": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              }
+            },
+            "findings": [],
+            "executed": [
+              "call",
+              "source"
+            ],
+            "aliases": {}
+          },
+          {
+            "status": "PASS",
+            "plan": {
+              "ruleset_id": "probe.identity",
+              "entrypoint": "static",
+              "order": [
+                "call",
+                "source"
+              ],
+              "calls": [
+                {
+                  "id": "call",
+                  "rule_id": "probe.identity.call",
+                  "original_rule_id": "probe.identity.call",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                },
+                {
+                  "id": "source",
+                  "rule_id": "probe.identity.source",
+                  "original_rule_id": "probe.identity.source",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                }
+              ],
+              "relations": []
+            },
+            "results": {
+              "call": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              },
+              "source": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              }
+            },
+            "findings": [],
+            "executed": [
+              "call",
+              "source"
+            ],
+            "aliases": {}
+          },
+          {
+            "status": "PASS",
+            "plan": {
+              "ruleset_id": "probe.identity",
+              "entrypoint": "static",
+              "order": [
+                "call",
+                "source"
+              ],
+              "calls": [
+                {
+                  "id": "call",
+                  "rule_id": "probe.identity.call",
+                  "original_rule_id": "probe.identity.call",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                },
+                {
+                  "id": "source",
+                  "rule_id": "probe.identity.source",
+                  "original_rule_id": "probe.identity.source",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                }
+              ],
+              "relations": []
+            },
+            "results": {
+              "call": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              },
+              "source": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              }
+            },
+            "findings": [],
+            "executed": [
+              "call",
+              "source"
+            ],
+            "aliases": {}
+          },
+          {
+            "status": "PASS",
+            "plan": {
+              "ruleset_id": "probe.identity",
+              "entrypoint": "static",
+              "order": [
+                "call",
+                "source"
+              ],
+              "calls": [
+                {
+                  "id": "call",
+                  "rule_id": "probe.identity.call",
+                  "original_rule_id": "probe.identity.call",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                },
+                {
+                  "id": "source",
+                  "rule_id": "probe.identity.source",
+                  "original_rule_id": "probe.identity.source",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                }
+              ],
+              "relations": []
+            },
+            "results": {
+              "call": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              },
+              "source": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              }
+            },
+            "findings": [],
+            "executed": [
+              "call",
+              "source"
+            ],
+            "aliases": {}
+          },
+          {
+            "status": "PASS",
+            "plan": {
+              "ruleset_id": "probe.identity",
+              "entrypoint": "static",
+              "order": [
+                "call",
+                "source"
+              ],
+              "calls": [
+                {
+                  "id": "call",
+                  "rule_id": "probe.identity.call",
+                  "original_rule_id": "probe.identity.call",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                },
+                {
+                  "id": "source",
+                  "rule_id": "probe.identity.source",
+                  "original_rule_id": "probe.identity.source",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                }
+              ],
+              "relations": []
+            },
+            "results": {
+              "call": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              },
+              "source": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              }
+            },
+            "findings": [],
+            "executed": [
+              "call",
+              "source"
+            ],
+            "aliases": {}
+          },
+          {
+            "status": "PASS",
+            "plan": {
+              "ruleset_id": "probe.identity",
+              "entrypoint": "static",
+              "order": [
+                "call",
+                "source"
+              ],
+              "calls": [
+                {
+                  "id": "call",
+                  "rule_id": "probe.identity.call",
+                  "original_rule_id": "probe.identity.call",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                },
+                {
+                  "id": "source",
+                  "rule_id": "probe.identity.source",
+                  "original_rule_id": "probe.identity.source",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "probe.identity"
+                  ],
+                  "parameter_sources": {}
+                }
+              ],
+              "relations": []
+            },
+            "results": {
+              "call": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              },
+              "source": {
+                "state": "completed",
+                "records": {},
+                "findings": []
+              }
+            },
+            "findings": [],
+            "executed": [
+              "call",
+              "source"
+            ],
+            "aliases": {}
+          },
+          {
+            "status": "CONCERNS",
+            "plan": {
+              "ruleset_id": "vibeflow.workflow",
+              "entrypoint": "static",
+              "order": [
+                "workflow"
+              ],
+              "calls": [
+                {
+                  "id": "workflow",
+                  "rule_id": "vibeflow.workflow",
+                  "original_rule_id": "vibeflow.workflow",
+                  "params": {
+                    "nodeset_max_depth": 4,
+                    "nodeset_warn_width": 10
+                  },
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "vibeflow.workflow"
+                  ],
+                  "parameter_sources": {
+                    "nodeset_max_depth": "default:vibeflow.workflow",
+                    "nodeset_warn_width": "default:vibeflow.workflow"
+                  }
+                }
+              ],
+              "relations": []
+            },
+            "results": {
+              "workflow": {
+                "state": "completed",
+                "records": {
+                  "planned_events": {
+                    "type_id": "vibeflow.planned_events.v1",
+                    "value": []
+                  },
+                  "workflow_review": {
+                    "type_id": "vibeflow.workflow_review.v1",
+                    "value": {
+                      "mainline": {
+                        "pipeline": {
+                          "owner": "pipeline",
+                          "mainline_edges": [
+                            {
+                              "from": "start",
+                              "to": "inspect0"
+                            },
+                            {
+                              "from": "inspect0",
+                              "to": "inspect1"
+                            },
+                            {
+                              "from": "inspect1",
+                              "to": "inspect2"
+                            },
+                            {
+                              "from": "inspect2",
+                              "to": "inspect3"
+                            },
+                            {
+                              "from": "inspect3",
+                              "to": "inspect4"
+                            },
+                            {
+                              "from": "inspect4",
+                              "to": "inspect5"
+                            },
+                            {
+                              "from": "inspect5",
+                              "to": "inspect6"
+                            },
+                            {
+                              "from": "inspect6",
+                              "to": "inspect7"
+                            },
+                            {
+                              "from": "inspect7",
+                              "to": "inspect8"
+                            },
+                            {
+                              "from": "inspect8",
+                              "to": "inspect9"
+                            },
+                            {
+                              "from": "inspect9",
+                              "to": "inspect10"
+                            },
+                            {
+                              "from": "inspect10",
+                              "to": "inspect11"
+                            },
+                            {
+                              "from": "inspect11",
+                              "to": "end"
+                            }
+                          ],
+                          "data_bypass_edges": [],
+                          "async_edges": [],
+                          "schedule_edges": [
+                            {
+                              "from": "start",
+                              "to": "inspect0"
+                            },
+                            {
+                              "from": "inspect0",
+                              "to": "inspect1"
+                            },
+                            {
+                              "from": "inspect1",
+                              "to": "inspect2"
+                            },
+                            {
+                              "from": "inspect2",
+                              "to": "inspect3"
+                            },
+                            {
+                              "from": "inspect3",
+                              "to": "inspect4"
+                            },
+                            {
+                              "from": "inspect4",
+                              "to": "inspect5"
+                            },
+                            {
+                              "from": "inspect5",
+                              "to": "inspect6"
+                            },
+                            {
+                              "from": "inspect6",
+                              "to": "inspect7"
+                            },
+                            {
+                              "from": "inspect7",
+                              "to": "inspect8"
+                            },
+                            {
+                              "from": "inspect8",
+                              "to": "inspect9"
+                            },
+                            {
+                              "from": "inspect9",
+                              "to": "inspect10"
+                            },
+                            {
+                              "from": "inspect10",
+                              "to": "inspect11"
+                            },
+                            {
+                              "from": "inspect11",
+                              "to": "end"
+                            }
+                          ],
+                          "transfer_edges": [
+                            {
+                              "from": "start",
+                              "to": "inspect0"
+                            },
+                            {
+                              "from": "inspect0",
+                              "to": "inspect1"
+                            },
+                            {
+                              "from": "inspect1",
+                              "to": "inspect2"
+                            },
+                            {
+                              "from": "inspect2",
+                              "to": "inspect3"
+                            },
+                            {
+                              "from": "inspect3",
+                              "to": "inspect4"
+                            },
+                            {
+                              "from": "inspect4",
+                              "to": "inspect5"
+                            },
+                            {
+                              "from": "inspect5",
+                              "to": "inspect6"
+                            },
+                            {
+                              "from": "inspect6",
+                              "to": "inspect7"
+                            },
+                            {
+                              "from": "inspect7",
+                              "to": "inspect8"
+                            },
+                            {
+                              "from": "inspect8",
+                              "to": "inspect9"
+                            },
+                            {
+                              "from": "inspect9",
+                              "to": "inspect10"
+                            },
+                            {
+                              "from": "inspect10",
+                              "to": "inspect11"
+                            },
+                            {
+                              "from": "inspect11",
+                              "to": "end"
+                            }
+                          ],
+                          "mainline_nodes": [
+                            "start",
+                            "inspect0",
+                            "inspect1",
+                            "inspect2",
+                            "inspect3",
+                            "inspect4",
+                            "inspect5",
+                            "inspect6",
+                            "inspect7",
+                            "inspect8",
+                            "inspect9",
+                            "inspect10",
+                            "inspect11",
+                            "end"
+                          ],
+                          "async_nodes": [],
+                          "findings": []
+                        }
+                      },
+                      "definition_review_reused": false
+                    }
+                  }
+                },
+                "findings": [
+                  {
+                    "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "severity": "warning",
+                    "object_type": "contract_key",
+                    "object_id": "result0",
+                    "source_location": {},
+                    "rule_source": "kernel.default_policy",
+                    "failure_layer": "topology",
+                    "message": "node 'inspect0' provides key 'result0' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                    "suggested_fix_type": "fix_config",
+                    "details": {
+                      "node": "inspect0",
+                      "owner": "pipeline",
+                      "provider_key": "result0",
+                      "provider_type": "probe.inspection",
+                      "downstream_nodes": [
+                        "inspect1"
+                      ],
+                      "downstream_required_types": {
+                        "inspect1": []
+                      },
+                      "pipeline_output_types": []
+                    },
+                    "definition_id": "vibeflow.workflow"
+                  },
+                  {
+                    "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "severity": "warning",
+                    "object_type": "contract_key",
+                    "object_id": "result1",
+                    "source_location": {},
+                    "rule_source": "kernel.default_policy",
+                    "failure_layer": "topology",
+                    "message": "node 'inspect1' provides key 'result1' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                    "suggested_fix_type": "fix_config",
+                    "details": {
+                      "node": "inspect1",
+                      "owner": "pipeline",
+                      "provider_key": "result1",
+                      "provider_type": "probe.inspection",
+                      "downstream_nodes": [
+                        "inspect2"
+                      ],
+                      "downstream_required_types": {
+                        "inspect2": []
+                      },
+                      "pipeline_output_types": []
+                    },
+                    "definition_id": "vibeflow.workflow"
+                  },
+                  {
+                    "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "severity": "warning",
+                    "object_type": "contract_key",
+                    "object_id": "result2",
+                    "source_location": {},
+                    "rule_source": "kernel.default_policy",
+                    "failure_layer": "topology",
+                    "message": "node 'inspect2' provides key 'result2' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                    "suggested_fix_type": "fix_config",
+                    "details": {
+                      "node": "inspect2",
+                      "owner": "pipeline",
+                      "provider_key": "result2",
+                      "provider_type": "probe.inspection",
+                      "downstream_nodes": [
+                        "inspect3"
+                      ],
+                      "downstream_required_types": {
+                        "inspect3": []
+                      },
+                      "pipeline_output_types": []
+                    },
+                    "definition_id": "vibeflow.workflow"
+                  },
+                  {
+                    "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "severity": "warning",
+                    "object_type": "contract_key",
+                    "object_id": "result3",
+                    "source_location": {},
+                    "rule_source": "kernel.default_policy",
+                    "failure_layer": "topology",
+                    "message": "node 'inspect3' provides key 'result3' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                    "suggested_fix_type": "fix_config",
+                    "details": {
+                      "node": "inspect3",
+                      "owner": "pipeline",
+                      "provider_key": "result3",
+                      "provider_type": "probe.inspection",
+                      "downstream_nodes": [
+                        "inspect4"
+                      ],
+                      "downstream_required_types": {
+                        "inspect4": []
+                      },
+                      "pipeline_output_types": []
+                    },
+                    "definition_id": "vibeflow.workflow"
+                  },
+                  {
+                    "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "severity": "warning",
+                    "object_type": "contract_key",
+                    "object_id": "result4",
+                    "source_location": {},
+                    "rule_source": "kernel.default_policy",
+                    "failure_layer": "topology",
+                    "message": "node 'inspect4' provides key 'result4' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                    "suggested_fix_type": "fix_config",
+                    "details": {
+                      "node": "inspect4",
+                      "owner": "pipeline",
+                      "provider_key": "result4",
+                      "provider_type": "probe.inspection",
+                      "downstream_nodes": [
+                        "inspect5"
+                      ],
+                      "downstream_required_types": {
+                        "inspect5": []
+                      },
+                      "pipeline_output_types": []
+                    },
+                    "definition_id": "vibeflow.workflow"
+                  },
+                  {
+                    "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "severity": "warning",
+                    "object_type": "contract_key",
+                    "object_id": "result5",
+                    "source_location": {},
+                    "rule_source": "kernel.default_policy",
+                    "failure_layer": "topology",
+                    "message": "node 'inspect5' provides key 'result5' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                    "suggested_fix_type": "fix_config",
+                    "details": {
+                      "node": "inspect5",
+                      "owner": "pipeline",
+                      "provider_key": "result5",
+                      "provider_type": "probe.inspection",
+                      "downstream_nodes": [
+                        "inspect6"
+                      ],
+                      "downstream_required_types": {
+                        "inspect6": []
+                      },
+                      "pipeline_output_types": []
+                    },
+                    "definition_id": "vibeflow.workflow"
+                  },
+                  {
+                    "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "severity": "warning",
+                    "object_type": "contract_key",
+                    "object_id": "result6",
+                    "source_location": {},
+                    "rule_source": "kernel.default_policy",
+                    "failure_layer": "topology",
+                    "message": "node 'inspect6' provides key 'result6' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                    "suggested_fix_type": "fix_config",
+                    "details": {
+                      "node": "inspect6",
+                      "owner": "pipeline",
+                      "provider_key": "result6",
+                      "provider_type": "probe.inspection",
+                      "downstream_nodes": [
+                        "inspect7"
+                      ],
+                      "downstream_required_types": {
+                        "inspect7": []
+                      },
+                      "pipeline_output_types": []
+                    },
+                    "definition_id": "vibeflow.workflow"
+                  },
+                  {
+                    "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "severity": "warning",
+                    "object_type": "contract_key",
+                    "object_id": "result7",
+                    "source_location": {},
+                    "rule_source": "kernel.default_policy",
+                    "failure_layer": "topology",
+                    "message": "node 'inspect7' provides key 'result7' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                    "suggested_fix_type": "fix_config",
+                    "details": {
+                      "node": "inspect7",
+                      "owner": "pipeline",
+                      "provider_key": "result7",
+                      "provider_type": "probe.inspection",
+                      "downstream_nodes": [
+                        "inspect8"
+                      ],
+                      "downstream_required_types": {
+                        "inspect8": []
+                      },
+                      "pipeline_output_types": []
+                    },
+                    "definition_id": "vibeflow.workflow"
+                  },
+                  {
+                    "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "severity": "warning",
+                    "object_type": "contract_key",
+                    "object_id": "result8",
+                    "source_location": {},
+                    "rule_source": "kernel.default_policy",
+                    "failure_layer": "topology",
+                    "message": "node 'inspect8' provides key 'result8' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                    "suggested_fix_type": "fix_config",
+                    "details": {
+                      "node": "inspect8",
+                      "owner": "pipeline",
+                      "provider_key": "result8",
+                      "provider_type": "probe.inspection",
+                      "downstream_nodes": [
+                        "inspect9"
+                      ],
+                      "downstream_required_types": {
+                        "inspect9": []
+                      },
+                      "pipeline_output_types": []
+                    },
+                    "definition_id": "vibeflow.workflow"
+                  },
+                  {
+                    "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "severity": "warning",
+                    "object_type": "contract_key",
+                    "object_id": "result9",
+                    "source_location": {},
+                    "rule_source": "kernel.default_policy",
+                    "failure_layer": "topology",
+                    "message": "node 'inspect9' provides key 'result9' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                    "suggested_fix_type": "fix_config",
+                    "details": {
+                      "node": "inspect9",
+                      "owner": "pipeline",
+                      "provider_key": "result9",
+                      "provider_type": "probe.inspection",
+                      "downstream_nodes": [
+                        "inspect10"
+                      ],
+                      "downstream_required_types": {
+                        "inspect10": []
+                      },
+                      "pipeline_output_types": []
+                    },
+                    "definition_id": "vibeflow.workflow"
+                  },
+                  {
+                    "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "severity": "warning",
+                    "object_type": "contract_key",
+                    "object_id": "result10",
+                    "source_location": {},
+                    "rule_source": "kernel.default_policy",
+                    "failure_layer": "topology",
+                    "message": "node 'inspect10' provides key 'result10' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                    "suggested_fix_type": "fix_config",
+                    "details": {
+                      "node": "inspect10",
+                      "owner": "pipeline",
+                      "provider_key": "result10",
+                      "provider_type": "probe.inspection",
+                      "downstream_nodes": [
+                        "inspect11"
+                      ],
+                      "downstream_required_types": {
+                        "inspect11": []
+                      },
+                      "pipeline_output_types": []
+                    },
+                    "definition_id": "vibeflow.workflow"
+                  },
+                  {
+                    "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                    "severity": "warning",
+                    "object_type": "contract_key",
+                    "object_id": "result11",
+                    "source_location": {},
+                    "rule_source": "kernel.default_policy",
+                    "failure_layer": "topology",
+                    "message": "node 'inspect11' provides key 'result11' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                    "suggested_fix_type": "fix_config",
+                    "details": {
+                      "node": "inspect11",
+                      "owner": "pipeline",
+                      "provider_key": "result11",
+                      "provider_type": "probe.inspection",
+                      "downstream_nodes": [
+                        "end"
+                      ],
+                      "downstream_required_types": {
+                        "end": []
+                      },
+                      "pipeline_output_types": []
+                    },
+                    "definition_id": "vibeflow.workflow"
+                  }
+                ]
+              }
+            },
+            "findings": [
+              {
+                "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "severity": "warning",
+                "object_type": "contract_key",
+                "object_id": "result0",
+                "source_location": {},
+                "rule_source": "kernel.default_policy",
+                "failure_layer": "topology",
+                "message": "node 'inspect0' provides key 'result0' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                "suggested_fix_type": "fix_config",
+                "details": {
+                  "node": "inspect0",
+                  "owner": "pipeline",
+                  "provider_key": "result0",
+                  "provider_type": "probe.inspection",
+                  "downstream_nodes": [
+                    "inspect1"
+                  ],
+                  "downstream_required_types": {
+                    "inspect1": []
+                  },
+                  "pipeline_output_types": []
+                },
+                "definition_id": "vibeflow.workflow"
+              },
+              {
+                "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "severity": "warning",
+                "object_type": "contract_key",
+                "object_id": "result1",
+                "source_location": {},
+                "rule_source": "kernel.default_policy",
+                "failure_layer": "topology",
+                "message": "node 'inspect1' provides key 'result1' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                "suggested_fix_type": "fix_config",
+                "details": {
+                  "node": "inspect1",
+                  "owner": "pipeline",
+                  "provider_key": "result1",
+                  "provider_type": "probe.inspection",
+                  "downstream_nodes": [
+                    "inspect2"
+                  ],
+                  "downstream_required_types": {
+                    "inspect2": []
+                  },
+                  "pipeline_output_types": []
+                },
+                "definition_id": "vibeflow.workflow"
+              },
+              {
+                "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "severity": "warning",
+                "object_type": "contract_key",
+                "object_id": "result2",
+                "source_location": {},
+                "rule_source": "kernel.default_policy",
+                "failure_layer": "topology",
+                "message": "node 'inspect2' provides key 'result2' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                "suggested_fix_type": "fix_config",
+                "details": {
+                  "node": "inspect2",
+                  "owner": "pipeline",
+                  "provider_key": "result2",
+                  "provider_type": "probe.inspection",
+                  "downstream_nodes": [
+                    "inspect3"
+                  ],
+                  "downstream_required_types": {
+                    "inspect3": []
+                  },
+                  "pipeline_output_types": []
+                },
+                "definition_id": "vibeflow.workflow"
+              },
+              {
+                "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "severity": "warning",
+                "object_type": "contract_key",
+                "object_id": "result3",
+                "source_location": {},
+                "rule_source": "kernel.default_policy",
+                "failure_layer": "topology",
+                "message": "node 'inspect3' provides key 'result3' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                "suggested_fix_type": "fix_config",
+                "details": {
+                  "node": "inspect3",
+                  "owner": "pipeline",
+                  "provider_key": "result3",
+                  "provider_type": "probe.inspection",
+                  "downstream_nodes": [
+                    "inspect4"
+                  ],
+                  "downstream_required_types": {
+                    "inspect4": []
+                  },
+                  "pipeline_output_types": []
+                },
+                "definition_id": "vibeflow.workflow"
+              },
+              {
+                "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "severity": "warning",
+                "object_type": "contract_key",
+                "object_id": "result4",
+                "source_location": {},
+                "rule_source": "kernel.default_policy",
+                "failure_layer": "topology",
+                "message": "node 'inspect4' provides key 'result4' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                "suggested_fix_type": "fix_config",
+                "details": {
+                  "node": "inspect4",
+                  "owner": "pipeline",
+                  "provider_key": "result4",
+                  "provider_type": "probe.inspection",
+                  "downstream_nodes": [
+                    "inspect5"
+                  ],
+                  "downstream_required_types": {
+                    "inspect5": []
+                  },
+                  "pipeline_output_types": []
+                },
+                "definition_id": "vibeflow.workflow"
+              },
+              {
+                "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "severity": "warning",
+                "object_type": "contract_key",
+                "object_id": "result5",
+                "source_location": {},
+                "rule_source": "kernel.default_policy",
+                "failure_layer": "topology",
+                "message": "node 'inspect5' provides key 'result5' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                "suggested_fix_type": "fix_config",
+                "details": {
+                  "node": "inspect5",
+                  "owner": "pipeline",
+                  "provider_key": "result5",
+                  "provider_type": "probe.inspection",
+                  "downstream_nodes": [
+                    "inspect6"
+                  ],
+                  "downstream_required_types": {
+                    "inspect6": []
+                  },
+                  "pipeline_output_types": []
+                },
+                "definition_id": "vibeflow.workflow"
+              },
+              {
+                "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "severity": "warning",
+                "object_type": "contract_key",
+                "object_id": "result6",
+                "source_location": {},
+                "rule_source": "kernel.default_policy",
+                "failure_layer": "topology",
+                "message": "node 'inspect6' provides key 'result6' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                "suggested_fix_type": "fix_config",
+                "details": {
+                  "node": "inspect6",
+                  "owner": "pipeline",
+                  "provider_key": "result6",
+                  "provider_type": "probe.inspection",
+                  "downstream_nodes": [
+                    "inspect7"
+                  ],
+                  "downstream_required_types": {
+                    "inspect7": []
+                  },
+                  "pipeline_output_types": []
+                },
+                "definition_id": "vibeflow.workflow"
+              },
+              {
+                "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "severity": "warning",
+                "object_type": "contract_key",
+                "object_id": "result7",
+                "source_location": {},
+                "rule_source": "kernel.default_policy",
+                "failure_layer": "topology",
+                "message": "node 'inspect7' provides key 'result7' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                "suggested_fix_type": "fix_config",
+                "details": {
+                  "node": "inspect7",
+                  "owner": "pipeline",
+                  "provider_key": "result7",
+                  "provider_type": "probe.inspection",
+                  "downstream_nodes": [
+                    "inspect8"
+                  ],
+                  "downstream_required_types": {
+                    "inspect8": []
+                  },
+                  "pipeline_output_types": []
+                },
+                "definition_id": "vibeflow.workflow"
+              },
+              {
+                "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "severity": "warning",
+                "object_type": "contract_key",
+                "object_id": "result8",
+                "source_location": {},
+                "rule_source": "kernel.default_policy",
+                "failure_layer": "topology",
+                "message": "node 'inspect8' provides key 'result8' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                "suggested_fix_type": "fix_config",
+                "details": {
+                  "node": "inspect8",
+                  "owner": "pipeline",
+                  "provider_key": "result8",
+                  "provider_type": "probe.inspection",
+                  "downstream_nodes": [
+                    "inspect9"
+                  ],
+                  "downstream_required_types": {
+                    "inspect9": []
+                  },
+                  "pipeline_output_types": []
+                },
+                "definition_id": "vibeflow.workflow"
+              },
+              {
+                "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "severity": "warning",
+                "object_type": "contract_key",
+                "object_id": "result9",
+                "source_location": {},
+                "rule_source": "kernel.default_policy",
+                "failure_layer": "topology",
+                "message": "node 'inspect9' provides key 'result9' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                "suggested_fix_type": "fix_config",
+                "details": {
+                  "node": "inspect9",
+                  "owner": "pipeline",
+                  "provider_key": "result9",
+                  "provider_type": "probe.inspection",
+                  "downstream_nodes": [
+                    "inspect10"
+                  ],
+                  "downstream_required_types": {
+                    "inspect10": []
+                  },
+                  "pipeline_output_types": []
+                },
+                "definition_id": "vibeflow.workflow"
+              },
+              {
+                "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "severity": "warning",
+                "object_type": "contract_key",
+                "object_id": "result10",
+                "source_location": {},
+                "rule_source": "kernel.default_policy",
+                "failure_layer": "topology",
+                "message": "node 'inspect10' provides key 'result10' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                "suggested_fix_type": "fix_config",
+                "details": {
+                  "node": "inspect10",
+                  "owner": "pipeline",
+                  "provider_key": "result10",
+                  "provider_type": "probe.inspection",
+                  "downstream_nodes": [
+                    "inspect11"
+                  ],
+                  "downstream_required_types": {
+                    "inspect11": []
+                  },
+                  "pipeline_output_types": []
+                },
+                "definition_id": "vibeflow.workflow"
+              },
+              {
+                "code": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER",
+                "severity": "warning",
+                "object_type": "contract_key",
+                "object_id": "result11",
+                "source_location": {},
+                "rule_source": "kernel.default_policy",
+                "failure_layer": "topology",
+                "message": "node 'inspect11' provides key 'result11' type 'probe.inspection' but no direct downstream flow successor requires that type",
+                "suggested_fix_type": "fix_config",
+                "details": {
+                  "node": "inspect11",
+                  "owner": "pipeline",
+                  "provider_key": "result11",
+                  "provider_type": "probe.inspection",
+                  "downstream_nodes": [
+                    "end"
+                  ],
+                  "downstream_required_types": {
+                    "end": []
+                  },
+                  "pipeline_output_types": []
+                },
+                "definition_id": "vibeflow.workflow"
+              }
+            ],
+            "executed": [
+              "workflow"
+            ],
+            "aliases": {}
+          }
+        ],
+        "workflow_rulesets": [
+          "vibeflow.workflow"
+        ],
+        "nodeset_imports": [],
+        "resources": {
+          "global_config": {},
+          "base_lib": {
+            "paths": [],
+            "modules": []
+          },
+          "plugins": [],
+          "host_extensions": []
+        },
+        "effective_resources": {
+          "global_config": {},
+          "base_lib": {
+            "paths": [],
+            "modules": []
+          },
+          "plugins": [],
+          "host_extensions": []
+        },
+        "available_resources": {
+          "global_config": {},
+          "base_lib": {
+            "paths": [
+              "/tmp/vf-context-reuse-release/cli/project"
+            ],
+            "modules": []
+          },
+          "plugins": [],
+          "host_extensions": []
+        },
+        "workspace": {
+          "path": "/tmp/vf-context-reuse-release/cli/project/vibeflow_config.jsonc",
+          "roots": [
+            {
+              "id": "probe",
+              "path": "/tmp/vf-context-reuse-release/cli/project",
+              "config": "/tmp/vf-context-reuse-release/cli/project/vibeflow_project.jsonc",
+              "project_target": "python",
+              "quality_enabled": true
+            }
+          ]
+        }
+      },
+      "effective_policy": {
+        "node_source": {
+          "max_lines": 500,
+          "max_bytes": 60000,
+          "warn_lines": 450,
+          "warn_bytes": 54000
+        },
+        "complexity": {
+          "max_functions": null,
+          "max_branches": null,
+          "max_nesting_depth": null,
+          "max_params": null,
+          "max_contract_keys": null
+        },
+        "maintainability": {
+          "warn_call_chain_length": 4,
+          "max_call_chain_length": 4,
+          "warn_dependency_chain_length": 4,
+          "max_dependency_chain_length": 6
+        },
+        "imports": {
+          "allowed_roots": [],
+          "banned_roots": [
+            "_ctypes",
+            "_thread",
+            "asyncio",
+            "boto3",
+            "boundaries",
+            "boundary",
+            "cffi",
+            "concurrent",
+            "ctypes",
+            "dotenv",
+            "httpx",
+            "importlib",
+            "multiprocessing",
+            "nodriver",
+            "os",
+            "pathlib",
+            "playwright",
+            "psycopg2",
+            "pymongo",
+            "pymysql",
+            "redis",
+            "requests",
+            "selenium",
+            "shutil",
+            "socket",
+            "sqlalchemy",
+            "sqlite3",
+            "subprocess",
+            "threading",
+            "urllib"
+          ],
+          "allowed_modules": [
+            "urllib.parse",
+            "vibeflow"
+          ],
+          "banned_modules": [
+            "urllib.request"
+          ]
+        },
+        "base_lib": {
+          "allowed_paths": [],
+          "allowed_modules": [],
+          "banned_modules": []
+        },
+        "sources": [
+          "kernel.default_policy",
+          "workspace.policy:/tmp/vf-context-reuse-release/cli/project/vibeflow_config.jsonc"
+        ]
+      },
+      "result_code": "VIBEFLOW_STRUCTURE_CONCERNS",
+      "validation_scope": "vibeflow_structure",
+      "summary": "VibeFlow 结构检查完成，但存在关注项",
+      "checked": [
+        {
+          "id": "config_registration",
+          "label": "配置和登记关系"
+        },
+        {
+          "id": "node_contract_shape",
+          "label": "节点契约形状"
+        },
+        {
+          "id": "data_reachability",
+          "label": "数据可达性"
+        },
+        {
+          "id": "control_flow",
+          "label": "控制流"
+        },
+        {
+          "id": "effect_boundaries",
+          "label": "副作用边界"
+        },
+        {
+          "id": "project_structure",
+          "label": "项目结构"
+        }
+      ],
+      "not_checked": [
+        {
+          "id": "business_correctness",
+          "label": "业务结果正确性"
+        },
+        {
+          "id": "requirements_conformance",
+          "label": "项目需求符合性"
+        },
+        {
+          "id": "external_semantics",
+          "label": "外部接口业务语义"
+        },
+        {
+          "id": "domain_data_correctness",
+          "label": "领域数据正确性"
+        }
+      ]
+    },
+    "stderr": "",
+    "diagnostics": []
+  }
+}

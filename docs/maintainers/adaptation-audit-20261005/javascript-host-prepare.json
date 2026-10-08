@@ -1,0 +1,17 @@
+{
+  "status": "PASS",
+  "used_host_extensions": [
+    "audit.child",
+    "demo.host"
+  ],
+  "rule_subjects": [
+    "demo.model",
+    "demo.start",
+    "base_lib:demo.math",
+    "plugin:demo.runtime",
+    "host_extension:demo.host",
+    "plugin_declaration:demo",
+    "workflow:"
+  ],
+  "findings": []
+}

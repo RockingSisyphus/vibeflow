@@ -1,0 +1,78 @@
+{
+  "steps": [
+    {
+      "step": "repository-quality",
+      "status": "passed",
+      "seconds": 5.233116710005561
+    },
+    {
+      "step": "compileall",
+      "status": "passed",
+      "seconds": 0.7297473840008024
+    },
+    {
+      "step": "pytest",
+      "status": "passed",
+      "seconds": 244.33713548799278
+    },
+    {
+      "step": "python-sandbox",
+      "status": "passed",
+      "seconds": 459.59853938999004
+    },
+    {
+      "step": "javascript-minimal",
+      "status": "passed",
+      "seconds": 17.454734227998415
+    },
+    {
+      "step": "javascript-integration",
+      "status": "passed",
+      "seconds": 277.5713653889834
+    },
+    {
+      "step": "rule-regression-sandboxes",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/rule_gaps/run_all.py', '--workers', '8', '--toolchain', '/tmp/vf-review-performance-full-final/pytest/javascript-toolchain', '--renderer', '/tmp/vf-review-performance-full-final/puppeteer', '--work', '/tmp/vf-review-performance-full-final/rule-gaps', '--report', '/tmp/vf-review-performance-full-final/rule-gaps.json')' returned non-zero exit status 1.",
+      "seconds": 2714.8727543800196
+    },
+    {
+      "step": "runtime-observation-browser",
+      "status": "passed",
+      "seconds": 6.57516831898829
+    },
+    {
+      "step": "review-performance-sandbox",
+      "status": "passed",
+      "seconds": 84.87786073700408
+    },
+    {
+      "step": "wheel-isolation",
+      "status": "passed",
+      "seconds": 12.111217561003286
+    },
+    {
+      "step": "generated-artifact-cleanup",
+      "status": "passed",
+      "seconds": 0.07759762200294062
+    },
+    {
+      "step": "distribution",
+      "status": "passed",
+      "seconds": 24.702683512005024
+    },
+    {
+      "step": "repository-quality-final",
+      "status": "passed",
+      "seconds": 7.726775841001654
+    },
+    {
+      "step": "clean-tree",
+      "status": "passed",
+      "seconds": 0.07945069100242108
+    }
+  ],
+  "failures": [
+    "rule-regression-sandboxes failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/rule_gaps/run_all.py', '--workers', '8', '--toolchain', '/tmp/vf-review-performance-full-final/pytest/javascript-toolchain', '--renderer', '/tmp/vf-review-performance-full-final/puppeteer', '--work', '/tmp/vf-review-performance-full-final/rule-gaps', '--report', '/tmp/vf-review-performance-full-final/rule-gaps.json')' returned non-zero exit status 1."
+  ]
+}
