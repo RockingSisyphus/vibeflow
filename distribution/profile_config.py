@@ -57,7 +57,7 @@ def load_distribution_profiles(path: Path) -> dict[str, DistributionProfile]:
             raw_paths,
             repository_root,
             f"document_sets.{set_name}",
-            allowed_roots=(repository_root / "docs",),
+            allowed_roots=(repository_root / "distribution" / "docs",),
         )
 
     raw_profiles = _mapping(root.get("profiles"), "profiles")

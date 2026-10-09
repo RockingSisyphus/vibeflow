@@ -2,25 +2,25 @@
   "schema": "vibeflow.distribution-profiles.v1",
   "document_sets": {
     "common": [
-      "docs/overview.md",
-      "docs/user/quickstart.md",
-      "docs/user/workflow-and-config.md",
-      "docs/user/python-development.md",
-      "docs/user/javascript-development.md",
-      "docs/user/nodesets-and-loops.md",
-      "docs/user/plugins-and-integrations.md",
-      "docs/user/multifile-resources.md",
-      "docs/user/rules-and-nodes.md",
-      "docs/user/rule-system-migration.md",
-      "docs/user/runtime-observation.md",
-      "docs/user/commands-and-results.md",
-      "docs/user/product-check-boundaries.md"
+      "distribution/docs/overview.md",
+      "distribution/docs/user/quickstart.md",
+      "distribution/docs/user/workflow-and-config.md",
+      "distribution/docs/user/python-development.md",
+      "distribution/docs/user/javascript-development.md",
+      "distribution/docs/user/nodesets-and-loops.md",
+      "distribution/docs/user/plugins-and-integrations.md",
+      "distribution/docs/user/multifile-resources.md",
+      "distribution/docs/user/rules-and-nodes.md",
+      "distribution/docs/user/rule-system-migration.md",
+      "distribution/docs/user/runtime-observation.md",
+      "distribution/docs/user/commands-and-results.md",
+      "distribution/docs/user/product-check-boundaries.md"
     ],
     "collaborative": [
-      "docs/user/profiles/collaborative.md"
+      "distribution/docs/user/profiles/collaborative.md"
     ],
     "autonomous": [
-      "docs/user/profiles/autonomous.md"
+      "distribution/docs/user/profiles/autonomous.md"
     ]
   },
   "profiles": {

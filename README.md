@@ -48,9 +48,9 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 
 ## 文档
 
-- [项目概览](docs/overview.md)
+- [项目概览](distribution/docs/overview.md)
 - [使用者开发文档](docs/README.md#使用者开发)
-- [多文件资源与展示](docs/user/multifile-resources.md)
+- [多文件资源与展示](distribution/docs/user/multifile-resources.md)
 - [系统设计](docs/README.md#系统设计)
 - [内核维护](docs/README.md#内核维护)
 
@@ -62,4 +62,4 @@ python tools/verify_project.py --full
 
 当前开发版本为 `0.17.0`，Workflow ABI 为 `vibeflow.workflow.v5`，AOT manifest 为 `vibeflow.aot-build.v2`。旧计划与构建目录需重新生成；本次本地整改不代表已发布新 Release。
 
-质量检查只覆盖当前实际选择的 Rule；不证明业务正确、代码安全、算法确定性或全部无副作用。有限 Python 输入写入规则独立于效果政策，详见[产品检查边界](docs/user/product-check-boundaries.md)。
+质量检查只覆盖当前实际选择的 Rule；不证明业务正确、代码安全、算法确定性或全部无副作用。有限 Python 输入写入规则独立于效果政策，详见[产品检查边界](distribution/docs/user/product-check-boundaries.md)。

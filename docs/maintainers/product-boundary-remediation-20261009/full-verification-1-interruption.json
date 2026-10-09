@@ -1,7 +1,0 @@
-{
-  "stopped_pids": [
-    2749185,
-    2872408
-  ],
-  "reason": "Completed pytest; repo-local TMPDIR caused distribution path rejection and Chromium singleton socket path too long. Stopped remaining full batch and will retest using short external TMPDIR."
-}

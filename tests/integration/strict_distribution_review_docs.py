@@ -99,7 +99,7 @@ def test_agent_prompt_is_a_document_router(built_distribution: Path) -> None:
 
 
 def test_active_documentation_has_no_duplicate_long_prose() -> None:
-    documents = sorted((REPOSITORY_ROOT / "docs").rglob("*.md"))
+    documents = sorted(path for root in (REPOSITORY_ROOT / "docs", REPOSITORY_ROOT / "distribution/docs") for path in root.rglob("*.md"))
     seen: dict[str, Path] = {}
     for path in documents:
         source = path.read_text(encoding="utf-8")
@@ -117,15 +117,17 @@ def test_active_documentation_has_no_duplicate_long_prose() -> None:
 
 
 def test_document_index_covers_every_active_markdown() -> None:
-    docs_root = REPOSITORY_ROOT / "docs"
-    index = (docs_root / "README.md").read_text(encoding="utf-8")
+    roots = (REPOSITORY_ROOT / "docs", REPOSITORY_ROOT / "distribution/docs")
     linked = {
-        (docs_root / target).resolve()
-        for target in re.findall(r"\]\(([^)#]+\.md)(?:#[^)]+)?\)", index)
+        (root / target).resolve()
+        for root in roots
+        for target in re.findall(r"\]\(([^)#]+\.md)(?:#[^)]+)?\)", (root / "README.md").read_text(encoding="utf-8"))
+        if Path(target).name != "README.md"
     }
     expected = {
         path.resolve()
-        for path in docs_root.rglob("*.md")
+        for root in roots
+        for path in root.rglob("*.md")
         if path.name != "README.md"
     }
     assert linked == expected

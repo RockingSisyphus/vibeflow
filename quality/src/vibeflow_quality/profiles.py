@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import os
 from pathlib import Path
 import re
@@ -76,7 +77,9 @@ _DOCUMENTATION_ROOTS = (
     "THIRD_PARTY_NOTICES.md",
     ".github",
     "docs",
+    "distribution/docs",
     "distribution/kernel_development_pack",
+    "tests/fixtures",
     "quality/README.md",
     "sandbox",
 )
@@ -256,6 +259,7 @@ _REQUIRED_DIRECTORIES = (
     "tests/integration",
     "tests/fixtures",
     "distribution",
+    "distribution/docs",
     "references",
     "tools",
 )
@@ -365,6 +369,67 @@ def _generated_paths(root: Path) -> Iterator[Path]:
         for name in files:
             if name.endswith((".pyc", ".pyo")):
                 yield current_path / name
+
+
+def _directory_role_findings(root: Path) -> list[Finding]:
+    """Check the few output/document boundaries hidden by artifact traversal."""
+    misplaced: list[Path] = []
+    dist = root / "dist"
+    release_directories = {"vibeflow-distribution", "vibeflow-distribution-autonomous"}
+    versions: set[str] = set()
+    packages: set[str] = set()
+    for name in release_directories:
+        metadata = dist / name / "DISTRIBUTION.json"
+        if metadata.is_file():
+            try:
+                version = json.loads(metadata.read_text())["version"]
+            except (OSError, ValueError, KeyError, TypeError):
+                continue  # Package content validation belongs to the builder.
+            if isinstance(version, str):
+                versions.add(version)
+                packages.add(f"{name}-{version}.zip")
+    if dist.is_dir():
+        for path in dist.iterdir():
+            valid = path.is_dir() and path.name in release_directories
+            if path.is_file():
+                valid = (
+                    path.name in packages
+                    or path.name in {f"SHA256SUMS-{v}.txt" for v in versions}
+                    or (not versions and re.fullmatch(r"vibeflow-distribution(?:-autonomous)?-[0-9][\w.-]*\.zip", path.name))
+                )
+            if not valid:
+                misplaced.append(path)
+    archive = root / "archive"
+    if archive.is_dir():
+        for path in archive.rglob("*"):
+            if path.is_dir():
+                if path.relative_to(archive).parts[0] != "history":
+                    misplaced.append(path)
+            elif not re.fullmatch(r"(?:vibeflow-distribution(?:-autonomous)?-[0-9][\w.-]*\.zip|SHA256SUMS-[\w.-]+\.txt)", path.name):
+                misplaced.append(path)
+    sandbox = root / "sandbox"
+    if sandbox.is_dir():
+        misplaced.extend(path for path in sandbox.iterdir() if path.name not in
+                         {"python", "javascript", "README.md", "TEST_COVERAGE.md", ".gitignore"})
+        for path in sandbox.rglob("*"):
+            if path.name == "evidence" or (path.is_file() and path.name in
+                {"before.json", "after.json", "report.json", "verification.json"}):
+                misplaced.append(path)
+    docs = root / "docs"
+    if docs.is_dir():
+        misplaced.extend(path for path in docs.rglob("*") if path.is_file()
+                         and not path.is_relative_to(docs / "assets")
+                         and (path.suffix in {".log", ".zip", ".whl", ".gz", ".py", ".ts", ".mjs", ".patch"}
+                              or path.name in {"before.json", "after.json", "report.json", "verification.json", "observations.json"}
+                              or path.name.endswith(("-report.json", "-verification.json", "-observations.json"))))
+    for relative in ("docs/user", "docs/overview.md"):
+        path = root / relative
+        if path.exists():
+            misplaced.append(path)
+    return [_finding("DIRECTORY_ROLE", root, path,
+                     "Content does not belong to this directory's documented responsibility.",
+                     "Keep current releases in dist, historical releases in archive, user manuals in distribution/docs, and runtime evidence outside the checkout.")
+            for path in sorted(set(misplaced))]
 
 
 def _iter_documentation_files(root: Path) -> Iterator[Path]:
@@ -660,6 +725,7 @@ def check_base(root: Path, *, node_executable: str | None = None) -> list[Findin
     findings.extend(scan_layer(root, "target-services", graph=graph))
     findings.extend(neutral_tooling_findings(root, graph))
     findings.extend(_documentation_findings(root))
+    findings.extend(_directory_role_findings(root))
     return findings
 
 

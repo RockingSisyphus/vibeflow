@@ -5,7 +5,7 @@ from types import MappingProxyType
 
 import pytest
 
-from sandbox.python.readonly_graph.probe import distinct_objects, observe, observe_mixed
+from tests.fixtures.python.readonly_graph.probe import distinct_objects, observe, observe_mixed
 from vibeflow.core.rules import RuleContext
 from vibeflow.core.rules.models import readonly
 

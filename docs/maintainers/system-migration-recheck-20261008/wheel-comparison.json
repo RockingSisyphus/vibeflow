@@ -1,9 +1,0 @@
-{
-  "path": "/tmp/vibeflow-migration-full-passing-20261007/wheel-dist/vibeflow-0.16.0-py3-none-any.whl",
-  "exists": true,
-  "sha256": "4f671a545e6aa0eb8dce829b9ac92e8220ca6a3f4d5c61ee6da5959e9defb958",
-  "matches_record": true,
-  "files": 333,
-  "different": [],
-  "source_missing_from_wheel": []
-}

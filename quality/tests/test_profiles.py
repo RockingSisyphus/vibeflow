@@ -48,6 +48,33 @@ class ProfileTests(unittest.TestCase):
     def codes(self, profile: str) -> list[str]:
         return [item.code for item in run_profile(self.fixture.root, profile).findings]
 
+    def test_directory_roles_reject_workdirs_and_audit_archives(self) -> None:
+        self.fixture.write("dist/independent-review/result.json", "{}")
+        self.fixture.write("archive/review-performance-observations.zip", "audit")
+        self.fixture.write("docs/maintainers/run.log", "output")
+        self.fixture.write("sandbox/rule_gaps/report.json", "{}")
+        subjects = {f.subject_id for f in profile_module._directory_role_findings(self.fixture.root)}
+        self.assertIn("dist/independent-review", subjects)
+        self.assertIn("archive/review-performance-observations.zip", subjects)
+        self.assertIn("docs/maintainers/run.log", subjects)
+        self.assertIn("sandbox/rule_gaps", subjects)
+
+    def test_directory_roles_allow_releases_sources_and_document_assets(self) -> None:
+        self.fixture.write("dist/vibeflow-distribution/DISTRIBUTION.json", '{"version":"0.17.0"}')
+        self.fixture.write("dist/vibeflow-distribution-0.17.0.zip", "package")
+        self.fixture.write("dist/SHA256SUMS-0.17.0.txt", "hash")
+        self.fixture.write("archive/history/old-build/vibeflow-distribution-0.15.1.zip", "old")
+        self.fixture.write("docs/assets/architecture.svg", "image")
+        self.fixture.write("docs/maintainers/design.pdf", "document")
+        self.fixture.write("docs/maintainers/notes.txt", "notes")
+        self.fixture.write("docs/design/diagram.json", "{}")
+        self.fixture.write("sandbox/python/domain_rules/input.json", "{}")
+        self.fixture.write("tests/fixtures/rule_parity/reference.json", "{}")
+        self.assertEqual(profile_module._directory_role_findings(self.fixture.root), [])
+        self.fixture.write("dist/vibeflow-distribution-0.15.2.zip", "stale")
+        self.assertEqual([f.subject_id for f in profile_module._directory_role_findings(self.fixture.root)],
+                         ["dist/vibeflow-distribution-0.15.2.zip"])
+
     def test_core_rejects_target_dependency(self) -> None:
         self.fixture.write(
             "src/vibeflow/core/model.py",

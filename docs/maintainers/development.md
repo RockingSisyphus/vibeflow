@@ -34,8 +34,8 @@ python tools/run_tests.py
 ```bash
 python tools/verify_project.py --full --workers 4
 python tools/run_tests.py --workers 2 -- tests/core
-python sandbox/rule_parity/run_all.py --current-only --workers 8
-python sandbox/rule_gaps/run_all.py --workers 8
+python tests/fixtures/rule_parity/run_all.py --current-only --workers 8
+python tests/fixtures/rule_gaps/run_all.py --workers 8
 VIBEFLOW_TEST_WORKERS=4 python tools/verify_project.py --full
 ```
 
@@ -47,7 +47,7 @@ pytest 使用独立进程，并按文件分组；同一文件内的测试按顺�
 
 完整入口覆盖仓库质量、pytest、Python sandbox、JavaScript integration、真实浏览器、基线规则对照、接口与多文件资源沙箱、wheel 隔离、双发行 smoke、确定性归档及清洁工作树检查。
 
-资源专项使用正式 CLI，覆盖登记、归属、规则、修改、展示和原生运行。单独重跑见[sandbox/resources](../../sandbox/resources/README.md)；稳定案例与历史验收分别见[案例对应表](../design/multifile-resource-cases.md)和[实现验收记录](../design/multifile-resources-results.md)。
+资源专项使用正式 CLI，覆盖登记、归属、规则、修改、展示和原生运行。单独重跑见[sandbox/resources](history/multifile-resource-sandbox.md)；稳定案例与历史验收分别见[案例对应表](../design/history/multifile-resource-cases.md)和[实现验收记录](../design/history/multifile-resources-results.md)。
 
 仓库自检器为：
 
@@ -59,7 +59,7 @@ python quality/run.py --profile all
 
 ## 文档维护
 
-- `docs/user/` 面向业务项目的开发者与 AI，说明如何声明、启用、检查、构建和查看资源；
+- `distribution/docs/user/` 面向业务项目的开发者与 AI，说明如何声明、启用、检查、构建和查看资源；
 - `distribution/prompts/` 为 AI 提供任务导航和 profile 协议，链接使用手册中的完整规范；
 - `docs/design/` 的系统架构与执行模型解释当前内核，阶段计划和验收保留对应基线及证据；
 - `docs/maintainers/` 面向内核开发者，记录修改、验证和发行操作；

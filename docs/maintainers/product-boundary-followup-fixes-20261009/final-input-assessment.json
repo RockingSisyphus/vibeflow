@@ -1,8 +1,0 @@
-{
-  "input_count": 2367,
-  "changed": [],
-  "final_pytest": 4213,
-  "python_parity": 291,
-  "python_gap_cases": 11,
-  "final_source_tests_and_user_docs_unchanged": true
-}

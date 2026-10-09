@@ -20,8 +20,10 @@ import tempfile
 
 if __package__:
     from .test_parallel import DEFAULT_WORKERS, WORKER_ENVIRONMENT, add_worker_argument
+    from .pytest_workdirs import external_scratch
 else:
     from test_parallel import DEFAULT_WORKERS, WORKER_ENVIRONMENT, add_worker_argument
+    from pytest_workdirs import external_scratch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,6 +56,7 @@ def _environment(*, toolchain_root: Path) -> dict[str, str]:
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     environment["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
     environment["VIBEFLOW_TEST_TOOLCHAIN_ROOT"] = str(toolchain_root)
+    environment.setdefault("npm_config_cache", str(toolchain_root.parent / "npm-cache"))
     environment.pop("PYTEST_ADDOPTS", None)
     environment.pop("PYTEST_PLUGINS", None)
     return environment
@@ -100,6 +103,7 @@ def run_tests(scratch: Path, pytest_args: list[str], *, workers: int = DEFAULT_W
         "-p",
         "no:cacheprovider",
         "-p", "pytest_workdirs",
+        "--basetemp", str(scratch / "pytest-tmp"),
         *(("-p", "xdist.plugin", "-n", str(workers), "--dist", "loadfile") if parallel else ()),
         *_resolve_paths(pytest_args),
     )
@@ -113,12 +117,17 @@ def run_tests(scratch: Path, pytest_args: list[str], *, workers: int = DEFAULT_W
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    parser = _parser()
+    args = parser.parse_args(argv)
     pytest_args = list(args.pytest_args)
     if pytest_args[:1] == ["--"]:
         pytest_args.pop(0)
     if args.scratch is not None:
-        return run_tests(args.scratch.resolve(), pytest_args, workers=args.workers)
+        try:
+            scratch = external_scratch(args.scratch, ROOT)
+        except ValueError as exc:
+            parser.error(str(exc))
+        return run_tests(scratch, pytest_args, workers=args.workers)
     with tempfile.TemporaryDirectory(prefix="vibeflow-pytest-") as temporary:
         return run_tests(Path(temporary), pytest_args, workers=args.workers)
 

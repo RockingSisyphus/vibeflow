@@ -1,6 +1,6 @@
 # Contributing to VibeFlow
 
-This guide is for people changing the VibeFlow framework. Project authors should start with `docs/overview.md` and `docs/user/quickstart.md`.
+This guide is for people changing the VibeFlow framework. Project authors should start with `distribution/docs/overview.md` and `distribution/docs/user/quickstart.md`.
 
 VibeFlow 0.13.2 uses independent Python and JavaScript Target application closures. Every project root declares exactly one `project_target`; do not introduce cross-Target workflow execution or imports. Use the layered packages directly and keep language-specific implementation outside Core.
 
@@ -109,11 +109,11 @@ python distribution/build.py \
   --archive-dir /tmp/vibeflow-distribution-archives
 ```
 
-Do not edit generated distribution output. Change canonical sources under `docs/`, `distribution/prompts/` or `src/vibeflow/`, then rebuild.
+Do not edit generated distribution output. Change canonical sources under `distribution/docs/`, `distribution/prompts/` or `src/vibeflow/`, then rebuild.
 
 ## Documentation
 
-- Stable user interfaces belong in `docs/user/`.
+- Stable user interfaces belong in `distribution/docs/user/`.
 - Language-neutral design belongs in `docs/design/`.
 - Repository and release procedures belong in `docs/maintainers/`.
 - Distribution prompts only route agents to canonical user documentation.

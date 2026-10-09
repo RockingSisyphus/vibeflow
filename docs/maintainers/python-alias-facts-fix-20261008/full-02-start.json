@@ -1,9 +1,0 @@
-{
-  "product_files": 334,
-  "input_files": 2336,
-  "changes_since_full01": [
-    "sandbox/rule_parity/python/ownership_variants.py"
-  ],
-  "scratch": "/home/rockingsisyphus/.cache/vibeflow-alias-facts-20261008/full-02",
-  "tmpdir": "/home/rockingsisyphus/.cache/vf-p2/t"
-}

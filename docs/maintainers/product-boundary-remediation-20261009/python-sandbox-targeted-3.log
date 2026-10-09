@@ -1,9 +1,0 @@
-valid:global_state_execution_lock PASS
-valid:training_object_flow PASS
-invalid:inspect_node:GeneratorRunPureNode PASS
-invalid:inspect_node:NodeImportNode PASS
-invalid:inspect_node:SetAttrNode PASS
-invalid:inspect_node:MonkeyPatchNode PASS
-invalid:inspect_node:RecursiveNode PASS
-invalid:inspect_node:IndirectRecursiveNode PASS
-8 cases and real lock traces/artifacts passed; evidence saved

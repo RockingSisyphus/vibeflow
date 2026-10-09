@@ -118,7 +118,7 @@ def audit(wheel=None):
                     if any(module == retired or module.startswith(retired + '.') for retired in RETIRED_MODULES):
                         failures.append({'path': str(path.relative_to(ROOT)), 'line': node.lineno,
                                          'reason': 'retired product module import: ' + module})
-                if isinstance(node, ast.Constant) and isinstance(node.value, str) and not path.is_relative_to(ROOT / 'sandbox/rule_parity'):
+                if isinstance(node, ast.Constant) and isinstance(node.value, str) and not path.is_relative_to(ROOT / 'tests/fixtures/rule_parity'):
                     # Frozen parity generators contain historical imports. Current
                     # generated programs must use the same API as normal callers.
                     for module in RETIRED_MODULES:

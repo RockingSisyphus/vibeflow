@@ -1,8 +1,0 @@
-{
-  "recorded_utc": "2026-10-08T10:13:33.062343+00:00",
-  "phase": "after_all_4023_packaged_probe_cases",
-  "source_manifest": "/home/rockingsisyphus/projects/VibeFlow/dist/python-comprehension-scope-validation-20261008/full-02-input-freeze.json",
-  "input_count": 2848,
-  "changes": [],
-  "passed": true
-}

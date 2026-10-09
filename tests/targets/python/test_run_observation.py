@@ -11,9 +11,9 @@ from vibeflow.core.run_status import snapshot_info
 from vibeflow.targets.python.runtime.observation import RunObservation
 from vibeflow.targets.python.runtime.options import RuntimeOptions
 from vibeflow.targets.python.sdk import update_run_info
-from sandbox.python.typing_annotations.probe import observe
+from tests.fixtures.python.typing_annotations.probe import observe
 from sandbox.python.runtime_observation.probe import observe as observe_cli
-from sandbox.python.sdk_defaults.validate_probe import write_project
+from tests.fixtures.python.sdk_defaults.validate_probe import write_project
 from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
 

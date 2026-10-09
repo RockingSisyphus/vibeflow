@@ -1,9 +1,0 @@
-{
-  "entrypoint": "tools/run_tests.py",
-  "passed": 1947,
-  "seconds": 34.45,
-  "exit_code": 0,
-  "output_record": "Tool output of this independent review; result metadata recorded here.",
-  "additional_real_aot_passed": 8,
-  "additional_real_aot_log": "aot-tests.log"
-}

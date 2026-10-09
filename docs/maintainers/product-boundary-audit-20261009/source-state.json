@@ -1,6 +1,0 @@
-{
-  "head": "5b9f9763ab7051fc964a4d83a1419d87a621b4c9",
-  "source_files": 335,
-  "changed_since_previous_audit": [],
-  "meaning": "Read-only audit evidence. Not a runtime or build gate."
-}

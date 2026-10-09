@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 
-SOURCE = Path(__file__).resolve().parents[2] / "sandbox/rule_parity/results.py"
+SOURCE = Path(__file__).resolve().parents[2] / "tests/fixtures/rule_parity/results.py"
 SPEC = importlib.util.spec_from_file_location("parity_results", SOURCE)
 RESULTS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(RESULTS)

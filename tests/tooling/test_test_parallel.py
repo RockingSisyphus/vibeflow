@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from sandbox.rule_gaps import run_all as gaps
+from tests.fixtures.rule_gaps import run_all as gaps
 from tools import run_tests, verify_project
 from tools.test_parallel import WORKER_ENVIRONMENT, add_worker_argument
 
@@ -17,6 +17,16 @@ def parse_workers(arguments=()):
     parser = argparse.ArgumentParser()
     add_worker_argument(parser)
     return parser.parse_args(arguments).workers
+
+
+@pytest.mark.parametrize("runner", [run_tests, verify_project])
+def test_in_repository_scratch_is_rejected_before_creating_work(runner, tmp_path, monkeypatch):
+    monkeypatch.setattr(runner, "ROOT", tmp_path)
+    work = tmp_path / "dist" / "regression-work"
+    with pytest.raises(SystemExit) as error:
+        runner.main(["--scratch", str(work)])
+    assert error.value.code == 2
+    assert not work.exists()
 
 
 def test_default_environment_and_cli_precedence(monkeypatch):
@@ -91,7 +101,7 @@ def test_verify_forwards_worker_count(tmp_path, monkeypatch):
     monkeypatch.setattr(verify_project, "_run", lambda command, **kwargs: commands.append(command))
     monkeypatch.setattr(verify_project, "_puppeteer_root", lambda scratch: scratch / "renderer")
     verify_project._pytest(tmp_path, workers=2)
-    verify_project._rule_sandboxes(tmp_path, workers=2)
+    verify_project._rule_regressions(tmp_path, workers=2)
     assert len(commands) == 3
     for command in commands:
         values = list(map(str, command))

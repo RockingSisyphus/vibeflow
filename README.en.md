@@ -48,9 +48,9 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 
 ## Documentation
 
-- [Project overview](docs/overview.md)
+- [Project overview](distribution/docs/overview.md)
 - [User development guides](docs/README.md#使用者开发)
-- [Multi-file resources and presentation](docs/user/multifile-resources.md)
+- [Multi-file resources and presentation](distribution/docs/user/multifile-resources.md)
 - [System design](docs/README.md#系统设计)
 - [Kernel maintenance](docs/README.md#内核维护)
 

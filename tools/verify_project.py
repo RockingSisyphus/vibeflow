@@ -26,6 +26,7 @@ if str(ROOT) not in sys.path:
     # are deliberately not packaged in the wheel.
     sys.path.insert(0, str(ROOT))
 from tools.test_parallel import DEFAULT_WORKERS, add_worker_argument
+from tools.pytest_workdirs import external_scratch
 from tools.audit_retired_architecture import RETIRED_FILES, MOVED_FILES
 PYTHON = sys.executable
 TEST_GROUPS = (
@@ -155,12 +156,12 @@ def _javascript_integration(scratch: Path) -> None:
     )
 
 
-def _rule_sandboxes(scratch: Path, *, workers: int = DEFAULT_WORKERS) -> None:
+def _rule_regressions(scratch: Path, *, workers: int = DEFAULT_WORKERS) -> None:
     toolchain = scratch / "pytest/javascript-toolchain"
     commands = (
-        (PYTHON, "sandbox/rule_parity/run_all.py", "--workers", str(workers), "--current-only", "--toolchain", toolchain,
+        (PYTHON, "tests/fixtures/rule_parity/run_all.py", "--workers", str(workers), "--current-only", "--toolchain", toolchain,
          "--work", scratch / "rule-parity", "--report", scratch / "rule-parity.json"),
-        (PYTHON, "sandbox/rule_gaps/run_all.py", "--workers", str(workers), "--toolchain", toolchain,
+        (PYTHON, "tests/fixtures/rule_gaps/run_all.py", "--workers", str(workers), "--toolchain", toolchain,
          "--renderer", _puppeteer_root(scratch), "--work", scratch / "rule-gaps", "--report", scratch / "rule-gaps.json"),
     )
     failures = []
@@ -190,29 +191,29 @@ if not result['matched']:
           _puppeteer_root(scratch), scratch / "runtime-observation-browser.json"))
 
 
-def _review_performance_sandbox(scratch: Path) -> None:
-    _run((PYTHON, "sandbox/python/review_performance/run_all.py",
+def _review_performance_regressions(scratch: Path) -> None:
+    _run((PYTHON, "tests/fixtures/python/review_performance/run_all.py",
           "--work", scratch / "review-performance", "--report", scratch / "review-performance.json",
           "--renderer", _puppeteer_root(scratch)))
 
 
-def _review_layout_sandbox(scratch: Path) -> None:
-    _run((PYTHON, "sandbox/python/review_layout/run_all.py",
+def _review_layout_regressions(scratch: Path) -> None:
+    _run((PYTHON, "tests/fixtures/python/review_layout/run_all.py",
           "--work", scratch / "review-layout", "--report", scratch / "review-layout.json",
           "--renderer", _puppeteer_root(scratch)))
 
 
-def _resource_sections_sandbox(scratch: Path) -> None:
-    _run((PYTHON, "sandbox/python/resource_sections/run_all.py",
+def _resource_sections_regressions(scratch: Path) -> None:
+    _run((PYTHON, "tests/fixtures/python/resource_sections/run_all.py",
           "--work", scratch / "python-resource-sections", "--report", scratch / "python-resource-sections.json",
           "--renderer", _puppeteer_root(scratch)))
-    _run((PYTHON, "sandbox/javascript/resource_sections/run_all.py",
+    _run((PYTHON, "tests/fixtures/javascript/resource_sections/run_all.py",
           "--work", scratch / "javascript-resource-sections", "--report", scratch / "javascript-resource-sections.json",
           "--renderer", _puppeteer_root(scratch), "--toolchain", scratch / "pytest/javascript-toolchain"))
 
 
-def _adaptation_sandbox(scratch: Path, *, workers: int = DEFAULT_WORKERS) -> None:
-    _run((PYTHON, "sandbox/adaptation_regressions/run_all.py", "--workers", str(workers),
+def _adaptation_regressions(scratch: Path, *, workers: int = DEFAULT_WORKERS) -> None:
+    _run((PYTHON, "tests/fixtures/adaptation_regressions/run_all.py", "--workers", str(workers),
           "--toolchain", scratch / "pytest/javascript-toolchain", "--renderer", _puppeteer_root(scratch),
           "--work", scratch / "adaptation-regressions", "--report", scratch / "adaptation-regressions.json"))
 
@@ -655,12 +656,12 @@ def _steps(*, full: bool, workers: int = DEFAULT_WORKERS) -> tuple[Step, ...]:
         Step("python-sandbox", _python_sandbox),
         Step("javascript-minimal", _javascript_minimal),
         Step("javascript-integration", _javascript_integration),
-        Step("rule-regression-sandboxes", lambda scratch: _rule_sandboxes(scratch, workers=workers)),
+        Step("rule-regressions", lambda scratch: _rule_regressions(scratch, workers=workers)),
         Step("runtime-observation-browser", _runtime_observation_browser),
-        Step("review-layout-sandbox", _review_layout_sandbox),
-        Step("resource-sections-sandbox", _resource_sections_sandbox),
-        Step("review-performance-sandbox", _review_performance_sandbox),
-        Step("adaptation-regression-sandbox", lambda scratch: _adaptation_sandbox(scratch, workers=workers)),
+        Step("review-layout-regressions", _review_layout_regressions),
+        Step("resource-sections-regressions", _resource_sections_regressions),
+        Step("review-performance-regressions", _review_performance_regressions),
+        Step("adaptation-regressions", lambda scratch: _adaptation_regressions(scratch, workers=workers)),
         Step("wheel-isolation", _wheel_smoke),
         Step("generated-artifact-cleanup", _cleanup_generated_artifacts),
         Step("distribution", _distribution_smoke),
@@ -698,16 +699,20 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--scratch",
         type=Path,
-        help="use an explicit ignored scratch directory instead of a temporary one",
+        help="use a caller-owned scratch directory outside the repository",
     )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    parser = _parser()
+    args = parser.parse_args(argv)
     try:
         if args.scratch is not None:
-            scratch = args.scratch.resolve()
+            try:
+                scratch = external_scratch(args.scratch, ROOT)
+            except ValueError as exc:
+                parser.error(str(exc))
             scratch.mkdir(parents=True, exist_ok=True)
             _run_steps(_steps(full=args.full, workers=args.workers), scratch=scratch)
         else:

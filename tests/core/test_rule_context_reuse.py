@@ -5,7 +5,7 @@ from types import MappingProxyType
 
 import pytest
 
-from sandbox.python.context_reuse.probe import observe
+from tests.fixtures.python.context_reuse.probe import observe
 from vibeflow.core.rules import RuleContext, RuleCall, RuleDescriptor, RuleResult, RulesetDescriptor, compile_ruleset, execute_rule_plan
 
 

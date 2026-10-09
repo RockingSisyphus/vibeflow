@@ -4,6 +4,14 @@ import os
 from pathlib import Path
 
 
+def external_scratch(path: Path, repository: Path) -> Path:
+    """Keep disposable test workspaces out of maintained repository trees."""
+    resolved = path.expanduser().resolve()
+    if resolved == repository or repository in resolved.parents:
+        raise ValueError("test scratch must be outside the repository; omit --scratch for automatic cleanup")
+    return resolved
+
+
 def pytest_configure(config):
     worker_input = getattr(config, "workerinput", None)
     if worker_input:

@@ -4,7 +4,7 @@
 
 **状态：职责定义依据用户明确要求；具体实施细则为整改建议，尚未实施。本文不是修复完成报告，也不授权自动执行全部产品改动。** 不能把本规格中的目标行为描述成当前已有能力。开发者实施后，应以实际代码和对应验收重新核对。
 
-本规格承接[职责边界审核](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-audit-20261009.md)，保留 B01—B11 编号。历史反例和旧审核报告保留原貌；本文重新界定哪些问题属于当前产品责任，不改写历史事实。
+本规格承接[职责边界审核](history/product-boundary-audit-20261009.md)，保留 B01—B11 编号。历史反例和旧审核报告保留原貌；本文重新界定哪些问题属于当前产品责任，不改写历史事实。
 
 ## 一、完整职责定义
 
@@ -53,14 +53,14 @@
 
 源码基线为 HEAD **5b9f9763ab7051fc964a4d83a1419d87a621b4c9**，包含当时工作区中的未提交修复。源码链接的行号依据当前工作区核对；实施后行号会移动，应同时按本文列出的函数和字段定位。
 
-先前职责审核保存了 335 个产品文件的状态，见[源码状态](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-audit-20261009/source-state.json)。现有行为证据为：
+先前职责审核保存了 335 个产品文件的状态，见[源码状态](evidence/index.md#artifact-d655cb92522f3056)。现有行为证据为：
 
 | 证据 | 实际覆盖 | 限制 |
 |---|---|---|
-| [Python CLI 结果](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-audit-20261009/cli-results.json) | 13 项 SDK → Ruleset → 正式 validate 案例，8 项拒绝、5 项对照通过 | 加载声明和检查源码，没有执行业务 Node |
-| [JS 原生 Rule 与 lock API 结果](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-audit-20261009/javascript-results.json) | 5 项原生 Rule 案例、3 项工具链 API 案例 | 不是完整 workflow 构建；lock 案例确认的是工具启动前拒绝 |
-| [Python 接口 Rule 结果](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-audit-20261009/interface-results.json) | 4 项原生接口 Rule 案例 | 不是完整 workflow 运行验收 |
-| [审核摘要](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-audit-20261009/summary.json) | 记录执行范围与未实施状态 | 不代表本规格中的目标行为已验证 |
+| [Python CLI 结果](evidence/index.md#artifact-2ac0ffdf07bbff35) | 13 项 SDK → Ruleset → 正式 validate 案例，8 项拒绝、5 项对照通过 | 加载声明和检查源码，没有执行业务 Node |
+| [JS 原生 Rule 与 lock API 结果](evidence/index.md#artifact-740f7a052f53d806) | 5 项原生 Rule 案例、3 项工具链 API 案例 | 不是完整 workflow 构建；lock 案例确认的是工具启动前拒绝 |
+| [Python 接口 Rule 结果](evidence/index.md#artifact-4297044948174fc1) | 4 项原生接口 Rule 案例 | 不是完整 workflow 运行验收 |
+| [审核摘要](evidence/index.md#artifact-2a460472d79d47fa) | 记录执行范围与未实施状态 | 不代表本规格中的目标行为已验证 |
 
 本文编写时补查了消费者和源码位置，没有为文档重新执行全量测试、发行构建或业务验收。不能用上述探针宣称未来修改已经安全完成，也不能宣称穷尽全部第三方 Rule。
 
@@ -72,10 +72,10 @@
 
 **源码位置及调用关系**
 
-- [input_tracking.py：_input_reference_facts](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:102)、[_ExceptionAliases](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:111)、[_InputCallFacts](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:138) 是主分析实现；[visit_Try](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:511) 建模异常与 handler 状态。
-- [parameter_facts.py：source_parameter_facts](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-remediation-20261009/baseline.tar.gz#baseline/src/vibeflow/targets/python/quality/source_analysis/parameter_facts.py) 沿调用传播输入参数、字典事实和 builtin 事实。
-- [effects.py：参数事实装配](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/rules/effects.py:83) 将结果交给 Node／Module visitor；[visitors.py：_visit_input_scoped_body](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/visitors.py:241) 再调用局部分析。
-- [source_input_parameters](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:81) 是参数分析的转接入口；[_tainted_helper_parameters](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:786) 服务跨函数传播。
+- [input_tracking.py：_input_reference_facts](../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:102)、[_ExceptionAliases](../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:111)、[_InputCallFacts](../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:138) 是主分析实现；[visit_Try](../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:511) 建模异常与 handler 状态。
+- [parameter_facts.py：source_parameter_facts](evidence/index.md#artifact-2ee797c99fa41c0b) 沿调用传播输入参数、字典事实和 builtin 事实。
+- [effects.py：参数事实装配](../../src/vibeflow/targets/python/quality/rules/effects.py:83) 将结果交给 Node／Module visitor；[visitors.py：_visit_input_scoped_body](../../src/vibeflow/targets/python/quality/source_analysis/visitors.py:241) 再调用局部分析。
+- [source_input_parameters](../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:81) 是参数分析的转接入口；[_tainted_helper_parameters](../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:786) 服务跨函数传播。
 
 **当前逻辑**
 
@@ -115,9 +115,9 @@
 
 **源码位置及调用关系**
 
-- [visitors.py：NodePurityVisitor.visit_Return](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/visitors.py:631) 根据推断出的键集合拒绝返回语句。
-- [input_tracking.py：_track_output_literal](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:801)、[_track_output_key_assignment](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:810)、[_record_output_key](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:815)、[_return_keys](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:851) 保存和读取输出键；[visitor 初始化](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/visitors.py:544) 建立 _output_dicts。
-- 应保留的实际接口：[Python Runtime._validate_outputs](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/runtime/node_mixin.py:267)、[JS node_contract_check](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/frontend/build_contracts.py:61)。
+- [visitors.py：NodePurityVisitor.visit_Return](../../src/vibeflow/targets/python/quality/source_analysis/visitors.py:631) 根据推断出的键集合拒绝返回语句。
+- [input_tracking.py：_track_output_literal](../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:801)、[_track_output_key_assignment](../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:810)、[_record_output_key](../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:815)、[_return_keys](../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:851) 保存和读取输出键；[visitor 初始化](../../src/vibeflow/targets/python/quality/source_analysis/visitors.py:544) 建立 _output_dicts。
+- 应保留的实际接口：[Python Runtime._validate_outputs](../../src/vibeflow/targets/python/runtime/node_mixin.py:267)、[JS node_contract_check](../../src/vibeflow/targets/javascript/frontend/build_contracts.py:61)。
 
 **当前逻辑**
 
@@ -145,9 +145,9 @@ run_pure 的返回值无法被静态识别为字典键集合时，报 NODE.PURIT
 
 **源码位置及调用关系**
 
-- [runtime_dispatch.py：analyze_runtime_dispatch](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-remediation-20261009/baseline.tar.gz#baseline/src/vibeflow/targets/python/quality/source_analysis/runtime_dispatch.py)、[analyze_source_runtime_dispatch](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-remediation-20261009/baseline.tar.gz#baseline/src/vibeflow/targets/python/quality/source_analysis/runtime_dispatch.py)、[_RuntimeDispatchAnalyzer](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-remediation-20261009/baseline.tar.gz#baseline/src/vibeflow/targets/python/quality/source_analysis/runtime_dispatch.py) 构成约 919 行的推断器。
-- [效果规则入口](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/rules/effects.py:177) 产生 NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED warning；[Python 编译适配入口 _runtime_dispatch_fact](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/project/compiler.py:228) 也执行推断。
-- 编译装配另见[_refresh_rule_facts](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/project/compiler.py:135)、[_adapt_implementation_facts](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/project/compiler.py:159)。
+- [runtime_dispatch.py：analyze_runtime_dispatch](evidence/index.md#artifact-2ee797c99fa41c0b)、[analyze_source_runtime_dispatch](evidence/index.md#artifact-2ee797c99fa41c0b)、[_RuntimeDispatchAnalyzer](evidence/index.md#artifact-2ee797c99fa41c0b) 构成约 919 行的推断器。
+- [效果规则入口](../../src/vibeflow/targets/python/quality/rules/effects.py:177) 产生 NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED warning；[Python 编译适配入口 _runtime_dispatch_fact](../../src/vibeflow/targets/python/project/compiler.py:228) 也执行推断。
+- 编译装配另见[_refresh_rule_facts](../../src/vibeflow/targets/python/project/compiler.py:135)、[_adapt_implementation_facts](../../src/vibeflow/targets/python/project/compiler.py:159)。
 
 **当前逻辑**
 
@@ -163,14 +163,14 @@ run_pure 的返回值无法被静态识别为字典键集合时，报 NODE.PURIT
 
 | 消费者 | 需要清理的位置 |
 |---|---|
-| 实现事实与编译图 | [ImplementationFact.runtime_dispatch](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/core/models.py:28)、[CompiledGraph.runtime_dispatches](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/core/compiler.py:44)、[_node_runtime_dispatches](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/core/compiler.py:827) |
-| BlockPlan 与序列化 | [BlockPlan 投影](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/block_compiler/compiler.py:420)、[NodePlan 字段](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/block_compiler/model.py:325)、[字典输出](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/block_compiler/model.py:391) |
-| Python 可移植适配 | [portable_adapter.py 投影](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/runtime/support/portable_adapter.py:232) |
-| JS 事实装配 | [frontend/facts.py](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/frontend/facts.py:94) 及同文件另一构造位置 |
-| Core 架构资料 | [inspection/architecture.py 标签函数](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/core/inspection/architecture.py:127) 及记录生成 |
-| Python 文档与 SVG | [architecture_document.py](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/application/python/presentation/architecture_document.py:329)、[mermaid/__init__.py](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/application/python/presentation/mermaid/__init__.py:709) 中字段、文本与各布局消费者 |
-| JS audit 与 review | [audit.py](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/application/javascript/audit.py:458)、[review.py](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/application/javascript/review.py:775) 中记录、标签与文本消费者 |
-| 共享展示与导出 | [展示标签解析](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/presentation/mermaid.py:216)、[source_analysis 导出](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/__init__.py:4)、[旧诊断映射](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/types.py:191) |
+| 实现事实与编译图 | [ImplementationFact.runtime_dispatch](../../src/vibeflow/core/models.py:28)、[CompiledGraph.runtime_dispatches](../../src/vibeflow/core/compiler.py:44)、[_node_runtime_dispatches](../../src/vibeflow/core/compiler.py:827) |
+| BlockPlan 与序列化 | [BlockPlan 投影](../../src/vibeflow/block_compiler/compiler.py:420)、[NodePlan 字段](../../src/vibeflow/block_compiler/model.py:325)、[字典输出](../../src/vibeflow/block_compiler/model.py:391) |
+| Python 可移植适配 | [portable_adapter.py 投影](../../src/vibeflow/targets/python/runtime/support/portable_adapter.py:232) |
+| JS 事实装配 | [frontend/facts.py](../../src/vibeflow/targets/javascript/frontend/facts.py:94) 及同文件另一构造位置 |
+| Core 架构资料 | [inspection/architecture.py 标签函数](../../src/vibeflow/core/inspection/architecture.py:127) 及记录生成 |
+| Python 文档与 SVG | [architecture_document.py](../../src/vibeflow/tooling/application/python/presentation/architecture_document.py:329)、[mermaid/__init__.py](../../src/vibeflow/tooling/application/python/presentation/mermaid/__init__.py:709) 中字段、文本与各布局消费者 |
+| JS audit 与 review | [audit.py](../../src/vibeflow/tooling/application/javascript/audit.py:458)、[review.py](../../src/vibeflow/tooling/application/javascript/review.py:775) 中记录、标签与文本消费者 |
+| 共享展示与导出 | [展示标签解析](../../src/vibeflow/tooling/presentation/mermaid.py:216)、[source_analysis 导出](../../src/vibeflow/targets/python/quality/source_analysis/__init__.py:4)、[旧诊断映射](../../src/vibeflow/targets/python/quality/source_analysis/types.py:191) |
 
 涉及公开计划／报告格式时，明确版本和迁移说明。若确需有限过渡，可以输出“未分析”占位，但必须指定移除版本，不能保留旧分析器暗中运行。不扩展为动态调用安全检查，不移除共享源码依赖解析。
 
@@ -186,7 +186,7 @@ run_pure 的返回值无法被静态识别为字典键集合时，报 NODE.PURIT
 
 **源码位置**
 
-[NodePurityVisitor.visit_While](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/visitors.py:615)；[check_node_implementation 中 recursive_paths 的硬拒绝](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/builtin/implementation.py:85)。
+[NodePurityVisitor.visit_While](../../src/vibeflow/targets/python/quality/source_analysis/visitors.py:615)；[check_node_implementation 中 recursive_paths 的硬拒绝](../../src/vibeflow/builtin/implementation.py:85)。
 
 **当前逻辑**
 
@@ -214,7 +214,7 @@ Node 可以完成正常局部算法；工作流 Loop 表示跨 Node 的重复调
 
 **源码位置**
 
-[RESOURCE_FIELD_NAMES](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/types.py:60)、[_assigns_resource_field](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/helpers.py:39)、[Node visitor 的字段判断](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/visitors.py:583)、[_check_monkey_patch_call](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/visitors.py:654)、[Module visitor 对 setattr／delattr 的判断](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/visitors.py:756)、[_check_assignment_target](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:837)。
+[RESOURCE_FIELD_NAMES](../../src/vibeflow/targets/python/quality/source_analysis/types.py:60)、[_assigns_resource_field](../../src/vibeflow/targets/python/quality/source_analysis/helpers.py:39)、[Node visitor 的字段判断](../../src/vibeflow/targets/python/quality/source_analysis/visitors.py:583)、[_check_monkey_patch_call](../../src/vibeflow/targets/python/quality/source_analysis/visitors.py:654)、[Module visitor 对 setattr／delattr 的判断](../../src/vibeflow/targets/python/quality/source_analysis/visitors.py:756)、[_check_assignment_target](../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:837)。
 
 **当前逻辑**
 
@@ -242,10 +242,10 @@ self.client = 1 因字段名被判成资源持有，self.value = 1 通过。对�
 
 **源码位置及调用关系**
 
-- [effects.py：硬禁导入与 FFI 集合](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/effects.py:47)、[call_violation](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/effects.py:313)、[_is_python_io_call](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/effects.py:543)。
-- [ambient_state_call_name](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/effects.py:395)、[_looks_like_ambient_container](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/effects.py:430)、[dynamic_namespace_reference](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/effects.py:441)、[_dynamic_reflection_call_name](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/effects.py:577)。
-- [visitor 效果调用消费者](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/visitors.py:435)、[ExitStack 分析装配](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/visitors.py:202)、[exit_stacks.py：analyze_exit_stacks](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-remediation-20261009/baseline.tar.gz#baseline/src/vibeflow/targets/python/quality/source_analysis/exit_stacks.py)。
-- JS 同类边界实现为[auditHostIo](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/resources/toolchain_driver.mjs:1821)、[auditModuleStateWrites](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/resources/toolchain_driver.mjs:1454)，应按同一职责定义检查，不机械复制 Python 语法。
+- [effects.py：硬禁导入与 FFI 集合](../../src/vibeflow/targets/python/quality/source_analysis/effects.py:47)、[call_violation](../../src/vibeflow/targets/python/quality/source_analysis/effects.py:313)、[_is_python_io_call](../../src/vibeflow/targets/python/quality/source_analysis/effects.py:543)。
+- [ambient_state_call_name](../../src/vibeflow/targets/python/quality/source_analysis/effects.py:395)、[_looks_like_ambient_container](../../src/vibeflow/targets/python/quality/source_analysis/effects.py:430)、[dynamic_namespace_reference](../../src/vibeflow/targets/python/quality/source_analysis/effects.py:441)、[_dynamic_reflection_call_name](../../src/vibeflow/targets/python/quality/source_analysis/effects.py:577)。
+- [visitor 效果调用消费者](../../src/vibeflow/targets/python/quality/source_analysis/visitors.py:435)、[ExitStack 分析装配](../../src/vibeflow/targets/python/quality/source_analysis/visitors.py:202)、[exit_stacks.py：analyze_exit_stacks](evidence/index.md#artifact-2ee797c99fa41c0b)。
+- JS 同类边界实现为[auditHostIo](../../src/vibeflow/targets/javascript/resources/toolchain_driver.mjs:1821)、[auditModuleStateWrites](../../src/vibeflow/targets/javascript/resources/toolchain_driver.mjs:1454)，应按同一职责定义检查，不机械复制 Python 语法。
 
 **当前逻辑**
 
@@ -284,7 +284,7 @@ effects.py 当前约 610 行，exit_stacks.py 163 行。目标是删除原因和
 
 **源码位置**
 
-[auditHostIo 的 nondeterministicGlobals](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/resources/toolchain_driver.mjs:1837)、[reportNondeterminism](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/resources/toolchain_driver.mjs:1899)、[Math 和动态成员判断](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/resources/toolchain_driver.mjs:1994)。
+[auditHostIo 的 nondeterministicGlobals](../../src/vibeflow/targets/javascript/resources/toolchain_driver.mjs:1837)、[reportNondeterminism](../../src/vibeflow/targets/javascript/resources/toolchain_driver.mjs:1899)、[Math 和动态成员判断](../../src/vibeflow/targets/javascript/resources/toolchain_driver.mjs:1994)。
 
 **当前逻辑**
 
@@ -312,7 +312,7 @@ Date、performance、crypto/webcrypto 和 Math 的部分使用与宿主权限混
 
 **源码位置**
 
-[node_interface.py：contract_overlap、Decision 命名和 examples.outputs](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/rules/node_interface.py:61)、[_looks_route_key](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/rules/node_interface.py:91)；[Node schema 的 examples 定义](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/tooling/project/schema/node.schema.json:124)。
+[node_interface.py：contract_overlap、Decision 命名和 examples.outputs](../../src/vibeflow/targets/python/quality/rules/node_interface.py:61)、[_looks_route_key](../../src/vibeflow/targets/python/quality/rules/node_interface.py:91)；[Node schema 的 examples 定义](../../src/vibeflow/tooling/project/schema/node.schema.json:124)。
 
 **当前逻辑**
 
@@ -326,7 +326,7 @@ Date、performance、crypto/webcrypto 和 Math 的部分使用与宿主权限混
 
 删除这三项 hard finding 和专用命名函数；不将它们换成另一套强制命名门禁。命名风格若保留，只能作为明确风格政策或非阻塞提示。
 
-保留入口签名、实现 symbol、单一执行入口、支持的 completion、合法声明字段和语义说明覆盖。保留[Core 的 Decision 路由条件检查](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/core/compiler.py:761)及实际端口绑定；不由输出名称猜业务路由。不要声称此处新增了尚未实现的所有 when 表达式语义校验。
+保留入口签名、实现 symbol、单一执行入口、支持的 completion、合法声明字段和语义说明覆盖。保留[Core 的 Decision 路由条件检查](../../src/vibeflow/core/compiler.py:761)及实际端口绑定；不由输出名称猜业务路由。不要声称此处新增了尚未实现的所有 when 表达式语义校验。
 
 **为什么这样改**
 
@@ -340,9 +340,9 @@ Date、performance、crypto/webcrypto 和 Math 的部分使用与宿主权限混
 
 **源码位置及调用关系**
 
-[probe_toolchain](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/build/toolchain.py:90)、[run_build_driver](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/build/toolchain.py:122) 都调用[_lock_identity](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/build/toolchain.py:281)与[_validate_lock_tool_versions](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/build/toolchain.py:319)。[ToolchainInfo 字段](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/build/toolchain.py:43)携带 lock_sha256／lock_files。
+[probe_toolchain](../../src/vibeflow/targets/javascript/build/toolchain.py:90)、[run_build_driver](../../src/vibeflow/targets/javascript/build/toolchain.py:122) 都调用[_lock_identity](../../src/vibeflow/targets/javascript/build/toolchain.py:281)与[_validate_lock_tool_versions](../../src/vibeflow/targets/javascript/build/toolchain.py:319)。[ToolchainInfo 字段](../../src/vibeflow/targets/javascript/build/toolchain.py:43)携带 lock_sha256／lock_files。
 
-补充消费者：[publish.py 的 _TOOLCHAIN_KEYS](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/build/publish.py:37)、[_validate_toolchain](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/build/publish.py:359) 强制要求这两个字段。只删构建前调用会留下发布格式残余。
+补充消费者：[publish.py 的 _TOOLCHAIN_KEYS](../../src/vibeflow/targets/javascript/build/publish.py:37)、[_validate_toolchain](../../src/vibeflow/targets/javascript/build/publish.py:359) 强制要求这两个字段。只删构建前调用会留下发布格式残余。
 
 **当前逻辑**
 
@@ -372,7 +372,7 @@ Date、performance、crypto/webcrypto 和 Math 的部分使用与宿主权限混
 
 **源码位置及调用关系**
 
-[内置 Rule／Ruleset 装配 builtin_effect_resources](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/builtin/effects.py:7)、[Python 效果规则参数与 visitor 装配](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/rules/effects.py:83)、[NodePurityVisitor](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/visitors.py:529)、[ModulePurityVisitor](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/visitors.py:684)。
+[内置 Rule／Ruleset 装配 builtin_effect_resources](../../src/vibeflow/builtin/effects.py:7)、[Python 效果规则参数与 visitor 装配](../../src/vibeflow/targets/python/quality/rules/effects.py:83)、[NodePurityVisitor](../../src/vibeflow/targets/python/quality/source_analysis/visitors.py:529)、[ModulePurityVisitor](../../src/vibeflow/targets/python/quality/source_analysis/visitors.py:684)。
 
 **当前逻辑**
 
@@ -402,9 +402,9 @@ no_side_effects 的共同 visitor 同时负责效果、输入污染、输出键�
 
 **源码位置及当前逻辑**
 
-[input_tracking.py：_check_params_get_call](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:828) 仍被[NodePurityVisitor.visit_Call](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/python/quality/source_analysis/visitors.py:607) 调用，但其最终调用的 _check_params_key_node 只删除局部参数，没有判定效果。
+[input_tracking.py：_check_params_get_call](../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:828) 仍被[NodePurityVisitor.visit_Call](../../src/vibeflow/targets/python/quality/source_analysis/visitors.py:607) 调用，但其最终调用的 _check_params_key_node 只删除局部参数，没有判定效果。
 
-[core/result_scope.py：_NOT_CHECKED](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/core/result_scope.py:38) 已排除业务正确性等项目，但尚未明确列出代码安全性和通用程序行为证明。旧活动测试、parity 与文档还可能把被退役能力当作通过条件。
+[core/result_scope.py：_NOT_CHECKED](../../src/vibeflow/core/result_scope.py:38) 已排除业务正确性等项目，但尚未明确列出代码安全性和通用程序行为证明。旧活动测试、parity 与文档还可能把被退役能力当作通过条件。
 
 **目标逻辑**
 
@@ -418,12 +418,12 @@ no_side_effects 的共同 visitor 同时负责效果、输入污染、输出键�
 
 | 旧能力或消费者 | 测试与资料位置 | 处置方式 |
 |---|---|---|
-| 异常／写回／参数推断 | [test_input_exception_states.py](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-remediation-20261009/baseline.tar.gz#baseline/tests/targets/python/test_input_exception_states.py)、[test_input_writeback.py](/home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_input_writeback.py)、[test_source_parameter_facts.py](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-remediation-20261009/baseline.tar.gz#baseline/tests/targets/python/test_source_parameter_facts.py) | 删除专用语义证明期待；共享作用域或有限规则案例按新目标保留 |
-| 动态分派 | [test_runtime_dispatch.py](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-remediation-20261009/original-tests.tar.gz#tests/targets/python/test_runtime_dispatch.py)、[test_source_effect_parameters.py](/home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_source_effect_parameters.py) | 退役专用推断测试；检查是否混有真实依赖／效果测试 |
-| ExitStack 静态豁免 | [test_exit_stack.py](/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-remediation-20261009/original-tests.tar.gz#tests/targets/python/test_exit_stack.py) | 退役语义补偿期待；不删除运行生命周期验收 |
-| Plan 与展示 | [test_block_compiler.py](/home/rockingsisyphus/projects/VibeFlow/tests/block_compiler/test_block_compiler.py)、[strict_portable_plan.py](/home/rockingsisyphus/projects/VibeFlow/tests/block_compiler/strict_portable_plan.py)、[strict_architecture_document.py](/home/rockingsisyphus/projects/VibeFlow/tests/tooling/strict_architecture_document.py)、[strict_mermaid_cli.py](/home/rockingsisyphus/projects/VibeFlow/tests/tooling/strict_mermaid_cli.py) | 更新退休字段与格式，保留真实计划／展示功能 |
-| JS 事实与 AOT | [test_implementation_facts.py](/home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_implementation_facts.py)、[strict_aot_project_build.py](/home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/strict_aot_project_build.py)、[strict_aot_publish.py](/home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/strict_aot_publish.py) | 更新字段和 lock 期待，继续验证实际工具接入与发布 |
-| 旧 parity | [sandbox/rule_parity/reference.json](/home/rockingsisyphus/projects/VibeFlow/sandbox/rule_parity/reference.json)、[python/node_specs.py](/home/rockingsisyphus/projects/VibeFlow/sandbox/rule_parity/python/node_specs.py) 及两种语言案例 | 按新职责更新活动基线，不用旧 PASS 数量裁决新目标 |
+| 异常／写回／参数推断 | [test_input_exception_states.py](evidence/index.md#artifact-2ee797c99fa41c0b)、[test_input_writeback.py](../../tests/targets/python/test_input_writeback.py)、[test_source_parameter_facts.py](evidence/index.md#artifact-2ee797c99fa41c0b) | 删除专用语义证明期待；共享作用域或有限规则案例按新目标保留 |
+| 动态分派 | [test_runtime_dispatch.py](evidence/index.md#artifact-d5548768dfd7a91a)、[test_source_effect_parameters.py](../../tests/targets/python/test_source_effect_parameters.py) | 退役专用推断测试；检查是否混有真实依赖／效果测试 |
+| ExitStack 静态豁免 | [test_exit_stack.py](evidence/index.md#artifact-d5548768dfd7a91a) | 退役语义补偿期待；不删除运行生命周期验收 |
+| Plan 与展示 | [test_block_compiler.py](../../tests/block_compiler/test_block_compiler.py)、[strict_portable_plan.py](../../tests/block_compiler/strict_portable_plan.py)、[strict_architecture_document.py](../../tests/tooling/strict_architecture_document.py)、[strict_mermaid_cli.py](../../tests/tooling/strict_mermaid_cli.py) | 更新退休字段与格式，保留真实计划／展示功能 |
+| JS 事实与 AOT | [test_implementation_facts.py](../../tests/targets/javascript/test_implementation_facts.py)、[strict_aot_project_build.py](../../tests/targets/javascript/strict_aot_project_build.py)、[strict_aot_publish.py](../../tests/targets/javascript/strict_aot_publish.py) | 更新字段和 lock 期待，继续验证实际工具接入与发布 |
+| 旧 parity | [tests/fixtures/rule_parity/reference.json](../../tests/fixtures/rule_parity/reference.json)、[python/node_specs.py](../../tests/fixtures/rule_parity/python/node_specs.py) 及两种语言案例 | 按新职责更新活动基线，不用旧 PASS 数量裁决新目标 |
 
 表列的是本次核对到的入口，不是实施时可以省略消费者搜索的声明；不得仅按文件名整文件删除混合测试。原 F01—F06 仍可记录当时发现的事实；真实身份、明确外部操作和词法识别问题依然有效，复杂行为证明不再要求补齐。
 
@@ -451,7 +451,7 @@ no_side_effects 的共同 visitor 同时负责效果、输入污染、输出键�
 | 缓存／身份用途的摘要和确有需要的产物字段 | 不属于 npm lock 资格检查 | 搜到 SHA／manifest 就一律删除 |
 | profile 的明确开发协议 | 既有协作方式，不自动等于运行时安全准入 | 无证据撤销 collaborative 的人工架构协议 |
 
-JS driver 的[auditContracts 普通诊断范围](/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/resources/toolchain_driver.mjs:2377)针对生成契约文件；不能只看 strict 配置便认定它在强制证明整个业务项目类型正确。此处保留的是接入合同，不是新增完整业务编译检查。
+JS driver 的[auditContracts 普通诊断范围](../../src/vibeflow/targets/javascript/resources/toolchain_driver.mjs:2377)针对生成契约文件；不能只看 strict 配置便认定它在强制证明整个业务项目类型正确。此处保留的是接入合同，不是新增完整业务编译检查。
 
 去除某项静态推断意味着不再提前报告它曾试图发现的部分业务风险；这是职责收缩的实际后果，应诚实记录。不能为了恢复同样“覆盖率”再添加沙箱、输入冻结、深拷贝、预运行、全依赖扫描或历史报告准入。
 

@@ -1,8 +1,0 @@
-{
-  "runtime_and_user_manual_inputs_unchanged": true,
-  "full_input_files": 2389,
-  "after_batch_changes": [
-    "docs/README.md"
-  ],
-  "reason": "Index the new maintainer review-fixes record; source and shipped manuals unchanged."
-}
