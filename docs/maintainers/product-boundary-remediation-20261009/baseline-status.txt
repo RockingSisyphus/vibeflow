@@ -1,0 +1,26 @@
+ M docs/README.md
+ M docs/maintainers/quality-boundaries.md
+ M sandbox/rule_parity/python/ownership_variants.py
+ M src/vibeflow/targets/python/quality/rules/effects.py
+ M src/vibeflow/targets/python/quality/source_analysis/bindings.py
+ M src/vibeflow/targets/python/quality/source_analysis/input_tracking.py
+ M src/vibeflow/targets/python/quality/source_analysis/visitors.py
+ M src/vibeflow/targets/python/quality/source_context.py
+?? docs/maintainers/product-boundary-audit-20261009.md
+?? docs/maintainers/product-boundary-audit-20261009/
+?? docs/maintainers/product-boundary-refactor-spec-20261009.md
+?? docs/maintainers/product-boundary-remediation-20261009/
+?? docs/maintainers/python-alias-facts-fix-20261008.md
+?? docs/maintainers/python-alias-facts-fix-20261008/
+?? docs/maintainers/python-alias-facts-review-20261008.md
+?? docs/maintainers/python-alias-facts-review-20261008/
+?? docs/maintainers/python-exception-alias-fix-20261008.md
+?? docs/maintainers/python-exception-alias-fix-20261008/
+?? docs/maintainers/python-exception-alias-review-20261009.md
+?? docs/maintainers/python-exception-alias-review-20261009/
+?? src/vibeflow/targets/python/quality/source_analysis/parameter_facts.py
+?? tests/targets/python/test_effect_alias_scopes.py
+?? tests/targets/python/test_input_exception_states.py
+?? tests/targets/python/test_input_writeback.py
+?? tests/targets/python/test_source_control_definitions.py
+?? tests/targets/python/test_source_parameter_facts.py

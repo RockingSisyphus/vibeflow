@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping, TypeAlias
 
 
-WORKFLOW_ABI_VERSION = "vibeflow.workflow.v4"
+WORKFLOW_ABI_VERSION = "vibeflow.workflow.v5"
 _CARDINALITIES = frozenset({"exactly_one", "optional_one", "all"})
 _BLOCK_KINDS = frozenset({"workflow", "nodeset", "loop"})
 _CONDITION_OPERATORS = frozenset({"==", "!="})
@@ -322,7 +322,6 @@ class NodeCallPlan:
     io_operation: str = ""
     io_port: str = ""
     effect_scope: str = "none"
-    runtime_dispatch: bool | None = None
     execution_lock: ExecutionLockPlan | None = None
     contains_global_state: bool = False
 
@@ -341,12 +340,6 @@ class NodeCallPlan:
             )
         if not isinstance(self.effect_scope, str) or not self.effect_scope:
             raise PortablePlanError("node effect_scope must be non-empty")
-        if self.runtime_dispatch is not None and not isinstance(
-            self.runtime_dispatch, bool
-        ):
-            raise PortablePlanError(
-                "node runtime_dispatch must be true, false, or null"
-            )
         if self.execution_lock is not None and not isinstance(
             self.execution_lock, ExecutionLockPlan
         ):
@@ -388,7 +381,7 @@ class NodeCallPlan:
             "io_operation": self.io_operation,
             "io_port": self.io_port,
             "effect_scope": self.effect_scope,
-            "runtime_dispatch": self.runtime_dispatch,
+
             "execution_lock": (
                 self.execution_lock.to_dict()
                 if self.execution_lock is not None

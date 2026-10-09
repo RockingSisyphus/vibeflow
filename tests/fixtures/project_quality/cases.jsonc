@@ -13,7 +13,9 @@
     {
       "name": "dynamic_import",
       "run_body": "        importlib.import_module(\"math\")\n        return {\"demo.out\": 1}",
-      "expected_code": "NODE.PURITY.BANNED_CALL"
+      "expected_allowed": true,
+      "retired_code": "NODE.PURITY.BANNED_CALL",
+      "migration": "B06: string evaluation and dynamic import are not default security policy."
     },
     {
       "name": "node_mutual_call",
@@ -36,16 +38,12 @@
             {
               "display_name": "Add",
               "description": "Adds value.in.",
-
-
               "id": "add",
               "type_used": "test.add"
             },
             {
               "display_name": "Copy",
               "description": "Copies value.out back to value.in.",
-
-
               "id": "copy",
               "type_used": "test.copy"
             }
@@ -83,7 +81,6 @@
             {
               "display_name": "Seed",
               "description": "Produces value.in.",
-
               "id": "seed",
               "type_used": "test.seed"
             }
@@ -117,31 +114,24 @@
             {
               "display_name": "Add",
               "description": "Adds value.in.",
-
-
               "id": "add",
               "type_used": "test.add"
             },
             {
               "display_name": "Route",
               "description": "Routes the loop.",
-
-
               "id": "route",
               "type_used": "test.route"
             },
             {
               "display_name": "Copy",
               "description": "Copies output back to the loop input.",
-
-
               "id": "copy",
               "type_used": "test.copy_alt"
             },
             {
               "display_name": "End",
               "description": "Consumes value.in.",
-
               "id": "end",
               "type_used": "test.in_end"
             }
@@ -179,14 +169,12 @@
             {
               "display_name": "Seed",
               "description": "Produces value.in.",
-
               "id": "seed",
               "type_used": "test.seed"
             },
             {
               "display_name": "End",
               "description": "Consumes value.in.",
-
               "id": "end",
               "type_used": "test.in_end"
             }
@@ -217,15 +205,12 @@
             {
               "display_name": "Route",
               "description": "Produces route values.",
-
               "id": "route",
               "type_used": "test.route"
             },
             {
               "display_name": "Copy",
               "description": "Copies value.in to value.out.",
-
-
               "id": "copy",
               "type_used": "test.copy"
             }
@@ -263,14 +248,12 @@
             {
               "display_name": "Bad Name",
               "description": "Produces value.in for the policy fixture.",
-
               "id": "BadName",
               "type_used": "test.seed"
             },
             {
               "display_name": "End",
               "description": "Consumes value.in.",
-
               "id": "end",
               "type_used": "test.in_end"
             }
@@ -337,22 +320,18 @@
             {
               "display_name": "Seed",
               "description": "Produces value.in.",
-
               "id": "seed",
               "type_used": "test.seed"
             },
             {
               "display_name": "Add",
               "description": "Adds value.in.",
-
-
               "id": "add",
               "type_used": "test.add"
             },
             {
               "display_name": "End",
               "description": "Consumes value.out.",
-
               "id": "end",
               "type_used": "test.out_end"
             }

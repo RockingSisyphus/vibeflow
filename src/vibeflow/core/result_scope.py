@@ -20,8 +20,10 @@ _COVERAGE = {
     "node_contract_shape": CoverageItem("node_contract_shape", "节点契约形状"),
     "data_reachability": CoverageItem("data_reachability", "数据可达性"),
     "control_flow": CoverageItem("control_flow", "控制流"),
-    "effect_boundaries": CoverageItem("effect_boundaries", "副作用边界"),
+    "effect_boundaries": CoverageItem("effect_boundaries", "所选效果政策的明确边界"),
     "project_structure": CoverageItem("project_structure", "项目结构"),
+    "node_relationships": CoverageItem("node_relationships", "所选 Node 源码关系检查"),
+    "direct_input_writes": CoverageItem("direct_input_writes", "所选有限 Python 输入写入检查"),
     "source_quality": CoverageItem("source_quality", "源码质量与依赖结构"),
     "target_build": CoverageItem("target_build", "目标代码构建"),
     "data_schema": CoverageItem("data_schema", "Data Schema 与生成类型"),
@@ -37,6 +39,10 @@ _COVERAGE = {
 
 _NOT_CHECKED = (
     CoverageItem("business_correctness", "业务结果正确性"),
+    CoverageItem("code_security", "代码安全性"),
+    CoverageItem("general_execution_semantics", "通用业务执行语义"),
+    CoverageItem("determinism", "算法确定性"),
+    CoverageItem("all_side_effects", "全部副作用排除证明"),
     CoverageItem("requirements_conformance", "项目需求符合性"),
     CoverageItem("external_semantics", "外部接口业务语义"),
     CoverageItem("domain_data_correctness", "领域数据正确性"),
@@ -64,16 +70,14 @@ DEFAULT_CHECKS = {
         "node_contract_shape",
         "data_reachability",
         "control_flow",
-        "effect_boundaries",
         "project_structure",
     ),
-    "vibeflow_quality": ("project_structure", "source_quality", "effect_boundaries"),
+    "vibeflow_quality": (),
     "vibeflow_build": (
         "config_registration",
         "node_contract_shape",
         "data_reachability",
         "control_flow",
-        "effect_boundaries",
         "data_schema",
         "module_boundaries",
         "async_ownership",
@@ -84,7 +88,6 @@ DEFAULT_CHECKS = {
         "node_contract_shape",
         "data_reachability",
         "control_flow",
-        "effect_boundaries",
         "architecture_freshness",
         "review_artifact",
     ),
@@ -130,6 +133,51 @@ def result_scope_payload(
     }
 
 
+_OPTIONAL_CHECKS = ("effect_boundaries", "node_relationships", "direct_input_writes", "source_quality")
+_RULE_COVERAGE = {
+    "vibeflow.node_architecture": "node_relationships",
+    "vibeflow.input_writes": "direct_input_writes",
+    "vibeflow.node_interface": "node_contract_shape",
+    "vibeflow.maintainability": "source_quality",
+    "vibeflow.quality.files": "source_quality",
+    "vibeflow.quality.dependencies": "source_quality",
+    "vibeflow.quality.duplicates": "source_quality",
+    "vibeflow.quality.structure": "project_structure",
+}
+
+
+def _selected_checks(payload):
+    """Read completed Rule outputs already present in public reports."""
+    checks = set()
+    def visit(value):
+        if isinstance(value, Mapping):
+            plan, results = value.get("plan"), value.get("results")
+            if isinstance(plan, Mapping) and isinstance(results, Mapping):
+                for call in plan.get("calls", ()):
+                    result = results.get(call.get("id"), {})
+                    if result.get("state") != "completed":
+                        continue
+                    coverage = _RULE_COVERAGE.get(call.get("rule_id"))
+                    if coverage:
+                        checks.add(coverage)
+                    if any(record.get("type_id") == "vibeflow.effect_policy.v1"
+                           for record in result.get("records", {}).values()):
+                        checks.add("effect_boundaries")
+            for name in ("rule_executions", "rule_checks", "subjects", "info", "health", "roots", "workspace_roots", "reports", "source_quality"):
+                child = value.get(name)
+                if child is not None:
+                    if name == "subjects" and isinstance(child, Mapping):
+                        for executions in child.values():
+                            visit(executions)
+                    else:
+                        visit(child)
+        elif isinstance(value, (tuple, list)):
+            for item in value:
+                visit(item)
+    visit(payload)
+    return checks
+
+
 def add_result_scope(
     payload: Mapping[str, object],
     validation_scope: str,
@@ -137,6 +185,10 @@ def add_result_scope(
     checked_ids: Iterable[str] | None = None,
 ) -> dict[str, object]:
     result = dict(payload)
+    if checked_ids is None:
+        selected = _selected_checks(payload)
+        checked_ids = tuple(dict.fromkeys((*DEFAULT_CHECKS[validation_scope],
+            *(key for key in _COVERAGE if key in selected))))
     if "summary" in result and not isinstance(result["summary"], str):
         result.setdefault("details_summary", result["summary"])
     result.update(
@@ -146,6 +198,9 @@ def add_result_scope(
             checked_ids=checked_ids,
         )
     )
+    if validation_scope != "vibeflow_workflow_execution":
+        checked = {item["id"] for item in result["checked"]}
+        result["not_checked"].extend(_COVERAGE[key].to_dict() for key in _OPTIONAL_CHECKS if key not in checked)
     return result
 
 

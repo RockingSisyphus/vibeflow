@@ -32,9 +32,6 @@ from vibeflow.core.models import (
     ImplementationFacts,
     TargetFeatureSet,
 )
-from vibeflow.targets.python.quality.source_analysis.runtime_dispatch import (
-    analyze_runtime_dispatch,
-)
 
 
 class CompilerPluginRegistry(Protocol):
@@ -135,25 +132,24 @@ class GraphCompiler:
     def _refresh_rule_facts(self, compilation: CoreCompilation, *, registry) -> CoreCompilation:
         """Update review metadata while retaining the compiler stage artifact.
 
-        Rules describe effects and Target analysis supplies runtime dispatch.
+        Rules describe the explicitly selected effects.
         Neither changes the already resolved native topology or contracts.
         Compiler hooks own their stage's other compiled fields.
         """
         facts = ImplementationFacts(tuple(replace(fact,
             effect_scope=registry.effect_scope(fact.type_key),
-            runtime_dispatch=_runtime_dispatch_fact(registry, fact.type_key))
+            )
             for fact in compilation.workflow.implementation_facts.nodes),
             strict=compilation.workflow.implementation_facts.strict)
         graph = compilation.workflow.graph
         compiled = compilation.compiled_graph
-        scopes, dispatches = dict(compiled.effect_scopes), dict(compiled.runtime_dispatches)
+        scopes = dict(compiled.effect_scopes)
         for node in graph.nodes:
             fact = facts.get(node.type_used)
             if node.status != STATUS_PLANNED and fact is not None:
                 scopes[node.id] = fact.effect_scope or "unconstrained"
-                dispatches[node.id] = fact.runtime_dispatch
         return replace(compilation, workflow=replace(compilation.workflow, implementation_facts=facts),
-                       compiled_graph=replace(compiled, effect_scopes=scopes, runtime_dispatches=dispatches))
+                       compiled_graph=replace(compiled, effect_scopes=scopes))
 
 
 def _adapt_implementation_facts(
@@ -192,11 +188,11 @@ def _adapt_implementation_facts(
             registered = source.descriptor(type_key) if callable(getattr(source, "descriptor", None)) else _require_registered_type(source, type_key)
         except Exception:
             continue
-        facts.append(_implementation_fact(type_key, registered, effect_scope=source.effect_scope(type_key) if callable(getattr(source, "effect_scope", None)) else "unconstrained", runtime_dispatch=_runtime_dispatch_fact(source, type_key)))
+        facts.append(_implementation_fact(type_key, registered, effect_scope=source.effect_scope(type_key) if callable(getattr(source, "effect_scope", None)) else "unconstrained"))
     return ImplementationFacts(tuple(facts), strict=True)
 
 
-def _implementation_fact(type_key: str, registered: Any, *, effect_scope: str = "unconstrained", runtime_dispatch: bool | None = None) -> ImplementationFact:
+def _implementation_fact(type_key: str, registered: Any, *, effect_scope: str = "unconstrained") -> ImplementationFact:
     flow_kind = _text_attribute(registered, "flow_kind")
     contract = getattr(registered, "contract", None)
     completion = _text_attribute(registered, "completion")
@@ -215,7 +211,7 @@ def _implementation_fact(type_key: str, registered: Any, *, effect_scope: str = 
         type_key=type_key,
         flow_kind=flow_kind,
         effect_scope=effect_scope,
-        runtime_dispatch=runtime_dispatch,
+
         requires=tuple(getattr(contract, "requires", ()) or ()),
         provides=tuple(getattr(contract, "provides", ()) or ()),
         completion=completion or "immediate",
@@ -225,23 +221,6 @@ def _implementation_fact(type_key: str, registered: Any, *, effect_scope: str = 
     )
 
 
-def _runtime_dispatch_fact(registry, type_key):
-    context = getattr(registry, "source_context_snapshot", None)
-    node = next((item for item in context.nodes if item.type_key == type_key), None) if context is not None else None
-    loader = getattr(registry,"source_context_loader",None)
-    if node is None and callable(loader):
-        context = loader(type_key)
-        node = next((item for item in context.nodes if item.type_key == type_key),None)
-    if node is not None:
-        from vibeflow.targets.python.quality.source_analysis.runtime_dispatch import analyze_source_runtime_dispatch
-        analysis = analyze_source_runtime_dispatch(context, node)
-        return analysis.detected if analysis is not None else None
-    implementation = getattr(registry, "_registry", {}).get(type_key)
-    if implementation is None:
-        return None
-    from vibeflow.targets.python.quality.source_analysis.runtime_dispatch import analyze_runtime_dispatch
-    analysis = analyze_runtime_dispatch(implementation)
-    return analysis.detected if analysis is not None else None
 
 
 def _text_attribute(value: object, name: str) -> str:

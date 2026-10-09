@@ -1,0 +1,126 @@
+ M README.en.md
+ M README.md
+ M distribution/profiles.jsonc
+ M docs/README.md
+ M docs/design/system-architecture.md
+ M docs/maintainers/quality-boundaries.md
+ M docs/maintainers/release.md
+ M docs/overview.md
+ M docs/user/javascript-development.md
+ M docs/user/rule-system-migration.md
+ M docs/user/rules-and-nodes.md
+ M pyproject.toml
+ M quality/src/vibeflow_quality/profiles.py
+ M quality/tests/test_profiles.py
+ M sandbox/javascript/integration/project/configs/negative/dynamic_code.jsonc
+ M sandbox/javascript/integration/run_all.py
+ M sandbox/python/integration/run_all.py
+ M sandbox/python/source_false_positives/probe.py
+ M sandbox/python/typing_annotations/probe.py
+ M sandbox/rule_parity/core/cases.py
+ M sandbox/rule_parity/javascript/cases.py
+ M sandbox/rule_parity/javascript/variants.py
+ M sandbox/rule_parity/python/cases.py
+ M sandbox/rule_parity/python/ownership_variants.py
+ M src/vibeflow/block_compiler/compiler.py
+ M src/vibeflow/block_compiler/model.py
+ M src/vibeflow/builtin/effects.py
+ M src/vibeflow/builtin/implementation.py
+ M src/vibeflow/builtin/import_policy.py
+ M src/vibeflow/core/compiler.py
+ M src/vibeflow/core/inspection/architecture.py
+ M src/vibeflow/core/models.py
+ M src/vibeflow/core/result_scope.py
+ M src/vibeflow/targets/javascript/build/build_support.py
+ M src/vibeflow/targets/javascript/build/publish.py
+ M src/vibeflow/targets/javascript/build/toolchain.py
+ M src/vibeflow/targets/javascript/frontend/declarations.py
+ M src/vibeflow/targets/javascript/frontend/facts.py
+ M src/vibeflow/targets/javascript/quality/builtin_plugin.py
+ M src/vibeflow/targets/javascript/resources/runtime_helpers.mjs
+ M src/vibeflow/targets/javascript/resources/toolchain_driver.mjs
+ M src/vibeflow/targets/python/project/compiler.py
+ M src/vibeflow/targets/python/quality/builtin_plugin.py
+ M src/vibeflow/targets/python/quality/rules/effects.py
+ M src/vibeflow/targets/python/quality/rules/node_interface.py
+ M src/vibeflow/targets/python/quality/rules/project_effects.py
+ M src/vibeflow/targets/python/quality/source_analysis/__init__.py
+ M src/vibeflow/targets/python/quality/source_analysis/ast_rules.py
+ M src/vibeflow/targets/python/quality/source_analysis/bindings.py
+ M src/vibeflow/targets/python/quality/source_analysis/effects.py
+ D src/vibeflow/targets/python/quality/source_analysis/exit_stacks.py
+ M src/vibeflow/targets/python/quality/source_analysis/helpers.py
+ M src/vibeflow/targets/python/quality/source_analysis/input_tracking.py
+ D src/vibeflow/targets/python/quality/source_analysis/runtime_dispatch.py
+ M src/vibeflow/targets/python/quality/source_analysis/types.py
+ M src/vibeflow/targets/python/quality/source_analysis/visitors.py
+ M src/vibeflow/targets/python/quality/source_context.py
+ M src/vibeflow/targets/python/runtime/support/portable_adapter.py
+ M src/vibeflow/tooling/application/javascript/audit.py
+ M src/vibeflow/tooling/application/javascript/review.py
+ M src/vibeflow/tooling/application/python/presentation/architecture_document.py
+ M src/vibeflow/tooling/application/python/presentation/mermaid/__init__.py
+ M src/vibeflow/tooling/presentation/mermaid.py
+ M tests/block_compiler/strict_portable_plan.py
+ M tests/block_compiler/test_block_compiler.py
+ M tests/core/strict_complexity_nodesets.py
+ M tests/core/test_core_layer.py
+ M tests/core/test_quality_shared_rules.py
+ M tests/core/test_result_scope.py
+ M tests/fixtures/project_quality/cases.jsonc
+ M tests/integration/strict_distribution_release.py
+ M tests/integration/strict_distribution_review_docs.py
+ M tests/integration/test_javascript_sandbox.py
+ M tests/targets/javascript/strict_aot_cli.py
+ M tests/targets/javascript/strict_aot_project_build.py
+ M tests/targets/javascript/strict_aot_publish.py
+ M tests/targets/javascript/strict_aot_schema_build.py
+ M tests/targets/javascript/strict_aot_toolchain.py
+ M tests/targets/javascript/strict_long_running_workflow.py
+ M tests/targets/javascript/test_analysis_session.py
+ M tests/targets/javascript/test_aot_core.py
+ M tests/targets/javascript/test_codegen.py
+ M tests/targets/javascript/test_emitter_golden.py
+ M tests/targets/javascript/test_implementation_facts.py
+ M tests/targets/javascript/test_models.py
+ M tests/targets/javascript/test_nested_async.py
+ M tests/targets/javascript/test_project_dependency_negatives.py
+ M tests/targets/javascript/test_quality_sandbox.py
+ M tests/targets/javascript/test_source_effect_parameters.py
+ M tests/targets/python/strict_effect_scopes.py
+ M tests/targets/python/test_comprehension_scopes.py
+ D tests/targets/python/test_exit_stack.py
+ M tests/targets/python/test_import_policy_parameters.py
+ D tests/targets/python/test_input_declared_bindings.py
+ D tests/targets/python/test_runtime_dispatch.py
+ M tests/targets/python/test_source_effect_parameters.py
+ M tests/tooling/strict_architecture_document.py
+ M tests/tooling/strict_base_config_examples.py
+ M tests/tooling/strict_mermaid_cli.py
+ M tools/audit_retired_architecture.py
+?? docs/maintainers/product-boundary-audit-20261009.md
+?? docs/maintainers/product-boundary-audit-20261009/
+?? docs/maintainers/product-boundary-refactor-spec-20261009.md
+?? docs/maintainers/product-boundary-remediation-20261009/
+?? docs/maintainers/product-boundary-remediation-plan-20261009.md
+?? docs/maintainers/product-boundary-remediation-results-20261009.md
+?? docs/maintainers/product-boundary-remediation-review-20261009.md
+?? docs/maintainers/product-boundary-remediation-review-20261009/
+?? docs/maintainers/product-boundary-review-fixes-20261009/
+?? docs/maintainers/python-alias-facts-fix-20261008.md
+?? docs/maintainers/python-alias-facts-fix-20261008/
+?? docs/maintainers/python-alias-facts-review-20261008.md
+?? docs/maintainers/python-alias-facts-review-20261008/
+?? docs/maintainers/python-exception-alias-fix-20261008.md
+?? docs/maintainers/python-exception-alias-fix-20261008/
+?? docs/maintainers/python-exception-alias-review-20261009.md
+?? docs/maintainers/python-exception-alias-review-20261009/
+?? docs/user/product-check-boundaries.md
+?? src/vibeflow/targets/python/quality/rules/input_writes.py
+?? src/vibeflow/targets/python/quality/rules/node_architecture.py
+?? src/vibeflow/targets/python/quality/source_analysis/resource_slices.py
+?? tests/targets/python/test_effect_alias_scopes.py
+?? tests/targets/python/test_global_state_coordination.py
+?? tests/targets/python/test_input_writeback.py
+?? tests/targets/python/test_product_boundary.py
+?? tests/targets/python/test_source_control_definitions.py

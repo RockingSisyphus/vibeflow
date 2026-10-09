@@ -35,6 +35,15 @@ coverage.xml
 /docs/pdfs/
 /vibeflow_distribution-*.zip
 
+# Maintainer acceptance logs are evidence linked from committed reports.
+!/docs/maintainers/**/*.log
+
+# Large temporary-run captures remain archived locally after scratch cleanup.
+# Keep original-source backups, fixtures, reports and delivery packages in Git.
+/docs/maintainers/**/completed-temporary-evidence-*.tar.gz
+/docs/maintainers/**/generated-evidence.tar.gz
+/docs/maintainers/**/full-*-generated-evidence.tar.gz
+
 # Large or protected VF-EvoBench assets kept outside normal Git history.
 /experiments/**/sealed-hidden/
 /experiments/**/external_sources/

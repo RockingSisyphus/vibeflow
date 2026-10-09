@@ -4,22 +4,11 @@ import ast
 from copy import deepcopy
 from typing import Mapping
 
-from vibeflow.targets.python.quality.source_analysis.types import RESOURCE_FIELD_NAMES, PurityViolation, _SourceInfo, _default_rule_id
+from vibeflow.targets.python.quality.source_analysis.types import PurityViolation, _SourceInfo, _default_rule_id
 
 
-def _dict_literal_keys(node: ast.Dict) -> tuple[set[str] | None, bool]:
-    keys: set[str] = set()
-    for key in node.keys:
-        if not isinstance(key, ast.Constant) or not isinstance(key.value, str) or not key.value:
-            return None, True
-        keys.add(key.value)
-    return keys, False
 
 
-def _literal_subscript_key(node: ast.Subscript) -> str:
-    if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
-        return node.slice.value
-    return ""
 
 
 def _root_name(node: ast.AST) -> str:
@@ -36,17 +25,6 @@ def _matches_prefix(name: str, patterns: set[str]) -> bool:
     return any(name.startswith(f"{pattern}.") for pattern in patterns)
 
 
-def _assigns_resource_field(node: ast.AST) -> bool:
-    targets: list[ast.AST] = []
-    if isinstance(node, ast.Assign):
-        targets = list(node.targets)
-    elif isinstance(node, ast.AnnAssign):
-        targets = [node.target]
-    for target in targets:
-        if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
-            if target.attr.lower() in RESOURCE_FIELD_NAMES:
-                return True
-    return False
 
 
 def _module_matches(module: str, patterns: tuple[str, ...]) -> bool:

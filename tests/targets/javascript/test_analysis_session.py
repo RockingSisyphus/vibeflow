@@ -65,7 +65,7 @@ def test_program_sharing_does_not_share_base_lib_permissions(package):
         {"path":str(helper),"kind":"base_lib","id":"test.helper","export":"value"}]
     with DriverScope():
         for libraries in ([],["test.helper"],[]):
-            result=run_rule_check_driver({"typecheckFiles":[str(source)],"ruleTopics":["imports"],
+            result=run_rule_check_driver({"typecheckFiles":[str(source)],"ruleTopics":["architecture"],
                 "ruleSubjectKind":"node","ruleSubjectId":"test.node",
                 "importPolicy":{"owners":owners,"nodeBaseLibs":{"test.node":libraries}}},package_root=package)
             denied=any(item["code"]=="VF_IMPORT_BASE_LIB" for item in result.findings)

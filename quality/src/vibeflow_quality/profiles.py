@@ -402,7 +402,7 @@ def _markdown_link_target(raw: str) -> str:
     elif " " in target:
         # Markdown permits an optional quoted title after the destination.
         target = target.split(None, 1)[0]
-    return unquote(target.split("#", 1)[0].split("?", 1)[0]).strip()
+    return re.sub(r":\d+$", "", unquote(target.split("#", 1)[0].split("?", 1)[0]).strip())
 
 
 def _documentation_findings(root: Path) -> list[Finding]:
@@ -442,7 +442,7 @@ def _documentation_findings(root: Path) -> list[Finding]:
                             },
                         )
                     )
-            for match in _MARKDOWN_LINK_RE.finditer(line):
+            for match in _MARKDOWN_LINK_RE.finditer(re.sub(r"(`+).*?\1", "", line)):
                 target = _markdown_link_target(match.group(1))
                 if not target or target.startswith(
                     ("#", "http://", "https://", "mailto:", "data:")
@@ -480,9 +480,10 @@ def _documentation_findings(root: Path) -> list[Finding]:
                 )
             )
         for token, fix in _STALE_DOCUMENT_TOKENS.items():
-            if token not in source:
+            match = re.search(re.escape(token) + r"(?![\w-])", source)
+            if match is None:
                 continue
-            line_number = source[: source.index(token)].count("\n") + 1
+            line_number = source[: match.start()].count("\n") + 1
             findings.append(
                 _finding(
                     "STALE_DOCUMENTATION",

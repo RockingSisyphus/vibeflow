@@ -116,14 +116,16 @@ workflow 和 Nodeset 文件顶层也可选择 `rulesets`，默认 `vibeflow.work
 | none | 不授予效果权限 |
 | terminal | 终端输入输出，例如 print/console；不允许 fetch 或文件 I/O |
 | python_io | 各 Target 对应的一般 I/O；显式导入禁止继续生效 |
-| global_state | 资源或模块状态；不允许修改 builtin、原型及宿主关键状态 |
+| global_state | 共享或模块状态；不允许修改 builtin、原型及宿主关键状态 |
 | trusted | 不增加权限 |
 
-JavaScript 继续执行其已有时间、随机数检查；python_io 保留该 Target 既有的放行行为。Python 本轮没有新增时间、随机数禁令，两个语言分析器的覆盖不保证完全相同。
+默认效果规则不禁止 Date、performance 或 Math 的时间与随机数操作，也不证明算法确定性。各 Target 的有限外部操作检查仍按实际所选政策执行，两个语言分析器的覆盖不保证完全相同。
 
 effects 与 imports Rule 的 `policy.imports` 支持 `allowed_roots`、`banned_roots`、`allowed_modules`、`banned_modules` 四个字符串数组。显式模块禁止优先，其次检查模块允许，再处理根政策；根允许是同根禁止的例外。允许只影响导入政策，不解除效果检查或未声明资源依赖。JS 支持 scoped npm 包、子路径，以及 fs/node:fs 等价形式。
 
-Python effects 默认根禁止只有 importlib，并保留 urllib.parse/vibeflow 模块允许；imports-only 的四数组默认都为空，仍检查导入期执行和真实 ownership。显式空数组不会回退默认禁止。参数只能包含实际 handler 消费的内容，未知或不相关字段明确失败；对象参数的显式覆盖整体替换原对象，有效参数与来源在正式记录中可查。
+Python effects 的默认根禁止数组为空，并保留 urllib.parse/vibeflow 模块允许；imports-only 的四数组默认都为空，仍检查导入期执行和真实 ownership。importlib 不因模块名被默认禁止；项目可在所选规则的政策中明确禁止它。显式空数组不会回退旧禁止表。参数只能包含实际 handler 消费的内容，未知或不相关字段明确失败；对象参数的显式覆盖整体替换原对象，有效参数与来源在正式记录中可查。
+
+global/nonlocal 声明和 Node 调用内部的局部闭包不等同于共享状态修改。规则检查可明确识别的模块全局赋值、删除、共享对象变异及外部操作；复杂归属未知时不据此证明行为或产生硬错误。有限输入写入规则独立检查直接输入写入与简单直线别名，不对无赋值值的类型注解报告写入，也不追踪跨函数污染。
 
 ## 入口、范围与源码归属
 
@@ -170,4 +172,4 @@ review-rules 加载选中插件的受信固定定义，再展开有效计划；�
 
 SDK 记录 Rule 的执行语言和源码入口。一个执行族最多一个实现，JS/TS 属于同一族；JS Rule 在 Node worker 中检查，业务的 Node.js/Browser 平台作为 `context.target` 资料供规则使用。BaseLib、Plugin 和 HostExtension 同样选择自己的 rulesets；插件声明源码使用独立的 declaration_rulesets。
 
-公开版本为 Plugin ABI v3、Rule ABI v1 和 Workflow ABI v4。升级旧项目的写法对应见[声明迁移](rule-system-migration.md)。
+公开版本为 Plugin ABI v3、Rule ABI v1 和 Workflow ABI v5。升级旧项目的写法对应见[声明迁移](rule-system-migration.md)。

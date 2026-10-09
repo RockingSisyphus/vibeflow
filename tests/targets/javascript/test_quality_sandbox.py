@@ -511,7 +511,7 @@ def test_registered_node_uses_config_schema_keys_and_static_call_chain(tmp_path:
     source.write_text(source.read_text(encoding="utf-8").replace("function h4() { return 1; }", "function h4() { return h1(); }"), encoding="utf-8")
     code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
     payload = json.loads(capsys.readouterr().out)
-    assert code == 1 and payload["code"] == "NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN"
+    assert code == 1 and payload["code"] == "NODE.MAINTAINABILITY.CALL_CHAIN_TOO_DEEP"
     source.write_text(source.read_text(encoding="utf-8").replace("function h4() { return h1(); }", "function h4() { return 1; }").replace("function h3() { return h4(); }\nfunction h4() { return 1; }", "function h3() { return 1; }"), encoding="utf-8")
     _configure_rule_policy(project, {"complexity": {"max_params": 1}})
     code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
@@ -872,18 +872,14 @@ def test_registered_node_direct_recursion_reaches_javascript_quality_cli(
     source = project / "nodes/greet.ts"
     source.write_text(
         source.read_text(encoding="utf-8").replace(
-            "  const name =", "  run(inputs, params, context);\n  const name =",
+            "  const name =", "  await run(inputs, params, context);\n  const name =",
         ),
         encoding="utf-8",
     )
     code = main(["quality-check", "--workspace", str(workspace), "--json"])
     payload = json.loads(capsys.readouterr().out)
-    assert code == 1
-    assert any(
-        item["rule_id"] == "NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN"
-        and item["details"]["path"] == ["run", "run"]
-        for item in _formal_findings(payload, "error")
-    )
+    assert code == 0, payload
+    assert not _formal_findings(payload, "error")
 
 
 def test_registered_node_source_limits_preserve_exact_boundaries(tmp_path: Path) -> None:
@@ -1018,3 +1014,15 @@ def test_selected_plugin_ownership_is_checked(tmp_path: Path, capsys) -> None:
     assert any(item["rule_id"] == "VF_PROMISE_UNOWNED" for item in _formal_findings(payload,"error"))
 
 # Publish controlled definitions before each formal operation.
+
+
+def test_quality_cli_reports_completed_checks_from_source_and_resource_rules(tmp_path, capsys):
+    workspace, project, _ = _project_case(tmp_path)
+    code = main(["quality-check", "--workspace", str(workspace), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0, payload
+    checked = {item["id"] for item in payload["checked"]}
+    assert {"source_quality", "node_contract_shape", "node_relationships", "effect_boundaries"} <= checked
+    assert "direct_input_writes" not in checked  # Python-only Rule is unavailable on JS.
+    assert {"code_security", "general_execution_semantics", "determinism", "all_side_effects"} <= {
+        item["id"] for item in payload["not_checked"]}

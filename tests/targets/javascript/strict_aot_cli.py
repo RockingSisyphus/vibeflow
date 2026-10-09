@@ -44,8 +44,6 @@ def test_build_cli_prints_one_machine_readable_success_object(
             "node": "22.12.0",
             "typescript": "7.0.0",
             "esbuild": "0.28.0",
-            "lock_sha256": "abc",
-            "lock_files": ["package-lock.json"],
         }
     )
     result = SimpleNamespace(

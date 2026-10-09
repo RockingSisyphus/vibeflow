@@ -8,6 +8,7 @@ import pytest
 from vibeflow.core.descriptors import NodeContractDescriptor, NodeDescriptor
 from vibeflow.core.rules import RuleContext
 from vibeflow.targets.python.quality import PythonSource
+from vibeflow.targets.python.quality.rules.input_writes import input_writes
 from vibeflow.targets.python.quality.rules.effects import no_side_effects
 from vibeflow.targets.python.quality.source_context import PythonSourceFile, PythonSourceNode, build_python_source_context
 
@@ -161,8 +162,8 @@ def test_comprehension_input_ownership_uses_actual_outer_and_target_bindings(pla
     sources = build_python_source_context((PythonSourceNode(descriptor, entry.path, "Task"),), (entry,))
     context = RuleContext(subject={"kind":"node", "type_key":"example.task"}, target="python",
         facts={"source_context":sources, "node_catalog":(), "source_owners":()})
-    result = _evaluate(context)
-    assert any("mutate inputs" in item.message for item in result.findings) == denied, (placement, label, result.findings)
+    result = input_writes(context, {}, {})
+    assert bool(result.findings) == (placement == "method" and (label.endswith(".outside") or label.endswith(".first_iterable"))), (placement, label, result.findings)
 
 
 CALLABLE_CASES = tuple((form + "." + mode, expression, resolved)
@@ -199,7 +200,7 @@ def test_comprehension_callable_facts_follow_real_cross_file_bindings(kind, help
     entry_effects = tuple(item for item in effects if item.source_location["path"] == entry.path
                          and (item.source_location["line"], item.source_location["column"]) in sites)
     actual_sites = {(item.source_location["line"], item.source_location["column"]) for item in entry_effects}
-    assert actual_sites == (set() if resolved else sites), (kind, helper_effect, label, result.findings)
+    assert actual_sites == set(), (kind, helper_effect, label, result.findings)
     if resolved:
         assert bool(effects) == helper_effect, (kind, helper_effect, label, result.findings)
         assert all(item.source_location["path"] == helper.path for item in effects), (kind, label, result.findings)
@@ -238,8 +239,8 @@ def test_incremental_comprehension_walrus_preserves_real_input_aliases(form, via
     sources = build_python_source_context((PythonSourceNode(descriptor, entry.path, "Task"),), (entry,))
     context = RuleContext(subject={"kind":"node", "type_key":"example.task"}, target="python",
         facts={"source_context":sources, "node_catalog":(), "source_owners":()})
-    result = _evaluate(context)
-    assert any("mutate inputs" in item.message for item in result.findings) == owned, (form, via_helper, owned, result.findings)
+    result = input_writes(context, {}, {})
+    assert bool(result.findings) is False, (form, via_helper, owned, result.findings)
 
 
 @pytest.mark.parametrize("kind", KINDS)
@@ -298,8 +299,6 @@ def test_incremental_helper_callsite_input_identity_respects_local_scopes(label,
     assert any(reference.kind == "call" and reference.target == helper.id for reference in sources.references)
     context = RuleContext(subject={"kind":"node", "type_key":"example.task"}, target="python",
         facts={"source_context":sources, "node_catalog":(), "source_owners":()})
-    result = _evaluate(context)
+    result = input_writes(context, {}, {})
     mutations = tuple(item for item in result.findings if "mutate inputs" in item.message)
-    assert bool(mutations) == owned, (label, result.findings)
-    if owned:
-        assert all(item.source_location["line"] == 2 for item in mutations), (label, result.findings)
+    assert bool(mutations) is False, (label, result.findings)

@@ -51,8 +51,19 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [Tooling 规则盘点](design/baseline-rule-inventory-tooling.md)
 - [第二次覆盖审计](design/baseline-rule-coverage-second-audit.md)
 
+- [产品检查边界与 0.17 格式迁移](user/product-check-boundaries.md)
+
 ## 内核维护
 
+- [职责边界整改独立审核](maintainers/product-boundary-remediation-review-20261009.md)：确认主要整改生效，记录 5 项问题及整改前后对照，其中 2 项为新引入误判。
+- [产品职责边界整改执行计划](maintainers/product-boundary-remediation-plan-20261009.md)
+- [产品职责边界首次整改结果](maintainers/product-boundary-remediation-results-20261009.md)：原批次成绩与旧包的历史记录，后续缺陷见独立审核。
+- [职责边界审核修正](maintainers/product-boundary-review-fixes-20261009.md)：R01—R05 修正、正反对照、实际验收边界及新交付物。
+- [审核修正的独立复核](maintainers/product-boundary-review-fixes-recheck-20261009.md)：确认原问题修复，记录两项新增有限规则漏检及修改前后证据。
+- [两项保留规则退化修复的独立审核](maintainers/product-boundary-followup-review-20261009.md)：确认 R06、R07 修复，记录全套测试覆盖、正常对照及最新包核验。
+
+- [VibeFlow 职责边界与整改规格](maintainers/product-boundary-refactor-spec-20261009.md)：完整职责定义、11 项源码定位、当前与目标逻辑、删改停止点和实施后验收。
+- [VibeFlow 职责边界与收缩建议](maintainers/product-boundary-audit-20261009.md)：按代码质量／架构限制器定位重新分类现有规则，列出保留、收缩与退役范围。
 - [系统迁移审计](maintainers/system-migration-audit-20261007.md)
 - [Python 迁移审计详情](maintainers/system-migration-audit-20261007/python.md)
 - [JavaScript 迁移审计详情](maintainers/system-migration-audit-20261007/javascript.md)
@@ -66,6 +77,10 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [函数作用域修复独立复核](maintainers/python-function-definition-scope-review-20261008.md)
 - [Python 推导式作用域修正](maintainers/python-comprehension-scope-fix-20261008.md)
 - [Python 推导式修复独立审核](maintainers/python-comprehension-scope-review-20261008.md)
+- [Python 别名事实修复独立审核](maintainers/python-alias-facts-review-20261008.md)
+- [Python 异常出口修复独立审核](maintainers/python-exception-alias-review-20261009.md)
+- [Python 别名事实与输入突变统一](maintainers/python-alias-facts-fix-20261008.md)
+- [Python 异常出口中的输入别名修复](maintainers/python-exception-alias-fix-20261008.md)
 - [Python 函数定义表达式作用域修正](maintainers/python-function-definition-scope-fix-20261008.md)
 - [开发与验证](maintainers/development.md)
 - [架构质检的阻断边界](maintainers/quality-boundaries.md)
@@ -83,3 +98,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [Tooling / JavaScript SDK and Rule adaptation audit](maintainers/adaptation-audit-20261005/javascript-audit.md)
 - [Rule、SDK 与资源装配适配审查](maintainers/adaptation-audit-20261005.md)
 - [适配修复：案例、接口与验收对应](maintainers/adaptation-repair-20261005/case-matrix.md)
+
+- [整改执行计划](maintainers/product-boundary-remediation-plan-20261009.md)
+- [已批准的七文件测试迁移](maintainers/product-boundary-remediation-20261009/test-retirement-review.md)
+- [首轮全量后的混合测试迁移审查](maintainers/product-boundary-remediation-20261009/additional-test-migration-review.md)

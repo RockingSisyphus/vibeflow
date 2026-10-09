@@ -90,7 +90,7 @@ Decision Node 使用 `flow_kind="decision"`，提供 route-like 输出，例如 
 | `vibeflow.process` Ruleset | 默认禁止副作用 |
 | `vibeflow.io` Ruleset | 允许真实终端输入输出 |
 | `vibeflow.document` / `vibeflow.data_store` Ruleset | 允许文件、网络、数据库等 Python I/O |
-| `vibeflow.global_state` Ruleset | 允许易失状态与源码可见 runtime dispatch |
+| `vibeflow.global_state` Ruleset | 允许有限效果检查所识别的共享／模块状态操作，仍执行其他所选检查 |
 
 Node 的代码声明直接选择 Ruleset，并通过 workflow 选中的插件贡献。省略或空列表表示未选择 Node 审查规则；报告中的 `effect_scope` 来自有效规则记录。`flow_kind` 描述执行身份，`external` 标记外部边界，副作用权限由规则表达。详见[Rule 与 Node](rules-and-nodes.md)。需要协调 `global_state` 冲突资源时使用静态命名 `execution_lock`；相同 key 互斥，不同 key 可并行。
 

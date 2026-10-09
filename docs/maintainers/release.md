@@ -1,6 +1,6 @@
 # 发行与文档装配
 
-VibeFlow 当前开发版本为 0.16.0，按旧 API 直接退役的破坏性升级准备 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。迁移入口与删除接口见 [统一资源迁移](../user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖归档发行包。
+VibeFlow 当前开发版本为 0.17.0，按旧 API 直接退役的破坏性升级准备 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。迁移入口与删除接口见 [统一资源迁移](../user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖归档发行包。
 
 0.15.2 包含用户项目 SVG 展示边界修正：资源目录只展示当前 workflow 使用的 Plugin、BaseLib、Host 等条目，恢复旧版横竖布局，移除内部定义、源码文件和 reference 的 SVG 投影。变更与源码回归见 [展示边界记录](user-svg-boundary-20261006.md)，本版归档与隔离验收见 [0.15.2 构建记录](releases/0.15.2/verification.json)。
 

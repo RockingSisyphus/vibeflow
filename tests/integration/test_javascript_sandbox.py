@@ -126,7 +126,7 @@ def test_typescript_sandbox_selected_import_rules_reject_before_aot(
             profile="single-esm",
         ))
     finding = next(item for item in error.value.diagnostics if item["code"] == expected_code)
-    assert finding["definition_id"] == "vibeflow.import_side_effects"
+    assert finding["definition_id"] == ("vibeflow.import_side_effects" if expected_code == "VF_IMPORT_DYNAMIC" else "vibeflow.node_architecture")
     assert finding["source_location"]["path"] == str(project / "negative/nodes" / (Path(config_name).stem + ".ts"))
     assert finding["source_location"]["line"] == expected_line
     assert finding["details"]["source_owner"]["id"] == f"sandbox.invalid.{Path(config_name).stem}"

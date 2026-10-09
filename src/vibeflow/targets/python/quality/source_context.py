@@ -307,7 +307,7 @@ def build_python_source_context(nodes: Iterable[PythonSourceNode], files: Iterab
 def _symbols(source: PythonSourceFile) -> tuple[PythonSymbol, ...]:
     found: list[PythonSymbol] = []
 
-    def collect(body: list[ast.stmt], prefix: str = "") -> None:
+    def collect(body: Iterable[ast.AST], prefix: str = "") -> None:
         for item in body:
             if isinstance(item, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
                 name = prefix + item.name
@@ -319,6 +319,10 @@ def _symbols(source: PythonSourceFile) -> tuple[PythonSymbol, ...]:
                 for target in targets:
                     for name in _assigned_names(target):
                         found.append(PythonSymbol(source.path, name, "global", item.lineno, item.end_lineno or item.lineno, item))
+            else:
+                # Control suites share their enclosing lexical scope. Only a
+                # class or function definition changes the qualified prefix.
+                collect(ast.iter_child_nodes(item), prefix)
 
     collect(source._tree.body if source._tree else [])
     return tuple(found)

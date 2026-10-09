@@ -391,6 +391,8 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         workspace, config, source = _project(root, variant, toolchain, case)
         actual = _observe(case, root, workspace, config, source, variant=variant)
         code = case.current_code if variant == 'current' and case.current_code is not None else case.code
+        if variant == 'current' and case.id in {'js.node.recursive-helper', 'js.base.nondeterministic', 'js.node.dynamic-code'}:
+            code = ''  # B04/B06/B07: preserve the baseline, retire current default inference.
         severity = 'warning' if case.id == 'js.quality.function-duplicate' else 'error'
         expected: dict[str, Any] = {'should_accept': not code or severity == 'warning',
             'codes': [{'code': code, 'severity': severity}] if code else [], 'metrics': dict(case.metrics)}

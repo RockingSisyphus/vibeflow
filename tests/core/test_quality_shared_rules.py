@@ -102,12 +102,12 @@ def test_shared_node_chain_boundaries(length, expected) -> None:
 
 
 @pytest.mark.parametrize("calls", [{"run": ("run",)}, {"run": ("helper",), "helper": ("run",)}])
-def test_shared_node_recursion_is_an_error(calls) -> None:
+def test_private_recursion_does_not_create_a_default_error(calls) -> None:
     findings = check_node_implementation(
         ImplementationMetrics(call_chain=analyze_call_graph(calls, entry="run")),
         ImplementationLimits(),
     )
-    assert any(item.rule_id == "NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN" and item.severity == "error" for item in findings)
+    assert not any(item.rule_id == "NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN" for item in findings)
 
 
 @pytest.mark.parametrize(

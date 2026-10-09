@@ -27,7 +27,7 @@ def normalized_import_policy(params, *, effect_defaults=False):
         raise ValueError(f"unknown rule policy import parameters: {sorted(unknown)}")
     defaults = {name: [] for name in IMPORT_POLICY_KEYS}
     if effect_defaults:
-        defaults.update(banned_roots=["importlib"], allowed_modules=["urllib.parse", "vibeflow"])
+        defaults.update(allowed_modules=["urllib.parse", "vibeflow"])
     for name, value in imports.items():
         if not isinstance(value, (list, tuple)) or any(not isinstance(item, str) or not item.strip() for item in value):
             raise ValueError(f"rule policy imports.{name} must be an array of non-empty strings")

@@ -94,8 +94,13 @@ class _FunctionBindingCollector(ast.NodeVisitor):
         self.nonlocal_names: set[str] = set()
 
     def visit_Name(self, node: ast.Name) -> None:
-        if isinstance(node.ctx, ast.Store):
+        if isinstance(node.ctx, (ast.Store, ast.Del)):
             self.names.add(node.id)
+
+    def visit_ExceptHandler(self, node):
+        if node.name is not None:
+            self.names.add(node.name)
+        self.generic_visit(node)
 
     def visit_Import(self, node: ast.Import) -> None:
         bound = {alias.asname or alias.name.split(".", 1)[0] for alias in node.names}
@@ -106,6 +111,20 @@ class _FunctionBindingCollector(ast.NodeVisitor):
         bound = {alias.asname or alias.name for alias in node.names if alias.name != "*"}
         self.names.update(bound)
         self.import_names.update(bound)
+
+    def visit_MatchAs(self, node):
+        if node.name:
+            self.names.add(node.name)
+        self.generic_visit(node)
+
+    def visit_MatchStar(self, node):
+        if node.name:
+            self.names.add(node.name)
+
+    def visit_MatchMapping(self, node):
+        if node.rest:
+            self.names.add(node.rest)
+        self.generic_visit(node)
 
     def visit_Global(self, node: ast.Global) -> None:
         self.global_names.update(node.names)

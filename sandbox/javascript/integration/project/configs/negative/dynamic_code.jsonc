@@ -19,7 +19,7 @@
         "id": "invalid",
         "type_used": "sandbox.invalid.dynamic_code",
         "display_name": "dynamic code",
-        "description": "This negative fixture must fail during the JavaScript project audit."
+        "description": "B06 allows runtime string evaluation; this fixture must build and run."
       },
       {
         "id": "end",

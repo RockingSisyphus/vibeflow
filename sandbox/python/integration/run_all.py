@@ -165,12 +165,7 @@ VALID_RUN_CASES = [
         "config": "pass_callback_warning.jsonc",
         "initial_factory": _callback_initial,
         "expected_outputs": {"value.out": 23},
-        "expected_health_warnings": [
-            "NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED",
-        ],
-        "expected_mermaid_contains": (
-            "runtime_dispatch: detected",
-        ),
+        "expected_health_warnings": [],
     },
     {
         "name": "training_object_flow",
@@ -185,7 +180,6 @@ VALID_RUN_CASES = [
         ],
         "expected_mermaid_contains": (
             "forward@{ shape: cloud",
-            "runtime_dispatch: detected",
             "execution_lock: none",
         ),
         "expected_svg_cloud_nodes": ("forward", "backward", "step"),
@@ -897,9 +891,9 @@ INVALID_CASES = [
     {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "VarArgsNode", "type": "bad.varargs", "expect": "NODE.CONTRACT.RUN_PURE_SIGNATURE"},
     {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "PublicHelperNode", "type": "bad.public_helper", "expect": "NODE.CONTRACT.PUBLIC_CALLABLE"},
     {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "InitWithClientNode", "type": "bad.init_client", "expect": "NODE.CONTRACT.INIT_SIGNATURE"},
-    {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "ResourceFieldNode", "type": "bad.resource_field", "expect": "NODE.PURITY.RESOURCE_FIELD"},
+    {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "ResourceFieldNode", "type": "bad.resource_field", "allowed": True, "retired_expect": "NODE.PURITY.RESOURCE_FIELD"},
     {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "AsyncRunPureNode", "type": "bad.async_run_pure", "expect": "NODE.CONTRACT.ASYNC_RUN_PURE"},
-    {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "GeneratorRunPureNode", "type": "bad.generator_run_pure", "expect": "NODE.PURITY.GENERATOR_RUN_PURE"},
+    {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "GeneratorRunPureNode", "type": "bad.generator_run_pure", "expect": "NODE.CONTRACT.GENERATOR_RUN_PURE"},
     {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "OpenFileNode", "type": "bad.open", "expect": "NODE.EFFECT.CALL_FORBIDDEN"},
     {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "PathReadTextNode", "type": "bad.path_read", "expect": "NODE.EFFECT.IMPORT_FORBIDDEN"},
     {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "OsGetenvNode", "type": "bad.getenv", "expect": "NODE.EFFECT.IMPORT_FORBIDDEN"},
@@ -907,24 +901,24 @@ INVALID_CASES = [
     {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "SocketNode", "type": "bad.socket", "expect": "NODE.EFFECT.IMPORT_FORBIDDEN"},
     {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "RequestsNode", "type": "bad.requests", "expect": "NODE.EFFECT.IMPORT_FORBIDDEN"},
     {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "SqliteNode", "type": "bad.sqlite", "expect": "NODE.EFFECT.IMPORT_FORBIDDEN"},
-    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "EvalNode", "type": "bad.eval", "expect": "NODE.PURITY.BANNED_CALL"},
-    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "DynamicImportNode", "type": "bad.dynamic_import", "expect": "NODE.PURITY.BANNED_IMPORT"},
+    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "EvalNode", "type": "bad.eval", "allowed": True, "retired_expect": "NODE.PURITY.BANNED_CALL"},
+    {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "DynamicImportNode", "type": "bad.dynamic_import", "allowed": True, "retired_expect": "NODE.PURITY.BANNED_IMPORT"},
     {"kind": "inspect_node", "module": "illegal_nodes/coupling_cases.py", "class": "NodeImportNode", "type": "bad.node_import", "expect": "NODE_IMPORT"},
     {"kind": "inspect_node", "module": "illegal_nodes/coupling_cases.py", "class": "DirectNodeCallNode", "type": "bad.node_call", "expect": "NODE_DIRECT_CALL"},
     {"kind": "inspect_node", "module": "illegal_nodes/coupling_cases.py", "class": "NodeInternalReadNode", "type": "bad.node_internal", "expect": "NODE_INTERNAL_READ"},
-    {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "DynamicOutputKeyNode", "type": "bad.dynamic_output", "expect": "NODE.PURITY.DYNAMIC_OUTPUT_KEY"},
-    {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "MissingOutputNode", "type": "bad.missing_output", "expect": "NODE.PURITY.MISSING_OUTPUT"},
-    {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "ExtraOutputNode", "type": "bad.extra_output", "expect": "NODE.PURITY.UNDECLARED_OUTPUT"},
+    {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "DynamicOutputKeyNode", "type": "bad.dynamic_output", "allowed": True, "retired_expect": "NODE.PURITY.DYNAMIC_OUTPUT_KEY"},
+    {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "MissingOutputNode", "type": "bad.missing_output", "allowed": True, "retired_expect": "NODE.PURITY.MISSING_OUTPUT"},
+    {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "ExtraOutputNode", "type": "bad.extra_output", "allowed": True, "retired_expect": "NODE.PURITY.UNDECLARED_OUTPUT"},
     {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "MutateInputsNode", "type": "bad.mutate_inputs", "expect": "NODE.PURITY.INPUT_MUTATION"},
     {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "MutateNestedInputNode", "type": "bad.mutate_nested", "expect": "NODE.PURITY.INPUT_MUTATION"},
     {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "GlobalStateNode", "type": "bad.global_state", "expect": "NODE.IMPORT.SIDE_EFFECT"},
-    {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "SetAttrNode", "type": "bad.setattr", "expect": "NODE.PURITY.MONKEY_PATCH"},
-    {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "MonkeyPatchNode", "type": "bad.monkey_patch", "expect": "NODE.PURITY.MONKEY_PATCH"},
+    {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "SetAttrNode", "type": "bad.setattr", "remaining_expect": "NODE.IMPORT.SIDE_EFFECT", "retired_expect": "NODE.PURITY.MONKEY_PATCH"},
+    {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "MonkeyPatchNode", "type": "bad.monkey_patch", "remaining_expect": "NODE.IMPORT.SIDE_EFFECT", "retired_expect": "NODE.PURITY.MONKEY_PATCH"},
     {"kind": "inspect_node_small_source", "module": "illegal_nodes/maintainability_cases.py", "class": "LongSourceNode", "type": "bad.long_source", "expect": "NODE.PURITY.SOURCE_TOO_LARGE"},
     {"kind": "inspect_node_warn", "module": "illegal_nodes/maintainability_cases.py", "class": "WarnCallChainNode", "type": "bad.warn_call_chain", "expect": "CALL_CHAIN_TOO_DEEP"},
     {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "DeepCallChainNode", "type": "bad.deep_call_chain", "expect": "NODE.MAINTAINABILITY.CALL_CHAIN_TOO_DEEP"},
-    {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "RecursiveNode", "type": "bad.recursive", "expect": "NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN"},
-    {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "IndirectRecursiveNode", "type": "bad.indirect_recursive", "expect": "NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN"},
+    {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "RecursiveNode", "type": "bad.recursive", "remaining_expect": "NODE.IMPORT.SIDE_EFFECT", "retired_expect": "NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN"},
+    {"kind": "inspect_node", "module": "illegal_nodes/maintainability_cases.py", "class": "IndirectRecursiveNode", "type": "bad.indirect_recursive", "remaining_expect": "NODE.IMPORT.SIDE_EFFECT", "retired_expect": "NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN"},
     {"kind": "health_node", "module": "illegal_nodes/deep_dependency_node.py", "class": "DeepBaseLibNode", "type": "bad.deep_base_lib", "expect": "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP"},
     {"kind": "base_lib", "expect": "BASE_LIB.SIDE_EFFECT_CALL"},
     {"kind": "base_lib", "expect": "BASE_LIB.GLOBAL_STATE"},
@@ -2091,7 +2085,10 @@ def _run_global_state_forbidden_effect_audit() -> CaseResult:
     for category, type_key in cases.items():
         findings = _node_source_report(type_key, policy=policy)
         errors = [finding.rule_id for finding in findings if finding.severity == "error"]
-        if not set(errors) & accepted:
+        if category in {"eval", "dynamic_import", "ffi", "cffi"}:
+            if errors:
+                raise AssertionError(f"retired security restriction still rejects {category}: {errors}")
+        elif not set(errors) & accepted:
             raise AssertionError(f"selected global-state Rules unexpectedly allowed {category}: {errors}")
         rules[category] = errors
     return CaseResult("global-state:forbidden-effect-audit", "PASS", payload={"rejected":rules})
@@ -2895,7 +2892,6 @@ def _assert_global_state_architecture(architecture: dict[str, Any]) -> None:
     expected = {
         "flow_kind": "global_state",
         "effect_scope": "global_state",
-        "runtime_dispatch": "none",
         "contains_global_state": True,
         "execution_lock": {
             "key": "sandbox.global-state.serial",
@@ -3005,9 +3001,9 @@ def _assert_execution_plan(case: dict[str, Any], plan) -> None:
                     f"got {actual_tasks!r}"
                 )
         if case.get("expected_workflow_global_state"):
-            if portable.abi_version != "vibeflow.workflow.v4":
+            if portable.abi_version != "vibeflow.workflow.v5":
                 raise AssertionError(
-                    f"expected WorkflowPlan v4, got {portable.abi_version!r}"
+                    f"expected WorkflowPlan v5, got {portable.abi_version!r}"
                 )
             if portable.contains_global_state is not True:
                 raise AssertionError("WorkflowPlan did not propagate global state")
@@ -3027,10 +3023,8 @@ def _assert_execution_plan(case: dict[str, Any], plan) -> None:
                 )
             if state.contains_global_state is not True:
                 raise AssertionError("WorkflowPlan state does not declare global state")
-            if state.runtime_dispatch is not False:
-                raise AssertionError(
-                    f"WorkflowPlan state runtime_dispatch is {state.runtime_dispatch!r}"
-                )
+            if hasattr(state, "runtime_dispatch"):
+                raise AssertionError("WorkflowPlan retained retired runtime_dispatch metadata")
             if state.execution_lock is None or state.execution_lock.to_dict() != {
                 "key": "sandbox.global-state.serial",
                 "scope": "node",
@@ -3214,7 +3208,13 @@ def _inspect_invalid_node(case: dict[str, Any], kind: str) -> CaseResult:
     elif kind == "inspect_node_warn":
         policy = PurityPolicy(max_source_lines=500, warn_call_chain_length=4, max_call_chain_length=99)
     violations = _node_source_report(str(case["type"]), policy=policy)
-    _assert_violations_have_rule(violations, str(case["expect"]))
+    if case.get("remaining_expect"):
+        _assert_violations_have_rule(violations, case["remaining_expect"])
+        assert not any(item.rule_id == case["retired_expect"] for item in violations)
+    elif case.get("allowed"):
+        assert not [item for item in violations if item.severity == "error"], violations
+    else:
+        _assert_violations_have_rule(violations, str(case["expect"]))
     return CaseResult(f"invalid:inspect_node:{case['class']}", "PASS", payload={"rules": [item.rule_id for item in violations]})
 
 

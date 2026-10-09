@@ -229,7 +229,7 @@ class _ExecutionPlanAdapter:
                 spec.id,
                 execution_plan_effect_scope(frame),
             ),
-            runtime_dispatch=compiled.runtime_dispatches.get(spec.id),
+
             execution_lock=_execution_lock_plan(
                 frame.execution_lock,
                 scope="block" if frame.is_nodeset or frame.is_loop else "node",

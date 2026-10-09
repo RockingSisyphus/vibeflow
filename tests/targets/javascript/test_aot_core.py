@@ -60,7 +60,7 @@ def _build_with_selected_source_rules(request: BuildRequest):
     policy["allowed_external_packages"] = list({*policy.get("allowed_external_packages", ()), *request.external_packages})
     checked = run_rule_check_driver({
         "typecheckFiles": sorted({str(item["path"]) for item in owners}),
-        "ruleTopics": ["imports", "purity", "completion", "module_state", "host_io"],
+        "ruleTopics": ["imports", "architecture", "purity", "completion", "module_state", "host_io"],
         "importPolicy": policy,
     }, package_root=request.package_root, node_command=request.node_command)
     errors = tuple(item for item in checked.findings if item.get("severity", "error") == "error")
@@ -107,7 +107,7 @@ def _linear_plan(
     entry_mode: str = "sync",
 ) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "test.workflow",
         "entry_mode": entry_mode,
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -226,7 +226,7 @@ def _real_toolchain_project(tmp_path: Path) -> Path:
 
 def _empty_real_plan(module: Path) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "test.import-policy",
         "inputs": [],
         "outputs": [],
@@ -331,7 +331,7 @@ def test_emitted_esm_json_schema_const_uses_json_deep_equality(
     tmp_path: Path,
 ) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "test.schema-const",
         "inputs": [
             {
@@ -395,7 +395,7 @@ console.log(JSON.stringify({ value, mismatch, nullInput }));
 
 def test_emitted_esm_schema_length_counts_unicode_code_points(tmp_path: Path) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "test.unicode-length",
         "inputs": [
             {
@@ -438,7 +438,7 @@ def test_emitted_esm_preserves_magic_public_output_keys(
     tmp_path: Path,
 ) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "test.magic-output-key",
         "inputs": [],
         "outputs": [
@@ -706,7 +706,7 @@ def test_emitted_esm_exposes_only_each_nodes_declared_capability_operations(
     tmp_path: Path,
 ) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "test.capability-minimum-authority",
         "inputs": [],
         "outputs": [],
@@ -785,7 +785,7 @@ def test_emitted_esm_max_steps_has_root_block_and_next_node_path(
     tmp_path: Path,
 ) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "test.max-steps-path",
         "inputs": [],
         "outputs": [],
@@ -833,7 +833,7 @@ console.log(JSON.stringify(failure));
 
 def test_emitted_esm_supports_all_join_result_key_and_detached(tmp_path: Path) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "test.parallel",
         "inputs": [],
         "outputs": [{"type": "value", "cardinality": "all", "as": "values"}],
@@ -923,7 +923,7 @@ console.log(JSON.stringify(value));
     assert async_result == {"answer": 10}
 
     conditional_async_plan = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "test.async-condition",
         "entry_mode": "async",
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -1009,7 +1009,7 @@ console.log(JSON.stringify({
     }
 
     detached_plan = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "test.detached",
         "entry_mode": "async",
         "inputs": [],
@@ -1048,7 +1048,7 @@ console.log(JSON.stringify({ value, calls: globalThis.__vfCalls }));
     }
 
     failure_plan = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "test.detached.failure",
         "entry_mode": "async",
         "inputs": [],
@@ -1109,7 +1109,7 @@ def test_canonical_blocks_expand_child_nodeset_and_require_explicit_input_requir
         ),
     ]
     portable = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "portable",
         "entry_block": "block:/",
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -1188,7 +1188,7 @@ def test_process_only_root_is_not_promoted_to_a_workflow_entry(
     module = tmp_path / "node.mjs"
     module.write_text("export function run() { return {}; }\n", encoding="utf-8")
     plan = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "test.no-entry",
         "inputs": [],
         "outputs": [],
@@ -1217,7 +1217,7 @@ def test_process_only_root_is_not_promoted_to_a_workflow_entry(
 
 def test_canonical_portable_loop_accepts_stop_when_carry_and_collect() -> None:
     portable = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "portable.loop",
         "entry_block": "block:/",
         "inputs": [],
@@ -1307,7 +1307,7 @@ def test_emitted_esm_runs_nested_nodeset_and_bounded_or_unbounded_loop(
     tmp_path: Path,
 ) -> None:
     child = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "nested.child",
         "inputs": [{"key": "number", "type": "number", "required": True}],
         "outputs": [{"type": "answer", "cardinality": "exactly_one", "as": "answer"}],
@@ -1366,7 +1366,7 @@ console.log(JSON.stringify(value));
     assert nested == {"answer": 12}
 
     body = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "loop.body",
         "inputs": [{"key": "current", "type": "number", "required": True}],
         "outputs": [{"type": "next", "cardinality": "exactly_one", "as": "next"}],
@@ -1453,8 +1453,6 @@ def _fake_driver(request, *, package_root, node_command="node"):
             node="24.0.0",
             typescript="7.0.2",
             esbuild="0.28.1",
-            lock_sha256="a" * 64,
-            lock_files=("package-lock.json",),
         ),
         outputs=(str(entry),),
         inputs=(),
@@ -1488,7 +1486,7 @@ def test_build_profiles_are_atomic_and_manifest_is_deterministic(
         encoding="utf-8",
     )
     plan = {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "build",
         "inputs": [],
         "outputs": [{"type": "value", "cardinality": "exactly_one", "as": "value"}],
@@ -1528,7 +1526,7 @@ def test_build_profiles_are_atomic_and_manifest_is_deterministic(
     )
     assert second.manifest.read_bytes() == first_manifest
     manifest = json.loads(second.manifest.read_text(encoding="utf-8"))
-    assert manifest["format"] == "vibeflow.aot-build.v1"
+    assert manifest["format"] == "vibeflow.aot-build.v2"
     assert manifest["project_target"] == "javascript"
     assert "timestamp" not in manifest
     assert manifest["profile"] == profile
@@ -1556,46 +1554,19 @@ def test_build_profiles_are_atomic_and_manifest_is_deterministic(
     assert second.manifest.read_bytes() == old_manifest
 
 
-def test_toolchain_requires_project_lockfile(tmp_path: Path) -> None:
-    (tmp_path / "package.json").write_text('{"private":true}\n', encoding="utf-8")
-    with pytest.raises(AotToolchainError, match="lock"):
-        probe_toolchain(tmp_path)
-
-
-def test_toolchain_rejects_package_lock_version_mismatch(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
+@pytest.mark.parametrize("lock", (None, "yarn.lock", "pnpm-lock.yaml", "package-lock.json"))
+def test_toolchain_uses_actual_dependencies_without_lock_qualification(tmp_path, monkeypatch, lock):
     import vibeflow.targets.javascript.build.toolchain as toolchain_module
-
-    (tmp_path / "package.json").write_text('{"private":true}\n', encoding="utf-8")
-    (tmp_path / "package-lock.json").write_text(
-        json.dumps(
-            {
-                "lockfileVersion": 3,
-                "packages": {
-                    "": {},
-                    "node_modules/typescript": {"version": "7.0.1"},
-                    "node_modules/esbuild": {"version": "0.28.1"},
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(
-        toolchain_module,
-        "_run_driver",
-        lambda *args, **kwargs: {
-            "ok": True,
-            "probe": {
-                "node": "24.0.0",
-                "typescript": "7.0.2",
-                "esbuild": "0.28.1",
-            },
-        },
-    )
-    with pytest.raises(AotToolchainError, match="does not match"):
-        probe_toolchain(tmp_path)
+    (tmp_path / "package.json").write_text('{"private":true}\n')
+    if lock:
+        (tmp_path / lock).write_text("unrelated lock metadata")
+    calls = []
+    def probe(*args, **kwargs):
+        calls.append(args)
+        return {"ok":True, "probe":{"node":"24.0.0", "typescript":"7.0.2", "esbuild":"0.28.1"}}
+    monkeypatch.setattr(toolchain_module, "_run_driver", probe)
+    info = probe_toolchain(tmp_path)
+    assert calls and info.to_dict() == {"node":"24.0.0", "typescript":"7.0.2", "esbuild":"0.28.1"}
 
 
 @pytest.mark.parametrize(
@@ -1825,7 +1796,7 @@ def test_real_typescript_rejects_base_lib_host_io(
         ),
     ],
 )
-def test_real_typescript_rejects_base_lib_nondeterminism_and_host_observation(
+def test_real_typescript_allows_computation_but_retains_process_observation(
     tmp_path: Path,
     target: str,
     implementation: str,
@@ -1843,9 +1814,7 @@ def test_real_typescript_rejects_base_lib_nondeterminism_and_host_observation(
         f"export function effect() {{ {implementation} }}\n",
         encoding="utf-8",
     )
-    with pytest.raises(AotBuildError) as caught:
-        _build_with_selected_source_rules(
-            fixture_build_request(
+    request = fixture_build_request(
                 plan=_empty_real_plan(module),
                 project_root=project,
                 package_root=project,
@@ -1864,15 +1833,13 @@ def test_real_typescript_rejects_base_lib_nondeterminism_and_host_observation(
                     "node_base_libs": {"test.run": ["test.base"]},
                     "base_lib_dependencies": {"test.base": []},
                 },
-            )
-        )
-    host_findings = [
-        diagnostic
-        for diagnostic in caught.value.diagnostics
-        if diagnostic.get("code") == "VF_BASE_LIB_HOST_IO"
-    ]
-    assert host_findings
-    assert any(effect in str(finding.get("message")) for finding in host_findings)
+    )
+    if effect == "process":
+        with pytest.raises(AotBuildError) as caught:
+            _build_with_selected_source_rules(request)
+        assert any(item.get("code") == "VF_BASE_LIB_HOST_IO" for item in caught.value.diagnostics)
+    else:
+        assert _build_with_selected_source_rules(request).entry.is_file()
 
 
 @pytest.mark.parametrize("target", ["browser", "node"])
@@ -2351,38 +2318,31 @@ def test_real_typescript_still_rejects_vibeflow_node_abi_mismatch(
         'return eval(\'import("./hidden.ts")\');',
         'return new Function(\'return import("./hidden.ts")\')();',
         'const make = Function; return new make("return 1")();',
-        'return setTimeout("globalThis.compromised = true", 0);',
     ],
 )
-def test_real_typescript_rejects_runtime_string_evaluation(
-    tmp_path: Path,
-    body: str,
-) -> None:
+def test_real_typescript_builds_runtime_string_evaluation(tmp_path: Path, body: str) -> None:
     project = _real_toolchain_project(tmp_path)
     module = project / "node.ts"
-    module.write_text(
-        f"export function run() {{ {body} }}\n",
-        encoding="utf-8",
-    )
+    module.write_text(f"export function run() {{ {body} }}\n", encoding="utf-8")
+    built = _build_with_selected_source_rules(fixture_build_request(
+        plan=_empty_real_plan(module), project_root=project, package_root=project,
+        out_dir=project / "dist", target="node", profile="single-esm",
+        import_policy={"owners": [{"path": str(module), "kind": "node", "id": "test.run"}]},
+    ))
+    assert (built.out_dir / "index.js").is_file()
+
+
+def test_real_typescript_rejects_unowned_string_timer(tmp_path: Path) -> None:
+    project = _real_toolchain_project(tmp_path)
+    module = project / "node.ts"
+    module.write_text('export function run() { return setTimeout("globalThis.compromised = true", 0); }\n')
     with pytest.raises(AotBuildError) as caught:
-        _build_with_selected_source_rules(
-            fixture_build_request(
-                plan=_empty_real_plan(module),
-                project_root=project,
-                package_root=project,
-                out_dir=project / "dist",
-                target="node",
-                profile="single-esm",
-                import_policy={
-                    "owners": [
-                        {"path": str(module), "kind": "node", "id": "test.run"}
-                    ]
-                },
-            )
-        )
-    assert "VF_IMPORT_DYNAMIC_CODE" in {
-        diagnostic.get("code") for diagnostic in caught.value.diagnostics
-    }
+        _build_with_selected_source_rules(fixture_build_request(
+            plan=_empty_real_plan(module), project_root=project, package_root=project,
+            out_dir=project / "dist", target="node", profile="single-esm",
+            import_policy={"owners": [{"path": str(module), "kind": "node", "id": "test.run"}]},
+        ))
+    assert "VF_NODE_LONG_LIVED_LISTENER" in {item.get("code") for item in caught.value.diagnostics}
 
 
 @pytest.mark.parametrize(
@@ -2949,3 +2909,23 @@ def test_real_typescript_builds_async_workflow_host_in_all_profiles(
     declaration = declaration_files[0].read_text(encoding="utf-8")
     assert "runWorkflowAsync(" in declaration
     assert "): Promise<WorkflowOutputs>;" in declaration
+
+
+@pytest.mark.parametrize('lock_name', (None, 'yarn.lock', 'pnpm-lock.yaml'))
+def test_actual_aot_build_and_replace_need_no_npm_lock(tmp_path, lock_name):
+    from vibeflow.targets.javascript.build.publish import validate_owned_build_directory
+    project = _real_toolchain_project(tmp_path)
+    (project / 'package-lock.json').unlink()
+    if lock_name:
+        (project / lock_name).write_text('package-manager-owned metadata\n')
+    module = project / 'node.ts'
+    module.write_text('export function run() { return {}; }\n')
+    request = fixture_build_request(plan=_empty_real_plan(module), project_root=project,
+        package_root=project, out_dir=project/'dist', target='node', profile='single-esm')
+    built = build_aot(request)
+    manifest = validate_owned_build_directory(built.out_dir, manifest_format='vibeflow.aot-build.v2')
+    assert set(manifest['toolchain']) == {'node','typescript','esbuild'}
+    assert manifest['abi_version'] == 'vibeflow.workflow.v5'
+    assert _run_esm(built.entry, 'await workflow.runWorkflow({}); console.log(JSON.stringify({ok:true}));') == {'ok':True}
+    from dataclasses import replace
+    assert build_aot(replace(request, replace=True)).entry.is_file()

@@ -35,7 +35,7 @@ _OPTIONAL_MANIFEST_KEYS = frozenset(
     {"plugin_abi_version", "plugins"}
 )
 _TOOLCHAIN_KEYS = frozenset(
-    {"node", "typescript", "esbuild", "lock_sha256", "lock_files"}
+    {"node", "typescript", "esbuild"}
 )
 
 
@@ -361,17 +361,6 @@ def _validate_toolchain(value: object) -> None:
         _invalid_manifest("toolchain fields are invalid")
     for key in ("node", "typescript", "esbuild"):
         _require_text(value, key)
-    lock_hash = value.get("lock_sha256")
-    if not isinstance(lock_hash, str) or not _SHA256_RE.fullmatch(lock_hash):
-        _invalid_manifest("toolchain.lock_sha256 is invalid")
-    lock_files = value.get("lock_files")
-    if (
-        not isinstance(lock_files, list)
-        or not lock_files
-        or any(not isinstance(item, str) or not item for item in lock_files)
-        or lock_files != sorted(set(lock_files))
-    ):
-        _invalid_manifest("toolchain.lock_files must be sorted unique strings")
 
 
 def _safe_relative_name(value: str) -> str:

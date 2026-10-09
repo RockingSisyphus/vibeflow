@@ -39,8 +39,8 @@ CASES = (
     ("inherited_async", "", VALUE, "NODE.CONTRACT.ASYNC_RUN_PURE", False),
     ("missing_method", "", VALUE, "NODE.CONTRACT.MISSING_RUN_PURE", False),
     ("decision_flow_output", "", VALUE, "", True),
-    ("decision_plain_output", "", VALUE, "NODE.DECISION.MISSING_ROUTE_OUTPUT", False),
-    ("missing_output_branch", "", '        if params["cleanup_record_roots"]:\n            return {}\n' + VALUE, "NODE.PURITY.MISSING_OUTPUT", False),
+    ("decision_plain_output", "", VALUE, "", True),
+    ("missing_output_branch", "", '        if params["cleanup_record_roots"]:\n            return {}\n' + VALUE, "", True),
     ("file_over_limit", "", VALUE, "BASE_LIB.SOURCE.MAX_LINES", False),
 )
 

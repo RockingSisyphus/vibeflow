@@ -5,15 +5,11 @@ from typing import Mapping
 
 
 BANNED_IMPORT_ROOTS = {
-    "_ctypes",
     "_thread",
     "boto3",
-    "cffi",
     "concurrent",
-    "ctypes",
     "dotenv",
     "httpx",
-    "importlib",
     "asyncio",
     "multiprocessing",
     "nodriver",
@@ -34,7 +30,6 @@ BANNED_IMPORT_ROOTS = {
     "threading",
     "urllib",
 }
-BANNED_CALL_NAMES = {"__import__", "compile", "eval", "exec", "input", "open"}
 BANNED_ATTR_CALLS = {
     "Path.read_bytes",
     "Path.read_text",
@@ -44,7 +39,6 @@ BANNED_ATTR_CALLS = {
     "Path.write_text",
     "httpx.get",
     "httpx.post",
-    "importlib.import_module",
     "os.getenv",
     "os.system",
     "requests.get",
@@ -56,16 +50,6 @@ BANNED_ATTR_CALLS = {
     "subprocess.Popen",
     "subprocess.run",
     "time.sleep",
-}
-RESOURCE_FIELD_NAMES = {
-    "browser",
-    "client",
-    "connection",
-    "context",
-    "cursor",
-    "driver",
-    "engine",
-    "session",
 }
 MUTATING_METHODS = {
     "append",
@@ -89,7 +73,7 @@ class PurityPolicy:
     warn_source_lines: int | None = None
     warn_source_bytes: int | None = None
     allowed_import_roots: tuple[str, ...] = ()
-    banned_import_roots: tuple[str, ...] = ("importlib",)
+    banned_import_roots: tuple[str, ...] = ()
     allowed_import_modules: tuple[str, ...] = ("urllib.parse", "vibeflow")
     banned_import_modules: tuple[str, ...] = ()
     configured_import_fields: frozenset[str] | None = field(default=None, compare=False, repr=False)
@@ -188,7 +172,7 @@ def _default_rule_id(code: str) -> str:
     effect_rules = {
         "effect_call": "NODE.EFFECT.CALL_FORBIDDEN",
         "effect_import": "NODE.EFFECT.IMPORT_FORBIDDEN",
-        "runtime_dispatch": "NODE.EFFECT.RUNTIME_DISPATCH.UNDECLARED",
+
     }
     if code in effect_rules:
         return effect_rules[code]
@@ -208,7 +192,6 @@ def _default_rule_id(code: str) -> str:
     if code.startswith("complexity_") or code in {
         "call_chain_too_deep",
         "confusing_key_name",
-        "recursive_call_chain",
         "temporary_key",
         "wide_contract",
     }:

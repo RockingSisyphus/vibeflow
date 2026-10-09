@@ -120,7 +120,7 @@ def _deferred_plan() -> dict[str, object]:
 
 def _detached_plan() -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "baseline.detached",
         "entry_mode": "async",
         "inputs": [],
@@ -167,7 +167,7 @@ def _port_plan() -> dict[str, object]:
     )
     send["type_used"] = "vibeflow.io"
     return {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "baseline.port",
         "entry_mode": "async",
         "inputs": [],
@@ -227,38 +227,36 @@ def _emission_cases() -> dict[str, tuple[dict[str, object], tuple[dict, ...]]]:
 
 # These hashes intentionally freeze generated source formatting as well as its
 # semantic plan.  Update them only after reviewing an intentional ABI change.
-# Plugin ABI v3 changes helpers and its declaration literal; Native plan hashes are unchanged.
-EMISSION_GOLDENS = {'sync': ('b22d5cb58b92c2449e1c414738bc427b7b55160e0ab4c96915b9e90627e8825a',
-          '267d0586df4ba471549db93358ab104a0640833f67c6aa584a7a2c8813613d50',
-          '53e8507930ecd9f043c897669c0ff7a2dd4697e44de7540c5079f9442710faef'),
- 'async': ('763196c2409b4e210e0be24b4b30e37774fa7f0d2c7d4c76b9101b5e99b0ea6f',
-           '50b0853a0b8e8e2ba51600d062354ed59fd51cd9027723c20a6168d9932fd6ef',
-           '8e28da66ba854889a606495f2a0a0e3bd139d7f2219e7d3305f3db249b958379'),
- 'nested_nodeset': ('64f67fa360b3e0c2acfd8130a691cfb45e1874f29ea2be6ca694b21154818405',
-                    '267d0586df4ba471549db93358ab104a0640833f67c6aa584a7a2c8813613d50',
-                    '750bcd394cec0893e7ad7c4c30e81a02e1d6a2f44838ed3a0ea195fbc523dab9'),
- 'bounded_loop': ('df8934d9a99c241dcfc5639a47a6a7e11ba7bdfef8e8f148d94666415212121b',
-                  '267d0586df4ba471549db93358ab104a0640833f67c6aa584a7a2c8813613d50',
-                  '77ec1071a3a1e9ff5a596f09a86e7d866caa54a35381091899dce21d6dc43386'),
- 'unbounded_loop': ('02d0f332b44ef2ed3ad5493ac686343076cd84f77ae28eca304060a2c3b2950c',
-                    '267d0586df4ba471549db93358ab104a0640833f67c6aa584a7a2c8813613d50',
-                    '6706fbd35b3a4c2928aa2c0e5ee3a483f35467e3ec85287851389ed8e6ed3260'),
- 'deferred': ('706b7acde07c4c7421a547d08bf6fc18d0f2dde997131ceb2f1965cced97f9a1',
-              '50b0853a0b8e8e2ba51600d062354ed59fd51cd9027723c20a6168d9932fd6ef',
-              '0e778a67bc301f40f8a9aa58d23a0166f43e707bec3e36c6c2b79be543c5573d'),
- 'detached': ('e4493e7fd3db204e0fa02842eb99142ff3858cc62542d8d1efc6b37a4bb2577e',
-              'decb4991f97aea58adec3e7941467cd09f506c7f6790c3c2986d6d513f6e87fe',
-              '1ca5974e988a6bf82959775b27d90e7e9640aab7249236b0e78f50c042ab9b5d'),
- 'port': ('b7dceea3016d917c00e18e400f7f69709b74ec93f6603f0c17c75a57ded1871d',
-          '78a9022d14463548f32f5959a267cc7c729bea773fca34e3845d96cdb377dce1',
-          '3d8d823f0d64d73f593ed0efb5442a887e85c67b4c486f3a1727bd5a9743fc10'),
- 'host_extension': ('84b111f17df4430b565116203f7f93b1f8ee5388c9baefb24b5f94f89a4b47c9',
-                    'f4ae4522e48fb9fd23eaff421fbaf4f65d7a96fda797f31cf7149d43214818fd',
-                    '53e8507930ecd9f043c897669c0ff7a2dd4697e44de7540c5079f9442710faef')}
+# Workflow ABI v5 retires runtime-dispatch metadata; source and plan hashes migrate together.
+EMISSION_GOLDENS = {'sync': ('92a9cfc17136c24e68cff11c2457f227d6b869c44f976ec19c14430ece0942c6',
+          '758795a1a4d87d71ac71f8cd17675159c2b6627077098d82ecaa0ef96f3eadc2',
+          'eff7205382e740cfcc38a226aeebca2963c4668da2cbfa1618a241f5f6166380'),
+ 'async': ('98427927b4d5b961f72d5d57269b005e2ebad9d2feda3d1ddc6f2972653ad886',
+           '9ef96ea189aa0dace931813732867222bf6c9c353615ebe13e74856442961229',
+           '933f3dae514f51e03c47b5fecdee808df3c0fa50d4de1eaf274c90b2e988b0e3'),
+ 'nested_nodeset': ('f904c25ec89cbf60d70d3c359e5c9b28b673c539a29fffde00cee7a7aac37657',
+                    '758795a1a4d87d71ac71f8cd17675159c2b6627077098d82ecaa0ef96f3eadc2',
+                    'de4aa426e2f03e9b09010da02397b4aac90f9b830a65710fb22bfa9159518d93'),
+ 'bounded_loop': ('e4da526b38481b5b99f6e2ffc1f4c7e4a83e979ab59ed947f5d174dbd31d1cd7',
+                  '758795a1a4d87d71ac71f8cd17675159c2b6627077098d82ecaa0ef96f3eadc2',
+                  '5bac47f18822edc7e933660f62884c888056776d7771a093db20cc2d8bbe9180'),
+ 'unbounded_loop': ('55ab8be520223e71d3ebe81167792453d48a9b709fe4cc81ebd212d967089a09',
+                    '758795a1a4d87d71ac71f8cd17675159c2b6627077098d82ecaa0ef96f3eadc2',
+                    '2a0d04be6c5f58168e07a03f5240127839fe24a7f5a6edcf44165dc8ce526386'),
+ 'deferred': ('aa32b6d349a01ffc20e50afe107a3af780f6045a9f9c2b23f75b8396e0251559',
+              '9ef96ea189aa0dace931813732867222bf6c9c353615ebe13e74856442961229',
+              '5b1bcac65d07a2b156cbd4799dcef9f265c3730707012cd11498089921a80882'),
+ 'detached': ('60be75a5fe52a1602a327d815835402c39d49faa4a692ead5dcff4a5ea8d12f0',
+              '64978ad1bf7dfe9c41a7444c8df5e4b2c410cd3f8d6f61e0fb1883a9b19731e7',
+              'b94fc627c316a9501c3917df5bdedf4137c8d6a6ac86f4a3dca5192cff124b6c'),
+ 'port': ('8fe1af59573f415f1c78a5b9ee515bf224078f8782df3f1b8c7256fc89c98ac3',
+          '3455be48945601a9308f73af686142320f213d41871adc9422bf183a2b3145cd',
+          '5981bd98808dd43b5ae3b04935ace05b79a0db512fb514ddcbc2156d4d269a71'),
+ 'host_extension': ('3ce340e6a4f23a9e9aa1623498a2b862be3a82ffff3d85801f049617f7cac66f',
+                    'fc7caab9967cce6ab92e95b6f793a4fb5aa25b7fb436094eec1f215b130733cb',
+                    'eff7205382e740cfcc38a226aeebca2963c4668da2cbfa1618a241f5f6166380')}
 
-NORMALIZED_WORKFLOW_SHA256 = (
-    "84040e3d50fdd63d581f8f8e778bc0144d77d98746a35c27a33fde64b85c4a04"
-)
+NORMALIZED_WORKFLOW_SHA256 = '08ad91b0a7b80f6777e481597fc6374020b587d8dc780b5b9b91160226c463e5'
 
 
 def test_canonical_bound_view_payload_is_frozen() -> None:
@@ -556,8 +554,8 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
         "host_extensions": manifest["host_extensions"],
         "files": sorted(manifest["files"]),
     } == {
-        "format": "vibeflow.aot-build.v1",
-        "abi_version": "vibeflow.workflow.v4",
+        "format": "vibeflow.aot-build.v2",
+        "abi_version": "vibeflow.workflow.v5",
         "project_target": "javascript",
         "workflow_id": "test.workflow",
         "entry_mode": "sync",

@@ -9,6 +9,7 @@ from vibeflow.core.descriptors import NodeContractDescriptor, NodeDescriptor
 from vibeflow.core.rules import RuleCall, RuleContext, RulesetDescriptor, compile_ruleset, execute_rule_plan
 from vibeflow.targets.python.quality import PythonSource
 from vibeflow.targets.python.quality.policy_parameters import complete_source_policy_plan
+from vibeflow.targets.python.quality.rules.input_writes import input_writes
 from vibeflow.targets.python.quality.rules.effects import no_side_effects
 from vibeflow.targets.python.quality.source_context import PythonSourceFile, PythonSourceNode, build_python_source_context
 from vibeflow.targets.shared.bindings import native_binding
@@ -45,8 +46,8 @@ def _context(kind, body):
     ('print("hello")\nreturn {}', {"terminal", "python_io"}),
     ('import requests\nreturn requests.get("https://example.invalid")', {"python_io"}),
     ('import sqlite3\nreturn sqlite3.connect("data.db")', {"python_io"}),
-    ('import ctypes\nreturn ctypes.CDLL(None)', set()),
-    ('return eval("1 + 1")', set()),
+    ('import ctypes\nreturn ctypes.CDLL(None)', {"none", "terminal", "python_io", "global_state", "trusted"}),
+    ('return eval("1 + 1")', {"none", "terminal", "python_io", "global_state", "trusted"}),
     ('import torch\ntorch.manual_seed(0)\nreturn {}', {"global_state"}),
 ])
 def test_effect_scopes_have_the_same_contract_for_source_node_and_library(scope, body, allowed):
@@ -300,11 +301,11 @@ def test_node_class_base_and_decorator_arguments_use_shared_effects(header, scop
 
 
 @pytest.mark.parametrize("scope", ["none", "terminal", "python_io", "global_state", "trusted"])
-def test_existing_hard_ffi_markers_stay_forbidden_on_local_receivers(scope):
+def test_local_receiver_names_do_not_create_ffi_security_bans(scope):
     body = "resource = object()\nresource.CDLL(None)\nreturn 1"
     for kind in ("python_source", "node", "base_lib", "plugin"):
         result = no_side_effects(_context(kind, body), {}, {"effect_scope":scope})
-        assert result.findings and any("CDLL" in item.message for item in result.findings), (kind, scope, result)
+        assert result.findings == (), (kind, scope, result)
 
 
 @pytest.mark.parametrize("scope", ["none", "terminal", "python_io", "global_state", "trusted"])
@@ -315,11 +316,11 @@ def test_existing_hard_ffi_markers_stay_forbidden_on_local_receivers(scope):
     ("from contextlib import ExitStack\nstack = ExitStack()\nstack = params.get('connection')\nstack.close()\nreturn 1", "stack.close"),
     ("from contextlib import ExitStack\nstack = ExitStack()\nif marker:\n    stack = params.get('connection')\nstack.close()\nreturn 1", "stack.close"),
 ])
-def test_local_receiver_calls_keep_conservative_io_classification(scope, body, marker):
+def test_known_file_operations_are_distinct_from_unknown_close_methods(scope, body, marker):
     for kind in ("python_source", "node", "base_lib", "plugin"):
         result = no_side_effects(_context(kind, body), {}, {"effect_scope":scope})
         assert result.state == "completed"
-        assert any(marker in item.message for item in result.findings) == (scope != "python_io"), (kind, scope, body, result.findings)
+        assert bool(result.findings) == (scope != "python_io" and ("Path" in body or "file = open" in body)), (kind, scope, body, result.findings)
 
 
 @pytest.mark.parametrize("scope", ["none", "terminal", "python_io", "global_state", "trusted"])
@@ -455,9 +456,9 @@ def test_function_headers_keep_enclosing_input_ownership_until_body(target, in_b
     sources = build_python_source_context((PythonSourceNode(descriptor, parsed.path, "Task"),), (parsed,))
     context = RuleContext(subject={"kind":"node", "type_key":"example.task"}, target="python",
         facts={"source_context":sources, "node_catalog":(), "source_owners":()})
-    result = no_side_effects(context, {}, {"effect_scope":"global_state"})
+    result = input_writes(context, {}, {})
     assert result.state == "completed"
-    assert any("mutate inputs" in item.message for item in result.findings) == in_body, (target, in_body, result.findings)
+    assert bool(result.findings) == (in_body and target == "method"), (target, in_body, result.findings)
 
 
 @pytest.mark.parametrize("kind", ["python_source", "node", "base_lib", "plugin"])
@@ -535,10 +536,10 @@ def test_nested_function_and_lambda_input_ownership_follows_real_bindings(target
     else:
         text = "def helper(inputs):\n" + indent(statements, "    ")
         text += "class Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n"
-    result = no_side_effects(_module_definition_context("node", text, "/virtual/owned_nested.py"),
-        {}, {"effect_scope":"global_state"})
+    result = input_writes(_module_definition_context("node", text, "/virtual/owned_nested.py"),
+        {}, {})
     assert result.state == "completed"
-    assert any("mutate inputs" in item.message for item in result.findings) == denied, (target, body, result.findings)
+    assert bool(result.findings) == (target == "method" and "=inputs.pop" in body), (target, body, result.findings)
 
 
 
@@ -635,7 +636,7 @@ def test_lambda_reference_facts_distinguish_defaults_and_bound_parameters(kind, 
     effects = _effect_call_findings(result)
     matches = tuple(item for item in effects if item.source_location["path"] == entry.path
                     and (item.source_location["line"], item.source_location["column"]) == site)
-    assert bool(matches) == (not resolved), (kind, placement, expression, result.findings)
+    assert matches == (), (kind, placement, expression, result.findings)
     if resolved:
         assert effects == (), (kind, placement, expression, result.findings)
 

@@ -205,7 +205,7 @@ def is_banned_import(module: str, *, allowed_roots: tuple[str, ...], banned_root
 
 def _is_pathlike_expression(node: ast.AST, aliases: Mapping[str, str]) -> bool:
     if isinstance(node, ast.Name):
-        return aliases.get(node.id, "") == "pathlib.Path" or _looks_pathlike_name(node.id)
+        return aliases.get(node.id, "") == "pathlib.Path"
     if isinstance(node, ast.Call):
         return qualified_call_name(node.func, aliases) == "pathlib.Path" or _is_pathlike_expression(node.func, aliases)
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
@@ -215,11 +215,6 @@ def _is_pathlike_expression(node: ast.AST, aliases: Mapping[str, str]) -> bool:
     return False
 
 
-def _looks_pathlike_name(value: str) -> bool:
-    lowered = value.lower()
-    return lowered in {"path", "root", "output", "destination", "run_dir"} or lowered.endswith(
-        ("_path", "_dir", "_file", "_root")
-    )
 
 
 def _literal_string(node: ast.AST) -> str:
@@ -236,3 +231,39 @@ def _normalize_builtin_root(value: str) -> str:
 
 def _is_docstring_expr(stmt: ast.stmt) -> bool:
     return isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str)
+
+
+def _reachable_module_helpers(node: ast.Module, node_class_name: str) -> set[str]:
+    helpers = {
+        stmt.name: stmt
+        for stmt in node.body
+        if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    target = next(
+        (
+            stmt
+            for stmt in node.body
+            if isinstance(stmt, ast.ClassDef) and stmt.name == node_class_name
+        ),
+        None,
+    )
+    if target is None or not helpers:
+        return set()
+    reachable: set[str] = set()
+    pending = list(_called_module_helpers(target, helpers))
+    while pending:
+        name = pending.pop()
+        if name in reachable:
+            continue
+        reachable.add(name)
+        pending.extend(_called_module_helpers(helpers[name], helpers) - reachable)
+    return reachable
+
+def _called_module_helpers(node: ast.AST, helpers: dict[str, ast.AST]) -> set[str]:
+    return {
+        child.func.id
+        for child in ast.walk(node)
+        if isinstance(child, ast.Call)
+        and isinstance(child.func, ast.Name)
+        and child.func.id in helpers
+    }

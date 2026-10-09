@@ -213,7 +213,6 @@ _FIELD_PREFIXES = frozenset(
         "async:",
         "result_key:",
         "effect_scope:",
-        "runtime_dispatch:",
         "execution_lock:",
     }
 )

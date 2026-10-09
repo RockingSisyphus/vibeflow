@@ -104,7 +104,6 @@ def render_ascii(
                 semantics = (
                     f" flow_kind={flow_kind or 'process'}"
                     f" effect_scope={'unavailable' if planned else _effect_scope(compiled, node.id, flow_kind)}"
-                    f" runtime_dispatch={_runtime_dispatch(compiled, node.id)}"
                 )
             lines.append(
                 f"{indent}- {node.id} [{node.type_used}] <- {parents}{semantics}"
@@ -480,7 +479,6 @@ def _graph_mermaid(
                 (
                     f"flow_kind: {flow_kind or 'process'}",
                     f"effect_scope: {'unavailable' if is_planned else _effect_scope(compiled, node.id, flow_kind)}",
-                    f"runtime_dispatch: {_runtime_dispatch(compiled, node.id)}",
                     f"execution_lock: {_lock_text(graph, node) or 'none'}",
                 )
             )
@@ -772,9 +770,6 @@ def _escape_label(value: str) -> str:
     return value.replace('"', "'").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _runtime_dispatch(compiled: object, node_id: str) -> str:
-    value = getattr(compiled, "runtime_dispatches", {}).get(node_id)
-    return "detected" if value is True else "none" if value is False else "unknown"
 
 
 def _effect_scope(compiled: object, node_id: str, flow_kind: str) -> str:

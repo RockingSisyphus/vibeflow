@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import hashlib
 from importlib.resources import as_file
 import json
 from pathlib import Path
@@ -18,8 +17,6 @@ TYPESCRIPT_MINIMUM = (7, 0, 0)
 TYPESCRIPT_MAXIMUM = (8, 0, 0)
 ESBUILD_MINIMUM = (0, 28, 0)
 ESBUILD_MAXIMUM = (0, 29, 0)
-LOCK_FILES = ("package-lock.json",)
-UNVERIFIED_LOCK_FILES = ("pnpm-lock.yaml", "yarn.lock")
 
 
 class AotToolchainError(RuntimeError):
@@ -40,16 +37,12 @@ class ToolchainInfo:
     node: str
     typescript: str
     esbuild: str
-    lock_sha256: str
-    lock_files: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "node": self.node,
             "typescript": self.typescript,
             "esbuild": self.esbuild,
-            "lock_sha256": self.lock_sha256,
-            "lock_files": list(self.lock_files),
         }
 
 
@@ -93,7 +86,6 @@ def probe_toolchain(
     node_command: str = "node",
 ) -> ToolchainInfo:
     root = _validated_package_root(package_root)
-    lock_files, lock_sha256 = _lock_identity(root)
     payload = _run_driver(
         {
             "command": "probe",
@@ -111,11 +103,8 @@ def probe_toolchain(
         node=str(probe.get("node", "")),
         typescript=str(probe.get("typescript", "")),
         esbuild=str(probe.get("esbuild", "")),
-        lock_sha256=lock_sha256,
-        lock_files=lock_files,
     )
     _validate_versions(info)
-    _validate_lock_tool_versions(root, lock_files, info)
     return info
 
 
@@ -126,7 +115,6 @@ def run_build_driver(
     node_command: str = "node",
 ) -> DriverBuildResult:
     root = _validated_package_root(package_root)
-    lock_files, lock_sha256 = _lock_identity(root)
     payload = _run_driver(
         {
             **dict(request),
@@ -146,11 +134,8 @@ def run_build_driver(
         node=str(probe.get("node", "")),
         typescript=str(probe.get("typescript", "")),
         esbuild=str(probe.get("esbuild", "")),
-        lock_sha256=lock_sha256,
-        lock_files=lock_files,
     )
     _validate_versions(info)
-    _validate_lock_tool_versions(root, lock_files, info)
     return DriverBuildResult(
         toolchain=info,
         outputs=tuple(sorted(str(item) for item in build.get("outputs", ()))),
@@ -276,105 +261,6 @@ def _validated_package_root(value: str | Path) -> Path:
             f"JavaScript package_root has no package.json: {root}",
         )
     return root
-
-
-def _lock_identity(root: Path) -> tuple[tuple[str, ...], str]:
-    paths = tuple(
-        root / name
-        for name in (*LOCK_FILES, *UNVERIFIED_LOCK_FILES)
-        if (root / name).is_file()
-    )
-    if not paths:
-        raise AotToolchainError(
-            "VF_TOOLCHAIN_MISSING",
-            (
-                "JavaScript package_root must contain package-lock.json"
-            ),
-        )
-    if len(paths) != 1:
-        raise AotToolchainError(
-            "VF_TOOLCHAIN_LOCK",
-            (
-                "JavaScript package_root must contain exactly one supported "
-                f"lockfile, found {[path.name for path in paths]}"
-            ),
-        )
-    if paths[0].name != "package-lock.json":
-        raise AotToolchainError(
-            "VF_TOOLCHAIN_LOCK",
-            (
-                f"{paths[0].name} cannot yet be verified against installed "
-                "TypeScript/esbuild versions; use package-lock.json"
-            ),
-        )
-    digest = hashlib.sha256()
-    for path in paths:
-        digest.update(path.name.encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(path.read_bytes())
-        digest.update(b"\0")
-    return tuple(path.name for path in paths), digest.hexdigest()
-
-
-def _validate_lock_tool_versions(
-    root: Path,
-    lock_files: tuple[str, ...],
-    info: ToolchainInfo,
-) -> None:
-    if lock_files != ("package-lock.json",):
-        return
-    lock_path = root / "package-lock.json"
-    try:
-        payload = json.loads(lock_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise AotToolchainError(
-            "VF_TOOLCHAIN_LOCK",
-            f"package-lock.json cannot be parsed: {lock_path}",
-        ) from exc
-    if not isinstance(payload, Mapping):
-        raise AotToolchainError(
-            "VF_TOOLCHAIN_LOCK",
-            "package-lock.json must contain a JSON object",
-        )
-    for package, actual in (
-        ("typescript", info.typescript),
-        ("esbuild", info.esbuild),
-    ):
-        locked = _package_lock_version(payload, package)
-        if not locked:
-            raise AotToolchainError(
-                "VF_TOOLCHAIN_LOCK",
-                f"package-lock.json does not lock required package '{package}'",
-            )
-        if _normalized_exact_version(locked) != _normalized_exact_version(actual):
-            raise AotToolchainError(
-                "VF_TOOLCHAIN_LOCK",
-                (
-                    f"installed {package} version {actual} does not match "
-                    f"package-lock.json version {locked}"
-                ),
-            )
-
-
-def _package_lock_version(
-    payload: Mapping[str, Any],
-    package: str,
-) -> str:
-    packages = payload.get("packages")
-    if isinstance(packages, Mapping):
-        entry = packages.get(f"node_modules/{package}")
-        if isinstance(entry, Mapping) and entry.get("version"):
-            return str(entry["version"])
-    dependencies = payload.get("dependencies")
-    if isinstance(dependencies, Mapping):
-        entry = dependencies.get(package)
-        if isinstance(entry, Mapping) and entry.get("version"):
-            return str(entry["version"])
-    return ""
-
-
-def _normalized_exact_version(value: str) -> tuple[int, int, int]:
-    return _version_tuple(str(value).split("-", 1)[0], subject="package version")
 
 
 def _run_driver(
